@@ -80,6 +80,10 @@ describe('AdminRecordService', () => {
     expect(resetRoleIndex).toBeGreaterThan(dataQueryIndex);
     expect(commitIndex).toBeGreaterThan(resetRoleIndex);
     expect(clientQueryMock.mock.calls[dataQueryIndex]?.[1]).toEqual(['%demo%', 10, 0]);
+    // Read paths must not pay for the primary-key metadata query.
+    expect(sqlCalls.some((sql) => sql.includes('information_schema.table_constraints'))).toBe(
+      false
+    );
   });
 
   it('delegates protected-schema writes to project_admin privileges', async () => {
@@ -127,6 +131,9 @@ describe('AdminRecordService', () => {
           ],
         };
       }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'id' }] };
+      }
       if (sql.includes('UPDATE "public"."projects"')) {
         return {
           rows: [{ id: 'p1', owner_id: null, name: 'Renamed project' }],
@@ -136,10 +143,15 @@ describe('AdminRecordService', () => {
     });
 
     const service = AdminRecordService.getInstance();
-    const record = await service.updateRecord('public', 'projects', 'id', 'p1', {
-      owner_id: '',
-      name: 'Renamed project',
-    });
+    const record = await service.updateRecord(
+      'public',
+      'projects',
+      { id: 'p1' },
+      {
+        owner_id: '',
+        name: 'Renamed project',
+      }
+    );
 
     expect(record).toEqual({ id: 'p1', owner_id: null, name: 'Renamed project' });
     const updateCall = clientQueryMock.mock.calls.find(
@@ -209,6 +221,9 @@ describe('AdminRecordService', () => {
           ],
         };
       }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'id' }] };
+      }
       if (sql.includes('UPDATE "public"."projects"')) {
         return {
           rows: [{ id: 'p1', priority: null }],
@@ -218,9 +233,14 @@ describe('AdminRecordService', () => {
     });
 
     const service = AdminRecordService.getInstance();
-    const record = await service.updateRecord('public', 'projects', 'id', 'p1', {
-      priority: '',
-    });
+    const record = await service.updateRecord(
+      'public',
+      'projects',
+      { id: 'p1' },
+      {
+        priority: '',
+      }
+    );
 
     expect(record).toEqual({ id: 'p1', priority: null });
     const updateCall = clientQueryMock.mock.calls.find(
@@ -250,9 +270,14 @@ describe('AdminRecordService', () => {
     const service = AdminRecordService.getInstance();
 
     await expect(
-      service.updateRecord('public', 'projects', 'id', 'p1', {
-        priority: '',
-      })
+      service.updateRecord(
+        'public',
+        'projects',
+        { id: 'p1' },
+        {
+          priority: '',
+        }
+      )
     ).rejects.toBeInstanceOf(AppError);
 
     const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
@@ -269,6 +294,9 @@ describe('AdminRecordService', () => {
           ],
         };
       }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'id' }] };
+      }
       if (sql.includes('DELETE FROM "public"."projects"')) {
         return { rowCount: 2, rows: [] };
       }
@@ -276,9 +304,19 @@ describe('AdminRecordService', () => {
     });
 
     const service = AdminRecordService.getInstance();
-    const deletedCount = await service.deleteRecords('public', 'projects', 'id', ['p1', 'p2']);
+    const deletedCount = await service.deleteRecords('public', 'projects', [
+      { id: 'p1' },
+      { id: 'p2' },
+    ]);
 
     expect(deletedCount).toBe(2);
+
+    const deleteCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('DELETE FROM "public"."projects"')
+    );
+    // Each selected single-column key is matched as its own AND-group, OR'd together.
+    expect(deleteCall?.[0]).toContain('WHERE ("id" = $1) OR ("id" = $2)');
+    expect(deleteCall?.[1]).toEqual(['p1', 'p2']);
 
     const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
     const setRoleIndex = sqlCalls.indexOf('SET LOCAL ROLE project_admin');
@@ -290,6 +328,262 @@ describe('AdminRecordService', () => {
     expect(sqlCalls[0]).toBe('BEGIN');
     expect(deleteIndex).toBeGreaterThan(setRoleIndex);
     expect(commitIndex).toBeGreaterThan(deleteIndex);
+  });
+
+  it('updates a composite-key row using the full primary-key tuple', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'tenant_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'item_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'label', data_type: 'text', is_nullable: 'YES', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'tenant_id' }, { column_name: 'item_id' }] };
+      }
+      if (sql.includes('UPDATE "public"."composite_pk_test"')) {
+        return {
+          rows: [{ tenant_id: 'tenant_a', item_id: 'item_2', label: 'second-updated' }],
+        };
+      }
+      return { rows: [] };
+    });
+
+    const service = AdminRecordService.getInstance();
+    const record = await service.updateRecord(
+      'public',
+      'composite_pk_test',
+      { tenant_id: 'tenant_a', item_id: 'item_2' },
+      { label: 'second-updated' }
+    );
+
+    expect(record).toEqual({ tenant_id: 'tenant_a', item_id: 'item_2', label: 'second-updated' });
+
+    const updateCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('UPDATE "public"."composite_pk_test"')
+    );
+    // The WHERE clause must match both key columns, not just the (duplicated) first one.
+    expect(updateCall?.[0]).toContain(
+      'SET "label" = $1 WHERE "tenant_id" = $2 AND "item_id" = $3 RETURNING *'
+    );
+    expect(updateCall?.[1]).toEqual(['second-updated', 'tenant_a', 'item_2']);
+  });
+
+  it('deletes only the selected composite-key tuples', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'tenant_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'item_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'label', data_type: 'text', is_nullable: 'YES', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'tenant_id' }, { column_name: 'item_id' }] };
+      }
+      if (sql.includes('DELETE FROM "public"."composite_pk_test"')) {
+        return { rowCount: 1, rows: [] };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = AdminRecordService.getInstance();
+    // tenant_a is duplicated across rows; deleting must target the exact tuple only.
+    const deletedCount = await service.deleteRecords('public', 'composite_pk_test', [
+      { tenant_id: 'tenant_a', item_id: 'item_2' },
+    ]);
+
+    expect(deletedCount).toBe(1);
+
+    const deleteCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('DELETE FROM "public"."composite_pk_test"')
+    );
+    expect(deleteCall?.[0]).toContain('WHERE ("tenant_id" = $1 AND "item_id" = $2)');
+    expect(deleteCall?.[1]).toEqual(['tenant_a', 'item_2']);
+  });
+
+  it('matches each selected composite tuple independently when deleting many rows', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'tenant_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'item_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'tenant_id' }, { column_name: 'item_id' }] };
+      }
+      if (sql.includes('DELETE FROM "public"."composite_pk_test"')) {
+        return { rowCount: 2, rows: [] };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = AdminRecordService.getInstance();
+    const deletedCount = await service.deleteRecords('public', 'composite_pk_test', [
+      { tenant_id: 'tenant_a', item_id: 'item_1' },
+      { tenant_id: 'tenant_a', item_id: 'item_2' },
+    ]);
+
+    expect(deletedCount).toBe(2);
+
+    const deleteCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('DELETE FROM "public"."composite_pk_test"')
+    );
+    expect(deleteCall?.[0]).toContain(
+      'WHERE ("tenant_id" = $1 AND "item_id" = $2) OR ("tenant_id" = $3 AND "item_id" = $4)'
+    );
+    expect(deleteCall?.[1]).toEqual(['tenant_a', 'item_1', 'tenant_a', 'item_2']);
+  });
+
+  it('rejects a partial composite key instead of mutating unintended rows', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'tenant_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'item_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'label', data_type: 'text', is_nullable: 'YES', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'tenant_id' }, { column_name: 'item_id' }] };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = AdminRecordService.getInstance();
+
+    // Supplying only the first PK column of a composite key must be rejected, not
+    // turned into a broad DELETE that removes every row sharing that value.
+    await expect(
+      service.deleteRecords('public', 'composite_pk_test', [{ tenant_id: 'tenant_a' }])
+    ).rejects.toBeInstanceOf(AppError);
+
+    const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
+    expect(sqlCalls.some((sql) => sql.includes('DELETE FROM'))).toBe(false);
+    expect(sqlCalls).toContain('ROLLBACK');
+
+    // The same partial key must also be rejected on update.
+    await expect(
+      service.updateRecord('public', 'composite_pk_test', { tenant_id: 'tenant_a' }, { label: 'x' })
+    ).rejects.toBeInstanceOf(AppError);
+
+    expect(
+      clientQueryMock.mock.calls.some(
+        ([sql]) => typeof sql === 'string' && sql.includes('UPDATE "public"."composite_pk_test"')
+      )
+    ).toBe(false);
+  });
+
+  it('falls back to the caller-provided key when the table has no primary key', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
+            { column_name: 'name', data_type: 'text', is_nullable: 'YES', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [] }; // table has no primary key
+      }
+      if (sql.includes('UPDATE "public"."pkless"')) {
+        return { rows: [{ id: 'p1', name: 'Renamed' }] };
+      }
+      if (sql.includes('DELETE FROM "public"."pkless"')) {
+        return { rowCount: 1, rows: [] };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = AdminRecordService.getInstance();
+
+    // With no detectable primary key, the supplied key columns are used as-is.
+    const updated = await service.updateRecord(
+      'public',
+      'pkless',
+      { id: 'p1' },
+      { name: 'Renamed' }
+    );
+    expect(updated).toEqual({ id: 'p1', name: 'Renamed' });
+
+    const updateCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('UPDATE "public"."pkless"')
+    );
+    expect(updateCall?.[0]).toContain('WHERE "id" = $2 RETURNING *');
+    expect(updateCall?.[1]).toEqual(['Renamed', 'p1']);
+
+    const deletedCount = await service.deleteRecords('public', 'pkless', [{ id: 'p1' }]);
+    expect(deletedCount).toBe(1);
+
+    const deleteCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('DELETE FROM "public"."pkless"')
+    );
+    expect(deleteCall?.[0]).toContain('WHERE ("id" = $1)');
+    expect(deleteCall?.[1]).toEqual(['p1']);
+  });
+
+  it('matches a null key column with IS NULL on a keyless table', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'name', data_type: 'text', is_nullable: 'YES', udt_name: 'text' },
+            { column_name: 'email', data_type: 'text', is_nullable: 'YES', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [] }; // table has no primary key
+      }
+      if (sql.includes('UPDATE "public"."pkless"')) {
+        return { rows: [{ name: 'alice', email: 'fixed@x.com' }] };
+      }
+      if (sql.includes('DELETE FROM "public"."pkless"')) {
+        return { rowCount: 1, rows: [] };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = AdminRecordService.getInstance();
+
+    // A genuinely-null column in the all-columns fallback key must match the row
+    // with `IS NULL`, not `= ''` (which would silently match nothing).
+    const updated = await service.updateRecord(
+      'public',
+      'pkless',
+      { name: 'alice', email: null },
+      { email: 'fixed@x.com' }
+    );
+    expect(updated).toEqual({ name: 'alice', email: 'fixed@x.com' });
+
+    const updateCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('UPDATE "public"."pkless"')
+    );
+    // The null component becomes `IS NULL` and binds no parameter for it.
+    expect(updateCall?.[0]).toContain('WHERE "name" = $2 AND "email" IS NULL RETURNING *');
+    expect(updateCall?.[1]).toEqual(['fixed@x.com', 'alice']);
+
+    const deletedCount = await service.deleteRecords('public', 'pkless', [
+      { name: 'alice', email: null },
+    ]);
+    expect(deletedCount).toBe(1);
+
+    const deleteCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('DELETE FROM "public"."pkless"')
+    );
+    expect(deleteCall?.[0]).toContain('WHERE ("name" = $1 AND "email" IS NULL)');
+    expect(deleteCall?.[1]).toEqual(['alice']);
   });
 
   it('discards the pooled client when admin transaction cleanup fails', async () => {
@@ -304,6 +598,9 @@ describe('AdminRecordService', () => {
           ],
         };
       }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'id' }] };
+      }
       if (sql.includes('UPDATE "public"."projects"')) {
         return { rows: [{ id: 'p1', name: 'Renamed project' }] };
       }
@@ -316,9 +613,14 @@ describe('AdminRecordService', () => {
     const service = AdminRecordService.getInstance();
 
     await expect(
-      service.updateRecord('public', 'projects', 'id', 'p1', {
-        name: 'Renamed project',
-      })
+      service.updateRecord(
+        'public',
+        'projects',
+        { id: 'p1' },
+        {
+          name: 'Renamed project',
+        }
+      )
     ).rejects.toBe(resetError);
 
     expect(clientQueryMock.mock.calls.map(([sql]) => sql as string)).toContain('ROLLBACK');

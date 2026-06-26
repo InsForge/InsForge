@@ -17,14 +17,15 @@ import { ScrollArea } from '#components';
 import { useRecords } from '#features/database/hooks/useRecords';
 import { buildDynamicSchema, getInitialValues } from '#features/database';
 import { RecordFormField } from './RecordFormField';
-import { ColumnSchema } from '@insforge/shared-schemas';
-import { SYSTEM_FIELDS } from '#features/database/helpers';
+import { ColumnSchema, type ForeignKeySchema } from '@insforge/shared-schemas';
+import { getForeignKeyByColumn, SYSTEM_FIELDS } from '#features/database/helpers';
 
 interface RecordFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tableName: string;
   schema: ColumnSchema[];
+  foreignKeys?: ForeignKeySchema[];
   onSuccess?: () => void;
 }
 
@@ -33,6 +34,7 @@ export function RecordFormDialog({
   onOpenChange,
   tableName,
   schema,
+  foreignKeys,
   onSuccess,
 }: RecordFormDialogProps) {
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +44,8 @@ export function RecordFormDialog({
     const filteredFields = schema.filter((field) => !SYSTEM_FIELDS.includes(field.columnName));
     return filteredFields;
   }, [schema]);
+
+  const foreignKeyByColumn = useMemo(() => getForeignKeyByColumn(foreignKeys), [foreignKeys]);
 
   const dynamicSchema = useMemo(() => {
     const schema = buildDynamicSchema(displayFields);
@@ -123,7 +127,13 @@ export function RecordFormDialog({
                       <div className="h-px w-full bg-[var(--alpha-8)]" />
                     </div>
                   )}
-                  <RecordFormField field={field} form={form} tableName={tableName} />
+                  <RecordFormField
+                    field={field}
+                    columns={displayFields}
+                    form={form}
+                    tableName={tableName}
+                    foreignKey={foreignKeyByColumn.get(field.columnName)}
+                  />
                 </div>
               ))}
             </div>

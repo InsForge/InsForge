@@ -1,5 +1,5 @@
 import { ConvertedValue } from '#components/datagrid/datagridTypes';
-import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
+import { DEFAULT_DATABASE_SCHEMA, type RecordPrimaryKey } from '#features/database/helpers';
 import { databaseTableQueryKeys } from '#features/database/queryKeys';
 import { recordService } from '#features/database/services/record.service';
 import { useToast } from '#lib/hooks/useToast';
@@ -53,13 +53,14 @@ export function useRecords(tableName: string, schemaName: string = DEFAULT_DATAB
     });
   };
 
-  // Hook to fetch a single record by foreign key value
-  const useRecordByForeignKey = (columnName: string, value: string, enabled = true) => {
+  // Hook to fetch a single record by foreign key value(s).
+  // Supports composite foreign keys via parallel arrays of columns and values.
+  const useRecordByForeignKey = (columns: string[], values: string[], enabled = true) => {
     return useQuery({
-      queryKey: ['records', schemaName, tableName, 'foreignKey', columnName, value],
+      queryKey: ['records', schemaName, tableName, 'foreignKey', ...columns, ...values],
       queryFn: () =>
-        recordService.getRecordByForeignKeyValue(tableName, columnName, value, schemaName),
-      enabled: enabled && !!tableName && !!columnName && !!value,
+        recordService.getRecordByForeignKeyValue(tableName, columns, values, schemaName),
+      enabled: enabled && !!tableName && columns.length > 0 && columns.length === values.length,
       staleTime: 30 * 1000,
     });
   };
@@ -101,14 +102,12 @@ export function useRecords(tableName: string, schemaName: string = DEFAULT_DATAB
   // Mutation to update a record
   const updateRecordMutation = useMutation({
     mutationFn: ({
-      pkColumn,
-      pkValue,
+      primaryKey,
       data,
     }: {
-      pkColumn: string;
-      pkValue: string;
+      primaryKey: RecordPrimaryKey;
       data: { [key: string]: ConvertedValue };
-    }) => recordService.updateRecord(tableName, pkColumn, pkValue, data, schemaName),
+    }) => recordService.updateRecord(tableName, primaryKey, data, schemaName),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: recordsQueryKeyPrefix });
       void queryClient.invalidateQueries({
@@ -124,14 +123,14 @@ export function useRecords(tableName: string, schemaName: string = DEFAULT_DATAB
 
   // Mutation to delete a record
   const deleteRecordsMutation = useMutation({
-    mutationFn: (variables: { pkColumn: string; pkValues: string[] }) =>
-      recordService.deleteRecords(tableName, variables.pkColumn, variables.pkValues, schemaName),
+    mutationFn: (variables: { primaryKeys: RecordPrimaryKey[] }) =>
+      recordService.deleteRecords(tableName, variables.primaryKeys, schemaName),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: recordsQueryKeyPrefix });
       void queryClient.invalidateQueries({
         queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
       });
-      const count = variables.pkValues.length;
+      const count = variables.primaryKeys.length;
       if (count === 1) {
         showToast('Record deleted successfully', 'success');
       } else {
@@ -139,7 +138,7 @@ export function useRecords(tableName: string, schemaName: string = DEFAULT_DATAB
       }
     },
     onError: (error: Error, variables) => {
-      const count = variables.pkValues.length;
+      const count = variables.primaryKeys.length;
       const recordText = count === 1 ? 'record' : 'records';
       const errorMessage =
         error instanceof Error ? error.message : `Failed to delete ${recordText}`;

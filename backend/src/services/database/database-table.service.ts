@@ -1,13 +1,8 @@
+import { createHash } from 'crypto';
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/utils/errors.js';
-import {
-  COLUMN_TYPES,
-  ForeignKeyRow,
-  ColumnInfo,
-  PrimaryKeyInfo,
-  ForeignKeyInfo,
-} from '@/types/database.js';
+import { COLUMN_TYPES, ForeignKeyRow, ColumnInfo, PrimaryKeyInfo } from '@/types/database.js';
 import {
   ERROR_CODES,
   ColumnSchema,
@@ -17,8 +12,6 @@ import {
   UpdateTableSchemaRequest,
   UpdateTableSchemaResponse,
   DeleteTableResponse,
-  OnDeleteActionSchema,
-  OnUpdateActionSchema,
   ForeignKeySchema,
 } from '@insforge/shared-schemas';
 import { validateIdentifier, validateSchemaName } from '@/utils/validations.js';
@@ -27,6 +20,8 @@ import {
   DEFAULT_DATABASE_SCHEMA,
   quoteQualifiedName,
   splitQualifiedTableReference,
+  FOREIGN_KEY_INTROSPECTION_QUERY,
+  groupForeignKeyRows,
 } from './helpers.js';
 import { withAdminContext } from './user-context.service.js';
 
@@ -146,6 +141,7 @@ export class DatabaseTableService {
     schemaName: string,
     table_name: string,
     columns: ColumnSchema[],
+    foreignKeys: ForeignKeySchema[] = [],
     use_RLS = true
   ): Promise<CreateTableResponse> {
     validateSchemaName(schemaName);
@@ -234,10 +230,24 @@ export class DatabaseTableService {
             })
             .join(', ');
 
-          // Prepare foreign key constraints
-          const foreignKeyConstraints = validatedColumns
-            .filter((col) => col.foreignKey)
-            .map((col) => this.generateFkeyConstraintStatement(col, schemaName, true))
+          // Reject foreign keys on system columns (consistent with updateTableSchema).
+          for (const fk of foreignKeys) {
+            const systemSourceColumn = fk.referenceColumns
+              .map((rc) => rc.sourceColumn)
+              .find((source) => Object.keys(reservedColumns).includes(source));
+            if (systemSourceColumn) {
+              throw new AppError(
+                'cannot add foreign key on system columns',
+                400,
+                ERROR_CODES.DATABASE_FORBIDDEN,
+                `You cannot add foreign key on the system column '${systemSourceColumn}'`
+              );
+            }
+          }
+
+          // Prepare foreign key constraints — one statement per constraint entity.
+          const foreignKeyConstraints = foreignKeys
+            .map((fk) => this.generateFkeyConstraintStatement(fk, schemaName, true))
             .join(', ');
 
           // Create table with auto fields and foreign keys
@@ -372,8 +382,8 @@ export class DatabaseTableService {
         );
       }
 
-      // Get foreign key information
-      const foreignKeyMap = await this.getFkeyConstraints(schemaName, table);
+      // Get foreign key information (one entity per constraint)
+      const foreignKeys = await this.getFkeyConstraints(schemaName, table);
 
       // Get primary key information
       const primaryKeysResult = await client.query(
@@ -438,11 +448,9 @@ export class DatabaseTableService {
             isPrimaryKey: pkSet.has(col.column_name),
             isUnique: pkSet.has(col.column_name) || uniqueSet.has(col.column_name),
             defaultValue: this.parseDefaultValue(col.column_default),
-            ...(foreignKeyMap.has(col.column_name) && {
-              foreignKey: foreignKeyMap.get(col.column_name),
-            }),
           };
         }),
+        foreignKeys,
         recordCount: row_count,
       };
     } finally {
@@ -517,25 +525,35 @@ export class DatabaseTableService {
             );
           }
 
-          const foreignKeyMap = await this.getFkeyConstraints(schemaName, tableName);
+          const existingForeignKeys = await this.getFkeyConstraints(schemaName, tableName);
+          const existingConstraintNames = new Set(
+            existingForeignKeys.map((fk) => fk.constraintName).filter(Boolean)
+          );
           const completedOperations: string[] = [];
 
           // Execute operations
 
-          // Drop foreign key constraints
+          // Drop foreign key constraints by constraint name.
           if (dropForeignKeys && Array.isArray(dropForeignKeys)) {
-            for (const col of dropForeignKeys) {
-              const constraintName = foreignKeyMap.get(col)?.constraint_name;
-              if (constraintName) {
-                await client.query(
-                  `
+            for (const constraintName of dropForeignKeys) {
+              // Fail loudly on an unknown/stale name instead of reporting success while
+              // the constraint is still enforced (e.g. a typo'd or already-dropped name).
+              if (!existingConstraintNames.has(constraintName)) {
+                throw new AppError(
+                  `Foreign key constraint '${constraintName}' does not exist on this table.`,
+                  404,
+                  ERROR_CODES.DATABASE_NOT_FOUND,
+                  'Refresh the table schema and retry; the constraint may have already been removed.'
+                );
+              }
+              await client.query(
+                `
                   ALTER TABLE ${safeQualifiedTableName}
                   DROP CONSTRAINT ${this.quoteIdentifier(constraintName)}
                 `
-                );
+              );
 
-                completedOperations.push(`Dropped foreign key constraint on column: ${col}`);
-              }
+              completedOperations.push(`Dropped foreign key constraint: ${constraintName}`);
             }
           }
 
@@ -638,18 +656,21 @@ export class DatabaseTableService {
             }
           }
 
-          // Add foreign key constraints
+          // Add foreign key constraints — one ALTER per constraint entity.
           if (addForeignKeys && Array.isArray(addForeignKeys)) {
-            for (const col of addForeignKeys) {
-              if (Object.keys(reservedColumns).includes(col.columnName)) {
+            for (const fk of addForeignKeys) {
+              const systemSourceColumn = fk.referenceColumns
+                .map((rc) => rc.sourceColumn)
+                .find((source) => Object.keys(reservedColumns).includes(source));
+              if (systemSourceColumn) {
                 throw new AppError(
                   'cannot add foreign key on system columns',
                   404,
                   ERROR_CODES.DATABASE_FORBIDDEN,
-                  `You cannot add foreign key on the system column '${col.columnName}'`
+                  `You cannot add foreign key on the system column '${systemSourceColumn}'`
                 );
               }
-              const fkeyConstraint = this.generateFkeyConstraintStatement(col, schemaName, true);
+              const fkeyConstraint = this.generateFkeyConstraintStatement(fk, schemaName, true);
               await client.query(
                 `
                 ALTER TABLE ${safeQualifiedTableName}
@@ -657,7 +678,10 @@ export class DatabaseTableService {
               `
               );
 
-              completedOperations.push(`Added foreign key constraint on column: ${col.columnName}`);
+              const sourceColumns = fk.referenceColumns.map((rc) => rc.sourceColumn).join(', ');
+              completedOperations.push(
+                `Added foreign key constraint on column(s): ${sourceColumns}`
+              );
             }
           }
 
@@ -797,76 +821,37 @@ export class DatabaseTableService {
   }
 
   private generateFkeyConstraintStatement(
-    col: { columnName: string; foreignKey?: ForeignKeySchema },
+    fk: ForeignKeySchema,
     defaultSchemaName: string,
     include_source_column: boolean = true
   ) {
-    if (!col.foreignKey) {
+    if (!fk.referenceColumns || fk.referenceColumns.length === 0) {
       return '';
     }
-    // Store foreign_key in a const to avoid repeated non-null assertions
-    const fk = col.foreignKey;
-    // Use "auth_users" in constraint name for auth.users references
+    const sourceCols = fk.referenceColumns.map((r) => r.sourceColumn);
+    const refCols = fk.referenceColumns.map((r) => r.referenceColumn);
     const safeTableName = fk.referenceTable.replace(/\./g, '_');
-    const constraintName = `fk_${col.columnName}_${safeTableName}_${fk.referenceColumn}`;
+    const baseName = `fk_${sourceCols.join('_')}_${safeTableName}_${refCols.join('_')}`;
+    const MAX_IDENTIFIER_LENGTH = 63;
+    const constraintName =
+      baseName.length > MAX_IDENTIFIER_LENGTH
+        ? `${baseName.slice(0, MAX_IDENTIFIER_LENGTH - 9)}_${createHash('sha256').update(baseName).digest('hex').slice(0, 8)}`
+        : baseName;
     const onDelete = fk.onDelete || 'RESTRICT';
     const onUpdate = fk.onUpdate || 'RESTRICT';
 
+    const sourcePart = sourceCols.map((c) => this.quoteIdentifier(c)).join(', ');
+    const refPart = refCols.map((c) => this.quoteIdentifier(c)).join(', ');
+
     if (include_source_column) {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.columnName)}) REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${sourcePart}) REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${refPart}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     } else {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${refPart}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     }
   }
 
-  private async getFkeyConstraints(
-    schemaName: string,
-    table: string
-  ): Promise<Map<string, ForeignKeyInfo>> {
-    const result = await this.getPool().query(
-      `
-        SELECT
-          tc.constraint_name,
-          kcu.column_name as from_column,
-          ccu.table_schema AS foreign_schema,
-          ccu.table_name AS foreign_table,
-          ccu.column_name AS foreign_column,
-          rc.delete_rule as on_delete,
-          rc.update_rule as on_update
-        FROM information_schema.table_constraints AS tc
-        JOIN information_schema.key_column_usage AS kcu
-          ON tc.constraint_name = kcu.constraint_name
-          AND tc.table_schema = kcu.table_schema
-        JOIN information_schema.constraint_column_usage AS ccu
-          ON ccu.constraint_name = tc.constraint_name
-        JOIN information_schema.referential_constraints AS rc
-          ON rc.constraint_name = tc.constraint_name
-          AND rc.constraint_schema = tc.table_schema
-        WHERE tc.constraint_type = 'FOREIGN KEY'
-        AND tc.table_schema = $1
-        AND tc.table_name = $2
-      `,
-      [schemaName, table]
-    );
-
-    const foreignKeys = result.rows;
-
-    // Create a map of column names to their foreign key info
-    const foreignKeyMap = new Map<string, ForeignKeyInfo>();
-    foreignKeys.forEach((fk: ForeignKeyRow) => {
-      // Prefix table name with schema if not public (e.g., "auth.users")
-      const referenceTable =
-        fk.foreign_schema !== 'public'
-          ? `${fk.foreign_schema}.${fk.foreign_table}`
-          : fk.foreign_table;
-      foreignKeyMap.set(fk.from_column, {
-        constraint_name: fk.constraint_name,
-        referenceTable,
-        referenceColumn: fk.foreign_column,
-        onDelete: fk.on_delete as OnDeleteActionSchema,
-        onUpdate: fk.on_update as OnUpdateActionSchema,
-      });
-    });
-    return foreignKeyMap;
+  private async getFkeyConstraints(schemaName: string, table: string): Promise<ForeignKeySchema[]> {
+    const result = await this.getPool().query(FOREIGN_KEY_INTROSPECTION_QUERY, [schemaName, table]);
+    return groupForeignKeyRows(result.rows as ForeignKeyRow[]);
   }
 }

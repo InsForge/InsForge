@@ -37,12 +37,6 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'auth.users',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'is_active',
@@ -66,6 +60,14 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
         },
       ],
+      foreignKeys: [
+        {
+          referenceTable: 'auth.users',
+          referenceColumns: [{ sourceColumn: 'creator_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+      ],
     },
     {
       tableName: 'posts',
@@ -77,12 +79,6 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'communities',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'user_id',
@@ -90,12 +86,6 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'auth.users',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'title',
@@ -147,6 +137,20 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
         },
       ],
+      foreignKeys: [
+        {
+          referenceTable: 'communities',
+          referenceColumns: [{ sourceColumn: 'community_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+        {
+          referenceTable: 'auth.users',
+          referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+      ],
     },
     {
       tableName: 'comments',
@@ -158,12 +162,6 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'posts',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'user_id',
@@ -171,12 +169,6 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'auth.users',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'parent_comment_id',
@@ -184,12 +176,6 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'comments',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'content',
@@ -220,6 +206,26 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
         },
       ],
+      foreignKeys: [
+        {
+          referenceTable: 'posts',
+          referenceColumns: [{ sourceColumn: 'post_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+        {
+          referenceTable: 'auth.users',
+          referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+        {
+          referenceTable: 'comments',
+          referenceColumns: [{ sourceColumn: 'parent_comment_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+      ],
     },
     {
       tableName: 'votes',
@@ -231,12 +237,6 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'auth.users',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'post_id',
@@ -244,12 +244,6 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'posts',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'comment_id',
@@ -257,12 +251,6 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'comments',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'vote_type',
@@ -279,6 +267,26 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
         },
       ],
+      foreignKeys: [
+        {
+          referenceTable: 'auth.users',
+          referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+        {
+          referenceTable: 'posts',
+          referenceColumns: [{ sourceColumn: 'post_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+        {
+          referenceTable: 'comments',
+          referenceColumns: [{ sourceColumn: 'comment_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+      ],
     },
     {
       tableName: 'community_members',
@@ -290,12 +298,6 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'communities',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'user_id',
@@ -303,12 +305,6 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'auth.users',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'role',
@@ -323,6 +319,20 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
+        },
+      ],
+      foreignKeys: [
+        {
+          referenceTable: 'communities',
+          referenceColumns: [{ sourceColumn: 'community_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+        {
+          referenceTable: 'auth.users',
+          referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
         },
       ],
     },

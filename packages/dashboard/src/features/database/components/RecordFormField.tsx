@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react';
-import { Control, Controller, FieldError, UseFormReturn } from 'react-hook-form';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Control, Controller, FieldError, UseFormReturn, UseFormSetValue } from 'react-hook-form';
 import { Calendar, Clock, Link2, X } from 'lucide-react';
 import { Button, Input, cn } from '@insforge/ui';
 import {
@@ -9,7 +9,7 @@ import {
   type DatabaseRecord,
   type ConvertedValue,
 } from '#components';
-import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
+import { ColumnSchema, ColumnType, type ForeignKeySchema } from '@insforge/shared-schemas';
 import { convertValueForColumn, formatValueForDisplay } from '#lib/utils/utils';
 import { LinkRecordDialog } from './LinkRecordDialog';
 import { isValid, parseISO } from 'date-fns';
@@ -222,8 +222,11 @@ function FormJsonEditor({ value, nullable, onChange }: FormJsonEditorProps) {
 
 interface RecordFormFieldProps {
   field: ColumnSchema;
+  columns: ColumnSchema[];
   form: UseFormReturn<DatabaseRecord>;
   tableName: string;
+  // Foreign key whose source column is this field, if any (table-level FK).
+  foreignKey?: ForeignKeySchema;
 }
 
 function FieldLabel({ field, tableName }: { field: ColumnSchema; tableName: string }) {
@@ -243,16 +246,33 @@ function FieldLabel({ field, tableName }: { field: ColumnSchema; tableName: stri
 
 interface FieldWithLinkProps {
   field: ColumnSchema;
+  columns: ColumnSchema[];
   control: Control<DatabaseRecord>;
+  setValue: UseFormSetValue<DatabaseRecord>;
+  foreignKey?: ForeignKeySchema;
   children: ReactNode;
 }
 
-function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
-  if (!field.foreignKey) {
+function FieldWithLink({
+  field,
+  columns,
+  control,
+  setValue,
+  foreignKey,
+  children,
+}: FieldWithLinkProps) {
+  // Build type lookup for all columns (needed for sibling FK column coercion)
+  const columnTypeMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const col of columns) {
+      map[col.columnName] = col.type;
+    }
+    return map;
+  }, [columns]);
+
+  if (!foreignKey) {
     return <>{children}</>;
   }
-
-  const foreignKey = field.foreignKey;
 
   return (
     <Controller
@@ -272,7 +292,16 @@ function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
                 type="button"
                 variant="secondary"
                 size="icon"
-                onClick={() => formField.onChange('')}
+                onClick={() => {
+                  // Clear every key component to null (not ''), so nullable non-string
+                  // columns (integer/boolean/uuid) clear to NULL instead of failing validation.
+                  formField.onChange(null);
+                  for (const refCol of foreignKey.referenceColumns) {
+                    if (refCol.sourceColumn !== field.columnName) {
+                      setValue(refCol.sourceColumn, null);
+                    }
+                  }
+                }}
                 className="h-8 w-8 shrink-0 rounded border border-[var(--alpha-8)] bg-card p-0"
                 title="Clear linked record"
               >
@@ -281,14 +310,26 @@ function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
             )}
             <LinkRecordDialog
               referenceTable={foreignKey.referenceTable}
-              referenceColumn={foreignKey.referenceColumn}
+              fkColumns={foreignKey.referenceColumns}
               onSelectRecord={(record: DatabaseRecord) => {
-                const referenceValue = record[foreignKey.referenceColumn];
-                const result = convertValueForColumn(field.type, String(referenceValue || ''));
-                if (result.success) {
-                  formField.onChange(result.value);
-                } else {
-                  formField.onChange(String(referenceValue || ''));
+                for (const refCol of foreignKey.referenceColumns) {
+                  const refValue = record[refCol.referenceColumn];
+                  // Preserve a null referenced value as null (don't coerce to ''),
+                  // so a nullable key component stores NULL instead of failing validation.
+                  let val: ConvertedValue | null;
+                  if (refValue === null || refValue === undefined) {
+                    val = null;
+                  } else {
+                    const rawValue = String(refValue);
+                    const sourceType = columnTypeMap[refCol.sourceColumn] || field.type;
+                    const converted = convertValueForColumn(sourceType, rawValue);
+                    val = converted.success ? converted.value : rawValue;
+                  }
+                  if (refCol.sourceColumn === field.columnName) {
+                    formField.onChange(val);
+                  } else {
+                    setValue(refCol.sourceColumn, val);
+                  }
                 }
               }}
             >
@@ -316,9 +357,16 @@ function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
   );
 }
 
-export function RecordFormField({ field, form, tableName }: RecordFormFieldProps) {
+export function RecordFormField({
+  field,
+  columns,
+  form,
+  tableName,
+  foreignKey,
+}: RecordFormFieldProps) {
   const {
     control,
+    setValue,
     formState: { errors },
   } = form;
 
@@ -452,15 +500,22 @@ export function RecordFormField({ field, form, tableName }: RecordFormFieldProps
       <FieldLabel field={field} tableName={tableName} />
 
       <div className="min-w-0 space-y-1">
-        <FieldWithLink field={field} control={control}>
+        <FieldWithLink
+          field={field}
+          columns={columns}
+          control={control}
+          setValue={setValue}
+          foreignKey={foreignKey}
+        >
           {renderInput()}
         </FieldWithLink>
 
-        {field.foreignKey && (
+        {foreignKey && (
           <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <span className="truncate">Has a Foreign Key relation to</span>
             <FormMetaBadge>
-              {field.foreignKey.referenceTable}.{field.foreignKey.referenceColumn}
+              {foreignKey.referenceTable}.
+              {foreignKey.referenceColumns.map((c) => c.referenceColumn).join(',')}
             </FormMetaBadge>
           </div>
         )}

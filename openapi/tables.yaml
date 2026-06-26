@@ -65,17 +65,11 @@ paths:
                         type: boolean
                       defaultValue:
                         type: string
-                      foreignKey:
-                        type: object
-                        properties:
-                          table:
-                            type: string
-                          column:
-                            type: string
-                          onDelete:
-                            type: string
-                            enum: [CASCADE, SET NULL, NO ACTION, RESTRICT]
-                            default: NO ACTION
+                foreignKeys:
+                  type: array
+                  description: Table-level foreign key constraints
+                  items:
+                    $ref: '#/components/schemas/ForeignKeyConstraint'
                 rlsEnabled:
                   type: boolean
                   default: false
@@ -160,16 +154,11 @@ paths:
                           nullable: true
                         isPrimaryKey:
                           type: boolean
-                        foreignKey:
-                          type: object
-                          nullable: true
-                          properties:
-                            table:
-                              type: string
-                            column:
-                              type: string
-                            on_delete:
-                              type: string
+                  foreignKeys:
+                    type: array
+                    description: Table-level foreign key constraints (one entry per constraint)
+                    items:
+                      $ref: '#/components/schemas/ForeignKeyConstraint'
               example:
                 tableName: "posts"
                 columns:
@@ -179,24 +168,26 @@ paths:
                     unique: true
                     default: "gen_random_uuid()"
                     isPrimaryKey: true
-                    foreignKey: null
                   - name: "title"
                     type: "string"
                     nullable: false
                     unique: false
                     default: null
                     isPrimaryKey: false
-                    foreignKey: null
                   - name: "userId"
                     type: "uuid"
                     nullable: false
                     unique: false
                     default: null
                     isPrimaryKey: false
-                    foreignKey:
-                      table: "auth.users"
-                      column: "id"
-                      on_delete: "CASCADE"
+                foreignKeys:
+                  - constraintName: "fk_userId_auth_users_id"
+                    referenceTable: "auth.users"
+                    referenceColumns:
+                      - sourceColumn: "userId"
+                        referenceColumn: "id"
+                    onDelete: "CASCADE"
+                    onUpdate: "CASCADE"
         '404':
           description: Table not found
           content:
@@ -283,44 +274,15 @@ paths:
                         description: New default value for the column (optional)
                 addForeignKeys:
                   type: array
-                  description: Add foreign key constraints to existing columns
+                  description: Add foreign key constraints (one entry per constraint; composite keys list multiple column mappings)
                   items:
-                    type: object
-                    required:
-                      - columnName
-                      - foreignKey
-                    properties:
-                      columnName:
-                        type: string
-                        description: Name of the column to add foreign key to
-                      foreignKey:
-                        type: object
-                        required:
-                          - referenceTable
-                          - referenceColumn
-                        properties:
-                          referenceTable:
-                            type: string
-                            description: Table being referenced
-                          referenceColumn:
-                            type: string
-                            description: Column being referenced
-                          onDelete:
-                            type: string
-                            enum: [CASCADE, SET NULL, NO ACTION, RESTRICT]
-                            default: RESTRICT
-                            description: Action on delete
-                          onUpdate:
-                            type: string
-                            enum: [CASCADE, SET NULL, NO ACTION, RESTRICT]
-                            default: RESTRICT
-                            description: Action on update
+                    $ref: '#/components/schemas/ForeignKeyConstraint'
                 dropForeignKeys:
                   type: array
-                  description: Remove foreign key constraints from columns
+                  description: Constraint names of foreign keys to drop
                   items:
                     type: string
-                    description: Name of the column with foreign key to drop
+                    description: Name of the foreign key constraint to drop
                 renameTable:
                   type: object
                   description: Rename the table
@@ -563,6 +525,44 @@ components:
       name: X-API-Key
   
   schemas:
+    ForeignKeyConstraint:
+      type: object
+      description: A table-level foreign key constraint. One entry per constraint; composite keys list multiple column mappings.
+      required:
+        - referenceTable
+        - referenceColumns
+        - onDelete
+        - onUpdate
+      properties:
+        constraintName:
+          type: string
+          description: Constraint name. Returned when reading the schema; derived by the backend on create.
+        referenceTable:
+          type: string
+          minLength: 1
+          description: Table being referenced
+        referenceColumns:
+          type: array
+          minItems: 1
+          description: Ordered (source → reference) column pairs
+          items:
+            type: object
+            required:
+              - sourceColumn
+              - referenceColumn
+            properties:
+              sourceColumn:
+                type: string
+                description: Column in the current table
+              referenceColumn:
+                type: string
+                description: Column in the referenced table
+        onDelete:
+          type: string
+          enum: [CASCADE, SET NULL, SET DEFAULT, NO ACTION, RESTRICT]
+        onUpdate:
+          type: string
+          enum: [CASCADE, SET NULL, SET DEFAULT, NO ACTION, RESTRICT]
     Migration:
       type: object
       required:

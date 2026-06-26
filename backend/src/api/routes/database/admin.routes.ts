@@ -4,11 +4,10 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
-  adminTableRecordUpdateQuerySchema,
   adminTableRecordUpdateRequestSchema,
   adminTableRecordLookupQuerySchema,
   adminTableRecordsCreateRequestSchema,
-  adminTableRecordsDeleteQuerySchema,
+  adminTableRecordsDeleteRequestSchema,
   adminTableRecordsListQuerySchema,
   type AdminTableRecordsSortClause,
 } from '@insforge/shared-schemas';
@@ -124,11 +123,15 @@ router.get(
         throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
       }
 
+      const { column, value } = validation.data;
+      const columns = Array.isArray(column) ? column : [column];
+      const values = Array.isArray(value) ? value : [value];
+
       const record = await recordsService.lookupRecord(
         schemaName,
         req.params.tableName,
-        validation.data.column,
-        validation.data.value
+        columns,
+        values
       );
 
       successResponse(res, record);
@@ -163,18 +166,10 @@ router.post(
 );
 
 router.patch(
-  '/tables/:tableName/records/:recordId',
+  '/tables/:tableName/records',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
-      const queryValidation = adminTableRecordUpdateQuerySchema.safeParse(req.query);
-      if (!queryValidation.success) {
-        throw new AppError(
-          getValidationMessage(queryValidation.error),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
 
       const bodyValidation = adminTableRecordUpdateRequestSchema.safeParse(req.body);
       if (!bodyValidation.success) {
@@ -188,9 +183,8 @@ router.patch(
       const updatedRecord = await recordsService.updateRecord(
         schemaName,
         req.params.tableName,
-        queryValidation.data.pkColumn,
-        req.params.recordId,
-        bodyValidation.data as DatabaseRecord
+        bodyValidation.data.pkKeys,
+        bodyValidation.data.data as DatabaseRecord
       );
 
       broadcastRecordChange(schemaName, req.params.tableName);
@@ -206,30 +200,15 @@ router.delete(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
-      const validation = adminTableRecordsDeleteQuerySchema.safeParse(req.query);
+      const validation = adminTableRecordsDeleteRequestSchema.safeParse(req.body);
       if (!validation.success) {
         throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
-      }
-
-      const pkValues = validation.data.pkValues
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean);
-
-      if (pkValues.length === 0) {
-        throw new AppError(
-          'pkValues must include at least one primary key value.',
-          400,
-          ERROR_CODES.INVALID_INPUT,
-          'Provide at least one non-empty primary key value.'
-        );
       }
 
       const deletedCount = await recordsService.deleteRecords(
         schemaName,
         req.params.tableName,
-        validation.data.pkColumn,
-        pkValues
+        validation.data.pkKeys
       );
 
       if (deletedCount > 0) {

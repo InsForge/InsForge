@@ -225,18 +225,16 @@ export function SchemaVisualizer({
     const referencedColumnsByTable: Record<string, string[]> = {};
 
     tables.forEach((table) => {
-      table.columns.forEach((column) => {
-        if (column.foreignKey) {
-          const targetTable = column.foreignKey.referenceTable;
-          const targetColumn = column.foreignKey.referenceColumn;
-
+      (table.foreignKeys ?? []).forEach((fk) => {
+        const targetTable = fk.referenceTable;
+        fk.referenceColumns.forEach((ref) => {
           if (!referencedColumnsByTable[targetTable]) {
             referencedColumnsByTable[targetTable] = [];
           }
-          if (!referencedColumnsByTable[targetTable].includes(targetColumn)) {
-            referencedColumnsByTable[targetTable].push(targetColumn);
+          if (!referencedColumnsByTable[targetTable].includes(ref.referenceColumn)) {
+            referencedColumnsByTable[targetTable].push(ref.referenceColumn);
           }
-        }
+        });
       });
     });
 
@@ -264,11 +262,10 @@ export function SchemaVisualizer({
 
     // Check if any tables reference users.id
     const isUsersReferenced = tables.some((table) =>
-      table.columns.some(
-        (column) =>
-          column.foreignKey &&
-          column.foreignKey.referenceTable === 'auth.users' &&
-          column.foreignKey.referenceColumn === 'id'
+      (table.foreignKeys ?? []).some(
+        (fk) =>
+          fk.referenceTable === 'auth.users' &&
+          fk.referenceColumns.some((r) => r.referenceColumn === 'id')
       )
     );
 
@@ -293,14 +290,23 @@ export function SchemaVisualizer({
     const edgeColor = resolvedTheme === 'dark' ? 'white' : '#18181b'; // zinc-950 for light mode
 
     tables.forEach((table) => {
-      table.columns.forEach((column) => {
-        if (column.foreignKey) {
-          // Check if this is a reference to users.id
-          const isAuthReference =
-            column.foreignKey.referenceTable === 'auth.users' &&
-            column.foreignKey.referenceColumn === 'id';
+      (table.foreignKeys ?? []).forEach((fk) => {
+        // Check if this is a reference to users.id
+        const isAuthReference =
+          fk.referenceTable === 'auth.users' &&
+          fk.referenceColumns.some((r) => r.referenceColumn === 'id');
 
-          const edgeId = `${table.tableName}-${column.columnName}-${column.foreignKey.referenceTable}`;
+        // One edge per (source -> reference) column pair so composite keys render fully.
+        fk.referenceColumns.forEach((ref) => {
+          // Include the constraint and both columns so multiple constraints from the
+          // same source column to the same table get distinct (non-colliding) edge IDs.
+          const edgeId = [
+            table.tableName,
+            fk.constraintName ?? 'foreign-key',
+            ref.sourceColumn,
+            fk.referenceTable,
+            ref.referenceColumn,
+          ].join('-');
 
           if (isAuthReference) {
             // Connect to the authentication node
@@ -308,7 +314,7 @@ export function SchemaVisualizer({
               id: edgeId,
               source: table.tableName,
               target: 'authentication',
-              sourceHandle: `${column.columnName}-source`,
+              sourceHandle: `${ref.sourceColumn}-source`,
               targetHandle: 'id-target',
               type: 'smoothstep',
               animated: true,
@@ -319,13 +325,13 @@ export function SchemaVisualizer({
               },
             });
           } else {
-            // Regular table-to-table edge
+            // Regular table-to-table edge — connect this source column to its target column.
             edges.push({
               id: edgeId,
               source: table.tableName,
-              target: column.foreignKey.referenceTable,
-              sourceHandle: `${column.columnName}-source`,
-              targetHandle: `${column.foreignKey.referenceColumn}-target`,
+              target: fk.referenceTable,
+              sourceHandle: `${ref.sourceColumn}-source`,
+              targetHandle: `${ref.referenceColumn}-target`,
               type: 'smoothstep',
               animated: true,
               style: { stroke: edgeColor, strokeWidth: 2, zIndex: 1000 },
@@ -335,7 +341,7 @@ export function SchemaVisualizer({
               },
             });
           }
-        }
+        });
       });
     });
 
