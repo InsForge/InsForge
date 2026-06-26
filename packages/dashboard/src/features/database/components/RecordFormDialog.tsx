@@ -24,6 +24,7 @@ interface RecordFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tableName: string;
+  schemaName: string;
   schema: ColumnSchema[];
   foreignKeys?: ForeignKeySchema[];
   onSuccess?: () => void;
@@ -33,12 +34,13 @@ export function RecordFormDialog({
   open,
   onOpenChange,
   tableName,
+  schemaName,
   schema,
   foreignKeys,
   onSuccess,
 }: RecordFormDialogProps) {
   const [error, setError] = useState<string | null>(null);
-  const { createRecord, isCreating } = useRecords(tableName);
+  const { createRecord, isCreating } = useRecords(tableName, schemaName);
 
   const displayFields = useMemo(() => {
     const filteredFields = schema.filter((field) => !SYSTEM_FIELDS.includes(field.columnName));

@@ -750,6 +750,7 @@ export default function TablesPage() {
           open={showRecordForm}
           onOpenChange={setShowRecordForm}
           tableName={selectedTable}
+          schemaName={selectedSchema}
           schema={schemaData.columns}
           foreignKeys={schemaData.foreignKeys}
         />
