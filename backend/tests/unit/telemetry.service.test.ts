@@ -87,26 +87,47 @@ describe('TelemetryService', () => {
     );
   });
 
-  it('reuses an installation id created by another process during the initial write', async () => {
+  it('reuses an installation id published by another process during the atomic create', async () => {
     const config = makeConfig();
     const fetchMock = makeFetchMock();
     const racedInstallationId = '11111111-1111-4111-8111-111111111111';
-    const openSync = fs.openSync.bind(fs);
-    const openSpy = vi.spyOn(fs, 'openSync').mockImplementation((file, flags, mode) => {
-      if (file === config.installationIdPath && flags === 'wx') {
+    const linkSync = fs.linkSync.bind(fs);
+    const linkSpy = vi.spyOn(fs, 'linkSync').mockImplementation((existingPath, newPath) => {
+      if (newPath === config.installationIdPath) {
         fs.writeFileSync(config.installationIdPath, racedInstallationId, { mode: 0o600 });
         throw Object.assign(new Error('file exists'), { code: 'EEXIST' });
       }
 
-      return openSync(file, flags, mode);
+      return linkSync(existingPath, newPath);
     });
 
     await new TelemetryService(config, fetchMock).sendEvent('instance_started');
 
     const body = getPostedBody(fetchMock);
-    expect(openSpy).toHaveBeenCalled();
+    expect(linkSpy).toHaveBeenCalled();
     expect(body.distinct_id).toBe(racedInstallationId);
     expect(fs.readFileSync(config.installationIdPath, 'utf8')).toBe(racedInstallationId);
+    expect(fs.readdirSync(path.dirname(config.installationIdPath))).toEqual([
+      path.basename(config.installationIdPath),
+    ]);
+  });
+
+  it('does not send telemetry in CI by default', async () => {
+    process.env.CI = 'true';
+    const fetchMock = makeFetchMock();
+
+    await new TelemetryService(undefined, fetchMock).sendEvent('instance_started');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not send telemetry in local development by default', async () => {
+    process.env.npm_lifecycle_event = 'dev';
+    const fetchMock = makeFetchMock();
+
+    await new TelemetryService(undefined, fetchMock).sendEvent('instance_started');
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('starts once, schedules heartbeats, and stops the heartbeat timer', async () => {

@@ -60,9 +60,30 @@ const POSTHOG_EVENT_NAMES: Record<TelemetryEventName, string> = {
   heartbeat: 'oss_heartbeat',
 };
 
+function isCiEnvironment(): boolean {
+  return CI_ENV_KEYS.some((key) => !!process.env[key]);
+}
+
+function isDevelopmentLikeRuntime(): boolean {
+  return (
+    process.env.NODE_ENV === 'development' ||
+    process.env.NODE_ENV === 'test' ||
+    process.env.npm_lifecycle_event === 'dev'
+  );
+}
+
+function isTelemetryRuntimeDisabled(): boolean {
+  return (
+    appConfig.telemetry.disabled ||
+    isCloudEnvironment() ||
+    isCiEnvironment() ||
+    isDevelopmentLikeRuntime()
+  );
+}
+
 function defaultTelemetryConfig(): TelemetryConfig {
   return {
-    disabled: appConfig.telemetry.disabled || isCloudEnvironment(),
+    disabled: isTelemetryRuntimeDisabled(),
     endpoint: DEFAULT_TELEMETRY_ENDPOINT,
     posthogApiKey: DEFAULT_POSTHOG_API_KEY,
     installationIdPath: path.join(appConfig.server.logsDir, '.insforge-installation-id'),
@@ -155,14 +176,16 @@ export class TelemetryService {
     }
 
     const installationId = randomUUID();
-    fs.mkdirSync(path.dirname(this.config.installationIdPath), { recursive: true });
+    const installationIdDir = path.dirname(this.config.installationIdPath);
+    const tempInstallationIdPath = path.join(
+      installationIdDir,
+      `.insforge-installation-id.${process.pid}.${randomUUID()}.tmp`
+    );
+
+    fs.mkdirSync(installationIdDir, { recursive: true });
     try {
-      const fd = fs.openSync(this.config.installationIdPath, 'wx', 0o600);
-      try {
-        fs.writeFileSync(fd, installationId, 'utf8');
-      } finally {
-        fs.closeSync(fd);
-      }
+      fs.writeFileSync(tempInstallationIdPath, installationId, { mode: 0o600, flag: 'wx' });
+      fs.linkSync(tempInstallationIdPath, this.config.installationIdPath);
       return installationId;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
@@ -172,6 +195,13 @@ export class TelemetryService {
         }
       }
       throw error;
+    } finally {
+      try {
+        fs.unlinkSync(tempInstallationIdPath);
+      } catch {
+        // Best effort cleanup: telemetry must never fail because a temp file
+        // could not be removed after publishing or losing the creation race.
+      }
     }
   }
 
@@ -204,7 +234,7 @@ export class TelemetryService {
         platform: os.platform(),
         arch: os.arch(),
         node_version: process.version,
-        is_ci: CI_ENV_KEYS.some((key) => !!process.env[key]),
+        is_ci: isCiEnvironment(),
         storage_backend: detectStorageBackend(),
         features: {
           site_deployments_configured: Boolean(
