@@ -1,3 +1,5 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
@@ -6,6 +8,14 @@ import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import logger from '@/utils/logger.js';
 import { createApp } from './app.js';
+
+const __filename = fileURLToPath(import.meta.url);
+
+function isEntrypoint() {
+  const entrypoint = process.argv[1];
+  return entrypoint ? path.resolve(entrypoint) === __filename : false;
+}
+
 
 async function initializeServer() {
   try {
@@ -80,6 +90,8 @@ async function cleanup() {
   process.exit(0);
 }
 
-void initializeServer();
-process.on('SIGINT', () => void cleanup());
-process.on('SIGTERM', () => void cleanup());
+if (isEntrypoint()) {
+  void initializeServer();
+  process.on('SIGINT', () => void cleanup());
+  process.on('SIGTERM', () => void cleanup());
+}

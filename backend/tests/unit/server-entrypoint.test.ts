@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-describe('app module', () => {
+const createAppMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../src/app.js', () => ({
+  createApp: createAppMock,
+}));
+
+describe('server entrypoint', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -10,8 +16,9 @@ describe('app module', () => {
 
     const processOnSpy = vi.spyOn(process, 'on');
 
-    await import('../../src/app.js');
+    await import('../../src/server.js');
 
+    expect(createAppMock).not.toHaveBeenCalled();
     expect(processOnSpy).not.toHaveBeenCalledWith('SIGINT', expect.any(Function));
     expect(processOnSpy).not.toHaveBeenCalledWith('SIGTERM', expect.any(Function));
   });
