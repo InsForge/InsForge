@@ -40,7 +40,9 @@ describe('database schema route wiring', () => {
     expect(tableRoutesSource).toContain(
       'const { tableName, columns, foreignKeys, rlsEnabled } = validation.data'
     );
-    expect(tableRoutesSource).toContain('tableService.createTable(');
+    expect(tableRoutesSource).toMatch(
+      /tableService\.createTable\(\s*schemaName,\s*tableName,\s*columns,\s*foreignKeys,\s*rlsEnabled\s*\)/s
+    );
     expect(tableRoutesSource).toContain('tableService.getTableSchema(schemaName, tableName)');
     expect(tableRoutesSource).toContain(
       'tableService.updateTableSchema(schemaName, tableName, operations)'

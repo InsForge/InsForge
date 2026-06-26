@@ -293,10 +293,12 @@ function FieldWithLink({
                 variant="secondary"
                 size="icon"
                 onClick={() => {
-                  formField.onChange('');
+                  // Clear every key component to null (not ''), so nullable non-string
+                  // columns (integer/boolean/uuid) clear to NULL instead of failing validation.
+                  formField.onChange(null);
                   for (const refCol of foreignKey.referenceColumns) {
                     if (refCol.sourceColumn !== field.columnName) {
-                      setValue(refCol.sourceColumn, '');
+                      setValue(refCol.sourceColumn, null);
                     }
                   }
                 }}
@@ -312,10 +314,17 @@ function FieldWithLink({
               onSelectRecord={(record: DatabaseRecord) => {
                 for (const refCol of foreignKey.referenceColumns) {
                   const refValue = record[refCol.referenceColumn];
-                  const rawValue = String(refValue ?? '');
-                  const sourceType = columnTypeMap[refCol.sourceColumn] || field.type;
-                  const converted = convertValueForColumn(sourceType, rawValue);
-                  const val = converted.success ? converted.value : rawValue;
+                  // Preserve a null referenced value as null (don't coerce to ''),
+                  // so a nullable key component stores NULL instead of failing validation.
+                  let val: ConvertedValue | null;
+                  if (refValue === null || refValue === undefined) {
+                    val = null;
+                  } else {
+                    const rawValue = String(refValue);
+                    const sourceType = columnTypeMap[refCol.sourceColumn] || field.type;
+                    const converted = convertValueForColumn(sourceType, rawValue);
+                    val = converted.success ? converted.value : rawValue;
+                  }
                   if (refCol.sourceColumn === field.columnName) {
                     formField.onChange(val);
                   } else {

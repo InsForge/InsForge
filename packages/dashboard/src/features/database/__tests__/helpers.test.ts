@@ -82,8 +82,18 @@ describe('database helpers', () => {
       'id',
     ]);
 
-    // No primary key metadata -> fall back to the conventional `id` column.
-    expect(getPrimaryKeyColumns([column({ columnName: 'name' })])).toEqual(['id']);
+    // No primary key metadata but an `id` column exists -> use `id`.
+    expect(
+      getPrimaryKeyColumns([column({ columnName: 'id' }), column({ columnName: 'name' })])
+    ).toEqual(['id']);
+
+    // No primary key and no `id` column -> use every column so distinct rows keep
+    // distinct identities (instead of all collapsing to a single `{"id":null}` key).
+    expect(
+      getPrimaryKeyColumns([column({ columnName: 'name' }), column({ columnName: 'email' })])
+    ).toEqual(['name', 'email']);
+
+    // No metadata at all -> fall back to the conventional `id` column.
     expect(getPrimaryKeyColumns(undefined)).toEqual(['id']);
   });
 

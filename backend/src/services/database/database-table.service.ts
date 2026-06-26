@@ -230,6 +230,21 @@ export class DatabaseTableService {
             })
             .join(', ');
 
+          // Reject foreign keys on system columns (consistent with updateTableSchema).
+          for (const fk of foreignKeys) {
+            const systemSourceColumn = fk.referenceColumns
+              .map((rc) => rc.sourceColumn)
+              .find((source) => Object.keys(reservedColumns).includes(source));
+            if (systemSourceColumn) {
+              throw new AppError(
+                'cannot add foreign key on system columns',
+                400,
+                ERROR_CODES.DATABASE_FORBIDDEN,
+                `You cannot add foreign key on the system column '${systemSourceColumn}'`
+              );
+            }
+          }
+
           // Prepare foreign key constraints — one statement per constraint entity.
           const foreignKeyConstraints = foreignKeys
             .map((fk) => this.generateFkeyConstraintStatement(fk, schemaName, true))
@@ -518,11 +533,18 @@ export class DatabaseTableService {
 
           // Execute operations
 
-          // Drop foreign key constraints by constraint name (only ones that exist on this table).
+          // Drop foreign key constraints by constraint name.
           if (dropForeignKeys && Array.isArray(dropForeignKeys)) {
             for (const constraintName of dropForeignKeys) {
+              // Fail loudly on an unknown/stale name instead of reporting success while
+              // the constraint is still enforced (e.g. a typo'd or already-dropped name).
               if (!existingConstraintNames.has(constraintName)) {
-                continue;
+                throw new AppError(
+                  `Foreign key constraint '${constraintName}' does not exist on this table.`,
+                  404,
+                  ERROR_CODES.DATABASE_NOT_FOUND,
+                  'Refresh the table schema and retry; the constraint may have already been removed.'
+                );
               }
               await client.query(
                 `

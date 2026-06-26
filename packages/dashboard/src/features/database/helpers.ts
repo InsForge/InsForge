@@ -46,7 +46,18 @@ export type RecordPrimaryKey = Record<string, string | number | boolean | null>;
 export function getPrimaryKeyColumns(columns?: ColumnSchema[]): string[] {
   const primaryKeyColumns =
     columns?.filter((column) => column.isPrimaryKey).map((column) => column.columnName) ?? [];
-  return primaryKeyColumns.length > 0 ? primaryKeyColumns : ['id'];
+  if (primaryKeyColumns.length > 0) {
+    return primaryKeyColumns;
+  }
+
+  const allColumns = columns?.map((column) => column.columnName) ?? [];
+  if (allColumns.includes('id')) {
+    return ['id'];
+  }
+  // No declared primary key and no `id` column: fall back to every column so distinct
+  // rows keep distinct grid identities instead of all collapsing to a single
+  // `{"id":null}` key (which would merge selection/edit/delete across rows).
+  return allColumns.length > 0 ? allColumns : ['id'];
 }
 
 /**
@@ -88,12 +99,32 @@ export function encodeRecordKey(row: Record<string, unknown>, primaryKeyColumns:
  * Decodes a grid row key produced by {@link encodeRecordKey} back into the
  * primary-key tuple to send to the record update/delete APIs.
  */
+function isRecordPrimaryKey(value: unknown): value is RecordPrimaryKey {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  return Object.values(value).every(
+    (item) =>
+      item === null ||
+      typeof item === 'string' ||
+      typeof item === 'number' ||
+      typeof item === 'boolean'
+  );
+}
+
 export function decodeRecordKey(encodedKey: string): RecordPrimaryKey {
+  let parsed: unknown;
   try {
-    return JSON.parse(encodedKey) as RecordPrimaryKey;
+    parsed = JSON.parse(encodedKey);
   } catch {
     throw new Error(`Invalid record key: ${encodedKey}`);
   }
+  // Reject anything that isn't a plain scalar-valued object before it reaches the
+  // update/delete APIs as pkKeys (JSON.parse also accepts null, arrays, scalars).
+  if (!isRecordPrimaryKey(parsed)) {
+    throw new Error(`Invalid record key: ${encodedKey}`);
+  }
+  return parsed;
 }
 
 // Helper function to build dynamic Zod schema based on column definitions

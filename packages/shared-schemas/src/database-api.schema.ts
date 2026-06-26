@@ -132,16 +132,9 @@ export const exportJsonDataSchema = z.object({
           isPrimary: z.boolean().nullable(),
         })
       ),
-      foreignKeys: z.array(
-        z.object({
-          constraintName: z.string(),
-          columnName: z.string(),
-          foreignTableName: z.string(),
-          foreignColumnName: z.string(),
-          deleteRule: z.string().nullable(),
-          updateRule: z.string().nullable(),
-        })
-      ),
+      // Table-level foreign keys: one entry per constraint (composite keys list
+      // multiple column mappings), consistent with the rest of the schema model.
+      foreignKeys: z.array(foreignKeySchema),
       rlsEnabled: z.boolean().optional(),
       policies: z.array(
         z.object({

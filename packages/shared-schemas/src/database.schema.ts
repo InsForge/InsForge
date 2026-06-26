@@ -11,7 +11,15 @@ export enum ColumnType {
   JSON = 'json',
 }
 
-export const onUpdateActionSchema = z.enum(['CASCADE', 'RESTRICT', 'NO ACTION']);
+// Postgres supports the same referential actions for ON UPDATE as ON DELETE;
+// introspection can return SET NULL / SET DEFAULT, so the schema must accept them.
+export const onUpdateActionSchema = z.enum([
+  'CASCADE',
+  'SET NULL',
+  'SET DEFAULT',
+  'RESTRICT',
+  'NO ACTION',
+]);
 export const onDeleteActionSchema = z.enum([
   'CASCADE',
   'SET NULL',

@@ -7,6 +7,9 @@ import {
   type ExportDatabaseJsonData,
   type ImportDatabaseResponse,
   type BulkUpsertResponse,
+  type ForeignKeySchema,
+  type OnDeleteActionSchema,
+  type OnUpdateActionSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { checkSqlExecutionGuards, parseSQLStatements } from '@/utils/sql-parser.js';
@@ -33,6 +36,50 @@ export class DatabaseAdvanceService {
    * Get table data using simple SELECT query
    * More reliable than streaming for moderate datasets
    */
+  // Groups the per-column FK rows from the JSON export query into table-level
+  // constraints (one entry per constraint, columns ordered by ordinal position),
+  // matching the table-level foreign-key model used everywhere else.
+  private groupExportedForeignKeyRows(
+    rows: {
+      constraintName: string;
+      columnName: string;
+      foreignTableName: string;
+      foreignColumnName: string;
+      ordinalPosition: number;
+      deleteRule: string;
+      updateRule: string;
+    }[]
+  ): ForeignKeySchema[] {
+    const byConstraint = new Map<string, ForeignKeySchema & { _ordinals: number[] }>();
+    for (const row of rows) {
+      let fk = byConstraint.get(row.constraintName);
+      if (!fk) {
+        fk = {
+          constraintName: row.constraintName,
+          referenceTable: row.foreignTableName,
+          referenceColumns: [],
+          onDelete: row.deleteRule as OnDeleteActionSchema,
+          onUpdate: row.updateRule as OnUpdateActionSchema,
+          _ordinals: [],
+        };
+        byConstraint.set(row.constraintName, fk);
+      }
+      fk.referenceColumns.push({
+        sourceColumn: row.columnName,
+        referenceColumn: row.foreignColumnName,
+      });
+      fk._ordinals.push(row.ordinalPosition);
+    }
+
+    return Array.from(byConstraint.values()).map(({ _ordinals, ...fk }) => {
+      fk.referenceColumns = _ordinals
+        .map((ordinal, i) => ({ ordinal, pair: fk.referenceColumns[i] }))
+        .sort((a, b) => a.ordinal - b.ordinal)
+        .map((entry) => entry.pair);
+      return fk;
+    });
+  }
+
   private async getTableData(
     client: PoolClient,
     table: string,
@@ -658,7 +705,7 @@ export class DatabaseAdvanceService {
           jsonData.tables[table] = {
             schema: schemaResult.rows,
             indexes: indexesResult.rows,
-            foreignKeys: foreignKeysResult.rows,
+            foreignKeys: this.groupExportedForeignKeyRows(foreignKeysResult.rows),
             rlsEnabled,
             policies: policiesResult.rows,
             triggers: triggersResult.rows,

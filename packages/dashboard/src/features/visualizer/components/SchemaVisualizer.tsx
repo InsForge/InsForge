@@ -298,7 +298,15 @@ export function SchemaVisualizer({
 
         // One edge per (source -> reference) column pair so composite keys render fully.
         fk.referenceColumns.forEach((ref) => {
-          const edgeId = `${table.tableName}-${ref.sourceColumn}-${fk.referenceTable}`;
+          // Include the constraint and both columns so multiple constraints from the
+          // same source column to the same table get distinct (non-colliding) edge IDs.
+          const edgeId = [
+            table.tableName,
+            fk.constraintName ?? 'foreign-key',
+            ref.sourceColumn,
+            fk.referenceTable,
+            ref.referenceColumn,
+          ].join('-');
 
           if (isAuthReference) {
             // Connect to the authentication node

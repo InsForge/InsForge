@@ -237,7 +237,11 @@ export function convertSchemaToColumns(
       // Foreign key column - show reference popover, disable editing
       column.renderCell = (props: RenderCellProps<DatabaseDataGridRow>) => (
         <ForeignKeyCell
-          value={String(props.row[col.columnName] || '')}
+          value={
+            props.row[col.columnName] === null || props.row[col.columnName] === undefined
+              ? ''
+              : String(props.row[col.columnName])
+          }
           foreignKey={{
             table: foreignKey.referenceTable,
             columns: foreignKey.referenceColumns,

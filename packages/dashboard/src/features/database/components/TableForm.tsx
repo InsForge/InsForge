@@ -127,6 +127,8 @@ export function TableForm({
 
         return {
           constraintName: fk.constraintName,
+          // Stable identity: an existing constraint is uniquely identified by its name.
+          uid: fk.constraintName ?? crypto.randomUUID(),
           // Primary source column, used only to associate the FK with a column row in the UI.
           columnName: fk.referenceColumns[0]?.sourceColumn ?? '',
           referenceTable:
@@ -210,6 +212,7 @@ export function TableForm({
       const columns = data.columns.map((col) => ({
         columnName: col.columnName,
         type: col.type,
+        isPrimaryKey: col.isPrimaryKey,
         isNullable: col.isNullable,
         isUnique: col.isUnique,
         defaultValue: col.defaultValue,
@@ -406,33 +409,28 @@ export function TableForm({
 
   const handleAddForeignKey = (fk: TableFormForeignKeySchema) => {
     if (editingForeignKey) {
-      // Update existing foreign key
+      // Update existing foreign key (matched by stable uid, not source column).
       setForeignKeys(
         foreignKeys.map((existingFk) =>
-          existingFk.columnName === editingForeignKey ? { ...fk } : existingFk
+          existingFk.uid === editingForeignKey ? { ...fk, uid: existingFk.uid } : existingFk
         )
       );
       setEditingForeignKey(undefined);
       setForeignKeysDirty(true);
     } else {
-      // Add new foreign key
-      setForeignKeys([
-        ...foreignKeys,
-        {
-          ...fk,
-        },
-      ]);
+      // Add new foreign key with a fresh client-side identity.
+      setForeignKeys([...foreignKeys, { ...fk, uid: crypto.randomUUID() }]);
     }
     setForeignKeysDirty(true);
   };
 
-  const handleRemoveForeignKey = (columnName?: string) => {
-    // Each entry is one constraint, so removing by its (primary) source column
-    // drops the whole constraint — including composite keys.
-    if (!foreignKeys.some((fk) => fk.columnName === columnName)) {
+  const handleRemoveForeignKey = (uid?: string) => {
+    // Identify by stable uid so constraints sharing a first source column
+    // (e.g. multi-tenant `tenant_id`) are removed individually, not together.
+    if (!foreignKeys.some((fk) => fk.uid === uid)) {
       return;
     }
-    setForeignKeys(foreignKeys.filter((fk) => fk.columnName !== columnName));
+    setForeignKeys(foreignKeys.filter((fk) => fk.uid !== uid));
     setForeignKeysDirty(true);
   };
 
@@ -534,7 +532,7 @@ export function TableForm({
 
                   {foreignKeys.map((fk, index) => (
                     <div
-                      key={fk.columnName}
+                      key={fk.uid ?? fk.columnName}
                       className={`group grid h-12 grid-cols-[minmax(260px,1fr)_190px_190px_52px] items-center px-1.5 hover:bg-[var(--alpha-4)] ${
                         index === foreignKeys.length - 1 ? '' : 'border-b border-[var(--alpha-8)]'
                       }`}
@@ -559,7 +557,7 @@ export function TableForm({
                       <div className="flex items-center justify-end px-2.5">
                         <button
                           type="button"
-                          onClick={() => handleRemoveForeignKey(fk.columnName)}
+                          onClick={() => handleRemoveForeignKey(fk.uid)}
                           className="flex size-8 items-center justify-center rounded text-muted-foreground opacity-0 transition-[opacity,colors] group-hover:opacity-100 hover:bg-[var(--alpha-8)] hover:text-foreground focus-visible:opacity-100"
                           aria-label="Remove"
                         >
@@ -599,7 +597,7 @@ export function TableForm({
               onAddForeignKey={handleAddForeignKey}
               initialValue={
                 editingForeignKey
-                  ? foreignKeys.find((fk) => fk.columnName === editingForeignKey)
+                  ? foreignKeys.find((fk) => fk.uid === editingForeignKey)
                   : undefined
               }
             />

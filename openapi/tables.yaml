@@ -531,15 +531,19 @@ components:
       required:
         - referenceTable
         - referenceColumns
+        - onDelete
+        - onUpdate
       properties:
         constraintName:
           type: string
           description: Constraint name. Returned when reading the schema; derived by the backend on create.
         referenceTable:
           type: string
+          minLength: 1
           description: Table being referenced
         referenceColumns:
           type: array
+          minItems: 1
           description: Ordered (source → reference) column pairs
           items:
             type: object
@@ -558,7 +562,7 @@ components:
           enum: [CASCADE, SET NULL, SET DEFAULT, NO ACTION, RESTRICT]
         onUpdate:
           type: string
-          enum: [CASCADE, NO ACTION, RESTRICT]
+          enum: [CASCADE, SET NULL, SET DEFAULT, NO ACTION, RESTRICT]
     Migration:
       type: object
       required:
