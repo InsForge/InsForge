@@ -1,5 +1,4 @@
-import path from 'path';
-import { fileURLToPath } from 'url';
+
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
@@ -8,20 +7,10 @@ import { FunctionService } from '@/services/functions/function.service.js';
 import logger from '@/utils/logger.js';
 import { createApp } from './app.js';
 
-const __filename = fileURLToPath(import.meta.url);
-
-const PORT = parseInt(process.env.PORT || '7130');
-
-function isEntrypoint() {
-  const entrypoint = process.argv[1];
-  return entrypoint ? path.resolve(entrypoint) === __filename : false;
-}
-
-export { createApp };
-
-export async function initializeServer() {
+async function initializeServer() {
   try {
     const app = await createApp();
+    const PORT = parseInt(process.env.PORT || '7130');
     const server = app.listen(PORT, () => {
       logger.info(`Backend API service listening on port ${PORT}`);
     });
@@ -91,8 +80,6 @@ async function cleanup() {
   process.exit(0);
 }
 
-if (isEntrypoint()) {
-  void initializeServer();
-  process.on('SIGINT', () => void cleanup());
-  process.on('SIGTERM', () => void cleanup());
-}
+void initializeServer();
+process.on('SIGINT', () => void cleanup());
+process.on('SIGTERM', () => void cleanup());
