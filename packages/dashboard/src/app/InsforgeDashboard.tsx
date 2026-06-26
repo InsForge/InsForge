@@ -9,6 +9,7 @@ import { PostHogAnalyticsProvider } from '#lib/analytics/posthog';
 import { SQLEditorProvider } from '#features/database/contexts/SQLEditorContext';
 import { DashboardHostProvider, DashboardProjectProvider } from '#lib/config/DashboardHostContext';
 import { setDashboardBackendUrl } from '#lib/config/runtime';
+import { advisorService } from '#features/dashboard/services/advisor.service';
 import type { InsForgeDashboardProps } from '#types';
 
 function normalizeBackendUrl(url?: string) {
@@ -39,6 +40,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
     onRequestProjectMetrics,
     onRequestAdvisorLatest,
     onRequestAdvisorIssues,
+    onRequestAdvisorCategoryCounts,
     onTriggerAdvisorScan,
     onConnectPosthog,
     subscribePosthogConnectionStatus,
@@ -71,9 +73,18 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onRequestUserApiKey,
       onRequestModelCredits,
       onRequestProjectMetrics,
-      onRequestAdvisorLatest,
-      onRequestAdvisorIssues,
-      onTriggerAdvisorScan,
+      onRequestAdvisorLatest:
+        onRequestAdvisorLatest ??
+        (mode === 'self-hosting' ? () => advisorService.getLatest() : undefined),
+      onRequestAdvisorIssues:
+        onRequestAdvisorIssues ??
+        (mode === 'self-hosting' ? (q) => advisorService.getIssues(q) : undefined),
+      onRequestAdvisorCategoryCounts:
+        onRequestAdvisorCategoryCounts ??
+        (mode === 'self-hosting' ? () => advisorService.getCategoryCounts() : undefined),
+      onTriggerAdvisorScan:
+        onTriggerAdvisorScan ??
+        (mode === 'self-hosting' ? () => advisorService.triggerScan() : undefined),
       onConnectPosthog,
       subscribePosthogConnectionStatus,
       onOpenPosthog,
@@ -102,6 +113,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onRequestProjectMetrics,
       onRequestAdvisorLatest,
       onRequestAdvisorIssues,
+      onRequestAdvisorCategoryCounts,
       onTriggerAdvisorScan,
       onConnectPosthog,
       subscribePosthogConnectionStatus,
