@@ -36,6 +36,9 @@ import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { posthogRouter } from '@/api/routes/posthog/index.routes.js';
+import { appConfig } from '@/infra/config/app.config.js';
+import { memoryRouter } from '@/api/routes/memory/index.routes.js';
+import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -91,7 +94,7 @@ export async function createApp() {
   const app = express();
 
   // Enable trust proxy setting for rate limiting behind proxies/load balancers
-  app.set('trust proxy', 2);
+  app.set('trust proxy', appConfig.server.trustProxy);
 
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -192,8 +195,8 @@ export async function createApp() {
   // We use high defaults (100mb/10mb) to ensure a smooth "out-of-the-box" experience
   // for large metadata/storage requests, as per project standards.
   // Users can override these via environment variables for hardened security.
-  const jsonLimit = process.env.MAX_JSON_BODY_SIZE || '100mb';
-  const urlencodedLimit = process.env.MAX_URLENCODED_BODY_SIZE || '10mb';
+  const jsonLimit = appConfig.server.maxJsonBodySize;
+  const urlencodedLimit = appConfig.server.maxUrlencodedBodySize;
 
   app.use(express.json({ limit: jsonLimit }));
   app.use(express.urlencoded({ extended: true, limit: urlencodedLimit }));
@@ -229,6 +232,8 @@ export async function createApp() {
   apiRouter.use('/payments', paymentsRouter);
   apiRouter.use('/compute/services', servicesRouter);
   apiRouter.use('/integrations/posthog', posthogRouter);
+  apiRouter.use('/memory', memoryRouter);
+  apiRouter.use('/analytics', analyticsRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
@@ -240,7 +245,7 @@ export async function createApp() {
 
     try {
       const functionService = FunctionService.getInstance();
-      const localRuntime = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
+      const localRuntime = appConfig.functions.denoRuntimeUrl;
 
       // Get target base URL: prefer Subhosting deployment, fallback to local runtime
       const baseUrl =
