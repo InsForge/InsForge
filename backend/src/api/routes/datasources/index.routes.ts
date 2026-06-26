@@ -46,6 +46,8 @@ datasourcesRouter.get(
   verifyAdmin,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      // Live OAuth access token — never let a browser or shared cache retain it.
+      res.set('Cache-Control', 'no-store');
       const tok = await service.getApifyToken();
       if (!tok) {
         res.status(404).json({ error: 'not_connected' });

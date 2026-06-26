@@ -30,6 +30,11 @@ export function ConnectorCard({ connector }: { connector: ConnectorDef }) {
         tabIndex={0}
         onClick={() => setPromptOpen(true)}
         onKeyDown={(e) => {
+          // Only act when the card itself is focused, so Enter/Space on the
+          // inner Connect/Disconnect button doesn't also open the prompt dialog.
+          if (e.target !== e.currentTarget) {
+            return;
+          }
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             setPromptOpen(true);
@@ -44,7 +49,11 @@ export function ConnectorCard({ connector }: { connector: ConnectorDef }) {
           </span>
         </div>
         <p className="text-sm text-muted-foreground">{connector.tagline}</p>
-        {connection ? (
+        {conn.isError ? (
+          // A non-404 lookup failure means the connection state is unknown, so
+          // don't render a misleading Connect button that would start OAuth.
+          <p className="text-sm text-muted-foreground">Connection status unavailable.</p>
+        ) : connection ? (
           <Button
             variant="secondary"
             onClick={(e) => {
@@ -58,7 +67,7 @@ export function ConnectorCard({ connector }: { connector: ConnectorDef }) {
         ) : (
           <Button
             variant="primary"
-            disabled={!onConnectApify || !projectId}
+            disabled={!onConnectApify || !projectId || conn.isLoading}
             onClick={(e) => {
               e.stopPropagation();
               if (projectId) {

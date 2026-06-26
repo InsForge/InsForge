@@ -8,7 +8,11 @@ export function DatasourceCatalog({ query = '' }: { query?: string }) {
   );
 
   if (list.length === 0) {
-    return <p className="text-sm text-muted-foreground">No data sources match your search.</p>;
+    return (
+      <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+        No data sources match your search.
+      </p>
+    );
   }
 
   return (
