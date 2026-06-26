@@ -1,9 +1,7 @@
-import path from 'path';
-import { fileURLToPath } from 'url';
-
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -18,7 +16,6 @@ import functionsRouter from '@/api/routes/functions/index.routes.js';
 import secretsRouter from '@/api/routes/secrets/index.routes.js';
 import { usageRouter } from '@/api/routes/usage/index.routes.js';
 import { aiRouter } from '@/api/routes/ai/index.routes.js';
-import { memoryRouter } from '@/api/routes/memory/index.routes.js';
 import { realtimeRouter } from '@/api/routes/realtime/index.routes.js';
 import { emailRouter } from '@/api/routes/email/index.routes.js';
 import { deploymentsRouter } from '@/api/routes/deployments/index.routes.js';
@@ -26,31 +23,56 @@ import { webhooksRouter } from '@/api/routes/webhooks/index.routes.js';
 import { s3GatewayRouter } from '@/api/routes/s3-gateway/index.routes.js';
 import { paymentsRouter } from '@/api/routes/payments/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
-import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
-import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
-import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
-import { FunctionService } from '@/services/functions/function.service.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
+import fetch from 'node-fetch';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { LogService } from '@/services/logs/log.service.js';
+import { StorageService } from '@/services/storage/storage.service.js';
+import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
-import { createApp } from './app.js';
+import { initSqlParser } from '@/utils/sql-parser.js';
+import { FunctionService } from '@/services/functions/function.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
-import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
-import { appConfig } from '@/infra/config/app.config.js';
+import { posthogRouter } from '@/api/routes/posthog/index.routes.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+let envLoaded = false;
 
-// Load .env file from the root directory (parent of backend)
-const envPath = path.resolve(__dirname, '../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-} else {
-  // Fallback to default behavior (looks in current working directory)
-  dotenv.config();
+function shouldSkipGlobalRateLimit(req: Request): boolean {
+  if (req.path === '/api/health') {
+    return true;
+  }
+
+  return (
+    req.method === 'PUT' && /^\/api\/deployments\/[^/]+\/files\/[^/]+\/content$/.test(req.path)
+  );
+}
+
+function loadEnvironment() {
+  if (envLoaded) {
+    return;
+  }
+
+  const envPath = path.resolve(__dirname, '../../.env');
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+  } else {
+    dotenv.config();
+  }
+
+  envLoaded = true;
+}
+
+function shouldSkipRequestLog(pathname: string) {
+  return pathname === '/api/logs' || pathname.startsWith('/api/logs/');
 }
 
 export async function createApp() {
+  loadEnvironment();
+
   // Initialize database first
   const dbManager = DatabaseManager.getInstance();
   await dbManager.initialize(); // create data/app.db
@@ -68,8 +90,15 @@ export async function createApp() {
 
   const app = express();
 
-  // Enable trust proxy setting for rate limiting behind proxies/load balancers.
-  app.set('trust proxy', appConfig.server.trustProxy);
+  // Enable trust proxy setting for rate limiting behind proxies/load balancers
+  app.set('trust proxy', 2);
+
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 3000,
+    message: 'Too many requests from this IP',
+    skip: shouldSkipGlobalRateLimit,
+  });
 
   // Basic middleware
   app.use(
@@ -80,6 +109,7 @@ export async function createApp() {
     })
   );
   app.use(cookieParser()); // Parse cookies for refresh token handling
+  app.use(limiter);
   app.use((req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
     const originalSend = res.send;
@@ -129,7 +159,7 @@ export async function createApp() {
     // Log after response is finished
     res.on('finish', () => {
       // Skip logging for logs endpoints to avoid infinite loops
-      if (req.path.includes('/logs/')) {
+      if (shouldSkipRequestLog(req.path)) {
         return;
       }
 
@@ -162,8 +192,8 @@ export async function createApp() {
   // We use high defaults (100mb/10mb) to ensure a smooth "out-of-the-box" experience
   // for large metadata/storage requests, as per project standards.
   // Users can override these via environment variables for hardened security.
-  const jsonLimit = appConfig.server.maxJsonBodySize;
-  const urlencodedLimit = appConfig.server.maxUrlencodedBodySize;
+  const jsonLimit = process.env.MAX_JSON_BODY_SIZE || '100mb';
+  const urlencodedLimit = process.env.MAX_URLENCODED_BODY_SIZE || '10mb';
 
   app.use(express.json({ limit: jsonLimit }));
   app.use(express.urlencoded({ extended: true, limit: urlencodedLimit }));
@@ -192,26 +222,25 @@ export async function createApp() {
   apiRouter.use('/secrets', secretsRouter);
   apiRouter.use('/usage', usageRouter);
   apiRouter.use('/ai', aiRouter);
-  apiRouter.use('/memory', memoryRouter);
   apiRouter.use('/realtime', realtimeRouter);
   apiRouter.use('/email', emailRouter);
   apiRouter.use('/deployments', deploymentsRouter);
   apiRouter.use('/schedules', schedulesRouter);
   apiRouter.use('/payments', paymentsRouter);
   apiRouter.use('/compute/services', servicesRouter);
-  apiRouter.use('/analytics', analyticsRouter);
+  apiRouter.use('/integrations/posthog', posthogRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
 
-  // Proxy function execution to Deno Deploy or local runtime
+  // Proxy function execution to Deno Subhosting or local runtime
   // this logic is used for backward compatibility, we will let the sdk directly call the edge function
   app.all('/functions/:slug', async (req: Request, res: Response) => {
     const { slug } = req.params;
 
     try {
       const functionService = FunctionService.getInstance();
-      const localRuntime = appConfig.functions.denoRuntimeUrl;
+      const localRuntime = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
 
       // Get target base URL: prefer Subhosting deployment, fallback to local runtime
       const baseUrl =
@@ -222,19 +251,34 @@ export async function createApp() {
       const targetUrl = new URL(`/${slug}`, baseUrl);
       targetUrl.search = new URL(req.url, `http://${req.headers.host}`).search;
 
+      const hasBody = !['GET', 'HEAD'].includes(req.method) && req.body !== undefined;
+
       // Build headers, filtering out non-string values and overriding host
       const headers: Record<string, string> = {};
       for (const [key, value] of Object.entries(req.headers)) {
+        const lowerKey = key.toLowerCase();
+        if (
+          ['host', 'content-length', 'transfer-encoding'].includes(lowerKey) ||
+          (hasBody && lowerKey === 'content-type')
+        ) {
+          continue;
+        }
+
         if (typeof value === 'string') {
           headers[key] = value;
         }
       }
       headers.host = targetUrl.host;
 
+      const body = hasBody ? JSON.stringify(req.body) : undefined;
+      if (body !== undefined) {
+        headers['content-type'] = 'application/json';
+      }
+
       const response = await fetch(targetUrl, {
         method: req.method,
         headers,
-        body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
+        body,
       });
 
       // Read response as raw bytes to preserve binary data (images, PDFs, etc.)
@@ -293,91 +337,8 @@ export async function createApp() {
     });
   }
 
-const __filename = fileURLToPath(import.meta.url);
+  app.use(errorMiddleware);
+  await seedBackend();
 
-function isEntrypoint() {
-  const entrypoint = process.argv[1];
-  return entrypoint ? path.resolve(entrypoint) === __filename : false;
-}
-
-// Use PORT from config (already parsed from env, falls back to 7130)
-const PORT = appConfig.app.port;
-
-async function initializeServer() {
-  try {
-    const app = await createApp();
-    const PORT = parseInt(process.env.PORT || '7130');
-    const server = app.listen(PORT, () => {
-      logger.info(`Backend API service listening on port ${PORT}`);
-    });
-
-    // Initialize Socket.IO service
-    const socketService = SocketManager.getInstance();
-    socketService.initialize(server);
-
-    // Initialize RealtimeManager (pg_notify listener)
-    const realtimeManager = RealtimeManager.getInstance();
-    await realtimeManager.initialize();
-
-    // Sync existing functions to Deno Deploy (non-blocking)
-    const functionService = FunctionService.getInstance();
-    functionService.syncDeployment().catch((err) => {
-      logger.error('Failed to sync functions to Deno Deploy', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
-  } catch (error) {
-    logger.error('Failed to initialize server', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    process.exit(1);
-  }
-}
-
-async function cleanup() {
-  logger.info('Shutting down gracefully...');
-
-  try {
-    const realtimeManager = RealtimeManager.getInstance();
-    await realtimeManager.close();
-  } catch (error) {
-    logger.error('Error closing RealtimeManager', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-
-  try {
-    const socketService = SocketManager.getInstance();
-    socketService.close();
-  } catch (error) {
-    logger.error('Error closing SocketManager', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-
-  try {
-    const oAuthPKCEService = OAuthPKCEService.getInstance();
-    oAuthPKCEService.destroy();
-  } catch (error) {
-    logger.error('Error closing OAuthPKCEService', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-
-  try {
-    destroyEmailCooldownInterval();
-  } catch (error) {
-    logger.error('Error clearing email cooldown interval', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-
-  process.exit(0);
-}
-
-if (isEntrypoint()) {
-  void initializeServer();
-  process.on('SIGINT', () => void cleanup());
-  process.on('SIGTERM', () => void cleanup());
+  return app;
 }

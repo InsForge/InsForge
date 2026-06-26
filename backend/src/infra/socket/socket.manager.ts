@@ -20,9 +20,7 @@ import { RealtimeMessageService } from '@/services/realtime/realtime-message.ser
 import { RealtimePresenceService } from '@/services/realtime/realtime-presence.service.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 
-const tokenManager = TokenManager.getInstance();
-const secretService = SecretService.getInstance();
-const presenceService = RealtimePresenceService.getInstance();
+
 
 /**
  * SocketManager - Industrial-grade Socket.IO implementation
@@ -78,6 +76,7 @@ export class SocketManager {
 
         // Try API key authentication first
         if (apiKey) {
+          const secretService = SecretService.getInstance();
           const isValid = await secretService.verifyApiKey(apiKey);
           if (isValid) {
             socket.data.user = {
@@ -132,6 +131,7 @@ export class SocketManager {
           );
         }
 
+        const tokenManager = TokenManager.getInstance();
         const payload = tokenManager.verifyToken(token);
         if (!payload.role) {
           throw new AppError(
@@ -238,6 +238,7 @@ export class SocketManager {
     });
 
     // Presence: if this was the final socket for any logical member, notify remaining subscribers.
+    const presenceService = RealtimePresenceService.getInstance();
     for (const result of presenceService.removeSocketFromAllRooms(socket.id)) {
       const channel = result.roomName.replace(/^realtime:/, '');
       this.emitPresenceMemberEvent(
@@ -334,6 +335,7 @@ export class SocketManager {
         metadata.subscriptions.add(roomName);
       }
 
+      const presenceService = RealtimePresenceService.getInstance();
       const presence =
         socket.data.presenceType === 'user' && userId
           ? presenceService.trackMember(roomName, socket.id, {
@@ -385,6 +387,7 @@ export class SocketManager {
     const { channel } = payload;
     const roomName = `realtime:${channel}`;
 
+    const presenceService = RealtimePresenceService.getInstance();
     const leavingMember = presenceService.removeSocketFromRoom(roomName, socket.id);
     if (leavingMember) {
       this.emitPresenceMemberEvent(
@@ -658,6 +661,7 @@ export class SocketManager {
 
     // Clear metadata
     this.socketMetadata.clear();
+    const presenceService = RealtimePresenceService.getInstance();
     presenceService.clear();
   }
 }
