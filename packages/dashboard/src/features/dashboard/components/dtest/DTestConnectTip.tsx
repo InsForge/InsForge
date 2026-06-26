@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { getFeatureFlag } from '#lib/analytics/posthog';
+import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 import { useProjectId } from '#lib/hooks/useMetadata';
 import { useDashboardHost, useDashboardProject } from '#lib/config/DashboardHostContext';
 
@@ -28,7 +29,7 @@ function writeConnectTipDismissed(key: string): void {
 // onboarding completes in d_test. Rendered at AppLayout level (not inside
 // AppHeader) because cloud-hosting hides our AppHeader via showNavbar=false.
 export function DTestConnectTip() {
-  const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
+  const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
   const { pathname } = useLocation();
   const isOnInstallPage = pathname === '/dashboard/install';
   // Prefer the host-injected project id (synchronous) so the dismissal state
@@ -58,7 +59,7 @@ export function DTestConnectTip() {
 
   if (
     host.mode !== 'cloud-hosting' ||
-    dashboardVariant !== 'd_test' ||
+    dashboardVariant !== FEATURE_FLAG_VARIANTS.D_TEST ||
     isOnInstallPage ||
     dismissed
   ) {

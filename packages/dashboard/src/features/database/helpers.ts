@@ -4,27 +4,6 @@ import { z } from 'zod';
 
 export const DEFAULT_DATABASE_SCHEMA = 'public' as const;
 
-export const INSFORGE_MANAGED_DATABASE_SCHEMAS = [
-  'ai',
-  'auth',
-  'compute',
-  'cron',
-  'deployments',
-  'email',
-  'functions',
-  'payments',
-  'realtime',
-  'schedules',
-  'storage',
-  'system',
-] as const;
-
-const insforgeManagedDatabaseSchemaSet = new Set<string>(INSFORGE_MANAGED_DATABASE_SCHEMAS);
-
-export function isInsForgeManagedDatabaseSchema(schemaName: string): boolean {
-  return insforgeManagedDatabaseSchemaSet.has(schemaName);
-}
-
 export const SYSTEM_FIELDS = ['id', 'created_at', 'updated_at'];
 
 // Helper function to build dynamic Zod schema based on column definitions
@@ -196,7 +175,7 @@ export function getDatabaseSchemaInfo(
   return (
     schemas?.find((schema) => schema.name === schemaName) ?? {
       name: schemaName,
-      isProtected: isInsForgeManagedDatabaseSchema(schemaName),
+      isProtected: false,
     }
   );
 }

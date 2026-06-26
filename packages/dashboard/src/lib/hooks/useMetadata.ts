@@ -14,8 +14,11 @@ export function useMetadata(options?: UseMetadataOptions) {
     refetch,
   } = useQuery({
     queryKey: ['metadata', 'full'],
-    queryFn: () => metadataService.getFullMetadata(),
+    queryFn: ({ signal }) => metadataService.getFullMetadata(signal),
     staleTime: options?.staleTime ?? 5 * 60 * 1000, // Cache for 5 minutes by default
+    gcTime: Infinity, // Never garbage-collect: cached metadata survives navigation
+    // away from /dashboard so returning to it doesn't trigger a cold skeleton/
+    // empty-metric-card render while the fetch is in flight.
     enabled: options?.enabled ?? true,
   });
 
@@ -39,13 +42,34 @@ export function useApiKey(options?: UseMetadataOptions) {
     refetch,
   } = useQuery({
     queryKey: ['metadata', 'apiKey'],
-    queryFn: () => metadataService.fetchApiKey(),
+    queryFn: ({ signal }) => metadataService.fetchApiKey(signal),
     staleTime: options?.staleTime ?? 10 * 60 * 1000, // Cache for 10 minutes by default
     enabled: options?.enabled ?? true,
   });
 
   return {
     apiKey,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+export function useAnonKey(options?: UseMetadataOptions) {
+  const {
+    data: anonKey,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['metadata', 'anonKey'],
+    queryFn: ({ signal }) => metadataService.fetchAnonKey(signal),
+    staleTime: options?.staleTime ?? 10 * 60 * 1000, // Cache for 10 minutes by default
+    enabled: options?.enabled ?? true,
+  });
+
+  return {
+    anonKey,
     isLoading,
     error,
     refetch,
@@ -60,7 +84,7 @@ export function useProjectId(options?: UseMetadataOptions) {
     refetch,
   } = useQuery({
     queryKey: ['metadata', 'projectId'],
-    queryFn: () => metadataService.fetchProjectId(),
+    queryFn: ({ signal }) => metadataService.fetchProjectId(signal),
     staleTime: options?.staleTime ?? 10 * 60 * 1000,
     enabled: options?.enabled ?? true,
   });
@@ -81,7 +105,7 @@ export function useDatabaseConnectionString(options?: UseMetadataOptions) {
     refetch,
   } = useQuery({
     queryKey: ['metadata', 'databaseConnectionString'],
-    queryFn: () => metadataService.getDatabaseConnectionString(),
+    queryFn: ({ signal }) => metadataService.getDatabaseConnectionString(signal),
     staleTime: 0,
     gcTime: 0,
     enabled: options?.enabled ?? true,
@@ -103,7 +127,7 @@ export function useDatabasePassword(options?: UseMetadataOptions) {
     refetch,
   } = useQuery({
     queryKey: ['metadata', 'databasePassword'],
-    queryFn: () => metadataService.getDatabasePassword(),
+    queryFn: ({ signal }) => metadataService.getDatabasePassword(signal),
     staleTime: 0,
     gcTime: 0,
     enabled: options?.enabled ?? true,

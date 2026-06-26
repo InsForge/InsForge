@@ -63,7 +63,7 @@ export default function FunctionLogsPage() {
     setSelectedLog(null);
   }, []);
 
-  const logsColumns: LogsColumnDef[] = useMemo(
+  const logsColumns: LogsColumnDef<LogSchema>[] = useMemo(
     () => [
       {
         key: 'timestamp',
@@ -79,9 +79,7 @@ export default function FunctionLogsPage() {
         key: 'severity',
         name: 'Type',
         width: '160px',
-        renderCell: ({ row }) => (
-          <SeverityBadge severity={getSeverity(row as unknown as LogSchema)} />
-        ),
+        renderCell: ({ row }) => <SeverityBadge severity={getSeverity(row)} />,
       },
       {
         key: 'event_message',

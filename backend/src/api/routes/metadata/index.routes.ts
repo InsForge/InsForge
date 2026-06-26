@@ -1,18 +1,22 @@
+import { z } from 'zod';
 import { Router, Response, NextFunction } from 'express';
 import { DatabaseAdvanceService } from '@/services/database/database-advance.service.js';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { RealtimeChannelService } from '@/services/realtime/realtime-channel.service.js';
-import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import { AppError } from '@/api/middlewares/error.js';
-import type { AppMetadataSchema, ProjectIdResponse } from '@insforge/shared-schemas';
+import { AppError } from '@/utils/errors.js';
+import {
+  ERROR_CODES,
+  type AnonKeyResponse,
+  type ProjectIdResponse,
+} from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { CloudDatabaseProvider } from '@/providers/database/cloud.provider.js';
+import { MetadataService } from '@/services/metadata/metadata.service.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -21,42 +25,32 @@ const functionService = FunctionService.getInstance();
 const realtimeChannelService = RealtimeChannelService.getInstance();
 const dbManager = DatabaseManager.getInstance();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
-const deploymentService = DeploymentService.getInstance();
+const metadataService = MetadataService.getInstance();
 
 router.use(verifyAdmin);
+
+const metadataQuerySchema = z.object({
+  format: z.enum(['json', 'markdown']).optional().default('json'),
+});
 
 // Get full metadata (default endpoint)
 router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Gather metadata from all modules
+    const queryValidation = metadataQuerySchema.safeParse(req.query);
+    if (!queryValidation.success) {
+      throw new AppError('Invalid format parameter', 400, ERROR_CODES.INVALID_INPUT);
+    }
+    const { format } = queryValidation.data;
 
-    // Fetch all metadata in parallel for better performance
-    const [auth, database, storage, functions, deployments] = await Promise.all([
-      authService.getMetadata(),
-      dbManager.getMetadata(),
-      storageService.getMetadata(),
-      functionService.getMetadata(),
-      deploymentService.getConfigMetadata(),
-    ]);
+    const metadata = await metadataService.getAppMetadata();
 
-    // Get version from package.json or default
-    const version = process.env.npm_package_version || '1.0.0';
-
-    const metadata: AppMetadataSchema = {
-      auth,
-      database,
-      storage,
-      functions,
-      // Deployments slice is omitted entirely on self-hosted backends
-      // (deploymentService.getConfigMetadata returns undefined). Cloud
-      // projects see { customSlug: string | null }. The CLI capability
-      // probe depends on this presence/absence signal to gate
-      // [deployments] TOML sections.
-      ...(deployments ? { deployments } : {}),
-      version,
-    };
-
-    successResponse(res, metadata);
+    if (format === 'markdown') {
+      res
+        .set('Content-Type', 'text/markdown; charset=utf-8')
+        .send(metadataService.formatAsMarkdown(metadata));
+    } else {
+      successResponse(res, metadata);
+    }
   } catch (error) {
     next(error);
   }
@@ -124,6 +118,26 @@ router.get('/api-key', async (req: AuthRequest, res: Response, next: NextFunctio
   }
 });
 
+// Get anon key (admin only)
+// Opaque, non-secret client identifier (`anon_...`) that maps requests to the
+// `anon` role. Safe to embed in frontend bundles; RLS is the security boundary.
+// Seeded at startup by seedBackend(), so it always exists here.
+router.get('/anon-key', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const secretService = SecretService.getInstance();
+    const anonKey = await secretService.getSecretByKey('ANON_KEY');
+
+    if (!anonKey) {
+      throw new AppError('Anon key not initialized', 404, ERROR_CODES.SECRET_NOT_FOUND);
+    }
+
+    const response: AnonKeyResponse = { anonKey };
+    successResponse(res, response);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get backend project id from environment (admin only)
 router.get('/project-id', (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -162,7 +176,7 @@ router.get('/database-password', async (_req: AuthRequest, res: Response, next: 
 });
 
 // get metadata for a table.
-// Notice: must be after fixed endpoints like /api-key and /project-id in case of conflict.
+// Notice: must be after fixed endpoints like /api-key, /anon-key, and /project-id in case of conflict.
 router.get('/:tableName', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { tableName } = req.params;

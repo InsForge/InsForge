@@ -2,9 +2,13 @@ import { Router, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
 import { successResponse } from '@/utils/response.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import { listMessagesRequestSchema, messageStatsRequestSchema } from '@insforge/shared-schemas';
+import { AppError } from '@/utils/errors.js';
+import {
+  clearRealtimeMessagesResponseSchema,
+  ERROR_CODES,
+  listMessagesRequestSchema,
+  messageStatsRequestSchema,
+} from '@insforge/shared-schemas';
 
 const router = Router();
 const messageService = RealtimeMessageService.getInstance();
@@ -22,6 +26,17 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
     }
     const messages = await messageService.list(validation.data);
     successResponse(res, messages);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Clear all messages
+router.delete('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const deleted = await messageService.clearAllMessages();
+    const response = clearRealtimeMessagesResponseSchema.parse({ deleted });
+    successResponse(res, response);
   } catch (error) {
     next(error);
   }

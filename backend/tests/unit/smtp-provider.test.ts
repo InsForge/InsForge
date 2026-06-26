@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SmtpEmailProvider } from '../../src/providers/email/smtp.provider';
-import { AppError } from '../../src/api/middlewares/error';
+import { AppError } from '../../src/utils/errors';
 
 // Mock dependencies
 vi.mock('nodemailer', () => {
@@ -36,7 +36,7 @@ const mockSmtpConfig = {
 };
 
 const mockTemplate = {
-  id: '00000000-0000-0000-0000-000000000001',
+  id: '11111111-1111-4111-8111-111111111111',
   templateType: 'email-verification-code',
   subject: 'Verify your email',
   bodyHtml: '<p>Your code is: {{ token }}</p><p>Email: {{ email }}</p>',

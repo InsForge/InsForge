@@ -1,12 +1,21 @@
 import { useState, useCallback, useRef } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Trash2 } from 'lucide-react';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { Skeleton, PaginationControls, TableHeader } from '#components';
+import {
+  Button,
+  ConfirmDialog,
+  Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@insforge/ui';
+import { PaginationControls, TableHeader } from '#components';
 import { useRealtimeMessages } from '#features/realtime/hooks/useRealtimeMessages';
 import { MessageRow } from '#features/realtime/components/MessageRow';
 import RealtimeEmptyState from '#features/realtime/components/RealtimeEmptyState';
 import type { RealtimeMessage } from '#features/realtime/services/realtime.service';
+import { useConfirm } from '#lib/hooks/useConfirm';
 
 export default function RealtimeMessagesPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -14,6 +23,7 @@ export default function RealtimeMessagesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { confirm, confirmDialogProps } = useConfirm();
 
   const handleScroll = useCallback(() => {
     if (scrollRef.current) {
@@ -30,6 +40,8 @@ export default function RealtimeMessagesPage() {
     messagesTotalCount,
     messagesPageSize,
     setMessagesPage,
+    clearMessages,
+    isClearingMessages,
   } = useRealtimeMessages();
 
   const handleSearchChange = useCallback((value: string) => {
@@ -50,6 +62,26 @@ export default function RealtimeMessagesPage() {
       await refetchMessages();
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleClearMessages = async () => {
+    const shouldClear = await confirm({
+      title: 'Clear Realtime Messages',
+      description:
+        'This will permanently delete every stored realtime message. This action cannot be undone.',
+      confirmText: 'Clear Messages',
+      destructive: true,
+    });
+
+    if (!shouldClear) {
+      return;
+    }
+
+    try {
+      await clearMessages();
+    } catch {
+      // The mutation hook already handles error toasts; swallow here to avoid an unhandled rejection.
     }
   };
 
@@ -143,6 +175,25 @@ export default function RealtimeMessagesPage() {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Clear messages"
+                    onClick={() => void handleClearMessages()}
+                    disabled={isClearingMessages}
+                    className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                  >
+                    <Trash2 className="h-5 w-5 text-[#717A7A]" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="center">
+                  <p>{isClearingMessages ? 'Clearing...' : 'Clear messages'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         }
         searchValue={searchQuery}
@@ -222,6 +273,7 @@ export default function RealtimeMessagesPage() {
           />
         </div>
       )}
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }

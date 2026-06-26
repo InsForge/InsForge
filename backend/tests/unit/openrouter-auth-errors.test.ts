@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import OpenAI from 'openai';
 
-const { mockGetApiKeyWithSource, mockGetClient, mockRenewCloudApiKey } = vi.hoisted(() => ({
+const { mockGetApiKeyWithSource, mockGetClient } = vi.hoisted(() => ({
   mockGetApiKeyWithSource: vi.fn(),
   mockGetClient: vi.fn(),
-  mockRenewCloudApiKey: vi.fn(),
 }));
 
 vi.mock('../../src/utils/environment.js', () => ({
@@ -16,7 +15,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 import { OpenRouterProvider } from '../../src/providers/ai/openrouter.provider.js';
-import { ERROR_CODES } from '../../src/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 function createAPIError(status: number, message: string): OpenAI.APIError {
   return new OpenAI.APIError(status, { message }, message, new Headers());
@@ -34,7 +33,34 @@ describe('OpenRouterProvider authentication error handling', () => {
     const p = provider as Record<string, any>;
     p.getApiKeyWithSource = mockGetApiKeyWithSource;
     p.getClient = mockGetClient.mockResolvedValue(new OpenAI({ apiKey: 'test' }));
-    p.renewCloudApiKey = mockRenewCloudApiKey;
+  });
+
+  it('throws AppError with BILLING_INSUFFICIENT_BALANCE for cloud key 402 without renewing', async () => {
+    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'cloud-key', source: 'cloud' });
+
+    await expect(
+      provider.sendRequest(() => {
+        throw createAPIError(402, 'Insufficient credits');
+      })
+    ).rejects.toMatchObject({
+      statusCode: 402,
+      code: ERROR_CODES.BILLING_INSUFFICIENT_BALANCE,
+      nextActions: expect.stringContaining('Upgrade your plan'),
+    });
+  });
+
+  it('throws AppError with BILLING_INSUFFICIENT_BALANCE for env key 402', async () => {
+    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'env' });
+
+    await expect(
+      provider.sendRequest(() => {
+        throw createAPIError(402, 'Insufficient credits');
+      })
+    ).rejects.toMatchObject({
+      statusCode: 402,
+      code: ERROR_CODES.BILLING_INSUFFICIENT_BALANCE,
+      nextActions: expect.stringContaining('OpenRouter account'),
+    });
   });
 
   it('throws AppError with AI_INVALID_API_KEY for env key 401', async () => {
@@ -79,7 +105,7 @@ describe('OpenRouterProvider authentication error handling', () => {
     });
   });
 
-  it('still throws raw error for non-API errors', async () => {
+  it('maps non-API provider errors to AI_UPSTREAM_UNAVAILABLE', async () => {
     mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'env' });
 
     const networkError = new Error('ECONNREFUSED');
@@ -88,16 +114,24 @@ describe('OpenRouterProvider authentication error handling', () => {
       provider.sendRequest(() => {
         throw networkError;
       })
-    ).rejects.toBe(networkError);
+    ).rejects.toMatchObject({
+      statusCode: 502,
+      code: ERROR_CODES.AI_UPSTREAM_UNAVAILABLE,
+      message: 'ECONNREFUSED',
+    });
   });
 
-  it('still throws raw error for 500 API errors', async () => {
+  it('maps 500 API errors to AI_UPSTREAM_UNAVAILABLE', async () => {
     mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'env' });
 
     await expect(
       provider.sendRequest(() => {
         throw createAPIError(500, 'Internal Server Error');
       })
-    ).rejects.toBeInstanceOf(OpenAI.APIError);
+    ).rejects.toMatchObject({
+      statusCode: 500,
+      code: ERROR_CODES.AI_UPSTREAM_UNAVAILABLE,
+      message: expect.stringContaining('Internal Server Error'),
+    });
   });
 });

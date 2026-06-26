@@ -1,7 +1,6 @@
 import type { ComponentProps } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { Button, Input } from '@insforge/ui';
-import { cn } from '#lib/utils/utils';
+import { Button, Input, cn } from '@insforge/ui';
 
 interface SecretInputProps extends ComponentProps<typeof Input> {
   isVisible: boolean;

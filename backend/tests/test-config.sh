@@ -6,9 +6,9 @@
 # API Configuration
 export TEST_API_BASE="${TEST_API_BASE:-http://localhost:7130/api}"
 
-# Admin credentials - can be overridden by environment variables
-export TEST_ADMIN_EMAIL="${TEST_ADMIN_EMAIL:-${ADMIN_EMAIL:-admin@example.com}}"
-export TEST_ADMIN_PASSWORD="${TEST_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}"
+# Root admin credentials - can be overridden by environment variables
+export TEST_ADMIN_USERNAME="${TEST_ADMIN_USERNAME:-${ROOT_ADMIN_USERNAME:-admin}}"
+export TEST_ADMIN_PASSWORD="${TEST_ADMIN_PASSWORD:-${ROOT_ADMIN_PASSWORD:-change-this-password}}"
 
 # User test credentials
 export TEST_USER_EMAIL_PREFIX="${TEST_USER_EMAIL_PREFIX:-testuser_}"
@@ -38,12 +38,28 @@ print_blue() {
     echo -e "${BLUE}$1${NC}"
 }
 
+# Build admin login JSON without trusting shell string interpolation.
+build_admin_login_payload() {
+    if command -v jq &> /dev/null; then
+        jq -cn \
+            --arg username "$1" \
+            --arg password "$2" \
+            '{username: $username, password: $password}'
+    else
+        node -e 'process.stdout.write(JSON.stringify({ username: process.argv[1] ?? "", password: process.argv[2] ?? "" }))' "$1" "$2"
+    fi
+}
+
 # Function to login as admin and get token
 get_admin_token() {
     # Use JWT admin endpoint
-    local response=$(curl -s -X POST "$TEST_API_BASE/auth/admin/sessions" \
+    local payload
+    payload=$(build_admin_login_payload "$TEST_ADMIN_USERNAME" "$TEST_ADMIN_PASSWORD")
+
+    local response
+    response=$(curl -s -X POST "$TEST_API_BASE/auth/admin/sessions" \
         -H "Content-Type: application/json" \
-        -d "{\"email\":\"$TEST_ADMIN_EMAIL\",\"password\":\"$TEST_ADMIN_PASSWORD\"}")
+        -d "$payload")
     
     if echo "$response" | grep -q '"accessToken"'; then
             echo "$response" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4
@@ -102,15 +118,31 @@ register_test_bucket() {
     TEST_BUCKETS_CREATED+=("$bucket_name")
 }
 
+# Function to get the public anon key from the metadata endpoint (requires admin auth)
+get_anon_key() {
+    local admin_token
+    admin_token=$(get_admin_token)
+    if [ -z "$admin_token" ]; then
+        echo ""
+        return 1
+    fi
+    local response
+    response=$(curl -s "$TEST_API_BASE/metadata/anon-key" \
+        -H "Authorization: Bearer $admin_token")
+    echo "$response" | grep -o '"anonKey":"[^"]*"' | cut -d'"' -f4
+}
+
 # Function to register a user with Better Auth
 register_user() {
     local email=$1
     local password=$2
     local name=${3:-"Test User"}
+    local anon_key="${4:-${ACCESS_ANON_KEY:-$(get_anon_key)}}"
     
-    # Use JWT registration
+    # Use JWT registration (requires anon key in Authorization header)
     curl -s -X POST "$TEST_API_BASE/auth/users" \
         -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $anon_key" \
         -d "{\"email\":\"$email\",\"password\":\"$password\",\"name\":\"$name\"}"
 }
 
@@ -151,7 +183,7 @@ cleanup_test_data() {
     
     local cleanup_failed=0
     
-    # Try to get credentials - but continue cleanup even if they fail
+    # Try to get root admin credentials - but continue cleanup even if they fail
     local admin_token=$(get_admin_token 2>/dev/null || echo "")
     local api_key=$(get_admin_api_key 2>/dev/null || echo "")
     

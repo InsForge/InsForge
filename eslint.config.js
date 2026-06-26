@@ -260,6 +260,20 @@ export default defineConfig(
           selector: 'enumMember',
           format: ['UPPER_CASE'],
         },
+        // Shared schemas model external wire contracts. Object literal keys may
+        // intentionally use snake_case while local identifiers stay camelCase.
+        {
+          selector: 'objectLiteralProperty',
+          format: ['camelCase', 'snake_case'],
+          leadingUnderscore: 'allow',
+        },
+        // Allow exported constant maps like ERROR_CODES.
+        {
+          selector: 'variable',
+          modifiers: ['const', 'global'],
+          format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+          leadingUnderscore: 'allow',
+        },
         // Default for everything else - camelCase
         {
           selector: 'default',

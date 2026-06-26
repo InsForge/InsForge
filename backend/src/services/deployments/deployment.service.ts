@@ -9,8 +9,7 @@ import {
   type VercelDomainConfig,
 } from '@/providers/deployments/vercel.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import {
   DeploymentStatus,
@@ -18,20 +17,22 @@ import {
   type DeploymentStatusType,
 } from '@/types/deployments.js';
 import logger from '@/utils/logger.js';
-import type {
-  CreateDeploymentResponse,
-  CreateDirectDeploymentRequest,
-  CreateDirectDeploymentResponse,
-  DeploymentManifestFile,
-  UploadDeploymentFileResponse,
-  StartDeploymentRequest,
-  UpdateSlugResponse,
-  DeploymentMetadataResponse,
-  CustomDomain,
-  ListCustomDomainsResponse,
-  AddCustomDomainResponse,
-  VerifyCustomDomainResponse,
-  DeploymentsMetadataSchema,
+import { appConfig } from '@/infra/config/app.config.js';
+import {
+  ERROR_CODES,
+  type CreateDeploymentResponse,
+  type CreateDirectDeploymentRequest,
+  type CreateDirectDeploymentResponse,
+  type DeploymentManifestFile,
+  type UploadDeploymentFileResponse,
+  type StartDeploymentRequest,
+  type UpdateSlugResponse,
+  type DeploymentMetadataResponse,
+  type CustomDomain,
+  type ListCustomDomainsResponse,
+  type AddCustomDomainResponse,
+  type VerifyCustomDomainResponse,
+  type DeploymentsMetadataSchema,
 } from '@insforge/shared-schemas';
 
 export type {
@@ -44,9 +45,6 @@ export type {
   VerifyCustomDomainResponse,
 };
 
-const DEFAULT_MAX_DEPLOYMENT_FILES = 5000;
-const DEFAULT_MAX_DEPLOYMENT_TOTAL_BYTES = 100 * 1024 * 1024;
-const DEFAULT_MAX_DEPLOYMENT_FILE_BYTES = 100 * 1024 * 1024;
 const DEPLOYMENT_BUCKET = '_deployments';
 const getDeploymentKey = (id: string) => `${id}.zip`;
 
@@ -71,15 +69,11 @@ export class DeploymentService {
   }
 
   private initializeS3Provider(): void {
-    const s3Bucket = process.env.AWS_S3_BUCKET;
-    const appKey = process.env.APP_KEY || 'local';
+    const s3Bucket = appConfig.storage.s3Bucket;
+    const appKey = appConfig.storage.appKey;
 
     if (s3Bucket) {
-      this.s3Provider = new S3StorageProvider(
-        s3Bucket,
-        appKey,
-        process.env.AWS_REGION || 'us-east-2'
-      );
+      this.s3Provider = new S3StorageProvider(s3Bucket, appKey, appConfig.storage.awsRegion);
       this.s3Provider.initialize();
     }
   }
@@ -356,7 +350,7 @@ export class DeploymentService {
       const deployment = await this.getDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
 
       if (
@@ -366,21 +360,25 @@ export class DeploymentService {
         throw new AppError(
           `Deployment files can only be uploaded while status is WAITING or UPLOADING. Current status: ${deployment.status}`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          ERROR_CODES.DEPLOYMENT_INVALID_FILE
         );
       }
 
       const file = await this.getDeploymentFileById(id, fileId);
 
       if (!file) {
-        throw new AppError(`Deployment file not found: ${fileId}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(
+          `Deployment file not found: ${fileId}`,
+          404,
+          ERROR_CODES.DEPLOYMENT_NOT_FOUND
+        );
       }
 
       if (this.getUploadMode(deployment, 1) !== 'direct') {
         throw new AppError(
           'Deployment files can only be uploaded for direct deployments.',
           400,
-          ERROR_CODES.INVALID_INPUT
+          ERROR_CODES.DEPLOYMENT_INVALID_FILE
         );
       }
 
@@ -458,7 +456,7 @@ export class DeploymentService {
       const deployment = await this.getDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
 
       if (
@@ -587,7 +585,7 @@ export class DeploymentService {
       await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
         error: 'No files found in source zip.',
       });
-      throw new AppError('No files found in source zip.', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('No files found in source zip.', 400, ERROR_CODES.DEPLOYMENT_INVALID_FILE);
     }
 
     if (input.envVars && input.envVars.length > 0) {
@@ -714,27 +712,16 @@ export class DeploymentService {
     return providerUrl;
   }
 
-  private getPositiveIntegerEnv(name: string, fallback: number): number {
-    const parsed = Number.parseInt(process.env[name] ?? '', 10);
-    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
-  }
-
   private getMaxDeploymentFiles(): number {
-    return this.getPositiveIntegerEnv('MAX_DEPLOYMENT_FILES', DEFAULT_MAX_DEPLOYMENT_FILES);
+    return appConfig.deployments.maxDeploymentFiles;
   }
 
   private getMaxDeploymentTotalBytes(): number {
-    return this.getPositiveIntegerEnv(
-      'MAX_DEPLOYMENT_TOTAL_BYTES',
-      DEFAULT_MAX_DEPLOYMENT_TOTAL_BYTES
-    );
+    return appConfig.deployments.maxDeploymentTotalBytes;
   }
 
   private getMaxDeploymentFileBytes(): number {
-    return this.getPositiveIntegerEnv(
-      'MAX_DEPLOYMENT_FILE_BYTES',
-      DEFAULT_MAX_DEPLOYMENT_FILE_BYTES
-    );
+    return appConfig.deployments.maxDeploymentFileBytes;
   }
 
   private normalizeDeploymentFilePath(filePath: string): string {
@@ -753,7 +740,11 @@ export class DeploymentService {
       );
     }
     if (filePath.startsWith('/')) {
-      throw new AppError('Deployment file path must be relative.', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError(
+        'Deployment file path must be relative.',
+        400,
+        ERROR_CODES.DEPLOYMENT_INVALID_FILE
+      );
     }
 
     const parts = filePath.split('/');
@@ -1164,7 +1155,7 @@ export class DeploymentService {
       const deployment = await this.getDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
 
       // If deployment has a Vercel ID, cancel it on Vercel
@@ -1312,7 +1303,7 @@ export class DeploymentService {
       );
     }
 
-    const projectId = process.env.PROJECT_ID;
+    const projectId = appConfig.cloud.projectId;
     if (!projectId) {
       throw new AppError(
         'PROJECT_ID not found in environment variables',
@@ -1321,7 +1312,7 @@ export class DeploymentService {
       );
     }
 
-    const jwtSecret = process.env.JWT_SECRET;
+    const jwtSecret = appConfig.app.jwtSecret;
     if (!jwtSecret) {
       throw new AppError(
         'JWT_SECRET not found in environment variables',
@@ -1332,7 +1323,7 @@ export class DeploymentService {
 
     try {
       const signature = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
-      const cloudApiHost = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
+      const cloudApiHost = appConfig.cloud.apiHost;
 
       const response = await fetch(`${cloudApiHost}/sites/v1/${projectId}/slug`, {
         method: 'PUT',
@@ -1350,7 +1341,7 @@ export class DeploymentService {
         throw new AppError(
           errorData.error || 'Slug is already taken',
           409,
-          ERROR_CODES.ALREADY_EXISTS
+          ERROR_CODES.DEPLOYMENT_ALREADY_EXISTS
         );
       }
 

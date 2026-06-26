@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { SortColumn } from 'react-data-grid';
 import { AlertCircle, Mail } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
@@ -13,14 +13,16 @@ import {
   DataGridEmptyState,
   ErrorState,
   LoadingState,
-  TableHeader,
   type DataGridColumn,
   type DataGridRowType,
+  TableHeader,
 } from '#components';
-import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
+import { PaymentsOnboardingState } from '#features/payments/components/PaymentsOnboardingState';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
+import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
-import { cn } from '#lib/utils/utils';
+import { cn } from '@insforge/ui';
+import { formatCurrencyAmount } from '#features/payments/helpers';
 
 type CustomerBadgeVariant = 'deleted' | 'guest' | null;
 
@@ -152,6 +154,8 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
   },
 ];
 
+// Intentionally NOT the shared formatDateTime — this uses a zero-padded hour
+// ("03:30 PM") where the shared one renders "3:30 PM". Keep it local.
 function formatDateTime(value: string | null) {
   if (!value) {
     return '-';
@@ -171,28 +175,8 @@ function formatDateTime(value: string | null) {
   }).format(date);
 }
 
-function formatCurrencyAmount(amount: number | null, currency: string | null) {
-  if (amount === null || !currency) {
-    return '-';
-  }
-
-  const normalizedCurrency = currency.toUpperCase();
-  const fractionDigits =
-    new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: normalizedCurrency,
-      currencyDisplay: 'code',
-    }).resolvedOptions().maximumFractionDigits ?? 2;
-
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: normalizedCurrency,
-    currencyDisplay: 'code',
-  }).format(amount / 10 ** fractionDigits);
-}
-
 function getCustomerLabel(customer: PaymentCustomerListItem) {
-  return customer.name ?? customer.email ?? customer.stripeCustomerId;
+  return customer.name ?? customer.email ?? customer.providerCustomerId;
 }
 
 function getCustomerBadgeVariant(customer: PaymentCustomerListItem): CustomerBadgeVariant {
@@ -385,15 +369,23 @@ function CountryCell({ code, name }: { code: string | null; name: string | null 
 }
 
 export default function CustomersPage() {
-  const { openPaymentsSettings, environment } = useOutletContext<PaymentsOutletContext>();
+  const { openPaymentsSettings, provider, setProvider, environment } =
+    useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([
     { columnKey: 'lastPaymentAt', direction: 'DESC' },
   ]);
 
-  const { activeConnection, customers, isLoading, error, refetch } =
-    usePaymentCustomers(environment);
-  const hasActiveKey = !!activeConnection?.maskedKey;
+  const {
+    activeConnection,
+    activeRazorpayConnection,
+
+    hasActiveKey,
+    customers,
+    isLoading,
+    error,
+    refetch,
+  } = usePaymentCustomers(provider, environment);
 
   const filteredCustomers = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -403,7 +395,7 @@ export default function CustomersPage() {
 
     return customers.filter((customer) =>
       [
-        customer.stripeCustomerId,
+        customer.providerCustomerId,
         customer.email,
         customer.name,
         customer.phone,
@@ -421,8 +413,8 @@ export default function CustomersPage() {
   const customerRows = useMemo<CustomerGridRow[]>(
     () =>
       filteredCustomers.map((customer) => ({
-        id: `${customer.environment}:${customer.stripeCustomerId}`,
-        customerId: customer.stripeCustomerId,
+        id: `${customer.environment}:${customer.providerCustomerId}`,
+        customerId: customer.providerCustomerId,
         customer: getCustomerLabel(customer),
         email: customer.email,
         paymentMethodBrand: customer.paymentMethodBrand,
@@ -431,7 +423,7 @@ export default function CustomersPage() {
         countryName: getCountryName(customer.countryCode),
         totalSpend: customer.totalSpend,
         totalSpendCurrency: customer.totalSpendCurrency,
-        createdAt: customer.stripeCreatedAt,
+        createdAt: customer.providerCreatedAt,
         paymentsCount: customer.paymentsCount,
         lastPaymentAt: customer.lastPaymentAt,
         badgeVariant: getCustomerBadgeVariant(customer),
@@ -463,33 +455,53 @@ export default function CustomersPage() {
     });
   }, [customerRows, sortColumns]);
 
-  const handlePageChange = useCallback((_page: number) => {}, []);
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    pageSize,
+    startIndex,
+    endIndex,
+    showPagination,
+  } = usePaymentClientPagination(sortedCustomerRows.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [environment, provider, searchQuery, setCurrentPage, sortColumns]);
+
+  const paginatedCustomerRows = useMemo(
+    () => sortedCustomerRows.slice(startIndex, endIndex),
+    [endIndex, sortedCustomerRows, startIndex]
+  );
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <TableHeader
-        title="Customers"
-        className="h-14 min-h-14"
-        leftClassName="py-0"
-        rightClassName="py-0"
-        showSearch={hasActiveKey}
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchDebounceTime={300}
-        searchPlaceholder="Search customer"
-        searchInputClassName="w-[280px]"
-      />
+      {hasActiveKey && (
+        <TableHeader
+          className="h-14 min-h-14"
+          leftClassName="py-0"
+          rightClassName="py-0"
+          title="Customers"
+          showSearch
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchDebounceTime={300}
+          searchPlaceholder="Search customer"
+          searchInputClassName="w-[280px]"
+        />
+      )}
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {error ? (
           <ErrorState error={error as Error} onRetry={() => void refetch()} />
         ) : isLoading ? (
-          <LoadingState message="Loading Stripe customers..." />
+          <LoadingState message="Loading customers..." />
         ) : !hasActiveKey ? (
-          <PaymentsKeyMissingState
+          <PaymentsOnboardingState
+            provider={provider}
             environment={environment}
-            resourceLabel="customers"
             onConfigure={openPaymentsSettings}
+            onProviderChange={setProvider}
           />
         ) : (
           <div className="flex h-full flex-col">
@@ -497,9 +509,20 @@ export default function CustomersPage() {
               <div className="px-3 py-3">
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Latest sync failed</AlertTitle>
+                  <AlertTitle>Latest Stripe sync failed</AlertTitle>
                   <AlertDescription className="mt-2">
                     {activeConnection.lastSyncError}
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+            {activeRazorpayConnection?.lastSyncError && (
+              <div className="px-3 py-3">
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Latest Razorpay sync failed</AlertTitle>
+                  <AlertDescription className="mt-2">
+                    {activeRazorpayConnection.lastSyncError}
                   </AlertDescription>
                 </Alert>
               </div>
@@ -507,16 +530,17 @@ export default function CustomersPage() {
 
             <div className="min-h-0 flex-1 overflow-hidden">
               <DataGrid<CustomerGridRow>
-                data={sortedCustomerRows}
+                data={paginatedCustomerRows}
                 columns={CUSTOMER_COLUMNS}
                 sortColumns={sortColumns}
                 onSortColumnsChange={setSortColumns}
-                currentPage={1}
-                totalPages={1}
-                pageSize={Math.max(sortedCustomerRows.length, 1)}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
                 totalRecords={sortedCustomerRows.length}
-                onPageChange={handlePageChange}
+                onPageChange={setCurrentPage}
                 paginationRecordLabel="customers"
+                showPagination={showPagination}
                 showSelection={false}
                 showTypeBadge={false}
                 headerRowHeight={32}

@@ -1,17 +1,15 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Database, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Link, useLocation, useMatch, useNavigate } from 'react-router-dom';
-import EmptyBoxSvg from '#assets/images/empty_box.svg?react';
 import {
+  EmptyStateIllustration,
   FeatureSidebar,
   type FeatureSidebarActionButton,
   type FeatureSidebarItemAction,
   type FeatureSidebarListItem,
 } from '#components';
 import { ScrollArea } from '#components/radix/ScrollArea';
-import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
-import { cn } from '#lib/utils/utils';
-import { Button } from '@insforge/ui';
+import { Button, cn } from '@insforge/ui';
 import { DatabaseSchemaSelect } from '#features/database/components/DatabaseSchemaSelect';
 import type { DatabaseSchemaInfo } from '@insforge/shared-schemas';
 
@@ -113,8 +111,6 @@ function DatabaseStudioSidebarItem({ label, href, sectionEnd }: DatabaseStudioSi
 const STUDIO_MENU_TRANSITION_MS = 260;
 
 export function DatabaseStudioSidebarPanel({ onBack }: DatabaseStudioSidebarPanelProps) {
-  const isCloudHostingMode = useIsCloudHostingMode();
-
   return (
     <aside className="h-full w-60 flex flex-col border-r border-border bg-semantic-1 flex-shrink-0">
       <div className="p-3">
@@ -130,17 +126,14 @@ export function DatabaseStudioSidebarPanel({ onBack }: DatabaseStudioSidebarPane
 
       <ScrollArea className="flex-1 px-3 pb-2">
         <div className="flex flex-col gap-1.5">
-          {(isCloudHostingMode
-            ? [
-                ...DATABASE_STUDIO_SIDEBAR_BASE_ITEMS,
-                {
-                  id: 'backups',
-                  label: 'Backup & Restore',
-                  href: '/dashboard/database/backups',
-                },
-              ]
-            : DATABASE_STUDIO_SIDEBAR_BASE_ITEMS
-          ).map((item) => (
+          {[
+            ...DATABASE_STUDIO_SIDEBAR_BASE_ITEMS,
+            {
+              id: 'backups',
+              label: 'Backup & Restore',
+              href: '/dashboard/database/backups',
+            },
+          ].map((item) => (
             <DatabaseStudioSidebarItem
               key={item.id}
               label={item.label}
@@ -282,16 +275,7 @@ export function DatabaseSidebar({
             emptyState={
               showEmptyState ? (
                 <div className="flex flex-col items-center gap-2 pt-2 text-center">
-                  <EmptyBoxSvg
-                    className="h-[95px] w-[160px]"
-                    style={
-                      {
-                        '--empty-box-fill-primary': 'rgb(var(--semantic-2))',
-                        '--empty-box-fill-secondary': 'rgb(var(--semantic-6))',
-                      } as CSSProperties
-                    }
-                    aria-hidden="true"
-                  />
+                  <EmptyStateIllustration />
                   <p className="text-sm font-medium leading-6 text-muted-foreground">
                     No Table Yet
                   </p>

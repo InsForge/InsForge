@@ -3,9 +3,8 @@ import { LogService } from '@/services/logs/log.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
-import { GetLogsResponse } from '@insforge/shared-schemas';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES, type GetLogsResponse } from '@insforge/shared-schemas';
+import { AppError } from '@/utils/errors.js';
 
 const router = Router();
 
@@ -95,7 +94,7 @@ router.get('/stats', async (_req: AuthRequest, res: Response, next: NextFunction
   }
 });
 
-// GET /logs/functions/build-logs - Get function build logs from Deno Subhosting
+// GET /logs/functions/build-logs - Get function build logs from Deno Deploy
 router.get('/functions/build-logs', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { deployment_id } = req.query;
@@ -105,9 +104,9 @@ router.get('/functions/build-logs', async (req: AuthRequest, res: Response, next
 
     if (!result) {
       throw new AppError(
-        'Build logs not available. Deno Subhosting may not be configured or no deployments found.',
+        'Build logs not available. Deno Deploy may not be configured or no deployments found.',
         404,
-        ERROR_CODES.NOT_FOUND
+        ERROR_CODES.LOG_NOT_FOUND
       );
     }
 

@@ -9,6 +9,7 @@ import {
   databasePolicySchema,
   databaseTriggerSchema,
   migrationSchema,
+  databaseBackupSchema,
 } from './database.schema.js';
 
 export const createTableRequestSchema = tableSchema
@@ -403,6 +404,41 @@ export const databaseMigrationsResponseSchema = z.object({
   migrations: z.array(migrationSchema),
 });
 
+// Database Backup Schemas
+export const createDatabaseBackupRequestSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Backup name cannot be empty')
+    .max(64, 'Backup name must be less than 64 characters')
+    .optional(),
+});
+
+export const renameDatabaseBackupRequestSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Backup name cannot be empty')
+    .max(64, 'Backup name must be less than 64 characters')
+    .nullable(),
+});
+
+export const databaseBackupsResponseSchema = z.object({
+  backups: z.array(databaseBackupSchema),
+});
+
+export const createDatabaseBackupResponseSchema = databaseBackupSchema;
+
+export const updateDatabaseBackupResponseSchema = databaseBackupSchema;
+
+export const deleteDatabaseBackupResponseSchema = z.object({
+  message: z.string(),
+});
+
+export const restoreDatabaseBackupResponseSchema = z.object({
+  message: z.string(),
+});
+
 // Database Metadata Response Types
 export type DatabaseFunctionsResponse = z.infer<typeof databaseFunctionsResponseSchema>;
 export type DatabaseSchemasResponse = z.infer<typeof databaseSchemasResponseSchema>;
@@ -410,3 +446,12 @@ export type DatabaseIndexesResponse = z.infer<typeof databaseIndexesResponseSche
 export type DatabasePoliciesResponse = z.infer<typeof databasePoliciesResponseSchema>;
 export type DatabaseTriggersResponse = z.infer<typeof databaseTriggersResponseSchema>;
 export type DatabaseMigrationsResponse = z.infer<typeof databaseMigrationsResponseSchema>;
+
+// Database Backup Types
+export type CreateDatabaseBackupRequest = z.infer<typeof createDatabaseBackupRequestSchema>;
+export type RenameDatabaseBackupRequest = z.infer<typeof renameDatabaseBackupRequestSchema>;
+export type DatabaseBackupsResponse = z.infer<typeof databaseBackupsResponseSchema>;
+export type CreateDatabaseBackupResponse = z.infer<typeof createDatabaseBackupResponseSchema>;
+export type UpdateDatabaseBackupResponse = z.infer<typeof updateDatabaseBackupResponseSchema>;
+export type DeleteDatabaseBackupResponse = z.infer<typeof deleteDatabaseBackupResponseSchema>;
+export type RestoreDatabaseBackupResponse = z.infer<typeof restoreDatabaseBackupResponseSchema>;

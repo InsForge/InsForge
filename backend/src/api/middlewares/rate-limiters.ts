@@ -1,8 +1,8 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
-import { AppError } from './error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 /**
  * Store for tracking per-email cooldowns
@@ -85,6 +85,33 @@ export const s3AccessKeyManagementRateLimiter = rateLimit({
     next(
       new AppError(
         'Too many S3 access key management requests from this IP. Please try again in 15 minutes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+  skipSuccessfulRequests: false,
+  skipFailedRequests: false,
+});
+
+/**
+ * Per-IP rate limiter for the compute logs endpoint.
+ * Unlike the write limiters, this is a read endpoint the dashboard polls every
+ * ~2s while live-tailing, so the budget is generous — it exists to cap retry
+ * storms / abuse, not to throttle normal tailing (≈30 req/min) across a few
+ * open tabs.
+ *
+ * Limits: 120 requests per minute per IP.
+ */
+export const computeLogsRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many log requests from this IP. Please slow down and try again shortly.',
         429,
         ERROR_CODES.TOO_MANY_REQUESTS
       )

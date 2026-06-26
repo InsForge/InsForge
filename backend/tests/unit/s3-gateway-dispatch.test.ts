@@ -48,6 +48,20 @@ describe('dispatchOp', () => {
     expect(dispatchOp(make('GET', '/mybucket?location'))).toBe('GetBucketLocation'));
   it('GetBucketVersioning stub', () =>
     expect(dispatchOp(make('GET', '/mybucket?versioning'))).toBe('GetBucketVersioning'));
+  it('PutBucketVersioning', () =>
+    expect(dispatchOp(make('PUT', '/mybucket?versioning'))).toBe('PutBucketVersioning'));
+  it('GetBucketCors', () =>
+    expect(dispatchOp(make('GET', '/mybucket?cors'))).toBe('GetBucketCors'));
+  it('PutBucketCors', () =>
+    expect(dispatchOp(make('PUT', '/mybucket?cors'))).toBe('PutBucketCors'));
+  it('DeleteBucketCors', () =>
+    expect(dispatchOp(make('DELETE', '/mybucket?cors'))).toBe('DeleteBucketCors'));
+  it('GetObjectTagging', () =>
+    expect(dispatchOp(make('GET', '/mybucket/k?tagging'))).toBe('GetObjectTagging'));
+  it('PutObjectTagging', () =>
+    expect(dispatchOp(make('PUT', '/mybucket/k?tagging'))).toBe('PutObjectTagging'));
+  it('DeleteObjectTagging', () =>
+    expect(dispatchOp(make('DELETE', '/mybucket/k?tagging'))).toBe('DeleteObjectTagging'));
   it('unknown method → null', () => expect(dispatchOp(make('PATCH', '/mybucket/k'))).toBeNull());
   it('unknown POST without delete/uploads → null', () =>
     expect(dispatchOp(make('POST', '/mybucket/k'))).toBeNull());

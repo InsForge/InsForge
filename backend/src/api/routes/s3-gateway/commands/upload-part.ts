@@ -6,10 +6,11 @@ import {
   ChunkSignatureV4Parser,
 } from '@/services/storage/s3-signature.js';
 import { sendS3Error, S3ProtocolError } from '../errors.js';
-import { S3AuthenticatedRequest } from '@/api/middlewares/s3-sigv4.js';
+import { S3GatewayRequest, getS3Bucket, getS3Key } from '../request.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
-const MAX_PART_BYTES = 5 * 1024 * 1024 * 1024;
 const MAX_PART_NUMBER = 10_000;
+const AWS_S3_PER_PART_HARD_CAP = 5 * 1024 * 1024 * 1024;
 
 class ByteLimitStream extends Transform {
   private received = 0;
@@ -69,9 +70,10 @@ function parseDecodedLength(raw: unknown): number | null {
   return Number(raw);
 }
 
-export async function handle(req: S3AuthenticatedRequest, res: Response): Promise<void> {
-  const bucket = (req as unknown as { s3Bucket: string }).s3Bucket;
-  const key = (req as unknown as { s3Key: string }).s3Key;
+export async function handle(req: S3GatewayRequest, res: Response): Promise<void> {
+  const bucket = getS3Bucket(req);
+  const key = getS3Key(req);
+  const partLimit = Math.min(appConfig.storage.maxS3UploadSize, AWS_S3_PER_PART_HARD_CAP);
 
   const partNumberRaw = req.query.partNumber;
   const uploadIdRaw = req.query.uploadId;
@@ -117,7 +119,7 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
     });
     return;
   }
-  if (contentLength > MAX_PART_BYTES) {
+  if (contentLength > partLimit) {
     sendS3Error(res, 'EntityTooLarge', `Part too large: ${contentLength}`, {
       resource: req.path,
       requestId: req.s3Auth.requestId,
@@ -134,13 +136,13 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
       scope: req.s3Auth.scope,
       acceptTrailer: isSignedStreamTrailer,
     });
-    const limiter = new ByteLimitStream(MAX_PART_BYTES);
+    const limiter = new ByteLimitStream(partLimit);
     const coalesce = new MinChunkSizeStream(MIN_UPSTREAM_CHUNK_BYTES);
     req.pipe(parser).pipe(limiter).pipe(coalesce);
     body = coalesce;
   } else if (isUnsignedStreamTrailer) {
     const parser = new AwsChunkedPayloadParser();
-    const limiter = new ByteLimitStream(MAX_PART_BYTES);
+    const limiter = new ByteLimitStream(partLimit);
     const coalesce = new MinChunkSizeStream(MIN_UPSTREAM_CHUNK_BYTES);
     req.pipe(parser).pipe(limiter).pipe(coalesce);
     body = coalesce;

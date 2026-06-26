@@ -674,6 +674,14 @@ GET /api/auth/oauth/custom/{key}
 |-----------|------|----------|-------------|
 | `redirect_uri` | string | Yes | URL to redirect after authentication |
 | `code_challenge` | string | Yes | PKCE code challenge (Base64 URL-encoded SHA256 hash of code_verifier) |
+| Other string query params | string | No | Provider-specific OAuth hints, such as Google's `prompt=select_account` |
+
+<Note>
+  Extra query params are forwarded as provider-specific hints only when they do not collide with
+  server-owned OAuth fields. Do not pass `client_id`, `redirect_uri`, `code_challenge`, `state`,
+  `response_type`, or `scope`; InsForge/provider-generated values win and colliding client
+  values are ignored.
+</Note>
 
 ### Supported Providers
 
@@ -697,7 +705,7 @@ CODE_VERIFIER=$(openssl rand -base64 32 | tr -d '=' | tr '/+' '_-')
 # Generate code_challenge (SHA256 hash of code_verifier, Base64 URL-encoded)
 CODE_CHALLENGE=$(echo -n $CODE_VERIFIER | openssl dgst -sha256 -binary | base64 | tr -d '=' | tr '/+' '_-')
 
-curl "https://your-app.insforge.app/api/auth/oauth/google?redirect_uri=https://myapp.com/callback&code_challenge=$CODE_CHALLENGE"
+curl "https://your-app.insforge.app/api/auth/oauth/google?redirect_uri=https://myapp.com/callback&code_challenge=$CODE_CHALLENGE&prompt=select_account"
 ```
 
 ```bash
@@ -980,13 +988,52 @@ curl -X POST "https://your-app.insforge.app/api/auth/admin/sessions/exchange" \
 
 ```json
 {
-  "user": {
-    "id": "123e4567-e89b-12d3-a456-426614174000",
-    "email": "admin@example.com",
-    "role": "project_admin"
+  "admin": {
+    "sub": "cloud:user_123"
   },
-  "accessToken": "eyJhbGciOiJIUzI1NiIs..."
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123..."
 }
+```
+
+### Get Current Admin Session
+
+Get the current dashboard admin session from a project admin access token.
+
+```
+GET /api/auth/admin/sessions/current
+```
+
+#### Response
+
+```json
+{
+  "admin": {
+    "sub": "local:admin"
+  }
+}
+```
+
+### Refresh Admin Session
+
+Refresh a dashboard admin access token. This endpoint uses the dashboard-only
+`insforge_admin_refresh_token` httpOnly cookie and does not share the app/user
+refresh cookie.
+
+```
+POST /api/auth/admin/refresh
+```
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/admin/refresh" \
+  -H "X-CSRF-Token: abc123..." \
+  --cookie "insforge_admin_refresh_token=..."
+```
+
+### Logout Admin Session
+
+```
+POST /api/auth/admin/logout
 ```
 
 ---

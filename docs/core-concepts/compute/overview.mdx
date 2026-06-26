@@ -1,0 +1,58 @@
+---
+title: "Custom Compute"
+sidebarTitle: "Overview"
+description: "Run long-lived containers next to your InsForge project."
+---
+
+Use InsForge Custom Compute to run long-lived containers next to your project: queue workers, background processors, AI inference loops, websocket servers, scrapers, anything that needs to stay up. Containers attach to your project's database, storage, and auth with the same credentials a function would use.
+
+<Note>
+  **Just need to handle a request?** Use [Edge Functions](/core-concepts/functions/overview) for request/response work and short jobs. Custom Compute is for processes that need to run continuously.
+</Note>
+
+```mermaid
+graph TB
+    Dashboard[InsForge Dashboard] --> Service[Compute Service]
+    CLI[InsForge CLI] --> Service
+
+    Service --> Container[Long-lived Container]
+
+    Container --> DB[(Database)]
+    Container --> Storage[Storage]
+    Container --> Auth[Auth]
+
+    style Dashboard fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style CLI fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style Service fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Container fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style DB fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Storage fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Auth fill:#0e7490,stroke:#06b6d4,color:#cffafe
+```
+
+## Features
+
+### Container deploys
+
+Push any Docker image to InsForge and it runs. Use a `Dockerfile` from your repo or point at a pre-built image on a registry. No proprietary build pipeline to learn.
+
+### Project-linked credentials
+
+Containers receive the InsForge project URL, service-role JWT, and S3 storage credentials as environment variables. Connect to Postgres, call the SDK, and read objects without provisioning anything.
+
+### Scaling
+
+Run one instance for a singleton worker, or scale horizontally for stateless workloads. Memory, CPU, and replica count are configurable per service.
+
+### Logs
+
+Structured logs per container, queryable by service and time range. Tail in the dashboard, CLI, or MCP without `kubectl exec`-ing into anything.
+
+### Secrets and env vars
+
+Set environment variables and secrets per service, separately from your edge-function secrets. Rotate without redeploying.
+
+## Next steps
+
+- Set up the [CLI](/quickstart) to link your project (the recommended path).
+- See [Edge Functions](/core-concepts/functions/overview) if request/response is all you need.

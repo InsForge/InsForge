@@ -7,14 +7,18 @@
   "plugins": [
     {
       "name": "insforge",
-      "source": "./claude-plugin",
-      "description": "Official InsForge plugin with schema patterns, best practices for database design, RLS policies, and SDK usage examples. Includes patterns for social graphs, multi-tenancy, and complex relationships.",
-      "version": "1.0.0",
+      "source": {
+        "source": "github",
+        "repo": "InsForge/insforge-skills"
+      },
+      "description": "The backend platform for AI-native developers. A Postgres-based backend with auth, storage, compute, hosting, and AI gateway — built for coding agents. This plugin gives agents the full InsForge surface: database CRUD with RLS, authentication, storage, edge functions, AI, realtime, Stripe payments, and deployments. Includes CLI infrastructure management, debugging diagnostics, and integration guides for third-party auth providers (Auth0, Clerk, Kinde, Stytch, WorkOS).",
+      "version": "1.2.0",
       "author": {
-        "name": "InsForge Team"
+        "name": "InsForge",
+        "url": "https://insforge.dev"
       },
       "category": "database",
-      "tags": ["insforge", "postgresql", "postgrest", "database", "baas", "backend", "rls", "schema"]
+      "tags": ["insforge", "ai-native", "coding-agents", "ai-agents", "backend-as-a-service", "baas", "postgres", "auth", "storage", "compute", "hosting", "ai-gateway", "edge-functions", "stripe", "rls"]
     }
   ]
 }

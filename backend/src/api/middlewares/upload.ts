@@ -1,28 +1,27 @@
 import multer from 'multer';
 import { Request, Response, NextFunction } from 'express';
-import { AppError } from './error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { ProcessedFormData } from '@/types/storage.js';
 import { StorageConfigService } from '@/services/storage/storage-config.service.js';
 import logger from '@/utils/logger.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 // Constants
 const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const DEFAULT_MAX_FILES = 10;
 
 /**
  * Returns the configured max file size in bytes.
  * Uses the MAX_FILE_SIZE environment variable if set, otherwise defaults to 50 MB.
  */
-export const getMaxFileSize = (): number =>
-  parseInt(process.env.MAX_FILE_SIZE || '') || DEFAULT_MAX_FILE_SIZE;
+export const getMaxFileSize = (): number => appConfig.server.maxFileSize ?? DEFAULT_MAX_FILE_SIZE;
 
 // Create multer instance with memory storage (static, env-based — used by non-storage routes)
 export const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: getMaxFileSize(),
-    files: parseInt(process.env.MAX_FILES_PER_FIELD || '') || DEFAULT_MAX_FILES,
+    files: appConfig.server.maxFilesPerField,
   },
 });
 
@@ -50,7 +49,7 @@ export const dynamicUploadSingle =
       storage: multer.memoryStorage(),
       limits: {
         fileSize: maxSize,
-        files: parseInt(process.env.MAX_FILES_PER_FIELD || '') || DEFAULT_MAX_FILES,
+        files: appConfig.server.maxFilesPerField,
       },
     }).single(fieldName);
     uploader(req, res, next);

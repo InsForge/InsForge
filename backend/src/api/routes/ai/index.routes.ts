@@ -4,12 +4,12 @@ import { AuthRequest, verifyAdmin, verifyUser } from '../../middlewares/auth.js'
 import { ImageGenerationService } from '@/services/ai/image-generation.service.js';
 import { EmbeddingService } from '@/services/ai/embedding.service.js';
 import { AIModelService } from '@/services/ai/ai-model.service.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { errorResponse, successResponse } from '@/utils/response.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import logger from '@/utils/logger.js';
 import {
+  ERROR_CODES,
   chatCompletionRequestSchema,
   embeddingsRequestSchema,
   imageGenerationRequestSchema,
@@ -79,6 +79,25 @@ router.get(
   }
 );
 
+/**
+ * POST /api/ai/:provider/api-key/rotate
+ * Rotate the active provider API key for cloud-managed Model Gateway credentials.
+ */
+router.post(
+  '/:provider/api-key/rotate',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const provider = parseAIProvider(req.params.provider);
+      const openRouterProvider = OpenRouterProvider.getInstance();
+      const key = await rotateProviderApiKey(provider, openRouterProvider);
+      successResponse(res, key);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 function parseAIProvider(value: string | undefined): AIProvider {
   if (value === 'openrouter') {
     return value;
@@ -95,6 +114,21 @@ function getProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterP
   switch (provider) {
     case 'openrouter':
       return openRouterProvider.getMaskedApiKey();
+    default: {
+      const exhaustiveProvider: never = provider;
+      throw new AppError(
+        `Unsupported AI provider: ${exhaustiveProvider}`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+  }
+}
+
+function rotateProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterProvider) {
+  switch (provider) {
+    case 'openrouter':
+      return openRouterProvider.rotateManagedApiKey();
     default: {
       const exhaustiveProvider: never = provider;
       throw new AppError(

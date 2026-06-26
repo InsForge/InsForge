@@ -1,11 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import { PaymentService } from '@/services/payments/payment.service.js';
-import { stripeWebhookParamsSchema } from '@insforge/shared-schemas';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES, stripeWebhookParamsSchema } from '@insforge/shared-schemas';
+import { StripeWebhookService } from '@/services/payments/stripe/webhook.service.js';
 
 const router = Router();
-const paymentService = PaymentService.getInstance();
+const webhookService = StripeWebhookService.getInstance();
 
 export function normalizeStripeWebhookError(error: unknown) {
   if (error instanceof Error && error.name === 'StripeSignatureVerificationError') {
@@ -42,7 +41,7 @@ router.post('/:environment', async (req: Request, res: Response, next: NextFunct
       );
     }
 
-    const result = await paymentService.handleStripeWebhook(
+    const result = await webhookService.handleStripeWebhook(
       paramsValidation.data.environment,
       req.body,
       signature

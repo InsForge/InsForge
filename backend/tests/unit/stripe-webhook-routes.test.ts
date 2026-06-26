@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AppError } from '../../src/api/middlewares/error';
-import { ERROR_CODES } from '../../src/types/error-constants';
+import { AppError } from '../../src/utils/errors';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { normalizeStripeWebhookError } from '../../src/api/routes/webhooks/stripe.routes';
 
 describe('normalizeStripeWebhookError', () => {

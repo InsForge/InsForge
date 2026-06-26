@@ -3,9 +3,9 @@ import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { successResponse } from '@/utils/response.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import {
+  ERROR_CODES,
   DocTypeSchema,
   SdkFeatureSchema,
   SdkLanguageSchema,
@@ -16,6 +16,11 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Resolve the documentation root once for the module.
+// PROJECT_ROOT is set in docker-compose.yml. Otherwise, fallback to the monorepo root.
+const PROJECT_ROOT = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../../..');
+const DOCS_ROOT = path.join(PROJECT_ROOT, 'docs');
 
 const router = Router();
 
@@ -94,20 +99,21 @@ async function processSnippets(content: string, docsRoot: string): Promise<strin
 
 // Legacy documentation map for GET /api/docs/:docType endpoint
 // Only contains keys defined in DocTypeSchema for type safety
-const LEGACY_DOCS_MAP: Record<DocTypeSchema, string> = {
-  instructions: 'insforge-instructions-sdk.md',
+export const LEGACY_DOCS_MAP: Record<DocTypeSchema, string> = {
+  instructions: '../.agents/docs/insforge-instructions-sdk.md',
   'db-sdk': 'sdks/typescript/database.mdx',
   'auth-sdk': 'sdks/typescript/auth.mdx',
   'storage-sdk': 'sdks/typescript/storage.mdx',
   'functions-sdk': 'sdks/typescript/functions.mdx',
   'ai-integration-sdk': 'sdks/typescript/ai.mdx',
-  'real-time': 'agent-docs/real-time.md',
-  deployment: 'agent-docs/deployment.md',
+  'real-time': '../.agents/docs/real-time.md',
+  deployment: '../.agents/docs/deployment.md',
+  payments: '../.agents/docs/payments.md',
 };
 
 // SDK documentation map for GET /api/docs/:docFeature/:docLanguage endpoint
 // Supports feature × language combinations with type safety
-const SDK_DOCS_MAP: Record<SdkFeatureSchema, Partial<Record<SdkLanguageSchema, string>>> = {
+export const SDK_DOCS_MAP: Record<SdkFeatureSchema, Partial<Record<SdkLanguageSchema, string>>> = {
   db: {
     typescript: 'sdks/typescript/database.mdx',
     swift: 'sdks/swift/database.mdx',
@@ -144,6 +150,9 @@ const SDK_DOCS_MAP: Record<SdkFeatureSchema, Partial<Record<SdkLanguageSchema, s
     kotlin: 'sdks/kotlin/realtime.mdx',
     'rest-api': 'sdks/rest/realtime.mdx',
   },
+  payments: {
+    typescript: 'sdks/typescript/payments.mdx',
+  },
 };
 
 // GET /api/docs/:docType - Get specific documentation (legacy endpoint)
@@ -154,20 +163,30 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
     // Validate doc type using Zod enum
     const parsed = docTypeSchema.safeParse(docType);
     if (!parsed.success) {
-      throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('Documentation not found', 404, ERROR_CODES.DOCS_NOT_FOUND);
     }
 
     const docFileName = LEGACY_DOCS_MAP[parsed.data];
 
     // Read the documentation file
-    // PROJECT_ROOT is set in the docker-compose.yml file to point to the InsForge directory
-    const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../..');
-    const docsRoot = path.join(projectRoot, 'docs');
-    const filePath = path.join(docsRoot, docFileName);
+    const filePath = path.join(DOCS_ROOT, docFileName);
+
+    // Security check: ensure path is within either docs/ or .agents/docs/
+    const resolvedPath = path.resolve(filePath);
+    const resolvedDocsRoot = path.resolve(DOCS_ROOT);
+    const resolvedAgentsRoot = path.resolve(PROJECT_ROOT, '.agents/docs');
+
+    if (
+      !resolvedPath.startsWith(resolvedDocsRoot) &&
+      !resolvedPath.startsWith(resolvedAgentsRoot)
+    ) {
+      throw new AppError('Invalid documentation path', 403, ERROR_CODES.FORBIDDEN);
+    }
+
     const rawContent = await readFile(filePath, 'utf-8');
 
     // Process snippet imports and replace component tags with actual content
-    const content = await processSnippets(rawContent, docsRoot);
+    const content = await processSnippets(rawContent, DOCS_ROOT);
 
     // Traditional REST: return documentation directly
     return successResponse(res, {
@@ -189,7 +208,7 @@ router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next
     const parsedLanguage = sdkLanguageSchema.safeParse(docLanguage);
 
     if (!parsedFeature.success || !parsedLanguage.success) {
-      throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('Documentation not found', 404, ERROR_CODES.DOCS_NOT_FOUND);
     }
 
     // Look up the documentation file from SDK_DOCS_MAP
@@ -197,7 +216,7 @@ router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next
     const docFileName = featureDocs[parsedLanguage.data];
 
     if (!docFileName) {
-      throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('Documentation not found', 404, ERROR_CODES.DOCS_NOT_FOUND);
     }
 
     // Construct docType for response
@@ -207,14 +226,24 @@ router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next
         : `${parsedFeature.data}-sdk-${parsedLanguage.data}`;
 
     // Read the documentation file
-    // PROJECT_ROOT is set in the docker-compose.yml file to point to the InsForge directory
-    const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../..');
-    const docsRoot = path.join(projectRoot, 'docs');
-    const filePath = path.join(docsRoot, docFileName);
+    const filePath = path.join(DOCS_ROOT, docFileName);
+
+    // Security check: ensure path is within either docs/ or .agents/docs/
+    const resolvedPath = path.resolve(filePath);
+    const resolvedDocsRoot = path.resolve(DOCS_ROOT);
+    const resolvedAgentsRoot = path.resolve(PROJECT_ROOT, '.agents/docs');
+
+    if (
+      !resolvedPath.startsWith(resolvedDocsRoot) &&
+      !resolvedPath.startsWith(resolvedAgentsRoot)
+    ) {
+      throw new AppError('Invalid documentation path', 403, ERROR_CODES.FORBIDDEN);
+    }
+
     const rawContent = await readFile(filePath, 'utf-8');
 
     // Process snippet imports and replace component tags with actual content
-    const content = await processSnippets(rawContent, docsRoot);
+    const content = await processSnippets(rawContent, DOCS_ROOT);
 
     // Traditional REST: return documentation directly
     return successResponse(res, {

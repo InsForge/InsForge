@@ -7,7 +7,7 @@ export interface HealthResponse {
 
 export class HealthService {
   async getHealth(): Promise<HealthResponse> {
-    return apiClient.request('/health', { skipAuth: true });
+    return apiClient.request('/health');
   }
 }
 

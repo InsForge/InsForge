@@ -1,8 +1,11 @@
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
-import type { EmbeddingsRequest, EmbeddingsResponse } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  type EmbeddingsRequest,
+  type EmbeddingsResponse,
+} from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 
 export class EmbeddingService {
   private static instance: EmbeddingService;
@@ -19,13 +22,13 @@ export class EmbeddingService {
 
   /**
    * Generate embeddings for the given input using OpenRouter API
-   * Uses sendRequest for automatic renewal and retry logic
+   * Uses sendRequest for upstream error mapping
    * @param options - Embeddings request options including model, input, and encoding_format
    * @returns Embeddings response with vector data and metadata
    */
   async createEmbeddings(options: EmbeddingsRequest): Promise<EmbeddingsResponse> {
     try {
-      // Send request with automatic renewal and retry logic (same pattern as chat-completion)
+      // Send request with upstream error mapping (same pattern as chat-completion)
       const { result: response } = await this.openRouterProvider.sendRequest((client) =>
         client.embeddings.create({
           model: options.model,

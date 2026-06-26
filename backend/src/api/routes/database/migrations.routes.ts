@@ -1,16 +1,16 @@
 import { Router, Response, NextFunction } from 'express';
 import {
+  ERROR_CODES,
   createMigrationRequestSchema,
   type CreateMigrationResponse,
   type DatabaseMigrationsResponse,
 } from '@insforge/shared-schemas';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { DatabaseMigrationService } from '@/services/database/database-migration.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { successResponse } from '@/utils/response.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { type DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 
@@ -51,7 +51,7 @@ router.post(
       const result = await migrationService.createMigration(validation.data);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_CUSTOM_MIGRATION',
         module: 'DATABASE',
         details: {

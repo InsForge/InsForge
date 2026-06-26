@@ -37,6 +37,16 @@ export const createServiceSchema = z.object({
     )
     .optional(),
   region: z.string().default('iad'),
+  /**
+   * Edge protocol. `'http'` (default) is the existing behaviour — Fly terminates
+   * TLS at its anycast edge and proxies HTTP/1.1 + HTTP/2 to the container on
+   * the container's port. `'tcp'` is for raw TCP services (Redis, the Postgres
+   * wire protocol, custom binary protocols) — Fly exposes the container's port
+   * directly with empty L7 handlers so bytes flow end-to-end without HTTP
+   * inspection. Optional and back-compat: omitting the field is identical to
+   * sending `'http'` at every fallback site downstream.
+   */
+  protocol: z.enum(['http', 'tcp']).optional(),
 });
 
 export const updateServiceSchema = z
@@ -94,6 +104,11 @@ export const updateServiceSchema = z
       })
       .optional(),
     region: z.string().optional(),
+    /**
+     * Edge protocol — same semantics as createServiceSchema.protocol. Optional
+     * on update; omitting it leaves the existing service's protocol in place.
+     */
+    protocol: z.enum(['http', 'tcp']).optional(),
   })
   .refine((data) => !(data.envVars !== undefined && data.envVarsPatch !== undefined), {
     message:
@@ -105,6 +120,25 @@ export const listServicesResponseSchema = z.object({
   services: z.array(serviceSchema),
 });
 
+// A single container stdout/stderr line, as surfaced from Fly's logs API.
+// `timestamp` is normalized to epoch milliseconds by the backend provider.
+export const computeLogLineSchema = z.object({
+  timestamp: z.number(),
+  message: z.string(),
+  instance: z.string().optional(),
+  region: z.string().optional(),
+});
+
+// Response for GET /compute/services/:id/logs. `nextToken` is an opaque cursor
+// (Fly's nanosecond `next_token`) to poll forward for live tailing; null when
+// there is nothing further to page.
+export const computeLogsResponseSchema = z.object({
+  lines: z.array(computeLogLineSchema),
+  nextToken: z.string().nullable(),
+});
+
 export type CreateServiceRequest = z.infer<typeof createServiceSchema>;
 export type UpdateServiceRequest = z.infer<typeof updateServiceSchema>;
 export type ListServicesResponse = z.infer<typeof listServicesResponseSchema>;
+export type ComputeLogLine = z.infer<typeof computeLogLineSchema>;
+export type ComputeLogsResponse = z.infer<typeof computeLogsResponseSchema>;

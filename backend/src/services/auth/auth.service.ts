@@ -4,17 +4,6 @@ import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
-import type {
-  UserSchema,
-  CreateUserResponse,
-  CreateSessionResponse,
-  VerifyEmailResponse,
-  ResetPasswordResponse,
-  CreateAdminSessionResponse,
-  AuthMetadataSchema,
-  OAuthProvidersSchema,
-  GetPublicAuthConfigResponse,
-} from '@insforge/shared-schemas';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.service.js';
 import { AuthConfigService } from './auth-config.service.js';
@@ -40,13 +29,24 @@ import {
   UserRecord,
   OAuthUserData,
 } from '@/types/auth.js';
-import { ADMIN_ID } from '@/utils/constants.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import { appConfig } from '@/infra/config/app.config.js';
+import {
+  ERROR_CODES,
+  type AuthMetadataSchema,
+  type CreateAdminSessionResponse,
+  type CreateSessionResponse,
+  type CreateUserResponse,
+  type GetPublicAuthConfigResponse,
+  type OAuthProvidersSchema,
+  type ResetPasswordResponse,
+  type UserSchema,
+  type VerifyEmailResponse,
+} from '@insforge/shared-schemas';
 
 /**
  * Simplified JWT-based auth service
@@ -54,7 +54,7 @@ import { getApiBaseUrl } from '@/utils/environment.js';
  */
 export class AuthService {
   private static instance: AuthService;
-  private adminEmail: string;
+  private adminUsername: string;
   private adminPassword: string;
   private pool: Pool | null = null;
   private tokenManager: TokenManager;
@@ -70,11 +70,13 @@ export class AuthService {
   private appleOAuthProvider: AppleOAuthProvider;
 
   private constructor() {
-    this.adminEmail = process.env.ADMIN_EMAIL ?? '';
-    this.adminPassword = process.env.ADMIN_PASSWORD ?? '';
+    this.adminUsername = appConfig.auth.rootAdminUsername;
+    this.adminPassword = appConfig.auth.rootAdminPassword;
 
-    if (!this.adminEmail || !this.adminPassword) {
-      throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required');
+    if (!this.adminUsername || !this.adminPassword) {
+      throw new Error(
+        'ROOT_ADMIN_USERNAME and ROOT_ADMIN_PASSWORD environment variables are required'
+      );
     }
 
     // Initialize token manager
@@ -199,7 +201,7 @@ export class AuthService {
       await client.query('ROLLBACK');
       // Postgres unique_violation
       if (e && typeof e === 'object' && 'code' in e && e.code === '23505') {
-        throw new AppError('User already exists', 409, ERROR_CODES.ALREADY_EXISTS);
+        throw new AppError('User already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
       }
       throw e;
     } finally {
@@ -654,31 +656,20 @@ export class AuthService {
   /**
    * Admin login (validates against env variables only)
    */
-  adminLogin(email: string, password: string): CreateAdminSessionResponse {
+  adminLogin(username: string, password: string): CreateAdminSessionResponse {
     // Simply validate against environment variables
-    if (email !== this.adminEmail || password !== this.adminPassword) {
+    if (username !== this.adminUsername || password !== this.adminPassword) {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    // Use a fixed admin ID for the system administrator
-
-    // Return admin user with JWT token (24h expiration) - no database interaction
+    const sub = `local:${username}`;
     const accessToken = this.tokenManager.generateAccessToken({
-      sub: ADMIN_ID,
-      email,
+      sub,
       role: 'project_admin',
     });
 
     return {
-      user: {
-        id: ADMIN_ID,
-        email: email,
-        emailVerified: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        profile: { name: 'Administrator' },
-        metadata: null,
-      },
+      admin: { sub },
       accessToken,
     };
   }
@@ -687,36 +678,17 @@ export class AuthService {
    * Admin login with authorization token (validates JWT from external issuer)
    */
   async adminLoginWithAuthorizationCode(code: string): Promise<CreateAdminSessionResponse> {
-    try {
-      // Use TokenManager to verify cloud token
-      const { payload } = await this.tokenManager.verifyCloudToken(code);
+    const { payload } = await this.tokenManager.verifyCloudToken(code);
+    const sub = `cloud:${payload.userId}`;
+    const accessToken = this.tokenManager.generateAccessToken({
+      sub,
+      role: 'project_admin',
+    });
 
-      // If verification succeeds, extract user info and generate internal token
-      const email = payload['email'] || payload['sub'] || 'admin@insforge.local';
-
-      // Generate internal access token (24h expiration)
-      const accessToken = this.tokenManager.generateAccessToken({
-        sub: ADMIN_ID,
-        email: email as string,
-        role: 'project_admin',
-      });
-
-      return {
-        user: {
-          id: ADMIN_ID,
-          email: email as string,
-          emailVerified: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          profile: { name: 'Administrator' },
-          metadata: null,
-        },
-        accessToken,
-      };
-    } catch (error) {
-      logger.error('Admin token verification failed:', error);
-      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
+    return {
+      admin: { sub },
+      accessToken,
+    };
   }
 
   /**
@@ -988,26 +960,34 @@ export class AuthService {
   /**
    * Generate OAuth authorization URL for any supported provider
    */
-  async generateOAuthUrl(provider: OAuthProvidersSchema, state?: string): Promise<string> {
+  async generateOAuthUrl(
+    provider: OAuthProvidersSchema,
+    state?: string,
+    additionalParams?: Record<string, string>
+  ): Promise<string> {
     switch (provider) {
       case 'google':
-        return this.googleOAuthProvider.generateOAuthUrl(state);
+        return this.googleOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'github':
-        return this.githubOAuthProvider.generateOAuthUrl(state);
+        return this.githubOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'discord':
-        return this.discordOAuthProvider.generateOAuthUrl(state);
+        return this.discordOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'linkedin':
-        return this.linkedinOAuthProvider.generateOAuthUrl(state);
+        return this.linkedinOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'facebook':
-        return this.facebookOAuthProvider.generateOAuthUrl(state);
+        return this.facebookOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'microsoft':
-        return this.microsoftOAuthProvider.generateOAuthUrl(state);
+        return this.microsoftOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'x':
-        return this.xOAuthProvider.generateOAuthUrl(state);
+        return this.xOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'apple':
-        return this.appleOAuthProvider.generateOAuthUrl(state);
+        return this.appleOAuthProvider.generateOAuthUrl(state, additionalParams);
       default:
-        throw new Error(`OAuth provider ${provider} is not implemented yet.`);
+        throw new AppError(
+          `OAuth provider '${provider}' is not implemented yet.`,
+          501,
+          ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER
+        );
     }
   }
 
@@ -1046,7 +1026,11 @@ export class AuthService {
         userData = await this.appleOAuthProvider.handleCallback(payload);
         break;
       default:
-        throw new Error(`OAuth provider ${provider} is not implemented yet.`);
+        throw new AppError(
+          `OAuth provider '${provider}' is not implemented yet.`,
+          501,
+          ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER
+        );
     }
 
     return this.findOrCreateThirdPartyUser(
@@ -1092,8 +1076,14 @@ export class AuthService {
         userData = this.appleOAuthProvider.handleSharedCallback(payloadData);
         break;
       case 'microsoft':
+        userData = this.microsoftOAuthProvider.handleSharedCallback(payloadData);
+        break;
       default:
-        throw new Error(`OAuth provider ${provider} is not supported for shared callback.`);
+        throw new AppError(
+          `OAuth provider '${provider}' is not supported for shared callback.`,
+          501,
+          ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER
+        );
     }
 
     return this.findOrCreateThirdPartyUser(
@@ -1185,7 +1175,6 @@ export class AuthService {
         u.profile,
         u.metadata,
         u.email_verified,
-        u.is_project_admin,
         u.is_anonymous,
         u.created_at,
         u.updated_at,
@@ -1203,7 +1192,7 @@ export class AuthService {
   }
 
   /**
-   * Get user by ID (returns raw database record with is_project_admin field)
+   * Get user by ID (returns raw database record)
    */
   async getUserById(userId: string): Promise<UserRecord | null> {
     const pool = this.getPool();
@@ -1215,7 +1204,6 @@ export class AuthService {
         u.profile,
         u.metadata,
         u.email_verified,
-        u.is_project_admin,
         u.is_anonymous,
         u.created_at,
         u.updated_at,
@@ -1231,22 +1219,6 @@ export class AuthService {
 
     if (result.rows[0]) {
       return result.rows[0];
-    }
-
-    // Fallback: if admin record is missing from DB, construct it from env vars
-    if (userId === ADMIN_ID) {
-      const now = new Date().toISOString();
-      return {
-        id: ADMIN_ID,
-        email: this.adminEmail,
-        profile: { name: 'Administrator' },
-        metadata: {},
-        email_verified: true,
-        is_project_admin: true,
-        is_anonymous: false,
-        created_at: now,
-        updated_at: now,
-      };
     }
 
     return null;
@@ -1298,7 +1270,6 @@ export class AuthService {
         u.profile,
         u.metadata,
         u.email_verified,
-        u.is_project_admin,
         u.is_anonymous,
         u.created_at,
         u.updated_at,
@@ -1306,7 +1277,8 @@ export class AuthService {
         STRING_AGG(a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
-      WHERE u.is_project_admin = false AND u.is_anonymous = false
+      WHERE u.is_anonymous = false
+        AND u.is_project_admin = false
     `;
     const params: (string | number)[] = [];
 
@@ -1324,9 +1296,9 @@ export class AuthService {
     // Transform users
     const users = dbUsers.map((dbUser) => this.transformUserRecordToSchema(dbUser));
 
-    // Get total count (exclude admins and anonymous users)
+    // Get total count (exclude anonymous and legacy project-admin users)
     let countQuery =
-      'SELECT COUNT(*) as count FROM auth.users WHERE is_project_admin = false AND is_anonymous = false';
+      'SELECT COUNT(*) as count FROM auth.users WHERE is_anonymous = false AND is_project_admin = false';
     const countParams: string[] = [];
     if (search) {
       countQuery += ` AND (email LIKE $1 OR profile->>'name' LIKE $2)`;
@@ -1388,7 +1360,7 @@ export class AuthService {
     );
 
     if (result.rows.length === 0) {
-      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('User not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
     }
 
     return {
@@ -1401,16 +1373,11 @@ export class AuthService {
    * Delete multiple users by IDs
    */
   async deleteUsers(userIds: string[]): Promise<number> {
-    const filtered = userIds.filter((id) => id !== ADMIN_ID);
-    if (filtered.length === 0) {
-      return 0;
-    }
-
     const pool = this.getPool();
-    const placeholders = filtered.map((_, i) => `$${i + 1}`).join(',');
+    const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
     const result = await pool.query(
       `DELETE FROM auth.users WHERE id IN (${placeholders})`,
-      filtered
+      userIds
     );
 
     return result.rowCount || 0;

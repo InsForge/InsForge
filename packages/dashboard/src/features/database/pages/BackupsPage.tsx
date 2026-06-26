@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Info, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { CircleAlert, Info, Loader2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -15,10 +15,11 @@ import { DatabaseEmptyState } from '#features/database/components/DatabaseEmptyS
 import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
 import { RenameBackupDialog } from '#features/database/components/RenameBackupDialog';
 import {
+  useDatabaseBackupActions,
   useDatabaseBackupInfo,
   useDatabaseBackupInstanceInfo,
 } from '#features/database/hooks/useDatabaseBackup';
-import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { useConfirm } from '#lib/hooks/useConfirm';
 import { useToast } from '#lib/hooks/useToast';
 
@@ -43,10 +44,12 @@ export default function BackupsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const host = useDashboardHost();
+  const isCloudHostingMode = useIsCloudHostingMode();
   const { showToast } = useToast();
   const { confirm, confirmDialogProps } = useConfirm();
   const { backupInfo, refetch } = useDatabaseBackupInfo();
   const { instanceInfo } = useDatabaseBackupInstanceInfo();
+  const backupActions = useDatabaseBackupActions();
   const [createBackupDialogOpen, setCreateBackupDialogOpen] = useState(false);
   const [renameBackupDialogState, setRenameBackupDialogState] = useState<{
     id: string;
@@ -57,7 +60,12 @@ export default function BackupsPage() {
     timestampLabel: string;
   } | null>(null);
 
-  const isFreePlan = (instanceInfo?.planName?.toLowerCase() ?? 'free') === 'free';
+  // Self-hosting has no plans, quotas, or backup scheduler — only the
+  // cloud-hosting control plane does.
+  const isFreePlan =
+    isCloudHostingMode && (instanceInfo?.planName?.toLowerCase() ?? 'free') === 'free';
+  const hasManualBackupQuota = isCloudHostingMode;
+  const showScheduledBackups = isCloudHostingMode && !isFreePlan;
   const manualBackups = backupInfo?.manualBackups ?? [];
   const scheduledBackups = backupInfo?.scheduledBackups ?? [];
 
@@ -82,12 +90,30 @@ export default function BackupsPage() {
   };
 
   const handleRestoreBackupClick = async (backupId: string) => {
-    if (!host.onRestoreBackup) {
+    if (!backupActions.restoreBackup) {
       showToast('Backup restore is not available in the current dashboard mode.', 'info');
       return;
     }
 
-    await host.onRestoreBackup(backupId);
+    try {
+      await backupActions.restoreBackup(backupId);
+    } catch (error) {
+      // Rethrow so ConfirmRestoreDialog stays open; the cloud host surfaces
+      // its own restore error notifications.
+      if (!isCloudHostingMode) {
+        showToast(
+          error instanceof Error ? error.message : 'Failed to restore the backup.',
+          'error'
+        );
+      }
+      throw error;
+    }
+
+    if (!isCloudHostingMode) {
+      // The cloud host surfaces its own restore notifications.
+      showToast('Database restored successfully.', 'success');
+      await refetch();
+    }
   };
 
   const handleRenameBackupClick = (backupId: string, backupLabel: string) => {
@@ -98,11 +124,21 @@ export default function BackupsPage() {
   };
 
   const handleCreateBackup = async (backupName: string) => {
-    if (!host.onCreateBackup) {
+    if (!backupActions.createBackup) {
       throw new Error('Backup creation is not available in the current dashboard mode.');
     }
 
-    await host.onCreateBackup(backupName);
+    try {
+      await backupActions.createBackup(backupName);
+    } catch (error) {
+      // Rethrow so CreateBackupDialog stays open; the cloud host surfaces its
+      // own error notifications.
+      if (!isCloudHostingMode) {
+        showToast(error instanceof Error ? error.message : 'Failed to create the backup.', 'error');
+      }
+      throw error;
+    }
+
     await refetch();
   };
 
@@ -119,16 +155,19 @@ export default function BackupsPage() {
       return;
     }
 
-    if (!host.onDeleteBackup) {
+    if (!backupActions.deleteBackup) {
       showToast('Backup deletion is not available in the current dashboard mode.', 'info');
       return;
     }
 
     try {
-      await host.onDeleteBackup(backupId);
+      await backupActions.deleteBackup(backupId);
       await refetch();
-    } catch {
+    } catch (error) {
       // The cloud host is responsible for delete failure toasts.
+      if (!isCloudHostingMode) {
+        showToast(error instanceof Error ? error.message : 'Failed to delete the backup.', 'error');
+      }
     }
   };
 
@@ -158,12 +197,16 @@ export default function BackupsPage() {
               >
                 <div className="min-w-0">
                   <h2 className="text-xl font-medium leading-7 text-foreground">
-                    Manual Backups ({manualBackups.length}/{isFreePlan ? 1 : 5})
+                    {hasManualBackupQuota
+                      ? `Manual Backups (${manualBackups.length}/${isFreePlan ? 1 : 5})`
+                      : `Manual Backups (${manualBackups.length})`}
                   </h2>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    {isFreePlan && manualBackups.length === 0
-                      ? 'Create a manual backup. Free plan allows 1 manual backup.'
-                      : 'You can create up to 5 backups manually and can be restored at any time.'}
+                    {!hasManualBackupQuota
+                      ? 'Create manual backups of your database and restore them at any time.'
+                      : isFreePlan && manualBackups.length === 0
+                        ? 'Create a manual backup. Free plan allows 1 manual backup.'
+                        : 'You can create up to 5 backups manually and can be restored at any time.'}
                   </p>
                 </div>
                 {isFreePlan && manualBackups.length >= 1 ? (
@@ -198,6 +241,8 @@ export default function BackupsPage() {
                   {manualBackups.map((backup) => {
                     const savedOnLabel = formatBackupTimestamp(backup.createdAt);
                     const backupLabel = backup.name?.trim() || `${savedOnLabel} (Manual)`;
+                    const showStatus = !isCloudHostingMode && backup.status !== 'completed';
+                    const isRestorable = isCloudHostingMode || backup.status === 'completed';
 
                     return (
                       <div
@@ -217,9 +262,32 @@ export default function BackupsPage() {
                             >
                               <Pencil className="h-4 w-4" />
                             </button>
+                            {showStatus && backup.status === 'running' && (
+                              <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Backing up…
+                              </span>
+                            )}
+                            {showStatus && backup.status === 'failed' && (
+                              <span
+                                className="flex shrink-0 items-center gap-1 text-xs text-destructive"
+                                title={backup.errorMessage ?? undefined}
+                              >
+                                <CircleAlert className="h-3 w-3" />
+                                Failed
+                              </span>
+                            )}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-4 text-muted-foreground">
                             <span>Saved on: {savedOnLabel}</span>
+                            {showStatus && backup.status === 'failed' && backup.errorMessage && (
+                              <span
+                                className="truncate text-destructive"
+                                title={backup.errorMessage}
+                              >
+                                {backup.errorMessage}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -228,6 +296,7 @@ export default function BackupsPage() {
                             type="button"
                             variant="secondary"
                             size="sm"
+                            disabled={!isRestorable}
                             className="h-7 rounded border-[var(--alpha-8)] px-2 text-sm font-medium text-foreground"
                             onClick={() => {
                               handleOpenRestoreBackupDialog(
@@ -271,7 +340,7 @@ export default function BackupsPage() {
               )}
             </div>
 
-            {!isFreePlan && (
+            {showScheduledBackups && (
               <div className="overflow-hidden rounded-lg border border-[var(--alpha-8)] bg-card">
                 <div className="px-6 py-6">
                   <div className="min-w-0">
@@ -384,15 +453,28 @@ export default function BackupsPage() {
             return Promise.resolve();
           }
 
-          if (!host.onRenameBackup) {
+          const renameBackup = backupActions.renameBackup;
+          if (!renameBackup) {
             return Promise.reject(
               new Error('Backup rename is not available in the current dashboard mode.')
             );
           }
 
-          return host.onRenameBackup(renameBackupDialogState.id, backupName).then(async () => {
-            await refetch();
-          });
+          return renameBackup(renameBackupDialogState.id, backupName)
+            .then(async () => {
+              await refetch();
+            })
+            .catch((error: unknown) => {
+              // Rethrow so RenameBackupDialog stays open; the cloud host
+              // surfaces its own error notifications.
+              if (!isCloudHostingMode) {
+                showToast(
+                  error instanceof Error ? error.message : 'Failed to rename the backup.',
+                  'error'
+                );
+              }
+              throw error;
+            });
         }}
       />
       <ConfirmRestoreDialog

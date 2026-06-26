@@ -1,12 +1,20 @@
 import { useState } from 'react';
 import { ExternalLink, Copy, Check, RefreshCw } from 'lucide-react';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { Skeleton } from '#components';
+import {
+  Button,
+  Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+  cn,
+} from '@insforge/ui';
 import { useDeployments } from '#features/deployments/hooks/useDeployments';
 import { useDeploymentMetadata } from '#features/deployments/hooks/useDeploymentMetadata';
+import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import { useCustomDomains } from '#features/deployments/hooks/useCustomDomains';
 import { useToast } from '#lib/hooks/useToast';
-import { cn, formatTime } from '#lib/utils/utils';
+import { formatTime } from '#lib/utils/utils';
 
 const statusColors: Record<string, string> = {
   WAITING: 'bg-yellow-600',
@@ -22,7 +30,7 @@ const DEPLOY_PROMPT = 'Deploy my app to InsForge';
 
 export default function DeploymentOverviewPage() {
   const { showToast } = useToast();
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
   const { deployments, isLoadingDeployments, refetchDeployments } = useDeployments();
@@ -81,11 +89,8 @@ export default function DeploymentOverviewPage() {
   };
 
   const handleCopyPrompt = async () => {
-    try {
-      await navigator.clipboard.writeText(DEPLOY_PROMPT);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
+    const ok = await copy(DEPLOY_PROMPT);
+    if (!ok) {
       showToast('Failed to copy to clipboard', 'error');
     }
   };
@@ -100,13 +105,13 @@ export default function DeploymentOverviewPage() {
         <div className="bg-neutral-100 dark:bg-[#333] rounded-lg p-6">
           <div className="flex flex-col gap-6">
             <h2 className="text-xl font-semibold text-zinc-950 dark:text-white">
-              No Deployments Yet
+              No deployments yet
             </h2>
 
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted-foreground dark:text-neutral-400">
-                Send the prompt below to your connected AI agent to deploy your project for the
-                first time.
+                Send the prompt below to your connected AI agent to deploy your site for the first
+                time.
               </p>
 
               <div className="bg-neutral-200 dark:bg-[#171717] rounded-lg p-3 flex flex-col gap-2">
@@ -157,7 +162,7 @@ export default function DeploymentOverviewPage() {
                 <iframe
                   key={iframeKey}
                   src={deploymentUrl}
-                  title="Deployment Preview"
+                  title="Site Preview"
                   className="absolute top-0 left-0 w-[1215px] h-[912px] origin-top-left scale-[0.333] border-0 pointer-events-none"
                   sandbox="allow-scripts allow-same-origin"
                   loading="lazy"
@@ -173,7 +178,9 @@ export default function DeploymentOverviewPage() {
           {/* Metadata Grid */}
           <div className="flex-1 flex flex-col gap-6 justify-center">
             <div className="flex flex-col">
-              <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-6">ID</p>
+              <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-6">
+                Deployment ID
+              </p>
               <p className="text-sm text-zinc-950 dark:text-white font-mono">
                 {latestReadyDeployment.id}
               </p>

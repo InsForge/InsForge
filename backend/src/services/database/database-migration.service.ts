@@ -1,64 +1,24 @@
-import { parseSync } from 'libpg-query';
-import type {
-  CreateMigrationRequest,
-  CreateMigrationResponse,
-  DatabaseMigrationsResponse,
-  Migration,
+import {
+  ERROR_CODES,
+  type CreateMigrationRequest,
+  type CreateMigrationResponse,
+  type DatabaseMigrationsResponse,
+  type Migration,
 } from '@insforge/shared-schemas';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError, isPgErrorLike } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import { isPgErrorLike } from '@/utils/errors.js';
 import {
   analyzeQuery,
-  checkAuthSchemaOperations,
-  checkManagedSchemaWriteOperations,
-  checkSystemSchemaOperations,
+  checkSqlExecutionGuards,
   initSqlParser,
   parseSQLStatements,
   type DatabaseResourceUpdate,
 } from '@/utils/sql-parser.js';
+import { withAdminContext } from './user-context.service.js';
 
 interface CreateMigrationResult {
   migration: CreateMigrationResponse;
   changes: DatabaseResourceUpdate[];
-}
-
-export function assertMigrationDoesNotManageTransactions(statement: string): void {
-  const { stmts } = parseSync(statement);
-  const statementWrappers = stmts as Array<{ stmt: Record<string, unknown> }>;
-
-  for (const statementWrapper of statementWrappers) {
-    const [statementType] = Object.entries(statementWrapper.stmt)[0] as [
-      string,
-      Record<string, unknown>,
-    ];
-
-    if (statementType === 'TransactionStmt') {
-      throw new AppError(
-        'Custom migrations cannot manage their own transactions.',
-        400,
-        ERROR_CODES.DATABASE_FORBIDDEN
-      );
-    }
-  }
-}
-
-export function assertMigrationStatementIsAllowed(statement: string): void {
-  const managedSchemaError = checkManagedSchemaWriteOperations(statement);
-  if (managedSchemaError) {
-    throw new AppError(managedSchemaError, 403, ERROR_CODES.FORBIDDEN);
-  }
-
-  const authSchemaError = checkAuthSchemaOperations(statement);
-  if (authSchemaError) {
-    throw new AppError(authSchemaError, 403, ERROR_CODES.FORBIDDEN);
-  }
-
-  const systemSchemaError = checkSystemSchemaOperations(statement);
-  if (systemSchemaError) {
-    throw new AppError(systemSchemaError, 403, ERROR_CODES.FORBIDDEN);
-  }
 }
 
 export class DatabaseMigrationService {
@@ -102,9 +62,9 @@ export class DatabaseMigrationService {
 
     await initSqlParser();
 
-    for (const statement of statements) {
-      assertMigrationDoesNotManageTransactions(statement);
-      assertMigrationStatementIsAllowed(statement);
+    const guardError = checkSqlExecutionGuards(input.sql);
+    if (guardError) {
+      throw new AppError(guardError, 403, ERROR_CODES.FORBIDDEN);
     }
 
     const client = await this.dbManager.getPool().connect();
@@ -132,11 +92,11 @@ export class DatabaseMigrationService {
         throw new AppError(
           'Migration version must be newer than the latest applied migration.',
           409,
-          ERROR_CODES.ALREADY_EXISTS
+          ERROR_CODES.DATABASE_MIGRATION_ALREADY_EXISTS
         );
       }
 
-      await client.query(input.sql);
+      await withAdminContext(client, () => client.query(input.sql), true);
 
       const insertResult = await client.query<Migration>(
         `
@@ -166,7 +126,7 @@ export class DatabaseMigrationService {
       };
     } catch (error) {
       if (transactionStarted) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
       }
 
       if (
@@ -174,7 +134,11 @@ export class DatabaseMigrationService {
         error.code === '23505' &&
         error.constraint === 'custom_migrations_pkey'
       ) {
-        throw new AppError('Migration version already exists.', 409, ERROR_CODES.ALREADY_EXISTS);
+        throw new AppError(
+          'Migration version already exists.',
+          409,
+          ERROR_CODES.DATABASE_MIGRATION_ALREADY_EXISTS
+        );
       }
 
       throw error;

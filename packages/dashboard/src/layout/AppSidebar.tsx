@@ -10,10 +10,11 @@ import {
 } from '#navigation/menuItems';
 import { Link, useLocation, matchPath } from 'react-router-dom';
 import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
-import { cn, isInsForgeCloudProject } from '#lib/utils/utils';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { isInsForgeCloudProject } from '#lib/utils/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from '@insforge/ui';
 import { ProjectSettingsMenuDialog } from '#features/dashboard/components';
 import { getFeatureFlag } from '#lib/analytics/posthog';
+import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
@@ -27,7 +28,8 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
 
   const isCloud = isInsForgeCloudProject();
   const host = useDashboardHost();
-  const isDTest = getFeatureFlag('dashboard-v4-experiment') === 'd_test';
+  const isDTest =
+    getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT) === FEATURE_FLAG_VARIANTS.D_TEST;
   const isDTestCloud = isDTest && host.mode === 'cloud-hosting';
 
   // Cloud-only additions: Deployments inserted after AI, Analytics appended at end.

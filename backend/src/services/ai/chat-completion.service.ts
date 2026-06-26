@@ -1,15 +1,15 @@
 import OpenAI from 'openai';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
-import type {
-  ChatCompletionResponse,
-  ChatMessageSchema,
-  ToolCall,
-  UrlCitationAnnotation,
+import {
+  ERROR_CODES,
+  type ChatCompletionResponse,
+  type ChatMessageSchema,
+  type ToolCall,
+  type UrlCitationAnnotation,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { ChatCompletionOptions } from '@/types/ai.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 
 // OpenRouter plugin type for web search
 interface OpenRouterWebPlugin {
@@ -274,7 +274,7 @@ export class ChatCompletionService {
         parallel_tool_calls: options.parallelToolCalls,
       };
 
-      // Send request with automatic renewal and retry logic
+      // Send request with upstream error mapping
       const { result: response } = await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(
           request as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
@@ -370,7 +370,7 @@ export class ChatCompletionService {
         parallel_tool_calls: options.parallelToolCalls,
       };
 
-      // Send request with automatic renewal and retry logic
+      // Send request with upstream error mapping
       const { result: stream } = await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(request as OpenAI.Chat.ChatCompletionCreateParamsStreaming)
       );

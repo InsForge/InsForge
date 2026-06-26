@@ -1,6 +1,6 @@
 ---
 title: Realtime SDK Reference
-description: Real-time subscriptions and messaging with the InsForge Swift SDK
+description: Subscribe to channels, publish events, and track presence with the InsForge Swift SDK.
 ---
 
 import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
@@ -9,177 +9,116 @@ import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
 
 <SwiftSdkInstallation />
 
+## Mental Model
+
+The Swift SDK connects to InsForge Realtime over Socket.IO. Subscribe to channel names such as `order:123` or `chat:room-1`, then listen for event names published to those channels.
+
+Events are published by database triggers that call `realtime.publish(...)` or by clients that publish to a channel they have already joined. See [Realtime overview](/core-concepts/realtime/overview) for the channel and RLS model.
+
+## Quick Start
+
+```swift
+try await insforge.realtime.connect()
+
+await insforge.realtime.subscribe(to: "order:\(orderId)") { message in
+    if message.eventName == "status_changed" {
+        print("Payload: \(String(describing: message.payload))")
+    }
+}
+```
+
 ## connect()
 
-Establish a WebSocket connection to the realtime server.
-
-### Example
+Establish a realtime connection.
 
 ```swift
 do {
     try await insforge.realtime.connect()
-    print("Connected to realtime server")
+    print("Connected to realtime")
 } catch {
     print("Connection failed: \(error)")
 }
 ```
 
----
-
 ## subscribe()
 
-Subscribe to a channel to receive messages.
-
-### Parameters
-
-- `to` (String) - Channel name (e.g., "orders:123", "chat:room-1")
-- `onMessage` (Closure) - Callback for receiving messages
-
-### Example
+Subscribe to a channel and receive messages published to it.
 
 ```swift
-await insforge.realtime.subscribe(to: "chat:lobby") { message in
+await insforge.realtime.subscribe(to: "chat:room-1") { message in
     print("Event: \(message.eventName ?? "")")
     print("Channel: \(message.channelName ?? "")")
 
     if let payload = message.payload {
-        print("Data: \(payload)")
-    }
-
-    if let senderId = message.senderId {
-        print("From: \(senderId)")
+        print("Payload: \(payload)")
     }
 }
 ```
 
----
-
-## unsubscribe()
-
-Unsubscribe from a channel.
-
-### Example
-
-```swift
-await insforge.realtime.unsubscribe(from: "chat:lobby")
-```
-
----
+If RLS is enabled on `realtime.channels`, subscription is checked against `SELECT` policies.
 
 ## publish()
 
-Publish a message to a channel.
-
-### Parameters
-
-- `to` (String) - Channel name
-- `event` (String) - Event name
-- `payload` ([String: Any]) - Message payload as dictionary
-
-### Example
+Publish an event to a channel.
 
 ```swift
 try await insforge.realtime.publish(
-    to: "chat:lobby",
-    event: "message.new",
+    to: "chat:room-1",
+    event: "new_message",
     payload: [
-        "text": "Hello everyone!",
-        "author": currentUser.name,
-        "timestamp": Date().timeIntervalSince1970
+        "text": "Hello from Swift",
+        "sentAt": ISO8601DateFormatter().string(from: Date())
     ]
 )
 ```
 
----
+<Note>
+  The client must subscribe to a channel before publishing to that same channel.
+</Note>
+
+If RLS is enabled on `realtime.messages`, publish is also checked against `INSERT` policies.
+
+## unsubscribe()
+
+Leave a channel.
+
+```swift
+await insforge.realtime.unsubscribe(from: "chat:room-1")
+```
 
 ## disconnect()
 
-Disconnect from the realtime server.
-
-### Example
+Close the realtime connection.
 
 ```swift
 await insforge.realtime.disconnect()
 ```
 
----
-
 ## Channel API
 
-The high-level Channel API provides a more structured way to work with realtime features including broadcast messages and Postgres changes.
-
-### channel()
-
-Get or create a channel instance.
+The channel API groups operations for one channel name.
 
 ```swift
-let channel = await insforge.realtime.channel("chat:lobby")
-```
-
-### removeChannel()
-
-Remove a channel.
-
-```swift
-await insforge.realtime.removeChannel("chat:lobby")
-```
-
----
-
-## RealtimeChannel
-
-### subscribe()
-
-Subscribe to the channel. Must be called before receiving messages.
-
-```swift
-let channel = await insforge.realtime.channel("chat:lobby")
+let channel = await insforge.realtime.channel("chat:room-1")
 try await channel.subscribe()
 ```
 
-### unsubscribe()
+### Broadcast Messages
 
-Unsubscribe from the channel.
-
-```swift
-await channel.unsubscribe()
-```
-
----
-
-## Broadcast Messages
-
-### Listening for Broadcasts
-
-Use `broadcast(event:)` to receive broadcast messages as an AsyncStream.
+Listen for an event:
 
 ```swift
-let channel = await insforge.realtime.channel("chat:lobby")
+let channel = await insforge.realtime.channel("chat:room-1")
 try await channel.subscribe()
 
-// Listen for specific event
 for await message in await channel.broadcast(event: "new_message") {
-    print("Event: \(message.event)")
     print("Payload: \(message.payload)")
-
-    // Decode to typed struct
-    if let chatMessage = try? message.decode(ChatMessage.self) {
-        print("Message: \(chatMessage.text)")
-    }
-}
-
-// Listen for all events (wildcard)
-for await message in await channel.broadcast(event: "*") {
-    print("Received: \(message.event)")
 }
 ```
 
-### Sending Broadcasts
-
-Send broadcast messages with typed or dictionary payloads.
+Publish through the channel:
 
 ```swift
-// With Encodable struct
 struct ChatMessage: Codable {
     let text: String
     let author: String
@@ -187,66 +126,18 @@ struct ChatMessage: Codable {
 
 try await channel.broadcast(
     event: "new_message",
-    message: ChatMessage(text: "Hello!", author: "John")
-)
-
-// With dictionary
-try await channel.broadcast(
-    event: "typing",
-    message: ["userId": userId, "isTyping": true]
+    message: ChatMessage(text: "Hello", author: currentUser.name)
 )
 ```
 
----
-
-## Postgres Changes
-
-Listen for real-time database changes using typed actions.
-
-### Action Types
-
-- `InsertAction<T>` - New record inserted
-- `UpdateAction<T>` - Record updated (includes `record` and `oldRecord`)
-- `DeleteAction<T>` - Record deleted (includes `oldRecord`)
-- `SelectAction<T>` - Record selected
-- `AnyAction<T>` - Any of the above
-
-### Listening for Changes
+Remove a channel object when it is no longer needed:
 
 ```swift
-struct Todo: Codable, Sendable {
-    let id: String
-    let title: String
-    let completed: Bool
-}
-
-let channel = await insforge.realtime.channel("db-changes")
-try await channel.subscribe()
-
-// Listen for inserts only
-for await action in await channel.postgresChange(
-    InsertAction<Todo>.self,
-    schema: "public",
-    table: "todos"
-) {
-    print("New todo: \(action.record.title)")
-}
-
-// Listen for any change
-for await action in await channel.postgresChange(
-    AnyAction<Todo>.self,
-    schema: "public",
-    table: "todos"
-) {
-    switch action {
-    case .insert(let insert):
-        print("Inserted: \(insert.record.title)")
-    case .update(let update):
-        print("Updated: \(update.record.title)")
-    case .delete(let delete):
-        print("Deleted: \(delete.oldRecord.title)")
-    case .select(let select):
-        print("Selected: \(select.record.title)")
-    }
-}
+await insforge.realtime.removeChannel("chat:room-1")
 ```
+
+## Presence
+
+Successful subscriptions return the current presence snapshot where supported by the SDK API. Listen for presence updates through the channel or lower-level event APIs exposed by the SDK.
+
+Presence is ephemeral online state. It is not stored in Postgres.

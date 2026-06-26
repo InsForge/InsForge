@@ -1,9 +1,12 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
-import type { RealtimeMessage, RoleSchema } from '@insforge/shared-schemas';
+import type { RealtimeMessage } from '@insforge/shared-schemas';
 import { RealtimeChannelService } from './realtime-channel.service.js';
-import { RealtimeAuthService } from './realtime-auth.service.js';
+import type { UserContext } from '@/api/middlewares/auth.js';
+import { withUserContext } from '@/services/database/user-context.service.js';
+
+const DEFAULT_CLEAR_BATCH_SIZE = 1000;
 
 export class RealtimeMessageService {
   private static instance: RealtimeMessageService;
@@ -36,8 +39,7 @@ export class RealtimeMessageService {
     channelName: string,
     eventName: string,
     payload: Record<string, unknown>,
-    userId: string | undefined,
-    userRole: RoleSchema
+    userContext: UserContext
   ): Promise<{
     channelId: string;
     channelName: string;
@@ -54,34 +56,36 @@ export class RealtimeMessageService {
       return null;
     }
 
-    const client = await this.getPool().connect();
+    // Anonymous and admin senders have no row identity: sender_id stays NULL
+    const senderId = userContext.role === 'authenticated' ? userContext.id : null;
 
     try {
-      // Begin transaction to ensure settings persist across queries
-      await client.query('BEGIN');
-
-      // Switch to specified role to enforce RLS policies
-      await client.query(`SET LOCAL ROLE ${userRole}`);
-
-      // Set user context for RLS policy evaluation
-      const authService = RealtimeAuthService.getInstance();
-      await authService.setUserContext(client, userId, channelName);
-
-      // Attempt INSERT with sender info - RLS will allow/deny based on policies
-      // No RETURNING clause needed - trigger handles pg_notify
-      await client.query(
-        `INSERT INTO realtime.messages (event_name, channel_id, channel_name, payload, sender_type, sender_id)
-         VALUES ($1, $2, $3, $4, 'user', $5)`,
-        [eventName, channel.id, channelName, JSON.stringify(payload), userId || null]
+      await withUserContext(
+        this.getPool(),
+        userContext,
+        async (client) => {
+          // Attempt INSERT with sender info - RLS will allow/deny based on policies.
+          // No RETURNING clause needed - trigger handles pg_notify.
+          await client.query(
+            `INSERT INTO realtime.messages (event_name, channel_id, channel_name, payload, sender_type, sender_id)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+              eventName,
+              channel.id,
+              channelName,
+              JSON.stringify(payload),
+              userContext.role === 'project_admin' ? 'system' : 'user',
+              senderId,
+            ]
+          );
+        },
+        { 'realtime.channel_name': channelName }
       );
-
-      // Commit transaction - insert succeeded
-      await client.query('COMMIT');
 
       logger.debug('Client message inserted', {
         channelName,
         eventName,
-        userId,
+        userId: senderId,
       });
 
       return {
@@ -89,19 +93,17 @@ export class RealtimeMessageService {
         channelName,
         eventName,
         payload,
-        senderId: userId || null,
+        senderId,
       };
     } catch (error) {
-      // Rollback transaction on error
-      await client.query('ROLLBACK').catch(() => {});
-
       // RLS policy denied the INSERT or other error
-      logger.debug('Message insert denied or failed', { channelName, eventName, userId, error });
+      logger.debug('Message insert denied or failed', {
+        channelName,
+        eventName,
+        userId: senderId,
+        error,
+      });
       return null;
-    } finally {
-      // Reset role back to default before releasing connection
-      await client.query('RESET ROLE');
-      client.release();
     }
   }
 
@@ -174,6 +176,51 @@ export class RealtimeMessageService {
 
     const result = await this.getPool().query(query, params);
     return result.rows;
+  }
+
+  async clearAllMessages(batchSize = DEFAULT_CLEAR_BATCH_SIZE): Promise<number> {
+    if (batchSize <= 0) {
+      logger.warn('Invalid realtime message clear batch size', { batchSize });
+      return 0;
+    }
+
+    const pool = this.getPool();
+    const cutoffResult = await pool.query('SELECT NOW() as cutoff_time');
+    const cutoffTime = cutoffResult.rows[0]?.cutoff_time;
+    let totalDeleted = 0;
+    let batches = 0;
+
+    while (true) {
+      const result = await pool.query(
+        `WITH deleted AS (
+          DELETE FROM realtime.messages
+          WHERE id IN (
+            SELECT id FROM realtime.messages
+            WHERE created_at <= $2
+            ORDER BY created_at ASC
+            LIMIT $1
+          )
+          RETURNING id
+        )
+        SELECT COUNT(*)::int as deleted_count FROM deleted`,
+        [batchSize, cutoffTime]
+      );
+      const deletedCount = Number(result.rows[0]?.deleted_count ?? 0);
+      totalDeleted += deletedCount;
+
+      if (deletedCount === 0) {
+        break;
+      }
+
+      batches += 1;
+
+      if (deletedCount < batchSize) {
+        break;
+      }
+    }
+
+    logger.info('Realtime messages cleared', { deletedCount: totalDeleted, batches });
+    return totalDeleted;
   }
 
   /**

@@ -1,11 +1,10 @@
 import { Router, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
-import { computeWriteLimiter } from '@/api/middlewares/rate-limiters.js';
+import { computeWriteLimiter, computeLogsRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { ComputeServicesService } from '@/services/compute/services.service.js';
 import { successResponse } from '@/utils/response.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import { createServiceSchema, updateServiceSchema } from '@insforge/shared-schemas';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES, createServiceSchema, updateServiceSchema } from '@insforge/shared-schemas';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
@@ -91,7 +90,7 @@ router.post(
       successResponse(res, service, 201);
 
       bestEffortAudit({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_COMPUTE_SERVICE',
         module: 'COMPUTE',
         details: { serviceName: validation.data.name, projectId },
@@ -128,7 +127,7 @@ router.post(
       successResponse(res, service, 201);
 
       bestEffortAudit({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'PREPARE_COMPUTE_DEPLOY',
         module: 'COMPUTE',
         details: { serviceName: validation.data.name, projectId },
@@ -210,7 +209,7 @@ router.patch(
       }
 
       bestEffortAudit({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_COMPUTE_SERVICE',
         module: 'COMPUTE',
         details: auditDetails,
@@ -246,7 +245,7 @@ router.delete(
       successResponse(res, { message: 'Service deleted' });
 
       bestEffortAudit({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_COMPUTE_SERVICE',
         module: 'COMPUTE',
         details: {
@@ -282,7 +281,7 @@ router.post(
       successResponse(res, service);
 
       bestEffortAudit({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'STOP_COMPUTE_SERVICE',
         module: 'COMPUTE',
         details: { serviceId: req.params.id, serviceName: existing.name },
@@ -314,7 +313,7 @@ router.post(
       successResponse(res, service);
 
       bestEffortAudit({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'START_COMPUTE_SERVICE',
         module: 'COMPUTE',
         details: { serviceId: req.params.id, serviceName: existing.name },
@@ -346,6 +345,34 @@ router.get(
       const events = await svc.getServiceEvents(req.params.id, { limit });
 
       successResponse(res, events);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Get container stdout/stderr ("application logs") from Fly's logs API.
+// Backfills from Fly's ~7-day retention; pass `next_token` (returned in the
+// response) to page forward for live tailing. Rate-limited because the
+// dashboard polls this every ~2s while live.
+router.get(
+  '/:id/logs',
+  verifyAdmin,
+  computeLogsRateLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const svc = ComputeServicesService.getInstance();
+      const existing = await svc.getService(req.params.id);
+
+      if (existing.projectId !== getProjectId(req)) {
+        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      }
+
+      const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1000);
+      const nextToken = typeof req.query.next_token === 'string' ? req.query.next_token : undefined;
+      const logs = await svc.getServiceLogs(req.params.id, { limit, nextToken });
+
+      successResponse(res, logs);
     } catch (error) {
       next(error);
     }

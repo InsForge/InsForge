@@ -8,8 +8,9 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  Skeleton,
 } from '@insforge/ui';
-import { Skeleton, TableHeader } from '#components';
+import { TableHeader } from '#components';
 import { ScheduleFormDialog } from '#features/functions/components/ScheduleFormDialog';
 import type { ScheduleFormSchema } from '#features/functions/types';
 import { normalizeHeaders } from '#features/functions/helpers';

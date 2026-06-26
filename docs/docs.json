@@ -3,9 +3,9 @@
   "theme": "mint",
   "name": "InsForge Docs",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#07C983",
+    "light": "#4ADE80",
+    "dark": "#059669"
   },
   "appearance": {
     "default": "dark"
@@ -31,93 +31,128 @@
         "groups": [
           {
             "group": "Getting Started",
-            "pages": ["introduction", "quickstart", "mcp-setup", "vscode-extension", "partnership", "oauth-server"]
+            "pages": [
+              "introduction",
+              "products",
+              {
+                "group": "Quickstart",
+                "expanded": true,
+                "pages": ["quickstart", "mcp-setup"]
+              }
+            ]
           },
           {
-            "group": "Core Concepts",
+            "group": "Products",
+            "expanded": true,
             "pages": [
               {
                 "group": "Database",
                 "pages": [
-                  "core-concepts/database/architecture",
+                  "core-concepts/database/overview",
                   "core-concepts/database/migrations",
-                  "core-concepts/database/branching",
                   "core-concepts/database/pgvector"
                 ]
               },
               {
                 "group": "Authentication",
                 "pages": [
-                  "core-concepts/authentication/architecture"
+                  "core-concepts/authentication/overview"
                 ]
               },
               {
                 "group": "Storage",
                 "pages": [
-                  "core-concepts/storage/architecture",
+                  "core-concepts/storage/overview",
                   "core-concepts/storage/s3-compatibility"
-                ]
-              },
-              {
-                "group": "AI Integration",
-                "pages": [
-                  "core-concepts/ai/architecture"
-                ]
-              },
-              {
-                "group": "Functions",
-                "pages": [
-                  "core-concepts/functions/architecture",
-                  "core-concepts/functions/schedules"
                 ]
               },
               {
                 "group": "Realtime",
                 "pages": [
-                  "core-concepts/realtime/architecture"
+                  "core-concepts/realtime/overview"
                 ]
               },
               {
-                "group": "Email (Private Preview)",
+                "group": "Edge Functions",
                 "pages": [
-                  "core-concepts/email/architecture",
-                  "core-concepts/email/custom-smtp"
+                  "core-concepts/functions/overview",
+                  "core-concepts/functions/schedules"
                 ]
               },
               {
-                "group": "Deployments",
+                "group": "Model Gateway",
                 "pages": [
-                  "core-concepts/deployments/architecture"
+                  "core-concepts/ai/overview"
                 ]
               },
               {
-                "group": "Payments (Private Preview)",
+                "group": "Sites",
                 "pages": [
-                  "core-concepts/payments/architecture",
-                  "core-concepts/payments/cli"
+                  "core-concepts/sites/overview"
                 ]
               },
               {
-                "group": "Compute (Private Preview)",
+                "group": "Messaging",
                 "pages": [
-                  "core-concepts/compute/architecture"
+                  "core-concepts/messaging/overview",
+                  "core-concepts/messaging/custom-smtp"
+                ]
+              },
+              {
+                "group": "Payments",
+                "pages": [
+                  "core-concepts/payments/overview",
+                  "core-concepts/payments/stripe",
+                  "core-concepts/payments/razorpay"
+                ]
+              },
+              {
+                "group": "Custom Compute",
+                "pages": [
+                  "core-concepts/compute/overview"
+                ]
+              },
+              {
+                "group": "Analytics",
+                "pages": [
+                  "core-concepts/analytics/overview"
                 ]
               }
             ]
           },
           {
-            "group": "Self-Hosting",
+            "group": "Agent-Native Initiatives",
             "pages": [
-              "deployment/deployment-security-guide"
+              "agent-native/overview",
+              "agent-native/vscode-extension",
+              "agent-native/cli-harness",
+              "agent-native/diagnostics",
+              "agent-native/config-as-code",
+              "agent-native/branching"
             ]
           },
           {
-            "group": "Community Showcase",
-            "pages": ["showcase"]
+            "group": "Partnership",
+            "pages": [
+              "partnership",
+              "oauth-server"
+            ]
           },
           {
-            "group": "Changelog",
-            "pages": ["changelog"]
+            "group": "Self-Hosting",
+            "pages": [
+              "deployment/deployment-security-guide",
+              "deployment/deploy-to-aws-ec2",
+              "deployment/deploy-to-azure-virtual-machines",
+              "deployment/deploy-to-containarium",
+              "deployment/deploy-to-google-cloud-compute-engine"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "showcase"
+            ]
           }
         ]
       },
@@ -136,7 +171,14 @@
               "sdks/typescript/ai",
               "sdks/typescript/realtime",
               "sdks/typescript/email",
-              "sdks/typescript/payments",
+              {
+                "group": "Payments",
+                "pages": [
+                  "sdks/typescript/payments",
+                  "sdks/typescript/payments-stripe",
+                  "sdks/typescript/payments-razorpay"
+                ]
+              },
               {
                 "group": "Framework Guides",
                 "pages": [
@@ -214,7 +256,7 @@
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/storage.yaml"
           },
           {
-            "group": "AI Integration",
+            "group": "Model Gateway",
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/ai.yaml"
           },
           {
@@ -226,11 +268,11 @@
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/realtime.yaml"
           },
           {
-            "group": "Email",
+            "group": "Messaging",
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/email.yaml"
           },
           {
-            "group": "Payments (Private Preview)",
+            "group": "Payments",
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/payments.yaml"
           },
           {
@@ -271,12 +313,18 @@
         },
         {
           "anchor": "GitHub",
-          "href": "https://github.com/InsForge",
+          "href": "https://github.com/InsForge/InsForge",
           "icon": "github"
         }
       ]
     }
   },
+  "redirects": [
+    { "source": "/core-concepts/database/branching", "destination": "/agent-native/branching" },
+    { "source": "/configuration/config-as-code", "destination": "/agent-native/config-as-code" },
+    { "source": "/core-concepts/deployments/overview", "destination": "/core-concepts/sites/overview" },
+    { "source": "/deployment/deploy-to-render", "destination": "/deployment/deploy-to-aws-ec2" }
+  ],
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg",
@@ -304,7 +352,7 @@
   "footer": {
     "socials": {
       "x": "https://x.com/InsForge_dev",
-      "github": "https://github.com/insforge",
+      "github": "https://github.com/InsForge/InsForge",
       "linkedin": "https://linkedin.com/company/insforge"
     }
   }

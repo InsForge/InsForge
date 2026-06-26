@@ -1,19 +1,27 @@
 import { Request, Response, NextFunction } from 'express';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import { AppError } from './error.js';
-import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES, type RoleSchema } from '@insforge/shared-schemas';
+import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { UserContext } from '@/services/db/user-context.service.js';
-import { RoleSchema } from '@insforge/shared-schemas';
+
+export type UserContext = {
+  /**
+   * Always present at the API level: user UUID for authenticated, admin id
+   * for project_admin, 'anonymous' for anon. Only the authenticated UUID is
+   * a row-ownership identity; database boundaries (claims, owner columns)
+   * gate on role === 'authenticated' so admin/anon labels never reach
+   * uuid-typed claims or columns.
+   */
+  id: string;
+  email?: string;
+  role: RoleSchema;
+};
 
 export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: RoleSchema;
-  };
+  user?: UserContext;
   authenticated?: boolean;
-  apiKey?: string;
+  hasApiKey?: boolean;
   projectId?: string;
 }
 
@@ -44,23 +52,22 @@ export function extractApiKey(req: AuthRequest): string | null {
   return null;
 }
 
-// Build a UserContext from an authenticated request. Admin = API key or
-// project_admin role; everyone else runs as `authenticated` with their
-// `sub` claim plumbed through to RLS. Anonymous → role=anon.
-export function getUserContextFromReq(req: AuthRequest): UserContext {
-  if (req.apiKey || req.user?.role === 'project_admin') {
-    return { isAdmin: true, role: 'authenticated' };
+// Helper function to extract the opaque anon key from a request
+// The anon key travels in the Authorization header like every other client
+// credential (Bearer anon_...); signed-in clients replace it with their JWT.
+export function extractAnonKey(req: AuthRequest): string | null {
+  const bearerToken = extractBearerToken(req.headers.authorization);
+  if (bearerToken && bearerToken.startsWith('anon_')) {
+    return bearerToken;
   }
-  if (req.user) {
-    return { userId: req.user.id, email: req.user.email, role: 'authenticated' };
-  }
-  return { role: 'anon' };
+
+  return null;
 }
 
 // Helper function to set user on request
 function setRequestUser(
   req: AuthRequest,
-  payload: { sub: string; email: string; role: RoleSchema }
+  payload: { sub: string; email?: string; role: RoleSchema }
 ) {
   req.user = {
     id: payload.sub,
@@ -70,7 +77,18 @@ function setRequestUser(
 }
 
 /**
- * Verifies user authentication (accepts both user and admin tokens)
+ * Verifies user authentication (accepts API keys, anon keys, and JWT tokens)
+ *
+ * All credentials travel in the Authorization header; dispatch is by shape,
+ * never by falling back on failure:
+ * - `ik_...` (Bearer or x-api-key) -> admin API key
+ * - Bearer `anon_...` -> opaque anon key, `anon` role
+ * - any other Bearer -> JWT (role claim decides admin/authenticated/legacy anon)
+ *
+ * Signed-out clients send the anon key as their Bearer credential; signing in
+ * replaces it with the user JWT. Each branch fails closed: an invalid or
+ * expired user JWT must return 401 (so SDK refresh flows trigger) — it must
+ * never silently downgrade to anon.
  */
 export async function verifyUser(req: AuthRequest, res: Response, next: NextFunction) {
   const apiKey = extractApiKey(req);
@@ -78,7 +96,13 @@ export async function verifyUser(req: AuthRequest, res: Response, next: NextFunc
     return verifyApiKey(req, res, next);
   }
 
-  // Use the main verifyToken that handles JWT authentication
+  const bearerToken = extractBearerToken(req.headers.authorization);
+  if (bearerToken && bearerToken.startsWith('anon_')) {
+    return verifyAnonKey(req, res, next);
+  }
+
+  // Anything else (including no credentials) goes through JWT verification,
+  // which produces the canonical 401 when the header is missing or invalid
   return verifyToken(req, res, next);
 }
 
@@ -98,7 +122,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
         'No admin token provided',
         401,
         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
+        NEXT_ACTIONS.CHECK_TOKEN
       );
     }
 
@@ -110,7 +134,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
         'Admin access required',
         403,
         ERROR_CODES.AUTH_UNAUTHORIZED,
-        NEXT_ACTION.CHECK_ADMIN_TOKEN
+        NEXT_ACTIONS.CHECK_ADMIN_TOKEN
       );
     }
 
@@ -125,7 +149,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
           'Invalid admin token',
           401,
           ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-          NEXT_ACTION.CHECK_ADMIN_TOKEN
+          NEXT_ACTIONS.CHECK_ADMIN_TOKEN
         )
       );
     }
@@ -146,7 +170,7 @@ export async function verifyApiKey(req: AuthRequest, _res: Response, next: NextF
         'No API key provided',
         401,
         ERROR_CODES.AUTH_INVALID_API_KEY,
-        NEXT_ACTION.CHECK_API_KEY
+        NEXT_ACTIONS.CHECK_API_KEY
       );
     }
 
@@ -156,11 +180,48 @@ export async function verifyApiKey(req: AuthRequest, _res: Response, next: NextF
         'Invalid API key',
         401,
         ERROR_CODES.AUTH_INVALID_API_KEY,
-        NEXT_ACTION.CHECK_API_KEY
+        NEXT_ACTIONS.CHECK_API_KEY
       );
     }
     req.authenticated = true;
-    req.apiKey = apiKey;
+    req.hasApiKey = true;
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Verifies the opaque anon key (`anon_...`)
+ * Maps the request to the `anon` role; RLS policies are the security boundary.
+ * The request carries 'anonymous' as its API-level subject, but no sub claim
+ * reaches the database (stripped like admin subjects), so auth.uid() is NULL
+ * and identity-scoped policies fail closed.
+ */
+export async function verifyAnonKey(req: AuthRequest, _res: Response, next: NextFunction) {
+  try {
+    const anonKey = extractAnonKey(req);
+
+    if (!anonKey) {
+      throw new AppError(
+        'No anon key provided',
+        401,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+        NEXT_ACTIONS.CHECK_TOKEN
+      );
+    }
+
+    const isValid = await secretService.verifyAnonKey(anonKey);
+    if (!isValid) {
+      throw new AppError(
+        'Invalid anon key',
+        401,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+        NEXT_ACTIONS.CHECK_TOKEN
+      );
+    }
+
+    setRequestUser(req, { sub: 'anonymous', role: 'anon' });
     next();
   } catch (error) {
     next(error);
@@ -179,7 +240,7 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
         'No token provided',
         401,
         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
+        NEXT_ACTIONS.CHECK_TOKEN
       );
     }
 
@@ -192,7 +253,7 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
         'Invalid token: missing role',
         401,
         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
+        NEXT_ACTIONS.CHECK_TOKEN
       );
     }
 
@@ -209,7 +270,7 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
           'Invalid token',
           401,
           ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-          NEXT_ACTION.CHECK_TOKEN
+          NEXT_ACTIONS.CHECK_TOKEN
         )
       );
     }
@@ -228,7 +289,7 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
         'No authorization token provided',
         401,
         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
+        NEXT_ACTIONS.CHECK_TOKEN
       );
     }
 
@@ -249,7 +310,7 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
           'Invalid cloud backend token',
           401,
           ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-          NEXT_ACTION.CHECK_TOKEN
+          NEXT_ACTIONS.CHECK_TOKEN
         )
       );
     }

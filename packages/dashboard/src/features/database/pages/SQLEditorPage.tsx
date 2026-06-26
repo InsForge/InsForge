@@ -1,10 +1,10 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useRawSQL } from '#features/database/hooks/useRawSQL';
 import { useSQLEditorContext } from '#features/database/contexts/SQLEditorContext';
-import { Button, Tabs, Tab } from '@insforge/ui';
+import { Button, Tabs, Tab, cn } from '@insforge/ui';
 import { CodeEditor, DataGrid, type DataGridColumn, type DataGridRow } from '#components';
-import { X, Plus } from 'lucide-react';
-import { cn } from '#lib/utils/utils';
+import { X, Plus, Download, FileJson } from 'lucide-react';
+import { convertToCSV, convertToJSON, getExportFilename } from '#lib/utils/data-export';
 
 interface ResultsViewerProps {
   data: unknown;
@@ -117,8 +117,11 @@ export default function SQLEditorPage() {
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTabName, setEditingTabName] = useState('');
-  const [resultView, setResultView] = useState<'result' | 'chart'>('result');
+  const [resultView, setResultView] = useState<'result' | 'table'>('result');
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [exportError, setExportError] = useState<Error | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   const { executeSQL, isPending, data, isSuccess, error, isError } = useRawSQL({
     showSuccessToast: true,
@@ -132,10 +135,27 @@ export default function SQLEditorPage() {
     }
   }, [editingTabId]);
 
+  // Close export menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setIsExportMenuOpen(false);
+      }
+    }
+
+    if (isExportMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isExportMenuOpen]);
+
   const handleExecuteQuery = () => {
     if (!activeTab?.query.trim() || isPending) {
       return;
     }
+
+    // Clear any previous export error when running a new query
+    setExportError(null);
 
     executeSQL({ query: activeTab.query, params: [] });
   };
@@ -169,6 +189,52 @@ export default function SQLEditorPage() {
     } else if (e.key === 'Escape') {
       setEditingTabId(null);
       setEditingTabName('');
+    }
+  };
+
+  const getExportTableData = (): unknown[] | null => {
+    if (!isSuccess || !data) {
+      return null;
+    }
+
+    const rows = data.rows || data;
+    if (Array.isArray(rows) && rows.length > 0) {
+      return rows;
+    }
+    return null;
+  };
+
+  const handleExportCSV = () => {
+    const exportData = getExportTableData();
+    if (!exportData) {
+      return;
+    }
+
+    setExportError(null);
+
+    try {
+      const filename = getExportFilename('query_results');
+      convertToCSV(exportData, filename);
+      setIsExportMenuOpen(false);
+    } catch (err) {
+      setExportError(err instanceof Error ? err : new Error('Failed to export CSV'));
+    }
+  };
+
+  const handleExportJSON = () => {
+    const exportData = getExportTableData();
+    if (!exportData) {
+      return;
+    }
+
+    setExportError(null);
+
+    try {
+      const filename = getExportFilename('query_results');
+      convertToJSON(exportData, filename);
+      setIsExportMenuOpen(false);
+    } catch (err) {
+      setExportError(err instanceof Error ? err : new Error('Failed to export JSON'));
     }
   };
 
@@ -316,12 +382,53 @@ export default function SQLEditorPage() {
                   </span>
                 )}
               </Tab>
-              <Tab value="chart">Chart</Tab>
+              <Tab value="table">Table View</Tab>
             </Tabs>
-            {/* Run Button */}
-            <Button onClick={handleExecuteQuery} disabled={isPending || !activeTab?.query.trim()}>
-              Run
-            </Button>
+            {/* Run Button + Export Menu */}
+            <div className="flex items-center gap-2 relative">
+              <Button onClick={handleExecuteQuery} disabled={isPending || !activeTab?.query.trim()}>
+                Run
+              </Button>
+
+              {/* Export Dropdown */}
+              <div ref={exportMenuRef} className="relative">
+                <button
+                  onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                  disabled={!getExportTableData()}
+                  className={cn(
+                    'flex items-center justify-center p-2 rounded transition-colors',
+                    getExportTableData()
+                      ? 'hover:bg-[var(--alpha-8)] text-foreground cursor-pointer'
+                      : 'text-muted-foreground opacity-50 cursor-not-allowed'
+                  )}
+                  aria-label="Export results"
+                  title={getExportTableData() ? 'Export results' : 'No data to export'}
+                >
+                  <Download className="w-5 h-5" />
+                </button>
+
+                {/* Export Menu Dropdown */}
+                {isExportMenuOpen && getExportTableData() && (
+                  <div className="absolute right-0 mt-1 w-40 rounded-lg bg-[rgb(var(--semantic-0))] border border-[var(--alpha-8)] shadow-lg z-50">
+                    <button
+                      onClick={handleExportCSV}
+                      className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-[var(--alpha-4)] rounded-t-lg flex items-center gap-2 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download as CSV
+                    </button>
+                    <div className="border-t border-[var(--alpha-8)]" />
+                    <button
+                      onClick={handleExportJSON}
+                      className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-[var(--alpha-4)] rounded-b-lg flex items-center gap-2 transition-colors"
+                    >
+                      <FileJson className="w-4 h-4" />
+                      Download as JSON
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Results Content */}
@@ -331,7 +438,11 @@ export default function SQLEditorPage() {
               resultView === 'result' && 'px-4 py-3'
             )}
           >
-            {isError && error ? (
+            {exportError ? (
+              <div className={resultView !== 'result' ? 'px-4 py-3' : ''}>
+                <ErrorViewer error={exportError} />
+              </div>
+            ) : isError && error ? (
               <div className={resultView !== 'result' ? 'px-4 py-3' : ''}>
                 <ErrorViewer error={error} />
               </div>

@@ -39,3 +39,20 @@ import Installation from '/snippets/sdk-installation.mdx';
 
 Address the reader as "you"; use imperative verbs. See `docs/quickstart.mdx`
 for the canonical voice.
+
+## Sound human, not AI-generated
+
+InsForge docs are public-facing; they should not read as machine-written. Strip
+the common AI tells (from the humanizer skill, based on Wikipedia's "Signs of AI
+writing"):
+
+- **Em dashes** for asides or emphasis. Use a comma, period, colon, or parentheses instead.
+- **Rule of three.** Don't auto-triple ("fast, reliable, and scalable"); name the one that matters.
+- **Negative parallelism** ("It's not just X, it's Y"). State the positive claim directly.
+- **Inflated significance** ("plays a vital role", "underscores the importance of").
+- **Vague attribution** ("studies show", "widely regarded"). Name the source or drop the claim.
+- **AI vocabulary**: delve, leverage, utilize, underscore, foster, realm, landscape, tapestry, seamless, robust, pivotal. Use the plain word.
+
+Read it back. If it sounds like a press release or a term paper, flatten it.
+
+When you're not sure the draft is clean, run the full `humanizer` skill for a deeper pass (or see [blader/humanizer](https://github.com/blader/humanizer)). The rules above are the quick version.

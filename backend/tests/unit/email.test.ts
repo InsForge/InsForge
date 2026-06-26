@@ -1,5 +1,5 @@
 import { EmailService } from '../../src/services/email/email.service';
-import { AppError } from '../../src/api/middlewares/error';
+import { AppError } from '../../src/utils/errors';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
@@ -14,8 +14,8 @@ vi.mock('../../src/utils/logger', () => ({
     warn: vi.fn(),
   },
 }));
-vi.mock('../../src/infra/config/app.config', () => ({
-  config: {
+vi.mock('../../src/infra/config/app.config', () => {
+  const c = {
     app: {
       jwtSecret: 'test-jwt-secret',
     },
@@ -23,8 +23,12 @@ vi.mock('../../src/infra/config/app.config', () => ({
       projectId: 'test-project-123',
       apiHost: 'https://api.test.com',
     },
-  },
-}));
+  };
+  return {
+    config: c,
+    appConfig: c,
+  };
+});
 
 describe('EmailService', () => {
   let emailService: EmailService;
@@ -35,10 +39,10 @@ describe('EmailService', () => {
     vi.resetAllMocks();
 
     // Mock config values
-    const { config } = await import('../../src/infra/config/app.config');
-    config.cloud.projectId = 'test-project-123';
-    config.app.jwtSecret = 'test-jwt-secret';
-    config.cloud.apiHost = 'https://api.test.com';
+    const { appConfig } = await import('../../src/infra/config/app.config');
+    appConfig.cloud.projectId = 'test-project-123';
+    appConfig.app.jwtSecret = 'test-jwt-secret';
+    appConfig.cloud.apiHost = 'https://api.test.com';
 
     // Get fresh instance
     emailService = EmailService.getInstance();
@@ -155,8 +159,8 @@ describe('EmailService', () => {
     });
 
     it('throws error if PROJECT_ID is not configured', async () => {
-      const { config } = await import('../../src/infra/config/app.config');
-      config.cloud.projectId = 'local';
+      const { appConfig } = await import('../../src/infra/config/app.config');
+      appConfig.cloud.projectId = 'local';
 
       await expect(
         emailService.sendWithTemplate('user@example.com', 'John', 'email-verification-code', {
@@ -171,12 +175,12 @@ describe('EmailService', () => {
       ).rejects.toThrow('PROJECT_ID is not configured');
 
       // Reset for other tests
-      config.cloud.projectId = 'test-project-123';
+      appConfig.cloud.projectId = 'test-project-123';
     });
 
     it('throws error if JWT_SECRET is not configured', async () => {
-      const { config } = await import('../../src/infra/config/app.config');
-      config.app.jwtSecret = '';
+      const { appConfig } = await import('../../src/infra/config/app.config');
+      appConfig.app.jwtSecret = '';
 
       await expect(
         emailService.sendWithTemplate('user@example.com', 'John', 'email-verification-code', {
@@ -191,7 +195,7 @@ describe('EmailService', () => {
       ).rejects.toThrow('JWT_SECRET is not configured');
 
       // Reset for other tests
-      config.app.jwtSecret = 'test-jwt-secret';
+      appConfig.app.jwtSecret = 'test-jwt-secret';
     });
 
     it('throws error if required parameters are missing', async () => {

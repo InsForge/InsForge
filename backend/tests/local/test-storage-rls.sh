@@ -32,6 +32,7 @@ PASS="testpass123"
 
 ALICE_EMAIL="alice-rls-$TS@example.com"
 BOB_EMAIL="bob-rls-$TS@example.com"
+ANON_KEY=$(get_anon_key)
 
 # === helpers ============================================================
 
@@ -56,7 +57,7 @@ fi
 if [ -z "$API_KEY" ]; then
   print_fail "Could not get API key (set TEST_API_KEY or ACCESS_API_KEY)"
   print_info "  TEST_API_BASE=$TEST_API_BASE"
-  print_info "  TEST_ADMIN_EMAIL=$TEST_ADMIN_EMAIL"
+  print_info "  TEST_ADMIN_USERNAME=$TEST_ADMIN_USERNAME"
   print_info "  ADMIN_TOKEN length=${#ADMIN_TOKEN}"
   print_info "  /metadata/api-key response (first 200 chars): ${API_KEY_RESPONSE:0:200}"
   exit 1
@@ -77,6 +78,7 @@ PATH_BUCKET="rls-path-$TS"
 # the same state the migration left it: RLS enabled, zero policies.
 cleanup_storage_policies() {
   psql "$DATABASE_URL" >/dev/null 2>&1 <<'SQL' || true
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS storage_objects_public_read_test ON storage.objects;
 DROP POLICY IF EXISTS storage_objects_path_select ON storage.objects;
 DROP POLICY IF EXISTS storage_objects_owner_select ON storage.objects;
@@ -127,8 +129,10 @@ curl -sS -X POST "$API/storage/buckets" \
 print_success "Bucket created: $BUCKET"
 
 curl -sS -X POST "$API/auth/users" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ANON_KEY" \
   -d "{\"email\":\"$ALICE_EMAIL\",\"password\":\"$PASS\",\"name\":\"Alice\"}" > /dev/null
 curl -sS -X POST "$API/auth/users" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ANON_KEY" \
   -d "{\"email\":\"$BOB_EMAIL\",\"password\":\"$PASS\",\"name\":\"Bob\"}" > /dev/null
 register_test_user "$ALICE_EMAIL"
 register_test_user "$BOB_EMAIL"
@@ -167,6 +171,7 @@ print_blue "
 # same way against a fresh CI DB (migration shipped no defaults) or an
 # existing-project DB (migration installed the same set already).
 psql "$DATABASE_URL" >/dev/null <<'SQL'
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS storage_objects_owner_select ON storage.objects;
 DROP POLICY IF EXISTS storage_objects_owner_insert ON storage.objects;
 DROP POLICY IF EXISTS storage_objects_owner_update ON storage.objects;

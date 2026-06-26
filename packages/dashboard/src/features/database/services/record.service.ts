@@ -2,6 +2,7 @@ import { ConvertedValue } from '#components/datagrid/datagridTypes';
 import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
 import { apiClient } from '#lib/api/client';
 import { BulkUpsertResponse } from '@insforge/shared-schemas';
+import { convertToCSV, getExportFilename } from '#lib/utils/data-export';
 
 interface AdminRecordListResponse {
   data: { [key: string]: ConvertedValue }[];
@@ -274,6 +275,50 @@ export class RecordService {
       body: formData,
     });
     return response;
+  }
+
+  async exportTableAsCSV(
+    tableName: string,
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
+  ): Promise<{ limited: boolean }> {
+    // Export limit to prevent browser crashes on large tables
+    const MAX_EXPORT_ROWS = 10_000;
+    // Backend API max limit is 500 records per request
+    const limit = 500;
+    const allRecords: { [key: string]: ConvertedValue }[] = [];
+    let offset = 0;
+    let isLimited = false;
+
+    while (allRecords.length < MAX_EXPORT_ROWS) {
+      const { records } = await this.getTableRecords(tableName, schemaName, limit, offset);
+
+      if (records.length === 0) {
+        break;
+      }
+
+      // Only take what we need up to the limit
+      const remaining = MAX_EXPORT_ROWS - allRecords.length;
+      allRecords.push(...records.slice(0, remaining));
+
+      // Check if we've hit the limit or exhausted records
+      if (allRecords.length >= MAX_EXPORT_ROWS) {
+        isLimited = true;
+        break;
+      }
+
+      if (records.length < limit) {
+        break;
+      }
+
+      offset += limit;
+    }
+
+    const filename = getExportFilename(tableName + '_data');
+
+    // Convert and download
+    convertToCSV(allRecords, filename);
+
+    return { limited: isLimited };
   }
 }
 

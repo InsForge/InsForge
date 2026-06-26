@@ -8,9 +8,5 @@
 -- - Keep ai.usage.config_id always linked to ai.configs(id)
 -- - Allow disabling/enabling models without hard deletes
 
-BEGIN;
-
 ALTER TABLE ai.configs
-ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE;
-
-COMMIT;
+ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;

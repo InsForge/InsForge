@@ -3,10 +3,11 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import type { Readable } from 'stream';
 import { isCloudEnvironment } from '@/utils/environment.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError, UpstreamError } from '@/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 const VERCEL_UPLOAD_TIMEOUT_MS = 120_000;
 
@@ -250,9 +251,9 @@ export class VercelProvider {
       return await this.fetchCloudCredentials();
     }
 
-    const token = process.env.VERCEL_TOKEN;
-    const teamId = process.env.VERCEL_TEAM_ID;
-    const projectId = process.env.VERCEL_PROJECT_ID;
+    const token = appConfig.deployments.vercelToken;
+    const teamId = appConfig.deployments.vercelTeamId;
+    const projectId = appConfig.deployments.vercelProjectId;
 
     if (!token) {
       throw new AppError(
@@ -287,9 +288,9 @@ export class VercelProvider {
       return true;
     }
     return !!(
-      process.env.VERCEL_TOKEN &&
-      process.env.VERCEL_TEAM_ID &&
-      process.env.VERCEL_PROJECT_ID
+      appConfig.deployments.vercelToken &&
+      appConfig.deployments.vercelTeamId &&
+      appConfig.deployments.vercelProjectId
     );
   }
 
@@ -304,12 +305,12 @@ export class VercelProvider {
 
     this.fetchPromise = (async () => {
       try {
-        const projectId = process.env.PROJECT_ID;
+        const projectId = appConfig.cloud.projectId;
         if (!projectId) {
           throw new Error('PROJECT_ID not found in environment variables');
         }
 
-        const jwtSecret = process.env.JWT_SECRET;
+        const jwtSecret = appConfig.app.jwtSecret;
         if (!jwtSecret) {
           throw new Error('JWT_SECRET not found in environment variables');
         }
@@ -317,7 +318,7 @@ export class VercelProvider {
         const signature = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
 
         const response = await fetch(
-          `${process.env.CLOUD_API_HOST || 'https://api.insforge.dev'}/sites/v1/credentials/${projectId}?sign=${signature}`
+          `${appConfig.cloud.apiHost}/sites/v1/credentials/${projectId}?sign=${signature}`
         );
 
         if (!response.ok) {
@@ -439,7 +440,7 @@ export class VercelProvider {
       logger.error('Failed to create Vercel deployment', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to create Vercel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to create Vercel deployment');
     }
   }
 
@@ -473,13 +474,17 @@ export class VercelProvider {
       };
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Deployment not found: ${deploymentId}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(
+          `Deployment not found: ${deploymentId}`,
+          404,
+          ERROR_CODES.DEPLOYMENT_NOT_FOUND
+        );
       }
       logger.error('Failed to get Vercel deployment', {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new AppError('Failed to get Vercel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to get Vercel deployment');
     }
   }
 
@@ -509,7 +514,7 @@ export class VercelProvider {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new AppError('Failed to cancel Vercel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to cancel Vercel deployment');
     }
   }
 
@@ -548,7 +553,7 @@ export class VercelProvider {
       logger.error('Failed to upsert environment variables', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to upsert environment variables', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to upsert environment variables');
     }
   }
 
@@ -620,7 +625,7 @@ export class VercelProvider {
       logger.error('Failed to list environment variables', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to list environment variables', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to list environment variables');
     }
   }
 
@@ -666,13 +671,17 @@ export class VercelProvider {
       };
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Environment variable not found: ${envId}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(
+          `Environment variable not found: ${envId}`,
+          404,
+          ERROR_CODES.ENVIRONMENT_VARIABLE_NOT_FOUND
+        );
       }
       logger.error('Failed to get environment variable', {
         error: error instanceof Error ? error.message : String(error),
         envId,
       });
-      throw new AppError('Failed to get environment variable', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to get environment variable');
     }
   }
 
@@ -698,13 +707,17 @@ export class VercelProvider {
         throw error;
       }
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Environment variable not found: ${envId}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(
+          `Environment variable not found: ${envId}`,
+          404,
+          ERROR_CODES.ENVIRONMENT_VARIABLE_NOT_FOUND
+        );
       }
       logger.error('Failed to delete environment variable', {
         error: error instanceof Error ? error.message : String(error),
         envId,
       });
-      throw new AppError('Failed to delete environment variable', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to delete environment variable');
     }
   }
 
@@ -787,7 +800,7 @@ export class VercelProvider {
       logger.error('Failed to list custom domains from Vercel', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to list custom domains', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to list custom domains');
     }
   }
 
@@ -816,7 +829,7 @@ export class VercelProvider {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to get custom domain config', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to get custom domain config');
     }
   }
 
@@ -842,13 +855,17 @@ export class VercelProvider {
       return response.data as VercelProjectDomain;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Domain not found on Vercel: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(
+          `Domain not found on Vercel: ${domain}`,
+          404,
+          ERROR_CODES.DOMAIN_NOT_FOUND
+        );
       }
       logger.error('Failed to fetch custom domain from Vercel', {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to get custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to get custom domain');
     }
   }
 
@@ -894,18 +911,18 @@ export class VercelProvider {
           throw new AppError(
             msg || `Domain ${domain} is already added to this project`,
             409,
-            ERROR_CODES.ALREADY_EXISTS
+            ERROR_CODES.DOMAIN_ALREADY_EXISTS
           );
         }
         if (status === 400) {
-          throw new AppError(msg || `Invalid domain: ${domain}`, 400, ERROR_CODES.INVALID_INPUT);
+          throw new AppError(msg || `Invalid domain: ${domain}`, 400, ERROR_CODES.DOMAIN_INVALID);
         }
       }
       logger.error('Failed to add custom domain to Vercel', {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to add custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to add custom domain');
     }
   }
 
@@ -939,7 +956,7 @@ export class VercelProvider {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to remove custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to remove custom domain');
     }
   }
 
@@ -976,13 +993,17 @@ export class VercelProvider {
         throw error;
       }
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Domain not found on Vercel: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(
+          `Domain not found on Vercel: ${domain}`,
+          404,
+          ERROR_CODES.DOMAIN_NOT_FOUND
+        );
       }
       logger.error('Failed to verify custom domain', {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to verify custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to verify custom domain');
     }
   }
 
@@ -1061,12 +1082,12 @@ export class VercelProvider {
         logger.error('Failed to upload file to Vercel', {
           error: error instanceof Error ? error.message : String(error),
         });
-        throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+        throw new UpstreamError(error, 'Failed to upload file to Vercel');
       }
     }
 
     // Unreachable, but TypeScript needs a return
-    throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+    throw new AppError('Failed to upload file to Vercel', 502, ERROR_CODES.UPSTREAM_FAILURE);
   }
 
   /**
@@ -1125,7 +1146,7 @@ export class VercelProvider {
         throw new AppError(
           `Vercel file upload timed out after ${VERCEL_UPLOAD_TIMEOUT_MS}ms. Retry the file upload.`,
           504,
-          ERROR_CODES.INTERNAL_ERROR
+          ERROR_CODES.UPSTREAM_FAILURE
         );
       }
 
@@ -1146,26 +1167,27 @@ export class VercelProvider {
         );
       }
 
-      if (axios.isAxiosError(error) && error.response?.status === 400) {
+      if (axios.isAxiosError(error) && error.response) {
         logger.warn('Vercel rejected streamed file upload', {
           sha: input.sha,
           status: error.response.status,
+          responseData: error.response.data,
         });
-        throw new AppError(
-          'Uploaded file content does not match the registered deployment file.',
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
+        throw new UpstreamError(error, 'Failed to upload file to Vercel');
       }
 
       if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') {
-        throw new AppError('Vercel file upload was interrupted.', 499, ERROR_CODES.INVALID_INPUT);
+        throw new AppError(
+          'Vercel file upload was interrupted.',
+          499,
+          ERROR_CODES.DEPLOYMENT_UPLOAD_CANCELED
+        );
       }
 
       logger.error('Failed to stream file to Vercel', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to upload file to Vercel');
     } finally {
       cleanup();
     }
@@ -1250,7 +1272,7 @@ export class VercelProvider {
         error: error instanceof Error ? error.message : String(error),
         fileCount: files.length,
       });
-      throw new AppError('Failed to create Vercel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to create Vercel deployment');
     }
   }
 }

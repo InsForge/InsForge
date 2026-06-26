@@ -1,12 +1,12 @@
 import { Response } from 'express';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { sendS3Error } from '../errors.js';
-import { S3AuthenticatedRequest } from '@/api/middlewares/s3-sigv4.js';
+import { S3GatewayRequest, getS3Bucket } from '../request.js';
 
 const BUCKET_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 
-export async function handle(req: S3AuthenticatedRequest, res: Response): Promise<void> {
-  const bucket = (req as unknown as { s3Bucket: string }).s3Bucket;
+export async function handle(req: S3GatewayRequest, res: Response): Promise<void> {
+  const bucket = getS3Bucket(req);
   if (!BUCKET_NAME_RE.test(bucket)) {
     sendS3Error(res, 'InvalidBucketName', `Invalid bucket name ${bucket}`, {
       resource: req.path,

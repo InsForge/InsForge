@@ -4,10 +4,10 @@ import { DeploymentService } from '@/services/deployments/deployment.service.js'
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { deploymentsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
 import {
+  ERROR_CODES,
   createDirectDeploymentRequestSchema,
   startDeploymentRequestSchema,
   updateSlugRequestSchema,
@@ -39,7 +39,7 @@ router.post(
 
       // Log audit
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_DEPLOYMENT',
         module: 'DEPLOYMENTS',
         details: { id: response.id },
@@ -75,7 +75,7 @@ router.post(
       const response = await deploymentService.createDirectDeployment(validationResult.data);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_DIRECT_DEPLOYMENT',
         module: 'DEPLOYMENTS',
         details: { id: response.id, fileCount: response.files.length },
@@ -174,7 +174,7 @@ router.post(
 
       // Log audit
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'START_DEPLOYMENT',
         module: 'DEPLOYMENTS',
         details: {
@@ -250,7 +250,7 @@ router.put(
 
       // Log audit
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_DEPLOYMENT_SLUG',
         module: 'DEPLOYMENTS',
         details: { slug: result.slug, domain: result.domain },
@@ -307,7 +307,7 @@ router.post(
       const domain = await deploymentService.addCustomDomain(validationResult.data.domain);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'ADD_CUSTOM_DOMAIN',
         module: 'DEPLOYMENTS',
         details: { domain: domain.domain },
@@ -371,7 +371,7 @@ router.delete(
       await deploymentService.removeCustomDomain(domain);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'REMOVE_CUSTOM_DOMAIN',
         module: 'DEPLOYMENTS',
         details: { domain },
@@ -396,7 +396,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
     const deployment = await deploymentService.getDeploymentById(id);
 
     if (!deployment) {
-      throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
     }
 
     successResponse(res, deployment);
@@ -423,7 +423,7 @@ router.post(
       const deployment = await deploymentService.syncDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
 
       successResponse(res, deployment);
@@ -449,7 +449,7 @@ router.post(
 
       // Log audit
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CANCEL_DEPLOYMENT',
         module: 'DEPLOYMENTS',
         details: { id },

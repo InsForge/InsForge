@@ -3,9 +3,12 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { DatabaseTableService } from '@/services/database/database-table.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { successResponse } from '@/utils/response.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import { createTableRequestSchema, updateTableSchemaRequestSchema } from '@insforge/shared-schemas';
+import { AppError } from '@/utils/errors.js';
+import {
+  ERROR_CODES,
+  createTableRequestSchema,
+  updateTableSchemaRequestSchema,
+} from '@insforge/shared-schemas';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { normalizeDatabaseSchemaName } from '@/services/database/helpers.js';
 
@@ -48,7 +51,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
 
     // Log audit for table creation
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'CREATE_TABLE',
       module: 'DATABASE',
       details: {
@@ -108,7 +111,7 @@ router.patch(
 
       // Log audit for table schema update
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_TABLE',
         module: 'DATABASE',
         details: {
@@ -140,7 +143,7 @@ router.delete(
 
       // Log audit for table deletion
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_TABLE',
         module: 'DATABASE',
         details: {

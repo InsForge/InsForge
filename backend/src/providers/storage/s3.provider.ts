@@ -20,6 +20,7 @@ import { Readable } from 'stream';
 import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
 import { StorageProvider, ObjectMetadata, GetObjectResult } from './base.provider.js';
 import logger from '@/utils/logger.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 function stripEtagQuotes(etag: string | undefined): string {
   return (etag ?? '').replace(/^"(.*)"$/, '$1');
@@ -76,21 +77,24 @@ export class S3StorageProvider implements StorageProvider {
     };
 
     // Use S3-specific credentials as a pair, otherwise fall back to AWS credentials as a pair
-    const useS3Creds = process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY;
-    const accessKeyId = useS3Creds ? process.env.S3_ACCESS_KEY_ID : process.env.AWS_ACCESS_KEY_ID;
+    const useS3Creds = appConfig.storage.s3AccessKeyId && appConfig.storage.s3SecretAccessKey;
+    const accessKeyId = useS3Creds
+      ? appConfig.storage.s3AccessKeyId
+      : appConfig.storage.awsAccessKeyId;
     const secretAccessKey = useS3Creds
-      ? process.env.S3_SECRET_ACCESS_KEY
-      : process.env.AWS_SECRET_ACCESS_KEY;
+      ? appConfig.storage.s3SecretAccessKey
+      : appConfig.storage.awsSecretAccessKey;
 
     if (accessKeyId && secretAccessKey) {
       s3Config.credentials = { accessKeyId, secretAccessKey };
     }
 
     // Support MinIO or other S3-compatible endpoints
-    if (process.env.S3_ENDPOINT_URL) {
-      s3Config.endpoint = process.env.S3_ENDPOINT_URL;
-      // MinIO requires path-style URLs
-      s3Config.forcePathStyle = true;
+    if (appConfig.storage.s3EndpointUrl) {
+      s3Config.endpoint = appConfig.storage.s3EndpointUrl;
+      // MinIO needs path-style; Tencent COS / Aliyun OSS need virtual-hosted-style.
+      // Configurable via S3_FORCE_PATH_STYLE (default true, backward-compatible).
+      s3Config.forcePathStyle = appConfig.storage.s3ForcePathStyle;
     }
 
     this.s3Client = new S3Client(s3Config);
@@ -344,14 +348,14 @@ export class S3StorageProvider implements StorageProvider {
     }
     // Public files get longer expiration (7 days), private files get shorter (1 hour default)
     const actualExpiresIn = isPublic ? SEVEN_DAYS_IN_SECONDS : expiresIn; // 604800 = 7 days
-    const cloudFrontUrl = process.env.AWS_CLOUDFRONT_URL;
+    const cloudFrontUrl = appConfig.cloud.cloudFrontUrl;
 
     try {
       // If CloudFront URL is configured and not using a custom S3 endpoint, use CloudFront for downloads
       // CloudFront only works with AWS S3, not with S3-compatible providers like Wasabi/MinIO
-      if (cloudFrontUrl && !process.env.S3_ENDPOINT_URL) {
-        const cloudFrontKeyPairId = process.env.AWS_CLOUDFRONT_KEY_PAIR_ID;
-        const cloudFrontPrivateKey = process.env.AWS_CLOUDFRONT_PRIVATE_KEY;
+      if (cloudFrontUrl && !appConfig.storage.s3EndpointUrl) {
+        const cloudFrontKeyPairId = appConfig.cloud.cloudFrontKeyPairId;
+        const cloudFrontPrivateKey = appConfig.cloud.cloudFrontPrivateKey;
 
         if (!cloudFrontKeyPairId || !cloudFrontPrivateKey) {
           logger.warn(

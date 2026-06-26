@@ -1,13 +1,16 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
-import type { TokenPayloadSchema } from '@insforge/shared-schemas';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES, type TokenPayloadSchema } from '@insforge/shared-schemas';
+import { NEXT_ACTIONS } from '../../utils/next-actions.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
-const JWT_SECRET = process.env.JWT_SECRET ?? '';
+const JWT_SECRET = appConfig.app.jwtSecret;
 const ACCESS_TOKEN_EXPIRES_IN = '15m';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
+
+export type RefreshSessionType = 'user' | 'admin';
 
 /**
  * Refresh token payload interface
@@ -16,13 +19,20 @@ export interface RefreshTokenPayload {
   sub: string;
   type: 'refresh';
   iss: string;
+  csrfNonce: string;
+  sessionType: RefreshSessionType;
+}
+
+export interface RefreshTokenWithCsrf {
+  refreshToken: string;
+  csrfToken: string;
 }
 
 /**
  * Create JWKS instance with caching and timeout configuration
  * The instance will automatically cache keys and handle refetching
  */
-const cloudApiHost = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
+const cloudApiHost = appConfig.cloud.apiHost;
 const JWKS = createRemoteJWKSet(new URL(`${cloudApiHost}/.well-known/jwks.json`), {
   timeoutDuration: 10000, // 10 second timeout for HTTP requests
   cooldownDuration: 30000, // 30 seconds cooldown after successful fetch
@@ -37,7 +47,7 @@ export class TokenManager {
   private static instance: TokenManager;
 
   private constructor() {
-    if (!process.env.JWT_SECRET) {
+    if (!appConfig.app.jwtSecret) {
       throw new Error('JWT_SECRET environment variable is required');
     }
   }
@@ -60,13 +70,11 @@ export class TokenManager {
   }
 
   /**
-   * Generate API key token (never expires)
-   * Used for internal API key authenticated requests to PostgREST
+   * Generate PostgREST project admin token (never expires)
+   * Used only for internal PostgREST proxy requests
    */
-  generateApiKeyToken(): string {
+  generatePostgrestAdminToken(): string {
     const payload = {
-      sub: 'project-admin-with-api-key',
-      email: 'project-admin@email.com',
       role: 'project_admin',
     };
     return jwt.sign(payload, JWT_SECRET, {
@@ -78,16 +86,31 @@ export class TokenManager {
   /**
    * Generate refresh token for secure session management
    */
-  generateRefreshToken(userId: string): string {
-    const refreshPayload: RefreshTokenPayload = {
-      sub: userId,
-      type: 'refresh',
-      iss: 'insforge',
-    };
+  generateRefreshToken(
+    userId: string,
+    sessionType: RefreshSessionType,
+    csrfNonce = this.generateCsrfNonce()
+  ): string {
+    const refreshPayload = this.createRefreshTokenPayload(userId, sessionType, csrfNonce);
     return jwt.sign(refreshPayload, JWT_SECRET, {
       algorithm: 'HS256',
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
     });
+  }
+
+  generateRefreshTokenWithCsrf(
+    userId: string,
+    sessionType: RefreshSessionType,
+    csrfNonce = this.generateCsrfNonce()
+  ): RefreshTokenWithCsrf {
+    const refreshPayload = this.createRefreshTokenPayload(userId, sessionType, csrfNonce);
+    return {
+      refreshToken: jwt.sign(refreshPayload, JWT_SECRET, {
+        algorithm: 'HS256',
+        expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+      }),
+      csrfToken: this.generateCsrfToken(refreshPayload),
+    };
   }
 
   /**
@@ -102,7 +125,13 @@ export class TokenManager {
       }) as RefreshTokenPayload;
 
       // Ensure this is a refresh token, not an access token
-      if (decoded.type !== 'refresh' || !decoded.sub) {
+      if (
+        decoded.type !== 'refresh' ||
+        !decoded.sub ||
+        typeof decoded.csrfNonce !== 'string' ||
+        decoded.csrfNonce.length === 0 ||
+        (decoded.sessionType !== 'user' && decoded.sessionType !== 'admin')
+      ) {
         throw new AppError('Invalid refresh token type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
 
@@ -116,12 +145,21 @@ export class TokenManager {
   }
 
   /**
-   * Generate anonymous JWT token (never expires)
+   * Generate PostgREST anon token (never expires)
+   *
+   * Internal use only: this token is minted at the gateway when a request
+   * authenticates with the opaque anon key (`anon_...`) and is forwarded to
+   * PostgREST, which derives the `anon` Postgres role from the `role` claim.
+   * It must never be handed out to clients — clients use the opaque anon key,
+   * which is rotatable/revocable (see SecretService).
+   *
+   * Like the PostgREST admin token, it carries no subject: anonymous requests
+   * have a role, not an identity, so auth.uid() is NULL and identity-scoped
+   * RLS policies fail closed. Legacy client-held anon JWTs (which carried a
+   * fake subject) keep working through the normal JWT verification path.
    */
-  generateAnonToken(): string {
+  generatePostgrestAnonToken(): string {
     const payload = {
-      sub: '12345678-1234-5678-90ab-cdef12345678',
-      email: 'anon@insforge.com',
       role: 'anon',
     };
     return jwt.sign(payload, JWT_SECRET, {
@@ -136,6 +174,9 @@ export class TokenManager {
   verifyToken(token: string): TokenPayloadSchema {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as TokenPayloadSchema;
+      if (!decoded.sub) {
+        throw new AppError('Invalid token subject', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
       return {
         sub: decoded.sub,
         email: decoded.email,
@@ -159,14 +200,14 @@ export class TokenManager {
 
       // Verify project_id matches if configured
       const tokenProjectId = payload['projectId'] as string;
-      const expectedProjectId = process.env.PROJECT_ID;
+      const expectedProjectId = appConfig.cloud.projectId;
 
       if (expectedProjectId && tokenProjectId !== expectedProjectId) {
         throw new AppError(
           'Project ID mismatch',
           403,
           ERROR_CODES.AUTH_UNAUTHORIZED,
-          NEXT_ACTION.CHECK_TOKEN
+          NEXT_ACTIONS.CHECK_TOKEN
         );
       }
 
@@ -185,31 +226,53 @@ export class TokenManager {
         `Invalid cloud authorization code: ${error instanceof Error ? error.message : 'Unknown error'}`,
         401,
         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
+        NEXT_ACTIONS.CHECK_TOKEN
       );
     }
   }
 
   /**
-   * Generate CSRF token derived from refresh token using HMAC
+   * Generate CSRF token derived from refresh-session claims using HMAC.
    */
-  generateCsrfToken(refreshToken: string): string {
-    return crypto.createHmac('sha256', JWT_SECRET).update(refreshToken).digest('hex');
+  generateCsrfToken(payload: RefreshTokenPayload): string {
+    return crypto
+      .createHmac('sha256', JWT_SECRET)
+      .update(`insforge:csrf:v1:${payload.sessionType}:${payload.sub}:${payload.csrfNonce}`)
+      .digest('hex');
   }
 
   /**
-   * Verify CSRF token by re-computing from refresh token
+   * Verify CSRF token by re-computing from refresh-session claims.
    * Uses timing-safe comparison to prevent timing attacks
    */
-  verifyCsrfToken(csrfHeader: string | undefined, refreshToken: string): boolean {
-    if (!csrfHeader || !refreshToken) {
+  verifyCsrfToken(csrfHeader: string | undefined, payload: RefreshTokenPayload): boolean {
+    if (!csrfHeader) {
       return false;
     }
-    const expectedCsrf = this.generateCsrfToken(refreshToken);
+
     try {
+      const expectedCsrf = this.generateCsrfToken(payload);
       return crypto.timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(expectedCsrf));
     } catch {
       return false;
     }
+  }
+
+  private generateCsrfNonce(): string {
+    return crypto.randomBytes(32).toString('base64url');
+  }
+
+  private createRefreshTokenPayload(
+    userId: string,
+    sessionType: RefreshSessionType,
+    csrfNonce: string
+  ): RefreshTokenPayload {
+    return {
+      sub: userId,
+      type: 'refresh',
+      iss: 'insforge',
+      csrfNonce,
+      sessionType,
+    };
   }
 }

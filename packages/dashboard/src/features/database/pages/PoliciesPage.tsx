@@ -17,6 +17,7 @@ import { SQLModal, SQLCellButton } from '#features/database/components/SQLModal'
 import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
 import { type DatabasePoliciesResponse } from '@insforge/shared-schemas';
 import { DatabaseSchemaSelect } from '#features/database/components/DatabaseSchemaSelect';
+import { usePageSize } from '#lib/hooks/usePageSize';
 import { DEFAULT_DATABASE_SCHEMA, getDatabaseSchemaInfo } from '#features/database/helpers';
 
 interface PolicyRow extends DataGridRowType {
@@ -62,6 +63,8 @@ export default function PoliciesPage() {
   const selectedSchemaInfo = getDatabaseSchemaInfo(schemas, selectedSchema);
   const { data, isLoading, error, refetch } = usePolicies(selectedSchema, true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
+  const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('db-policies');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const allPolicies = useMemo(() => parsePoliciesFromResponse(data), [data]);
 
@@ -78,10 +81,23 @@ export default function PoliciesPage() {
     );
   }, [allPolicies, searchQuery]);
 
+  const totalPages = Math.ceil(filteredPolicies.length / pageSize);
+  const safeCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
+
+  const paginatedPolicies = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredPolicies.slice(start, start + pageSize);
+  }, [filteredPolicies, safeCurrentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedSchema, pageSize]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       setSearchQuery('');
+      setCurrentPage(1);
       await refetch();
     } finally {
       setIsRefreshing(false);
@@ -236,6 +252,7 @@ export default function PoliciesPage() {
                 value={selectedSchemaInfo.name}
                 onValueChange={(schemaName) => {
                   setSearchQuery('');
+                  setCurrentPage(1);
                   setSelectedSchema(schemaName, { replace: true });
                 }}
                 disabled={isLoadingSchemas}
@@ -254,10 +271,18 @@ export default function PoliciesPage() {
         ) : (
           <div className="min-h-0 flex-1 overflow-hidden">
             <DataGrid
-              data={filteredPolicies}
+              data={paginatedPolicies}
               columns={columns}
               showSelection={false}
-              showPagination={false}
+              showPagination={true}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              pageSizeOptions={pageSizeOptions}
+              totalRecords={filteredPolicies.length}
+              paginationRecordLabel="policies"
+              onPageChange={setCurrentPage}
+              onPageSizeChange={onPageSizeChange}
               noPadding={true}
               className="h-full"
               isRefreshing={isRefreshing}

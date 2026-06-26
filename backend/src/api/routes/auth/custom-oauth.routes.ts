@@ -1,7 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import logger from '@/utils/logger.js';
@@ -12,6 +11,7 @@ import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.se
 import { AuditService } from '@/services/logs/audit.service.js';
 import { CustomOAuthProvider } from '@/providers/oauth/custom.provider.js';
 import {
+  ERROR_CODES,
   createCustomOAuthConfigRequestSchema,
   updateCustomOAuthConfigRequestSchema,
   listCustomOAuthConfigsResponseSchema,
@@ -69,7 +69,7 @@ router.get(
         throw new AppError(
           `Custom OAuth configuration for ${key} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
       const clientSecret = await customOAuthConfigService.getClientSecretByKey(key);
@@ -105,7 +105,7 @@ router.post(
 
       const config = await customOAuthConfigService.createConfig(validationResult.data);
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_CUSTOM_OAUTH_CONFIG',
         module: 'AUTH',
         details: {
@@ -149,7 +149,7 @@ router.put(
 
       const config = await customOAuthConfigService.updateConfig(key, validationResult.data);
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_CUSTOM_OAUTH_CONFIG',
         module: 'AUTH',
         details: {
@@ -180,11 +180,11 @@ router.delete(
         throw new AppError(
           `Custom OAuth configuration for ${req.params.key} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_CUSTOM_OAUTH_CONFIG',
         module: 'AUTH',
         details: {
@@ -227,11 +227,8 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
       );
     }
 
-    const { redirect_uri, code_challenge } = queryValidation.data;
+    const { redirect_uri, code_challenge, ...additionalParams } = queryValidation.data;
     const redirectUri = redirect_uri;
-    if (!redirectUri) {
-      throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
-    }
 
     if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
       throw new AppError(
@@ -253,7 +250,7 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
       { algorithm: 'HS256', expiresIn: '1h' }
     );
 
-    const authUrl = await customOAuthProvider.generateOAuthUrl(key, state);
+    const authUrl = await customOAuthProvider.generateOAuthUrl(key, state, additionalParams);
     successResponse(res, { authUrl });
   } catch (error) {
     logger.error('Custom OAuth init failed', { error, key: req.params.key });

@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { ERROR_CODES } from '@insforge/shared-schemas';
+import type { AppError } from '@/utils/errors.js';
 
 // --- Mocks ---
 
@@ -20,8 +22,8 @@ vi.mock('@/infra/security/encryption.manager.js', () => ({
   },
 }));
 
-vi.mock('@/infra/config/app.config.js', () => ({
-  config: {
+vi.mock('@/infra/config/app.config.js', () => {
+  const c = {
     fly: {
       enabled: true,
       apiToken: 'test-token',
@@ -35,8 +37,15 @@ vi.mock('@/infra/config/app.config.js', () => ({
     app: {
       jwtSecret: 'test-secret',
     },
-  },
-}));
+    storage: {
+      appKey: 'testkey1',
+    },
+  };
+  return {
+    config: c,
+    appConfig: c,
+  };
+});
 
 vi.mock('@/utils/logger.js', () => ({
   default: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -50,6 +59,7 @@ const mockStopMachine = vi.fn();
 const mockStartMachine = vi.fn();
 const mockDestroyMachine = vi.fn();
 const mockGetEvents = vi.fn();
+const mockGetLogs = vi.fn();
 const mockListMachines = vi.fn();
 const mockIsConfigured = vi.fn(() => true);
 
@@ -62,6 +72,7 @@ const mockFlyInstance = {
   startMachine: mockStartMachine,
   destroyMachine: mockDestroyMachine,
   getEvents: mockGetEvents,
+  getLogs: mockGetLogs,
   listMachines: mockListMachines,
   isConfigured: mockIsConfigured,
 };
@@ -77,11 +88,21 @@ import { ComputeServicesService } from '@/services/compute/services.service.js';
 describe('ComputeServicesService', () => {
   let service: ComputeServicesService;
 
+  const oldEnvAppKey = process.env.APP_KEY;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     process.env.APP_KEY = 'testkey1';
     service = ComputeServicesService.getInstance();
     mockIsConfigured.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    if (oldEnvAppKey === undefined) {
+      delete process.env.APP_KEY;
+    } else {
+      process.env.APP_KEY = oldEnvAppKey;
+    }
   });
 
   describe('createService', () => {
@@ -235,14 +256,146 @@ describe('ComputeServicesService', () => {
       expect(failedUpdateCall[1]).toContain('failed');
     });
 
+    // INS-271: end-to-end pass-through of `protocol: 'tcp'` from createService
+    // input → INSERT column list → launchMachine params. The cloud-backend +
+    // CLI work is wasted if the OSS strips this field. Pin both wire surfaces.
+    it('forwards protocol: tcp to INSERT and launchMachine when supplied', async () => {
+      const serviceId = 'svc-tcp-create';
+      const tcpInput = { ...input, protocol: 'tcp' as const, port: 6379, name: 'my-redis' };
+
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: tcpInput.projectId,
+            name: tcpInput.name,
+            image_url: tcpInput.imageUrl,
+            port: tcpInput.port,
+            cpu: tcpInput.cpu,
+            memory: tcpInput.memory,
+            region: tcpInput.region,
+            protocol: 'tcp',
+            fly_app_id: null,
+            fly_machine_id: null,
+            status: 'creating',
+            endpoint_url: null,
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+      mockCreateApp.mockResolvedValue({ appId: 'my-redis-proj-123' });
+      mockLaunchMachine.mockResolvedValue({ machineId: 'mach-tcp' });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: tcpInput.projectId,
+            name: tcpInput.name,
+            image_url: tcpInput.imageUrl,
+            port: tcpInput.port,
+            cpu: tcpInput.cpu,
+            memory: tcpInput.memory,
+            region: tcpInput.region,
+            protocol: 'tcp',
+            fly_app_id: 'my-redis-proj-123',
+            fly_machine_id: 'mach-tcp',
+            status: 'running',
+            endpoint_url: 'https://my-redis-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      const result = await service.createService(tcpInput);
+
+      // INSERT must include the column AND the value (positional bind, so
+      // assert the value made it into the params list rather than parsing the
+      // SQL string).
+      const insertCall = mockQuery.mock.calls[0];
+      expect(insertCall[0]).toContain('protocol');
+      expect(insertCall[1]).toContain('tcp');
+
+      // launchMachine must receive protocol: 'tcp' so the provider can pick
+      // raw-TCP edge handlers instead of HTTP.
+      expect(mockLaunchMachine).toHaveBeenCalledWith(expect.objectContaining({ protocol: 'tcp' }));
+
+      // Response shape echoes the persisted value (verified via mapRowToSchema).
+      expect(result.protocol).toBe('tcp');
+    });
+
+    // Back-compat — omitting protocol must NOT inject 'http' into the
+    // launchMachine call as a positive value. Sending `protocol: undefined` is
+    // fine (JSON.stringify drops it on the wire); sending `protocol: 'http'`
+    // would change the wire format vs pre-INS-271 deploys, which we don't
+    // want until we also rev the cloud-backend's wire-format invariant.
+    it('omitting protocol does not inject a default value into launchMachine', async () => {
+      const serviceId = 'svc-no-proto';
+
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: null,
+            fly_machine_id: null,
+            status: 'creating',
+            endpoint_url: null,
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+      mockCreateApp.mockResolvedValue({ appId: 'my-api-proj-123' });
+      mockLaunchMachine.mockResolvedValue({ machineId: 'mach-default' });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: 'my-api-proj-123',
+            fly_machine_id: 'mach-default',
+            status: 'running',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      await service.createService(input); // input has no `protocol`
+
+      // launchMachine was called; protocol param is undefined (the provider
+      // applies its own default). JSON.stringify drops undefined fields, so
+      // this preserves the pre-INS-271 wire format byte-for-byte.
+      const launchCall = mockLaunchMachine.mock.calls[0][0];
+      expect(launchCall.protocol).toBeUndefined();
+    });
+
     it('passes through structured cloud errors (quota, invalid input, etc.) instead of swallowing as generic 502', async () => {
       // Reproduces the bug found by stress-testing against staging:
       // when the cloud backend returns 403 COMPUTE_QUOTA_EXCEEDED with a clear
       // message ("Project X has reached 5 active services"), the OSS was
       // catching it and re-throwing as generic
       // "Compute service operation failed" 502 — losing the actual reason.
-      const { AppError } = await import('@/api/middlewares/error.js');
-      const { ERROR_CODES } = await import('@/types/error-constants.js');
+      const { AppError } = await import('@/utils/errors.js');
 
       const serviceId = 'svc-quota-test';
       mockQuery.mockResolvedValueOnce({
@@ -271,9 +424,12 @@ describe('ComputeServicesService', () => {
       // an AppError; replicate that shape — JSON string in `message`, status
       // code = HTTP status from cloud.
       const cloudQuotaError = new AppError(
-        '{"code":"COMPUTE_QUOTA_EXCEEDED","error":"Project e8a6b768 has reached 5 active services"}',
+        JSON.stringify({
+          code: ERROR_CODES.COMPUTE_QUOTA_EXCEEDED,
+          error: 'Project e8a6b768 has reached 5 active services',
+        }),
         403,
-        (ERROR_CODES as { COMPUTE_PROVIDER_ERROR: string }).COMPUTE_PROVIDER_ERROR
+        ERROR_CODES.COMPUTE_PROVIDER_ERROR
       );
       mockCreateApp.mockRejectedValue(cloudQuotaError);
 
@@ -290,7 +446,7 @@ describe('ComputeServicesService', () => {
       // Real bug: this used to be 502/COMPUTE_SERVICE_DEPLOY_FAILED. Should be
       // the cloud's actual code + message + status.
       expect(thrown!.statusCode).toBe(403);
-      expect(thrown!.code).toBe('COMPUTE_QUOTA_EXCEEDED');
+      expect(thrown!.code).toBe(ERROR_CODES.COMPUTE_QUOTA_EXCEEDED);
       expect(thrown!.message).toMatch(/has reached 5 active services/);
     });
   });
@@ -392,6 +548,11 @@ describe('ComputeServicesService', () => {
         cpu: 'shared-1x',
         memory: 256,
         region: 'iad',
+        // mapRowToSchema / snapshot path falls back to 'http' when the row is
+        // missing the column (pre-INS-271 rows backfilled by the 047
+        // migration). The fixture above doesn't set `protocol`, so this is
+        // the back-compat default surfacing.
+        protocol: 'http',
         flyAppId: 'app-del-proj-123',
         flyMachineId: 'machine-del',
         endpointUrl: 'https://app-del-proj-123.fly.dev',
@@ -855,24 +1016,80 @@ describe('ComputeServicesService', () => {
       // CloudComputeProvider wraps the cloud's JSON body verbatim into an
       // AppError whose .message is the raw body. The catch block must parse
       // it back out and surface code/message/nextActions.
-      const { AppError } = await import('@/api/middlewares/error.js');
+      const { AppError } = await import('@/utils/errors.js');
       const cloudBody = JSON.stringify({
-        code: 'COMPUTE_QUOTA_EXCEEDED',
+        code: ERROR_CODES.COMPUTE_QUOTA_EXCEEDED,
         error: 'Project compute quota exceeded',
         nextActions: ['upgrade plan', 'delete unused services'],
       });
-      mockLaunchMachine.mockRejectedValue(new AppError(cloudBody, 403, 'COMPUTE_QUOTA_EXCEEDED'));
+      mockLaunchMachine.mockRejectedValue(
+        new AppError(cloudBody, 403, ERROR_CODES.COMPUTE_QUOTA_EXCEEDED)
+      );
 
       await expect(
         service.updateService('svc-pa-1', { imageUrl: 'registry.fly.io/x:y' })
       ).rejects.toMatchObject({
         statusCode: 403,
-        code: 'COMPUTE_QUOTA_EXCEEDED',
+        code: ERROR_CODES.COMPUTE_QUOTA_EXCEEDED,
         message: 'Project compute quota exceeded',
       });
 
       // Final UPDATE must NOT have run — Fly call failed.
       expect(mockQuery.mock.calls.some((c) => String(c[0]).startsWith('UPDATE'))).toBe(false);
+    });
+
+    // INS-271: updateService forwards protocol through to updateMachine on
+    // the redeploy path. Switching http<->tcp swaps the Fly edge handlers
+    // entirely, so the provider has to know.
+    it('forwards protocol: tcp to updateMachine on redeploy', async () => {
+      const deployedRow = {
+        ...baseRow,
+        fly_machine_id: 'mach-existing',
+        status: 'running',
+        protocol: 'http',
+      };
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockUpdateMachine.mockResolvedValue(undefined);
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...deployedRow, protocol: 'tcp' }],
+      });
+
+      await service.updateService('svc-pa-1', { protocol: 'tcp' });
+
+      expect(mockUpdateMachine).toHaveBeenCalledWith(
+        expect.objectContaining({
+          appId: 'my-api-proj-123',
+          machineId: 'mach-existing',
+          protocol: 'tcp',
+        })
+      );
+
+      // SQL UPDATE persists the new protocol value.
+      const updateCall = mockQuery.mock.calls[2];
+      expect(updateCall[0]).toContain('protocol');
+      expect(updateCall[1]).toContain('tcp');
+    });
+
+    // Back-compat — if the caller doesn't pass `protocol`, the persisted value
+    // (from `existing.protocol`) flows through. This is how a port-only update
+    // keeps the existing service's protocol setting.
+    it('preserves existing.protocol when update omits the field', async () => {
+      const deployedRow = {
+        ...baseRow,
+        fly_machine_id: 'mach-existing',
+        status: 'running',
+        protocol: 'tcp',
+      };
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockUpdateMachine.mockResolvedValue(undefined);
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] });
+
+      // Memory-only update — should still forward the existing tcp protocol.
+      await service.updateService('svc-pa-1', { memory: 1024 });
+
+      expect(mockUpdateMachine).toHaveBeenCalledWith(expect.objectContaining({ protocol: 'tcp' }));
     });
 
     it('regression: existing machine + imageUrl takes the redeploy path (updateMachine, no launch, no optimistic lock)', async () => {
@@ -1030,6 +1247,49 @@ describe('ComputeServicesService', () => {
       expect(mockUpdateMachine).not.toHaveBeenCalled();
     });
   });
+
+  describe('getServiceLogs', () => {
+    const serviceRow = {
+      id: 'svc-logs-1',
+      project_id: 'proj-123',
+      name: 'my-api',
+      image_url: 'nginx:latest',
+      port: 8080,
+      cpu: 'shared-1x',
+      memory: 256,
+      region: 'iad',
+      fly_app_id: 'my-api-proj-123',
+      fly_machine_id: 'machine-1',
+      status: 'running',
+      endpoint_url: 'https://my-api-proj-123.fly.dev',
+      env_vars_encrypted: null,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+
+    it('delegates to provider.getLogs with the app, machine, and options', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      const payload = { lines: [{ timestamp: 1, message: 'hi' }], nextToken: '42' };
+      mockGetLogs.mockResolvedValue(payload);
+
+      const result = await service.getServiceLogs('svc-logs-1', { limit: 200, nextToken: 'cur' });
+
+      expect(mockGetLogs).toHaveBeenCalledWith('my-api-proj-123', 'machine-1', {
+        limit: 200,
+        nextToken: 'cur',
+      });
+      expect(result).toEqual(payload);
+    });
+
+    it('throws COMPUTE_SERVICE_NOT_FOUND when the service has no machine yet', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...serviceRow, fly_app_id: null, fly_machine_id: null }],
+      });
+
+      await expect(service.getServiceLogs('svc-logs-1')).rejects.toThrow('Service not found');
+      expect(mockGetLogs).not.toHaveBeenCalled();
+    });
+  });
 });
 
 // NOTE: Route-level integration tests for compute endpoints are deferred —
@@ -1047,39 +1307,51 @@ describe('selectComputeProvider factory', () => {
   });
 
   it('returns FlyProvider when FLY_API_TOKEN is set', async () => {
-    vi.doMock('@/infra/config/app.config.js', () => ({
-      config: {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
         fly: { apiToken: 'tok', org: 'o', enabled: true, domain: 'd' },
         cloud: { projectId: 'local', apiHost: '' },
         app: { jwtSecret: 'x' },
-      },
-    }));
+      };
+      return {
+        config: c,
+        appConfig: c,
+      };
+    });
     const { selectComputeProvider } = await import('@/services/compute/services.service.js');
     const { FlyProvider } = await import('@/providers/compute/fly.provider.js');
     expect(selectComputeProvider()).toBe(FlyProvider.getInstance());
   });
 
   it('returns CloudComputeProvider when PROJECT_ID is provisioned and no FLY_API_TOKEN', async () => {
-    vi.doMock('@/infra/config/app.config.js', () => ({
-      config: {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
         cloud: { projectId: 'p', apiHost: 'https://x' },
         app: { jwtSecret: 'x' },
-      },
-    }));
+      };
+      return {
+        config: c,
+        appConfig: c,
+      };
+    });
     const { selectComputeProvider } = await import('@/services/compute/services.service.js');
     const { CloudComputeProvider } = await import('@/providers/compute/cloud.provider.js');
     expect(selectComputeProvider()).toBe(CloudComputeProvider.getInstance());
   });
 
   it('throws COMPUTE_NOT_CONFIGURED when neither is set', async () => {
-    vi.doMock('@/infra/config/app.config.js', () => ({
-      config: {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
         cloud: { projectId: 'local', apiHost: '' },
         app: { jwtSecret: 'x' },
-      },
-    }));
+      };
+      return {
+        config: c,
+        appConfig: c,
+      };
+    });
     const { selectComputeProvider } = await import('@/services/compute/services.service.js');
     expect(() => selectComputeProvider()).toThrow(/COMPUTE_NOT_CONFIGURED|not configured/);
   });

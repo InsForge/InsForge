@@ -1,9 +1,9 @@
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { z } from 'zod';
-import { config } from '@/infra/config/app.config.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { appConfig } from '@/infra/config/app.config.js';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { DatabaseProvider, DatabaseConnectionInfo, DatabasePasswordInfo } from './base.provider.js';
 
 /**
@@ -47,8 +47,8 @@ export class CloudDatabaseProvider implements DatabaseProvider {
    * Generate JWT sign token for cloud API authentication
    */
   private generateSignToken(): string {
-    const projectId = config.cloud.projectId;
-    const jwtSecret = config.app.jwtSecret;
+    const projectId = appConfig.cloud.projectId;
+    const jwtSecret = appConfig.app.jwtSecret;
 
     if (!projectId || projectId === 'local') {
       throw new AppError(
@@ -74,7 +74,7 @@ export class CloudDatabaseProvider implements DatabaseProvider {
    */
   async getDatabaseConnectionString(): Promise<DatabaseConnectionInfo> {
     const signToken = this.generateSignToken();
-    const url = `${config.cloud.apiHost}/projects/v1/${config.cloud.projectId}/database-connection-string`;
+    const url = `${appConfig.cloud.apiHost}/projects/v1/${appConfig.cloud.projectId}/database-connection-string`;
 
     try {
       const response = await axios.get(url, {
@@ -118,7 +118,7 @@ export class CloudDatabaseProvider implements DatabaseProvider {
    */
   async getDatabasePassword(): Promise<DatabasePasswordInfo> {
     const signToken = this.generateSignToken();
-    const url = `${config.cloud.apiHost}/projects/v1/${config.cloud.projectId}/database-password`;
+    const url = `${appConfig.cloud.apiHost}/projects/v1/${appConfig.cloud.projectId}/database-password`;
 
     try {
       const response = await axios.get(url, {

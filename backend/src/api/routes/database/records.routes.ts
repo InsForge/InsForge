@@ -1,11 +1,12 @@
 import { Router, Response, NextFunction } from 'express';
 import axios from 'axios';
-import { AuthRequest, extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
+import { AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { validateTableName } from '@/utils/validations.js';
 import { DatabaseRecord } from '@/types/database.js';
+import { TEXT_LIKE_DATA_TYPES } from '@/utils/constants.js';
 import { successResponse } from '@/utils/response.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
@@ -55,7 +56,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
           if (item && typeof item === 'object') {
             const filtered: DatabaseRecord = {};
             for (const key in item) {
-              if (columnTypeMap[key] !== 'text' && item[key] === '') {
+              if (!TEXT_LIKE_DATA_TYPES.has(columnTypeMap[key] ?? '') && item[key] === '') {
                 continue;
               }
               filtered[key] = item[key];
@@ -66,7 +67,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
         });
       } else {
         for (const key in body) {
-          if (columnTypeMap[key] === 'uuid' && body[key] === '') {
+          if (!TEXT_LIKE_DATA_TYPES.has(columnTypeMap[key] ?? '') && body[key] === '') {
             delete body[key];
           }
         }
@@ -74,14 +75,20 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     }
 
     // Forward to PostgREST via service
-    const result = await proxyService.forward({
+    const proxyRequest = {
       method: req.method,
       path,
       query: req.query as Record<string, unknown>,
       headers: req.headers as Record<string, string | string[] | undefined>,
       body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? body : undefined,
-      apiKey: extractApiKey(req) ?? undefined,
-    });
+    };
+
+    const result =
+      req.user?.role === 'project_admin' || req.hasApiKey === true
+        ? await proxyService.forwardAsAdmin(proxyRequest)
+        : req.user?.role === 'anon'
+          ? await proxyService.forwardAsAnon(proxyRequest)
+          : await proxyService.forward(proxyRequest);
 
     // Forward response headers
     const headers = PostgrestProxyService.filterHeaders(result.headers);
