@@ -141,7 +141,6 @@
           {
             "group": "Self-Hosting",
             "pages": [
-              "deployment/telemetry",
               "deployment/deployment-security-guide",
               "deployment/deploy-to-aws-ec2",
               "deployment/deploy-to-azure-virtual-machines",
