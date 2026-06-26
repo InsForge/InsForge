@@ -54,10 +54,21 @@ describe('055_grant-internal-schema-select-defaults migration', () => {
     expect(sql).not.toMatch(/SCHEMA public\b/);
   });
 
-  it('drops the deprecated ai schema without CASCADE', () => {
+  it('guards the role and every schema so a missing object is a no-op, not an error', () => {
     const sql = readMigration();
-    expect(sql).toMatch(/DROP SCHEMA IF EXISTS ai;/);
-    expect(sql).not.toMatch(/DROP SCHEMA IF EXISTS ai CASCADE/);
+    expect(sql).toMatch(/IF NOT EXISTS \(SELECT 1 FROM pg_roles WHERE rolname = 'project_admin'\)/);
+    for (const schema of MANAGED_SCHEMAS) {
+      expect(sql).toMatch(new RegExp(`IF to_regnamespace\\('${schema}'\\) IS NOT NULL THEN`));
+    }
+  });
+
+  it('drops the deprecated ai schema safely (guarded, no CASCADE, no data loss)', () => {
+    const sql = readMigration();
+    expect(sql).toMatch(/IF to_regnamespace\('ai'\) IS NOT NULL THEN/);
+    expect(sql).toMatch(/DROP SCHEMA ai/);
+    expect(sql).not.toMatch(/DROP SCHEMA ai CASCADE/);
+    // A non-empty schema is left in place rather than erroring or cascading.
+    expect(sql).toMatch(/EXCEPTION WHEN dependent_objects_still_exist/);
     // No SELECT/default grants for ai -- it is being removed.
     expect(sql).not.toMatch(/ON ALL TABLES IN SCHEMA ai\b/);
   });
