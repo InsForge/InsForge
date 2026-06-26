@@ -62,7 +62,7 @@ const POSTHOG_EVENT_NAMES: Record<TelemetryEventName, string> = {
 
 function defaultTelemetryConfig(): TelemetryConfig {
   return {
-    disabled: appConfig.telemetry.disabled,
+    disabled: appConfig.telemetry.disabled || isCloudEnvironment(),
     endpoint: DEFAULT_TELEMETRY_ENDPOINT,
     posthogApiKey: DEFAULT_POSTHOG_API_KEY,
     installationIdPath: path.join(appConfig.server.logsDir, '.insforge-installation-id'),
@@ -156,8 +156,23 @@ export class TelemetryService {
 
     const installationId = randomUUID();
     fs.mkdirSync(path.dirname(this.config.installationIdPath), { recursive: true });
-    fs.writeFileSync(this.config.installationIdPath, installationId, { mode: 0o600 });
-    return installationId;
+    try {
+      const fd = fs.openSync(this.config.installationIdPath, 'wx', 0o600);
+      try {
+        fs.writeFileSync(fd, installationId, 'utf8');
+      } finally {
+        fs.closeSync(fd);
+      }
+      return installationId;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+        const racedId = this.readInstallationId();
+        if (racedId) {
+          return racedId;
+        }
+      }
+      throw error;
+    }
   }
 
   private readInstallationId(): string | null {

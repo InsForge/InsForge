@@ -121,6 +121,13 @@ describe('config.telemetry', () => {
 
     expect(c.telemetry).toEqual({ disabled: true });
   });
+
+  it('disables telemetry with the documented opt-out value', () => {
+    process.env.INSFORGE_TELEMETRY_DISABLED = '1';
+    const c = loadConfig();
+
+    expect(c.telemetry).toEqual({ disabled: true });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

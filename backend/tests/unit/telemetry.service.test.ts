@@ -43,9 +43,10 @@ function makeFetchMock(status = 204): FetchFunction {
   return vi.fn(async () => new Response(null, { status })) as FetchFunction;
 }
 
-function getPostedBody(fetchMock: FetchFunction): Record<string, unknown> {
-  const call = vi.mocked(fetchMock).mock.calls[0];
-  const init = call[1];
+function getPostedBody(fetchMock: FetchFunction, callIndex = 0): Record<string, unknown> {
+  const call = vi.mocked(fetchMock).mock.calls[callIndex];
+  expect(call).toBeDefined();
+  const init = call?.[1];
   expect(init).toBeDefined();
   expect(typeof init).toBe('object');
 
@@ -72,15 +73,74 @@ describe('TelemetryService', () => {
 
     await service.sendEvent('instance_started');
     const installationId = fs.readFileSync(config.installationIdPath, 'utf8').trim();
+    const firstBody = getPostedBody(fetchMock);
 
     await service.sendEvent('heartbeat');
-    const secondBody = getPostedBody(fetchMock);
+    const secondBody = getPostedBody(fetchMock, 1);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(firstBody.event).toBe('oss_instance_started');
+    expect(secondBody.event).toBe('oss_heartbeat');
     expect(secondBody.distinct_id).toBe(installationId);
     expect(installationId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     );
+  });
+
+  it('reuses an installation id created by another process during the initial write', async () => {
+    const config = makeConfig();
+    const fetchMock = makeFetchMock();
+    const racedInstallationId = '11111111-1111-4111-8111-111111111111';
+    const openSync = fs.openSync.bind(fs);
+    const openSpy = vi.spyOn(fs, 'openSync').mockImplementation((file, flags, mode) => {
+      if (file === config.installationIdPath && flags === 'wx') {
+        fs.writeFileSync(config.installationIdPath, racedInstallationId, { mode: 0o600 });
+        throw Object.assign(new Error('file exists'), { code: 'EEXIST' });
+      }
+
+      return openSync(file, flags, mode);
+    });
+
+    await new TelemetryService(config, fetchMock).sendEvent('instance_started');
+
+    const body = getPostedBody(fetchMock);
+    expect(openSpy).toHaveBeenCalled();
+    expect(body.distinct_id).toBe(racedInstallationId);
+    expect(fs.readFileSync(config.installationIdPath, 'utf8')).toBe(racedInstallationId);
+  });
+
+  it('starts once, schedules heartbeats, and stops the heartbeat timer', async () => {
+    vi.useFakeTimers();
+    try {
+      const config = makeConfig({ heartbeatIntervalMs: 1_000 });
+      const fetchMock = makeFetchMock();
+      const service = new TelemetryService(config, fetchMock);
+
+      service.start();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(getPostedBody(fetchMock).event).toBe('oss_instance_started');
+
+      service.start();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(config.heartbeatIntervalMs);
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(getPostedBody(fetchMock, 1).event).toBe('oss_heartbeat');
+
+      service.stop();
+      await vi.advanceTimersByTimeAsync(config.heartbeatIntervalMs);
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('sends only coarse, non-sensitive runtime fields', async () => {
