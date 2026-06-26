@@ -1,4 +1,4 @@
--- Migration: 055 - Expose developer-created schemas to PostgREST (deny-list model)
+-- Migration: 056 - Expose developer-created schemas to PostgREST (deny-list model)
 --
 -- PostgREST only serves schemas listed in its `db-schemas` config, and that
 -- list is loaded once at boot (compose pins `PGRST_DB_SCHEMA: public`). There
