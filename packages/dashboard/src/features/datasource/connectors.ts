@@ -18,6 +18,6 @@ export const CONNECTORS: ConnectorDef[] = [
     skillsCount: 5,
     consoleUrl: 'https://console.apify.com',
     examplePrompt:
-      'Use the apify-ultimate-scraper skill to scrape <what you want> and return the results.',
+      'Use the insforge datasource apify skill to scrape <what you want> and return the results.',
   },
 ];
