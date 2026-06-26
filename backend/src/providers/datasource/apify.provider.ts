@@ -16,15 +16,8 @@ export const apifyConnectionSchema = z.object({
 });
 export type ApifyConnection = z.infer<typeof apifyConnectionSchema>;
 
-// Envelopes returned by the cloud-backend project routes. Run/dataset item
-// shapes are Apify-defined, so items stay `unknown` — we validate the envelope,
-// not every field.
+// Envelope returned by the cloud-backend project token route.
 const apifyTokenSchema = z.object({ accessToken: z.string() });
-const apifyRunsSchema = z.object({ runs: z.array(z.unknown()) });
-const apifyLatestDataSchema = z.object({
-  datasetId: z.string().nullable(),
-  items: z.array(z.unknown()),
-});
 
 export class ApifyProvider {
   private static instance: ApifyProvider;
@@ -132,16 +125,6 @@ export class ApifyProvider {
   // Currently-valid (lazily refreshed) access token for the user's own compute.
   async getToken(): Promise<{ accessToken: string } | null> {
     return this.validatedGet('/apify/token', apifyTokenSchema);
-  }
-
-  async getRuns(limit: number): Promise<{ runs: unknown[] } | null> {
-    return this.validatedGet('/apify/runs', apifyRunsSchema, { limit });
-  }
-
-  async getLatestData(
-    limit: number
-  ): Promise<{ datasetId: string | null; items: unknown[] } | null> {
-    return this.validatedGet('/apify/data', apifyLatestDataSchema, { limit });
   }
 
   // proxyGet + Zod validation: 404 → null; bad 200 shape → 502 (don't leak an

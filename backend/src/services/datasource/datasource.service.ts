@@ -28,12 +28,4 @@ export class DatasourceService {
   getApifyToken() {
     return this.apify.getToken();
   }
-
-  getApifyRuns(limit: number) {
-    return this.apify.getRuns(limit);
-  }
-
-  getApifyLatestData(limit: number) {
-    return this.apify.getLatestData(limit);
-  }
 }

@@ -9,21 +9,6 @@ export interface ApifyConnection {
   createdAt: string;
 }
 
-export interface ApifyRun {
-  id: string;
-  actId: string | null;
-  status: string | null;
-  startedAt: string | null;
-  finishedAt: string | null;
-  usageTotalUsd: number | null;
-  defaultDatasetId: string | null;
-}
-
-export interface ApifyLatestData {
-  datasetId: string | null;
-  items: unknown[];
-}
-
 export const datasourceService = {
   async getApifyConnection(): Promise<ApifyConnection | null> {
     try {
@@ -44,21 +29,5 @@ export const datasourceService = {
       method: 'DELETE',
       headers: apiClient.withAccessToken({}),
     });
-  },
-
-  async getApifyRuns(limit = 10): Promise<ApifyRun[]> {
-    const res = await apiClient.request(`/datasources/apify/runs?limit=${limit}`, {
-      headers: apiClient.withAccessToken({}),
-    });
-    // Drop items without a stable id — they break React keys and would produce
-    // bogus `/actors/runs/undefined` links.
-    return ((res?.runs ?? []) as ApifyRun[]).filter((r) => typeof r?.id === 'string' && r.id);
-  },
-
-  async getApifyLatestData(limit = 5): Promise<ApifyLatestData> {
-    const res = await apiClient.request(`/datasources/apify/data?limit=${limit}`, {
-      headers: apiClient.withAccessToken({}),
-    });
-    return { datasetId: res?.datasetId ?? null, items: res?.items ?? [] };
   },
 };
