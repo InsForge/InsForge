@@ -108,8 +108,7 @@ function isRecordPrimaryKey(value: unknown): value is RecordPrimaryKey {
     return false;
   }
   return Object.values(value).every(
-    (item) =>
-      typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean'
+    (item) => typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean'
   );
 }
 

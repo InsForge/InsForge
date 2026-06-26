@@ -312,9 +312,7 @@ export const adminTableRecordUpdateRequestSchema = z.object({
 // Delete request body: one primary-key tuple per record to delete,
 // e.g. { "pkKeys": [{"tenant_id":"t1","item_id":"i2"},{"tenant_id":"t1","item_id":"i3"}] }.
 export const adminTableRecordsDeleteRequestSchema = z.object({
-  pkKeys: z
-    .array(adminTableRecordPrimaryKeySchema)
-    .min(1, 'At least one primary key is required'),
+  pkKeys: z.array(adminTableRecordPrimaryKeySchema).min(1, 'At least one primary key is required'),
 });
 
 export const adminTableRecordResponseSchema = adminTableRecordSchema;
