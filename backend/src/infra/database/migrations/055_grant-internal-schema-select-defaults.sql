@@ -4,31 +4,42 @@
 -- in our managed internal schemas. Migration 045 enumerated those grants by
 -- hand, so any table added to an internal schema afterwards had to remember its
 -- own GRANT SELECT -- which was easy to miss (memory.memories in migration 050
--- shipped without one and is currently unreadable by project_admin).
+-- shipped without one, and without schema USAGE, so it is unreadable by
+-- project_admin today).
 --
 -- Migration 054 fixed this for the `system` schema with ALTER DEFAULT
--- PRIVILEGES; this migration extends the same rule to every internal schema.
--- ALTER DEFAULT PRIVILEGES with no FOR ROLE applies to objects created by the
--- role running the migration (postgres, the migration runner), so every future
--- table created by a migration in these schemas grants SELECT to project_admin
--- automatically. Per-table writes stay enumerated where a schema needs them.
+-- PRIVILEGES; this migration extends the same rule to the other internal
+-- schemas. ALTER DEFAULT PRIVILEGES with no FOR ROLE applies to objects created
+-- by the role running the migration (postgres, the migration runner), so every
+-- future table created by a migration in these schemas grants SELECT to
+-- project_admin automatically. Per-table writes stay enumerated where a schema
+-- needs them.
 --
 -- Each GRANT ON ALL TABLES backfills SELECT on tables that already exist
 -- (catching missed grants such as memory.memories); each ALTER DEFAULT
 -- PRIVILEGES covers tables created later.
 --
--- `public` is intentionally excluded: it is the developer data surface and
--- already receives ALL default privileges in migration 045.
+-- `system` is intentionally excluded: migration 054 already owns its default
+-- privilege, and PostgreSQL stores a single pg_default_acl entry per
+-- (schema, role), so re-granting and later revoking it here would strip what
+-- 054 established on rollback. `public` is excluded too -- it is the developer
+-- data surface and already receives ALL default privileges in migration 045.
+--
+-- Schemas are not individually existence-guarded: all of these are created by
+-- earlier migrations and exist by the time 055 runs, matching migration 045's
+-- role-only guard.
 
 -- UP migration
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'project_admin') THEN
+    -- memory was created after migration 045, so it never received the schema
+    -- USAGE grant the other internal schemas have. Without it the table-level
+    -- SELECT below is unusable.
+    GRANT USAGE ON SCHEMA memory TO project_admin;
+
     GRANT SELECT ON ALL TABLES IN SCHEMA auth TO project_admin;
     ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT SELECT ON TABLES TO project_admin;
-
-    GRANT SELECT ON ALL TABLES IN SCHEMA ai TO project_admin;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA ai GRANT SELECT ON TABLES TO project_admin;
 
     GRANT SELECT ON ALL TABLES IN SCHEMA compute TO project_admin;
     ALTER DEFAULT PRIVILEGES IN SCHEMA compute GRANT SELECT ON TABLES TO project_admin;
@@ -56,9 +67,6 @@ BEGIN
 
     GRANT SELECT ON ALL TABLES IN SCHEMA storage TO project_admin;
     ALTER DEFAULT PRIVILEGES IN SCHEMA storage GRANT SELECT ON TABLES TO project_admin;
-
-    GRANT SELECT ON ALL TABLES IN SCHEMA system TO project_admin;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA system GRANT SELECT ON TABLES TO project_admin;
   END IF;
 END $$;
 
@@ -70,7 +78,6 @@ DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'project_admin') THEN
     ALTER DEFAULT PRIVILEGES IN SCHEMA auth REVOKE SELECT ON TABLES FROM project_admin;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA ai REVOKE SELECT ON TABLES FROM project_admin;
     ALTER DEFAULT PRIVILEGES IN SCHEMA compute REVOKE SELECT ON TABLES FROM project_admin;
     ALTER DEFAULT PRIVILEGES IN SCHEMA deployments REVOKE SELECT ON TABLES FROM project_admin;
     ALTER DEFAULT PRIVILEGES IN SCHEMA email REVOKE SELECT ON TABLES FROM project_admin;
@@ -80,6 +87,5 @@ BEGIN
     ALTER DEFAULT PRIVILEGES IN SCHEMA realtime REVOKE SELECT ON TABLES FROM project_admin;
     ALTER DEFAULT PRIVILEGES IN SCHEMA schedules REVOKE SELECT ON TABLES FROM project_admin;
     ALTER DEFAULT PRIVILEGES IN SCHEMA storage REVOKE SELECT ON TABLES FROM project_admin;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA system REVOKE SELECT ON TABLES FROM project_admin;
   END IF;
 END $$;
