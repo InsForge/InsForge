@@ -6,7 +6,8 @@ description: "Learn what anonymous usage data InsForge self-hosted deployments s
 InsForge collects anonymous telemetry from self-hosted deployments to understand active installs, version adoption, deployment methods, and which optional services are configured. This helps maintainers prioritize fixes, security notices, and deployment work for the open-source project.
 
 Telemetry is optional. You can disable it at any time.
-InsForge does not send this telemetry from InsForge Cloud, local development runs, or CI environments.
+InsForge does not send this telemetry from InsForge Cloud.
+Self-hosted events include a coarse runtime label, such as production, development, test, ci, or unknown, so maintainers can separate local and automated runs from production deployments.
 
 ## What InsForge sends
 
@@ -21,7 +22,7 @@ Each event contains:
 - Event timestamp
 - Hosting mode, such as `self-hosted` or `cloud`
 - Coarse deployment method, such as Docker Compose, Railway, Zeabur, Sealos, Dokploy, Kubernetes, or unknown
-- Operating system, CPU architecture, Node.js version, and whether the process appears to be running in CI
+- Operating system, CPU architecture, Node.js version, runtime environment, and whether the process appears to be running in CI
 - Storage backend category: local filesystem, S3, or S3-compatible
 - Boolean flags for whether optional features are configured: site deployments, functions, compute, and OpenRouter
 

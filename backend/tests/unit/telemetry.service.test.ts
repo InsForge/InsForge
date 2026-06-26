@@ -9,6 +9,7 @@ import logger from '../../src/utils/logger';
 type FetchFunction = ConstructorParameters<typeof TelemetryService>[1];
 
 const tempRoots: string[] = [];
+const ciEnvKeys = ['CI', 'GITHUB_ACTIONS', 'GITLAB_CI', 'BUILDKITE', 'CIRCLECI', 'JENKINS_URL'];
 let savedEnv: NodeJS.ProcessEnv;
 
 beforeEach(() => {
@@ -41,6 +42,15 @@ function makeConfig(overrides: Partial<TelemetryConfig> = {}): TelemetryConfig {
 
 function makeFetchMock(status = 204): FetchFunction {
   return vi.fn(async () => new Response(null, { status })) as FetchFunction;
+}
+
+function clearRuntimeEnvironment(): void {
+  for (const key of ciEnvKeys) {
+    delete process.env[key];
+  }
+
+  delete process.env.NODE_ENV;
+  delete process.env.npm_lifecycle_event;
 }
 
 function getPostedBody(fetchMock: FetchFunction, callIndex = 0): Record<string, unknown> {
@@ -112,23 +122,101 @@ describe('TelemetryService', () => {
     ]);
   });
 
-  it('does not send telemetry in CI by default', async () => {
+  it('marks CI telemetry with the CI runtime environment', async () => {
     process.env.CI = 'true';
+    const config = makeConfig();
     const fetchMock = makeFetchMock();
 
-    await new TelemetryService(undefined, fetchMock).sendEvent('instance_started');
+    await new TelemetryService(config, fetchMock).sendEvent('instance_started');
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    const body = getPostedBody(fetchMock);
+    expect(body.properties).toEqual(
+      expect.objectContaining({
+        runtime_environment: 'ci',
+        is_ci: true,
+      })
+    );
   });
 
-  it('does not send telemetry in local development by default', async () => {
+  it('marks local development telemetry with the development runtime environment', async () => {
+    clearRuntimeEnvironment();
     process.env.npm_lifecycle_event = 'dev';
+    const config = makeConfig();
     const fetchMock = makeFetchMock();
 
-    await new TelemetryService(undefined, fetchMock).sendEvent('instance_started');
+    await new TelemetryService(config, fetchMock).sendEvent('instance_started');
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    const body = getPostedBody(fetchMock);
+    expect(body.properties).toEqual(
+      expect.objectContaining({
+        runtime_environment: 'development',
+        is_ci: false,
+      })
+    );
   });
+
+  it.each([
+    {
+      name: 'CI takes precedence over NODE_ENV',
+      setup: () => {
+        clearRuntimeEnvironment();
+        process.env.CI = 'true';
+        process.env.NODE_ENV = 'test';
+      },
+      expectedRuntimeEnvironment: 'ci',
+      expectedIsCi: true,
+    },
+    {
+      name: 'production NODE_ENV',
+      setup: () => {
+        clearRuntimeEnvironment();
+        process.env.NODE_ENV = 'production';
+      },
+      expectedRuntimeEnvironment: 'production',
+      expectedIsCi: false,
+    },
+    {
+      name: 'development NODE_ENV',
+      setup: () => {
+        clearRuntimeEnvironment();
+        process.env.NODE_ENV = 'development';
+      },
+      expectedRuntimeEnvironment: 'development',
+      expectedIsCi: false,
+    },
+    {
+      name: 'test NODE_ENV',
+      setup: () => {
+        clearRuntimeEnvironment();
+        process.env.NODE_ENV = 'test';
+      },
+      expectedRuntimeEnvironment: 'test',
+      expectedIsCi: false,
+    },
+    {
+      name: 'unknown runtime',
+      setup: clearRuntimeEnvironment,
+      expectedRuntimeEnvironment: 'unknown',
+      expectedIsCi: false,
+    },
+  ])(
+    'marks telemetry with the $name runtime environment',
+    async ({ setup, expectedRuntimeEnvironment, expectedIsCi }) => {
+      setup();
+      const config = makeConfig();
+      const fetchMock = makeFetchMock();
+
+      await new TelemetryService(config, fetchMock).sendEvent('instance_started');
+
+      const body = getPostedBody(fetchMock);
+      expect(body.properties).toEqual(
+        expect.objectContaining({
+          runtime_environment: expectedRuntimeEnvironment,
+          is_ci: expectedIsCi,
+        })
+      );
+    }
+  );
 
   it('starts once, schedules heartbeats, and stops the heartbeat timer', async () => {
     vi.useFakeTimers();
@@ -198,6 +286,7 @@ describe('TelemetryService', () => {
         platform: process.platform,
         arch: process.arch,
         node_version: process.version,
+        runtime_environment: expect.stringMatching(/^(production|development|test|ci|unknown)$/),
         is_ci: expect.any(Boolean),
         storage_backend: expect.stringMatching(/^(local|s3|s3-compatible)$/),
         features: {
