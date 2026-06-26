@@ -9,6 +9,7 @@ import logger from '../../src/utils/logger';
 type FetchFunction = ConstructorParameters<typeof TelemetryService>[1];
 
 const tempRoots: string[] = [];
+const ciEnvKeys = ['CI', 'GITHUB_ACTIONS', 'GITLAB_CI', 'BUILDKITE', 'CIRCLECI', 'JENKINS_URL'];
 let savedEnv: NodeJS.ProcessEnv;
 
 beforeEach(() => {
@@ -112,22 +113,40 @@ describe('TelemetryService', () => {
     ]);
   });
 
-  it('does not send telemetry in CI by default', async () => {
+  it('marks CI telemetry with the CI runtime environment', async () => {
     process.env.CI = 'true';
+    const config = makeConfig();
     const fetchMock = makeFetchMock();
 
-    await new TelemetryService(undefined, fetchMock).sendEvent('instance_started');
+    await new TelemetryService(config, fetchMock).sendEvent('instance_started');
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    const body = getPostedBody(fetchMock);
+    expect(body.properties).toEqual(
+      expect.objectContaining({
+        runtime_environment: 'ci',
+        is_ci: true,
+      })
+    );
   });
 
-  it('does not send telemetry in local development by default', async () => {
+  it('marks local development telemetry with the development runtime environment', async () => {
+    for (const key of ciEnvKeys) {
+      delete process.env[key];
+    }
+    delete process.env.NODE_ENV;
     process.env.npm_lifecycle_event = 'dev';
+    const config = makeConfig();
     const fetchMock = makeFetchMock();
 
-    await new TelemetryService(undefined, fetchMock).sendEvent('instance_started');
+    await new TelemetryService(config, fetchMock).sendEvent('instance_started');
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    const body = getPostedBody(fetchMock);
+    expect(body.properties).toEqual(
+      expect.objectContaining({
+        runtime_environment: 'development',
+        is_ci: false,
+      })
+    );
   });
 
   it('starts once, schedules heartbeats, and stops the heartbeat timer', async () => {
@@ -198,6 +217,7 @@ describe('TelemetryService', () => {
         platform: process.platform,
         arch: process.arch,
         node_version: process.version,
+        runtime_environment: expect.stringMatching(/^(production|development|test|ci|unknown)$/),
         is_ci: expect.any(Boolean),
         storage_backend: expect.stringMatching(/^(local|s3|s3-compatible)$/),
         features: {

@@ -9,6 +9,7 @@ import logger from '@/utils/logger.js';
 import packageJson from '../../../../package.json';
 
 export type TelemetryEventName = 'instance_started' | 'heartbeat';
+type TelemetryRuntimeEnvironment = 'production' | 'development' | 'test' | 'ci' | 'unknown';
 
 export interface TelemetryConfig {
   disabled: boolean;
@@ -35,6 +36,7 @@ interface PostHogTelemetryEvent {
     platform: NodeJS.Platform;
     arch: string;
     node_version: string;
+    runtime_environment: TelemetryRuntimeEnvironment;
     is_ci: boolean;
     storage_backend: 'local' | 's3' | 's3-compatible';
     features: {
@@ -64,21 +66,28 @@ function isCiEnvironment(): boolean {
   return CI_ENV_KEYS.some((key) => !!process.env[key]);
 }
 
-function isDevelopmentLikeRuntime(): boolean {
-  return (
+function detectRuntimeEnvironment(): TelemetryRuntimeEnvironment {
+  if (isCiEnvironment()) {
+    return 'ci';
+  }
+
+  if (
+    process.env.NODE_ENV === 'production' ||
     process.env.NODE_ENV === 'development' ||
-    process.env.NODE_ENV === 'test' ||
-    process.env.npm_lifecycle_event === 'dev'
-  );
+    process.env.NODE_ENV === 'test'
+  ) {
+    return process.env.NODE_ENV;
+  }
+
+  if (process.env.npm_lifecycle_event === 'dev') {
+    return 'development';
+  }
+
+  return 'unknown';
 }
 
 function isTelemetryRuntimeDisabled(): boolean {
-  return (
-    appConfig.telemetry.disabled ||
-    isCloudEnvironment() ||
-    isCiEnvironment() ||
-    isDevelopmentLikeRuntime()
-  );
+  return appConfig.telemetry.disabled || isCloudEnvironment();
 }
 
 function defaultTelemetryConfig(): TelemetryConfig {
@@ -234,6 +243,7 @@ export class TelemetryService {
         platform: os.platform(),
         arch: os.arch(),
         node_version: process.version,
+        runtime_environment: detectRuntimeEnvironment(),
         is_ci: isCiEnvironment(),
         storage_backend: detectStorageBackend(),
         features: {
