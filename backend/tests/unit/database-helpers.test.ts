@@ -4,7 +4,9 @@ import {
   buildQualifiedTableKey,
   isInternalDashboardSchema,
   normalizeDatabaseSchemaName,
+  postgrestProfileHeaderName,
   quoteQualifiedName,
+  resolvePostgrestSchema,
   splitQualifiedTableReference,
 } from '../../src/services/database/helpers';
 
@@ -49,5 +51,62 @@ describe('database helpers', () => {
     expect(isInternalDashboardSchema('information_schema')).toBe(true);
     expect(isInternalDashboardSchema('pg_catalog')).toBe(true);
     expect(isInternalDashboardSchema('analytics')).toBe(false);
+  });
+});
+
+describe('resolvePostgrestSchema', () => {
+  it('maps the method to the right PostgREST profile header', () => {
+    expect(postgrestProfileHeaderName('GET')).toBe('accept-profile');
+    expect(postgrestProfileHeaderName('head')).toBe('accept-profile');
+    expect(postgrestProfileHeaderName('POST')).toBe('content-profile');
+    expect(postgrestProfileHeaderName('PATCH')).toBe('content-profile');
+    expect(postgrestProfileHeaderName('DELETE')).toBe('content-profile');
+  });
+
+  it('defaults to public with no schema param or profile header', () => {
+    const result = resolvePostgrestSchema('GET', { select: '*' }, {});
+    expect(result.schemaName).toBe('public');
+    expect(result.query).toEqual({ select: '*' });
+    expect(result.headers['accept-profile']).toBeUndefined();
+  });
+
+  it('desugars ?schema= on reads into Accept-Profile and strips it from the query', () => {
+    const result = resolvePostgrestSchema('GET', { schema: 'analytics', select: '*' }, {});
+    expect(result.schemaName).toBe('analytics');
+    expect(result.headers['accept-profile']).toBe('analytics');
+    expect(result.query).toEqual({ select: '*' });
+    expect('schema' in result.query).toBe(false);
+  });
+
+  it('desugars ?schema= on writes into Content-Profile', () => {
+    const result = resolvePostgrestSchema('POST', { schema: 'analytics' }, {});
+    expect(result.schemaName).toBe('analytics');
+    expect(result.headers['content-profile']).toBe('analytics');
+    expect('accept-profile' in result.headers).toBe(false);
+  });
+
+  it('honors a client-sent profile header when no ?schema= is present', () => {
+    const read = resolvePostgrestSchema('GET', {}, { 'accept-profile': 'analytics' });
+    expect(read.schemaName).toBe('analytics');
+
+    const write = resolvePostgrestSchema('POST', {}, { 'content-profile': 'analytics' });
+    expect(write.schemaName).toBe('analytics');
+  });
+
+  it('lets ?schema= override a client-sent profile header', () => {
+    const result = resolvePostgrestSchema(
+      'GET',
+      { schema: 'analytics' },
+      { 'accept-profile': 'reporting' }
+    );
+    expect(result.schemaName).toBe('analytics');
+    expect(result.headers['accept-profile']).toBe('analytics');
+  });
+
+  it('rejects internal schemas passed via ?schema=', () => {
+    expect(() => resolvePostgrestSchema('GET', { schema: 'pg_catalog' }, {})).toThrow(AppError);
+    expect(() => resolvePostgrestSchema('GET', { schema: 'information_schema' }, {})).toThrow(
+      AppError
+    );
   });
 });

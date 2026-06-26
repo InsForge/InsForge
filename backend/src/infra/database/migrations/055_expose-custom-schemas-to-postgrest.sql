@@ -46,7 +46,12 @@ $fn$;
 -- `public`, excludes Postgres internals, InsForge internal schemas, any
 -- `_`-prefixed schema (the "keep private" convention), and any schema owned by
 -- an extension (e.g. pg_cron's `cron`, PostGIS's `tiger`). STABLE rather than
--- IMMUTABLE because the extension-ownership check reads catalogs.
+-- IMMUTABLE because it reads catalogs and the `insforge.internal_schemas` GUC.
+--
+-- The InsForge-internal deny-list is sourced from the `insforge.internal_schemas`
+-- setting (defined in postgresql.conf, alongside `insforge.policy_grant_tables`)
+-- so it has a single source of truth and can be updated without a migration.
+-- The literal below is only a fallback for deployments where the GUC is unset.
 CREATE OR REPLACE FUNCTION system.is_exposed_schema(p_schema text)
 RETURNS boolean
 LANGUAGE sql
@@ -56,11 +61,19 @@ AS $fn$
     p_schema IS NOT NULL
     AND p_schema NOT LIKE 'pg\_%'
     AND p_schema NOT LIKE '\_%'
-    AND p_schema NOT IN (
-      'information_schema',
-      -- InsForge-internal schemas (never exposed over the REST data API)
-      'ai', 'auth', 'compute', 'deployments', 'email', 'functions',
-      'memory', 'payments', 'realtime', 'schedules', 'storage', 'system'
+    AND p_schema <> 'information_schema'
+    AND p_schema <> ALL (
+      -- Comma-separated GUC; strip any incidental whitespace before splitting.
+      string_to_array(
+        regexp_replace(
+          coalesce(
+            nullif(current_setting('insforge.internal_schemas', true), ''),
+            'ai,auth,compute,deployments,email,functions,memory,payments,realtime,schedules,storage,system'
+          ),
+          '\s', '', 'g'
+        ),
+        ','
+      )
     )
     -- Extension-managed schemas are infrastructure, not developer data.
     AND NOT EXISTS (

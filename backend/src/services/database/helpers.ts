@@ -38,6 +38,58 @@ export function buildQualifiedTableKey(tableName: string, schemaName: string): s
   return `${schemaName}.${tableName}`;
 }
 
+type ProxyHeaderBag = Record<string, string | string[] | undefined>;
+
+const POSTGREST_READ_METHODS = new Set(['GET', 'HEAD']);
+
+/**
+ * PostgREST selects the schema via a profile header: `Accept-Profile` for reads
+ * and `Content-Profile` for writes/RPC.
+ */
+export function postgrestProfileHeaderName(method: string): 'accept-profile' | 'content-profile' {
+  return POSTGREST_READ_METHODS.has(method.toUpperCase()) ? 'accept-profile' : 'content-profile';
+}
+
+/**
+ * Resolve the target schema for a data-API request the native PostgREST way and
+ * return the query/headers to forward.
+ *
+ * Precedence:
+ *   1. An explicit `?schema=` convenience param, desugared into the correct
+ *      profile header for the method and stripped from the forwarded query (so
+ *      PostgREST does not treat `schema` as a column filter).
+ *   2. A client-sent `Accept-Profile`/`Content-Profile` header, honored as-is.
+ *   3. PostgREST's default schema (the first entry in `db-schemas`).
+ *
+ * `schemaName` is the effective schema for server-side lookups (e.g. column
+ * types); `query`/`headers` are what should be forwarded to PostgREST.
+ */
+export function resolvePostgrestSchema(
+  method: string,
+  query: Record<string, unknown>,
+  headers: ProxyHeaderBag
+): { schemaName: string; query: Record<string, unknown>; headers: ProxyHeaderBag } {
+  const profileHeader = postgrestProfileHeaderName(method);
+
+  if (query.schema !== undefined) {
+    const schemaName = normalizeDatabaseSchemaName(query.schema);
+    const forwardedQuery = { ...query };
+    delete forwardedQuery.schema;
+    return {
+      schemaName,
+      query: forwardedQuery,
+      headers: { ...headers, [profileHeader]: schemaName },
+    };
+  }
+
+  const headerValue = headers[profileHeader];
+  if (typeof headerValue === 'string' && headerValue.trim().length > 0) {
+    return { schemaName: normalizeDatabaseSchemaName(headerValue), query, headers };
+  }
+
+  return { schemaName: DEFAULT_DATABASE_SCHEMA, query, headers };
+}
+
 export function quoteIdentifier(identifier: string): string {
   validateIdentifier(identifier);
   return `"${identifier.replace(/"/g, '""')}"`;
