@@ -44,6 +44,15 @@ function makeFetchMock(status = 204): FetchFunction {
   return vi.fn(async () => new Response(null, { status })) as FetchFunction;
 }
 
+function clearRuntimeEnvironment(): void {
+  for (const key of ciEnvKeys) {
+    delete process.env[key];
+  }
+
+  delete process.env.NODE_ENV;
+  delete process.env.npm_lifecycle_event;
+}
+
 function getPostedBody(fetchMock: FetchFunction, callIndex = 0): Record<string, unknown> {
   const call = vi.mocked(fetchMock).mock.calls[callIndex];
   expect(call).toBeDefined();
@@ -130,10 +139,7 @@ describe('TelemetryService', () => {
   });
 
   it('marks local development telemetry with the development runtime environment', async () => {
-    for (const key of ciEnvKeys) {
-      delete process.env[key];
-    }
-    delete process.env.NODE_ENV;
+    clearRuntimeEnvironment();
     process.env.npm_lifecycle_event = 'dev';
     const config = makeConfig();
     const fetchMock = makeFetchMock();
@@ -148,6 +154,60 @@ describe('TelemetryService', () => {
       })
     );
   });
+
+  it.each([
+    {
+      name: 'CI takes precedence over NODE_ENV',
+      setup: () => {
+        clearRuntimeEnvironment();
+        process.env.CI = 'true';
+        process.env.NODE_ENV = 'test';
+      },
+      expectedRuntimeEnvironment: 'ci',
+      expectedIsCi: true,
+    },
+    {
+      name: 'production NODE_ENV',
+      setup: () => {
+        clearRuntimeEnvironment();
+        process.env.NODE_ENV = 'production';
+      },
+      expectedRuntimeEnvironment: 'production',
+      expectedIsCi: false,
+    },
+    {
+      name: 'test NODE_ENV',
+      setup: () => {
+        clearRuntimeEnvironment();
+        process.env.NODE_ENV = 'test';
+      },
+      expectedRuntimeEnvironment: 'test',
+      expectedIsCi: false,
+    },
+    {
+      name: 'unknown runtime',
+      setup: clearRuntimeEnvironment,
+      expectedRuntimeEnvironment: 'unknown',
+      expectedIsCi: false,
+    },
+  ])(
+    'marks telemetry with the $name runtime environment',
+    async ({ setup, expectedRuntimeEnvironment, expectedIsCi }) => {
+      setup();
+      const config = makeConfig();
+      const fetchMock = makeFetchMock();
+
+      await new TelemetryService(config, fetchMock).sendEvent('instance_started');
+
+      const body = getPostedBody(fetchMock);
+      expect(body.properties).toEqual(
+        expect.objectContaining({
+          runtime_environment: expectedRuntimeEnvironment,
+          is_ci: expectedIsCi,
+        })
+      );
+    }
+  );
 
   it('starts once, schedules heartbeats, and stops the heartbeat timer', async () => {
     vi.useFakeTimers();
