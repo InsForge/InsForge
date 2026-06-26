@@ -7,9 +7,6 @@ import {
   type ExportDatabaseJsonData,
   type ImportDatabaseResponse,
   type BulkUpsertResponse,
-  type ForeignKeySchema,
-  type OnDeleteActionSchema,
-  type OnUpdateActionSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { checkSqlExecutionGuards, parseSQLStatements } from '@/utils/sql-parser.js';
@@ -18,6 +15,8 @@ import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
 import { type PoolClient } from 'pg';
 import { withAdminContext } from './user-context.service.js';
+import type { ForeignKeyRow } from '@/types/database.js';
+import { FOREIGN_KEY_INTROSPECTION_QUERY, groupForeignKeyRows } from './helpers.js';
 
 export class DatabaseAdvanceService {
   private static instance: DatabaseAdvanceService;
@@ -36,50 +35,6 @@ export class DatabaseAdvanceService {
    * Get table data using simple SELECT query
    * More reliable than streaming for moderate datasets
    */
-  // Groups the per-column FK rows from the JSON export query into table-level
-  // constraints (one entry per constraint, columns ordered by ordinal position),
-  // matching the table-level foreign-key model used everywhere else.
-  private groupExportedForeignKeyRows(
-    rows: {
-      constraintName: string;
-      columnName: string;
-      foreignTableName: string;
-      foreignColumnName: string;
-      ordinalPosition: number;
-      deleteRule: string;
-      updateRule: string;
-    }[]
-  ): ForeignKeySchema[] {
-    const byConstraint = new Map<string, ForeignKeySchema & { _ordinals: number[] }>();
-    for (const row of rows) {
-      let fk = byConstraint.get(row.constraintName);
-      if (!fk) {
-        fk = {
-          constraintName: row.constraintName,
-          referenceTable: row.foreignTableName,
-          referenceColumns: [],
-          onDelete: row.deleteRule as OnDeleteActionSchema,
-          onUpdate: row.updateRule as OnUpdateActionSchema,
-          _ordinals: [],
-        };
-        byConstraint.set(row.constraintName, fk);
-      }
-      fk.referenceColumns.push({
-        sourceColumn: row.columnName,
-        referenceColumn: row.foreignColumnName,
-      });
-      fk._ordinals.push(row.ordinalPosition);
-    }
-
-    return Array.from(byConstraint.values()).map(({ _ordinals, ...fk }) => {
-      fk.referenceColumns = _ordinals
-        .map((ordinal, i) => ({ ordinal, pair: fk.referenceColumns[i] }))
-        .sort((a, b) => a.ordinal - b.ordinal)
-        .map((entry) => entry.pair);
-      return fk;
-    });
-  }
-
   private async getTableData(
     client: PoolClient,
     table: string,
@@ -597,43 +552,11 @@ export class DatabaseAdvanceService {
             [table]
           );
 
-          // Get foreign keys
-          const foreignKeysResult = await client.query(
-            `
-            SELECT
-              c.conname as "constraintName",
-              a1.attname as "columnName",
-              CASE WHEN nf.nspname = 'public' THEN cf.relname ELSE nf.nspname || '.' || cf.relname END as "foreignTableName",
-              a2.attname as "foreignColumnName",
-              u.pos::int as "ordinalPosition",
-              CASE c.confdeltype
-                WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
-                WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
-                WHEN 'd' THEN 'SET DEFAULT'
-              END as "deleteRule",
-              CASE c.confupdtype
-                WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
-                WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
-                WHEN 'd' THEN 'SET DEFAULT'
-              END as "updateRule"
-            FROM pg_catalog.pg_constraint c
-            JOIN pg_catalog.pg_class ct ON c.conrelid = ct.oid
-            JOIN pg_catalog.pg_namespace nt ON ct.relnamespace = nt.oid
-            JOIN pg_catalog.pg_class cf ON c.confrelid = cf.oid
-            JOIN pg_catalog.pg_namespace nf ON cf.relnamespace = nf.oid
-            CROSS JOIN LATERAL unnest(c.conkey, c.confkey)
-              WITH ORDINALITY AS u(src_attnum, ref_attnum, pos)
-            JOIN pg_catalog.pg_attribute a1
-              ON a1.attnum = u.src_attnum AND a1.attrelid = c.conrelid
-            JOIN pg_catalog.pg_attribute a2
-              ON a2.attnum = u.ref_attnum AND a2.attrelid = c.confrelid
-            WHERE c.contype = 'f'
-              AND nt.nspname = 'public'
-              AND ct.relname = $1
-            ORDER BY c.conname, u.pos
-          `,
-            [table]
-          );
+          // Get foreign keys (one entity per constraint, columns in ordinal order)
+          const foreignKeysResult = await client.query(FOREIGN_KEY_INTROSPECTION_QUERY, [
+            'public',
+            table,
+          ]);
 
           // Check if RLS is enabled on the table
           const rlsResult = await client.query(
@@ -705,7 +628,7 @@ export class DatabaseAdvanceService {
           jsonData.tables[table] = {
             schema: schemaResult.rows,
             indexes: indexesResult.rows,
-            foreignKeys: this.groupExportedForeignKeyRows(foreignKeysResult.rows),
+            foreignKeys: groupForeignKeyRows(foreignKeysResult.rows as ForeignKeyRow[]),
             rlsEnabled,
             policies: policiesResult.rows,
             triggers: triggersResult.rows,

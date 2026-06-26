@@ -533,6 +533,59 @@ describe('AdminRecordService', () => {
     expect(deleteCall?.[1]).toEqual(['p1']);
   });
 
+  it('matches a null key column with IS NULL on a keyless table', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'name', data_type: 'text', is_nullable: 'YES', udt_name: 'text' },
+            { column_name: 'email', data_type: 'text', is_nullable: 'YES', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [] }; // table has no primary key
+      }
+      if (sql.includes('UPDATE "public"."pkless"')) {
+        return { rows: [{ name: 'alice', email: 'fixed@x.com' }] };
+      }
+      if (sql.includes('DELETE FROM "public"."pkless"')) {
+        return { rowCount: 1, rows: [] };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = AdminRecordService.getInstance();
+
+    // A genuinely-null column in the all-columns fallback key must match the row
+    // with `IS NULL`, not `= ''` (which would silently match nothing).
+    const updated = await service.updateRecord(
+      'public',
+      'pkless',
+      { name: 'alice', email: null },
+      { email: 'fixed@x.com' }
+    );
+    expect(updated).toEqual({ name: 'alice', email: 'fixed@x.com' });
+
+    const updateCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('UPDATE "public"."pkless"')
+    );
+    // The null component becomes `IS NULL` and binds no parameter for it.
+    expect(updateCall?.[0]).toContain('WHERE "name" = $2 AND "email" IS NULL RETURNING *');
+    expect(updateCall?.[1]).toEqual(['fixed@x.com', 'alice']);
+
+    const deletedCount = await service.deleteRecords('public', 'pkless', [
+      { name: 'alice', email: null },
+    ]);
+    expect(deletedCount).toBe(1);
+
+    const deleteCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('DELETE FROM "public"."pkless"')
+    );
+    expect(deleteCall?.[0]).toContain('WHERE ("name" = $1 AND "email" IS NULL)');
+    expect(deleteCall?.[1]).toEqual(['alice']);
+  });
+
   it('discards the pooled client when admin transaction cleanup fails', async () => {
     const resetError = new Error('reset failed');
 

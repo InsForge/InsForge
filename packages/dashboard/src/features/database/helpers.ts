@@ -64,8 +64,8 @@ export function getPrimaryKeyColumns(columns?: ColumnSchema[]): string[] {
 
 /**
  * Builds the primary-key tuple for a row from the given primary-key columns.
- * Missing values are coerced to null and non-scalar values to their string form,
- * since primary keys are always scalar.
+ * Missing/null values are preserved as null and non-scalar values coerced to
+ * their string form, since primary keys are always scalar.
  */
 export function getRecordPrimaryKey(
   row: Record<string, unknown>,
@@ -75,9 +75,11 @@ export function getRecordPrimaryKey(
   for (const columnName of primaryKeyColumns) {
     const value = row[columnName];
     if (value === undefined || value === null) {
-      // PK columns are NOT NULL; this branch is defensive for pathological rows
-      // (e.g. the no-PK fallback). Use '' to stay a non-null scalar and a stable key.
-      key[columnName] = '';
+      // PK columns are NOT NULL, so this only triggers on the no-PK fallback
+      // (key = all columns). Keep null — the record API matches it with
+      // `col IS NULL`, so a genuinely-null column still identifies its row.
+      // Coercing to '' would build `col = ''` and silently match nothing.
+      key[columnName] = null;
     } else if (
       typeof value === 'string' ||
       typeof value === 'number' ||
@@ -108,7 +110,11 @@ function isRecordPrimaryKey(value: unknown): value is RecordPrimaryKey {
     return false;
   }
   return Object.values(value).every(
-    (item) => typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean'
+    (item) =>
+      item === null ||
+      typeof item === 'string' ||
+      typeof item === 'number' ||
+      typeof item === 'boolean'
   );
 }
 

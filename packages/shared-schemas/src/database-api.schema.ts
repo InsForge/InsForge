@@ -280,10 +280,17 @@ export const adminTableRecordsCreateRequestSchema = z
   .min(1, 'At least one record is required');
 
 // A primary-key value. Restricted to scalar types that survive a JSON round-trip
-// through the query string and that node-postgres can bind as a query parameter.
-// `null` is excluded: PK columns are NOT NULL, and `WHERE col = NULL` never matches,
-// so a null key would silently affect zero rows instead of failing loudly.
-export const adminTableRecordPkValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+// and that node-postgres can bind as a query parameter, plus `null`.
+// `null` is matched with `col IS NULL` (not `col = NULL`) by the record service,
+// so it correctly identifies rows in keyless tables whose fallback identity (all
+// columns) includes a genuinely-null column. On a real (NOT NULL) primary key a
+// null value simply matches no row, surfacing as a clear "record not found".
+export const adminTableRecordPkValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
 
 // A single record's primary key as a map of pk column name -> value.
 // Supports composite primary keys (more than one column).

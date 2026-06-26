@@ -190,7 +190,12 @@ export class AdminRecordService {
       const values: unknown[] = entries.map(([, value]) => value);
 
       // WHERE matches the full primary-key tuple so composite keys target exactly one row.
+      // A null component (only possible on the keyless all-columns fallback) is matched
+      // with `IS NULL`, since `col = NULL` never matches.
       const whereClauses = keyEntries.map(([columnName, value]) => {
+        if (value === null) {
+          return `${quoteIdentifier(columnName)} IS NULL`;
+        }
         values.push(value);
         return `${quoteIdentifier(columnName)} = $${values.length}`;
       });
@@ -253,6 +258,9 @@ export class AdminRecordService {
         );
 
         const columnClauses = keyEntries.map(([columnName, value]) => {
+          if (value === null) {
+            return `${quoteIdentifier(columnName)} IS NULL`;
+          }
           values.push(value);
           return `${quoteIdentifier(columnName)} = $${values.length}`;
         });

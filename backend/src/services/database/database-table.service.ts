@@ -12,8 +12,6 @@ import {
   UpdateTableSchemaRequest,
   UpdateTableSchemaResponse,
   DeleteTableResponse,
-  OnDeleteActionSchema,
-  OnUpdateActionSchema,
   ForeignKeySchema,
 } from '@insforge/shared-schemas';
 import { validateIdentifier, validateSchemaName } from '@/utils/validations.js';
@@ -22,6 +20,8 @@ import {
   DEFAULT_DATABASE_SCHEMA,
   quoteQualifiedName,
   splitQualifiedTableReference,
+  FOREIGN_KEY_INTROSPECTION_QUERY,
+  groupForeignKeyRows,
 } from './helpers.js';
 import { withAdminContext } from './user-context.service.js';
 
@@ -851,95 +851,7 @@ export class DatabaseTableService {
   }
 
   private async getFkeyConstraints(schemaName: string, table: string): Promise<ForeignKeySchema[]> {
-    const result = await this.getPool().query(
-      `
-        SELECT
-          c.conname AS constraint_name,
-          a1.attname AS from_column,
-          nf.nspname AS foreign_schema,
-          cf.relname AS foreign_table,
-          a2.attname AS foreign_column,
-          u.pos::int AS ordinal_position,
-          CASE c.confdeltype
-            WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
-            WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
-            WHEN 'd' THEN 'SET DEFAULT'
-          END AS on_delete,
-          CASE c.confupdtype
-            WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
-            WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
-            WHEN 'd' THEN 'SET DEFAULT'
-          END AS on_update
-        FROM pg_catalog.pg_constraint c
-        JOIN pg_catalog.pg_class ct ON c.conrelid = ct.oid
-        JOIN pg_catalog.pg_namespace nt ON ct.relnamespace = nt.oid
-        JOIN pg_catalog.pg_class cf ON c.confrelid = cf.oid
-        JOIN pg_catalog.pg_namespace nf ON cf.relnamespace = nf.oid
-        CROSS JOIN LATERAL unnest(c.conkey, c.confkey)
-          WITH ORDINALITY AS u(src_attnum, ref_attnum, pos)
-        JOIN pg_catalog.pg_attribute a1
-          ON a1.attnum = u.src_attnum AND a1.attrelid = c.conrelid
-        JOIN pg_catalog.pg_attribute a2
-          ON a2.attnum = u.ref_attnum AND a2.attrelid = c.confrelid
-        WHERE c.contype = 'f'
-          AND nt.nspname = $1
-          AND ct.relname = $2
-        ORDER BY c.conname, u.pos
-      `,
-      [schemaName, table]
-    );
-
-    const foreignKeys = result.rows;
-
-    // Group rows by constraint_name into one entity per constraint. A composite key
-    // is a single entity carrying all its (source -> reference) pairs in ordinal order.
-    const constraintGroups = new Map<
-      string,
-      {
-        constraintName: string;
-        referenceTable: string;
-        fromColumns: { name: string; foreignColumn: string; ordinal: number }[];
-        onDelete: string;
-        onUpdate: string;
-      }
-    >();
-
-    for (const fk of foreignKeys as ForeignKeyRow[]) {
-      const referenceTable =
-        fk.foreign_schema !== 'public'
-          ? `${fk.foreign_schema}.${fk.foreign_table}`
-          : fk.foreign_table;
-
-      let group = constraintGroups.get(fk.constraint_name);
-      if (!group) {
-        group = {
-          constraintName: fk.constraint_name,
-          referenceTable,
-          fromColumns: [],
-          onDelete: fk.on_delete,
-          onUpdate: fk.on_update,
-        };
-        constraintGroups.set(fk.constraint_name, group);
-      }
-      group.fromColumns.push({
-        name: fk.from_column,
-        foreignColumn: fk.foreign_column,
-        ordinal: fk.ordinal_position,
-      });
-    }
-
-    return Array.from(constraintGroups.values()).map((group) => {
-      group.fromColumns.sort((a, b) => a.ordinal - b.ordinal);
-      return {
-        constraintName: group.constraintName,
-        referenceTable: group.referenceTable,
-        referenceColumns: group.fromColumns.map((c) => ({
-          sourceColumn: c.name,
-          referenceColumn: c.foreignColumn,
-        })),
-        onDelete: group.onDelete as OnDeleteActionSchema,
-        onUpdate: group.onUpdate as OnUpdateActionSchema,
-      };
-    });
+    const result = await this.getPool().query(FOREIGN_KEY_INTROSPECTION_QUERY, [schemaName, table]);
+    return groupForeignKeyRows(result.rows as ForeignKeyRow[]);
   }
 }

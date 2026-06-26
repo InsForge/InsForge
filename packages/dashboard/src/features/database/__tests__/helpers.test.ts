@@ -97,7 +97,7 @@ describe('database helpers', () => {
     expect(getPrimaryKeyColumns(undefined)).toEqual(['id']);
   });
 
-  it('builds a record primary key tuple, coercing missing values to empty string', () => {
+  it('builds a record primary key tuple, preserving null for missing values', () => {
     expect(
       getRecordPrimaryKey({ tenant_id: 'tenant_a', item_id: 'item_2', label: 'x' }, [
         'tenant_id',
@@ -106,8 +106,13 @@ describe('database helpers', () => {
     ).toEqual({ tenant_id: 'tenant_a', item_id: 'item_2' });
 
     expect(getRecordPrimaryKey({ id: 5 }, ['id'])).toEqual({ id: 5 });
-    // PK columns are NOT NULL; a missing value is coerced to '' (non-null scalar).
-    expect(getRecordPrimaryKey({}, ['id'])).toEqual({ id: '' });
+    // Missing/null values stay null (the record API matches them with `col IS NULL`),
+    // so a keyless table's null column still identifies its row instead of `col = ''`.
+    expect(getRecordPrimaryKey({}, ['id'])).toEqual({ id: null });
+    expect(getRecordPrimaryKey({ name: 'a', email: null }, ['name', 'email'])).toEqual({
+      name: 'a',
+      email: null,
+    });
   });
 
   it('encodes the full key tuple and decodes it back, so duplicate first columns stay distinct', () => {
