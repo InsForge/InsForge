@@ -1,10 +1,10 @@
-import { CONNECTORS } from '../connectors';
+import { CONNECTORS } from '#features/datasource/connectors';
 import { ConnectorCard } from './ConnectorCard';
 
 export function DatasourceCatalog({ query = '' }: { query?: string }) {
   const q = query.toLowerCase();
   const list = CONNECTORS.filter(
-    (c) => c.name.toLowerCase().includes(q) || c.tagline.toLowerCase().includes(q),
+    (c) => c.name.toLowerCase().includes(q) || c.tagline.toLowerCase().includes(q)
   );
 
   if (list.length === 0) {

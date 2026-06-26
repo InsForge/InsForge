@@ -12,7 +12,7 @@ import {
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { useProjectId } from '#lib/hooks/useMetadata';
 import { useApifyConnection } from '#features/datasource/hooks/useDatasource';
-import type { ConnectorDef } from '../connectors';
+import type { ConnectorDef } from '#features/datasource/connectors';
 import { ApifyDisconnectDialog } from './ApifyDisconnectDialog';
 
 export function ConnectorCard({ connector }: { connector: ConnectorDef }) {
