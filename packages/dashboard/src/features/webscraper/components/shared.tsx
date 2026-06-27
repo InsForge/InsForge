@@ -10,8 +10,8 @@ export function fmtTime(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
-export function fmtCost(usd: number | null): string {
-  return usd === null ? '—' : `$${usd.toFixed(2)}`;
+export function fmtCost(usd: number | null | undefined): string {
+  return typeof usd === 'number' ? `$${usd.toFixed(2)}` : '—';
 }
 
 // Run status as a colored badge, mirroring the auth grid's email-verified badge.
