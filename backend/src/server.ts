@@ -42,6 +42,7 @@ import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import { TelemetryService } from '@/services/telemetry/telemetry.service.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -174,6 +175,19 @@ export async function createApp() {
 
   // Create API router and mount all API routes under /api
   const apiRouter = express.Router();
+
+  const jwksHandler = async (_req: Request, res: Response) => {
+    try {
+      const jwks = await TokenManager.getInstance().getJwks();
+      res.json(jwks);
+    } catch (error) {
+      logger.error('Failed to serve JWKS', { error });
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  };
+
+  app.get('/.well-known/jwks.json', jwksHandler);
+  apiRouter.get('/.well-known/jwks.json', jwksHandler);
 
   apiRouter.get('/health', (_req: Request, res: Response) => {
     const version = packageJson.version;

@@ -798,4 +798,94 @@ export class SecretService {
 
     return apiKey;
   }
+
+  /**
+   * Initialize JWT asymmetric keypair on startup.
+   */
+  async initializeJwtKeyPair(): Promise<{ privateKey: string; publicKey: string; kid: string }> {
+    const [existingPrivateKey, existingPublicKey, existingKid] = await Promise.all([
+      this.getSecretByKey('JWT_PRIVATE_KEY'),
+      this.getSecretByKey('JWT_PUBLIC_KEY'),
+      this.getSecretByKey('JWT_KEY_ID'),
+    ]);
+
+    if (existingPrivateKey && existingPublicKey && existingKid) {
+      logger.info('✅ JWT asymmetric keypair exists in database');
+      return {
+        privateKey: existingPrivateKey,
+        publicKey: existingPublicKey,
+        kid: existingKid,
+      };
+    }
+
+    // Generate new RSA-2048 keypair
+    const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: {
+        type: 'spki',
+        format: 'pem',
+      },
+      privateKeyEncoding: {
+        type: 'pkcs8',
+        format: 'pem',
+      },
+    });
+
+    const kid = 'kid_' + crypto.randomBytes(16).toString('hex');
+
+    const client = await this.getPool().connect();
+    try {
+      await client.query('BEGIN');
+
+      // Check one more time inside transaction to prevent race conditions
+      const checkRes = await client.query(
+        "SELECT key FROM system.secrets WHERE key IN ('JWT_PRIVATE_KEY', 'JWT_PUBLIC_KEY', 'JWT_KEY_ID') FOR UPDATE"
+      );
+
+      if (checkRes.rows.length === 3) {
+        await client.query('ROLLBACK');
+        // Retrieve them again
+        const [pKey, pubKey, kId] = await Promise.all([
+          this.getSecretByKey('JWT_PRIVATE_KEY'),
+          this.getSecretByKey('JWT_PUBLIC_KEY'),
+          this.getSecretByKey('JWT_KEY_ID'),
+        ]);
+        return {
+          privateKey: pKey!,
+          publicKey: pubKey!,
+          kid: kId!,
+        };
+      }
+
+      // Delete any partial keys just in case
+      await client.query(
+        "DELETE FROM system.secrets WHERE key IN ('JWT_PRIVATE_KEY', 'JWT_PUBLIC_KEY', 'JWT_KEY_ID')"
+      );
+
+      // Create new ones
+      const privEncrypted = EncryptionManager.encrypt(privateKey);
+      const pubEncrypted = EncryptionManager.encrypt(publicKey);
+      const kidEncrypted = EncryptionManager.encrypt(kid);
+
+      await client.query(
+        `INSERT INTO system.secrets (key, value_ciphertext, is_reserved, is_active)
+         VALUES 
+           ('JWT_PRIVATE_KEY', $1, true, true),
+           ('JWT_PUBLIC_KEY', $2, true, true),
+           ('JWT_KEY_ID', $3, true, true)`,
+        [privEncrypted, pubEncrypted, kidEncrypted]
+      );
+
+      await client.query('COMMIT');
+      logger.info('✅ JWT asymmetric keypair generated and stored');
+      return { privateKey, publicKey, kid };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Failed to initialize JWT keypair', { error });
+      throw new Error('Failed to initialize JWT keypair');
+    } finally {
+      client.release();
+    }
+  }
 }
+

@@ -129,6 +129,30 @@ export class PostgrestProxyService {
   }
 
   /**
+   * Gateway exchange for authenticated users: verify the user's token in the
+   * app layer, and swap it for a short-lived internal HS256 token containing the
+   * user's claims to forward to PostgREST.
+   */
+  async forwardAsUser(
+    request: ProxyRequest,
+    user: { id: string; email?: string; role: string }
+  ): Promise<ProxyResponse> {
+    const userToken = this.tokenManager.generatePostgrestUserToken({
+      sub: user.id,
+      email: user.email,
+      role: user.role as any,
+    });
+
+    return this.forwardRequest({
+      ...request,
+      headers: {
+        ...request.headers,
+        authorization: `Bearer ${userToken}`,
+      },
+    });
+  }
+
+  /**
    * Forward request to PostgREST with retry logic
    */
   private async forwardRequest(request: ProxyRequest): Promise<ProxyResponse> {

@@ -88,7 +88,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
         ? await proxyService.forwardAsAdmin(proxyRequest)
         : req.user?.role === 'anon'
           ? await proxyService.forwardAsAnon(proxyRequest)
-          : await proxyService.forward(proxyRequest);
+          : await proxyService.forwardAsUser(proxyRequest, req.user!);
 
     // Forward response headers
     const headers = PostgrestProxyService.filterHeaders(result.headers);

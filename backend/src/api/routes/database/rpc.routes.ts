@@ -51,7 +51,7 @@ const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: Next
         ? await proxyService.forwardAsAdmin(proxyRequest)
         : req.user?.role === 'anon'
           ? await proxyService.forwardAsAnon(proxyRequest)
-          : await proxyService.forward(proxyRequest);
+          : await proxyService.forwardAsUser(proxyRequest, req.user!);
 
     const headers = PostgrestProxyService.filterHeaders(result.headers);
     Object.entries(headers).forEach(([key, value]) => res.setHeader(key, value));

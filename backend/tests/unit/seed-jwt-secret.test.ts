@@ -4,6 +4,7 @@ const mockGetSecretByKey = vi.fn();
 const mockCreateSecret = vi.fn();
 const mockInitializeApiKey = vi.fn().mockResolvedValue('api-key');
 const mockInitializeAnonKey = vi.fn().mockResolvedValue('anon_test');
+const mockInitializeJwtKeyPair = vi.fn().mockResolvedValue({ privateKey: 'priv-key', publicKey: 'pub-key', kid: 'kid-id' });
 const mockIsCloudEnvironment = vi.fn();
 const mockGetApiBaseUrl = vi.fn().mockReturnValue('https://api.example.com');
 const mockClientQuery = vi.fn();
@@ -22,6 +23,7 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
       createSecret: mockCreateSecret,
       initializeApiKey: mockInitializeApiKey,
       initializeAnonKey: mockInitializeAnonKey,
+      initializeJwtKeyPair: mockInitializeJwtKeyPair,
     }),
   },
 }));
