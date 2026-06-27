@@ -109,4 +109,23 @@ describe('resolvePostgrestSchema', () => {
       AppError
     );
   });
+
+  it('rejects a malformed explicit ?schema= instead of falling back to public', () => {
+    // Blank value.
+    expect(() => resolvePostgrestSchema('GET', { schema: '' }, {})).toThrow(AppError);
+    // Repeated param: Express parses `?schema=a&schema=b` as an array.
+    expect(() => resolvePostgrestSchema('GET', { schema: ['a', 'b'] }, {})).toThrow(AppError);
+  });
+
+  it('rejects an array-valued profile header', () => {
+    expect(() =>
+      resolvePostgrestSchema('GET', {}, { 'accept-profile': ['analytics', 'reporting'] })
+    ).toThrow(AppError);
+  });
+
+  it('re-forwards the normalized profile header so it cannot disagree with schemaName', () => {
+    const result = resolvePostgrestSchema('GET', {}, { 'accept-profile': '  analytics  ' });
+    expect(result.schemaName).toBe('analytics');
+    expect(result.headers['accept-profile']).toBe('analytics');
+  });
 });

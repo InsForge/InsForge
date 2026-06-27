@@ -71,7 +71,18 @@ export function resolvePostgrestSchema(
 ): { schemaName: string; query: Record<string, unknown>; headers: ProxyHeaderBag } {
   const profileHeader = postgrestProfileHeaderName(method);
 
+  // An explicit ?schema= must be a single non-empty value. Don't let a blank or
+  // repeated param (Express parses `?schema=a&schema=b` as an array) silently
+  // fall back to `public` -- that would route an explicit request to the wrong
+  // schema. Reject it instead.
   if (query.schema !== undefined) {
+    if (typeof query.schema !== 'string' || query.schema.trim().length === 0) {
+      throw new AppError(
+        'The "schema" query parameter must be a single non-empty schema name.',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
     const schemaName = normalizeDatabaseSchemaName(query.schema);
     const forwardedQuery = { ...query };
     delete forwardedQuery.schema;
@@ -82,9 +93,21 @@ export function resolvePostgrestSchema(
     };
   }
 
+  // Honor a client-sent profile header, but it must be a single value -- a
+  // repeated header arrives as an array, which we'd otherwise ignore for
+  // schemaName while still forwarding it, desyncing metadata from routing.
   const headerValue = headers[profileHeader];
+  if (Array.isArray(headerValue)) {
+    throw new AppError(
+      `The "${profileHeader}" header must be a single schema name.`,
+      400,
+      ERROR_CODES.INVALID_INPUT
+    );
+  }
   if (typeof headerValue === 'string' && headerValue.trim().length > 0) {
-    return { schemaName: normalizeDatabaseSchemaName(headerValue), query, headers };
+    const schemaName = normalizeDatabaseSchemaName(headerValue);
+    // Re-forward the normalized value so the header can't disagree with schemaName.
+    return { schemaName, query, headers: { ...headers, [profileHeader]: schemaName } };
   }
 
   return { schemaName: DEFAULT_DATABASE_SCHEMA, query, headers };
