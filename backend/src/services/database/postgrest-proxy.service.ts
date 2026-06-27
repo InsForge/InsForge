@@ -140,7 +140,7 @@ export class PostgrestProxyService {
     const userToken = this.tokenManager.generatePostgrestUserToken({
       sub: user.id,
       email: user.email,
-      role: user.role as any,
+      role: user.role as 'authenticated' | 'project_admin' | 'anon',
     });
 
     return this.forwardRequest({

@@ -68,8 +68,12 @@ export class TokenManager {
    * Preload JWT asymmetric keys from the database.
    */
   async ensureKeysLoaded(): Promise<void> {
-    if (this.isLoaded) return;
-    if (this.loadPromise) return this.loadPromise;
+    if (this.isLoaded) {
+      return;
+    }
+    if (this.loadPromise) {
+      return this.loadPromise;
+    }
 
     this.loadPromise = (async () => {
       try {
@@ -109,7 +113,7 @@ export class TokenManager {
   /**
    * Export the public key as a JWK Set (JWKS).
    */
-  async getJwks(): Promise<{ keys: any[] }> {
+  async getJwks(): Promise<{ keys: Record<string, unknown>[] }> {
     await this.ensureKeysLoaded();
     if (!this.publicKey || !this.kid) {
       return { keys: [] };
@@ -271,21 +275,17 @@ export class TokenManager {
       if (decodedToken && typeof decodedToken === 'object' && decodedToken.header) {
         const header = decodedToken.header;
         if (header.kid && header.alg === 'RS256' && this.publicKey && header.kid === this.kid) {
-          try {
-            const decoded = jwt.verify(token, this.publicKey, {
-              algorithms: ['RS256'],
-            }) as TokenPayloadSchema;
-            if (!decoded.sub) {
-              throw new AppError('Invalid token subject', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-            }
-            return {
-              sub: decoded.sub,
-              email: decoded.email,
-              role: decoded.role || 'authenticated',
-            };
-          } catch (err) {
-            throw err;
+          const decoded = jwt.verify(token, this.publicKey, {
+            algorithms: ['RS256'],
+          }) as TokenPayloadSchema;
+          if (!decoded.sub) {
+            throw new AppError('Invalid token subject', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
           }
+          return {
+            sub: decoded.sub,
+            email: decoded.email,
+            role: decoded.role || 'authenticated',
+          };
         }
       }
 

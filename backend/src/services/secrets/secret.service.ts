@@ -845,15 +845,16 @@ export class SecretService {
       if (checkRes.rows.length === 3) {
         await client.query('ROLLBACK');
         // Retrieve them again
-        const [pKey, pubKey, kId] = await Promise.all([
-          this.getSecretByKey('JWT_PRIVATE_KEY'),
-          this.getSecretByKey('JWT_PUBLIC_KEY'),
-          this.getSecretByKey('JWT_KEY_ID'),
-        ]);
+        const pKey = await this.getSecretByKey('JWT_PRIVATE_KEY');
+        const pubKey = await this.getSecretByKey('JWT_PUBLIC_KEY');
+        const kId = await this.getSecretByKey('JWT_KEY_ID');
+        if (!pKey || !pubKey || !kId) {
+          throw new Error('Asymmetric keys were missing or corrupted in database');
+        }
         return {
-          privateKey: pKey!,
-          publicKey: pubKey!,
-          kid: kId!,
+          privateKey: pKey,
+          publicKey: pubKey,
+          kid: kId,
         };
       }
 
@@ -888,4 +889,3 @@ export class SecretService {
     }
   }
 }
-

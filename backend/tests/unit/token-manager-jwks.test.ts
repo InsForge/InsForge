@@ -55,7 +55,7 @@ describe('TokenManager JWKS & RS256 Support', () => {
     expect(token).toBeDefined();
     
     // Decode the token header to inspect the kid and algorithm
-    const decoded = jwt.decode(token, { complete: true }) as any;
+    const decoded = jwt.decode(token, { complete: true }) as unknown as { header: { alg: string; kid: string } };
     expect(decoded).not.toBeNull();
     expect(decoded.header.alg).toBe('RS256');
     expect(decoded.header.kid).toBe(testKid);
