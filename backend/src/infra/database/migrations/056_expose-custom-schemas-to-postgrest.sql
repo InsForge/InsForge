@@ -8,10 +8,9 @@
 --
 -- This migration makes the exposed set dynamic with an OPT-OUT (deny-list)
 -- policy: every schema is exposed to the data API EXCEPT Postgres internals,
--- InsForge's own internal schemas, and any schema whose name begins with `_`
--- (the "keep private" convention). New schemas become reachable automatically
--- via a DDL event trigger -- including those created through raw SQL or
--- migrations, not just the table API.
+-- InsForge's own internal schemas, and extension-owned schemas. New schemas
+-- become reachable automatically via a DDL event trigger -- including those
+-- created through raw SQL or migrations, not just the table API.
 --
 -- Mechanism:
 --   1. The live allowlist is stored in the connecting role's in-database config
@@ -38,10 +37,10 @@
 -- UP migration
 
 -- Deny-list predicate: which schemas are exposed to the data API. Keeps
--- `public`, excludes Postgres internals, InsForge internal schemas, any
--- `_`-prefixed schema (the "keep private" convention), and any schema owned by
--- an extension (e.g. pg_cron's `cron`, PostGIS's `tiger`). STABLE rather than
--- IMMUTABLE because it reads catalogs and the `insforge.internal_schemas` GUC.
+-- `public`, excludes Postgres internals, InsForge internal schemas, and any
+-- schema owned by an extension (e.g. pg_cron's `cron`, PostGIS's `tiger`).
+-- STABLE rather than IMMUTABLE because it reads catalogs and the
+-- `insforge.internal_schemas` GUC.
 --
 -- The InsForge-internal deny-list is sourced from the `insforge.internal_schemas`
 -- setting (defined in postgresql.conf, alongside `insforge.policy_grant_tables`)
@@ -55,7 +54,6 @@ AS $fn$
   SELECT
     p_schema IS NOT NULL
     AND p_schema NOT LIKE 'pg\_%'
-    AND p_schema NOT LIKE '\_%'
     AND p_schema <> 'information_schema'
     AND p_schema <> ALL (
       -- Comma-separated GUC; strip any incidental whitespace before splitting.
