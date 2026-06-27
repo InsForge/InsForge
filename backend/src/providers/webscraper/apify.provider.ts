@@ -26,12 +26,11 @@ export type ApifyConnection = z.infer<typeof apifyConnectionSchema>;
 // not every field.
 const apifyTokenSchema = z.object({ accessToken: z.string() });
 const apifyRunsSchema = z.object({ runs: z.array(z.unknown()) });
+const apifyActorsSchema = z.object({ actors: z.array(z.unknown()) });
+const apifyDatasetsSchema = z.object({ datasets: z.array(z.unknown()) });
 const apifyLatestDataSchema = z.object({
   datasetId: z.string().nullable(),
   items: z.array(z.unknown()),
-  // Set when Apify locked the dataset because the account hit its monthly usage
-  // limit (a quota condition, not a fetch failure).
-  limitReached: z.boolean().optional(),
 });
 
 export class ApifyProvider {
@@ -146,6 +145,14 @@ export class ApifyProvider {
     return this.validatedGet('/apify/runs', apifyRunsSchema, { limit });
   }
 
+  async getActors(limit: number): Promise<{ actors: unknown[] } | null> {
+    return this.validatedGet('/apify/actors', apifyActorsSchema, { limit });
+  }
+
+  async getDatasets(limit: number): Promise<{ datasets: unknown[] } | null> {
+    return this.validatedGet('/apify/datasets', apifyDatasetsSchema, { limit });
+  }
+
   async getLatestData(
     limit: number
   ): Promise<{ datasetId: string | null; items: unknown[] } | null> {
@@ -190,9 +197,14 @@ export class ApifyProvider {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
         return null;
       }
-      const msg = err instanceof Error ? err.message : 'unknown';
+      const upstreamMsg =
+        axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
+          ? err.response.data.message
+          : err instanceof Error
+            ? err.message
+            : 'unknown';
       throw new AppError(
-        `Failed to fetch Apify ${path}: ${msg}`,
+        `Failed to fetch Apify ${path}: ${upstreamMsg}`,
         502,
         ERROR_CODES.UPSTREAM_FAILURE
       );

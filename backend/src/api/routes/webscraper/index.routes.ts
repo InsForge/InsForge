@@ -72,7 +72,43 @@ webscraperRouter.get(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const data = await service.getApifyRuns(parseLimit(req.query.limit, 10, 50));
+      const data = await service.getApifyRuns(parseLimit(req.query.limit, 10, 200));
+      if (!data) {
+        res.status(404).json({ error: 'not_connected' });
+        return;
+      }
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/webscraper/apify/actors?limit= — actor-first list (recently used)
+webscraperRouter.get(
+  '/apify/actors',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const data = await service.getApifyActors(parseLimit(req.query.limit, 20, 100));
+      if (!data) {
+        res.status(404).json({ error: 'not_connected' });
+        return;
+      }
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/webscraper/apify/datasets?limit= — dataset-first list (recently created)
+webscraperRouter.get(
+  '/apify/datasets',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const data = await service.getApifyDatasets(parseLimit(req.query.limit, 20, 100));
       if (!data) {
         res.status(404).json({ error: 'not_connected' });
         return;

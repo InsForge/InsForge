@@ -16,9 +16,6 @@ export interface ApifyConnection {
 export interface ApifyRun {
   id: string;
   actId: string | null;
-  // Human-readable actor name (e.g. "apify/google-maps-scraper"), resolved
-  // server-side from actId. Null when unavailable.
-  actorName: string | null;
   status: string | null;
   startedAt: string | null;
   finishedAt: string | null;
@@ -26,12 +23,27 @@ export interface ApifyRun {
   defaultDatasetId: string | null;
 }
 
+// A scraper the user created or used (actor-first list).
+export interface ApifyActor {
+  id: string;
+  name: string | null;
+  title: string | null;
+  lastRunStartedAt: string | null;
+  totalRuns: number | null;
+}
+
+// A stored dataset (run output) the user owns (dataset-first list).
+export interface ApifyDataset {
+  id: string;
+  name: string | null;
+  itemCount: number | null;
+  createdAt: string | null;
+  actId: string | null;
+}
+
 export interface ApifyLatestData {
   datasetId: string | null;
   items: unknown[];
-  // True when Apify locked the dataset because the account hit its monthly usage
-  // limit — distinct from a fetch failure so the UI can prompt an upgrade.
-  limitReached: boolean;
 }
 
 export const webscraperService = {
@@ -56,7 +68,23 @@ export const webscraperService = {
     });
   },
 
-  async getApifyRuns(limit = 10): Promise<ApifyRun[]> {
+  async getApifyActors(limit = 20): Promise<ApifyActor[]> {
+    const res = await apiClient.request(`/webscraper/apify/actors?limit=${limit}`, {
+      headers: apiClient.withAccessToken({}),
+    });
+    return ((res?.actors ?? []) as ApifyActor[]).filter((a) => typeof a?.id === 'string' && a.id);
+  },
+
+  async getApifyDatasets(limit = 20): Promise<ApifyDataset[]> {
+    const res = await apiClient.request(`/webscraper/apify/datasets?limit=${limit}`, {
+      headers: apiClient.withAccessToken({}),
+    });
+    return ((res?.datasets ?? []) as ApifyDataset[]).filter(
+      (d) => typeof d?.id === 'string' && d.id
+    );
+  },
+
+  async getApifyRuns(limit = 20): Promise<ApifyRun[]> {
     const res = await apiClient.request(`/webscraper/apify/runs?limit=${limit}`, {
       headers: apiClient.withAccessToken({}),
     });
@@ -72,7 +100,6 @@ export const webscraperService = {
     return {
       datasetId: res?.datasetId ?? null,
       items: res?.items ?? [],
-      limitReached: res?.limitReached === true,
     };
   },
 };

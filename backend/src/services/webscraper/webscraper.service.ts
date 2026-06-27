@@ -33,6 +33,14 @@ export class WebscraperService {
     return this.apify.getRuns(limit);
   }
 
+  getApifyActors(limit: number) {
+    return this.apify.getActors(limit);
+  }
+
+  getApifyDatasets(limit: number) {
+    return this.apify.getDatasets(limit);
+  }
+
   getApifyLatestData(limit: number) {
     return this.apify.getLatestData(limit);
   }
