@@ -149,7 +149,7 @@ export function WebScraperSettingsDialog({
                       <p className="text-sm leading-6 text-foreground">{connection.status}</p>
                     </FieldRow>
 
-                    {connection.dataRetentionDays !== null && (
+                    {typeof connection.dataRetentionDays === 'number' && (
                       <>
                         <div className="h-px w-full bg-[var(--alpha-8)]" />
                         <FieldRow label="Data retention">

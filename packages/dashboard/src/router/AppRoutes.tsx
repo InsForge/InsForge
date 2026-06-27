@@ -158,12 +158,14 @@ function AuthenticatedRoutes() {
             <Route path="session-replay" element={<SessionReplayPage />} />
           </Route>
         )}
-        <Route path="/dashboard/webscraper" element={<WebscraperLayout />}>
-          <Route index element={<Navigate to="actors" replace />} />
-          <Route path="actors" element={<WebscraperActorsPage />} />
-          <Route path="runs" element={<WebscraperRunsPage />} />
-          <Route path="dataset" element={<WebscraperDatasetPage />} />
-        </Route>
+        {isCloudHosting && (
+          <Route path="/dashboard/webscraper" element={<WebscraperLayout />}>
+            <Route index element={<Navigate to="actors" replace />} />
+            <Route path="actors" element={<WebscraperActorsPage />} />
+            <Route path="runs" element={<WebscraperRunsPage />} />
+            <Route path="dataset" element={<WebscraperDatasetPage />} />
+          </Route>
+        )}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>

@@ -46,6 +46,10 @@ export interface ApifyLatestData {
   items: unknown[];
 }
 
+function is404(err: unknown): boolean {
+  return (err as { response?: { status?: number } })?.response?.status === 404;
+}
+
 export const webscraperService = {
   async getApifyConnection(): Promise<ApifyConnection | null> {
     try {
@@ -54,7 +58,7 @@ export const webscraperService = {
       });
       return (res?.connection ?? null) as ApifyConnection | null;
     } catch (err: unknown) {
-      if ((err as { response?: { status: number } })?.response?.status === 404) {
+      if (is404(err)) {
         return null;
       }
       throw err;
@@ -69,37 +73,65 @@ export const webscraperService = {
   },
 
   async getApifyActors(limit = 20): Promise<ApifyActor[]> {
-    const res = await apiClient.request(`/webscraper/apify/actors?limit=${limit}`, {
-      headers: apiClient.withAccessToken({}),
-    });
-    return ((res?.actors ?? []) as ApifyActor[]).filter((a) => typeof a?.id === 'string' && a.id);
+    try {
+      const res = await apiClient.request(`/webscraper/apify/actors?limit=${limit}`, {
+        headers: apiClient.withAccessToken({}),
+      });
+      return ((res?.actors ?? []) as ApifyActor[]).filter((a) => typeof a?.id === 'string' && a.id);
+    } catch (err: unknown) {
+      if (is404(err)) {
+        return [];
+      }
+      throw err;
+    }
   },
 
   async getApifyDatasets(limit = 20): Promise<ApifyDataset[]> {
-    const res = await apiClient.request(`/webscraper/apify/datasets?limit=${limit}`, {
-      headers: apiClient.withAccessToken({}),
-    });
-    return ((res?.datasets ?? []) as ApifyDataset[]).filter(
-      (d) => typeof d?.id === 'string' && d.id
-    );
+    try {
+      const res = await apiClient.request(`/webscraper/apify/datasets?limit=${limit}`, {
+        headers: apiClient.withAccessToken({}),
+      });
+      return ((res?.datasets ?? []) as ApifyDataset[]).filter(
+        (d) => typeof d?.id === 'string' && d.id
+      );
+    } catch (err: unknown) {
+      if (is404(err)) {
+        return [];
+      }
+      throw err;
+    }
   },
 
   async getApifyRuns(limit = 20): Promise<ApifyRun[]> {
-    const res = await apiClient.request(`/webscraper/apify/runs?limit=${limit}`, {
-      headers: apiClient.withAccessToken({}),
-    });
-    // Drop items without a stable id — they break React keys and would produce
-    // bogus `/actors/runs/undefined` links.
-    return ((res?.runs ?? []) as ApifyRun[]).filter((r) => typeof r?.id === 'string' && r.id);
+    try {
+      const res = await apiClient.request(`/webscraper/apify/runs?limit=${limit}`, {
+        headers: apiClient.withAccessToken({}),
+      });
+      // Drop items without a stable id — they break React keys and would produce
+      // bogus `/actors/runs/undefined` links.
+      return ((res?.runs ?? []) as ApifyRun[]).filter((r) => typeof r?.id === 'string' && r.id);
+    } catch (err: unknown) {
+      if (is404(err)) {
+        return [];
+      }
+      throw err;
+    }
   },
 
   async getApifyLatestData(limit = 5): Promise<ApifyLatestData> {
-    const res = await apiClient.request(`/webscraper/apify/data?limit=${limit}`, {
-      headers: apiClient.withAccessToken({}),
-    });
-    return {
-      datasetId: res?.datasetId ?? null,
-      items: res?.items ?? [],
-    };
+    try {
+      const res = await apiClient.request(`/webscraper/apify/data?limit=${limit}`, {
+        headers: apiClient.withAccessToken({}),
+      });
+      return {
+        datasetId: res?.datasetId ?? null,
+        items: res?.items ?? [],
+      };
+    } catch (err: unknown) {
+      if (is404(err)) {
+        return { datasetId: null, items: [] };
+      }
+      throw err;
+    }
   },
 };

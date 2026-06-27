@@ -36,7 +36,7 @@ export function useApifyDatasets(enabled: boolean, limit = 100) {
   });
 }
 
-export function useApifyRuns(enabled: boolean, limit = 200) {
+export function useApifyRuns(enabled: boolean, limit = 100) {
   return useQuery({
     queryKey: [...webscraperQueryKeys.apifyRuns, limit],
     queryFn: () => webscraperService.getApifyRuns(limit),

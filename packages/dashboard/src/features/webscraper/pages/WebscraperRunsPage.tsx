@@ -112,7 +112,7 @@ export function WebscraperRunsPage() {
   const rows = useMemo<RunRow[]>(() => {
     const all = (runs.data ?? []).map((r) => ({
       ...r,
-      actorName: (r.actId && nameByActId.get(r.actId)) || 'Unknown actor',
+      actorName: (r.actId && nameByActId.get(r.actId)) || r.actId || 'Unknown actor',
     }));
     const q = search.trim().toLowerCase();
     if (!q) {

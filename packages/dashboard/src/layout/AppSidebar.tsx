@@ -48,12 +48,9 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
       }
 
       items.push({ ...dashboardAnalyticsMenuItem });
-    }
 
-    // Web Scraper is shown in all modes (not only cloud) so it is visible on
-    // self-hosted / local too; the backend itself reports "not available" when
-    // the web scraper endpoints are absent.
-    items.push({ ...dashboardWebscraperMenuItem });
+      items.push({ ...dashboardWebscraperMenuItem });
+    }
 
     return items;
   }, [isCloud]);
