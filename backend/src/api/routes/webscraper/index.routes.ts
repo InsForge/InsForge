@@ -1,12 +1,12 @@
 import { Router, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
-import { DatasourceService } from '@/services/datasource/datasource.service.js';
+import { WebscraperService } from '@/services/webscraper/webscraper.service.js';
 
-export const datasourcesRouter = Router();
-const service = DatasourceService.getInstance();
+export const webscraperRouter = Router();
+const service = WebscraperService.getInstance();
 
-// GET /api/datasources/apify/connection
-datasourcesRouter.get(
+// GET /api/webscraper/apify/connection
+webscraperRouter.get(
   '/apify/connection',
   verifyAdmin,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
@@ -23,8 +23,8 @@ datasourcesRouter.get(
   }
 );
 
-// DELETE /api/datasources/apify/connection
-datasourcesRouter.delete(
+// DELETE /api/webscraper/apify/connection
+webscraperRouter.delete(
   '/apify/connection',
   verifyAdmin,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
@@ -45,11 +45,11 @@ function parseLimit(raw: unknown, fallback: number, max: number): number {
   return Math.min(n, max);
 }
 
-// GET /api/datasources/apify/token — runtime token accessor. Admin-gated: it
+// GET /api/webscraper/apify/token — runtime token accessor. Admin-gated: it
 // returns the user's live Apify OAuth token, so it must NOT be reachable with an
 // anon key. verifyAdmin accepts the project `ik_` admin key that edge functions
 // get injected, plus project_admin JWTs.
-datasourcesRouter.get(
+webscraperRouter.get(
   '/apify/token',
   verifyAdmin,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
@@ -66,8 +66,8 @@ datasourcesRouter.get(
   }
 );
 
-// GET /api/datasources/apify/runs?limit=
-datasourcesRouter.get(
+// GET /api/webscraper/apify/runs?limit=
+webscraperRouter.get(
   '/apify/runs',
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -84,8 +84,8 @@ datasourcesRouter.get(
   }
 );
 
-// GET /api/datasources/apify/data?limit= — latest run's dataset preview
-datasourcesRouter.get(
+// GET /api/webscraper/apify/data?limit= — latest run's dataset preview
+webscraperRouter.get(
   '/apify/data',
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {

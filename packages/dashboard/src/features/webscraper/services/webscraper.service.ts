@@ -5,6 +5,10 @@ import { apiClient } from '#lib/api/client';
 export interface ApifyConnection {
   apifyUsername: string | null;
   plan: string | null;
+  // Live account metadata (read from Apify per request, not stored).
+  planTier: string | null;
+  email: string | null;
+  dataRetentionDays: number | null;
   status: 'active' | 'degraded' | 'revoked';
   createdAt: string;
 }
@@ -12,6 +16,9 @@ export interface ApifyConnection {
 export interface ApifyRun {
   id: string;
   actId: string | null;
+  // Human-readable actor name (e.g. "apify/google-maps-scraper"), resolved
+  // server-side from actId. Null when unavailable.
+  actorName: string | null;
   status: string | null;
   startedAt: string | null;
   finishedAt: string | null;
@@ -22,12 +29,15 @@ export interface ApifyRun {
 export interface ApifyLatestData {
   datasetId: string | null;
   items: unknown[];
+  // True when Apify locked the dataset because the account hit its monthly usage
+  // limit — distinct from a fetch failure so the UI can prompt an upgrade.
+  limitReached: boolean;
 }
 
-export const datasourceService = {
+export const webscraperService = {
   async getApifyConnection(): Promise<ApifyConnection | null> {
     try {
-      const res = await apiClient.request('/datasources/apify/connection', {
+      const res = await apiClient.request('/webscraper/apify/connection', {
         headers: apiClient.withAccessToken({}),
       });
       return (res?.connection ?? null) as ApifyConnection | null;
@@ -40,14 +50,14 @@ export const datasourceService = {
   },
 
   async disconnectApify(): Promise<void> {
-    await apiClient.request('/datasources/apify/connection', {
+    await apiClient.request('/webscraper/apify/connection', {
       method: 'DELETE',
       headers: apiClient.withAccessToken({}),
     });
   },
 
   async getApifyRuns(limit = 10): Promise<ApifyRun[]> {
-    const res = await apiClient.request(`/datasources/apify/runs?limit=${limit}`, {
+    const res = await apiClient.request(`/webscraper/apify/runs?limit=${limit}`, {
       headers: apiClient.withAccessToken({}),
     });
     // Drop items without a stable id — they break React keys and would produce
@@ -56,9 +66,13 @@ export const datasourceService = {
   },
 
   async getApifyLatestData(limit = 5): Promise<ApifyLatestData> {
-    const res = await apiClient.request(`/datasources/apify/data?limit=${limit}`, {
+    const res = await apiClient.request(`/webscraper/apify/data?limit=${limit}`, {
       headers: apiClient.withAccessToken({}),
     });
-    return { datasetId: res?.datasetId ?? null, items: res?.items ?? [] };
+    return {
+      datasetId: res?.datasetId ?? null,
+      items: res?.items ?? [],
+      limitReached: res?.limitReached === true,
+    };
   },
 };

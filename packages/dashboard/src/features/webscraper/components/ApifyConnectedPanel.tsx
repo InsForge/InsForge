@@ -1,17 +1,18 @@
 import { useState } from 'react';
+import { ExternalLink } from 'lucide-react';
 import { Button } from '@insforge/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { useToast } from '#lib/hooks/useToast';
 import {
-  datasourceQueryKeys,
+  webscraperQueryKeys,
   useApifyLatestData,
   useApifyRuns,
-} from '#features/datasource/hooks/useDatasource';
+} from '#features/webscraper/hooks/useWebscraper';
 import {
-  datasourceService,
+  webscraperService,
   type ApifyConnection,
-} from '#features/datasource/services/datasource.service';
+} from '#features/webscraper/services/webscraper.service';
 
 const APIFY_CONSOLE_URL = 'https://console.apify.com';
 
@@ -51,7 +52,7 @@ function buildImportPrompt(datasetId: string, sample: unknown): string {
     `I have an Apify dataset (id: ${datasetId}) connected to my InsForge project. Using InsForge:`,
     '1. Create a table whose columns match the fields in the sample item below (infer sensible types).',
     '2. Write an InsForge edge function that:',
-    '   - gets a fresh Apify token: GET `${INSFORGE_BASE_URL}/api/datasources/apify/token` with header `Authorization: Bearer ${API_KEY}`',
+    '   - gets a fresh Apify token: GET `${INSFORGE_BASE_URL}/api/webscraper/apify/token` with header `Authorization: Bearer ${API_KEY}`',
     `   - fetches items: GET https://api.apify.com/v2/datasets/${datasetId}/items?clean=true`,
     '   - upserts them into that table (dedupe by a stable id field).',
     'Sample item:',
@@ -77,8 +78,8 @@ export function ApifyConnectedPanel({
   const handleDisconnect = async () => {
     setDisconnecting(true);
     try {
-      await datasourceService.disconnectApify();
-      await qc.invalidateQueries({ queryKey: datasourceQueryKeys.all });
+      await webscraperService.disconnectApify();
+      await qc.invalidateQueries({ queryKey: webscraperQueryKeys.all });
       showToast('Apify disconnected.', 'info');
     } catch {
       showToast('Failed to disconnect Apify.', 'error');
@@ -130,8 +131,16 @@ export function ApifyConnectedPanel({
           <p className="text-sm font-medium leading-6 text-foreground">Apify connected</p>
           <p className="truncate text-sm leading-6 text-muted-foreground">
             {connection.apifyUsername ?? 'account'}
-            {connection.plan ? ` · ${connection.plan}` : ''} · {connection.status}
+            {connection.email ? ` · ${connection.email}` : ''} · {connection.status}
           </p>
+          {(connection.planTier || connection.plan || connection.dataRetentionDays != null) && (
+            <p className="truncate text-xs leading-5 text-muted-foreground">
+              {connection.planTier ?? connection.plan ?? 'Unknown plan'}
+              {connection.dataRetentionDays != null
+                ? ` · Apify keeps datasets ${connection.dataRetentionDays} days`
+                : ''}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <a
@@ -173,11 +182,17 @@ export function ApifyConnectedPanel({
                 rel="noopener noreferrer"
                 className="flex items-center justify-between gap-3 py-2 text-sm hover:bg-[var(--alpha-4)]"
               >
-                <span className="shrink-0 text-foreground">
+                <span className="min-w-0 flex-1 truncate text-foreground" title={r.actorName ?? undefined}>
+                  {r.actorName ?? 'Unknown actor'}
+                </span>
+                <span className="shrink-0 text-muted-foreground">
                   {statusMark(r.status)} {r.status ?? '—'}
                 </span>
-                <span className="truncate text-muted-foreground">{fmtTime(r.startedAt)}</span>
+                <span className="hidden shrink-0 text-muted-foreground sm:inline">
+                  {fmtTime(r.startedAt)}
+                </span>
                 <span className="shrink-0 text-muted-foreground">{fmtCost(r.usageTotalUsd)}</span>
+                <ExternalLink className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
               </a>
             ))}
           </div>
@@ -203,7 +218,12 @@ export function ApifyConnectedPanel({
         ) : latest.isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : latest.isError ? (
-          <p className="text-sm text-warning">Could not load data. Try refreshing.</p>
+          <p className="text-sm text-warning">Could not load data from Apify. Try refreshing.</p>
+        ) : latest.data?.limitReached ? (
+          <p className="text-sm text-warning">
+            Apify has locked this dataset because the account reached its monthly usage limit.
+            Upgrade your Apify plan to keep loading data.
+          </p>
         ) : previewItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">No data yet.</p>
         ) : (

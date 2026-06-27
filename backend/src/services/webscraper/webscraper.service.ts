@@ -1,20 +1,20 @@
-import { ApifyProvider } from '@/providers/datasource/apify.provider.js';
+import { ApifyProvider } from '@/providers/webscraper/apify.provider.js';
 
 // Wraps the data-source providers (Apify first; others slot in later). Mirrors
 // AnalyticsService's thin delegation over PostHogProvider.
-export class DatasourceService {
-  private static instance: DatasourceService;
+export class WebscraperService {
+  private static instance: WebscraperService;
   private apify: ApifyProvider;
 
   constructor(apify: ApifyProvider = ApifyProvider.getInstance()) {
     this.apify = apify;
   }
 
-  static getInstance(): DatasourceService {
-    if (!DatasourceService.instance) {
-      DatasourceService.instance = new DatasourceService();
+  static getInstance(): WebscraperService {
+    if (!WebscraperService.instance) {
+      WebscraperService.instance = new WebscraperService();
     }
-    return DatasourceService.instance;
+    return WebscraperService.instance;
   }
 
   getApifyConnection() {

@@ -11,6 +11,11 @@ import { ERROR_CODES } from '@insforge/shared-schemas';
 export const apifyConnectionSchema = z.object({
   apifyUsername: z.string().nullable(),
   plan: z.string().nullable(),
+  // Live account metadata from cloud-backend (/users/me), surfaced on the
+  // dashboard. Optional so an older cloud-backend that omits them still parses.
+  planTier: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  dataRetentionDays: z.number().nullable().optional(),
   status: z.enum(['active', 'degraded', 'revoked']),
   createdAt: z.string(),
 });
@@ -24,6 +29,9 @@ const apifyRunsSchema = z.object({ runs: z.array(z.unknown()) });
 const apifyLatestDataSchema = z.object({
   datasetId: z.string().nullable(),
   items: z.array(z.unknown()),
+  // Set when Apify locked the dataset because the account hit its monthly usage
+  // limit (a quota condition, not a fetch failure).
+  limitReached: z.boolean().optional(),
 });
 
 export class ApifyProvider {
@@ -145,7 +153,7 @@ export class ApifyProvider {
   }
 
   // proxyGet + Zod validation: 404 → null; bad 200 shape → 502 (don't leak an
-  // unvalidated upstream response through the datasource contract).
+  // unvalidated upstream response through the web scraper contract).
   private async validatedGet<T>(
     path: string,
     schema: z.ZodType<T>,

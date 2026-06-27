@@ -8,7 +8,7 @@ import AnalyticsLayout from '#features/analytics/components/AnalyticsLayout';
 import { TrafficPage } from '#features/analytics/pages/TrafficPage';
 import { RetentionPage } from '#features/analytics/pages/RetentionPage';
 import { SessionReplayPage } from '#features/analytics/pages/SessionReplayPage';
-import DatasourceLayout from '#features/datasource/components/DatasourceLayout';
+import WebscraperLayout from '#features/webscraper/components/WebscraperLayout';
 import AuthenticationLayout from '#features/auth/components/AuthenticationLayout';
 import AuthMethodsPage from '#features/auth/pages/AuthMethodsPage';
 import EmailPage from '#features/auth/pages/EmailPage';
@@ -155,7 +155,7 @@ function AuthenticatedRoutes() {
             <Route path="session-replay" element={<SessionReplayPage />} />
           </Route>
         )}
-        {isCloudHosting && <Route path="/dashboard/datasources" element={<DatasourceLayout />} />}
+        {isCloudHosting && <Route path="/dashboard/webscraper" element={<WebscraperLayout />} />}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>
