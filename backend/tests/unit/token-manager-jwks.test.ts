@@ -2,6 +2,10 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 
+vi.hoisted(() => {
+  process.env.JWT_SECRET = 'test-jwt-secret-please-change-in-production';
+});
+
 // Generate mock RSA key pair for testing
 const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -49,22 +53,32 @@ describe('TokenManager JWKS & RS256 Support', () => {
   });
 
   it('generates RS256 access tokens containing a kid header', async () => {
-    const payload = { sub: 'test-user-id', email: 'test@example.com', role: 'authenticated' as const };
+    const payload = {
+      sub: 'test-user-id',
+      email: 'test@example.com',
+      role: 'authenticated' as const,
+    };
     const token = tokenManager.generateAccessToken(payload);
-    
+
     expect(token).toBeDefined();
-    
+
     // Decode the token header to inspect the kid and algorithm
-    const decoded = jwt.decode(token, { complete: true }) as unknown as { header: { alg: string; kid: string } };
+    const decoded = jwt.decode(token, { complete: true }) as unknown as {
+      header: { alg: string; kid: string };
+    };
     expect(decoded).not.toBeNull();
     expect(decoded.header.alg).toBe('RS256');
     expect(decoded.header.kid).toBe(testKid);
   });
 
   it('verifies the RS256 access token successfully', async () => {
-    const payload = { sub: 'test-user-id', email: 'test@example.com', role: 'authenticated' as const };
+    const payload = {
+      sub: 'test-user-id',
+      email: 'test@example.com',
+      role: 'authenticated' as const,
+    };
     const token = tokenManager.generateAccessToken(payload);
-    
+
     const verified = tokenManager.verifyToken(token);
     expect(verified.sub).toBe(payload.sub);
     expect(verified.email).toBe(payload.email);
@@ -72,12 +86,20 @@ describe('TokenManager JWKS & RS256 Support', () => {
   });
 
   it('falls back to verifying HS256 tokens signed with the shared secret', async () => {
-    const payload = { sub: 'legacy-user-id', email: 'legacy@example.com', role: 'authenticated' as const };
-    const legacyToken = jwt.sign(payload, process.env.JWT_SECRET || 'dev-secret-please-change-in-production', {
-      algorithm: 'HS256',
-      expiresIn: '15m',
-    });
-    
+    const payload = {
+      sub: 'legacy-user-id',
+      email: 'legacy@example.com',
+      role: 'authenticated' as const,
+    };
+    const legacyToken = jwt.sign(
+      payload,
+      process.env.JWT_SECRET || 'dev-secret-please-change-in-production',
+      {
+        algorithm: 'HS256',
+        expiresIn: '15m',
+      }
+    );
+
     const verified = tokenManager.verifyToken(legacyToken);
     expect(verified.sub).toBe(payload.sub);
     expect(verified.email).toBe(payload.email);
@@ -89,7 +111,7 @@ describe('TokenManager JWKS & RS256 Support', () => {
     expect(jwks).toBeDefined();
     expect(jwks.keys).toBeDefined();
     expect(jwks.keys.length).toBe(1);
-    
+
     const key = jwks.keys[0];
     expect(key.kty).toBe('RSA');
     expect(key.alg).toBe('RS256');
