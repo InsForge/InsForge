@@ -46,9 +46,7 @@ describe('Pre-deploy check — end to end through real deno check (#1594)', () =
   });
 
   it('rejects the real duplicate-declaration function with a 400 before any DB write', async () => {
-    const { FunctionService } = await import(
-      '../../src/services/functions/function.service.js'
-    );
+    const { FunctionService } = await import('../../src/services/functions/function.service.js');
     const service = FunctionService.getInstance();
 
     await expect(
@@ -75,9 +73,7 @@ describe('Pre-deploy check — end to end through real deno check (#1594)', () =
   }, 60_000);
 
   it('does NOT block the same code when it is uploaded inactive (no deploy => no check)', async () => {
-    const { FunctionService } = await import(
-      '../../src/services/functions/function.service.js'
-    );
+    const { FunctionService } = await import('../../src/services/functions/function.service.js');
     const service = FunctionService.getInstance();
 
     // Inactive functions are not deployed, so the static check is skipped and

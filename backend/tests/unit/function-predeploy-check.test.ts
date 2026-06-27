@@ -49,7 +49,7 @@ describe('Pre-deploy static check wiring (issue #1594)', () => {
   it('createFunction runs checkCode and fails fast (no DB write) when it rejects', async () => {
     checkCode.mockRejectedValueOnce(
       new AppError(
-        'Function code failed type check:\nTS2451 Cannot redeclare block-scoped variable \'KILL_SWITCH_DOC_ID\'.',
+        "Function code failed type check:\nTS2451 Cannot redeclare block-scoped variable 'KILL_SWITCH_DOC_ID'.",
         400,
         ERROR_CODES.INVALID_INPUT
       )
