@@ -151,6 +151,16 @@ export class FunctionService {
     // Validate only platform contract constraints; runtime security is enforced by the runtime/provider.
     this.validateCode(code);
 
+    // Static pre-deploy check (deno check): reject syntax/type errors — e.g. a
+    // duplicate top-level declaration — up front, with the offending file:line.
+    // Such code builds fine but throws "Identifier '...' has already been
+    // declared" at isolate warm-up; because all active functions ship as a
+    // single Deno revision, one bad function would otherwise fail every deploy
+    // for the whole project (issue #1594). No-op in local mode (self-gating).
+    if (status === 'active') {
+      await this.denoSubhostingProvider.checkCode(code, slug);
+    }
+
     // Save to DB (release client before deployment polling)
     let created: FunctionSchema;
     const client = await this.getPool().connect();
@@ -220,6 +230,9 @@ export class FunctionService {
     // Validate code if provided
     if (updates.code !== undefined) {
       this.validateCode(updates.code);
+      // Static pre-deploy check — reject syntax/type errors before they reach
+      // Deno and wedge the project's deploys (issue #1594; see createFunction).
+      await this.denoSubhostingProvider.checkCode(updates.code, slug);
     }
 
     // Save to DB (release client before deployment polling)
