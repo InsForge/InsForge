@@ -423,20 +423,20 @@ export class DatabaseAdvisorService {
         'connection-stats': `
           WITH conn_stats AS (
             SELECT
-              (SELECT count(*)::float FROM pg_stat_activity WHERE state = 'active') AS active_conns,
+              (SELECT count(*)::float FROM pg_stat_activity) AS total_conns,
               (SELECT setting::float FROM pg_settings WHERE name = 'max_connections') AS max_conns
           )
           SELECT
             'max_connections' AS affected_object,
-            CASE WHEN (active_conns / max_conns) * 100 >= 95.0 THEN 'connection-critical' ELSE 'connection-high' END AS rule_id,
-            CASE WHEN (active_conns / max_conns) * 100 >= 95.0 THEN 'critical' ELSE 'warning' END AS severity,
+            CASE WHEN (total_conns / max_conns) * 100 >= 95.0 THEN 'connection-critical' ELSE 'connection-high' END AS rule_id,
+            CASE WHEN (total_conns / max_conns) * 100 >= 95.0 THEN 'critical' ELSE 'warning' END AS severity,
             'performance' AS category,
-            CASE WHEN (active_conns / max_conns) * 100 >= 95.0 THEN 'Database Connections Critical' ELSE 'Database Connections High' END AS title,
-            'The number of active database connections is high relative to the maximum connections limit.' AS description,
-            format('Database has %s active connections out of %s max_connections (%s%% used).', active_conns, max_conns, round(((active_conns / max_conns) * 100)::numeric, 2)) AS detail,
+            CASE WHEN (total_conns / max_conns) * 100 >= 95.0 THEN 'Database Connections Critical' ELSE 'Database Connections High' END AS title,
+            'The number of open database connections is high relative to max_connections. Idle connections still occupy connection slots and count toward the limit.' AS description,
+            format('Database has %s connections out of %s max_connections (%s%% used).', total_conns, max_conns, round(((total_conns / max_conns) * 100)::numeric, 2)) AS detail,
             'Close idle connections, implement connection pooling, or scale up your compute resources.' AS remediation
           FROM conn_stats
-          WHERE (active_conns / max_conns) * 100 >= 80.0
+          WHERE (total_conns / max_conns) * 100 >= 80.0
         `,
         'idle-in-transaction': `
           SELECT
@@ -574,8 +574,8 @@ export class DatabaseAdvisorService {
           LEFT JOIN table_indices ti ON tc.table_oid = ti.table_oid AND tc.attnum = ANY(ti.col_attnums)
           WHERE ti.table_oid IS NULL
             AND (
-              p.qual LIKE '%' || tc.column_name || '%'
-              OR p.with_check LIKE '%' || tc.column_name || '%'
+              p.qual ~ ('\\m' || tc.column_name || '\\M')
+              OR p.with_check ~ ('\\m' || tc.column_name || '\\M')
             )
         `,
         'dead-tuples': `
@@ -599,6 +599,7 @@ export class DatabaseAdvisorService {
                 ELSE (n_dead_tup::float / (n_live_tup + n_dead_tup)::float) * 100
               END AS dead_ratio
             FROM pg_stat_user_tables
+            WHERE schemaname NOT IN (${ADVISOR_EXCLUDED_SCHEMAS})
           ) q
           WHERE (n_live_tup + n_dead_tup) > 1000
             AND n_dead_tup > 200
@@ -627,6 +628,7 @@ export class DatabaseAdvisorService {
               last_analyze,
               last_autoanalyze
             FROM pg_stat_user_tables
+            WHERE schemaname NOT IN (${ADVISOR_EXCLUDED_SCHEMAS})
           ) q
           WHERE n_mod_since_analyze > 500
             AND (
@@ -655,6 +657,7 @@ export class DatabaseAdvisorService {
                 ELSE (last_value::float / max_value::float) * 100
               END AS pct_used
             FROM pg_sequences
+            WHERE schemaname NOT IN (${ADVISOR_EXCLUDED_SCHEMAS})
           ) q
           WHERE max_value > 0 AND pct_used >= 80.0
         `,
@@ -939,7 +942,13 @@ export class DatabaseAdvisorService {
     const issuesResult = await pool.query<AdvisorIssue>(query, params);
 
     return {
-      issues: issuesResult.rows,
+      // Normalize nullable DB columns to undefined so the response matches the
+      // dashboard's optional-string contract (AdvisorIssue), not `string | null`.
+      issues: issuesResult.rows.map((issue) => ({
+        ...issue,
+        affectedObject: issue.affectedObject ?? undefined,
+        recommendation: issue.recommendation ?? undefined,
+      })),
       total,
     };
   }
