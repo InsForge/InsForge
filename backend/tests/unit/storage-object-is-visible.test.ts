@@ -368,11 +368,14 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       size: 8,
       mimeType: 'text/plain',
     });
-    expect(typeof result.uploadedAt).toBe('string');
+    // uploaded_at is an ISO string supplied app-side; assert it round-trips.
+    expect(new Date(result.uploadedAt).toISOString()).toBe(result.uploadedAt);
     expect(provider.putObject).toHaveBeenCalledOnce();
     expect(calls.map((c) => c.sql)).not.toContain('BEGIN');
     expect(calls.map((c) => c.sql)).not.toContain('SET LOCAL ROLE project_admin');
     expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(true);
+    // The insert must not use RETURNING — that re-couples writes to SELECT RLS.
+    expect(calls.some((c) => /RETURNING/i.test(c.sql))).toBe(false);
   });
 
   it('confirms presigned uploads for project_admin JWT callers through root access', async () => {
@@ -407,10 +410,13 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       size: 8,
       mimeType: 'text/plain',
     });
-    expect(typeof result.uploadedAt).toBe('string');
+    // uploaded_at is an ISO string supplied app-side; assert it round-trips.
+    expect(new Date(result.uploadedAt).toISOString()).toBe(result.uploadedAt);
     expect(calls.map((c) => c.sql)).not.toContain('BEGIN');
     expect(calls.map((c) => c.sql)).not.toContain('SET LOCAL ROLE project_admin');
     expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(true);
+    // The insert must not use RETURNING — that re-couples writes to SELECT RLS.
+    expect(calls.some((c) => /RETURNING/i.test(c.sql))).toBe(false);
   });
 
   it('deletes objects for project_admin JWT callers through root access', async () => {
