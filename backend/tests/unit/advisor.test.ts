@@ -311,6 +311,31 @@ describe('Database Advisor Unit Tests', () => {
       expect(res2.body.error).toContain('Invalid offset parameter');
     });
 
+    it('GET /api/advisor/issues should return 400 for non-integer limit/offset', async () => {
+      const res = await request(app).get('/api/advisor/issues').query({ limit: '1.5' }).expect(400);
+      expect(res.body.error).toContain('Invalid limit parameter');
+
+      const res2 = await request(app)
+        .get('/api/advisor/issues')
+        .query({ offset: '2abc' })
+        .expect(400);
+      expect(res2.body.error).toContain('Invalid offset parameter');
+    });
+
+    it('GET /api/advisor/issues should return 400 for invalid severity or category', async () => {
+      const res = await request(app)
+        .get('/api/advisor/issues')
+        .query({ severity: 'urgent' })
+        .expect(400);
+      expect(res.body.error).toContain('Invalid severity parameter');
+
+      const res2 = await request(app)
+        .get('/api/advisor/issues')
+        .query({ category: 'networking' })
+        .expect(400);
+      expect(res2.body.error).toContain('Invalid category parameter');
+    });
+
     it('GET /api/advisor/category-counts should return category/severity matrix', async () => {
       queryMock.mockImplementation((sql: string) => {
         if (sql.includes('advisor_scans')) {

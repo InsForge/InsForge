@@ -1,17 +1,14 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import type {
-  DashboardAdvisorCategory,
+  DashboardAdvisorCategoryCountsResponse,
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
   DashboardAdvisorSeverity,
   DashboardAdvisorSummary,
 } from '#types';
 
-export type AdvisorCategorySeverityMatrix = Record<
-  DashboardAdvisorCategory,
-  Record<DashboardAdvisorSeverity, number>
->;
+export type AdvisorCategorySeverityMatrix = DashboardAdvisorCategoryCountsResponse;
 
 export const ADVISOR_QUERY_KEYS = {
   latest: ['advisor', 'latest'] as const,
