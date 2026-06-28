@@ -45,4 +45,29 @@ describe('LoginService refreshAccessToken', () => {
       })
     );
   });
+
+  it('sends the stored CSRF token on admin logout', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: vi.fn().mockResolvedValue(JSON.stringify({ success: true })),
+      headers: new Headers(),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    setDashboardBackendUrl('https://dashboard.example.com/');
+    apiClient.setCsrfToken('csrf-token');
+
+    await loginService.logout();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://dashboard.example.com/api/auth/admin/logout',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'X-CSRF-Token': 'csrf-token',
+        },
+        signal: expect.any(AbortSignal),
+      })
+    );
+  });
 });
