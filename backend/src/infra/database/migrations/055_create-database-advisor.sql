@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS system.advisor_findings (
   description     TEXT NOT NULL,
   affected_object TEXT,
   recommendation  TEXT,
-  is_resolved     BOOLEAN NOT NULL DEFAULT FALSE,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

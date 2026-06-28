@@ -1,8 +1,41 @@
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { AppError } from '@/utils/errors.js';
+import { AppError, hasPgErrorCode } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { PoolClient } from 'pg';
+
+// Internal/system schemas that advisor rules never report on. Kept as a single
+// source of truth so the exclusion list can't drift between rule queries.
+const ADVISOR_EXCLUDED_SCHEMAS = [
+  '_timescaledb_cache',
+  '_timescaledb_catalog',
+  '_timescaledb_config',
+  '_timescaledb_internal',
+  'auth',
+  'cron',
+  'extensions',
+  'graphql',
+  'graphql_public',
+  'information_schema',
+  'net',
+  'pgmq',
+  'pgroonga',
+  'pgsodium',
+  'pgsodium_masks',
+  'pgtle',
+  'pgbouncer',
+  'pg_catalog',
+  'realtime',
+  'repack',
+  'storage',
+  'supabase_functions',
+  'supabase_migrations',
+  'tiger',
+  'topology',
+  'vault',
+]
+  .map((s) => `'${s}'`)
+  .join(', ');
 
 export interface AdvisorSummary {
   scanId: string;
@@ -99,18 +132,21 @@ export class DatabaseAdvisorService {
 
       return scanId;
     } catch (error) {
+      let connectionPoisoned = false;
       if (acquired) {
         await client.query('SELECT pg_advisory_unlock(14589230, 1)').catch((err) => {
           logger.error(
             'Failed to release database advisor scan lock during early error cleanup:',
             err
           );
+          connectionPoisoned = true;
         });
       }
       await client.query('RESET statement_timeout').catch((err) => {
         logger.error('Failed to reset statement_timeout during early error cleanup:', err);
+        connectionPoisoned = true;
       });
-      client.release();
+      client.release(connectionPoisoned);
       if (startedScan) {
         this.isScanning = false;
       }
@@ -125,7 +161,7 @@ export class DatabaseAdvisorService {
     const pool = this.dbManager.getPool();
 
     try {
-      const findings: Omit<AdvisorIssue, 'id' | 'isResolved'>[] = [];
+      const findings: Omit<AdvisorIssue, 'id'>[] = [];
 
       // A. Check if pg_stat_statements is available
       const pgStatStatementsCheck = await client.query(`
@@ -161,10 +197,7 @@ export class DatabaseAdvisorService {
             )
             AND n.nspname = ANY(ARRAY(SELECT trim(UNNEST(string_to_array(coalesce(current_setting('pgrst.db_schemas', 't'), 'public'), ',')))))
             AND n.nspname NOT IN (
-              '_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal',
-              'auth', 'cron', 'extensions', 'graphql', 'graphql_public', 'information_schema',
-              'net', 'pgmq', 'pgroonga', 'pgsodium', 'pgsodium_masks', 'pgtle', 'pgbouncer', 'pg_catalog',
-              'realtime', 'repack', 'storage', 'supabase_functions', 'supabase_migrations', 'tiger', 'topology', 'vault'
+              ${ADVISOR_EXCLUDED_SCHEMAS}
             )
         `,
         'rls-permissive': `
@@ -196,10 +229,7 @@ export class DatabaseAdvisorService {
               AND pa.polname = pb.policyname
             WHERE pc.relkind = 'r'
               AND nsp.nspname NOT IN (
-                '_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal',
-                'auth', 'cron', 'extensions', 'graphql', 'graphql_public', 'information_schema',
-                'net', 'pgmq', 'pgroonga', 'pgsodium', 'pgsodium_masks', 'pgtle', 'pgbouncer', 'pg_catalog',
-                'realtime', 'repack', 'storage', 'supabase_functions', 'supabase_migrations', 'tiger', 'topology', 'vault'
+                ${ADVISOR_EXCLUDED_SCHEMAS}
               )
           ),
           permissive_patterns AS (
@@ -256,10 +286,7 @@ export class DatabaseAdvisorService {
             AND dep.classid = 'pg_catalog.pg_class'::regclass
           WHERE c.relkind = 'r'
             AND n.nspname NOT IN (
-              '_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal',
-              'auth', 'cron', 'extensions', 'graphql', 'graphql_public', 'information_schema',
-              'net', 'pgmq', 'pgroonga', 'pgsodium', 'pgsodium_masks', 'pgtle', 'pgbouncer', 'pg_catalog',
-              'realtime', 'repack', 'storage', 'supabase_functions', 'supabase_migrations', 'tiger', 'topology', 'vault'
+              ${ADVISOR_EXCLUDED_SCHEMAS}
             )
             AND c.relrowsecurity
             AND p.polname IS NULL
@@ -293,10 +320,7 @@ export class DatabaseAdvisorService {
               AND pg_catalog.has_function_privilege(role_name, p.oid, 'EXECUTE')
               AND n.nspname = ANY(ARRAY(SELECT trim(UNNEST(string_to_array(coalesce(current_setting('pgrst.db_schemas', 't'), 'public'), ',')))))
               AND n.nspname NOT IN (
-                '_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal',
-                'auth', 'cron', 'extensions', 'graphql', 'graphql_public', 'information_schema',
-                'net', 'pgmq', 'pgroonga', 'pgsodium', 'pgsodium_masks', 'pgtle', 'pgbouncer', 'pg_catalog',
-                'realtime', 'repack', 'storage', 'supabase_functions', 'supabase_migrations', 'tiger', 'topology', 'vault'
+                ${ADVISOR_EXCLUDED_SCHEMAS}
               )
           ) exposed_functions
         `,
@@ -323,10 +347,7 @@ export class DatabaseAdvisorService {
               WHERE p.polrelid = c.oid AND p.polcmd IN ('a', 'w', 'd', '*')
             )
             AND n.nspname NOT IN (
-              '_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal',
-              'auth', 'cron', 'extensions', 'graphql', 'graphql_public', 'information_schema',
-              'net', 'pgmq', 'pgroonga', 'pgsodium', 'pgsodium_masks', 'pgtle', 'pgbouncer', 'pg_catalog',
-              'realtime', 'repack', 'storage', 'supabase_functions', 'supabase_migrations', 'tiger', 'topology', 'vault'
+              ${ADVISOR_EXCLUDED_SCHEMAS}
             )
         `,
         'missing-fk-index': `
@@ -346,7 +367,7 @@ export class DatabaseAdvisorService {
             WHERE ct.contype = 'f'
               AND d.objid IS NULL
               AND ns.nspname NOT IN (
-                'pg_catalog', 'information_schema', 'auth', 'storage', 'vault', 'extensions'
+                ${ADVISOR_EXCLUDED_SCHEMAS}
               )
           ),
           index_ AS (
@@ -373,10 +394,7 @@ export class DatabaseAdvisorService {
             AND fk.col_attnums = idx.col_attnums[1:array_length(fk.col_attnums, 1)]
           WHERE idx.index_ IS NULL
             AND fk.schema_name NOT IN (
-              '_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal',
-              'auth', 'cron', 'extensions', 'graphql', 'graphql_public', 'information_schema',
-              'net', 'pgmq', 'pgroonga', 'pgsodium', 'pgsodium_masks', 'pgtle', 'pgbouncer', 'pg_catalog',
-              'realtime', 'repack', 'storage', 'supabase_functions', 'supabase_migrations', 'tiger', 'topology', 'vault'
+              ${ADVISOR_EXCLUDED_SCHEMAS}
             )
         `,
         'unused-index': `
@@ -399,16 +417,13 @@ export class DatabaseAdvisorService {
             AND NOT pi.indisprimary
             AND dep.objid IS NULL
             AND psui.schemaname NOT IN (
-              '_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal',
-              'auth', 'cron', 'extensions', 'graphql', 'graphql_public', 'information_schema',
-              'net', 'pgmq', 'pgroonga', 'pgsodium', 'pgsodium_masks', 'pgtle', 'pgbouncer', 'pg_catalog',
-              'realtime', 'repack', 'storage', 'supabase_functions', 'supabase_migrations', 'tiger', 'topology', 'vault'
+              ${ADVISOR_EXCLUDED_SCHEMAS}
             )
         `,
         'connection-stats': `
           WITH conn_stats AS (
             SELECT
-              (SELECT count(*)::float FROM pg_stat_activity) AS active_conns,
+              (SELECT count(*)::float FROM pg_stat_activity WHERE state = 'active') AS active_conns,
               (SELECT setting::float FROM pg_settings WHERE name = 'max_connections') AS max_conns
           )
           SELECT
@@ -499,10 +514,7 @@ export class DatabaseAdvisorService {
           FROM policies
           WHERE is_rls_active
             AND schema_name NOT IN (
-              '_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal',
-              'auth', 'cron', 'extensions', 'graphql', 'graphql_public', 'information_schema',
-              'net', 'pgmq', 'pgroonga', 'pgsodium', 'pgsodium_masks', 'pgtle', 'pgbouncer', 'pg_catalog',
-              'realtime', 'repack', 'storage', 'supabase_functions', 'supabase_migrations', 'tiger', 'topology', 'vault'
+              ${ADVISOR_EXCLUDED_SCHEMAS}
             )
             AND (
               (qual LIKE '%auth.uid()%' AND lower(qual) NOT LIKE '%select auth.uid()%')
@@ -531,7 +543,7 @@ export class DatabaseAdvisorService {
             WHERE c.relkind = 'r'
               AND a.attnum > 0
               AND NOT a.attisdropped
-              AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'auth', 'storage', 'vault', 'extensions')
+              AND n.nspname NOT IN (${ADVISOR_EXCLUDED_SCHEMAS})
           ),
           policies AS (
             SELECT
@@ -745,11 +757,17 @@ export class DatabaseAdvisorService {
           );
         }
 
-        // Update scan status
-        const finalStatus = 'completed';
+        // Update scan status. If every rule query errored, the scan evaluated
+        // nothing — persisting it as 'completed' would show a false all-clear,
+        // so demote it to 'failed'. Partial failures stay 'completed' with a warning.
+        const totalRules = Object.keys(queries).length;
+        const allRulesFailed = totalRules > 0 && failedRules.length === totalRules;
+        const finalStatus = allRulesFailed ? 'failed' : 'completed';
         const finalErrorMessage =
           failedRules.length > 0
-            ? `Scan completed with warnings. Failed rules: ${failedRules.join(', ')}`
+            ? allRulesFailed
+              ? `Scan failed: all ${totalRules} rule queries errored. Failed rules: ${failedRules.join(', ')}`
+              : `Scan completed with warnings. Failed rules: ${failedRules.join(', ')}`
             : null;
 
         await client.query(
@@ -766,7 +784,11 @@ export class DatabaseAdvisorService {
         throw dbErr;
       }
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : String(error);
+      const errMsg = hasPgErrorCode(error, '57014')
+        ? 'Scan timed out: a rule query exceeded the 15s statement timeout.'
+        : error instanceof Error
+          ? error.message
+          : String(error);
       logger.error(`Database Advisor scan execution failed:`, { scanId, error: errMsg });
       // Update scan status to failed
       await pool
@@ -782,13 +804,18 @@ export class DatabaseAdvisorService {
           logger.error('Failed to update scan status to failed:', updateErr);
         });
     } finally {
+      let connectionPoisoned = false;
       await client.query('RESET statement_timeout').catch((err) => {
         logger.error('Failed to reset statement_timeout:', err);
+        connectionPoisoned = true;
       });
       await client.query('SELECT pg_advisory_unlock(14589230, 1)').catch((err) => {
         logger.error('Failed to release database advisor scan lock:', err);
+        connectionPoisoned = true;
       });
-      client.release();
+      // If cleanup failed, destroy the connection instead of returning it to the
+      // pool still carrying the 15s statement_timeout or holding the advisory lock.
+      client.release(connectionPoisoned);
       this.isScanning = false;
     }
   }
