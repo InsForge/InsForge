@@ -214,26 +214,28 @@ export class StorageService {
     const finalKey = await this.generateNextAvailableKey(bucket, originalKey, this.getPool());
 
     const userId = ctx?.role === 'authenticated' ? ctx.id : null;
+    // Set uploaded_at app-side instead of reading back the DB default via
+    // RETURNING. Under RLS, INSERT ... RETURNING also applies the table's
+    // SELECT policies to the returned row, so an end-user upload fails unless
+    // the caller can also SELECT its own new row — wrongly coupling write
+    // success to read visibility. Supplying the value keeps this a pure INSERT
+    // gated only by the INSERT policy's WITH CHECK.
+    const uploadedAt = new Date();
     const insertObject = async (db: PoolClient) => {
       // INSERT before provider write so UNIQUE (bucket, key) catches any
       // race-window collision before any blob is touched. Provider write
       // stays inside the transaction — a provider failure throws, the tx
       // rolls back, and no orphan row remains.
-      const result = await db.query(
+      await db.query(
         `
-        INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
-        VALUES ($1, $2, $3, $4, $5, 'rest')
-        RETURNING uploaded_at as "uploadedAt"
+        INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via, uploaded_at)
+        VALUES ($1, $2, $3, $4, $5, 'rest', $6)
       `,
-        [bucket, finalKey, file.size, file.mimetype || null, userId]
+        [bucket, finalKey, file.size, file.mimetype || null, userId, uploadedAt]
       );
 
-      if (!result.rows[0]) {
-        throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
-      }
-
       const { etag: providerEtag } = await this.provider.putObject(bucket, finalKey, file);
-      return { etag: providerEtag, uploadedAt: result.rows[0].uploadedAt };
+      return { etag: providerEtag, uploadedAt };
     };
     let uploadedObject: Awaited<ReturnType<typeof insertObject>>;
     if (hasApiKey || ctx?.role === 'project_admin') {
@@ -244,7 +246,7 @@ export class StorageService {
       }
       uploadedObject = await withUserContext(this.getPool(), ctx, insertObject);
     }
-    const { etag, uploadedAt } = uploadedObject;
+    const { etag } = uploadedObject;
 
     // Persist the etag as a best-effort step OUTSIDE the user-context
     // transaction. If we ran this inside the tx and the UPDATE failed, the
@@ -275,7 +277,7 @@ export class StorageService {
       key: finalKey,
       size: file.size,
       mimeType: file.mimetype,
-      uploadedAt,
+      uploadedAt: uploadedAt.toISOString(),
       url: this.buildObjectUrl(bucket, finalKey, etag || uploadedAt),
     };
   }
@@ -693,25 +695,25 @@ export class StorageService {
     // WITH CHECK on storage_objects_owner_insert verifies uploaded_by =
     // jwt.sub. Admin/API-key callers use the backend pool.
     const userId = ctx?.role === 'authenticated' ? ctx.id : null;
+    // Set uploaded_at app-side instead of reading it back via RETURNING. Under
+    // RLS, INSERT ... RETURNING also enforces the table's SELECT policies on
+    // the returned row, so confirm-upload would fail for any bucket that has
+    // an INSERT policy but no covering SELECT policy. A plain INSERT is gated
+    // solely by the INSERT policy's WITH CHECK, which is the intended check.
+    const uploadedAt = new Date();
     const insertObjectRow = (db: PoolClient) =>
       db.query(
-        `INSERT INTO storage.objects (bucket, key, size, mime_type, etag, uploaded_by, uploaded_via)
-         VALUES ($1, $2, $3, $4, $5, $6, 'rest')
-         RETURNING uploaded_at as "uploadedAt"`,
-        [bucket, key, fileSize, metadata.contentType || null, finalEtag, userId]
+        `INSERT INTO storage.objects (bucket, key, size, mime_type, etag, uploaded_by, uploaded_via, uploaded_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 'rest', $7)`,
+        [bucket, key, fileSize, metadata.contentType || null, finalEtag, userId, uploadedAt]
       );
-    let result: Awaited<ReturnType<typeof insertObjectRow>>;
     if (hasApiKey || ctx?.role === 'project_admin') {
-      result = await runWithRootAccess(this.getPool(), insertObjectRow);
+      await runWithRootAccess(this.getPool(), insertObjectRow);
     } else {
       if (!ctx) {
         throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
       }
-      result = await withUserContext(this.getPool(), ctx, insertObjectRow);
-    }
-
-    if (!result.rows[0]) {
-      throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${key}`);
+      await withUserContext(this.getPool(), ctx, insertObjectRow);
     }
 
     return {
@@ -719,8 +721,8 @@ export class StorageService {
       key,
       size: fileSize,
       mimeType: metadata.contentType,
-      uploadedAt: result.rows[0].uploadedAt,
-      url: this.buildObjectUrl(bucket, key, finalEtag || result.rows[0].uploadedAt),
+      uploadedAt: uploadedAt.toISOString(),
+      url: this.buildObjectUrl(bucket, key, finalEtag || uploadedAt),
     };
   }
 
