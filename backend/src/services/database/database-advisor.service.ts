@@ -850,23 +850,34 @@ export class DatabaseAdvisorService {
 
     const scan = scanResult.rows[0];
 
-    // Query finding counts grouped by severity
-    const countResult = await pool.query<{ severity: string; count: string }>(
+    const completedScan = await pool.query<{ id: string }>(
       `
-        SELECT severity, count(*)::int AS count
-        FROM system.advisor_findings
-        WHERE scan_id = $1
-        GROUP BY severity
-      `,
-      [scan.id]
+        SELECT id
+        FROM system.advisor_scans
+        WHERE status = 'completed'
+        ORDER BY scanned_at DESC
+        LIMIT 1
+      `
     );
 
     const counts: Record<string, number> = { critical: 0, warning: 0, info: 0 };
     let total = 0;
 
-    for (const row of countResult.rows) {
-      counts[row.severity] = parseInt(row.count, 10);
-      total += counts[row.severity];
+    if (completedScan.rows.length > 0) {
+      const countResult = await pool.query<{ severity: string; count: string }>(
+        `
+          SELECT severity, count(*)::int AS count
+          FROM system.advisor_findings
+          WHERE scan_id = $1
+          GROUP BY severity
+        `,
+        [completedScan.rows[0].id]
+      );
+
+      for (const row of countResult.rows) {
+        counts[row.severity] = parseInt(row.count, 10);
+        total += counts[row.severity];
+      }
     }
 
     return {
@@ -898,6 +909,7 @@ export class DatabaseAdvisorService {
     const latestScan = await pool.query<{ id: string }>(
       `
         SELECT id FROM system.advisor_scans
+        WHERE status = 'completed'
         ORDER BY scanned_at DESC
         LIMIT 1
       `
