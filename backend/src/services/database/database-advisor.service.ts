@@ -38,6 +38,11 @@ const ADVISOR_EXCLUDED_SCHEMAS = [
   .join(', ');
 
 export interface AdvisorSummary {
+  // NOTE: `scanId`, `status`, `scanType`, `scannedAt` and `errorMessage` describe
+  // the *latest* scan (so the UI can show in-progress/failed state), while
+  // `summary` counts come from the latest *completed* scan so a running or failed
+  // rescan doesn't blank out the last usable results. When the latest scan is
+  // running/failed these therefore refer to two different scans by design.
   scanId: string;
   status: 'running' | 'completed' | 'failed';
   scanType: 'manual' | 'scheduled';
@@ -736,27 +741,41 @@ export class DatabaseAdvisorService {
         }
       }
 
-      // C. Save all findings to DB inside a transaction
+      // C. Save all findings to DB inside a transaction. Insert in batched
+      // multi-row statements rather than one INSERT per finding: far fewer round
+      // trips (so large result sets are much less likely to hit the 15s
+      // statement_timeout), while the batch size keeps the parameter count well
+      // under Postgres' 65535-bind limit (500 rows * 8 cols = 4000 params).
       await client.query('BEGIN');
       try {
-        for (const finding of findings) {
+        const COLUMNS = 8;
+        const BATCH_SIZE = 500;
+        for (let start = 0; start < findings.length; start += BATCH_SIZE) {
+          const batch = findings.slice(start, start + BATCH_SIZE);
+          const valuesSql = batch
+            .map((_, i) => {
+              const b = i * COLUMNS;
+              return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6}, $${b + 7}, $${b + 8})`;
+            })
+            .join(', ');
+          const params = batch.flatMap((finding) => [
+            scanId,
+            finding.ruleId,
+            finding.severity,
+            finding.category,
+            finding.title,
+            finding.description,
+            finding.affectedObject,
+            finding.recommendation,
+          ]);
           await client.query(
             `
               INSERT INTO system.advisor_findings (
                 scan_id, rule_id, severity, category, title, description, affected_object, recommendation
               )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+              VALUES ${valuesSql}
             `,
-            [
-              scanId,
-              finding.ruleId,
-              finding.severity,
-              finding.category,
-              finding.title,
-              finding.description,
-              finding.affectedObject,
-              finding.recommendation,
-            ]
+            params
           );
         }
 
