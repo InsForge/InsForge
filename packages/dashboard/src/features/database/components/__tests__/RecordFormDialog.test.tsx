@@ -33,6 +33,7 @@ describe('RecordFormDialog', () => {
         open
         onOpenChange={vi.fn()}
         tableName="wide_table"
+        schemaName="public"
         schema={makeSchema(30)}
       />
     );
@@ -55,6 +56,7 @@ describe('RecordFormDialog', () => {
         open
         onOpenChange={onOpenChange}
         tableName="wide_table"
+        schemaName="public"
         schema={makeSchema(40)}
         onSuccess={vi.fn()}
       />
