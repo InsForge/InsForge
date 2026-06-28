@@ -30,4 +30,6 @@ export * from './compute-services-api.schema.js';
 export * from './posthog.schema.js';
 export * from './posthog-api.schema.js';
 export * from './memory-api.schema.js';
+export * from './kv-api.schema.js';
+export * from './vector-api.schema.js';
 export * from './error-codes.schema.js';

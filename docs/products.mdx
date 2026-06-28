@@ -3,7 +3,7 @@ title: "Products"
 description: "Every InsForge product in one place. Click any card to dive in."
 ---
 
-InsForge ships ten products, each exposed through the same REST surface, the
+InsForge ships twelve products, each exposed through the same REST surface, the
 same JWT auth, the same MCP server, and the same SDKs.
 
 <CardGroup cols={2}>
@@ -25,6 +25,16 @@ same JWT auth, the same MCP server, and the same SDKs.
   <Card title="Realtime" icon="tower-broadcast" href="/core-concepts/realtime/overview">
     Database changes, broadcast, and presence over one WebSocket connection.
     Subscriptions and client publish use RLS checks.
+  </Card>
+
+  <Card title="Key-Value Store" icon="key" href="/core-concepts/kv/overview">
+    Redis-like JSON KV with TTL, atomic counters, and compare-and-swap.
+    Owner-scoped by row-level security.
+  </Card>
+
+  <Card title="Vector Store" icon="magnifying-glass" href="/core-concepts/vector-store/overview">
+    Pinecone-style semantic search on pgvector. Collections, server-side
+    embedding, and metadata-filtered similarity queries.
   </Card>
 
   <Card title="Edge Functions" icon="bolt" href="/core-concepts/functions/overview">

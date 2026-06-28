@@ -73,6 +73,18 @@
                 ]
               },
               {
+                "group": "Key-Value Store",
+                "pages": [
+                  "core-concepts/kv/overview"
+                ]
+              },
+              {
+                "group": "Vector Store",
+                "pages": [
+                  "core-concepts/vector-store/overview"
+                ]
+              },
+              {
                 "group": "Edge Functions",
                 "pages": [
                   "core-concepts/functions/overview",

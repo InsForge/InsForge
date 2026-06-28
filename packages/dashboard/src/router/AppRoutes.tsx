@@ -13,6 +13,8 @@ import AuthMethodsPage from '#features/auth/pages/AuthMethodsPage';
 import EmailPage from '#features/auth/pages/EmailPage';
 import UsersPage from '#features/auth/pages/UsersPage';
 import ComputePage from '#features/compute/pages/ComputePage';
+import KvPage from '#features/kv/pages/KvPage';
+import VectorPage from '#features/vectors/pages/VectorPage';
 import DashboardLayout from '#features/dashboard/components/DashboardLayout';
 import DashboardPage from '#features/dashboard/pages/DashboardPage';
 import DTestDashboardPage from '#features/dashboard/pages/DTestDashboardPage';
@@ -146,6 +148,8 @@ function AuthenticatedRoutes() {
           <Route path="domains" element={<DeploymentDomainsPage />} />
         </Route>
         <Route path="/dashboard/compute" element={<ComputePage />} />
+        <Route path="/dashboard/kv" element={<KvPage />} />
+        <Route path="/dashboard/vectors" element={<VectorPage />} />
         {isCloudHosting && (
           <Route path="/dashboard/analytics" element={<AnalyticsLayout />}>
             <Route index element={<Navigate to="traffic" replace />} />
