@@ -72,7 +72,9 @@ export function useAdvisorCategoryCounts() {
   return useQuery<AdvisorCategorySeverityMatrix, Error>({
     queryKey: ADVISOR_QUERY_KEYS.categoryCounts,
     queryFn: async () => {
-      if (!fetcher) return emptyMatrix();
+      if (!fetcher) {
+        return emptyMatrix();
+      }
       const matrix = emptyMatrix();
       let offset = 0;
       for (;;) {
