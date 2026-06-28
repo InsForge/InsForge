@@ -236,7 +236,7 @@ export class StorageService {
       return { etag: providerEtag, uploadedAt: result.rows[0].uploadedAt };
     };
     let uploadedObject: Awaited<ReturnType<typeof insertObject>>;
-    if (hasApiKey || ctx?.role === 'project_admin') {
+    if (hasApiKey || ctx?.role === 'project_admin' || (await this.isBucketPublic(bucket))) {
       uploadedObject = await runWithRootAccess(this.getPool(), insertObject);
     } else {
       if (!ctx) {
@@ -540,7 +540,7 @@ export class StorageService {
 
     const key = await this.generateNextAvailableKey(bucket, metadata.filename, this.getPool());
     const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
-    if (hasApiKey || ctx?.role === 'project_admin') {
+    if (hasApiKey || ctx?.role === 'project_admin' || (await this.isBucketPublic(bucket))) {
       return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
     }
     if (!ctx) {
@@ -701,7 +701,7 @@ export class StorageService {
         [bucket, key, fileSize, metadata.contentType || null, finalEtag, userId]
       );
     let result: Awaited<ReturnType<typeof insertObjectRow>>;
-    if (hasApiKey || ctx?.role === 'project_admin') {
+    if (hasApiKey || ctx?.role === 'project_admin' || (await this.isBucketPublic(bucket))) {
       result = await runWithRootAccess(this.getPool(), insertObjectRow);
     } else {
       if (!ctx) {

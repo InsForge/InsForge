@@ -276,6 +276,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
       { rows: [], rowCount: 0 }, // root object dedup query
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [{ public: false }], rowCount: 1 }, // public bucket check (private)
       { rows: [], rowCount: 0 }, // BEGIN
       { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
       { rows: [], rowCount: 0 }, // set_config(claims)
@@ -299,8 +300,8 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       params: ['photos'],
     });
     expect(calls[1].sql).toContain('SELECT key FROM storage.objects');
-    expect(calls[3].sql).toBe('BEGIN');
-    expect(calls[4].sql).toBe('SET LOCAL ROLE authenticated');
+    expect(calls[4].sql).toBe('BEGIN');
+    expect(calls[5].sql).toBe('SET LOCAL ROLE authenticated');
     expect(calls.map((c) => c.sql).slice(1)).not.toContain(
       'SELECT 1 FROM storage.buckets WHERE name = $1 LIMIT 1'
     );
