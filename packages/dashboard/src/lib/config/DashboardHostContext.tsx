@@ -13,7 +13,6 @@ import type {
   DashboardAdvisorSummary,
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
-  DashboardAdvisorCategoryCountsResponse,
 } from '#types';
 
 interface DashboardHostContextValue {
@@ -44,7 +43,6 @@ interface DashboardHostContextValue {
   onRequestAdvisorIssues?: (
     query: DashboardAdvisorIssuesQuery
   ) => Promise<DashboardAdvisorIssuesResponse>;
-  onRequestAdvisorCategoryCounts?: () => Promise<DashboardAdvisorCategoryCountsResponse>;
   onTriggerAdvisorScan?: () => Promise<void>;
   onConnectPosthog?: (projectId: string) => void;
   subscribePosthogConnectionStatus?: (

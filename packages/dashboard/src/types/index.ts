@@ -168,7 +168,6 @@ export interface DashboardProps {
   onRequestAdvisorIssues?: (
     query: DashboardAdvisorIssuesQuery
   ) => Promise<DashboardAdvisorIssuesResponse>;
-  onRequestAdvisorCategoryCounts?: () => Promise<DashboardAdvisorCategoryCountsResponse>;
   onTriggerAdvisorScan?: () => Promise<void>;
   /** Cloud-hosting only: ask the parent shell to start the PostHog OAuth flow. */
   onConnectPosthog?: (projectId: string) => void;

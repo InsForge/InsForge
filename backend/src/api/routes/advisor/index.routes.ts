@@ -94,22 +94,4 @@ router.get('/issues', verifyAdmin, async (req: AuthRequest, res: Response, next:
   }
 });
 
-/**
- * Get category and severity counts for the latest scan.
- * GET /api/advisor/category-counts
- */
-router.get(
-  '/category-counts',
-  verifyAdmin,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const counts = await advisorService.getLatestScanCategoryCounts();
-      successResponse(res, counts);
-    } catch (error: unknown) {
-      logger.warn('Get advisor category counts error:', error);
-      next(error);
-    }
-  }
-);
-
 export { router as advisorRouter };

@@ -3,7 +3,6 @@ import type {
   DashboardAdvisorSummary,
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
-  DashboardAdvisorCategoryCountsResponse,
 } from '#types';
 
 export class AdvisorService {
@@ -31,13 +30,6 @@ export class AdvisorService {
 
     const queryString = params.toString() ? `?${params.toString()}` : '';
     return apiClient.request(`/advisor/issues${queryString}`, {
-      method: 'GET',
-      headers: apiClient.withAccessToken({}),
-    });
-  }
-
-  async getCategoryCounts(): Promise<DashboardAdvisorCategoryCountsResponse> {
-    return apiClient.request('/advisor/category-counts', {
       method: 'GET',
       headers: apiClient.withAccessToken({}),
     });

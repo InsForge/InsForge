@@ -14,7 +14,6 @@ import type {
   DashboardAdvisorSummary,
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
-  DashboardAdvisorCategoryCountsResponse,
 } from '@insforge/dashboard';
 import { partnerService } from './partner.service';
 
@@ -60,7 +59,6 @@ type PendingRequestKey =
   | 'projectMetrics'
   | 'advisorLatest'
   | 'advisorIssues'
-  | 'advisorCategoryCounts'
   | 'advisorScan';
 
 type PendingRequest<T> = {
@@ -87,7 +85,6 @@ type PendingRequestValues = {
   projectMetrics: DashboardMetricsResponse;
   advisorLatest: DashboardAdvisorSummary;
   advisorIssues: DashboardAdvisorIssuesResponse;
-  advisorCategoryCounts: DashboardAdvisorCategoryCountsResponse;
   advisorScan: void;
 };
 
@@ -361,10 +358,6 @@ export function useCloudHosting() {
         case 'advisorIssues':
           pendingRequestsRef.current.advisorIssues =
             pendingRequest as PendingRequest<DashboardAdvisorIssuesResponse>;
-          return;
-        case 'advisorCategoryCounts':
-          pendingRequestsRef.current.advisorCategoryCounts =
-            pendingRequest as PendingRequest<DashboardAdvisorCategoryCountsResponse>;
           return;
         case 'advisorScan':
           pendingRequestsRef.current.advisorScan = pendingRequest as PendingRequest<void>;
@@ -871,44 +864,6 @@ export function useCloudHosting() {
             );
             return;
           }
-          case 'ADVISOR_CATEGORY_COUNTS': {
-            const rawCounts = message.counts as Record<string, Record<string, unknown>> | undefined;
-            if (!rawCounts || typeof rawCounts !== 'object') {
-              rejectPendingRequest(
-                'advisorCategoryCounts',
-                'Invalid advisor category counts payload'
-              );
-              return;
-            }
-
-            const matrix: DashboardAdvisorCategoryCountsResponse = {
-              security: { critical: 0, warning: 0, info: 0 },
-              performance: { critical: 0, warning: 0, info: 0 },
-              health: { critical: 0, warning: 0, info: 0 },
-            };
-
-            for (const cat of VALID_ADVISOR_CATEGORIES) {
-              const catGroup = rawCounts[cat];
-              if (catGroup && typeof catGroup === 'object') {
-                for (const sev of VALID_ADVISOR_SEVERITIES) {
-                  const countVal = catGroup[sev];
-                  if (typeof countVal === 'number' && Number.isFinite(countVal) && countVal >= 0) {
-                    matrix[cat][sev] = countVal;
-                  }
-                }
-              }
-            }
-
-            resolvePendingRequest('advisorCategoryCounts', matrix);
-            return;
-          }
-          case 'ADVISOR_CATEGORY_COUNTS_ERROR': {
-            rejectPendingRequest(
-              'advisorCategoryCounts',
-              getErrorMessage(message.error, 'Failed to load advisor category counts')
-            );
-            return;
-          }
           case 'ADVISOR_SCAN_RESULT': {
             if (message.success === true) {
               resolvePendingRequest('advisorScan', undefined);
@@ -1141,15 +1096,6 @@ export function useCloudHosting() {
     [createPendingRequest, sendMessageToParent]
   );
 
-  const requestAdvisorCategoryCounts =
-    useCallback(async (): Promise<DashboardAdvisorCategoryCountsResponse> => {
-      await sendMessageToParent(
-        { type: 'REQUEST_ADVISOR_CATEGORY_COUNTS' },
-        'Unable to request advisor category counts from the parent window'
-      );
-      return createPendingRequest('advisorCategoryCounts', 'Advisor category counts request');
-    }, [createPendingRequest, sendMessageToParent]);
-
   const triggerAdvisorScan = useCallback(async (): Promise<void> => {
     await sendMessageToParent(
       { type: 'TRIGGER_ADVISOR_SCAN' },
@@ -1279,7 +1225,6 @@ export function useCloudHosting() {
     requestProjectMetrics,
     requestAdvisorLatest,
     requestAdvisorIssues,
-    requestAdvisorCategoryCounts,
     triggerAdvisorScan,
     connectPosthog,
     openPosthog,

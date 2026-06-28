@@ -24,7 +24,6 @@ export function CloudHostingDashboard() {
     requestProjectMetrics,
     requestAdvisorLatest,
     requestAdvisorIssues,
-    requestAdvisorCategoryCounts,
     triggerAdvisorScan,
     connectPosthog,
     openPosthog,
@@ -56,7 +55,6 @@ export function CloudHostingDashboard() {
       onRequestProjectMetrics={requestProjectMetrics}
       onRequestAdvisorLatest={requestAdvisorLatest}
       onRequestAdvisorIssues={requestAdvisorIssues}
-      onRequestAdvisorCategoryCounts={requestAdvisorCategoryCounts}
       onTriggerAdvisorScan={triggerAdvisorScan}
       onConnectPosthog={connectPosthog}
       onOpenPosthog={openPosthog}
