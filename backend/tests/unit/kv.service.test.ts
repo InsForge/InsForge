@@ -37,6 +37,7 @@ describe('KvService (admin / project-global path)', () => {
           expires_at: new Date('2026-08-01T00:00:00Z'),
           created_at: new Date('2026-06-28T00:00:00Z'),
           updated_at: new Date('2026-06-28T00:00:00Z'),
+          inserted: true,
         },
       ],
       rowCount: 1,
@@ -72,6 +73,41 @@ describe('KvService (admin / project-global path)', () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
     const result = await service.set(ADMIN, 'default', 'k', { value: 'v', ifNotExists: true });
     expect(result).toEqual({ created: false, entry: null });
+  });
+
+  it('set reports created=false when ON CONFLICT updated an existing key (xmax)', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          value: 'v',
+          visibility: 'private',
+          expires_at: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+          inserted: false, // xmax != 0 -> this was an update, not an insert
+        },
+      ],
+      rowCount: 1,
+    });
+    const result = await service.set(ADMIN, 'default', 'k', { value: 'v' });
+    expect(result.created).toBe(false);
+    expect(result.entry).not.toBeNull();
+    expect(mockQuery.mock.calls[0][0]).toContain('(xmax = 0) AS inserted');
+  });
+
+  it('del guards against logically-expired rows', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    await expect(service.del(ADMIN, 'default', 'k')).resolves.toBe(false);
+    expect(mockQuery.mock.calls[0][0]).toContain('expires_at IS NULL OR expires_at > NOW()');
+  });
+
+  it('mset writes all pairs in a single atomic statement', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 2 });
+    await expect(service.mset(ADMIN, 'default', { a: 1, b: 2 })).resolves.toBe(2);
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    const sql = mockQuery.mock.calls[0][0] as string;
+    expect(sql).toContain('ON CONFLICT');
+    expect((sql.match(/::jsonb/g) || []).length).toBe(2); // one value tuple per key
   });
 
   it('rejects values over the size cap before touching the database', async () => {

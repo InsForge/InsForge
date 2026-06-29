@@ -13,13 +13,14 @@ export const kvVisibilitySchema = z.enum(['private', 'authed', 'public']);
 export type KvVisibility = z.infer<typeof kvVisibilitySchema>;
 
 // Namespaces and keys are single URL path segments. ':' is allowed (the
-// conventional namespace separator inside a key); '/' is not.
-const namespaceSchema = z
+// conventional namespace separator inside a key); '/' is not. Exported so the
+// route layer can validate path params against the same bounds.
+export const kvNamespaceSchema = z
   .string()
   .min(1)
   .max(256)
   .regex(/^[^/]+$/, 'Namespace must not contain "/"');
-const keySchema = z
+export const kvKeySchema = z
   .string()
   .min(1)
   .max(512)
@@ -64,9 +65,10 @@ export const kvSetResponseSchema = z.object({
 export type KvSetResponse = z.infer<typeof kvSetResponseSchema>;
 
 // POST /api/kv/entries/:namespace/:key/incr  (and /decr)
+// `by` is always positive; /decr negates it server-side. This prevents a
+// negative `by` on /decr from silently incrementing.
 export const kvIncrRequestSchema = z.object({
-  by: z.number().default(1),
-  ttl: ttlSecondsSchema.nullable().optional(),
+  by: z.number().positive().default(1),
 });
 export type KvIncrRequest = z.infer<typeof kvIncrRequestSchema>;
 
@@ -92,8 +94,8 @@ export type KvTtlResponse = z.infer<typeof kvTtlResponseSchema>;
 
 // POST /api/kv/mget
 export const kvMgetRequestSchema = z.object({
-  namespace: namespaceSchema.default('default'),
-  keys: z.array(keySchema).min(1).max(100),
+  namespace: kvNamespaceSchema.default('default'),
+  keys: z.array(kvKeySchema).min(1).max(100),
 });
 export type KvMgetRequest = z.infer<typeof kvMgetRequestSchema>;
 
@@ -105,7 +107,7 @@ export type KvMgetResponse = z.infer<typeof kvMgetResponseSchema>;
 
 // POST /api/kv/mset
 export const kvMsetRequestSchema = z.object({
-  namespace: namespaceSchema.default('default'),
+  namespace: kvNamespaceSchema.default('default'),
   entries: z.record(kvValueSchema),
   ttl: ttlSecondsSchema.nullable().optional(),
   visibility: kvVisibilitySchema.optional(),

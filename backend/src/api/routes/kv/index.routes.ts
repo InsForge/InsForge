@@ -6,6 +6,8 @@ import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
+  kvNamespaceSchema,
+  kvKeySchema,
   kvSetRequestSchema,
   kvIncrRequestSchema,
   kvCasRequestSchema,
@@ -46,6 +48,22 @@ function parseBody<S extends z.ZodTypeAny>(schema: S, body: unknown): z.infer<S>
   return parsed.data;
 }
 
+// Validate path params against the shared KV bounds (length caps, no '/') so the
+// HTTP surface matches the exported contract instead of trusting raw req.params.
+function parseParam(schema: z.ZodType<string>, value: string, label: string): string {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) {
+    throw new AppError(
+      `Invalid ${label}: ${parsed.error.errors.map((e) => e.message).join(', ')}`,
+      400,
+      ERROR_CODES.INVALID_INPUT
+    );
+  }
+  return parsed.data;
+}
+const ns = (req: AuthRequest) => parseParam(kvNamespaceSchema, req.params.namespace, 'namespace');
+const key = (req: AuthRequest) => parseParam(kvKeySchema, req.params.key, 'key');
+
 // --- bulk ops (registered before the dynamic /entries routes) ---------------
 
 // POST /api/kv/mget
@@ -75,7 +93,7 @@ router.post('/mset', async (req: AuthRequest, res: Response, next: NextFunction)
 // GET /api/kv/entries/:namespace  (list keys)
 router.get('/entries/:namespace', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const keys = await kvService.list(resolveActor(req), req.params.namespace);
+    const keys = await kvService.list(resolveActor(req), ns(req));
     successResponse(res, { keys });
   } catch (error) {
     next(error);
@@ -87,7 +105,7 @@ router.get(
   '/entries/:namespace/:key/ttl',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const ttl = await kvService.ttl(resolveActor(req), req.params.namespace, req.params.key);
+      const ttl = await kvService.ttl(resolveActor(req), ns(req), key(req));
       successResponse(res, { ttl });
     } catch (error) {
       next(error);
@@ -100,13 +118,11 @@ router.get(
   '/entries/:namespace/:key',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const value = await kvService.get(resolveActor(req), req.params.namespace, req.params.key);
+      const namespace = ns(req);
+      const k = key(req);
+      const value = await kvService.get(resolveActor(req), namespace, k);
       if (value === null) {
-        throw new AppError(
-          `Key not found: ${req.params.namespace}/${req.params.key}`,
-          404,
-          ERROR_CODES.KV_NOT_FOUND
-        );
+        throw new AppError(`Key not found: ${namespace}/${k}`, 404, ERROR_CODES.KV_NOT_FOUND);
       }
       successResponse(res, { value });
     } catch (error) {
@@ -121,13 +137,10 @@ router.put(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const body = parseBody(kvSetRequestSchema, req.body);
-      const result = await kvService.set(
-        resolveActor(req),
-        req.params.namespace,
-        req.params.key,
-        body
-      );
-      successResponse(res, result, result.created ? 200 : 409);
+      // Always 200: a setnx conflict (created=false, entry=null) is a normal
+      // outcome the caller inspects via `created`, not an HTTP error.
+      const result = await kvService.set(resolveActor(req), ns(req), key(req), body);
+      successResponse(res, result);
     } catch (error) {
       next(error);
     }
@@ -139,7 +152,7 @@ router.delete(
   '/entries/:namespace/:key',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const deleted = await kvService.del(resolveActor(req), req.params.namespace, req.params.key);
+      const deleted = await kvService.del(resolveActor(req), ns(req), key(req));
       successResponse(res, { deleted });
     } catch (error) {
       next(error);
@@ -153,12 +166,7 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { by } = parseBody(kvIncrRequestSchema, req.body);
-      const value = await kvService.incrBy(
-        resolveActor(req),
-        req.params.namespace,
-        req.params.key,
-        by
-      );
+      const value = await kvService.incrBy(resolveActor(req), ns(req), key(req), by);
       successResponse(res, { value });
     } catch (error) {
       next(error);
@@ -171,13 +179,9 @@ router.post(
   '/entries/:namespace/:key/decr',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      // `by` is validated positive; negate it here for the decrement.
       const { by } = parseBody(kvIncrRequestSchema, req.body);
-      const value = await kvService.incrBy(
-        resolveActor(req),
-        req.params.namespace,
-        req.params.key,
-        -by
-      );
+      const value = await kvService.incrBy(resolveActor(req), ns(req), key(req), -by);
       successResponse(res, { value });
     } catch (error) {
       next(error);
@@ -191,13 +195,7 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { expected, next: nextValue } = parseBody(kvCasRequestSchema, req.body);
-      const entry = await kvService.cas(
-        resolveActor(req),
-        req.params.namespace,
-        req.params.key,
-        expected,
-        nextValue
-      );
+      const entry = await kvService.cas(resolveActor(req), ns(req), key(req), expected, nextValue);
       successResponse(res, { entry });
     } catch (error) {
       next(error);
@@ -211,18 +209,11 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { ttl } = parseBody(kvExpireRequestSchema, req.body);
-      const updated = await kvService.expire(
-        resolveActor(req),
-        req.params.namespace,
-        req.params.key,
-        ttl
-      );
+      const namespace = ns(req);
+      const k = key(req);
+      const updated = await kvService.expire(resolveActor(req), namespace, k, ttl);
       if (!updated) {
-        throw new AppError(
-          `Key not found: ${req.params.namespace}/${req.params.key}`,
-          404,
-          ERROR_CODES.KV_NOT_FOUND
-        );
+        throw new AppError(`Key not found: ${namespace}/${k}`, 404, ERROR_CODES.KV_NOT_FOUND);
       }
       successResponse(res, { updated });
     } catch (error) {

@@ -27,6 +27,8 @@ interface EntryRow {
   expires_at: Date | null;
   created_at: Date;
   updated_at: Date;
+  // (xmax = 0) — true only for a genuine INSERT, false when ON CONFLICT updated.
+  inserted?: boolean;
 }
 
 function toIso(value: Date | null): string | null {
@@ -144,17 +146,18 @@ export class KvService {
            CASE WHEN $6::int IS NULL THEN NULL ELSE NOW() + make_interval(secs => $6::int) END
          )
          ON CONFLICT (namespace, key, COALESCE(owner_id, $7::uuid)) ${conflictClause}
-         RETURNING value, visibility, expires_at, created_at, updated_at`,
+         RETURNING value, visibility, expires_at, created_at, updated_at, (xmax = 0) AS inserted`,
         [namespace, key, serialized, ownerId, visibility, ttlSeconds, OWNER_SENTINEL]
       );
 
       if (!result.rows.length) {
-        // ifNotExists hit an existing row — nothing written.
+        // ifNotExists (DO NOTHING) hit an existing row — nothing written.
         return { created: false, entry: null };
       }
       const row = result.rows[0] as EntryRow;
       return {
-        created: true,
+        // true only for a genuine insert; an upsert that updated reports false.
+        created: row.inserted === true,
         entry: {
           namespace,
           key,
@@ -173,9 +176,11 @@ export class KvService {
       const result = await db.query(
         `DELETE FROM kv.entries
           WHERE namespace = $1 AND key = $2
-            AND COALESCE(owner_id, $3::uuid) = COALESCE($4::uuid, $3::uuid)`,
+            AND COALESCE(owner_id, $3::uuid) = COALESCE($4::uuid, $3::uuid)
+            AND (expires_at IS NULL OR expires_at > NOW())`,
         [namespace, key, OWNER_SENTINEL, this.ownerParam(ownerId)]
       );
+      // A logically-expired key reports deleted=false, matching get() returning null.
       return (result.rowCount ?? 0) > 0;
     });
   }
@@ -359,25 +364,29 @@ export class KvService {
     for (const [, value] of pairs) {
       this.assertValueSize(value);
     }
+    if (pairs.length === 0) {
+      return 0;
+    }
 
     return this.run(actor, async (db, ownerId) => {
-      let count = 0;
-      for (const [key, value] of pairs) {
-        await db.query(
-          `INSERT INTO kv.entries (namespace, key, value, owner_id, visibility, expires_at)
-           VALUES (
-             $1, $2, $3::jsonb, $4::uuid, $5,
-             CASE WHEN $6::int IS NULL THEN NULL ELSE NOW() + make_interval(secs => $6::int) END
-           )
-           ON CONFLICT (namespace, key, COALESCE(owner_id, $7::uuid))
-           DO UPDATE SET value = EXCLUDED.value,
-                         visibility = EXCLUDED.visibility,
-                         expires_at = EXCLUDED.expires_at`,
-          [namespace, key, JSON.stringify(value ?? null), ownerId, vis, ttlSeconds, OWNER_SENTINEL]
-        );
-        count++;
-      }
-      return count;
+      // One multi-row upsert so the whole batch is atomic: a failure on any key
+      // rolls back the rest instead of leaving a partial write.
+      const params: unknown[] = [ownerId, vis, ttlSeconds, OWNER_SENTINEL];
+      const rows = pairs.map(([key, value]) => {
+        const base = params.length;
+        params.push(namespace, key, JSON.stringify(value ?? null));
+        return `($${base + 1}, $${base + 2}, $${base + 3}::jsonb, $1::uuid, $2, CASE WHEN $3::int IS NULL THEN NULL ELSE NOW() + make_interval(secs => $3::int) END)`;
+      });
+      const result = await db.query(
+        `INSERT INTO kv.entries (namespace, key, value, owner_id, visibility, expires_at)
+         VALUES ${rows.join(', ')}
+         ON CONFLICT (namespace, key, COALESCE(owner_id, $4::uuid))
+         DO UPDATE SET value = EXCLUDED.value,
+                       visibility = EXCLUDED.visibility,
+                       expires_at = EXCLUDED.expires_at`,
+        params
+      );
+      return result.rowCount ?? pairs.length;
     });
   }
 

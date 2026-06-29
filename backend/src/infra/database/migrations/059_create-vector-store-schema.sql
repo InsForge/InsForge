@@ -13,7 +13,11 @@ CREATE SCHEMA IF NOT EXISTS vectors;
 CREATE TABLE IF NOT EXISTS vectors.collections (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name       TEXT NOT NULL,
-  dimension  INT NOT NULL DEFAULT 1536,
+  -- vectors.items.embedding is fixed at VECTOR(1536) in this version, so the
+  -- collection dimension is constrained to match. A direct insert with any
+  -- other dimension would be unusable (upsert/query would fail); the CHECK
+  -- makes that contract enforceable at the DB level, not just in the service.
+  dimension  INT NOT NULL DEFAULT 1536 CHECK (dimension = 1536),
   metric     TEXT NOT NULL DEFAULT 'cosine' CHECK (metric IN ('cosine', 'l2', 'ip')),
   owner_id   UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

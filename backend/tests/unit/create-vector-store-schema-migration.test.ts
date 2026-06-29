@@ -42,6 +42,11 @@ describe('create vector store schema migration', () => {
     expect(sql).toMatch(/REFERENCES vectors\.collections\(id\) ON DELETE CASCADE/i);
   });
 
+  it('enforces the fixed 1536 collection dimension with a CHECK constraint', () => {
+    const sql = readMigration();
+    expect(sql).toMatch(/dimension\s+INT NOT NULL DEFAULT 1536 CHECK \(dimension = 1536\)/i);
+  });
+
   it('creates the HNSW cosine index and the GIN metadata index', () => {
     const sql = readMigration();
     expect(sql).toMatch(/USING hnsw \(embedding vector_cosine_ops\)/i);
