@@ -139,14 +139,14 @@ export class PostgrestProxyService {
     request: ProxyRequest,
     user: { id: string; email?: string; role: string }
   ): Promise<ProxyResponse> {
-    if (user.role !== 'authenticated' && user.role !== 'project_admin' && user.role !== 'anon') {
+    if (user.role !== 'authenticated' && user.role !== 'project_admin') {
       throw new AppError('Invalid user role claim', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
     const userToken = this.tokenManager.generatePostgrestUserToken({
       sub: user.id,
       email: user.email,
-      role: user.role,
+      role: user.role as 'authenticated' | 'project_admin',
     });
 
     return this.forwardRequest({
