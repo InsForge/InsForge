@@ -12,6 +12,7 @@ import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 import { PostgrestProxyService } from '@/services/database/postgrest-proxy.service.js';
+import { resolvePostgrestSchema } from '@/services/database/helpers.js';
 
 const router = Router();
 const proxyService = PostgrestProxyService.getInstance();
@@ -45,12 +46,25 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
       throw new AppError('Invalid table name', 400, ERROR_CODES.INVALID_INPUT);
     }
 
+    // Resolve the target schema the native PostgREST way: an explicit ?schema=
+    // is desugared into the Accept-Profile/Content-Profile header (and stripped
+    // from the forwarded query); a client-sent profile header is honored as-is.
+    const {
+      schemaName,
+      query: forwardedQuery,
+      headers: forwardedHeaders,
+    } = resolvePostgrestSchema(
+      req.method,
+      req.query as Record<string, unknown>,
+      req.headers as Record<string, string | string[] | undefined>
+    );
+
     // Process request body for POST/PATCH/PUT (filter empty values based on column types)
     const method = req.method.toUpperCase();
     let body = req.body;
 
     if (['POST', 'PATCH', 'PUT'].includes(method) && body && typeof body === 'object') {
-      const columnTypeMap = await DatabaseManager.getColumnTypeMap(tableName);
+      const columnTypeMap = await DatabaseManager.getColumnTypeMap(tableName, schemaName);
       if (Array.isArray(body)) {
         body = body.map((item) => {
           if (item && typeof item === 'object') {
@@ -78,8 +92,8 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     const proxyRequest = {
       method: req.method,
       path,
-      query: req.query as Record<string, unknown>,
-      headers: req.headers as Record<string, string | string[] | undefined>,
+      query: forwardedQuery,
+      headers: forwardedHeaders,
       body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? body : undefined,
     };
 

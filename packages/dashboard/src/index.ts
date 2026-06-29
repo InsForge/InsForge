@@ -30,6 +30,7 @@ export type {
   DashboardAdvisorIssue,
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
+  DashboardAdvisorCategoryCountsResponse,
   DashboardPosthogConnectionStatus,
   DashboardPosthogOpenResult,
 } from './types';

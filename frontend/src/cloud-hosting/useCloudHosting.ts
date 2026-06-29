@@ -845,7 +845,6 @@ export function useCloudHosting() {
                         typeof i.affectedObject === 'string' ? i.affectedObject : undefined,
                       recommendation:
                         typeof i.recommendation === 'string' ? i.recommendation : undefined,
-                      isResolved: !!i.isResolved,
                     },
                   ];
                 })

@@ -432,8 +432,7 @@ export class SecretService {
       const result = await this.getPool().query(
         `DELETE FROM system.secrets
          WHERE expires_at IS NOT NULL
-         AND expires_at < NOW()
-         RETURNING id`
+         AND expires_at < NOW()`
       );
 
       const deletedCount = result.rowCount ?? 0;
