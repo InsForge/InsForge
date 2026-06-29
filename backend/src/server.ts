@@ -41,6 +41,7 @@ import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
+import { webscraperRouter } from '@/api/routes/webscraper/index.routes.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import { TelemetryService } from '@/services/telemetry/telemetry.service.js';
 const __filename = fileURLToPath(import.meta.url);
@@ -205,6 +206,7 @@ export async function createApp() {
   apiRouter.use('/payments', paymentsRouter);
   apiRouter.use('/compute/services', servicesRouter);
   apiRouter.use('/analytics', analyticsRouter);
+  apiRouter.use('/webscraper', webscraperRouter);
   apiRouter.use('/advisor', advisorRouter);
 
   // Mount all API routes under /api prefix

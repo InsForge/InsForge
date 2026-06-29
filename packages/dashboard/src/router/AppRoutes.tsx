@@ -8,6 +8,10 @@ import AnalyticsLayout from '#features/analytics/components/AnalyticsLayout';
 import { TrafficPage } from '#features/analytics/pages/TrafficPage';
 import { RetentionPage } from '#features/analytics/pages/RetentionPage';
 import { SessionReplayPage } from '#features/analytics/pages/SessionReplayPage';
+import WebscraperLayout from '#features/webscraper/components/WebscraperLayout';
+import { WebscraperActorsPage } from '#features/webscraper/pages/WebscraperActorsPage';
+import { WebscraperRunsPage } from '#features/webscraper/pages/WebscraperRunsPage';
+import { WebscraperDatasetPage } from '#features/webscraper/pages/WebscraperDatasetPage';
 import AuthenticationLayout from '#features/auth/components/AuthenticationLayout';
 import AuthMethodsPage from '#features/auth/pages/AuthMethodsPage';
 import EmailPage from '#features/auth/pages/EmailPage';
@@ -152,6 +156,14 @@ function AuthenticatedRoutes() {
             <Route path="traffic" element={<TrafficPage />} />
             <Route path="retention" element={<RetentionPage />} />
             <Route path="session-replay" element={<SessionReplayPage />} />
+          </Route>
+        )}
+        {isCloudHosting && (
+          <Route path="/dashboard/webscraper" element={<WebscraperLayout />}>
+            <Route index element={<Navigate to="actors" replace />} />
+            <Route path="actors" element={<WebscraperActorsPage />} />
+            <Route path="runs" element={<WebscraperRunsPage />} />
+            <Route path="dataset" element={<WebscraperDatasetPage />} />
           </Route>
         )}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

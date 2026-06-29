@@ -12,6 +12,7 @@ import {
   BarChart3,
   Settings,
   Globe,
+  Radar,
   SquarePen,
   Download,
   BookOpen,
@@ -142,6 +143,13 @@ export const dashboardAnalyticsMenuItem: DashboardPrimaryMenuItem = {
   label: 'Analytics',
   href: '/dashboard/analytics',
   icon: BarChart3,
+};
+
+export const dashboardWebscraperMenuItem: DashboardPrimaryMenuItem = {
+  id: 'webscraper',
+  label: 'Web Scraper',
+  href: '/dashboard/webscraper',
+  icon: Radar,
 };
 
 // d_test + cloud-hosting only: navigates to the Install InsForge route.

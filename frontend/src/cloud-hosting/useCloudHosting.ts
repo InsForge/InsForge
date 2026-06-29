@@ -4,6 +4,7 @@ import type {
   DashboardBackupInfo,
   DashboardInstanceInfo,
   DashboardModelCreditUsage,
+  DashboardApifyConnectionStatus,
   DashboardPosthogConnectionStatus,
   DashboardPosthogOpenResult,
   DashboardProjectInfo,
@@ -294,6 +295,9 @@ export function useCloudHosting() {
   const posthogStatusSubscribersRef = useRef<
     Set<(event: DashboardPosthogConnectionStatus) => void>
   >(new Set());
+  const apifyStatusSubscribersRef = useRef<Set<(event: DashboardApifyConnectionStatus) => void>>(
+    new Set()
+  );
 
   const setPendingRequest = useCallback(
     <K extends PendingRequestKey>(
@@ -894,6 +898,25 @@ export function useCloudHosting() {
             });
             return;
           }
+          case 'APIFY_CONNECTION_STATUS': {
+            const status = message.status;
+            if (status !== 'connected' && status !== 'error' && status !== 'cancelled') {
+              return;
+            }
+            const rawReason = typeof message.reason === 'string' ? message.reason : undefined;
+            const reason = rawReason ? rawReason.slice(0, 200) : undefined;
+            const timestamp =
+              typeof message.timestamp === 'number' ? message.timestamp : Date.now();
+            const event: DashboardApifyConnectionStatus = { status, reason, timestamp };
+            apifyStatusSubscribersRef.current.forEach((cb) => {
+              try {
+                cb(event);
+              } catch {
+                // Subscriber crashes shouldn't break delivery to other subscribers.
+              }
+            });
+            return;
+          }
           default:
             return;
         }
@@ -1126,6 +1149,17 @@ export function useCloudHosting() {
     [postMessageToParent]
   );
 
+  const connectApify = useCallback(
+    (projectId: string) => {
+      void postMessageToParent({
+        type: 'APIFY_CONNECT_REQUEST',
+        projectId,
+        timestamp: Date.now(),
+      });
+    },
+    [postMessageToParent]
+  );
+
   // Deep-link "Open in PostHog". Cloud calls /integrations/posthog/v1/open and
   // posts the resolved URL back as POSTHOG_OPEN_RESPONSE. Self-contained one-off
   // listener (rather than the PendingRequest singleton machinery) so concurrent
@@ -1204,6 +1238,16 @@ export function useCloudHosting() {
     []
   );
 
+  const subscribeApifyConnectionStatus = useCallback(
+    (cb: (event: DashboardApifyConnectionStatus) => void) => {
+      apifyStatusSubscribersRef.current.add(cb);
+      return () => {
+        apifyStatusSubscribersRef.current.delete(cb);
+      };
+    },
+    []
+  );
+
   return {
     projectInfo,
     getAuthorizationCode,
@@ -1229,5 +1273,7 @@ export function useCloudHosting() {
     connectPosthog,
     openPosthog,
     subscribePosthogConnectionStatus,
+    connectApify,
+    subscribeApifyConnectionStatus,
   };
 }

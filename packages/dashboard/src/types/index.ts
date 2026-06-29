@@ -137,6 +137,13 @@ export interface DashboardPosthogConnectionStatus {
   timestamp: number;
 }
 
+/** Status event posted from cloud-shell after the Apify OAuth flow finishes. */
+export interface DashboardApifyConnectionStatus {
+  status: 'connected' | 'error' | 'cancelled';
+  reason?: string;
+  timestamp: number;
+}
+
 /** Resolution of an `onOpenPosthog` call — exactly one of `url` or `error` is set. */
 export type DashboardPosthogOpenResult =
   | { url: string; error?: never }
@@ -176,6 +183,12 @@ export interface DashboardProps {
     cb: (event: DashboardPosthogConnectionStatus) => void
   ) => () => void;
   onOpenPosthog?: (projectId: string) => Promise<DashboardPosthogOpenResult>;
+  /** Cloud-hosting only: ask the parent shell to start the Apify OAuth flow. */
+  onConnectApify?: (projectId: string) => void;
+  /** Cloud-hosting only: subscribe to Apify OAuth completion / failure events. */
+  subscribeApifyConnectionStatus?: (
+    cb: (event: DashboardApifyConnectionStatus) => void
+  ) => () => void;
 }
 
 export interface SelfHostingDashboardProps extends DashboardProps {
