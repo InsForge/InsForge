@@ -3,7 +3,7 @@ import { z } from 'zod';
 // Canonical error codes shared across backend, SDK, CLI, MCP, and tooling.
 // Keep the public string values stable.
 
-const authErrorCodes = [
+export const authErrorCodes = [
   'AUTH_INVALID_EMAIL',
   'AUTH_WEAK_PASSWORD',
   'AUTH_INVALID_CREDENTIALS',
@@ -20,7 +20,7 @@ const authErrorCodes = [
   'AUTH_SIGNUP_DISABLED',
 ] as const;
 
-const databaseErrorCodes = [
+export const databaseErrorCodes = [
   'DATABASE_INVALID_PARAMETER',
   'DATABASE_VALIDATION_ERROR',
   'DATABASE_CONSTRAINT_VIOLATION',
@@ -32,7 +32,7 @@ const databaseErrorCodes = [
   'DATABASE_FORBIDDEN',
 ] as const;
 
-const storageErrorCodes = [
+export const storageErrorCodes = [
   'STORAGE_ALREADY_EXISTS',
   'STORAGE_INVALID_PARAMETER',
   'STORAGE_INVALID_FILE_TYPE',
@@ -44,7 +44,7 @@ const storageErrorCodes = [
   'S3_PROTOCOL_UNAVAILABLE',
 ] as const;
 
-const realtimeErrorCodes = [
+export const realtimeErrorCodes = [
   'REALTIME_CHANNEL_NOT_FOUND',
   'REALTIME_CONNECTION_FAILED',
   'REALTIME_INVALID_CHANNEL_REQUEST',
@@ -54,13 +54,17 @@ const realtimeErrorCodes = [
   'REALTIME_UNAUTHORIZED',
 ] as const;
 
-const aiErrorCodes = ['AI_INVALID_API_KEY', 'AI_INVALID_MODEL', 'AI_UPSTREAM_UNAVAILABLE'] as const;
+export const aiErrorCodes = [
+  'AI_INVALID_API_KEY',
+  'AI_INVALID_MODEL',
+  'AI_UPSTREAM_UNAVAILABLE',
+] as const;
 
-const analyticsErrorCodes = ['ANALYTICS_NOT_CONNECTED', 'ANALYTICS_UNAVAILABLE'] as const;
+export const analyticsErrorCodes = ['ANALYTICS_NOT_CONNECTED', 'ANALYTICS_UNAVAILABLE'] as const;
 
-const logsErrorCodes = ['LOGS_AWS_NOT_CONFIGURED', 'LOG_NOT_FOUND'] as const;
+export const logsErrorCodes = ['LOGS_AWS_NOT_CONFIGURED', 'LOG_NOT_FOUND'] as const;
 
-const computeErrorCodes = [
+export const computeErrorCodes = [
   'COMPUTE_CLOUD_UNAVAILABLE',
   'COMPUTE_NOT_CONFIGURED',
   'COMPUTE_PROVIDER_ERROR',
@@ -75,15 +79,15 @@ const computeErrorCodes = [
   'COMPUTE_QUOTA_EXCEEDED',
 ] as const;
 
-const billingErrorCodes = ['BILLING_INSUFFICIENT_BALANCE'] as const;
+export const billingErrorCodes = ['BILLING_INSUFFICIENT_BALANCE'] as const;
 
-const emailErrorCodes = [
+export const emailErrorCodes = [
   'EMAIL_SMTP_CONNECTION_FAILED',
   'EMAIL_SMTP_SEND_FAILED',
   'EMAIL_TEMPLATE_NOT_FOUND',
 ] as const;
 
-const deploymentErrorCodes = [
+export const deploymentErrorCodes = [
   'DEPLOYMENT_ALREADY_EXISTS',
   'DEPLOYMENT_INVALID_FILE',
   'DEPLOYMENT_NOT_FOUND',
@@ -94,17 +98,17 @@ const deploymentErrorCodes = [
   'ENVIRONMENT_VARIABLE_NOT_FOUND',
 ] as const;
 
-const docsErrorCodes = ['DOCS_NOT_FOUND'] as const;
+export const docsErrorCodes = ['DOCS_NOT_FOUND'] as const;
 
-const functionErrorCodes = [
+export const functionErrorCodes = [
   'FUNCTION_ALREADY_EXISTS',
   'FUNCTION_DEPLOYMENT_NOT_FOUND',
   'FUNCTION_NOT_FOUND',
 ] as const;
 
-const scheduleErrorCodes = ['SCHEDULE_INVALID_CRON', 'SCHEDULE_NOT_FOUND'] as const;
+export const scheduleErrorCodes = ['SCHEDULE_INVALID_CRON', 'SCHEDULE_NOT_FOUND'] as const;
 
-const paymentErrorCodes = [
+export const paymentErrorCodes = [
   'PAYMENT_CHECKOUT_ALREADY_EXISTS',
   'PAYMENT_CONFIG_INVALID',
   'PAYMENT_CONFIG_NOT_FOUND',
@@ -114,9 +118,9 @@ const paymentErrorCodes = [
   'PAYMENT_PRODUCT_NOT_FOUND',
 ] as const;
 
-const secretErrorCodes = ['SECRET_ALREADY_EXISTS', 'SECRET_NOT_FOUND'] as const;
+export const secretErrorCodes = ['SECRET_ALREADY_EXISTS', 'SECRET_NOT_FOUND'] as const;
 
-const generalErrorCodes = [
+export const generalErrorCodes = [
   'MISSING_FIELD',
   'ALREADY_EXISTS',
   'INVALID_INPUT',
@@ -130,7 +134,7 @@ const generalErrorCodes = [
   'UPSTREAM_FAILURE',
 ] as const;
 
-const errorCodeValues = [
+export const errorCodeValues = [
   ...authErrorCodes,
   ...databaseErrorCodes,
   ...storageErrorCodes,
@@ -155,3 +159,13 @@ export const errorCodeSchema = z.enum(errorCodeValues);
 export type ErrorCode = z.infer<typeof errorCodeSchema>;
 
 export const ERROR_CODES = errorCodeSchema.enum;
+
+const errorCodeSet = new Set<string>(errorCodeValues);
+
+export function isErrorCode(value: unknown): value is ErrorCode {
+  return typeof value === 'string' && errorCodeSet.has(value);
+}
+
+export function parseErrorCode(value: unknown): ErrorCode | undefined {
+  return isErrorCode(value) ? value : undefined;
+}
