@@ -14,6 +14,7 @@ Then use the narrowest package skill that matches the task:
 - `ui`
 - `shared-schemas`
 - `docs`
+- `e2e-testing`
 
 ## Core Rules
 
@@ -64,5 +65,6 @@ Before opening a PR or pushing new commits to an existing PR branch, run **all**
    - Auto-fixable prettier/eslint errors in your own diff must be fixed (`npx eslint --fix <file>` or `npm run format`).
 3. `npx turbo run test` (or the package-specific test command) — all tests must pass, including any new tests you added for the change.
 4. `npx turbo run build` if routing, config, schemas, or cross-package exports changed.
+5. Use `e2e-testing` to run the deterministic cross-repo E2E gate before opening, updating, or submitting the InsForge OSS PR.
 
 Never push with failing checks on files you touched, even if CI would catch them later. CI failures slow reviewers down and the lint fix almost always takes less than a minute locally.
