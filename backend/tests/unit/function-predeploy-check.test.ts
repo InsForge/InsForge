@@ -90,16 +90,53 @@ describe('Pre-deploy static check wiring (issue #1594)', () => {
     expect(checkCode).toHaveBeenCalledTimes(1);
   });
 
-  it('updateFunction runs checkCode when new code is provided', async () => {
-    checkCode.mockRejectedValueOnce(
-      new AppError('Function code failed type check:\n...', 400, ERROR_CODES.INVALID_INPUT)
-    );
+  it('updateFunction checks NEW code when updating an active function', async () => {
+    // Existence/status pre-fetch: active function.
+    mockPool.query.mockResolvedValueOnce({ rows: [{ code: 'old', status: 'active' }] });
+    checkCode.mockRejectedValueOnce(new AppError('rejected', 400, ERROR_CODES.INVALID_INPUT));
 
     await expect(
       service.updateFunction('dpo_agent', { code: 'const X = 1;\nvar X = 2;' })
     ).rejects.toMatchObject({ statusCode: 400 });
 
     expect(checkCode).toHaveBeenCalledWith('const X = 1;\nvar X = 2;', 'dpo_agent');
+    expect(mockPool.connect).not.toHaveBeenCalled(); // failed before any write
+  });
+
+  it('updateFunction checks STORED code on status-only activation (issue #1594 gap)', async () => {
+    // Activating a previously-inactive function with no new code: the stored
+    // (possibly bad) code must still be checked before it joins the Deno revision.
+    mockPool.query.mockResolvedValueOnce({
+      rows: [{ code: 'const X = 1;\nvar X = 2;', status: 'inactive' }],
+    });
+    checkCode.mockRejectedValueOnce(new AppError('rejected', 400, ERROR_CODES.INVALID_INPUT));
+
+    await expect(service.updateFunction('dpo_agent', { status: 'active' })).rejects.toMatchObject({
+      statusCode: 400,
+    });
+
+    expect(checkCode).toHaveBeenCalledWith('const X = 1;\nvar X = 2;', 'dpo_agent');
+    expect(mockPool.connect).not.toHaveBeenCalled();
+  });
+
+  it('updateFunction does NOT check a code edit on an inactive draft', async () => {
+    // Devs iterating on a broken draft (kept inactive) are not blocked.
+    mockPool.query.mockResolvedValueOnce({ rows: [{ code: 'old', status: 'inactive' }] });
+    mockClient.query.mockResolvedValue({ rows: [{ id: '1', slug: 'draft', status: 'inactive' }] });
+
+    await expect(
+      service.updateFunction('draft', { code: 'const X = 1;\nvar X = 2;' })
+    ).resolves.toBeDefined();
+
+    expect(checkCode).not.toHaveBeenCalled();
+  });
+
+  it('updateFunction on a missing slug returns null without checking', async () => {
+    mockPool.query.mockResolvedValueOnce({ rows: [] }); // not found
+
+    await expect(service.updateFunction('ghost', { code: 'whatever' })).resolves.toBeNull();
+
+    expect(checkCode).not.toHaveBeenCalled();
     expect(mockPool.connect).not.toHaveBeenCalled();
   });
 });

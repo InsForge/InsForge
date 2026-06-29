@@ -516,10 +516,10 @@ export class DenoSubhostingProvider {
       host
     );
 
-    // 2300 Duplicate identifier; 2403 var conflicts with let/const in same
-    // scope; 2440/2567 redeclare variants; 2451 Cannot redeclare block-scoped
-    // variable — the family V8 reports as "already been declared" at runtime.
-    const REDECLARE_CODES = new Set([2300, 2403, 2440, 2451, 2567]);
+    // 2300 Duplicate identifier; 2403 subsequent var declarations must match;
+    // 2440 import conflicts with local declaration; 2451 Cannot redeclare
+    // block-scoped variable — the family V8 reports as "already been declared".
+    const REDECLARE_CODES = new Set([2300, 2403, 2440, 2451]);
     const diagnostics = [
       ...program.getSyntacticDiagnostics(sourceFile),
       ...program.getSemanticDiagnostics(sourceFile).filter((d) => REDECLARE_CODES.has(d.code)),
