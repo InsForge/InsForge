@@ -37,8 +37,12 @@ describe('DenoSubhostingProvider.checkCode (pre-deploy static check)', () => {
       code: ERROR_CODES.INVALID_INPUT,
     });
 
-    // And the message must name the identifier so the agent/CLI can fix it.
+    // The message must name the identifier AND tell the user how to fix it
+    // (rename to another name) — not just surface an opaque compiler error.
     await expect(provider.checkCode(code, 'dpo_agent')).rejects.toThrow(/KILL_SWITCH_DOC_ID/);
+    await expect(provider.checkCode(code, 'dpo_agent')).rejects.toThrow(
+      /declared more than once.*change one of them to another name/s
+    );
   }, 60_000);
 
   it('accepts a valid, import-free function', async () => {

@@ -413,10 +413,14 @@ export class DenoSubhostingProvider {
     // fail isolate warm-up with "Identifier '...' has already been declared",
     // which surfaces only as the opaque "Event iterator validation failed"
     // (issue #1594). Without this floor, such code would wedge every deploy.
-    const fatal = this.detectFatalCodeErrors(transformed);
+    // Check the user's own source so reported line numbers match what they
+    // wrote (the transform only prepends a header / legacy shim).
+    const fatal = this.detectFatalCodeErrors(userCode);
     if (fatal.length > 0) {
       throw new AppError(
-        `Function code failed type check:\n${fatal.join('\n')}`,
+        `Edge function "${slug}" was not deployed — its code would fail to start:\n${fatal
+          .map((f) => `  • ${f}`)
+          .join('\n')}`,
         400,
         ERROR_CODES.INVALID_INPUT
       );
@@ -523,11 +527,20 @@ export class DenoSubhostingProvider {
 
     return diagnostics.map((d) => {
       const message = ts.flattenDiagnosticMessageText(d.messageText, '\n');
+      let where = '';
       if (d.file && typeof d.start === 'number') {
         const { line, character } = d.file.getLineAndCharacterOfPosition(d.start);
-        return `${fileName}:${line + 1}:${character + 1} - ${message}`;
+        where = ` (line ${line + 1}, column ${character + 1})`;
       }
-      return message;
+      // Turn the compiler diagnostic into an actionable message naming the
+      // duplicated identifier and telling the user how to fix it.
+      if (REDECLARE_CODES.has(d.code)) {
+        const name = message.match(/'([^']+)'/)?.[1];
+        return name
+          ? `"${name}" is declared more than once${where}. Please change one of them to another name and redeploy.`
+          : `A name is declared more than once${where}. Please change one of them to another name and redeploy.`;
+      }
+      return `Syntax error${where}: ${message}`;
     });
   }
 
