@@ -11,7 +11,7 @@ vi.mock('@/infra/database/database.manager.js', () => ({
   DatabaseManager: { getInstance: () => ({ getPool: () => ({}) }) },
 }));
 
-import { StorageService } from '../../src/services/storage/storage.service.ts';
+import { StorageService } from '../../src/services/storage/storage.service';
 
 type UrlBuilder = (bucket: string, key: string, version?: string | Date | null) => string;
 

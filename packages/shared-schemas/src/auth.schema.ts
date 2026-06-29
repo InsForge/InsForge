@@ -31,6 +31,41 @@ export const roleSchema = z.enum(['anon', 'authenticated', 'project_admin']);
 
 export const verificationMethodSchema = z.enum(['code', 'link']);
 
+export const authTokenExpiryLimits = {
+  codeMinutes: {
+    min: 1,
+    max: 7 * 24 * 60,
+  },
+  linkHours: {
+    min: 1,
+    max: 7 * 24,
+  },
+} as const;
+
+export const codeExpiryMinutesSchema = z
+  .number()
+  .int()
+  .min(
+    authTokenExpiryLimits.codeMinutes.min,
+    `Must be at least ${authTokenExpiryLimits.codeMinutes.min} minute`
+  )
+  .max(
+    authTokenExpiryLimits.codeMinutes.max,
+    `Must be at most ${authTokenExpiryLimits.codeMinutes.max} minutes`
+  );
+
+export const linkExpiryHoursSchema = z
+  .number()
+  .int()
+  .min(
+    authTokenExpiryLimits.linkHours.min,
+    `Must be at least ${authTokenExpiryLimits.linkHours.min} hour`
+  )
+  .max(
+    authTokenExpiryLimits.linkHours.max,
+    `Must be at most ${authTokenExpiryLimits.linkHours.max} hours`
+  );
+
 /**
  * User profile schema with default fields and passthrough for custom fields
  * Note: Using snake_case for fields as they are stored directly in PostgreSQL JSONB
@@ -131,6 +166,10 @@ export const authConfigSchema = z.object({
   requireSpecialChar: z.boolean(),
   verifyEmailMethod: verificationMethodSchema,
   resetPasswordMethod: verificationMethodSchema,
+  verifyEmailCodeExpiryMinutes: codeExpiryMinutesSchema,
+  verifyEmailLinkExpiryHours: linkExpiryHoursSchema,
+  resetPasswordCodeExpiryMinutes: codeExpiryMinutesSchema,
+  resetPasswordLinkExpiryHours: linkExpiryHoursSchema,
   allowedRedirectUrls: z
     .array(z.string().regex(allowedRedirectUrlsRegex, { message: 'Invalid URL or wildcard URL' }))
     .optional()

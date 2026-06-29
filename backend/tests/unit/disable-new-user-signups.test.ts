@@ -131,6 +131,10 @@ const DISABLED_CONFIG = {
   requireSpecialChar: false,
   verifyEmailMethod: 'code' as const,
   resetPasswordMethod: 'code' as const,
+  verifyEmailCodeExpiryMinutes: 15,
+  verifyEmailLinkExpiryHours: 24,
+  resetPasswordCodeExpiryMinutes: 10,
+  resetPasswordLinkExpiryHours: 1,
   allowedRedirectUrls: [],
   disableSignup: true,
 };
