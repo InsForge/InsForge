@@ -1,7 +1,7 @@
 import { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
-import type { UserContext } from '@/api/middlewares/auth.js';
+import type { StoreActor } from '@/api/middlewares/store-actor.js';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES, type KvEntry, type KvVisibility } from '@insforge/shared-schemas';
@@ -17,9 +17,9 @@ const OWNER_SENTINEL = '00000000-0000-0000-0000-000000000000';
 
 type Queryable = Pool | PoolClient;
 
-// API-key callers manage the shared project-global store (RLS-bypassing pool);
-// end users operate on their own rows through withUserContext + RLS.
-export type KvActor = { mode: 'admin' } | { mode: 'user'; ctx: UserContext };
+// API-key/admin callers manage the shared project-global store (RLS-bypassing
+// pool); end users operate on their own rows through withUserContext + RLS.
+export type KvActor = StoreActor;
 
 interface EntryRow {
   value: unknown;
@@ -79,10 +79,6 @@ export class KvService {
     return withUserContext(this.getPool(), ctx, (client) => fn(client, ownerId));
   }
 
-  private ownerParam(ownerId: string | null): string | null {
-    return ownerId;
-  }
-
   private assertValueSize(value: unknown): string {
     const serialized = JSON.stringify(value ?? null);
     if (Buffer.byteLength(serialized, 'utf8') > MAX_VALUE_BYTES) {
@@ -110,7 +106,7 @@ export class KvService {
           WHERE namespace = $1 AND key = $2
             AND COALESCE(owner_id, $3::uuid) = COALESCE($4::uuid, $3::uuid)
             AND (expires_at IS NULL OR expires_at > NOW())`,
-        [namespace, key, OWNER_SENTINEL, this.ownerParam(ownerId)]
+        [namespace, key, OWNER_SENTINEL, ownerId]
       );
       return result.rows.length ? (result.rows[0].value as unknown) : null;
     });
@@ -178,7 +174,7 @@ export class KvService {
           WHERE namespace = $1 AND key = $2
             AND COALESCE(owner_id, $3::uuid) = COALESCE($4::uuid, $3::uuid)
             AND (expires_at IS NULL OR expires_at > NOW())`,
-        [namespace, key, OWNER_SENTINEL, this.ownerParam(ownerId)]
+        [namespace, key, OWNER_SENTINEL, ownerId]
       );
       // A logically-expired key reports deleted=false, matching get() returning null.
       return (result.rowCount ?? 0) > 0;
@@ -186,7 +182,9 @@ export class KvService {
   }
 
   async exists(actor: KvActor, namespace: string, key: string): Promise<boolean> {
-    return (await this.get(actor, namespace, key)) !== null;
+    // SELECT 1 instead of get(): avoids fetching a potentially large value JSONB
+    // just to test presence.
+    return this.run(actor, (db, ownerId) => this.existsInTx(db, namespace, key, ownerId));
   }
 
   // Atomic increment. Initializes a missing key to `by`. Fails if the existing

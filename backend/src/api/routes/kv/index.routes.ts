@@ -1,7 +1,11 @@
 import { Router, Response, NextFunction } from 'express';
-import { z } from 'zod';
 import { AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
-import { KvService, type KvActor } from '@/services/kv/kv.service.js';
+import {
+  resolveStoreActor as resolveActor,
+  parseBody,
+  parseParam,
+} from '@/api/middlewares/store-actor.js';
+import { KvService } from '@/services/kv/kv.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
 import {
@@ -23,44 +27,6 @@ const kvService = KvService.getInstance();
 // project-global store) and by app end users (own, RLS-scoped entries).
 router.use(verifyUser);
 
-// API-key callers and the admin dashboard (project_admin JWT) manage the
-// project-global store with full access via the superuser pool (RLS bypassed).
-// Only genuine end users operate as their authenticated/anon identity through RLS.
-function resolveActor(req: AuthRequest): KvActor {
-  if (req.hasApiKey || req.user?.role === 'project_admin') {
-    return { mode: 'admin' };
-  }
-  if (!req.user) {
-    throw new AppError('Authentication required', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-  }
-  return { mode: 'user', ctx: req.user };
-}
-
-function parseBody<S extends z.ZodTypeAny>(schema: S, body: unknown): z.infer<S> {
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new AppError(
-      `Validation error: ${parsed.error.errors.map((e) => e.message).join(', ')}`,
-      400,
-      ERROR_CODES.INVALID_INPUT
-    );
-  }
-  return parsed.data;
-}
-
-// Validate path params against the shared KV bounds (length caps, no '/') so the
-// HTTP surface matches the exported contract instead of trusting raw req.params.
-function parseParam(schema: z.ZodType<string>, value: string, label: string): string {
-  const parsed = schema.safeParse(value);
-  if (!parsed.success) {
-    throw new AppError(
-      `Invalid ${label}: ${parsed.error.errors.map((e) => e.message).join(', ')}`,
-      400,
-      ERROR_CODES.INVALID_INPUT
-    );
-  }
-  return parsed.data;
-}
 const ns = (req: AuthRequest) => parseParam(kvNamespaceSchema, req.params.namespace, 'namespace');
 const key = (req: AuthRequest) => parseParam(kvKeySchema, req.params.key, 'key');
 

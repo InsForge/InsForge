@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
-import { z } from 'zod';
 import { AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
-import { VectorService, type VectorActor } from '@/services/vectors/vector.service.js';
+import { resolveStoreActor as resolveActor, parseBody } from '@/api/middlewares/store-actor.js';
+import { VectorService } from '@/services/vectors/vector.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
 import {
@@ -17,31 +17,6 @@ const vectorService = VectorService.getInstance();
 // Reachable by the project API key (project-global store) and app end users
 // (own, RLS-scoped collections and items).
 router.use(verifyUser);
-
-// API-key callers and the admin dashboard (project_admin JWT) manage the
-// project-global store with full access via the superuser pool (RLS bypassed).
-// Only genuine end users operate as their authenticated/anon identity through RLS.
-function resolveActor(req: AuthRequest): VectorActor {
-  if (req.hasApiKey || req.user?.role === 'project_admin') {
-    return { mode: 'admin' };
-  }
-  if (!req.user) {
-    throw new AppError('Authentication required', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-  }
-  return { mode: 'user', ctx: req.user };
-}
-
-function parseBody<S extends z.ZodTypeAny>(schema: S, body: unknown): z.infer<S> {
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new AppError(
-      `Validation error: ${parsed.error.errors.map((e) => e.message).join(', ')}`,
-      400,
-      ERROR_CODES.INVALID_INPUT
-    );
-  }
-  return parsed.data;
-}
 
 // POST /api/vectors/collections
 router.post('/collections', async (req: AuthRequest, res: Response, next: NextFunction) => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Loader2, Plus, Trash2, Eye, XCircle, KeyRound } from 'lucide-react';
 import {
   Button,
@@ -53,13 +53,19 @@ export default function KvPage() {
   const [viewKey, setViewKey] = useState<string | null>(null);
   const [viewValue, setViewValue] = useState<unknown>(null);
   const [viewLoading, setViewLoading] = useState(false);
+  // Monotonic id so a slow getValue() can't overwrite a newer view request.
+  const viewRequestId = useRef(0);
 
-  const { data: keys = [], isLoading, error } = useKvKeys(namespace);
-  const setEntry = useSetKvEntry(namespace);
-  const deleteEntry = useDeleteKvEntry(namespace);
+  // Guard against an empty namespace (e.g. the input cleared) producing invalid
+  // list/save requests.
+  const activeNamespace = namespace.trim();
+
+  const { data: keys = [], isLoading, error } = useKvKeys(activeNamespace);
+  const setEntry = useSetKvEntry(activeNamespace);
+  const deleteEntry = useDeleteKvEntry(activeNamespace);
 
   const handleSave = async () => {
-    if (!newKey.trim()) {
+    if (!newKey.trim() || !activeNamespace) {
       return;
     }
     try {
@@ -75,15 +81,23 @@ export default function KvPage() {
   };
 
   const handleView = async (key: string) => {
+    const requestId = ++viewRequestId.current;
     setViewKey(key);
     setViewLoading(true);
+    setViewValue(null);
     try {
-      const value = await kvService.getValue(namespace, key);
-      setViewValue(value);
+      const value = await kvService.getValue(activeNamespace, key);
+      if (viewRequestId.current === requestId) {
+        setViewValue(value);
+      }
     } catch {
-      setViewValue('(failed to load value)');
+      if (viewRequestId.current === requestId) {
+        setViewValue('(failed to load value)');
+      }
     } finally {
-      setViewLoading(false);
+      if (viewRequestId.current === requestId) {
+        setViewLoading(false);
+      }
     }
   };
 
@@ -151,7 +165,7 @@ export default function KvPage() {
               <Button
                 variant="primary"
                 onClick={() => void handleSave()}
-                disabled={!newKey.trim() || setEntry.isPending}
+                disabled={!newKey.trim() || !activeNamespace || setEntry.isPending}
               >
                 {setEntry.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -203,10 +217,20 @@ export default function KvPage() {
                       {formatExpiry(entry.expiresAt)}
                     </div>
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => void handleView(entry.key)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`View ${entry.key}`}
+                        onClick={() => void handleView(entry.key)}
+                      >
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(entry.key)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Delete ${entry.key}`}
+                        onClick={() => setDeleteTarget(entry.key)}
+                      >
                         <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </Button>
                     </div>

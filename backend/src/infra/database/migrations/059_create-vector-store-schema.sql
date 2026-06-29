@@ -91,6 +91,8 @@ CREATE POLICY vector_items_delete ON vectors.items
 -- ============================================================================
 -- GRANTS
 -- ============================================================================
-GRANT USAGE ON SCHEMA vectors TO authenticated, anon;
+-- Only authenticated end users get table privileges; anon has no vector access,
+-- so it needs no schema USAGE.
+GRANT USAGE ON SCHEMA vectors TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON vectors.collections TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON vectors.items TO authenticated;

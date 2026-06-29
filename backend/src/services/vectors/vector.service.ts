@@ -1,8 +1,9 @@
 import { Pool, PoolClient } from 'pg';
+import { randomUUID } from 'crypto';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EmbeddingService } from '@/services/ai/embedding.service.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
-import type { UserContext } from '@/api/middlewares/auth.js';
+import type { StoreActor } from '@/api/middlewares/store-actor.js';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import {
@@ -21,7 +22,7 @@ const OWNER_SENTINEL = '00000000-0000-0000-0000-000000000000';
 
 type Queryable = Pool | PoolClient;
 
-export type VectorActor = { mode: 'admin' } | { mode: 'user'; ctx: UserContext };
+export type VectorActor = StoreActor;
 
 interface CollectionRow {
   id: string;
@@ -251,48 +252,40 @@ export class VectorService {
     collectionName: string,
     items: VectorUpsertItem[]
   ): Promise<string[]> {
+    // Resolve the collection under the actor's context (RLS) first, then embed
+    // outside any DB transaction so the provider HTTP call never holds a
+    // connection open.
+    const collection = await this.run(actor, (db, ownerId) =>
+      this.resolveCollection(db, collectionName, ownerId)
+    );
+    const embeddings = await this.resolveEmbeddings(items, collection.dimension);
+
+    // Pre-generate ids so the returned order matches the input and an
+    // explicit-id upsert is idempotent via ON CONFLICT (id) DO UPDATE.
+    const ids = items.map((item) => item.id ?? randomUUID());
+
     return this.run(actor, async (db, ownerId) => {
-      const collection = await this.resolveCollection(db, collectionName, ownerId);
-      const embeddings = await this.resolveEmbeddings(items, collection.dimension);
-
-      const ids: string[] = [];
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const literal = toVectorLiteral(embeddings[i]);
-        const metadata = JSON.stringify(item.metadata ?? {});
-        const content = item.content ?? null;
-
-        if (item.id) {
-          // Caller-supplied id: update the existing owned row, else insert it.
-          const updated = await db.query(
-            `UPDATE vectors.items
-                SET embedding = $1::vector, content = $2, metadata = $3::jsonb
-              WHERE id = $4 AND collection_id = $5
-                AND COALESCE(owner_id, $6::uuid) = COALESCE($7::uuid, $6::uuid)
-            RETURNING id`,
-            [literal, content, metadata, item.id, collection.id, OWNER_SENTINEL, ownerId]
-          );
-          if (updated.rows.length) {
-            ids.push(updated.rows[0].id);
-            continue;
-          }
-          const inserted = await db.query(
-            `INSERT INTO vectors.items (id, collection_id, embedding, content, metadata, owner_id)
-             VALUES ($1, $2, $3::vector, $4, $5::jsonb, $6::uuid)
-             RETURNING id`,
-            [item.id, collection.id, literal, content, metadata, ownerId]
-          );
-          ids.push(inserted.rows[0].id);
-        } else {
-          const inserted = await db.query(
-            `INSERT INTO vectors.items (collection_id, embedding, content, metadata, owner_id)
-             VALUES ($1, $2::vector, $3, $4::jsonb, $5::uuid)
-             RETURNING id`,
-            [collection.id, literal, content, metadata, ownerId]
-          );
-          ids.push(inserted.rows[0].id);
-        }
-      }
+      // Single multi-row upsert so the whole batch commits or rolls back together.
+      const params: unknown[] = [collection.id, ownerId];
+      const rows = items.map((item, i) => {
+        const base = params.length;
+        params.push(
+          ids[i],
+          toVectorLiteral(embeddings[i]),
+          item.content ?? null,
+          JSON.stringify(item.metadata ?? {})
+        );
+        return `($${base + 1}, $1, $${base + 2}::vector, $${base + 3}, $${base + 4}::jsonb, $2::uuid)`;
+      });
+      await db.query(
+        `INSERT INTO vectors.items (id, collection_id, embedding, content, metadata, owner_id)
+         VALUES ${rows.join(', ')}
+         ON CONFLICT (id) DO UPDATE SET
+           embedding = EXCLUDED.embedding,
+           content = EXCLUDED.content,
+           metadata = EXCLUDED.metadata`,
+        params
+      );
       return ids;
     });
   }

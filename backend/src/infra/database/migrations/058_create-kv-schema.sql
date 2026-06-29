@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS kv.entries (
 CREATE UNIQUE INDEX IF NOT EXISTS uq_kv_entries_owner_ns_key
   ON kv.entries (namespace, key, COALESCE(owner_id, '00000000-0000-0000-0000-000000000000'::uuid));
 
-CREATE INDEX IF NOT EXISTS idx_kv_entries_lookup ON kv.entries (namespace, key);
+-- (namespace, key) lookups are already served by the unique index above as a
+-- left-prefix B-tree scan, so no separate (namespace, key) index is needed.
 -- Partial index supports the TTL sweep without bloating it with non-expiring rows.
 CREATE INDEX IF NOT EXISTS idx_kv_entries_expires_at
   ON kv.entries (expires_at) WHERE expires_at IS NOT NULL;

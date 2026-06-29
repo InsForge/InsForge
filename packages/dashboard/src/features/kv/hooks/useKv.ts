@@ -9,6 +9,8 @@ export function useKvKeys(namespace: string) {
   return useQuery({
     queryKey: [KV_KEYS_QUERY_KEY, namespace],
     queryFn: () => kvService.listKeys(namespace),
+    // Skip the request when there is no namespace (e.g. the input was cleared).
+    enabled: namespace.length > 0,
     staleTime: 30 * 1000,
     retry: false,
   });

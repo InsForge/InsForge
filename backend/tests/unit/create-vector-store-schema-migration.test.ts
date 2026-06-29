@@ -60,8 +60,11 @@ describe('create vector store schema migration', () => {
     for (const policy of [
       'vector_collections_select',
       'vector_collections_insert',
+      'vector_collections_delete',
       'vector_items_select',
       'vector_items_insert',
+      'vector_items_update',
+      'vector_items_delete',
     ]) {
       const dropIdx = sql.indexOf(`DROP POLICY IF EXISTS ${policy}`);
       const createIdx = sql.indexOf(`CREATE POLICY ${policy}`);
