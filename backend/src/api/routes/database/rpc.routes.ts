@@ -60,7 +60,7 @@ const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: Next
     const result =
       req.user?.role === 'project_admin' || req.hasApiKey === true
         ? await proxyService.forwardAsAdmin(proxyRequest)
-        : req.user
+        : req.user && req.user.role !== 'anon'
           ? await proxyService.forwardAsUser(proxyRequest, req.user)
           : await proxyService.forwardAsAnon(proxyRequest);
 
