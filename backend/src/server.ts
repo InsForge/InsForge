@@ -22,6 +22,7 @@ import { deploymentsRouter } from '@/api/routes/deployments/index.routes.js';
 import { webhooksRouter } from '@/api/routes/webhooks/index.routes.js';
 import { s3GatewayRouter } from '@/api/routes/s3-gateway/index.routes.js';
 import { paymentsRouter } from '@/api/routes/payments/index.routes.js';
+import { advisorRouter } from '@/api/routes/advisor/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
@@ -42,6 +43,7 @@ import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
 import { webscraperRouter } from '@/api/routes/webscraper/index.routes.js';
 import { appConfig } from '@/infra/config/app.config.js';
+import { TelemetryService } from '@/services/telemetry/telemetry.service.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -205,6 +207,7 @@ export async function createApp() {
   apiRouter.use('/compute/services', servicesRouter);
   apiRouter.use('/analytics', analyticsRouter);
   apiRouter.use('/webscraper', webscraperRouter);
+  apiRouter.use('/advisor', advisorRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
@@ -329,6 +332,8 @@ async function initializeServer() {
         error: err instanceof Error ? err.message : String(err),
       });
     });
+
+    TelemetryService.getInstance().start();
   } catch (error) {
     logger.error('Failed to initialize server', {
       error: error instanceof Error ? error.message : String(error),
@@ -366,6 +371,14 @@ async function cleanup() {
     oAuthPKCEService.destroy();
   } catch (error) {
     logger.error('Error closing OAuthPKCEService', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
+    TelemetryService.getInstance().stop();
+  } catch (error) {
+    logger.error('Error closing TelemetryService', {
       error: error instanceof Error ? error.message : String(error),
     });
   }

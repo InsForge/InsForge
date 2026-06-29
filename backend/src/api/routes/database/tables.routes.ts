@@ -44,8 +44,14 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
     }
 
     const schemaName = normalizeDatabaseSchemaName(req.query.schema);
-    const { tableName, columns, rlsEnabled } = validation.data;
-    const result = await tableService.createTable(schemaName, tableName, columns, rlsEnabled);
+    const { tableName, columns, foreignKeys, rlsEnabled } = validation.data;
+    const result = await tableService.createTable(
+      schemaName,
+      tableName,
+      columns,
+      foreignKeys,
+      rlsEnabled
+    );
 
     DatabaseManager.clearColumnTypeCache(tableName, schemaName);
 

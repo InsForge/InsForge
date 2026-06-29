@@ -12,7 +12,6 @@ import {
   DataGrid,
   DataGridEmptyState,
   TypeBadge,
-  type CellMouseEvent,
   type CellClickArgs,
   type RenderCellProps,
   type RenderHeaderCellProps,
@@ -29,20 +28,23 @@ import { convertSchemaToColumns } from './DatabaseDataGrid';
 import { formatValueForDisplay } from '#lib/utils/utils';
 import { ColumnType } from '@insforge/shared-schemas';
 import { AUTH_USERS_TABLE, authUsersSchema } from '#features/database/constants';
-import { parseDatabaseTableReference } from '#features/database/helpers';
+import { getPrimaryKeyColumns, parseDatabaseTableReference } from '#features/database/helpers';
 
 const PAGE_SIZE = 50;
 
+// Non-printable delimiter that cannot appear in PG text values
+const ROW_KEY_DELIMITER = '\x00';
+
 interface LinkRecordDialogProps {
   referenceTable: string;
-  referenceColumn: string;
+  fkColumns: { sourceColumn: string; referenceColumn: string }[];
   onSelectRecord: (record: DatabaseRecord) => void;
   children: (openDialog: () => void) => ReactNode;
 }
 
 export function LinkRecordDialog({
   referenceTable,
-  referenceColumn,
+  fkColumns,
   onSelectRecord,
   children,
 }: LinkRecordDialogProps) {
@@ -91,6 +93,22 @@ export function LinkRecordDialog({
     !isAuthUsers && open
   );
 
+  // Determine PK columns for stable row key derivation. auth.users is keyed by id;
+  // DB tables reuse the shared PK helper (full composite key, falling back to id).
+  const pkColumns = useMemo(
+    () => (isAuthUsers ? ['id'] : getPrimaryKeyColumns(fetchedSchema?.columns)),
+    [isAuthUsers, fetchedSchema]
+  );
+
+  // Build a stable encoded key from a record's PK column values.
+  // Uses \x00 as delimiter since PG text cannot contain null bytes.
+  const getRowKey = useCallback(
+    (record: DatabaseRecord): string => {
+      return pkColumns.map((col) => String(record[col] ?? '')).join(ROW_KEY_DELIMITER);
+    },
+    [pkColumns]
+  );
+
   // Combine data from either source
   const recordsData = useMemo(() => {
     if (isAuthUsers) {
@@ -127,37 +145,22 @@ export function LinkRecordDialog({
   const totalRecords = recordsData?.totalRecords || 0;
   const totalPages = Math.ceil(totalRecords / PAGE_SIZE);
 
-  // Create selected rows set for highlighting
+  // Create selected rows set using stable PK-derived keys
   const selectedRows = useMemo(() => {
     if (!selectedRecord) {
       return new Set<string>();
     }
-    return new Set([String(selectedRecord.id || '')]);
-  }, [selectedRecord]);
+    return new Set([getRowKey(selectedRecord)]);
+  }, [selectedRecord, getRowKey]);
 
-  // Handle cell click to select record - only for reference column
-  const handleCellClick = useCallback(
-    (args: CellClickArgs<DataGridRowType>, event: CellMouseEvent) => {
-      // Only allow selection when clicking on the reference column
-      if (args.column.key !== referenceColumn) {
-        // Prevent the default selection behavior for non-reference columns
-        event?.preventDefault();
-        event?.stopPropagation();
-        return;
-      }
-
-      const record = records.find((r: DatabaseRecord) => String(r.id) === String(args.row.id));
-      if (record) {
-        setSelectedRecord(record);
-      }
-    },
-    [records, referenceColumn]
-  );
+  // Handle cell click to select record
+  const handleCellClick = useCallback((args: CellClickArgs<DataGridRowType>) => {
+    setSelectedRecord(args.row as DatabaseRecord);
+  }, []);
 
   // Convert schema to columns for the DataGrid with visual distinction
   const columns = useMemo(() => {
     const cols = convertSchemaToColumns(schema);
-    // Add visual indication for the reference column (clickable column)
     return cols.map((col) => {
       const baseCol = {
         ...col,
@@ -168,52 +171,23 @@ export function LinkRecordDialog({
       };
 
       // Helper function to render cell value properly based on type
-      // Accepts DatabaseRecord value type and converts to display string
       const renderCellValue = (
         value: ConvertedValue | { [key: string]: string }[],
         type: ColumnType | undefined
       ): string => {
-        // For JSON type, if value is already an object/array, stringify it for formatValueForDisplay
         if (type === ColumnType.JSON && value !== null && typeof value === 'object') {
           return formatValueForDisplay(JSON.stringify(value), type);
         }
         return formatValueForDisplay(value as ConvertedValue, type);
       };
 
-      if (col.key === referenceColumn) {
-        return {
-          ...baseCol,
-          renderCell: (props: RenderCellProps<DataGridRowType>) => {
-            const displayValue = renderCellValue(props.row[col.key], col.type);
-            return (
-              <div className="w-full h-full flex items-center cursor-pointer">
-                <span className="truncate font-medium" title={displayValue}>
-                  {displayValue}
-                </span>
-              </div>
-            );
-          },
-          renderHeaderCell: (props: RenderHeaderCellProps<DataGridRowType>) => (
-            <SortableHeaderRenderer
-              column={col}
-              sortDirection={props.sortDirection}
-              columnType={col.type}
-              showTypeBadge={true}
-              mutedHeader={false}
-            />
-          ),
-        };
-      }
-
       return {
         ...baseCol,
-        cellClass: 'link-record-dialog-disabled-cell',
         renderCell: (props: RenderCellProps<DataGridRowType>) => {
           const displayValue = renderCellValue(props.row[col.key], col.type);
           return (
-            <div className="w-full h-full flex items-center cursor-not-allowed relative">
-              <div className="absolute inset-0 pointer-events-none opacity-0 hover:opacity-10 bg-gray-200 dark:bg-gray-600 transition-opacity z-5" />
-              <span className="truncate dark:text-zinc-300 opacity-70" title={displayValue}>
+            <div className="w-full h-full flex items-center cursor-pointer">
+              <span className="truncate font-medium" title={displayValue}>
                 {displayValue}
               </span>
             </div>
@@ -225,12 +199,12 @@ export function LinkRecordDialog({
             sortDirection={props.sortDirection}
             columnType={col.type}
             showTypeBadge={true}
-            mutedHeader={true}
+            mutedHeader={false}
           />
         ),
       };
     });
-  }, [schema, referenceColumn]);
+  }, [schema]);
 
   const handleConfirmSelection = () => {
     if (selectedRecord) {
@@ -258,7 +232,7 @@ export function LinkRecordDialog({
                 Select a record to reference from
               </span>
               <TypeBadge
-                type={`${referenceTable}.${referenceColumn}`}
+                type={`${referenceTable}.${fkColumns.map((c) => c.referenceColumn).join(',')}`}
                 className="dark:bg-neutral-700"
               />
             </div>
@@ -281,12 +255,12 @@ export function LinkRecordDialog({
               data={records}
               columns={columns}
               loading={isLoading && !records.length}
+              rowKeyGetter={getRowKey}
               selectedRows={selectedRows}
               onSelectedRowsChange={(newSelectedRows) => {
-                // Handle selection changes from cell clicks
                 const selectedId = Array.from(newSelectedRows)[0];
                 if (selectedId) {
-                  const record = records.find((r: DatabaseRecord) => String(r.id) === selectedId);
+                  const record = records.find((r) => getRowKey(r) === selectedId);
                   if (record) {
                     setSelectedRecord(record);
                   }

@@ -151,6 +151,16 @@ export class FunctionService {
     // Validate only platform contract constraints; runtime security is enforced by the runtime/provider.
     this.validateCode(code);
 
+    // Static pre-deploy check (deno check): reject syntax/type errors — e.g. a
+    // duplicate top-level declaration — up front, with the offending file:line.
+    // Such code builds fine but throws "Identifier '...' has already been
+    // declared" at isolate warm-up; because all active functions ship as a
+    // single Deno revision, one bad function would otherwise fail every deploy
+    // for the whole project (issue #1594). No-op in local mode (self-gating).
+    if (status === 'active') {
+      await this.denoSubhostingProvider.checkCode(code, slug);
+    }
+
     // Save to DB (release client before deployment polling)
     let created: FunctionSchema;
     const client = await this.getPool().connect();
@@ -217,9 +227,34 @@ export class FunctionService {
     slug: string,
     updates: UpdateFunctionRequest
   ): Promise<{ function: FunctionSchema; deployment?: DeploymentResult | null } | null> {
-    // Validate code if provided
+    // Validate platform contract constraints (cheap, regex-only) if code given.
     if (updates.code !== undefined) {
       this.validateCode(updates.code);
+    }
+
+    // Fetch current code/status up front — both to confirm the function exists
+    // before doing any expensive checking, and to run the static pre-deploy
+    // check against the code that will actually be deployed.
+    const existing = await this.getPool().query<{ code: string; status: string }>(
+      'SELECT code, status FROM functions.definitions WHERE slug = $1',
+      [slug]
+    );
+    if (existing.rows.length === 0) {
+      return null;
+    }
+    const effectiveStatus = updates.status ?? existing.rows[0].status;
+    const effectiveCode = updates.code ?? existing.rows[0].code;
+
+    // Static pre-deploy check (issue #1594): run whenever the function will be
+    // active AND its code or active-state is changing — so neither a code edit
+    // nor a status-only activation can push unchecked code into the shared Deno
+    // revision and wedge every deploy. Inactive drafts are left alone, matching
+    // createFunction (which only checks active functions).
+    if (
+      effectiveStatus === 'active' &&
+      (updates.code !== undefined || updates.status === 'active')
+    ) {
+      await this.denoSubhostingProvider.checkCode(effectiveCode, slug);
     }
 
     // Save to DB (release client before deployment polling)
@@ -227,14 +262,6 @@ export class FunctionService {
     const shouldDeploy = updates.code !== undefined || updates.status !== undefined;
     const client = await this.getPool().connect();
     try {
-      const existingResult = await client.query(
-        'SELECT id FROM functions.definitions WHERE slug = $1',
-        [slug]
-      );
-      if (existingResult.rows.length === 0) {
-        return null;
-      }
-
       if (updates.name !== undefined) {
         await client.query('UPDATE functions.definitions SET name = $1 WHERE slug = $2', [
           updates.name,
@@ -281,6 +308,11 @@ export class FunctionService {
         FROM functions.definitions WHERE slug = $1`,
         [slug]
       );
+      // Guard the rare race where the function is deleted between the existence
+      // check above and this update.
+      if (result.rows.length === 0) {
+        return null;
+      }
       updated = result.rows[0];
     } catch (error) {
       logger.error('Failed to update function', {

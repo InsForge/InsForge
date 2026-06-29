@@ -3,6 +3,7 @@ import { ERROR_CODES } from '@insforge/shared-schemas';
 import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import { z } from 'zod';
+import ts from 'typescript';
 import fetch, { RequestInit, Response } from 'node-fetch';
 import { execFile } from 'node:child_process';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
@@ -405,6 +406,26 @@ export class DenoSubhostingProvider {
     }
 
     const transformed = this.transformUserCode(userCode, slug);
+
+    // Deno-free static check (works even where the `deno` binary is absent —
+    // e.g. CI and minimal deploy images, where the `deno check` below skips).
+    // Rejects duplicate declarations / fatal syntax errors that build fine but
+    // fail isolate warm-up with "Identifier '...' has already been declared",
+    // which surfaces only as the opaque "Event iterator validation failed"
+    // (issue #1594). Without this floor, such code would wedge every deploy.
+    // Check the user's own source so reported line numbers match what they
+    // wrote (the transform only prepends a header / legacy shim).
+    const fatal = this.detectFatalCodeErrors(userCode);
+    if (fatal.length > 0) {
+      throw new AppError(
+        `Edge function "${slug}" was not deployed — its code would fail to start:\n${fatal
+          .map((f) => `  • ${f}`)
+          .join('\n')}`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
     const tempDir = await mkdtemp(join(tmpdir(), 'insforge-deno-check-'));
 
     try {
@@ -448,6 +469,79 @@ export class DenoSubhostingProvider {
     } finally {
       await rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
+  }
+
+  /**
+   * Deno-free detector for the fatal code errors that fail isolate warm-up:
+   * duplicate top-level declarations (issue #1594) and true syntax errors.
+   *
+   * Uses the TypeScript binder (already a dependency) so it runs without the
+   * `deno` binary. Semantic diagnostics are filtered to redeclaration /
+   * duplicate-identifier codes so Deno-specific type noise (npm: imports, Deno
+   * globals, missing DOM lib) does NOT cause false positives; syntactic
+   * diagnostics are always fatal and never fire on valid code.
+   */
+  private detectFatalCodeErrors(code: string): string[] {
+    const fileName = 'func.ts';
+    const sourceFile = ts.createSourceFile(
+      fileName,
+      code,
+      ts.ScriptTarget.ESNext,
+      true,
+      ts.ScriptKind.TS
+    );
+    const host: ts.CompilerHost = {
+      getSourceFile: (name) => (name === fileName ? sourceFile : undefined),
+      writeFile: () => {},
+      getDefaultLibFileName: () => 'lib.d.ts',
+      fileExists: (name) => name === fileName,
+      readFile: (name) => (name === fileName ? code : undefined),
+      getCurrentDirectory: () => '/',
+      getCanonicalFileName: (name) => name,
+      useCaseSensitiveFileNames: () => true,
+      getNewLine: () => '\n',
+    };
+    const program = ts.createProgram(
+      [fileName],
+      {
+        noEmit: true,
+        noLib: true,
+        skipLibCheck: true,
+        noResolve: true,
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        types: [],
+      },
+      host
+    );
+
+    // 2300 Duplicate identifier; 2403 subsequent var declarations must match;
+    // 2440 import conflicts with local declaration; 2451 Cannot redeclare
+    // block-scoped variable — the family V8 reports as "already been declared".
+    const REDECLARE_CODES = new Set([2300, 2403, 2440, 2451]);
+    const diagnostics = [
+      ...program.getSyntacticDiagnostics(sourceFile),
+      ...program.getSemanticDiagnostics(sourceFile).filter((d) => REDECLARE_CODES.has(d.code)),
+    ];
+
+    return diagnostics.map((d) => {
+      const message = ts.flattenDiagnosticMessageText(d.messageText, '\n');
+      let where = '';
+      if (d.file && typeof d.start === 'number') {
+        const { line, character } = d.file.getLineAndCharacterOfPosition(d.start);
+        where = ` (line ${line + 1}, column ${character + 1})`;
+      }
+      // Turn the compiler diagnostic into an actionable message naming the
+      // duplicated identifier and telling the user how to fix it.
+      if (REDECLARE_CODES.has(d.code)) {
+        const name = message.match(/'([^']+)'/)?.[1];
+        return name
+          ? `"${name}" is declared more than once${where}. Please change one of them to another name and redeploy.`
+          : `A name is declared more than once${where}. Please change one of them to another name and redeploy.`;
+      }
+      return `Syntax error${where}: ${message}`;
+    });
   }
 
   /**

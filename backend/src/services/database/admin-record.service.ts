@@ -1,6 +1,6 @@
 import { AppError } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { ERROR_CODES, type AdminTableRecordPrimaryKey } from '@insforge/shared-schemas';
 import type { PoolClient } from 'pg';
 import type { DatabaseRecord } from '@/types/database.js';
 import { TEXT_LIKE_DATA_TYPES } from '@/utils/constants.js';
@@ -76,19 +76,30 @@ export class AdminRecordService {
   async lookupRecord(
     schemaName: string,
     tableName: string,
-    columnName: string,
-    value: string
+    columns: string[],
+    values: string[]
   ): Promise<DatabaseRecord | null> {
     validateTableName(tableName);
 
+    if (columns.length === 0 || columns.length !== values.length) {
+      throw new AppError(
+        'Columns and values must have the same non-zero length',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
     return this.withAdminTransaction(async (client) => {
       const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
-      this.assertColumnExists(metadata, columnName);
+      for (const col of columns) {
+        this.assertColumnExists(metadata, col);
+      }
 
       const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
+      const whereClauses = columns.map((col, i) => `${quoteIdentifier(col)} = $${i + 1}`);
       const result = await client.query<DatabaseRecord>(
-        `SELECT * FROM ${qualifiedTableName} WHERE ${quoteIdentifier(columnName)} = $1 LIMIT 1`,
-        [value]
+        `SELECT * FROM ${qualifiedTableName} WHERE ${whereClauses.join(' AND ')} LIMIT 1`,
+        values
       );
 
       return result.rows[0] ?? null;
@@ -137,15 +148,29 @@ export class AdminRecordService {
   async updateRecord(
     schemaName: string,
     tableName: string,
-    pkColumn: string,
-    pkValue: string,
+    primaryKey: AdminTableRecordPrimaryKey,
     data: DatabaseRecord
   ): Promise<DatabaseRecord> {
     validateTableName(tableName);
 
+    const keyEntries = Object.entries(primaryKey);
+    if (keyEntries.length === 0) {
+      throw new AppError(
+        'Primary key is required to update a record.',
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        'Provide at least one primary key column and value.'
+      );
+    }
+
     return this.withAdminTransaction(async (client) => {
       const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
-      this.assertColumnExists(metadata, pkColumn);
+      const primaryKeyColumns = await this.getPrimaryKeyColumns(schemaName, tableName, client);
+      keyEntries.forEach(([columnName]) => this.assertColumnExists(metadata, columnName));
+      this.assertKeyMatchesPrimaryKey(
+        primaryKeyColumns,
+        keyEntries.map(([columnName]) => columnName)
+      );
 
       const sanitizedRecord = this.sanitizeUpdateRecord(data, metadata);
       const entries = Object.entries(sanitizedRecord);
@@ -162,12 +187,24 @@ export class AdminRecordService {
       const assignments = entries.map(
         ([columnName], index) => `${quoteIdentifier(columnName)} = $${index + 1}`
       );
-      const values = entries.map(([, value]) => value);
-      values.push(pkValue);
+      const values: unknown[] = entries.map(([, value]) => value);
+
+      // WHERE matches the full primary-key tuple so composite keys target exactly one row.
+      // A null component (only possible on the keyless all-columns fallback) is matched
+      // with `IS NULL`, since `col = NULL` never matches.
+      const whereClauses = keyEntries.map(([columnName, value]) => {
+        if (value === null) {
+          return `${quoteIdentifier(columnName)} IS NULL`;
+        }
+        values.push(value);
+        return `${quoteIdentifier(columnName)} = $${values.length}`;
+      });
 
       const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
       const result = await client.query<DatabaseRecord>(
-        `UPDATE ${qualifiedTableName} SET ${assignments.join(', ')} WHERE ${quoteIdentifier(pkColumn)} = $${values.length} RETURNING *`,
+        `UPDATE ${qualifiedTableName} SET ${assignments.join(', ')} WHERE ${whereClauses.join(
+          ' AND '
+        )} RETURNING *`,
         values
       );
 
@@ -188,24 +225,53 @@ export class AdminRecordService {
   async deleteRecords(
     schemaName: string,
     tableName: string,
-    pkColumn: string,
-    pkValues: string[]
+    primaryKeys: AdminTableRecordPrimaryKey[]
   ): Promise<number> {
     validateTableName(tableName);
 
     return this.withAdminTransaction(async (client) => {
       const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
-      this.assertColumnExists(metadata, pkColumn);
+      const primaryKeyColumns = await this.getPrimaryKeyColumns(schemaName, tableName, client);
 
-      if (pkValues.length === 0) {
+      if (primaryKeys.length === 0) {
         return 0;
       }
 
-      const placeholders = pkValues.map((_, index) => `$${index + 1}`);
+      const values: unknown[] = [];
+      // Each selected row is matched by its full primary-key tuple, OR'd together,
+      // so composite keys delete exactly the selected rows (not WHERE first_col IN (...)).
+      const rowClauses = primaryKeys.map((primaryKey) => {
+        const keyEntries = Object.entries(primaryKey);
+        if (keyEntries.length === 0) {
+          throw new AppError(
+            'Primary key is required to delete a record.',
+            400,
+            ERROR_CODES.INVALID_INPUT,
+            'Provide at least one primary key column and value for each record.'
+          );
+        }
+
+        keyEntries.forEach(([columnName]) => this.assertColumnExists(metadata, columnName));
+        this.assertKeyMatchesPrimaryKey(
+          primaryKeyColumns,
+          keyEntries.map(([columnName]) => columnName)
+        );
+
+        const columnClauses = keyEntries.map(([columnName, value]) => {
+          if (value === null) {
+            return `${quoteIdentifier(columnName)} IS NULL`;
+          }
+          values.push(value);
+          return `${quoteIdentifier(columnName)} = $${values.length}`;
+        });
+
+        return `(${columnClauses.join(' AND ')})`;
+      });
+
       const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
       const result = await client.query(
-        `DELETE FROM ${qualifiedTableName} WHERE ${quoteIdentifier(pkColumn)} IN (${placeholders.join(', ')})`,
-        pkValues
+        `DELETE FROM ${qualifiedTableName} WHERE ${rowClauses.join(' OR ')}`,
+        values
       );
 
       return result.rowCount ?? 0;
@@ -305,6 +371,62 @@ export class AdminRecordService {
       nullableColumns,
       searchableColumns,
     };
+  }
+
+  /**
+   * Fetches a table's primary-key columns (ordinal order). Returns an empty array
+   * only when the table genuinely has no primary key. Mutations call this directly,
+   * so an empty result can never be confused with "metadata wasn't loaded".
+   */
+  private async getPrimaryKeyColumns(
+    schemaName: string,
+    tableName: string,
+    client: PoolClient
+  ): Promise<string[]> {
+    const result = await client.query<{ column_name: string }>(
+      `
+        SELECT kcu.column_name
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+          ON tc.constraint_name = kcu.constraint_name
+          AND tc.table_schema = kcu.table_schema
+          AND tc.table_name = kcu.table_name
+        WHERE tc.constraint_type = 'PRIMARY KEY'
+          AND tc.table_schema = $1
+          AND tc.table_name = $2
+        ORDER BY kcu.ordinal_position
+      `,
+      [schemaName, tableName]
+    );
+
+    return result.rows.map((row) => row.column_name);
+  }
+
+  /**
+   * Ensures the supplied key columns are exactly the table's primary key, so a
+   * partial composite key (e.g. only `tenant_id` of a `(tenant_id, item_id)` key)
+   * can't match and mutate more rows than intended. Tables with no detected
+   * primary key (empty `primaryKeyColumns`) fall back to the caller-provided
+   * columns (validated for existence elsewhere).
+   */
+  private assertKeyMatchesPrimaryKey(primaryKeyColumns: string[], suppliedColumns: string[]): void {
+    if (primaryKeyColumns.length === 0) {
+      return;
+    }
+
+    const suppliedSet = new Set(suppliedColumns);
+    const matchesFullKey =
+      suppliedSet.size === primaryKeyColumns.length &&
+      primaryKeyColumns.every((column) => suppliedSet.has(column));
+
+    if (!matchesFullKey) {
+      throw new AppError(
+        'Primary key does not match the table primary key.',
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        `Provide exactly these primary key columns: ${primaryKeyColumns.join(', ')}.`
+      );
+    }
   }
 
   private buildWhereClause(

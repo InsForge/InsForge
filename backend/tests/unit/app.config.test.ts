@@ -89,6 +89,48 @@ describe('config.app', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Section: telemetry
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('config.telemetry', () => {
+  it('enables anonymous telemetry by default', () => {
+    unsetEnvKeys(
+      'INSFORGE_TELEMETRY_DISABLED',
+      'INSFORGE_TELEMETRY_DEBUG',
+      'INSFORGE_TELEMETRY_ENDPOINT',
+      'INSFORGE_TELEMETRY_POSTHOG_API_KEY',
+      'INSFORGE_TELEMETRY_INSTALLATION_ID_PATH',
+      'INSFORGE_TELEMETRY_HEARTBEAT_INTERVAL_MS',
+      'INSFORGE_TELEMETRY_REQUEST_TIMEOUT_MS',
+      'LOGS_DIR'
+    );
+    const c = loadConfig();
+
+    expect(c.telemetry).toEqual({ disabled: false });
+  });
+
+  it('only exposes the telemetry disabled env var', () => {
+    process.env.INSFORGE_TELEMETRY_DISABLED = 'true';
+    process.env.INSFORGE_TELEMETRY_DEBUG = '1';
+    process.env.INSFORGE_TELEMETRY_ENDPOINT = 'https://events.example.com/v1';
+    process.env.INSFORGE_TELEMETRY_POSTHOG_API_KEY = 'phc_custom';
+    process.env.INSFORGE_TELEMETRY_INSTALLATION_ID_PATH = '/tmp/insforge-id';
+    process.env.INSFORGE_TELEMETRY_HEARTBEAT_INTERVAL_MS = '60000';
+    process.env.INSFORGE_TELEMETRY_REQUEST_TIMEOUT_MS = '500';
+    const c = loadConfig();
+
+    expect(c.telemetry).toEqual({ disabled: true });
+  });
+
+  it('disables telemetry with the documented opt-out value', () => {
+    process.env.INSFORGE_TELEMETRY_DISABLED = '1';
+    const c = loadConfig();
+
+    expect(c.telemetry).toEqual({ disabled: true });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Section: cloud
 // ═══════════════════════════════════════════════════════════════════════════
 

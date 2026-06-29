@@ -120,23 +120,24 @@ export function TableForm({
         })),
       });
 
-      // Set foreign keys from editTable
-      const existingForeignKeys = editTable.columns
-        .filter((col) => !SYSTEM_FIELDS.includes(col.columnName) && col.foreignKey)
-        .map((col) => {
-          const referenceTableValue = col.foreignKey?.referenceTable ?? '';
-          const { schemaName: referenceSchemaName, tableName: referenceTableName } =
-            parseDatabaseTableReference(referenceTableValue, schemaName);
+      // Set foreign keys from editTable (one entry per table-level constraint)
+      const existingForeignKeys = (editTable.foreignKeys ?? []).map((fk) => {
+        const { schemaName: referenceSchemaName, tableName: referenceTableName } =
+          parseDatabaseTableReference(fk.referenceTable, schemaName);
 
-          return {
-            columnName: col.columnName,
-            referenceTable:
-              referenceSchemaName === schemaName ? referenceTableName : referenceTableValue,
-            referenceColumn: col.foreignKey?.referenceColumn ?? '',
-            onDelete: col.foreignKey?.onDelete || 'NO ACTION',
-            onUpdate: col.foreignKey?.onUpdate || 'NO ACTION',
-          };
-        });
+        return {
+          constraintName: fk.constraintName,
+          // Stable identity: an existing constraint is uniquely identified by its name.
+          uid: fk.constraintName ?? crypto.randomUUID(),
+          // Primary source column, used only to associate the FK with a column row in the UI.
+          columnName: fk.referenceColumns[0]?.sourceColumn ?? '',
+          referenceTable:
+            referenceSchemaName === schemaName ? referenceTableName : fk.referenceTable,
+          referenceColumns: fk.referenceColumns,
+          onDelete: fk.onDelete || 'NO ACTION',
+          onUpdate: fk.onUpdate || 'NO ACTION',
+        };
+      });
       setForeignKeys(existingForeignKeys);
     } else {
       form.reset({
@@ -208,29 +209,24 @@ export function TableForm({
 
   const createTableMutation = useMutation({
     mutationFn: (data: TableFormSchema) => {
-      const columns = data.columns.map((col) => {
-        // Find foreign key for this field if it exists
-        const foreignKey = foreignKeys.find((fk) => fk.columnName === col.columnName);
+      const columns = data.columns.map((col) => ({
+        columnName: col.columnName,
+        type: col.type,
+        isPrimaryKey: col.isPrimaryKey,
+        isNullable: col.isNullable,
+        isUnique: col.isUnique,
+        defaultValue: col.defaultValue,
+      }));
 
-        return {
-          columnName: col.columnName,
-          type: col.type,
-          isNullable: col.isNullable,
-          isUnique: col.isUnique,
-          defaultValue: col.defaultValue,
-          // Embed foreign key information directly in the column
-          ...(foreignKey && {
-            foreignKey: {
-              referenceTable: foreignKey.referenceTable,
-              referenceColumn: foreignKey.referenceColumn,
-              onDelete: foreignKey.onDelete,
-              onUpdate: foreignKey.onUpdate,
-            },
-          }),
-        };
-      });
+      // Foreign keys are table-level: one entity per constraint.
+      const tableForeignKeys = foreignKeys.map((fk) => ({
+        referenceTable: fk.referenceTable,
+        referenceColumns: fk.referenceColumns,
+        onDelete: fk.onDelete,
+        onUpdate: fk.onUpdate,
+      }));
 
-      return tableService.createTable(schemaName, data.tableName, columns);
+      return tableService.createTable(schemaName, data.tableName, columns, tableForeignKeys);
     },
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['database-metadata'] });
@@ -314,48 +310,28 @@ export function TableForm({
         }
       });
 
-      // Handle foreign keys
-      // Get existing foreign keys from editTable
-      const existingForeignKeys = existingUserColumns
-        .filter((col) => col.foreignKey)
-        .map((col) => {
-          const referenceTableValue = col.foreignKey?.referenceTable ?? '';
-          const { schemaName: referenceSchemaName, tableName: referenceTableName } =
-            parseDatabaseTableReference(referenceTableValue, schemaName);
+      // Handle foreign keys, identified by constraint name (table-level entities).
+      const existingForeignKeys = editTable.foreignKeys ?? [];
+      const formConstraintNames = new Set(
+        foreignKeys.map((fk) => fk.constraintName).filter(Boolean)
+      );
 
-          return {
-            columnName: col.columnName,
-            referenceTable:
-              referenceSchemaName === schemaName ? referenceTableName : referenceTableValue,
-            referenceColumn: col.foreignKey?.referenceColumn ?? '',
-            onDelete: col.foreignKey?.onDelete || 'NO ACTION',
-            onUpdate: col.foreignKey?.onUpdate || 'NO ACTION',
-          };
-        });
-
-      // Compare with new foreign keys
+      // Newly added FKs have no constraint name yet → add them.
       foreignKeys.forEach((fk) => {
-        const existingFK = existingForeignKeys.find((efk) => efk.columnName === fk.columnName);
-
-        if (!existingFK) {
+        if (!fk.constraintName) {
           addForeignKeys.push({
-            columnName: fk.columnName,
-            foreignKey: {
-              referenceTable: fk.referenceTable,
-              referenceColumn: fk.referenceColumn,
-              onDelete: fk.onDelete,
-              onUpdate: fk.onUpdate,
-            },
+            referenceTable: fk.referenceTable,
+            referenceColumns: fk.referenceColumns,
+            onDelete: fk.onDelete,
+            onUpdate: fk.onUpdate,
           });
         }
       });
 
-      // Check for dropped foreign keys
+      // Existing constraints no longer present in the form → drop them by name.
       existingForeignKeys.forEach((efk) => {
-        const stillExists = foreignKeys.find((fk) => fk.columnName === efk.columnName);
-        if (!stillExists) {
-          // This foreign key was removed
-          dropForeignKeys.push(efk.columnName);
+        if (efk.constraintName && !formConstraintNames.has(efk.constraintName)) {
+          dropForeignKeys.push(efk.constraintName);
         }
       });
 
@@ -433,28 +409,28 @@ export function TableForm({
 
   const handleAddForeignKey = (fk: TableFormForeignKeySchema) => {
     if (editingForeignKey) {
-      // Update existing foreign key
+      // Update existing foreign key (matched by stable uid, not source column).
       setForeignKeys(
         foreignKeys.map((existingFk) =>
-          existingFk.columnName === editingForeignKey ? { ...fk } : existingFk
+          existingFk.uid === editingForeignKey ? { ...fk, uid: existingFk.uid } : existingFk
         )
       );
       setEditingForeignKey(undefined);
       setForeignKeysDirty(true);
     } else {
-      // Add new foreign key
-      setForeignKeys([
-        ...foreignKeys,
-        {
-          ...fk,
-        },
-      ]);
+      // Add new foreign key with a fresh client-side identity.
+      setForeignKeys([...foreignKeys, { ...fk, uid: crypto.randomUUID() }]);
     }
     setForeignKeysDirty(true);
   };
 
-  const handleRemoveForeignKey = (columnName?: string) => {
-    setForeignKeys(foreignKeys.filter((fk) => fk.columnName !== columnName));
+  const handleRemoveForeignKey = (uid?: string) => {
+    // Identify by stable uid so constraints sharing a first source column
+    // (e.g. multi-tenant `tenant_id`) are removed individually, not together.
+    if (!foreignKeys.some((fk) => fk.uid === uid)) {
+      return;
+    }
+    setForeignKeys(foreignKeys.filter((fk) => fk.uid !== uid));
     setForeignKeysDirty(true);
   };
 
@@ -556,17 +532,20 @@ export function TableForm({
 
                   {foreignKeys.map((fk, index) => (
                     <div
-                      key={fk.columnName}
+                      key={fk.uid ?? fk.columnName}
                       className={`group grid h-12 grid-cols-[minmax(260px,1fr)_190px_190px_52px] items-center px-1.5 hover:bg-[var(--alpha-4)] ${
                         index === foreignKeys.length - 1 ? '' : 'border-b border-[var(--alpha-8)]'
                       }`}
                     >
                       <div className="flex items-center gap-2 overflow-hidden px-2.5 text-[13px] leading-[18px]">
                         <Link className="size-5 shrink-0 text-muted-foreground" />
-                        <span className="truncate">{fk.columnName}</span>
+                        <span className="truncate">
+                          {fk.referenceColumns.map((c) => c.sourceColumn).join(', ')}
+                        </span>
                         <MoveRight className="size-5 shrink-0 text-muted-foreground" />
                         <span className="truncate">
-                          {fk.referenceTable}.{fk.referenceColumn}
+                          {fk.referenceTable}.
+                          {fk.referenceColumns.map((c) => c.referenceColumn).join(', ')}
                         </span>
                       </div>
                       <div className="truncate px-2.5 text-[13px] leading-[18px]">
@@ -578,7 +557,7 @@ export function TableForm({
                       <div className="flex items-center justify-end px-2.5">
                         <button
                           type="button"
-                          onClick={() => handleRemoveForeignKey(fk.columnName)}
+                          onClick={() => handleRemoveForeignKey(fk.uid)}
                           className="flex size-8 items-center justify-center rounded text-muted-foreground opacity-0 transition-[opacity,colors] group-hover:opacity-100 hover:bg-[var(--alpha-8)] hover:text-foreground focus-visible:opacity-100"
                           aria-label="Remove"
                         >
@@ -618,7 +597,7 @@ export function TableForm({
               onAddForeignKey={handleAddForeignKey}
               initialValue={
                 editingForeignKey
-                  ? foreignKeys.find((fk) => fk.columnName === editingForeignKey)
+                  ? foreignKeys.find((fk) => fk.uid === editingForeignKey)
                   : undefined
               }
             />

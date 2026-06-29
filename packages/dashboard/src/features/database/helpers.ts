@@ -1,10 +1,137 @@
 import { jsonSchema } from '#lib/utils/schemaValidations';
-import { ColumnSchema, ColumnType, type DatabaseSchemaInfo } from '@insforge/shared-schemas';
+import {
+  type AdminTableRecordPrimaryKey,
+  ColumnSchema,
+  ColumnType,
+  type DatabaseSchemaInfo,
+  type ForeignKeySchema,
+} from '@insforge/shared-schemas';
 import { z } from 'zod';
 
 export const DEFAULT_DATABASE_SCHEMA = 'public' as const;
 
 export const SYSTEM_FIELDS = ['id', 'created_at', 'updated_at'];
+
+/**
+ * Derives a source-column -> foreign-key lookup from a table's table-level
+ * foreign keys. Each participating source column maps to its (shared) constraint,
+ * so a composite key resolves the same entity from any of its columns. This is a
+ * computed view for per-column rendering; the table's `foreignKeys` list stays the
+ * single source of truth.
+ */
+export function getForeignKeyByColumn(
+  foreignKeys?: ForeignKeySchema[]
+): Map<string, ForeignKeySchema> {
+  const byColumn = new Map<string, ForeignKeySchema>();
+  for (const fk of foreignKeys ?? []) {
+    for (const ref of fk.referenceColumns) {
+      if (!byColumn.has(ref.sourceColumn)) {
+        byColumn.set(ref.sourceColumn, fk);
+      }
+    }
+  }
+  return byColumn;
+}
+
+/**
+ * A record's primary key as a map of column name -> value. Supports composite keys.
+ * Aliased to the backend contract so the dashboard and API can't drift; PK columns
+ * are NOT NULL, so values are non-null scalars.
+ */
+export type RecordPrimaryKey = AdminTableRecordPrimaryKey;
+
+/**
+ * Returns the primary-key column names for a table, in schema (ordinal) order.
+ * Falls back to `['id']` when the schema reports no primary key, preserving the
+ * previous single-column behavior for tables that don't expose key metadata.
+ */
+export function getPrimaryKeyColumns(columns?: ColumnSchema[]): string[] {
+  const primaryKeyColumns =
+    columns?.filter((column) => column.isPrimaryKey).map((column) => column.columnName) ?? [];
+  if (primaryKeyColumns.length > 0) {
+    return primaryKeyColumns;
+  }
+
+  const allColumns = columns?.map((column) => column.columnName) ?? [];
+  if (allColumns.includes('id')) {
+    return ['id'];
+  }
+  // No declared primary key and no `id` column: fall back to every column so distinct
+  // rows keep distinct grid identities instead of all collapsing to a single
+  // `{"id":null}` key (which would merge selection/edit/delete across rows).
+  return allColumns.length > 0 ? allColumns : ['id'];
+}
+
+/**
+ * Builds the primary-key tuple for a row from the given primary-key columns.
+ * Missing/null values are preserved as null and non-scalar values coerced to
+ * their string form, since primary keys are always scalar.
+ */
+export function getRecordPrimaryKey(
+  row: Record<string, unknown>,
+  primaryKeyColumns: string[]
+): RecordPrimaryKey {
+  const key: RecordPrimaryKey = {};
+  for (const columnName of primaryKeyColumns) {
+    const value = row[columnName];
+    if (value === undefined || value === null) {
+      // PK columns are NOT NULL, so this only triggers on the no-PK fallback
+      // (key = all columns). Keep null — the record API matches it with
+      // `col IS NULL`, so a genuinely-null column still identifies its row.
+      // Coercing to '' would build `col = ''` and silently match nothing.
+      key[columnName] = null;
+    } else if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      key[columnName] = value;
+    } else {
+      key[columnName] = String(value);
+    }
+  }
+  return key;
+}
+
+/**
+ * Encodes a row's full primary-key tuple into a stable string usable as a React
+ * grid row key. Two rows with the same key tuple encode identically (same identity).
+ */
+export function encodeRecordKey(row: Record<string, unknown>, primaryKeyColumns: string[]): string {
+  return JSON.stringify(getRecordPrimaryKey(row, primaryKeyColumns));
+}
+
+/**
+ * Decodes a grid row key produced by {@link encodeRecordKey} back into the
+ * primary-key tuple to send to the record update/delete APIs.
+ */
+function isRecordPrimaryKey(value: unknown): value is RecordPrimaryKey {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  return Object.values(value).every(
+    (item) =>
+      item === null ||
+      typeof item === 'string' ||
+      typeof item === 'number' ||
+      typeof item === 'boolean'
+  );
+}
+
+export function decodeRecordKey(encodedKey: string): RecordPrimaryKey {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(encodedKey);
+  } catch {
+    throw new Error(`Invalid record key: ${encodedKey}`);
+  }
+  // Reject anything that isn't a plain scalar-valued object before it reaches the
+  // update/delete APIs as pkKeys (JSON.parse also accepts null, arrays, scalars).
+  if (!isRecordPrimaryKey(parsed)) {
+    throw new Error(`Invalid record key: ${encodedKey}`);
+  }
+  return parsed;
+}
 
 // Helper function to build dynamic Zod schema based on column definitions
 export function buildDynamicSchema(columns: ColumnSchema[]) {

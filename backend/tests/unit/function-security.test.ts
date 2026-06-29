@@ -23,6 +23,7 @@ vi.mock('../../src/providers/functions/deno-subhosting.provider.js', () => ({
   DenoSubhostingProvider: {
     getInstance: () => ({
       isConfigured: vi.fn().mockReturnValue(false),
+      checkCode: vi.fn(),
     }),
   },
 }));

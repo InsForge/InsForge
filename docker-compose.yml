@@ -147,6 +147,8 @@ services:
       - INSFORGE_DISABLE_WRITE_RATE_LIMIT=${INSFORGE_DISABLE_WRITE_RATE_LIMIT:-}
       # Logs directory
       - LOGS_DIR=/insforge-logs
+      # Anonymous telemetry (set INSFORGE_TELEMETRY_DISABLED=1 to opt out)
+      - INSFORGE_TELEMETRY_DISABLED=${INSFORGE_TELEMETRY_DISABLED:-}
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
     volumes:

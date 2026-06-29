@@ -39,7 +39,13 @@ import { useCSVExport } from '#features/database/hooks/useCSVExport';
 import { useTablePreferences } from '#features/database/hooks/useTablePreferences';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { usePageSize } from '#lib/hooks/usePageSize';
-import { DEFAULT_DATABASE_SCHEMA, getDatabaseSchemaInfo } from '#features/database/helpers';
+import {
+  DEFAULT_DATABASE_SCHEMA,
+  decodeRecordKey,
+  encodeRecordKey,
+  getDatabaseSchemaInfo,
+  getPrimaryKeyColumns,
+} from '#features/database/helpers';
 
 export default function TablesPage() {
   const location = useLocation();
@@ -219,9 +225,9 @@ export default function TablesPage() {
     !!editingTable
   );
 
-  const primaryKeyColumn = useMemo(() => {
-    return schemaData?.columns.find((col) => col.isPrimaryKey)?.columnName;
-  }, [schemaData]);
+  // Full primary-key tuple (supports composite keys) used for row identity,
+  // updates, and deletes.
+  const primaryKeyColumns = useMemo(() => getPrimaryKeyColumns(schemaData?.columns), [schemaData]);
 
   const {
     mutate: importCSV,
@@ -415,8 +421,8 @@ export default function TablesPage() {
     setPreviewingTemplate(null);
   };
 
-  // Handle record update
-  const handleRecordUpdate = async (rowId: string, columnKey: string, newValue: string) => {
+  // Handle record update. `rowKey` is the encoded primary-key tuple from the grid.
+  const handleRecordUpdate = async (rowKey: string, columnKey: string, newValue: string) => {
     if (!selectedTable || selectedSchemaInfo.isProtected) {
       return;
     }
@@ -434,8 +440,7 @@ export default function TablesPage() {
         }
         const updates = { [columnKey]: conversionResult.value };
         await recordsHook.updateRecord({
-          pkColumn: primaryKeyColumn || 'id',
-          pkValue: rowId,
+          primaryKey: decodeRecordKey(rowKey),
           data: updates,
         });
       }
@@ -445,21 +450,21 @@ export default function TablesPage() {
     }
   };
 
-  // Handle bulk delete
-  const handleBulkDelete = async (ids: string[]) => {
-    if (!selectedTable || !ids.length || selectedSchemaInfo.isProtected) {
+  // Handle bulk delete. `rowKeys` are the encoded primary-key tuples from the grid.
+  const handleBulkDelete = async (rowKeys: string[]) => {
+    if (!selectedTable || !rowKeys.length || selectedSchemaInfo.isProtected) {
       return;
     }
 
     const shouldDelete = await confirm({
-      title: `Delete ${ids.length} ${ids.length === 1 ? 'Record' : 'Records'}`,
-      description: `Are you sure you want to delete ${ids.length} ${ids.length === 1 ? 'record' : 'records'}? This action cannot be undone.`,
+      title: `Delete ${rowKeys.length} ${rowKeys.length === 1 ? 'Record' : 'Records'}`,
+      description: `Are you sure you want to delete ${rowKeys.length} ${rowKeys.length === 1 ? 'record' : 'records'}? This action cannot be undone.`,
       confirmText: 'Delete',
       destructive: true,
     });
 
     if (shouldDelete) {
-      await recordsHook.deleteRecords({ pkColumn: primaryKeyColumn || 'id', pkValues: ids });
+      await recordsHook.deleteRecords({ primaryKeys: rowKeys.map(decodeRecordKey) });
       // Query invalidation is handled by the mutation, no manual refetch needed
       setSelectedRows(new Set());
     }
@@ -686,7 +691,7 @@ export default function TablesPage() {
                   loading={isLoadingTable && !tableData}
                   isSorting={isSorting}
                   isRefreshing={isRefreshing}
-                  rowKeyGetter={(row) => String(row[primaryKeyColumn || 'id'])}
+                  rowKeyGetter={(row) => encodeRecordKey(row, primaryKeyColumns)}
                   selectedRows={selectedRows}
                   onSelectedRowsChange={setSelectedRows}
                   sortColumns={sortColumns}
@@ -745,7 +750,9 @@ export default function TablesPage() {
           open={showRecordForm}
           onOpenChange={setShowRecordForm}
           tableName={selectedTable}
+          schemaName={selectedSchema}
           schema={schemaData.columns}
+          foreignKeys={schemaData.foreignKeys}
         />
       )}
 

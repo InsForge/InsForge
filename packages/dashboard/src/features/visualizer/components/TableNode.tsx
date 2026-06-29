@@ -3,6 +3,7 @@ import { Database, Circle, Key, ExternalLink } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
 import { useNavigate } from 'react-router-dom';
 import { TableSchema } from '@insforge/shared-schemas';
+import { getForeignKeyByColumn } from '#features/database/helpers';
 
 interface TableNodeProps {
   data: {
@@ -15,6 +16,8 @@ interface TableNodeProps {
 export function TableNode({ data }: TableNodeProps) {
   const navigate = useNavigate();
   const { table, referencedColumns = [], showRecordCount = true } = data;
+  // Source columns that participate in a foreign key (table-level constraints).
+  const foreignKeyColumns = getForeignKeyByColumn(table.foreignKeys);
 
   const getColumnIcon = (isReferenced: boolean = false) => {
     // If column is referenced by another table (has incoming connections)
@@ -81,7 +84,7 @@ export function TableNode({ data }: TableNodeProps) {
             className="flex items-center justify-between p-3 border-b border-[var(--alpha-8)] last:border-b-0 relative"
           >
             {/* Source handle for foreign key columns - invisible and non-interactive */}
-            {column.foreignKey && (
+            {foreignKeyColumns.has(column.columnName) && (
               <Handle
                 type="source"
                 position={Position.Right}
@@ -130,7 +133,7 @@ export function TableNode({ data }: TableNodeProps) {
                 </span>
               </div>
               {/* Show white dot with outer circle for foreign key columns, gray circle for others */}
-              {column.foreignKey ? (
+              {foreignKeyColumns.has(column.columnName) ? (
                 <div className="w-5 h-5 flex items-center justify-center relative">
                   <Circle
                     className="w-5 h-5 text-zinc-950 dark:text-white fill-none stroke-current"

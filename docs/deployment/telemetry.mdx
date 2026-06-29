@@ -1,0 +1,48 @@
+---
+title: "Anonymous self-host telemetry"
+description: "Learn what anonymous usage data InsForge self-hosted deployments send, what is never collected, and how to opt out using INSFORGE_TELEMETRY_DISABLED."
+---
+
+InsForge collects anonymous telemetry from self-hosted deployments to understand active installs, version adoption, deployment methods, and which optional services are configured. This helps maintainers prioritize fixes, security notices, and deployment work for the open-source project.
+
+Telemetry is optional. You can disable it at any time.
+InsForge does not send this telemetry from InsForge Cloud.
+Self-hosted events include a coarse runtime label, such as production, development, test, ci, or unknown, so maintainers can separate local and automated runs from production deployments.
+
+## What InsForge sends
+
+InsForge sends an `oss_instance_started` event when the backend starts and an `oss_heartbeat` event about once every 24 hours while the backend is running.
+Events are sent through InsForge's PostHog proxy at `https://b.insforge.dev/capture/` using PostHog's capture API format.
+
+Each event contains:
+
+- PostHog event name: `oss_instance_started` or `oss_heartbeat`
+- Anonymous installation ID stored locally in `LOGS_DIR/.insforge-installation-id`, used as the PostHog `distinct_id`
+- InsForge version
+- Event timestamp
+- Hosting mode, such as `self-hosted` or `cloud`
+- Coarse deployment method, such as Docker Compose, Railway, Zeabur, Sealos, Dokploy, Kubernetes, or unknown
+- Operating system, CPU architecture, Node.js version, runtime environment, and whether the process appears to be running in CI
+- Storage backend category: local filesystem, S3, or S3-compatible
+- Boolean flags for whether optional features are configured: site deployments, functions, compute, and OpenRouter
+
+## What InsForge never sends
+
+Telemetry does not include:
+
+- Environment variable values
+- API keys, JWT secrets, passwords, OAuth secrets, or payment secrets
+- Database contents, schemas, table names, or row counts
+- Logs, error stack traces, file contents, or file paths
+- Project names, domains, bucket names, email addresses, or user data
+
+## Disable telemetry
+
+Set `INSFORGE_TELEMETRY_DISABLED=1` in your environment and restart the backend.
+For Docker Compose deployments, add the same line to your `.env` file:
+
+```bash
+INSFORGE_TELEMETRY_DISABLED=1
+```
+
+Network failures are logged and ignored so telemetry never blocks startup or normal requests.

@@ -100,6 +100,9 @@ export interface AppConfig {
   ai: {
     openrouterApiKey: string | undefined;
   };
+  telemetry: {
+    disabled: boolean;
+  };
 }
 
 function parseEnvInt(val: string | undefined, fallback: number): number {
@@ -109,6 +112,11 @@ function parseEnvInt(val: string | undefined, fallback: number): number {
     return fallback;
   }
   return parsed;
+}
+
+function parseEnvBool(val: string | undefined): boolean {
+  if (!val) return false;
+  return ['1', 'true', 'yes', 'on'].includes(val.trim().toLowerCase());
 }
 
 const AWS_MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024;
@@ -124,6 +132,8 @@ function parseEnvBytes(val: string | undefined, fallback: number): number {
 }
 
 export function loadConfig(): AppConfig {
+  const logsDir = process.env.LOGS_DIR || path.join(process.cwd(), 'logs');
+
   return {
     app: {
       port: parseEnvInt(process.env.PORT, 7130),
@@ -167,7 +177,7 @@ export function loadConfig(): AppConfig {
         return isNaN(parsed) || parsed <= 0 ? undefined : parsed;
       })(),
       maxFilesPerField: parseEnvInt(process.env.MAX_FILES_PER_FIELD, 10),
-      logsDir: process.env.LOGS_DIR || path.join(process.cwd(), 'logs'),
+      logsDir,
       trustProxy: parseTrustProxySetting(process.env.TRUST_PROXY),
     },
     database: {
@@ -219,6 +229,9 @@ export function loadConfig(): AppConfig {
     },
     ai: {
       openrouterApiKey: process.env.OPENROUTER_API_KEY || undefined,
+    },
+    telemetry: {
+      disabled: parseEnvBool(process.env.INSFORGE_TELEMETRY_DISABLED),
     },
   };
 }
