@@ -14,6 +14,9 @@ Then use the narrowest package skill that matches the task:
 - `ui`
 - `shared-schemas`
 - `docs`
+
+Use the cross-repo release workflow skill when preparing an OSS PR:
+
 - `e2e-testing`
 
 ## Core Rules

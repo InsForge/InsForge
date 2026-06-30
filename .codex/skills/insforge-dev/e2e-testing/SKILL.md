@@ -12,9 +12,9 @@ This is an additional release-quality gate. It does not replace local `typecheck
 ## Repositories
 
 - InsForge OSS repo: current workspace.
-- E2E repo: sibling `agent-e2e`, usually at `/Users/lyu/Documents/GitHub/agent-e2e`.
+- E2E repo: remote GitHub repository `InsForge/agent-e2e`.
 
-If the sibling repo is not present, locate it with `find` or ask before cloning.
+Use the remote `InsForge/agent-e2e` repository for workflow dispatch and read-only workflow checks. Do not rely on a developer-specific local checkout path. Create or use a local checkout only when the deterministic fixture tests must be edited.
 
 ## Build The Test Tag
 
@@ -57,7 +57,9 @@ Do not start the cross-repo E2E workflow until the image build succeeds.
 
 ## Decide Whether `agent-e2e` Must Change
 
-Inspect the InsForge diff and compare it with deterministic fixture coverage in `agent-e2e`.
+Inspect the InsForge diff and compare it with deterministic fixture coverage in `InsForge/agent-e2e`.
+
+For read-only checks, prefer remote GitHub access such as `gh api`, `gh repo view`, or remote file reads. Use a local checkout only when editing fixture files or when remote inspection is not enough to understand coverage.
 
 Update `agent-e2e` when the InsForge change adds, removes, or changes behavior that the deterministic fixture should assert, including:
 
@@ -86,10 +88,10 @@ gh run watch --repo InsForge/agent-e2e <run-id>
 
 ## If E2E Tests Need An Update
 
-Work in the sibling `agent-e2e` repo.
+Work in a local checkout of the remote `InsForge/agent-e2e` repo only for the fixture update.
 
-1. Make sure the repo is clean before switching branches.
-2. Start from `main` or an up-to-date branch based on `main`.
+1. Use an existing clean checkout or clone `https://github.com/InsForge/agent-e2e.git` into an isolated workspace.
+2. Fetch `origin` and start from `origin/main`.
 3. Create a branch named `codex/<short-topic>`.
 4. Update only the deterministic fixture validators, fixtures, app assertions, and docs needed for the InsForge behavior change.
 5. Run the smallest local validation that gives confidence:
@@ -117,7 +119,7 @@ If the deterministic fixture workflow passes:
 
 - Link the run in the InsForge PR body or final PR notes.
 - If an `agent-e2e` PR was required, link that PR too.
-- Proceed with opening or submitting the InsForge OSS PR.
+- Proceed with opening, updating, or submitting the InsForge OSS PR.
 
 If the deterministic fixture workflow fails:
 

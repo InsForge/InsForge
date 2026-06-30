@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Add The `e2e-testing` Child Skill
+## Task 1: Add The `e2e-testing` Child Skill
 
 **Files:**
 - Create: `.agents/skills/insforge-dev/e2e-testing/SKILL.md`
@@ -29,14 +29,14 @@ description: Use this skill when an InsForge maintainer has finished an OSS repo
 
 # InsForge E2E Testing Gate
 
-Use this skill after local implementation and normal InsForge pre-PR checks pass, and before opening or submitting the InsForge OSS PR.
+Use this skill after local implementation and normal InsForge pre-PR checks pass, and before opening, updating, or submitting the InsForge OSS PR.
 ```
 
 - [ ] **Step 2: Include exact workflow instructions**
 
 The body must cover package-version tag calculation, image build workflow dispatch, deterministic fixture dispatch, when to update `agent-e2e`, pass/fail triage, and the rule to ignore the support-desk workflow.
 
-### Task 2: Link The Child Skill From `insforge-dev`
+## Task 2: Link The Child Skill From `insforge-dev`
 
 **Files:**
 - Modify: `.agents/skills/insforge-dev/SKILL.md`
@@ -49,9 +49,9 @@ Add `e2e-testing` beside the existing child skills.
 
 - [ ] **Step 2: Add pre-PR invocation text**
 
-Add a short pre-PR rule: after local checks pass and before opening/submitting an OSS PR, use `e2e-testing` to run the deterministic cross-repo gate.
+Add a short pre-PR rule: after local checks pass and before opening, updating, or submitting an OSS PR, use `e2e-testing` to run the deterministic cross-repo gate.
 
-### Task 3: Validate The Skill Markdown
+## Task 3: Validate The Skill Markdown
 
 **Files:**
 - Inspect all changed skill files and the design/plan docs.
@@ -63,8 +63,11 @@ Run:
 ```bash
 sed -n '1,220p' .agents/skills/insforge-dev/e2e-testing/SKILL.md
 sed -n '1,140p' .agents/skills/insforge-dev/SKILL.md
+sed -n '1,140p' .codex/skills/insforge-dev/SKILL.md
+sed -n '1,140p' .claude/skills/insforge-dev/SKILL.md
 diff -u .agents/skills/insforge-dev/e2e-testing/SKILL.md .codex/skills/insforge-dev/e2e-testing/SKILL.md
 diff -u .agents/skills/insforge-dev/e2e-testing/SKILL.md .claude/skills/insforge-dev/e2e-testing/SKILL.md
+scripts/sync-skills.sh --check
 ```
 
 Expected: the child skill has valid YAML front matter, the parent references `e2e-testing`, and mirrored child skills are identical.
