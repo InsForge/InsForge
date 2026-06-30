@@ -6,7 +6,7 @@
 
 **Architecture:** Implement the workflow as a new child `SKILL.md` mirrored across `.agents`, `.codex`, and `.claude`. Add a parent `insforge-dev` pointer in each surface so agents know to invoke the child skill during the pre-PR phase.
 
-**Tech Stack:** Markdown skill files, YAML frontmatter, GitHub CLI workflow commands, existing InsForge and `agent-e2e` GitHub Actions workflows.
+**Tech Stack:** Markdown skill files, YAML front matter, GitHub CLI workflow commands, existing InsForge and `agent-e2e` GitHub Actions workflows.
 
 ---
 
@@ -56,7 +56,7 @@ Add a short pre-PR rule: after local checks pass and before opening/submitting a
 **Files:**
 - Inspect all changed skill files and the design/plan docs.
 
-- [ ] **Step 1: Check frontmatter and trigger text**
+- [ ] **Step 1: Check front matter and trigger text**
 
 Run:
 
@@ -67,7 +67,7 @@ diff -u .agents/skills/insforge-dev/e2e-testing/SKILL.md .codex/skills/insforge-
 diff -u .agents/skills/insforge-dev/e2e-testing/SKILL.md .claude/skills/insforge-dev/e2e-testing/SKILL.md
 ```
 
-Expected: the child skill has valid YAML frontmatter, the parent references `e2e-testing`, and mirrored child skills are identical.
+Expected: the child skill has valid YAML front matter, the parent references `e2e-testing`, and mirrored child skills are identical.
 
 - [ ] **Step 2: Check git diff**
 

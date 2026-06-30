@@ -42,4 +42,4 @@ The skill should not edit `agent-e2e` unless the InsForge change affects behavio
 
 ## Validation
 
-Validate the new skill by checking that each copied `SKILL.md` has valid frontmatter and that the parent `insforge-dev` skill references the child skill consistently across `.agents`, `.codex`, and `.claude`.
+Validate the new skill by checking that each copied `SKILL.md` has valid front matter and that the parent `insforge-dev` skill references the child skill consistently across `.agents`, `.codex`, and `.claude`.
