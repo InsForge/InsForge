@@ -601,9 +601,22 @@ paths:
   /api/auth/logout:
     post:
       summary: Logout user
-      description: Logout and clear refresh token cookie
+      description: Logout and clear refresh token cookie. For web clients, requires validation of the `X-CSRF-Token` header if the cookie is present.
       tags:
         - Client
+      parameters:
+        - name: client_type
+          in: query
+          schema:
+            type: string
+            enum: [web, mobile, desktop, server]
+            default: web
+          description: Client type (CSRF check is only performed for 'web' client type)
+        - name: X-CSRF-Token
+          in: header
+          schema:
+            type: string
+          description: CSRF token received from login/register response (required for web clients only if refresh cookie is present)
       responses:
         '200':
           description: Logged out successfully
@@ -616,6 +629,8 @@ paths:
                     type: boolean
                   message:
                     type: string
+        '403':
+          description: Invalid CSRF token
 
   /api/auth/sessions/current:
     get:
@@ -776,9 +791,15 @@ paths:
   /api/auth/admin/logout:
     post:
       summary: Logout admin dashboard session
-      description: Clears the dashboard-only `insforge_admin_refresh_token` cookie.
+      description: Clears the dashboard-only `insforge_admin_refresh_token` cookie. Requires validation of the `X-CSRF-Token` header if the cookie is present.
       tags:
         - Admin
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          schema:
+            type: string
+          description: CSRF token returned from admin login or admin refresh (required if refresh cookie is present)
       responses:
         '200':
           description: Logged out successfully
@@ -791,6 +812,8 @@ paths:
                     type: boolean
                   message:
                     type: string
+        '403':
+          description: Invalid CSRF token
 
   /api/auth/tokens/anon:
     post:

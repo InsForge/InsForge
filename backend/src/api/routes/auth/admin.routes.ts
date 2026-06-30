@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
+import { TokenManager, type RefreshTokenPayload } from '@/infra/security/token.manager.js';
 import { AuthRequest, verifyToken } from '@/api/middlewares/auth.js';
-import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import {
@@ -127,7 +127,7 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
     const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
     if (!tokenManager.verifyCsrfToken(csrfHeader, payload)) {
       logger.warn('[Auth:AdminRefresh] CSRF token validation failed');
-      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.FORBIDDEN);
     }
 
     const newAccessToken = tokenManager.generateAccessToken({
@@ -154,8 +154,40 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /api/auth/admin/logout - Logout dashboard session
-router.post('/logout', (_req: Request, res: Response, next: NextFunction) => {
+// Validates X-CSRF-Token header before clearing the admin httpOnly cookie to prevent CSRF attacks.
+router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tokenManager = TokenManager.getInstance();
+    const refreshToken = req.cookies?.[ADMIN_REFRESH_TOKEN_COOKIE_NAME];
+
+    if (refreshToken) {
+      // Only validate CSRF when a refresh token cookie is actually present.
+      // If the cookie is missing the user is already logged out — clear and succeed.
+      let payload: RefreshTokenPayload | undefined;
+      try {
+        payload = tokenManager.verifyRefreshToken(refreshToken);
+      } catch {
+        // Token is expired or malformed — session is already dead.
+        // Clear the cookie and succeed; no CSRF check needed.
+      }
+
+      if (payload) {
+        if (payload.sessionType !== 'admin') {
+          throw new AppError(
+            'Invalid admin refresh session type',
+            401,
+            ERROR_CODES.AUTH_UNAUTHORIZED
+          );
+        }
+
+        const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
+        if (!csrfHeader || !tokenManager.verifyCsrfToken(csrfHeader, payload)) {
+          logger.warn('[Auth:AdminLogout] CSRF token validation failed');
+          throw new AppError('Invalid CSRF token', 403, ERROR_CODES.FORBIDDEN);
+        }
+      }
+    }
+
     clearAdminRefreshTokenCookie(res);
 
     successResponse(res, {
