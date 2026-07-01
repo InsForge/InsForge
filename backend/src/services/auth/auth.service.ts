@@ -1097,10 +1097,13 @@ export class AuthService {
   }
 
   /**
-   * Sign in with ID token from native SDK (Google One Tap, etc.)
-   * Limited to Google for now to unblock customer ask, can extend to other providers later as needed.
+   * Sign in with ID token from native SDK (Google One Tap, Apple Sign In, etc.)
    */
-  async signInWithIdToken(provider: 'google', idToken: string): Promise<CreateSessionResponse> {
+  async signInWithIdToken(
+    provider: 'google' | 'apple',
+    idToken: string,
+    audience?: string
+  ): Promise<CreateSessionResponse> {
     let userData: OAuthUserData;
 
     switch (provider) {
@@ -1142,9 +1145,55 @@ export class AuthService {
         break;
       }
 
+      case 'apple': {
+        const requestedAudience = audience?.trim();
+        if (requestedAudience) {
+          const allowed = (process.env.APPLE_ALLOWED_AUDIENCES || '')
+            .split(',')
+            .map((s: string) => s.trim())
+            .filter(Boolean);
+          if (!allowed.includes(requestedAudience)) {
+            throw new AppError(
+              'Audience is not allowed for Apple ID token',
+              400,
+              ERROR_CODES.INVALID_INPUT
+            );
+          }
+        }
+
+        let appleUserInfo;
+        try {
+          appleUserInfo = await this.appleOAuthProvider.verifyIdToken(idToken, audience);
+        } catch (error) {
+          logger.error('Failed to verify Apple ID token:', error);
+          throw new AppError('Failed to verify Apple ID token', 400, ERROR_CODES.INVALID_INPUT);
+        }
+
+        const sub = appleUserInfo.sub?.trim();
+        if (!sub || sub === 'undefined' || sub === 'null') {
+          throw new AppError(
+            'Invalid Apple ID token: missing sub claim',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
+
+        const email = appleUserInfo.email || `apple-${sub}@placeholder.local`;
+        const userName = email.split('@')[0];
+        userData = {
+          provider: 'apple',
+          providerId: sub,
+          email,
+          userName,
+          avatarUrl: '',
+          identityData: appleUserInfo,
+        };
+        break;
+      }
+
       default:
         throw new AppError(
-          `Provider ${provider} is not supported for ID token sign-in. Supported: google`,
+          `Provider ${provider} is not supported for ID token sign-in. Supported: google, apple`,
           400,
           ERROR_CODES.INVALID_INPUT
         );
