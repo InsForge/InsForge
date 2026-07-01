@@ -634,7 +634,12 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
         }
 
         if (payload.sessionType !== 'user') {
-          throw new AppError('Invalid refresh session type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+          clearRefreshTokenCookie(res);
+          successResponse(res, {
+            success: true,
+            message: 'Logged out successfully',
+          });
+          return;
         }
 
         const csrfHeader = req.headers['x-csrf-token'];
