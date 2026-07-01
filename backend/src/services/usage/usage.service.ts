@@ -9,6 +9,8 @@ export interface UsageStats {
   user_count: number;
 }
 
+export type MCPConnectionStatus = 'connected' | 'disconnected';
+
 export interface MCPUsageRecord {
   tool_name: string;
   success: boolean;
@@ -39,6 +41,39 @@ export class UsageService {
       UsageService.instance = new UsageService();
     }
     return UsageService.instance;
+  }
+
+  /**
+   * Get the current MCP connection status
+   */
+  async getMCPConnectionStatus(): Promise<MCPConnectionStatus> {
+    try {
+      const result = await this.getPool().query(
+        `SELECT status FROM system.mcp_status WHERE id = 1`
+      );
+      return (result.rows[0]?.status ?? 'disconnected') as MCPConnectionStatus;
+    } catch (error) {
+      logger.error('Failed to get MCP connection status', { error });
+      return 'disconnected';
+    }
+  }
+
+  /**
+   * Update the MCP connection status
+   */
+  async updateMCPConnectionStatus(status: MCPConnectionStatus): Promise<void> {
+    try {
+      await this.getPool().query(
+        `INSERT INTO system.mcp_status (id, status, updated_at)
+         VALUES (1, $1, CURRENT_TIMESTAMP)
+         ON CONFLICT (id) DO UPDATE SET status = $1, updated_at = CURRENT_TIMESTAMP`,
+        [status]
+      );
+      logger.info('MCP connection status updated', { status });
+    } catch (error) {
+      logger.error('Failed to update MCP connection status', { error });
+      throw new Error('Failed to update MCP connection status');
+    }
   }
 
   /**

@@ -15,6 +15,42 @@ Follow the instructions below for your AI client. Don't see your tool? Browse th
 - An **AI coding assistant** (Cursor, Claude Code, GitHub Copilot, etc.)
 - An **InsForge project** - [create one here](https://insforge.dev) if you haven't already
 
+## CLI Quick Connect
+
+If you use the InsForge CLI and have already run `npx @insforge/cli link` to link your project, you can connect or disconnect any MCP provider with a single command — no manual config editing required.
+
+### Connect
+
+```bash
+# Connect the default provider (cursor)
+npx @insforge/cli connect
+
+# Connect a specific provider
+npx @insforge/cli connect cursor
+npx @insforge/cli connect claude-code
+npx @insforge/cli connect windsurf
+npx @insforge/cli connect cline
+npx @insforge/cli connect roo
+npx @insforge/cli connect codex
+npx @insforge/cli connect antigravity
+```
+
+This writes the InsForge MCP server entry directly into the provider's local config file (e.g. `.cursor/mcp.json`) using your linked project's API key and host URL, then marks the dashboard as **Connected**.
+
+### Disconnect
+
+```bash
+# Disconnect from all known local provider configs
+npx @insforge/cli disconnect
+
+# Disconnect from a specific provider
+npx @insforge/cli disconnect cursor
+```
+
+This removes only the `insforge` entry from the provider's config file and marks the dashboard as **Disconnected**. All other MCP servers remain untouched.
+
+---
+
 ## Local MCP Configuration (Recommended)
 
 If you prefer to configure MCP locally, select your AI coding assistant below:
