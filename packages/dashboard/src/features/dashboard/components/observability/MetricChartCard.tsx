@@ -202,10 +202,10 @@ export function MetricChartCard({
               </PopoverTrigger>
               <PopoverContent
                 align="start"
-                className="w-auto max-w-[260px] p-3 text-left text-[13px] font-normal normal-case leading-5"
+                className="w-auto max-w-[260px] rounded border-[var(--border)] bg-[rgb(var(--foreground))] p-2 text-left text-xs font-normal normal-case leading-4 text-[rgb(var(--inverse))] shadow-[0_4px_4px_rgba(0,0,0,0.08)]"
               >
                 <p>{description}</p>
-                {thresholdNote && <p className="mt-1 text-muted-foreground">{thresholdNote}</p>}
+                {thresholdNote && <p className="mt-1">{thresholdNote}</p>}
               </PopoverContent>
             </Popover>
           )}
