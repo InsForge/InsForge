@@ -3,6 +3,7 @@ import { createInterface } from 'readline';
 import path from 'path';
 import { LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-schemas';
 import { BaseLogProvider } from './base.provider.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 
 export class LocalFileProvider extends BaseLogProvider {
@@ -15,7 +16,8 @@ export class LocalFileProvider extends BaseLogProvider {
   ]);
 
   async initialize(): Promise<void> {
-    this.logsDir = process.env.LOGS_DIR || path.resolve(process.cwd(), 'insforge-logs');
+    // Same directory the winston file transport writes to (utils/logger.ts).
+    this.logsDir = appConfig.server.logsDir;
     try {
       await fs.mkdir(this.logsDir, { recursive: true });
     } catch {
@@ -71,6 +73,59 @@ export class LocalFileProvider extends BaseLogProvider {
     };
   }
 
+  /**
+   * Build the display message for a parsed JSONL line, or null when the line
+   * is not a log entry we understand. Handles both line shapes found in these
+   * files: entries written by the winston file transport (utils/logger.ts) and
+   * legacy entries shipped by the Vector sidecar before it was removed.
+   */
+  private formatEventMessage(log: Record<string, unknown>): string | null {
+    // Legacy Vector-transformed entries carry an appname field
+    if (log.appname) {
+      // For error logs, include error and stack in eventMessage to match CloudWatch display
+      let eventMessage = String(log.event_message ?? '');
+      if (log.level === 'error' && log.error) {
+        eventMessage = `${eventMessage}\n\nError: ${log.error}`;
+        if (log.stack) {
+          eventMessage += `\n\nStack Trace:\n${log.stack}`;
+        }
+      }
+      return eventMessage;
+    }
+
+    // Winston file transport entries: { id, timestamp, message, level, metadata }
+    if (log.message !== undefined && log.level && log.timestamp) {
+      const metadata = (log.metadata ?? {}) as Record<string, unknown>;
+
+      // HTTP request logs (see the request logger in server.ts) — format as an
+      // nginx-style line, matching what the Vector pipeline used to produce
+      if (metadata.duration !== undefined) {
+        return [
+          metadata.method,
+          metadata.path,
+          metadata.status,
+          metadata.size,
+          metadata.duration,
+          '-',
+          metadata.ip,
+          '-',
+          metadata.userAgent,
+        ].join(' ');
+      }
+
+      let eventMessage = `${log.level} - ${log.message}`;
+      if (metadata.error) {
+        eventMessage += `\n\nError: ${metadata.error}`;
+        if (metadata.stack) {
+          eventMessage += `\n\nStack Trace:\n${metadata.stack}`;
+        }
+      }
+      return eventMessage;
+    }
+
+    return null;
+  }
+
   private async readLogsFromFile(
     filePath: string,
     limit: number,
@@ -98,24 +153,14 @@ export class LocalFileProvider extends BaseLogProvider {
 
       try {
         const log = JSON.parse(line);
-
-        // Only process Vector-transformed logs (have appname field)
-        if (!log.appname) {
+        const eventMessage = this.formatEventMessage(log);
+        if (eventMessage === null) {
           continue;
         }
 
         const logTime = new Date(log.timestamp).getTime();
 
         if (logTime < beforeMs) {
-          // For error logs, include error and stack in eventMessage to match CloudWatch display
-          let eventMessage = log.event_message || '';
-          if (log.level === 'error' && log.error) {
-            eventMessage = `${eventMessage}\n\nError: ${log.error}`;
-            if (log.stack) {
-              eventMessage += `\n\nStack Trace:\n${log.stack}`;
-            }
-          }
-
           logs.push({
             id: `${logTime}-${Math.random()}`,
             timestamp: log.timestamp,

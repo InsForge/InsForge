@@ -1,8 +1,44 @@
 import winston from 'winston';
+import fs from 'fs';
 import path from 'path';
 import { appConfig } from '@/infra/config/app.config.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 
 const logsDir = appConfig.server.logsDir;
+
+const transports: winston.transport[] = [new winston.transports.Console()];
+
+// The JSONL file feeds the self-hosted dashboard logs (LocalFileProvider).
+// Cloud deployments ship stdout to CloudWatch via the awslogs driver and read
+// logs back through CloudWatchProvider, so writing the file there would only
+// grow the container filesystem with data nothing reads.
+if (!isCloudEnvironment()) {
+  try {
+    fs.mkdirSync(logsDir, { recursive: true });
+    transports.push(
+      new winston.transports.File({
+        filename: path.join(logsDir, 'insforge.logs.jsonl'),
+        // Rotate so the file cannot grow unbounded; LocalFileProvider only
+        // reads the base file, which `tailable` keeps as the newest one.
+        maxsize: 20 * 1024 * 1024,
+        maxFiles: 2,
+        tailable: true,
+        format: winston.format.printf((info) => {
+          const { timestamp, level, message, ...metadata } = info;
+          return JSON.stringify({
+            id: `${Date.now()}-${Math.random()}`,
+            timestamp,
+            message,
+            level,
+            metadata,
+          });
+        }),
+      })
+    );
+  } catch {
+    // Logs directory is not writable — console logging still works.
+  }
+}
 
 export const logger = winston.createLogger({
   level: appConfig.app.logLevel,
@@ -14,22 +50,7 @@ export const logger = winston.createLogger({
     winston.format.errors({ stack: process.env.NODE_ENV !== 'production' }),
     winston.format.json()
   ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({
-      filename: path.join(logsDir, 'insforge.logs.jsonl'),
-      format: winston.format.printf((info) => {
-        const { timestamp, level, message, ...metadata } = info;
-        return JSON.stringify({
-          id: `${Date.now()}-${Math.random()}`,
-          timestamp,
-          message,
-          level,
-          metadata,
-        });
-      }),
-    }),
-  ],
+  transports,
 });
 
 export default logger;
