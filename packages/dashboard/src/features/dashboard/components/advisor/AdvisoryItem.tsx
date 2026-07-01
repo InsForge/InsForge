@@ -1,6 +1,6 @@
 import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import type { DashboardAdvisorIssue } from '#types';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import { formatRemediationPrompt } from './remediationPrompt';
 import CriticalIcon from '#assets/icons/severity_critical.svg?react';

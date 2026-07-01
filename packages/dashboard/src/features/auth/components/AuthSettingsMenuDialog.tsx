@@ -26,6 +26,7 @@ import {
   SelectItem,
   SelectTrigger,
   Switch,
+  useToast,
 } from '@insforge/ui';
 import {
   updateAuthConfigRequestSchema,
@@ -33,7 +34,6 @@ import {
   type UpdateAuthConfigRequest,
 } from '@insforge/shared-schemas';
 import { useAuthConfig } from '#features/auth/hooks/useAuthConfig';
-import { useToast } from '#lib/hooks/useToast';
 import { isInsForgeCloudProject } from '#lib/utils/utils';
 
 interface AuthSettingsMenuDialogProps {

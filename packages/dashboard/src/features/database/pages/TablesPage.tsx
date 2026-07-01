@@ -19,6 +19,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  useToast,
 } from '@insforge/ui';
 import {
   Alert,
@@ -30,7 +31,6 @@ import {
   TableHeader,
 } from '#components';
 import { useConfirm } from '#lib/hooks/useConfirm';
-import { useToast } from '#lib/hooks/useToast';
 import { DatabaseDataGrid } from '#features/database/components/DatabaseDataGrid';
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '#lib/utils/utils';

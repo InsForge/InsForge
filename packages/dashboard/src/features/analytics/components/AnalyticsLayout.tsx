@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ErrorState, LoadingState } from '#components';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { useProjectId } from '#lib/hooks/useMetadata';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 import { TimeRangeProvider } from '#features/analytics/context/TimeRangeContext';
 import { analyticsQueryKeys, useAnalyticsConnection } from '#features/analytics/hooks/useAnalytics';
 import { AnalyticsSidebar } from './AnalyticsSidebar';

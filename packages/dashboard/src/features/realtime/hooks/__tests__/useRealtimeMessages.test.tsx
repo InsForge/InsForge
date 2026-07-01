@@ -13,11 +13,20 @@ vi.mock('#features/realtime/services/realtime.service', () => ({
   },
 }));
 
-vi.mock('#lib/hooks/useToast', () => ({
-  useToast: () => ({
-    showToast: vi.fn(),
-  }),
+const toastMocks = vi.hoisted(() => ({
+  showToast: vi.fn(),
 }));
+
+vi.mock('@insforge/ui', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@insforge/ui')>();
+
+  return {
+    ...actual,
+    useToast: () => ({
+      showToast: toastMocks.showToast,
+    }),
+  };
+});
 
 const listMessagesMock = vi.mocked(realtimeService.listMessages);
 const getMessageStatsMock = vi.mocked(realtimeService.getMessageStats);
@@ -39,6 +48,7 @@ function createWrapper() {
 describe('useRealtimeMessages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    toastMocks.showToast.mockReset();
     listMessagesMock.mockResolvedValue([]);
     getMessageStatsMock.mockResolvedValue({
       totalMessages: 300,
