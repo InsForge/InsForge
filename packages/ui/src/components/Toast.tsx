@@ -103,6 +103,12 @@ function getToastDuration(tone: ToastTone, duration?: number) {
   return tone === 'success' ? SUCCESS_TOAST_DURATION : DEFAULT_TOAST_DURATION;
 }
 
+function clampProgress(progress?: number) {
+  const finiteProgress = progress !== undefined && Number.isFinite(progress) ? progress : 0;
+
+  return Math.min(100, Math.max(0, finiteProgress));
+}
+
 function createToastId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID();
@@ -120,7 +126,11 @@ function normalizeToastOptions(
     return { variant: options, icon, duration };
   }
 
-  return { variant: options?.variant ?? 'info', icon: options?.icon, duration: options?.duration };
+  return {
+    variant: options?.variant ?? 'info',
+    icon: options?.icon ?? icon,
+    duration: options?.duration ?? duration,
+  };
 }
 
 function getDefaultIcon(tone: ToastTone) {
@@ -244,7 +254,7 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
               'h-full transition-all duration-300 ease-out',
               progressBarClasses[toast.tone]
             )}
-            style={{ width: `${toast.progress ?? 0}%` }}
+            style={{ width: `${clampProgress(toast.progress)}%` }}
           />
         </div>
       ) : (
@@ -277,14 +287,18 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         }
 
         const tone = updates.variant ? normalizeTone(updates.variant) : toast.tone;
+        // A variant change re-applies that tone's default duration unless an
+        // explicit duration is passed; non-variant updates keep the prior timing.
+        const durationOverride = updates.duration ?? (updates.variant ? undefined : toast.duration);
 
         return {
           ...toast,
           message: updates.message ?? toast.message,
           tone,
           icon: updates.icon ?? toast.icon,
-          duration: getToastDuration(tone, updates.duration ?? toast.duration),
-          progress: updates.progress ?? toast.progress,
+          duration: getToastDuration(tone, durationOverride),
+          progress:
+            updates.progress === undefined ? toast.progress : clampProgress(updates.progress),
           onCancel: updates.onCancel ?? toast.onCancel,
         };
       })
@@ -339,7 +353,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             tone: 'upload',
             icon: options?.icon,
             duration: PERSISTENT_TOAST_DURATION,
-            progress: options?.progress ?? 0,
+            progress: clampProgress(options?.progress),
             onCancel: options?.onCancel,
           },
         ]);
@@ -352,10 +366,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const regularToasts = toasts.filter((toastItem) => toastItem.tone !== 'upload');
   const uploadToasts = toasts.filter((toastItem) => toastItem.tone === 'upload');
 
+  const contextValue = React.useMemo<ToastContextValue>(
+    () => ({ toast, showToast: toast, updateToast, dismissToast, removeToast: dismissToast }),
+    [toast, updateToast, dismissToast]
+  );
+
   return (
-    <ToastContext.Provider
-      value={{ toast, showToast: toast, updateToast, dismissToast, removeToast: dismissToast }}
-    >
+    <ToastContext.Provider value={contextValue}>
       {children}
       <ToastPrimitive.Provider swipeDirection="right">
         {regularToasts.map((toastItem) => (
@@ -412,9 +429,11 @@ export function useUploadToast() {
 
   const updateUploadProgress = React.useCallback(
     (toastId: string, progress: number) => {
-      updateToast(toastId, { progress });
+      const clampedProgress = clampProgress(progress);
 
-      if (progress >= 100) {
+      updateToast(toastId, { progress: clampedProgress });
+
+      if (clampedProgress >= 100) {
         window.setTimeout(() => {
           dismissToast(toastId);
         }, 1500);
