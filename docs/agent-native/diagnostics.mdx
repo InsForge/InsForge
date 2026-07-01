@@ -1,13 +1,16 @@
 ---
-title: "Diagnostics & advisor"
-sidebarTitle: "Diagnostics & advisor"
-description: "The agent reads backend health, advisor findings, and error logs, then applies the fix."
+title: 'Diagnostics & advisor'
+sidebarTitle: 'Diagnostics & advisor'
+description: 'The agent reads backend health, advisor findings, and error logs, then applies the fix.'
 ---
 
 When something breaks, an agent should not have to guess. `npx @insforge/cli diagnose` turns the backend's own signals into something an agent can fetch and act on directly: advisor findings with remediations, database health checks, instance metrics, and aggregated error logs. Each finding comes with a fix, so "what is wrong" and "what to do about it" arrive together. The agent pulls all of this itself, with no dashboard in the loop, which is what lets it close security gaps like a permissive RLS policy before they leak data.
 
 <Frame caption="A Backend Advisor finding: the problem, the affected table, and a remediation the agent can copy and apply.">
-  <img src="/images/backend-advisor.png" alt="Backend Advisor finding: a permissive RLS policy on public.messages with a Copy Remediation button" />
+  <img
+    src="/images/backend-advisor.png"
+    alt="Backend Advisor finding: a permissive RLS policy on public.messages with a Copy Remediation button"
+  />
 </Frame>
 
 ## Full health report
@@ -36,12 +39,12 @@ A typical finding is a permissive RLS policy that exposes a table to anonymous u
 
 Each part of the report is also available on its own:
 
-| Command | What it checks |
-|---------|----------------|
+| Command            | What it checks                                                |
+| ------------------ | ------------------------------------------------------------- |
 | `diagnose advisor` | Latest advisor scan: security, performance, and health issues |
-| `diagnose db` | Database health: connections, table bloat, index usage |
-| `diagnose metrics` | Instance metrics: CPU, memory, disk, and network |
-| `diagnose logs` | Error-level logs aggregated across every backend source |
+| `diagnose db`      | Database health: connections, table bloat, index usage        |
+| `diagnose metrics` | Instance metrics: CPU, memory, disk, and network              |
+| `diagnose logs`    | Error-level logs aggregated across every backend source       |
 
 For raw logs from a single source, use the top-level command:
 
@@ -51,6 +54,24 @@ npx @insforge/cli logs postgres.logs
 ```
 
 Sources include `insforge.logs`, `postgREST.logs`, `postgres.logs`, `function.logs`, and `function-deploy.logs`.
+
+## Policy simulator
+
+The advisor tells you a policy looks wrong. The policy simulator tells you what a specific identity can actually do, before you deploy. Send a table, an operation, a role, and the JWT claims to test, and the backend runs that exact operation as that identity inside a transaction it always rolls back, then reports whether row-level security allowed or denied it and which policies applied. This endpoint is admin-protected.
+
+```http
+POST /api/database/policies/simulate
+{
+  "table": "todos",
+  "operation": "SELECT",
+  "role": "authenticated",
+  "claims": { "sub": "550e8400-e29b-41d4-a716-446655440001" }
+}
+```
+
+The response gives the decision (`allowed`, `denied`, `partial`, or `bypass`), how many rows the role can see versus how many exist, the policies Postgres considered with their `USING` and `WITH CHECK` expressions, and a plain-language explanation. `project_admin` is reported as `bypass` because it has `BYPASSRLS`. No rows are persisted: every simulated statement runs under a downgraded role and is rolled back. See the [policies API spec](https://github.com/InsForge/InsForge/blob/main/openapi/policies.yaml) for the full request and response shape.
+
+This sits between the advisor and [branching](/agent-native/branching): the advisor finds a bad policy, the simulator confirms exactly how it allows or denies a given user, and branching lets you rehearse the fix in isolation.
 
 ## Let the agent interpret it
 

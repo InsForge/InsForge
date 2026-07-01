@@ -229,7 +229,7 @@ export const verifyOTPLimiter = [verifyOTPRateLimiter];
  * an explicit named flag (not `NODE_ENV`) so unit tests still exercise the
  * limiter and prod can never accidentally bypass via test envs.
  */
-export type WriteLimiterCategory = 'functions' | 'deployments' | 'compute';
+export type WriteLimiterCategory = 'functions' | 'deployments' | 'compute' | 'database';
 
 function isWriteRateLimitDisabled(): boolean {
   return process.env.INSFORGE_DISABLE_WRITE_RATE_LIMIT === '1';
@@ -245,6 +245,7 @@ export const DEFAULT_WRITE_ENDPOINT_LIMITS: Readonly<Record<WriteLimiterCategory
     functions: 15,
     deployments: 25,
     compute: 15,
+    database: 30,
   });
 
 /**
@@ -448,3 +449,4 @@ function createWriteEndpointLimiter(category: WriteLimiterCategory) {
 export const functionsWriteLimiter = createWriteEndpointLimiter('functions');
 export const deploymentsWriteLimiter = createWriteEndpointLimiter('deployments');
 export const computeWriteLimiter = createWriteEndpointLimiter('compute');
+export const databaseWriteLimiter = createWriteEndpointLimiter('database');
