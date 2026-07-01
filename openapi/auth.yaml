@@ -601,12 +601,32 @@ paths:
   /api/auth/logout:
     post:
       summary: Logout user
-      description: Logout and clear refresh token cookie
+      description: |
+        Logout the current client session.
+
+        Web clients use the httpOnly refresh token cookie. If a valid web refresh cookie is present,
+        the request must include the `X-CSRF-Token` header returned from login, registration, or refresh.
+        Missing, expired, invalid, or wrong-session-type refresh cookies are cleared idempotently and still
+        return success. Mobile, desktop, and server clients do not have server-side logout state and should
+        discard their stored refresh token after this request.
       tags:
         - Client
+      parameters:
+        - name: client_type
+          in: query
+          schema:
+            type: string
+            enum: [web, mobile, desktop, server]
+            default: web
+          description: Client type. Web clients clear the httpOnly refresh cookie; other clients should discard their local refresh token.
+        - name: X-CSRF-Token
+          in: header
+          schema:
+            type: string
+          description: CSRF token required for web clients when a valid refresh cookie is present
       responses:
         '200':
-          description: Logged out successfully
+          description: Logged out successfully. Also returned when the refresh cookie is missing, expired, invalid, or the wrong session type.
           content:
             application/json:
               schema:
@@ -616,6 +636,8 @@ paths:
                     type: boolean
                   message:
                     type: string
+        '403':
+          description: Invalid or missing CSRF token for a valid web refresh cookie
 
   /api/auth/sessions/current:
     get:
@@ -776,12 +798,24 @@ paths:
   /api/auth/admin/logout:
     post:
       summary: Logout admin dashboard session
-      description: Clears the dashboard-only `insforge_admin_refresh_token` cookie.
+      description: |
+        Clears the dashboard-only `insforge_admin_refresh_token` cookie.
+
+        If a valid admin refresh cookie is present, the request must include the `X-CSRF-Token`
+        header returned from admin login, admin session exchange, or admin refresh. Missing, expired,
+        invalid, or wrong-session-type admin refresh cookies are cleared idempotently and still return
+        success.
       tags:
         - Admin
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          schema:
+            type: string
+          description: CSRF token required when a valid admin refresh cookie is present
       responses:
         '200':
-          description: Logged out successfully
+          description: Logged out successfully. Also returned when the admin refresh cookie is missing, expired, invalid, or the wrong session type.
           content:
             application/json:
               schema:
@@ -791,6 +825,8 @@ paths:
                     type: boolean
                   message:
                     type: string
+        '403':
+          description: Invalid or missing CSRF token for a valid admin refresh cookie
 
   /api/auth/tokens/anon:
     post:
