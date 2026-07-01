@@ -1,6 +1,6 @@
 import { type MouseEventHandler, type ReactNode, useId, useMemo, useRef, useState } from 'react';
 import { Info } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { Popover, PopoverContent, PopoverTrigger } from '#components';
 import type { DashboardMetricDataPoint } from '#types';
 import { aggregateMetricSeries } from '#features/dashboard/utils/aggregateMetricSeries';
 
@@ -190,23 +190,24 @@ export function MetricChartCard({
           <span className="flex h-5 w-5 shrink-0 items-center justify-center">{icon}</span>
           <span className="truncate">{title}</span>
           {description && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-                    aria-label={`About ${title}`}
-                  >
-                    <Info className="h-3.5 w-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-[240px] text-left font-normal normal-case">
-                  <p>{description}</p>
-                  {thresholdNote && <p className="mt-1 opacity-80">{thresholdNote}</p>}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label={`About ${title}`}
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                className="w-auto max-w-[260px] rounded border-[var(--border)] bg-[rgb(var(--foreground))] p-2 text-left text-xs font-normal normal-case leading-4 text-[rgb(var(--inverse))] shadow-[0_4px_4px_rgba(0,0,0,0.08)]"
+              >
+                <p>{description}</p>
+                {thresholdNote && <p className="mt-1">{thresholdNote}</p>}
+              </PopoverContent>
+            </Popover>
           )}
         </div>
         <p className="text-[20px] font-medium leading-7 text-foreground">
