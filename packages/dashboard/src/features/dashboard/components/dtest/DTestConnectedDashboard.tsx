@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { type ReactNode, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@insforge/ui';
 import { Braces, Database, Download, HardDrive, User } from 'lucide-react';
@@ -67,6 +67,22 @@ export function DTestConnectedDashboard() {
     advisorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  // The advisor section only mounts in cloud-hosting mode, so only make these
+  // badges clickable when there is somewhere for them to scroll to.
+  const renderAdvisorBadge = (content: ReactNode, label: string) =>
+    isCloudHostingMode ? (
+      <button
+        type="button"
+        onClick={scrollToAdvisor}
+        className={`${STATUS_BADGE_CLASS} transition-colors hover:bg-[var(--alpha-8)]`}
+        aria-label={label}
+      >
+        {content}
+      </button>
+    ) : (
+      <div className={STATUS_BADGE_CLASS}>{content}</div>
+    );
+
   const projectName = isCloudProject
     ? projectInfo.name || 'My InsForge Project'
     : 'My InsForge Project';
@@ -109,19 +125,17 @@ export function DTestConnectedDashboard() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={scrollToAdvisor}
-              className={`${STATUS_BADGE_CLASS} transition-colors hover:bg-[var(--alpha-8)]`}
-              aria-label="View backend advisor"
-            >
-              <span className="flex h-5 w-5 items-center justify-center">
-                <span
-                  className={`h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-amber-400'}`}
-                />
-              </span>
-              <span className="px-1">{projectHealth}</span>
-            </button>
+            {renderAdvisorBadge(
+              <>
+                <span className="flex h-5 w-5 items-center justify-center">
+                  <span
+                    className={`h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                  />
+                </span>
+                <span className="px-1">{projectHealth}</span>
+              </>,
+              'View backend advisor'
+            )}
             {lastBackupAge && (
               <button
                 type="button"
@@ -133,19 +147,16 @@ export function DTestConnectedDashboard() {
                 <span className="px-1">Last Backup {lastBackupAge}</span>
               </button>
             )}
-            {criticalCount > 0 && (
-              <button
-                type="button"
-                onClick={scrollToAdvisor}
-                className={`${STATUS_BADGE_CLASS} transition-colors hover:bg-[var(--alpha-8)]`}
-                aria-label="View critical issues in backend advisor"
-              >
-                <CriticalIcon className="h-5 w-5 text-destructive" />
-                <span className="px-1">
-                  {criticalCount} Critical {criticalCount === 1 ? 'Issue' : 'Issues'}
-                </span>
-              </button>
-            )}
+            {criticalCount > 0 &&
+              renderAdvisorBadge(
+                <>
+                  <CriticalIcon className="h-5 w-5 text-destructive" />
+                  <span className="px-1">
+                    {criticalCount} Critical {criticalCount === 1 ? 'Issue' : 'Issues'}
+                  </span>
+                </>,
+                'View critical issues in backend advisor'
+              )}
           </div>
         </div>
 
