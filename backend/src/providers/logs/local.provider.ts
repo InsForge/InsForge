@@ -82,9 +82,11 @@ export class LocalFileProvider extends BaseLogProvider {
   private formatEventMessage(log: Record<string, unknown>): string | null {
     // Legacy Vector-transformed entries carry an appname field
     if (log.appname) {
-      // For error logs, include error and stack in eventMessage to match CloudWatch display
+      // For error logs, include error and stack in eventMessage to match CloudWatch display.
+      // Vector stored severity under metadata.level, not at the top level.
+      const level = (log.metadata as Record<string, unknown> | undefined)?.level ?? log.level;
       let eventMessage = String(log.event_message ?? '');
-      if (log.level === 'error' && log.error) {
+      if (level === 'error' && log.error) {
         eventMessage = `${eventMessage}\n\nError: ${log.error}`;
         if (log.stack) {
           eventMessage += `\n\nStack Trace:\n${log.stack}`;
@@ -98,8 +100,9 @@ export class LocalFileProvider extends BaseLogProvider {
       const metadata = (log.metadata ?? {}) as Record<string, unknown>;
 
       // HTTP request logs (see the request logger in server.ts) — format as an
-      // nginx-style line, matching what the Vector pipeline used to produce
-      if (metadata.duration !== undefined) {
+      // nginx-style line, matching what the Vector pipeline used to produce.
+      // Require method too so timing metadata on other logs doesn't match.
+      if (metadata.duration !== undefined && metadata.method !== undefined) {
         return [
           metadata.method,
           metadata.path,
@@ -115,9 +118,14 @@ export class LocalFileProvider extends BaseLogProvider {
 
       let eventMessage = `${log.level} - ${log.message}`;
       if (metadata.error) {
-        eventMessage += `\n\nError: ${metadata.error}`;
-        if (metadata.stack) {
-          eventMessage += `\n\nStack Trace:\n${metadata.stack}`;
+        // metadata.error is either a string or a flattened Error
+        // ({ message, stack } — see flattenErrors in utils/logger.ts)
+        const err = metadata.error as { message?: unknown; stack?: unknown } | string;
+        const errMessage = typeof err === 'object' && err.message !== undefined ? err.message : err;
+        const errStack = (typeof err === 'object' ? err.stack : undefined) ?? metadata.stack;
+        eventMessage += `\n\nError: ${errMessage}`;
+        if (errStack) {
+          eventMessage += `\n\nStack Trace:\n${errStack}`;
         }
       }
       return eventMessage;

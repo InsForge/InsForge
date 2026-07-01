@@ -8,6 +8,17 @@ const logsDir = appConfig.server.logsDir;
 
 const transports: winston.transport[] = [new winston.transports.Console()];
 
+// Error instances stringify to {} — flatten them so metadata like
+// `logger.error('...', { error })` survives the trip to disk. Stacks follow
+// the same production gate as winston.format.errors below.
+const flattenErrors = (_key: string, value: unknown) =>
+  value instanceof Error
+    ? {
+        message: value.message,
+        ...(process.env.NODE_ENV !== 'production' ? { stack: value.stack } : {}),
+      }
+    : value;
+
 // The JSONL file feeds the self-hosted dashboard logs (LocalFileProvider).
 // Cloud deployments ship stdout to CloudWatch via the awslogs driver and read
 // logs back through CloudWatchProvider, so writing the file there would only
@@ -25,18 +36,22 @@ if (!isCloudEnvironment()) {
         tailable: true,
         format: winston.format.printf((info) => {
           const { timestamp, level, message, ...metadata } = info;
-          return JSON.stringify({
-            id: `${Date.now()}-${Math.random()}`,
-            timestamp,
-            message,
-            level,
-            metadata,
-          });
+          return JSON.stringify(
+            {
+              id: `${Date.now()}-${Math.random()}`,
+              timestamp,
+              message,
+              level,
+              metadata,
+            },
+            flattenErrors
+          );
         }),
       })
     );
-  } catch {
-    // Logs directory is not writable — console logging still works.
+  } catch (error) {
+    // Console logging still works, but surface why the dashboard log file is missing
+    console.warn(`Could not initialize file logging at ${logsDir}:`, error);
   }
 }
 

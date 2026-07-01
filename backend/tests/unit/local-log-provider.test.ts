@@ -54,12 +54,39 @@ const winstonRequestLog = {
   },
 };
 
-// Line shape shipped by the legacy Vector sidecar
+const winstonFlattenedErrorLog = {
+  id: '4-0.4',
+  timestamp: '2026-07-01T10:03:00.000Z',
+  message: 'Failed to record MCP usage',
+  level: 'error',
+  metadata: {
+    error: { message: 'kaboom', stack: 'Error: kaboom\n  at y.ts:2' },
+  },
+};
+
+const winstonTimingLog = {
+  id: '5-0.5',
+  timestamp: '2026-07-01T10:04:00.000Z',
+  message: 'Query finished',
+  level: 'info',
+  metadata: { duration: '50ms' },
+};
+
+// Line shapes shipped by the legacy Vector sidecar
 const vectorLog = {
   appname: 'insforge',
   timestamp: '2026-07-01T09:59:00.000Z',
   event_message: 'legacy vector line',
   metadata: { level: 'info' },
+};
+
+const vectorErrorLog = {
+  appname: 'insforge',
+  timestamp: '2026-07-01T09:58:00.000Z',
+  event_message: 'error - it broke',
+  metadata: { level: 'error' },
+  error: 'it broke',
+  stack: 'Error: it broke\n  at z.ts:3',
 };
 
 describe('LocalFileProvider', () => {
@@ -112,6 +139,26 @@ describe('LocalFileProvider', () => {
     expect(logs[0].eventMessage).toBe('GET /api/health 200 17 12ms - 127.0.0.1 - curl/8.0');
   });
 
+  it('renders flattened Error objects in metadata', async () => {
+    await writeLogFile([winstonFlattenedErrorLog]);
+
+    const { logs } = await provider.getLogsBySource('insforge.logs');
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].eventMessage).toContain('error - Failed to record MCP usage');
+    expect(logs[0].eventMessage).toContain('Error: kaboom');
+    expect(logs[0].eventMessage).toContain('Stack Trace:\nError: kaboom');
+  });
+
+  it('does not mistake timing metadata for an HTTP request log', async () => {
+    await writeLogFile([winstonTimingLog]);
+
+    const { logs } = await provider.getLogsBySource('insforge.logs');
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].eventMessage).toBe('info - Query finished');
+  });
+
   it('still parses legacy Vector lines', async () => {
     await writeLogFile([vectorLog]);
 
@@ -119,6 +166,16 @@ describe('LocalFileProvider', () => {
 
     expect(logs).toHaveLength(1);
     expect(logs[0].eventMessage).toBe('legacy vector line');
+  });
+
+  it('appends error details for legacy Vector error lines (metadata.level)', async () => {
+    await writeLogFile([vectorErrorLog]);
+
+    const { logs } = await provider.getLogsBySource('insforge.logs');
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].eventMessage).toContain('Error: it broke');
+    expect(logs[0].eventMessage).toContain('Stack Trace:\nError: it broke');
   });
 
   it('skips unparseable and unknown-shape lines', async () => {
