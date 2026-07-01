@@ -4,6 +4,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 // stable host. The service caches the value at call time, not import time.
 vi.mock('@/utils/environment.js', () => ({
   getApiBaseUrl: () => 'https://example.test',
+  // logger.ts (pulled in transitively) gates its file transport on this
+  isCloudEnvironment: () => false,
 }));
 
 // Stub DatabaseManager so StorageService construction doesn't touch a pool.
