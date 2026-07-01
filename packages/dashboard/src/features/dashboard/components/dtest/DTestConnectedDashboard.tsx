@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@insforge/ui';
 import { Braces, Database, Download, HardDrive, User } from 'lucide-react';
@@ -61,6 +61,11 @@ export function DTestConnectedDashboard() {
   const isBranch = project?.isBranch === true;
   const lastBackupQuery = useLastBackup();
   const advisorLatest = useAdvisorLatest();
+  const advisorRef = useRef<HTMLDivElement>(null);
+
+  const scrollToAdvisor = () => {
+    advisorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const projectName = isCloudProject
     ? projectInfo.name || 'My InsForge Project'
@@ -104,27 +109,42 @@ export function DTestConnectedDashboard() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className={STATUS_BADGE_CLASS}>
+            <button
+              type="button"
+              onClick={scrollToAdvisor}
+              className={`${STATUS_BADGE_CLASS} transition-colors hover:bg-[var(--alpha-8)]`}
+              aria-label="View backend advisor"
+            >
               <span className="flex h-5 w-5 items-center justify-center">
                 <span
                   className={`h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-amber-400'}`}
                 />
               </span>
               <span className="px-1">{projectHealth}</span>
-            </div>
+            </button>
             {lastBackupAge && (
-              <div className={STATUS_BADGE_CLASS}>
+              <button
+                type="button"
+                onClick={() => void navigate('/dashboard/database/backups')}
+                className={`${STATUS_BADGE_CLASS} transition-colors hover:bg-[var(--alpha-8)]`}
+                aria-label="View backup & restore"
+              >
                 <CloudDoneIcon className="h-5 w-5 text-primary" />
                 <span className="px-1">Last Backup {lastBackupAge}</span>
-              </div>
+              </button>
             )}
             {criticalCount > 0 && (
-              <div className={STATUS_BADGE_CLASS}>
+              <button
+                type="button"
+                onClick={scrollToAdvisor}
+                className={`${STATUS_BADGE_CLASS} transition-colors hover:bg-[var(--alpha-8)]`}
+                aria-label="View critical issues in backend advisor"
+              >
                 <CriticalIcon className="h-5 w-5 text-destructive" />
                 <span className="px-1">
                   {criticalCount} Critical {criticalCount === 1 ? 'Issue' : 'Issues'}
                 </span>
-              </div>
+              </button>
             )}
           </div>
         </div>
@@ -181,7 +201,9 @@ export function DTestConnectedDashboard() {
         {isCloudHostingMode && (
           <>
             <ObservabilitySection />
-            <BackendAdvisorSection />
+            <div ref={advisorRef} className="scroll-mt-10">
+              <BackendAdvisorSection />
+            </div>
           </>
         )}
       </div>

@@ -1,4 +1,6 @@
 import { type MouseEventHandler, type ReactNode, useId, useMemo, useRef, useState } from 'react';
+import { Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import type { DashboardMetricDataPoint } from '#types';
 import { aggregateMetricSeries } from '#features/dashboard/utils/aggregateMetricSeries';
 
@@ -15,6 +17,8 @@ export interface MetricChartCardProps {
   fixedDomain?: [number, number];
   /** Formatter for axis labels (threshold + zero). Defaults to `${v}%`. */
   formatAxisLabel?: (value: number) => string;
+  /** Short explanation of the metric, surfaced via an info tooltip next to the title. */
+  description?: string;
 }
 
 const SPARKLINE_WIDTH = 434;
@@ -107,6 +111,7 @@ export function MetricChartCard({
   threshold,
   fixedDomain,
   formatAxisLabel,
+  description,
 }: MetricChartCardProps) {
   const effectiveDomain =
     fixedDomain ?? (threshold !== undefined ? FIXED_PERCENT_DOMAIN : undefined);
@@ -164,6 +169,10 @@ export function MetricChartCard({
     threshold !== undefined ? 100 - ((threshold - domainMin) / domainRange) * 100 : 0;
   const renderAxisLabel = (value: number) =>
     formatAxisLabel ? formatAxisLabel(value) : `${value}%`;
+  const thresholdNote =
+    threshold !== undefined
+      ? `Green while healthy; the line turns red above ${renderAxisLabel(threshold)}.`
+      : null;
   const gradientTransitionHalfWidth = 8;
   const gradientTransitionStart = Math.max(
     0,
@@ -180,6 +189,25 @@ export function MetricChartCard({
         <div className="flex items-center gap-1.5 text-[13px] leading-[22px] text-muted-foreground">
           <span className="flex h-5 w-5 shrink-0 items-center justify-center">{icon}</span>
           <span className="truncate">{title}</span>
+          {description && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label={`About ${title}`}
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[240px] text-left font-normal normal-case">
+                  <p>{description}</p>
+                  {thresholdNote && <p className="mt-1 opacity-80">{thresholdNote}</p>}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
         <p className="text-[20px] font-medium leading-7 text-foreground">
           {isLoading ? '—' : renderValue(aggregates.latest)}

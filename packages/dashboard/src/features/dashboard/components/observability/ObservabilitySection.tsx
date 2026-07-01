@@ -19,6 +19,7 @@ interface MetricConfig {
   icon: React.ReactNode;
   format: (value: number) => string;
   threshold?: number;
+  description: string;
 }
 
 const PERCENT = (value: number) => `${value.toFixed(1)}%`;
@@ -53,6 +54,8 @@ const METRICS: MetricConfig[] = [
     icon: <Cpu className="h-5 w-5" />,
     format: PERCENT,
     threshold: 60,
+    description:
+      "How hard your instance's processor is working. Sustained high usage slows down API requests and background jobs.",
   },
   {
     metric: 'memory_usage',
@@ -60,18 +63,24 @@ const METRICS: MetricConfig[] = [
     icon: <MemoryStick className="h-5 w-5" />,
     format: PERCENT,
     threshold: 85,
+    description:
+      "How much of your instance's RAM is in use. When memory runs low, processes can be killed or start swapping, which hurts performance.",
   },
   {
     metric: 'network_in',
     title: 'Network In',
     icon: <ArrowDownToLine className="h-5 w-5" />,
     format: BYTES_PER_SEC,
+    description:
+      'Rate of data flowing into your instance, such as file uploads and incoming API requests.',
   },
   {
     metric: 'network_out',
     title: 'Network Out',
     icon: <ArrowUpFromLine className="h-5 w-5" />,
     format: BYTES_PER_SEC,
+    description:
+      'Rate of data leaving your instance, such as query results and file downloads served to clients.',
   },
 ];
 
@@ -149,6 +158,7 @@ export function ObservabilitySection() {
                   formatValue={config.format}
                   isLoading={isLoading}
                   threshold={config.threshold}
+                  description={config.description}
                 />
               );
             });
@@ -167,6 +177,7 @@ export function ObservabilitySection() {
                 threshold={diskCardProps.threshold}
                 fixedDomain={diskCardProps.fixedDomain}
                 formatAxisLabel={BYTES_SIZE}
+                description="How much of your instance's storage the database, files, and logs are using. A full disk stops writes and can take the backend offline."
               />
             );
             return cards;
