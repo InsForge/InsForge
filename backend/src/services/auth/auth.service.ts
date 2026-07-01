@@ -262,6 +262,64 @@ export class AuthService {
   }
 
   /**
+   * Anonymous user registration
+   */
+  async anonymousRegister(): Promise<CreateSessionResponse> {
+    const { disableSignup } = await AuthConfigService.getInstance().getAuthConfig();
+    if (disableSignup) {
+      throw new AppError(
+        'User signups are disabled for this project.',
+        403,
+        ERROR_CODES.AUTH_SIGNUP_DISABLED
+      );
+    }
+
+    const userId = crypto.randomUUID();
+    const syntheticEmail = `anon+${userId}@anonymous.insforge.dev`;
+
+    const pool = this.getPool();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `INSERT INTO auth.users (id, email, is_anonymous, profile, created_at, updated_at)
+         VALUES ($1, $2, true, $3::jsonb, NOW(), NOW())`,
+        [userId, syntheticEmail, JSON.stringify({ name: 'Guest' })]
+      );
+
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      // Postgres unique_violation
+      if (e && typeof e === 'object' && 'code' in e && e.code === '23505') {
+        throw new AppError('User already exists', 409, ERROR_CODES.ALREADY_EXISTS);
+      }
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    const dbUser = await this.getUserById(userId);
+    if (!dbUser) {
+      throw new Error('User not found after registration');
+    }
+    const user = this.transformUserRecordToSchema(dbUser);
+
+    // Email verification not required, provide access token for immediate login
+    const accessToken = this.tokenManager.generateAccessToken({
+      sub: userId,
+      email: syntheticEmail,
+      role: 'authenticated',
+    });
+
+    return {
+      user,
+      accessToken,
+    };
+  }
+
+  /**
    * User login
    */
   async login(email: string, password: string): Promise<CreateSessionResponse> {
@@ -292,7 +350,7 @@ export class AuthService {
     const user = this.transformUserRecordToSchema(dbUser);
     const accessToken = this.tokenManager.generateAccessToken({
       sub: dbUser.id,
-      email: dbUser.email,
+      email: dbUser.email ?? undefined,
       role: 'authenticated',
     });
 
@@ -416,7 +474,7 @@ export class AuthService {
       const user = this.transformUserRecordToSchema(dbUser);
       const accessToken = this.tokenManager.generateAccessToken({
         sub: dbUser.id,
-        email: dbUser.email,
+        email: dbUser.email ?? undefined,
         role: 'authenticated',
       });
 
@@ -477,7 +535,7 @@ export class AuthService {
       const user = this.transformUserRecordToSchema(dbUser);
       const accessToken = this.tokenManager.generateAccessToken({
         sub: dbUser.id,
-        email: dbUser.email,
+        email: dbUser.email ?? undefined,
         role: 'authenticated',
       });
 
@@ -742,7 +800,7 @@ export class AuthService {
       const user = this.transformUserRecordToSchema(dbUser);
       const accessToken = this.tokenManager.generateAccessToken({
         sub: user.id,
-        email: user.email,
+        email: user.email ?? undefined,
         role: 'authenticated',
       });
 
@@ -874,6 +932,7 @@ export class AuthService {
         updatedAt: new Date().toISOString(),
         profile: { name: userName, avatar_url: avatarUrl },
         metadata: null,
+        isAnonymous: false,
       };
 
       const accessToken = this.tokenManager.generateAccessToken({
@@ -1251,6 +1310,7 @@ export class AuthService {
       providers: providers,
       profile: dbUser.profile,
       metadata: dbUser.metadata,
+      isAnonymous: dbUser.is_anonymous,
     };
   }
 

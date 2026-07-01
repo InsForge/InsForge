@@ -343,10 +343,7 @@ paths:
                   refreshToken:
                     type: string
                     nullable: true
-                    description: Refresh token for mobile/desktop/server clients (null for web clients or if email verification required)
-                  requireEmailVerification:
-                    type: boolean
-                    description: Whether email verification is required before login
+                    description: Refresh token for mobile/desktop/server clients (null for web clients)
         '400':
           description: Invalid request
         '403':
@@ -481,6 +478,60 @@ paths:
           description: Forbidden - Admin only
         '404':
           description: User not found
+
+  /api/auth/users/anonymous:
+    post:
+      summary: Register anonymous user
+      description: Creates a new anonymous user account
+      tags:
+          - Client
+      parameters:
+        - name: client_type
+          in: query
+          schema:
+            type: string
+            enum: [web, mobile, desktop, server]
+            default: web
+          description: |
+            Client type determines how refresh tokens are returned:
+            - web: Refresh token stored in httpOnly cookie, csrfToken returned in response
+            - mobile/desktop/server: refreshToken returned directly in response body
+      responses:
+        '200':
+          description: Anonymous user created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
+                  accessToken:
+                    type: string
+                    nullable: true
+                    description: JWT authentication token
+                  csrfToken:
+                    type: string
+                    nullable: true
+                    description: CSRF token for use with refresh endpoint (web clients only)
+                  refreshToken:
+                    type: string
+                    nullable: true
+                    description: Refresh token for mobile/desktop/server clients (null for web clients)
+        '400':
+          description: Invalid request
+        '403':
+          description: Signups disabled — project has disabled new user registration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: AUTH_SIGNUP_DISABLED
+                message: User signups are disabled for this project.
+                statusCode: 403
+        '409':
+          description: User already exists
 
   /api/auth/sessions:
     post:
@@ -2066,3 +2117,4 @@ components:
           type: string
           description: Suggested action to resolve the error
           example: "Please use a different email address"
+
