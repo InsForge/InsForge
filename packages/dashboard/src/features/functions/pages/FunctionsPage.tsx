@@ -2,10 +2,8 @@ import { ArrowLeft, Download, Edit3, Trash2, Upload } from 'lucide-react';
 import { FunctionRow } from '#features/functions/components/FunctionRow';
 import FunctionEmptyState from '#features/functions/components/FunctionEmptyState';
 import { useFunctions } from '#features/functions/hooks/useFunctions';
-import { useToast } from '#lib/hooks/useToast';
-import { useState, useCallback, useRef, useEffect } from 'react';
-import RefreshIcon from '#assets/icons/refresh.svg?react';
 import {
+  useToast,
   Button,
   ConfirmDialog,
   Tooltip,
@@ -14,6 +12,8 @@ import {
   TooltipTrigger,
   Skeleton,
 } from '@insforge/ui';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { CodeEditor, TableHeader } from '#components';
 import { useConfirm } from '#lib/hooks/useConfirm';
 

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { realtimeService } from '#features/realtime/services/realtime.service';
 import type { ListMessagesRequest } from '@insforge/shared-schemas';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 
 export function useRealtimeMessages() {
   const queryClient = useQueryClient();

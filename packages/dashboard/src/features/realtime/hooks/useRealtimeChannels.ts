@@ -4,7 +4,7 @@ import {
   realtimeService,
   type RealtimeChannel,
 } from '#features/realtime/services/realtime.service';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 import type { CreateChannelRequest, UpdateChannelRequest } from '@insforge/shared-schemas';
 
 export function useRealtimeChannels() {

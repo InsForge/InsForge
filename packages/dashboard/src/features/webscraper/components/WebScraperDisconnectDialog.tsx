@@ -8,10 +8,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  useToast,
 } from '@insforge/ui';
 import { webscraperQueryKeys } from '#features/webscraper/hooks/useWebscraper';
 import { webscraperService } from '#features/webscraper/services/webscraper.service';
-import { useToast } from '#lib/hooks/useToast';
 
 export function WebScraperDisconnectDialog({
   open,

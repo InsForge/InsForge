@@ -8,6 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  useToast,
 } from '@insforge/ui';
 import { CreateBackupDialog } from '#features/database/components/CreateBackupDialog';
 import { ConfirmRestoreDialog } from '#features/database/components/ConfirmRestoreDialog';
@@ -21,7 +22,6 @@ import {
 } from '#features/database/hooks/useDatabaseBackup';
 import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { useConfirm } from '#lib/hooks/useConfirm';
-import { useToast } from '#lib/hooks/useToast';
 
 function formatBackupTimestamp(timestamp: string) {
   const date = new Date(timestamp);

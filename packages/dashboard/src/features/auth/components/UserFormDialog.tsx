@@ -12,8 +12,8 @@ import {
   Input,
   Switch,
   cn,
+  useToast,
 } from '@insforge/ui';
-import { useToast } from '#lib/hooks/useToast';
 import { useUsers } from '#features/auth/hooks/useUsers';
 import { emailSchema } from '@insforge/shared-schemas';
 import { z } from 'zod';

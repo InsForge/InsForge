@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from '#lib/contexts/AuthContext';
 import { AppRoutes } from '#router/AppRoutes';
-import { ToastProvider } from '#lib/hooks/useToast';
+import { ToastProvider } from '@insforge/ui';
 import { SocketProvider } from '#lib/contexts/SocketContext';
 import { PostHogAnalyticsProvider } from '#lib/analytics/posthog';
 import { SQLEditorProvider } from '#features/database/contexts/SQLEditorContext';

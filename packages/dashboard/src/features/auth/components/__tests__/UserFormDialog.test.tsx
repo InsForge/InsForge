@@ -16,11 +16,16 @@ vi.mock('#features/auth/hooks/useUsers', () => ({
   }),
 }));
 
-vi.mock('#lib/hooks/useToast', () => ({
-  useToast: () => ({
-    showToast: hookMocks.showToast,
-  }),
-}));
+vi.mock('@insforge/ui', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@insforge/ui')>();
+
+  return {
+    ...actual,
+    useToast: () => ({
+      showToast: hookMocks.showToast,
+    }),
+  };
+});
 
 describe('UserFormDialog', () => {
   afterEach(() => {

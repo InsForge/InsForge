@@ -11,6 +11,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  useToast,
 } from '@insforge/ui';
 import type { AIOverviewMetricPoint } from '@insforge/shared-schemas';
 import { CodeEditor } from '#components';
@@ -19,7 +20,6 @@ import { useAIOverview } from '#features/ai/hooks/useAIOverview';
 import { useOpenRouterKey, useRotateOpenRouterKey } from '#features/ai/hooks/useOpenRouterKey';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { useConfirm } from '#lib/hooks/useConfirm';
-import { useToast } from '#lib/hooks/useToast';
 import type { DashboardModelCreditUsage } from '#types';
 import {
   CODE_TAB_LANGUAGE,

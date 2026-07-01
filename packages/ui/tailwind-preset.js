@@ -18,6 +18,15 @@ const tailwindPreset = {
         card: 'rgb(var(--card))',
         toast: 'rgb(var(--toast))',
       },
+      keyframes: {
+        'toast-progress': {
+          from: { transform: 'scaleX(0)' },
+          to: { transform: 'scaleX(1)' },
+        },
+      },
+      animation: {
+        'toast-progress': 'toast-progress linear forwards',
+      },
     },
   },
 };

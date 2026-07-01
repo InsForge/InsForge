@@ -19,12 +19,12 @@ import {
   DialogTitle,
   Input,
   Skeleton,
+  useToast,
 } from '@insforge/ui';
 import { useDeployments } from '#features/deployments/hooks/useDeployments';
 import { useDeploymentSlug } from '#features/deployments/hooks/useDeploymentSlug';
 import { useDeploymentMetadata } from '#features/deployments/hooks/useDeploymentMetadata';
 import { useCustomDomains } from '#features/deployments/hooks/useCustomDomains';
-import { useToast } from '#lib/hooks/useToast';
 import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import type { CustomDomain } from '#features/deployments/services/deployments.service';
 

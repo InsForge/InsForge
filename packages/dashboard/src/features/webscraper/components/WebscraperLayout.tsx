@@ -1,11 +1,10 @@
 import { useEffect } from 'react';
 import { Outlet, useOutletContext } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button } from '@insforge/ui';
+import { Button, useToast } from '@insforge/ui';
 import { ErrorState, LoadingState } from '#components';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { useProjectId } from '#lib/hooks/useMetadata';
-import { useToast } from '#lib/hooks/useToast';
 import { webscraperQueryKeys, useApifyConnection } from '#features/webscraper/hooks/useWebscraper';
 import type { ApifyConnection } from '#features/webscraper/services/webscraper.service';
 import { ApifyConnectPanel } from './ApifyConnectPanel';

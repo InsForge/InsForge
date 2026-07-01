@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { storageService, type ListObjectsParams } from '#features/storage/services/storage.service';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 
 export function useStorageObjects() {
   const queryClient = useQueryClient();

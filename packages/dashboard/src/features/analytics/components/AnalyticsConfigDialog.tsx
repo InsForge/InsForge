@@ -18,10 +18,10 @@ import {
   MenuDialogSideNavHeader,
   MenuDialogSideNavTitle,
   MenuDialogTitle,
+  useToast,
 } from '@insforge/ui';
 import type { PosthogConnection } from '@insforge/shared-schemas';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
-import { useToast } from '#lib/hooks/useToast';
 import { ANALYTICS_SETUP_PROMPT } from '#features/analytics/lib/constants';
 import { DisconnectDialog } from './posthog/DisconnectDialog';
 

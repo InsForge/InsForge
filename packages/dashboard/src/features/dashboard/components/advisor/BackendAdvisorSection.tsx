@@ -13,7 +13,7 @@ import type {
   DashboardAdvisorSeverity,
 } from '#types';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import { EmptyState, PaginationControls } from '#components';
 import { AdvisoryItem } from './AdvisoryItem';
