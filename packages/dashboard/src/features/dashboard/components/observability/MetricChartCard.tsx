@@ -1,6 +1,6 @@
 import { type MouseEventHandler, type ReactNode, useId, useMemo, useRef, useState } from 'react';
 import { Info } from 'lucide-react';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import type { DashboardMetricDataPoint } from '#types';
 import { aggregateMetricSeries } from '#features/dashboard/utils/aggregateMetricSeries';
 
@@ -193,15 +193,13 @@ export function MetricChartCard({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="icon-sm"
+                    className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
                     aria-label={`About ${title}`}
-                    className="h-4 w-4 shrink-0 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
                   >
                     <Info className="h-3.5 w-3.5" />
-                  </Button>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[240px] text-left font-normal normal-case">
                   <p>{description}</p>
