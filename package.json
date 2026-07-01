@@ -39,6 +39,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^13.24.0",
+    "lru-cache": "^11.3.5",
     "prettier": "^3.6.2",
     "rimraf": "^5.0.5",
     "turbo": "^2.9.16",
