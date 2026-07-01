@@ -177,7 +177,12 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
       }
 
       if (payload.sessionType !== 'admin') {
-        throw new AppError('Invalid admin refresh session type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+        clearAdminRefreshTokenCookie(res);
+        successResponse(res, {
+          success: true,
+          message: 'Logged out successfully',
+        });
+        return;
       }
 
       const csrfHeader = req.headers['x-csrf-token'];
