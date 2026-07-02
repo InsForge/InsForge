@@ -17,6 +17,7 @@ import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js';
 import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiters.js';
+import { isUnsafeMime, resolveSafeMimeType } from '@/utils/mime-guard.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
@@ -302,6 +303,19 @@ router.put(
         throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
+      if (!req.file.buffer) {
+        throw new AppError(
+          'In-memory buffer required for MIME validation',
+          500,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
+      }
+
+      // Magic-byte MIME detection: override client-supplied mimetype with the
+      // true detected type. Executable types (HTML, SVG, JS) are normalised to
+      // application/octet-stream before the metadata is written to the DB.
+      req.file.mimetype = await resolveSafeMimeType(req.file.buffer, req.file.mimetype);
+
       const storedFile = await StorageService.getInstance().putObject(
         req.user,
         bucketName,
@@ -349,7 +363,20 @@ router.post(
         throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
+      if (!req.file.buffer) {
+        throw new AppError(
+          'In-memory buffer required for MIME validation',
+          500,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
+      }
+
       const storageService = StorageService.getInstance();
+
+      // Magic-byte MIME detection: override client-supplied mimetype with the
+      // true detected type. Executable types (HTML, SVG, JS) are normalised to
+      // application/octet-stream before the metadata is written to the DB.
+      req.file.mimetype = await resolveSafeMimeType(req.file.buffer, req.file.mimetype);
 
       // Generate a unique key for the object using service
       const objectKey = storageService.generateObjectKey(req.file.originalname);
@@ -532,8 +559,15 @@ router.get(
       const { file, metadata } = result;
 
       // Set appropriate headers
-      res.setHeader('Content-Type', metadata.mimeType || 'application/octet-stream');
+      const serveMime = metadata.mimeType || 'application/octet-stream';
+      res.setHeader('Content-Type', serveMime);
       res.setHeader('Content-Length', file.length.toString());
+      // Defence-in-depth: even if a legacy upload somehow stored an executable
+      // MIME type, force the browser to download rather than render it inline.
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      if (isUnsafeMime(serveMime)) {
+        res.setHeader('Content-Disposition', 'attachment');
+      }
 
       // Send object content
       res.send(file);
