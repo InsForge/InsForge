@@ -66,7 +66,11 @@ export async function resolveSafeMimeType(buffer: Buffer, clientMime?: string): 
       textChunk.includes('<html') ||
       textChunk.includes('<script') ||
       textChunk.includes('<svg') ||
-      textChunk.includes('<!doctype html')
+      textChunk.includes('<!doctype html') ||
+      textChunk.includes('<body') ||
+      textChunk.includes('<iframe') ||
+      textChunk.includes('<object') ||
+      textChunk.includes('<form')
     ) {
       return 'application/octet-stream';
     }

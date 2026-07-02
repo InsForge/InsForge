@@ -307,7 +307,7 @@ router.put(
         throw new AppError(
           'In-memory buffer required for MIME validation',
           500,
-          ERROR_CODES.STORAGE_INVALID_PARAMETER
+          ERROR_CODES.INTERNAL_ERROR
         );
       }
 
@@ -367,7 +367,7 @@ router.post(
         throw new AppError(
           'In-memory buffer required for MIME validation',
           500,
-          ERROR_CODES.STORAGE_INVALID_PARAMETER
+          ERROR_CODES.INTERNAL_ERROR
         );
       }
 
@@ -541,7 +541,13 @@ router.get(
         throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
-      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
+      const metadataRow = await storageService.getObjectMetadataRow(bucketName, objectKey);
+      const serveMime = metadataRow?.mimeType || 'application/octet-stream';
+      const forceAttachment = isUnsafeMime(serveMime);
+
+      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey, undefined, {
+        asAttachment: forceAttachment,
+      });
       if (strategy.method === 'presigned') {
         return res.redirect(strategy.url);
       }
@@ -702,7 +708,12 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
-      const { size, contentType, etag } = req.body;
+      const { size, etag } = req.body;
+      let { contentType } = req.body;
+
+      if (contentType && isUnsafeMime(contentType)) {
+        contentType = 'application/octet-stream';
+      }
 
       if (!size) {
         throw new AppError('Size is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);

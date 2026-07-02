@@ -565,7 +565,12 @@ export class StorageService {
     return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
   }
 
-  async getDownloadStrategy(bucket: string, key: string, requestedExpiresIn?: number) {
+  async getDownloadStrategy(
+    bucket: string,
+    key: string,
+    requestedExpiresIn?: number,
+    options?: { asAttachment?: boolean }
+  ) {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
@@ -602,7 +607,14 @@ export class StorageService {
         null
     );
 
-    return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic, version || null);
+    return this.provider.getDownloadStrategy(
+      bucket,
+      key,
+      expiresIn,
+      isPublic,
+      version || null,
+      options
+    );
   }
 
   /**

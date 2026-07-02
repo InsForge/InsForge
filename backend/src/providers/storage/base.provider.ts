@@ -53,7 +53,8 @@ export interface StorageProvider {
     key: string,
     expiresIn?: number,
     isPublic?: boolean,
-    version?: string | null
+    version?: string | null,
+    options?: { asAttachment?: boolean }
   ): Promise<DownloadStrategyResponse>;
   /**
    * Confirms an object exists in the backing store and returns its

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { detectMimeType, isUnsafeMime, resolveSafeMimeType, UNSAFE_MIME_PREFIXES } from '../../src/utils/mime-guard';
+import {
+  detectMimeType,
+  isUnsafeMime,
+  resolveSafeMimeType,
+  UNSAFE_MIME_PREFIXES,
+} from '../../src/utils/mime-guard';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -17,10 +22,16 @@ const PNG_BUFFER = Buffer.from(
 const PDF_BYTES = Buffer.from('%PDF-1.4 1 0 obj<</Type/Catalog>>endobj', 'utf8');
 
 /** HTML content — no magic bytes, text-based. */
-const HTML_BYTES = Buffer.from('<!DOCTYPE html><html><body><script>alert(1)</script></body></html>', 'utf8');
+const HTML_BYTES = Buffer.from(
+  '<!DOCTYPE html><html><body><script>alert(1)</script></body></html>',
+  'utf8'
+);
 
 /** SVG content — XML-based, no binary magic bytes. */
-const SVG_BYTES = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', 'utf8');
+const SVG_BYTES = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+  'utf8'
+);
 
 /** Plain-text CSV — no magic bytes. */
 const CSV_BYTES = Buffer.from('id,name,email\n1,Alice,alice@example.com\n', 'utf8');
@@ -149,6 +160,18 @@ describe('resolveSafeMimeType', () => {
   it('an SVG uploaded with a text/plain claim gets caught by content scanner and returns application/octet-stream', async () => {
     // Attacker lies and says SVG is text/plain to bypass mime check
     const result = await resolveSafeMimeType(SVG_BYTES, 'text/plain');
+    expect(result).toBe('application/octet-stream');
+  });
+
+  it('an HTML fragment (<body onload) uploaded with a text/plain claim gets caught and returns application/octet-stream', async () => {
+    const fragment = Buffer.from('<body onload="alert(1)">', 'utf8');
+    const result = await resolveSafeMimeType(fragment, 'text/plain');
+    expect(result).toBe('application/octet-stream');
+  });
+
+  it('an HTML fragment (<iframe) uploaded with a text/plain claim gets caught and returns application/octet-stream', async () => {
+    const fragment = Buffer.from('<iframe src="javascript:alert(1)">', 'utf8');
+    const result = await resolveSafeMimeType(fragment, 'text/plain');
     expect(result).toBe('application/octet-stream');
   });
 });
