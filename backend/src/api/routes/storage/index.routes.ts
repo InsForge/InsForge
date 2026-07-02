@@ -565,13 +565,13 @@ router.get(
       const { file, metadata } = result;
 
       // Set appropriate headers
-      const serveMime = metadata.mimeType || 'application/octet-stream';
-      res.setHeader('Content-Type', serveMime);
+      const responseMime = metadata.mimeType || 'application/octet-stream';
+      res.setHeader('Content-Type', responseMime);
       res.setHeader('Content-Length', file.length.toString());
       // Defence-in-depth: even if a legacy upload somehow stored an executable
       // MIME type, force the browser to download rather than render it inline.
       res.setHeader('X-Content-Type-Options', 'nosniff');
-      if (isUnsafeMime(serveMime)) {
+      if (isUnsafeMime(responseMime)) {
         res.setHeader('Content-Disposition', 'attachment');
       }
 
