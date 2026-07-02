@@ -248,6 +248,10 @@ describe('SMTP in admin/public metadata response', () => {
     resetPasswordMethod: 'code' as const,
     allowedRedirectUrls: [],
     disableSignup: false,
+    verifyEmailCodeExpiryMinutes: 15,
+    verifyEmailLinkExpiryMinutes: 1440,
+    resetPasswordCodeExpiryMinutes: 10,
+    resetPasswordLinkExpiryMinutes: 60,
   };
 
   it('admin response includes smtpConfig with hasPassword', () => {

@@ -13,6 +13,8 @@ import { URL } from 'url';
 export class AuthConfigService {
   private static instance: AuthConfigService;
   private pool: Pool | null = null;
+  private configCache: { data: AuthConfigSchema; expiresAt: number } | null = null;
+  private static readonly CACHE_TTL_MS = 30_000;
 
   private constructor() {
     logger.info('AuthConfigService initialized');
@@ -23,6 +25,40 @@ export class AuthConfigService {
       AuthConfigService.instance = new AuthConfigService();
     }
     return AuthConfigService.instance;
+  }
+
+  clearCache(): void {
+    this.configCache = null;
+  }
+
+  private cacheAuthConfig(data: AuthConfigSchema): AuthConfigSchema {
+    this.configCache = {
+      data,
+      expiresAt: Date.now() + AuthConfigService.CACHE_TTL_MS,
+    };
+    return data;
+  }
+
+  private buildFallbackAuthConfig(): AuthConfigSchema {
+    return {
+      id: '00000000-0000-0000-0000-000000000000',
+      requireEmailVerification: false,
+      passwordMinLength: 6,
+      requireNumber: false,
+      requireLowercase: false,
+      requireUppercase: false,
+      requireSpecialChar: false,
+      verifyEmailMethod: 'code',
+      resetPasswordMethod: 'code',
+      allowedRedirectUrls: [],
+      verifyEmailCodeExpiryMinutes: 15,
+      verifyEmailLinkExpiryMinutes: 1440,
+      resetPasswordCodeExpiryMinutes: 10,
+      resetPasswordLinkExpiryMinutes: 60,
+      disableSignup: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
   }
 
   private getPool(): Pool {
@@ -85,6 +121,10 @@ export class AuthConfigService {
    * Returns the singleton configuration row with all columns
    */
   async getAuthConfig(): Promise<AuthConfigSchema> {
+    if (this.configCache && Date.now() < this.configCache.expiresAt) {
+      return this.configCache.data;
+    }
+
     try {
       const result = await this.getPool().query(
         `SELECT
@@ -98,6 +138,10 @@ export class AuthConfigService {
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod",
           allowed_redirect_urls as "allowedRedirectUrls",
+          verify_email_code_expiry_minutes as "verifyEmailCodeExpiryMinutes",
+          verify_email_link_expiry_minutes as "verifyEmailLinkExpiryMinutes",
+          reset_password_code_expiry_minutes as "resetPasswordCodeExpiryMinutes",
+          reset_password_link_expiry_minutes as "resetPasswordLinkExpiryMinutes",
           disable_signup as "disableSignup",
           created_at as "createdAt",
           updated_at as "updatedAt"
@@ -108,25 +152,10 @@ export class AuthConfigService {
       // If no config exists, return fallback values
       if (!result.rows.length) {
         logger.warn('No auth config found, returning default fallback values');
-        // Return a config with fallback values and generate a temporary ID
-        return {
-          id: '00000000-0000-0000-0000-000000000000',
-          requireEmailVerification: false,
-          passwordMinLength: 6,
-          requireNumber: false,
-          requireLowercase: false,
-          requireUppercase: false,
-          requireSpecialChar: false,
-          verifyEmailMethod: 'code' as const,
-          resetPasswordMethod: 'code' as const,
-          allowedRedirectUrls: [],
-          disableSignup: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+        return this.cacheAuthConfig(this.buildFallbackAuthConfig());
       }
 
-      return result.rows[0];
+      return this.cacheAuthConfig(result.rows[0]);
     } catch (error) {
       logger.error('Failed to get auth config', { error });
       throw new AppError(
@@ -213,6 +242,26 @@ export class AuthConfigService {
         values.push(input.allowedRedirectUrls);
       }
 
+      if (input.verifyEmailCodeExpiryMinutes !== undefined) {
+        updates.push(`verify_email_code_expiry_minutes = $${paramCount++}`);
+        values.push(input.verifyEmailCodeExpiryMinutes);
+      }
+
+      if (input.verifyEmailLinkExpiryMinutes !== undefined) {
+        updates.push(`verify_email_link_expiry_minutes = $${paramCount++}`);
+        values.push(input.verifyEmailLinkExpiryMinutes);
+      }
+
+      if (input.resetPasswordCodeExpiryMinutes !== undefined) {
+        updates.push(`reset_password_code_expiry_minutes = $${paramCount++}`);
+        values.push(input.resetPasswordCodeExpiryMinutes);
+      }
+
+      if (input.resetPasswordLinkExpiryMinutes !== undefined) {
+        updates.push(`reset_password_link_expiry_minutes = $${paramCount++}`);
+        values.push(input.resetPasswordLinkExpiryMinutes);
+      }
+
       if (input.disableSignup !== undefined) {
         updates.push(`disable_signup = $${paramCount++}`);
         values.push(input.disableSignup);
@@ -241,6 +290,10 @@ export class AuthConfigService {
            verify_email_method as "verifyEmailMethod",
            reset_password_method as "resetPasswordMethod",
            allowed_redirect_urls as "allowedRedirectUrls",
+           verify_email_code_expiry_minutes as "verifyEmailCodeExpiryMinutes",
+           verify_email_link_expiry_minutes as "verifyEmailLinkExpiryMinutes",
+           reset_password_code_expiry_minutes as "resetPasswordCodeExpiryMinutes",
+           reset_password_link_expiry_minutes as "resetPasswordLinkExpiryMinutes",
            disable_signup as "disableSignup",
            created_at as "createdAt",
            updated_at as "updatedAt"`,
@@ -248,6 +301,7 @@ export class AuthConfigService {
       );
 
       await client.query('COMMIT');
+      this.configCache = null;
       logger.info('Auth config updated', { updatedFields: Object.keys(input) });
       return result.rows[0];
     } catch (error) {
