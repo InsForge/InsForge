@@ -287,7 +287,7 @@ export class StorageService {
     bucket: string,
     key: string,
     hasApiKey: boolean = false,
-    prefetchedMetadata?: any
+    prefetchedMetadata?: Partial<StorageRecord> | null
   ): Promise<StorageObjectResult | null> {
     this.validateBucketName(bucket);
     this.validateKey(key);
@@ -315,7 +315,7 @@ export class StorageService {
       return null;
     }
 
-    const file = await this.provider.getObject(metadata.bucket, metadata.key);
+    const file = await this.provider.getObject(bucket, key);
     if (!file) {
       return null;
     }
@@ -323,15 +323,15 @@ export class StorageService {
     return {
       file,
       metadata: {
-        key: metadata.key,
-        bucket: metadata.bucket,
-        size: metadata.size,
-        mimeType: metadata.mime_type,
-        uploadedAt: metadata.uploaded_at,
+        key,
+        bucket,
+        size: metadata.size!,
+        mimeType: metadata.mime_type!,
+        uploadedAt: metadata.uploaded_at!,
         url: this.buildObjectUrl(
-          metadata.bucket,
-          metadata.key,
-          metadata.etag || metadata.uploaded_at
+          bucket,
+          key,
+          metadata.etag || metadata.uploaded_at!
         ),
       },
     };
@@ -572,7 +572,7 @@ export class StorageService {
     bucket: string,
     key: string,
     requestedExpiresIn?: number,
-    options?: { asAttachment?: boolean; prefetchedMetadata?: any }
+    options?: { asAttachment?: boolean; prefetchedMetadata?: Partial<StorageRecord> | null }
   ) {
     this.validateBucketName(bucket);
     this.validateKey(key);
@@ -601,8 +601,7 @@ export class StorageService {
     // read uses the normal backend pool because the caller already gated
     // access through RLS, an API key, or a public bucket check.
     let etag = options?.prefetchedMetadata?.etag;
-    let uploadedAt =
-      options?.prefetchedMetadata?.uploaded_at || options?.prefetchedMetadata?.uploadedAt;
+    let uploadedAt = options?.prefetchedMetadata?.uploaded_at;
 
     if (!options?.prefetchedMetadata) {
       const versionRow = await this.getPool().query(
@@ -613,7 +612,7 @@ export class StorageService {
       uploadedAt = versionRow.rows[0]?.uploadedAt;
     }
     const version = this.toVersionStamp(
-      (etag as string | null) ?? (uploadedAt as Date | null) ?? null
+      (etag as string | null) ?? uploadedAt ?? null
     );
 
     return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic, version || null, {
@@ -633,7 +632,7 @@ export class StorageService {
     bucket: string,
     key: string,
     hasApiKey: boolean = false
-  ): Promise<any | null> {
+  ): Promise<StorageRecord | null> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 

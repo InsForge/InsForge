@@ -33,7 +33,7 @@ function makeMockPool(): Pool {
   } as unknown as Pool;
 }
 
-describe('StorageService.objectIsVisible — RLS-gated visibility check', () => {
+describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check', () => {
   beforeEach(async () => {
     mockPool = makeMockPool();
     vi.resetModules();
@@ -43,7 +43,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
 
-    // The SELECT 1 returns a row, so objectIsVisible should return true.
+    // The SELECT 1 returns a row, so getObjectMetadataVisible should return true.
     queryResults = [
       { rows: [{ public: false }], rowCount: 1 }, // public bucket check
       { rows: [], rowCount: 0 }, // BEGIN
@@ -54,7 +54,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       { rows: [], rowCount: 0 }, // RESET ROLE
     ];
 
-    const visible = await svc.objectIsVisible(
+    const visible = await svc.getObjectMetadataVisible(
       { id: 'alice-sub', email: 'alice@example.com', role: 'authenticated' },
       'photos',
       'alice/cat.jpg'
@@ -94,7 +94,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       { rows: [], rowCount: 0 }, // RESET ROLE
     ];
 
-    const visible = await svc.objectIsVisible(
+    const visible = await svc.getObjectMetadataVisible(
       { id: 'bob-sub', email: 'bob@example.com', role: 'authenticated' },
       'photos',
       'alice/cat.jpg'
@@ -109,7 +109,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
 
     queryResults = [{ rows: [{ '?column?': 1 }], rowCount: 1 }];
 
-    const visible = await svc.objectIsVisible(undefined, 'photos', 'alice/cat.jpg', true);
+    const visible = await svc.getObjectMetadataVisible(undefined, 'photos', 'alice/cat.jpg', true);
 
     expect(visible).toBe(true);
     // API-key path skips BEGIN/SET ROLE/COMMIT — only the visibility SELECT runs.
@@ -124,7 +124,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
 
     queryResults = [{ rows: [{ '?column?': 1 }], rowCount: 1 }];
 
-    const visible = await svc.objectIsVisible(
+    const visible = await svc.getObjectMetadataVisible(
       { id: 'local:admin', role: 'project_admin' },
       'photos',
       'alice/cat.jpg'
@@ -233,7 +233,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
 
     queryResults = [{ rows: [{ public: false }], rowCount: 1 }];
 
-    await expect(svc.objectIsVisible(undefined, 'photos', 'alice/cat.jpg')).resolves.toBe(false);
+    await expect(svc.getObjectMetadataVisible(undefined, 'photos', 'alice/cat.jpg')).resolves.toBe(false);
     expect(calls).toEqual([
       {
         sql: 'SELECT public FROM storage.buckets WHERE name = $1',
@@ -451,7 +451,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       { rows: [{ '?column?': 1 }], rowCount: 1 },
     ];
 
-    const visible = await svc.objectIsVisible(undefined, 'photos', 'alice/cat.jpg');
+    const visible = await svc.getObjectMetadataVisible(undefined, 'photos', 'alice/cat.jpg');
 
     expect(visible).toBe(true);
     expect(calls).toEqual([
@@ -475,7 +475,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       { rows: [], rowCount: 0 },
     ];
 
-    const visible = await svc.objectIsVisible(undefined, 'photos', 'missing.jpg');
+    const visible = await svc.getObjectMetadataVisible(undefined, 'photos', 'missing.jpg');
 
     expect(visible).toBe(false);
     expect(calls).toEqual([
@@ -574,7 +574,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     const svc = StorageService.getInstance();
 
     await expect(
-      svc.objectIsVisible(
+      svc.getObjectMetadataVisible(
         { id: 'alice', email: 'alice@example.com', role: 'authenticated' },
         'no spaces allowed',
         'k'
@@ -588,7 +588,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     const svc = StorageService.getInstance();
 
     await expect(
-      svc.objectIsVisible(
+      svc.getObjectMetadataVisible(
         { id: 'alice', email: 'alice@example.com', role: 'authenticated' },
         'photos',
         '../../etc/passwd'
