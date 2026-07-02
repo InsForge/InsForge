@@ -173,6 +173,10 @@
   --animate-toast-progress: toast-progress linear forwards;
 }
 
+.animate-toast-progress {
+  animation: var(--animate-toast-progress);
+}
+
 @keyframes toast-progress {
   from {
     transform: scaleX(0);
