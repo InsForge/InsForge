@@ -3,12 +3,52 @@ import {
   StorageFileSchema,
   StorageBucketSchema,
   ListObjectsResponseSchema,
+  type UploadStrategyResponse,
 } from '@insforge/shared-schemas';
 
 export interface ListObjectsParams {
   prefix?: string;
   limit?: number;
   offset?: number;
+}
+
+function extractXmlMessage(xml: string): string | null {
+  const match = xml.match(/<Message[^>]*>([\s\S]*?)<\/Message>/i);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  return null;
+}
+
+function stripHtmlTags(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function parseErrorResponse(response: Response): Promise<string> {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    const body = await response.json();
+    return body.message || body.error || response.statusText;
+  }
+
+  if (contentType.includes('application/xml') || contentType.includes('text/xml')) {
+    const text = await response.text();
+    const message = extractXmlMessage(text);
+    return message || response.statusText;
+  }
+
+  if (contentType.includes('text/html')) {
+    const text = await response.text();
+    const cleaned = stripHtmlTags(text);
+    return cleaned || response.statusText;
+  }
+
+  const text = await response.text();
+  return text || response.statusText;
 }
 
 export const storageService = {
@@ -61,30 +101,93 @@ export const storageService = {
     objectKey: string,
     object: File
   ): Promise<StorageFileSchema> {
-    const formData = new FormData();
-    formData.append('file', object);
+    const token = apiClient.getAccessToken();
 
-    // Use fetch directly for object uploads to avoid Content-Type header issues
-    const response = await fetch(
-      `/api/storage/buckets/${encodeURIComponent(bucketName)}/objects/${encodeURIComponent(objectKey)}`,
+    const strategyResponse = await fetch(
+      `/api/storage/buckets/${encodeURIComponent(bucketName)}/upload-strategy`,
       {
-        method: 'PUT',
+        method: 'POST',
         headers: {
-          Authorization: `Bearer ${apiClient.getAccessToken()}`,
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-        body: formData,
+        body: JSON.stringify({
+          filename: objectKey,
+          contentType: object.type || undefined,
+          size: object.size,
+        }),
       }
     );
 
-    if (!response.ok) {
-      const error = await response.json();
-      // Traditional REST error format
-      throw new Error(error.message || error.error || 'Upload failed');
+    if (!strategyResponse.ok) {
+      const message = await parseErrorResponse(strategyResponse);
+      throw new Error(message);
     }
 
-    const result = await response.json();
-    // Traditional REST: response returned directly
-    return result;
+    const strategy: UploadStrategyResponse = await strategyResponse.json();
+
+    if (strategy.method === 'presigned') {
+      const formData = new FormData();
+      if (strategy.fields) {
+        for (const [key, value] of Object.entries(strategy.fields)) {
+          formData.append(key, value);
+        }
+      }
+      formData.append('file', object);
+
+      const uploadResponse = await fetch(strategy.uploadUrl, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const message = await parseErrorResponse(uploadResponse);
+        throw new Error(message);
+      }
+
+      if (strategy.confirmRequired && strategy.confirmUrl) {
+        const etag = uploadResponse.headers.get('etag') || undefined;
+        const confirmResponse = await fetch(strategy.confirmUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            size: object.size,
+            contentType: object.type || undefined,
+            etag,
+          }),
+        });
+
+        if (!confirmResponse.ok) {
+          const message = await parseErrorResponse(confirmResponse);
+          throw new Error(message);
+        }
+
+        return confirmResponse.json();
+      }
+
+      throw new Error('Upload succeeded but no confirm endpoint was provided');
+    }
+
+    const formData = new FormData();
+    formData.append('file', object);
+
+    const uploadResponse = await fetch(strategy.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      const message = await parseErrorResponse(uploadResponse);
+      throw new Error(message);
+    }
+
+    return uploadResponse.json();
   },
 
   // Get download URL for an object

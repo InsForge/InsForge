@@ -8,7 +8,7 @@ vi.mock('#lib/api/client', () => ({
   },
 }));
 
-import { storageService } from './storage.service';
+import { storageService } from '#features/storage/services/storage.service';
 
 const mockBucket = 'test-bucket';
 const mockFile = new File(['hello world'], 'readme.txt', { type: 'text/plain' });
@@ -156,7 +156,7 @@ describe('storageService.uploadObject', () => {
     ).rejects.toThrow('File too large. Maximum upload size is 50 MB.');
   });
 
-  it('falls back to text for non-JSON error responses', async () => {
+  it('strips HTML tags from HTML error responses', async () => {
     mockFetch()
       .mockResolvedValueOnce({
         ok: true,
@@ -175,39 +175,89 @@ describe('storageService.uploadObject', () => {
         statusText: 'Payload Too Large',
         headers: new Headers({ 'content-type': 'text/html' }),
         json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token < in JSON at position 0')),
-        text: vi.fn().mockResolvedValue('<html><body>413 Request Entity Too Large</body></html>'),
+        text: vi.fn().mockResolvedValue('<html><body><h1>413 Request Entity Too Large</h1></body></html>'),
       } as unknown as Response);
 
     await expect(
       storageService.uploadObject(mockBucket, 'readme.txt', mockFile)
-    ).rejects.toThrow('<html><body>413 Request Entity Too Large</body></html>');
+    ).rejects.toThrow('413 Request Entity Too Large');
   });
 
-  it('fallback from JSON parse failure uses text when Content-Type is JSON but body is not', async () => {
+  it('extracts Message tag from S3 XML error responses', async () => {
     mockFetch()
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
         headers: new Headers({ 'content-type': 'application/json' }),
         json: vi.fn().mockResolvedValue({
-          method: 'direct',
-          uploadUrl: '/upload',
+          method: 'presigned',
+          uploadUrl: 'https://s3.example.com/upload',
+          fields: { key: 'readme.txt' },
           key: 'readme.txt',
-          confirmRequired: false,
+          confirmRequired: true,
+          confirmUrl: '/confirm',
         }),
       } as unknown as Response)
       .mockResolvedValueOnce({
         ok: false,
         status: 413,
-        statusText: 'Payload Too Large',
-        headers: new Headers({ 'content-type': 'application/json' }),
-        json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token')),
-        text: vi.fn().mockResolvedValue('413 Payload Too Large'),
+        statusText: 'Request Entity Too Large',
+        headers: new Headers({ 'content-type': 'application/xml' }),
+        json: vi.fn().mockRejectedValue(new SyntaxError('Not JSON')),
+        text: vi.fn().mockResolvedValue(
+          '<Error><Code>EntityTooLarge</Code><Message>Your proposed upload exceeds the maximum allowed object size.</Message></Error>'
+        ),
       } as unknown as Response);
 
     await expect(
       storageService.uploadObject(mockBucket, 'readme.txt', mockFile)
-    ).rejects.toThrow('413 Payload Too Large');
+    ).rejects.toThrow('Your proposed upload exceeds the maximum allowed object size.');
+  });
+
+  it('falls back to statusText when XML has no Message tag', async () => {
+    mockFetch()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: vi.fn().mockResolvedValue({
+          method: 'presigned',
+          uploadUrl: 'https://s3.example.com/upload',
+          fields: { key: 'readme.txt' },
+          key: 'readme.txt',
+          confirmRequired: true,
+          confirmUrl: '/confirm',
+        }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: 'Forbidden',
+        headers: new Headers({ 'content-type': 'application/xml' }),
+        json: vi.fn().mockRejectedValue(new SyntaxError('Not JSON')),
+        text: vi.fn().mockResolvedValue('<Error><Code>AccessDenied</Code></Error>'),
+      } as unknown as Response);
+
+    await expect(
+      storageService.uploadObject(mockBucket, 'readme.txt', mockFile)
+    ).rejects.toThrow('Forbidden');
+  });
+
+  it('truncates long plain-text error messages', async () => {
+    const longMessage = 'A'.repeat(1000);
+
+    mockFetch().mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      headers: new Headers({ 'content-type': 'text/plain' }),
+      json: vi.fn().mockRejectedValue(new SyntaxError('Not JSON')),
+      text: vi.fn().mockResolvedValue(longMessage),
+    } as unknown as Response);
+
+    await expect(
+      storageService.uploadObject(mockBucket, 'readme.txt', mockFile)
+    ).rejects.toThrow(longMessage.slice(0, 500));
   });
 
   it('throws a meaningful error when the strategy endpoint itself fails', async () => {
