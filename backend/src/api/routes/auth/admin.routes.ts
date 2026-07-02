@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { AuthRequest, verifyToken } from '@/api/middlewares/auth.js';
-import { TokenManager } from '@/infra/security/token.manager.js';
+import { TokenManager, type RefreshTokenPayload } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import {
@@ -154,8 +154,45 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /api/auth/admin/logout - Logout dashboard session
-router.post('/logout', (_req: Request, res: Response, next: NextFunction) => {
+router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
   try {
+    const refreshToken = req.cookies?.[ADMIN_REFRESH_TOKEN_COOKIE_NAME];
+
+    if (refreshToken) {
+      const tokenManager = TokenManager.getInstance();
+      let payload: RefreshTokenPayload;
+
+      try {
+        payload = tokenManager.verifyRefreshToken(refreshToken);
+      } catch (error) {
+        if (error instanceof AppError && error.statusCode === 401) {
+          clearAdminRefreshTokenCookie(res);
+          successResponse(res, {
+            success: true,
+            message: 'Logged out successfully',
+          });
+          return;
+        }
+        throw error;
+      }
+
+      if (payload.sessionType !== 'admin') {
+        clearAdminRefreshTokenCookie(res);
+        successResponse(res, {
+          success: true,
+          message: 'Logged out successfully',
+        });
+        return;
+      }
+
+      const csrfHeader = req.headers['x-csrf-token'];
+      const csrfToken = typeof csrfHeader === 'string' ? csrfHeader : undefined;
+      if (!tokenManager.verifyCsrfToken(csrfToken, payload)) {
+        logger.warn('[Auth:AdminLogout] CSRF token validation failed');
+        throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+    }
+
     clearAdminRefreshTokenCookie(res);
 
     successResponse(res, {
