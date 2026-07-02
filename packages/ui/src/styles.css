@@ -164,3 +164,24 @@
 *::-webkit-scrollbar-thumb:hover {
   background-color: var(--alpha-16);
 }
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+
+:root {
+  --animate-toast-progress: toast-progress linear forwards;
+}
+
+.animate-toast-progress {
+  animation: var(--animate-toast-progress);
+}
+
+@keyframes toast-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
