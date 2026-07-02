@@ -6,6 +6,7 @@ import { StripeSyncService } from '@/services/payments/stripe/sync.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 
 /**
  * Seeds default auth configuration for cloud environments
@@ -253,6 +254,10 @@ export async function seedBackend(): Promise<void> {
         logger.info('✅ JWT_SECRET secret initialized');
       }
     }
+
+    // Initialize and load JWT asymmetric keypair
+    await secretService.initializeJwtKeyPair();
+    await TokenManager.getInstance().ensureKeysLoaded();
 
     logger.info(`API key generated: ${apiKey}`);
     logger.info(`Anon key generated: ${anonKey}`);

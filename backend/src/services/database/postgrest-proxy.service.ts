@@ -4,6 +4,8 @@ import https from 'https';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 const postgrestUrl = appConfig.database.postgrestBaseUrl;
 
@@ -124,6 +126,34 @@ export class PostgrestProxyService {
       headers: {
         ...request.headers,
         authorization: `Bearer ${this.anonToken}`,
+      },
+    });
+  }
+
+  /**
+   * Gateway exchange for authenticated users: verify the user's token in the
+   * app layer, and swap it for a short-lived internal HS256 token containing the
+   * user's claims to forward to PostgREST.
+   */
+  async forwardAsUser(
+    request: ProxyRequest,
+    user: { id: string; email?: string; role: string }
+  ): Promise<ProxyResponse> {
+    if (user.role !== 'authenticated' && user.role !== 'project_admin') {
+      throw new AppError('Invalid user role claim', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    const userToken = this.tokenManager.generatePostgrestUserToken({
+      sub: user.id,
+      email: user.email,
+      role: user.role as 'authenticated' | 'project_admin',
+    });
+
+    return this.forwardRequest({
+      ...request,
+      headers: {
+        ...request.headers,
+        authorization: `Bearer ${userToken}`,
       },
     });
   }

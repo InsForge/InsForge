@@ -27,6 +27,7 @@ const authMocks = vi.hoisted(() => {
 const proxyMocks = vi.hoisted(() => ({
   forward: vi.fn(),
   forwardAsAdmin: vi.fn(),
+  forwardAsUser: vi.fn(),
   filterHeaders: vi.fn((headers: Record<string, unknown>) => headers),
 }));
 
@@ -90,6 +91,7 @@ async function createApp() {
 
 function mockProxyResponses() {
   proxyMocks.forward.mockResolvedValue({ data: [{ via: 'user' }], status: 200, headers: {} });
+  proxyMocks.forwardAsUser.mockResolvedValue({ data: [{ via: 'user' }], status: 200, headers: {} });
   proxyMocks.forwardAsAdmin.mockResolvedValue({
     data: [{ via: 'project_admin' }],
     status: 200,
@@ -151,8 +153,9 @@ describe('Database Records Route Authentication', () => {
     await request(app).get('/api/database/records/widgets?select=id').expect(200);
 
     expect(authMocks.verifyUser).toHaveBeenCalledOnce();
-    expect(proxyMocks.forward).toHaveBeenCalledWith(
-      expect.objectContaining({ method: 'GET', path: '/widgets' })
+    expect(proxyMocks.forwardAsUser).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'GET', path: '/widgets' }),
+      expect.objectContaining({ id: 'user-id', role: 'authenticated' })
     );
     expect(proxyMocks.forwardAsAdmin).not.toHaveBeenCalled();
   });
@@ -211,8 +214,9 @@ describe('Database RPC Route Authentication', () => {
     await request(app).post('/api/database/rpc/do_work').send({ value: 1 }).expect(200);
 
     expect(authMocks.verifyUser).toHaveBeenCalledOnce();
-    expect(proxyMocks.forward).toHaveBeenCalledWith(
-      expect.objectContaining({ method: 'POST', path: '/rpc/do_work' })
+    expect(proxyMocks.forwardAsUser).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'POST', path: '/rpc/do_work' }),
+      expect.objectContaining({ id: 'user-id', role: 'authenticated' })
     );
     expect(proxyMocks.forwardAsAdmin).not.toHaveBeenCalled();
   });
