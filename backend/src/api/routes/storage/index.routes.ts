@@ -24,6 +24,20 @@ const auditService = AuditService.getInstance();
 const storageConfigService = StorageConfigService.getInstance();
 const s3AccessKeyService = S3AccessKeyService.getInstance();
 
+const enforceSafeMimeType = async (file: Express.Multer.File) => {
+  if (!file.buffer) {
+    throw new AppError(
+      'In-memory buffer required for MIME validation',
+      500,
+      ERROR_CODES.INTERNAL_ERROR
+    );
+  }
+  // Magic-byte MIME detection: override client-supplied mimetype with the
+  // true detected type. Executable types (HTML, SVG, JS) are normalised to
+  // application/octet-stream before the metadata is written to the DB.
+  file.mimetype = await resolveSafeMimeType(file.buffer, file.mimetype);
+};
+
 // Middleware to conditionally apply authentication based on bucket visibility.
 // This is only attached to object download hand-offs: GET object bytes and
 // GET/POST download-strategy. Strategy endpoint is GET (POST retained as a
@@ -303,18 +317,7 @@ router.put(
         throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      if (!req.file.buffer) {
-        throw new AppError(
-          'In-memory buffer required for MIME validation',
-          500,
-          ERROR_CODES.INTERNAL_ERROR
-        );
-      }
-
-      // Magic-byte MIME detection: override client-supplied mimetype with the
-      // true detected type. Executable types (HTML, SVG, JS) are normalised to
-      // application/octet-stream before the metadata is written to the DB.
-      req.file.mimetype = await resolveSafeMimeType(req.file.buffer, req.file.mimetype);
+      await enforceSafeMimeType(req.file);
 
       const storedFile = await StorageService.getInstance().putObject(
         req.user,
@@ -363,20 +366,9 @@ router.post(
         throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      if (!req.file.buffer) {
-        throw new AppError(
-          'In-memory buffer required for MIME validation',
-          500,
-          ERROR_CODES.INTERNAL_ERROR
-        );
-      }
+      await enforceSafeMimeType(req.file);
 
       const storageService = StorageService.getInstance();
-
-      // Magic-byte MIME detection: override client-supplied mimetype with the
-      // true detected type. Executable types (HTML, SVG, JS) are normalised to
-      // application/octet-stream before the metadata is written to the DB.
-      req.file.mimetype = await resolveSafeMimeType(req.file.buffer, req.file.mimetype);
 
       // Generate a unique key for the object using service
       const objectKey = storageService.generateObjectKey(req.file.originalname);
@@ -709,11 +701,13 @@ router.post(
     try {
       const { bucketName, objectKey } = req.params;
       const { size, etag } = req.body;
-      let { contentType } = req.body;
+      const { contentType } = req.body;
 
-      if (contentType && isUnsafeMime(contentType)) {
-        contentType = 'application/octet-stream';
-      }
+      // We do NOT coerce unsafe MIME types to application/octet-stream here.
+      // If we did, the download path wouldn't know the S3 object is actually
+      // an unsafe type (e.g. text/html), and it would skip adding the asAttachment
+      // flag to the presigned GET URL. We must store the original unsafe MIME
+      // in the DB so the read-path defense triggers.
 
       if (!size) {
         throw new AppError('Size is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);

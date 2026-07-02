@@ -1,10 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   detectMimeType,
   isUnsafeMime,
   resolveSafeMimeType,
   UNSAFE_MIME_PREFIXES,
 } from '../../src/utils/mime-guard';
+
+vi.mock('file-type', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('file-type')>();
+  return {
+    ...actual,
+    fileTypeFromBuffer: vi.fn(async (buffer: Buffer) => {
+      if (buffer.toString('utf8') === 'mock-unsafe-magic-bytes') {
+        return { ext: 'js', mime: 'application/javascript' };
+      }
+      return actual.fileTypeFromBuffer(buffer);
+    }),
+  };
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -172,6 +185,13 @@ describe('resolveSafeMimeType', () => {
   it('an HTML fragment (<iframe) uploaded with a text/plain claim gets caught and returns application/octet-stream', async () => {
     const fragment = Buffer.from('<iframe src="javascript:alert(1)">', 'utf8');
     const result = await resolveSafeMimeType(fragment, 'text/plain');
+    expect(result).toBe('application/octet-stream');
+  });
+
+  it('returns application/octet-stream when magic bytes themselves resolve to an unsafe type', async () => {
+    // We mocked fileTypeFromBuffer to return application/javascript for this specific buffer
+    const mockBuffer = Buffer.from('mock-unsafe-magic-bytes', 'utf8');
+    const result = await resolveSafeMimeType(mockBuffer, 'application/javascript');
     expect(result).toBe('application/octet-stream');
   });
 });
