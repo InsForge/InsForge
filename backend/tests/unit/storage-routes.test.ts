@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 const storageMocks = vi.hoisted(() => ({
   isBucketPublic: vi.fn(),
-  objectIsVisible: vi.fn(),
+  getObjectMetadataVisible: vi.fn(),
   getDownloadStrategy: vi.fn(),
 }));
 
@@ -92,7 +92,7 @@ describe('Storage routes', () => {
   test('download strategy route captures nested object keys', async () => {
     vi.resetModules();
     storageMocks.isBucketPublic.mockResolvedValue(true);
-    storageMocks.objectIsVisible.mockResolvedValue(true);
+    storageMocks.getObjectMetadataVisible.mockResolvedValue(true);
     storageMocks.getDownloadStrategy.mockResolvedValue({
       method: 'direct',
       url: 'http://localhost:7130/api/storage/buckets/product-images/objects/products%2Fprod_123%2Fmain.jpg',
@@ -122,7 +122,8 @@ describe('Storage routes', () => {
     expect(storageMocks.getDownloadStrategy).toHaveBeenCalledWith(
       'product-images',
       'products/prod_123/main.jpg',
-      undefined
+      undefined,
+      { prefetchedMetadata: true }
     );
     expect(authMocks.verifyUser).not.toHaveBeenCalled();
   });
@@ -158,7 +159,7 @@ describe('Storage routes', () => {
   test('download strategy route requires auth middleware for private buckets', async () => {
     vi.resetModules();
     storageMocks.isBucketPublic.mockResolvedValue(false);
-    storageMocks.objectIsVisible.mockResolvedValue(true);
+    storageMocks.getObjectMetadataVisible.mockResolvedValue(true);
     storageMocks.getDownloadStrategy.mockResolvedValue({
       method: 'direct',
       url: 'http://localhost:7130/api/storage/buckets/product-images/objects/products%2Fprod_123%2Fmain.jpg',
@@ -189,14 +190,15 @@ describe('Storage routes', () => {
     expect(storageMocks.getDownloadStrategy).toHaveBeenCalledWith(
       'product-images',
       'products/prod_123/main.jpg',
-      undefined
+      undefined,
+      { prefetchedMetadata: true }
     );
   });
 
   test('download strategy route forwards a caller-supplied expiresIn', async () => {
     vi.resetModules();
     storageMocks.isBucketPublic.mockResolvedValue(false);
-    storageMocks.objectIsVisible.mockResolvedValue(true);
+    storageMocks.getObjectMetadataVisible.mockResolvedValue(true);
     storageMocks.getDownloadStrategy.mockResolvedValue({
       method: 'presigned',
       url: 'https://cdn.example.com/product-images/products%2Fprod_123%2Fmain.jpg?Signature=abc',
@@ -227,14 +229,15 @@ describe('Storage routes', () => {
     expect(storageMocks.getDownloadStrategy).toHaveBeenCalledWith(
       'product-images',
       'products/prod_123/main.jpg',
-      120
+      120,
+      { prefetchedMetadata: true }
     );
   });
 
   test('canonical GET download-strategy route forwards expiresIn', async () => {
     vi.resetModules();
     storageMocks.isBucketPublic.mockResolvedValue(false);
-    storageMocks.objectIsVisible.mockResolvedValue(true);
+    storageMocks.getObjectMetadataVisible.mockResolvedValue(true);
     storageMocks.getDownloadStrategy.mockResolvedValue({
       method: 'presigned',
       url: 'https://cdn.example.com/product-images/products%2Fprod_123%2Fmain.jpg?Signature=abc',
@@ -265,14 +268,15 @@ describe('Storage routes', () => {
     expect(storageMocks.getDownloadStrategy).toHaveBeenCalledWith(
       'product-images',
       'products/prod_123/main.jpg',
-      120
+      120,
+      { prefetchedMetadata: true }
     );
   });
 
   test('download strategy route rejects a non-numeric expiresIn with 400', async () => {
     vi.resetModules();
     storageMocks.isBucketPublic.mockResolvedValue(false);
-    storageMocks.objectIsVisible.mockResolvedValue(true);
+    storageMocks.getObjectMetadataVisible.mockResolvedValue(true);
 
     const { storageRouter } = await import('../../src/api/routes/storage/index.routes.js');
     const app = express();

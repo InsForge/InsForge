@@ -441,13 +441,13 @@ const downloadStrategyHandler = async (
     // URL bypasses RLS at redeem time, so we must verify ownership before
     // issuing one.
     const authReq = req as AuthRequest;
-    const visible = await storageService.objectIsVisible(
+    const metadataRow = await storageService.getObjectMetadataVisible(
       authReq.user,
       bucketName,
       objectKey,
       !!authReq.hasApiKey
     );
-    if (!visible) {
+    if (!metadataRow) {
       throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
     }
 
@@ -474,7 +474,8 @@ const downloadStrategyHandler = async (
     const strategy = await storageService.getDownloadStrategy(
       bucketName,
       objectKey,
-      requestedExpiresIn
+      requestedExpiresIn,
+      { prefetchedMetadata: metadataRow }
     );
 
     // Strategy responses embed presigned URLs with short, server-decided
@@ -523,22 +524,22 @@ router.get(
 
       const storageService = StorageService.getInstance();
       const authReq = req as AuthRequest;
-      const visible = await storageService.objectIsVisible(
+      const metadataRow = await storageService.getObjectMetadataVisible(
         authReq.user,
         bucketName,
         objectKey,
         !!authReq.hasApiKey
       );
-      if (!visible) {
+      if (!metadataRow) {
         throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
-      const metadataRow = await storageService.getObjectMetadataRow(bucketName, objectKey);
-      const serveMime = metadataRow?.mimeType || 'application/octet-stream';
+      const serveMime = metadataRow.mime_type || 'application/octet-stream';
       const forceAttachment = isUnsafeMime(serveMime);
 
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey, undefined, {
         asAttachment: forceAttachment,
+        prefetchedMetadata: metadataRow,
       });
       if (strategy.method === 'presigned') {
         return res.redirect(strategy.url);
@@ -548,7 +549,8 @@ router.get(
         authReq.user,
         bucketName,
         objectKey,
-        !!authReq.hasApiKey
+        !!authReq.hasApiKey,
+        metadataRow
       );
       if (!result) {
         throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);

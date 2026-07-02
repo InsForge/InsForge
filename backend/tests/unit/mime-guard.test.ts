@@ -135,9 +135,9 @@ describe('resolveSafeMimeType', () => {
     expect(result).toBe('application/pdf');
   });
 
-  it('returns application/octet-stream when magic bytes reveal an unsafe type (text/html detection fallback)', async () => {
+  it('returns application/octet-stream when 4KB content scan detects HTML tags in undetectable content', async () => {
     // file-type cannot detect HTML from bytes — detection falls back to octet-stream.
-    // But client supplied text/html — isUnsafeMime check catches it.
+    // The 4KB tag scan detects the HTML payload and catches it.
     const result = await resolveSafeMimeType(HTML_BYTES, 'text/html');
     expect(result).toBe('application/octet-stream');
   });
