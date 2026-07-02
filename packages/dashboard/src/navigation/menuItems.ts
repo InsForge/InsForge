@@ -17,6 +17,8 @@ import {
   Download,
   BookOpen,
   CreditCard,
+  KeyRound,
+  Boxes,
 } from 'lucide-react';
 
 export interface DashboardSecondaryMenuItem {
@@ -96,6 +98,18 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     label: 'Realtime',
     href: '/dashboard/realtime',
     icon: Radio,
+  },
+  {
+    id: 'kv',
+    label: 'Key-Value',
+    href: '/dashboard/kv',
+    icon: KeyRound,
+  },
+  {
+    id: 'vectors',
+    label: 'Vector Store',
+    href: '/dashboard/vectors',
+    icon: Boxes,
   },
   {
     id: 'ai',

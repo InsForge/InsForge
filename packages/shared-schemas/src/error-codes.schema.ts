@@ -116,6 +116,21 @@ const paymentErrorCodes = [
 
 const secretErrorCodes = ['SECRET_ALREADY_EXISTS', 'SECRET_NOT_FOUND'] as const;
 
+const kvErrorCodes = [
+  'KV_NOT_FOUND',
+  'KV_CAS_MISMATCH',
+  'KV_NOT_A_NUMBER',
+  'KV_VALUE_TOO_LARGE',
+] as const;
+
+const vectorErrorCodes = [
+  'VECTOR_COLLECTION_NOT_FOUND',
+  'VECTOR_COLLECTION_ALREADY_EXISTS',
+  'VECTOR_ITEM_NOT_FOUND',
+  'VECTOR_DIMENSION_MISMATCH',
+  'VECTOR_QUERY_INVALID',
+] as const;
+
 const generalErrorCodes = [
   'MISSING_FIELD',
   'ALREADY_EXISTS',
@@ -147,6 +162,8 @@ const errorCodeValues = [
   ...scheduleErrorCodes,
   ...paymentErrorCodes,
   ...secretErrorCodes,
+  ...kvErrorCodes,
+  ...vectorErrorCodes,
   ...generalErrorCodes,
 ] as const;
 
