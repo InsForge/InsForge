@@ -4,6 +4,7 @@ import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type RoleSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 export type UserContext = {
   /**
@@ -27,6 +28,10 @@ export interface AuthRequest extends Request {
 
 const tokenManager = TokenManager.getInstance();
 const secretService = SecretService.getInstance();
+
+function getRootAdminSubject(): string {
+  return `local:${appConfig.auth.rootAdminUsername}`;
+}
 
 // Helper function to extract Bearer token (exported for optional auth checks)
 export function extractBearerToken(authHeader: string | undefined): string | null {
@@ -67,7 +72,7 @@ export function extractAnonKey(req: AuthRequest): string | null {
 // Helper function to set user on request
 function setRequestUser(
   req: AuthRequest,
-  payload: { sub: string; email?: string; role: RoleSchema }
+  payload: { sub: string; email?: string; role: RoleSchema; username?: string; isRoot?: boolean }
 ) {
   req.user = {
     id: payload.sub,
@@ -132,6 +137,60 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
     if (payload.role !== 'project_admin') {
       throw new AppError(
         'Admin access required',
+        403,
+        ERROR_CODES.AUTH_UNAUTHORIZED,
+        NEXT_ACTIONS.CHECK_ADMIN_TOKEN
+      );
+    }
+
+    setRequestUser(req, payload);
+    next();
+  } catch (error) {
+    if (error instanceof AppError) {
+      next(error);
+    } else {
+      next(
+        new AppError(
+          'Invalid admin token',
+          401,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+          NEXT_ACTIONS.CHECK_ADMIN_TOKEN
+        )
+      );
+    }
+  }
+}
+
+/**
+ * Verifies that the authenticated admin has root privileges
+ * Must be used after verifyAdmin
+ */
+export function requireRoot(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const token = extractBearerToken(req.headers.authorization);
+    if (!token) {
+      throw new AppError(
+        'No admin token provided',
+        401,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+        NEXT_ACTIONS.CHECK_TOKEN
+      );
+    }
+
+    const payload = tokenManager.verifyToken(token);
+
+    if (payload.role !== 'project_admin') {
+      throw new AppError(
+        'Admin access required',
+        403,
+        ERROR_CODES.AUTH_UNAUTHORIZED,
+        NEXT_ACTIONS.CHECK_ADMIN_TOKEN
+      );
+    }
+
+    if (payload.sub !== getRootAdminSubject()) {
+      throw new AppError(
+        'Root admin access required',
         403,
         ERROR_CODES.AUTH_UNAUTHORIZED,
         NEXT_ACTIONS.CHECK_ADMIN_TOKEN
@@ -256,10 +315,8 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
         NEXT_ACTIONS.CHECK_TOKEN
       );
     }
-
     // Set user info on request
     setRequestUser(req, payload);
-
     next();
   } catch (error) {
     if (error instanceof AppError) {

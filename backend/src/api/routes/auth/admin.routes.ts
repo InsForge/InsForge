@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
-import { AuthRequest, verifyToken } from '@/api/middlewares/auth.js';
+import { AuthRequest, verifyToken, verifyAdmin, requireRoot } from '@/api/middlewares/auth.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
@@ -15,6 +15,8 @@ import {
   exchangeAdminSessionRequestSchema,
   type CreateAdminSessionResponse,
   type GetCurrentAdminSessionResponse,
+  createAdminSchema,
+  changeAdminPasswordSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 
@@ -57,7 +59,7 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
 });
 
 // POST /api/auth/admin/sessions - Create admin session (web only)
-router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
+router.post('/sessions', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -69,7 +71,7 @@ router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
     }
 
     const { username, password } = validationResult.data;
-    const result: CreateAdminSessionResponse = authService.adminLogin(username, password);
+    const result: CreateAdminSessionResponse = await authService.adminLogin(username, password);
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
@@ -89,16 +91,14 @@ router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
 router.get(
   '/sessions/current',
   verifyToken,
-  (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (req.user?.role !== 'project_admin' || !req.user.id) {
         throw new AppError('Admin access required', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
 
       const response: GetCurrentAdminSessionResponse = {
-        admin: {
-          sub: req.user.id,
-        },
+        admin: await authService.getActiveAdminSessionFromSubject(req.user.id),
       };
 
       successResponse(res, response);
@@ -110,7 +110,7 @@ router.get(
 
 // POST /api/auth/admin/refresh - Refresh admin dashboard access token
 // Uses a dashboard-specific httpOnly cookie + X-CSRF-Token header.
-router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
+router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tokenManager = TokenManager.getInstance();
     const refreshToken = req.cookies?.[ADMIN_REFRESH_TOKEN_COOKIE_NAME];
@@ -130,18 +130,18 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
       throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
+    const admin = await authService.getActiveAdminSessionFromSubject(payload.sub);
+
     const newAccessToken = tokenManager.generateAccessToken({
-      sub: payload.sub,
+      sub: admin.sub,
       role: 'project_admin',
     });
     const { refreshToken: newRefreshToken, csrfToken: newCsrfToken } =
-      tokenManager.generateRefreshTokenWithCsrf(payload.sub, 'admin', payload.csrfNonce);
+      tokenManager.generateRefreshTokenWithCsrf(admin.sub, 'admin', payload.csrfNonce);
     setAdminRefreshTokenCookie(res, newRefreshToken);
 
     successResponse(res, {
-      admin: {
-        sub: payload.sub,
-      },
+      admin,
       accessToken: newAccessToken,
       csrfToken: newCsrfToken,
     });
@@ -166,5 +166,80 @@ router.post('/logout', (_req: Request, res: Response, next: NextFunction) => {
     next(error);
   }
 });
+
+// GET /api/auth/admin - List all admins (root only)
+router.get('/', requireRoot, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const admins = await authService.listAdmins();
+    successResponse(res, { admins });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/auth/admin - Create new admin (root only)
+router.post('/', requireRoot, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validation = createAdminSchema.safeParse(req.body);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const { username, password } = validation.data;
+    const admin = await authService.createAdmin(username, password);
+    successResponse(res, { admin }, 201);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/auth/admin/:username - Delete admin (root only, with self-deletion prevention)
+router.delete(
+  '/:username',
+  requireRoot,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { username } = req.params;
+
+      await authService.deleteAdmin(username, req.user?.id || '');
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /api/auth/admin/change-password - Change own password (any admin)
+router.post(
+  '/change-password',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = changeAdminPasswordSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const adminSubject = req.user?.id;
+      if (!adminSubject) {
+        throw new AppError('Unauthorized', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+
+      const { oldPassword, newPassword } = validation.data;
+      await authService.changeAdminPassword(adminSubject, oldPassword, newPassword);
+      successResponse(res, { message: 'Password changed successfully' });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 export default router;

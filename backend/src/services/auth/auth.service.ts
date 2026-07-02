@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { Pool } from 'pg';
+import { adminService } from '../admin/admin.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
@@ -37,6 +38,7 @@ import { getApiBaseUrl } from '@/utils/environment.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import {
   ERROR_CODES,
+  type AdminSchema,
   type AuthMetadataSchema,
   type CreateAdminSessionResponse,
   type CreateSessionResponse,
@@ -108,6 +110,60 @@ export class AuthService {
       this.pool = dbManager.getPool();
     }
     return this.pool;
+  }
+
+  private getLocalAdminSubject(username: string): string {
+    return `local:${username}`;
+  }
+
+  private getRootAdminSubject(): string {
+    return this.getLocalAdminSubject(this.adminUsername);
+  }
+
+  private getLocalAdminUsernameFromSubject(subject: string): string | null {
+    if (!subject.startsWith('local:')) {
+      return null;
+    }
+    const username = subject.slice('local:'.length);
+    return username.length > 0 ? username : null;
+  }
+
+  private isCloudAdminSubject(subject: string): boolean {
+    return subject.startsWith('cloud:');
+  }
+
+  private isRootAdminSubject(subject: string): boolean {
+    return subject === this.getRootAdminSubject();
+  }
+
+  async getActiveAdminSessionFromSubject(subject: string): Promise<AdminSchema> {
+    if (this.isRootAdminSubject(subject)) {
+      return {
+        sub: subject,
+        username: this.adminUsername,
+        isRoot: true,
+      };
+    }
+
+    if (this.isCloudAdminSubject(subject)) {
+      return { sub: subject, isRoot: false };
+    }
+
+    const username = this.getLocalAdminUsernameFromSubject(subject);
+    if (!username) {
+      throw new AppError('Invalid admin session', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    const admin = await adminService.getAdminByUsername(username);
+    if (!admin) {
+      throw new AppError('Admin user not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    return {
+      sub: subject,
+      username: admin.username,
+      isRoot: false,
+    };
   }
 
   /**
@@ -654,24 +710,143 @@ export class AuthService {
   }
 
   /**
-   * Admin login (validates against env variables only)
+   * Admin login - root admin is env-based, additional admins from DB.
+   * Self-hosted admin subjects are stable, readable `local:<username>` values.
    */
-  adminLogin(username: string, password: string): CreateAdminSessionResponse {
-    // Simply validate against environment variables
-    if (username !== this.adminUsername || password !== this.adminPassword) {
+  async adminLogin(username: string, password: string): Promise<CreateAdminSessionResponse> {
+    // 1. Check root admin (env-based)
+    if (username === this.adminUsername && password === this.adminPassword) {
+      const sub = this.getRootAdminSubject();
+      const accessToken = this.tokenManager.generateAccessToken({
+        sub,
+        role: 'project_admin',
+      });
+      return {
+        admin: { sub, username: this.adminUsername, isRoot: true },
+        accessToken,
+      };
+    }
+
+    if (username === this.adminUsername) {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const sub = `local:${username}`;
+    // 2. Check database for additional admins
+    const admin = await adminService.verifyCredentials(username, password);
+    if (!admin) {
+      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    const sub = this.getLocalAdminSubject(admin.username);
     const accessToken = this.tokenManager.generateAccessToken({
       sub,
       role: 'project_admin',
     });
 
     return {
-      admin: { sub },
+      admin: { sub, username: admin.username, isRoot: false },
       accessToken,
     };
+  }
+
+  /**
+   * List all project administrators (root only)
+   */
+  async listAdmins(): Promise<{ username: string; createdAt: string; updatedAt: string }[]> {
+    const admins = await adminService.listAdmins();
+    return admins.map((admin) => ({
+      username: admin.username,
+      createdAt: admin.created_at.toISOString(),
+      updatedAt: admin.updated_at.toISOString(),
+    }));
+  }
+
+  /**
+   * Create a new project administrator (root only)
+   */
+  async createAdmin(
+    username: string,
+    password: string,
+    createdBy?: string
+  ): Promise<{ username: string; createdAt: string; updatedAt: string }> {
+    if (username === this.adminUsername) {
+      throw new AppError('Admin user already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
+    }
+
+    const existing = await adminService.getAdminByUsername(username);
+    if (existing) {
+      throw new AppError('Admin user already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
+    }
+
+    const admin = await adminService.createAdmin(username, password, createdBy);
+
+    return {
+      username: admin.username,
+      createdAt: admin.created_at.toISOString(),
+      updatedAt: admin.updated_at.toISOString(),
+    };
+  }
+
+  /**
+   * Delete a project administrator (root only)
+   */
+  async deleteAdmin(username: string, currentAdminId: string): Promise<void> {
+    const admin = await adminService.getAdminByUsername(username);
+    if (!admin) {
+      throw new AppError('Admin user not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
+    }
+
+    // Don't allow deleting root admin
+    if (username === this.adminUsername) {
+      throw new AppError('Cannot delete root admin', 403, ERROR_CODES.FORBIDDEN);
+    }
+
+    const success = await adminService.deleteAdmin(admin.id, currentAdminId);
+    if (!success) {
+      throw new AppError('Cannot delete admin', 400, ERROR_CODES.FORBIDDEN);
+    }
+  }
+
+  /**
+   * Change current admin's password using the token subject.
+   */
+  async changeAdminPassword(
+    adminSubject: string,
+    oldPassword: string,
+    newPassword: string
+  ): Promise<void> {
+    // Root admin is env-based and has no DB row; its password is managed via
+    // ROOT_ADMIN_PASSWORD, not the dashboard.
+    if (this.isRootAdminSubject(adminSubject)) {
+      throw new AppError(
+        'Root admin password is managed via environment variables',
+        403,
+        ERROR_CODES.FORBIDDEN
+      );
+    }
+
+    if (this.isCloudAdminSubject(adminSubject)) {
+      throw new AppError(
+        'Cloud admin password is managed outside this self-hosted instance',
+        403,
+        ERROR_CODES.FORBIDDEN
+      );
+    }
+
+    const username = this.getLocalAdminUsernameFromSubject(adminSubject);
+    if (!username) {
+      throw new AppError('Invalid admin session', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    const admin = await adminService.getAdminByUsername(username);
+    if (!admin) {
+      throw new AppError('Admin user not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
+    }
+
+    const success = await adminService.changePassword(admin.id, oldPassword, newPassword);
+    if (!success) {
+      throw new AppError('Invalid old password', 400, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+    }
   }
 
   /**
@@ -686,7 +861,7 @@ export class AuthService {
     });
 
     return {
-      admin: { sub },
+      admin: { sub, isRoot: false },
       accessToken,
     };
   }
