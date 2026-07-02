@@ -31,8 +31,15 @@ async function parseErrorResponse(response: Response): Promise<string> {
   const contentType = response.headers.get('content-type') || '';
 
   if (contentType.includes('application/json')) {
-    const body = await response.json();
-    return body.message || body.error || response.statusText;
+    try {
+      const body = await response.json();
+      return body.message || body.error || response.statusText;
+    } catch {
+      console.warn('Failed to parse JSON error response:', {
+        status: response.status,
+        statusText: response.statusText,
+      });
+    }
   }
 
   if (contentType.includes('application/xml') || contentType.includes('text/xml')) {
@@ -145,7 +152,11 @@ export const storageService = {
         throw new Error(message);
       }
 
-      if (strategy.confirmRequired && strategy.confirmUrl) {
+      if (strategy.confirmRequired) {
+        if (!strategy.confirmUrl) {
+          throw new Error('Strategy requires confirmation but no confirm URL was provided');
+        }
+
         const etag = uploadResponse.headers.get('etag') || undefined;
         const confirmResponse = await fetch(strategy.confirmUrl, {
           method: 'POST',
@@ -168,17 +179,26 @@ export const storageService = {
         return confirmResponse.json();
       }
 
-      throw new Error('Upload succeeded but no confirm endpoint was provided');
+      return {
+        key: strategy.key,
+        bucket: bucketName,
+        size: object.size,
+        mimeType: object.type,
+        uploadedAt: new Date().toISOString(),
+        url: '',
+      } as StorageFileSchema;
     }
 
     const formData = new FormData();
     formData.append('file', object);
 
+    const isSameOrigin =
+      typeof window !== 'undefined' &&
+      new URL(strategy.uploadUrl, window.location.href).origin === window.location.origin;
+
     const uploadResponse = await fetch(strategy.uploadUrl, {
       method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: isSameOrigin ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     });
 

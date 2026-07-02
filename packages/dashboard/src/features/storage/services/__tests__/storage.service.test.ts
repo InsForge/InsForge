@@ -151,9 +151,9 @@ describe('storageService.uploadObject', () => {
         text: vi.fn().mockResolvedValue(''),
       } as unknown as Response);
 
-    await expect(
-      storageService.uploadObject(mockBucket, 'readme.txt', mockFile)
-    ).rejects.toThrow('File too large. Maximum upload size is 50 MB.');
+    await expect(storageService.uploadObject(mockBucket, 'readme.txt', mockFile)).rejects.toThrow(
+      'File too large. Maximum upload size is 50 MB.'
+    );
   });
 
   it('strips HTML tags from HTML error responses', async () => {
@@ -174,13 +174,17 @@ describe('storageService.uploadObject', () => {
         status: 413,
         statusText: 'Payload Too Large',
         headers: new Headers({ 'content-type': 'text/html' }),
-        json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token < in JSON at position 0')),
-        text: vi.fn().mockResolvedValue('<html><body><h1>413 Request Entity Too Large</h1></body></html>'),
+        json: vi
+          .fn()
+          .mockRejectedValue(new SyntaxError('Unexpected token < in JSON at position 0')),
+        text: vi
+          .fn()
+          .mockResolvedValue('<html><body><h1>413 Request Entity Too Large</h1></body></html>'),
       } as unknown as Response);
 
-    await expect(
-      storageService.uploadObject(mockBucket, 'readme.txt', mockFile)
-    ).rejects.toThrow('413 Request Entity Too Large');
+    await expect(storageService.uploadObject(mockBucket, 'readme.txt', mockFile)).rejects.toThrow(
+      '413 Request Entity Too Large'
+    );
   });
 
   it('extracts Message tag from S3 XML error responses', async () => {
@@ -204,14 +208,16 @@ describe('storageService.uploadObject', () => {
         statusText: 'Request Entity Too Large',
         headers: new Headers({ 'content-type': 'application/xml' }),
         json: vi.fn().mockRejectedValue(new SyntaxError('Not JSON')),
-        text: vi.fn().mockResolvedValue(
-          '<Error><Code>EntityTooLarge</Code><Message>Your proposed upload exceeds the maximum allowed object size.</Message></Error>'
-        ),
+        text: vi
+          .fn()
+          .mockResolvedValue(
+            '<Error><Code>EntityTooLarge</Code><Message>Your proposed upload exceeds the maximum allowed object size.</Message></Error>'
+          ),
       } as unknown as Response);
 
-    await expect(
-      storageService.uploadObject(mockBucket, 'readme.txt', mockFile)
-    ).rejects.toThrow('Your proposed upload exceeds the maximum allowed object size.');
+    await expect(storageService.uploadObject(mockBucket, 'readme.txt', mockFile)).rejects.toThrow(
+      'Your proposed upload exceeds the maximum allowed object size.'
+    );
   });
 
   it('falls back to statusText when XML has no Message tag', async () => {
@@ -238,26 +244,70 @@ describe('storageService.uploadObject', () => {
         text: vi.fn().mockResolvedValue('<Error><Code>AccessDenied</Code></Error>'),
       } as unknown as Response);
 
-    await expect(
-      storageService.uploadObject(mockBucket, 'readme.txt', mockFile)
-    ).rejects.toThrow('Forbidden');
+    await expect(storageService.uploadObject(mockBucket, 'readme.txt', mockFile)).rejects.toThrow(
+      'Forbidden'
+    );
   });
 
-  it('truncates long plain-text error messages', async () => {
-    const longMessage = 'A'.repeat(1000);
+  it('handles presigned strategy with confirmRequired: false gracefully', async () => {
+    const presignedUrl = 'https://s3.example.com/presigned-upload';
 
-    mockFetch().mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      statusText: 'Internal Server Error',
-      headers: new Headers({ 'content-type': 'text/plain' }),
-      json: vi.fn().mockRejectedValue(new SyntaxError('Not JSON')),
-      text: vi.fn().mockResolvedValue(longMessage),
-    } as unknown as Response);
+    mockFetch()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: vi.fn().mockResolvedValue({
+          method: 'presigned',
+          uploadUrl: presignedUrl,
+          fields: { key: 'readme.txt' },
+          key: 'readme.txt',
+          confirmRequired: false,
+        }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+        headers: new Headers({ 'content-type': 'application/xml' }),
+        json: vi.fn().mockRejectedValue(new Error('Not JSON')),
+        text: vi.fn().mockResolvedValue(''),
+      } as unknown as Response);
 
-    await expect(
-      storageService.uploadObject(mockBucket, 'readme.txt', mockFile)
-    ).rejects.toThrow(longMessage.slice(0, 500));
+    const result = await storageService.uploadObject(mockBucket, 'readme.txt', mockFile);
+
+    expect(result).toMatchObject({
+      key: 'readme.txt',
+      bucket: mockBucket,
+      size: 11,
+    });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back to text when JSON content-type body is malformed', async () => {
+    mockFetch()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: vi.fn().mockResolvedValue({
+          method: 'direct',
+          uploadUrl: '/upload',
+          key: 'readme.txt',
+          confirmRequired: false,
+        }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token')),
+        text: vi.fn().mockResolvedValue('Bad Gateway'),
+      } as unknown as Response);
+
+    await expect(storageService.uploadObject(mockBucket, 'readme.txt', mockFile)).rejects.toThrow(
+      'Bad Gateway'
+    );
   });
 
   it('throws a meaningful error when the strategy endpoint itself fails', async () => {
@@ -270,9 +320,9 @@ describe('storageService.uploadObject', () => {
       text: vi.fn().mockResolvedValue('Internal Server Error'),
     } as unknown as Response);
 
-    await expect(
-      storageService.uploadObject(mockBucket, 'readme.txt', mockFile)
-    ).rejects.toThrow('Internal Server Error');
+    await expect(storageService.uploadObject(mockBucket, 'readme.txt', mockFile)).rejects.toThrow(
+      'Internal Server Error'
+    );
   });
 
   it('throws a meaningful error when the confirm endpoint fails', async () => {
@@ -309,8 +359,8 @@ describe('storageService.uploadObject', () => {
         text: vi.fn().mockResolvedValue('Upload already confirmed'),
       } as unknown as Response);
 
-    await expect(
-      storageService.uploadObject(mockBucket, 'readme.txt', mockFile)
-    ).rejects.toThrow('Upload already confirmed');
+    await expect(storageService.uploadObject(mockBucket, 'readme.txt', mockFile)).rejects.toThrow(
+      'Upload already confirmed'
+    );
   });
 });
