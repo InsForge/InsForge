@@ -1131,6 +1131,10 @@ export function useCloudHosting() {
     void postMessageToParent({ type: 'SHOW_UPGRADE_DIALOG' });
   }, [postMessageToParent]);
 
+  const openWhatsNew = useCallback(() => {
+    void postMessageToParent({ type: 'OPEN_WHATS_NEW' });
+  }, [postMessageToParent]);
+
   const reportRouteChange = useCallback(
     (path: string) => {
       void postMessageToParent({ type: 'APP_ROUTE_CHANGE', path });
@@ -1263,6 +1267,7 @@ export function useCloudHosting() {
     deleteProject,
     updateVersion,
     showUpgradeDialog,
+    openWhatsNew,
     requestUserInfo,
     requestUserApiKey,
     requestModelCredits,

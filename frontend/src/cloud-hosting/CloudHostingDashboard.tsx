@@ -8,6 +8,7 @@ export function CloudHostingDashboard() {
     projectInfo,
     reportRouteChange,
     showUpgradeDialog,
+    openWhatsNew,
     renameProject,
     deleteProject,
     requestBackupInfo,
@@ -41,6 +42,7 @@ export function CloudHostingDashboard() {
       project={projectInfo}
       onRouteChange={reportRouteChange}
       onShowUpgradeDialog={showUpgradeDialog}
+      onOpenWhatsNew={openWhatsNew}
       onRenameProject={renameProject}
       onDeleteProject={deleteProject}
       onRequestBackupInfo={requestBackupInfo}

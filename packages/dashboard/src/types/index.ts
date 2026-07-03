@@ -155,6 +155,7 @@ export interface DashboardProps {
   project?: DashboardProjectInfo;
   onRouteChange?: (path: string) => void;
   onShowUpgradeDialog?: () => void;
+  onOpenWhatsNew?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
   onRequestBackupInfo?: () => Promise<DashboardBackupInfo>;

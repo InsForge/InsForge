@@ -7,6 +7,7 @@ import {
   dashboardDTestInstallMenuItem,
   dashboardSettingsMenuItem,
   dashboardStaticMenuItems,
+  dashboardWhatsNewMenuItem,
   type DashboardPrimaryMenuItem,
 } from '#navigation/menuItems';
 import { Link, useLocation, matchPath } from 'react-router-dom';
@@ -63,9 +64,12 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
       items.push({ ...dashboardDTestInstallMenuItem });
       items.push({ ...dashboardDTestDocMenuItem });
     }
+    if (host.mode === 'cloud-hosting') {
+      items.push({ ...dashboardWhatsNewMenuItem, onClick: () => host.onOpenWhatsNew?.() });
+    }
     items.push({ ...dashboardSettingsMenuItem, onClick: () => setIsSettingsDialogOpen(true) });
     return items;
-  }, [isDTestCloud]);
+  }, [isDTestCloud, host]);
 
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)
