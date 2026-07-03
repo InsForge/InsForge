@@ -442,6 +442,77 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ]);
   });
 
+  it('batch deletes objects for project_admin JWT callers through root access', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObjects: vi.fn(async () => ({
+        deleted: ['a.txt'],
+        failed: [{ key: 'b.txt', message: 'provider denied' }],
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [{ rows: [{ key: 'a.txt' }, { key: 'b.txt' }], rowCount: 2 }];
+
+    const result = await svc.deleteObjects({ id: 'local:admin', role: 'project_admin' }, 'photos', [
+      'a.txt',
+      'b.txt',
+      'missing.txt',
+      'a.txt',
+    ]);
+
+    expect(result).toEqual({
+      deleted: ['a.txt'],
+      notFound: ['missing.txt'],
+      failed: [{ key: 'b.txt', message: 'provider denied' }],
+    });
+    expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['a.txt', 'b.txt']);
+    expect(calls.map((c) => c.sql)).toEqual([
+      'DELETE FROM storage.objects WHERE bucket = $1 AND key = ANY($2::text[]) RETURNING key',
+    ]);
+    expect(calls[0].params).toEqual(['photos', ['a.txt', 'b.txt', 'missing.txt']]);
+  });
+
+  it('batch deletes objects through withUserContext for authenticated callers', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObjects: vi.fn(async () => ({ deleted: ['mine.txt'], failed: [] })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [], rowCount: 0 }, // BEGIN
+      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
+      { rows: [], rowCount: 0 }, // set_config(claims)
+      { rows: [{ key: 'mine.txt' }], rowCount: 1 }, // RLS-authorized delete
+      { rows: [], rowCount: 0 }, // COMMIT
+      { rows: [], rowCount: 0 }, // RESET ROLE
+    ];
+
+    const result = await svc.deleteObjects(
+      { id: 'alice-sub', email: 'alice@example.com', role: 'authenticated' },
+      'photos',
+      ['mine.txt', 'not-mine.txt']
+    );
+
+    expect(result).toEqual({
+      deleted: ['mine.txt'],
+      notFound: ['not-mine.txt'],
+      failed: [],
+    });
+    expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['mine.txt']);
+    expect(calls.map((c) => c.sql)).toEqual([
+      'BEGIN',
+      'SET LOCAL ROLE authenticated',
+      'SELECT set_config($1, $2, true)',
+      'DELETE FROM storage.objects WHERE bucket = $1 AND key = ANY($2::text[]) RETURNING key',
+      'COMMIT',
+      'RESET ROLE',
+    ]);
+  });
+
   it('returns true for public bucket objects without requiring user context', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
