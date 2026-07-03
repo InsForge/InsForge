@@ -8,6 +8,7 @@ vi.mock('fs/promises', async () => {
   return {
     ...actual,
     rm: vi.fn(actual.rm),
+    unlink: vi.fn(actual.unlink),
   };
 });
 
@@ -122,6 +123,54 @@ describe('LocalStorageProvider - putObject etag', () => {
     const a = await provider.putObject('etagBucket', 'k', makeFile(Buffer.from('v1')));
     const b = await provider.putObject('etagBucket', 'k', makeFile(Buffer.from('v2')));
     expect(a.etag).not.toBe(b.etag);
+  });
+});
+
+describe('LocalStorageProvider - deleteObjects', () => {
+  const baseDir = path.join(__dirname, 'test-storage-delete-objects');
+  let provider: LocalStorageProvider;
+
+  beforeEach(async () => {
+    provider = new LocalStorageProvider(baseDir);
+    await provider.initialize();
+    await provider.createBucket('batchBucket');
+  });
+
+  afterEach(async () => {
+    await fs.rm(baseDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('deletes multiple files and ignores missing files', async () => {
+    await fs.mkdir(path.join(baseDir, 'batchBucket', 'folder'), { recursive: true });
+    await fs.writeFile(path.join(baseDir, 'batchBucket', 'a.txt'), 'a');
+    await fs.writeFile(path.join(baseDir, 'batchBucket', 'folder', 'b.txt'), 'b');
+
+    const result = await provider.deleteObjects('batchBucket', [
+      'a.txt',
+      'folder/b.txt',
+      'missing.txt',
+    ]);
+
+    expect(result).toEqual({
+      deleted: ['a.txt', 'folder/b.txt', 'missing.txt'],
+      failed: [],
+    });
+    await expect(fs.access(path.join(baseDir, 'batchBucket', 'a.txt'))).rejects.toThrow();
+    await expect(fs.access(path.join(baseDir, 'batchBucket', 'folder', 'b.txt'))).rejects.toThrow();
+  });
+
+  it('reports unexpected unlink failures per key', async () => {
+    vi.spyOn(fs, 'unlink').mockRejectedValueOnce(
+      Object.assign(new Error('permission denied'), { code: 'EACCES' })
+    );
+
+    const result = await provider.deleteObjects('batchBucket', ['blocked.txt']);
+
+    expect(result).toEqual({
+      deleted: [],
+      failed: [{ key: 'blocked.txt', message: 'permission denied' }],
+    });
   });
 });
 
