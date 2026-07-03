@@ -8,6 +8,7 @@ import { dynamicUploadSingle, handleUploadError } from '@/api/middlewares/upload
 import {
   ERROR_CODES,
   createBucketRequestSchema,
+  deleteObjectsRequestSchema,
   updateBucketRequestSchema,
   updateStorageConfigRequestSchema,
   createS3AccessKeyRequestSchema,
@@ -591,6 +592,40 @@ router.delete(
       );
     } catch (error) {
       next(error);
+    }
+  }
+);
+
+// DELETE /api/storage/buckets/:bucketName/objects - Delete multiple objects from bucket (requires auth)
+router.delete(
+  '/buckets/:bucketName/objects',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { bucketName } = req.params;
+      const validation = deleteObjectsRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
+      }
+
+      const result = await StorageService.getInstance().deleteObjects(
+        req.user,
+        bucketName,
+        validation.data.keys,
+        !!req.hasApiKey
+      );
+
+      successResponse(res, result);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Invalid')) {
+        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+      } else {
+        next(error);
+      }
     }
   }
 );
