@@ -7,6 +7,7 @@ import { withUserContext } from '@/services/database/user-context.service.js';
 import { StorageRecord } from '@/types/storage.js';
 import {
   ERROR_CODES,
+  DELETE_OBJECT_FAILURE_MESSAGE,
   DeleteObjectsResponse,
   StorageBucketSchema,
   StorageFileSchema,
@@ -27,7 +28,6 @@ const PUBLIC_BUCKET_EXPIRY = 0; // Public buckets don't expire
 const PRIVATE_BUCKET_EXPIRY = 3600; // Private buckets expire in 1 hour
 const MIN_SIGNED_URL_EXPIRY = 1; // 1 second
 const MAX_SIGNED_URL_EXPIRY = 604800; // 7 days — S3 SigV4 presign ceiling
-const DELETE_OBJECT_FAILURE_MESSAGE = 'Failed to delete object';
 
 type StorageObjectResult = {
   file: Buffer;
@@ -350,38 +350,8 @@ export class StorageService {
     key: string,
     hasApiKey: boolean = false
   ): Promise<boolean> {
-    this.validateBucketName(bucket);
-    this.validateKey(key);
-
-    // DB DELETE first (RLS DELETE policy gates authorization) so a permissive
-    // SELECT + restrictive DELETE policy combo can't be exploited to destroy
-    // other users' blobs. If rowCount=0 the caller had no DELETE permission
-    // (or the row was already gone) — return false without touching storage.
-    // Provider delete then runs outside the tx; failure here leaves an orphan
-    // blob that an external GC sweep can reclaim, but never an orphan row.
-    const deleteObjectRow = async (db: PoolClient) => {
-      const result = await db.query('DELETE FROM storage.objects WHERE bucket = $1 AND key = $2', [
-        bucket,
-        key,
-      ]);
-      return (result.rowCount ?? 0) > 0;
-    };
-    let deleted: boolean;
-    if (hasApiKey || ctx?.role === 'project_admin') {
-      deleted = await runWithRootAccess(this.getPool(), deleteObjectRow);
-    } else {
-      if (!ctx) {
-        throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
-      }
-      deleted = await withUserContext(this.getPool(), ctx, deleteObjectRow);
-    }
-
-    if (!deleted) {
-      return false;
-    }
-
-    await this.provider.deleteObject(bucket, key);
-    return true;
+    const result = await this.deleteObjects(ctx, bucket, [key], hasApiKey);
+    return !result.notFound.includes(key);
   }
 
   async deleteObjects(
@@ -420,17 +390,27 @@ export class StorageService {
 
     try {
       const providerResult = await this.provider.deleteObjects(bucket, dbDeletedKeys);
-      if (providerResult.failed.length > 0) {
+      const providerDeletedKeys = new Set(
+        providerResult.deleted.filter((key) => dbDeletedKeySet.has(key))
+      );
+      const failed = providerResult.failed.filter((failure) => dbDeletedKeySet.has(failure.key));
+      const providerFailedKeys = new Set(failed.map((failure) => failure.key));
+      const unreconciledFailures = dbDeletedKeys
+        .filter((key) => !providerDeletedKeys.has(key) && !providerFailedKeys.has(key))
+        .map((key) => ({ key, message: DELETE_OBJECT_FAILURE_MESSAGE }));
+      failed.push(...unreconciledFailures);
+
+      if (failed.length > 0) {
         logger.warn('Storage provider batch delete partially failed after DB rows were deleted', {
           bucket,
-          failed: providerResult.failed,
+          failed,
         });
       }
-      const failedKeys = new Set(providerResult.failed.map((failure) => failure.key));
+      const failedKeys = new Set(failed.map((failure) => failure.key));
       return {
-        deleted: providerResult.deleted.filter((key) => !failedKeys.has(key)),
+        deleted: dbDeletedKeys.filter((key) => providerDeletedKeys.has(key) && !failedKeys.has(key)),
         notFound,
-        failed: providerResult.failed,
+        failed,
       };
     } catch (error) {
       logger.error('Storage provider batch delete failed', {
