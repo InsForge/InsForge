@@ -19,6 +19,24 @@ export const listObjectsResponseSchema = z.object({
   }),
 });
 
+export const deleteObjectsRequestSchema = z.object({
+  keys: z
+    .array(z.string().min(1, 'Object key cannot be empty'))
+    .min(1, 'At least one object key is required')
+    .max(1000, 'Cannot delete more than 1000 objects at once'),
+});
+
+export const deleteObjectsResponseSchema = z.object({
+  deleted: z.array(z.string()),
+  notFound: z.array(z.string()),
+  failed: z.array(
+    z.object({
+      key: z.string(),
+      message: z.string(),
+    })
+  ),
+});
+
 // Upload strategy schemas
 export const uploadStrategyRequestSchema = z.object({
   filename: z.string().min(1, 'Filename cannot be empty'),
@@ -66,6 +84,8 @@ export const getStorageConfigResponseSchema = storageConfigSchema;
 export type CreateBucketRequest = z.infer<typeof createBucketRequestSchema>;
 export type UpdateBucketRequest = z.infer<typeof updateBucketRequestSchema>;
 export type ListObjectsResponseSchema = z.infer<typeof listObjectsResponseSchema>;
+export type DeleteObjectsRequest = z.infer<typeof deleteObjectsRequestSchema>;
+export type DeleteObjectsResponse = z.infer<typeof deleteObjectsResponseSchema>;
 export type UploadStrategyRequest = z.infer<typeof uploadStrategyRequestSchema>;
 export type UploadStrategyResponse = z.infer<typeof uploadStrategyResponseSchema>;
 export type DownloadStrategyResponse = z.infer<typeof downloadStrategyResponseSchema>;
