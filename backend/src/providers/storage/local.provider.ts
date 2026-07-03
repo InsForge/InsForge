@@ -81,6 +81,36 @@ export class LocalStorageProvider implements StorageProvider {
     }
   }
 
+  async deleteObjects(
+    bucket: string,
+    keys: string[]
+  ): Promise<{ deleted: string[]; failed: Array<{ key: string; message: string }> }> {
+    const results = await Promise.allSettled(
+      keys.map(async (key) => {
+        await this.deleteObject(bucket, key);
+        return key;
+      })
+    );
+
+    const deleted: string[] = [];
+    const failed: Array<{ key: string; message: string }> = [];
+
+    results.forEach((result, index) => {
+      const key = keys[index];
+      if (result.status === 'fulfilled') {
+        deleted.push(key);
+      } else {
+        const reason = result.reason;
+        failed.push({
+          key,
+          message: reason instanceof Error ? reason.message : String(reason),
+        });
+      }
+    });
+
+    return { deleted, failed };
+  }
+
   async createBucket(bucket: string): Promise<void> {
     const bucketPath = this.getValidatedPath(bucket);
     await fs.mkdir(bucketPath, { recursive: true });
