@@ -471,11 +471,14 @@ const downloadStrategyHandler = async (
       requestedExpiresIn = parsed;
     }
 
+    const serveMime = metadataRow.mime_type || 'application/octet-stream';
+    const forceAttachment = isUnsafeMime(serveMime);
+
     const strategy = await storageService.getDownloadStrategy(
       bucketName,
       objectKey,
       requestedExpiresIn,
-      { prefetchedMetadata: metadataRow }
+      { asAttachment: forceAttachment, prefetchedMetadata: metadataRow }
     );
 
     // Strategy responses embed presigned URLs with short, server-decided

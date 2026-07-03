@@ -6,6 +6,9 @@ const storageMocks = vi.hoisted(() => ({
   isBucketPublic: vi.fn(),
   getObjectMetadataVisible: vi.fn(),
   getDownloadStrategy: vi.fn(),
+  getObjectMetadataRow: vi.fn(),
+  getObject: vi.fn(),
+  objectIsVisible: vi.fn(),
 }));
 
 const authMocks = vi.hoisted(() => ({
@@ -123,7 +126,7 @@ describe('Storage routes', () => {
       'product-images',
       'products/prod_123/main.jpg',
       undefined,
-      { prefetchedMetadata: true }
+      { asAttachment: false, prefetchedMetadata: true }
     );
     expect(authMocks.verifyUser).not.toHaveBeenCalled();
   });
@@ -191,7 +194,7 @@ describe('Storage routes', () => {
       'product-images',
       'products/prod_123/main.jpg',
       undefined,
-      { prefetchedMetadata: true }
+      { asAttachment: false, prefetchedMetadata: true }
     );
   });
 
@@ -230,7 +233,7 @@ describe('Storage routes', () => {
       'product-images',
       'products/prod_123/main.jpg',
       120,
-      { prefetchedMetadata: true }
+      { asAttachment: false, prefetchedMetadata: true }
     );
   });
 
@@ -269,7 +272,7 @@ describe('Storage routes', () => {
       'product-images',
       'products/prod_123/main.jpg',
       120,
-      { prefetchedMetadata: true }
+      { asAttachment: false, prefetchedMetadata: true }
     );
   });
 
@@ -300,5 +303,51 @@ describe('Storage routes', () => {
 
     expect(response.statusCode, response.body).toBe(400);
     expect(storageMocks.getDownloadStrategy).not.toHaveBeenCalled();
+  });
+
+  test('direct download route applies read-time defense for unsafe MIME types', async () => {
+    vi.resetModules();
+    storageMocks.objectIsVisible.mockResolvedValue(true);
+    storageMocks.getObjectMetadataRow.mockResolvedValue({ mimeType: 'text/html' });
+    storageMocks.getDownloadStrategy.mockResolvedValue({
+      method: 'direct',
+      url: 'http://localhost:7130/api/storage/buckets/product-images/objects/products/prod_123/main.html',
+    });
+    storageMocks.getObject.mockResolvedValue({
+      file: Buffer.from('<html><script>alert(1)</script></html>'),
+      metadata: { mimeType: 'text/html' },
+    });
+
+    const { storageRouter } = await import('../../src/api/routes/storage/index.routes.js');
+    const app = express();
+    app.use(express.json());
+    app.use('/api/storage', storageRouter);
+    app.use(routeErrorHandler);
+
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, resolve);
+    });
+    const address = server?.address();
+
+    if (!address || typeof address === 'string') {
+      throw new Error('Test server did not bind to a TCP port');
+    }
+
+    const request = http.request({
+      hostname: '127.0.0.1',
+      port: address.port,
+      path: '/api/storage/buckets/product-images/objects/products/prod_123/main.html',
+      method: 'GET',
+    });
+
+    const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+      request.on('response', resolve);
+      request.on('error', reject);
+      request.end();
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['content-disposition']).toBe('attachment');
   });
 });
