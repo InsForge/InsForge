@@ -55,4 +55,46 @@ describe('storageService', () => {
 
     expect(apiClientMock.request).not.toHaveBeenCalled();
   });
+
+  it('chunks deletes into batches of 1000 objects', async () => {
+    apiClientMock.request
+      .mockResolvedValueOnce({
+        deleted: Array.from({ length: 1000 }, (_, index) => `file-${index}.txt`),
+        notFound: [],
+        failed: [],
+      })
+      .mockResolvedValueOnce({
+        deleted: ['file-1000.txt'],
+        notFound: [],
+        failed: [],
+      });
+    const keys = Array.from({ length: 1001 }, (_, index) => `file-${index}.txt`);
+
+    const result = await storageService.deleteObjects('photos', keys);
+
+    expect(result).toEqual({ success: keys, failures: [] });
+    expect(apiClientMock.request).toHaveBeenCalledTimes(2);
+    expect(apiClientMock.request).toHaveBeenNthCalledWith(1, '/storage/buckets/photos/objects', {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer token' },
+      body: JSON.stringify({ keys: keys.slice(0, 1000) }),
+    });
+    expect(apiClientMock.request).toHaveBeenNthCalledWith(2, '/storage/buckets/photos/objects', {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer token' },
+      body: JSON.stringify({ keys: ['file-1000.txt'] }),
+    });
+  });
+
+  it('returns structured failures when a batch request fails', async () => {
+    apiClientMock.request.mockRejectedValue(new Error('HTTP 500'));
+
+    const result = await storageService.deleteObjects('photos', ['a.txt', 'b.txt']);
+
+    expect(result.success).toEqual([]);
+    expect(result.failures).toEqual([
+      { key: 'a.txt', error: new Error('HTTP 500') },
+      { key: 'b.txt', error: new Error('HTTP 500') },
+    ]);
+  });
 });

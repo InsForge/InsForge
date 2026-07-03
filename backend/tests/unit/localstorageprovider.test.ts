@@ -169,7 +169,7 @@ describe('LocalStorageProvider - deleteObjects', () => {
 
     expect(result).toEqual({
       deleted: [],
-      failed: [{ key: 'blocked.txt', message: 'permission denied' }],
+      failed: [{ key: 'blocked.txt', message: 'Failed to delete object' }],
     });
   });
 });

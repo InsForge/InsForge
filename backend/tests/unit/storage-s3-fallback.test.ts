@@ -166,7 +166,7 @@ describe('S3StorageProvider — branch fallback', () => {
 
       expect(result).toEqual({
         deleted: ['a.txt'],
-        failed: [{ key: 'b.txt', message: 'denied' }],
+        failed: [{ key: 'b.txt', message: 'Failed to delete object' }],
       });
       expect(sendMock).toHaveBeenCalledTimes(1);
       const command = sendMock.mock.calls[0][0] as DeleteObjectsCommand;
@@ -176,6 +176,23 @@ describe('S3StorageProvider — branch fallback', () => {
           Objects: [{ Key: 'branchkey/photos/a.txt' }, { Key: 'branchkey/photos/b.txt' }],
         },
       });
+    });
+
+    it('chunks deletes into S3-compatible batches of 1000 objects', async () => {
+      sendMock.mockResolvedValue({});
+      const p = makeProvider('parentkey');
+      const keys = Array.from({ length: 1001 }, (_, index) => `file-${index}.txt`);
+
+      const result = await p.deleteObjects('photos', keys);
+
+      expect(result).toEqual({ deleted: keys, failed: [] });
+      expect(sendMock).toHaveBeenCalledTimes(2);
+      const firstCommand = sendMock.mock.calls[0][0] as DeleteObjectsCommand;
+      const secondCommand = sendMock.mock.calls[1][0] as DeleteObjectsCommand;
+      expect(firstCommand.input.Delete?.Objects).toHaveLength(1000);
+      expect(secondCommand.input.Delete?.Objects).toEqual([
+        { Key: 'branchkey/photos/file-1000.txt' },
+      ]);
     });
   });
 

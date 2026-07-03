@@ -513,6 +513,31 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ]);
   });
 
+  it('throws a sanitized error when the provider batch delete fails unexpectedly', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const { AppError } = await import('@/utils/errors.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObjects: vi.fn(async () => {
+        throw new Error('/var/private/storage/photos/a.txt permission denied');
+      }),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [{ rows: [{ key: 'a.txt' }], rowCount: 1 }];
+
+    try {
+      await svc.deleteObjects({ id: 'local:admin', role: 'project_admin' }, 'photos', ['a.txt']);
+      throw new Error('Expected deleteObjects to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect(error).toMatchObject({
+        message: 'Failed to delete objects',
+        statusCode: 500,
+      });
+    }
+  });
+
   it('returns true for public bucket objects without requiring user context', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
