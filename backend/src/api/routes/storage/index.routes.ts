@@ -599,6 +599,7 @@ router.delete(
 // DELETE /api/storage/buckets/:bucketName/objects - Delete multiple objects from bucket (requires auth)
 router.delete(
   '/buckets/:bucketName/objects',
+  s3AccessKeyManagementRateLimiter,
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
