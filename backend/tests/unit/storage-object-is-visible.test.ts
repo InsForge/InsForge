@@ -538,11 +538,9 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
 
     queryResults = [{ rows: [{ key: 'a.txt' }], rowCount: 1 }];
 
-    const result = await svc.deleteObjects(
-      { id: 'local:admin', role: 'project_admin' },
-      'photos',
-      ['a.txt']
-    );
+    const result = await svc.deleteObjects({ id: 'local:admin', role: 'project_admin' }, 'photos', [
+      'a.txt',
+    ]);
 
     expect(result).toEqual({
       deleted: ['a.txt'],
