@@ -60,7 +60,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
       'alice/cat.jpg'
     );
 
-    expect(visible).toBe(true);
+    expect(visible).toBeTruthy();
 
     // Verify the SELECT happened *inside* withUserContext (BEGIN before, COMMIT after).
     const sequence = calls.map((c) => c.sql);
@@ -68,13 +68,13 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     expect(sequence[1]).toBe('BEGIN');
     expect(sequence[2]).toBe('SET LOCAL ROLE authenticated');
     expect(calls[3].params?.[0]).toBe('request.jwt.claims');
-    expect(sequence).toContain('SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2');
+    expect(sequence).toContain('SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2');
     expect(sequence[sequence.length - 2]).toBe('COMMIT');
     expect(sequence[sequence.length - 1]).toBe('RESET ROLE');
 
     // Verify the SELECT bound bucket and key as parameters.
     const selectCall = calls.find(
-      (c) => c.sql === 'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2'
+      (c) => c.sql === 'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2'
     );
     expect(selectCall?.params).toEqual(['photos', 'alice/cat.jpg']);
   });
@@ -100,7 +100,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
       'alice/cat.jpg'
     );
 
-    expect(visible).toBe(false);
+    expect(visible).toBeNull();
   });
 
   it('runs SELECT directly on the pool for API-key callers', async () => {
@@ -111,10 +111,10 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     const visible = await svc.getObjectMetadataVisible(undefined, 'photos', 'alice/cat.jpg', true);
 
-    expect(visible).toBe(true);
+    expect(visible).toBeTruthy();
     // API-key path skips BEGIN/SET ROLE/COMMIT — only the visibility SELECT runs.
     expect(calls.map((c) => c.sql)).toEqual([
-      'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+      'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
     ]);
   });
 
@@ -130,9 +130,9 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
       'alice/cat.jpg'
     );
 
-    expect(visible).toBe(true);
+    expect(visible).toBeTruthy();
     expect(calls.map((c) => c.sql)).toEqual([
-      'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+      'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
     ]);
   });
 
@@ -233,7 +233,9 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     queryResults = [{ rows: [{ public: false }], rowCount: 1 }];
 
-    await expect(svc.getObjectMetadataVisible(undefined, 'photos', 'alice/cat.jpg')).resolves.toBe(false);
+    await expect(
+      svc.getObjectMetadataVisible(undefined, 'photos', 'alice/cat.jpg')
+    ).resolves.toBeNull();
     expect(calls).toEqual([
       {
         sql: 'SELECT public FROM storage.buckets WHERE name = $1',
@@ -453,14 +455,14 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     const visible = await svc.getObjectMetadataVisible(undefined, 'photos', 'alice/cat.jpg');
 
-    expect(visible).toBe(true);
+    expect(visible).toBeTruthy();
     expect(calls).toEqual([
       {
         sql: 'SELECT public FROM storage.buckets WHERE name = $1',
         params: ['photos'],
       },
       {
-        sql: 'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+        sql: 'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
         params: ['photos', 'alice/cat.jpg'],
       },
     ]);
@@ -477,14 +479,14 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     const visible = await svc.getObjectMetadataVisible(undefined, 'photos', 'missing.jpg');
 
-    expect(visible).toBe(false);
+    expect(visible).toBeNull();
     expect(calls).toEqual([
       {
         sql: 'SELECT public FROM storage.buckets WHERE name = $1',
         params: ['photos'],
       },
       {
-        sql: 'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+        sql: 'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
         params: ['photos', 'missing.jpg'],
       },
     ]);

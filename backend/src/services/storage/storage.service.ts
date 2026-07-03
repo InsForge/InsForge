@@ -287,30 +287,13 @@ export class StorageService {
     bucket: string,
     key: string,
     hasApiKey: boolean = false,
-    prefetchedMetadata?: Partial<StorageRecord> | null
+    prefetchedMetadata?: StorageRecord | null
   ): Promise<StorageObjectResult | null> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    let metadata = prefetchedMetadata;
-    if (!metadata) {
-      const selectObjectMetadata = async (db: PoolClient) => {
-        const result = await db.query(
-          'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
-          [bucket, key]
-        );
-        return result.rows[0] as StorageRecord | undefined;
-      };
-
-      if (hasApiKey || ctx?.role === 'project_admin' || (await this.isBucketPublic(bucket))) {
-        metadata = await runWithRootAccess(this.getPool(), selectObjectMetadata);
-      } else if (!ctx) {
-        return null;
-      } else {
-        metadata = await withUserContext(this.getPool(), ctx, selectObjectMetadata);
-      }
-    }
-
+    const metadata =
+      prefetchedMetadata ?? (await this.getObjectMetadataVisible(ctx, bucket, key, hasApiKey));
     if (!metadata) {
       return null;
     }
@@ -325,14 +308,10 @@ export class StorageService {
       metadata: {
         key,
         bucket,
-        size: metadata.size!,
-        mimeType: metadata.mime_type!,
-        uploadedAt: metadata.uploaded_at!,
-        url: this.buildObjectUrl(
-          bucket,
-          key,
-          metadata.etag || metadata.uploaded_at!
-        ),
+        size: metadata.size,
+        mimeType: metadata.mime_type,
+        uploadedAt: metadata.uploaded_at,
+        url: this.buildObjectUrl(bucket, key, metadata.etag || metadata.uploaded_at),
       },
     };
   }
@@ -572,7 +551,7 @@ export class StorageService {
     bucket: string,
     key: string,
     requestedExpiresIn?: number,
-    options?: { asAttachment?: boolean; prefetchedMetadata?: Partial<StorageRecord> | null }
+    options?: { asAttachment?: boolean; prefetchedMetadata?: StorageRecord | null }
   ) {
     this.validateBucketName(bucket);
     this.validateKey(key);
@@ -603,7 +582,7 @@ export class StorageService {
     let etag = options?.prefetchedMetadata?.etag;
     let uploadedAt = options?.prefetchedMetadata?.uploaded_at;
 
-    if (!options?.prefetchedMetadata) {
+    if (!etag && !uploadedAt) {
       const versionRow = await this.getPool().query(
         'SELECT etag, uploaded_at as "uploadedAt" FROM storage.objects WHERE bucket = $1 AND key = $2 LIMIT 1',
         [bucket, key]
@@ -611,9 +590,7 @@ export class StorageService {
       etag = versionRow.rows[0]?.etag;
       uploadedAt = versionRow.rows[0]?.uploadedAt;
     }
-    const version = this.toVersionStamp(
-      (etag as string | null) ?? uploadedAt ?? null
-    );
+    const version = this.toVersionStamp((etag as string | null) ?? uploadedAt ?? null);
 
     return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic, version || null, {
       asAttachment: options?.asAttachment,

@@ -307,8 +307,11 @@ describe('Storage routes', () => {
 
   test('direct download route applies read-time defense for unsafe MIME types', async () => {
     vi.resetModules();
-    storageMocks.objectIsVisible.mockResolvedValue(true);
-    storageMocks.getObjectMetadataRow.mockResolvedValue({ mimeType: 'text/html' });
+    storageMocks.getObjectMetadataVisible.mockResolvedValue({
+      mime_type: 'text/html',
+      bucket: 'test-bucket',
+      key: 'test.html',
+    });
     storageMocks.getDownloadStrategy.mockResolvedValue({
       method: 'direct',
       url: 'http://localhost:7130/api/storage/buckets/product-images/objects/products/prod_123/main.html',
@@ -349,5 +352,34 @@ describe('Storage routes', () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers['x-content-type-options']).toBe('nosniff');
     expect(response.headers['content-disposition']).toBe('attachment');
+  });
+
+  test('download strategy route returns 404 for missing or invisible objects', async () => {
+    vi.resetModules();
+    storageMocks.isBucketPublic.mockResolvedValue(true);
+    storageMocks.getObjectMetadataVisible.mockResolvedValue(null);
+
+    const { storageRouter } = await import('../../src/api/routes/storage/index.routes.js');
+    const app = express();
+    app.use(express.json());
+    app.use('/api/storage', storageRouter);
+    app.use(routeErrorHandler);
+
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, resolve);
+    });
+    const address = server?.address();
+
+    if (!address || typeof address === 'string') {
+      throw new Error('Test server did not bind to a TCP port');
+    }
+
+    const response = await post(
+      address.port,
+      '/api/storage/buckets/product-images/objects/products/prod_123/missing.jpg/download-strategy'
+    );
+
+    expect(response.statusCode, response.body).toBe(404);
+    expect(storageMocks.getDownloadStrategy).not.toHaveBeenCalled();
   });
 });
