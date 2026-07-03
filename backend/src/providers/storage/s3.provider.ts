@@ -267,7 +267,8 @@ export class S3StorageProvider implements StorageProvider {
     bucket: string,
     key: string,
     metadata: { contentType?: string; size?: number },
-    maxFileSizeBytes: number
+    maxFileSizeBytes: number,
+    contentType: string = 'application/octet-stream'
   ): Promise<UploadStrategyResponse> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
@@ -281,12 +282,16 @@ export class S3StorageProvider implements StorageProvider {
       const { url, fields } = await createPresignedPost(this.s3Client, {
         Bucket: this.s3Bucket,
         Key: s3Key,
+        Fields: {
+          'Content-Type': contentType,
+        },
         Conditions: [
           [
             'content-length-range',
             0,
             Math.min(metadata.size || maxFileSizeBytes, maxFileSizeBytes),
           ],
+          ['eq', '$Content-Type', contentType],
         ],
         Expires: expiresIn,
       });

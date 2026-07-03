@@ -36,7 +36,8 @@ export interface StorageProvider {
     bucket: string,
     key: string,
     metadata: { contentType?: string; size?: number },
-    maxFileSizeBytes: number
+    maxFileSizeBytes: number,
+    contentType?: string
   ): Promise<UploadStrategyResponse>;
   /**
    * Generate a download URL. The optional `version` is a cache-bust stamp

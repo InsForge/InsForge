@@ -680,11 +680,17 @@ router.post(
         throw new AppError('Filename is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
+      const requestedType = contentType || 'application/octet-stream';
+      const safeContentType = isUnsafeMime(requestedType)
+        ? 'application/octet-stream'
+        : requestedType;
+
       const strategy = await StorageService.getInstance().getUploadStrategy(
         req.user,
         bucketName,
-        { filename, contentType, size },
-        !!req.hasApiKey
+        { filename, contentType: safeContentType, size },
+        !!req.hasApiKey,
+        safeContentType
       );
 
       successResponse(res, strategy);
@@ -706,13 +712,11 @@ router.post(
     try {
       const { bucketName, objectKey } = req.params;
       const { size, etag } = req.body;
-      const { contentType } = req.body;
+      let { contentType } = req.body;
 
-      // We do NOT coerce unsafe MIME types to application/octet-stream here.
-      // If we did, the download path wouldn't know the S3 object is actually
-      // an unsafe type (e.g. text/html), and it would skip adding the asAttachment
-      // flag to the presigned GET URL. We must store the original unsafe MIME
-      // in the DB so the read-path defense triggers.
+      if (contentType && isUnsafeMime(contentType)) {
+        contentType = 'application/octet-stream';
+      }
 
       if (!size) {
         throw new AppError('Size is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);

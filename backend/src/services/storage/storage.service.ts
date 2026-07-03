@@ -514,7 +514,8 @@ export class StorageService {
       contentType?: string;
       size?: number;
     },
-    hasApiKey: boolean = false
+    hasApiKey: boolean = false,
+    contentType: string = 'application/octet-stream'
   ) {
     this.validateBucketName(bucket);
 
@@ -525,7 +526,7 @@ export class StorageService {
     const key = await this.generateNextAvailableKey(bucket, metadata.filename, this.getPool());
     const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
     if (hasApiKey || ctx?.role === 'project_admin') {
-      return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
+      return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes, contentType);
     }
     if (!ctx) {
       throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
@@ -544,7 +545,7 @@ export class StorageService {
         await client.query('RELEASE SAVEPOINT upload_strategy_rls_probe');
       }
     });
-    return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
+    return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes, contentType);
   }
 
   async getDownloadStrategy(
