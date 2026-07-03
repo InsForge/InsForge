@@ -221,6 +221,38 @@ export class S3StorageProvider implements StorageProvider {
     await this.s3Client.send(command);
   }
 
+  async deleteObjects(
+    bucket: string,
+    keys: string[]
+  ): Promise<{ deleted: string[]; failed: Array<{ key: string; message: string }> }> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
+    if (keys.length === 0) {
+      return { deleted: [], failed: [] };
+    }
+
+    const s3KeyToOriginalKey = new Map(keys.map((key) => [this.getS3Key(bucket, key), key]));
+    const command = new DeleteObjectsCommand({
+      Bucket: this.s3Bucket,
+      Delete: {
+        Objects: keys.map((key) => ({ Key: this.getS3Key(bucket, key) })),
+      },
+    });
+    const response = await this.s3Client.send(command);
+    const failed = (response.Errors ?? []).map((error) => {
+      const originalKey = error.Key ? (s3KeyToOriginalKey.get(error.Key) ?? error.Key) : '';
+      return {
+        key: originalKey,
+        message: error.Message ?? error.Code ?? 'Failed to delete object',
+      };
+    });
+    const failedKeys = new Set(failed.map((error) => error.key));
+    const deleted = keys.filter((key) => !failedKeys.has(key));
+
+    return { deleted, failed };
+  }
+
   async createBucket(_bucket: string): Promise<void> {
     // In S3 with multi-tenant, we don't create actual buckets
     // We just use folders under the app key
