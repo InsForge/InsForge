@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { storageConfigSchema, storageFileSchema } from './storage.schema.js';
 
 export const DELETE_OBJECTS_MAX_KEYS = 1000;
+export const DELETE_OBJECT_FAILURE_MESSAGE = 'Failed to delete object';
 
 export const createBucketRequestSchema = z.object({
   bucketName: z.string().min(1, 'Bucket name cannot be empty'),
