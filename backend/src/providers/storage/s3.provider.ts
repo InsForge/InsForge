@@ -247,24 +247,44 @@ export class S3StorageProvider implements StorageProvider {
         },
       });
       const response = await this.s3Client.send(command);
-      const batchFailed = (response.Errors ?? []).map((error) => {
-        const originalKey = error.Key ? (s3KeyToOriginalKey.get(error.Key) ?? error.Key) : '';
-        return {
-          key: originalKey,
-          message: DELETE_OBJECT_FAILURE_MESSAGE,
-        };
-      });
+      const responseErrors = response.Errors ?? [];
+      const errorsWithKeys = responseErrors.filter(
+        (error): error is (typeof responseErrors)[number] & { Key: string } =>
+          typeof error.Key === 'string' && error.Key.length > 0
+      );
 
-      if (response.Errors?.length) {
+      if (responseErrors.length > 0) {
         logger.warn('S3 batch object delete returned errors', {
           bucket,
-          errors: response.Errors.map((error) => ({
+          errors: responseErrors.map((error) => ({
             key: error.Key,
             code: error.Code,
             message: error.Message,
           })),
         });
       }
+
+      if (errorsWithKeys.length !== responseErrors.length) {
+        logger.warn('S3 batch object delete returned an error without a key', {
+          bucket,
+          batchSize: batchKeys.length,
+        });
+        failed.push(
+          ...batchKeys.map((key) => ({
+            key,
+            message: DELETE_OBJECT_FAILURE_MESSAGE,
+          }))
+        );
+        continue;
+      }
+
+      const batchFailed = errorsWithKeys.map((error) => {
+        const originalKey = s3KeyToOriginalKey.get(error.Key) ?? error.Key;
+        return {
+          key: originalKey,
+          message: DELETE_OBJECT_FAILURE_MESSAGE,
+        };
+      });
 
       const failedKeys = new Set(batchFailed.map((error) => error.key));
       deleted.push(...batchKeys.filter((key) => !failedKeys.has(key)));

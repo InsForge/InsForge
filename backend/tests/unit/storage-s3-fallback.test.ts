@@ -194,6 +194,28 @@ describe('S3StorageProvider — branch fallback', () => {
         { Key: 'branchkey/photos/file-1000.txt' },
       ]);
     });
+
+    it('marks the whole batch failed when S3 returns an error without a key', async () => {
+      sendMock.mockResolvedValueOnce({
+        Errors: [
+          {
+            Code: 'InternalError',
+            Message: 'missing key',
+          },
+        ],
+      });
+      const p = makeProvider('parentkey');
+
+      const result = await p.deleteObjects('photos', ['a.txt', 'b.txt']);
+
+      expect(result).toEqual({
+        deleted: [],
+        failed: [
+          { key: 'a.txt', message: 'Failed to delete object' },
+          { key: 'b.txt', message: 'Failed to delete object' },
+        ],
+      });
+    });
   });
 
   describe('getObjectStream', () => {

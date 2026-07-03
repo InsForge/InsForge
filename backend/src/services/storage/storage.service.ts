@@ -27,7 +27,6 @@ const PUBLIC_BUCKET_EXPIRY = 0; // Public buckets don't expire
 const PRIVATE_BUCKET_EXPIRY = 3600; // Private buckets expire in 1 hour
 const MIN_SIGNED_URL_EXPIRY = 1; // 1 second
 const MAX_SIGNED_URL_EXPIRY = 604800; // 7 days — S3 SigV4 presign ceiling
-const DELETE_OBJECTS_FAILURE_MESSAGE = 'Failed to delete objects';
 
 type StorageObjectResult = {
   file: Buffer;
@@ -85,14 +84,22 @@ export class StorageService {
   private validateBucketName(bucket: string): void {
     // Simple validation: alphanumeric, hyphens, underscores
     if (!/^[a-zA-Z0-9_-]+$/.test(bucket)) {
-      throw new Error('Invalid bucket name. Use only letters, numbers, hyphens, and underscores.');
+      throw new AppError(
+        'Invalid bucket name. Use only letters, numbers, hyphens, and underscores.',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
     }
   }
 
   private validateKey(key: string): void {
     // Prevent directory traversal
     if (key.includes('..') || key.startsWith('/')) {
-      throw new Error('Invalid key. Cannot use ".." or start with "/"');
+      throw new AppError(
+        'Invalid key. Cannot use ".." or start with "/"',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
     }
   }
 
@@ -412,10 +419,16 @@ export class StorageService {
 
     try {
       const providerResult = await this.provider.deleteObjects(bucket, dbDeletedKeys);
+      if (providerResult.failed.length > 0) {
+        logger.warn('Storage provider batch delete partially failed after DB rows were deleted', {
+          bucket,
+          failed: providerResult.failed,
+        });
+      }
       return {
-        deleted: providerResult.deleted,
+        deleted: dbDeletedKeys,
         notFound,
-        failed: providerResult.failed,
+        failed: [],
       };
     } catch (error) {
       logger.error('Storage provider batch delete failed', {
@@ -423,7 +436,11 @@ export class StorageService {
         keys: dbDeletedKeys,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError(DELETE_OBJECTS_FAILURE_MESSAGE, 500, ERROR_CODES.INTERNAL_ERROR);
+      return {
+        deleted: dbDeletedKeys,
+        notFound,
+        failed: [],
+      };
     }
   }
 

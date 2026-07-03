@@ -1,6 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Pool, PoolClient } from 'pg';
 
+const loggerMocks = vi.hoisted(() => ({
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+}));
+
+vi.mock('@/utils/logger.js', () => ({
+  default: loggerMocks,
+}));
+
 // Mock the database manager so StorageService can be instantiated without
 // touching a real pool. The service caches the pool internally; we hand it
 // our mock via a controlled getInstance/getPool flow.
@@ -36,6 +46,9 @@ function makeMockPool(): Pool {
 describe('StorageService.objectIsVisible — RLS-gated visibility check', () => {
   beforeEach(async () => {
     mockPool = makeMockPool();
+    loggerMocks.info.mockClear();
+    loggerMocks.error.mockClear();
+    loggerMocks.warn.mockClear();
     vi.resetModules();
   });
 
@@ -463,9 +476,9 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ]);
 
     expect(result).toEqual({
-      deleted: ['a.txt'],
+      deleted: ['a.txt', 'b.txt'],
       notFound: ['missing.txt'],
-      failed: [{ key: 'b.txt', message: 'provider denied' }],
+      failed: [],
     });
     expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['a.txt', 'b.txt']);
     expect(calls.map((c) => c.sql)).toEqual([
@@ -513,9 +526,8 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ]);
   });
 
-  it('throws a sanitized error when the provider batch delete fails unexpectedly', async () => {
+  it('reports DB-deleted objects as deleted when the provider batch delete fails unexpectedly', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
-    const { AppError } = await import('@/utils/errors.js');
     const svc = StorageService.getInstance();
     const provider = {
       deleteObjects: vi.fn(async () => {
@@ -526,16 +538,40 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
 
     queryResults = [{ rows: [{ key: 'a.txt' }], rowCount: 1 }];
 
+    const result = await svc.deleteObjects(
+      { id: 'local:admin', role: 'project_admin' },
+      'photos',
+      ['a.txt']
+    );
+
+    expect(result).toEqual({
+      deleted: ['a.txt'],
+      notFound: [],
+      failed: [],
+    });
+    expect(loggerMocks.error).toHaveBeenCalledWith('Storage provider batch delete failed', {
+      bucket: 'photos',
+      keys: ['a.txt'],
+      error: '/var/private/storage/photos/a.txt permission denied',
+    });
+  });
+
+  it('rejects invalid batch delete keys as storage validation errors before querying', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const { AppError } = await import('@/utils/errors.js');
+    const svc = StorageService.getInstance();
+
     try {
-      await svc.deleteObjects({ id: 'local:admin', role: 'project_admin' }, 'photos', ['a.txt']);
+      await svc.deleteObjects({ id: 'local:admin', role: 'project_admin' }, 'photos', ['../bad']);
       throw new Error('Expected deleteObjects to throw');
     } catch (error) {
       expect(error).toBeInstanceOf(AppError);
       expect(error).toMatchObject({
-        message: 'Failed to delete objects',
-        statusCode: 500,
+        message: 'Invalid key. Cannot use ".." or start with "/"',
+        statusCode: 400,
       });
     }
+    expect(calls).toEqual([]);
   });
 
   it('returns true for public bucket objects without requiring user context', async () => {
