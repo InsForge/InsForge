@@ -6,6 +6,7 @@ const storageMocks = vi.hoisted(() => ({
   isBucketPublic: vi.fn(),
   objectIsVisible: vi.fn(),
   getDownloadStrategy: vi.fn(),
+  deleteObjects: vi.fn(),
 }));
 
 const authMocks = vi.hoisted(() => ({
@@ -14,26 +15,43 @@ const authMocks = vi.hoisted(() => ({
 }));
 
 const requestMethod = (
-  method: 'GET' | 'POST',
+  method: 'DELETE' | 'GET' | 'POST',
   port: number,
-  path: string
+  path: string,
+  body?: string
 ): Promise<{ statusCode: number; body: string }> =>
   new Promise((resolve, reject) => {
-    const request = http.request({ hostname: '127.0.0.1', port, path, method }, (response) => {
-      let body = '';
-      response.setEncoding('utf8');
-      response.on('data', (chunk) => {
-        body += chunk;
-      });
-      response.on('end', () => resolve({ statusCode: response.statusCode ?? 0, body }));
-    });
+    const headers = body
+      ? {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        }
+      : undefined;
+    const request = http.request(
+      { hostname: '127.0.0.1', port, path, method, headers },
+      (response) => {
+        let responseBody = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk) => {
+          responseBody += chunk;
+        });
+        response.on('end', () =>
+          resolve({ statusCode: response.statusCode ?? 0, body: responseBody })
+        );
+      }
+    );
 
     request.on('error', reject);
+    if (body) {
+      request.write(body);
+    }
     request.end();
   });
 
 const post = (port: number, path: string) => requestMethod('POST', port, path);
 const get = (port: number, path: string) => requestMethod('GET', port, path);
+const deleteJson = (port: number, path: string, body: string) =>
+  requestMethod('DELETE', port, path, body);
 
 const routeErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
   void next;
@@ -87,6 +105,77 @@ describe('Storage routes', () => {
     server?.close();
     server = undefined;
     vi.clearAllMocks();
+  });
+
+  test('batch delete route validates body and delegates to storage service', async () => {
+    vi.resetModules();
+    storageMocks.deleteObjects.mockResolvedValue({
+      deleted: ['a.txt'],
+      notFound: ['missing.txt'],
+      failed: [],
+    });
+
+    const { storageRouter } = await import('../../src/api/routes/storage/index.routes.js');
+    const app = express();
+    app.use(express.json());
+    app.use('/api/storage', storageRouter);
+    app.use(routeErrorHandler);
+
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, resolve);
+    });
+    const address = server?.address();
+
+    if (!address || typeof address === 'string') {
+      throw new Error('Test server did not bind to a TCP port');
+    }
+
+    const response = await deleteJson(
+      address.port,
+      '/api/storage/buckets/photos/objects',
+      JSON.stringify({ keys: ['a.txt', 'missing.txt'] })
+    );
+
+    expect(response.statusCode, response.body).toBe(200);
+    expect(JSON.parse(response.body)).toEqual({
+      deleted: ['a.txt'],
+      notFound: ['missing.txt'],
+      failed: [],
+    });
+    expect(storageMocks.deleteObjects).toHaveBeenCalledWith(
+      undefined,
+      'photos',
+      ['a.txt', 'missing.txt'],
+      false
+    );
+  });
+
+  test('batch delete route returns 400 for an empty key list', async () => {
+    vi.resetModules();
+
+    const { storageRouter } = await import('../../src/api/routes/storage/index.routes.js');
+    const app = express();
+    app.use(express.json());
+    app.use('/api/storage', storageRouter);
+    app.use(routeErrorHandler);
+
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, resolve);
+    });
+    const address = server?.address();
+
+    if (!address || typeof address === 'string') {
+      throw new Error('Test server did not bind to a TCP port');
+    }
+
+    const response = await deleteJson(
+      address.port,
+      '/api/storage/buckets/photos/objects',
+      JSON.stringify({ keys: [] })
+    );
+
+    expect(response.statusCode, response.body).toBe(400);
+    expect(storageMocks.deleteObjects).not.toHaveBeenCalled();
   });
 
   test('download strategy route captures nested object keys', async () => {
