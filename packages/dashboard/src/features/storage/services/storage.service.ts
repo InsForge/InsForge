@@ -1,8 +1,10 @@
 import { apiClient } from '#lib/api/client';
 import {
+  DELETE_OBJECTS_MAX_KEYS,
   StorageFileSchema,
   StorageBucketSchema,
   ListObjectsResponseSchema,
+  type DeleteObjectsResponse,
 } from '@insforge/shared-schemas';
 
 export interface ListObjectsParams {
@@ -10,14 +12,6 @@ export interface ListObjectsParams {
   limit?: number;
   offset?: number;
 }
-
-interface DeleteObjectsResponse {
-  deleted: string[];
-  notFound: string[];
-  failed: Array<{ key: string; message: string }>;
-}
-
-const DELETE_OBJECTS_BATCH_SIZE = 1000;
 
 export const storageService = {
   // List all buckets
@@ -133,8 +127,8 @@ export const storageService = {
     }
 
     const batches: string[][] = [];
-    for (let index = 0; index < objectKeys.length; index += DELETE_OBJECTS_BATCH_SIZE) {
-      batches.push(objectKeys.slice(index, index + DELETE_OBJECTS_BATCH_SIZE));
+    for (let index = 0; index < objectKeys.length; index += DELETE_OBJECTS_MAX_KEYS) {
+      batches.push(objectKeys.slice(index, index + DELETE_OBJECTS_MAX_KEYS));
     }
 
     const results = await Promise.allSettled(

@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { storageConfigSchema, storageFileSchema } from './storage.schema.js';
 
+export const DELETE_OBJECTS_MAX_KEYS = 1000;
+
 export const createBucketRequestSchema = z.object({
   bucketName: z.string().min(1, 'Bucket name cannot be empty'),
   isPublic: z.boolean().default(true),
@@ -23,7 +25,10 @@ export const deleteObjectsRequestSchema = z.object({
   keys: z
     .array(z.string().min(1, 'Object key cannot be empty'))
     .min(1, 'At least one object key is required')
-    .max(1000, 'Cannot delete more than 1000 objects at once'),
+    .max(
+      DELETE_OBJECTS_MAX_KEYS,
+      `Cannot delete more than ${DELETE_OBJECTS_MAX_KEYS} objects at once`
+    ),
 });
 
 export const deleteObjectsResponseSchema = z.object({
