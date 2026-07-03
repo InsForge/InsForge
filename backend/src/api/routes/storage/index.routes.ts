@@ -680,7 +680,10 @@ router.post(
         throw new AppError('Filename is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      const requestedType = contentType || 'application/octet-stream';
+      const requestedType =
+        typeof contentType === 'string' && contentType.trim()
+          ? contentType
+          : 'application/octet-stream';
       const safeContentType = isUnsafeMime(requestedType)
         ? 'application/octet-stream'
         : requestedType;
@@ -713,9 +716,12 @@ router.post(
       const { bucketName, objectKey } = req.params;
       const { size, etag } = req.body;
       let { contentType } = req.body;
-
-      if (contentType && isUnsafeMime(contentType)) {
-        contentType = 'application/octet-stream';
+      if (contentType !== undefined && contentType !== null) {
+        const typeStr =
+          typeof contentType === 'string' && contentType.trim()
+            ? contentType
+            : 'application/octet-stream';
+        contentType = isUnsafeMime(typeStr) ? 'application/octet-stream' : typeStr;
       }
 
       if (!size) {
