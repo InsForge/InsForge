@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
 import { S3StorageProvider } from '../../src/providers/storage/s3.provider.ts';
-import { CopyObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  CopyObjectCommand,
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 import crypto from 'crypto';
 
@@ -141,6 +146,36 @@ describe('S3StorageProvider — branch fallback', () => {
       const p = makeProvider('parentkey');
       await expect(p.headObject('photos', 'a.txt')).rejects.toThrow();
       expect(sendMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('deleteObjects', () => {
+    it('sends one DeleteObjectsCommand and maps S3 errors back to original keys', async () => {
+      sendMock.mockResolvedValueOnce({
+        Errors: [
+          {
+            Key: 'branchkey/photos/b.txt',
+            Code: 'AccessDenied',
+            Message: 'denied',
+          },
+        ],
+      });
+      const p = makeProvider('parentkey');
+
+      const result = await p.deleteObjects('photos', ['a.txt', 'b.txt']);
+
+      expect(result).toEqual({
+        deleted: ['a.txt'],
+        failed: [{ key: 'b.txt', message: 'denied' }],
+      });
+      expect(sendMock).toHaveBeenCalledTimes(1);
+      const command = sendMock.mock.calls[0][0] as DeleteObjectsCommand;
+      expect(command.input).toMatchObject({
+        Bucket: 'bucket',
+        Delete: {
+          Objects: [{ Key: 'branchkey/photos/a.txt' }, { Key: 'branchkey/photos/b.txt' }],
+        },
+      });
     });
   });
 
