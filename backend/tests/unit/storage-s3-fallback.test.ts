@@ -174,6 +174,7 @@ describe('S3StorageProvider — branch fallback', () => {
         Bucket: 'bucket',
         Delete: {
           Objects: [{ Key: 'branchkey/photos/a.txt' }, { Key: 'branchkey/photos/b.txt' }],
+          Quiet: true,
         },
       });
     });
@@ -190,14 +191,15 @@ describe('S3StorageProvider — branch fallback', () => {
       const firstCommand = sendMock.mock.calls[0][0] as DeleteObjectsCommand;
       const secondCommand = sendMock.mock.calls[1][0] as DeleteObjectsCommand;
       expect(firstCommand.input.Delete?.Objects).toHaveLength(1000);
+      expect(firstCommand.input.Delete?.Quiet).toBe(true);
       expect(secondCommand.input.Delete?.Objects).toEqual([
         { Key: 'branchkey/photos/file-1000.txt' },
       ]);
+      expect(secondCommand.input.Delete?.Quiet).toBe(true);
     });
 
-    it('preserves confirmed deleted keys when S3 returns an error without a key', async () => {
+    it('reports keys absent from keyed S3 errors as deleted when S3 returns an error without a key', async () => {
       sendMock.mockResolvedValueOnce({
-        Deleted: [{ Key: 'branchkey/photos/a.txt' }],
         Errors: [
           {
             Code: 'InternalError',
@@ -210,7 +212,7 @@ describe('S3StorageProvider — branch fallback', () => {
       const result = await p.deleteObjects('photos', ['a.txt', 'b.txt']);
 
       expect(result).toEqual({
-        deleted: ['a.txt'],
+        deleted: ['a.txt', 'b.txt'],
         failed: [],
       });
     });
