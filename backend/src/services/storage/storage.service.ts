@@ -408,7 +408,9 @@ export class StorageService {
       }
       const failedKeys = new Set(failed.map((failure) => failure.key));
       return {
-        deleted: dbDeletedKeys.filter((key) => providerDeletedKeys.has(key) && !failedKeys.has(key)),
+        deleted: dbDeletedKeys.filter(
+          (key) => providerDeletedKeys.has(key) && !failedKeys.has(key)
+        ),
         notFound,
         failed,
       };
