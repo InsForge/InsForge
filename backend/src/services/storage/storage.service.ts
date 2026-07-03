@@ -27,6 +27,7 @@ const PUBLIC_BUCKET_EXPIRY = 0; // Public buckets don't expire
 const PRIVATE_BUCKET_EXPIRY = 3600; // Private buckets expire in 1 hour
 const MIN_SIGNED_URL_EXPIRY = 1; // 1 second
 const MAX_SIGNED_URL_EXPIRY = 604800; // 7 days — S3 SigV4 presign ceiling
+const DELETE_OBJECT_FAILURE_MESSAGE = 'Failed to delete object';
 
 type StorageObjectResult = {
   file: Buffer;
@@ -425,10 +426,11 @@ export class StorageService {
           failed: providerResult.failed,
         });
       }
+      const failedKeys = new Set(providerResult.failed.map((failure) => failure.key));
       return {
-        deleted: dbDeletedKeys,
+        deleted: providerResult.deleted.filter((key) => !failedKeys.has(key)),
         notFound,
-        failed: [],
+        failed: providerResult.failed,
       };
     } catch (error) {
       logger.error('Storage provider batch delete failed', {
@@ -437,9 +439,9 @@ export class StorageService {
         error: error instanceof Error ? error.message : String(error),
       });
       return {
-        deleted: dbDeletedKeys,
+        deleted: [],
         notFound,
-        failed: [],
+        failed: dbDeletedKeys.map((key) => ({ key, message: DELETE_OBJECT_FAILURE_MESSAGE })),
       };
     }
   }

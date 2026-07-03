@@ -476,9 +476,9 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ]);
 
     expect(result).toEqual({
-      deleted: ['a.txt', 'b.txt'],
+      deleted: ['a.txt'],
       notFound: ['missing.txt'],
-      failed: [],
+      failed: [{ key: 'b.txt', message: 'provider denied' }],
     });
     expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['a.txt', 'b.txt']);
     expect(calls.map((c) => c.sql)).toEqual([
@@ -526,7 +526,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ]);
   });
 
-  it('reports DB-deleted objects as deleted when the provider batch delete fails unexpectedly', async () => {
+  it('reports DB-deleted objects as failed when the provider batch delete fails unexpectedly', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
     const provider = {
@@ -543,9 +543,9 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ]);
 
     expect(result).toEqual({
-      deleted: ['a.txt'],
+      deleted: [],
       notFound: [],
-      failed: [],
+      failed: [{ key: 'a.txt', message: 'Failed to delete object' }],
     });
     expect(loggerMocks.error).toHaveBeenCalledWith('Storage provider batch delete failed', {
       bucket: 'photos',
