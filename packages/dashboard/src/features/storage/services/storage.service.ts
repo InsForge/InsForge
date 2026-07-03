@@ -11,6 +11,12 @@ export interface ListObjectsParams {
   offset?: number;
 }
 
+interface DeleteObjectsResponse {
+  deleted: string[];
+  notFound: string[];
+  failed: Array<{ key: string; message: string }>;
+}
+
 export const storageService = {
   // List all buckets
   async listBuckets(): Promise<StorageBucketSchema[]> {
@@ -120,21 +126,29 @@ export const storageService = {
     bucketName: string,
     objectKeys: string[]
   ): Promise<{ success: string[]; failures: { key: string; error: Error }[] }> {
-    const results = await Promise.allSettled(
-      objectKeys.map((key) => this.deleteObject(bucketName, key))
-    );
-    const success: string[] = [];
-    const failures: { key: string; error: Error }[] = [];
+    if (objectKeys.length === 0) {
+      return { success: [], failures: [] };
+    }
 
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
-        success.push(objectKeys[index]);
-      } else {
-        failures.push({ key: objectKeys[index], error: result.reason as Error });
+    const response: DeleteObjectsResponse = await apiClient.request(
+      `/storage/buckets/${encodeURIComponent(bucketName)}/objects`,
+      {
+        method: 'DELETE',
+        headers: apiClient.withAccessToken(),
+        body: JSON.stringify({ keys: objectKeys }),
       }
-    });
+    );
 
-    return { success, failures };
+    return {
+      success: response.deleted,
+      failures: [
+        ...response.notFound.map((key) => ({ key, error: new Error('Object not found') })),
+        ...response.failed.map((failure) => ({
+          key: failure.key,
+          error: new Error(failure.message),
+        })),
+      ],
+    };
   },
 
   // Create a new bucket
