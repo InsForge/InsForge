@@ -17,8 +17,17 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl as getCloudFrontSignedUrl } from '@aws-sdk/cloudfront-signer';
 import { Readable } from 'stream';
-import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
-import { StorageProvider, ObjectMetadata, GetObjectResult } from './base.provider.js';
+import {
+  UploadStrategyResponse,
+  DownloadStrategyResponse,
+  DELETE_OBJECT_FAILURE_MESSAGE,
+} from '@insforge/shared-schemas';
+import {
+  StorageProvider,
+  ObjectMetadata,
+  GetObjectResult,
+  DeleteObjectsResult,
+} from './base.provider.js';
 import logger from '@/utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
 
@@ -43,7 +52,6 @@ function isS3NotFound(err: unknown): boolean {
 
 const ONE_HOUR_IN_SECONDS = 3600;
 const SEVEN_DAYS_IN_SECONDS = 604800;
-const DELETE_OBJECT_FAILURE_MESSAGE = 'Failed to delete object';
 const MAX_DELETE_OBJECTS_PER_REQUEST = 1000;
 
 /**
@@ -223,10 +231,7 @@ export class S3StorageProvider implements StorageProvider {
     await this.s3Client.send(command);
   }
 
-  async deleteObjects(
-    bucket: string,
-    keys: string[]
-  ): Promise<{ deleted: string[]; failed: Array<{ key: string; message: string }> }> {
+  async deleteObjects(bucket: string, keys: string[]): Promise<DeleteObjectsResult> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
     }
@@ -244,6 +249,7 @@ export class S3StorageProvider implements StorageProvider {
         Bucket: this.s3Bucket,
         Delete: {
           Objects: batchKeys.map((key) => ({ Key: this.getS3Key(bucket, key) })),
+          Quiet: true,
         },
       });
       const response = await this.s3Client.send(command);
@@ -281,26 +287,7 @@ export class S3StorageProvider implements StorageProvider {
       });
 
       const failedKeys = new Set(batchFailed.map((error) => error.key));
-      const responseDeleted = (response.Deleted ?? [])
-        .map((deletedObject) =>
-          deletedObject.Key ? (s3KeyToOriginalKey.get(deletedObject.Key) ?? deletedObject.Key) : ''
-        )
-        .filter((key) => key.length > 0);
-
-      if (responseDeleted.length > 0) {
-        deleted.push(...responseDeleted.filter((key) => !failedKeys.has(key)));
-      } else if (!hasUnkeyedErrors) {
-        deleted.push(...batchKeys.filter((key) => !failedKeys.has(key)));
-      } else {
-        failed.push(
-          ...batchKeys
-            .filter((key) => !failedKeys.has(key))
-            .map((key) => ({
-              key,
-              message: DELETE_OBJECT_FAILURE_MESSAGE,
-            }))
-        );
-      }
+      deleted.push(...batchKeys.filter((key) => !failedKeys.has(key)));
       failed.push(...batchFailed);
     }
 
@@ -335,6 +322,7 @@ export class S3StorageProvider implements StorageProvider {
             Objects: listResponse.Contents.filter((obj) => obj.Key !== undefined).map((obj) => ({
               Key: obj.Key as string,
             })),
+            Quiet: true,
           },
         });
         await this.s3Client.send(deleteCommand);

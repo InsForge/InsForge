@@ -1,17 +1,22 @@
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
-import { StorageProvider, ObjectMetadata, GetObjectResult } from './base.provider.js';
+import {
+  StorageProvider,
+  ObjectMetadata,
+  GetObjectResult,
+  DeleteObjectsResult,
+} from './base.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
 import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
   DownloadStrategyResponse,
+  DELETE_OBJECT_FAILURE_MESSAGE,
   UploadStrategyResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 
-const DELETE_OBJECT_FAILURE_MESSAGE = 'Failed to delete object';
 const DELETE_OBJECTS_CONCURRENCY = 25;
 
 /**
@@ -85,10 +90,7 @@ export class LocalStorageProvider implements StorageProvider {
     }
   }
 
-  async deleteObjects(
-    bucket: string,
-    keys: string[]
-  ): Promise<{ deleted: string[]; failed: Array<{ key: string; message: string }> }> {
+  async deleteObjects(bucket: string, keys: string[]): Promise<DeleteObjectsResult> {
     const deleted: string[] = [];
     const failed: Array<{ key: string; message: string }> = [];
 
