@@ -264,18 +264,12 @@ export class S3StorageProvider implements StorageProvider {
         });
       }
 
-      if (errorsWithKeys.length !== responseErrors.length) {
+      const hasUnkeyedErrors = errorsWithKeys.length !== responseErrors.length;
+      if (hasUnkeyedErrors) {
         logger.warn('S3 batch object delete returned an error without a key', {
           bucket,
           batchSize: batchKeys.length,
         });
-        failed.push(
-          ...batchKeys.map((key) => ({
-            key,
-            message: DELETE_OBJECT_FAILURE_MESSAGE,
-          }))
-        );
-        continue;
       }
 
       const batchFailed = errorsWithKeys.map((error) => {
@@ -287,7 +281,26 @@ export class S3StorageProvider implements StorageProvider {
       });
 
       const failedKeys = new Set(batchFailed.map((error) => error.key));
-      deleted.push(...batchKeys.filter((key) => !failedKeys.has(key)));
+      const responseDeleted = (response.Deleted ?? [])
+        .map((deletedObject) =>
+          deletedObject.Key ? (s3KeyToOriginalKey.get(deletedObject.Key) ?? deletedObject.Key) : ''
+        )
+        .filter((key) => key.length > 0);
+
+      if (responseDeleted.length > 0) {
+        deleted.push(...responseDeleted.filter((key) => !failedKeys.has(key)));
+      } else if (!hasUnkeyedErrors) {
+        deleted.push(...batchKeys.filter((key) => !failedKeys.has(key)));
+      } else {
+        failed.push(
+          ...batchKeys
+            .filter((key) => !failedKeys.has(key))
+            .map((key) => ({
+              key,
+              message: DELETE_OBJECT_FAILURE_MESSAGE,
+            }))
+        );
+      }
       failed.push(...batchFailed);
     }
 

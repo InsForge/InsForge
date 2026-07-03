@@ -195,8 +195,9 @@ describe('S3StorageProvider — branch fallback', () => {
       ]);
     });
 
-    it('marks the whole batch failed when S3 returns an error without a key', async () => {
+    it('preserves confirmed deleted keys when S3 returns an error without a key', async () => {
       sendMock.mockResolvedValueOnce({
+        Deleted: [{ Key: 'branchkey/photos/a.txt' }],
         Errors: [
           {
             Code: 'InternalError',
@@ -209,11 +210,8 @@ describe('S3StorageProvider — branch fallback', () => {
       const result = await p.deleteObjects('photos', ['a.txt', 'b.txt']);
 
       expect(result).toEqual({
-        deleted: [],
-        failed: [
-          { key: 'a.txt', message: 'Failed to delete object' },
-          { key: 'b.txt', message: 'Failed to delete object' },
-        ],
+        deleted: ['a.txt'],
+        failed: [],
       });
     });
   });
