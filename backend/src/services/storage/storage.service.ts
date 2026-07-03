@@ -292,8 +292,12 @@ export class StorageService {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    const metadata =
-      prefetchedMetadata ?? (await this.getObjectMetadataVisible(ctx, bucket, key, hasApiKey));
+    let metadata = prefetchedMetadata;
+    if (metadata && (metadata.bucket !== bucket || metadata.key !== key)) {
+      metadata = null;
+    }
+
+    metadata = metadata ?? (await this.getObjectMetadataVisible(ctx, bucket, key, hasApiKey));
     if (!metadata) {
       return null;
     }
