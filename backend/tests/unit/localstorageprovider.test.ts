@@ -172,6 +172,23 @@ describe('LocalStorageProvider - deleteObjects', () => {
       failed: [{ key: 'blocked.txt', message: 'Failed to delete object' }],
     });
   });
+
+  it('limits concurrent unlink calls when deleting many files', async () => {
+    let active = 0;
+    let maxActive = 0;
+    vi.spyOn(fs, 'unlink').mockImplementation(async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      active -= 1;
+    });
+    const keys = Array.from({ length: 30 }, (_, index) => `file-${index}.txt`);
+
+    const result = await provider.deleteObjects('batchBucket', keys);
+
+    expect(result).toEqual({ deleted: keys, failed: [] });
+    expect(maxActive).toBeLessThanOrEqual(25);
+  });
 });
 
 describe('LocalStorageProvider - getDownloadStrategy versioning', () => {

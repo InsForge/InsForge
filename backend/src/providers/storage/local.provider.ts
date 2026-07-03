@@ -12,6 +12,7 @@ import {
 import logger from '@/utils/logger.js';
 
 const DELETE_OBJECT_FAILURE_MESSAGE = 'Failed to delete object';
+const DELETE_OBJECTS_CONCURRENCY = 25;
 
 /**
  * Local filesystem storage implementation
@@ -88,33 +89,36 @@ export class LocalStorageProvider implements StorageProvider {
     bucket: string,
     keys: string[]
   ): Promise<{ deleted: string[]; failed: Array<{ key: string; message: string }> }> {
-    const results = await Promise.allSettled(
-      keys.map(async (key) => {
-        await this.deleteObject(bucket, key);
-        return key;
-      })
-    );
-
     const deleted: string[] = [];
     const failed: Array<{ key: string; message: string }> = [];
 
-    results.forEach((result, index) => {
-      const key = keys[index];
-      if (result.status === 'fulfilled') {
-        deleted.push(key);
-      } else {
-        const reason = result.reason;
-        logger.warn('Local storage object delete failed', {
-          bucket,
-          key,
-          error: reason instanceof Error ? reason.message : String(reason),
-        });
-        failed.push({
-          key,
-          message: DELETE_OBJECT_FAILURE_MESSAGE,
-        });
-      }
-    });
+    for (let index = 0; index < keys.length; index += DELETE_OBJECTS_CONCURRENCY) {
+      const batchKeys = keys.slice(index, index + DELETE_OBJECTS_CONCURRENCY);
+      const results = await Promise.allSettled(
+        batchKeys.map(async (key) => {
+          await this.deleteObject(bucket, key);
+          return key;
+        })
+      );
+
+      results.forEach((result, resultIndex) => {
+        const key = batchKeys[resultIndex];
+        if (result.status === 'fulfilled') {
+          deleted.push(key);
+        } else {
+          const reason = result.reason;
+          logger.warn('Local storage object delete failed', {
+            bucket,
+            key,
+            error: reason instanceof Error ? reason.message : String(reason),
+          });
+          failed.push({
+            key,
+            message: DELETE_OBJECT_FAILURE_MESSAGE,
+          });
+        }
+      });
+    }
 
     return { deleted, failed };
   }
