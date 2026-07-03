@@ -353,6 +353,7 @@ paths:
 
     delete:
       summary: Delete Multiple Objects
+      description: Deletes up to 1000 objects from a bucket for the authenticated caller. Object row deletion is authorized through storage RLS, and the response reports per-key outcomes for rows deleted from the database, keys not visible or missing, and provider-level failures.
       tags:
         - Client
       security:
