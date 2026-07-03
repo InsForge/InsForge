@@ -7,6 +7,7 @@ import { withUserContext } from '@/services/database/user-context.service.js';
 import { StorageRecord } from '@/types/storage.js';
 import {
   ERROR_CODES,
+  DeleteObjectsResponse,
   StorageBucketSchema,
   StorageFileSchema,
   StorageMetadataSchema,
@@ -372,6 +373,57 @@ export class StorageService {
 
     await this.provider.deleteObject(bucket, key);
     return true;
+  }
+
+  async deleteObjects(
+    ctx: UserContext | undefined,
+    bucket: string,
+    keys: string[],
+    hasApiKey: boolean = false
+  ): Promise<DeleteObjectsResponse> {
+    this.validateBucketName(bucket);
+    const uniqueKeys = [...new Set(keys)];
+    uniqueKeys.forEach((key) => this.validateKey(key));
+
+    const deleteObjectRows = async (db: PoolClient): Promise<string[]> => {
+      const result = await db.query<{ key: string }>(
+        'DELETE FROM storage.objects WHERE bucket = $1 AND key = ANY($2::text[]) RETURNING key',
+        [bucket, uniqueKeys]
+      );
+      return result.rows.map((row) => row.key);
+    };
+
+    let dbDeletedKeys: string[];
+    if (hasApiKey || ctx?.role === 'project_admin') {
+      dbDeletedKeys = await runWithRootAccess(this.getPool(), deleteObjectRows);
+    } else {
+      if (!ctx) {
+        throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
+      }
+      dbDeletedKeys = await withUserContext(this.getPool(), ctx, deleteObjectRows);
+    }
+
+    const dbDeletedKeySet = new Set(dbDeletedKeys);
+    const notFound = uniqueKeys.filter((key) => !dbDeletedKeySet.has(key));
+    if (dbDeletedKeys.length === 0) {
+      return { deleted: [], notFound, failed: [] };
+    }
+
+    try {
+      const providerResult = await this.provider.deleteObjects(bucket, dbDeletedKeys);
+      return {
+        deleted: providerResult.deleted,
+        notFound,
+        failed: providerResult.failed,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        deleted: [],
+        notFound,
+        failed: dbDeletedKeys.map((key) => ({ key, message })),
+      };
+    }
   }
 
   async listObjects(
