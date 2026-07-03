@@ -392,6 +392,10 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - deleted
+                  - notFound
+                  - failed
                 properties:
                   deleted:
                     type: array
@@ -405,6 +409,9 @@ paths:
                     type: array
                     items:
                       type: object
+                      required:
+                        - key
+                        - message
                       properties:
                         key:
                           type: string

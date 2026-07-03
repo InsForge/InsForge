@@ -17,6 +17,8 @@ interface DeleteObjectsResponse {
   failed: Array<{ key: string; message: string }>;
 }
 
+const DELETE_OBJECTS_BATCH_SIZE = 1000;
+
 export const storageService = {
   // List all buckets
   async listBuckets(): Promise<StorageBucketSchema[]> {
@@ -130,24 +132,51 @@ export const storageService = {
       return { success: [], failures: [] };
     }
 
-    const response: DeleteObjectsResponse = await apiClient.request(
-      `/storage/buckets/${encodeURIComponent(bucketName)}/objects`,
-      {
-        method: 'DELETE',
-        headers: apiClient.withAccessToken(),
-        body: JSON.stringify({ keys: objectKeys }),
-      }
+    const batches: string[][] = [];
+    for (let index = 0; index < objectKeys.length; index += DELETE_OBJECTS_BATCH_SIZE) {
+      batches.push(objectKeys.slice(index, index + DELETE_OBJECTS_BATCH_SIZE));
+    }
+
+    const results = await Promise.allSettled(
+      batches.map(async (keys) => {
+        const response: DeleteObjectsResponse = await apiClient.request(
+          `/storage/buckets/${encodeURIComponent(bucketName)}/objects`,
+          {
+            method: 'DELETE',
+            headers: apiClient.withAccessToken(),
+            body: JSON.stringify({ keys }),
+          }
+        );
+        return { keys, response };
+      })
     );
 
-    return {
-      success: response.deleted,
-      failures: [
+    const success: string[] = [];
+    const failures: { key: string; error: Error }[] = [];
+
+    results.forEach((result, index) => {
+      const keys = batches[index];
+      if (result.status === 'rejected') {
+        const error =
+          result.reason instanceof Error ? result.reason : new Error(String(result.reason));
+        failures.push(...keys.map((key) => ({ key, error })));
+        return;
+      }
+
+      const response = result.value.response;
+      success.push(...response.deleted);
+      failures.push(
         ...response.notFound.map((key) => ({ key, error: new Error('Object not found') })),
         ...response.failed.map((failure) => ({
           key: failure.key,
           error: new Error(failure.message),
-        })),
-      ],
+        }))
+      );
+    });
+
+    return {
+      success,
+      failures,
     };
   },
 

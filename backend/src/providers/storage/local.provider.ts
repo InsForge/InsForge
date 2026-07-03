@@ -9,6 +9,9 @@ import {
   DownloadStrategyResponse,
   UploadStrategyResponse,
 } from '@insforge/shared-schemas';
+import logger from '@/utils/logger.js';
+
+const DELETE_OBJECT_FAILURE_MESSAGE = 'Failed to delete object';
 
 /**
  * Local filesystem storage implementation
@@ -101,9 +104,14 @@ export class LocalStorageProvider implements StorageProvider {
         deleted.push(key);
       } else {
         const reason = result.reason;
+        logger.warn('Local storage object delete failed', {
+          bucket,
+          key,
+          error: reason instanceof Error ? reason.message : String(reason),
+        });
         failed.push({
           key,
-          message: reason instanceof Error ? reason.message : String(reason),
+          message: DELETE_OBJECT_FAILURE_MESSAGE,
         });
       }
     });

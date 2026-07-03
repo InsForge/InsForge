@@ -621,11 +621,7 @@ router.delete(
 
       successResponse(res, result);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('Invalid')) {
-        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
-      } else {
-        next(error);
-      }
+      next(error);
     }
   }
 );
