@@ -286,7 +286,16 @@ function normalizeProjectInfo(
 
 export function useCloudHosting() {
   const currentOrigin = getCurrentOrigin();
-  const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo>();
+  // PROJECT_INFO can only arrive from a parent iframe: REQUEST_PROJECT_INFO is
+  // posted to the parent window, and opener messages are restricted to the
+  // authorization-code types. When the dashboard runs in its own tab (partner
+  // new-tab flow), start from a default so consumers that wait on project info
+  // (e.g. the cloud login redirect) don't block forever.
+  const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo | undefined>(() =>
+    getParentWindow()
+      ? undefined
+      : { id: currentOrigin, name: 'Project', region: '', instanceType: '' }
+  );
   const parentOriginRef = useRef<string | null>(getParentOrigin());
   const openerOriginRef = useRef<string | null>(null);
   const parentOriginTrustedRef = useRef(false);
