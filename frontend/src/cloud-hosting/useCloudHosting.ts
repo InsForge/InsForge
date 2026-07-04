@@ -294,7 +294,7 @@ export function useCloudHosting() {
   const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo | undefined>(() =>
     getParentWindow()
       ? undefined
-      : { id: getCurrentOrigin(), name: 'Project', region: '', instanceType: '' }
+      : { id: currentOrigin, name: 'Project', region: '', instanceType: '' }
   );
   const parentOriginRef = useRef<string | null>(getParentOrigin());
   const openerOriginRef = useRef<string | null>(null);
