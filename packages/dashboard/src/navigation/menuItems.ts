@@ -17,6 +17,7 @@ import {
   Download,
   BookOpen,
   CreditCard,
+  Megaphone,
 } from 'lucide-react';
 
 export interface DashboardSecondaryMenuItem {
@@ -129,6 +130,13 @@ export const dashboardSettingsMenuItem: DashboardPrimaryMenuItem = {
   label: 'Settings',
   href: '',
   icon: Settings,
+};
+
+export const dashboardWhatsNewMenuItem: DashboardPrimaryMenuItem = {
+  id: 'whats-new',
+  label: "What's New",
+  href: '',
+  icon: Megaphone,
 };
 
 export const dashboardDeploymentsMenuItem: DashboardPrimaryMenuItem = {
