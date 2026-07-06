@@ -7,7 +7,7 @@ test('signs in with mocked self-hosting admin credentials', async ({ page }) => 
   await page.goto('/dashboard/login');
   await expect(page.getByRole('heading', { name: 'Insforge Admin' })).toBeVisible();
 
-  await page.locator('input[type="email"]').fill('admin@example.com');
+  await page.locator('input[name="username"]').fill('admin');
   await page.locator('input[type="password"]').fill('test-admin-password-for-ci');
   const loginResponse = page.waitForResponse(
     (response) =>

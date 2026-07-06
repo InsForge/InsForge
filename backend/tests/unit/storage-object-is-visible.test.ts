@@ -125,7 +125,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     queryResults = [{ rows: [{ '?column?': 1 }], rowCount: 1 }];
 
     const visible = await svc.objectIsVisible(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { id: 'local:admin', role: 'project_admin' },
       'photos',
       'alice/cat.jpg'
     );
@@ -162,7 +162,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ];
 
     const result = await svc.getObject(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { id: 'local:admin', role: 'project_admin' },
       'photos',
       'alice/cat.jpg'
     );
@@ -204,7 +204,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ];
 
     const result = await svc.listObjects(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { id: 'local:admin', role: 'project_admin' },
       'photos',
       undefined,
       10,
@@ -329,7 +329,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ];
 
     const strategy = await svc.getUploadStrategy(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { id: 'local:admin', role: 'project_admin' },
       'photos',
       { filename: 'note.txt', contentType: 'text/plain', size: 8 }
     );
@@ -343,20 +343,20 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
   it('uploads objects for project_admin JWT callers through root access', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
-    const uploadedAt = new Date('2026-01-01T00:00:00.000Z');
     const provider = {
       putObject: vi.fn(async () => ({ etag: 'etag-admin-upload' })),
     };
     (svc as unknown as { provider: typeof provider }).provider = provider;
 
+    // uploaded_at is supplied app-side, so the INSERT no longer uses RETURNING.
     queryResults = [
       { rows: [], rowCount: 0 }, // root object dedup query
-      { rows: [{ uploadedAt }], rowCount: 1 }, // root insert
+      { rows: [], rowCount: 1 }, // root insert (no RETURNING)
       { rows: [], rowCount: 1 }, // root etag update
     ];
 
     const result = await svc.putObject(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { id: 'local:admin', role: 'project_admin' },
       'photos',
       'note.txt',
       { size: 8, mimetype: 'text/plain' } as Express.Multer.File
@@ -367,18 +367,20 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       key: 'note.txt',
       size: 8,
       mimeType: 'text/plain',
-      uploadedAt,
     });
+    // uploaded_at is an ISO string supplied app-side; assert it round-trips.
+    expect(new Date(result.uploadedAt).toISOString()).toBe(result.uploadedAt);
     expect(provider.putObject).toHaveBeenCalledOnce();
     expect(calls.map((c) => c.sql)).not.toContain('BEGIN');
     expect(calls.map((c) => c.sql)).not.toContain('SET LOCAL ROLE project_admin');
     expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(true);
+    // The insert must not use RETURNING — that re-couples writes to SELECT RLS.
+    expect(calls.some((c) => /RETURNING/i.test(c.sql))).toBe(false);
   });
 
   it('confirms presigned uploads for project_admin JWT callers through root access', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
-    const uploadedAt = new Date('2026-01-01T00:00:00.000Z');
     const provider = {
       verifyObjectExists: vi.fn(async () => ({
         exists: true,
@@ -388,14 +390,15 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     };
     (svc as unknown as { provider: typeof provider }).provider = provider;
 
+    // uploaded_at is supplied app-side, so the INSERT no longer uses RETURNING.
     queryResults = [
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
       { rows: [], rowCount: 0 }, // already-confirmed check
-      { rows: [{ uploadedAt }], rowCount: 1 }, // root insert
+      { rows: [], rowCount: 1 }, // root insert (no RETURNING)
     ];
 
     const result = await svc.confirmUpload(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { id: 'local:admin', role: 'project_admin' },
       'photos',
       'note.txt',
       { size: 8, contentType: 'text/plain' }
@@ -406,11 +409,14 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       key: 'note.txt',
       size: 8,
       mimeType: 'text/plain',
-      uploadedAt,
     });
+    // uploaded_at is an ISO string supplied app-side; assert it round-trips.
+    expect(new Date(result.uploadedAt).toISOString()).toBe(result.uploadedAt);
     expect(calls.map((c) => c.sql)).not.toContain('BEGIN');
     expect(calls.map((c) => c.sql)).not.toContain('SET LOCAL ROLE project_admin');
     expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(true);
+    // The insert must not use RETURNING — that re-couples writes to SELECT RLS.
+    expect(calls.some((c) => /RETURNING/i.test(c.sql))).toBe(false);
   });
 
   it('deletes objects for project_admin JWT callers through root access', async () => {
@@ -424,7 +430,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     queryResults = [{ rows: [], rowCount: 1 }];
 
     const deleted = await svc.deleteObject(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { id: 'local:admin', role: 'project_admin' },
       'photos',
       'note.txt'
     );

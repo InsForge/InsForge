@@ -6,6 +6,7 @@ export interface UsageStats {
   mcp_usage_count: number;
   database_size_bytes: number;
   storage_size_bytes: number;
+  user_count: number;
 }
 
 export interface MCPUsageRecord {
@@ -106,10 +107,19 @@ export class UsageService {
         `SELECT COALESCE(SUM(size), 0) as total_size FROM storage.objects`
       );
 
+      // Get total user count (exclude anonymous and legacy project-admin accounts)
+      const userCountResult = await this.getPool().query(
+        `SELECT COUNT(*) as count
+         FROM auth.users
+         WHERE is_anonymous = false
+           AND is_project_admin = false`
+      );
+
       return {
         mcp_usage_count: parseInt(mcpResult.rows[0]?.count || '0'),
         database_size_bytes: parseInt(dbSizeResult.rows[0]?.size || '0'),
         storage_size_bytes: parseInt(storageResult.rows[0]?.total_size || '0'),
+        user_count: parseInt(userCountResult.rows[0]?.count || '0'),
       };
     } catch (error) {
       logger.error('Failed to get usage stats', { error });

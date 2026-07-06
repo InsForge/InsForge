@@ -4,6 +4,7 @@ import type {
   DashboardInstanceInfo,
   DashboardModelCreditUsage,
   DashboardMode,
+  DashboardApifyConnectionStatus,
   DashboardPosthogConnectionStatus,
   DashboardPosthogOpenResult,
   DashboardProjectInfo,
@@ -23,6 +24,7 @@ interface DashboardHostContextValue {
   useAuthorizationCodeRefresh?: boolean;
   onRouteChange?: (path: string) => void;
   onShowUpgradeDialog?: () => void;
+  onOpenWhatsNew?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
   onRequestBackupInfo?: () => Promise<DashboardBackupInfo>;
@@ -49,6 +51,10 @@ interface DashboardHostContextValue {
     cb: (event: DashboardPosthogConnectionStatus) => void
   ) => () => void;
   onOpenPosthog?: (projectId: string) => Promise<DashboardPosthogOpenResult>;
+  onConnectApify?: (projectId: string) => void;
+  subscribeApifyConnectionStatus?: (
+    cb: (event: DashboardApifyConnectionStatus) => void
+  ) => () => void;
 }
 
 const DashboardHostContext = createContext<DashboardHostContextValue | null>(null);

@@ -18,11 +18,14 @@ import { StorageConfigService } from '@/services/storage/storage-config.service.
 import logger from '@/utils/logger.js';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 const DEFAULT_LIST_LIMIT = 100;
 const GIGABYTE_IN_BYTES = 1024 * 1024 * 1024;
 const PUBLIC_BUCKET_EXPIRY = 0; // Public buckets don't expire
 const PRIVATE_BUCKET_EXPIRY = 3600; // Private buckets expire in 1 hour
+const MIN_SIGNED_URL_EXPIRY = 1; // 1 second
+const MAX_SIGNED_URL_EXPIRY = 604800; // 7 days — S3 SigV4 presign ceiling
 
 type StorageObjectResult = {
   file: Buffer;
@@ -35,19 +38,19 @@ export class StorageService {
   private pool: Pool | null = null;
 
   private constructor() {
-    const s3Bucket = process.env.AWS_S3_BUCKET;
-    const appKey = process.env.APP_KEY || 'local';
+    const s3Bucket = appConfig.storage.s3Bucket;
+    const appKey = appConfig.storage.appKey;
     // PARENT_APP_KEY is set by cloud-backend at branch EC2 startup. When
     // present, the S3 provider runs in branch mode: read paths fall back to
     // parent's S3 prefix on 404, write paths target the branch's prefix only.
-    const parentAppKey = process.env.PARENT_APP_KEY?.trim() || undefined;
+    const parentAppKey = appConfig.storage.parentAppKey;
 
     if (s3Bucket) {
       // Use S3 backend
       this.provider = new S3StorageProvider(
         s3Bucket,
         appKey,
-        process.env.AWS_REGION || 'us-east-2',
+        appConfig.storage.awsRegion,
         parentAppKey
       );
       if (parentAppKey) {
@@ -55,8 +58,7 @@ export class StorageService {
       }
     } else {
       // Use local filesystem backend (no fallback support — local installs aren't branched)
-      const baseDir = process.env.STORAGE_DIR || path.resolve(process.cwd(), 'insforge-storage');
-      this.provider = new LocalStorageProvider(baseDir);
+      this.provider = new LocalStorageProvider(appConfig.storage.storageDir);
     }
   }
 
@@ -211,27 +213,29 @@ export class StorageService {
     // Raw-pool dedup sees all rows and avoids silent cross-user blob overwrite.
     const finalKey = await this.generateNextAvailableKey(bucket, originalKey, this.getPool());
 
-    const userId = ctx?.id ?? null;
+    const userId = ctx?.role === 'authenticated' ? ctx.id : null;
+    // Set uploaded_at app-side instead of reading back the DB default via
+    // RETURNING. Under RLS, INSERT ... RETURNING also applies the table's
+    // SELECT policies to the returned row, so an end-user upload fails unless
+    // the caller can also SELECT its own new row — wrongly coupling write
+    // success to read visibility. Supplying the value keeps this a pure INSERT
+    // gated only by the INSERT policy's WITH CHECK.
+    const uploadedAt = new Date();
     const insertObject = async (db: PoolClient) => {
       // INSERT before provider write so UNIQUE (bucket, key) catches any
       // race-window collision before any blob is touched. Provider write
       // stays inside the transaction — a provider failure throws, the tx
       // rolls back, and no orphan row remains.
-      const result = await db.query(
+      await db.query(
         `
-        INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
-        VALUES ($1, $2, $3, $4, $5, 'rest')
-        RETURNING uploaded_at as "uploadedAt"
+        INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via, uploaded_at)
+        VALUES ($1, $2, $3, $4, $5, 'rest', $6)
       `,
-        [bucket, finalKey, file.size, file.mimetype || null, userId]
+        [bucket, finalKey, file.size, file.mimetype || null, userId, uploadedAt]
       );
 
-      if (!result.rows[0]) {
-        throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
-      }
-
       const { etag: providerEtag } = await this.provider.putObject(bucket, finalKey, file);
-      return { etag: providerEtag, uploadedAt: result.rows[0].uploadedAt };
+      return { etag: providerEtag, uploadedAt };
     };
     let uploadedObject: Awaited<ReturnType<typeof insertObject>>;
     if (hasApiKey || ctx?.role === 'project_admin') {
@@ -242,7 +246,7 @@ export class StorageService {
       }
       uploadedObject = await withUserContext(this.getPool(), ctx, insertObject);
     }
-    const { etag, uploadedAt } = uploadedObject;
+    const { etag } = uploadedObject;
 
     // Persist the etag as a best-effort step OUTSIDE the user-context
     // transaction. If we ran this inside the tx and the UPDATE failed, the
@@ -273,7 +277,7 @@ export class StorageService {
       key: finalKey,
       size: file.size,
       mimeType: file.mimetype,
-      uploadedAt,
+      uploadedAt: uploadedAt.toISOString(),
       url: this.buildObjectUrl(bucket, finalKey, etag || uploadedAt),
     };
   }
@@ -544,7 +548,7 @@ export class StorageService {
     if (!ctx) {
       throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
     }
-    const userId = ctx.id ?? null;
+    const userId = ctx?.role === 'authenticated' ? ctx.id : null;
     await withUserContext(this.getPool(), ctx, async (client) => {
       await client.query('SAVEPOINT upload_strategy_rls_probe');
       try {
@@ -561,15 +565,25 @@ export class StorageService {
     return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
   }
 
-  async getDownloadStrategy(bucket: string, key: string) {
+  async getDownloadStrategy(bucket: string, key: string, requestedExpiresIn?: number) {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
     // Check if bucket is public
     const isPublic = await this.isBucketPublic(bucket);
 
-    // Auto-calculate expiry based on bucket visibility if not provided
-    const expiresIn = isPublic ? PUBLIC_BUCKET_EXPIRY : PRIVATE_BUCKET_EXPIRY;
+    // Auto-calculate expiry based on bucket visibility if not provided.
+    // Private buckets honor a caller-supplied TTL (clamped to a safe range) so
+    // `createSignedUrl(key, expiresIn)` can mint short-lived links; public
+    // buckets keep their long, server-decided expiry regardless (the provider
+    // also forces 7 days for public objects).
+    let expiresIn = isPublic ? PUBLIC_BUCKET_EXPIRY : PRIVATE_BUCKET_EXPIRY;
+    if (!isPublic && requestedExpiresIn !== undefined && Number.isFinite(requestedExpiresIn)) {
+      expiresIn = Math.min(
+        Math.max(Math.floor(requestedExpiresIn), MIN_SIGNED_URL_EXPIRY),
+        MAX_SIGNED_URL_EXPIRY
+      );
+    }
 
     // Fetch the version stamp (etag preferred, uploaded_at fallback) and pass
     // it to the provider, which knows whether its URL flavor tolerates an
@@ -680,26 +694,26 @@ export class StorageService {
     // INSERT runs through withUserContext for end-user callers, so the RLS
     // WITH CHECK on storage_objects_owner_insert verifies uploaded_by =
     // jwt.sub. Admin/API-key callers use the backend pool.
-    const userId = ctx?.id ?? null;
+    const userId = ctx?.role === 'authenticated' ? ctx.id : null;
+    // Set uploaded_at app-side instead of reading it back via RETURNING. Under
+    // RLS, INSERT ... RETURNING also enforces the table's SELECT policies on
+    // the returned row, so confirm-upload would fail for any bucket that has
+    // an INSERT policy but no covering SELECT policy. A plain INSERT is gated
+    // solely by the INSERT policy's WITH CHECK, which is the intended check.
+    const uploadedAt = new Date();
     const insertObjectRow = (db: PoolClient) =>
       db.query(
-        `INSERT INTO storage.objects (bucket, key, size, mime_type, etag, uploaded_by, uploaded_via)
-         VALUES ($1, $2, $3, $4, $5, $6, 'rest')
-         RETURNING uploaded_at as "uploadedAt"`,
-        [bucket, key, fileSize, metadata.contentType || null, finalEtag, userId]
+        `INSERT INTO storage.objects (bucket, key, size, mime_type, etag, uploaded_by, uploaded_via, uploaded_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 'rest', $7)`,
+        [bucket, key, fileSize, metadata.contentType || null, finalEtag, userId, uploadedAt]
       );
-    let result: Awaited<ReturnType<typeof insertObjectRow>>;
     if (hasApiKey || ctx?.role === 'project_admin') {
-      result = await runWithRootAccess(this.getPool(), insertObjectRow);
+      await runWithRootAccess(this.getPool(), insertObjectRow);
     } else {
       if (!ctx) {
         throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
       }
-      result = await withUserContext(this.getPool(), ctx, insertObjectRow);
-    }
-
-    if (!result.rows[0]) {
-      throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${key}`);
+      await withUserContext(this.getPool(), ctx, insertObjectRow);
     }
 
     return {
@@ -707,8 +721,8 @@ export class StorageService {
       key,
       size: fileSize,
       mimeType: metadata.contentType,
-      uploadedAt: result.rows[0].uploadedAt,
-      url: this.buildObjectUrl(bucket, key, finalEtag || result.rows[0].uploadedAt),
+      uploadedAt: uploadedAt.toISOString(),
+      url: this.buildObjectUrl(bucket, key, finalEtag || uploadedAt),
     };
   }
 
@@ -901,6 +915,108 @@ export class StorageService {
       'SELECT name, created_at FROM storage.buckets ORDER BY name'
     );
     return r.rows.map((row) => ({ name: row.name, createdAt: row.created_at }));
+  }
+
+  // ==========================================================================
+  // S3 CORS support
+  // ==========================================================================
+
+  async getBucketCorsRules(bucket: string): Promise<Array<Record<string, unknown>> | null> {
+    const r = await this.getPool().query('SELECT cors_rules FROM storage.buckets WHERE name = $1', [
+      bucket,
+    ]);
+    if (r.rowCount === 0) {
+      return null;
+    }
+    return r.rows[0].cors_rules as Array<Record<string, unknown>> | null;
+  }
+
+  async putBucketCorsRules(bucket: string, rules: Array<Record<string, unknown>>): Promise<void> {
+    await this.getPool().query(
+      `UPDATE storage.buckets SET cors_rules = $1, updated_at = NOW()
+       WHERE name = $2`,
+      [JSON.stringify(rules), bucket]
+    );
+  }
+
+  async deleteBucketCorsRules(bucket: string): Promise<void> {
+    await this.getPool().query(
+      `UPDATE storage.buckets SET cors_rules = NULL, updated_at = NOW()
+       WHERE name = $1`,
+      [bucket]
+    );
+  }
+
+  // ==========================================================================
+  // S3 object tagging support
+  // ==========================================================================
+
+  async getObjectTags(
+    bucket: string,
+    key: string
+  ): Promise<Array<{ tagKey: string; tagValue: string }>> {
+    const r = await this.getPool().query(
+      'SELECT tag_key, tag_value FROM storage.object_tags WHERE bucket = $1 AND key = $2 ORDER BY tag_key',
+      [bucket, key]
+    );
+    return r.rows.map((row) => ({ tagKey: row.tag_key, tagValue: row.tag_value }));
+  }
+
+  async putObjectTags(
+    bucket: string,
+    key: string,
+    tags: Array<{ tagKey: string; tagValue: string }>
+  ): Promise<void> {
+    const client = await this.getPool().connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM storage.object_tags WHERE bucket = $1 AND key = $2', [
+        bucket,
+        key,
+      ]);
+      for (const t of tags) {
+        await client.query(
+          'INSERT INTO storage.object_tags (bucket, key, tag_key, tag_value) VALUES ($1, $2, $3, $4)',
+          [bucket, key, t.tagKey, t.tagValue]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteObjectTags(bucket: string, key: string): Promise<void> {
+    await this.getPool().query('DELETE FROM storage.object_tags WHERE bucket = $1 AND key = $2', [
+      bucket,
+      key,
+    ]);
+  }
+
+  // ==========================================================================
+  // S3 bucket versioning support
+  // ==========================================================================
+
+  async getBucketVersioningStatus(bucket: string): Promise<string | null> {
+    const r = await this.getPool().query(
+      'SELECT versioning_status FROM storage.buckets WHERE name = $1',
+      [bucket]
+    );
+    if (r.rowCount === 0) {
+      return null;
+    }
+    return r.rows[0].versioning_status as string;
+  }
+
+  async putBucketVersioningStatus(bucket: string, status: string): Promise<void> {
+    await this.getPool().query(
+      `UPDATE storage.buckets SET versioning_status = $1, updated_at = NOW()
+       WHERE name = $2`,
+      [status, bucket]
+    );
   }
 
   async listObjectsV2Db(params: {

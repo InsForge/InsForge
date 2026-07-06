@@ -44,14 +44,20 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
     }
 
     const schemaName = normalizeDatabaseSchemaName(req.query.schema);
-    const { tableName, columns, rlsEnabled } = validation.data;
-    const result = await tableService.createTable(schemaName, tableName, columns, rlsEnabled);
+    const { tableName, columns, foreignKeys, rlsEnabled } = validation.data;
+    const result = await tableService.createTable(
+      schemaName,
+      tableName,
+      columns,
+      foreignKeys,
+      rlsEnabled
+    );
 
     DatabaseManager.clearColumnTypeCache(tableName, schemaName);
 
     // Log audit for table creation
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'CREATE_TABLE',
       module: 'DATABASE',
       details: {
@@ -111,7 +117,7 @@ router.patch(
 
       // Log audit for table schema update
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_TABLE',
         module: 'DATABASE',
         details: {
@@ -143,7 +149,7 @@ router.delete(
 
       // Log audit for table deletion
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_TABLE',
         module: 'DATABASE',
         details: {

@@ -4,6 +4,34 @@ import { CopyObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s
 import { Readable } from 'stream';
 import crypto from 'crypto';
 
+vi.mock('@/infra/config/app.config.js', () => {
+  const c = {
+    cloud: {
+      get cloudFrontUrl() {
+        return process.env.AWS_CLOUDFRONT_URL;
+      },
+      get cloudFrontKeyPairId() {
+        return process.env.AWS_CLOUDFRONT_KEY_PAIR_ID;
+      },
+      get cloudFrontPrivateKey() {
+        return process.env.AWS_CLOUDFRONT_PRIVATE_KEY;
+      },
+    },
+    storage: {
+      get s3EndpointUrl() {
+        return process.env.S3_ENDPOINT_URL;
+      },
+    },
+    server: {
+      logsDir: 'logs',
+    },
+    app: {
+      logLevel: 'info',
+    },
+  };
+  return { config: c, appConfig: c };
+});
+
 function asyncIterableFromString(s: string): AsyncIterable<Uint8Array> {
   return {
     [Symbol.asyncIterator]: async function* () {
@@ -306,6 +334,25 @@ describe('S3StorageProvider — branch fallback', () => {
       const p = makeProvider();
       await expect(p.copyObject('photos', 'a.txt', 'photos', 'b.txt')).rejects.toThrow();
       expect(sendMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getDownloadStrategy expiry', () => {
+    // Uses the real presigner (signs locally with the dummy creds), so the
+    // returned URL actually carries `X-Amz-Expires` — proving the caller's
+    // expiresIn reaches the signature, not just the function arguments.
+    it('private bucket: caller expiresIn flows into the S3 presigned signature', async () => {
+      const p = makeProvider(); // no parent -> no HEAD round-trip, pure S3 presign
+      const strat = await p.getDownloadStrategy('photos', 'a.txt', 120, false);
+      expect(strat.method).toBe('presigned');
+      expect(new URL(strat.url).searchParams.get('X-Amz-Expires')).toBe('120');
+    });
+
+    it('public bucket: expiry is overridden to 7 days regardless of caller value', async () => {
+      const p = makeProvider();
+      const strat = await p.getDownloadStrategy('photos', 'a.txt', 120, true);
+      expect(strat.method).toBe('presigned');
+      expect(new URL(strat.url).searchParams.get('X-Amz-Expires')).toBe('604800');
     });
   });
 });

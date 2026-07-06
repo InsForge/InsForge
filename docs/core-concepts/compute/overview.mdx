@@ -1,18 +1,14 @@
 ---
-title: "Compute"
+title: "Custom Compute"
 sidebarTitle: "Overview"
 description: "Run long-lived containers next to your InsForge project."
 ---
 
-Use InsForge Compute to run long-lived containers next to your project: queue workers, background processors, AI inference loops, websocket servers, scrapers, anything that needs to stay up. Containers attach to your project's database, storage, and auth with the same credentials a function would use.
+Use InsForge Custom Compute to run long-lived containers next to your project: queue workers, background processors, AI inference loops, websocket servers, scrapers, anything that needs to stay up. Containers attach to your project's database, storage, and auth with the same credentials a function would use.
 
 <Note>
-  **Just need to handle a request?** Use [Edge Functions](/core-concepts/functions/overview) for request/response work and short jobs. Compute is for processes that need to run continuously.
+  **Just need to handle a request?** Use [Edge Functions](/core-concepts/functions/overview) for request/response work and short jobs. Custom Compute is for processes that need to run continuously.
 </Note>
-
-<Warning>
-  Compute is in private preview. The API may change before general availability. Reach out if you want early access.
-</Warning>
 
 ```mermaid
 graph TB

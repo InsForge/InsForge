@@ -3,22 +3,12 @@ import { Readable, Transform, TransformCallback } from 'stream';
 import crypto from 'crypto';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { sendS3Error, S3ProtocolError } from '../errors.js';
-import { S3AuthenticatedRequest } from '@/api/middlewares/s3-sigv4.js';
+import { S3GatewayRequest, getS3Bucket, getS3Key } from '../request.js';
 import {
   AwsChunkedPayloadParser,
   ChunkSignatureV4Parser,
 } from '@/services/storage/s3-signature.js';
-
-const AWS_MAX_PUT_OBJECT_GB = 5;
-
-function capBytes(): number {
-  const override = Number(process.env.S3_PROTOCOL_MAX_OBJECT_SIZE_GB);
-  const effective =
-    Number.isFinite(override) && override > 0 && override < AWS_MAX_PUT_OBJECT_GB
-      ? override
-      : AWS_MAX_PUT_OBJECT_GB;
-  return effective * 1024 * 1024 * 1024;
-}
+import { appConfig } from '@/infra/config/app.config.js';
 
 /**
  * Transform that counts bytes and errors if it exceeds the cap. Used on the
@@ -95,9 +85,9 @@ function parseDecodedLength(raw: unknown): number | null {
   return Number(raw);
 }
 
-export async function handle(req: S3AuthenticatedRequest, res: Response): Promise<void> {
-  const bucket = (req as unknown as { s3Bucket: string }).s3Bucket;
-  const key = (req as unknown as { s3Key: string }).s3Key;
+export async function handle(req: S3GatewayRequest, res: Response): Promise<void> {
+  const bucket = getS3Bucket(req);
+  const key = getS3Key(req);
   const svc = StorageService.getInstance();
   if (!(await svc.bucketExists(bucket))) {
     sendS3Error(res, 'NoSuchBucket', 'Bucket does not exist', {
@@ -124,7 +114,7 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
       ? plainLen
       : null;
 
-  const cap = capBytes();
+  const cap = appConfig.storage.maxS3UploadSize;
   if (contentLength !== null && contentLength > cap) {
     sendS3Error(res, 'EntityTooLarge', `Object too large: ${contentLength} > ${cap}`, {
       resource: req.path,

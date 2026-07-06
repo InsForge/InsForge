@@ -37,10 +37,8 @@ export const uploadStrategyResponseSchema = z.object({
 });
 
 // Download strategy schemas
-export const downloadStrategyRequestSchema = z.object({
-  expiresIn: z.number().optional().default(3600),
-});
-
+// download-strategy is a GET endpoint with no request body; expiry is
+// auto-calculated server-side from bucket visibility.
 export const downloadStrategyResponseSchema = z.object({
   method: z.enum(['presigned', 'direct']),
   url: z.string(),
@@ -70,7 +68,6 @@ export type UpdateBucketRequest = z.infer<typeof updateBucketRequestSchema>;
 export type ListObjectsResponseSchema = z.infer<typeof listObjectsResponseSchema>;
 export type UploadStrategyRequest = z.infer<typeof uploadStrategyRequestSchema>;
 export type UploadStrategyResponse = z.infer<typeof uploadStrategyResponseSchema>;
-export type DownloadStrategyRequest = z.infer<typeof downloadStrategyRequestSchema>;
 export type DownloadStrategyResponse = z.infer<typeof downloadStrategyResponseSchema>;
 export type ConfirmUploadRequest = z.infer<typeof confirmUploadRequestSchema>;
 export type UpdateStorageConfigRequest = z.infer<typeof updateStorageConfigRequestSchema>;

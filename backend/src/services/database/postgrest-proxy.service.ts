@@ -2,10 +2,12 @@ import axios, { AxiosResponse } from 'axios';
 import http from 'http';
 import https from 'https';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
+import { appConfig } from '@/infra/config/app.config.js';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
-const postgrestUrl = process.env.POSTGREST_BASE_URL || 'http://localhost:5430';
+const postgrestUrl = appConfig.database.postgrestBaseUrl;
 
 // Connection pooling for PostgREST
 const httpAgent = new http.Agent({
@@ -41,7 +43,6 @@ export interface ProxyRequest {
   query?: Record<string, unknown>;
   headers?: Record<string, string | string[] | undefined>;
   body?: unknown;
-  apiKey?: string;
 }
 
 export interface ProxyResponse {
@@ -63,11 +64,12 @@ const EXCLUDED_HEADERS = new Set([
 export class PostgrestProxyService {
   private static instance: PostgrestProxyService;
   private tokenManager = TokenManager.getInstance();
-  private secretService = SecretService.getInstance();
   private adminToken: string;
+  private anonToken: string;
 
   private constructor() {
-    this.adminToken = this.tokenManager.generateApiKeyToken();
+    this.adminToken = this.tokenManager.generatePostgrestAdminToken();
+    this.anonToken = this.tokenManager.generatePostgrestAnonToken();
   }
 
   public static getInstance(): PostgrestProxyService {
@@ -95,10 +97,71 @@ export class PostgrestProxyService {
     return filtered;
   }
 
+  async forward(request: ProxyRequest): Promise<ProxyResponse> {
+    return this.forwardRequest(request);
+  }
+
+  async forwardAsAdmin(request: ProxyRequest): Promise<ProxyResponse> {
+    return this.forwardRequest({
+      ...request,
+      headers: {
+        ...request.headers,
+        // Project admin subjects are intentionally dropped before PostgREST
+        // because auth.uid() is UUID-based while admin subjects are not.
+        authorization: `Bearer ${this.adminToken}`,
+      },
+    });
+  }
+
+  /**
+   * Gateway exchange for anon-role requests: PostgREST derives its role from
+   * a JWT claim, so the client credential (opaque anon key, or a legacy anon
+   * JWT carrying the old shared fake subject) is swapped for an internally-
+   * minted subject-less `anon` JWT that never leaves the server. All anon
+   * traffic therefore reaches the database with identical claims.
+   */
+  async forwardAsAnon(request: ProxyRequest): Promise<ProxyResponse> {
+    return this.forwardRequest({
+      ...request,
+      headers: {
+        ...request.headers,
+        authorization: `Bearer ${this.anonToken}`,
+      },
+    });
+  }
+
+  /**
+   * Gateway exchange for authenticated users: verify the user's token in the
+   * app layer, and swap it for a short-lived internal HS256 token containing the
+   * user's claims to forward to PostgREST.
+   */
+  async forwardAsUser(
+    request: ProxyRequest,
+    user: { id: string; email?: string; role: string }
+  ): Promise<ProxyResponse> {
+    if (user.role !== 'authenticated' && user.role !== 'project_admin') {
+      throw new AppError('Invalid user role claim', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    const userToken = this.tokenManager.generatePostgrestUserToken({
+      sub: user.id,
+      email: user.email,
+      role: user.role as 'authenticated' | 'project_admin',
+    });
+
+    return this.forwardRequest({
+      ...request,
+      headers: {
+        ...request.headers,
+        authorization: `Bearer ${userToken}`,
+      },
+    });
+  }
+
   /**
    * Forward request to PostgREST with retry logic
    */
-  async forward(request: ProxyRequest): Promise<ProxyResponse> {
+  private async forwardRequest(request: ProxyRequest): Promise<ProxyResponse> {
     const targetUrl = `${postgrestUrl}${request.path}`;
 
     const axiosConfig: {
@@ -117,14 +180,6 @@ export class PostgrestProxyService {
         'content-length': undefined,
       },
     };
-
-    // Use admin token if valid API key provided
-    if (request.apiKey) {
-      const isValid = await this.secretService.verifyApiKey(request.apiKey);
-      if (isValid) {
-        axiosConfig.headers.authorization = `Bearer ${this.adminToken}`;
-      }
-    }
 
     if (request.body !== undefined) {
       axiosConfig.data = request.body;

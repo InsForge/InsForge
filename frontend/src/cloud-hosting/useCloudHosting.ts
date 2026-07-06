@@ -4,6 +4,7 @@ import type {
   DashboardBackupInfo,
   DashboardInstanceInfo,
   DashboardModelCreditUsage,
+  DashboardApifyConnectionStatus,
   DashboardPosthogConnectionStatus,
   DashboardPosthogOpenResult,
   DashboardProjectInfo,
@@ -285,7 +286,16 @@ function normalizeProjectInfo(
 
 export function useCloudHosting() {
   const currentOrigin = getCurrentOrigin();
-  const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo>();
+  // PROJECT_INFO can only arrive from a parent iframe: REQUEST_PROJECT_INFO is
+  // posted to the parent window, and opener messages are restricted to the
+  // authorization-code types. When the dashboard runs in its own tab (partner
+  // new-tab flow), start from a default so consumers that wait on project info
+  // (e.g. the cloud login redirect) don't block forever.
+  const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo | undefined>(() =>
+    getParentWindow()
+      ? undefined
+      : { id: currentOrigin, name: 'Project', region: '', instanceType: '' }
+  );
   const parentOriginRef = useRef<string | null>(getParentOrigin());
   const openerOriginRef = useRef<string | null>(null);
   const parentOriginTrustedRef = useRef(false);
@@ -294,6 +304,9 @@ export function useCloudHosting() {
   const posthogStatusSubscribersRef = useRef<
     Set<(event: DashboardPosthogConnectionStatus) => void>
   >(new Set());
+  const apifyStatusSubscribersRef = useRef<Set<(event: DashboardApifyConnectionStatus) => void>>(
+    new Set()
+  );
 
   const setPendingRequest = useCallback(
     <K extends PendingRequestKey>(
@@ -845,7 +858,6 @@ export function useCloudHosting() {
                         typeof i.affectedObject === 'string' ? i.affectedObject : undefined,
                       recommendation:
                         typeof i.recommendation === 'string' ? i.recommendation : undefined,
-                      isResolved: !!i.isResolved,
                     },
                   ];
                 })
@@ -887,6 +899,25 @@ export function useCloudHosting() {
               typeof message.timestamp === 'number' ? message.timestamp : Date.now();
             const event: DashboardPosthogConnectionStatus = { status, reason, timestamp };
             posthogStatusSubscribersRef.current.forEach((cb) => {
+              try {
+                cb(event);
+              } catch {
+                // Subscriber crashes shouldn't break delivery to other subscribers.
+              }
+            });
+            return;
+          }
+          case 'APIFY_CONNECTION_STATUS': {
+            const status = message.status;
+            if (status !== 'connected' && status !== 'error' && status !== 'cancelled') {
+              return;
+            }
+            const rawReason = typeof message.reason === 'string' ? message.reason : undefined;
+            const reason = rawReason ? rawReason.slice(0, 200) : undefined;
+            const timestamp =
+              typeof message.timestamp === 'number' ? message.timestamp : Date.now();
+            const event: DashboardApifyConnectionStatus = { status, reason, timestamp };
+            apifyStatusSubscribersRef.current.forEach((cb) => {
               try {
                 cb(event);
               } catch {
@@ -1109,6 +1140,10 @@ export function useCloudHosting() {
     void postMessageToParent({ type: 'SHOW_UPGRADE_DIALOG' });
   }, [postMessageToParent]);
 
+  const openWhatsNew = useCallback(() => {
+    void postMessageToParent({ type: 'OPEN_WHATS_NEW' });
+  }, [postMessageToParent]);
+
   const reportRouteChange = useCallback(
     (path: string) => {
       void postMessageToParent({ type: 'APP_ROUTE_CHANGE', path });
@@ -1120,6 +1155,17 @@ export function useCloudHosting() {
     (projectId: string) => {
       void postMessageToParent({
         type: 'POSTHOG_CONNECT_REQUEST',
+        projectId,
+        timestamp: Date.now(),
+      });
+    },
+    [postMessageToParent]
+  );
+
+  const connectApify = useCallback(
+    (projectId: string) => {
+      void postMessageToParent({
+        type: 'APIFY_CONNECT_REQUEST',
         projectId,
         timestamp: Date.now(),
       });
@@ -1205,6 +1251,16 @@ export function useCloudHosting() {
     []
   );
 
+  const subscribeApifyConnectionStatus = useCallback(
+    (cb: (event: DashboardApifyConnectionStatus) => void) => {
+      apifyStatusSubscribersRef.current.add(cb);
+      return () => {
+        apifyStatusSubscribersRef.current.delete(cb);
+      };
+    },
+    []
+  );
+
   return {
     projectInfo,
     getAuthorizationCode,
@@ -1220,6 +1276,7 @@ export function useCloudHosting() {
     deleteProject,
     updateVersion,
     showUpgradeDialog,
+    openWhatsNew,
     requestUserInfo,
     requestUserApiKey,
     requestModelCredits,
@@ -1230,5 +1287,7 @@ export function useCloudHosting() {
     connectPosthog,
     openPosthog,
     subscribePosthogConnectionStatus,
+    connectApify,
+    subscribeApifyConnectionStatus,
   };
 }

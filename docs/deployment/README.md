@@ -34,6 +34,13 @@ This directory contains deployment guides for self-hosting InsForge on various p
   - Domain and SSL configuration
   - Production best practices
 
+- **[Containarium](./deploy-to-containarium.md)** - Deploy InsForge on a self-hosted Containarium host (LXC + MCP-native control plane)
+  - One-command box provisioning with Docker pre-installed
+  - Built-in TLS-on-a-hostname via Caddy + ACME
+  - Compose-autostart survives host reboots
+  - Multi-tenant: many isolated InsForge projects per host
+  - Optional agent-driven deploy via MCP
+
 ### Coming Soon
 
 - **Digital Ocean** - Droplet deployment guide

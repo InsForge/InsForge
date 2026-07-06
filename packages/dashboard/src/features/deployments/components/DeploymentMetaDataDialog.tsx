@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from '@insforge/ui';
 import { ScrollArea } from '#components';
+import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import type { DeploymentSchema } from '#features/deployments/services/deployments.service';
 
 interface DeploymentMetaDataDialogProps {
@@ -13,19 +13,13 @@ export function DeploymentMetaDataDialog({
   deployment,
   onOpenChange,
 }: DeploymentMetaDataDialogProps) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
 
   const handleCopyMetadata = async () => {
     if (!deployment?.metadata) {
       return;
     }
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(deployment.metadata, null, 2));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
+    await copy(JSON.stringify(deployment.metadata, null, 2));
   };
 
   const handleClose = () => {
@@ -85,7 +79,7 @@ export function DeploymentMetaDataDialog({
             className="h-8 px-3 bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
           >
             {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
-            {copied ? 'Copied' : 'Copy Meta Data'}
+            {copied ? 'Copied' : 'Copy Deployment Meta Data'}
           </Button>
         </div>
       </DialogContent>

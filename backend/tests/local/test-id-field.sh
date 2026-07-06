@@ -12,6 +12,7 @@ echo "=== Testing User Creation with ID Field ==="
 
 # Use configuration from test-config.sh
 API_URL="$TEST_API_BASE"
+ANON_KEY=$(get_anon_key)
 
 # Test users for cleanup tracking
 USER1_EMAIL="${TEST_USER_EMAIL_PREFIX}id_test1_$(date +%s)@example.com"
@@ -27,6 +28,7 @@ register_test_user "$USER3_EMAIL"
 print_info "1. Creating user without ID (auto-generate):"
 response1=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/auth/users" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ANON_KEY" \
   -d "{
     \"email\": \"$USER1_EMAIL\",
     \"password\": \"password123\",
@@ -51,6 +53,7 @@ print_info "2. Creating user with custom ID:"
 CUSTOM_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
 response2=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/auth/users" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ANON_KEY" \
   -d "{
     \"id\": \"$CUSTOM_ID\",
     \"email\": \"$USER2_EMAIL\",
@@ -74,6 +77,7 @@ fi
 print_info "3. Creating user with duplicate ID (JWT auth ignores custom ID):"
 response3=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/auth/users" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ANON_KEY" \
   -d "{
     \"id\": \"$CUSTOM_ID\",
     \"email\": \"$USER3_EMAIL\",

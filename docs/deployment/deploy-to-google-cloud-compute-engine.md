@@ -1,3 +1,8 @@
+---
+title: "Deploy InsForge to Google Cloud Compute Engine"
+description: "Deploy InsForge on a Google Cloud Compute Engine VM with Docker Compose, covering firewall rules, SSH access, custom domains, and HTTPS setup."
+---
+
 # Deploy InsForge to Google Cloud Compute Engine
 
 This guide will walk you through deploying InsForge on Google Cloud Compute Engine using Docker Compose.
@@ -172,8 +177,8 @@ At a minimum, set these values:
 JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
 
 # Admin account (used for initial setup)
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=change-this-password
+ROOT_ADMIN_USERNAME=admin
+ROOT_ADMIN_PASSWORD=change-this-password
 
 # Database (required)
 POSTGRES_PASSWORD=your-secure-postgres-password
@@ -547,4 +552,4 @@ effective_cache_size = 3GB
 
 **Congratulations! 🎉** Your InsForge instance is now running on Google Cloud Compute Engine. You can start building applications by connecting AI agents to your backend platform.
 
-For other production deployment strategies, check out our [deployment guides](./README.md).
+For other production deployment strategies, check out our [deployment guides](/deployment/deployment-security-guide).

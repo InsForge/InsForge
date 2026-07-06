@@ -9,12 +9,14 @@ import {
   databasePolicySchema,
   databaseTriggerSchema,
   migrationSchema,
+  databaseBackupSchema,
 } from './database.schema.js';
 
 export const createTableRequestSchema = tableSchema
   .pick({
     tableName: true,
     columns: true,
+    foreignKeys: true,
   })
   .extend({
     rlsEnabled: z.boolean().default(true),
@@ -35,13 +37,7 @@ export const createTableResponseSchema = tableSchema
 export const getTableSchemaResponseSchema = tableSchema;
 
 export const updateTableSchemaRequestSchema = z.object({
-  addColumns: z
-    .array(
-      columnSchema.omit({
-        foreignKey: true,
-      })
-    )
-    .optional(),
+  addColumns: z.array(columnSchema).optional(),
   dropColumns: z.array(z.string()).optional(),
   updateColumns: z
     .array(
@@ -56,14 +52,9 @@ export const updateTableSchemaRequestSchema = z.object({
       })
     )
     .optional(),
-  addForeignKeys: z
-    .array(
-      z.object({
-        columnName: z.string().min(1, 'Column name is required for adding foreign key'),
-        foreignKey: foreignKeySchema,
-      })
-    )
-    .optional(),
+  // Each entry is a full foreign-key constraint (composite keys are one entry).
+  addForeignKeys: z.array(foreignKeySchema).optional(),
+  // Constraint names to drop.
   dropForeignKeys: z.array(z.string()).optional(),
   renameTable: z
     .object({
@@ -141,16 +132,9 @@ export const exportJsonDataSchema = z.object({
           isPrimary: z.boolean().nullable(),
         })
       ),
-      foreignKeys: z.array(
-        z.object({
-          constraintName: z.string(),
-          columnName: z.string(),
-          foreignTableName: z.string(),
-          foreignColumnName: z.string(),
-          deleteRule: z.string().nullable(),
-          updateRule: z.string().nullable(),
-        })
-      ),
+      // Table-level foreign keys: one entry per constraint (composite keys list
+      // multiple column mappings), consistent with the rest of the schema model.
+      foreignKeys: z.array(foreignKeySchema),
       rlsEnabled: z.boolean().optional(),
       policies: z.array(
         z.object({
@@ -274,29 +258,68 @@ export const adminTableRecordsListQuerySchema = z
     }
   );
 
-export const adminTableRecordLookupQuerySchema = z.object({
-  column: z.string().trim().min(1, 'Column is required'),
-  value: z.string(),
-});
+export const adminTableRecordLookupQuerySchema = z
+  .object({
+    column: z.union([z.string().trim().min(1), z.array(z.string().trim().min(1)).min(1)]),
+    value: z.union([z.string(), z.array(z.string()).min(1)]),
+  })
+  .refine(
+    (data) => {
+      const cols = Array.isArray(data.column) ? data.column : [data.column];
+      const vals = Array.isArray(data.value) ? data.value : [data.value];
+      return cols.length === vals.length;
+    },
+    {
+      message: 'column and value must have the same number of entries',
+      path: ['value'],
+    }
+  );
 
 export const adminTableRecordsCreateRequestSchema = z
   .array(adminTableRecordSchema)
   .min(1, 'At least one record is required');
 
-export const adminTableRecordUpdateQuerySchema = z.object({
-  pkColumn: z.string().trim().min(1, 'Primary key column is required'),
-});
+// A primary-key value. Restricted to scalar types that survive a JSON round-trip
+// and that node-postgres can bind as a query parameter, plus `null`.
+// `null` is matched with `col IS NULL` (not `col = NULL`) by the record service,
+// so it correctly identifies rows in keyless tables whose fallback identity (all
+// columns) includes a genuinely-null column. On a real (NOT NULL) primary key a
+// null value simply matches no row, surfacing as a clear "record not found".
+export const adminTableRecordPkValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
 
-export const adminTableRecordUpdateRequestSchema = adminTableRecordSchema.refine(
+// A single record's primary key as a map of pk column name -> value.
+// Supports composite primary keys (more than one column).
+export const adminTableRecordPrimaryKeySchema = z
+  .record(z.string().trim().min(1, 'Primary key column is required'), adminTableRecordPkValueSchema)
+  .refine((key) => Object.keys(key).length > 0, {
+    message: 'Primary key must include at least one column.',
+  });
+
+// The columns to set on update (at least one).
+export const adminTableRecordUpdateDataSchema = adminTableRecordSchema.refine(
   (record) => Object.keys(record).length > 0,
   {
     message: 'At least one field is required.',
   }
 );
 
-export const adminTableRecordsDeleteQuerySchema = z.object({
-  pkColumn: z.string().trim().min(1, 'Primary key column is required'),
-  pkValues: z.string().trim().min(1, 'At least one primary key value is required'),
+// Update request body: the primary-key tuple identifying the row plus the columns
+// to set. Carried in the body (not the query string) so composite keys are
+// validated structurally, e.g. { "pkKeys": {"tenant_id":"t1","item_id":"i2"}, "data": {...} }.
+export const adminTableRecordUpdateRequestSchema = z.object({
+  pkKeys: adminTableRecordPrimaryKeySchema,
+  data: adminTableRecordUpdateDataSchema,
+});
+
+// Delete request body: one primary-key tuple per record to delete,
+// e.g. { "pkKeys": [{"tenant_id":"t1","item_id":"i2"},{"tenant_id":"t1","item_id":"i3"}] }.
+export const adminTableRecordsDeleteRequestSchema = z.object({
+  pkKeys: z.array(adminTableRecordPrimaryKeySchema).min(1, 'At least one primary key is required'),
 });
 
 export const adminTableRecordResponseSchema = adminTableRecordSchema;
@@ -367,9 +390,9 @@ export type AdminTableRecordsSortClause = z.infer<typeof adminTableRecordsSortCl
 export type AdminTableRecordsListQuery = z.infer<typeof adminTableRecordsListQuerySchema>;
 export type AdminTableRecordLookupQuery = z.infer<typeof adminTableRecordLookupQuerySchema>;
 export type AdminTableRecordsCreateRequest = z.infer<typeof adminTableRecordsCreateRequestSchema>;
-export type AdminTableRecordUpdateQuery = z.infer<typeof adminTableRecordUpdateQuerySchema>;
+export type AdminTableRecordPrimaryKey = z.infer<typeof adminTableRecordPrimaryKeySchema>;
 export type AdminTableRecordUpdateRequest = z.infer<typeof adminTableRecordUpdateRequestSchema>;
-export type AdminTableRecordsDeleteQuery = z.infer<typeof adminTableRecordsDeleteQuerySchema>;
+export type AdminTableRecordsDeleteRequest = z.infer<typeof adminTableRecordsDeleteRequestSchema>;
 export type AdminTableRecordResponse = z.infer<typeof adminTableRecordResponseSchema>;
 export type AdminTableRecordLookupResponse = z.infer<typeof adminTableRecordLookupResponseSchema>;
 export type AdminTableRecordsCreateResponse = z.infer<typeof adminTableRecordsCreateResponseSchema>;
@@ -403,6 +426,41 @@ export const databaseMigrationsResponseSchema = z.object({
   migrations: z.array(migrationSchema),
 });
 
+// Database Backup Schemas
+export const createDatabaseBackupRequestSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Backup name cannot be empty')
+    .max(64, 'Backup name must be less than 64 characters')
+    .optional(),
+});
+
+export const renameDatabaseBackupRequestSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Backup name cannot be empty')
+    .max(64, 'Backup name must be less than 64 characters')
+    .nullable(),
+});
+
+export const databaseBackupsResponseSchema = z.object({
+  backups: z.array(databaseBackupSchema),
+});
+
+export const createDatabaseBackupResponseSchema = databaseBackupSchema;
+
+export const updateDatabaseBackupResponseSchema = databaseBackupSchema;
+
+export const deleteDatabaseBackupResponseSchema = z.object({
+  message: z.string(),
+});
+
+export const restoreDatabaseBackupResponseSchema = z.object({
+  message: z.string(),
+});
+
 // Database Metadata Response Types
 export type DatabaseFunctionsResponse = z.infer<typeof databaseFunctionsResponseSchema>;
 export type DatabaseSchemasResponse = z.infer<typeof databaseSchemasResponseSchema>;
@@ -410,3 +468,12 @@ export type DatabaseIndexesResponse = z.infer<typeof databaseIndexesResponseSche
 export type DatabasePoliciesResponse = z.infer<typeof databasePoliciesResponseSchema>;
 export type DatabaseTriggersResponse = z.infer<typeof databaseTriggersResponseSchema>;
 export type DatabaseMigrationsResponse = z.infer<typeof databaseMigrationsResponseSchema>;
+
+// Database Backup Types
+export type CreateDatabaseBackupRequest = z.infer<typeof createDatabaseBackupRequestSchema>;
+export type RenameDatabaseBackupRequest = z.infer<typeof renameDatabaseBackupRequestSchema>;
+export type DatabaseBackupsResponse = z.infer<typeof databaseBackupsResponseSchema>;
+export type CreateDatabaseBackupResponse = z.infer<typeof createDatabaseBackupResponseSchema>;
+export type UpdateDatabaseBackupResponse = z.infer<typeof updateDatabaseBackupResponseSchema>;
+export type DeleteDatabaseBackupResponse = z.infer<typeof deleteDatabaseBackupResponseSchema>;
+export type RestoreDatabaseBackupResponse = z.infer<typeof restoreDatabaseBackupResponseSchema>;

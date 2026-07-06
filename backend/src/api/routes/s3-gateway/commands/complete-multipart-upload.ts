@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { parseXml, toXml } from '../xml.js';
 import { sendS3Error } from '../errors.js';
-import { S3AuthenticatedRequest } from '@/api/middlewares/s3-sigv4.js';
+import { S3GatewayRequest, getS3Bucket, getS3Key } from '../request.js';
+
+const MAX_COMPLETE_MPU_BODY_BYTES = 1024 * 1024;
 
 const partSchema = z.object({
   PartNumber: z.coerce.number().int().positive().max(10_000),
@@ -16,9 +18,9 @@ const bodySchema = z.object({
   }),
 });
 
-export async function handle(req: S3AuthenticatedRequest, res: Response): Promise<void> {
-  const bucket = (req as unknown as { s3Bucket: string }).s3Bucket;
-  const key = (req as unknown as { s3Key: string }).s3Key;
+export async function handle(req: S3GatewayRequest, res: Response): Promise<void> {
+  const bucket = getS3Bucket(req);
+  const key = getS3Key(req);
   const uploadIdRaw = req.query.uploadId;
   const uploadId = typeof uploadIdRaw === 'string' ? uploadIdRaw : '';
   if (!uploadId) {
@@ -30,8 +32,23 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
   }
 
   const chunks: Buffer[] = [];
+  let received = 0;
   for await (const c of req) {
-    chunks.push(c as Buffer);
+    const b = c as Buffer;
+    received += b.length;
+    if (received > MAX_COMPLETE_MPU_BODY_BYTES) {
+      sendS3Error(
+        res,
+        'EntityTooLarge',
+        'CompleteMultipartUpload body exceeds maximum allowed size',
+        {
+          resource: req.path,
+          requestId: req.s3Auth.requestId,
+        }
+      );
+      return;
+    }
+    chunks.push(b);
   }
 
   let parsed: unknown;

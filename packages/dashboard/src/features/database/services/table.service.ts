@@ -3,6 +3,7 @@ import { buildDatabaseSchemaSearch, DEFAULT_DATABASE_SCHEMA } from '#features/da
 import {
   ColumnSchema,
   CreateTableRequest,
+  type ForeignKeySchema,
   GetTableSchemaResponse,
   UpdateTableSchemaRequest,
   UpdateTableSchemaResponse,
@@ -33,8 +34,13 @@ export class TableService {
     );
   }
 
-  createTable(schemaName: string, tableName: string, columns: ColumnSchema[]) {
-    const body: CreateTableRequest = { tableName, columns, rlsEnabled: true };
+  createTable(
+    schemaName: string,
+    tableName: string,
+    columns: ColumnSchema[],
+    foreignKeys: ForeignKeySchema[] = []
+  ) {
+    const body: CreateTableRequest = { tableName, columns, foreignKeys, rlsEnabled: true };
 
     return apiClient.request(`/database/tables${buildDatabaseSchemaSearch(schemaName)}`, {
       method: 'POST',

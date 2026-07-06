@@ -1,5 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { withUserContext } from '../../src/services/database/user-context.service';
+import {
+  withAdminContext,
+  withUserContext,
+} from '../../src/services/database/user-context.service';
 import type { Pool, PoolClient } from 'pg';
 
 /**
@@ -65,16 +68,33 @@ describe('withUserContext', () => {
     expect(client.release).toHaveBeenCalledOnce();
   });
 
-  it('sets anon role in the canonical claims object when id is undefined', async () => {
+  it('strips the anonymous sentinel subject from database claims', async () => {
     const { client, calls } = makeMockClient();
     const pool = makeMockPool(client);
 
-    await withUserContext(pool, { role: 'anon' }, async () => {});
+    await withUserContext(pool, { id: 'anonymous', role: 'anon' }, async () => {});
 
+    // The sentinel is an API-level label: auth.uid() casts sub to uuid, so
+    // it must never reach the database claims
     expect(calls[2].params?.[0]).toBe('request.jwt.claims');
     expect(JSON.parse(calls[2].params![1] as string)).toEqual({ role: 'anon' });
     const setLocalRole = calls.find((c) => c.sql.startsWith('SET LOCAL ROLE'));
     expect(setLocalRole?.sql).toBe('SET LOCAL ROLE anon');
+  });
+
+  it('strips anon subjects even when they are UUIDs (legacy anon JWTs)', async () => {
+    const { client, calls } = makeMockClient();
+    const pool = makeMockPool(client);
+
+    // The legacy shared anon UUID never identified anyone — ownership is an
+    // authenticated-only concept, regardless of the subject's shape
+    await withUserContext(
+      pool,
+      { id: '12345678-1234-5678-90ab-cdef12345678', role: 'anon' },
+      async () => {}
+    );
+
+    expect(JSON.parse(calls[2].params![1] as string)).toEqual({ role: 'anon' });
   });
 
   it('can run as project_admin when the caller wants database policies to decide', async () => {
@@ -84,9 +104,8 @@ describe('withUserContext', () => {
     await withUserContext(
       pool,
       {
-        id: 'admin-sub',
+        id: 'local:admin',
         role: 'project_admin',
-        email: 'admin@example.com',
       },
       async () => {}
     );
@@ -95,8 +114,6 @@ describe('withUserContext', () => {
     expect(calls[2].params?.[0]).toBe('request.jwt.claims');
     expect(JSON.parse(calls[2].params![1] as string)).toEqual({
       role: 'project_admin',
-      sub: 'admin-sub',
-      email: 'admin@example.com',
     });
   });
 
@@ -224,5 +241,138 @@ describe('withUserContext', () => {
 
     expect(calls.map((c) => c.sql)).toContain('RESET ROLE');
     expect(client.release).toHaveBeenCalledOnce();
+  });
+});
+
+describe('withAdminContext', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('uses session-level project_admin context by default and resets it', async () => {
+    const { client, calls } = makeMockClient();
+
+    const result = await withAdminContext(client, async () => {
+      await client.query('SELECT 1');
+      return 'ok';
+    });
+
+    expect(result).toBe('ok');
+    expect(calls.map((c) => c.sql)).toEqual([
+      'SET ROLE project_admin',
+      'SELECT set_config($1, $2, $3)',
+      'SELECT 1',
+      'RESET ROLE',
+      'SELECT set_config($1, $2, $3)',
+    ]);
+    expect(calls[1].params).toEqual([
+      'request.jwt.claims',
+      JSON.stringify({ role: 'project_admin' }),
+      false,
+    ]);
+    expect(calls[4].params).toEqual(['request.jwt.claims', '{}', false]);
+  });
+
+  it('uses transaction-local project_admin context when requested', async () => {
+    const { client, calls } = makeMockClient();
+
+    await withAdminContext(
+      client,
+      async () => {
+        await client.query('CREATE TABLE public.todos (id uuid)');
+      },
+      true
+    );
+
+    expect(calls.map((c) => c.sql)).toEqual([
+      'SET LOCAL ROLE project_admin',
+      'SELECT set_config($1, $2, $3)',
+      'CREATE TABLE public.todos (id uuid)',
+      'RESET ROLE',
+      'SELECT set_config($1, $2, $3)',
+    ]);
+    expect(calls[1].params).toEqual([
+      'request.jwt.claims',
+      JSON.stringify({ role: 'project_admin' }),
+      true,
+    ]);
+    expect(calls[4].params).toEqual(['request.jwt.claims', '{}', true]);
+  });
+
+  it('does not swallow admin context cleanup failures', async () => {
+    const { client, calls } = makeMockClient();
+    const resetError = new Error('reset failed');
+    const cleanupErrors: Error[] = [];
+
+    (client.query as ReturnType<typeof vi.fn>).mockImplementation(
+      async (sql: string, params?: unknown[]) => {
+        calls.push({ sql, params });
+        if (sql === 'RESET ROLE') {
+          throw resetError;
+        }
+        return { rows: [], rowCount: 0 };
+      }
+    );
+
+    await expect(
+      withAdminContext(
+        client,
+        async () => 'ok',
+        false,
+        (error) => cleanupErrors.push(error)
+      )
+    ).rejects.toBe(resetError);
+    expect(cleanupErrors).toEqual([resetError]);
+  });
+
+  it('preserves the original SQL error when admin context cleanup also fails', async () => {
+    const { client, calls } = makeMockClient();
+    const sqlError = new Error('sql failed');
+    const resetError = new Error('reset failed');
+    const cleanupErrors: Error[] = [];
+
+    (client.query as ReturnType<typeof vi.fn>).mockImplementation(
+      async (sql: string, params?: unknown[]) => {
+        calls.push({ sql, params });
+        if (sql === 'RESET ROLE') {
+          throw resetError;
+        }
+        return { rows: [], rowCount: 0 };
+      }
+    );
+
+    await expect(
+      withAdminContext(
+        client,
+        async () => {
+          throw sqlError;
+        },
+        false,
+        (error) => cleanupErrors.push(error)
+      )
+    ).rejects.toBe(sqlError);
+    expect(sqlError.cause).toBe(resetError);
+    expect(cleanupErrors).toEqual([resetError]);
+  });
+
+  it('lets the surrounding transaction rollback clear local context after SQL failures', async () => {
+    const { client, calls } = makeMockClient();
+
+    await expect(
+      withAdminContext(
+        client,
+        async () => {
+          await client.query('SELECT broken');
+          throw new Error('sql failed');
+        },
+        true
+      )
+    ).rejects.toThrow('sql failed');
+
+    expect(calls.map((c) => c.sql)).toEqual([
+      'SET LOCAL ROLE project_admin',
+      'SELECT set_config($1, $2, $3)',
+      'SELECT broken',
+    ]);
   });
 });

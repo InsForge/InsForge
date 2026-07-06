@@ -4,7 +4,14 @@ import AILayout from '#features/ai/components/AILayout';
 import AIOverviewPage from '#features/ai/pages/AIOverviewPage';
 import AIQuickStartPage from '#features/ai/pages/AIQuickStartPage';
 import AIModelsPage from '#features/ai/pages/AIModelsPage';
-import { AnalyticsPage } from '#features/analytics';
+import AnalyticsLayout from '#features/analytics/components/AnalyticsLayout';
+import { TrafficPage } from '#features/analytics/pages/TrafficPage';
+import { RetentionPage } from '#features/analytics/pages/RetentionPage';
+import { SessionReplayPage } from '#features/analytics/pages/SessionReplayPage';
+import WebscraperLayout from '#features/webscraper/components/WebscraperLayout';
+import { WebscraperActorsPage } from '#features/webscraper/pages/WebscraperActorsPage';
+import { WebscraperRunsPage } from '#features/webscraper/pages/WebscraperRunsPage';
+import { WebscraperDatasetPage } from '#features/webscraper/pages/WebscraperDatasetPage';
 import AuthenticationLayout from '#features/auth/components/AuthenticationLayout';
 import AuthMethodsPage from '#features/auth/pages/AuthMethodsPage';
 import EmailPage from '#features/auth/pages/EmailPage';
@@ -44,8 +51,8 @@ import MCPLogsPage from '#features/logs/pages/MCPLogsPage';
 import PaymentsLayout from '#features/payments/components/PaymentsLayout';
 import CatalogPage from '#features/payments/pages/CatalogPage';
 import CustomersPage from '#features/payments/pages/CustomersPage';
-import PaymentHistoryPage from '#features/payments/pages/PaymentHistoryPage';
 import SubscriptionsPage from '#features/payments/pages/SubscriptionsPage';
+import TransactionsPage from '#features/payments/pages/TransactionsPage';
 import RealtimeLayout from '#features/realtime/components/RealtimeLayout';
 import RealtimeChannelsPage from '#features/realtime/pages/RealtimeChannelsPage';
 import RealtimeMessagesPage from '#features/realtime/pages/RealtimeMessagesPage';
@@ -56,11 +63,12 @@ import VisualizerLayout from '#features/visualizer/components/VisualizerLayout';
 import VisualizerPage from '#features/visualizer/pages/VisualizerPage';
 import AppLayout from '#layout/AppLayout';
 import { getFeatureFlag } from '#lib/analytics/posthog';
+import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 
 function AuthenticatedRoutes() {
-  const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
-  const isDTest = dashboardVariant === 'd_test';
+  const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
+  const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;
   const DashboardHomePage = isDTest ? DTestDashboardPage : DashboardPage;
   const isCloudHosting = useIsCloudHostingMode();
 
@@ -126,7 +134,7 @@ function AuthenticatedRoutes() {
           <Route path="catalog" element={<CatalogPage />} />
           <Route path="customers" element={<CustomersPage />} />
           <Route path="subscriptions" element={<SubscriptionsPage />} />
-          <Route path="payment-history" element={<PaymentHistoryPage />} />
+          <Route path="transactions" element={<TransactionsPage />} />
         </Route>
         <Route path="/dashboard/realtime" element={<RealtimeLayout />}>
           <Route index element={<Navigate to="channels" replace />} />
@@ -142,7 +150,22 @@ function AuthenticatedRoutes() {
           <Route path="domains" element={<DeploymentDomainsPage />} />
         </Route>
         <Route path="/dashboard/compute" element={<ComputePage />} />
-        {isCloudHosting && <Route path="/dashboard/analytics" element={<AnalyticsPage />} />}
+        {isCloudHosting && (
+          <Route path="/dashboard/analytics" element={<AnalyticsLayout />}>
+            <Route index element={<Navigate to="traffic" replace />} />
+            <Route path="traffic" element={<TrafficPage />} />
+            <Route path="retention" element={<RetentionPage />} />
+            <Route path="session-replay" element={<SessionReplayPage />} />
+          </Route>
+        )}
+        {isCloudHosting && (
+          <Route path="/dashboard/webscraper" element={<WebscraperLayout />}>
+            <Route index element={<Navigate to="actors" replace />} />
+            <Route path="actors" element={<WebscraperActorsPage />} />
+            <Route path="runs" element={<WebscraperRunsPage />} />
+            <Route path="dataset" element={<WebscraperDatasetPage />} />
+          </Route>
+        )}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>

@@ -1,7 +1,8 @@
 import { ConvertedValue } from '#components/datagrid/datagridTypes';
-import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
+import { DEFAULT_DATABASE_SCHEMA, type RecordPrimaryKey } from '#features/database/helpers';
 import { apiClient } from '#lib/api/client';
 import { BulkUpsertResponse } from '@insforge/shared-schemas';
+import { convertToCSV, getExportFilename } from '#lib/utils/data-export';
 
 interface AdminRecordListResponse {
   data: { [key: string]: ConvertedValue }[];
@@ -82,23 +83,28 @@ export class RecordService {
   }
 
   /**
-   * Get a single record by foreign key value.
-   * Specifically designed for foreign key lookups.
+   * Get a single record by foreign key value(s).
+   * Supports composite foreign keys via multiple columns/values.
    *
    * @param tableName - Name of the table to search in
-   * @param columnName - Name of the column to filter by
-   * @param value - Value to match
+   * @param columns - Column name(s) to filter by
+   * @param values - Value(s) to match (parallel array to columns)
    * @returns Single record or null if not found
    */
   async getRecordByForeignKeyValue(
     tableName: string,
-    columnName: string,
-    value: string,
+    columns: string[],
+    values: string[],
     schemaName: string = DEFAULT_DATABASE_SCHEMA
   ) {
-    const params = new URLSearchParams({
-      column: columnName,
-      value,
+    if (columns.length === 0 || columns.length !== values.length) {
+      throw new Error('Columns and values must have the same non-zero length');
+    }
+
+    const params = new URLSearchParams();
+    columns.forEach((col, i) => {
+      params.append('column', col);
+      params.append('value', values[i]);
     });
 
     return apiClient.request(this.buildAdminRecordsPath(tableName, schemaName, '/lookup', params), {
@@ -207,42 +213,37 @@ export class RecordService {
 
   updateRecord(
     table: string,
-    pkColumn: string,
-    pkValue: string,
+    primaryKey: RecordPrimaryKey,
     data: { [key: string]: ConvertedValue },
     schemaName: string = DEFAULT_DATABASE_SCHEMA
   ) {
-    const params = new URLSearchParams({ pkColumn });
-
-    return apiClient.request(
-      this.buildAdminRecordsPath(table, schemaName, `/${encodeURIComponent(pkValue)}`, params),
-      {
-        method: 'PATCH',
-        headers: apiClient.withAccessToken({
-          'Content-Type': 'application/json',
-        }),
-        body: JSON.stringify(data),
-      }
-    );
+    // pkKeys (the full primary-key tuple) and data travel in the body so composite
+    // keys are validated structurally instead of being crammed into the query string.
+    return apiClient.request(this.buildAdminRecordsPath(table, schemaName, ''), {
+      method: 'PATCH',
+      headers: apiClient.withAccessToken({
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify({ pkKeys: primaryKey, data }),
+    });
   }
 
   deleteRecords(
     table: string,
-    pkColumn: string,
-    pkValues: string[],
+    primaryKeys: RecordPrimaryKey[],
     schemaName: string = DEFAULT_DATABASE_SCHEMA
   ) {
-    if (!pkValues.length) {
+    if (!primaryKeys.length) {
       return Promise.resolve();
     }
-    const params = new URLSearchParams({
-      pkColumn,
-      pkValues: pkValues.join(','),
-    });
-
-    return apiClient.request(this.buildAdminRecordsPath(table, schemaName, '', params), {
+    // pkKeys (one tuple per record) travels in the body so each selected row is
+    // matched exactly without a length-limited query string.
+    return apiClient.request(this.buildAdminRecordsPath(table, schemaName, ''), {
       method: 'DELETE',
-      headers: apiClient.withAccessToken(),
+      headers: apiClient.withAccessToken({
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify({ pkKeys: primaryKeys }),
     });
   }
 
@@ -274,6 +275,50 @@ export class RecordService {
       body: formData,
     });
     return response;
+  }
+
+  async exportTableAsCSV(
+    tableName: string,
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
+  ): Promise<{ limited: boolean }> {
+    // Export limit to prevent browser crashes on large tables
+    const MAX_EXPORT_ROWS = 10_000;
+    // Backend API max limit is 500 records per request
+    const limit = 500;
+    const allRecords: { [key: string]: ConvertedValue }[] = [];
+    let offset = 0;
+    let isLimited = false;
+
+    while (allRecords.length < MAX_EXPORT_ROWS) {
+      const { records } = await this.getTableRecords(tableName, schemaName, limit, offset);
+
+      if (records.length === 0) {
+        break;
+      }
+
+      // Only take what we need up to the limit
+      const remaining = MAX_EXPORT_ROWS - allRecords.length;
+      allRecords.push(...records.slice(0, remaining));
+
+      // Check if we've hit the limit or exhausted records
+      if (allRecords.length >= MAX_EXPORT_ROWS) {
+        isLimited = true;
+        break;
+      }
+
+      if (records.length < limit) {
+        break;
+      }
+
+      offset += limit;
+    }
+
+    const filename = getExportFilename(tableName + '_data');
+
+    // Convert and download
+    convertToCSV(allRecords, filename);
+
+    return { limited: isLimited };
   }
 }
 

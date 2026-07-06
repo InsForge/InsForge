@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogBody,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -78,6 +79,11 @@ export function S3AccessKeyCreateDialog({
       <DialogContent className="max-w-[520px]">
         <DialogHeader>
           <DialogTitle>{showingSecret ? 'S3 Access Key Created' : 'New S3 Access Key'}</DialogTitle>
+          <DialogDescription>
+            {showingSecret
+              ? 'Copy the secret access key now. Acknowledgement is required before closing.'
+              : 'Create a new S3 access key. The secret is shown only once.'}
+          </DialogDescription>
         </DialogHeader>
 
         <DialogBody>

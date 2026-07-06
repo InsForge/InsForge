@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   postgres:
-    image: ghcr.io/insforge/postgres:v15.13.2
+    image: ghcr.io/insforge/postgres:v15.13.4
     command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
@@ -71,8 +69,10 @@ services:
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
-      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-this-password}
+      - ROOT_ADMIN_USERNAME=${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
+      - ROOT_ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}
+      - ADMIN_EMAIL=${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
+      - ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       # S3-specific credentials (for Wasabi, MinIO, etc. — falls back to AWS_* if not set)
@@ -92,9 +92,9 @@ services:
       - POSTGREST_BASE_URL=http://postgrest:3000
       # Deno Runtime URL for serverless functions
       - DENO_RUNTIME_URL=http://deno:7133
-      # Deno Subhosting Configuration
-      - DENO_SUBHOSTING_TOKEN=${DENO_SUBHOSTING_TOKEN:-}
-      - DENO_SUBHOSTING_ORG_ID=${DENO_SUBHOSTING_ORG_ID:-}
+      # Deno Deploy Configuration
+      - DENO_DEPLOY_TOKEN=${DENO_DEPLOY_TOKEN:-}
+      - DENO_DEPLOY_ORG_ID=${DENO_DEPLOY_ORG_ID:-}
       # Storage Configuration
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}
@@ -111,6 +111,7 @@ services:
       - PROJECT_ID=${PROJECT_ID:-}
       - APP_KEY=${APP_KEY:-}
       - ACCESS_API_KEY=${ACCESS_API_KEY:-}
+      - ACCESS_ANON_KEY=${ACCESS_ANON_KEY:-}
       - CLOUD_API_HOST=${CLOUD_API_HOST:-}
       # LLM Model API keys
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
@@ -144,6 +145,8 @@ services:
       - INSFORGE_DISABLE_WRITE_RATE_LIMIT=${INSFORGE_DISABLE_WRITE_RATE_LIMIT:-}
       # Logs directory
       - LOGS_DIR=/insforge-logs
+      # Anonymous telemetry (set INSFORGE_TELEMETRY_DISABLED=1 to opt out)
+      - INSFORGE_TELEMETRY_DISABLED=${INSFORGE_TELEMETRY_DISABLED:-}
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
     volumes:
@@ -154,6 +157,7 @@ services:
       - ./frontend:/app/frontend
       - ./packages:/app/packages
       - ./docs:/app/docs
+      - ./.agents:/app/.agents
       - node_modules:/app/node_modules
       - backend_node_modules:/app/backend/node_modules
       - frontend_node_modules:/app/frontend/node_modules

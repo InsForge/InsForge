@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { RefreshCw, Trash2, ExternalLink } from 'lucide-react';
 import { LogsDataGrid, type LogsColumnDef } from '#features/logs/components';
-import { formatTime, cn } from '#lib/utils/utils';
+import { formatTime } from '#lib/utils/utils';
 import { useConfirm } from '#lib/hooks/useConfirm';
 import { usePageSize } from '#lib/hooks/usePageSize';
-import { Button, ConfirmDialog } from '@insforge/ui';
+import { Button, ConfirmDialog, cn } from '@insforge/ui';
 import { DataGridEmptyState, TableHeader } from '#components';
 import { useAuditLogs, useClearAuditLogs } from '#features/logs/hooks/useAuditLogs';
-import type { GetAuditLogsRequest } from '@insforge/shared-schemas';
+import type { AuditLogSchema, GetAuditLogsRequest } from '@insforge/shared-schemas';
 
 function ModuleBadge({ module }: { module?: string | null }) {
   return (
@@ -73,7 +73,7 @@ export default function AuditsPage() {
   const logsData = logsResponse?.data || [];
   const totalRecords = logsResponse?.pagination?.total || 0;
 
-  const columns: LogsColumnDef[] = useMemo(
+  const columns: LogsColumnDef<AuditLogSchema>[] = useMemo(
     () => [
       {
         key: 'actor',

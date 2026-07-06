@@ -30,6 +30,10 @@ export const serviceSchema = z.object({
   cpu: cpuTierEnum,
   memory: z.number(),
   region: z.string(),
+  // Required on the response shape (every persisted row has a value — the
+  // migration backfills `'http'` for pre-INS-271 rows). Defaults are only
+  // optional on the *input* schemas.
+  protocol: z.enum(['http', 'tcp']),
   flyAppId: z.string().nullable(),
   flyMachineId: z.string().nullable(),
   status: serviceStatusEnum,

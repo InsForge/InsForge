@@ -4,6 +4,7 @@ import { RealtimeMessageService } from '@/services/realtime/realtime-message.ser
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
 import {
+  clearRealtimeMessagesResponseSchema,
   ERROR_CODES,
   listMessagesRequestSchema,
   messageStatsRequestSchema,
@@ -25,6 +26,17 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
     }
     const messages = await messageService.list(validation.data);
     successResponse(res, messages);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Clear all messages
+router.delete('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const deleted = await messageService.clearAllMessages();
+    const response = clearRealtimeMessagesResponseSchema.parse({ deleted });
+    successResponse(res, response);
   } catch (error) {
     next(error);
   }

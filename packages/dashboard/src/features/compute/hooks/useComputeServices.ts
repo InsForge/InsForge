@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { computeServicesApi } from '#features/compute/services/compute.service';
 import type { CreateServiceRequest, UpdateServiceRequest } from '@insforge/shared-schemas';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 import { deriveHealth, type ServiceHealth } from '#features/compute/lib/health';
 
 export function useComputeServices() {
@@ -104,6 +104,21 @@ export function useServiceEvents(serviceId: string | null) {
     queryFn: () => computeServicesApi.events(serviceId!, 50),
     enabled: !!serviceId,
     staleTime: 0,
+  });
+}
+
+// Container stdout/stderr for the detail-view Logs panel. When `live` is on we
+// re-pull the recent window every 2s (simple, stateless tail — no cursor
+// accumulation/dedup to get wrong for v1); otherwise it's a one-shot recent
+// fetch the user can refresh manually.
+export function useServiceLogs(serviceId: string | null, opts?: { live?: boolean }) {
+  return useQuery({
+    queryKey: ['compute', 'services', serviceId, 'logs'],
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by enabled
+    queryFn: () => computeServicesApi.logs(serviceId!, { limit: 200 }),
+    enabled: !!serviceId,
+    staleTime: 0,
+    refetchInterval: opts?.live ? 2000 : false,
   });
 }
 

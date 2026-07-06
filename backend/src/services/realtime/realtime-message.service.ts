@@ -6,6 +6,8 @@ import { RealtimeChannelService } from './realtime-channel.service.js';
 import type { UserContext } from '@/api/middlewares/auth.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
 
+const DEFAULT_CLEAR_BATCH_SIZE = 1000;
+
 export class RealtimeMessageService {
   private static instance: RealtimeMessageService;
   private pool: Pool | null = null;
@@ -54,7 +56,8 @@ export class RealtimeMessageService {
       return null;
     }
 
-    const senderId = userContext.id ?? null;
+    // Anonymous and admin senders have no row identity: sender_id stays NULL
+    const senderId = userContext.role === 'authenticated' ? userContext.id : null;
 
     try {
       await withUserContext(
@@ -65,8 +68,15 @@ export class RealtimeMessageService {
           // No RETURNING clause needed - trigger handles pg_notify.
           await client.query(
             `INSERT INTO realtime.messages (event_name, channel_id, channel_name, payload, sender_type, sender_id)
-             VALUES ($1, $2, $3, $4, 'user', $5)`,
-            [eventName, channel.id, channelName, JSON.stringify(payload), senderId]
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+              eventName,
+              channel.id,
+              channelName,
+              JSON.stringify(payload),
+              userContext.role === 'project_admin' ? 'system' : 'user',
+              senderId,
+            ]
           );
         },
         { 'realtime.channel_name': channelName }
@@ -166,6 +176,51 @@ export class RealtimeMessageService {
 
     const result = await this.getPool().query(query, params);
     return result.rows;
+  }
+
+  async clearAllMessages(batchSize = DEFAULT_CLEAR_BATCH_SIZE): Promise<number> {
+    if (batchSize <= 0) {
+      logger.warn('Invalid realtime message clear batch size', { batchSize });
+      return 0;
+    }
+
+    const pool = this.getPool();
+    const cutoffResult = await pool.query('SELECT NOW() as cutoff_time');
+    const cutoffTime = cutoffResult.rows[0]?.cutoff_time;
+    let totalDeleted = 0;
+    let batches = 0;
+
+    while (true) {
+      const result = await pool.query(
+        `WITH deleted AS (
+          DELETE FROM realtime.messages
+          WHERE id IN (
+            SELECT id FROM realtime.messages
+            WHERE created_at <= $2
+            ORDER BY created_at ASC
+            LIMIT $1
+          )
+          RETURNING id
+        )
+        SELECT COUNT(*)::int as deleted_count FROM deleted`,
+        [batchSize, cutoffTime]
+      );
+      const deletedCount = Number(result.rows[0]?.deleted_count ?? 0);
+      totalDeleted += deletedCount;
+
+      if (deletedCount === 0) {
+        break;
+      }
+
+      batches += 1;
+
+      if (deletedCount < batchSize) {
+        break;
+      }
+    }
+
+    logger.info('Realtime messages cleared', { deletedCount: totalDeleted, batches });
+    return totalDeleted;
   }
 
   /**

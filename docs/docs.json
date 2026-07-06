@@ -33,6 +33,7 @@
             "group": "Getting Started",
             "pages": [
               "introduction",
+              "products",
               {
                 "group": "Quickstart",
                 "expanded": true,
@@ -85,35 +86,36 @@
                 ]
               },
               {
-                "group": "Deployments",
+                "group": "Sites",
                 "pages": [
-                  "core-concepts/deployments/overview"
+                  "core-concepts/sites/overview"
                 ]
               },
               {
-                "group": "Messaging (Private Preview)",
+                "group": "Messaging",
                 "pages": [
                   "core-concepts/messaging/overview",
                   "core-concepts/messaging/custom-smtp"
                 ]
               },
               {
-                "group": "Payments (Private Preview)",
+                "group": "Payments",
                 "pages": [
                   "core-concepts/payments/overview",
-                  "core-concepts/payments/cli"
+                  "core-concepts/payments/stripe",
+                  "core-concepts/payments/razorpay"
                 ]
               },
               {
-                "group": "Compute (Private Preview)",
+                "group": "Custom Compute",
                 "pages": [
                   "core-concepts/compute/overview"
                 ]
               },
               {
-                "group": "Developer Guides",
+                "group": "Analytics",
                 "pages": [
-                  "agent-docs/error-codes"
+                  "core-concepts/analytics/overview"
                 ]
               }
             ]
@@ -122,6 +124,7 @@
             "group": "Agent-Native Initiatives",
             "pages": [
               "agent-native/overview",
+              "agent-native/vscode-extension",
               "agent-native/cli-harness",
               "agent-native/diagnostics",
               "agent-native/config-as-code",
@@ -141,6 +144,7 @@
               "deployment/deployment-security-guide",
               "deployment/deploy-to-aws-ec2",
               "deployment/deploy-to-azure-virtual-machines",
+              "deployment/deploy-to-containarium",
               "deployment/deploy-to-google-cloud-compute-engine"
             ]
           },
@@ -167,7 +171,14 @@
               "sdks/typescript/ai",
               "sdks/typescript/realtime",
               "sdks/typescript/email",
-              "sdks/typescript/payments",
+              {
+                "group": "Payments",
+                "pages": [
+                  "sdks/typescript/payments",
+                  "sdks/typescript/payments-stripe",
+                  "sdks/typescript/payments-razorpay"
+                ]
+              },
               {
                 "group": "Framework Guides",
                 "pages": [
@@ -261,7 +272,7 @@
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/email.yaml"
           },
           {
-            "group": "Payments (Private Preview)",
+            "group": "Payments",
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/payments.yaml"
           },
           {
@@ -311,6 +322,7 @@
   "redirects": [
     { "source": "/core-concepts/database/branching", "destination": "/agent-native/branching" },
     { "source": "/configuration/config-as-code", "destination": "/agent-native/config-as-code" },
+    { "source": "/core-concepts/deployments/overview", "destination": "/core-concepts/sites/overview" },
     { "source": "/deployment/deploy-to-render", "destination": "/deployment/deploy-to-aws-ec2" }
   ],
   "logo": {

@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
-import { cn } from '#lib/utils/utils';
-import { format, parse } from 'date-fns';
-import { Button } from '@insforge/ui';
+import { format, isValid, parse } from 'date-fns';
+import { Button, cn } from '@insforge/ui';
 import { Popover, PopoverContent, PopoverTrigger } from '#components';
 import type { DateCellEditorProps } from './types';
 import { ColumnType } from '@insforge/shared-schemas';
@@ -19,6 +18,30 @@ interface TimeColumnProps {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const DATE_FORMAT = 'yyyy-MM-dd';
+const DATE_VALUE_REGEX = /^(\d{4}-\d{2}-\d{2})(?:$|[T\s])/;
+
+const parseCellDateValue = (
+  value: string | null | undefined,
+  type: DateCellEditorProps['type']
+): Date | null => {
+  if (!value || value === 'null') {
+    return null;
+  }
+
+  if (type === ColumnType.DATE) {
+    const datePart = value.match(DATE_VALUE_REGEX)?.[1];
+    if (!datePart) {
+      return null;
+    }
+
+    const parsed = parse(datePart, DATE_FORMAT, new Date());
+    return isValid(parsed) ? parsed : null;
+  }
+
+  const parsed = new Date(value);
+  return isValid(parsed) ? parsed : null;
+};
 
 // Reusable time column component
 function TimeColumn({ label, value, range, onChange, scrollRef }: TimeColumnProps) {
@@ -60,27 +83,20 @@ export function DateCellEditor({
 }: DateCellEditorProps) {
   const [open, setOpen] = useState(true);
   const [pickerMode, setPickerMode] = useState<PickerMode>('day');
-  const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    if (value && value !== 'null') {
-      if (type === ColumnType.DATE) {
-        return parse(value, 'yyyy-MM-dd', new Date());
-      } else {
-        return new Date(value);
-      }
-    }
-    return new Date();
-  });
+  const [selectedDate, setSelectedDate] = useState<Date>(
+    () => parseCellDateValue(value, type) ?? new Date()
+  );
 
   const [selectedHour, setSelectedHour] = useState(() => {
-    if (value && value !== 'null' && type === ColumnType.DATETIME) {
-      return new Date(value).getHours();
+    if (type === ColumnType.DATETIME) {
+      return parseCellDateValue(value, type)?.getHours() ?? new Date().getHours();
     }
     return new Date().getHours();
   });
 
   const [selectedMinute, setSelectedMinute] = useState(() => {
-    if (value && value !== 'null' && type === ColumnType.DATETIME) {
-      return new Date(value).getMinutes();
+    if (type === ColumnType.DATETIME) {
+      return parseCellDateValue(value, type)?.getMinutes() ?? new Date().getMinutes();
     }
     return new Date().getMinutes();
   });
@@ -139,7 +155,7 @@ export function DateCellEditor({
     setSelectedDate(newDate);
 
     if (type === ColumnType.DATE) {
-      const dateString = format(newDate, 'yyyy-MM-dd');
+      const dateString = format(newDate, DATE_FORMAT);
       onValueChange(dateString);
       setOpen(false);
     }
@@ -211,7 +227,7 @@ export function DateCellEditor({
       const localISOString = `${year}-${month}-${day}T${hours}:${minutes}:00${timezoneOffset}`;
       onValueChange(localISOString);
     } else {
-      const dateString = format(selectedDate, 'yyyy-MM-dd');
+      const dateString = format(selectedDate, DATE_FORMAT);
       onValueChange(dateString);
     }
     setOpen(false);
@@ -225,17 +241,14 @@ export function DateCellEditor({
   };
 
   const formatDisplayValue = () => {
-    if (!value || value === 'null') {
+    const date = parseCellDateValue(value, type);
+    if (!date) {
       return 'Select date...';
     }
 
-    if (type === ColumnType.DATETIME) {
-      const d = new Date(value);
-      return format(d, 'MMM dd, yyyy hh:mm a');
-    } else {
-      const date = parse(value, 'yyyy-MM-dd', new Date());
-      return format(date, 'MMM dd, yyyy');
-    }
+    return type === ColumnType.DATETIME
+      ? format(date, 'MMM dd, yyyy hh:mm a')
+      : format(date, 'MMM dd, yyyy');
   };
 
   const renderDayPicker = () => {

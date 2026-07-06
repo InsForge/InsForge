@@ -1,11 +1,11 @@
 import { Response } from 'express';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { toXml } from '../xml.js';
-import { S3AuthenticatedRequest } from '@/api/middlewares/s3-sigv4.js';
+import { S3GatewayRequest, getS3Bucket, getS3Key } from '../request.js';
 
-export async function handle(req: S3AuthenticatedRequest, res: Response): Promise<void> {
-  const bucket = (req as unknown as { s3Bucket: string }).s3Bucket;
-  const key = (req as unknown as { s3Key: string }).s3Key;
+export async function handle(req: S3GatewayRequest, res: Response): Promise<void> {
+  const bucket = getS3Bucket(req);
+  const key = getS3Key(req);
   const contentType = (req.headers['content-type'] as string) ?? 'application/octet-stream';
   const { uploadId } = await StorageService.getInstance()
     .getProvider()

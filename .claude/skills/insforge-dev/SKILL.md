@@ -15,6 +15,10 @@ Then use the narrowest package skill that matches the task:
 - `shared-schemas`
 - `docs`
 
+Use the cross-repo release workflow skill when preparing an OSS PR:
+
+- `e2e-testing`
+
 ## Core Rules
 
 1. Identify the package boundary before editing.
@@ -37,6 +41,7 @@ Then use the narrowest package skill that matches the task:
    - Backend success responses usually return raw JSON, not `{ data }`.
    - Backend validation commonly uses shared Zod schemas plus `AppError`.
    - Dashboard data access goes through `apiClient` and React Query.
+   - Dashboard frontend tests are split into Vitest unit tests, Vitest component tests, and Playwright UI smoke tests.
    - Shared payloads belong in `@insforge/shared-schemas`.
    - Never use the TypeScript `any` type. Prefer precise types, schema-derived types, `unknown`, or generics.
 
@@ -47,8 +52,8 @@ Then use the narrowest package skill that matches the task:
 ## Finish Rules
 
 - Run the smallest validation that gives confidence for the change.
-- Use repo-level checks like `npm run lint`, `npm run build`, and `npm test` when the change crosses package boundaries.
-- `npm run typecheck` does not cover `packages/dashboard/` or `packages/shared-schemas/`, so run package-specific validation when either package changes.
+- Use repo-level checks like `npm run lint`, `npm run build`, `npm run typecheck`, and `npm test` when the change crosses package boundaries — each is wired through Turborepo (`turbo run <task>`) and covers every workspace, including `packages/dashboard/` and `packages/shared-schemas/`.
+- For dashboard UI behavior changes, choose the lowest useful frontend test layer from the `dashboard` skill and run that command before reporting back.
 - Use the package-specific validation steps in the child skill when the work is isolated to one package.
 - When reporting back, state what changed, what you validated, and what you could not validate.
 
@@ -63,5 +68,6 @@ Before opening a PR or pushing new commits to an existing PR branch, run **all**
    - Auto-fixable prettier/eslint errors in your own diff must be fixed (`npx eslint --fix <file>` or `npm run format`).
 3. `npx turbo run test` (or the package-specific test command) — all tests must pass, including any new tests you added for the change.
 4. `npx turbo run build` if routing, config, schemas, or cross-package exports changed.
+5. Use `e2e-testing` to run the deterministic cross-repo E2E gate before opening, updating, or submitting the InsForge OSS PR.
 
 Never push with failing checks on files you touched, even if CI would catch them later. CI failures slow reviewers down and the lint fix almost always takes less than a minute locally.

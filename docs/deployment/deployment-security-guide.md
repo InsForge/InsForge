@@ -1,8 +1,13 @@
+---
+title: "VPS deployment and security guide"
+description: "Deploy InsForge on a generic Linux VPS, harden it with firewall, SSH, and TLS best practices, and maintain it with safe updates and rollbacks."
+---
+
 # Deployment & Security Guide for VPS Installation
 
 This comprehensive guide covers deploying InsForge on a generic VPS (Virtual Private Server) for production, hardening your instance with security best practices, and maintaining it over time with safe updates and rollback procedures.
 
-> **Scope**: This guide is provider-agnostic. It works on any Linux VPS — Ubuntu/Debian recommended — from providers such as DigitalOcean, Hetzner, Linode, Vultr, OVH, or a bare-metal server. For cloud-specific guides (AWS EC2, GCP, Azure, Render), see the [deployment directory](./README.md).
+> **Scope**: This guide is provider-agnostic. It works on any Linux VPS — Ubuntu/Debian recommended — from providers such as DigitalOcean, Hetzner, Linode, Vultr, OVH, or a bare-metal server. For cloud-specific guides (AWS EC2, GCP, Azure, Render), see the other guides in this section.
 
 ---
 
@@ -226,8 +231,8 @@ These **must** be changed from defaults before going to production:
 # ── Security (CRITICAL — generate unique values) ──────────────
 JWT_SECRET=<output of: openssl rand -base64 32>
 ENCRYPTION_KEY=<output of: openssl rand -base64 24>
-ADMIN_EMAIL=you@yourdomain.com
-ADMIN_PASSWORD=<strong-unique-password>
+ROOT_ADMIN_USERNAME=admin
+ROOT_ADMIN_PASSWORD=<strong-unique-password>
 
 # ── Public URL (must match your domain/IP) ────────────────────
 API_BASE_URL=https://insforge.yourdomain.com
@@ -1111,7 +1116,7 @@ docker compose down && docker compose up -d   # Apply update
 - [ ] Fail2Ban installed and active
 - [ ] `JWT_SECRET` changed from default (32+ chars)
 - [ ] `ENCRYPTION_KEY` set (separate from `JWT_SECRET`)
-- [ ] `ADMIN_PASSWORD` changed from default
+- [ ] `ROOT_ADMIN_PASSWORD` changed from default
 - [ ] `POSTGRES_PASSWORD` changed from default
 - [ ] `.env` file permissions set to `600`
 - [ ] HTTPS enabled via Certbot or Caddy

@@ -23,6 +23,7 @@ export interface DashboardBackup {
   triggerSource: 'manual' | 'scheduled';
   status: 'running' | 'completed' | string;
   sizeBytes: number | null;
+  errorMessage?: string | null;
   expiresAt?: string | null;
   createdAt: string;
   createdBy: string | null;
@@ -97,6 +98,7 @@ export interface DashboardAdvisorSummary {
   status: 'running' | 'completed' | 'failed';
   scanType: 'scheduled' | 'manual';
   scannedAt: string; // ISO
+  errorMessage?: string | null;
   summary: { total: number; critical: number; warning: number; info: number };
 }
 
@@ -109,13 +111,17 @@ export interface DashboardAdvisorIssue {
   description: string;
   affectedObject?: string;
   recommendation?: string;
-  isResolved: boolean;
 }
 
 export interface DashboardAdvisorIssuesResponse {
   issues: DashboardAdvisorIssue[];
   total: number;
 }
+
+export type DashboardAdvisorCategoryCountsResponse = Record<
+  DashboardAdvisorCategory,
+  Record<DashboardAdvisorSeverity, number>
+>;
 
 export interface DashboardAdvisorIssuesQuery {
   severity?: DashboardAdvisorSeverity;
@@ -126,6 +132,13 @@ export interface DashboardAdvisorIssuesQuery {
 
 /** Status event posted from cloud-shell after the PostHog OAuth flow finishes. */
 export interface DashboardPosthogConnectionStatus {
+  status: 'connected' | 'error' | 'cancelled';
+  reason?: string;
+  timestamp: number;
+}
+
+/** Status event posted from cloud-shell after the Apify OAuth flow finishes. */
+export interface DashboardApifyConnectionStatus {
   status: 'connected' | 'error' | 'cancelled';
   reason?: string;
   timestamp: number;
@@ -142,6 +155,7 @@ export interface DashboardProps {
   project?: DashboardProjectInfo;
   onRouteChange?: (path: string) => void;
   onShowUpgradeDialog?: () => void;
+  onOpenWhatsNew?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
   onRequestBackupInfo?: () => Promise<DashboardBackupInfo>;
@@ -170,6 +184,12 @@ export interface DashboardProps {
     cb: (event: DashboardPosthogConnectionStatus) => void
   ) => () => void;
   onOpenPosthog?: (projectId: string) => Promise<DashboardPosthogOpenResult>;
+  /** Cloud-hosting only: ask the parent shell to start the Apify OAuth flow. */
+  onConnectApify?: (projectId: string) => void;
+  /** Cloud-hosting only: subscribe to Apify OAuth completion / failure events. */
+  subscribeApifyConnectionStatus?: (
+    cb: (event: DashboardApifyConnectionStatus) => void
+  ) => () => void;
 }
 
 export interface SelfHostingDashboardProps extends DashboardProps {

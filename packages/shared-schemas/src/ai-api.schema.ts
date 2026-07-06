@@ -1,6 +1,18 @@
 import { z } from 'zod';
 import { modalitySchema } from './ai.schema.js';
 
+declare const process: { env?: Record<string, string> };
+
+export const DEFAULT_MAX_TOKENS_CAP = 16384;
+
+const getMaxTokensCap = () => {
+  if (typeof process !== 'undefined' && process.env && process.env.MAX_COMPLETION_TOKENS) {
+    const parsed = Number(process.env.MAX_COMPLETION_TOKENS);
+    if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  }
+  return DEFAULT_MAX_TOKENS_CAP;
+};
+
 // ============= Chat Completion Schemas =============
 
 // OpenAI-compatible content schemas
@@ -11,7 +23,6 @@ export const textContentSchema = z.object({
 
 export const imageContentSchema = z.object({
   type: z.literal('image_url'),
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   image_url: z.object({
     // URL can be either a public URL or base64-encoded data URI
     // Examples:
@@ -24,7 +35,6 @@ export const imageContentSchema = z.object({
 
 export const audioContentSchema = z.object({
   type: z.literal('input_audio'),
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   input_audio: z.object({
     // Base64-encoded audio data (direct URLs not supported for audio)
     data: z.string(),
@@ -41,7 +51,6 @@ export const fileContentSchema = z.object({
     // File data can be:
     // - Public URL: "https://example.com/document.pdf"
     // - Base64 data URL: "data:application/pdf;base64,..."
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     file_data: z.string(),
   }),
 });
@@ -93,10 +102,8 @@ export const chatMessageSchema = z.object({
   // Legacy format: separate images field (deprecated but supported for backward compatibility)
   images: z.array(z.object({ url: z.string() })).optional(),
   // Tool calls made by the assistant
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   tool_calls: z.array(toolCallSchema).optional(),
   // Tool call ID for tool response messages
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   tool_call_id: z.string().optional(),
 });
 
@@ -133,7 +140,16 @@ export const chatCompletionRequestSchema = z.object({
   model: z.string(),
   messages: z.array(chatMessageSchema),
   temperature: z.number().min(0).max(2).optional(),
-  maxTokens: z.number().positive().optional(),
+  // Cap output tokens to prevent abuse. Configurable via MAX_COMPLETION_TOKENS env var, defaults to 16,384.
+  // Evaluated lazily per-request so dotenv loading order does not affect the cap.
+  maxTokens: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .refine((val) => val === undefined || val <= getMaxTokensCap(), {
+      message: 'Exceeds configured maximum token cap.',
+    }),
   topP: z.number().min(0).max(1).optional(),
   stream: z.boolean().optional(),
   // Web Search: Incorporate relevant web search results into the response
@@ -185,7 +201,6 @@ export const annotationSchema = z.union([urlCitationAnnotationSchema, fileAnnota
 export const chatCompletionResponseSchema = z.object({
   text: z.string(),
   // Tool calls from the assistant (present when the model invokes tools)
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   tool_calls: z.array(toolCallSchema).optional(),
   // Annotations from web search or file parsing (can be URL citations or file annotations)
   annotations: z.array(annotationSchema).optional(),
@@ -208,7 +223,6 @@ export const chatCompletionResponseSchema = z.object({
 export const embeddingsRequestSchema = z.object({
   model: z.string(),
   input: z.union([z.string(), z.array(z.string())]),
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   encoding_format: z.enum(['float', 'base64']).optional(),
   dimensions: z.number().int().min(0).optional(),
 });

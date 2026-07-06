@@ -1,8 +1,9 @@
 import { AppError, UpstreamError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import { z } from 'zod';
+import ts from 'typescript';
 import fetch, { RequestInit, Response } from 'node-fetch';
 import { execFile } from 'node:child_process';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
@@ -12,11 +13,20 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-const DENO_SUBHOSTING_API_BASE = 'https://api.deno.com/v1';
+// Ambient declaration for the Deno isolate IPC dispatch binding.
+// This global is intentionally set on globalThis inside each generated
+// Deno router script so the InsForge host can reach into the isolate
+// for in-process function invocation. Typing it here prevents any
+// TypeScript code in this module from resorting to `(globalThis as any)`.
+declare global {
+  var __insforge_dispatch__: ((req: Request) => Promise<Response>) | undefined;
+}
+
+const DENO_SUBHOSTING_API_BASE = 'https://api.deno.com/v2';
 const DEFAULT_TIMEOUT_MS = 10000;
 
 // Exponential backoff schedule for 429 (rate-limited) responses, in ms.
-// Deno Subhosting doesn't always surface Retry-After, so we fall back to this
+// Deno Deploy doesn't always surface Retry-After, so we fall back to this
 // schedule. When Retry-After is present we honour it (taking the max of the
 // header value and the scheduled backoff), plus a small jitter.
 const DEFAULT_RATE_LIMIT_BACKOFF_MS = [1000, 2000, 4000];
@@ -102,7 +112,7 @@ async function fetchWithTimeout(
             ? Math.min(Math.max(retryAfterMs, rateLimitBackoffMs[r]), MAX_RETRY_AFTER_MS)
             : rateLimitBackoffMs[r];
           const delay = Math.min(baseMs + Math.floor(Math.random() * 250), MAX_RETRY_AFTER_MS);
-          logger.warn('Deno Subhosting 429 — retrying', {
+          logger.warn('Deno Deploy 429 — retrying', {
             url,
             attempt: r + 1,
             delayMs: delay,
@@ -132,7 +142,7 @@ async function fetchWithTimeout(
             currentResponse.body.resume();
           }
           throw new AppError(
-            'Deno Subhosting rate limit exceeded after retries. Please retry shortly.',
+            'Deno Deploy rate limit exceeded after retries. Please retry shortly.',
             429,
             ERROR_CODES.RATE_LIMITED
           );
@@ -203,28 +213,42 @@ interface DenoSubhostingAsset {
   encoding: 'utf-8';
 }
 
-// App log types
+// App log types (v2: GET /v2/apps/{app}/logs)
 export interface AppLogQueryOptions {
-  q?: string;
+  // `start` is required by the v2 API; getDeploymentAppLogs supplies a default
+  // window when the caller omits it.
+  start?: string;
+  end?: string;
   level?: string;
-  region?: string;
-  since?: string;
-  until?: string;
+  query?: string;
   limit?: number;
-  order?: 'asc' | 'desc';
   cursor?: string;
 }
 
-const appLogEntrySchema = z.object({
-  time: z.string(),
+// Raw v2 RuntimeLog entry shape. Note `timestamp` (v1 used `time`) and that
+// `region` is optional in v2.
+const runtimeLogSchema = z.object({
+  timestamp: z.string(),
   level: z.string(),
   message: z.string(),
-  region: z.string(),
+  region: z.string().optional(),
+  revision_id: z.string().optional(),
 });
 
-export type AppLogEntry = z.infer<typeof appLogEntrySchema>;
+// v2 wraps logs in an object with body-level pagination (v1 used a Link header).
+const runtimeLogsResponseSchema = z.object({
+  logs: z.array(runtimeLogSchema),
+  next_cursor: z.string().nullable().optional(),
+});
 
-const appLogResponseSchema = z.array(appLogEntrySchema);
+// Normalized entry returned to callers (stable across the v1→v2 migration so
+// log.service doesn't need to know the wire shape).
+export interface AppLogEntry {
+  time: string;
+  level: string;
+  message: string;
+  region: string;
+}
 
 export interface AppLogResult {
   logs: AppLogEntry[];
@@ -238,24 +262,30 @@ export interface BuildLogEntry {
   message: string;
 }
 
-// Schema for Deno Subhosting API response
-// Note: Deno doesn't return error details in deployment response
-// Error info comes from build logs endpoint
-const denoSubhostingApiResponseSchema = z.object({
+// v2 Revision response (POST /v2/apps/{app}/deploy, GET /v2/revisions/{id}).
+// Renamed from v1's `deployment`; snake_case; no `domains`/`projectId` fields.
+// Deno still doesn't return error details here — they come from build logs.
+const revisionResponseSchema = z.object({
   id: z.string(),
-  projectId: z.string(),
-  status: z.string().transform((s) => {
-    if (s === 'success') {
-      return 'success' as const;
-    }
-    if (s === 'failed') {
-      return 'failed' as const;
-    }
-    return 'pending' as const;
-  }),
-  domains: z.array(z.string()).default([]),
-  createdAt: z.string(),
+  status: z.enum(['skipped', 'queued', 'building', 'succeeded', 'failed']),
+  failure_reason: z.string().nullable().optional(),
+  created_at: z.string(),
 });
+
+type RevisionStatus = z.infer<typeof revisionResponseSchema>['status'];
+
+// Collapse the v2 revision lifecycle to the coarse status our DB and callers
+// use ('pending' | 'success' | 'failed'), keeping the provider's public contract
+// stable. `skipped` means "no changes to deploy" — treat as a successful no-op.
+function mapRevisionStatus(status: RevisionStatus): 'pending' | 'success' | 'failed' {
+  if (status === 'succeeded' || status === 'skipped') {
+    return 'success';
+  }
+  if (status === 'failed') {
+    return 'failed';
+  }
+  return 'pending'; // queued | building
+}
 
 export class DenoSubhostingProvider {
   private static instance: DenoSubhostingProvider;
@@ -270,45 +300,46 @@ export class DenoSubhostingProvider {
   }
 
   /**
-   * Check if Deno Subhosting is properly configured
+   * Check if Deno Deploy is properly configured
    */
   isConfigured(): boolean {
-    const { token, organizationId } = config.denoSubhosting;
+    const { token, organizationId } = appConfig.denoSubhosting;
     return !!(token && organizationId);
   }
 
   /**
-   * Get Deno Subhosting credentials from config
+   * Get Deno Deploy credentials from config
    */
   getCredentials(): DenoSubhostingCredentials {
-    const { token, organizationId } = config.denoSubhosting;
+    const { token, organizationId } = appConfig.denoSubhosting;
 
     if (!token) {
-      throw new AppError('DENO_SUBHOSTING_TOKEN not configured', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('DENO_DEPLOY_TOKEN not configured', 500, ERROR_CODES.INTERNAL_ERROR);
     }
     if (!organizationId) {
-      throw new AppError('DENO_SUBHOSTING_ORG_ID not configured', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('DENO_DEPLOY_ORG_ID not configured', 500, ERROR_CODES.INTERNAL_ERROR);
     }
 
     return { token, organizationId };
   }
 
   /**
-   * Ensure project exists, create if not
+   * Ensure the Deno app exists, creating it if not.
+   *
+   * The app slug = APP_KEY. Combined with our org slug (`insforge`), Deno serves
+   * the app at `{slug}.insforge.deno.net`; the public function URL is the
+   * CloudFront proxy in front of that (see docs/deno-subhosting.md §4.1).
    */
-  private async ensureProject(projectId: string): Promise<void> {
+  private async ensureApp(slug: string): Promise<void> {
     const credentials = this.getCredentials();
 
-    // Check if project exists
-    const checkResponse = await fetchWithTimeout(
-      `${DENO_SUBHOSTING_API_BASE}/projects/${projectId}`,
-      {
-        headers: { Authorization: `Bearer ${credentials.token}` },
-      }
-    );
+    // Check if the app exists
+    const checkResponse = await fetchWithTimeout(`${DENO_SUBHOSTING_API_BASE}/apps/${slug}`, {
+      headers: { Authorization: `Bearer ${credentials.token}` },
+    });
 
     if (checkResponse.ok) {
-      return; // Project exists
+      return; // App exists
     }
 
     if (checkResponse.status !== 404) {
@@ -320,24 +351,22 @@ export class DenoSubhostingProvider {
             data: await checkResponse.text(),
           },
         },
-        'Failed to check project'
+        'Failed to check app'
       );
     }
 
-    // Create project
-    logger.info('Creating Deno Subhosting project', { projectId });
+    // Create the app. v2 binds the token to one org, so there is no org in the
+    // path; the slug travels in the body.
+    logger.info('Creating Deno Deploy app', { slug });
 
-    const createResponse = await fetchWithTimeout(
-      `${DENO_SUBHOSTING_API_BASE}/organizations/${credentials.organizationId}/projects`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${credentials.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: projectId }),
-      }
-    );
+    const createResponse = await fetchWithTimeout(`${DENO_SUBHOSTING_API_BASE}/apps`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${credentials.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ slug }),
+    });
 
     if (!createResponse.ok) {
       throw new UpstreamError(
@@ -348,18 +377,27 @@ export class DenoSubhostingProvider {
             data: await createResponse.text(),
           },
         },
-        'Failed to create project'
+        'Failed to create app'
       );
     }
 
-    logger.info('Deno Subhosting project created', { projectId });
+    logger.info('Deno Deploy app created', { slug });
+  }
+
+  /**
+   * Build the public function URL for an app slug. Points at the CloudFront
+   * proxy domain (appConfig.denoSubhosting.domain, e.g. `function2.insforge.app`),
+   * which forwards to `{slug}.insforge.deno.net`.
+   */
+  private getFunctionUrl(slug: string): string {
+    return `https://${slug}.${appConfig.denoSubhosting.domain}`;
   }
 
   /**
    * Type-check a single function's code with `deno check`.
    * Runs the transformed code (after legacy conversion) so it catches
    * require(), bad imports, syntax errors, etc. before saving to DB.
-   * Only runs in cloud environments where Deno Subhosting is configured.
+   * Only runs in cloud environments where Deno Deploy is configured.
    * Skips gracefully if Deno is not installed.
    */
   async checkCode(userCode: string, slug: string): Promise<void> {
@@ -368,6 +406,26 @@ export class DenoSubhostingProvider {
     }
 
     const transformed = this.transformUserCode(userCode, slug);
+
+    // Deno-free static check (works even where the `deno` binary is absent —
+    // e.g. CI and minimal deploy images, where the `deno check` below skips).
+    // Rejects duplicate declarations / fatal syntax errors that build fine but
+    // fail isolate warm-up with "Identifier '...' has already been declared",
+    // which surfaces only as the opaque "Event iterator validation failed"
+    // (issue #1594). Without this floor, such code would wedge every deploy.
+    // Check the user's own source so reported line numbers match what they
+    // wrote (the transform only prepends a header / legacy shim).
+    const fatal = this.detectFatalCodeErrors(userCode);
+    if (fatal.length > 0) {
+      throw new AppError(
+        `Edge function "${slug}" was not deployed — its code would fail to start:\n${fatal
+          .map((f) => `  • ${f}`)
+          .join('\n')}`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
     const tempDir = await mkdtemp(join(tmpdir(), 'insforge-deno-check-'));
 
     try {
@@ -414,7 +472,80 @@ export class DenoSubhostingProvider {
   }
 
   /**
-   * Deploy functions to Deno Subhosting
+   * Deno-free detector for the fatal code errors that fail isolate warm-up:
+   * duplicate top-level declarations (issue #1594) and true syntax errors.
+   *
+   * Uses the TypeScript binder (already a dependency) so it runs without the
+   * `deno` binary. Semantic diagnostics are filtered to redeclaration /
+   * duplicate-identifier codes so Deno-specific type noise (npm: imports, Deno
+   * globals, missing DOM lib) does NOT cause false positives; syntactic
+   * diagnostics are always fatal and never fire on valid code.
+   */
+  private detectFatalCodeErrors(code: string): string[] {
+    const fileName = 'func.ts';
+    const sourceFile = ts.createSourceFile(
+      fileName,
+      code,
+      ts.ScriptTarget.ESNext,
+      true,
+      ts.ScriptKind.TS
+    );
+    const host: ts.CompilerHost = {
+      getSourceFile: (name) => (name === fileName ? sourceFile : undefined),
+      writeFile: () => {},
+      getDefaultLibFileName: () => 'lib.d.ts',
+      fileExists: (name) => name === fileName,
+      readFile: (name) => (name === fileName ? code : undefined),
+      getCurrentDirectory: () => '/',
+      getCanonicalFileName: (name) => name,
+      useCaseSensitiveFileNames: () => true,
+      getNewLine: () => '\n',
+    };
+    const program = ts.createProgram(
+      [fileName],
+      {
+        noEmit: true,
+        noLib: true,
+        skipLibCheck: true,
+        noResolve: true,
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        types: [],
+      },
+      host
+    );
+
+    // 2300 Duplicate identifier; 2403 subsequent var declarations must match;
+    // 2440 import conflicts with local declaration; 2451 Cannot redeclare
+    // block-scoped variable — the family V8 reports as "already been declared".
+    const REDECLARE_CODES = new Set([2300, 2403, 2440, 2451]);
+    const diagnostics = [
+      ...program.getSyntacticDiagnostics(sourceFile),
+      ...program.getSemanticDiagnostics(sourceFile).filter((d) => REDECLARE_CODES.has(d.code)),
+    ];
+
+    return diagnostics.map((d) => {
+      const message = ts.flattenDiagnosticMessageText(d.messageText, '\n');
+      let where = '';
+      if (d.file && typeof d.start === 'number') {
+        const { line, character } = d.file.getLineAndCharacterOfPosition(d.start);
+        where = ` (line ${line + 1}, column ${character + 1})`;
+      }
+      // Turn the compiler diagnostic into an actionable message naming the
+      // duplicated identifier and telling the user how to fix it.
+      if (REDECLARE_CODES.has(d.code)) {
+        const name = message.match(/'([^']+)'/)?.[1];
+        return name
+          ? `"${name}" is declared more than once${where}. Please change one of them to another name and redeploy.`
+          : `A name is declared more than once${where}. Please change one of them to another name and redeploy.`;
+      }
+      return `Syntax error${where}: ${message}`;
+    });
+  }
+
+  /**
+   * Deploy functions to Deno Deploy
    *
    * Creates a multi-file deployment with:
    * - main.ts: Router that handles path-based routing
@@ -427,9 +558,14 @@ export class DenoSubhostingProvider {
   ): Promise<FunctionDeploymentResult> {
     const credentials = this.getCredentials();
 
+    // Single source of truth for the Deno app slug (= APP_KEY). deployFunctions,
+    // getDeployment, and getDeploymentAppLogs must all resolve it the same way,
+    // otherwise we deploy to one app and poll status/logs/URL for another.
+    const slug = appConfig.cloud.appKey;
+
     try {
-      // Ensure project exists
-      await this.ensureProject(projectId);
+      // Ensure the app exists
+      await this.ensureApp(slug);
 
       // Build assets map
       const assets: Record<string, DenoSubhostingAsset> = {
@@ -457,7 +593,7 @@ export class DenoSubhostingProvider {
         };
       }
 
-      logger.info('Deploying to Deno Subhosting', {
+      logger.info('Deploying to Deno Deploy', {
         projectId,
         functionCount: functions.length,
         functions: functions.map((f) => f.slug),
@@ -465,16 +601,20 @@ export class DenoSubhostingProvider {
       });
 
       const payload = {
-        entryPointUrl: 'main.ts',
         assets,
-        // Pass secrets directly as env vars - accessible via Deno.env.get('KEY')
-        envVars: secrets,
-        // Use template variable for stable subdomain (Subhosting resolves this)
-        domains: [`{project.name}.${config.denoSubhosting.domain}`],
+        // v2 moves the entrypoint into config.runtime; `dynamic` runs a Deno
+        // process (vs. `static` file serving). No `domains` field exists in v2 —
+        // custom-domain routing is handled by the CloudFront proxy instead.
+        config: {
+          runtime: { type: 'dynamic', entrypoint: 'main.ts' },
+        },
+        // v2 takes env vars as an array of {key, value} (was a Record in v1).
+        // Accessible via Deno.env.get('KEY').
+        env_vars: Object.entries(secrets).map(([key, value]) => ({ key, value })),
       };
 
       const response = await fetchWithTimeout(
-        `${DENO_SUBHOSTING_API_BASE}/projects/${projectId}/deployments`,
+        `${DENO_SUBHOSTING_API_BASE}/apps/${slug}/deploy`,
         {
           method: 'POST',
           headers: {
@@ -487,7 +627,7 @@ export class DenoSubhostingProvider {
       );
 
       if (!response.ok) {
-        logger.error('Deno Subhosting API error', {
+        logger.error('Deno Deploy API error', {
           status: response.status,
           statusText: response.statusText,
           projectId,
@@ -500,39 +640,40 @@ export class DenoSubhostingProvider {
               data: await response.text(),
             },
           },
-          'Deno Subhosting failed'
+          'Deno Deploy failed'
         );
       }
 
-      const data = denoSubhostingApiResponseSchema.parse(await response.json());
+      const data = revisionResponseSchema.parse(await response.json());
+      const status = mapRevisionStatus(data.status);
 
-      logger.info('Deno Subhosting deployment created', {
-        deploymentId: data.id,
-        projectId: data.projectId,
-        status: data.status,
-        domains: data.domains,
+      logger.info('Deno Deploy deployment created', {
+        revisionId: data.id,
+        projectId: slug,
+        status,
+        denoStatus: data.status,
       });
 
       return {
         id: data.id,
-        projectId: data.projectId,
-        status: data.status,
-        url:
-          data.domains.length > 0
-            ? `https://${data.domains[0]}`
-            : `https://${projectId}.${config.denoSubhosting.domain}`,
-        createdAt: new Date(data.createdAt),
+        projectId: slug,
+        status,
+        // Gate the URL on success to match getDeployment(); the initial revision
+        // is typically `pending`, and callers use `url !== null` to decide
+        // whether the endpoint is live.
+        url: status === 'success' ? this.getFunctionUrl(slug) : null,
+        createdAt: new Date(data.created_at),
       };
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
       }
 
-      logger.error('Failed to deploy to Deno Subhosting', {
+      logger.error('Failed to deploy to Deno Deploy', {
         error: error instanceof Error ? error.message : String(error),
         projectId,
       });
-      throw new UpstreamError(error, 'Failed to deploy to Deno Subhosting');
+      throw new UpstreamError(error, 'Failed to deploy to Deno Deploy');
     }
   }
 
@@ -544,7 +685,7 @@ export class DenoSubhostingProvider {
 
     try {
       const response = await fetchWithTimeout(
-        `${DENO_SUBHOSTING_API_BASE}/deployments/${deploymentId}`,
+        `${DENO_SUBHOSTING_API_BASE}/revisions/${deploymentId}`,
         {
           headers: {
             Authorization: `Bearer ${credentials.token}`,
@@ -572,25 +713,30 @@ export class DenoSubhostingProvider {
         );
       }
 
-      const data = denoSubhostingApiResponseSchema.parse(await response.json());
+      const data = revisionResponseSchema.parse(await response.json());
+      const status = mapRevisionStatus(data.status);
+
+      // v2 revisions carry no app slug or domain; the URL is deterministic from
+      // our app slug (= APP_KEY). Only surface it once the revision succeeds.
+      const slug = appConfig.cloud.appKey;
 
       return {
         id: data.id,
-        projectId: data.projectId,
-        status: data.status,
-        url: data.domains.length > 0 ? `https://${data.domains[0]}` : null,
-        createdAt: new Date(data.createdAt),
+        projectId: slug,
+        status,
+        url: status === 'success' ? this.getFunctionUrl(slug) : null,
+        createdAt: new Date(data.created_at),
       };
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
       }
 
-      logger.error('Failed to get Deno Subhosting deployment', {
+      logger.error('Failed to get Deno Deploy deployment', {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new UpstreamError(error, 'Failed to get Deno Subhosting deployment');
+      throw new UpstreamError(error, 'Failed to get Deno Deploy deployment');
     }
   }
 
@@ -606,43 +752,46 @@ export class DenoSubhostingProvider {
     const credentials = this.getCredentials();
 
     try {
+      // v2 logs are app-scoped (`/apps/{slug}/logs`) and filtered by revision.
+      // `deploymentId` is the revision id; the app slug is our APP_KEY.
+      const slug = appConfig.cloud.appKey;
+
+      // v2 requires a `start`. Default to a 24h window ending at `end` (or now)
+      // so "latest logs" requests keep working without the caller computing it.
+      const end = options.end ?? new Date().toISOString();
+      const endMs = Date.parse(end);
+      if (isNaN(endMs)) {
+        // Guard before `new Date(NaN).toISOString()` throws a RangeError that the
+        // outer catch would misclassify as an upstream failure.
+        throw new AppError(`Invalid end timestamp: "${end}"`, 400, ERROR_CODES.INVALID_INPUT);
+      }
+      const start = options.start ?? new Date(endMs - 24 * 60 * 60 * 1000).toISOString();
+
       const params = new URLSearchParams();
-      if (options.q) {
-        params.set('q', options.q);
+      params.set('start', start);
+      params.set('end', end);
+      params.set('revision_id', deploymentId);
+      if (options.query) {
+        params.set('query', options.query);
       }
       if (options.level) {
         params.set('level', options.level);
       }
-      if (options.region) {
-        params.set('region', options.region);
-      }
-      if (options.since) {
-        params.set('since', options.since);
-      }
-      if (options.until) {
-        params.set('until', options.until);
-      }
       if (options.limit !== undefined) {
         params.set('limit', String(options.limit));
-      }
-      if (options.order) {
-        params.set('order', options.order);
       }
       if (options.cursor) {
         params.set('cursor', options.cursor);
       }
 
-      const queryString = params.toString();
-      const url = `${DENO_SUBHOSTING_API_BASE}/deployments/${deploymentId}/app_logs${
-        queryString ? `?${queryString}` : ''
-      }`;
+      const url = `${DENO_SUBHOSTING_API_BASE}/apps/${slug}/logs?${params.toString()}`;
 
       const response = await fetchWithTimeout(
         url,
         {
           headers: {
             Authorization: `Bearer ${credentials.token}`,
-            Accept: 'application/x-ndjson',
+            Accept: 'application/json',
           },
         },
         6000
@@ -668,18 +817,17 @@ export class DenoSubhostingProvider {
         );
       }
 
-      // Parse NDJSON format (newline-delimited JSON)
-      const text = await response.text();
-      const logs = text
-        .split('\n')
-        .filter((line) => line.trim())
-        .map((line) => JSON.parse(line));
-      const data = appLogResponseSchema.parse(logs);
-      const linkHeader = response.headers.get('link');
-      const cursor = this.parseCursorFromLinkHeader(linkHeader);
+      const data = runtimeLogsResponseSchema.parse(await response.json());
+      const logs: AppLogEntry[] = data.logs.map((entry) => ({
+        time: entry.timestamp,
+        level: entry.level,
+        message: entry.message,
+        region: entry.region ?? '',
+      }));
+      const cursor = data.next_cursor ?? null;
 
       return {
-        logs: data,
+        logs,
         cursor,
         hasMore: cursor !== null,
       };
@@ -704,7 +852,7 @@ export class DenoSubhostingProvider {
 
     try {
       const response = await fetchWithTimeout(
-        `${DENO_SUBHOSTING_API_BASE}/deployments/${deploymentId}/build_logs`,
+        `${DENO_SUBHOSTING_API_BASE}/revisions/${deploymentId}/build_logs`,
         {
           headers: {
             Authorization: `Bearer ${credentials.token}`,
@@ -830,12 +978,18 @@ export class DenoSubhostingProvider {
 // createClient is injected and available in scope
 import { createClient } from 'npm:@insforge/sdk';
 
+declare global {
+  var __insforge_dispatch__: (req: Request) => Promise<Response>;
+}
+
 const _legacyModule: { exports: unknown } = { exports: {} };
 const module = _legacyModule;
 
 ${userCode}
 
 export default _legacyModule.exports as (req: Request) => Promise<Response>;
+
+globalThis.__insforge_dispatch__ = (req: Request) => (_legacyModule.exports as (req: Request) => Promise<Response>)(req);
 `;
   }
 
@@ -847,6 +1001,11 @@ export default _legacyModule.exports as (req: Request) => Promise<Response>;
       // Empty router when no functions
       return `
 // Auto-generated router (no functions)
+declare global {
+  var __insforge_dispatch__: (req: Request) => Promise<Response>;
+}
+export {};
+
 const dispatch = async (req: Request): Promise<Response> => {
   const url = new URL(req.url);
   const pathname = url.pathname;
@@ -870,7 +1029,7 @@ const dispatch = async (req: Request): Promise<Response> => {
   });
 };
 
-(globalThis as any).__insforge_dispatch__ = dispatch;
+globalThis.__insforge_dispatch__ = dispatch;
 
 Deno.serve(dispatch);
 `;
@@ -887,12 +1046,16 @@ Deno.serve(dispatch);
 import { AsyncLocalStorage } from 'node:async_hooks';
 ${imports}
 
+declare global {
+  var __insforge_dispatch__: (req: Request) => Promise<Response>;
+}
+
 const routes: Record<string, (req: Request) => Promise<Response>> = {
 ${routes}
 };
 
 // Per-request call-depth tracking to catch recursive function invocations
-// (in-process dispatch bypasses Deno Subhosting's network-level 508 guard).
+// (in-process dispatch bypasses Deno Deploy's network-level 508 guard).
 const MAX_DEPTH = 8;
 const depthStore = new AsyncLocalStorage<number>();
 
@@ -955,6 +1118,9 @@ const dispatch = async (req: Request): Promise<Response> => {
       const response = await handler(funcReq);
       const duration = Date.now() - startTime;
 
+      // Structured JSON log — matches InsForge backend log format:
+      // { timestamp, slug, method, status, duration }. Captured by the
+      // Deno Deploy platform from stdout and surfaced as app logs.
       console.log(JSON.stringify({
         timestamp: new Date().toISOString(),
         slug,
@@ -977,27 +1143,11 @@ const dispatch = async (req: Request): Promise<Response> => {
   });
 };
 
-(globalThis as any).__insforge_dispatch__ = dispatch;
+// __insforge_dispatch__ bridges the isolate boundary for in-process dispatch.
+globalThis.__insforge_dispatch__ = dispatch;
 
 Deno.serve(dispatch);
 `;
-  }
-
-  /**
-   * Parse cursor from RFC 8288 Link header
-   * Expected format: <url?cursor=abc123>; rel="next"
-   */
-  private parseCursorFromLinkHeader(linkHeader: string | null): string | null {
-    if (!linkHeader) {
-      return null;
-    }
-
-    const nextMatch = linkHeader.match(/<[^>]*[?&]cursor=([^&>]+)[^>]*>;\s*rel="next"/);
-    if (nextMatch && nextMatch[1]) {
-      return decodeURIComponent(nextMatch[1]);
-    }
-
-    return null;
   }
 
   /**

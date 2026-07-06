@@ -1,5 +1,5 @@
 // Type definitions for database schema management
-import { ColumnType, ColumnSchema, ForeignKeySchema } from '@insforge/shared-schemas';
+import { ColumnType, ColumnSchema } from '@insforge/shared-schemas';
 
 // Database metadata format returned by getDatabaseMetadata
 export interface DatabaseMetadata {
@@ -93,11 +93,6 @@ export interface ForeignKeyDefinition {
   on_update?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
 }
 
-// Type definition for foreign key information
-export type ForeignKeyInfo = ForeignKeySchema & {
-  constraint_name: string;
-};
-
 // Type definition for foreign key row from database
 export interface ForeignKeyRow {
   constraint_name: string;
@@ -105,6 +100,7 @@ export interface ForeignKeyRow {
   foreign_schema: string;
   foreign_table: string;
   foreign_column: string;
+  ordinal_position: number;
   on_delete: string;
   on_update: string;
 }

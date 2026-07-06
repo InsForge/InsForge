@@ -13,6 +13,7 @@ import {
 } from '#components';
 import { useDatabaseSchemas, useFunctions } from '#features/database/hooks/useDatabase';
 import { useDatabaseSchemaSelection } from '#features/database/hooks/useDatabaseSchemaSelection';
+import { usePageSize } from '#lib/hooks/usePageSize';
 import { SQLModal, SQLCellButton } from '#features/database/components/SQLModal';
 import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
 import { type DatabaseFunctionsResponse } from '@insforge/shared-schemas';
@@ -58,6 +59,8 @@ export default function FunctionsPage() {
   const selectedSchemaInfo = getDatabaseSchemaInfo(schemas, selectedSchema);
   const { data, isLoading, error, refetch } = useFunctions(selectedSchema, true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
+  const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('db-functions');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const allFunctions = useMemo(() => parseFunctionsFromResponse(data), [data]);
 
@@ -70,10 +73,23 @@ export default function FunctionsPage() {
     return allFunctions.filter((func) => func.functionName.toLowerCase().includes(query));
   }, [allFunctions, searchQuery]);
 
+  const totalPages = Math.ceil(filteredFunctions.length / pageSize);
+  const safeCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
+
+  const paginatedFunctions = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredFunctions.slice(start, start + pageSize);
+  }, [filteredFunctions, safeCurrentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedSchema, pageSize]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       setSearchQuery('');
+      setCurrentPage(1);
       await refetch();
     } finally {
       setIsRefreshing(false);
@@ -202,6 +218,7 @@ export default function FunctionsPage() {
                 value={selectedSchemaInfo.name}
                 onValueChange={(schemaName) => {
                   setSearchQuery('');
+                  setCurrentPage(1);
                   setSelectedSchema(schemaName, { replace: true });
                 }}
                 disabled={isLoadingSchemas}
@@ -220,10 +237,18 @@ export default function FunctionsPage() {
         ) : (
           <div className="min-h-0 flex-1 overflow-hidden">
             <DataGrid
-              data={filteredFunctions}
+              data={paginatedFunctions}
               columns={columns}
               showSelection={false}
-              showPagination={false}
+              showPagination={true}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              pageSizeOptions={pageSizeOptions}
+              totalRecords={filteredFunctions.length}
+              paginationRecordLabel="functions"
+              onPageChange={setCurrentPage}
+              onPageSizeChange={onPageSizeChange}
               noPadding={true}
               className="h-full"
               isRefreshing={isRefreshing}

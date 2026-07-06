@@ -1,7 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -16,12 +15,14 @@ import functionsRouter from '@/api/routes/functions/index.routes.js';
 import secretsRouter from '@/api/routes/secrets/index.routes.js';
 import { usageRouter } from '@/api/routes/usage/index.routes.js';
 import { aiRouter } from '@/api/routes/ai/index.routes.js';
+import { memoryRouter } from '@/api/routes/memory/index.routes.js';
 import { realtimeRouter } from '@/api/routes/realtime/index.routes.js';
 import { emailRouter } from '@/api/routes/email/index.routes.js';
 import { deploymentsRouter } from '@/api/routes/deployments/index.routes.js';
 import { webhooksRouter } from '@/api/routes/webhooks/index.routes.js';
 import { s3GatewayRouter } from '@/api/routes/s3-gateway/index.routes.js';
 import { paymentsRouter } from '@/api/routes/payments/index.routes.js';
+import { advisorRouter } from '@/api/routes/advisor/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
@@ -40,18 +41,12 @@ import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
+import { webscraperRouter } from '@/api/routes/webscraper/index.routes.js';
+import { appConfig } from '@/infra/config/app.config.js';
+import { TelemetryService } from '@/services/telemetry/telemetry.service.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-function shouldSkipGlobalRateLimit(req: Request): boolean {
-  if (req.path === '/api/health') {
-    return true;
-  }
-
-  return (
-    req.method === 'PUT' && /^\/api\/deployments\/[^/]+\/files\/[^/]+\/content$/.test(req.path)
-  );
-}
 
 // Load .env file from the root directory (parent of backend)
 const envPath = path.resolve(__dirname, '../../.env');
@@ -80,15 +75,8 @@ export async function createApp() {
 
   const app = express();
 
-  // Enable trust proxy setting for rate limiting behind proxies/load balancers
-  app.set('trust proxy', 2);
-
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 3000,
-    message: 'Too many requests from this IP',
-    skip: shouldSkipGlobalRateLimit,
-  });
+  // Enable trust proxy setting for rate limiting behind proxies/load balancers.
+  app.set('trust proxy', appConfig.server.trustProxy);
 
   // Basic middleware
   app.use(
@@ -99,7 +87,6 @@ export async function createApp() {
     })
   );
   app.use(cookieParser()); // Parse cookies for refresh token handling
-  app.use(limiter);
   app.use((req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
     const originalSend = res.send;
@@ -182,14 +169,27 @@ export async function createApp() {
   // We use high defaults (100mb/10mb) to ensure a smooth "out-of-the-box" experience
   // for large metadata/storage requests, as per project standards.
   // Users can override these via environment variables for hardened security.
-  const jsonLimit = process.env.MAX_JSON_BODY_SIZE || '100mb';
-  const urlencodedLimit = process.env.MAX_URLENCODED_BODY_SIZE || '10mb';
+  const jsonLimit = appConfig.server.maxJsonBodySize;
+  const urlencodedLimit = appConfig.server.maxUrlencodedBodySize;
 
   app.use(express.json({ limit: jsonLimit }));
   app.use(express.urlencoded({ extended: true, limit: urlencodedLimit }));
 
   // Create API router and mount all API routes under /api
   const apiRouter = express.Router();
+
+  const jwksHandler = async (_req: Request, res: Response) => {
+    try {
+      const jwks = await TokenManager.getInstance().getJwks();
+      res.json(jwks);
+    } catch (error) {
+      logger.error('Failed to serve JWKS', { error });
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  };
+
+  app.get('/.well-known/jwks.json', jwksHandler);
+  apiRouter.get('/.well-known/jwks.json', jwksHandler);
 
   apiRouter.get('/health', (_req: Request, res: Response) => {
     const version = packageJson.version;
@@ -212,6 +212,7 @@ export async function createApp() {
   apiRouter.use('/secrets', secretsRouter);
   apiRouter.use('/usage', usageRouter);
   apiRouter.use('/ai', aiRouter);
+  apiRouter.use('/memory', memoryRouter);
   apiRouter.use('/realtime', realtimeRouter);
   apiRouter.use('/email', emailRouter);
   apiRouter.use('/deployments', deploymentsRouter);
@@ -219,18 +220,20 @@ export async function createApp() {
   apiRouter.use('/payments', paymentsRouter);
   apiRouter.use('/compute/services', servicesRouter);
   apiRouter.use('/analytics', analyticsRouter);
+  apiRouter.use('/webscraper', webscraperRouter);
+  apiRouter.use('/advisor', advisorRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
 
-  // Proxy function execution to Deno Subhosting or local runtime
+  // Proxy function execution to Deno Deploy or local runtime
   // this logic is used for backward compatibility, we will let the sdk directly call the edge function
   app.all('/functions/:slug', async (req: Request, res: Response) => {
     const { slug } = req.params;
 
     try {
       const functionService = FunctionService.getInstance();
-      const localRuntime = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
+      const localRuntime = appConfig.functions.denoRuntimeUrl;
 
       // Get target base URL: prefer Subhosting deployment, fallback to local runtime
       const baseUrl =
@@ -318,8 +321,8 @@ export async function createApp() {
   return app;
 }
 
-// Use PORT from environment variable, fallback to 7130
-const PORT = parseInt(process.env.PORT || '7130');
+// Use PORT from config (already parsed from env, falls back to 7130)
+const PORT = appConfig.app.port;
 
 async function initializeServer() {
   try {
@@ -336,13 +339,15 @@ async function initializeServer() {
     const realtimeManager = RealtimeManager.getInstance();
     await realtimeManager.initialize();
 
-    // Sync existing functions to Deno Subhosting (non-blocking)
+    // Sync existing functions to Deno Deploy (non-blocking)
     const functionService = FunctionService.getInstance();
     functionService.syncDeployment().catch((err) => {
-      logger.error('Failed to sync functions to Deno Subhosting', {
+      logger.error('Failed to sync functions to Deno Deploy', {
         error: err instanceof Error ? err.message : String(err),
       });
     });
+
+    TelemetryService.getInstance().start();
   } catch (error) {
     logger.error('Failed to initialize server', {
       error: error instanceof Error ? error.message : String(error),
@@ -380,6 +385,14 @@ async function cleanup() {
     oAuthPKCEService.destroy();
   } catch (error) {
     logger.error('Error closing OAuthPKCEService', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
+    TelemetryService.getInstance().stop();
+  } catch (error) {
+    logger.error('Error closing TelemetryService', {
       error: error instanceof Error ? error.message : String(error),
     });
   }

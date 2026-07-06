@@ -25,10 +25,9 @@ npm-debug.log*
 .gitignore
 *.md
 docs/**
-!docs/agent-docs/**
 !docs/sdks/**
 !docs/snippets/**
-!docs/insforge-instructions-sdk.md
+!.agents/docs/**
 tests/
 *.test.ts
 *.test.tsx

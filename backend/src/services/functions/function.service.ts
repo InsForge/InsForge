@@ -15,6 +15,7 @@ import { AppError, hasPgErrorCode } from '@/utils/errors.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 export class FunctionService {
   private static instance: FunctionService;
@@ -72,7 +73,7 @@ export class FunctionService {
         runtimeHealthy = true;
       } else {
         try {
-          const denoUrl = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
+          const denoUrl = appConfig.functions.denoRuntimeUrl;
           const healthResponse = await fetch(`${denoUrl}/health`, {
             method: 'GET',
             signal: AbortSignal.timeout(2000), // 2 second timeout
@@ -150,6 +151,16 @@ export class FunctionService {
     // Validate only platform contract constraints; runtime security is enforced by the runtime/provider.
     this.validateCode(code);
 
+    // Static pre-deploy check (deno check): reject syntax/type errors — e.g. a
+    // duplicate top-level declaration — up front, with the offending file:line.
+    // Such code builds fine but throws "Identifier '...' has already been
+    // declared" at isolate warm-up; because all active functions ship as a
+    // single Deno revision, one bad function would otherwise fail every deploy
+    // for the whole project (issue #1594). No-op in local mode (self-gating).
+    if (status === 'active') {
+      await this.denoSubhostingProvider.checkCode(code, slug);
+    }
+
     // Save to DB (release client before deployment polling)
     let created: FunctionSchema;
     const client = await this.getPool().connect();
@@ -216,9 +227,34 @@ export class FunctionService {
     slug: string,
     updates: UpdateFunctionRequest
   ): Promise<{ function: FunctionSchema; deployment?: DeploymentResult | null } | null> {
-    // Validate code if provided
+    // Validate platform contract constraints (cheap, regex-only) if code given.
     if (updates.code !== undefined) {
       this.validateCode(updates.code);
+    }
+
+    // Fetch current code/status up front — both to confirm the function exists
+    // before doing any expensive checking, and to run the static pre-deploy
+    // check against the code that will actually be deployed.
+    const existing = await this.getPool().query<{ code: string; status: string }>(
+      'SELECT code, status FROM functions.definitions WHERE slug = $1',
+      [slug]
+    );
+    if (existing.rows.length === 0) {
+      return null;
+    }
+    const effectiveStatus = updates.status ?? existing.rows[0].status;
+    const effectiveCode = updates.code ?? existing.rows[0].code;
+
+    // Static pre-deploy check (issue #1594): run whenever the function will be
+    // active AND its code or active-state is changing — so neither a code edit
+    // nor a status-only activation can push unchecked code into the shared Deno
+    // revision and wedge every deploy. Inactive drafts are left alone, matching
+    // createFunction (which only checks active functions).
+    if (
+      effectiveStatus === 'active' &&
+      (updates.code !== undefined || updates.status === 'active')
+    ) {
+      await this.denoSubhostingProvider.checkCode(effectiveCode, slug);
     }
 
     // Save to DB (release client before deployment polling)
@@ -226,14 +262,6 @@ export class FunctionService {
     const shouldDeploy = updates.code !== undefined || updates.status !== undefined;
     const client = await this.getPool().connect();
     try {
-      const existingResult = await client.query(
-        'SELECT id FROM functions.definitions WHERE slug = $1',
-        [slug]
-      );
-      if (existingResult.rows.length === 0) {
-        return null;
-      }
-
       if (updates.name !== undefined) {
         await client.query('UPDATE functions.definitions SET name = $1 WHERE slug = $2', [
           updates.name,
@@ -280,6 +308,11 @@ export class FunctionService {
         FROM functions.definitions WHERE slug = $1`,
         [slug]
       );
+      // Guard the rare race where the function is deleted between the existence
+      // check above and this update.
+      if (result.rows.length === 0) {
+        return null;
+      }
       updated = result.rows[0];
     } catch (error) {
       logger.error('Failed to update function', {
@@ -305,27 +338,42 @@ export class FunctionService {
    * Delete a function
    */
   async deleteFunction(slug: string): Promise<boolean> {
+    const client = await this.getPool().connect();
     try {
-      const result = await this.getPool().query(
-        'DELETE FROM functions.definitions WHERE slug = $1',
-        [slug]
-      );
+      await client.query('BEGIN');
+
+      const result = await client.query('DELETE FROM functions.definitions WHERE slug = $1', [
+        slug,
+      ]);
 
       if (result.rowCount === 0) {
+        await client.query('ROLLBACK');
         return false;
       }
+
+      // Remove the deleted slug from deployment records' functions array,
+      // preserving shared deployment history for other functions.
+      await client.query(
+        'UPDATE functions.deployments SET functions = functions - $1 WHERE functions @> $2::jsonb',
+        [slug, JSON.stringify([slug])]
+      );
+
+      await client.query('COMMIT');
 
       // Trigger redeployment without the deleted function
       this.scheduleDeployment();
 
       return true;
     } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
       logger.error('Failed to delete function', {
         error: error instanceof Error ? error.message : String(error),
         operation: 'deleteFunction',
         slug,
       });
       throw error;
+    } finally {
+      client.release();
     }
   }
 
@@ -363,14 +411,14 @@ export class FunctionService {
   }
 
   // ============================================
-  // Deno Subhosting Integration
+  // Deno Deploy Integration
   // ============================================
 
   /**
-   * Get the Deno Subhosting project ID for this InsForge instance
+   * Get the Deno Deploy project ID for this InsForge instance
    */
   private getDenoProjectId(): string {
-    return process.env.APP_KEY || 'local';
+    return appConfig.storage.appKey;
   }
 
   /**
@@ -380,7 +428,7 @@ export class FunctionService {
    */
   private async deployAndWait(): Promise<DeploymentResult | null> {
     if (!this.denoSubhostingProvider.isConfigured()) {
-      logger.debug('Deno Subhosting not configured, skipping deployment');
+      logger.debug('Deno Deploy not configured, skipping deployment');
       return null;
     }
 
@@ -392,7 +440,7 @@ export class FunctionService {
       const secrets = await this.getFunctionSecrets();
       const functionSlugs = activeFunctions.map((f) => f.slug);
 
-      logger.info('Deploying to Deno Subhosting (sync)', {
+      logger.info('Deploying to Deno Deploy (sync)', {
         projectId,
         functionCount: activeFunctions.length,
         functions: functionSlugs,
@@ -431,7 +479,7 @@ export class FunctionService {
         this.cachedDeploymentUrl = finalResult.url;
       }
 
-      logger.info('Deno Subhosting deployment completed', {
+      logger.info('Deno Deploy deployment completed', {
         deploymentId: result.id,
         status: finalResult.status,
       });
@@ -445,7 +493,7 @@ export class FunctionService {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
 
-      logger.error('Deno Subhosting deployment failed', { error: errorMsg, projectId });
+      logger.error('Deno Deploy deployment failed', { error: errorMsg, projectId });
 
       // Update DB record so it doesn't stay stuck in 'pending'
       if (savedDeploymentId) {
@@ -480,12 +528,12 @@ export class FunctionService {
   }
 
   /**
-   * Trigger deployment of all active functions to Deno Subhosting
+   * Trigger deployment of all active functions to Deno Deploy
    * This is called asynchronously after function CRUD operations
    */
   private async triggerDeployment(): Promise<void> {
     if (!this.denoSubhostingProvider.isConfigured()) {
-      logger.debug('Deno Subhosting not configured, skipping deployment');
+      logger.debug('Deno Deploy not configured, skipping deployment');
       return;
     }
 
@@ -496,7 +544,7 @@ export class FunctionService {
       const secrets = await this.getFunctionSecrets();
       const functionSlugs = activeFunctions.map((f) => f.slug);
 
-      logger.info('Deploying to Deno Subhosting', {
+      logger.info('Deploying to Deno Deploy', {
         projectId,
         functionCount: activeFunctions.length,
         functions: functionSlugs,
@@ -517,7 +565,7 @@ export class FunctionService {
         functions: functionSlugs,
       });
 
-      logger.info('Deno Subhosting deployment created', {
+      logger.info('Deno Deploy deployment created', {
         deploymentId: result.id,
         status: result.status,
         url: result.url,
@@ -525,7 +573,7 @@ export class FunctionService {
 
       void this.pollDeploymentStatus(result.id, functionSlugs);
     } catch (error) {
-      logger.error('Deno Subhosting deployment failed', {
+      logger.error('Deno Deploy deployment failed', {
         error: error instanceof Error ? error.message : String(error),
         projectId,
       });
@@ -556,13 +604,13 @@ export class FunctionService {
         if (result.url) {
           this.cachedDeploymentUrl = result.url;
         }
-        logger.info('Deno Subhosting deployment succeeded', {
+        logger.info('Deno Deploy deployment succeeded', {
           deploymentId,
           url: result.url,
           functions,
         });
       } else {
-        logger.error('Deno Subhosting deployment failed', {
+        logger.error('Deno Deploy deployment failed', {
           deploymentId,
           errorMessage,
           buildLogs: result.buildLogs,
@@ -628,7 +676,7 @@ export class FunctionService {
   }
 
   /**
-   * Check if Deno Subhosting is configured
+   * Check if Deno Deploy is configured
    */
   isSubhostingConfigured(): boolean {
     return this.denoSubhostingProvider.isConfigured();
@@ -708,12 +756,12 @@ export class FunctionService {
   }
 
   /**
-   * Sync existing functions to Deno Subhosting on server startup
+   * Sync existing functions to Deno Deploy on server startup
    * Only deploys if there's no existing successful deployment
    */
   async syncDeployment(): Promise<void> {
     if (!this.denoSubhostingProvider.isConfigured()) {
-      logger.debug('Deno Subhosting not configured, skipping sync');
+      logger.debug('Deno Deploy not configured, skipping sync');
       return;
     }
 
@@ -721,7 +769,7 @@ export class FunctionService {
       // Check if there's already a successful deployment
       const existingUrl = await this.getDeploymentUrl();
       if (existingUrl) {
-        logger.info('Existing Deno Subhosting deployment found, skipping sync', {
+        logger.info('Existing Deno Deploy deployment found, skipping sync', {
           url: existingUrl,
         });
         return;
@@ -734,7 +782,7 @@ export class FunctionService {
         return;
       }
 
-      logger.info('No existing deployment found, syncing functions to Deno Subhosting', {
+      logger.info('No existing deployment found, syncing functions to Deno Deploy', {
         functionCount: activeFunctions.length,
         functions: activeFunctions.map((f) => f.slug),
       });
@@ -761,7 +809,7 @@ export class FunctionService {
   /**
    * Get all active secrets for function injection
    * In cloud deployments, INSFORGE_INTERNAL_URL is replaced with INSFORGE_BASE_URL
-   * because the internal container URL is not reachable from Deno Subhosting.
+   * because the internal container URL is not reachable from Deno Deploy.
    */
   private async getFunctionSecrets(): Promise<Record<string, string>> {
     try {

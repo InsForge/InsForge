@@ -8,6 +8,7 @@ export function CloudHostingDashboard() {
     projectInfo,
     reportRouteChange,
     showUpgradeDialog,
+    openWhatsNew,
     renameProject,
     deleteProject,
     requestBackupInfo,
@@ -28,6 +29,8 @@ export function CloudHostingDashboard() {
     connectPosthog,
     openPosthog,
     subscribePosthogConnectionStatus,
+    connectApify,
+    subscribeApifyConnectionStatus,
   } = useCloudHosting();
 
   return (
@@ -39,6 +42,7 @@ export function CloudHostingDashboard() {
       project={projectInfo}
       onRouteChange={reportRouteChange}
       onShowUpgradeDialog={showUpgradeDialog}
+      onOpenWhatsNew={openWhatsNew}
       onRenameProject={renameProject}
       onDeleteProject={deleteProject}
       onRequestBackupInfo={requestBackupInfo}
@@ -59,6 +63,8 @@ export function CloudHostingDashboard() {
       onConnectPosthog={connectPosthog}
       onOpenPosthog={openPosthog}
       subscribePosthogConnectionStatus={subscribePosthogConnectionStatus}
+      onConnectApify={connectApify}
+      subscribeApifyConnectionStatus={subscribeApifyConnectionStatus}
     />
   );
 }

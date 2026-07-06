@@ -8,9 +8,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  useToast,
 } from '@insforge/ui';
+import { analyticsQueryKeys } from '#features/analytics/hooks/useAnalytics';
 import { analyticsService } from '#features/analytics/services/analytics.service';
-import { useToast } from '#lib/hooks/useToast';
 
 export function DisconnectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
@@ -18,7 +19,7 @@ export function DisconnectDialog({ open, onClose }: { open: boolean; onClose: ()
   const m = useMutation({
     mutationFn: () => analyticsService.disconnect(),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['posthog'] });
+      void qc.invalidateQueries({ queryKey: analyticsQueryKeys.all });
       onClose();
     },
     onError: () => {

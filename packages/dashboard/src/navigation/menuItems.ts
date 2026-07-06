@@ -11,11 +11,13 @@ import {
   ChartLine,
   BarChart3,
   Settings,
-  Rocket,
+  Globe,
+  Radar,
   SquarePen,
   Download,
   BookOpen,
   CreditCard,
+  Megaphone,
 } from 'lucide-react';
 
 export interface DashboardSecondaryMenuItem {
@@ -130,11 +132,18 @@ export const dashboardSettingsMenuItem: DashboardPrimaryMenuItem = {
   icon: Settings,
 };
 
+export const dashboardWhatsNewMenuItem: DashboardPrimaryMenuItem = {
+  id: 'whats-new',
+  label: "What's New",
+  href: '',
+  icon: Megaphone,
+};
+
 export const dashboardDeploymentsMenuItem: DashboardPrimaryMenuItem = {
   id: 'deployments',
-  label: 'Deployments',
+  label: 'Sites',
   href: '/dashboard/deployments',
-  icon: Rocket,
+  icon: Globe,
 };
 
 export const dashboardAnalyticsMenuItem: DashboardPrimaryMenuItem = {
@@ -142,6 +151,13 @@ export const dashboardAnalyticsMenuItem: DashboardPrimaryMenuItem = {
   label: 'Analytics',
   href: '/dashboard/analytics',
   icon: BarChart3,
+};
+
+export const dashboardWebscraperMenuItem: DashboardPrimaryMenuItem = {
+  id: 'webscraper',
+  label: 'Web Scraper',
+  href: '/dashboard/webscraper',
+  icon: Radar,
 };
 
 // d_test + cloud-hosting only: navigates to the Install InsForge route.

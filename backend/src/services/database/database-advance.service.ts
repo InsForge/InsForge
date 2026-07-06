@@ -9,17 +9,14 @@ import {
   type BulkUpsertResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import {
-  parseSQLStatements,
-  checkManagedSchemaWriteOperations,
-  checkAuthSchemaOperations,
-  checkSystemSchemaOperations,
-} from '@/utils/sql-parser.js';
+import { checkSqlExecutionGuards, parseSQLStatements } from '@/utils/sql-parser.js';
 import { validateSchemaName, validateTableName } from '@/utils/validations.js';
 import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
 import { type PoolClient } from 'pg';
-import { assertWritableDatabaseSchema } from './helpers.js';
+import { withAdminContext } from './user-context.service.js';
+import type { ForeignKeyRow } from '@/types/database.js';
+import { FOREIGN_KEY_INTROSPECTION_QUERY, groupForeignKeyRows } from './helpers.js';
 
 export class DatabaseAdvanceService {
   private static instance: DatabaseAdvanceService;
@@ -71,74 +68,45 @@ export class DatabaseAdvanceService {
     return { rows, totalRows, wasTruncated };
   }
 
-  /**
-   * Sanitize query with strict or relaxed mode
-   *
-   * Blocks:
-   * - DROP DATABASE, CREATE DATABASE, ALTER DATABASE
-   * - pg_catalog and information_schema access
-   * - Write operations on InsForge-managed schemas
-   *
-   * Allows:
-   * - Read-only queries against InsForge-managed schemas
-   */
-  sanitizeQuery(query: string, _mode: 'strict' | 'relaxed' = 'strict'): string {
-    // Block database-level operations
-    const dangerousPatterns = [
-      /DROP\s+DATABASE/i,
-      /CREATE\s+DATABASE/i,
-      /ALTER\s+DATABASE/i,
-      /pg_catalog/i,
-    ];
-
-    for (const pattern of dangerousPatterns) {
-      if (pattern.test(query)) {
-        throw new AppError('Query contains restricted operations', 403, ERROR_CODES.FORBIDDEN);
-      }
-    }
-
-    const managedSchemaError = checkManagedSchemaWriteOperations(query);
-    if (managedSchemaError) {
-      logger.warn('Blocked operation on protected schema', {
+  sanitizeQuery(query: string): string {
+    const guardError = checkSqlExecutionGuards(query);
+    if (guardError) {
+      logger.warn('Blocked raw SQL operation', {
         query: query.substring(0, 100),
       });
-      throw new AppError(managedSchemaError, 403, ERROR_CODES.FORBIDDEN);
-    }
-
-    // Use parser-based check for auth schema operations
-    const authError = checkAuthSchemaOperations(query);
-    if (authError) {
-      logger.warn('Blocked operation on auth schema', {
-        query: query.substring(0, 100),
-      });
-      throw new AppError(authError, 403, ERROR_CODES.FORBIDDEN);
-    }
-
-    // Block DDL/DML on system schema
-    const systemError = checkSystemSchemaOperations(query);
-    if (systemError) {
-      logger.warn('Blocked operation on system schema', {
-        query: query.substring(0, 100),
-      });
-      throw new AppError(systemError, 403, ERROR_CODES.FORBIDDEN);
+      throw new AppError(guardError, 403, ERROR_CODES.FORBIDDEN);
     }
 
     return query;
   }
 
-  async executeRawSQL(query: string, params: unknown[] = []): Promise<RawSQLResponse> {
+  async executeRawSQL(
+    query: string,
+    params: unknown[] = [],
+    asRoot: boolean = false
+  ): Promise<RawSQLResponse> {
+    const sanitizedQuery = this.sanitizeQuery(query);
     const pool = this.dbManager.getPool();
     const client = await pool.connect();
+    let releaseError: Error | undefined;
 
     try {
       // Set statement timeout at session level (30 seconds)
       await client.query('SET statement_timeout = 30000');
 
-      // Execute query - database will enforce the timeout
-      const result = await client.query(query, params);
+      const result = asRoot
+        ? await client.query<Record<string, unknown>>(sanitizedQuery, params)
+        : await withAdminContext(
+            client,
+            () => client.query<Record<string, unknown>>(sanitizedQuery, params),
+            false,
+            (error) => {
+              releaseError = error;
+            }
+          );
 
       // Refresh schema cache if it was a DDL operation
-      if (/CREATE|ALTER|DROP/i.test(query)) {
+      if (/CREATE|ALTER|DROP/i.test(sanitizedQuery)) {
         await client.query(`NOTIFY pgrst, 'reload schema';`);
         // Metadata is now updated on-demand
       }
@@ -161,9 +129,10 @@ export class DatabaseAdvanceService {
       // Re-throw other errors as-is
       throw error;
     } finally {
-      // Reset timeout to default before releasing client back to pool
-      await client.query('SET statement_timeout = 0');
-      client.release();
+      await client.query('SET statement_timeout = 0').catch((error: unknown) => {
+        releaseError = error instanceof Error ? error : new Error(String(error));
+      });
+      client.release(releaseError);
     }
   }
 
@@ -220,36 +189,43 @@ export class DatabaseAdvanceService {
     // Export foreign key constraints
     const foreignKeysResult = await client.query(
       `
-      SELECT DISTINCT
-        'ALTER TABLE ' || quote_ident(tc.table_name) ||
-        ' ADD CONSTRAINT ' || quote_ident(tc.constraint_name) ||
-        ' FOREIGN KEY (' || quote_ident(kcu.column_name) || ')' ||
-        ' REFERENCES ' || quote_ident(ccu.table_name) ||
-        ' (' || quote_ident(ccu.column_name) || ')' ||
+      SELECT
+        'ALTER TABLE ' || quote_ident(ct.relname) ||
+        ' ADD CONSTRAINT ' || quote_ident(c.conname) ||
+        ' FOREIGN KEY (' || string_agg(quote_ident(a1.attname), ', ' ORDER BY u.pos) || ')' ||
+        ' REFERENCES ' || CASE WHEN nf.nspname = 'public' THEN quote_ident(cf.relname) ELSE quote_ident(nf.nspname) || '.' || quote_ident(cf.relname) END ||
+        ' (' || string_agg(quote_ident(a2.attname), ', ' ORDER BY u.pos) || ')' ||
         CASE
-          WHEN rc.delete_rule != 'NO ACTION' THEN ' ON DELETE ' || rc.delete_rule
+          WHEN c.confdeltype = 'c' THEN ' ON DELETE CASCADE'
+          WHEN c.confdeltype = 'n' THEN ' ON DELETE SET NULL'
+          WHEN c.confdeltype = 'r' THEN ' ON DELETE RESTRICT'
+          WHEN c.confdeltype = 'd' THEN ' ON DELETE SET DEFAULT'
           ELSE ''
         END ||
         CASE
-          WHEN rc.update_rule != 'NO ACTION' THEN ' ON UPDATE ' || rc.update_rule
+          WHEN c.confupdtype = 'c' THEN ' ON UPDATE CASCADE'
+          WHEN c.confupdtype = 'n' THEN ' ON UPDATE SET NULL'
+          WHEN c.confupdtype = 'r' THEN ' ON UPDATE RESTRICT'
+          WHEN c.confupdtype = 'd' THEN ' ON UPDATE SET DEFAULT'
           ELSE ''
         END || ';' as fk_statement,
-        tc.constraint_name
-      FROM information_schema.table_constraints AS tc
-      JOIN information_schema.key_column_usage AS kcu
-        ON tc.constraint_name = kcu.constraint_name
-        AND tc.table_schema = kcu.table_schema
-        AND kcu.table_name = tc.table_name
-      JOIN information_schema.constraint_column_usage AS ccu
-        ON ccu.constraint_name = tc.constraint_name
-        AND ccu.table_schema = tc.table_schema
-      LEFT JOIN information_schema.referential_constraints AS rc
-        ON tc.constraint_name = rc.constraint_name
-        AND tc.table_schema = rc.constraint_schema
-      WHERE tc.constraint_type = 'FOREIGN KEY'
-      AND tc.table_name = $1
-      AND tc.table_schema = 'public'
-      ORDER BY tc.constraint_name
+        c.conname as constraint_name
+      FROM pg_catalog.pg_constraint c
+      JOIN pg_catalog.pg_class ct ON c.conrelid = ct.oid
+      JOIN pg_catalog.pg_namespace nt ON ct.relnamespace = nt.oid
+      JOIN pg_catalog.pg_class cf ON c.confrelid = cf.oid
+      JOIN pg_catalog.pg_namespace nf ON cf.relnamespace = nf.oid
+      CROSS JOIN LATERAL unnest(c.conkey, c.confkey)
+        WITH ORDINALITY AS u(src_attnum, ref_attnum, pos)
+      JOIN pg_catalog.pg_attribute a1
+        ON a1.attnum = u.src_attnum AND a1.attrelid = c.conrelid
+      JOIN pg_catalog.pg_attribute a2
+        ON a2.attnum = u.ref_attnum AND a2.attrelid = c.confrelid
+      WHERE c.contype = 'f'
+        AND nt.nspname = 'public'
+        AND ct.relname = $1
+      GROUP BY c.conname, ct.relname, nf.nspname, cf.relname, c.confdeltype, c.confupdtype
+      ORDER BY c.conname
     `,
       [table]
     );
@@ -576,34 +552,11 @@ export class DatabaseAdvanceService {
             [table]
           );
 
-          // Get foreign keys
-          const foreignKeysResult = await client.query(
-            `
-            SELECT DISTINCT
-              tc.constraint_name as "constraintName",
-              kcu.column_name as "columnName",
-              ccu.table_name as "foreignTableName",
-              ccu.column_name as "foreignColumnName",
-              rc.delete_rule as "deleteRule",
-              rc.update_rule as "updateRule"
-            FROM information_schema.table_constraints AS tc
-            JOIN information_schema.key_column_usage AS kcu
-              ON tc.constraint_name = kcu.constraint_name
-              AND tc.table_schema = kcu.table_schema
-              AND kcu.table_name = tc.table_name
-            JOIN information_schema.constraint_column_usage AS ccu
-              ON ccu.constraint_name = tc.constraint_name
-              AND ccu.table_schema = tc.table_schema
-            LEFT JOIN information_schema.referential_constraints AS rc
-              ON tc.constraint_name = rc.constraint_name
-              AND tc.table_schema = rc.constraint_schema
-            WHERE tc.constraint_type = 'FOREIGN KEY'
-            AND tc.table_name = $1
-            AND tc.table_schema = 'public'
-            ORDER BY "constraintName", "columnName"
-          `,
-            [table]
-          );
+          // Get foreign keys (one entity per constraint, columns in ordinal order)
+          const foreignKeysResult = await client.query(FOREIGN_KEY_INTROSPECTION_QUERY, [
+            'public',
+            table,
+          ]);
 
           // Check if RLS is enabled on the table
           const rlsResult = await client.query(
@@ -675,7 +628,7 @@ export class DatabaseAdvanceService {
           jsonData.tables[table] = {
             schema: schemaResult.rows,
             indexes: indexesResult.rows,
-            foreignKeys: foreignKeysResult.rows,
+            foreignKeys: groupForeignKeyRows(foreignKeysResult.rows as ForeignKeyRow[]),
             rlsEnabled,
             policies: policiesResult.rows,
             triggers: triggersResult.rows,
@@ -780,76 +733,90 @@ export class DatabaseAdvanceService {
       const importedTables: string[] = [];
       let totalRows = 0;
 
-      // If truncate is requested, truncate all public tables first
-      if (truncate) {
-        const tablesResult = await client.query(`
-          SELECT tablename 
-          FROM pg_tables 
-          WHERE schemaname = 'public'
-        `);
+      await withAdminContext(
+        client,
+        async () => {
+          // If truncate is requested, truncate all public tables first
+          if (truncate) {
+            const tablesResult = await client.query(`
+            SELECT tablename
+            FROM pg_tables
+            WHERE schemaname = 'public'
+          `);
 
-        for (const row of tablesResult.rows) {
+            for (const row of tablesResult.rows) {
+              try {
+                // Use a SAVEPOINT before each TRUNCATE so that a failure only rolls back
+                // this single statement and does NOT abort the entire transaction (PG 25P02).
+                // Without this, a failed TRUNCATE inside a transaction permanently poisons
+                // the transaction and causes every subsequent query to fail with:
+                // "ERROR: current transaction is aborted, commands ignored until end of transaction block"
+                await client.query('SAVEPOINT truncate_attempt');
+                await client.query(pgFormat('TRUNCATE TABLE %I CASCADE', row.tablename));
+                await client.query('RELEASE SAVEPOINT truncate_attempt');
+                logger.info(`Truncated table: ${row.tablename}`);
+              } catch (err) {
+                // Roll back to the savepoint to restore the transaction to a healthy state,
+                // then release it to clean up the savepoint and prevent accumulation, then log and continue with the next table.
+                await client.query('ROLLBACK TO SAVEPOINT truncate_attempt');
+                await client.query('RELEASE SAVEPOINT truncate_attempt');
+                logger.warn(`Could not truncate table ${row.tablename}:`, err);
+              }
+            }
+          }
+
+          // Process SQL file using our SQL parser utility
+          let statements: string[] = [];
+
           try {
-            await client.query(pgFormat('TRUNCATE TABLE %I CASCADE', row.tablename));
-            logger.info(`Truncated table: ${row.tablename}`);
-          } catch (err) {
-            logger.warn(`Could not truncate table ${row.tablename}:`, err);
-          }
-        }
-      }
-
-      // Process SQL file using our SQL parser utility
-      let statements: string[] = [];
-
-      try {
-        statements = parseSQLStatements(data);
-        logger.info(`Parsed ${statements.length} SQL statements from import file`);
-      } catch (parseError) {
-        logger.warn('Failed to parse SQL file:', parseError);
-        throw new AppError(
-          'Invalid SQL file format. Please ensure the file contains valid SQL statements.',
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      for (const statement of statements) {
-        // Basic validation to prevent dangerous operations
-        this.sanitizeQuery(statement);
-
-        try {
-          const result = await client.query(statement);
-
-          // Track INSERT operations
-          if (statement.toUpperCase().startsWith('INSERT')) {
-            totalRows += result.rowCount || 0;
-
-            // Extract table name from INSERT statement
-            const tableMatch = statement.match(/INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)/i);
-            if (tableMatch && !importedTables.includes(tableMatch[1])) {
-              importedTables.push(tableMatch[1]);
-            }
-          }
-
-          // Track CREATE TABLE operations
-          if (statement.toUpperCase().includes('CREATE TABLE')) {
-            // Extract table name from CREATE TABLE statement
-            const tableMatch = statement.match(
-              /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z_][a-zA-Z0-9_]*)/i
+            statements = parseSQLStatements(data);
+            logger.info(`Parsed ${statements.length} SQL statements from import file`);
+          } catch (parseError) {
+            logger.warn('Failed to parse SQL file:', parseError);
+            throw new AppError(
+              'Invalid SQL file format. Please ensure the file contains valid SQL statements.',
+              400,
+              ERROR_CODES.INVALID_INPUT
             );
-            if (tableMatch && !importedTables.includes(tableMatch[1])) {
-              importedTables.push(tableMatch[1]);
+          }
+
+          for (const statement of statements) {
+            try {
+              const result = await client.query(statement);
+
+              // Track INSERT operations
+              if (statement.toUpperCase().startsWith('INSERT')) {
+                totalRows += result.rowCount || 0;
+
+                // Extract table name from INSERT statement
+                const tableMatch = statement.match(/INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)/i);
+                if (tableMatch && !importedTables.includes(tableMatch[1])) {
+                  importedTables.push(tableMatch[1]);
+                }
+              }
+
+              // Track CREATE TABLE operations
+              if (statement.toUpperCase().includes('CREATE TABLE')) {
+                // Extract table name from CREATE TABLE statement
+                const tableMatch = statement.match(
+                  /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z_][a-zA-Z0-9_]*)/i
+                );
+                if (tableMatch && !importedTables.includes(tableMatch[1])) {
+                  importedTables.push(tableMatch[1]);
+                }
+              }
+            } catch (err: unknown) {
+              logger.warn(`Failed to execute statement: ${statement.substring(0, 100)}...`, err);
+              throw new AppError(
+                `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+                400,
+                ERROR_CODES.INVALID_INPUT
+              );
             }
           }
-        } catch (err: unknown) {
-          logger.warn(`Failed to execute statement: ${statement.substring(0, 100)}...`, err);
-          throw new AppError(
-            `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
-            400,
-            ERROR_CODES.INVALID_INPUT
-          );
-        }
-      }
+        },
+        true
+      );
 
       await client.query(`NOTIFY pgrst, 'reload schema';`);
       await client.query('COMMIT');
@@ -864,7 +831,7 @@ export class DatabaseAdvanceService {
         fileSize,
       };
     } catch (error) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       throw error;
     } finally {
       client.release();
@@ -880,7 +847,6 @@ export class DatabaseAdvanceService {
   ): Promise<BulkUpsertResponse> {
     validateSchemaName(schemaName);
     validateTableName(table);
-    assertWritableDatabaseSchema(schemaName);
 
     const fileExtension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
     let records: Record<string, unknown>[] = [];
@@ -945,75 +911,135 @@ export class DatabaseAdvanceService {
     const pool = this.dbManager.getPool();
 
     try {
-      // Get column names from first record
-      const columns = Object.keys(records[0]);
+      // Group records by their key shape (sorted keys signature) to prevent data loss
+      // and avoid overwriting existing non-null columns with NULL during upserts.
+      const groupsMap = new Map<
+        string,
+        { columns: string[]; records: Record<string, unknown>[] }
+      >();
 
-      // Convert records to array format for pg-format
-      const values = records.map((record) =>
-        columns.map((col) => {
-          const value = record[col];
-          // pg-format handles NULL, dates, JSON automatically
-          // Convert empty strings to NULL for consistency
-          return value === '' ? null : value;
-        })
-      );
-
-      let query: string;
-
-      if (upsertKey) {
-        // Validate upsert key exists in columns
-        if (!columns.includes(upsertKey)) {
-          throw new AppError(
-            `Upsert key '${upsertKey}' not found in record columns`,
-            400,
-            ERROR_CODES.INVALID_INPUT
-          );
+      for (const record of records) {
+        const keys: string[] = [];
+        for (const key of Object.keys(record)) {
+          keys.push(key);
         }
+        keys.sort();
+        const signature = keys.join(',');
 
-        // Build upsert query with pg-format
-        const updateColumns = columns.filter((c) => c !== upsertKey);
-
-        if (updateColumns.length) {
-          // Build UPDATE SET clause
-          const updateClause = updateColumns
-            .map((col) => pgFormat('%I = EXCLUDED.%I', col, col))
-            .join(', ');
-
-          query = pgFormat(
-            'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
-            schemaName,
-            table,
-            columns,
-            values,
-            upsertKey,
-            updateClause
-          );
-        } else {
-          // No columns to update, just do nothing on conflict
-          query = pgFormat(
-            'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO NOTHING',
-            schemaName,
-            table,
-            columns,
-            values,
-            upsertKey
-          );
+        let group = groupsMap.get(signature);
+        if (!group) {
+          group = {
+            columns: keys,
+            records: [],
+          };
+          groupsMap.set(signature, group);
         }
-      } else {
-        // Simple insert
-        query = pgFormat('INSERT INTO %I.%I (%I) VALUES %L', schemaName, table, columns, values);
+        group.records.push(record);
       }
 
-      // Execute query
-      const result = await pool.query(query);
+      const client = await pool.connect();
+      let releaseError: Error | undefined;
+      let totalRowCount = 0;
+      const allRows: unknown[] = [];
 
-      // Refresh schema cache if needed
-      await pool.query(`NOTIFY pgrst, 'reload schema';`);
+      try {
+        await withAdminContext(
+          client,
+          async () => {
+            await client.query('BEGIN');
+            try {
+              for (const { columns, records: groupRecords } of groupsMap.values()) {
+                // Convert records to array format for pg-format.
+                const values = groupRecords.map((record) =>
+                  columns.map((col) => {
+                    const value = record[col];
+                    // pg-format handles NULL, dates, JSON automatically.
+                    // Convert empty strings and undefined to NULL for consistency (preserving original behaviour).
+                    return value === '' || value === undefined ? null : value;
+                  })
+                );
 
-      return {
-        rowCount: result.rowCount || 0,
-        rows: result.rows,
-      };
+                let query: string;
+
+                if (upsertKey) {
+                  // Validate upsert key exists in columns
+                  if (!columns.includes(upsertKey)) {
+                    throw new AppError(
+                      `Upsert key '${upsertKey}' not found in record columns`,
+                      400,
+                      ERROR_CODES.INVALID_INPUT
+                    );
+                  }
+
+                  // Build upsert query with pg-format
+                  const updateColumns = columns.filter((c) => c !== upsertKey);
+
+                  if (updateColumns.length) {
+                    // Build UPDATE SET clause
+                    const updateClause = updateColumns
+                      .map((col) => pgFormat('%I = EXCLUDED.%I', col, col))
+                      .join(', ');
+
+                    query = pgFormat(
+                      'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
+                      schemaName,
+                      table,
+                      columns,
+                      values,
+                      upsertKey,
+                      updateClause
+                    );
+                  } else {
+                    // No columns to update, just do nothing on conflict
+                    query = pgFormat(
+                      'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO NOTHING',
+                      schemaName,
+                      table,
+                      columns,
+                      values,
+                      upsertKey
+                    );
+                  }
+                } else {
+                  // Simple insert
+                  query = pgFormat(
+                    'INSERT INTO %I.%I (%I) VALUES %L',
+                    schemaName,
+                    table,
+                    columns,
+                    values
+                  );
+                }
+
+                const result = await client.query(query);
+
+                totalRowCount += result.rowCount || 0;
+                if (result.rows) {
+                  allRows.push(...result.rows);
+                }
+              }
+
+              // Refresh schema cache if needed
+              await client.query(`NOTIFY pgrst, 'reload schema';`);
+              await client.query('COMMIT');
+            } catch (err) {
+              await client.query('ROLLBACK').catch(() => {});
+              throw err;
+            }
+          },
+          false,
+          (error) => {
+            releaseError = error;
+          }
+        );
+
+        return {
+          rowCount: totalRowCount,
+          rows: allRows,
+        };
+      } finally {
+        client.release(releaseError);
+      }
     } catch (error) {
       // Log the error for debugging
       logger.error('Bulk insert error:', error);

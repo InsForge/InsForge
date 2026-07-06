@@ -1,8 +1,16 @@
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
-import type { ComputeProvider } from './compute.provider.js';
+import type { ComputeProvider, ComputeLogsResult } from './compute.provider.js';
 
 const FLY_API_BASE = 'https://api.machines.dev/v1';
+// Container stdout/stderr lives on a different host + auth scheme than the
+// Machines API: api.fly.io with the `FlyV1 <macaroon>` scheme. The Machines
+// host (api.machines.dev) does NOT serve logs, and this endpoint rejects the
+// `Bearer` scheme with 401 — verified against a live Fly app. Same token,
+// different host + prefix. Fly documents this endpoint as stable-but-unofficial
+// (flyctl depends on it); we degrade to a thrown error rather than crash if it
+// ever changes shape.
+const FLY_LOGS_API_BASE = 'https://api.fly.io/api/v1';
 
 // Fly Machines API field names for the autostop/autostart block on a
 // service. Kept narrow on purpose: extend when we expose CLI overrides.
@@ -12,6 +20,20 @@ type ScaleOptions = {
   autostop: 'off' | 'stop' | 'suspend';
   autostart: boolean;
   min_machines_running: number;
+};
+
+// Shape of Fly's logs API response (JSON:API-style). Fields are optional on
+// purpose — we parse defensively since the endpoint is unofficial.
+type FlyLogsResponse = {
+  data?: {
+    attributes?: {
+      timestamp?: string | number;
+      message?: string;
+      instance?: string;
+      region?: string;
+    };
+  }[];
+  meta?: { next_token?: string | number };
 };
 
 export class FlyProvider implements ComputeProvider {
@@ -30,12 +52,12 @@ export class FlyProvider implements ComputeProvider {
   // Cloud-managed mode (CloudComputeProvider) detects itself implicitly from
   // PROJECT_ID + JWT_SECRET + CLOUD_API_HOST and bypasses this check.
   isConfigured(): boolean {
-    return !!config.fly.apiToken && !!config.fly.org;
+    return !!appConfig.fly.apiToken && !!appConfig.fly.org;
   }
 
   private headers(): Record<string, string> {
     return {
-      Authorization: `Bearer ${config.fly.apiToken}`,
+      Authorization: `Bearer ${appConfig.fly.apiToken}`,
       'Content-Type': 'application/json',
     };
   }
@@ -111,7 +133,7 @@ export class FlyProvider implements ComputeProvider {
       const response = await fetch(graphqlEndpoint, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${config.fly.apiToken}`,
+          Authorization: `Bearer ${appConfig.fly.apiToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query: mutation, variables: { input: { appId, type } } }),
@@ -154,7 +176,7 @@ export class FlyProvider implements ComputeProvider {
     const response = await fetch('https://api.fly.io/graphql', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${config.fly.apiToken}`,
+        Authorization: `Bearer ${appConfig.fly.apiToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -197,12 +219,28 @@ export class FlyProvider implements ComputeProvider {
   // Machines API silently ignores unknown fields, so getting these wrong
   // looks like it works but leaves machines always-on. Source of truth:
   // https://docs.machines.dev/spec/openapi3.json — fly.MachineService.
-  private serviceConfig(internalPort: number, scale: ScaleOptions = FlyProvider.SCALE_TO_ZERO) {
+  //
+  // `edgeProtocol` selects the edge-handler shape:
+  //   - `'http'` (default): TLS-terminated at the Fly anycast edge, HTTP/1.1+H2
+  //     proxied to the container's port. Two public ports (443 TLS, 80 plain).
+  //   - `'tcp'`: container's port exposed directly with empty handlers, for
+  //     Redis / Postgres-protocol / raw TCP services. Single public port =
+  //     internal port. Fly's `services[].protocol` stays `'tcp'` either way
+  //     (that's the L4 protocol field, not L7).
+  private serviceConfig(
+    internalPort: number,
+    edgeProtocol: 'http' | 'tcp' = 'http',
+    scale: ScaleOptions = FlyProvider.SCALE_TO_ZERO
+  ) {
+    const ports =
+      edgeProtocol === 'tcp'
+        ? [{ port: internalPort, handlers: [] as string[] }]
+        : [
+            { port: 443, handlers: ['tls', 'http'] },
+            { port: 80, handlers: ['http'] },
+          ];
     return {
-      ports: [
-        { port: 443, handlers: ['tls', 'http'] },
-        { port: 80, handlers: ['http'] },
-      ],
+      ports,
       internal_port: internalPort,
       protocol: 'tcp',
       // Scale config. `stop` (vs `suspend`) fully releases the machine —
@@ -223,6 +261,7 @@ export class FlyProvider implements ComputeProvider {
     memory: number;
     envVars: Record<string, string>;
     region: string;
+    protocol?: 'http' | 'tcp';
   }): Promise<{ machineId: string }> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
     const result = await this.requestJson<{ id: string }>(`/apps/${params.appId}/machines`, {
@@ -232,7 +271,7 @@ export class FlyProvider implements ComputeProvider {
           image: params.image,
           guest,
           env: params.envVars,
-          services: [this.serviceConfig(params.port)],
+          services: [this.serviceConfig(params.port, params.protocol ?? 'http')],
         },
         region: params.region,
       }),
@@ -248,6 +287,7 @@ export class FlyProvider implements ComputeProvider {
     cpu: string;
     memory: number;
     envVars: Record<string, string>;
+    protocol?: 'http' | 'tcp';
   }): Promise<void> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
     await this.request(`/apps/${params.appId}/machines/${params.machineId}`, {
@@ -257,7 +297,7 @@ export class FlyProvider implements ComputeProvider {
           image: params.image,
           guest,
           env: params.envVars,
-          services: [this.serviceConfig(params.port)],
+          services: [this.serviceConfig(params.port, params.protocol ?? 'http')],
         },
       }),
     });
@@ -339,6 +379,93 @@ export class FlyProvider implements ComputeProvider {
 
     const limit = options?.limit ?? 100;
     return mapped.slice(0, limit);
+  }
+
+  /**
+   * Returns container stdout/stderr ("application logs") from Fly's logs API
+   * (api.fly.io/api/v1/apps/:app/logs). Unlike getEvents (machine lifecycle),
+   * these are the lines the running process writes. Supports backfill from
+   * Fly's ~7-day retention window and forward paging via `nextToken` for
+   * live tailing.
+   */
+  async getLogs(
+    appId: string,
+    machineId: string,
+    options?: { limit?: number; nextToken?: string }
+  ): Promise<ComputeLogsResult> {
+    const params = new URLSearchParams();
+    // Scope to this service's single machine — a Fly app may briefly hold more
+    // than one (e.g. mid-redeploy), and we only want this service's lines.
+    if (machineId) {
+      params.set('instance', machineId);
+    }
+    if (options?.limit) {
+      // Best-effort: forward the page size so Fly returns enough lines rather
+      // than relying solely on the local slice below (Fly's default is ~100;
+      // unknown params are ignored, so this is safe if unsupported).
+      params.set('limit', String(options.limit));
+    }
+    if (options?.nextToken) {
+      params.set('next_token', options.nextToken);
+    }
+    const url = `${FLY_LOGS_API_BASE}/apps/${appId}/logs?${params.toString()}`;
+
+    let response: Response;
+    try {
+      // Time-box the upstream call — this endpoint is polled live, so a stalled
+      // Fly request must not pile up and degrade API responsiveness.
+      response = await fetch(url, {
+        headers: {
+          Authorization: `FlyV1 ${appConfig.fly.apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (error) {
+      logger.error('Fly logs API request failed', { url, error });
+      throw new Error(`Fly logs API request failed: ${(error as Error).message}`);
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      logger.error('Fly logs API error', { url, status: response.status, body: text });
+      throw new Error(`Fly logs API error (${response.status}): ${text}`);
+    }
+
+    const raw = await response.text();
+    const body = JSON.parse(raw) as FlyLogsResponse;
+
+    const lines = (body.data ?? []).map((entry) => {
+      const a = entry.attributes ?? {};
+      // Fly returns RFC3339 strings (e.g. "2026-06-04T21:25:05.152Z"); some
+      // shapes carry epoch numbers. Normalize to epoch ms; 0 if unparseable.
+      const parsed = typeof a.timestamp === 'number' ? a.timestamp : Date.parse(a.timestamp ?? '');
+      return {
+        timestamp: Number.isNaN(parsed) ? 0 : parsed,
+        message: a.message ?? '',
+        instance: a.instance,
+        region: a.region,
+      };
+    });
+
+    const limit = options?.limit ?? 100;
+    // Keep the most-recent `limit` lines (Fly returns oldest→newest).
+    const bounded = lines.length > limit ? lines.slice(-limit) : lines;
+
+    // `next_token` is a nanosecond Unix timestamp — it exceeds
+    // Number.MAX_SAFE_INTEGER, so JSON.parse() would silently round it and
+    // corrupt the cursor. Pull the exact digits from the raw text for numeric
+    // tokens. If Fly ever issues a non-numeric (string) cursor, the JSON-parsed
+    // value is already safe, so fall back to it rather than dropping the cursor.
+    const tokenMatch = raw.match(/"next_token"\s*:\s*"?(\d+)"?/);
+    const parsedToken = body.meta?.next_token;
+    const nextToken = tokenMatch
+      ? tokenMatch[1]
+      : typeof parsedToken === 'string'
+        ? parsedToken
+        : null;
+
+    return { lines: bounded, nextToken };
   }
 
   // Parse Fly.io's `<kind>-<N>x` format (e.g. shared-2x, performance-8x).

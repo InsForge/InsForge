@@ -9,13 +9,13 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
+  cn,
 } from '@insforge/ui';
 import { Label } from '#components';
 import { useTables } from '#features/database/hooks/useTables';
 import { UseFormReturn } from 'react-hook-form';
 import { TableFormSchema, TableFormForeignKeySchema } from '#features/database/schema';
 import { ColumnSchema, OnDeleteActionSchema, OnUpdateActionSchema } from '@insforge/shared-schemas';
-import { cn } from '#lib/utils/utils';
 import { AUTH_USERS_TABLE } from '#features/database/constants';
 import { parseDatabaseTableReference } from '#features/database/helpers';
 
@@ -43,7 +43,7 @@ export function ForeignKeyPopover({
   const [newForeignKey, setNewForeignKey] = useState<TableFormForeignKeySchema>({
     columnName: '',
     referenceTable: '',
-    referenceColumn: '',
+    referenceColumns: [{ sourceColumn: '', referenceColumn: '' }],
     onDelete: 'NO ACTION',
     onUpdate: 'NO ACTION',
   });
@@ -57,7 +57,9 @@ export function ForeignKeyPopover({
       setNewForeignKey({
         columnName: initialValue.columnName,
         referenceTable: initialValue.referenceTable,
-        referenceColumn: initialValue.referenceColumn,
+        referenceColumns: initialValue.referenceColumns?.length
+          ? initialValue.referenceColumns
+          : [{ sourceColumn: initialValue.columnName, referenceColumn: '' }],
         onDelete: initialValue.onDelete,
         onUpdate: initialValue.onUpdate,
       });
@@ -66,7 +68,7 @@ export function ForeignKeyPopover({
       setNewForeignKey({
         columnName: '',
         referenceTable: '',
-        referenceColumn: '',
+        referenceColumns: [{ sourceColumn: '', referenceColumn: '' }],
         onDelete: 'NO ACTION',
         onUpdate: 'NO ACTION',
       });
@@ -110,16 +112,32 @@ export function ForeignKeyPopover({
 
   // Calculate if the button should be enabled
   const isAddButtonEnabled = Boolean(
-    newForeignKey.columnName && newForeignKey.referenceTable && newForeignKey.referenceColumn
+    newForeignKey.columnName &&
+    newForeignKey.referenceTable &&
+    newForeignKey.referenceColumns[0]?.referenceColumn
   );
 
   const handleAddForeignKey = () => {
-    if (newForeignKey.columnName && newForeignKey.referenceTable && newForeignKey.referenceColumn) {
-      onAddForeignKey(newForeignKey);
+    if (
+      newForeignKey.columnName &&
+      newForeignKey.referenceTable &&
+      newForeignKey.referenceColumns[0]?.referenceColumn
+    ) {
+      // Ensure sourceColumn matches the selected columnName for dashboard-created FKs
+      const fk = {
+        ...newForeignKey,
+        referenceColumns: [
+          {
+            sourceColumn: newForeignKey.columnName,
+            referenceColumn: newForeignKey.referenceColumns[0].referenceColumn,
+          },
+        ],
+      };
+      onAddForeignKey(fk);
       setNewForeignKey({
         columnName: '',
         referenceTable: '',
-        referenceColumn: '',
+        referenceColumns: [{ sourceColumn: '', referenceColumn: '' }],
         onDelete: 'NO ACTION',
         onUpdate: 'NO ACTION',
       });
@@ -131,7 +149,7 @@ export function ForeignKeyPopover({
     setNewForeignKey({
       columnName: '',
       referenceTable: '',
-      referenceColumn: '',
+      referenceColumns: [{ sourceColumn: '', referenceColumn: '' }],
       onDelete: 'NO ACTION',
       onUpdate: 'NO ACTION',
     });
@@ -199,7 +217,9 @@ export function ForeignKeyPopover({
                   setNewForeignKey((prev) => ({
                     ...prev,
                     referenceTable: value,
-                    referenceColumn: '', // Reset column when table changes
+                    referenceColumns: [
+                      { sourceColumn: prev.columnName || '', referenceColumn: '' },
+                    ],
                   }));
                 }}
               >
@@ -231,19 +251,23 @@ export function ForeignKeyPopover({
                 </Label>
                 <Select
                   key={`column-select-${newForeignKey.referenceTable}`}
-                  value={newForeignKey.referenceColumn}
+                  value={newForeignKey.referenceColumns[0]?.referenceColumn || ''}
                   onValueChange={(value) =>
-                    setNewForeignKey((prev) => ({ ...prev, referenceColumn: value }))
+                    setNewForeignKey((prev) => ({
+                      ...prev,
+                      referenceColumns: [{ ...prev.referenceColumns[0], referenceColumn: value }],
+                    }))
                   }
                 >
                   <SelectTrigger className="w-70 h-10">
                     <span
                       className={cn(
                         'text-sm text-muted-foreground dark:text-neutral-400',
-                        newForeignKey.referenceColumn && 'text-black dark:text-white'
+                        newForeignKey.referenceColumns[0]?.referenceColumn &&
+                          'text-black dark:text-white'
                       )}
                     >
-                      {newForeignKey.referenceColumn || 'Select column'}
+                      {newForeignKey.referenceColumns[0]?.referenceColumn || 'Select column'}
                     </span>
                   </SelectTrigger>
                   <SelectContent className="max-w-[360px]">

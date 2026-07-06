@@ -10,7 +10,7 @@ export interface OAuthProvider {
    * @param state - Optional state parameter for CSRF protection
    * @returns Authorization URL
    */
-  generateOAuthUrl(state?: string): Promise<string>;
+  generateOAuthUrl(state?: string, additionalParams?: Record<string, string>): Promise<string>;
 
   /**
    * Handle OAuth callback and exchange code/token for user info

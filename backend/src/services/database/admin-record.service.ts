@@ -1,9 +1,12 @@
 import { AppError } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { ERROR_CODES, type AdminTableRecordPrimaryKey } from '@insforge/shared-schemas';
+import type { PoolClient } from 'pg';
 import type { DatabaseRecord } from '@/types/database.js';
+import { TEXT_LIKE_DATA_TYPES } from '@/utils/constants.js';
 import { escapeSqlLikePattern, validateTableName } from '@/utils/validations.js';
-import { assertWritableDatabaseSchema, quoteIdentifier, quoteQualifiedName } from './helpers.js';
+import { quoteIdentifier, quoteQualifiedName } from './helpers.js';
+import { withAdminContext } from './user-context.service.js';
 
 interface SortClause {
   columnName: string;
@@ -25,8 +28,6 @@ interface TableColumnMetadata {
   searchableColumns: string[];
 }
 
-const TEXT_LIKE_DATA_TYPES = new Set(['text', 'character varying', 'character', 'citext']);
-
 export class AdminRecordService {
   private static instance: AdminRecordService;
   private dbManager = DatabaseManager.getInstance();
@@ -46,50 +47,63 @@ export class AdminRecordService {
     options: ListTableRecordsOptions
   ): Promise<{ records: DatabaseRecord[]; total: number }> {
     validateTableName(tableName);
-    const metadata = await this.getTableColumnMetadata(schemaName, tableName);
-    const { whereSql, params } = this.buildWhereClause(metadata, options);
-    const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
-    const orderBySql = this.buildOrderByClause(metadata, options.sort);
 
-    const countResult = await this.dbManager.getPool().query<{
-      total: string;
-    }>(`SELECT COUNT(*)::text AS total FROM ${qualifiedTableName}${whereSql}`, params);
+    return this.withAdminTransaction(async (client) => {
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      const { whereSql, params } = this.buildWhereClause(metadata, options);
+      const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
+      const orderBySql = this.buildOrderByClause(metadata, options.sort);
 
-    const dataParams = [...params, options.limit, options.offset];
-    const limitPlaceholder = `$${params.length + 1}`;
-    const offsetPlaceholder = `$${params.length + 2}`;
-    const recordsResult = await this.dbManager
-      .getPool()
-      .query<DatabaseRecord>(
+      const countResult = await client.query<{
+        total: string;
+      }>(`SELECT COUNT(*)::text AS total FROM ${qualifiedTableName}${whereSql}`, params);
+
+      const dataParams = [...params, options.limit, options.offset];
+      const limitPlaceholder = `$${params.length + 1}`;
+      const offsetPlaceholder = `$${params.length + 2}`;
+      const recordsResult = await client.query<DatabaseRecord>(
         `SELECT * FROM ${qualifiedTableName}${whereSql}${orderBySql} LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
         dataParams
       );
 
-    return {
-      records: recordsResult.rows,
-      total: Number(countResult.rows[0]?.total ?? 0),
-    };
+      return {
+        records: recordsResult.rows,
+        total: Number(countResult.rows[0]?.total ?? 0),
+      };
+    });
   }
 
   async lookupRecord(
     schemaName: string,
     tableName: string,
-    columnName: string,
-    value: string
+    columns: string[],
+    values: string[]
   ): Promise<DatabaseRecord | null> {
     validateTableName(tableName);
-    const metadata = await this.getTableColumnMetadata(schemaName, tableName);
-    this.assertColumnExists(metadata, columnName);
 
-    const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
-    const result = await this.dbManager
-      .getPool()
-      .query<DatabaseRecord>(
-        `SELECT * FROM ${qualifiedTableName} WHERE ${quoteIdentifier(columnName)} = $1 LIMIT 1`,
-        [value]
+    if (columns.length === 0 || columns.length !== values.length) {
+      throw new AppError(
+        'Columns and values must have the same non-zero length',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    return this.withAdminTransaction(async (client) => {
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      for (const col of columns) {
+        this.assertColumnExists(metadata, col);
+      }
+
+      const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
+      const whereClauses = columns.map((col, i) => `${quoteIdentifier(col)} = $${i + 1}`);
+      const result = await client.query<DatabaseRecord>(
+        `SELECT * FROM ${qualifiedTableName} WHERE ${whereClauses.join(' AND ')} LIMIT 1`,
+        values
       );
 
-    return result.rows[0] ?? null;
+      return result.rows[0] ?? null;
+    });
   }
 
   async createRecords(
@@ -98,17 +112,11 @@ export class AdminRecordService {
     records: DatabaseRecord[]
   ): Promise<DatabaseRecord[]> {
     validateTableName(tableName);
-    assertWritableDatabaseSchema(schemaName);
 
-    const metadata = await this.getTableColumnMetadata(schemaName, tableName);
-    const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
-    const client = await this.dbManager.getPool().connect();
-    const createdRecords: DatabaseRecord[] = [];
-    let transactionStarted = false;
-
-    try {
-      await client.query('BEGIN');
-      transactionStarted = true;
+    return this.withAdminTransaction(async (client) => {
+      const createdRecords: DatabaseRecord[] = [];
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
 
       for (const record of records) {
         const sanitizedRecord = this.sanitizeInsertRecord(record, metadata);
@@ -133,105 +141,186 @@ export class AdminRecordService {
         createdRecords.push(...result.rows);
       }
 
-      await client.query('COMMIT');
-      transactionStarted = false;
-
       return createdRecords;
-    } catch (error) {
-      if (transactionStarted) {
-        await client.query('ROLLBACK');
-      }
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   async updateRecord(
     schemaName: string,
     tableName: string,
-    pkColumn: string,
-    pkValue: string,
+    primaryKey: AdminTableRecordPrimaryKey,
     data: DatabaseRecord
   ): Promise<DatabaseRecord> {
     validateTableName(tableName);
-    assertWritableDatabaseSchema(schemaName);
 
-    const metadata = await this.getTableColumnMetadata(schemaName, tableName);
-    this.assertColumnExists(metadata, pkColumn);
-
-    const sanitizedRecord = this.sanitizeUpdateRecord(data, metadata);
-    const entries = Object.entries(sanitizedRecord);
-
-    if (entries.length === 0) {
+    const keyEntries = Object.entries(primaryKey);
+    if (keyEntries.length === 0) {
       throw new AppError(
-        'No valid fields to update.',
+        'Primary key is required to update a record.',
         400,
         ERROR_CODES.INVALID_INPUT,
-        'Provide at least one editable field with a non-empty value.'
+        'Provide at least one primary key column and value.'
       );
     }
 
-    const assignments = entries.map(
-      ([columnName], index) => `${quoteIdentifier(columnName)} = $${index + 1}`
-    );
-    const values = entries.map(([, value]) => value);
-    values.push(pkValue);
+    return this.withAdminTransaction(async (client) => {
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      const primaryKeyColumns = await this.getPrimaryKeyColumns(schemaName, tableName, client);
+      keyEntries.forEach(([columnName]) => this.assertColumnExists(metadata, columnName));
+      this.assertKeyMatchesPrimaryKey(
+        primaryKeyColumns,
+        keyEntries.map(([columnName]) => columnName)
+      );
 
-    const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
-    const result = await this.dbManager
-      .getPool()
-      .query<DatabaseRecord>(
-        `UPDATE ${qualifiedTableName} SET ${assignments.join(', ')} WHERE ${quoteIdentifier(pkColumn)} = $${values.length} RETURNING *`,
+      const sanitizedRecord = this.sanitizeUpdateRecord(data, metadata);
+      const entries = Object.entries(sanitizedRecord);
+
+      if (entries.length === 0) {
+        throw new AppError(
+          'No valid fields to update.',
+          400,
+          ERROR_CODES.INVALID_INPUT,
+          'Provide at least one editable field with a non-empty value.'
+        );
+      }
+
+      const assignments = entries.map(
+        ([columnName], index) => `${quoteIdentifier(columnName)} = $${index + 1}`
+      );
+      const values: unknown[] = entries.map(([, value]) => value);
+
+      // WHERE matches the full primary-key tuple so composite keys target exactly one row.
+      // A null component (only possible on the keyless all-columns fallback) is matched
+      // with `IS NULL`, since `col = NULL` never matches.
+      const whereClauses = keyEntries.map(([columnName, value]) => {
+        if (value === null) {
+          return `${quoteIdentifier(columnName)} IS NULL`;
+        }
+        values.push(value);
+        return `${quoteIdentifier(columnName)} = $${values.length}`;
+      });
+
+      const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
+      const result = await client.query<DatabaseRecord>(
+        `UPDATE ${qualifiedTableName} SET ${assignments.join(', ')} WHERE ${whereClauses.join(
+          ' AND '
+        )} RETURNING *`,
         values
       );
 
-    const updatedRecord = result.rows[0];
-    if (!updatedRecord) {
-      throw new AppError(
-        'Record not found.',
-        404,
-        ERROR_CODES.DATABASE_NOT_FOUND,
-        'Check the record identifier and try again.'
-      );
-    }
+      const updatedRecord = result.rows[0];
+      if (!updatedRecord) {
+        throw new AppError(
+          'Record not found.',
+          404,
+          ERROR_CODES.DATABASE_NOT_FOUND,
+          'Check the record identifier and try again.'
+        );
+      }
 
-    return updatedRecord;
+      return updatedRecord;
+    });
   }
 
   async deleteRecords(
     schemaName: string,
     tableName: string,
-    pkColumn: string,
-    pkValues: string[]
+    primaryKeys: AdminTableRecordPrimaryKey[]
   ): Promise<number> {
     validateTableName(tableName);
-    assertWritableDatabaseSchema(schemaName);
 
-    const metadata = await this.getTableColumnMetadata(schemaName, tableName);
-    this.assertColumnExists(metadata, pkColumn);
+    return this.withAdminTransaction(async (client) => {
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      const primaryKeyColumns = await this.getPrimaryKeyColumns(schemaName, tableName, client);
 
-    if (pkValues.length === 0) {
-      return 0;
-    }
+      if (primaryKeys.length === 0) {
+        return 0;
+      }
 
-    const placeholders = pkValues.map((_, index) => `$${index + 1}`);
-    const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
-    const result = await this.dbManager
-      .getPool()
-      .query(
-        `DELETE FROM ${qualifiedTableName} WHERE ${quoteIdentifier(pkColumn)} IN (${placeholders.join(', ')})`,
-        pkValues
+      const values: unknown[] = [];
+      // Each selected row is matched by its full primary-key tuple, OR'd together,
+      // so composite keys delete exactly the selected rows (not WHERE first_col IN (...)).
+      const rowClauses = primaryKeys.map((primaryKey) => {
+        const keyEntries = Object.entries(primaryKey);
+        if (keyEntries.length === 0) {
+          throw new AppError(
+            'Primary key is required to delete a record.',
+            400,
+            ERROR_CODES.INVALID_INPUT,
+            'Provide at least one primary key column and value for each record.'
+          );
+        }
+
+        keyEntries.forEach(([columnName]) => this.assertColumnExists(metadata, columnName));
+        this.assertKeyMatchesPrimaryKey(
+          primaryKeyColumns,
+          keyEntries.map(([columnName]) => columnName)
+        );
+
+        const columnClauses = keyEntries.map(([columnName, value]) => {
+          if (value === null) {
+            return `${quoteIdentifier(columnName)} IS NULL`;
+          }
+          values.push(value);
+          return `${quoteIdentifier(columnName)} = $${values.length}`;
+        });
+
+        return `(${columnClauses.join(' AND ')})`;
+      });
+
+      const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
+      const result = await client.query(
+        `DELETE FROM ${qualifiedTableName} WHERE ${rowClauses.join(' OR ')}`,
+        values
       );
 
-    return result.rowCount ?? 0;
+      return result.rowCount ?? 0;
+    });
+  }
+
+  private async withAdminTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await this.dbManager.getPool().connect();
+    let transactionStarted = false;
+    let releaseError: Error | undefined;
+
+    try {
+      await client.query('BEGIN');
+      transactionStarted = true;
+
+      const result = await withAdminContext(
+        client,
+        () => fn(client),
+        true,
+        (error) => {
+          releaseError = error;
+        }
+      );
+
+      await client.query('COMMIT');
+      transactionStarted = false;
+      return result;
+    } catch (error) {
+      if (transactionStarted) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          releaseError =
+            rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+        }
+      }
+      throw error;
+    } finally {
+      client.release(releaseError);
+    }
   }
 
   private async getTableColumnMetadata(
     schemaName: string,
-    tableName: string
+    tableName: string,
+    client?: PoolClient
   ): Promise<TableColumnMetadata> {
-    const result = await this.dbManager.getPool().query<{
+    const queryable = client ?? this.dbManager.getPool();
+    const result = await queryable.query<{
       column_name: string;
       data_type: string;
       is_nullable: string;
@@ -282,6 +371,62 @@ export class AdminRecordService {
       nullableColumns,
       searchableColumns,
     };
+  }
+
+  /**
+   * Fetches a table's primary-key columns (ordinal order). Returns an empty array
+   * only when the table genuinely has no primary key. Mutations call this directly,
+   * so an empty result can never be confused with "metadata wasn't loaded".
+   */
+  private async getPrimaryKeyColumns(
+    schemaName: string,
+    tableName: string,
+    client: PoolClient
+  ): Promise<string[]> {
+    const result = await client.query<{ column_name: string }>(
+      `
+        SELECT kcu.column_name
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+          ON tc.constraint_name = kcu.constraint_name
+          AND tc.table_schema = kcu.table_schema
+          AND tc.table_name = kcu.table_name
+        WHERE tc.constraint_type = 'PRIMARY KEY'
+          AND tc.table_schema = $1
+          AND tc.table_name = $2
+        ORDER BY kcu.ordinal_position
+      `,
+      [schemaName, tableName]
+    );
+
+    return result.rows.map((row) => row.column_name);
+  }
+
+  /**
+   * Ensures the supplied key columns are exactly the table's primary key, so a
+   * partial composite key (e.g. only `tenant_id` of a `(tenant_id, item_id)` key)
+   * can't match and mutate more rows than intended. Tables with no detected
+   * primary key (empty `primaryKeyColumns`) fall back to the caller-provided
+   * columns (validated for existence elsewhere).
+   */
+  private assertKeyMatchesPrimaryKey(primaryKeyColumns: string[], suppliedColumns: string[]): void {
+    if (primaryKeyColumns.length === 0) {
+      return;
+    }
+
+    const suppliedSet = new Set(suppliedColumns);
+    const matchesFullKey =
+      suppliedSet.size === primaryKeyColumns.length &&
+      primaryKeyColumns.every((column) => suppliedSet.has(column));
+
+    if (!matchesFullKey) {
+      throw new AppError(
+        'Primary key does not match the table primary key.',
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        `Provide exactly these primary key columns: ${primaryKeyColumns.join(', ')}.`
+      );
+    }
   }
 
   private buildWhereClause(

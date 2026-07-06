@@ -1,16 +1,18 @@
 import { Router, Response, NextFunction } from 'express';
 import axios from 'axios';
-import { AuthRequest, extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
+import { AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { validateTableName } from '@/utils/validations.js';
 import { DatabaseRecord } from '@/types/database.js';
+import { TEXT_LIKE_DATA_TYPES } from '@/utils/constants.js';
 import { successResponse } from '@/utils/response.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 import { PostgrestProxyService } from '@/services/database/postgrest-proxy.service.js';
+import { resolvePostgrestSchema } from '@/services/database/helpers.js';
 
 const router = Router();
 const proxyService = PostgrestProxyService.getInstance();
@@ -44,18 +46,31 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
       throw new AppError('Invalid table name', 400, ERROR_CODES.INVALID_INPUT);
     }
 
+    // Resolve the target schema the native PostgREST way: an explicit ?schema=
+    // is desugared into the Accept-Profile/Content-Profile header (and stripped
+    // from the forwarded query); a client-sent profile header is honored as-is.
+    const {
+      schemaName,
+      query: forwardedQuery,
+      headers: forwardedHeaders,
+    } = resolvePostgrestSchema(
+      req.method,
+      req.query as Record<string, unknown>,
+      req.headers as Record<string, string | string[] | undefined>
+    );
+
     // Process request body for POST/PATCH/PUT (filter empty values based on column types)
     const method = req.method.toUpperCase();
     let body = req.body;
 
     if (['POST', 'PATCH', 'PUT'].includes(method) && body && typeof body === 'object') {
-      const columnTypeMap = await DatabaseManager.getColumnTypeMap(tableName);
+      const columnTypeMap = await DatabaseManager.getColumnTypeMap(tableName, schemaName);
       if (Array.isArray(body)) {
         body = body.map((item) => {
           if (item && typeof item === 'object') {
             const filtered: DatabaseRecord = {};
             for (const key in item) {
-              if (columnTypeMap[key] !== 'text' && item[key] === '') {
+              if (!TEXT_LIKE_DATA_TYPES.has(columnTypeMap[key] ?? '') && item[key] === '') {
                 continue;
               }
               filtered[key] = item[key];
@@ -66,7 +81,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
         });
       } else {
         for (const key in body) {
-          if (columnTypeMap[key] === 'uuid' && body[key] === '') {
+          if (!TEXT_LIKE_DATA_TYPES.has(columnTypeMap[key] ?? '') && body[key] === '') {
             delete body[key];
           }
         }
@@ -74,14 +89,20 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     }
 
     // Forward to PostgREST via service
-    const result = await proxyService.forward({
+    const proxyRequest = {
       method: req.method,
       path,
-      query: req.query as Record<string, unknown>,
-      headers: req.headers as Record<string, string | string[] | undefined>,
+      query: forwardedQuery,
+      headers: forwardedHeaders,
       body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? body : undefined,
-      apiKey: extractApiKey(req) ?? undefined,
-    });
+    };
+
+    const result =
+      req.user?.role === 'project_admin' || req.hasApiKey === true
+        ? await proxyService.forwardAsAdmin(proxyRequest)
+        : req.user && req.user.role !== 'anon'
+          ? await proxyService.forwardAsUser(proxyRequest, req.user)
+          : await proxyService.forwardAsAnon(proxyRequest);
 
     // Forward response headers
     const headers = PostgrestProxyService.filterHeaders(result.headers);

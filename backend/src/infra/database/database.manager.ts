@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import { DatabaseMetadataSchema } from '@insforge/shared-schemas';
 import pgFormat from 'pg-format';
 import { buildQualifiedTableKey, DEFAULT_DATABASE_SCHEMA } from '@/services/database/helpers.js';
+import { appConfig } from '@/infra/config/app.config.js';
+import logger from '@/utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,9 +24,16 @@ export class DatabaseManager {
   private static readonly COLUMN_TYPE_CACHE_TTL = 5 * 60 * 1000;
   private static columnTypeCache = new Map<string, CacheEntry<Record<string, string>>>();
   private static readonly MAX_CACHE_SIZE = 100;
+  /**
+   * Maximum entries for table row counts.
+   * Bounded at 1000 per workspace/process to prevent memory leaks in multi-tenant or multi-schema deployments.
+   */
+  private static readonly MAX_TABLE_COUNT_CACHE_SIZE = 1000;
+  private static readonly TABLE_COUNT_CACHE_TTL = 60 * 1000;
+  private static tableCountCache = new Map<string, { count: number; timestamp: number }>();
 
   private constructor() {
-    this.dataDir = process.env.DATABASE_DIR || path.join(__dirname, '../../data');
+    this.dataDir = appConfig.database.dir;
   }
 
   static getInstance(): DatabaseManager {
@@ -37,13 +46,12 @@ export class DatabaseManager {
   async initialize(): Promise<void> {
     await fs.mkdir(this.dataDir, { recursive: true });
 
-    // PostgreSQL connection configuration
     this.pool = new Pool({
-      host: process.env.POSTGRES_HOST || 'localhost',
-      port: parseInt(process.env.POSTGRES_PORT || '5432'),
-      database: process.env.POSTGRES_DB || 'insforge',
-      user: process.env.POSTGRES_USER || 'postgres',
-      password: process.env.POSTGRES_PASSWORD || 'postgres',
+      host: appConfig.database.host,
+      port: appConfig.database.port,
+      database: appConfig.database.name,
+      user: appConfig.database.user,
+      password: appConfig.database.password,
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
@@ -64,32 +72,50 @@ export class DatabaseManager {
     const client = await instance.pool.connect();
     try {
       const result = await client.query(
-        `SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2`,
+        `SELECT column_name, data_type, udt_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2`,
         [schemaName, tableName]
       );
       const map: Record<string, string> = {};
       for (const row of result.rows) {
-        map[row.column_name] = row.data_type;
+        const dataType = row.data_type.toLowerCase();
+        map[row.column_name] = dataType === 'user-defined' ? row.udt_name.toLowerCase() : dataType;
       }
 
-      DatabaseManager.setColumnTypeCache(cacheKey, map);
+      DatabaseManager.setBoundedCache(
+        DatabaseManager.columnTypeCache,
+        DatabaseManager.MAX_CACHE_SIZE,
+        cacheKey,
+        { data: map, expiry: Date.now() + DatabaseManager.COLUMN_TYPE_CACHE_TTL }
+      );
       return map;
     } finally {
       client.release();
     }
   }
 
-  private static setColumnTypeCache(cacheKey: string, data: Record<string, string>): void {
-    if (DatabaseManager.columnTypeCache.size >= DatabaseManager.MAX_CACHE_SIZE) {
-      const firstKey = DatabaseManager.columnTypeCache.keys().next().value;
-      if (firstKey) {
-        DatabaseManager.columnTypeCache.delete(firstKey);
+  /**
+   * Inserts an entry into a bounded cache with FIFO eviction.
+   * When the cache reaches maxSize, the oldest entry (first insertion-order key) is removed
+   * before adding the new entry, preventing unbounded memory growth.
+   *
+   * @param cache - The Map to insert into
+   * @param maxSize - Maximum number of entries allowed
+   * @param key - Cache key
+   * @param entry - Value to cache
+   */
+  private static setBoundedCache<V>(
+    cache: Map<string, V>,
+    maxSize: number,
+    key: string,
+    entry: V
+  ): void {
+    if (cache.size >= maxSize && !cache.has(key)) {
+      const first = cache.keys().next().value;
+      if (first !== undefined) {
+        cache.delete(first);
       }
     }
-    DatabaseManager.columnTypeCache.set(cacheKey, {
-      data,
-      expiry: Date.now() + DatabaseManager.COLUMN_TYPE_CACHE_TTL,
-    });
+    cache.set(key, entry);
   }
 
   static clearColumnTypeCache(
@@ -122,61 +148,79 @@ export class DatabaseManager {
   }
 
   async getMetadata(): Promise<DatabaseMetadataSchema> {
-    const client = await this.pool.connect();
-    try {
-      // Fetch all tables, database size, and record counts in parallel
-      const [allTables, databaseSize, countResults] = await Promise.all([
-        this.getUserTables(),
-        this.getDatabaseSizeInGB(),
-        // Get all counts in a single query using UNION ALL
-        (async () => {
-          try {
-            const tablesResult = await client.query(
-              `
-              SELECT table_name as name
-              FROM information_schema.tables
-              WHERE table_schema = 'public'
-              AND table_type = 'BASE TABLE'
-              ORDER BY table_name
-            `
-            );
-            const tableNames = tablesResult.rows.map((row: { name: string }) => row.name);
+    const [allTables, databaseSize] = await Promise.all([
+      this.getUserTables(),
+      this.getDatabaseSizeInGB(),
+    ]);
 
-            if (tableNames.length === 0) {
-              return [];
-            }
+    const now = Date.now();
+    const requestCounts = new Map<string, number>();
+    const missingOrExpired: string[] = [];
 
-            // Build a UNION ALL query to get all counts in one query
-            const unionQuery = tableNames
-              .map((tableName) =>
-                pgFormat('SELECT %L as table_name, COUNT(*) as count FROM %I', tableName, tableName)
-              )
-              .join(' UNION ALL ');
-
-            const result = await client.query(unionQuery);
-            return result.rows as { table_name: string; count: number }[];
-          } catch {
-            return [];
-          }
-        })(),
-      ]);
-
-      // Map the count results to a lookup object
-      const countMap = new Map(countResults.map((r) => [r.table_name, Number(r.count)]));
-
-      const tableMetadatas = allTables.map((tableName) => ({
-        tableName,
-        recordCount: countMap.get(tableName) || 0,
-      }));
-
-      return {
-        tables: tableMetadatas,
-        totalSizeInGB: databaseSize,
-        hint: 'To retrieve detailed schema information for a specific table, call the get-table-schema tool with the table name.',
-      };
-    } finally {
-      client.release();
+    for (const tableName of allTables) {
+      const cacheKey = buildQualifiedTableKey(tableName, 'public');
+      const cached = DatabaseManager.tableCountCache.get(cacheKey);
+      if (cached && now - cached.timestamp < DatabaseManager.TABLE_COUNT_CACHE_TTL) {
+        requestCounts.set(cacheKey, cached.count);
+      } else {
+        missingOrExpired.push(tableName);
+      }
     }
+
+    if (missingOrExpired.length > 0) {
+      const client = await this.pool.connect();
+      try {
+        const unionQuery = missingOrExpired
+          .map((tableName) =>
+            pgFormat(
+              'SELECT %L as table_name, COUNT(*) as count FROM %I.%I',
+              tableName,
+              'public',
+              tableName
+            )
+          )
+          .join(' UNION ALL ');
+
+        const queryResult = await client.query(unionQuery);
+        const nowAfterQuery = Date.now();
+
+        // 1. Resolve all database counts into the request-local map first
+        for (const row of queryResult.rows) {
+          const cacheKey = buildQualifiedTableKey(row.table_name, 'public');
+          requestCounts.set(cacheKey, Number(row.count));
+        }
+
+        // 2. Perform all cache mutations second
+        for (const row of queryResult.rows) {
+          const cacheKey = buildQualifiedTableKey(row.table_name, 'public');
+          const count = requestCounts.get(cacheKey) ?? Number(row.count);
+          DatabaseManager.setBoundedCache(
+            DatabaseManager.tableCountCache,
+            DatabaseManager.MAX_TABLE_COUNT_CACHE_SIZE,
+            cacheKey,
+            { count, timestamp: nowAfterQuery }
+          );
+        }
+      } catch (error) {
+        logger.error('Failed to batch query exact table counts:', { error });
+      } finally {
+        client.release();
+      }
+    }
+
+    const tableMetadatas = allTables.map((tableName) => {
+      const cacheKey = buildQualifiedTableKey(tableName, 'public');
+      return {
+        tableName,
+        recordCount: requestCounts.get(cacheKey) ?? 0,
+      };
+    });
+
+    return {
+      tables: tableMetadatas,
+      totalSizeInGB: databaseSize,
+      hint: 'To retrieve detailed schema information for a specific table, call the get-table-schema tool with the table name.',
+    };
   }
 
   async getDatabaseSizeInGB(): Promise<number> {
@@ -203,11 +247,11 @@ export class DatabaseManager {
    */
   createClient(): Client {
     return new Client({
-      host: process.env.POSTGRES_HOST || 'localhost',
-      port: parseInt(process.env.POSTGRES_PORT || '5432'),
-      database: process.env.POSTGRES_DB || 'insforge',
-      user: process.env.POSTGRES_USER || 'postgres',
-      password: process.env.POSTGRES_PASSWORD || 'postgres',
+      host: appConfig.database.host,
+      port: appConfig.database.port,
+      database: appConfig.database.name,
+      user: appConfig.database.user,
+      password: appConfig.database.password,
     });
   }
 

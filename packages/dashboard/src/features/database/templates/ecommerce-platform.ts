@@ -93,12 +93,6 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: true,
-          foreignKey: {
-            referenceTable: 'auth.users',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'first_name',
@@ -157,6 +151,14 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isUnique: false,
         },
       ],
+      foreignKeys: [
+        {
+          referenceTable: 'auth.users',
+          referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+      ],
     },
     {
       tableName: 'orders',
@@ -168,12 +170,6 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'customers',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'status',
@@ -211,6 +207,14 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isUnique: false,
         },
       ],
+      foreignKeys: [
+        {
+          referenceTable: 'customers',
+          referenceColumns: [{ sourceColumn: 'customer_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+      ],
     },
     {
       tableName: 'order_items',
@@ -222,12 +226,6 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'orders',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'product_id',
@@ -235,12 +233,6 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'products',
-            referenceColumn: 'id',
-            onDelete: 'RESTRICT',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'quantity',
@@ -264,6 +256,20 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isUnique: false,
         },
       ],
+      foreignKeys: [
+        {
+          referenceTable: 'orders',
+          referenceColumns: [{ sourceColumn: 'order_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+        {
+          referenceTable: 'products',
+          referenceColumns: [{ sourceColumn: 'product_id', referenceColumn: 'id' }],
+          onDelete: 'RESTRICT',
+          onUpdate: 'CASCADE',
+        },
+      ],
     },
     {
       tableName: 'reviews',
@@ -275,12 +281,6 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'products',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'customer_id',
@@ -288,12 +288,6 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'customers',
-            referenceColumn: 'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'rating',
@@ -315,6 +309,20 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
+        },
+      ],
+      foreignKeys: [
+        {
+          referenceTable: 'products',
+          referenceColumns: [{ sourceColumn: 'product_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+        {
+          referenceTable: 'customers',
+          referenceColumns: [{ sourceColumn: 'customer_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
         },
       ],
     },

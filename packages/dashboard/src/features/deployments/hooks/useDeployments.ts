@@ -4,7 +4,7 @@ import {
   deploymentsService,
   type DeploymentSchema,
 } from '#features/deployments/services/deployments.service';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 import type { StartDeploymentRequest } from '@insforge/shared-schemas';
 
 export function useDeployments() {

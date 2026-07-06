@@ -1,15 +1,6 @@
 import type { Page, Route } from '@playwright/test';
 
-const adminUser = {
-  id: '00000000-0000-4000-8000-000000000001',
-  email: 'admin@example.com',
-  emailVerified: true,
-  providers: ['password'],
-  createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-01T00:00:00.000Z',
-  profile: null,
-  metadata: null,
-};
+const admin = { sub: 'local:admin' };
 
 const selfHostingMetadata = {
   auth: {
@@ -55,18 +46,18 @@ async function fulfillLoggedOutSession(route: Route) {
 
 async function fulfillLoggedInSession(route: Route) {
   return fulfillJson(route, 200, {
-    user: adminUser,
+    admin,
   });
 }
 
 export async function mockLoggedOutApi(page: Page) {
-  await page.route('**/api/auth/sessions/current', fulfillLoggedOutSession);
+  await page.route('**/api/auth/admin/sessions/current', fulfillLoggedOutSession);
 }
 
 export async function mockSelfHostingDashboardApi(page: Page) {
   let isLoggedIn = false;
 
-  await page.route('**/api/auth/sessions/current', (route) => {
+  await page.route('**/api/auth/admin/sessions/current', (route) => {
     if (!isLoggedIn) {
       return fulfillLoggedOutSession(route);
     }
@@ -87,7 +78,7 @@ export async function mockSelfHostingDashboardApi(page: Page) {
 
     isLoggedIn = true;
     return fulfillJson(route, 200, {
-      user: adminUser,
+      admin,
       accessToken: 'test-access-token',
       csrfToken: 'test-csrf-token',
     });
@@ -109,11 +100,11 @@ export async function mockSelfHostingDashboardApi(page: Page) {
 
   await page.route('**/api/auth/users?*', (route) =>
     fulfillJson(route, 200, {
-      data: [adminUser],
+      data: [],
       pagination: {
         offset: 0,
         limit: 50,
-        total: 1,
+        total: 0,
       },
     })
   );

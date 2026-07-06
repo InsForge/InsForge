@@ -1,15 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/infra/config/app.config.js', () => ({
-  config: {
+vi.mock('@/infra/config/app.config.js', () => {
+  const c = {
     fly: {
       enabled: true,
       apiToken: 'test-token',
       org: 'test-org',
       domain: 'compute.test.dev',
     },
-  },
-}));
+  };
+  return {
+    config: c,
+    appConfig: c,
+  };
+});
 
 vi.mock('@/utils/logger.js', () => ({
   default: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -182,6 +186,65 @@ describe('FlyProvider', () => {
       expect(body.config.services[0].min_machines_running).toBe(0);
       expect(body.region).toBe('iad');
     });
+
+    // INS-271: protocol: 'tcp' switches the edge-handler shape from the
+    // HTTP-terminating 443/80 pair to a single direct-passthrough port that
+    // matches internal_port with empty L7 handlers. Without this, raw TCP
+    // services (Redis, the Postgres wire protocol, etc.) wedge behind the
+    // Fly anycast HTTP proxy.
+    it('protocol: tcp sets services[].ports to a single passthrough entry with empty handlers', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 'machine-tcp' })),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.launchMachine({
+        appId: 'my-redis',
+        image: 'redis:7',
+        port: 6379,
+        cpu: 'shared-1x',
+        memory: 256,
+        envVars: {},
+        region: 'iad',
+        protocol: 'tcp',
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.config.services[0].internal_port).toBe(6379);
+      // Single port = internal port, no TLS/HTTP handlers — bytes pass through.
+      expect(body.config.services[0].ports).toEqual([{ port: 6379, handlers: [] }]);
+      // Fly's services[].protocol stays 'tcp' (L4 protocol) regardless of
+      // edge mode — that's a Fly API constant, not our protocol field.
+      expect(body.config.services[0].protocol).toBe('tcp');
+    });
+
+    // Back-compat — omitting `protocol` is the same as passing 'http'. We pin
+    // both call shapes so a future refactor that flips the default doesn't
+    // silently change the wire format for existing HTTP deploys.
+    it('omitting protocol defaults to http edge handlers (443 TLS + 80 plain)', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 'machine-http' })),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.launchMachine({
+        appId: 'my-api',
+        image: 'node:20',
+        port: 8080,
+        cpu: 'shared-1x',
+        memory: 256,
+        envVars: {},
+        region: 'iad',
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.config.services[0].ports).toEqual([
+        { port: 443, handlers: ['tls', 'http'] },
+        { port: 80, handlers: ['http'] },
+      ]);
+    });
   });
 
   describe('stopMachine', () => {
@@ -258,6 +321,103 @@ describe('FlyProvider', () => {
         `${FLY_API_BASE}/apps/my-app`,
         expect.objectContaining({ method: 'DELETE' })
       );
+    });
+  });
+
+  describe('getLogs', () => {
+    const okText = (raw: string) => ({ ok: true, text: () => Promise.resolve(raw) });
+
+    it('hits the api.fly.io logs host with the FlyV1 scheme, scoped to the machine', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(okText('{"data":[],"meta":{}}'));
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.getLogs('my-app', 'machine-123');
+
+      const [calledUrl, init] = mockFetch.mock.calls[0];
+      expect(calledUrl).toContain('https://api.fly.io/api/v1/apps/my-app/logs');
+      // Scopes to this service's machine via the `instance` query param.
+      expect(calledUrl).toContain('instance=machine-123');
+      // Logs use Fly's macaroon scheme, NOT Bearer (which 401s on this host).
+      expect((init.headers as Record<string, string>).Authorization).toBe('FlyV1 test-token');
+    });
+
+    it('normalizes RFC3339 timestamps to epoch ms', async () => {
+      const raw =
+        '{"data":[{"attributes":{"timestamp":"2026-06-04T21:25:05.000Z",' +
+        '"message":"hello from container","instance":"machine-123","region":"iad"}}],"meta":{}}';
+      const mockFetch = vi.fn().mockResolvedValue(okText(raw));
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result = await provider.getLogs('my-app', 'machine-123');
+
+      expect(result.lines).toEqual([
+        {
+          timestamp: Date.parse('2026-06-04T21:25:05.000Z'),
+          message: 'hello from container',
+          instance: 'machine-123',
+          region: 'iad',
+        },
+      ]);
+    });
+
+    it('returns next_token at full precision (it exceeds Number.MAX_SAFE_INTEGER)', async () => {
+      // A bare JSON number here would round to ...890600 under JSON.parse;
+      // the provider must preserve every digit by reading the raw text.
+      const raw = '{"data":[],"meta":{"next_token":1780608313161890637}}';
+      const mockFetch = vi.fn().mockResolvedValue(okText(raw));
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result = await provider.getLogs('my-app', 'machine-123');
+
+      expect(result.nextToken).toBe('1780608313161890637');
+    });
+
+    it('forwards the requested limit as a Fly query param', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(okText('{"data":[],"meta":{}}'));
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.getLogs('my-app', 'machine-123', { limit: 200 });
+
+      expect(mockFetch.mock.calls[0][0]).toContain('limit=200');
+    });
+
+    it('falls back to the parsed string cursor for a non-numeric next_token', async () => {
+      const raw = '{"data":[],"meta":{"next_token":"abc-cursor"}}';
+      const mockFetch = vi.fn().mockResolvedValue(okText(raw));
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result = await provider.getLogs('my-app', 'machine-123');
+
+      expect(result.nextToken).toBe('abc-cursor');
+    });
+
+    it('times out the upstream Fly request (passes an abort signal)', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(okText('{"data":[],"meta":{}}'));
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.getLogs('my-app', 'machine-123');
+
+      expect(mockFetch.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it('forwards the nextToken cursor as the Fly next_token query param', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(okText('{"data":[],"meta":{}}'));
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.getLogs('my-app', 'machine-123', { nextToken: 'cursor-abc' });
+
+      expect(mockFetch.mock.calls[0][0]).toContain('next_token=cursor-abc');
+    });
+
+    it('throws on a non-2xx logs response', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: () => Promise.resolve('Unauthorized'),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await expect(provider.getLogs('my-app', 'machine-123')).rejects.toThrow(/401/);
     });
   });
 });

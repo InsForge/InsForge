@@ -3,6 +3,8 @@ import {
   emailSchema,
   passwordSchema,
   nameSchema,
+  usernameSchema,
+  adminSchema,
   userIdSchema,
   userSchema,
   profileSchema,
@@ -50,7 +52,10 @@ export const createSessionRequestSchema = z.object({
 /**
  * POST /api/auth/admin/sessions - Create admin session
  */
-export const createAdminSessionRequestSchema = createSessionRequestSchema;
+export const createAdminSessionRequestSchema = z.object({
+  username: usernameSchema,
+  password: passwordSchema,
+});
 
 /**
  * POST /api/auth/refresh - Refresh user session
@@ -209,13 +214,22 @@ export const resetPasswordResponseSchema = z.object({
 /**
  * Response for POST /api/auth/admin/sessions
  */
-export const createAdminSessionResponseSchema = createSessionResponseSchema;
+export const createAdminSessionResponseSchema = z.object({
+  admin: adminSchema,
+  accessToken: z.string(),
+  csrfToken: z.string().nullable().optional(),
+  refreshToken: z.string().optional(),
+});
 
 /**
  * Response for GET /api/auth/sessions/current
  */
 export const getCurrentSessionResponseSchema = z.object({
   user: userSchema,
+});
+
+export const getCurrentAdminSessionResponseSchema = z.object({
+  admin: adminSchema,
 });
 
 /**
@@ -296,16 +310,16 @@ const pkceRegex = /^[A-Za-z0-9._~-]+$/;
  * Query params for PKCE flow as per RFC 7636
  * Note: code_challenge uses snake_case as per OAuth 2.0 PKCE specification
  */
-export const oAuthInitRequestSchema = z.object({
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  redirect_uri: z.string().url().optional(),
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  code_challenge: z
-    .string()
-    .min(43, 'Code challenge must be at least 43 characters')
-    .max(128, 'Code challenge must be at most 128 characters')
-    .regex(pkceRegex, 'Code challenge must be base64url encoded'),
-});
+export const oAuthInitRequestSchema = z
+  .object({
+    redirect_uri: z.string({ required_error: 'Redirect URI is required' }).url(),
+    code_challenge: z
+      .string()
+      .min(43, 'Code challenge must be at least 43 characters')
+      .max(128, 'Code challenge must be at most 128 characters')
+      .regex(pkceRegex, 'Code challenge must be base64url encoded'),
+  })
+  .catchall(z.string());
 
 /**
  * POST /api/auth/oauth/exchange - Exchange OAuth code for tokens
@@ -313,7 +327,6 @@ export const oAuthInitRequestSchema = z.object({
  */
 export const oAuthCodeExchangeRequestSchema = z.object({
   code: z.string().min(1, 'Exchange code is required'),
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   code_verifier: z
     .string()
     .min(43, 'Code verifier must be at least 43 characters')
@@ -524,6 +537,7 @@ export type RefreshSessionResponse = z.infer<typeof refreshSessionResponseSchema
 export type ResetPasswordResponse = z.infer<typeof resetPasswordResponseSchema>;
 export type CreateAdminSessionResponse = z.infer<typeof createAdminSessionResponseSchema>;
 export type GetCurrentSessionResponse = z.infer<typeof getCurrentSessionResponseSchema>;
+export type GetCurrentAdminSessionResponse = z.infer<typeof getCurrentAdminSessionResponseSchema>;
 export type GetProfileResponse = z.infer<typeof getProfileResponseSchema>;
 export type ListUsersResponse = z.infer<typeof listUsersResponseSchema>;
 export type DeleteUsersResponse = z.infer<typeof deleteUsersResponseSchema>;

@@ -24,8 +24,9 @@ const storageConfigService = StorageConfigService.getInstance();
 const s3AccessKeyService = S3AccessKeyService.getInstance();
 
 // Middleware to conditionally apply authentication based on bucket visibility.
-// This is only attached to object download hand-offs: GET object bytes and POST
-// download-strategy. The strategy endpoint is POST, but it is still a read path.
+// This is only attached to object download hand-offs: GET object bytes and
+// GET/POST download-strategy. Strategy endpoint is GET (POST retained as a
+// deprecated alias for older SDKs); both are read paths.
 const conditionalDownloadAuth = async (req: Request, res: Response, next: NextFunction) => {
   if (req.params.bucketName) {
     try {
@@ -70,7 +71,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
     const config = await storageConfigService.updateStorageConfig(validation.data);
 
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'UPDATE_STORAGE_CONFIG',
       module: 'STORAGE',
       details: { updatedFields: Object.keys(validation.data) },
@@ -117,7 +118,7 @@ router.post(
 
       // Log audit for bucket creation
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_BUCKET',
         module: 'STORAGE',
         details: {
@@ -191,7 +192,7 @@ router.patch(
 
       // Log audit for bucket update
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_BUCKET',
         module: 'STORAGE',
         details: {
@@ -393,6 +394,101 @@ router.post(
   }
 );
 
+// GET /api/storage/buckets/:bucketName/download-strategy/objects/* - Get download URL (presigned or direct)
+// Read-only strategy hand-off; aligns with S3-style object retrieval semantics.
+// Strategy lives under a dedicated `/download-strategy/objects/*` path
+// (rather than `/objects/:objectKey/download-strategy`) so it cannot collide
+// with the wildcard download route below for object keys that legitimately
+// contain or end with `download-strategy`.
+// The wildcard captures the full object key, including `/` (pseudo-folders).
+const downloadStrategyHandler = async (
+  req: AuthRequest | Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { bucketName } = req.params;
+    // For the canonical GET route the wildcard captures the full object key.
+    // For the deprecated POST alias the key is the named `:objectKey` param.
+    const objectKey = req.params[0] ?? req.params.objectKey;
+
+    if (!objectKey) {
+      throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+    }
+
+    const storageService = StorageService.getInstance();
+
+    // RLS-gate the strategy hand-off, same as GET /objects/*. A presigned
+    // URL bypasses RLS at redeem time, so we must verify ownership before
+    // issuing one.
+    const authReq = req as AuthRequest;
+    const visible = await storageService.objectIsVisible(
+      authReq.user,
+      bucketName,
+      objectKey,
+      !!authReq.hasApiKey
+    );
+    if (!visible) {
+      throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
+    }
+
+    // Optional caller-supplied TTL (seconds) for the signed URL. Accepted from
+    // the query string (canonical GET) or body (deprecated POST alias). The
+    // service clamps it to a safe range and applies it to private buckets only.
+    // Reject malformed input (e.g. `?expiresIn=abc`) rather than silently
+    // coercing it: `Number('abc')` is NaN and `Number(null)` is 0, either of
+    // which would otherwise hand back a URL with a TTL the caller never asked for.
+    const rawExpiresIn = req.query.expiresIn ?? authReq.body?.expiresIn;
+    let requestedExpiresIn: number | undefined;
+    if (rawExpiresIn !== undefined && rawExpiresIn !== null && rawExpiresIn !== '') {
+      const parsed = Number(rawExpiresIn);
+      if (!Number.isFinite(parsed)) {
+        throw new AppError(
+          'expiresIn must be a finite number of seconds',
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
+      }
+      requestedExpiresIn = parsed;
+    }
+
+    const strategy = await storageService.getDownloadStrategy(
+      bucketName,
+      objectKey,
+      requestedExpiresIn
+    );
+
+    // Strategy responses embed presigned URLs with short, server-decided
+    // expiries. Prevent intermediaries (proxies, CDNs) from caching this
+    // GET response and replaying expired URLs to later callers.
+    res.setHeader('Cache-Control', 'no-store');
+    successResponse(res, strategy);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Invalid')) {
+      next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+    } else {
+      next(error);
+    }
+  }
+};
+
+router.get(
+  '/buckets/:bucketName/download-strategy/objects/*',
+  conditionalDownloadAuth,
+  downloadStrategyHandler
+);
+
+// @deprecated Use GET /buckets/:bucketName/download-strategy/objects/* instead.
+// Retained at the original path/method for backward compatibility with SDK
+// releases that already shipped against the POST endpoint. Uses a wildcard
+// so it matches both single-segment (encodeURIComponent'd) and raw-slash
+// object keys.
+router.post(
+  '/buckets/:bucketName/objects/*/download-strategy',
+  conditionalDownloadAuth,
+  downloadStrategyHandler
+);
+
 // GET /api/storage/buckets/:bucketName/objects/:objectKey - Download object from bucket (conditional auth)
 router.get(
   '/buckets/:bucketName/objects/*',
@@ -467,7 +563,7 @@ router.delete(
 
       // Log audit for bucket deletion
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_BUCKET',
         module: 'STORAGE',
         details: {
@@ -621,42 +717,6 @@ router.post(
   }
 );
 
-// POST /api/storage/buckets/:bucketName/objects/:objectKey/download-strategy - Get download URL (presigned or direct)
-router.post(
-  '/buckets/:bucketName/objects/:objectKey/download-strategy',
-  conditionalDownloadAuth,
-  async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
-    try {
-      const { bucketName, objectKey } = req.params;
-
-      const storageService = StorageService.getInstance();
-
-      // RLS-gate the strategy hand-off, same as GET /objects/*. A presigned
-      // URL bypasses RLS at redeem time, so we must verify ownership before
-      // issuing one.
-      const authReq = req as AuthRequest;
-      const visible = await storageService.objectIsVisible(
-        authReq.user,
-        bucketName,
-        objectKey,
-        !!authReq.hasApiKey
-      );
-      if (!visible) {
-        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
-      }
-
-      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
-
-      successResponse(res, strategy);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('Invalid')) {
-        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
-      } else {
-        next(error);
-      }
-    }
-  }
-);
 // ============================================================================
 // S3 Protocol — Gateway Config + Access Key Management (admin only)
 // Per-IP rate limiting applied across all three access-key endpoints since
@@ -697,7 +757,7 @@ router.post(
       }
       const result = await s3AccessKeyService.create(validation.data);
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_S3_ACCESS_KEY',
         module: 'STORAGE',
         details: { accessKeyId: result.accessKeyId },
@@ -734,7 +794,7 @@ router.delete(
     try {
       await s3AccessKeyService.delete(req.params.id);
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_S3_ACCESS_KEY',
         module: 'STORAGE',
         details: { id: req.params.id },

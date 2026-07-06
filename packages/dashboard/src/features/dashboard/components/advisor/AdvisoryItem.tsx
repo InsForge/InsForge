@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import type { DashboardAdvisorIssue } from '#types';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
+import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import { formatRemediationPrompt } from './remediationPrompt';
 import CriticalIcon from '#assets/icons/severity_critical.svg?react';
 import InfoIcon from '#assets/icons/severity_info.svg?react';
@@ -27,18 +27,15 @@ const SEVERITY_TONE = {
 
 export function AdvisoryItem({ issue, expanded, onToggle }: AdvisoryItemProps) {
   const { showToast } = useToast();
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   const Icon = SEVERITY_ICON[issue.severity];
 
   const handleCopyRemediation = async () => {
     if (!issue.recommendation) {
       return;
     }
-    try {
-      await navigator.clipboard.writeText(formatRemediationPrompt(issue));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
+    const ok = await copy(formatRemediationPrompt(issue));
+    if (!ok) {
       showToast('Failed to copy remediation', 'error');
     }
   };

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { CirclePlus, LogIn } from 'lucide-react';
+import { CirclePlus, FolderInput, FolderOutput } from 'lucide-react';
 import PencilIcon from '#assets/icons/pencil.svg?react';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { useDatabaseSchemas } from '#features/database/hooks/useDatabase';
@@ -19,6 +19,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  useToast,
 } from '@insforge/ui';
 import {
   Alert,
@@ -30,16 +31,22 @@ import {
   TableHeader,
 } from '#components';
 import { useConfirm } from '#lib/hooks/useConfirm';
-import { useToast } from '#lib/hooks/useToast';
 import { DatabaseDataGrid } from '#features/database/components/DatabaseDataGrid';
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '#lib/utils/utils';
 import { useCSVImport } from '#features/database/hooks/useCSVImport';
+import { useCSVExport } from '#features/database/hooks/useCSVExport';
 import { useTablePreferences } from '#features/database/hooks/useTablePreferences';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { usePageSize } from '#lib/hooks/usePageSize';
-import { DEFAULT_DATABASE_SCHEMA, getDatabaseSchemaInfo } from '#features/database/helpers';
 import { useProjectId } from '#lib/hooks/useMetadata';
+import {
+  DEFAULT_DATABASE_SCHEMA,
+  decodeRecordKey,
+  encodeRecordKey,
+  getDatabaseSchemaInfo,
+  getPrimaryKeyColumns,
+} from '#features/database/helpers';
 
 export default function TablesPage() {
   const location = useLocation();
@@ -52,8 +59,7 @@ export default function TablesPage() {
   const [isTableFormDirty, setIsTableFormDirty] = useState(false);
   const [showTableForm, setShowTableForm] = useState(false);
   const [editingTable, setEditingTable] = useState<string | null>(null);
-  const [searchValue, setSearchValue] = useState('');
-  const searchQuery = searchValue.trim();
+  const [searchByTable, setSearchByTable] = useState<Record<string, string>>({});
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('db-table');
@@ -86,6 +92,15 @@ export default function TablesPage() {
 
     return tables[0];
   }, [isLoadingTables, tables, selectedTableFromQuery]);
+  const tableKey = `${selectedSchema}\x00${selectedTable ?? ''}`;
+  const searchValue = searchByTable[tableKey] ?? '';
+  const searchQuery = searchValue.trim();
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearchByTable((prev) => ({ ...prev, [tableKey]: value }));
+    },
+    [tableKey]
+  );
   const selectTable = useCallback(
     (tableName: string | null, replace: boolean = false) => {
       const nextSearchParams = new URLSearchParams(searchParams);
@@ -214,9 +229,9 @@ export default function TablesPage() {
     !!editingTable
   );
 
-  const primaryKeyColumn = useMemo(() => {
-    return schemaData?.columns.find((col) => col.isPrimaryKey)?.columnName;
-  }, [schemaData]);
+  // Full primary-key tuple (supports composite keys) used for row identity,
+  // updates, and deletes.
+  const primaryKeyColumns = useMemo(() => getPrimaryKeyColumns(schemaData?.columns), [schemaData]);
 
   const {
     mutate: importCSV,
@@ -241,6 +256,26 @@ export default function TablesPage() {
         error?.message || 'An unexpected error occurred during import. Please try again.';
       showToast(message, 'error');
       resetImport();
+    },
+  });
+
+  const {
+    mutate: exportCSV,
+    isPending: isExporting,
+    reset: resetExport,
+  } = useCSVExport(selectedTable || '', selectedSchema, {
+    onSuccess: () => {
+      showToast('Export successful!', 'success');
+      resetExport();
+    },
+    onWarning: (message: string) => {
+      showToast(message, 'warn');
+    },
+    onError: (error: Error) => {
+      const message =
+        error?.message || 'An unexpected error occurred during export. Please try again.';
+      showToast(message, 'error');
+      resetExport();
     },
   });
 
@@ -289,7 +324,7 @@ export default function TablesPage() {
       // Reset all state
       setSelectedRows(new Set());
       setSortColumns([]);
-      setSearchValue('');
+      setSearchByTable((prev) => ({ ...prev, [tableKey]: '' }));
       setIsSorting(false);
 
       // Refresh current table data (if table is selected)
@@ -408,8 +443,8 @@ export default function TablesPage() {
     setPreviewingTemplate(null);
   };
 
-  // Handle record update
-  const handleRecordUpdate = async (rowId: string, columnKey: string, newValue: string) => {
+  // Handle record update. `rowKey` is the encoded primary-key tuple from the grid.
+  const handleRecordUpdate = async (rowKey: string, columnKey: string, newValue: string) => {
     if (!selectedTable || selectedSchemaInfo.isProtected) {
       return;
     }
@@ -427,8 +462,7 @@ export default function TablesPage() {
         }
         const updates = { [columnKey]: conversionResult.value };
         await recordsHook.updateRecord({
-          pkColumn: primaryKeyColumn || 'id',
-          pkValue: rowId,
+          primaryKey: decodeRecordKey(rowKey),
           data: updates,
         });
       }
@@ -438,21 +472,21 @@ export default function TablesPage() {
     }
   };
 
-  // Handle bulk delete
-  const handleBulkDelete = async (ids: string[]) => {
-    if (!selectedTable || !ids.length || selectedSchemaInfo.isProtected) {
+  // Handle bulk delete. `rowKeys` are the encoded primary-key tuples from the grid.
+  const handleBulkDelete = async (rowKeys: string[]) => {
+    if (!selectedTable || !rowKeys.length || selectedSchemaInfo.isProtected) {
       return;
     }
 
     const shouldDelete = await confirm({
-      title: `Delete ${ids.length} ${ids.length === 1 ? 'Record' : 'Records'}`,
-      description: `Are you sure you want to delete ${ids.length} ${ids.length === 1 ? 'record' : 'records'}? This action cannot be undone.`,
+      title: `Delete ${rowKeys.length} ${rowKeys.length === 1 ? 'Record' : 'Records'}`,
+      description: `Are you sure you want to delete ${rowKeys.length} ${rowKeys.length === 1 ? 'record' : 'records'}? This action cannot be undone.`,
       confirmText: 'Delete',
       destructive: true,
     });
 
     if (shouldDelete) {
-      await recordsHook.deleteRecords({ pkColumn: primaryKeyColumn || 'id', pkValues: ids });
+      await recordsHook.deleteRecords({ primaryKeys: rowKeys.map(decodeRecordKey) });
       // Query invalidation is handled by the mutation, no manual refetch needed
       setSelectedRows(new Set());
     }
@@ -532,6 +566,7 @@ export default function TablesPage() {
           <>
             {selectedTable && (
               <TableHeader
+                key={tableKey}
                 leftContent={
                   selectedRows.size > 0 ? (
                     <div className="flex items-center gap-2">
@@ -617,18 +652,30 @@ export default function TablesPage() {
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isImporting}
                           >
-                            <LogIn className="h-6 w-6 stroke-[1.5]" />
+                            <FolderInput className="h-6 w-6 stroke-[1.5]" />
                             <span className="px-1 text-sm font-medium leading-5">
                               {isImporting ? 'Importing...' : 'Import CSV'}
                             </span>
                           </Button>
                         </>
                       )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 rounded px-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
+                        onClick={() => exportCSV()}
+                        disabled={isExporting}
+                      >
+                        <FolderOutput className="h-6 w-6 stroke-[1.5]" />
+                        <span className="px-1 text-sm font-medium leading-5">
+                          {isExporting ? 'Exporting...' : 'Export CSV'}
+                        </span>
+                      </Button>
                     </div>
                   )
                 }
                 searchValue={searchValue}
-                onSearchChange={setSearchValue}
+                onSearchChange={handleSearchChange}
                 searchDebounceTime={300}
                 searchPlaceholder="Search records"
               />
@@ -654,7 +701,7 @@ export default function TablesPage() {
                     title={`No tables in ${selectedSchema}`}
                     description={
                       selectedSchemaInfo.isProtected
-                        ? 'InsForge-managed schemas are protected in the dashboard.'
+                        ? 'This schema is protected in the dashboard.'
                         : 'Create a table from the sidebar to get started.'
                     }
                   />
@@ -677,7 +724,7 @@ export default function TablesPage() {
                   loading={isLoadingTable && !tableData}
                   isSorting={isSorting}
                   isRefreshing={isRefreshing}
-                  rowKeyGetter={(row) => String(row[primaryKeyColumn || 'id'])}
+                  rowKeyGetter={(row) => encodeRecordKey(row, primaryKeyColumns)}
                   selectedRows={selectedRows}
                   onSelectedRowsChange={setSelectedRows}
                   sortColumns={sortColumns}
@@ -736,7 +783,9 @@ export default function TablesPage() {
           open={showRecordForm}
           onOpenChange={setShowRecordForm}
           tableName={selectedTable}
+          schemaName={selectedSchema}
           schema={schemaData.columns}
+          foreignKeys={schemaData.foreignKeys}
         />
       )}
 

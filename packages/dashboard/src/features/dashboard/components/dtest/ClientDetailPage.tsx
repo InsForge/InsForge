@@ -1,35 +1,45 @@
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { Button } from '@insforge/ui';
+import { Button, cn } from '@insforge/ui';
 import { ConnectionStringSectionV2 } from '#features/dashboard/components/connect/ConnectionStringSectionV2';
 import { APIKeysSectionV2 } from '#features/dashboard/components/connect/APIKeysSectionV2';
 import { DTestMCPSection } from './DTestMCPSection';
 import { DTestCLISection } from './DTestCLISection';
 import { QuickStartPromptCard } from './QuickStartPromptCard';
-import { CLIENT_ENTRIES, type AgentTab, type ClientId } from './clientRegistry';
+import { CLIENT_ENTRIES, DEFAULT_AGENT_TABS, type AgentTab, type ClientId } from './clientRegistry';
 import {
   useApiKey,
+  useAnonKey,
   useDatabaseConnectionString,
   useDatabasePassword,
 } from '#lib/hooks/useMetadata';
-import { useAnonToken } from '#features/auth/hooks/useAnonToken';
-import { cn, getBackendUrl } from '#lib/utils/utils';
+import { getBackendUrl } from '#lib/utils/utils';
+import { getFeatureFlag } from '#lib/analytics/posthog';
+import { FEATURE_FLAGS } from '#lib/analytics/constants';
 
 interface ClientDetailPageProps {
   clientId: ClientId;
   onBack: () => void;
 }
 
-const DEFAULT_AGENT_TABS: ReadonlyArray<AgentTab> = ['cli', 'mcp'];
-
 export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
   const entry = CLIENT_ENTRIES[clientId];
-  const availableTabs = entry.tabs ?? DEFAULT_AGENT_TABS;
+  const declaredTabs = entry.tabs ?? DEFAULT_AGENT_TABS;
+  const mcpVsCliVariant = getFeatureFlag(FEATURE_FLAGS.MCP_VS_CLI);
+  const variantAllowed: ReadonlyArray<AgentTab> =
+    mcpVsCliVariant === 'mcp' ? ['mcp'] : mcpVsCliVariant === 'cli' ? ['cli'] : declaredTabs;
+  const filteredTabs = declaredTabs.filter((t) => variantAllowed.includes(t));
+  const availableTabs = filteredTabs.length > 0 ? filteredTabs : declaredTabs;
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
-  const { accessToken: anonKey, isLoading: isAnonKeyLoading } = useAnonToken();
+  const { anonKey, isLoading: isAnonKeyLoading } = useAnonKey();
   const { connectionData } = useDatabaseConnectionString();
   const { passwordData } = useDatabasePassword();
   const [tab, setTab] = useState<AgentTab>(availableTabs[0] ?? 'cli');
+  // Guard against `tab` drifting out of `availableTabs` if the variant filter
+  // changes after mount (e.g. PostHog flag resolves late). Click handlers
+  // continue to update `tab` directly; this just ensures the rendered tab is
+  // always one the user is allowed to see.
+  const activeTab: AgentTab = availableTabs.includes(tab) ? tab : (availableTabs[0] ?? 'cli');
 
   const appUrl = getBackendUrl();
   const displayApiKey = isApiKeyLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
@@ -74,7 +84,7 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
                 {availableTabs.map((t) => (
                   <TabButton
                     key={t}
-                    active={tab === t}
+                    active={activeTab === t}
                     onClick={() => setTab(t)}
                     label={t === 'cli' ? 'CLI' : 'MCP'}
                   />
@@ -82,7 +92,7 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
               </div>
             )}
 
-            {tab === 'cli' ? (
+            {activeTab === 'cli' ? (
               <DTestCLISection agentName={entry.label} />
             ) : (
               <DTestMCPSection

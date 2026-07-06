@@ -1,13 +1,8 @@
+import { createHash } from 'crypto';
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/utils/errors.js';
-import {
-  COLUMN_TYPES,
-  ForeignKeyRow,
-  ColumnInfo,
-  PrimaryKeyInfo,
-  ForeignKeyInfo,
-} from '@/types/database.js';
+import { COLUMN_TYPES, ForeignKeyRow, ColumnInfo, PrimaryKeyInfo } from '@/types/database.js';
 import {
   ERROR_CODES,
   ColumnSchema,
@@ -17,18 +12,18 @@ import {
   UpdateTableSchemaRequest,
   UpdateTableSchemaResponse,
   DeleteTableResponse,
-  OnDeleteActionSchema,
-  OnUpdateActionSchema,
   ForeignKeySchema,
 } from '@insforge/shared-schemas';
 import { validateIdentifier, validateSchemaName } from '@/utils/validations.js';
 import { convertSqlTypeToColumnType } from '@/utils/utils.js';
 import {
-  assertWritableDatabaseSchema,
   DEFAULT_DATABASE_SCHEMA,
   quoteQualifiedName,
   splitQualifiedTableReference,
+  FOREIGN_KEY_INTROSPECTION_QUERY,
+  groupForeignKeyRows,
 } from './helpers.js';
+import { withAdminContext } from './user-context.service.js';
 
 const reservedColumns = {
   id: ColumnType.UUID,
@@ -146,10 +141,10 @@ export class DatabaseTableService {
     schemaName: string,
     table_name: string,
     columns: ColumnSchema[],
+    foreignKeys: ForeignKeySchema[] = [],
     use_RLS = true
   ): Promise<CreateTableResponse> {
     validateSchemaName(schemaName);
-    assertWritableDatabaseSchema(schemaName);
     // Validate table name
     validateIdentifier(table_name, 'table');
 
@@ -189,108 +184,128 @@ export class DatabaseTableService {
       await client.query('BEGIN');
       transactionStarted = true;
 
-      const safeQualifiedTableName = quoteQualifiedName(schemaName, table_name);
+      const response = await withAdminContext(
+        client,
+        async () => {
+          const safeQualifiedTableName = quoteQualifiedName(schemaName, table_name);
 
-      // Check if table exists
-      const tableExistsResult = await client.query(
-        `
-          SELECT EXISTS (
-            SELECT FROM information_schema.tables
-            WHERE table_schema = $1
-            AND table_name = $2
-          ) as exists
-        `,
-        [schemaName, table_name]
-      );
-
-      if (tableExistsResult.rows[0]?.exists) {
-        throw new AppError(
-          `table ${table_name} already exists`,
-          400,
-          ERROR_CODES.DATABASE_DUPLICATE,
-          `table ${table_name} already exists. Please check the table name, it must be a unique table name.`
-        );
-      }
-
-      // Map columns to SQL with proper type conversion
-      const columnDefs = validatedColumns
-        .map((col: ColumnSchema) => {
-          const fieldType = COLUMN_TYPES[col.type as ColumnType];
-          const sqlType = fieldType.sqlType;
-
-          // Handle default values
-          const defaultClause = formatDefaultValue(
-            col.defaultValue,
-            col.type as ColumnType,
-            col.isNullable
+          // Check if table exists
+          const tableExistsResult = await client.query(
+            `
+            SELECT EXISTS (
+              SELECT FROM information_schema.tables
+              WHERE table_schema = $1
+              AND table_name = $2
+            ) as exists
+          `,
+            [schemaName, table_name]
           );
 
-          const nullable = col.isNullable ? '' : 'NOT NULL';
-          const unique = col.isUnique ? 'UNIQUE' : '';
+          if (tableExistsResult.rows[0]?.exists) {
+            throw new AppError(
+              `table ${table_name} already exists`,
+              400,
+              ERROR_CODES.DATABASE_DUPLICATE,
+              `table ${table_name} already exists. Please check the table name, it must be a unique table name.`
+            );
+          }
 
-          return `${this.quoteIdentifier(col.columnName)} ${sqlType} ${nullable} ${unique} ${defaultClause}`.trim();
-        })
-        .join(', ');
+          // Map columns to SQL with proper type conversion
+          const columnDefs = validatedColumns
+            .map((col: ColumnSchema) => {
+              const fieldType = COLUMN_TYPES[col.type as ColumnType];
+              const sqlType = fieldType.sqlType;
 
-      // Prepare foreign key constraints
-      const foreignKeyConstraints = validatedColumns
-        .filter((col) => col.foreignKey)
-        .map((col) => this.generateFkeyConstraintStatement(col, schemaName, true))
-        .join(', ');
+              // Handle default values
+              const defaultClause = formatDefaultValue(
+                col.defaultValue,
+                col.type as ColumnType,
+                col.isNullable
+              );
 
-      // Create table with auto fields and foreign keys
-      const tableDefinition = [
-        'id UUID PRIMARY KEY DEFAULT gen_random_uuid()',
-        columnDefs,
-        'created_at TIMESTAMPTZ DEFAULT now()',
-        'updated_at TIMESTAMPTZ DEFAULT now()',
-        foreignKeyConstraints,
-      ]
-        .filter(Boolean)
-        .join(', ');
+              const nullable = col.isNullable ? '' : 'NOT NULL';
+              const unique = col.isUnique ? 'UNIQUE' : '';
 
-      await client.query(
-        `
-          CREATE TABLE ${safeQualifiedTableName} (
-            ${tableDefinition}
+              return `${this.quoteIdentifier(col.columnName)} ${sqlType} ${nullable} ${unique} ${defaultClause}`.trim();
+            })
+            .join(', ');
+
+          // Reject foreign keys on system columns (consistent with updateTableSchema).
+          for (const fk of foreignKeys) {
+            const systemSourceColumn = fk.referenceColumns
+              .map((rc) => rc.sourceColumn)
+              .find((source) => Object.keys(reservedColumns).includes(source));
+            if (systemSourceColumn) {
+              throw new AppError(
+                'cannot add foreign key on system columns',
+                400,
+                ERROR_CODES.DATABASE_FORBIDDEN,
+                `You cannot add foreign key on the system column '${systemSourceColumn}'`
+              );
+            }
+          }
+
+          // Prepare foreign key constraints — one statement per constraint entity.
+          const foreignKeyConstraints = foreignKeys
+            .map((fk) => this.generateFkeyConstraintStatement(fk, schemaName, true))
+            .join(', ');
+
+          // Create table with auto fields and foreign keys
+          const tableDefinition = [
+            'id UUID PRIMARY KEY DEFAULT gen_random_uuid()',
+            columnDefs,
+            'created_at TIMESTAMPTZ DEFAULT now()',
+            'updated_at TIMESTAMPTZ DEFAULT now()',
+            foreignKeyConstraints,
+          ]
+            .filter(Boolean)
+            .join(', ');
+
+          await client.query(
+            `
+            CREATE TABLE ${safeQualifiedTableName} (
+              ${tableDefinition}
+            );
+            NOTIFY pgrst, 'reload schema';
+          `
           );
-          NOTIFY pgrst, 'reload schema';
-        `
-      );
 
-      if (use_RLS) {
-        // Enable RLS policies
-        await client.query(
+          if (use_RLS) {
+            // Enable RLS policies
+            await client.query(
+              `
+              ALTER TABLE ${safeQualifiedTableName} ENABLE ROW LEVEL SECURITY;
+            `
+            );
+          }
+
+          // Create trigger for updated_at
+          await client.query(
+            `
+            CREATE TRIGGER ${this.quoteIdentifier(table_name + '_update_timestamp')}
+            BEFORE UPDATE ON ${safeQualifiedTableName}
+            FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
           `
-            ALTER TABLE ${safeQualifiedTableName} ENABLE ROW LEVEL SECURITY;
-          `
-        );
-      }
+          );
 
-      // Create trigger for updated_at
-      await client.query(
-        `
-          CREATE TRIGGER ${this.quoteIdentifier(table_name + '_update_timestamp')}
-          BEFORE UPDATE ON ${safeQualifiedTableName}
-          FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
-        `
+          // Update metadata
+          // Metadata is now updated on-demand
+
+          return {
+            schemaName,
+            message: 'table created successfully',
+            tableName: table_name,
+            columns: validatedColumns.map((col) => ({
+              ...col,
+              sqlType: COLUMN_TYPES[col.type as ColumnType].sqlType,
+            })),
+            autoFields: ['id', 'created_at', 'updated_at'],
+            nextActions:
+              'you can now use the table with the POST /api/database/tables/{table} endpoint',
+          };
+        },
+        true
       );
-
-      // Update metadata
-      // Metadata is now updated on-demand
-
-      const response = {
-        schemaName,
-        message: 'table created successfully',
-        tableName: table_name,
-        columns: validatedColumns.map((col) => ({
-          ...col,
-          sqlType: COLUMN_TYPES[col.type as ColumnType].sqlType,
-        })),
-        autoFields: ['id', 'created_at', 'updated_at'],
-        nextActions:
-          'you can now use the table with the POST /api/database/tables/{table} endpoint',
-      };
 
       await client.query('COMMIT');
       transactionStarted = false;
@@ -338,8 +353,6 @@ export class DatabaseTableService {
     validateIdentifier(table, 'table');
     const client = await this.getPool().connect();
     try {
-      const safeQualifiedTableName = quoteQualifiedName(schemaName, table);
-
       // Get column information from information_schema
       const columnsResult = await client.query(
         `
@@ -369,8 +382,8 @@ export class DatabaseTableService {
         );
       }
 
-      // Get foreign key information
-      const foreignKeyMap = await this.getFkeyConstraints(schemaName, table);
+      // Get foreign key information (one entity per constraint)
+      const foreignKeys = await this.getFkeyConstraints(schemaName, table);
 
       // Get primary key information
       const primaryKeysResult = await client.query(
@@ -411,10 +424,16 @@ export class DatabaseTableService {
       const uniqueColumns = uniqueColumnsResult.rows;
       const uniqueSet = new Set(uniqueColumns.map((u: { column_name: string }) => u.column_name));
 
-      // Get row count
-      const sql = `SELECT COUNT(*) as row_count FROM ${safeQualifiedTableName}`;
-      const rowCountResult = await client.query(sql);
-      const row_count = rowCountResult.rows[0].row_count;
+      // Get exact row count using standard COUNT(*)
+      let row_count = 0;
+      try {
+        const countResult = await client.query(
+          `SELECT COUNT(*) as row_count FROM ${quoteQualifiedName(schemaName, table)}`
+        );
+        row_count = Number(countResult.rows[0]?.row_count || 0);
+      } catch {
+        row_count = 0;
+      }
 
       return {
         schemaName,
@@ -429,11 +448,9 @@ export class DatabaseTableService {
             isPrimaryKey: pkSet.has(col.column_name),
             isUnique: pkSet.has(col.column_name) || uniqueSet.has(col.column_name),
             defaultValue: this.parseDefaultValue(col.column_default),
-            ...(foreignKeyMap.has(col.column_name) && {
-              foreignKey: foreignKeyMap.get(col.column_name),
-            }),
           };
         }),
+        foreignKeys,
         recordCount: row_count,
       };
     } finally {
@@ -450,7 +467,6 @@ export class DatabaseTableService {
     operations: UpdateTableSchemaRequest
   ): Promise<UpdateTableSchemaResponse> {
     validateSchemaName(schemaName);
-    assertWritableDatabaseSchema(schemaName);
     const { addColumns, dropColumns, updateColumns, addForeignKeys, dropForeignKeys, renameTable } =
       operations;
 
@@ -460,226 +476,250 @@ export class DatabaseTableService {
       await client.query('BEGIN');
       transactionStarted = true;
 
-      const safeQualifiedTableName = quoteQualifiedName(schemaName, tableName);
+      const response = await withAdminContext(
+        client,
+        async () => {
+          const safeQualifiedTableName = quoteQualifiedName(schemaName, tableName);
 
-      // Check if table exists
-      const tableExistsResult = await client.query(
-        `
-          SELECT EXISTS (
-            SELECT FROM information_schema.tables
-            WHERE table_schema = $1
-            AND table_name = $2
-          ) as exists
-        `,
-        [schemaName, tableName]
-      );
-
-      if (!tableExistsResult.rows[0]?.exists) {
-        throw new AppError(
-          'table not found',
-          404,
-          ERROR_CODES.DATABASE_NOT_FOUND,
-          'Please check the table name, it must be a valid table name, or you can create a new table with the POST /api/database/tables endpoint'
-        );
-      }
-      const currentSchema = await this.getTableSchema(schemaName, tableName);
-      const currentUserColumns = currentSchema.columns.filter(
-        (col) => !Object.keys(reservedColumns).includes(col.columnName)
-      );
-
-      // Filter dropped and added user columns
-      const droppedUserColumns = dropColumns
-        ? dropColumns.filter((col) => !Object.keys(reservedColumns).includes(col))
-        : [];
-      const addedUserColumns = addColumns ? this.validateReservedFields(addColumns) : [];
-
-      // Calculate final user column count
-      const finalUserColumnsCount =
-        currentUserColumns.length - droppedUserColumns.length + addedUserColumns.length;
-
-      if (finalUserColumnsCount <= 0) {
-        throw new AppError(
-          'Table must have at least one user-defined column after update',
-          400,
-          ERROR_CODES.DATABASE_VALIDATION_ERROR,
-          'The update would leave the table with no custom columns. Please add columns or avoid dropping all user-defined columns.'
-        );
-      }
-
-      const foreignKeyMap = await this.getFkeyConstraints(schemaName, tableName);
-      const completedOperations: string[] = [];
-
-      // Execute operations
-
-      // Drop foreign key constraints
-      if (dropForeignKeys && Array.isArray(dropForeignKeys)) {
-        for (const col of dropForeignKeys) {
-          const constraintName = foreignKeyMap.get(col)?.constraint_name;
-          if (constraintName) {
-            await client.query(
-              `
-                ALTER TABLE ${safeQualifiedTableName}
-                DROP CONSTRAINT ${this.quoteIdentifier(constraintName)}
-              `
-            );
-
-            completedOperations.push(`Dropped foreign key constraint on column: ${col}`);
-          }
-        }
-      }
-
-      // Drop columns first (to avoid conflicts with renames)
-      if (dropColumns && Array.isArray(dropColumns)) {
-        for (const col of dropColumns) {
-          if (Object.keys(reservedColumns).includes(col)) {
-            throw new AppError(
-              'cannot drop system columns',
-              404,
-              ERROR_CODES.DATABASE_FORBIDDEN,
-              `You cannot drop the system column '${col}'`
-            );
-          }
-          await client.query(
+          // Check if table exists
+          const tableExistsResult = await client.query(
             `
-              ALTER TABLE ${safeQualifiedTableName}
-              DROP COLUMN ${this.quoteIdentifier(col)}
-            `
+            SELECT EXISTS (
+              SELECT FROM information_schema.tables
+              WHERE table_schema = $1
+              AND table_name = $2
+            ) as exists
+          `,
+            [schemaName, tableName]
           );
 
-          completedOperations.push(`Dropped column: ${col}`);
-        }
-      }
-
-      // Update columns
-      if (updateColumns && Array.isArray(updateColumns)) {
-        for (const column of updateColumns) {
-          if (Object.keys(reservedColumns).includes(column.columnName)) {
+          if (!tableExistsResult.rows[0]?.exists) {
             throw new AppError(
-              'cannot update system columns',
+              'table not found',
               404,
-              ERROR_CODES.DATABASE_FORBIDDEN,
-              `You cannot update the system column '${column.columnName}'`
+              ERROR_CODES.DATABASE_NOT_FOUND,
+              'Please check the table name, it must be a valid table name, or you can create a new table with the POST /api/database/tables endpoint'
+            );
+          }
+          const currentSchema = await this.getTableSchema(schemaName, tableName);
+          const currentUserColumns = currentSchema.columns.filter(
+            (col) => !Object.keys(reservedColumns).includes(col.columnName)
+          );
+
+          // Filter dropped and added user columns
+          const droppedUserColumns = dropColumns
+            ? dropColumns.filter((col) => !Object.keys(reservedColumns).includes(col))
+            : [];
+          const addedUserColumns = addColumns ? this.validateReservedFields(addColumns) : [];
+
+          // Calculate final user column count
+          const finalUserColumnsCount =
+            currentUserColumns.length - droppedUserColumns.length + addedUserColumns.length;
+
+          if (finalUserColumnsCount <= 0) {
+            throw new AppError(
+              'Table must have at least one user-defined column after update',
+              400,
+              ERROR_CODES.DATABASE_VALIDATION_ERROR,
+              'The update would leave the table with no custom columns. Please add columns or avoid dropping all user-defined columns.'
             );
           }
 
-          // Handle default value changes
-          if (column.defaultValue !== undefined) {
-            if (column.defaultValue === '') {
-              // Drop default
+          const existingForeignKeys = await this.getFkeyConstraints(schemaName, tableName);
+          const existingConstraintNames = new Set(
+            existingForeignKeys.map((fk) => fk.constraintName).filter(Boolean)
+          );
+          const completedOperations: string[] = [];
+
+          // Execute operations
+
+          // Drop foreign key constraints by constraint name.
+          if (dropForeignKeys && Array.isArray(dropForeignKeys)) {
+            for (const constraintName of dropForeignKeys) {
+              // Fail loudly on an unknown/stale name instead of reporting success while
+              // the constraint is still enforced (e.g. a typo'd or already-dropped name).
+              if (!existingConstraintNames.has(constraintName)) {
+                throw new AppError(
+                  `Foreign key constraint '${constraintName}' does not exist on this table.`,
+                  404,
+                  ERROR_CODES.DATABASE_NOT_FOUND,
+                  'Refresh the table schema and retry; the constraint may have already been removed.'
+                );
+              }
+              await client.query(
+                `
+                  ALTER TABLE ${safeQualifiedTableName}
+                  DROP CONSTRAINT ${this.quoteIdentifier(constraintName)}
+                `
+              );
+
+              completedOperations.push(`Dropped foreign key constraint: ${constraintName}`);
+            }
+          }
+
+          // Drop columns first (to avoid conflicts with renames)
+          if (dropColumns && Array.isArray(dropColumns)) {
+            for (const col of dropColumns) {
+              if (Object.keys(reservedColumns).includes(col)) {
+                throw new AppError(
+                  'cannot drop system columns',
+                  404,
+                  ERROR_CODES.DATABASE_FORBIDDEN,
+                  `You cannot drop the system column '${col}'`
+                );
+              }
               await client.query(
                 `
                 ALTER TABLE ${safeQualifiedTableName}
-                ALTER COLUMN ${this.quoteIdentifier(column.columnName)} DROP DEFAULT
+                DROP COLUMN ${this.quoteIdentifier(col)}
               `
               );
-            } else {
-              // Set default
+
+              completedOperations.push(`Dropped column: ${col}`);
+            }
+          }
+
+          // Update columns
+          if (updateColumns && Array.isArray(updateColumns)) {
+            for (const column of updateColumns) {
+              if (Object.keys(reservedColumns).includes(column.columnName)) {
+                throw new AppError(
+                  'cannot update system columns',
+                  404,
+                  ERROR_CODES.DATABASE_FORBIDDEN,
+                  `You cannot update the system column '${column.columnName}'`
+                );
+              }
+
+              // Handle default value changes
+              if (column.defaultValue !== undefined) {
+                if (column.defaultValue === '') {
+                  // Drop default
+                  await client.query(
+                    `
+                  ALTER TABLE ${safeQualifiedTableName}
+                  ALTER COLUMN ${this.quoteIdentifier(column.columnName)} DROP DEFAULT
+                `
+                  );
+                } else {
+                  // Set default
+                  await client.query(
+                    `
+                  ALTER TABLE ${safeQualifiedTableName}
+                  ALTER COLUMN ${this.quoteIdentifier(column.columnName)} SET ${formatDefaultValue(column.defaultValue)}
+                `
+                  );
+                }
+              }
+
+              // Handle column rename - do this last to avoid issues with other operations
+              if (column.newColumnName) {
+                await client.query(
+                  `
+                ALTER TABLE ${safeQualifiedTableName}
+                RENAME COLUMN ${this.quoteIdentifier(column.columnName)} TO ${this.quoteIdentifier(column.newColumnName as string)}
+              `
+                );
+              }
+              completedOperations.push(`Updated column: ${column.columnName}`);
+            }
+          }
+
+          // Add new columns
+          if (addColumns && Array.isArray(addColumns)) {
+            // Validate and filter reserved fields
+            const columnsToAdd = this.validateReservedFields(addColumns);
+
+            for (const col of columnsToAdd) {
+              const fieldType = COLUMN_TYPES[col.type as ColumnType];
+              let sqlType = fieldType.sqlType;
+              if (col.type === ColumnType.UUID) {
+                sqlType = 'UUID';
+              }
+
+              const nullable = col.isNullable !== false ? '' : 'NOT NULL';
+              const unique = col.isUnique ? 'UNIQUE' : '';
+              const defaultClause = formatDefaultValue(
+                col.defaultValue,
+                col.type as ColumnType,
+                col.isNullable
+              );
+
               await client.query(
                 `
                 ALTER TABLE ${safeQualifiedTableName}
-                ALTER COLUMN ${this.quoteIdentifier(column.columnName)} SET ${formatDefaultValue(column.defaultValue)}
+                ADD COLUMN ${this.quoteIdentifier(col.columnName)} ${sqlType} ${nullable} ${unique} ${defaultClause}
               `
+              );
+
+              completedOperations.push(`Added column: ${col.columnName}`);
+            }
+          }
+
+          // Add foreign key constraints — one ALTER per constraint entity.
+          if (addForeignKeys && Array.isArray(addForeignKeys)) {
+            for (const fk of addForeignKeys) {
+              const systemSourceColumn = fk.referenceColumns
+                .map((rc) => rc.sourceColumn)
+                .find((source) => Object.keys(reservedColumns).includes(source));
+              if (systemSourceColumn) {
+                throw new AppError(
+                  'cannot add foreign key on system columns',
+                  404,
+                  ERROR_CODES.DATABASE_FORBIDDEN,
+                  `You cannot add foreign key on the system column '${systemSourceColumn}'`
+                );
+              }
+              const fkeyConstraint = this.generateFkeyConstraintStatement(fk, schemaName, true);
+              await client.query(
+                `
+                ALTER TABLE ${safeQualifiedTableName}
+                ADD ${fkeyConstraint}
+              `
+              );
+
+              const sourceColumns = fk.referenceColumns.map((rc) => rc.sourceColumn).join(', ');
+              completedOperations.push(
+                `Added foreign key constraint on column(s): ${sourceColumns}`
               );
             }
           }
 
-          // Handle column rename - do this last to avoid issues with other operations
-          if (column.newColumnName) {
+          if (renameTable && renameTable.newTableName) {
+            validateIdentifier(renameTable.newTableName, 'table');
+            const safeNewTableName = this.quoteIdentifier(renameTable.newTableName);
+            // Rename the table
             await client.query(
               `
               ALTER TABLE ${safeQualifiedTableName}
-              RENAME COLUMN ${this.quoteIdentifier(column.columnName)} TO ${this.quoteIdentifier(column.newColumnName as string)}
+              RENAME TO ${safeNewTableName}
             `
             );
-          }
-          completedOperations.push(`Updated column: ${column.columnName}`);
-        }
-      }
 
-      // Add new columns
-      if (addColumns && Array.isArray(addColumns)) {
-        // Validate and filter reserved fields
-        const columnsToAdd = this.validateReservedFields(addColumns);
-
-        for (const col of columnsToAdd) {
-          const fieldType = COLUMN_TYPES[col.type as ColumnType];
-          let sqlType = fieldType.sqlType;
-          if (col.type === ColumnType.UUID) {
-            sqlType = 'UUID';
-          }
-
-          const nullable = col.isNullable !== false ? '' : 'NOT NULL';
-          const unique = col.isUnique ? 'UNIQUE' : '';
-          const defaultClause = formatDefaultValue(
-            col.defaultValue,
-            col.type as ColumnType,
-            col.isNullable
-          );
-
-          await client.query(
-            `
-              ALTER TABLE ${safeQualifiedTableName}
-              ADD COLUMN ${this.quoteIdentifier(col.columnName)} ${sqlType} ${nullable} ${unique} ${defaultClause}
-            `
-          );
-
-          completedOperations.push(`Added column: ${col.columnName}`);
-        }
-      }
-
-      // Add foreign key constraints
-      if (addForeignKeys && Array.isArray(addForeignKeys)) {
-        for (const col of addForeignKeys) {
-          if (Object.keys(reservedColumns).includes(col.columnName)) {
-            throw new AppError(
-              'cannot add foreign key on system columns',
-              404,
-              ERROR_CODES.DATABASE_FORBIDDEN,
-              `You cannot add foreign key on the system column '${col.columnName}'`
+            completedOperations.push(
+              `Renamed table from ${tableName} to ${renameTable.newTableName}`
             );
           }
-          const fkeyConstraint = this.generateFkeyConstraintStatement(col, schemaName, true);
+
+          // Update metadata after schema changes
+          // Metadata is now updated on-demand
+
+          // enable postgrest to query this table
           await client.query(
             `
-              ALTER TABLE ${safeQualifiedTableName}
-              ADD ${fkeyConstraint}
-            `
+            NOTIFY pgrst, 'reload schema';
+          `
           );
 
-          completedOperations.push(`Added foreign key constraint on column: ${col.columnName}`);
-        }
-      }
-
-      if (renameTable && renameTable.newTableName) {
-        validateIdentifier(renameTable.newTableName, 'table');
-        const safeNewTableName = this.quoteIdentifier(renameTable.newTableName);
-        // Rename the table
-        await client.query(
-          `
-            ALTER TABLE ${safeQualifiedTableName}
-            RENAME TO ${safeNewTableName}
-          `
-        );
-
-        completedOperations.push(`Renamed table from ${tableName} to ${renameTable.newTableName}`);
-      }
-
-      // Update metadata after schema changes
-      // Metadata is now updated on-demand
-
-      // enable postgrest to query this table
-      await client.query(
-        `
-          NOTIFY pgrst, 'reload schema';
-        `
+          return {
+            schemaName,
+            message: 'table schema updated successfully',
+            tableName,
+            operations: completedOperations,
+          };
+        },
+        true
       );
-
-      const response = {
-        schemaName,
-        message: 'table schema updated successfully',
-        tableName,
-        operations: completedOperations,
-      };
 
       await client.query('COMMIT');
       transactionStarted = false;
@@ -700,28 +740,49 @@ export class DatabaseTableService {
    */
   async deleteTable(schemaName: string, table: string): Promise<DeleteTableResponse> {
     validateSchemaName(schemaName);
-    assertWritableDatabaseSchema(schemaName);
     const client = await this.getPool().connect();
+    let transactionStarted = false;
     try {
-      await client.query(`DROP TABLE IF EXISTS ${quoteQualifiedName(schemaName, table)} CASCADE`);
+      await client.query('BEGIN');
+      transactionStarted = true;
 
-      // Update metadata
-      // Metadata is now updated on-demand
+      const response = await withAdminContext(
+        client,
+        async () => {
+          await client.query(
+            `DROP TABLE IF EXISTS ${quoteQualifiedName(schemaName, table)} CASCADE`
+          );
 
-      // enable postgrest to query this table
-      await client.query(
+          // Update metadata
+          // Metadata is now updated on-demand
+
+          // enable postgrest to query this table
+          await client.query(
+            `
+          NOTIFY pgrst, 'reload schema';
         `
-        NOTIFY pgrst, 'reload schema';
-      `
+          );
+
+          return {
+            schemaName,
+            message: 'table deleted successfully',
+            tableName: table,
+            nextActions:
+              'table deleted successfully, you can create a new table with the POST /api/database/tables endpoint',
+          };
+        },
+        true
       );
 
-      return {
-        schemaName,
-        message: 'table deleted successfully',
-        tableName: table,
-        nextActions:
-          'table deleted successfully, you can create a new table with the POST /api/database/tables endpoint',
-      };
+      await client.query('COMMIT');
+      transactionStarted = false;
+      return response;
+    } catch (error) {
+      if (transactionStarted) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+      }
+      throw error;
     } finally {
       client.release();
     }
@@ -760,76 +821,37 @@ export class DatabaseTableService {
   }
 
   private generateFkeyConstraintStatement(
-    col: { columnName: string; foreignKey?: ForeignKeySchema },
+    fk: ForeignKeySchema,
     defaultSchemaName: string,
     include_source_column: boolean = true
   ) {
-    if (!col.foreignKey) {
+    if (!fk.referenceColumns || fk.referenceColumns.length === 0) {
       return '';
     }
-    // Store foreign_key in a const to avoid repeated non-null assertions
-    const fk = col.foreignKey;
-    // Use "auth_users" in constraint name for auth.users references
+    const sourceCols = fk.referenceColumns.map((r) => r.sourceColumn);
+    const refCols = fk.referenceColumns.map((r) => r.referenceColumn);
     const safeTableName = fk.referenceTable.replace(/\./g, '_');
-    const constraintName = `fk_${col.columnName}_${safeTableName}_${fk.referenceColumn}`;
+    const baseName = `fk_${sourceCols.join('_')}_${safeTableName}_${refCols.join('_')}`;
+    const MAX_IDENTIFIER_LENGTH = 63;
+    const constraintName =
+      baseName.length > MAX_IDENTIFIER_LENGTH
+        ? `${baseName.slice(0, MAX_IDENTIFIER_LENGTH - 9)}_${createHash('sha256').update(baseName).digest('hex').slice(0, 8)}`
+        : baseName;
     const onDelete = fk.onDelete || 'RESTRICT';
     const onUpdate = fk.onUpdate || 'RESTRICT';
 
+    const sourcePart = sourceCols.map((c) => this.quoteIdentifier(c)).join(', ');
+    const refPart = refCols.map((c) => this.quoteIdentifier(c)).join(', ');
+
     if (include_source_column) {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.columnName)}) REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${sourcePart}) REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${refPart}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     } else {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${refPart}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     }
   }
 
-  private async getFkeyConstraints(
-    schemaName: string,
-    table: string
-  ): Promise<Map<string, ForeignKeyInfo>> {
-    const result = await this.getPool().query(
-      `
-        SELECT
-          tc.constraint_name,
-          kcu.column_name as from_column,
-          ccu.table_schema AS foreign_schema,
-          ccu.table_name AS foreign_table,
-          ccu.column_name AS foreign_column,
-          rc.delete_rule as on_delete,
-          rc.update_rule as on_update
-        FROM information_schema.table_constraints AS tc
-        JOIN information_schema.key_column_usage AS kcu
-          ON tc.constraint_name = kcu.constraint_name
-          AND tc.table_schema = kcu.table_schema
-        JOIN information_schema.constraint_column_usage AS ccu
-          ON ccu.constraint_name = tc.constraint_name
-        JOIN information_schema.referential_constraints AS rc
-          ON rc.constraint_name = tc.constraint_name
-          AND rc.constraint_schema = tc.table_schema
-        WHERE tc.constraint_type = 'FOREIGN KEY'
-        AND tc.table_schema = $1
-        AND tc.table_name = $2
-      `,
-      [schemaName, table]
-    );
-
-    const foreignKeys = result.rows;
-
-    // Create a map of column names to their foreign key info
-    const foreignKeyMap = new Map<string, ForeignKeyInfo>();
-    foreignKeys.forEach((fk: ForeignKeyRow) => {
-      // Prefix table name with schema if not public (e.g., "auth.users")
-      const referenceTable =
-        fk.foreign_schema !== 'public'
-          ? `${fk.foreign_schema}.${fk.foreign_table}`
-          : fk.foreign_table;
-      foreignKeyMap.set(fk.from_column, {
-        constraint_name: fk.constraint_name,
-        referenceTable,
-        referenceColumn: fk.foreign_column,
-        onDelete: fk.on_delete as OnDeleteActionSchema,
-        onUpdate: fk.on_update as OnUpdateActionSchema,
-      });
-    });
-    return foreignKeyMap;
+  private async getFkeyConstraints(schemaName: string, table: string): Promise<ForeignKeySchema[]> {
+    const result = await this.getPool().query(FOREIGN_KEY_INTROSPECTION_QUERY, [schemaName, table]);
+    return groupForeignKeyRows(result.rows as ForeignKeyRow[]);
   }
 }

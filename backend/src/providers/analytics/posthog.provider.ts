@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
@@ -37,7 +37,7 @@ export class PostHogProvider {
   }
 
   private isEnabled(): boolean {
-    return !!config.cloud.projectId && config.cloud.projectId !== 'local';
+    return !!appConfig.cloud.projectId && appConfig.cloud.projectId !== 'local';
   }
 
   private throwUnsupported(): never {
@@ -49,8 +49,8 @@ export class PostHogProvider {
   }
 
   private signToken(): string {
-    const projectId = config.cloud.projectId;
-    const secret = config.app.jwtSecret;
+    const projectId = appConfig.cloud.projectId;
+    const secret = appConfig.app.jwtSecret;
     if (!projectId || projectId === 'local') {
       throw new AppError(
         'PROJECT_ID not configured; cannot reach cloud backend.',
@@ -73,7 +73,7 @@ export class PostHogProvider {
   }
 
   private url(path: string): string {
-    return `${config.cloud.apiHost}/projects/v1/${config.cloud.projectId}${path}`;
+    return `${appConfig.cloud.apiHost}/projects/v1/${appConfig.cloud.projectId}${path}`;
   }
 
   async getConnection(): Promise<PosthogConnection | null> {

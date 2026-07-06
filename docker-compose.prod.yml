@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: ghcr.io/insforge/postgres:v15.13.2
+    image: ghcr.io/insforge/postgres:v15.13.4
 
     command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
     environment:
@@ -68,8 +68,10 @@ services:
       - API_BASE_URL=${API_BASE_URL:-}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
-      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-this-password}
+      - ROOT_ADMIN_USERNAME=${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
+      - ROOT_ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}
+      - ADMIN_EMAIL=${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
+      - ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       # PostgreSQL connection
@@ -82,14 +84,19 @@ services:
       - POSTGREST_BASE_URL=http://postgrest:3000
       # Deno Runtime URL for serverless functions
       - DENO_RUNTIME_URL=http://deno:7133
-      - DENO_SUBHOSTING_TOKEN=${DENO_SUBHOSTING_TOKEN:-}
-      - DENO_SUBHOSTING_ORG_ID=${DENO_SUBHOSTING_ORG_ID:-}
+      - DENO_DEPLOY_TOKEN=${DENO_DEPLOY_TOKEN:-}
+      - DENO_DEPLOY_ORG_ID=${DENO_DEPLOY_ORG_ID:-}
       # Storage Configuration
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-}
       - MAX_JSON_BODY_SIZE=${MAX_JSON_BODY_SIZE:-}
       - MAX_URLENCODED_BODY_SIZE=${MAX_URLENCODED_BODY_SIZE:-}
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}
+      # S3-compatible storage (MinIO, Tencent COS, Aliyun OSS, R2 ...)
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-}
       - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL:-}
       - AWS_CLOUDFRONT_KEY_PAIR_ID=${AWS_CLOUDFRONT_KEY_PAIR_ID:-}
       - AWS_CLOUDFRONT_PRIVATE_KEY=${AWS_CLOUDFRONT_PRIVATE_KEY:-}
@@ -102,6 +109,7 @@ services:
       - PROJECT_ID=${PROJECT_ID:-}
       - APP_KEY=${APP_KEY:-}
       - ACCESS_API_KEY=${ACCESS_API_KEY:-}
+      - ACCESS_ANON_KEY=${ACCESS_ANON_KEY:-}
       # LLM Model API keys
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       # Stripe Payments Configuration
@@ -124,6 +132,8 @@ services:
       - APPLE_CLIENT_SECRET=${APPLE_CLIENT_SECRET:-}
       # Logs directory
       - LOGS_DIR=/insforge-logs
+      # Anonymous telemetry (set INSFORGE_TELEMETRY_DISABLED=1 to opt out)
+      - INSFORGE_TELEMETRY_DISABLED=${INSFORGE_TELEMETRY_DISABLED:-}
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
     volumes:

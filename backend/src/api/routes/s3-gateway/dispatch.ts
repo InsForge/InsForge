@@ -16,7 +16,14 @@ export type S3Op =
   | 'AbortMultipartUpload'
   | 'ListParts'
   | 'GetBucketLocation'
-  | 'GetBucketVersioning';
+  | 'GetBucketVersioning'
+  | 'PutBucketVersioning'
+  | 'GetBucketCors'
+  | 'PutBucketCors'
+  | 'DeleteBucketCors'
+  | 'GetObjectTagging'
+  | 'PutObjectTagging'
+  | 'DeleteObjectTagging';
 
 interface Req {
   method: string;
@@ -62,15 +69,27 @@ export function dispatchOp(req: Req): S3Op | null {
       if (q.has('versioning')) {
         return 'GetBucketVersioning';
       }
+      if (q.has('cors')) {
+        return 'GetBucketCors';
+      }
       return 'ListObjectsV2';
     }
     if (m === 'HEAD') {
       return 'HeadBucket';
     }
     if (m === 'PUT') {
+      if (q.has('versioning')) {
+        return 'PutBucketVersioning';
+      }
+      if (q.has('cors')) {
+        return 'PutBucketCors';
+      }
       return 'CreateBucket';
     }
     if (m === 'DELETE') {
+      if (q.has('cors')) {
+        return 'DeleteBucketCors';
+      }
       return 'DeleteBucket';
     }
     if (m === 'POST' && q.has('delete')) {
@@ -88,6 +107,9 @@ export function dispatchOp(req: Req): S3Op | null {
       if (header(req.headers, 'x-amz-copy-source')) {
         return 'CopyObject';
       }
+      if (q.has('tagging')) {
+        return 'PutObjectTagging';
+      }
       return 'PutObject';
     }
     if (m === 'POST') {
@@ -103,6 +125,9 @@ export function dispatchOp(req: Req): S3Op | null {
       if (q.has('uploadId')) {
         return 'ListParts';
       }
+      if (q.has('tagging')) {
+        return 'GetObjectTagging';
+      }
       return 'GetObject';
     }
     if (m === 'HEAD') {
@@ -111,6 +136,9 @@ export function dispatchOp(req: Req): S3Op | null {
     if (m === 'DELETE') {
       if (q.has('uploadId')) {
         return 'AbortMultipartUpload';
+      }
+      if (q.has('tagging')) {
+        return 'DeleteObjectTagging';
       }
       return 'DeleteObject';
     }

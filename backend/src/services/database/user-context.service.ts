@@ -29,7 +29,10 @@ export async function withUserContext<T>(
   settings: Record<string, string | undefined> = {}
 ): Promise<T> {
   const claims: Record<string, string> = { role: ctx.role };
-  if (ctx.id) {
+  // Only authenticated users have a row-ownership identity. Admin subjects
+  // (`cloud:<id>`, local admin ids) and the 'anonymous' sentinel are API-level
+  // labels: auth.uid() casts sub to uuid, so they must never become claims.
+  if (ctx.role === 'authenticated' && ctx.id) {
     claims.sub = ctx.id;
   }
   if (ctx.email) {
@@ -74,6 +77,75 @@ export async function withUserContext<T>(
     await client.query('RESET ROLE').catch(() => {});
     client.release();
   }
+}
+
+/**
+ * Run `fn` as project_admin on an existing client.
+ *
+ * By default, role and request claims are session-scoped and must be cleaned
+ * before returning the client to the pool. Pass `transactionLocal: true` only
+ * when the caller has already opened an explicit transaction; rollback can then
+ * clear local role/config state if fn or cleanup fails.
+ */
+export async function withAdminContext<T>(
+  client: PoolClient,
+  fn: () => Promise<T>,
+  transactionLocal: boolean = false,
+  onCleanupError?: (error: Error) => void
+): Promise<T> {
+  let roleSet = false;
+  let fnStarted = false;
+  let fnFailed = false;
+  let result: T | undefined;
+  let pendingError: unknown;
+  let cleanupError: Error | undefined;
+
+  try {
+    await client.query(
+      transactionLocal ? 'SET LOCAL ROLE project_admin' : 'SET ROLE project_admin'
+    );
+    roleSet = true;
+    await client.query('SELECT set_config($1, $2, $3)', [
+      REQUEST_JWT_CLAIMS_SETTING,
+      JSON.stringify({ role: 'project_admin' }),
+      transactionLocal,
+    ]);
+    fnStarted = true;
+    result = await fn();
+  } catch (error) {
+    fnFailed = fnStarted;
+    pendingError = error;
+  }
+
+  if (roleSet && !(transactionLocal && fnFailed)) {
+    try {
+      await client.query('RESET ROLE');
+      await client.query('SELECT set_config($1, $2, $3)', [
+        REQUEST_JWT_CLAIMS_SETTING,
+        '{}',
+        transactionLocal,
+      ]);
+    } catch (error) {
+      cleanupError = error instanceof Error ? error : new Error(String(error));
+      onCleanupError?.(cleanupError);
+    }
+  }
+
+  if (pendingError && cleanupError) {
+    if (pendingError instanceof Error && pendingError.cause === undefined) {
+      pendingError.cause = cleanupError;
+    }
+  }
+
+  if (pendingError) {
+    throw pendingError;
+  }
+
+  if (cleanupError) {
+    throw cleanupError;
+  }
+
+  return result as T;
 }
 
 async function setTransactionLocalConfig(

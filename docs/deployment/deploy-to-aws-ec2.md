@@ -1,3 +1,8 @@
+---
+title: "Deploy InsForge to AWS EC2"
+description: "Step-by-step guide to deploy InsForge on an AWS EC2 instance using Docker Compose, including SSH setup, domain config, and TLS termination."
+---
+
 # Deploy InsForge to AWS EC2
 
 This guide will walk you through deploying InsForge on an AWS EC2 instance using Docker Compose.
@@ -129,8 +134,8 @@ The full template lives at `deploy/docker-compose/.env.example`. These are the v
 ```env
 # Required
 JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=change-this-password
+ROOT_ADMIN_USERNAME=admin
+ROOT_ADMIN_PASSWORD=change-this-password
 POSTGRES_PASSWORD=change-this-password
 
 # Optional: falls back to JWT_SECRET if left blank
@@ -215,7 +220,7 @@ Open your browser and navigate to:
 http://your-ec2-ip:7130
 ```
 
-Log in with the `ADMIN_EMAIL` and `ADMIN_PASSWORD` you set in `.env`.
+Log in with the `ROOT_ADMIN_USERNAME` and `ROOT_ADMIN_PASSWORD` you set in `.env`.
 
 ### 6. Configure Domain (Optional but Recommended)
 
@@ -494,4 +499,4 @@ effective_cache_size = 3GB
 
 **Congratulations! 🎉** Your InsForge instance is now running on AWS EC2. You can start building applications by connecting AI agents to your backend platform.
 
-For other production deployment strategies, check out our [deployment guides](./README.md).
+For other production deployment strategies, check out our [deployment guides](/deployment/deployment-security-guide).

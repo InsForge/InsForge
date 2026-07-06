@@ -11,7 +11,15 @@ export enum ColumnType {
   JSON = 'json',
 }
 
-export const onUpdateActionSchema = z.enum(['CASCADE', 'RESTRICT', 'NO ACTION']);
+// Postgres supports the same referential actions for ON UPDATE as ON DELETE;
+// introspection can return SET NULL / SET DEFAULT, so the schema must accept them.
+export const onUpdateActionSchema = z.enum([
+  'CASCADE',
+  'SET NULL',
+  'SET DEFAULT',
+  'RESTRICT',
+  'NO ACTION',
+]);
 export const onDeleteActionSchema = z.enum([
   'CASCADE',
   'SET NULL',
@@ -31,9 +39,21 @@ export const columnTypeSchema = z.enum([
   ColumnType.JSON,
 ]);
 
+export const foreignKeyReferenceSchema = z.object({
+  sourceColumn: z.string().min(1, 'Source column cannot be empty'),
+  referenceColumn: z.string().min(1, 'Reference column cannot be empty'),
+});
+
+// A foreign key is a table-level constraint: one entity per constraint, with an
+// ordered list of (source -> reference) column pairs. Composite keys are a single
+// entity with multiple pairs, never duplicated across columns.
 export const foreignKeySchema = z.object({
+  // Constraint identity. Populated when reading schema; derived by the backend on create.
+  constraintName: z.string().optional(),
   referenceTable: z.string().min(1, 'Target table cannot be empty'),
-  referenceColumn: z.string().min(1, 'Target column cannot be empty'),
+  referenceColumns: z
+    .array(foreignKeyReferenceSchema)
+    .min(1, 'At least one column mapping is required'),
   onDelete: onDeleteActionSchema,
   onUpdate: onUpdateActionSchema,
 });
@@ -48,7 +68,6 @@ export const columnSchema = z.object({
   isPrimaryKey: z.boolean().optional(),
   isNullable: z.boolean(),
   isUnique: z.boolean(),
-  foreignKey: foreignKeySchema.optional(),
 });
 
 export const tableSchema = z.object({
@@ -58,6 +77,8 @@ export const tableSchema = z.object({
     .min(1, 'Table name cannot be empty')
     .max(64, 'Table name must be less than 64 characters'),
   columns: z.array(columnSchema).min(1, 'At least one column is required'),
+  // Foreign keys are table-level, one entry per constraint.
+  foreignKeys: z.array(foreignKeySchema).optional(),
   recordCount: z.number().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
@@ -65,6 +86,7 @@ export const tableSchema = z.object({
 
 export type TableSchema = z.infer<typeof tableSchema>;
 export type ColumnSchema = z.infer<typeof columnSchema>;
+export type ForeignKeyReferenceSchema = z.infer<typeof foreignKeyReferenceSchema>;
 export type ForeignKeySchema = z.infer<typeof foreignKeySchema>;
 export type OnUpdateActionSchema = z.infer<typeof onUpdateActionSchema>;
 export type OnDeleteActionSchema = z.infer<typeof onDeleteActionSchema>;
@@ -122,8 +144,21 @@ export const migrationSchema = z.object({
   createdAt: z.string(),
 });
 
+export const databaseBackupSchema = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+  triggerSource: z.enum(['manual', 'scheduled']),
+  status: z.enum(['running', 'completed', 'failed']),
+  sizeBytes: z.number().nullable(),
+  errorMessage: z.string().nullable(),
+  createdAt: z.string(),
+  completedAt: z.string().nullable(),
+  createdBy: z.string().nullable(),
+});
+
 export type DatabaseFunction = z.infer<typeof databaseFunctionSchema>;
 export type DatabaseIndex = z.infer<typeof databaseIndexSchema>;
 export type DatabasePolicy = z.infer<typeof databasePolicySchema>;
 export type DatabaseTrigger = z.infer<typeof databaseTriggerSchema>;
 export type Migration = z.infer<typeof migrationSchema>;
+export type DatabaseBackup = z.infer<typeof databaseBackupSchema>;

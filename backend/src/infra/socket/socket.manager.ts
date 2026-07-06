@@ -81,8 +81,7 @@ export class SocketManager {
           const isValid = await secretService.verifyApiKey(apiKey);
           if (isValid) {
             socket.data.user = {
-              id: 'api-key-client',
-              email: 'api-key@client',
+              id: 'api-key',
               role: 'project_admin',
             };
             socket.data.presenceType = 'anonymous';
@@ -95,6 +94,31 @@ export class SocketManager {
             401,
             ERROR_CODES.AUTH_INVALID_API_KEY,
             NEXT_ACTIONS.CHECK_API_KEY
+          );
+        }
+
+        // Opaque anon key authentication: like REST, the anon key travels in
+        // the single `token` credential slot; signed-in clients replace it
+        // with their user JWT. A failed verification rejects — it never
+        // falls through to the JWT path.
+        if (typeof token === 'string' && token.startsWith('anon_')) {
+          const isValid = await secretService.verifyAnonKey(token);
+          if (isValid) {
+            // Sentinel subject only — presence falls back to the socket id
+            socket.data.user = {
+              id: 'anonymous',
+              role: 'anon',
+            };
+            socket.data.presenceType = 'anonymous';
+            logger.debug('Socket authenticated via anon key');
+            return next();
+          }
+          // If anon key provided but invalid, reject — never downgrade
+          throw new AppError(
+            'Invalid anon key',
+            401,
+            ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+            NEXT_ACTIONS.CHECK_TOKEN
           );
         }
 

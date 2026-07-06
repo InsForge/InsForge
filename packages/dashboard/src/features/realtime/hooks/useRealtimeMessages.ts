@@ -1,9 +1,12 @@
 import { useState, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { realtimeService } from '#features/realtime/services/realtime.service';
 import type { ListMessagesRequest } from '@insforge/shared-schemas';
+import { useToast } from '@insforge/ui';
 
 export function useRealtimeMessages() {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [messagesParams, setMessagesParams] = useState<ListMessagesRequest>({
     limit: 100,
     offset: 0,
@@ -28,6 +31,24 @@ export function useRealtimeMessages() {
     queryKey: ['realtime', 'stats'],
     queryFn: () => realtimeService.getMessageStats(),
     staleTime: 60 * 1000,
+  });
+
+  const clearMessagesMutation = useMutation({
+    mutationFn: () => realtimeService.clearMessages(),
+    onSuccess: async (data) => {
+      setMessagesParams((previousParams) => ({
+        ...previousParams,
+        offset: 0,
+      }));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['realtime', 'messages'] }),
+        queryClient.invalidateQueries({ queryKey: ['realtime', 'stats'] }),
+      ]);
+      showToast(`Cleared ${data.deleted} realtime messages.`, 'success');
+    },
+    onError: (mutationError: Error) => {
+      showToast(mutationError.message || 'Failed to clear realtime messages.', 'error');
+    },
   });
 
   const filterMessages = useCallback((params: Partial<ListMessagesRequest>) => {
@@ -65,6 +86,8 @@ export function useRealtimeMessages() {
     messagesTotalPages,
     setMessagesPage,
     filterMessages,
+    clearMessages: clearMessagesMutation.mutateAsync,
+    isClearingMessages: clearMessagesMutation.isPending,
     refetchMessages,
     refetchStats,
     refetch,

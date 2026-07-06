@@ -3,12 +3,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from '#lib/contexts/AuthContext';
 import { AppRoutes } from '#router/AppRoutes';
-import { ToastProvider } from '#lib/hooks/useToast';
+import { ToastProvider } from '@insforge/ui';
 import { SocketProvider } from '#lib/contexts/SocketContext';
 import { PostHogAnalyticsProvider } from '#lib/analytics/posthog';
 import { SQLEditorProvider } from '#features/database/contexts/SQLEditorContext';
 import { DashboardHostProvider, DashboardProjectProvider } from '#lib/config/DashboardHostContext';
 import { setDashboardBackendUrl } from '#lib/config/runtime';
+import { advisorService } from '#features/dashboard/services/advisor.service';
 import type { InsForgeDashboardProps } from '#types';
 
 function normalizeBackendUrl(url?: string) {
@@ -23,6 +24,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
     showNavbar,
     onRouteChange,
     onShowUpgradeDialog,
+    onOpenWhatsNew,
     onRenameProject,
     onDeleteProject,
     onRequestBackupInfo,
@@ -43,6 +45,8 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
     onConnectPosthog,
     subscribePosthogConnectionStatus,
     onOpenPosthog,
+    onConnectApify,
+    subscribeApifyConnectionStatus,
   } = props;
   const getAuthorizationCode =
     props.mode === 'cloud-hosting' ? props.getAuthorizationCode : undefined;
@@ -57,6 +61,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       useAuthorizationCodeRefresh,
       onRouteChange,
       onShowUpgradeDialog,
+      onOpenWhatsNew,
       onRenameProject,
       onDeleteProject,
       onRequestBackupInfo,
@@ -71,12 +76,20 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onRequestUserApiKey,
       onRequestModelCredits,
       onRequestProjectMetrics,
-      onRequestAdvisorLatest,
-      onRequestAdvisorIssues,
-      onTriggerAdvisorScan,
+      onRequestAdvisorLatest:
+        onRequestAdvisorLatest ??
+        (mode === 'self-hosting' ? () => advisorService.getLatest() : undefined),
+      onRequestAdvisorIssues:
+        onRequestAdvisorIssues ??
+        (mode === 'self-hosting' ? (q) => advisorService.getIssues(q) : undefined),
+      onTriggerAdvisorScan:
+        onTriggerAdvisorScan ??
+        (mode === 'self-hosting' ? () => advisorService.triggerScan() : undefined),
       onConnectPosthog,
       subscribePosthogConnectionStatus,
       onOpenPosthog,
+      onConnectApify,
+      subscribeApifyConnectionStatus,
     }),
     [
       backendUrl,
@@ -86,6 +99,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       useAuthorizationCodeRefresh,
       onRouteChange,
       onShowUpgradeDialog,
+      onOpenWhatsNew,
       onRenameProject,
       onDeleteProject,
       onRequestBackupInfo,
@@ -106,6 +120,8 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onConnectPosthog,
       subscribePosthogConnectionStatus,
       onOpenPosthog,
+      onConnectApify,
+      subscribeApifyConnectionStatus,
     ]
   );
   const [queryClient] = useState(

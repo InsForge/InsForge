@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { sendS3Error } from '../errors.js';
 import { toXml } from '../xml.js';
-import { S3AuthenticatedRequest } from '@/api/middlewares/s3-sigv4.js';
+import { S3GatewayRequest, getS3Bucket } from '../request.js';
 
 const MAX_KEYS_DEFAULT = 1000;
 const MAX_KEYS_LIMIT = 1000;
@@ -23,8 +23,8 @@ function decodeContinuation(token: string | undefined): string | undefined {
   return Buffer.from(token, 'base64url').toString('utf8');
 }
 
-export async function handle(req: S3AuthenticatedRequest, res: Response): Promise<void> {
-  const bucket = (req as unknown as { s3Bucket: string }).s3Bucket;
+export async function handle(req: S3GatewayRequest, res: Response): Promise<void> {
+  const bucket = getS3Bucket(req);
   const svc = StorageService.getInstance();
   if (!(await svc.bucketExists(bucket))) {
     sendS3Error(res, 'NoSuchBucket', `Bucket ${bucket} does not exist`, {

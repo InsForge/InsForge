@@ -1,5 +1,5 @@
 import { Eye, EyeOff } from 'lucide-react';
-import { cn } from '#lib/utils/utils';
+import { cn } from '@insforge/ui';
 
 interface ShowPasswordButtonProps {
   show: boolean;

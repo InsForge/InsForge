@@ -16,7 +16,7 @@ import logger from '@/utils/logger.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { successResponse } from '@/utils/response.js';
-import { analyzeQuery, DatabaseResourceUpdate } from '@/utils/sql-parser.js';
+import { analyzeQuery, type DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 import { buildQualifiedTableKey } from '@/services/database/helpers.js';
 
 const router = Router();
@@ -40,11 +40,10 @@ function invalidateColumnTypeCacheFromChanges(changes: DatabaseResourceUpdate[])
 }
 
 /**
- * Execute raw SQL query with relaxed sanitization (Power User Mode)
+ * Execute raw SQL query with root privileges.
  * POST /api/database/advance/rawsql/unrestricted
  *
- * ⚠️ This endpoint has relaxed restrictions compared to /rawsql
- * - Allows SELECT and INSERT into system tables and users table
+ * Root back door for project-admin-only operations that need full database owner privileges.
  */
 router.post(
   '/rawsql/unrestricted',
@@ -63,22 +62,17 @@ router.post(
 
       const { query, params = [] } = validation.data;
 
-      // Sanitize query with relaxed mode
-      const sanitizedQuery = dbAdvanceService.sanitizeQuery(query, 'relaxed');
+      const response = await dbAdvanceService.executeRawSQL(query, params, true);
 
-      // Execute SQL
-      const response = await dbAdvanceService.executeRawSQL(sanitizedQuery, params);
-
-      // Log audit for relaxed raw SQL execution
       await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'EXECUTE_RAW_SQL_RELAXED',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'EXECUTE_RAW_SQL_UNRESTRICTED',
         module: 'DATABASE',
         details: {
           query: query.substring(0, 300), // Limit query length in audit log
           paramCount: params.length,
           rowsAffected: response.rowCount,
-          mode: 'relaxed',
+          executionRole: 'root',
         },
         ip_address: req.ip,
       });
@@ -98,14 +92,14 @@ router.post(
 
       successResponse(res, response);
     } catch (error: unknown) {
-      logger.warn('Relaxed raw SQL execution error:', error);
+      logger.warn('Unrestricted raw SQL execution error:', error);
       next(error);
     }
   }
 );
 
 /**
- * Execute raw SQL query with strict sanitization
+ * Execute raw SQL query with project_admin privileges.
  * POST /api/database/advance/rawsql
  */
 router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -122,22 +116,17 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
 
     const { query, params = [] } = validation.data;
 
-    // Sanitize query with strict mode
-    const sanitizedQuery = dbAdvanceService.sanitizeQuery(query, 'strict');
+    const response = await dbAdvanceService.executeRawSQL(query, params);
 
-    // Execute SQL
-    const response = await dbAdvanceService.executeRawSQL(sanitizedQuery, params);
-
-    // Log audit for strict raw SQL execution
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'EXECUTE_RAW_SQL',
       module: 'DATABASE',
       details: {
         query: query.substring(0, 300), // Limit query length in audit log
         paramCount: params.length,
         rowsAffected: response.rowCount,
-        mode: 'strict',
+        executionRole: 'project_admin',
       },
       ip_address: req.ip,
     });
@@ -199,7 +188,7 @@ router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response, next
 
     // Log audit for database export
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'EXPORT_DATABASE',
       module: 'DATABASE',
       details: {
@@ -256,7 +245,7 @@ router.post(
 
       // Log audit
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'BULK_UPSERT',
         module: 'DATABASE',
         details: {
@@ -332,7 +321,7 @@ router.post(
 
       // Log audit for database import
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'IMPORT_DATABASE',
         module: 'DATABASE',
         details: {

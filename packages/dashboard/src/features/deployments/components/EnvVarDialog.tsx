@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState, type ClipboardEvent } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from '@insforge/ui';
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  Input,
+  useToast,
+} from '@insforge/ui';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
-import { useToast } from '#lib/hooks/useToast';
 import {
   createEnvVarDraft,
   normalizeEnvVarDrafts,
@@ -228,7 +235,7 @@ export function EnvVarDialog({
           </DialogTitle>
         </div>
         <DialogDescription className="sr-only">
-          Configure deployment environment variables
+          Configure site environment variables
         </DialogDescription>
 
         <div className="flex max-h-[70vh] flex-col gap-6 overflow-y-auto p-6">

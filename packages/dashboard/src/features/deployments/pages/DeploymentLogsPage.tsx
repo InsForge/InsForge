@@ -13,13 +13,15 @@ import {
   SelectValue,
   Badge,
   Input,
+  Skeleton,
+  cn,
 } from '@insforge/ui';
-import { PaginationControls, Skeleton } from '#components';
+import { PaginationControls } from '#components';
 import { useDeployments } from '#features/deployments/hooks/useDeployments';
 import type { DeploymentSchema } from '#features/deployments/services/deployments.service';
 import DeploymentsEmptyState from '#features/deployments/components/DeploymentsEmptyState';
 import { DeploymentMetaDataDialog } from '#features/deployments/components/DeploymentMetaDataDialog';
-import { cn, formatTime } from '#lib/utils/utils';
+import { formatTime } from '#lib/utils/utils';
 
 type DeploymentStatus =
   | 'ALL'
@@ -131,7 +133,7 @@ export default function DeploymentLogsPage() {
       <div className="flex flex-col gap-6 p-4">
         {/* Title */}
         <h1 className="text-xl font-semibold text-zinc-950 dark:text-white tracking-[-0.1px]">
-          Deployment Log
+          Deployment Logs
         </h1>
 
         {/* Filters Row */}
