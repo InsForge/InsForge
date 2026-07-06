@@ -12,6 +12,8 @@ import {
   type SubscribeResponse,
   type UnsubscribeChannelPayload,
   type PresenceMember,
+  type RealtimeAuthPayload,
+  type RealtimeAuthResponse,
 } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { AppError } from '@/utils/errors.js';
@@ -215,12 +217,10 @@ export class SocketManager {
       void socket.join(`role:${metadata.role}`);
     }
 
-    // Log connection with reconnection status
     logger.info('Socket client connected', {
       socketId: socket.id,
       userId: metadata.userId,
       role: metadata.role,
-      restoredSubscriptions: metadata.subscriptions.size,
     });
   }
 
@@ -288,6 +288,14 @@ export class SocketManager {
     socket.on(ClientEvents.REALTIME_PUBLISH, (payload: PublishEventPayload) => {
       void this.handleRealtimePublish(socket, payload);
     });
+
+    // Handle in-band re-authentication after a token refresh
+    socket.on(
+      ClientEvents.REALTIME_AUTH,
+      (payload: RealtimeAuthPayload, ack: (response: RealtimeAuthResponse) => void) => {
+        this.handleRealtimeAuth(socket, payload, ack);
+      }
+    );
 
     // Update last activity on any event
     socket.onAny(() => {
@@ -374,6 +382,62 @@ export class SocketManager {
         ok: false,
         channel,
         error: { code: ERROR_CODES.INTERNAL_ERROR, message: 'Failed to subscribe to channel' },
+      });
+    }
+  }
+
+  /**
+   * Handle in-band re-authentication with a refreshed token.
+   * Keeps the server's view of the user's claims current on long-lived
+   * connections without a disconnect/reconnect cycle. Only tokens for the
+   * same subject are accepted — identity changes require a new handshake so
+   * rooms and presence are rebuilt under the new identity.
+   */
+  private handleRealtimeAuth(
+    socket: Socket,
+    payload: RealtimeAuthPayload,
+    ack?: (response: RealtimeAuthResponse) => void
+  ): void {
+    try {
+      const tokenPayload = tokenManager.verifyToken(payload.token);
+
+      if (!tokenPayload.role) {
+        ack?.({
+          ok: false,
+          error: { code: ERROR_CODES.AUTH_INVALID_CREDENTIALS, message: 'Token is missing role' },
+        });
+        return;
+      }
+
+      const currentUserId = socket.data.user?.id;
+      if (currentUserId !== tokenPayload.sub) {
+        ack?.({
+          ok: false,
+          error: {
+            code: ERROR_CODES.REALTIME_UNAUTHORIZED,
+            message: 'Token subject does not match the connection identity; reconnect instead',
+          },
+        });
+        return;
+      }
+
+      socket.data.user = {
+        id: tokenPayload.sub,
+        email: tokenPayload.email,
+        role: tokenPayload.role,
+      };
+
+      const metadata = this.socketMetadata.get(socket.id);
+      if (metadata) {
+        metadata.role = tokenPayload.role;
+      }
+
+      logger.debug('Socket re-authenticated', { socketId: socket.id, userId: tokenPayload.sub });
+      ack?.({ ok: true });
+    } catch {
+      ack?.({
+        ok: false,
+        error: { code: ERROR_CODES.AUTH_INVALID_CREDENTIALS, message: 'Invalid token' },
       });
     }
   }
