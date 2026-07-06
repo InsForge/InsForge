@@ -399,15 +399,9 @@ export class SocketManager {
     ack?: (response: RealtimeAuthResponse) => void
   ): void {
     try {
+      // verifyToken enforces signature + expiry and guarantees a role
+      // (defaults to 'authenticated')
       const tokenPayload = tokenManager.verifyToken(payload.token);
-
-      if (!tokenPayload.role) {
-        ack?.({
-          ok: false,
-          error: { code: ERROR_CODES.AUTH_INVALID_CREDENTIALS, message: 'Token is missing role' },
-        });
-        return;
-      }
 
       const currentUserId = socket.data.user?.id;
       if (currentUserId !== tokenPayload.sub) {
@@ -421,6 +415,8 @@ export class SocketManager {
         return;
       }
 
+      const previousRole = socket.data.user?.role;
+
       socket.data.user = {
         id: tokenPayload.sub,
         email: tokenPayload.email,
@@ -430,6 +426,14 @@ export class SocketManager {
       const metadata = this.socketMetadata.get(socket.id);
       if (metadata) {
         metadata.role = tokenPayload.role;
+      }
+
+      // Role-scoped rooms (e.g. role:project_admin DATA_UPDATE broadcasts)
+      // must track the refreshed claims, or a downgraded socket keeps
+      // receiving privileged broadcasts until it reconnects
+      if (previousRole && previousRole !== tokenPayload.role) {
+        void socket.leave(`role:${previousRole}`);
+        void socket.join(`role:${tokenPayload.role}`);
       }
 
       logger.debug('Socket re-authenticated', { socketId: socket.id, userId: tokenPayload.sub });

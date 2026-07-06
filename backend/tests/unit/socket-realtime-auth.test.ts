@@ -40,6 +40,8 @@ vi.mock('@/services/realtime/realtime-presence.service.js', () => ({
 interface FakeSocket {
   id: string;
   data: { user?: { id: string; email?: string; role?: string } };
+  join: ReturnType<typeof vi.fn>;
+  leave: ReturnType<typeof vi.fn>;
 }
 
 type AuthHandler = (
@@ -69,6 +71,8 @@ function connectedSocket(userId = 'user-1'): FakeSocket {
   return {
     id: 'socket-1',
     data: { user: { id: userId, email: `${userId}@example.com`, role: 'authenticated' } },
+    join: vi.fn(),
+    leave: vi.fn(),
   };
 }
 
@@ -94,6 +98,30 @@ describe('SocketManager realtime:auth', () => {
       email: 'user-1@example.com',
       role: 'project_admin',
     });
+  });
+
+  it('moves the socket between role rooms when the refreshed token changes role', async () => {
+    const { handleRealtimeAuth } = await loadHandler();
+    const socket = connectedSocket('user-1');
+    const ack = vi.fn();
+
+    handleRealtimeAuth(socket, { token: userToken('user-1', 'project_admin') }, ack);
+
+    expect(ack).toHaveBeenCalledWith({ ok: true });
+    expect(socket.leave).toHaveBeenCalledWith('role:authenticated');
+    expect(socket.join).toHaveBeenCalledWith('role:project_admin');
+  });
+
+  it('does not touch role rooms when the refreshed token keeps the same role', async () => {
+    const { handleRealtimeAuth } = await loadHandler();
+    const socket = connectedSocket('user-1');
+    const ack = vi.fn();
+
+    handleRealtimeAuth(socket, { token: userToken('user-1', 'authenticated') }, ack);
+
+    expect(ack).toHaveBeenCalledWith({ ok: true });
+    expect(socket.leave).not.toHaveBeenCalled();
+    expect(socket.join).not.toHaveBeenCalled();
   });
 
   it('rejects a token for a different subject without touching the socket claims', async () => {
