@@ -7,6 +7,15 @@ import { PoolClient } from 'pg';
 // Internal/system schemas that advisor rules never report on. Kept as a single
 // source of truth so the exclusion list can't drift between rule queries.
 const ADVISOR_EXCLUDED_SCHEMAS = [
+  'ai',
+  'compute',
+  'deployments',
+  'email',
+  'functions',
+  'memory',
+  'payments',
+  'schedules',
+  'system',
   '_timescaledb_cache',
   '_timescaledb_catalog',
   '_timescaledb_config',
@@ -323,6 +332,11 @@ export class DatabaseAdvisorService {
             ) r
             WHERE p.prosecdef = true
               AND pg_catalog.has_function_privilege(role_name, p.oid, 'EXECUTE')
+              -- Trigger / event-trigger functions cannot be invoked directly via SQL
+              -- (Postgres rejects the call by return type), so an anon/authenticated
+              -- EXECUTE grant is inert and confers no escalation path. Skip them to
+              -- avoid false positives such as system.on_schema_ddl().
+              AND p.prorettype NOT IN ('pg_catalog.trigger'::regtype, 'pg_catalog.event_trigger'::regtype)
               AND n.nspname = ANY(ARRAY(SELECT trim(UNNEST(string_to_array(coalesce(current_setting('pgrst.db_schemas', 't'), 'public'), ',')))))
               AND n.nspname NOT IN (
                 ${ADVISOR_EXCLUDED_SCHEMAS}
