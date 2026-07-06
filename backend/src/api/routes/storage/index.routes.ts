@@ -17,11 +17,26 @@ import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js';
 import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiters.js';
+import { isUnsafeMime, resolveSafeMimeType } from '@/utils/mime-guard.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
 const storageConfigService = StorageConfigService.getInstance();
 const s3AccessKeyService = S3AccessKeyService.getInstance();
+
+const enforceSafeMimeType = async (file: Express.Multer.File) => {
+  if (!file.buffer) {
+    throw new AppError(
+      'In-memory buffer required for MIME validation',
+      500,
+      ERROR_CODES.INTERNAL_ERROR
+    );
+  }
+  // Magic-byte MIME detection: override client-supplied mimetype with the
+  // true detected type. Executable types (HTML, SVG, JS) are normalised to
+  // application/octet-stream before the metadata is written to the DB.
+  file.mimetype = await resolveSafeMimeType(file.buffer, file.mimetype);
+};
 
 // Middleware to conditionally apply authentication based on bucket visibility.
 // This is only attached to object download hand-offs: GET object bytes and
@@ -302,6 +317,8 @@ router.put(
         throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
+      await enforceSafeMimeType(req.file);
+
       const storedFile = await StorageService.getInstance().putObject(
         req.user,
         bucketName,
@@ -348,6 +365,8 @@ router.post(
       if (!req.file) {
         throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
+
+      await enforceSafeMimeType(req.file);
 
       const storageService = StorageService.getInstance();
 
@@ -422,13 +441,13 @@ const downloadStrategyHandler = async (
     // URL bypasses RLS at redeem time, so we must verify ownership before
     // issuing one.
     const authReq = req as AuthRequest;
-    const visible = await storageService.objectIsVisible(
+    const metadataRow = await storageService.getObjectMetadataVisible(
       authReq.user,
       bucketName,
       objectKey,
       !!authReq.hasApiKey
     );
-    if (!visible) {
+    if (!metadataRow) {
       throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
     }
 
@@ -452,10 +471,14 @@ const downloadStrategyHandler = async (
       requestedExpiresIn = parsed;
     }
 
+    const serveMime = metadataRow.mime_type || 'application/octet-stream';
+    const forceAttachment = isUnsafeMime(serveMime);
+
     const strategy = await storageService.getDownloadStrategy(
       bucketName,
       objectKey,
-      requestedExpiresIn
+      requestedExpiresIn,
+      { asAttachment: forceAttachment, prefetchedMetadata: metadataRow }
     );
 
     // Strategy responses embed presigned URLs with short, server-decided
@@ -504,17 +527,23 @@ router.get(
 
       const storageService = StorageService.getInstance();
       const authReq = req as AuthRequest;
-      const visible = await storageService.objectIsVisible(
+      const metadataRow = await storageService.getObjectMetadataVisible(
         authReq.user,
         bucketName,
         objectKey,
         !!authReq.hasApiKey
       );
-      if (!visible) {
+      if (!metadataRow) {
         throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
-      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
+      const serveMime = metadataRow.mime_type || 'application/octet-stream';
+      const forceAttachment = isUnsafeMime(serveMime);
+
+      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey, undefined, {
+        asAttachment: forceAttachment,
+        prefetchedMetadata: metadataRow,
+      });
       if (strategy.method === 'presigned') {
         return res.redirect(strategy.url);
       }
@@ -523,7 +552,8 @@ router.get(
         authReq.user,
         bucketName,
         objectKey,
-        !!authReq.hasApiKey
+        !!authReq.hasApiKey,
+        metadataRow
       );
       if (!result) {
         throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
@@ -532,8 +562,15 @@ router.get(
       const { file, metadata } = result;
 
       // Set appropriate headers
-      res.setHeader('Content-Type', metadata.mimeType || 'application/octet-stream');
+      const responseMime = metadata.mimeType || 'application/octet-stream';
+      res.setHeader('Content-Type', responseMime);
       res.setHeader('Content-Length', file.length.toString());
+      // Defence-in-depth: even if a legacy upload somehow stored an executable
+      // MIME type, force the browser to download rather than render it inline.
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      if (isUnsafeMime(responseMime)) {
+        res.setHeader('Content-Disposition', 'attachment');
+      }
 
       // Send object content
       res.send(file);
@@ -643,11 +680,20 @@ router.post(
         throw new AppError('Filename is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
+      const requestedType =
+        typeof contentType === 'string' && contentType.trim()
+          ? contentType
+          : 'application/octet-stream';
+      const safeContentType = isUnsafeMime(requestedType)
+        ? 'application/octet-stream'
+        : requestedType;
+
       const strategy = await StorageService.getInstance().getUploadStrategy(
         req.user,
         bucketName,
-        { filename, contentType, size },
-        !!req.hasApiKey
+        { filename, contentType: safeContentType, size },
+        !!req.hasApiKey,
+        safeContentType
       );
 
       successResponse(res, strategy);
@@ -668,7 +714,15 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
-      const { size, contentType, etag } = req.body;
+      const { size, etag } = req.body;
+      let { contentType } = req.body;
+      if (contentType !== undefined && contentType !== null) {
+        const typeStr =
+          typeof contentType === 'string' && contentType.trim()
+            ? contentType
+            : 'application/octet-stream';
+        contentType = isUnsafeMime(typeStr) ? 'application/octet-stream' : typeStr;
+      }
 
       if (!size) {
         throw new AppError('Size is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);

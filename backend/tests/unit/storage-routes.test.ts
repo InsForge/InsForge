@@ -4,8 +4,11 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 const storageMocks = vi.hoisted(() => ({
   isBucketPublic: vi.fn(),
-  objectIsVisible: vi.fn(),
+  getObjectMetadataVisible: vi.fn(),
   getDownloadStrategy: vi.fn(),
+  getObjectMetadataRow: vi.fn(),
+  getObject: vi.fn(),
+  objectIsVisible: vi.fn(),
 }));
 
 const authMocks = vi.hoisted(() => ({
@@ -92,7 +95,7 @@ describe('Storage routes', () => {
   test('download strategy route captures nested object keys', async () => {
     vi.resetModules();
     storageMocks.isBucketPublic.mockResolvedValue(true);
-    storageMocks.objectIsVisible.mockResolvedValue(true);
+    storageMocks.getObjectMetadataVisible.mockResolvedValue(true);
     storageMocks.getDownloadStrategy.mockResolvedValue({
       method: 'direct',
       url: 'http://localhost:7130/api/storage/buckets/product-images/objects/products%2Fprod_123%2Fmain.jpg',
@@ -122,7 +125,8 @@ describe('Storage routes', () => {
     expect(storageMocks.getDownloadStrategy).toHaveBeenCalledWith(
       'product-images',
       'products/prod_123/main.jpg',
-      undefined
+      undefined,
+      { asAttachment: false, prefetchedMetadata: true }
     );
     expect(authMocks.verifyUser).not.toHaveBeenCalled();
   });
@@ -158,7 +162,7 @@ describe('Storage routes', () => {
   test('download strategy route requires auth middleware for private buckets', async () => {
     vi.resetModules();
     storageMocks.isBucketPublic.mockResolvedValue(false);
-    storageMocks.objectIsVisible.mockResolvedValue(true);
+    storageMocks.getObjectMetadataVisible.mockResolvedValue(true);
     storageMocks.getDownloadStrategy.mockResolvedValue({
       method: 'direct',
       url: 'http://localhost:7130/api/storage/buckets/product-images/objects/products%2Fprod_123%2Fmain.jpg',
@@ -189,14 +193,15 @@ describe('Storage routes', () => {
     expect(storageMocks.getDownloadStrategy).toHaveBeenCalledWith(
       'product-images',
       'products/prod_123/main.jpg',
-      undefined
+      undefined,
+      { asAttachment: false, prefetchedMetadata: true }
     );
   });
 
   test('download strategy route forwards a caller-supplied expiresIn', async () => {
     vi.resetModules();
     storageMocks.isBucketPublic.mockResolvedValue(false);
-    storageMocks.objectIsVisible.mockResolvedValue(true);
+    storageMocks.getObjectMetadataVisible.mockResolvedValue(true);
     storageMocks.getDownloadStrategy.mockResolvedValue({
       method: 'presigned',
       url: 'https://cdn.example.com/product-images/products%2Fprod_123%2Fmain.jpg?Signature=abc',
@@ -227,14 +232,15 @@ describe('Storage routes', () => {
     expect(storageMocks.getDownloadStrategy).toHaveBeenCalledWith(
       'product-images',
       'products/prod_123/main.jpg',
-      120
+      120,
+      { asAttachment: false, prefetchedMetadata: true }
     );
   });
 
   test('canonical GET download-strategy route forwards expiresIn', async () => {
     vi.resetModules();
     storageMocks.isBucketPublic.mockResolvedValue(false);
-    storageMocks.objectIsVisible.mockResolvedValue(true);
+    storageMocks.getObjectMetadataVisible.mockResolvedValue(true);
     storageMocks.getDownloadStrategy.mockResolvedValue({
       method: 'presigned',
       url: 'https://cdn.example.com/product-images/products%2Fprod_123%2Fmain.jpg?Signature=abc',
@@ -265,14 +271,15 @@ describe('Storage routes', () => {
     expect(storageMocks.getDownloadStrategy).toHaveBeenCalledWith(
       'product-images',
       'products/prod_123/main.jpg',
-      120
+      120,
+      { asAttachment: false, prefetchedMetadata: true }
     );
   });
 
   test('download strategy route rejects a non-numeric expiresIn with 400', async () => {
     vi.resetModules();
     storageMocks.isBucketPublic.mockResolvedValue(false);
-    storageMocks.objectIsVisible.mockResolvedValue(true);
+    storageMocks.getObjectMetadataVisible.mockResolvedValue(true);
 
     const { storageRouter } = await import('../../src/api/routes/storage/index.routes.js');
     const app = express();
@@ -295,6 +302,84 @@ describe('Storage routes', () => {
     );
 
     expect(response.statusCode, response.body).toBe(400);
+    expect(storageMocks.getDownloadStrategy).not.toHaveBeenCalled();
+  });
+
+  test('direct download route applies read-time defense for unsafe MIME types', async () => {
+    vi.resetModules();
+    storageMocks.getObjectMetadataVisible.mockResolvedValue({
+      mime_type: 'text/html',
+      bucket: 'test-bucket',
+      key: 'test.html',
+    });
+    storageMocks.getDownloadStrategy.mockResolvedValue({
+      method: 'direct',
+      url: 'http://localhost:7130/api/storage/buckets/product-images/objects/products/prod_123/main.html',
+    });
+    storageMocks.getObject.mockResolvedValue({
+      file: Buffer.from('<html><script>alert(1)</script></html>'),
+      metadata: { mimeType: 'text/html' },
+    });
+
+    const { storageRouter } = await import('../../src/api/routes/storage/index.routes.js');
+    const app = express();
+    app.use(express.json());
+    app.use('/api/storage', storageRouter);
+    app.use(routeErrorHandler);
+
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, resolve);
+    });
+    const address = server?.address();
+
+    if (!address || typeof address === 'string') {
+      throw new Error('Test server did not bind to a TCP port');
+    }
+
+    const request = http.request({
+      hostname: '127.0.0.1',
+      port: address.port,
+      path: '/api/storage/buckets/product-images/objects/products/prod_123/main.html',
+      method: 'GET',
+    });
+
+    const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+      request.on('response', resolve);
+      request.on('error', reject);
+      request.end();
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['content-disposition']).toBe('attachment');
+  });
+
+  test('download strategy route returns 404 for missing or invisible objects', async () => {
+    vi.resetModules();
+    storageMocks.isBucketPublic.mockResolvedValue(true);
+    storageMocks.getObjectMetadataVisible.mockResolvedValue(null);
+
+    const { storageRouter } = await import('../../src/api/routes/storage/index.routes.js');
+    const app = express();
+    app.use(express.json());
+    app.use('/api/storage', storageRouter);
+    app.use(routeErrorHandler);
+
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, resolve);
+    });
+    const address = server?.address();
+
+    if (!address || typeof address === 'string') {
+      throw new Error('Test server did not bind to a TCP port');
+    }
+
+    const response = await post(
+      address.port,
+      '/api/storage/buckets/product-images/objects/products/prod_123/missing.jpg/download-strategy'
+    );
+
+    expect(response.statusCode, response.body).toBe(404);
     expect(storageMocks.getDownloadStrategy).not.toHaveBeenCalled();
   });
 });

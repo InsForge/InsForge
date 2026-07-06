@@ -286,33 +286,23 @@ export class StorageService {
     ctx: UserContext | undefined,
     bucket: string,
     key: string,
-    hasApiKey: boolean = false
+    hasApiKey: boolean = false,
+    prefetchedMetadata?: StorageRecord | null
   ): Promise<StorageObjectResult | null> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    const selectObjectMetadata = async (db: PoolClient) => {
-      const result = await db.query(
-        'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
-        [bucket, key]
-      );
-      return result.rows[0] as StorageRecord | undefined;
-    };
-
-    let metadata: StorageRecord | undefined;
-    if (hasApiKey || ctx?.role === 'project_admin' || (await this.isBucketPublic(bucket))) {
-      metadata = await runWithRootAccess(this.getPool(), selectObjectMetadata);
-    } else if (!ctx) {
-      return null;
-    } else {
-      metadata = await withUserContext(this.getPool(), ctx, selectObjectMetadata);
+    let metadata = prefetchedMetadata;
+    if (metadata && (metadata.bucket !== bucket || metadata.key !== key)) {
+      metadata = null;
     }
 
+    metadata = metadata ?? (await this.getObjectMetadataVisible(ctx, bucket, key, hasApiKey));
     if (!metadata) {
       return null;
     }
 
-    const file = await this.provider.getObject(metadata.bucket, metadata.key);
+    const file = await this.provider.getObject(bucket, key);
     if (!file) {
       return null;
     }
@@ -320,16 +310,12 @@ export class StorageService {
     return {
       file,
       metadata: {
-        key: metadata.key,
-        bucket: metadata.bucket,
+        key,
+        bucket,
         size: metadata.size,
         mimeType: metadata.mime_type,
         uploadedAt: metadata.uploaded_at,
-        url: this.buildObjectUrl(
-          metadata.bucket,
-          metadata.key,
-          metadata.etag || metadata.uploaded_at
-        ),
+        url: this.buildObjectUrl(bucket, key, metadata.etag || metadata.uploaded_at),
       },
     };
   }
@@ -532,7 +518,8 @@ export class StorageService {
       contentType?: string;
       size?: number;
     },
-    hasApiKey: boolean = false
+    hasApiKey: boolean = false,
+    contentType: string = 'application/octet-stream'
   ) {
     this.validateBucketName(bucket);
 
@@ -543,7 +530,7 @@ export class StorageService {
     const key = await this.generateNextAvailableKey(bucket, metadata.filename, this.getPool());
     const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
     if (hasApiKey || ctx?.role === 'project_admin') {
-      return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
+      return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes, contentType);
     }
     if (!ctx) {
       throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
@@ -562,10 +549,15 @@ export class StorageService {
         await client.query('RELEASE SAVEPOINT upload_strategy_rls_probe');
       }
     });
-    return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
+    return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes, contentType);
   }
 
-  async getDownloadStrategy(bucket: string, key: string, requestedExpiresIn?: number) {
+  async getDownloadStrategy(
+    bucket: string,
+    key: string,
+    requestedExpiresIn?: number,
+    options?: { asAttachment?: boolean; prefetchedMetadata?: StorageRecord | null }
+  ) {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
@@ -592,48 +584,53 @@ export class StorageService {
     // appending after signing would yield SignatureDoesNotMatch 403s. The DB
     // read uses the normal backend pool because the caller already gated
     // access through RLS, an API key, or a public bucket check.
-    const versionRow = await this.getPool().query(
-      'SELECT etag, uploaded_at FROM storage.objects WHERE bucket = $1 AND key = $2',
-      [bucket, key]
-    );
-    const version = this.toVersionStamp(
-      (versionRow.rows[0]?.etag as string | null) ??
-        (versionRow.rows[0]?.uploaded_at as Date | null) ??
-        null
-    );
+    let etag = options?.prefetchedMetadata?.etag;
+    let uploadedAt = options?.prefetchedMetadata?.uploaded_at;
 
-    return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic, version || null);
+    if (!etag && !uploadedAt) {
+      const versionRow = await this.getPool().query(
+        'SELECT etag, uploaded_at as "uploadedAt" FROM storage.objects WHERE bucket = $1 AND key = $2 LIMIT 1',
+        [bucket, key]
+      );
+      etag = versionRow.rows[0]?.etag;
+      uploadedAt = versionRow.rows[0]?.uploadedAt;
+    }
+    const version = this.toVersionStamp((etag as string | null) ?? uploadedAt ?? null);
+
+    return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic, version || null, {
+      asAttachment: options?.asAttachment,
+    });
   }
 
   /**
-   * RLS-gated existence check. Returns true iff the caller is allowed by
+   * RLS-gated existence check. Returns the StorageRecord iff the caller is allowed by
    * `storage.objects` RLS policies to see this row. Public bucket rows are
-   * visible by definition, but missing rows still return false.
+   * visible by definition, but missing rows still return null.
    * Admin/API-key callers bypass RLS here because they can manage every object
    * through the storage API; end-user callers are scoped by storage.objects RLS.
    */
-  async objectIsVisible(
+  async getObjectMetadataVisible(
     ctx: UserContext | undefined,
     bucket: string,
     key: string,
     hasApiKey: boolean = false
-  ): Promise<boolean> {
+  ): Promise<StorageRecord | null> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
     const checkVisibleObject = async (db: PoolClient) => {
       const result = await db.query(
-        'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+        'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
         [bucket, key]
       );
-      return (result.rowCount ?? 0) > 0;
+      return result.rows[0] || null;
     };
 
     if (hasApiKey || ctx?.role === 'project_admin' || (await this.isBucketPublic(bucket))) {
       return runWithRootAccess(this.getPool(), checkVisibleObject);
     }
     if (!ctx) {
-      return false;
+      return null;
     }
     return withUserContext(this.getPool(), ctx, checkVisibleObject);
   }
