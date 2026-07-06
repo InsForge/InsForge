@@ -871,7 +871,7 @@ spec:
           template: PREBUILT_V2
           spec:
             source:
-                image: ghcr.io/insforge/insforge-oss:v2.0.0
+                image: ghcr.io/insforge/insforge-oss:v2.2.5
             ports:
                 - id: web
                   port: 7130
