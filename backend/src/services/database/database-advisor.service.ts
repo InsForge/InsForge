@@ -332,14 +332,15 @@ export class DatabaseAdvisorService {
             ) r
             WHERE p.prosecdef = true
               AND pg_catalog.has_function_privilege(role_name, p.oid, 'EXECUTE')
-              -- Event-trigger functions fire only on DDL, can only be installed by a
-              -- superuser, and cannot be invoked by anon/authenticated at all, so an
-              -- EXECUTE grant on them is inert (this is what false-flagged
-              -- system.on_schema_ddl()). Regular row/statement trigger functions are
-              -- NOT excluded: a SECURITY DEFINER trigger on a table that anon/
-              -- authenticated can write to still runs with definer privileges via DML,
-              -- which is a real escalation path worth surfacing.
-              AND p.prorettype <> 'pg_catalog.event_trigger'::regtype
+              -- Skip trigger and event-trigger functions: neither can be invoked
+              -- directly via SQL (Postgres rejects the call by return type), so the
+              -- anon/authenticated EXECUTE grant this rule keys on is inert — that is
+              -- what false-flagged system.on_schema_ddl(). Mirrors the cloud advisor's
+              -- returnsTrigger filter. Known limitation: a SECURITY DEFINER row/
+              -- statement trigger on a table anon/authenticated can write to still runs
+              -- with definer privileges via DML; that reachability path is not modeled
+              -- by an EXECUTE-based check and would need a dedicated pg_trigger rule.
+              AND p.prorettype NOT IN ('pg_catalog.trigger'::regtype, 'pg_catalog.event_trigger'::regtype)
               AND n.nspname = ANY(ARRAY(SELECT trim(UNNEST(string_to_array(coalesce(current_setting('pgrst.db_schemas', 't'), 'public'), ',')))))
               AND n.nspname NOT IN (
                 ${ADVISOR_EXCLUDED_SCHEMAS}
