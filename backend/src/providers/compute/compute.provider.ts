@@ -17,6 +17,12 @@ export interface LaunchMachineParams {
    * raw TCP services. Omitting the field is identical to `'http'`.
    */
   protocol?: 'http' | 'tcp';
+  /**
+   * Scale-to-zero. `true`/omitted (default) lets Fly stop the machine when
+   * idle and cold-start it on the next request. `false` keeps one machine
+   * running 24/7 (autostop off) for latency-sensitive services.
+   */
+  scaleToZero?: boolean;
 }
 
 export interface UpdateMachineParams {
@@ -36,6 +42,11 @@ export interface UpdateMachineParams {
    * for back-compat HTTP behavior.
    */
   protocol?: 'http' | 'tcp';
+  /**
+   * Scale-to-zero — same semantics as LaunchMachineParams.scaleToZero. Omit
+   * for back-compat scale-to-zero behavior.
+   */
+  scaleToZero?: boolean;
 }
 
 export interface MachineSummary {

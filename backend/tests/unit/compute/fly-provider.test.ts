@@ -187,6 +187,60 @@ describe('FlyProvider', () => {
       expect(body.region).toBe('iad');
     });
 
+    // scaleToZero: false flips the autostop block to always-on. min_machines_running
+    // must be 1 (not just autostop 'off') so Fly restarts the machine if it
+    // exits — always-on services should survive crashes, not just skip the
+    // idle stop.
+    it('scaleToZero: false sends autostop off with one machine kept running', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 'machine-always-on' })),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.launchMachine({
+        appId: 'my-app',
+        image: 'registry.fly.io/my-app:latest',
+        port: 8080,
+        cpu: 'shared-1x',
+        memory: 256,
+        envVars: {},
+        region: 'iad',
+        scaleToZero: false,
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.config.services[0].autostop).toBe('off');
+      expect(body.config.services[0].autostart).toBe(true);
+      expect(body.config.services[0].min_machines_running).toBe(1);
+    });
+
+    // scaleToZero: true must be byte-identical to omitting the field — only
+    // an explicit `false` may change the wire format.
+    it('scaleToZero: true keeps the scale-to-zero defaults', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 'machine-stz' })),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.launchMachine({
+        appId: 'my-app',
+        image: 'registry.fly.io/my-app:latest',
+        port: 8080,
+        cpu: 'shared-1x',
+        memory: 256,
+        envVars: {},
+        region: 'iad',
+        scaleToZero: true,
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.config.services[0].autostop).toBe('stop');
+      expect(body.config.services[0].autostart).toBe(true);
+      expect(body.config.services[0].min_machines_running).toBe(0);
+    });
+
     // INS-271: protocol: 'tcp' switches the edge-handler shape from the
     // HTTP-terminating 443/80 pair to a single direct-passthrough port that
     // matches internal_port with empty L7 handlers. Without this, raw TCP

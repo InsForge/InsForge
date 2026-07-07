@@ -389,6 +389,141 @@ describe('ComputeServicesService', () => {
       expect(launchCall.protocol).toBeUndefined();
     });
 
+    // --always-on: end-to-end pass-through of `scaleToZero: false` from
+    // createService input → INSERT column list → launchMachine params, same
+    // shape as the protocol pass-through above.
+    it('forwards scaleToZero: false to INSERT and launchMachine when supplied', async () => {
+      const serviceId = 'svc-always-on';
+      const alwaysOnInput = { ...input, scaleToZero: false, name: 'my-always-on' };
+
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: alwaysOnInput.projectId,
+            name: alwaysOnInput.name,
+            image_url: alwaysOnInput.imageUrl,
+            port: alwaysOnInput.port,
+            cpu: alwaysOnInput.cpu,
+            memory: alwaysOnInput.memory,
+            region: alwaysOnInput.region,
+            protocol: 'http',
+            scale_to_zero: false,
+            fly_app_id: null,
+            fly_machine_id: null,
+            status: 'creating',
+            endpoint_url: null,
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+      mockCreateApp.mockResolvedValue({ appId: 'my-always-on-proj-123' });
+      mockLaunchMachine.mockResolvedValue({ machineId: 'mach-always-on' });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: alwaysOnInput.projectId,
+            name: alwaysOnInput.name,
+            image_url: alwaysOnInput.imageUrl,
+            port: alwaysOnInput.port,
+            cpu: alwaysOnInput.cpu,
+            memory: alwaysOnInput.memory,
+            region: alwaysOnInput.region,
+            protocol: 'http',
+            scale_to_zero: false,
+            fly_app_id: 'my-always-on-proj-123',
+            fly_machine_id: 'mach-always-on',
+            status: 'running',
+            endpoint_url: 'https://my-always-on-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      const result = await service.createService(alwaysOnInput);
+
+      // INSERT must include the column AND the value (positional bind).
+      const insertCall = mockQuery.mock.calls[0];
+      expect(insertCall[0]).toContain('scale_to_zero');
+      expect(insertCall[1]).toContain(false);
+
+      // launchMachine must receive scaleToZero: false so the provider flips
+      // the Fly autostop block to always-on.
+      expect(mockLaunchMachine).toHaveBeenCalledWith(
+        expect.objectContaining({ scaleToZero: false })
+      );
+
+      // Response shape echoes the persisted value (via mapRowToSchema).
+      expect(result.scaleToZero).toBe(false);
+    });
+
+    // Back-compat — omitting scaleToZero persists the default (true) but must
+    // NOT inject a positive value into the launchMachine call; the provider
+    // applies its own scale-to-zero default.
+    it('omitting scaleToZero persists true and does not inject a value into launchMachine', async () => {
+      const serviceId = 'svc-default-stz';
+
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: null,
+            fly_machine_id: null,
+            status: 'creating',
+            endpoint_url: null,
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+      mockCreateApp.mockResolvedValue({ appId: 'my-api-proj-123' });
+      mockLaunchMachine.mockResolvedValue({ machineId: 'mach-default-stz' });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: 'my-api-proj-123',
+            fly_machine_id: 'mach-default-stz',
+            status: 'running',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      await service.createService(input); // input has no `scaleToZero`
+
+      // INSERT falls back to true (`input.scaleToZero ?? true`).
+      const insertCall = mockQuery.mock.calls[0];
+      expect(insertCall[0]).toContain('scale_to_zero');
+      expect(insertCall[1]).toContain(true);
+
+      const launchCall = mockLaunchMachine.mock.calls[0][0];
+      expect(launchCall.scaleToZero).toBeUndefined();
+    });
+
     it('passes through structured cloud errors (quota, invalid input, etc.) instead of swallowing as generic 502', async () => {
       // Reproduces the bug found by stress-testing against staging:
       // when the cloud backend returns 403 COMPUTE_QUOTA_EXCEEDED with a clear
@@ -553,6 +688,9 @@ describe('ComputeServicesService', () => {
         // migration). The fixture above doesn't set `protocol`, so this is
         // the back-compat default surfacing.
         protocol: 'http',
+        // Same back-compat fallback: fixture has no scale_to_zero column, so
+        // the snapshot surfaces the default (true).
+        scaleToZero: true,
         flyAppId: 'app-del-proj-123',
         flyMachineId: 'machine-del',
         endpointUrl: 'https://app-del-proj-123.fly.dev',
@@ -1090,6 +1228,62 @@ describe('ComputeServicesService', () => {
       await service.updateService('svc-pa-1', { memory: 1024 });
 
       expect(mockUpdateMachine).toHaveBeenCalledWith(expect.objectContaining({ protocol: 'tcp' }));
+    });
+
+    // --always-on: updateService forwards scaleToZero through to updateMachine
+    // on the redeploy path so an existing service can be flipped to always-on
+    // (or back) without delete + redeploy.
+    it('forwards scaleToZero: false to updateMachine on redeploy', async () => {
+      const deployedRow = {
+        ...baseRow,
+        fly_machine_id: 'mach-existing',
+        status: 'running',
+        scale_to_zero: true,
+      };
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockUpdateMachine.mockResolvedValue(undefined);
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...deployedRow, scale_to_zero: false }],
+      });
+
+      const result = await service.updateService('svc-pa-1', { scaleToZero: false });
+
+      expect(mockUpdateMachine).toHaveBeenCalledWith(
+        expect.objectContaining({
+          appId: 'my-api-proj-123',
+          machineId: 'mach-existing',
+          scaleToZero: false,
+        })
+      );
+
+      // SQL UPDATE persists the new value.
+      const updateCall = mockQuery.mock.calls[2];
+      expect(updateCall[0]).toContain('scale_to_zero');
+      expect(updateCall[1]).toContain(false);
+      expect(result.scaleToZero).toBe(false);
+    });
+
+    // Back-compat — a field-only update keeps the persisted always-on setting
+    // flowing to Fly (`data.scaleToZero ?? existing.scaleToZero`), so a plain
+    // redeploy doesn't silently flip an always-on service back to scale-to-zero.
+    it('preserves existing scaleToZero: false when update omits the field', async () => {
+      const deployedRow = {
+        ...baseRow,
+        fly_machine_id: 'mach-existing',
+        status: 'running',
+        scale_to_zero: false,
+      };
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockUpdateMachine.mockResolvedValue(undefined);
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] });
+
+      await service.updateService('svc-pa-1', { memory: 1024 });
+
+      expect(mockUpdateMachine).toHaveBeenCalledWith(
+        expect.objectContaining({ scaleToZero: false })
+      );
     });
 
     it('regression: existing machine + imageUrl takes the redeploy path (updateMachine, no launch, no optimistic lock)', async () => {

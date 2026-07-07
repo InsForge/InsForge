@@ -197,17 +197,29 @@ export class FlyProvider implements ComputeProvider {
     await this.request(`/apps/${appId}`, { method: 'DELETE' });
   }
 
-  // Scale-to-zero is v1's only mode — see compute-deploy.md in the skill
-  // for the rationale. Callers don't pass autostop overrides today. When
-  // we do want to expose `--autostop` / `--min-machines` CLI flags later,
-  // this is the one spot to plumb them through: extend `ScaleOptions` and
-  // pass it from launchMachine/updateMachine. The defaults stay correct
-  // regardless of how callers evolve.
+  // Scale-to-zero is the default mode — see compute-deploy.md in the skill
+  // for the rationale. Callers opt out per-service via the boolean
+  // `scaleToZero: false` on launch/update (surfaced as `--always-on` in the
+  // CLI); `scaleOptions` maps that onto the Fly autostop block. The defaults
+  // stay correct regardless of how callers evolve.
   private static readonly SCALE_TO_ZERO: ScaleOptions = {
     autostop: 'stop',
     autostart: true,
     min_machines_running: 0,
   };
+
+  // `min_machines_running: 1` (not just autostop 'off') so Fly restarts the
+  // machine if it exits — always-on services should survive crashes, not
+  // just skip the idle stop.
+  private static readonly ALWAYS_ON: ScaleOptions = {
+    autostop: 'off',
+    autostart: true,
+    min_machines_running: 1,
+  };
+
+  private static scaleOptions(scaleToZero: boolean | undefined): ScaleOptions {
+    return scaleToZero === false ? FlyProvider.ALWAYS_ON : FlyProvider.SCALE_TO_ZERO;
+  }
 
   // Single source of truth for the per-machine service block. Both launch
   // and update need to send the same shape, including the autostop fields:
@@ -262,6 +274,7 @@ export class FlyProvider implements ComputeProvider {
     envVars: Record<string, string>;
     region: string;
     protocol?: 'http' | 'tcp';
+    scaleToZero?: boolean;
   }): Promise<{ machineId: string }> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
     const result = await this.requestJson<{ id: string }>(`/apps/${params.appId}/machines`, {
@@ -271,7 +284,13 @@ export class FlyProvider implements ComputeProvider {
           image: params.image,
           guest,
           env: params.envVars,
-          services: [this.serviceConfig(params.port, params.protocol ?? 'http')],
+          services: [
+            this.serviceConfig(
+              params.port,
+              params.protocol ?? 'http',
+              FlyProvider.scaleOptions(params.scaleToZero)
+            ),
+          ],
         },
         region: params.region,
       }),
@@ -288,6 +307,7 @@ export class FlyProvider implements ComputeProvider {
     memory: number;
     envVars: Record<string, string>;
     protocol?: 'http' | 'tcp';
+    scaleToZero?: boolean;
   }): Promise<void> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
     await this.request(`/apps/${params.appId}/machines/${params.machineId}`, {
@@ -297,7 +317,13 @@ export class FlyProvider implements ComputeProvider {
           image: params.image,
           guest,
           env: params.envVars,
-          services: [this.serviceConfig(params.port, params.protocol ?? 'http')],
+          services: [
+            this.serviceConfig(
+              params.port,
+              params.protocol ?? 'http',
+              FlyProvider.scaleOptions(params.scaleToZero)
+            ),
+          ],
         },
       }),
     });
