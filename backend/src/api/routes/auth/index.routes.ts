@@ -621,16 +621,13 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
 
         try {
           payload = tokenManager.verifyRefreshToken(refreshToken);
-        } catch (error) {
-          if (error instanceof AppError && error.statusCode === 401) {
-            clearRefreshTokenCookie(res);
-            successResponse(res, {
-              success: true,
-              message: 'Logged out successfully',
-            });
-            return;
-          }
-          throw error;
+        } catch {
+          clearRefreshTokenCookie(res);
+          successResponse(res, {
+            success: true,
+            message: 'Logged out successfully',
+          });
+          return;
         }
 
         if (payload.sessionType !== 'user') {
