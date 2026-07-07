@@ -137,23 +137,27 @@ describe('storageService.uploadObject', () => {
           key: 'readme.txt',
           confirmRequired: false,
         }),
-        text: vi.fn().mockResolvedValue(JSON.stringify({
-          method: 'direct',
-          uploadUrl: '/upload',
-          key: 'readme.txt',
-          confirmRequired: false,
-        })),
+        text: vi.fn().mockResolvedValue(
+          JSON.stringify({
+            method: 'direct',
+            uploadUrl: '/upload',
+            key: 'readme.txt',
+            confirmRequired: false,
+          })
+        ),
       } as unknown as Response)
       .mockResolvedValueOnce({
         ok: false,
         status: 413,
         statusText: 'Payload Too Large',
         headers: new Headers({ 'content-type': 'application/json' }),
-        text: vi.fn().mockResolvedValue(JSON.stringify({
-          error: 'STORAGE_INVALID_PARAMETER',
-          message: 'File too large. Maximum upload size is 50 MB.',
-          statusCode: 413,
-        })),
+        text: vi.fn().mockResolvedValue(
+          JSON.stringify({
+            error: 'STORAGE_INVALID_PARAMETER',
+            message: 'File too large. Maximum upload size is 50 MB.',
+            statusCode: 413,
+          })
+        ),
       } as unknown as Response);
 
     await expect(storageService.uploadObject(mockBucket, 'readme.txt', mockFile)).rejects.toThrow(
