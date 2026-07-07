@@ -300,4 +300,80 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
     ]);
     expect(releaseMock).toHaveBeenCalled();
   });
+
+  it('executes explain under project_admin and rolls back the transaction', async () => {
+    const releaseMock = vi.fn();
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // SET statement_timeout
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({}) // SET LOCAL ROLE project_admin
+      .mockResolvedValueOnce({}) // set local request.jwt.claims
+      .mockResolvedValueOnce({
+        rows: [[{ Plan: { 'Node Type': 'Seq Scan' } }]],
+        rowCount: 1,
+      }) // execute explain SQL
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset request.jwt.claims
+      .mockResolvedValueOnce({}) // ROLLBACK
+      .mockResolvedValueOnce({}); // reset statement_timeout
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: releaseMock,
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    const result = await service.executeExplain('SELECT * FROM products', []);
+
+    expect(queryMock).toHaveBeenNthCalledWith(1, 'SET statement_timeout = 30000');
+    expect(queryMock).toHaveBeenNthCalledWith(2, 'BEGIN');
+    expect(queryMock).toHaveBeenNthCalledWith(3, 'SET LOCAL ROLE project_admin');
+    expect(queryMock).toHaveBeenNthCalledWith(4, 'SELECT set_config($1, $2, $3)', [
+      'request.jwt.claims',
+      JSON.stringify({ role: 'project_admin' }),
+      true,
+    ]);
+    expect(queryMock.mock.calls[4][0]).toContain('EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) SELECT * FROM products');
+    expect(queryMock).toHaveBeenNthCalledWith(6, 'RESET ROLE');
+    expect(queryMock).toHaveBeenNthCalledWith(7, 'SELECT set_config($1, $2, $3)', [
+      'request.jwt.claims',
+      '{}',
+      true,
+    ]);
+    expect(queryMock).toHaveBeenNthCalledWith(8, 'ROLLBACK');
+    expect(queryMock).toHaveBeenNthCalledWith(9, 'SET statement_timeout = 0');
+    expect(releaseMock).toHaveBeenCalled();
+  });
+
+  it('executes explain as root and rolls back the transaction', async () => {
+    const releaseMock = vi.fn();
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // SET statement_timeout
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({
+        rows: [[{ Plan: { 'Node Type': 'Seq Scan' } }]],
+        rowCount: 1,
+      }) // execute explain SQL
+      .mockResolvedValueOnce({}) // ROLLBACK
+      .mockResolvedValueOnce({}); // reset statement_timeout
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: releaseMock,
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    await service.executeExplain('SELECT * FROM products', [], true);
+
+    expect(queryMock).toHaveBeenNthCalledWith(1, 'SET statement_timeout = 30000');
+    expect(queryMock).toHaveBeenNthCalledWith(2, 'BEGIN');
+    expect(queryMock.mock.calls[2][0]).toContain('EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) SELECT * FROM products');
+    expect(queryMock).toHaveBeenNthCalledWith(4, 'ROLLBACK');
+    expect(queryMock).toHaveBeenNthCalledWith(5, 'SET statement_timeout = 0');
+    expect(queryMock).not.toHaveBeenCalledWith('SET ROLE project_admin');
+    expect(queryMock).not.toHaveBeenCalledWith('RESET ROLE');
+    expect(releaseMock).toHaveBeenCalled();
+  });
 });

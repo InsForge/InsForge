@@ -60,34 +60,50 @@ router.post(
         );
       }
 
-      const { query, params = [] } = validation.data;
+      const { query, params = [], explain = false } = validation.data;
 
-      const response = await dbAdvanceService.executeRawSQL(query, params, true);
+      const response = explain
+        ? await dbAdvanceService.executeExplain(query, params, true)
+        : await dbAdvanceService.executeRawSQL(query, params, true);
 
-      await auditService.log({
-        actor: req.hasApiKey ? 'api-key' : req.user?.id,
-        action: 'EXECUTE_RAW_SQL_UNRESTRICTED',
-        module: 'DATABASE',
-        details: {
-          query: query.substring(0, 300), // Limit query length in audit log
-          paramCount: params.length,
-          rowsAffected: response.rowCount,
-          executionRole: 'root',
-        },
-        ip_address: req.ip,
-      });
+      if (explain) {
+        await auditService.log({
+          actor: req.hasApiKey ? 'api-key' : req.user?.id,
+          action: 'EXPLAIN_RAW_SQL_UNRESTRICTED',
+          module: 'DATABASE',
+          details: {
+            query: query.substring(0, 300), // Limit query length in audit log
+            paramCount: params.length,
+            executionRole: 'root',
+          },
+          ip_address: req.ip,
+        });
+      } else {
+        await auditService.log({
+          actor: req.hasApiKey ? 'api-key' : req.user?.id,
+          action: 'EXECUTE_RAW_SQL_UNRESTRICTED',
+          module: 'DATABASE',
+          details: {
+            query: query.substring(0, 300), // Limit query length in audit log
+            paramCount: params.length,
+            rowsAffected: response.rowCount,
+            executionRole: 'root',
+          },
+          ip_address: req.ip,
+        });
 
-      // Broadcast changes if any modifying statements detected
-      const changes = analyzeQuery(query);
-      if (changes.length > 0) {
-        invalidateColumnTypeCacheFromChanges(changes);
-        const socket = SocketManager.getInstance();
-        socket.broadcastToRoom(
-          'role:project_admin',
-          ServerEvents.DATA_UPDATE,
-          { resource: DataUpdateResourceType.DATABASE, data: { changes } },
-          'system'
-        );
+        // Broadcast changes if any modifying statements detected
+        const changes = analyzeQuery(query);
+        if (changes.length > 0) {
+          invalidateColumnTypeCacheFromChanges(changes);
+          const socket = SocketManager.getInstance();
+          socket.broadcastToRoom(
+            'role:project_admin',
+            ServerEvents.DATA_UPDATE,
+            { resource: DataUpdateResourceType.DATABASE, data: { changes } },
+            'system'
+          );
+        }
       }
 
       successResponse(res, response);
@@ -114,34 +130,50 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
       );
     }
 
-    const { query, params = [] } = validation.data;
+    const { query, params = [], explain = false } = validation.data;
 
-    const response = await dbAdvanceService.executeRawSQL(query, params);
+    const response = explain
+      ? await dbAdvanceService.executeExplain(query, params)
+      : await dbAdvanceService.executeRawSQL(query, params);
 
-    await auditService.log({
-      actor: req.hasApiKey ? 'api-key' : req.user?.id,
-      action: 'EXECUTE_RAW_SQL',
-      module: 'DATABASE',
-      details: {
-        query: query.substring(0, 300), // Limit query length in audit log
-        paramCount: params.length,
-        rowsAffected: response.rowCount,
-        executionRole: 'project_admin',
-      },
-      ip_address: req.ip,
-    });
+    if (explain) {
+      await auditService.log({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'EXPLAIN_RAW_SQL',
+        module: 'DATABASE',
+        details: {
+          query: query.substring(0, 300), // Limit query length in audit log
+          paramCount: params.length,
+          executionRole: 'project_admin',
+        },
+        ip_address: req.ip,
+      });
+    } else {
+      await auditService.log({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'EXECUTE_RAW_SQL',
+        module: 'DATABASE',
+        details: {
+          query: query.substring(0, 300), // Limit query length in audit log
+          paramCount: params.length,
+          rowsAffected: response.rowCount,
+          executionRole: 'project_admin',
+        },
+        ip_address: req.ip,
+      });
 
-    // Broadcast changes if any modifying statements detected
-    const changes = analyzeQuery(query);
-    if (changes.length > 0) {
-      invalidateColumnTypeCacheFromChanges(changes);
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.DATABASE, data: { changes } },
-        'system'
-      );
+      // Broadcast changes if any modifying statements detected
+      const changes = analyzeQuery(query);
+      if (changes.length > 0) {
+        invalidateColumnTypeCacheFromChanges(changes);
+        const socket = SocketManager.getInstance();
+        socket.broadcastToRoom(
+          'role:project_admin',
+          ServerEvents.DATA_UPDATE,
+          { resource: DataUpdateResourceType.DATABASE, data: { changes } },
+          'system'
+        );
+      }
     }
 
     successResponse(res, response);

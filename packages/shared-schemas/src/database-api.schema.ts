@@ -84,6 +84,7 @@ export const deleteTableResponse = z.object({
 export const rawSQLRequestSchema = z.object({
   query: z.string().min(1, 'Query is required'),
   params: z.array(z.unknown()).optional(),
+  explain: z.boolean().optional(),
 });
 
 export const rawSQLResponseSchema = z.object({
