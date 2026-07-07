@@ -324,7 +324,7 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
     });
 
     const service = DatabaseAdvanceService.getInstance();
-    const result = await service.executeExplain('SELECT * FROM products', []);
+    await service.executeExplain('SELECT * FROM products', []);
 
     expect(queryMock).toHaveBeenNthCalledWith(1, 'SET statement_timeout = 30000');
     expect(queryMock).toHaveBeenNthCalledWith(2, 'BEGIN');
@@ -334,7 +334,9 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
       JSON.stringify({ role: 'project_admin' }),
       true,
     ]);
-    expect(queryMock.mock.calls[4][0]).toContain('EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) SELECT * FROM products');
+    expect(queryMock.mock.calls[4][0]).toContain(
+      'EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) SELECT * FROM products'
+    );
     expect(queryMock).toHaveBeenNthCalledWith(6, 'RESET ROLE');
     expect(queryMock).toHaveBeenNthCalledWith(7, 'SELECT set_config($1, $2, $3)', [
       'request.jwt.claims',
@@ -369,7 +371,9 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
 
     expect(queryMock).toHaveBeenNthCalledWith(1, 'SET statement_timeout = 30000');
     expect(queryMock).toHaveBeenNthCalledWith(2, 'BEGIN');
-    expect(queryMock.mock.calls[2][0]).toContain('EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) SELECT * FROM products');
+    expect(queryMock.mock.calls[2][0]).toContain(
+      'EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) SELECT * FROM products'
+    );
     expect(queryMock).toHaveBeenNthCalledWith(4, 'ROLLBACK');
     expect(queryMock).toHaveBeenNthCalledWith(5, 'SET statement_timeout = 0');
     expect(queryMock).not.toHaveBeenCalledWith('SET ROLE project_admin');

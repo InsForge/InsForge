@@ -1,7 +1,16 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useRawSQL } from '#features/database/hooks/useRawSQL';
 import { useSQLEditorContext } from '#features/database/contexts/SQLEditorContext';
-import { Button, Tabs, Tab, Tooltip, TooltipTrigger, TooltipContent, TooltipProvider, cn } from '@insforge/ui';
+import {
+  Button,
+  Tabs,
+  Tab,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+  cn,
+} from '@insforge/ui';
 import { CodeEditor, DataGrid, type DataGridColumn, type DataGridRow } from '#components';
 import { X, Plus, Download, FileJson, ChevronRight, HelpCircle } from 'lucide-react';
 import { convertToCSV, convertToJSON, getExportFilename } from '#lib/utils/data-export';
@@ -144,16 +153,16 @@ function PlanTreeNode({ node, depth }: PlanTreeNodeProps) {
           <button
             onClick={() => hasChildren && setIsExpanded(!isExpanded)}
             className={cn(
-              "w-5 h-5 flex items-center justify-center shrink-0 mr-2 rounded hover:bg-[var(--alpha-4)] transition-colors",
-              !hasChildren && "pointer-events-none opacity-50"
+              'w-5 h-5 flex items-center justify-center shrink-0 mr-2 rounded hover:bg-[var(--alpha-4)] transition-colors',
+              !hasChildren && 'pointer-events-none opacity-50'
             )}
             type="button"
           >
             {hasChildren ? (
               <ChevronRight
                 className={cn(
-                  "w-4 h-4 text-neutral-400 dark:text-neutral-500 transition-transform duration-200",
-                  isExpanded && "rotate-90 text-neutral-600 dark:text-neutral-300"
+                  'w-4 h-4 text-neutral-400 dark:text-neutral-500 transition-transform duration-200',
+                  isExpanded && 'rotate-90 text-neutral-600 dark:text-neutral-300'
                 )}
               />
             ) : (
@@ -212,18 +221,25 @@ function QueryPlanView({ planWrapper }: QueryPlanViewProps) {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button className="text-neutral-400 hover:text-foreground transition-colors cursor-help outline-none" type="button">
+                <button
+                  className="text-neutral-400 hover:text-foreground transition-colors cursor-help outline-none"
+                  type="button"
+                >
                   <HelpCircle className="w-4 h-4" />
                 </button>
               </TooltipTrigger>
               <TooltipContent className="max-w-xs font-normal">
-                This visual tree shows the PostgreSQL execution plan. Nodes show estimated cost/rows and actual time/rows per step. Use it to find bottlenecks and missing indexes.
+                This visual tree shows the PostgreSQL execution plan. Nodes show estimated cost/rows
+                and actual time/rows per step. Use it to find bottlenecks and missing indexes.
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
           <span className="text-neutral-300 dark:text-neutral-600">/</span>
           <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">
-            Total time: <span className="font-bold font-mono text-black dark:text-white">{totalTime.toFixed(2)}ms</span>
+            Total time:{' '}
+            <span className="font-bold font-mono text-black dark:text-white">
+              {totalTime.toFixed(2)}ms
+            </span>
           </span>
         </div>
       </div>
@@ -264,9 +280,7 @@ export default function SQLEditorPage() {
     executeSQL: executeExplain,
     isPending: isExplainPending,
     data: explainData,
-    isSuccess: isExplainSuccess,
     error: explainError,
-    isError: isExplainError,
   } = useRawSQL({
     showSuccessToast: false,
     showErrorToast: false,
@@ -298,6 +312,7 @@ export default function SQLEditorPage() {
     if (resultView === 'explain' && activeTab?.query.trim() && !isExplainPending) {
       executeExplain({ query: activeTab.query, params: [], explain: true });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultView, activeTabId]);
 
   const handleExecuteQuery = () => {
@@ -570,7 +585,10 @@ export default function SQLEditorPage() {
             </Tabs>
             {/* Run Button + Export Menu */}
             <div className="flex items-center gap-2 relative">
-              <Button onClick={handleExecuteQuery} disabled={isPending || isExplainPending || !activeTab?.query.trim()}>
+              <Button
+                onClick={handleExecuteQuery}
+                disabled={isPending || isExplainPending || !activeTab?.query.trim()}
+              >
                 Run
               </Button>
 
@@ -620,7 +638,10 @@ export default function SQLEditorPage() {
             className={cn(
               'flex-1 min-h-0 w-full overflow-auto bg-[rgb(var(--semantic-0))]',
               resultView === 'result' && 'px-4 py-3',
-              resultView === 'explain' && planNodeResult && !('error' in planNodeResult) && 'overflow-hidden'
+              resultView === 'explain' &&
+                planNodeResult &&
+                !('error' in planNodeResult) &&
+                'overflow-hidden'
             )}
           >
             {resultView === 'explain' ? (

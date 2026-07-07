@@ -10,7 +10,11 @@ export class AdvanceService {
    * @param params - Optional query parameters
    * @returns Response with query results
    */
-  async runRawSQL(query: string, params: unknown[] = [], explain?: boolean): Promise<RawSQLResponse> {
+  async runRawSQL(
+    query: string,
+    params: unknown[] = [],
+    explain?: boolean
+  ): Promise<RawSQLResponse> {
     const body: RawSQLRequest = { query, params, explain };
 
     return apiClient.request('/database/advance/rawsql', {
