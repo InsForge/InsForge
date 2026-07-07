@@ -116,6 +116,13 @@ vi.mock('../../src/infra/database/database.manager', () => ({
 }));
 
 describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
+  type BulkInsertType = (
+    schemaName: string,
+    table: string,
+    records: Record<string, unknown>[],
+    upsertKey?: string
+  ) => Promise<{ rowCount: number; rows?: unknown[] }>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     // pool.connect() returns a pg client with query + release
@@ -137,7 +144,7 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
   test('groups records by shape and executes shape-coherent batch queries', async () => {
     const svc = DatabaseAdvanceService.getInstance();
 
-    await svc.bulkInsert('public', 'contacts', [
+    await (svc as unknown as { bulkInsert: BulkInsertType }).bulkInsert('public', 'contacts', [
       { id: '1', name: 'Alice' },
       { id: '2', name: 'Bob', phone: '555-0001' },
       { id: '3', name: 'Carol', phone: '555-0002' },
@@ -165,7 +172,9 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
   test('explicit undefined values are converted to NULL', async () => {
     const svc = DatabaseAdvanceService.getInstance();
 
-    await svc.bulkInsert('public', 'contacts', [{ id: '1', name: 'Alice', phone: undefined }]);
+    await (svc as unknown as { bulkInsert: BulkInsertType }).bulkInsert('public', 'contacts', [
+      { id: '1', name: 'Alice', phone: undefined },
+    ]);
 
     const sqlQueries = captureAllInsertSql();
     expect(sqlQueries).toHaveLength(1);
@@ -177,7 +186,7 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
   test('uniform records (all same columns) still work correctly', async () => {
     const svc = DatabaseAdvanceService.getInstance();
 
-    await svc.bulkInsert('public', 'contacts', [
+    await (svc as unknown as { bulkInsert: BulkInsertType }).bulkInsert('public', 'contacts', [
       { id: '1', name: 'Alice', phone: '555-0001' },
       { id: '2', name: 'Bob', phone: '555-0002' },
     ]);
@@ -194,13 +203,15 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
 
   test('throws AppError when records array is empty', async () => {
     const svc = DatabaseAdvanceService.getInstance();
-    await expect(svc.bulkInsert('public', 'contacts', [])).rejects.toBeInstanceOf(AppError);
+    await expect(
+      (svc as unknown as { bulkInsert: BulkInsertType }).bulkInsert('public', 'contacts', [])
+    ).rejects.toBeInstanceOf(AppError);
   });
 
   test('upsert: optional column from later records is included in ON CONFLICT SET for its group', async () => {
     const svc = DatabaseAdvanceService.getInstance();
 
-    await svc.bulkInsert(
+    await (svc as unknown as { bulkInsert: BulkInsertType }).bulkInsert(
       'public',
       'contacts',
       [
@@ -229,7 +240,9 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
   test('explicit null values are preserved in the SQL', async () => {
     const svc = DatabaseAdvanceService.getInstance();
 
-    await svc.bulkInsert('public', 'contacts', [{ id: '1', name: 'Alice', phone: null }]);
+    await (svc as unknown as { bulkInsert: BulkInsertType }).bulkInsert('public', 'contacts', [
+      { id: '1', name: 'Alice', phone: null },
+    ]);
 
     const sqlQueries = captureAllInsertSql();
     expect(sqlQueries).toHaveLength(1);
@@ -256,13 +269,164 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
       { id: '2', name: 'Bob', phone: '555-0001' },
     ];
 
-    await expect(svc.bulkInsert('public', 'contacts', records)).rejects.toThrow(
-      'Constraint violation on second group'
-    );
+    await expect(
+      (svc as unknown as { bulkInsert: BulkInsertType }).bulkInsert('public', 'contacts', records)
+    ).rejects.toThrow('Constraint violation on second group');
 
     const calls = mockClientQuery.mock.calls.map(([sql]) => sql);
     expect(calls).toContain('BEGIN');
     expect(calls).toContain('ROLLBACK');
     expect(calls).not.toContain('COMMIT');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stream Database Export Tests (JSON transforms, connection integrity, leaks)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { Readable, Writable } from 'stream';
+import {
+  JsonExportTransform,
+  CsvExportTransform,
+  SqlExportTransform,
+} from '../../src/utils/export-streams';
+
+describe('DatabaseAdvanceService - Stream Export Transform Streams', () => {
+  test('JsonExportTransform processes rows and wraps them in a valid JSON array', async () => {
+    const transform = new JsonExportTransform();
+    let result = '';
+
+    const writer = new Writable({
+      write(chunk, encoding, callback) {
+        result += chunk.toString();
+        callback();
+      },
+    });
+
+    transform.pipe(writer);
+    transform.write({ id: 1, name: 'Alice' });
+    transform.write({ id: 2, name: 'Bob' });
+    transform.end();
+
+    await new Promise((resolve) => writer.on('finish', resolve));
+
+    expect(result).toBe('[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"}]');
+  });
+
+  test('JsonExportTransform outputs exactly [] when receiving 0 rows', async () => {
+    const transform = new JsonExportTransform();
+    let result = '';
+
+    const writer = new Writable({
+      write(chunk, encoding, callback) {
+        result += chunk.toString();
+        callback();
+      },
+    });
+
+    transform.pipe(writer);
+    transform.end();
+
+    await new Promise((resolve) => writer.on('finish', resolve));
+
+    expect(result).toBe('[]');
+  });
+
+  test('CsvExportTransform extracts headers and format values correctly', async () => {
+    const transform = new CsvExportTransform();
+    let result = '';
+
+    const writer = new Writable({
+      write(chunk, encoding, callback) {
+        result += chunk.toString();
+        callback();
+      },
+    });
+
+    transform.pipe(writer);
+    transform.write({ id: 1, name: 'Alice', bio: 'a, b\n' });
+    transform.write({ id: 2, name: 'Bob', bio: 'no quotes' });
+    transform.end();
+
+    await new Promise((resolve) => writer.on('finish', resolve));
+
+    expect(result).toBe('id,name,bio\n1,Alice,"a, b\n"\n2,Bob,no quotes\n');
+  });
+
+  test('SqlExportTransform produces correct INSERT statements', async () => {
+    const transform = new SqlExportTransform('users');
+    let result = '';
+
+    const writer = new Writable({
+      write(chunk, encoding, callback) {
+        result += chunk.toString();
+        callback();
+      },
+    });
+
+    transform.pipe(writer);
+    transform.write({ id: 1, name: "O'Conner", active: true });
+    transform.end();
+
+    await new Promise((resolve) => writer.on('finish', resolve));
+
+    expect(result).toBe("INSERT INTO users (id, name, active) VALUES (1, 'O''Conner', true);\n");
+  });
+});
+
+describe('DatabaseAdvanceService - Connection integrity & Pipeline mocks', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockClient: any;
+
+  beforeEach(() => {
+    mockClient = {
+      query: vi.fn().mockImplementation((queryObj) => {
+        if (typeof queryObj === 'string') {
+          return Promise.resolve({ rows: [], rowCount: 0 });
+        }
+        // Return a readable stream that simulates row emission
+        const stream = new Readable({
+          objectMode: true,
+          read() {
+            this.push({ id: 1, name: 'Alice' });
+            this.push(null);
+          },
+        });
+        return stream;
+      }),
+      release: vi.fn(),
+    };
+    mockConnect.mockResolvedValue(mockClient);
+  });
+
+  test('pipeline failure still releases the database client exactly once', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+
+    // Inject a write stream that throws an error immediately on write
+    const failingWriter = new Writable({
+      write(chunk, encoding, callback) {
+        callback(new Error('Write target crashed'));
+      },
+    });
+
+    await expect(svc.exportTableDataStream('users', 'json', failingWriter)).rejects.toThrow(
+      'Write target crashed'
+    );
+
+    expect(mockClient.release).toHaveBeenCalledTimes(1);
+  });
+
+  test('successful pipeline execution releases the database client exactly once', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+
+    const writer = new Writable({
+      write(chunk, encoding, callback) {
+        callback();
+      },
+    });
+
+    await svc.exportTableDataStream('users', 'json', writer);
+
+    expect(mockClient.release).toHaveBeenCalledTimes(1);
   });
 });

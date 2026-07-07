@@ -100,15 +100,14 @@ export const rawSQLResponseSchema = z.object({
 });
 
 // Export Schemas
-export const exportRequestSchema = z.object({
-  tables: z.array(z.string()).optional(),
-  format: z.enum(['sql', 'json']).default('sql'),
-  includeData: z.boolean().default(true),
-  includeFunctions: z.boolean().default(false),
-  includeSequences: z.boolean().default(false),
-  includeViews: z.boolean().default(false),
-  rowLimit: z.number().int().positive().max(10000).default(1000),
-});
+export const exportRequestSchema = z
+  .object({
+    tables: z.array(z.string()).min(1).max(1),
+    schema: z.string().optional(),
+    format: z.enum(['sql', 'json', 'csv']).default('sql'),
+    rowLimit: z.number().int().nonnegative().max(100000).optional(),
+  })
+  .strict();
 
 export const exportJsonDataSchema = z.object({
   timestamp: z.string(),

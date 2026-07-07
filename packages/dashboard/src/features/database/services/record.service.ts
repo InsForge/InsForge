@@ -1,8 +1,8 @@
 import { ConvertedValue } from '#components/datagrid/datagridTypes';
 import { DEFAULT_DATABASE_SCHEMA, type RecordPrimaryKey } from '#features/database/helpers';
 import { apiClient } from '#lib/api/client';
+import { getDashboardApiBaseUrl } from '#lib/config/runtime';
 import { BulkUpsertResponse } from '@insforge/shared-schemas';
-import { convertToCSV, getExportFilename } from '#lib/utils/data-export';
 
 interface AdminRecordListResponse {
   data: { [key: string]: ConvertedValue }[];
@@ -277,48 +277,149 @@ export class RecordService {
     return response;
   }
 
+  /**
+   * Exports a database table's records as a CSV file.
+   *
+   * Note: While the backend streams the response, this frontend method attempts to use the
+   * File System Access API (window.showSaveFilePicker) to write response.body directly to disk.
+   * If unsupported, it falls back to response.body.getReader() to buffer the stream chunks into
+   * a Blob in browser memory before triggering the native download.
+   * Extremely large tables may exhaust browser tab memory on browsers without File System Access support.
+   */
   async exportTableAsCSV(
     tableName: string,
     schemaName: string = DEFAULT_DATABASE_SCHEMA
   ): Promise<{ limited: boolean }> {
-    // Export limit to prevent browser crashes on large tables
-    const MAX_EXPORT_ROWS = 10_000;
-    // Backend API max limit is 500 records per request
-    const limit = 500;
-    const allRecords: { [key: string]: ConvertedValue }[] = [];
-    let offset = 0;
-    let isLimited = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-    while (allRecords.length < MAX_EXPORT_ROWS) {
-      const { records } = await this.getTableRecords(tableName, schemaName, limit, offset);
+    const hasSaveFilePicker =
+      typeof (window as Window & { showSaveFilePicker?: unknown }).showSaveFilePicker ===
+      'function';
+    const rowLimit = hasSaveFilePicker ? undefined : 10000;
 
-      if (records.length === 0) {
-        break;
+    try {
+      const response = await fetch(`${getDashboardApiBaseUrl()}/database/advance/export`, {
+        method: 'POST',
+        headers: apiClient.withAccessToken({
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify({
+          tables: [tableName],
+          schema: schemaName,
+          format: 'csv',
+          rowLimit,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        let msg = 'Failed to export CSV';
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed.message) {
+            msg = parsed.message;
+          }
+        } catch {
+          /* ignore invalid JSON response content */
+        }
+        throw new Error(msg);
       }
 
-      // Only take what we need up to the limit
-      const remaining = MAX_EXPORT_ROWS - allRecords.length;
-      allRecords.push(...records.slice(0, remaining));
-
-      // Check if we've hit the limit or exhausted records
-      if (allRecords.length >= MAX_EXPORT_ROWS) {
-        isLimited = true;
-        break;
+      // Parse filename from Content-Disposition header
+      const disposition = response.headers.get('content-disposition');
+      let filename = `${tableName}_export.csv`;
+      if (disposition && disposition.indexOf('attachment') !== -1) {
+        const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+        const matches = filenameRegex.exec(disposition);
+        if (matches !== null && matches[1]) {
+          filename = matches[1].replace(/['"]/g, '');
+        }
       }
 
-      if (records.length < limit) {
-        break;
+      if (!response.body) {
+        throw new Error('Response body stream is not readable.');
       }
 
-      offset += limit;
+      if (hasSaveFilePicker) {
+        let fileHandle;
+        try {
+          const picker = (
+            window as Window & {
+              showSaveFilePicker?: (options?: {
+                suggestedName?: string;
+                types?: { description?: string; accept?: Record<string, string[]> }[];
+              }) => Promise<{ createWritable(): Promise<WritableStream> }>;
+            }
+          ).showSaveFilePicker;
+          if (!picker) {
+            throw new Error('showSaveFilePicker is not supported on this browser.');
+          }
+          fileHandle = await picker({
+            suggestedName: filename,
+            types: [
+              {
+                description: 'CSV Files',
+                accept: { 'text/csv': ['.csv'] },
+              },
+            ],
+          });
+        } catch (err: unknown) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            // User cancelled the picker dialog. Exit gracefully.
+            return { limited: false };
+          }
+          throw err;
+        }
+
+        const writableStream = await fileHandle.createWritable();
+        await response.body.pipeTo(writableStream);
+        return { limited: false };
+      } else {
+        // Fallback: Read chunks from stream and download as Blob
+        const reader = response.body.getReader();
+        const chunks: Uint8Array[] = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+          if (value) {
+            chunks.push(value);
+          }
+        }
+        const blob = new Blob(chunks as BlobPart[], { type: 'text/csv; charset=utf-8' });
+
+        // Dynamically determine if the export was truncated by counting lines
+        // (Subtract 1 to account for the CSV header row)
+        const text = await blob.text();
+        const lineCount = text.split('\n').length - 1;
+        const isLimited = lineCount >= 10000;
+
+        // Trigger native browser download using temporary anchor tag
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+
+        return { limited: isLimited };
+      }
+    } catch (err: unknown) {
+      console.error('Database export CSV error:', err);
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new Error('Database export timed out after 60 seconds.');
+      }
+      throw err instanceof Error
+        ? err
+        : new Error('An unexpected error occurred during database export.');
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const filename = getExportFilename(tableName + '_data');
-
-    // Convert and download
-    convertToCSV(allRecords, filename);
-
-    return { limited: isLimited };
   }
 }
 

@@ -17,6 +17,14 @@ import { type PoolClient } from 'pg';
 import { withAdminContext } from './user-context.service.js';
 import type { ForeignKeyRow } from '@/types/database.js';
 import { FOREIGN_KEY_INTROSPECTION_QUERY, groupForeignKeyRows } from './helpers.js';
+import QueryStream from 'pg-query-stream';
+import { pipeline } from 'stream/promises';
+import type { Writable, Transform } from 'stream';
+import {
+  JsonExportTransform,
+  CsvExportTransform,
+  SqlExportTransform,
+} from '@/utils/export-streams.js';
 
 export class DatabaseAdvanceService {
   private static instance: DatabaseAdvanceService;
@@ -35,37 +43,98 @@ export class DatabaseAdvanceService {
    * Get table data using simple SELECT query
    * More reliable than streaming for moderate datasets
    */
+  private buildTableSelectQuery(
+    table: string,
+    schemaName?: string,
+    rowLimit?: number
+  ): { query: string; params: unknown[] } {
+    const safeTable = schemaName ? pgFormat('%I.%I', schemaName, table) : pgFormat('%I', table);
+    const hasLimit = typeof rowLimit === 'number' && Number.isFinite(rowLimit) && rowLimit >= 0;
+    const query = hasLimit ? `SELECT * FROM ${safeTable} LIMIT $1` : `SELECT * FROM ${safeTable}`;
+    const params = hasLimit ? [rowLimit] : [];
+    return { query, params };
+  }
+
   private async getTableData(
     client: PoolClient,
     table: string,
-    rowLimit: number | undefined
+    rowLimit: number | undefined,
+    schemaName?: string
   ): Promise<{ rows: Record<string, unknown>[]; totalRows: number; wasTruncated: boolean }> {
-    const safeTable = pgFormat('SELECT * FROM %I', table);
-    const query = rowLimit ? `${safeTable} LIMIT $1` : safeTable;
-    const queryParams: unknown[] = rowLimit ? [rowLimit] : [];
+    const { query, params } = this.buildTableSelectQuery(table, schemaName, rowLimit);
+    const hasLimit = typeof rowLimit === 'number' && Number.isFinite(rowLimit) && rowLimit >= 0;
 
     let wasTruncated = false;
     let totalRows = 0;
 
     // Check for truncation upfront if rowLimit is set
-    if (rowLimit) {
+    if (hasLimit) {
       try {
-        const countResult = await client.query(pgFormat('SELECT COUNT(*) FROM %I', table));
+        const countQuery = schemaName
+          ? pgFormat('SELECT COUNT(*) FROM %I.%I', schemaName, table)
+          : pgFormat('SELECT COUNT(*) FROM %I', table);
+        const countResult = await client.query(countQuery);
         totalRows = parseInt(countResult.rows[0].count);
-        wasTruncated = totalRows > rowLimit;
+        wasTruncated = totalRows > (rowLimit ?? 0);
       } catch (err) {
         logger.error('Error counting rows:', err);
       }
     }
 
-    const result = await client.query(query, queryParams);
+    const result = await client.query(query, params);
     const rows = result.rows || [];
 
-    if (!rowLimit) {
+    if (!hasLimit) {
       totalRows = rows.length;
     }
 
     return { rows, totalRows, wasTruncated };
+  }
+
+  /**
+   * Stream database table data directly to a destination Writable stream (e.g. HTTP response)
+   * to avoid high memory usage and buffer OOM.
+   */
+  async exportTableDataStream(
+    table: string,
+    format: 'json' | 'csv' | 'sql',
+    destination: Writable,
+    rowLimit?: number,
+    schemaName?: string
+  ): Promise<void> {
+    validateTableName(table);
+    if (schemaName) {
+      validateSchemaName(schemaName);
+    }
+
+    const pool = this.dbManager.getPool();
+    const client = await pool.connect();
+    let connectionError: Error | undefined;
+
+    try {
+      await client.query("SET statement_timeout = '60000'");
+      const { query, params } = this.buildTableSelectQuery(table, schemaName, rowLimit);
+
+      const queryStream = new QueryStream(query, params);
+      const dbStream = client.query(queryStream);
+
+      let transformStream: Transform;
+      if (format === 'json') {
+        transformStream = new JsonExportTransform();
+      } else if (format === 'csv') {
+        transformStream = new CsvExportTransform();
+      } else {
+        transformStream = new SqlExportTransform(table, schemaName);
+      }
+
+      await pipeline(dbStream, transformStream, destination);
+    } catch (err) {
+      connectionError = err instanceof Error ? err : new Error(String(err));
+      throw err;
+    } finally {
+      await client.query('SET statement_timeout = 0').catch(() => {});
+      client.release(connectionError);
+    }
   }
 
   sanitizeQuery(query: string): string {

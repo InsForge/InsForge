@@ -167,39 +167,72 @@ router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response, next
       );
     }
 
-    const {
-      tables,
-      format,
-      includeData,
-      includeFunctions,
-      includeSequences,
-      includeViews,
-      rowLimit,
-    } = validation.data;
-    const response = await dbAdvanceService.exportDatabase(
-      tables,
-      format,
-      includeData,
-      includeFunctions,
-      includeSequences,
-      includeViews,
-      rowLimit
-    );
+    const { tables, schema, format, rowLimit } = validation.data;
+
+    if (tables && tables.length > 1) {
+      throw new AppError(
+        'Streaming export only supports one table per request',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    // We export the first table in the list or fall back to an error if empty
+    const tableName = tables?.[0];
+    if (!tableName) {
+      throw new AppError(
+        'At least one table name is required to export data',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    // Sanitize tableName for filename Content-Disposition header
+    const safeFilename = tableName.replace(/[^A-Za-z0-9_-]/g, '');
+
+    // Set headers
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const ext = format === 'json' ? 'json' : format === 'csv' ? 'csv' : 'sql';
+    const filename = `${safeFilename}_export_${timestamp}.${ext}`;
+
+    let contentType = 'application/octet-stream';
+    if (format === 'json') {
+      contentType = 'application/json; charset=utf-8';
+    } else if (format === 'csv') {
+      contentType = 'text/csv; charset=utf-8';
+    } else if (format === 'sql') {
+      contentType = 'application/sql; charset=utf-8';
+    }
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
 
     // Log audit for database export
-    await auditService.log({
-      actor: req.hasApiKey ? 'api-key' : req.user?.id,
-      action: 'EXPORT_DATABASE',
-      module: 'DATABASE',
-      details: {
-        format: response.format,
-      },
-      ip_address: req.ip,
-    });
+    try {
+      await auditService.log({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'EXPORT_DATABASE',
+        module: 'DATABASE',
+        details: {
+          format,
+          tableName,
+          schemaName: schema,
+        },
+        ip_address: req.ip,
+      });
+    } catch (auditError) {
+      logger.error('Failed to log audit for database export:', auditError);
+    }
 
-    successResponse(res, response);
+    // Stream the data
+    await dbAdvanceService.exportTableDataStream(tableName, format, res, rowLimit, schema);
   } catch (error: unknown) {
     logger.warn('Database export error:', error);
+    if (res.headersSent) {
+      res.destroy(error instanceof Error ? error : new Error(String(error)));
+      return;
+    }
     next(error);
   }
 });
