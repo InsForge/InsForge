@@ -30,31 +30,31 @@ function stripHtmlTags(html: string): string {
 async function parseErrorResponse(response: Response): Promise<string> {
   const contentType = response.headers.get('content-type') || '';
 
+  const text = await response.text();
+
   if (contentType.includes('application/json')) {
     try {
-      const body = await response.json();
+      const body = JSON.parse(text);
       return body.message || body.error || response.statusText;
     } catch {
       console.warn('Failed to parse JSON error response:', {
         status: response.status,
         statusText: response.statusText,
       });
+      return text || response.statusText;
     }
   }
 
   if (contentType.includes('application/xml') || contentType.includes('text/xml')) {
-    const text = await response.text();
     const message = extractXmlMessage(text);
     return message || response.statusText;
   }
 
   if (contentType.includes('text/html')) {
-    const text = await response.text();
     const cleaned = stripHtmlTags(text);
     return cleaned || response.statusText;
   }
 
-  const text = await response.text();
   return text || response.statusText;
 }
 
@@ -192,13 +192,11 @@ export const storageService = {
     const formData = new FormData();
     formData.append('file', object);
 
-    const isSameOrigin =
-      typeof window !== 'undefined' &&
-      new URL(strategy.uploadUrl, window.location.href).origin === window.location.origin;
-
     const uploadResponse = await fetch(strategy.uploadUrl, {
       method: 'PUT',
-      headers: isSameOrigin ? { Authorization: `Bearer ${token}` } : {},
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
       body: formData,
     });
 
