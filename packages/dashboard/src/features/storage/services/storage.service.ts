@@ -158,14 +158,20 @@ export const storageService = {
       }
 
       const response = result.value.response;
-      success.push(...response.deleted);
-      failures.push(
-        ...response.notFound.map((key) => ({ key, error: new Error('Object not found') })),
-        ...response.failed.map((failure) => ({
-          key: failure.key,
-          error: new Error(failure.message),
-        }))
-      );
+      response.results.forEach((deleteResult) => {
+        if (deleteResult.status === 'deleted') {
+          success.push(deleteResult.key);
+          return;
+        }
+        failures.push({
+          key: deleteResult.key,
+          error: new Error(
+            deleteResult.status === 'notFound'
+              ? 'Object not found'
+              : (deleteResult.message ?? 'Failed to delete object')
+          ),
+        });
+      });
     });
 
     return {

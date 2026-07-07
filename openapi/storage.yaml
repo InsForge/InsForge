@@ -394,37 +394,35 @@ paths:
               schema:
                 type: object
                 required:
-                  - deleted
-                  - notFound
-                  - failed
+                  - results
                 properties:
-                  deleted:
-                    type: array
-                    items:
-                      type: string
-                  notFound:
-                    type: array
-                    items:
-                      type: string
-                  failed:
+                  results:
                     type: array
                     items:
                       type: object
                       required:
                         - key
-                        - message
+                        - status
                       properties:
                         key:
                           type: string
+                        status:
+                          type: string
+                          enum:
+                            - deleted
+                            - notFound
+                            - failed
                         message:
                           type: string
+                          description: Present when status is failed.
               example:
-                deleted:
-                  - users/user123.jpg
-                notFound:
-                  - users/missing.png
-                failed:
+                results:
+                  - key: users/user123.jpg
+                    status: deleted
+                  - key: users/missing.png
+                    status: notFound
                   - key: users/locked.png
+                    status: failed
                     message: Failed to delete object
         '400':
           description: Invalid bucket name or object keys

@@ -19,9 +19,11 @@ describe('storageService', () => {
 
   it('deletes objects with one batch DELETE request', async () => {
     apiClientMock.request.mockResolvedValue({
-      deleted: ['a.txt'],
-      notFound: ['missing.txt'],
-      failed: [{ key: 'blocked.txt', message: 'Access denied' }],
+      results: [
+        { key: 'a.txt', status: 'deleted' },
+        { key: 'missing.txt', status: 'notFound' },
+        { key: 'blocked.txt', status: 'failed', message: 'Access denied' },
+      ],
     });
 
     const result = await storageService.deleteObjects('photos', [
@@ -59,14 +61,13 @@ describe('storageService', () => {
   it('chunks deletes into batches of 1000 objects', async () => {
     apiClientMock.request
       .mockResolvedValueOnce({
-        deleted: Array.from({ length: 1000 }, (_, index) => `file-${index}.txt`),
-        notFound: [],
-        failed: [],
+        results: Array.from({ length: 1000 }, (_, index) => ({
+          key: `file-${index}.txt`,
+          status: 'deleted',
+        })),
       })
       .mockResolvedValueOnce({
-        deleted: ['file-1000.txt'],
-        notFound: [],
-        failed: [],
+        results: [{ key: 'file-1000.txt', status: 'deleted' }],
       });
     const keys = Array.from({ length: 1001 }, (_, index) => `file-${index}.txt`);
 

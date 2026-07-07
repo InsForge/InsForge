@@ -8,6 +8,7 @@ import { StorageRecord } from '@/types/storage.js';
 import {
   ERROR_CODES,
   DELETE_OBJECT_FAILURE_MESSAGE,
+  DeleteObjectResult,
   DeleteObjectsResponse,
   StorageBucketSchema,
   StorageFileSchema,
@@ -337,7 +338,7 @@ export class StorageService {
     hasApiKey: boolean = false
   ): Promise<boolean> {
     const result = await this.deleteObjects(ctx, bucket, [key], hasApiKey);
-    return !result.notFound.includes(key);
+    return result.results.some((entry) => entry.key === key && entry.status !== 'notFound');
   }
 
   async deleteObjects(
@@ -369,9 +370,10 @@ export class StorageService {
     }
 
     const dbDeletedKeySet = new Set(dbDeletedKeys);
-    const notFound = uniqueKeys.filter((key) => !dbDeletedKeySet.has(key));
     if (dbDeletedKeys.length === 0) {
-      return { deleted: [], notFound, failed: [] };
+      return {
+        results: uniqueKeys.map((key) => ({ key, status: 'notFound' })),
+      };
     }
 
     try {
@@ -379,12 +381,32 @@ export class StorageService {
       const providerDeletedKeys = new Set(
         providerResult.deleted.filter((key) => dbDeletedKeySet.has(key))
       );
-      const failed = providerResult.failed.filter((failure) => dbDeletedKeySet.has(failure.key));
-      const providerFailedKeys = new Set(failed.map((failure) => failure.key));
-      const unreconciledFailures = dbDeletedKeys
-        .filter((key) => !providerDeletedKeys.has(key) && !providerFailedKeys.has(key))
-        .map((key) => ({ key, message: DELETE_OBJECT_FAILURE_MESSAGE }));
-      failed.push(...unreconciledFailures);
+      const failedByKey = new Map(
+        providerResult.failed
+          .filter((failure) => dbDeletedKeySet.has(failure.key))
+          .map((failure) => [failure.key, failure.message])
+      );
+
+      const results: DeleteObjectResult[] = uniqueKeys.map((key) => {
+        if (!dbDeletedKeySet.has(key)) {
+          return { key, status: 'notFound' };
+        }
+        const failureMessage = failedByKey.get(key);
+        if (failureMessage) {
+          return { key, status: 'failed', message: failureMessage };
+        }
+        if (providerDeletedKeys.has(key)) {
+          return { key, status: 'deleted' };
+        }
+        return { key, status: 'failed', message: DELETE_OBJECT_FAILURE_MESSAGE };
+      });
+
+      const failed = results
+        .filter((result) => result.status === 'failed')
+        .map((result) => ({
+          key: result.key,
+          message: result.message ?? DELETE_OBJECT_FAILURE_MESSAGE,
+        }));
 
       if (failed.length > 0) {
         logger.warn('Storage provider batch delete partially failed after DB rows were deleted', {
@@ -392,14 +414,7 @@ export class StorageService {
           failed,
         });
       }
-      const failedKeys = new Set(failed.map((failure) => failure.key));
-      return {
-        deleted: dbDeletedKeys.filter(
-          (key) => providerDeletedKeys.has(key) && !failedKeys.has(key)
-        ),
-        notFound,
-        failed,
-      };
+      return { results };
     } catch (error) {
       logger.error('Storage provider batch delete failed', {
         bucket,
@@ -407,9 +422,11 @@ export class StorageService {
         error: error instanceof Error ? error.message : String(error),
       });
       return {
-        deleted: [],
-        notFound,
-        failed: dbDeletedKeys.map((key) => ({ key, message: DELETE_OBJECT_FAILURE_MESSAGE })),
+        results: uniqueKeys.map((key) =>
+          dbDeletedKeySet.has(key)
+            ? { key, status: 'failed', message: DELETE_OBJECT_FAILURE_MESSAGE }
+            : { key, status: 'notFound' }
+        ),
       };
     }
   }

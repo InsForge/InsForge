@@ -9,6 +9,7 @@ const storageMocks = vi.hoisted(() => ({
   getObjectMetadataRow: vi.fn(),
   getObject: vi.fn(),
   objectIsVisible: vi.fn(),
+  deleteObjects: vi.fn(),
 }));
 
 const authMocks = vi.hoisted(() => ({
@@ -112,9 +113,10 @@ describe('Storage routes', () => {
   test('batch delete route validates body and delegates to storage service', async () => {
     vi.resetModules();
     storageMocks.deleteObjects.mockResolvedValue({
-      deleted: ['a.txt'],
-      notFound: ['missing.txt'],
-      failed: [],
+      results: [
+        { key: 'a.txt', status: 'deleted' },
+        { key: 'missing.txt', status: 'notFound' },
+      ],
     });
 
     const { storageRouter } = await import('../../src/api/routes/storage/index.routes.js');
@@ -140,9 +142,10 @@ describe('Storage routes', () => {
 
     expect(response.statusCode, response.body).toBe(200);
     expect(JSON.parse(response.body)).toEqual({
-      deleted: ['a.txt'],
-      notFound: ['missing.txt'],
-      failed: [],
+      results: [
+        { key: 'a.txt', status: 'deleted' },
+        { key: 'missing.txt', status: 'notFound' },
+      ],
     });
     expect(storageMocks.deleteObjects).toHaveBeenCalledWith(
       undefined,

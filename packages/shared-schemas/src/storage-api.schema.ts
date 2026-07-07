@@ -32,15 +32,14 @@ export const deleteObjectsRequestSchema = z.object({
     ),
 });
 
+export const deleteObjectResultSchema = z.object({
+  key: z.string(),
+  status: z.enum(['deleted', 'notFound', 'failed']),
+  message: z.string().optional(),
+});
+
 export const deleteObjectsResponseSchema = z.object({
-  deleted: z.array(z.string()),
-  notFound: z.array(z.string()),
-  failed: z.array(
-    z.object({
-      key: z.string(),
-      message: z.string(),
-    })
-  ),
+  results: z.array(deleteObjectResultSchema),
 });
 
 // Upload strategy schemas
@@ -91,6 +90,7 @@ export type CreateBucketRequest = z.infer<typeof createBucketRequestSchema>;
 export type UpdateBucketRequest = z.infer<typeof updateBucketRequestSchema>;
 export type ListObjectsResponseSchema = z.infer<typeof listObjectsResponseSchema>;
 export type DeleteObjectsRequest = z.infer<typeof deleteObjectsRequestSchema>;
+export type DeleteObjectResult = z.infer<typeof deleteObjectResultSchema>;
 export type DeleteObjectsResponse = z.infer<typeof deleteObjectsResponseSchema>;
 export type UploadStrategyRequest = z.infer<typeof uploadStrategyRequestSchema>;
 export type UploadStrategyResponse = z.infer<typeof uploadStrategyResponseSchema>;

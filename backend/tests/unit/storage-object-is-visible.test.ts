@@ -508,9 +508,11 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     ]);
 
     expect(result).toEqual({
-      deleted: ['a.txt'],
-      notFound: ['missing.txt'],
-      failed: [{ key: 'b.txt', message: 'provider denied' }],
+      results: [
+        { key: 'a.txt', status: 'deleted' },
+        { key: 'b.txt', status: 'failed', message: 'provider denied' },
+        { key: 'missing.txt', status: 'notFound' },
+      ],
     });
     expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['a.txt', 'b.txt']);
     expect(calls.map((c) => c.sql)).toEqual([
@@ -543,9 +545,10 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     );
 
     expect(result).toEqual({
-      deleted: ['mine.txt'],
-      notFound: ['not-mine.txt'],
-      failed: [],
+      results: [
+        { key: 'mine.txt', status: 'deleted' },
+        { key: 'not-mine.txt', status: 'notFound' },
+      ],
     });
     expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['mine.txt']);
     expect(calls.map((c) => c.sql)).toEqual([
@@ -577,9 +580,10 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     ]);
 
     expect(result).toEqual({
-      deleted: ['a.txt'],
-      notFound: [],
-      failed: [{ key: 'b.txt', message: 'Failed to delete object' }],
+      results: [
+        { key: 'a.txt', status: 'deleted' },
+        { key: 'b.txt', status: 'failed', message: 'Failed to delete object' },
+      ],
     });
     expect(loggerMocks.warn).toHaveBeenCalledWith(
       'Storage provider batch delete partially failed after DB rows were deleted',
@@ -607,9 +611,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     ]);
 
     expect(result).toEqual({
-      deleted: [],
-      notFound: [],
-      failed: [{ key: 'a.txt', message: 'Failed to delete object' }],
+      results: [{ key: 'a.txt', status: 'failed', message: 'Failed to delete object' }],
     });
     expect(loggerMocks.error).toHaveBeenCalledWith('Storage provider batch delete failed', {
       bucket: 'photos',
