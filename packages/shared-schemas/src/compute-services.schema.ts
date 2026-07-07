@@ -34,6 +34,10 @@ export const serviceSchema = z.object({
   // migration backfills `'http'` for pre-INS-271 rows). Defaults are only
   // optional on the *input* schemas.
   protocol: z.enum(['http', 'tcp']),
+  // Required on the response shape (the migration backfills `true` for
+  // pre-existing rows). true = Fly stops the machine when idle and
+  // cold-starts it on the next request (the default); false = always-on.
+  scaleToZero: z.boolean(),
   flyAppId: z.string().nullable(),
   flyMachineId: z.string().nullable(),
   status: serviceStatusEnum,

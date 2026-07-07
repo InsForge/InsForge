@@ -39,6 +39,11 @@ export interface CreateServiceInput {
    * the DB column defaults to `'http'`.
    */
   protocol?: 'http' | 'tcp';
+  /**
+   * Scale-to-zero — `true` (default) lets Fly stop the machine when idle,
+   * `false` keeps it running 24/7. Optional; the DB column defaults to true.
+   */
+  scaleToZero?: boolean;
 }
 
 export interface UpdateServiceInput {
@@ -61,6 +66,8 @@ export interface UpdateServiceInput {
   envVarsPatch?: { set?: Record<string, string>; unset?: string[] };
   /** Edge protocol — same semantics as CreateServiceInput.protocol. */
   protocol?: 'http' | 'tcp';
+  /** Scale-to-zero — same semantics as CreateServiceInput.scaleToZero. */
+  scaleToZero?: boolean;
 }
 
 /**
@@ -80,6 +87,7 @@ export interface DeletedServiceSnapshot {
   memory: number;
   region: string;
   protocol: 'http' | 'tcp';
+  scaleToZero: boolean;
   flyAppId: string | null;
   flyMachineId: string | null;
   endpointUrl: string | null;
@@ -101,6 +109,10 @@ interface ServiceRow {
   // column will see undefined here; mapRowToSchema normalizes to 'http' so the
   // response shape's required `protocol` field never goes out as undefined.
   protocol: 'http' | 'tcp';
+  // Backfilled to true for pre-existing rows by the 058 migration, NOT NULL
+  // going forward. mapRowToSchema normalizes undefined to true for rows read
+  // from a pre-migration DB.
+  scale_to_zero: boolean;
   fly_app_id: string | null;
   fly_machine_id: string | null;
   status: string;
@@ -125,6 +137,7 @@ function mapRowToSchema(row: ServiceRow): ServiceSchema {
     // serviceSchema would reject `undefined`. Fall back to 'http' so a stale
     // schema doesn't break the response.
     protocol: (row.protocol ?? 'http') as ServiceSchema['protocol'],
+    scaleToZero: row.scale_to_zero ?? true,
     flyAppId: row.fly_app_id,
     flyMachineId: row.fly_machine_id,
     status: row.status as ServiceSchema['status'],
@@ -348,8 +361,8 @@ export class ComputeServicesService {
     let insertResult;
     try {
       insertResult = await this.getPool().query(
-        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, protocol, env_vars_encrypted, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'creating')
+        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, protocol, scale_to_zero, env_vars_encrypted, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'creating')
          RETURNING *`,
         [
           input.projectId,
@@ -360,6 +373,7 @@ export class ComputeServicesService {
           input.memory,
           input.region,
           input.protocol ?? 'http',
+          input.scaleToZero ?? true,
           envVarsEncrypted,
         ]
       );
@@ -397,6 +411,7 @@ export class ComputeServicesService {
         envVars: input.envVars ?? {},
         region: input.region,
         protocol: input.protocol,
+        scaleToZero: input.scaleToZero,
       });
       flyMachineId = machineId;
 
@@ -465,8 +480,8 @@ export class ComputeServicesService {
     let insertResult;
     try {
       insertResult = await this.getPool().query(
-        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, protocol, env_vars_encrypted, fly_app_id, endpoint_url, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'deploying')
+        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, protocol, scale_to_zero, env_vars_encrypted, fly_app_id, endpoint_url, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'deploying')
          RETURNING *`,
         [
           input.projectId,
@@ -477,6 +492,7 @@ export class ComputeServicesService {
           input.memory,
           input.region,
           input.protocol ?? 'http',
+          input.scaleToZero ?? true,
           envVarsEncrypted,
           flyAppName,
           endpointUrl,
@@ -606,6 +622,10 @@ export class ComputeServicesService {
       updates.push(`protocol = $${paramIdx++}`);
       values.push(data.protocol);
     }
+    if (data.scaleToZero !== undefined) {
+      updates.push(`scale_to_zero = $${paramIdx++}`);
+      values.push(data.scaleToZero);
+    }
 
     if (updates.length === 0) {
       return existing;
@@ -615,7 +635,16 @@ export class ComputeServicesService {
     // Only commit to DB after Fly accepts the new config to avoid stale DB state.
     // `protocol` is a deploy field — switching http<->tcp swaps the Fly edge
     // handlers entirely, so it has to propagate to Fly to take effect.
-    const deployFields = ['imageUrl', 'port', 'cpu', 'memory', 'envVars', 'protocol'] as const;
+    // `scaleToZero` likewise lives in the Fly service block (autostop config).
+    const deployFields = [
+      'imageUrl',
+      'port',
+      'cpu',
+      'memory',
+      'envVars',
+      'protocol',
+      'scaleToZero',
+    ] as const;
     const hasDeployChange = deployFields.some((f) => data[f] !== undefined);
 
     // env_vars merge is needed by both Fly-touching branches (updateMachine
@@ -651,6 +680,7 @@ export class ComputeServicesService {
           memory: data.memory ?? existing.memory,
           envVars: mergedEnvVars ?? {},
           protocol: data.protocol ?? existing.protocol,
+          scaleToZero: data.scaleToZero ?? existing.scaleToZero,
         });
         logger.info('Compute service machine updated', { id });
       } catch (error) {
@@ -671,6 +701,7 @@ export class ComputeServicesService {
           envVars: mergedEnvVars ?? {},
           region: data.region ?? existing.region,
           protocol: data.protocol ?? existing.protocol,
+          scaleToZero: data.scaleToZero ?? existing.scaleToZero,
         });
         justLaunchedMachineId = machineId;
         // Persist machine id + flip status alongside the field updates below.
@@ -814,6 +845,7 @@ export class ComputeServicesService {
       memory: row.memory,
       region: row.region,
       protocol: (row.protocol ?? 'http') as 'http' | 'tcp',
+      scaleToZero: row.scale_to_zero ?? true,
       flyAppId: row.fly_app_id,
       flyMachineId: row.fly_machine_id,
       endpointUrl: row.endpoint_url,
