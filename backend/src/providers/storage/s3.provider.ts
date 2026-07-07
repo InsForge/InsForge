@@ -341,7 +341,8 @@ export class S3StorageProvider implements StorageProvider {
     bucket: string,
     key: string,
     metadata: { contentType?: string; size?: number },
-    maxFileSizeBytes: number
+    maxFileSizeBytes: number,
+    contentType: string = 'application/octet-stream'
   ): Promise<UploadStrategyResponse> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
@@ -355,12 +356,16 @@ export class S3StorageProvider implements StorageProvider {
       const { url, fields } = await createPresignedPost(this.s3Client, {
         Bucket: this.s3Bucket,
         Key: s3Key,
+        Fields: {
+          'Content-Type': contentType,
+        },
         Conditions: [
           [
             'content-length-range',
             0,
             Math.min(metadata.size || maxFileSizeBytes, maxFileSizeBytes),
           ],
+          ['eq', '$Content-Type', contentType],
         ],
         Expires: expiresIn,
       });
@@ -389,7 +394,8 @@ export class S3StorageProvider implements StorageProvider {
     key: string,
     expiresIn: number = ONE_HOUR_IN_SECONDS,
     isPublic: boolean = false,
-    version?: string | null
+    version?: string | null,
+    options?: { asAttachment?: boolean }
   ): Promise<DownloadStrategyResponse> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
@@ -451,7 +457,13 @@ export class S3StorageProvider implements StorageProvider {
             // URL, so any *other* query — including our `?v=<version>` cache
             // stamp — must be in the URL *before* signing or verification
             // fails with 403. Append v first, then sign.
-            const urlToSign = version ? `${baseUrl}?v=${encodeURIComponent(version)}` : baseUrl;
+            let urlToSign = version ? `${baseUrl}?v=${encodeURIComponent(version)}` : baseUrl;
+            if (options?.asAttachment) {
+              const attachParam = 'response-content-disposition=attachment';
+              urlToSign = urlToSign.includes('?')
+                ? `${urlToSign}&${attachParam}`
+                : `${urlToSign}?${attachParam}`;
+            }
 
             // Convert escaped newlines to actual newlines in the private key
             const formattedPrivateKey = cloudFrontPrivateKey.replace(/\\n/g, '\n');
@@ -499,6 +511,7 @@ export class S3StorageProvider implements StorageProvider {
       const command = new GetObjectCommand({
         Bucket: this.s3Bucket,
         Key: s3Key,
+        ...(options?.asAttachment ? { ResponseContentDisposition: 'attachment' } : {}),
       });
 
       const url = await getSignedUrl(this.s3Client, command, { expiresIn: actualExpiresIn });

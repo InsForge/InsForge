@@ -120,6 +120,8 @@ type SubscribeResponse =
 
 `subscribe()` auto-connects if needed. Calling `connect()` explicitly is still recommended so connection event handlers are already attached.
 
+`subscribe()` is idempotent: calling it again for a channel you already joined re-requests the subscription and resolves the server's current presence snapshot. The server tracks presence per logical member, so repeated subscribes never produce duplicate members or spurious `presence:join` events.
+
 ## publish()
 
 Publish an event to a channel.
@@ -166,6 +168,7 @@ Reserved events:
 | `error` | `RealtimeErrorPayload` | Subscribe or publish failed. |
 | `presence:join` | `PresenceJoinMessage` | A logical member became present in a channel. |
 | `presence:leave` | `PresenceLeaveMessage` | A logical member is no longer present in a channel. |
+| `presence:sync` | `PresenceSyncEvent` | A fresh presence snapshot for a channel. Fired on every successful subscribe, including automatic resubscribes after a reconnect. |
 
 ## once()
 
@@ -286,6 +289,36 @@ insforge.realtime.on('presence:leave', (message) => {
 });
 ```
 
+### Reading presence state
+
+The SDK maintains the member list for every subscribed channel — seeded from the subscribe snapshot and kept current from `presence:join`/`presence:leave` deltas and reconnect resyncs. Read it at any time instead of merging deltas yourself:
+
+```typescript
+const members = insforge.realtime.getPresenceState('chat:room-1');
+```
+
+Returns an empty array for channels you are not subscribed to. While the socket is briefly disconnected it holds the last known state, replaced by a fresh snapshot as soon as the channel resubscribes.
+
+### Reconnects
+
+When the connection drops, the SDK automatically resubscribes to every channel on reconnect and emits `presence:sync` with the fresh presence snapshot for each. Members who joined or left while you were disconnected produce no individual `presence:join`/`presence:leave` deltas, so replace — don't merge — any state you keep outside the SDK:
+
+```typescript
+import type { PresenceSyncEvent } from '@insforge/sdk';
+
+insforge.realtime.on<PresenceSyncEvent>('presence:sync', ({ channel, presence }) => {
+  replaceMembers(channel, presence.members);
+});
+```
+
+If you render directly from `getPresenceState()`, `presence:sync` is simply your re-render signal. If a resubscribe is rejected (for example the user's access was revoked while disconnected), the SDK drops the channel and emits `error` instead.
+
+### Token refreshes
+
+When the signed-in user's access token refreshes, the SDK re-authenticates the live connection in-band — no reconnect, no presence churn for other members. The socket only reconnects when the identity actually changes: sign-in, sign-out, or switching users.
+
+Access *reductions* apply lazily on a live connection: publishing is re-checked against RLS on every message and new subscribes are re-checked at join time, but continued receipt on already-joined channels persists until the client unsubscribes or reconnects.
+
 ## Properties
 
 | Property | Type | Description |
@@ -294,6 +327,7 @@ insforge.realtime.on('presence:leave', (message) => {
 | `connectionState` | `'disconnected' \| 'connecting' \| 'connected'` | Current SDK connection state. |
 | `socketId` | `string \| undefined` | Socket.IO ID when connected. |
 | `getSubscribedChannels()` | `() => string[]` | Local list of subscribed channels. |
+| `getPresenceState(channel)` | `(channel: string) => PresenceMember[]` | Current members of a subscribed channel, maintained by the SDK. |
 
 ## Error Handling
 

@@ -95,6 +95,8 @@ Razorpay's
 realtime
 remediations
 repo
+resync
+resyncs
 rmcp
 roocode
 runbook

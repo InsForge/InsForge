@@ -42,7 +42,8 @@ export interface StorageProvider {
     bucket: string,
     key: string,
     metadata: { contentType?: string; size?: number },
-    maxFileSizeBytes: number
+    maxFileSizeBytes: number,
+    contentType?: string
   ): Promise<UploadStrategyResponse>;
   /**
    * Generate a download URL. The optional `version` is a cache-bust stamp
@@ -59,7 +60,8 @@ export interface StorageProvider {
     key: string,
     expiresIn?: number,
     isPublic?: boolean,
-    version?: string | null
+    version?: string | null,
+    options?: { asAttachment?: boolean }
   ): Promise<DownloadStrategyResponse>;
   /**
    * Confirms an object exists in the backing store and returns its

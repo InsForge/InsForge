@@ -7,6 +7,15 @@ import { PoolClient } from 'pg';
 // Internal/system schemas that advisor rules never report on. Kept as a single
 // source of truth so the exclusion list can't drift between rule queries.
 const ADVISOR_EXCLUDED_SCHEMAS = [
+  'ai',
+  'compute',
+  'deployments',
+  'email',
+  'functions',
+  'memory',
+  'payments',
+  'schedules',
+  'system',
   '_timescaledb_cache',
   '_timescaledb_catalog',
   '_timescaledb_config',
@@ -323,6 +332,15 @@ export class DatabaseAdvisorService {
             ) r
             WHERE p.prosecdef = true
               AND pg_catalog.has_function_privilege(role_name, p.oid, 'EXECUTE')
+              -- Skip trigger and event-trigger functions: neither can be invoked
+              -- directly via SQL (Postgres rejects the call by return type), so the
+              -- anon/authenticated EXECUTE grant this rule keys on is inert — that is
+              -- what false-flagged system.on_schema_ddl(). Mirrors the cloud advisor's
+              -- returnsTrigger filter. Known limitation: a SECURITY DEFINER row/
+              -- statement trigger on a table anon/authenticated can write to still runs
+              -- with definer privileges via DML; that reachability path is not modeled
+              -- by an EXECUTE-based check and would need a dedicated pg_trigger rule.
+              AND p.prorettype NOT IN ('pg_catalog.trigger'::regtype, 'pg_catalog.event_trigger'::regtype)
               AND n.nspname = ANY(ARRAY(SELECT trim(UNNEST(string_to_array(coalesce(current_setting('pgrst.db_schemas', 't'), 'public'), ',')))))
               AND n.nspname NOT IN (
                 ${ADVISOR_EXCLUDED_SCHEMAS}
