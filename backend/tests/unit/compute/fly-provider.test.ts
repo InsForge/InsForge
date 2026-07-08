@@ -530,6 +530,20 @@ describe('FlyProvider machine-gone translation', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it('does NOT translate a logs-API 404 (app-scoped — means the APP is gone)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: false,
+        status: 404,
+        text: async () => 'app not found',
+      } as Response)
+    ));
+
+    const err = await provider.getLogs('my-app', 'm1').catch((e: unknown) => e);
+    expect(err).not.toBeInstanceOf(MachineGoneError);
+    expect((err as Error).message).toMatch(/404/);
+  });
+
   it('does NOT translate non-404 Fly errors', async () => {
     vi.stubGlobal(
       'fetch',

@@ -626,6 +626,48 @@ describe('ComputeServicesService', () => {
   });
 
   describe('deleteService', () => {
+    it('tolerates a cloud 404 (JSON body without a "404" substring) from destroyApp', async () => {
+      const serviceId = 'svc-delete-gone';
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: 'proj-123',
+            name: 'app-gone',
+            image_url: 'img:1',
+            port: 8080,
+            cpu: 'shared-1x',
+            memory: 256,
+            region: 'iad',
+            fly_app_id: 'app-gone-proj-123',
+            fly_machine_id: 'machine-gone-1',
+            status: 'stopped',
+            endpoint_url: 'https://app-gone-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+      const { AppError: RealAppError } = await import('@/utils/errors.js');
+      // Cloud AppError message is the raw JSON body — no '404' substring.
+      const cloud404 = new RealAppError(
+        '{"code":"COMPUTE_SERVICE_NOT_FOUND","error":"app not found in project"}',
+        404,
+        ERROR_CODES.COMPUTE_PROVIDER_ERROR
+      );
+      mockDestroyMachine.mockRejectedValue(cloud404);
+      mockDestroyApp.mockRejectedValue(cloud404);
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // destroying UPDATE
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // DELETE
+
+      const snapshot = await service.deleteService(serviceId);
+
+      expect(snapshot.id).toBe(serviceId);
+      const deleteCall = mockQuery.mock.calls[mockQuery.mock.calls.length - 1];
+      expect(deleteCall[0]).toContain('DELETE FROM compute.services');
+    });
+
     it('marks as destroying, destroys Fly resources, and deletes from DB', async () => {
       const serviceId = 'svc-delete-1';
 
@@ -1161,6 +1203,63 @@ describe('ComputeServicesService', () => {
 
       expect(result.status).toBe('stopped');
       expectHealQuery();
+    });
+
+    it('post-heal requests get COMPUTE_MACHINE_NOT_FOUND + redeploy guidance, not "Service not found"', async () => {
+      const healedRow = { ...serviceRow, fly_machine_id: null, status: 'stopped' };
+      const calls = [
+        () => service.getServiceEvents('svc-ghost-1'),
+        () => service.getServiceLogs('svc-ghost-1'),
+        () => service.startService('svc-ghost-1'),
+        () => service.stopService('svc-ghost-1'),
+      ];
+      for (const call of calls) {
+        mockQuery.mockResolvedValueOnce({ rows: [healedRow] }); // getService
+        await expect(call()).rejects.toMatchObject({
+          statusCode: 404,
+          code: ERROR_CODES.COMPUTE_MACHINE_NOT_FOUND,
+        });
+      }
+    });
+
+    it('updateService relaunches the stored image when a deploy-field PATCH hits a healed row', async () => {
+      const healedRow = { ...serviceRow, fly_machine_id: null, status: 'stopped' };
+      mockQuery.mockResolvedValueOnce({ rows: [healedRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockLaunchMachine.mockResolvedValue({ machineId: 'mach-fresh' });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...healedRow, fly_machine_id: 'mach-fresh', status: 'running' }],
+      }); // final UPDATE
+
+      const result = await service.updateService('svc-ghost-1', {
+        envVars: { NEW: 'value' },
+      });
+
+      expect(mockLaunchMachine).toHaveBeenCalledWith(
+        expect.objectContaining({
+          appId: 'my-api-proj-123',
+          image: 'nginx:latest', // the stored image, relaunched
+        })
+      );
+      expect(result.flyMachineId).toBe('mach-fresh');
+    });
+
+    it('updateService does NOT relaunch during the prepare-window (placeholder image)', async () => {
+      // prepareForDeploy rows: status deploying, image_url is a placeholder.
+      const prepareRow = {
+        ...serviceRow,
+        fly_machine_id: null,
+        status: 'deploying',
+        image_url: 'dockerfile',
+      };
+      mockQuery.mockResolvedValueOnce({ rows: [prepareRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockQuery.mockResolvedValueOnce({ rows: [prepareRow] }); // final UPDATE
+
+      await service.updateService('svc-ghost-1', { envVars: { NEW: 'value' } });
+
+      expect(mockLaunchMachine).not.toHaveBeenCalled();
+      expect(mockUpdateMachine).not.toHaveBeenCalled();
     });
 
     it('transient provider errors do NOT heal the row', async () => {

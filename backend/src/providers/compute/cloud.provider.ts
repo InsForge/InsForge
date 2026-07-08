@@ -4,6 +4,7 @@ import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
   MachineGoneError,
+  translateMachineGone,
   type ComputeProvider,
   type LaunchMachineParams,
   type UpdateMachineParams,
@@ -138,24 +139,23 @@ export class CloudComputeProvider implements ComputeProvider {
     return { machineId: result.machineId };
   }
 
-  // A 404 from a machine-scoped cloud call means the machine no longer exists
-  // (the cloud control plane returns COMPUTE_MACHINE_NOT_FOUND after Fly
-  // reclaims/deletes a machine and its own row heals). Translate to the
-  // provider-level MachineGoneError so the service layer can heal local DB
-  // state instead of surfacing an opaque provider error forever.
-  private async machineScoped<T>(
-    appId: string,
-    machineId: string,
-    fn: () => Promise<T>
-  ): Promise<T> {
-    try {
-      return await fn();
-    } catch (err) {
-      if (err instanceof AppError && err.statusCode === 404) {
-        throw new MachineGoneError(appId, machineId);
-      }
-      throw err;
-    }
+  // The cloud control plane answers a machine-scoped call for a machine that
+  // no longer exists with 404 + code COMPUTE_MACHINE_NOT_FOUND (it verified
+  // against Fly and healed its own row). Translate exactly that into
+  // MachineGoneError so the service layer heals local DB state. The body-code
+  // check matters: a bare 404 can also mean the cloud-side service row is
+  // missing or CLOUD_API_HOST is mis-routed — healing on those would orphan a
+  // live, billing machine.
+  private machineScoped<T>(appId: string, machineId: string, fn: () => Promise<T>): Promise<T> {
+    return translateMachineGone(
+      appId,
+      machineId,
+      (err) =>
+        err instanceof AppError &&
+        err.statusCode === 404 &&
+        err.message.includes('COMPUTE_MACHINE_NOT_FOUND'),
+      fn
+    );
   }
 
   async updateMachine(params: UpdateMachineParams): Promise<void> {
@@ -259,9 +259,15 @@ export class CloudComputeProvider implements ComputeProvider {
         if (targetStates.includes(state)) {
           return state;
         }
-      } catch {
+      } catch (err) {
+        // Definitive machine-gone: polling won't bring it back — fail fast so
+        // the service layer can heal the stale row. Mirrors
+        // FlyProvider.waitForState.
+        if (err instanceof MachineGoneError) {
+          throw err;
+        }
         // Transient network/cloud blip — keep polling until the deadline
-        // rather than aborting the wait. Mirrors FlyProvider.waitForState.
+        // rather than aborting the wait.
       }
       await new Promise((r) => setTimeout(r, 1500));
     }

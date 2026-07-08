@@ -93,6 +93,26 @@ export class MachineGoneError extends Error {
   }
 }
 
+// Shared translation wrapper for machine-scoped provider calls. Each provider
+// supplies its own `isGone` predicate (they see different error shapes), but
+// the translate-and-rethrow contract lives in one place so fly-mode and
+// cloud-mode can't drift apart.
+export async function translateMachineGone<T>(
+  appId: string,
+  machineId: string,
+  isGone: (err: unknown) => boolean,
+  fn: () => Promise<T>
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (isGone(err)) {
+      throw new MachineGoneError(appId, machineId);
+    }
+    throw err;
+  }
+}
+
 export interface ComputeProvider {
   isConfigured(): boolean;
   createApp(params: { name: string; network: string; org: string }): Promise<{ appId: string }>;

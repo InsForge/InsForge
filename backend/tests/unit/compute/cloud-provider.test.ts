@@ -238,6 +238,36 @@ describe('CloudComputeProvider machine-gone translation', () => {
     await expect(provider.destroyMachine('app-1', 'm1')).rejects.toBeInstanceOf(MachineGoneError);
   });
 
+  it('does NOT translate a bare 404 without the COMPUTE_MACHINE_NOT_FOUND body code', async () => {
+    // e.g. the cloud-side service row is missing or the path is mis-routed —
+    // healing here would orphan a live, billing machine.
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => JSON.stringify({ code: 'COMPUTE_SERVICE_NOT_FOUND', error: 'no row' }),
+    } as Response);
+
+    const provider = CloudComputeProvider.getInstance();
+    const err = await provider.getEvents('app-1', 'm1').catch((e: unknown) => e);
+    expect(err).not.toBeInstanceOf(MachineGoneError);
+    expect((err as { statusCode: number }).statusCode).toBe(404);
+  });
+
+  it('waitForState fails fast when the machine is gone (no 60s poll)', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () =>
+        JSON.stringify({ code: 'COMPUTE_MACHINE_NOT_FOUND', error: 'Machine m1 not found' }),
+    } as Response);
+
+    const provider = CloudComputeProvider.getInstance();
+    await expect(provider.waitForState('app-1', 'm1', ['stopped'], 60_000)).rejects.toBeInstanceOf(
+      MachineGoneError
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('does NOT translate non-404 cloud errors', async () => {
     fetchMock.mockResolvedValue({
       ok: false,

@@ -2,6 +2,7 @@ import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import {
   MachineGoneError,
+  translateMachineGone,
   type ComputeProvider,
   type ComputeLogsResult,
 } from './compute.provider.js';
@@ -320,19 +321,13 @@ export class FlyProvider implements ComputeProvider {
   // migration). Translate to MachineGoneError so the service layer can heal
   // DB state that still points at the dead machine. Transient errors (5xx,
   // network) pass through untouched.
-  private async machineScoped<T>(
-    appId: string,
-    machineId: string,
-    fn: () => Promise<T>
-  ): Promise<T> {
-    try {
-      return await fn();
-    } catch (err) {
-      if (err instanceof FlyHttpError && err.status === 404) {
-        throw new MachineGoneError(appId, machineId);
-      }
-      throw err;
-    }
+  private machineScoped<T>(appId: string, machineId: string, fn: () => Promise<T>): Promise<T> {
+    return translateMachineGone(
+      appId,
+      machineId,
+      (err) => err instanceof FlyHttpError && err.status === 404,
+      fn
+    );
   }
 
   async updateMachine(params: {
@@ -508,11 +503,12 @@ export class FlyProvider implements ComputeProvider {
     if (!response.ok) {
       const text = await response.text();
       logger.error('Fly logs API error', { url, status: response.status, body: text });
-      // The logs API is app-scoped, so a 404 here means the whole app is gone
-      // (a reclaimed machine alone still returns 200 with zero lines).
-      if (response.status === 404) {
-        throw new MachineGoneError(appId, machineId);
-      }
+      // NOT translated to MachineGoneError: the logs API is app-scoped, so a
+      // 404 here means the whole APP is gone (a reclaimed machine alone still
+      // returns 200 with zero lines). Machine-level healing would be wrong —
+      // it keeps fly_app_id and advertises a redeploy that launches into the
+      // deleted app and fails forever. App-gone recovery is reconcile
+      // territory, not this path.
       throw new FlyHttpError(response.status, `Fly logs API error (${response.status}): ${text}`);
     }
 

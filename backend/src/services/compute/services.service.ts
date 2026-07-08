@@ -205,6 +205,19 @@ function makeEndpointUrl(flyAppName: string): string {
 // of a generic "Compute service operation failed" 502. Falls back to a 502
 // with the provided default message if the input isn't a recognizable
 // AppError.
+// True when the provider says the resource is already gone. Cloud mode
+// surfaces that as AppError(404) whose message is the raw JSON error body —
+// which need not contain the literal substring '404' — so a status check is
+// required alongside the legacy message sniff (kept for FlyProvider's plain
+// "Fly API error (404): ..." errors on paths without typed translation).
+function isAlreadyGone(error: unknown): boolean {
+  return (
+    error instanceof MachineGoneError ||
+    (error instanceof AppError && error.statusCode === 404) ||
+    (error instanceof Error && error.message.includes('404'))
+  );
+}
+
 function rewrapCloudError(error: unknown, defaultMessage: string): AppError {
   if (error instanceof AppError) {
     let parsed: { code?: string; error?: string; nextActions?: string[] } | undefined;
@@ -697,14 +710,26 @@ export class ComputeServicesService {
         logger.error('Failed to update machine on Fly', { id, error });
         throw rewrapCloudError(error, 'Compute service operation failed');
       }
-    } else if (data.imageUrl && existing.flyAppId && !existing.flyMachineId) {
-      // Path A: prepareForDeploy created the app + DB row but no machine.
-      // CLI has now built+pushed the image (via flyctl remote builder, or
-      // pre-built --image URL) and is telling us to launch the machine.
+    } else if (
+      (data.imageUrl ??
+        // Recovery relaunch: a healed row (machine vanished on the provider →
+        // status 'stopped', machine id cleared) still holds the last deployed
+        // image, so any deploy-field PATCH relaunches it. Without this, a
+        // retried env-var/cpu PATCH after a heal would "succeed" DB-only with
+        // nothing deployed. Gated on status === 'stopped' so prepare-window
+        // rows (status 'created'/'deploying', image_url may be a 'dockerfile'
+        // placeholder, launch PATCH always carries an explicit imageUrl)
+        // never take this arm with a non-launchable image.
+        (hasDeployChange && existing.status === 'stopped' ? existing.imageUrl : null)) &&
+      existing.flyAppId &&
+      !existing.flyMachineId
+    ) {
+      // Path A: no machine exists for the app — first deploy (CLI built+
+      // pushed and passes imageUrl explicitly) or recovery relaunch (above).
       try {
         const { machineId } = await this.getCompute().launchMachine({
           appId: existing.flyAppId,
-          image: data.imageUrl,
+          image: (data.imageUrl ?? existing.imageUrl) as string,
           port: data.port ?? existing.port,
           cpu: data.cpu ?? existing.cpu,
           memory: data.memory ?? existing.memory,
@@ -804,8 +829,7 @@ export class ComputeServicesService {
       try {
         await this.getCompute().destroyMachine(row.fly_app_id, row.fly_machine_id);
       } catch (error) {
-        const msg = error instanceof Error ? error.message : '';
-        if (!(error instanceof MachineGoneError) && !msg.includes('404')) {
+        if (!isAlreadyGone(error)) {
           logger.error('Failed to destroy Fly machine during delete', { id, error });
           await this.getPool().query(
             `UPDATE compute.services SET status = 'failed' WHERE id = $1`,
@@ -825,8 +849,7 @@ export class ComputeServicesService {
       try {
         await this.getCompute().destroyApp(row.fly_app_id);
       } catch (error) {
-        const msg = error instanceof Error ? error.message : '';
-        if (!msg.includes('404')) {
+        if (!isAlreadyGone(error)) {
           logger.error('Failed to destroy Fly app during delete', { id, error });
           await this.getPool().query(
             `UPDATE compute.services SET status = 'failed' WHERE id = $1`,
@@ -896,9 +919,22 @@ export class ComputeServicesService {
     );
   }
 
-  async stopService(id: string): Promise<ServiceSchema> {
-    const svc = await this.getService(id);
-
+  // Guard for machine-scoped operations. A row with an app but no machine is
+  // either not deployed yet or was healed after its machine vanished on the
+  // provider — either way the accurate signal is "no machine; deploy one",
+  // NOT "service not found": the service exists and shows up in `compute
+  // list`, so COMPUTE_SERVICE_NOT_FOUND here sends callers chasing the wrong
+  // problem (and every post-heal request would contradict the redeploy
+  // guidance the healing request just returned).
+  private requireMachine(svc: ServiceSchema): { flyAppId: string; flyMachineId: string } {
+    if (svc.flyAppId && !svc.flyMachineId) {
+      throw new AppError(
+        'No machine exists for this service',
+        404,
+        ERROR_CODES.COMPUTE_MACHINE_NOT_FOUND,
+        NEXT_ACTIONS.REDEPLOY_COMPUTE_SERVICE
+      );
+    }
     if (!svc.flyAppId || !svc.flyMachineId) {
       throw new AppError(
         'Service not found',
@@ -907,15 +943,21 @@ export class ComputeServicesService {
         NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
+    return { flyAppId: svc.flyAppId, flyMachineId: svc.flyMachineId };
+  }
+
+  async stopService(id: string): Promise<ServiceSchema> {
+    const svc = await this.getService(id);
+    const { flyAppId, flyMachineId } = this.requireMachine(svc);
 
     try {
-      await this.getCompute().stopMachine(svc.flyAppId, svc.flyMachineId);
+      await this.getCompute().stopMachine(flyAppId, flyMachineId);
     } catch (error) {
       // Stopping a machine that no longer exists: the desired state is
       // already true. Heal the row and fall through to the status update —
       // "Stop" on a ghost service succeeds instead of erroring.
       if (error instanceof MachineGoneError) {
-        await this.healMachineGone(id, svc.flyMachineId);
+        await this.healMachineGone(id, flyMachineId);
       } else {
         logger.error('Failed to stop compute service', { id, error });
         throw new AppError(
@@ -946,23 +988,15 @@ export class ComputeServicesService {
 
   async startService(id: string): Promise<ServiceSchema> {
     const svc = await this.getService(id);
-
-    if (!svc.flyAppId || !svc.flyMachineId) {
-      throw new AppError(
-        'Service not found',
-        404,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
-      );
-    }
+    const { flyAppId, flyMachineId } = this.requireMachine(svc);
 
     try {
-      await this.getCompute().startMachine(svc.flyAppId, svc.flyMachineId);
+      await this.getCompute().startMachine(flyAppId, flyMachineId);
     } catch (error) {
       // Can't start a machine that no longer exists — heal the row and tell
       // the caller to redeploy (which provisions a fresh machine).
       if (error instanceof MachineGoneError) {
-        throw await this.machineGone(id, svc.flyMachineId);
+        throw await this.machineGone(id, flyMachineId);
       }
       logger.error('Failed to start compute service', { id, error });
       throw new AppError(
@@ -995,21 +1029,13 @@ export class ComputeServicesService {
     options?: { limit?: number }
   ): Promise<{ timestamp: number; message: string }[]> {
     const svc = await this.getService(id);
-
-    if (!svc.flyAppId || !svc.flyMachineId) {
-      throw new AppError(
-        'Service not found',
-        404,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
-      );
-    }
+    const { flyAppId, flyMachineId } = this.requireMachine(svc);
 
     try {
-      return await this.getCompute().getEvents(svc.flyAppId, svc.flyMachineId, options);
+      return await this.getCompute().getEvents(flyAppId, flyMachineId, options);
     } catch (error) {
       if (error instanceof MachineGoneError) {
-        throw await this.machineGone(id, svc.flyMachineId);
+        throw await this.machineGone(id, flyMachineId);
       }
       throw error;
     }
@@ -1025,21 +1051,13 @@ export class ComputeServicesService {
     options?: { limit?: number; nextToken?: string }
   ): Promise<ComputeLogsResult> {
     const svc = await this.getService(id);
-
-    if (!svc.flyAppId || !svc.flyMachineId) {
-      throw new AppError(
-        'Service not found',
-        404,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
-      );
-    }
+    const { flyAppId, flyMachineId } = this.requireMachine(svc);
 
     try {
-      return await this.getCompute().getLogs(svc.flyAppId, svc.flyMachineId, options);
+      return await this.getCompute().getLogs(flyAppId, flyMachineId, options);
     } catch (error) {
       if (error instanceof MachineGoneError) {
-        throw await this.machineGone(id, svc.flyMachineId);
+        throw await this.machineGone(id, flyMachineId);
       }
       throw error;
     }
