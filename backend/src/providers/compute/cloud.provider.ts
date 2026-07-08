@@ -2,13 +2,15 @@ import jwt from 'jsonwebtoken';
 import { appConfig } from '@/infra/config/app.config.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
-import type {
-  ComputeProvider,
-  LaunchMachineParams,
-  UpdateMachineParams,
-  MachineSummary,
-  ComputeEvent,
-  ComputeLogsResult,
+import {
+  MachineGoneError,
+  translateMachineGone,
+  type ComputeProvider,
+  type LaunchMachineParams,
+  type UpdateMachineParams,
+  type MachineSummary,
+  type ComputeEvent,
+  type ComputeLogsResult,
 } from './compute.provider.js';
 
 export class CloudComputeProvider implements ComputeProvider {
@@ -137,20 +139,47 @@ export class CloudComputeProvider implements ComputeProvider {
     return { machineId: result.machineId };
   }
 
+  // The cloud control plane answers a machine-scoped call for a machine that
+  // no longer exists with 404 + code COMPUTE_MACHINE_NOT_FOUND (it verified
+  // against Fly and healed its own row). Translate exactly that into
+  // MachineGoneError so the service layer heals local DB state. The body-code
+  // check matters: a bare 404 can also mean the cloud-side service row is
+  // missing or CLOUD_API_HOST is mis-routed — healing on those would orphan a
+  // live, billing machine.
+  private machineScoped<T>(appId: string, machineId: string, fn: () => Promise<T>): Promise<T> {
+    return translateMachineGone(
+      appId,
+      machineId,
+      (err) =>
+        err instanceof AppError &&
+        err.statusCode === 404 &&
+        err.message.includes('COMPUTE_MACHINE_NOT_FOUND'),
+      fn
+    );
+  }
+
   async updateMachine(params: UpdateMachineParams): Promise<void> {
-    await this.call('PATCH', `/machines/${encodeURIComponent(params.machineId)}`, params);
+    await this.machineScoped(params.appId, params.machineId, () =>
+      this.call('PATCH', `/machines/${encodeURIComponent(params.machineId)}`, params)
+    );
   }
 
   async stopMachine(appId: string, machineId: string): Promise<void> {
-    await this.call('POST', `/machines/${encodeURIComponent(machineId)}/stop`, { appId });
+    await this.machineScoped(appId, machineId, () =>
+      this.call('POST', `/machines/${encodeURIComponent(machineId)}/stop`, { appId })
+    );
   }
 
   async startMachine(appId: string, machineId: string): Promise<void> {
-    await this.call('POST', `/machines/${encodeURIComponent(machineId)}/start`, { appId });
+    await this.machineScoped(appId, machineId, () =>
+      this.call('POST', `/machines/${encodeURIComponent(machineId)}/start`, { appId })
+    );
   }
 
   async destroyMachine(appId: string, machineId: string): Promise<void> {
-    await this.call('DELETE', `/machines/${encodeURIComponent(machineId)}`, { appId });
+    await this.machineScoped(appId, machineId, () =>
+      this.call('DELETE', `/machines/${encodeURIComponent(machineId)}`, { appId })
+    );
   }
 
   async listMachines(appId: string): Promise<MachineSummary[]> {
@@ -161,9 +190,11 @@ export class CloudComputeProvider implements ComputeProvider {
   }
 
   async getMachineStatus(appId: string, machineId: string): Promise<{ state: string }> {
-    const result = await this.call<{ state: string }>(
-      'GET',
-      `/machines/${encodeURIComponent(machineId)}?appId=${encodeURIComponent(appId)}`
+    const result = await this.machineScoped(appId, machineId, () =>
+      this.call<{ state: string }>(
+        'GET',
+        `/machines/${encodeURIComponent(machineId)}?appId=${encodeURIComponent(appId)}`
+      )
     );
     if (!result?.state) {
       throw new AppError(
@@ -183,9 +214,8 @@ export class CloudComputeProvider implements ComputeProvider {
     const qs =
       `?appId=${encodeURIComponent(appId)}` + (options?.limit ? `&limit=${options.limit}` : '');
     return (
-      (await this.call<ComputeEvent[]>(
-        'GET',
-        `/machines/${encodeURIComponent(machineId)}/events${qs}`
+      (await this.machineScoped(appId, machineId, () =>
+        this.call<ComputeEvent[]>('GET', `/machines/${encodeURIComponent(machineId)}/events${qs}`)
       )) ?? []
     );
   }
@@ -207,9 +237,11 @@ export class CloudComputeProvider implements ComputeProvider {
     if (options?.nextToken) {
       params.set('next_token', options.nextToken);
     }
-    const result = await this.call<ComputeLogsResult>(
-      'GET',
-      `/machines/${encodeURIComponent(machineId)}/logs?${params.toString()}`
+    const result = await this.machineScoped(appId, machineId, () =>
+      this.call<ComputeLogsResult>(
+        'GET',
+        `/machines/${encodeURIComponent(machineId)}/logs?${params.toString()}`
+      )
     );
     return result ?? { lines: [], nextToken: null };
   }
@@ -227,9 +259,15 @@ export class CloudComputeProvider implements ComputeProvider {
         if (targetStates.includes(state)) {
           return state;
         }
-      } catch {
+      } catch (err) {
+        // Definitive machine-gone: polling won't bring it back — fail fast so
+        // the service layer can heal the stale row. Mirrors
+        // FlyProvider.waitForState.
+        if (err instanceof MachineGoneError) {
+          throw err;
+        }
         // Transient network/cloud blip — keep polling until the deadline
-        // rather than aborting the wait. Mirrors FlyProvider.waitForState.
+        // rather than aborting the wait.
       }
       await new Promise((r) => setTimeout(r, 1500));
     }
