@@ -17,8 +17,17 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl as getCloudFrontSignedUrl } from '@aws-sdk/cloudfront-signer';
 import { Readable } from 'stream';
-import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
-import { StorageProvider, ObjectMetadata, GetObjectResult } from './base.provider.js';
+import {
+  UploadStrategyResponse,
+  DownloadStrategyResponse,
+  DELETE_OBJECT_FAILURE_MESSAGE,
+} from '@insforge/shared-schemas';
+import {
+  StorageProvider,
+  ObjectMetadata,
+  GetObjectResult,
+  DeleteObjectsResult,
+} from './base.provider.js';
 import logger from '@/utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
 
@@ -43,6 +52,7 @@ function isS3NotFound(err: unknown): boolean {
 
 const ONE_HOUR_IN_SECONDS = 3600;
 const SEVEN_DAYS_IN_SECONDS = 604800;
+const MAX_DELETE_OBJECTS_PER_REQUEST = 1000;
 
 /**
  * S3 storage implementation
@@ -221,6 +231,69 @@ export class S3StorageProvider implements StorageProvider {
     await this.s3Client.send(command);
   }
 
+  async deleteObjects(bucket: string, keys: string[]): Promise<DeleteObjectsResult> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
+    if (keys.length === 0) {
+      return { deleted: [], failed: [] };
+    }
+
+    const deleted: string[] = [];
+    const failed: Array<{ key: string; message: string }> = [];
+
+    for (let index = 0; index < keys.length; index += MAX_DELETE_OBJECTS_PER_REQUEST) {
+      const batchKeys = keys.slice(index, index + MAX_DELETE_OBJECTS_PER_REQUEST);
+      const s3KeyToOriginalKey = new Map(batchKeys.map((key) => [this.getS3Key(bucket, key), key]));
+      const command = new DeleteObjectsCommand({
+        Bucket: this.s3Bucket,
+        Delete: {
+          Objects: batchKeys.map((key) => ({ Key: this.getS3Key(bucket, key) })),
+          Quiet: true,
+        },
+      });
+      const response = await this.s3Client.send(command);
+      const responseErrors = response.Errors ?? [];
+      const errorsWithKeys = responseErrors.filter(
+        (error): error is (typeof responseErrors)[number] & { Key: string } =>
+          typeof error.Key === 'string' && error.Key.length > 0
+      );
+
+      if (responseErrors.length > 0) {
+        logger.warn('S3 batch object delete returned errors', {
+          bucket,
+          errors: responseErrors.map((error) => ({
+            key: error.Key,
+            code: error.Code,
+            message: error.Message,
+          })),
+        });
+      }
+
+      const hasUnkeyedErrors = errorsWithKeys.length !== responseErrors.length;
+      if (hasUnkeyedErrors) {
+        logger.warn('S3 batch object delete returned an error without a key', {
+          bucket,
+          batchSize: batchKeys.length,
+        });
+      }
+
+      const batchFailed = errorsWithKeys.map((error) => {
+        const originalKey = s3KeyToOriginalKey.get(error.Key) ?? error.Key;
+        return {
+          key: originalKey,
+          message: DELETE_OBJECT_FAILURE_MESSAGE,
+        };
+      });
+
+      const failedKeys = new Set(batchFailed.map((error) => error.key));
+      deleted.push(...batchKeys.filter((key) => !failedKeys.has(key)));
+      failed.push(...batchFailed);
+    }
+
+    return { deleted, failed };
+  }
+
   async createBucket(_bucket: string): Promise<void> {
     // In S3 with multi-tenant, we don't create actual buckets
     // We just use folders under the app key
@@ -249,6 +322,7 @@ export class S3StorageProvider implements StorageProvider {
             Objects: listResponse.Contents.filter((obj) => obj.Key !== undefined).map((obj) => ({
               Key: obj.Key as string,
             })),
+            Quiet: true,
           },
         });
         await this.s3Client.send(deleteCommand);

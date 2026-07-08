@@ -1,6 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Pool, PoolClient } from 'pg';
 
+const loggerMocks = vi.hoisted(() => ({
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+}));
+
+vi.mock('@/utils/logger.js', () => ({
+  default: loggerMocks,
+}));
+
 // Mock the database manager so StorageService can be instantiated without
 // touching a real pool. The service caches the pool internally; we hand it
 // our mock via a controlled getInstance/getPool flow.
@@ -36,6 +46,9 @@ function makeMockPool(): Pool {
 describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check', () => {
   beforeEach(async () => {
     mockPool = makeMockPool();
+    loggerMocks.info.mockClear();
+    loggerMocks.error.mockClear();
+    loggerMocks.warn.mockClear();
     vi.resetModules();
   });
 
@@ -425,11 +438,11 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
     const provider = {
-      deleteObject: vi.fn(async () => {}),
+      deleteObjects: vi.fn(async () => ({ deleted: ['note.txt'], failed: [] })),
     };
     (svc as unknown as { provider: typeof provider }).provider = provider;
 
-    queryResults = [{ rows: [], rowCount: 1 }];
+    queryResults = [{ rows: [{ key: 'note.txt' }], rowCount: 1 }];
 
     const deleted = await svc.deleteObject(
       { id: 'local:admin', role: 'project_admin' },
@@ -438,10 +451,191 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     );
 
     expect(deleted).toBe(true);
-    expect(provider.deleteObject).toHaveBeenCalledWith('photos', 'note.txt');
+    expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['note.txt']);
     expect(calls.map((c) => c.sql)).toEqual([
-      'DELETE FROM storage.objects WHERE bucket = $1 AND key = $2',
+      'DELETE FROM storage.objects WHERE bucket = $1 AND key = ANY($2::text[]) RETURNING key',
     ]);
+  });
+
+  it('returns true for single deletes after the DB row is deleted even when provider cleanup fails', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObjects: vi.fn(async () => ({
+        deleted: [],
+        failed: [{ key: 'note.txt', message: 'provider denied' }],
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [{ rows: [{ key: 'note.txt' }], rowCount: 1 }];
+
+    const deleted = await svc.deleteObject(
+      { id: 'local:admin', role: 'project_admin' },
+      'photos',
+      'note.txt'
+    );
+
+    expect(deleted).toBe(true);
+    expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['note.txt']);
+    expect(loggerMocks.warn).toHaveBeenCalledWith(
+      'Storage provider batch delete partially failed after DB rows were deleted',
+      {
+        bucket: 'photos',
+        failed: [{ key: 'note.txt', message: 'provider denied' }],
+      }
+    );
+  });
+
+  it('batch deletes objects for project_admin JWT callers through root access', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObjects: vi.fn(async () => ({
+        deleted: ['a.txt'],
+        failed: [{ key: 'b.txt', message: 'provider denied' }],
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [{ rows: [{ key: 'a.txt' }, { key: 'b.txt' }], rowCount: 2 }];
+
+    const result = await svc.deleteObjects({ id: 'local:admin', role: 'project_admin' }, 'photos', [
+      'a.txt',
+      'b.txt',
+      'missing.txt',
+      'a.txt',
+    ]);
+
+    expect(result).toEqual({
+      results: [
+        { key: 'a.txt', status: 'deleted' },
+        { key: 'b.txt', status: 'failed', message: 'provider denied' },
+        { key: 'missing.txt', status: 'notFound' },
+      ],
+    });
+    expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['a.txt', 'b.txt']);
+    expect(calls.map((c) => c.sql)).toEqual([
+      'DELETE FROM storage.objects WHERE bucket = $1 AND key = ANY($2::text[]) RETURNING key',
+    ]);
+    expect(calls[0].params).toEqual(['photos', ['a.txt', 'b.txt', 'missing.txt']]);
+  });
+
+  it('batch deletes objects through withUserContext for authenticated callers', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObjects: vi.fn(async () => ({ deleted: ['mine.txt'], failed: [] })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [], rowCount: 0 }, // BEGIN
+      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
+      { rows: [], rowCount: 0 }, // set_config(claims)
+      { rows: [{ key: 'mine.txt' }], rowCount: 1 }, // RLS-authorized delete
+      { rows: [], rowCount: 0 }, // COMMIT
+      { rows: [], rowCount: 0 }, // RESET ROLE
+    ];
+
+    const result = await svc.deleteObjects(
+      { id: 'alice-sub', email: 'alice@example.com', role: 'authenticated' },
+      'photos',
+      ['mine.txt', 'not-mine.txt']
+    );
+
+    expect(result).toEqual({
+      results: [
+        { key: 'mine.txt', status: 'deleted' },
+        { key: 'not-mine.txt', status: 'notFound' },
+      ],
+    });
+    expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['mine.txt']);
+    expect(calls.map((c) => c.sql)).toEqual([
+      'BEGIN',
+      'SET LOCAL ROLE authenticated',
+      'SELECT set_config($1, $2, true)',
+      'DELETE FROM storage.objects WHERE bucket = $1 AND key = ANY($2::text[]) RETURNING key',
+      'COMMIT',
+      'RESET ROLE',
+    ]);
+  });
+
+  it('reports DB-deleted objects as failed when provider result omits them', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObjects: vi.fn(async () => ({
+        deleted: ['a.txt'],
+        failed: [],
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [{ rows: [{ key: 'a.txt' }, { key: 'b.txt' }], rowCount: 2 }];
+
+    const result = await svc.deleteObjects({ id: 'local:admin', role: 'project_admin' }, 'photos', [
+      'a.txt',
+      'b.txt',
+    ]);
+
+    expect(result).toEqual({
+      results: [
+        { key: 'a.txt', status: 'deleted' },
+        { key: 'b.txt', status: 'failed', message: 'Failed to delete object' },
+      ],
+    });
+    expect(loggerMocks.warn).toHaveBeenCalledWith(
+      'Storage provider batch delete partially failed after DB rows were deleted',
+      {
+        bucket: 'photos',
+        failed: [{ key: 'b.txt', message: 'Failed to delete object' }],
+      }
+    );
+  });
+
+  it('reports DB-deleted objects as failed when the provider batch delete fails unexpectedly', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObjects: vi.fn(async () => {
+        throw new Error('/var/private/storage/photos/a.txt permission denied');
+      }),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [{ rows: [{ key: 'a.txt' }], rowCount: 1 }];
+
+    const result = await svc.deleteObjects({ id: 'local:admin', role: 'project_admin' }, 'photos', [
+      'a.txt',
+    ]);
+
+    expect(result).toEqual({
+      results: [{ key: 'a.txt', status: 'failed', message: 'Failed to delete object' }],
+    });
+    expect(loggerMocks.error).toHaveBeenCalledWith('Storage provider batch delete failed', {
+      bucket: 'photos',
+      keys: ['a.txt'],
+      error: '/var/private/storage/photos/a.txt permission denied',
+    });
+  });
+
+  it('rejects invalid batch delete keys as storage validation errors before querying', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const { AppError } = await import('@/utils/errors.js');
+    const svc = StorageService.getInstance();
+
+    try {
+      await svc.deleteObjects({ id: 'local:admin', role: 'project_admin' }, 'photos', ['../bad']);
+      throw new Error('Expected deleteObjects to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect(error).toMatchObject({
+        message: 'Invalid key. Cannot use ".." or start with "/"',
+        statusCode: 400,
+      });
+    }
+    expect(calls).toEqual([]);
   });
 
   it('returns true for public bucket objects without requiring user context', async () => {
