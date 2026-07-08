@@ -373,4 +373,34 @@ describe('EmailService', () => {
       });
     });
   });
+
+  describe('sendRaw', () => {
+    it('returns suppressed: false if the backend does not report suppression', async () => {
+      vi.mocked(axios.post).mockResolvedValue({
+        data: { success: true },
+      });
+
+      const response = await emailService.sendRaw({
+        to: 'user@example.com',
+        subject: 'Hello',
+        html: '<p>Hello</p>',
+      });
+
+      expect(response).toEqual({ suppressed: false });
+    });
+
+    it('returns suppressed: true if the backend reports suppression', async () => {
+      vi.mocked(axios.post).mockResolvedValue({
+        data: { success: true, suppressed: true },
+      });
+
+      const response = await emailService.sendRaw({
+        to: 'user@example.com',
+        subject: 'Hello',
+        html: '<p>Hello</p>',
+      });
+
+      expect(response).toEqual({ suppressed: true });
+    });
+  });
 });

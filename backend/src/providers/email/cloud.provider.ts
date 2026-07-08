@@ -5,7 +5,7 @@ import logger from '@/utils/logger.js';
 import { AppError } from '@/utils/errors.js';
 import { EmailTemplate } from '@/types/email.js';
 import { EmailProvider } from './base.provider.js';
-import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
+import { ERROR_CODES, SendRawEmailRequest, SendEmailResponse } from '@insforge/shared-schemas';
 
 /**
  * Cloud email provider for sending emails via Insforge cloud backend
@@ -188,7 +188,7 @@ export class CloudEmailProvider implements EmailProvider {
   /**
    * Send custom/raw email via cloud backend
    */
-  async sendRaw(options: SendRawEmailRequest): Promise<void> {
+  async sendRaw(options: SendRawEmailRequest): Promise<SendEmailResponse> {
     try {
       const projectId = appConfig.cloud.projectId;
       const apiHost = appConfig.cloud.apiHost;
@@ -205,6 +205,9 @@ export class CloudEmailProvider implements EmailProvider {
 
       if (response.data?.success) {
         logger.info('Raw email sent successfully', { projectId });
+        return {
+          suppressed: response.data?.suppressed ?? false,
+        };
       } else {
         throw new AppError(
           'Email service returned unsuccessful response',

@@ -25,6 +25,8 @@ export type SendRawEmailRequest = z.infer<typeof sendRawEmailRequestSchema>;
  * Response for POST /api/email/send-raw
  * Empty on success - extend with optional fields later if needed
  */
-export const sendEmailResponseSchema = z.object({});
+export const sendEmailResponseSchema = z.object({
+  suppressed: z.boolean().optional(),
+});
 
 export type SendEmailResponse = z.infer<typeof sendEmailResponseSchema>;

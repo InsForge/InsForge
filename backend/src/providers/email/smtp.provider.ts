@@ -4,7 +4,7 @@ import { AppError } from '@/utils/errors.js';
 import { EmailTemplate } from '@/types/email.js';
 import { SmtpConfigService, RawSmtpConfig } from '@/services/email/smtp-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';
-import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
+import { ERROR_CODES, SendRawEmailRequest, SendEmailResponse } from '@insforge/shared-schemas';
 import { EmailProvider } from './base.provider.js';
 import logger from '@/utils/logger.js';
 
@@ -32,11 +32,12 @@ export class SmtpEmailProvider implements EmailProvider {
   }
 
   private createTransporter(config: RawSmtpConfig) {
+    const hasAuth = config.username && config.password;
     return nodemailer.createTransport({
       host: config.host,
       port: config.port,
       secure: config.port === 465,
-      auth: { user: config.username, pass: config.password },
+      auth: hasAuth ? { user: config.username, pass: config.password } : false,
       connectionTimeout: 10000,
     });
   }
@@ -123,7 +124,7 @@ export class SmtpEmailProvider implements EmailProvider {
     );
   }
 
-  async sendRaw(options: SendRawEmailRequest): Promise<void> {
+  async sendRaw(options: SendRawEmailRequest): Promise<SendEmailResponse> {
     const config = await this.getRequiredConfig();
 
     await this.send(
@@ -138,5 +139,9 @@ export class SmtpEmailProvider implements EmailProvider {
       },
       { to: options.to }
     );
+
+    return {
+      suppressed: false,
+    };
   }
 }

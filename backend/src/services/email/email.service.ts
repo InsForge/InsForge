@@ -5,7 +5,7 @@ import { SmtpConfigService, RawSmtpConfig } from '@/services/email/smtp-config.s
 import { AppError } from '@/utils/errors.js';
 import { EmailTemplate } from '@/types/email.js';
 import logger from '@/utils/logger.js';
-import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
+import { ERROR_CODES, SendRawEmailRequest, SendEmailResponse } from '@insforge/shared-schemas';
 
 /**
  * Email service — resolves provider per-call so SMTP config changes take effect without restart
@@ -100,7 +100,7 @@ export class EmailService {
     }
   }
 
-  public async sendRaw(options: SendRawEmailRequest): Promise<void> {
+  public async sendRaw(options: SendRawEmailRequest): Promise<SendEmailResponse> {
     const [provider, smtpConfig] = await this.resolveProvider();
 
     const recipients = Array.isArray(options.to) ? options.to : [options.to];
@@ -114,12 +114,14 @@ export class EmailService {
     if (!provider.sendRaw) {
       throw new Error('Current email provider does not support raw email sending');
     }
-    await provider.sendRaw(options);
+    const result = await provider.sendRaw(options);
 
     if (smtpConfig) {
       for (const recipient of recipients) {
         this.recordEmailSent(recipient, smtpConfig.minIntervalSeconds);
       }
     }
+
+    return result;
   }
 }

@@ -33,9 +33,9 @@ router.post(
         throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
       }
 
-      await emailService.sendRaw(validation.data);
+      const result = await emailService.sendRaw(validation.data);
 
-      successResponse(res, {});
+      successResponse(res, result);
     } catch (error) {
       next(error);
     }

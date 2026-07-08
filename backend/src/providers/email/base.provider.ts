@@ -1,5 +1,5 @@
 import { EmailTemplate } from '@/types/email.js';
-import { SendRawEmailRequest } from '@insforge/shared-schemas';
+import { SendRawEmailRequest, SendEmailResponse } from '@insforge/shared-schemas';
 
 /**
  * Email provider interface
@@ -29,7 +29,7 @@ export interface EmailProvider {
    * Send custom/raw email (optional - not all providers may support this)
    * @param options - Email options (to, subject, html, cc, bcc, from, replyTo)
    */
-  sendRaw?(options: SendRawEmailRequest): Promise<void>;
+  sendRaw?(options: SendRawEmailRequest): Promise<SendEmailResponse>;
 
   /**
    * Check if provider supports template-based emails
