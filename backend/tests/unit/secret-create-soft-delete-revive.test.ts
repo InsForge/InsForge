@@ -116,10 +116,9 @@ describe('SecretService.createSecret with soft-deleted rows', () => {
       .mockResolvedValueOnce({ rows: [{ id: 'tx-id' }] });
 
     const service = await loadSecretService();
-    const result = await service.createSecret(
-      { key: 'DISCORD_CLIENT_SECRET', value: 'v' },
-      { query: clientQuery } as never
-    );
+    const result = await service.createSecret({ key: 'DISCORD_CLIENT_SECRET', value: 'v' }, {
+      query: clientQuery,
+    } as never);
 
     expect(result).toEqual({ id: 'tx-id' });
     expect(clientQuery).toHaveBeenCalledTimes(2);
