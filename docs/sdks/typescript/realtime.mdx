@@ -9,7 +9,7 @@ import Installation from '/snippets/sdk-installation.mdx';
 
 <Installation />
 
-## Mental Model
+## Mental model
 
 The TypeScript SDK opens one Socket.IO connection to your InsForge backend. You subscribe to named channels, listen for event names, and optionally publish events back to channels you have joined.
 
@@ -20,7 +20,7 @@ Events can come from two places:
 
 For the backend channel and RLS model, see [Realtime overview](/core-concepts/realtime/overview).
 
-## Quick Start
+## Quick start
 
 ```typescript
 import { createClient } from '@insforge/sdk';
@@ -211,7 +211,7 @@ Close the WebSocket and clear local subscriptions.
 insforge.realtime.disconnect();
 ```
 
-## Message Shape
+## Message shape
 
 Delivered messages include your payload fields plus server metadata.
 
@@ -329,7 +329,7 @@ Access *reductions* apply lazily on a live connection: publishing is re-checked 
 | `getSubscribedChannels()` | `() => string[]` | Local list of subscribed channels. |
 | `getPresenceState(channel)` | `(channel: string) => PresenceMember[]` | Current members of a subscribed channel, maintained by the SDK. |
 
-## Error Handling
+## Error handling
 
 ```typescript
 insforge.realtime.on('connect_error', (error) => {
@@ -353,7 +353,7 @@ Common realtime error codes:
 | `REALTIME_NOT_SUBSCRIBED` | The client tried to publish before subscribing to the channel. |
 | `INTERNAL_ERROR` | The backend could not complete the realtime operation. |
 
-## Complete Example
+## Complete example
 
 ```typescript
 const channel = `order:${orderId}`;
