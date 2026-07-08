@@ -229,9 +229,7 @@ describe('CloudComputeProvider machine-gone translation', () => {
 
     const provider = CloudComputeProvider.getInstance();
     await expect(provider.getEvents('app-1', 'm1')).rejects.toBeInstanceOf(MachineGoneError);
-    await expect(provider.getMachineStatus('app-1', 'm1')).rejects.toBeInstanceOf(
-      MachineGoneError
-    );
+    await expect(provider.getMachineStatus('app-1', 'm1')).rejects.toBeInstanceOf(MachineGoneError);
     await expect(provider.getLogs('app-1', 'm1')).rejects.toBeInstanceOf(MachineGoneError);
     await expect(provider.startMachine('app-1', 'm1')).rejects.toBeInstanceOf(MachineGoneError);
     await expect(provider.stopMachine('app-1', 'm1')).rejects.toBeInstanceOf(MachineGoneError);
