@@ -1,6 +1,11 @@
 import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
-import type { ComputeProvider, ComputeLogsResult } from './compute.provider.js';
+import {
+  MachineGoneError,
+  translateMachineGone,
+  type ComputeProvider,
+  type ComputeLogsResult,
+} from './compute.provider.js';
 
 const FLY_API_BASE = 'https://api.machines.dev/v1';
 // Container stdout/stderr lives on a different host + auth scheme than the
@@ -35,6 +40,19 @@ type FlyLogsResponse = {
   }[];
   meta?: { next_token?: string | number };
 };
+
+// Carries the HTTP status of a failed Fly API call so callers can distinguish
+// a definitive 404 (machine/app gone) from transient failures. Message format
+// is unchanged from the previous plain Error for anything matching on it.
+export class FlyHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'FlyHttpError';
+  }
+}
 
 export class FlyProvider implements ComputeProvider {
   private static instance: FlyProvider;
@@ -72,7 +90,7 @@ export class FlyProvider implements ComputeProvider {
     if (!response.ok) {
       const text = await response.text();
       logger.error('Fly API error', { url, status: response.status, body: text });
-      throw new Error(`Fly API error (${response.status}): ${text}`);
+      throw new FlyHttpError(response.status, `Fly API error (${response.status}): ${text}`);
     }
 
     const text = await response.text();
@@ -298,6 +316,20 @@ export class FlyProvider implements ComputeProvider {
     return { machineId: result.id };
   }
 
+  // A definitive 404 from a machine-scoped Fly call means the machine no
+  // longer exists (idle reaping, manual delete via the Fly dashboard, host
+  // migration). Translate to MachineGoneError so the service layer can heal
+  // DB state that still points at the dead machine. Transient errors (5xx,
+  // network) pass through untouched.
+  private machineScoped<T>(appId: string, machineId: string, fn: () => Promise<T>): Promise<T> {
+    return translateMachineGone(
+      appId,
+      machineId,
+      (err) => err instanceof FlyHttpError && err.status === 404,
+      fn
+    );
+  }
+
   async updateMachine(params: {
     appId: string;
     machineId: string;
@@ -310,33 +342,39 @@ export class FlyProvider implements ComputeProvider {
     scaleToZero?: boolean;
   }): Promise<void> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
-    await this.request(`/apps/${params.appId}/machines/${params.machineId}`, {
-      method: 'POST',
-      body: JSON.stringify({
-        config: {
-          image: params.image,
-          guest,
-          env: params.envVars,
-          services: [
-            this.serviceConfig(
-              params.port,
-              params.protocol ?? 'http',
-              FlyProvider.scaleOptions(params.scaleToZero)
-            ),
-          ],
-        },
-      }),
-    });
+    await this.machineScoped(params.appId, params.machineId, () =>
+      this.request(`/apps/${params.appId}/machines/${params.machineId}`, {
+        method: 'POST',
+        body: JSON.stringify({
+          config: {
+            image: params.image,
+            guest,
+            env: params.envVars,
+            services: [
+              this.serviceConfig(
+                params.port,
+                params.protocol ?? 'http',
+                FlyProvider.scaleOptions(params.scaleToZero)
+              ),
+            ],
+          },
+        }),
+      })
+    );
   }
 
   async stopMachine(appId: string, machineId: string): Promise<void> {
-    await this.request(`/apps/${appId}/machines/${machineId}/stop`, { method: 'POST' });
+    await this.machineScoped(appId, machineId, () =>
+      this.request(`/apps/${appId}/machines/${machineId}/stop`, { method: 'POST' })
+    );
   }
 
   async startMachine(appId: string, machineId: string): Promise<void> {
-    // Wait for machine to reach a startable state (stopped/created)
-    await this.waitForState(appId, machineId, ['stopped', 'created'], 30_000);
-    await this.request(`/apps/${appId}/machines/${machineId}/start`, { method: 'POST' });
+    await this.machineScoped(appId, machineId, async () => {
+      // Wait for machine to reach a startable state (stopped/created)
+      await this.waitForState(appId, machineId, ['stopped', 'created'], 30_000);
+      await this.request(`/apps/${appId}/machines/${machineId}/start`, { method: 'POST' });
+    });
   }
 
   async waitForState(
@@ -353,6 +391,12 @@ export class FlyProvider implements ComputeProvider {
           return state;
         }
       } catch (error) {
+        // Definitive machine-gone (getMachineStatus translates Fly 404s):
+        // polling for 30 more seconds won't bring the machine back. Fail
+        // fast so the service layer can heal the stale row.
+        if (error instanceof MachineGoneError) {
+          throw error;
+        }
         logger.warn('Transient error polling machine state, retrying', { appId, machineId, error });
       }
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -367,7 +411,9 @@ export class FlyProvider implements ComputeProvider {
     // Fly returns 412 `failed_precondition: unable to destroy machine, not
     // currently stopped, suspended, failed, or pending` and the caller's
     // delete path 502s, leaving the Fly app + DB row orphaned.
-    await this.request(`/apps/${appId}/machines/${machineId}?force=true`, { method: 'DELETE' });
+    await this.machineScoped(appId, machineId, () =>
+      this.request(`/apps/${appId}/machines/${machineId}?force=true`, { method: 'DELETE' })
+    );
   }
 
   async listMachines(appId: string): Promise<{ id: string; state: string; region: string }[]> {
@@ -378,8 +424,8 @@ export class FlyProvider implements ComputeProvider {
   }
 
   async getMachineStatus(appId: string, machineId: string): Promise<{ state: string }> {
-    const result = await this.requestJson<{ state: string }>(
-      `/apps/${appId}/machines/${machineId}`
+    const result = await this.machineScoped(appId, machineId, () =>
+      this.requestJson<{ state: string }>(`/apps/${appId}/machines/${machineId}`)
     );
     return { state: result.state };
   }
@@ -394,9 +440,11 @@ export class FlyProvider implements ComputeProvider {
     machineId: string,
     options?: { limit?: number }
   ): Promise<{ timestamp: number; message: string }[]> {
-    const events = await this.request<
-      { type: string; status: string; source: string; timestamp: number }[]
-    >(`/apps/${appId}/machines/${machineId}/events`);
+    const events = await this.machineScoped(appId, machineId, () =>
+      this.request<{ type: string; status: string; source: string; timestamp: number }[]>(
+        `/apps/${appId}/machines/${machineId}/events`
+      )
+    );
 
     const mapped = (events ?? []).map((e) => ({
       timestamp: e.timestamp,
@@ -455,7 +503,13 @@ export class FlyProvider implements ComputeProvider {
     if (!response.ok) {
       const text = await response.text();
       logger.error('Fly logs API error', { url, status: response.status, body: text });
-      throw new Error(`Fly logs API error (${response.status}): ${text}`);
+      // NOT translated to MachineGoneError: the logs API is app-scoped, so a
+      // 404 here means the whole APP is gone (a reclaimed machine alone still
+      // returns 200 with zero lines). Machine-level healing would be wrong —
+      // it keeps fly_app_id and advertises a redeploy that launches into the
+      // deleted app and fails forever. App-gone recovery is reconcile
+      // territory, not this path.
+      throw new FlyHttpError(response.status, `Fly logs API error (${response.status}): ${text}`);
     }
 
     const raw = await response.text();
