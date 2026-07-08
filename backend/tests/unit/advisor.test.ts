@@ -335,5 +335,75 @@ describe('Database Advisor Unit Tests', () => {
         .expect(400);
       expect(res2.body.error).toContain('Invalid category parameter');
     });
+
+    it('GET /api/advisor/suppressions should return suppressions list', async () => {
+      vi.spyOn(DatabaseAdvisorService.getInstance(), 'listSuppressions').mockResolvedValue([
+        {
+          id: '11111111-1111-1111-1111-111111111111',
+          ruleId: 'dangerous-function',
+          affectedObject: 'public.f()',
+          scope: 'instance',
+          reason: 'false_positive',
+          note: null,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+      const res = await request(app).get('/api/advisor/suppressions').expect(200);
+
+      expect(res.body.suppressions).toHaveLength(1);
+      expect(res.body.suppressions[0].ruleId).toBe('dangerous-function');
+    });
+
+    it('POST /api/advisor/suppressions should 400 on bad scope/reason', async () => {
+      const bad1 = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'x', scope: 'nope', reason: 'false_positive', affectedObject: 'y' })
+        .expect(400);
+      expect(bad1.body.error).toContain('Invalid scope');
+
+      const bad2 = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'x', scope: 'instance', reason: 'nope', affectedObject: 'y' })
+        .expect(400);
+      expect(bad2.body.error).toContain('Invalid reason');
+    });
+
+    it('POST /api/advisor/suppressions should 400 when instance scope lacks affectedObject', async () => {
+      const res = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'x', scope: 'instance', reason: 'wont_fix' })
+        .expect(400);
+      expect(res.body.error).toContain('Invalid affectedObject');
+    });
+
+    it('POST /api/advisor/suppressions should 201 on valid rule-scope body', async () => {
+      vi.spyOn(DatabaseAdvisorService.getInstance(), 'createSuppression').mockResolvedValue({
+        id: '22222222-2222-2222-2222-222222222222',
+        ruleId: 'rls-select-only',
+        affectedObject: null,
+        scope: 'rule',
+        reason: 'accepted_risk',
+        note: null,
+        createdAt: new Date().toISOString(),
+      });
+
+      const res = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'rls-select-only', scope: 'rule', reason: 'accepted_risk' })
+        .expect(201);
+
+      expect(res.body.id).toBe('22222222-2222-2222-2222-222222222222');
+      expect(res.body.scope).toBe('rule');
+    });
+
+    it('DELETE /api/advisor/suppressions/:id should 404 when missing', async () => {
+      vi.spyOn(DatabaseAdvisorService.getInstance(), 'deleteSuppression').mockResolvedValue(false);
+
+      const res = await request(app)
+        .delete('/api/advisor/suppressions/33333333-3333-3333-3333-333333333333')
+        .expect(404);
+      expect(res.body.error).toBe('Suppression not found');
+    });
   });
 });

@@ -3,6 +3,13 @@ import { AppError, hasPgErrorCode } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { PoolClient } from 'pg';
+import type {
+  AdvisorSummary,
+  AdvisorIssue,
+  AdvisorSuppression,
+  AdvisorSuppressionScope,
+  AdvisorSuppressionReason,
+} from '@/types/advisor.js';
 
 // Internal/system schemas that advisor rules never report on. Kept as a single
 // source of truth so the exclusion list can't drift between rule queries.
@@ -46,35 +53,16 @@ const ADVISOR_EXCLUDED_SCHEMAS = [
   .map((s) => `'${s}'`)
   .join(', ');
 
-export interface AdvisorSummary {
-  // NOTE: `scanId`, `status`, `scanType`, `scannedAt` and `errorMessage` describe
-  // the *latest* scan (so the UI can show in-progress/failed state), while
-  // `summary` counts come from the latest *completed* scan so a running or failed
-  // rescan doesn't blank out the last usable results. When the latest scan is
-  // running/failed these therefore refer to two different scans by design.
-  scanId: string;
-  status: 'running' | 'completed' | 'failed';
-  scanType: 'manual' | 'scheduled';
-  scannedAt: string;
-  errorMessage?: string | null;
-  summary: {
-    total: number;
-    critical: number;
-    warning: number;
-    info: number;
-  };
-}
-
-export interface AdvisorIssue {
-  id: string;
-  ruleId: string;
-  severity: 'critical' | 'warning' | 'info';
-  category: 'security' | 'performance' | 'health';
-  title: string;
-  description: string;
-  affectedObject?: string;
-  recommendation?: string;
-}
+// Appended to finding reads so suppressed findings never surface in the
+// Active list or in counts. A rule-scope suppression hides every finding of
+// that rule; an instance-scope one hides only the matching affected_object.
+const NOT_SUPPRESSED_SQL = `
+  NOT EXISTS (
+    SELECT 1 FROM system.advisor_suppressions s
+    WHERE s.rule_id = f.rule_id
+      AND (s.scope = 'rule' OR s.affected_object = f.affected_object)
+  )
+`;
 
 export class DatabaseAdvisorService {
   private static instance: DatabaseAdvisorService;
@@ -904,8 +892,9 @@ export class DatabaseAdvisorService {
       const countResult = await pool.query<{ severity: string; count: string }>(
         `
           SELECT severity, count(*)::int AS count
-          FROM system.advisor_findings
+          FROM system.advisor_findings f
           WHERE scan_id = $1
+            AND ${NOT_SUPPRESSED_SQL}
           GROUP BY severity
         `,
         [completedScan.rows[0].id]
@@ -961,8 +950,9 @@ export class DatabaseAdvisorService {
 
     let query = `
       SELECT id, rule_id AS "ruleId", severity, category, title, description, affected_object AS "affectedObject", recommendation
-      FROM system.advisor_findings
+      FROM system.advisor_findings f
       WHERE scan_id = $1
+        AND ${NOT_SUPPRESSED_SQL}
     `;
     const params: unknown[] = [scanId];
     let paramIndex = 2;
@@ -1000,5 +990,119 @@ export class DatabaseAdvisorService {
       })),
       total,
     };
+  }
+
+  /**
+   * Persistently suppress a finding fingerprint (instance) or a whole rule.
+   */
+  public async createSuppression(input: {
+    ruleId: string;
+    affectedObject?: string | null;
+    scope: AdvisorSuppressionScope;
+    reason: AdvisorSuppressionReason;
+    note?: string | null;
+  }): Promise<AdvisorSuppression> {
+    const pool = this.dbManager.getPool();
+    const affectedObject = input.scope === 'rule' ? null : (input.affectedObject ?? null);
+    try {
+      const result = await pool.query<{
+        id: string;
+        rule_id: string;
+        affected_object: string | null;
+        scope: AdvisorSuppressionScope;
+        reason: AdvisorSuppressionReason;
+        note: string | null;
+        created_by: string | null;
+        created_at: Date;
+      }>(
+        `
+          INSERT INTO system.advisor_suppressions (rule_id, affected_object, scope, reason, note)
+          VALUES ($1, $2, $3, $4, $5)
+          RETURNING id, rule_id, affected_object, scope, reason, note, created_by, created_at
+        `,
+        [input.ruleId, affectedObject, input.scope, input.reason, input.note ?? null]
+      );
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        ruleId: row.rule_id,
+        affectedObject: row.affected_object ?? undefined,
+        scope: row.scope,
+        reason: row.reason,
+        note: row.note ?? undefined,
+        createdBy: row.created_by ?? undefined,
+        createdAt: row.created_at.toISOString(),
+      };
+    } catch (error) {
+      if (hasPgErrorCode(error, '23505')) {
+        throw new AppError('This finding is already ignored.', 409, ERROR_CODES.DATABASE_DUPLICATE);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Remove a suppression. Returns false when the id does not exist.
+   */
+  public async deleteSuppression(id: string): Promise<boolean> {
+    const pool = this.dbManager.getPool();
+    const result = await pool.query(`DELETE FROM system.advisor_suppressions WHERE id = $1`, [id]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  /**
+   * List all suppressions, enriched with finding metadata from the latest
+   * completed scan when a matching finding exists (instance rows).
+   */
+  public async listSuppressions(): Promise<AdvisorSuppression[]> {
+    const pool = this.dbManager.getPool();
+    const result = await pool.query<{
+      id: string;
+      rule_id: string;
+      affected_object: string | null;
+      scope: AdvisorSuppressionScope;
+      reason: AdvisorSuppressionReason;
+      note: string | null;
+      created_by: string | null;
+      created_at: Date;
+      title: string | null;
+      severity: 'critical' | 'warning' | 'info' | null;
+      category: 'security' | 'performance' | 'health' | null;
+    }>(
+      `
+        WITH latest AS (
+          SELECT id FROM system.advisor_scans
+          WHERE status = 'completed'
+          ORDER BY scanned_at DESC
+          LIMIT 1
+        )
+        SELECT s.id, s.rule_id, s.affected_object, s.scope, s.reason, s.note,
+               s.created_by, s.created_at,
+               f.title, f.severity, f.category
+        FROM system.advisor_suppressions s
+        LEFT JOIN LATERAL (
+          SELECT title, severity, category
+          FROM system.advisor_findings f
+          WHERE f.scan_id = (SELECT id FROM latest)
+            AND f.rule_id = s.rule_id
+            AND (s.scope = 'rule' OR f.affected_object = s.affected_object)
+          LIMIT 1
+        ) f ON true
+        ORDER BY s.created_at DESC
+      `
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      ruleId: row.rule_id,
+      affectedObject: row.affected_object ?? undefined,
+      scope: row.scope,
+      reason: row.reason,
+      note: row.note ?? undefined,
+      createdBy: row.created_by ?? undefined,
+      createdAt: row.created_at.toISOString(),
+      title: row.title ?? undefined,
+      severity: row.severity ?? undefined,
+      category: row.category ?? undefined,
+    }));
   }
 }
