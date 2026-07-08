@@ -2,13 +2,14 @@ import jwt from 'jsonwebtoken';
 import { appConfig } from '@/infra/config/app.config.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
-import type {
-  ComputeProvider,
-  LaunchMachineParams,
-  UpdateMachineParams,
-  MachineSummary,
-  ComputeEvent,
-  ComputeLogsResult,
+import {
+  MachineGoneError,
+  type ComputeProvider,
+  type LaunchMachineParams,
+  type UpdateMachineParams,
+  type MachineSummary,
+  type ComputeEvent,
+  type ComputeLogsResult,
 } from './compute.provider.js';
 
 export class CloudComputeProvider implements ComputeProvider {
@@ -137,20 +138,48 @@ export class CloudComputeProvider implements ComputeProvider {
     return { machineId: result.machineId };
   }
 
+  // A 404 from a machine-scoped cloud call means the machine no longer exists
+  // (the cloud control plane returns COMPUTE_MACHINE_NOT_FOUND after Fly
+  // reclaims/deletes a machine and its own row heals). Translate to the
+  // provider-level MachineGoneError so the service layer can heal local DB
+  // state instead of surfacing an opaque provider error forever.
+  private async machineScoped<T>(
+    appId: string,
+    machineId: string,
+    fn: () => Promise<T>
+  ): Promise<T> {
+    try {
+      return await fn();
+    } catch (err) {
+      if (err instanceof AppError && err.statusCode === 404) {
+        throw new MachineGoneError(appId, machineId);
+      }
+      throw err;
+    }
+  }
+
   async updateMachine(params: UpdateMachineParams): Promise<void> {
-    await this.call('PATCH', `/machines/${encodeURIComponent(params.machineId)}`, params);
+    await this.machineScoped(params.appId, params.machineId, () =>
+      this.call('PATCH', `/machines/${encodeURIComponent(params.machineId)}`, params)
+    );
   }
 
   async stopMachine(appId: string, machineId: string): Promise<void> {
-    await this.call('POST', `/machines/${encodeURIComponent(machineId)}/stop`, { appId });
+    await this.machineScoped(appId, machineId, () =>
+      this.call('POST', `/machines/${encodeURIComponent(machineId)}/stop`, { appId })
+    );
   }
 
   async startMachine(appId: string, machineId: string): Promise<void> {
-    await this.call('POST', `/machines/${encodeURIComponent(machineId)}/start`, { appId });
+    await this.machineScoped(appId, machineId, () =>
+      this.call('POST', `/machines/${encodeURIComponent(machineId)}/start`, { appId })
+    );
   }
 
   async destroyMachine(appId: string, machineId: string): Promise<void> {
-    await this.call('DELETE', `/machines/${encodeURIComponent(machineId)}`, { appId });
+    await this.machineScoped(appId, machineId, () =>
+      this.call('DELETE', `/machines/${encodeURIComponent(machineId)}`, { appId })
+    );
   }
 
   async listMachines(appId: string): Promise<MachineSummary[]> {
@@ -161,9 +190,11 @@ export class CloudComputeProvider implements ComputeProvider {
   }
 
   async getMachineStatus(appId: string, machineId: string): Promise<{ state: string }> {
-    const result = await this.call<{ state: string }>(
-      'GET',
-      `/machines/${encodeURIComponent(machineId)}?appId=${encodeURIComponent(appId)}`
+    const result = await this.machineScoped(appId, machineId, () =>
+      this.call<{ state: string }>(
+        'GET',
+        `/machines/${encodeURIComponent(machineId)}?appId=${encodeURIComponent(appId)}`
+      )
     );
     if (!result?.state) {
       throw new AppError(
@@ -183,9 +214,8 @@ export class CloudComputeProvider implements ComputeProvider {
     const qs =
       `?appId=${encodeURIComponent(appId)}` + (options?.limit ? `&limit=${options.limit}` : '');
     return (
-      (await this.call<ComputeEvent[]>(
-        'GET',
-        `/machines/${encodeURIComponent(machineId)}/events${qs}`
+      (await this.machineScoped(appId, machineId, () =>
+        this.call<ComputeEvent[]>('GET', `/machines/${encodeURIComponent(machineId)}/events${qs}`)
       )) ?? []
     );
   }
@@ -207,9 +237,11 @@ export class CloudComputeProvider implements ComputeProvider {
     if (options?.nextToken) {
       params.set('next_token', options.nextToken);
     }
-    const result = await this.call<ComputeLogsResult>(
-      'GET',
-      `/machines/${encodeURIComponent(machineId)}/logs?${params.toString()}`
+    const result = await this.machineScoped(appId, machineId, () =>
+      this.call<ComputeLogsResult>(
+        'GET',
+        `/machines/${encodeURIComponent(machineId)}/logs?${params.toString()}`
+      )
     );
     return result ?? { lines: [], nextToken: null };
   }

@@ -84,6 +84,7 @@ vi.mock('@/providers/compute/fly.provider.js', () => ({
 }));
 
 import { ComputeServicesService } from '@/services/compute/services.service.js';
+import { MachineGoneError } from '@/providers/compute/compute.provider.js';
 
 describe('ComputeServicesService', () => {
   let service: ComputeServicesService;
@@ -1076,6 +1077,101 @@ describe('ComputeServicesService', () => {
       mockStartMachine.mockRejectedValue(new Error('Fly error'));
 
       await expect(service.startService('svc-start-1')).rejects.toThrow(/Failed to start/);
+    });
+  });
+
+  // A machine can vanish on the provider while our row still points at it
+  // (idle reaping, out-of-band delete). Providers throw MachineGoneError on a
+  // definitive 404; the service layer must heal the stale row (fly_machine_id
+  // → NULL, status → stopped) and surface a typed COMPUTE_MACHINE_NOT_FOUND
+  // 404 instead of an opaque 5xx forever.
+  describe('machine-gone healing', () => {
+    const serviceRow = {
+      id: 'svc-ghost-1',
+      project_id: 'proj-123',
+      name: 'my-api',
+      image_url: 'nginx:latest',
+      port: 8080,
+      cpu: 'shared-1x',
+      memory: 256,
+      region: 'iad',
+      fly_app_id: 'my-api-proj-123',
+      fly_machine_id: 'machine-ghost',
+      status: 'running',
+      endpoint_url: 'https://my-api-proj-123.fly.dev',
+      env_vars_encrypted: null,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+    const gone = () => new MachineGoneError('my-api-proj-123', 'machine-ghost');
+
+    function expectHealQuery() {
+      const healCall = mockQuery.mock.calls.find(
+        ([sql]) => typeof sql === 'string' && sql.includes('fly_machine_id = NULL')
+      );
+      expect(healCall).toBeDefined();
+      expect(healCall?.[1]).toEqual(['svc-ghost-1', 'machine-ghost']);
+    }
+
+    it('getServiceEvents heals the row and throws COMPUTE_MACHINE_NOT_FOUND', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      mockGetEvents.mockRejectedValue(gone());
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // heal UPDATE
+
+      await expect(service.getServiceEvents('svc-ghost-1')).rejects.toMatchObject({
+        statusCode: 404,
+        code: ERROR_CODES.COMPUTE_MACHINE_NOT_FOUND,
+      });
+      expectHealQuery();
+    });
+
+    it('getServiceLogs heals the row and throws COMPUTE_MACHINE_NOT_FOUND', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      mockGetLogs.mockRejectedValue(gone());
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // heal UPDATE
+
+      await expect(service.getServiceLogs('svc-ghost-1')).rejects.toMatchObject({
+        statusCode: 404,
+        code: ERROR_CODES.COMPUTE_MACHINE_NOT_FOUND,
+      });
+      expectHealQuery();
+    });
+
+    it('startService heals the row and throws COMPUTE_MACHINE_NOT_FOUND', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      mockStartMachine.mockRejectedValue(gone());
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // heal UPDATE
+
+      await expect(service.startService('svc-ghost-1')).rejects.toMatchObject({
+        statusCode: 404,
+        code: ERROR_CODES.COMPUTE_MACHINE_NOT_FOUND,
+      });
+      expectHealQuery();
+    });
+
+    it('stopService on a gone machine succeeds — desired state already true', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      mockStopMachine.mockRejectedValue(gone());
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // heal UPDATE
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...serviceRow, fly_machine_id: null, status: 'stopped' }],
+      }); // status UPDATE
+
+      const result = await service.stopService('svc-ghost-1');
+
+      expect(result.status).toBe('stopped');
+      expectHealQuery();
+    });
+
+    it('transient provider errors do NOT heal the row', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      mockGetEvents.mockRejectedValue(new Error('Fly API error (500): internal'));
+
+      await expect(service.getServiceEvents('svc-ghost-1')).rejects.toThrow(/500/);
+      const healCall = mockQuery.mock.calls.find(
+        ([sql]) => typeof sql === 'string' && sql.includes('fly_machine_id = NULL')
+      );
+      expect(healCall).toBeUndefined();
     });
   });
 

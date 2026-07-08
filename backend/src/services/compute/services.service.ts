@@ -4,7 +4,11 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { FlyProvider } from '@/providers/compute/fly.provider.js';
 import { CloudComputeProvider } from '@/providers/compute/cloud.provider.js';
-import type { ComputeProvider, ComputeLogsResult } from '@/providers/compute/compute.provider.js';
+import {
+  MachineGoneError,
+  type ComputeProvider,
+  type ComputeLogsResult,
+} from '@/providers/compute/compute.provider.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
@@ -684,6 +688,12 @@ export class ComputeServicesService {
         });
         logger.info('Compute service machine updated', { id });
       } catch (error) {
+        // The machine this PATCH targeted no longer exists. Heal the row
+        // (fly_machine_id → NULL) so the caller's retry takes the
+        // first-launch path above and provisions a fresh machine.
+        if (error instanceof MachineGoneError) {
+          throw await this.machineGone(id, existing.flyMachineId);
+        }
         logger.error('Failed to update machine on Fly', { id, error });
         throw rewrapCloudError(error, 'Compute service operation failed');
       }
@@ -795,7 +805,7 @@ export class ComputeServicesService {
         await this.getCompute().destroyMachine(row.fly_app_id, row.fly_machine_id);
       } catch (error) {
         const msg = error instanceof Error ? error.message : '';
-        if (!msg.includes('404')) {
+        if (!(error instanceof MachineGoneError) && !msg.includes('404')) {
           logger.error('Failed to destroy Fly machine during delete', { id, error });
           await this.getPool().query(
             `UPDATE compute.services SET status = 'failed' WHERE id = $1`,
@@ -854,6 +864,38 @@ export class ComputeServicesService {
     };
   }
 
+  // The provider reported the machine gone (definitive 404) while our row
+  // still points at it — the machine was reclaimed or deleted out-of-band.
+  // Heal the row: clear the dead machine pointer and mark the service
+  // stopped, so the dashboard stops showing a ghost "running" service and
+  // the next deploy takes the first-launch path (fly_machine_id IS NULL →
+  // launchMachine provisions a fresh machine). Guarded by fly_machine_id so
+  // a concurrent redeploy's fresh machine id is never clobbered.
+  private async healMachineGone(id: string, machineId: string): Promise<void> {
+    await this.getPool().query(
+      `UPDATE compute.services
+          SET status = 'stopped', fly_machine_id = NULL
+        WHERE id = $1 AND fly_machine_id = $2`,
+      [id, machineId]
+    );
+    logger.warn('Compute machine gone on provider; healed stale service row', {
+      id,
+      machineId,
+    });
+  }
+
+  // Standard translation for reads/ops that hit a gone machine: heal the row,
+  // then surface a typed 404 the dashboard/CLI can act on (redeploy).
+  private async machineGone(id: string, machineId: string): Promise<AppError> {
+    await this.healMachineGone(id, machineId);
+    return new AppError(
+      'The machine backing this service no longer exists on the compute provider',
+      404,
+      ERROR_CODES.COMPUTE_MACHINE_NOT_FOUND,
+      NEXT_ACTIONS.REDEPLOY_COMPUTE_SERVICE
+    );
+  }
+
   async stopService(id: string): Promise<ServiceSchema> {
     const svc = await this.getService(id);
 
@@ -869,12 +911,19 @@ export class ComputeServicesService {
     try {
       await this.getCompute().stopMachine(svc.flyAppId, svc.flyMachineId);
     } catch (error) {
-      logger.error('Failed to stop compute service', { id, error });
-      throw new AppError(
-        'Failed to stop compute service',
-        502,
-        ERROR_CODES.COMPUTE_SERVICE_STOP_FAILED
-      );
+      // Stopping a machine that no longer exists: the desired state is
+      // already true. Heal the row and fall through to the status update —
+      // "Stop" on a ghost service succeeds instead of erroring.
+      if (error instanceof MachineGoneError) {
+        await this.healMachineGone(id, svc.flyMachineId);
+      } else {
+        logger.error('Failed to stop compute service', { id, error });
+        throw new AppError(
+          'Failed to stop compute service',
+          502,
+          ERROR_CODES.COMPUTE_SERVICE_STOP_FAILED
+        );
+      }
     }
 
     const result = await this.getPool().query(
@@ -910,6 +959,11 @@ export class ComputeServicesService {
     try {
       await this.getCompute().startMachine(svc.flyAppId, svc.flyMachineId);
     } catch (error) {
+      // Can't start a machine that no longer exists — heal the row and tell
+      // the caller to redeploy (which provisions a fresh machine).
+      if (error instanceof MachineGoneError) {
+        throw await this.machineGone(id, svc.flyMachineId);
+      }
       logger.error('Failed to start compute service', { id, error });
       throw new AppError(
         'Failed to start compute service',
@@ -951,7 +1005,14 @@ export class ComputeServicesService {
       );
     }
 
-    return this.getCompute().getEvents(svc.flyAppId, svc.flyMachineId, options);
+    try {
+      return await this.getCompute().getEvents(svc.flyAppId, svc.flyMachineId, options);
+    } catch (error) {
+      if (error instanceof MachineGoneError) {
+        throw await this.machineGone(id, svc.flyMachineId);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -974,7 +1035,14 @@ export class ComputeServicesService {
       );
     }
 
-    return this.getCompute().getLogs(svc.flyAppId, svc.flyMachineId, options);
+    try {
+      return await this.getCompute().getLogs(svc.flyAppId, svc.flyMachineId, options);
+    } catch (error) {
+      if (error instanceof MachineGoneError) {
+        throw await this.machineGone(id, svc.flyMachineId);
+      }
+      throw error;
+    }
   }
 
   private decryptEnvVars(encrypted: string | null): Record<string, string> {

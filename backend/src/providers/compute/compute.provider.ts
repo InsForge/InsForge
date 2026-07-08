@@ -75,6 +75,24 @@ export interface ComputeLogsResult {
   nextToken: string | null;
 }
 
+// The backing machine no longer exists on the compute provider — reclaimed
+// after prolonged idleness, deleted out-of-band via the provider's dashboard,
+// or lost to a host migration. Providers throw this on a definitive 404 from
+// a machine-scoped call so the service layer can heal DB state that still
+// points at the dead machine, instead of surfacing an opaque 5xx forever.
+// The message deliberately contains "(404)" — deleteService tolerates
+// already-gone resources by substring today, and this keeps that path safe
+// even where an instanceof check is missed.
+export class MachineGoneError extends Error {
+  constructor(
+    public readonly appId: string,
+    public readonly machineId: string
+  ) {
+    super(`Machine ${machineId} no longer exists on app ${appId} (404)`);
+    this.name = 'MachineGoneError';
+  }
+}
+
 export interface ComputeProvider {
   isConfigured(): boolean;
   createApp(params: { name: string; network: string; org: string }): Promise<{ appId: string }>;
