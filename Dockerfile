@@ -123,15 +123,8 @@ RUN npm install -g "tsx@^4.7.1" && npm cache clean --force
 
 # --- Stable layers first (change only when dependencies change) ---
 
-# Production node_modules. Most deps hoist to the root, but npm nests a few
-# under backend/node_modules when a version can't be shared with the root tree
-# (e.g. file-type + its strtok3/token-types, and @aws-sdk/* pinned to a newer
-# minor than the hoisted copy). Copying only the root drops those, so backend
-# imports crash (file-type) or silently resolve the wrong version (client-s3).
-# The two dirs never collide (separate paths) and Node's upward resolution keeps
-# each importer on its intended version, so copy both.
+# Production node_modules (hoisted by npm workspaces)
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
-COPY --from=prod-deps --chown=node:node /app/backend/node_modules ./backend/node_modules
 
 # --- Volatile layers last (change every release) ---
 
