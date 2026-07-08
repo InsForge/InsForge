@@ -191,6 +191,7 @@ export function TableForm({
   const formScrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const foreignKeysRef = useRef(foreignKeys);
 
   const form = useForm({
     resolver: zodResolver(tableFormSchema),
@@ -214,6 +215,10 @@ export function TableForm({
       formScrollRef.current?.scrollTo({ top: 0, left: 0 });
     }
   }, [editTable?.tableName, mode, open, schemaName]);
+
+  useEffect(() => {
+    foreignKeysRef.current = foreignKeys;
+  }, [foreignKeys]);
 
   useEffect(() => {
     // Clear error when effect runs
@@ -260,6 +265,15 @@ export function TableForm({
 
     if (open && mode === 'create') {
       if (isProjectIdLoading) {
+        return;
+      }
+      const currentDraft = {
+        schemaName,
+        tableName: form.getValues('tableName') ?? '',
+        columns: form.getValues('columns') ?? createDefaultColumns(),
+        foreignKeys: foreignKeysRef.current,
+      };
+      if (hasCreateDraftData(currentDraft)) {
         return;
       }
 
