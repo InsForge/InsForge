@@ -2,6 +2,7 @@ import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import type { DashboardAdvisorIssue } from '#types';
 import { useToast } from '@insforge/ui';
 import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
+import { IgnoreMenu } from './IgnoreMenu';
 import { formatRemediationPrompt } from './remediationPrompt';
 import CriticalIcon from '#assets/icons/severity_critical.svg?react';
 import InfoIcon from '#assets/icons/severity_info.svg?react';
@@ -84,6 +85,7 @@ export function AdvisoryItem({ issue, expanded, onToggle }: AdvisoryItemProps) {
                 <span className="px-1">{copied ? 'Copied' : 'Copy Remediation'}</span>
               </button>
             )}
+            <IgnoreMenu issue={issue} visibilityClass={copyButtonVisibility} />
             <span
               aria-hidden="true"
               className="flex h-5 w-5 items-center justify-center text-muted-foreground"

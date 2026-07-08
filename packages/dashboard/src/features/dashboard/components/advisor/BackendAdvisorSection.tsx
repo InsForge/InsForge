@@ -18,6 +18,7 @@ import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import { EmptyState, PaginationControls } from '#components';
 import { AdvisoryItem } from './AdvisoryItem';
 import { AdvisoryTabs, type AdvisoryTabValue } from './AdvisoryTabs';
+import { IgnoredList } from './IgnoredList';
 import { SeverityFilterDropdown } from './SeverityFilterDropdown';
 import { formatRemediationPromptBatch } from './remediationPrompt';
 
@@ -56,6 +57,7 @@ const ADVISOR_BUTTON_CLASS =
 
 export function BackendAdvisorSection() {
   const [tab, setTab] = useState<AdvisoryTabValue>('all');
+  const [view, setView] = useState<'active' | 'ignored'>('active');
   const [selectedSeverities, setSelectedSeverities] = useState<Set<DashboardAdvisorSeverity>>(
     () => new Set(ALL_SEVERITIES)
   );
@@ -272,12 +274,30 @@ export function BackendAdvisorSection() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <AdvisoryTabs
-          value={tab}
-          onChange={setTab}
-          totalCount={filteredAllCount}
-          categoryCounts={filteredCategoryCounts}
-        />
+        <div className="flex items-center gap-3">
+          <div className="flex items-center rounded border border-[var(--alpha-8)] p-0.5">
+            {(['active', 'ignored'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setView(v)}
+                className={`rounded px-2 py-1 text-sm leading-5 capitalize ${
+                  view === v
+                    ? 'bg-[var(--alpha-8)] text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+          <AdvisoryTabs
+            value={tab}
+            onChange={setTab}
+            totalCount={filteredAllCount}
+            categoryCounts={filteredCategoryCounts}
+          />
+        </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -292,15 +312,22 @@ export function BackendAdvisorSection() {
             )}
             <span>{isScanning ? 'Scanning…' : 'Re-scan'}</span>
           </button>
-          <SeverityFilterDropdown selected={selectedSeverities} onChange={setSelectedSeverities} />
-          <button
-            type="button"
-            onClick={() => void handleCopyAll()}
-            className={ADVISOR_BUTTON_CLASS}
-          >
-            {copiedAll ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            <span>{copiedAll ? 'Copied' : 'Copy All'}</span>
-          </button>
+          {view === 'active' && (
+            <>
+              <SeverityFilterDropdown
+                selected={selectedSeverities}
+                onChange={setSelectedSeverities}
+              />
+              <button
+                type="button"
+                onClick={() => void handleCopyAll()}
+                className={ADVISOR_BUTTON_CLASS}
+              >
+                {copiedAll ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                <span>{copiedAll ? 'Copied' : 'Copy All'}</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -309,7 +336,9 @@ export function BackendAdvisorSection() {
         className="flex flex-col gap-4"
       >
         <div className="flex flex-col rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)]">
-          {!hasScan && !latest.isLoading ? (
+          {view === 'ignored' ? (
+            <IgnoredList category={categoryFilter} />
+          ) : !hasScan && !latest.isLoading ? (
             <EmptyState
               className="h-32 gap-1"
               title="No scan yet"
@@ -343,7 +372,7 @@ export function BackendAdvisorSection() {
           )}
         </div>
 
-        {hasScan && totalRecords > 0 && (
+        {view === 'active' && hasScan && totalRecords > 0 && (
           <PaginationControls
             currentPage={currentPage}
             totalPages={totalPages}

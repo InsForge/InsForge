@@ -130,6 +130,31 @@ export interface DashboardAdvisorIssuesQuery {
   offset?: number;
 }
 
+export type DashboardAdvisorSuppressionScope = 'instance' | 'rule';
+export type DashboardAdvisorSuppressionReason = 'false_positive' | 'accepted_risk' | 'wont_fix';
+
+export interface DashboardAdvisorSuppression {
+  id: string;
+  ruleId: string;
+  affectedObject?: string;
+  scope: DashboardAdvisorSuppressionScope;
+  reason: DashboardAdvisorSuppressionReason;
+  note?: string;
+  createdBy?: string;
+  createdAt: string;
+  title?: string;
+  severity?: DashboardAdvisorSeverity;
+  category?: DashboardAdvisorCategory;
+}
+
+export interface DashboardAdvisorSuppressRequest {
+  ruleId: string;
+  affectedObject?: string;
+  scope: DashboardAdvisorSuppressionScope;
+  reason: DashboardAdvisorSuppressionReason;
+  note?: string;
+}
+
 /** Status event posted from cloud-shell after the PostHog OAuth flow finishes. */
 export interface DashboardPosthogConnectionStatus {
   status: 'connected' | 'error' | 'cancelled';
@@ -177,6 +202,9 @@ export interface DashboardProps {
     query: DashboardAdvisorIssuesQuery
   ) => Promise<DashboardAdvisorIssuesResponse>;
   onTriggerAdvisorScan?: () => Promise<void>;
+  onRequestAdvisorSuppressions?: () => Promise<DashboardAdvisorSuppression[]>;
+  onSuppressAdvisorIssue?: (req: DashboardAdvisorSuppressRequest) => Promise<void>;
+  onUnsuppressAdvisorIssue?: (id: string) => Promise<void>;
   /** Cloud-hosting only: ask the parent shell to start the PostHog OAuth flow. */
   onConnectPosthog?: (projectId: string) => void;
   /** Cloud-hosting only: subscribe to PostHog OAuth completion / failure events. */
