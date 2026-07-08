@@ -192,7 +192,9 @@ export const storageService = {
     const formData = new FormData();
     formData.append('file', object);
 
-    const uploadResponse = await fetch(strategy.uploadUrl, {
+    const uploadUrl = `/api/storage/buckets/${encodeURIComponent(bucketName)}/objects/${encodeURIComponent(strategy.key)}`;
+
+    const uploadResponse = await fetch(uploadUrl, {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${token}`,
