@@ -261,7 +261,15 @@ export class DatabaseAdvisorService {
           SELECT
             table_name AS affected_object,
             'rls-permissive' AS rule_id,
-            'warning' AS severity,
+            -- critical when the permissive policy is reachable by anon/public
+            -- (effectively public data), warning when only authenticated roles
+            -- can reach it (cloud parity).
+            CASE
+              WHEN 0::oid = ANY(polroles)
+                OR EXISTS (SELECT 1 FROM unnest(polroles) AS r WHERE r::regrole::text = 'anon')
+              THEN 'critical'
+              ELSE 'warning'
+            END AS severity,
             'security' AS category,
             'RLS Policy Always True' AS title,
             'Detects RLS policies that use overly permissive expressions like USING (true) or WITH CHECK (true) for UPDATE, DELETE, or INSERT operations.' AS description,
@@ -274,7 +282,7 @@ export class DatabaseAdvisorService {
           SELECT
             c.relname AS affected_object,
             'rls-no-policy' AS rule_id,
-            'info' AS severity,
+            'critical' AS severity,
             'security' AS category,
             'RLS Enabled No Policy' AS title,
             'Detects cases where row level security (RLS) has been enabled on a table but no RLS policies have been created.' AS description,
@@ -299,7 +307,7 @@ export class DatabaseAdvisorService {
           SELECT
             function_name AS affected_object,
             'dangerous-function' AS rule_id,
-            'warning' AS severity,
+            'critical' AS severity,
             'security' AS category,
             'Public Can Execute SECURITY DEFINER Function' AS title,
             'Detects SECURITY DEFINER functions that are callable without signing in or by authenticated users, bypassing RLS.' AS description,
@@ -339,7 +347,7 @@ export class DatabaseAdvisorService {
           SELECT
             c.relname AS affected_object,
             'rls-select-only' AS rule_id,
-            'warning' AS severity,
+            'info' AS severity,
             'security' AS category,
             'Only SELECT Policy Exists on Table' AS title,
             'Table has RLS enabled but only has SELECT policies, leaving write operations unprotected or completely denied by default.' AS description,
@@ -392,7 +400,7 @@ export class DatabaseAdvisorService {
           SELECT
             fk.table_name AS affected_object,
             'missing-fk-index' AS rule_id,
-            'info' AS severity,
+            'warning' AS severity,
             'performance' AS category,
             'Unindexed Foreign Key' AS title,
             'Identifies foreign key constraints without a covering index, which can impact join performance.' AS description,
@@ -426,6 +434,10 @@ export class DatabaseAdvisorService {
           WHERE psui.idx_scan = 0
             AND NOT pi.indisunique
             AND NOT pi.indisprimary
+            -- Cloud parity: ignore indexes smaller than one 8 KB page so a
+            -- brand-new, near-empty index on a fresh project isn't flagged
+            -- just because no query has touched it yet.
+            AND pg_relation_size(psui.indexrelid) >= 8192
             AND dep.objid IS NULL
             AND psui.schemaname NOT IN (
               ${ADVISOR_EXCLUDED_SCHEMAS}
@@ -468,30 +480,36 @@ export class DatabaseAdvisorService {
             AND age(clock_timestamp(), state_change) > interval '5 minutes'
         `,
         'low-cache-hit-ratio': `
+          -- Database-wide ratio from pg_stat_database (matches the cloud advisor):
+          -- covers heap + index + toast + catalog reads, so it is far less noisy
+          -- than a heap-only pg_statio_user_tables ratio on small/idle databases.
+          -- Threshold warning < 95%, critical < 90% (cloud parity) instead of the
+          -- old < 99%, which tripped on normal cold-cache fluctuation.
           SELECT
-            'pg_statio_user_tables' AS affected_object,
+            'pg_stat_database' AS affected_object,
             'low-cache-hit-ratio' AS rule_id,
-            'warning' AS severity,
+            CASE WHEN ratio < 90.0 THEN 'critical' ELSE 'warning' END AS severity,
             'performance' AS category,
             'Low Cache Hit Ratio' AS title,
-            'The buffer cache hit ratio is below 99%, which indicates high disk read I/O operations.' AS description,
+            'The database buffer cache hit ratio is below 95%, so queries are frequently reading from disk instead of memory, which increases latency.' AS description,
             format('Database buffer cache hit ratio is %s%%.', round(ratio::numeric, 2)) AS detail,
-            'Increase shared_buffers size or optimize index usage to cache more pages in memory.' AS remediation
+            'Increase shared_buffers (a common target is ~25% of RAM) or add indexes so the working set fits in memory.' AS remediation
           FROM (
             SELECT
               CASE
-                WHEN (sum(heap_blks_hit) + sum(heap_blks_read)) = 0 THEN 100.0
-                ELSE (sum(heap_blks_hit)::float / (sum(heap_blks_hit) + sum(heap_blks_read))::float) * 100
+                WHEN (blks_hit + blks_read) = 0 THEN 100.0
+                ELSE (blks_hit::float / (blks_hit + blks_read)::float) * 100
               END AS ratio
-            FROM pg_statio_user_tables
+            FROM pg_stat_database
+            WHERE datname = current_database()
           ) q
-          WHERE ratio < 99.0
+          WHERE ratio < 95.0
         `,
         'long-running-query': `
           SELECT
             'pg_stat_activity' AS affected_object,
             'long-running-query' AS rule_id,
-            'warning' AS severity,
+            CASE WHEN age(clock_timestamp(), query_start) > interval '30 minutes' THEN 'critical' ELSE 'warning' END AS severity,
             'performance' AS category,
             'Long Running Query' AS title,
             'A query has been running actively for more than 5 minutes.' AS description,
@@ -597,7 +615,7 @@ export class DatabaseAdvisorService {
           SELECT
             relname AS affected_object,
             'dead-tuples' AS rule_id,
-            'warning' AS severity,
+            CASE WHEN dead_ratio > 50.0 THEN 'warning' ELSE 'info' END AS severity,
             'health' AS category,
             'High Dead Tuples Ratio' AS title,
             'The ratio of dead tuples to live tuples is above 20%, which can cause table bloat and degrade performance.' AS description,
@@ -624,7 +642,10 @@ export class DatabaseAdvisorService {
           SELECT
             relname AS affected_object,
             'stale-statistics' AS rule_id,
-            'warning' AS severity,
+            CASE
+              WHEN (last_analyze IS NULL AND last_autoanalyze IS NULL) OR n_mod_since_analyze > 100000
+              THEN 'warning' ELSE 'info'
+            END AS severity,
             'health' AS category,
             'Stale Database Statistics' AS title,
             'The database optimizer statistics are stale because the table has significant modifications since the last analyze operation.' AS description,
@@ -655,7 +676,7 @@ export class DatabaseAdvisorService {
           SELECT
             sequencename AS affected_object,
             'sequence-exhaustion' AS rule_id,
-            'critical' AS severity,
+            CASE WHEN pct_used >= 90.0 THEN 'critical' ELSE 'warning' END AS severity,
             'health' AS category,
             'Sequence Near Exhaustion' AS title,
             'A sequence is close to its maximum limit, which will block further row inserts once exhausted.' AS description,
@@ -674,13 +695,17 @@ export class DatabaseAdvisorService {
             FROM pg_sequences
             WHERE schemaname NOT IN (${ADVISOR_EXCLUDED_SCHEMAS})
           ) q
-          WHERE max_value > 0 AND pct_used >= 80.0
+          WHERE max_value > 0 AND pct_used >= 75.0
         `,
         'autovacuum-blocked': `
           SELECT
             c.relname AS affected_object,
             'autovacuum-blocked' AS rule_id,
-            'critical' AS severity,
+            -- Kept OSS's precise lock-based detection (fires only when an
+            -- autovacuum worker is actually blocked) rather than cloud's
+            -- oldest-transaction proxy; aligned only the severity split:
+            -- critical once the worker has been stuck > 1h, warning below.
+            CASE WHEN age(clock_timestamp(), blocked_activity.query_start) > interval '1 hour' THEN 'critical' ELSE 'warning' END AS severity,
             'health' AS category,
             'Autovacuum Blocked' AS title,
             'An autovacuum process is blocked by locks held by another active database transaction.' AS description,
