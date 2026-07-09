@@ -7,21 +7,22 @@ import type {
 } from '#types';
 import {
   useToast,
+  Button,
+  Input,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogBody,
+  DialogFooter,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@insforge/ui';
-import { Popover, PopoverTrigger, PopoverContent } from '#components/radix';
 import { useSuppressAdvisorIssue } from '#features/dashboard/hooks/useAdvisor';
-
-export const SUPPRESSION_REASON_LABELS: Record<DashboardAdvisorSuppressionReason, string> = {
-  false_positive: 'False positive',
-  accepted_risk: 'Accepted risk',
-  wont_fix: "Won't fix",
-};
-
-const REASONS = Object.keys(SUPPRESSION_REASON_LABELS) as DashboardAdvisorSuppressionReason[];
+import { SUPPRESSION_REASON_LABELS, SUPPRESSION_REASONS } from './suppression';
 
 interface IgnoreMenuProps {
   issue: DashboardAdvisorIssue;
@@ -29,9 +30,8 @@ interface IgnoreMenuProps {
 }
 
 export function IgnoreMenu({ issue, visibilityClass }: IgnoreMenuProps) {
-  const [panel, setPanel] = useState<'closed' | 'menu' | DashboardAdvisorSuppressionScope>(
-    'closed'
-  );
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [formScope, setFormScope] = useState<DashboardAdvisorSuppressionScope | null>(null);
   const [reason, setReason] = useState<DashboardAdvisorSuppressionReason | null>(null);
   const [note, setNote] = useState('');
   const { showToast } = useToast();
@@ -40,24 +40,27 @@ export function IgnoreMenu({ issue, visibilityClass }: IgnoreMenuProps) {
   const openForm = (scope: DashboardAdvisorSuppressionScope) => {
     setReason(null);
     setNote('');
-    setPanel(scope);
+    setFormScope(scope);
   };
 
-  const handleSubmit = () => {
-    if (!reason || panel === 'closed' || panel === 'menu') {
+  const closeForm = () => setFormScope(null);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reason || formScope === null) {
       return;
     }
     suppress.mutate(
       {
         ruleId: issue.ruleId,
-        affectedObject: panel === 'instance' ? issue.affectedObject : undefined,
-        scope: panel,
+        affectedObject: formScope === 'instance' ? issue.affectedObject : undefined,
+        scope: formScope,
         reason,
         note: note.trim() ? note.trim() : undefined,
       },
       {
         onSuccess: () => {
-          setPanel('closed');
+          closeForm();
           showToast('Issue ignored', 'success');
         },
         onError: (error) => {
@@ -67,110 +70,100 @@ export function IgnoreMenu({ issue, visibilityClass }: IgnoreMenuProps) {
     );
   };
 
-  const triggerButton = (
-    <button
-      type="button"
-      aria-label="Ignore options"
-      className={`flex items-center rounded border border-[var(--alpha-8)] bg-card p-1 text-foreground transition-opacity hover:bg-[var(--alpha-4)] ${visibilityClass}`}
-    >
-      <EllipsisVertical className="h-5 w-5" />
-    </button>
-  );
-
-  const isFormOpen = panel === 'instance' || panel === 'rule';
-
   return (
-    <div className="relative" onClick={(e) => e.stopPropagation()}>
-      {isFormOpen ? (
-        <Popover
-          open
-          onOpenChange={(open) => {
-            if (!open) {
-              setPanel('closed');
-            }
-          }}
-        >
-          <PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
-          <PopoverContent align="end" className="w-72 p-3">
-            <p className="text-sm font-medium leading-5 text-foreground">
-              {panel === 'instance' ? 'Ignore this issue' : `Ignore all "${issue.ruleId}" issues`}
-            </p>
-            {panel === 'instance' && issue.affectedObject && (
-              <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
-                {issue.affectedObject}
-              </p>
-            )}
-            <p className="mt-2 text-xs font-medium leading-4 text-muted-foreground">Reason *</p>
-            <div className="mt-1 flex flex-col gap-1">
-              {REASONS.map((r) => (
-                <label
-                  key={r}
-                  className="flex cursor-pointer items-center gap-2 text-sm text-foreground"
-                >
-                  <input
-                    type="radio"
-                    name={`ignore-reason-${issue.id}`}
-                    checked={reason === r}
-                    onChange={() => setReason(r)}
+    <div onClick={(e) => e.stopPropagation()}>
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Ignore options for ${issue.ruleId}${
+              issue.affectedObject ? ` (${issue.affectedObject})` : ''
+            }`}
+            className={`flex items-center rounded border border-[var(--alpha-8)] bg-card p-1 text-foreground transition-opacity hover:bg-[var(--alpha-4)] ${visibilityClass}`}
+          >
+            <EllipsisVertical className="h-5 w-5" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64 p-1">
+          <DropdownMenuItem
+            disabled={!issue.affectedObject}
+            onSelect={(e) => {
+              e.preventDefault();
+              openForm('instance');
+            }}
+          >
+            Ignore this issue
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              openForm('rule');
+            }}
+          >
+            {`Ignore all "${issue.ruleId}" issues`}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Dialog open={formScope !== null} onOpenChange={(open) => !open && closeForm()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {formScope === 'rule' ? `Ignore all "${issue.ruleId}" issues` : 'Ignore this issue'}
+            </DialogTitle>
+            <DialogDescription>
+              {formScope === 'instance' && issue.affectedObject
+                ? issue.affectedObject
+                : "Ignored issues move to the Ignored view and won't count toward active findings."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <DialogBody className="gap-4">
+              <div className="flex items-start gap-3">
+                <span className="w-28 shrink-0 pt-1 text-sm font-medium text-foreground">
+                  Reason
+                </span>
+                <div className="flex flex-1 flex-col gap-2">
+                  {SUPPRESSION_REASONS.map((r) => (
+                    <label key={r} className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name={`ignore-reason-${issue.id}`}
+                        value={r}
+                        checked={reason === r}
+                        onChange={() => setReason(r)}
+                        disabled={suppress.isPending}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm">{SUPPRESSION_REASON_LABELS[r]}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-28 shrink-0 pt-2 text-sm font-medium text-foreground">Note</span>
+                <div className="flex-1">
+                  <Input
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Optional"
+                    maxLength={1000}
+                    disabled={suppress.isPending}
                   />
-                  {SUPPRESSION_REASON_LABELS[r]}
-                </label>
-              ))}
-            </div>
-            <input
-              type="text"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Note (optional)"
-              maxLength={1000}
-              className="mt-2 w-full rounded border border-[var(--alpha-8)] bg-card px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground"
-            />
-            <div className="mt-3 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setPanel('closed')}
-                className="rounded border border-[var(--alpha-8)] bg-card px-2 py-1 text-sm text-foreground hover:bg-[var(--alpha-4)]"
-              >
+                </div>
+              </div>
+            </DialogBody>
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={closeForm}>
                 Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!reason || suppress.isPending}
-                onClick={handleSubmit}
-                className="rounded border border-[var(--alpha-8)] bg-[var(--alpha-8)] px-2 py-1 text-sm text-foreground hover:bg-[var(--alpha-4)] disabled:opacity-50"
-              >
+              </Button>
+              <Button type="submit" disabled={!reason || suppress.isPending}>
                 {suppress.isPending ? 'Ignoring…' : 'Ignore'}
-              </button>
-            </div>
-          </PopoverContent>
-        </Popover>
-      ) : (
-        <DropdownMenu
-          open={panel === 'menu'}
-          onOpenChange={(open) => setPanel(open ? 'menu' : 'closed')}
-        >
-          <DropdownMenuTrigger asChild>{triggerButton}</DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64 p-1">
-            <DropdownMenuItem
-              disabled={!issue.affectedObject}
-              onSelect={(e) => {
-                e.preventDefault();
-                openForm('instance');
-              }}
-            >
-              Ignore this issue
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                openForm('rule');
-              }}
-            >
-              {`Ignore all "${issue.ruleId}" issues`}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

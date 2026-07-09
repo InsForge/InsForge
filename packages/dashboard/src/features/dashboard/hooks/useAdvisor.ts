@@ -41,15 +41,14 @@ export function useAdvisorLatest() {
   });
 }
 
-export function useAdvisorIssues(query: DashboardAdvisorIssuesQuery) {
+export function useAdvisorIssues(query: DashboardAdvisorIssuesQuery, enabled = true) {
   const host = useDashboardHost();
   const fetcher = host.onRequestAdvisorIssues;
-  const isEnabled = !!fetcher;
 
   return useQuery<DashboardAdvisorIssuesResponse, Error>({
     queryKey: ADVISOR_QUERY_KEYS.issues(query),
     queryFn: () => (fetcher ? fetcher(query) : Promise.resolve({ issues: [], total: 0 })),
-    enabled: isEnabled,
+    enabled: enabled && !!fetcher,
     retry: false,
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,
@@ -67,10 +66,9 @@ function emptyMatrix(): AdvisorCategorySeverityMatrix {
 
 const ADVISOR_COUNT_PAGE_SIZE = 100;
 
-export function useAdvisorCategoryCounts() {
+export function useAdvisorCategoryCounts(enabled = true) {
   const host = useDashboardHost();
   const fetcher = host.onRequestAdvisorIssues;
-  const isEnabled = !!fetcher;
 
   return useQuery<AdvisorCategorySeverityMatrix, Error>({
     queryKey: ADVISOR_QUERY_KEYS.categoryCounts,
@@ -95,7 +93,7 @@ export function useAdvisorCategoryCounts() {
       }
       return matrix;
     },
-    enabled: isEnabled,
+    enabled: enabled && !!fetcher,
     retry: false,
     staleTime: 60 * 1000,
   });

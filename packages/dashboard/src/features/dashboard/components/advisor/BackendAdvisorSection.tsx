@@ -5,6 +5,7 @@ import {
   useAdvisorCategoryCounts,
   useAdvisorIssues,
   useAdvisorLatest,
+  useAdvisorSuppressions,
   useTriggerAdvisorScan,
 } from '#features/dashboard/hooks/useAdvisor';
 import type {
@@ -18,7 +19,7 @@ import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import { EmptyState, PaginationControls } from '#components';
 import { AdvisoryItem } from './AdvisoryItem';
 import { AdvisoryTabs, type AdvisoryTabValue } from './AdvisoryTabs';
-import { IgnoredList } from './IgnoredList';
+import { IgnoredList, selectIgnoredRows } from './IgnoredList';
 import { SeverityFilterDropdown } from './SeverityFilterDropdown';
 import { formatRemediationPromptBatch } from './remediationPrompt';
 
@@ -97,8 +98,11 @@ export function BackendAdvisorSection() {
     [serverSeverity, categoryFilter, clientSideSeverityFilter, pageSize, currentPage]
   );
   const latest = useAdvisorLatest();
-  const issues = useAdvisorIssues(issuesQuery);
-  const categoryCounts = useAdvisorCategoryCounts();
+  // Active-scan queries pause on the Ignored view; the suppressions query only
+  // runs when the Ignored view needs it.
+  const issues = useAdvisorIssues(issuesQuery, view === 'active');
+  const categoryCounts = useAdvisorCategoryCounts(view === 'active');
+  const suppressions = useAdvisorSuppressions(view === 'ignored');
   const trigger = useTriggerAdvisorScan();
   const host = useDashboardHost();
   const { showToast } = useToast();
@@ -189,6 +193,16 @@ export function BackendAdvisorSection() {
         health: [...selectedSeverities].reduce((s, sev) => s + matrix.health[sev], 0),
       }
     : undefined;
+
+  // Ignored-view tab counts come from the suppressions themselves (not the
+  // active scan), computed via the same selector the list uses so they match.
+  const ignoredRows = suppressions.data ?? [];
+  const ignoredAllCount = selectIgnoredRows(ignoredRows, undefined, selectedSeverities).length;
+  const ignoredCategoryCounts: Record<DashboardAdvisorCategory, number> = {
+    security: selectIgnoredRows(ignoredRows, 'security', selectedSeverities).length,
+    performance: selectIgnoredRows(ignoredRows, 'performance', selectedSeverities).length,
+    health: selectIgnoredRows(ignoredRows, 'health', selectedSeverities).length,
+  };
 
   // Predict filtered total so reserved height matches what this page will render.
   const predictedFilteredTotal = noSeveritiesSelected
@@ -294,8 +308,8 @@ export function BackendAdvisorSection() {
           <AdvisoryTabs
             value={tab}
             onChange={setTab}
-            totalCount={filteredAllCount}
-            categoryCounts={filteredCategoryCounts}
+            totalCount={view === 'ignored' ? ignoredAllCount : filteredAllCount}
+            categoryCounts={view === 'ignored' ? ignoredCategoryCounts : filteredCategoryCounts}
           />
         </div>
         <div className="flex items-center gap-2">
@@ -312,21 +326,16 @@ export function BackendAdvisorSection() {
             )}
             <span>{isScanning ? 'Scanning…' : 'Re-scan'}</span>
           </button>
+          <SeverityFilterDropdown selected={selectedSeverities} onChange={setSelectedSeverities} />
           {view === 'active' && (
-            <>
-              <SeverityFilterDropdown
-                selected={selectedSeverities}
-                onChange={setSelectedSeverities}
-              />
-              <button
-                type="button"
-                onClick={() => void handleCopyAll()}
-                className={ADVISOR_BUTTON_CLASS}
-              >
-                {copiedAll ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                <span>{copiedAll ? 'Copied' : 'Copy All'}</span>
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => void handleCopyAll()}
+              className={ADVISOR_BUTTON_CLASS}
+            >
+              {copiedAll ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              <span>{copiedAll ? 'Copied' : 'Copy All'}</span>
+            </button>
           )}
         </div>
       </div>
@@ -337,7 +346,7 @@ export function BackendAdvisorSection() {
       >
         <div className="flex flex-col rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)]">
           {view === 'ignored' ? (
-            <IgnoredList category={categoryFilter} />
+            <IgnoredList category={categoryFilter} selectedSeverities={selectedSeverities} />
           ) : !hasScan && !latest.isLoading ? (
             <EmptyState
               className="h-32 gap-1"
