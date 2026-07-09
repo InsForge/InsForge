@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS system.advisor_suppressions (
   rule_id         TEXT NOT NULL,
   affected_object TEXT,
   scope           TEXT NOT NULL DEFAULT 'instance' CHECK (scope IN ('instance', 'rule')),
-  reason          TEXT NOT NULL CHECK (reason IN ('false_positive', 'accepted_risk', 'wont_fix')),
+  reason          TEXT NOT NULL CHECK (reason IN ('false_positive', 'accepted_risk', 'wont_fix', 'other')),
   note            TEXT,
   created_by      TEXT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -45,9 +45,13 @@ export function IgnoreMenu({ issue, visibilityClass }: IgnoreMenuProps) {
 
   const closeForm = () => setFormScope(null);
 
+  // "Other" gives no standardized signal, so a free-text note is mandatory.
+  const noteRequired = reason === 'other';
+  const canSubmit = !!reason && (!noteRequired || note.trim().length > 0);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reason || formScope === null) {
+    if (!canSubmit || formScope === null) {
       return;
     }
     suppress.mutate(
@@ -111,10 +115,8 @@ export function IgnoreMenu({ issue, visibilityClass }: IgnoreMenuProps) {
             <DialogTitle>
               {formScope === 'rule' ? `Ignore all "${issue.ruleId}" issues` : 'Ignore this issue'}
             </DialogTitle>
-            <DialogDescription>
-              {formScope === 'instance' && issue.affectedObject
-                ? issue.affectedObject
-                : "Ignored issues move to the Ignored view and won't count toward active findings."}
+            <DialogDescription className="sr-only">
+              Choose a reason to move this advisor finding to the Ignored view.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
@@ -135,18 +137,22 @@ export function IgnoreMenu({ issue, visibilityClass }: IgnoreMenuProps) {
                         disabled={suppress.isPending}
                         className="accent-primary"
                       />
-                      <span className="text-sm">{SUPPRESSION_REASON_LABELS[r]}</span>
+                      <span className="text-sm text-foreground">
+                        {SUPPRESSION_REASON_LABELS[r]}
+                      </span>
                     </label>
                   ))}
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <span className="w-28 shrink-0 pt-2 text-sm font-medium text-foreground">Note</span>
+                <span className="w-28 shrink-0 pt-2 text-sm font-medium text-foreground">
+                  {noteRequired ? 'Note *' : 'Note'}
+                </span>
                 <div className="flex-1">
                   <Input
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    placeholder="Optional"
+                    placeholder={noteRequired ? 'Required' : 'Optional'}
                     maxLength={1000}
                     disabled={suppress.isPending}
                   />
@@ -157,7 +163,7 @@ export function IgnoreMenu({ issue, visibilityClass }: IgnoreMenuProps) {
               <Button type="button" variant="secondary" onClick={closeForm}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!reason || suppress.isPending}>
+              <Button type="submit" disabled={!canSubmit || suppress.isPending}>
                 {suppress.isPending ? 'Ignoring…' : 'Ignore'}
               </Button>
             </DialogFooter>

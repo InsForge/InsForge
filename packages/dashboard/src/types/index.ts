@@ -131,7 +131,11 @@ export interface DashboardAdvisorIssuesQuery {
 }
 
 export type DashboardAdvisorSuppressionScope = 'instance' | 'rule';
-export type DashboardAdvisorSuppressionReason = 'false_positive' | 'accepted_risk' | 'wont_fix';
+export type DashboardAdvisorSuppressionReason =
+  | 'false_positive'
+  | 'accepted_risk'
+  | 'wont_fix'
+  | 'other';
 
 export interface DashboardAdvisorSuppression {
   id: string;

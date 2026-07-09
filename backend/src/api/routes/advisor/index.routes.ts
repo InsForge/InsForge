@@ -140,7 +140,7 @@ router.post(
       }
       if (!SUPPRESSION_REASONS.includes(reason)) {
         throw new AppError(
-          'Invalid reason: must be one of false_positive, accepted_risk, wont_fix',
+          `Invalid reason: must be one of ${SUPPRESSION_REASONS.join(', ')}`,
           400,
           ERROR_CODES.INVALID_INPUT
         );
@@ -160,6 +160,13 @@ router.post(
       if (note !== undefined && note !== null && (typeof note !== 'string' || note.length > 1000)) {
         throw new AppError(
           'Invalid note: must be a string of at most 1000 characters',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+      if (reason === 'other' && (typeof note !== 'string' || note.trim().length === 0)) {
+        throw new AppError(
+          'Invalid note: required when reason is "other"',
           400,
           ERROR_CODES.INVALID_INPUT
         );

@@ -369,6 +369,33 @@ describe('Database Advisor Unit Tests', () => {
       expect(bad2.body.error).toContain('Invalid reason');
     });
 
+    it('POST /api/advisor/suppressions should 400 when reason is "other" without a note', async () => {
+      const res = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'x', scope: 'rule', reason: 'other' })
+        .expect(400);
+      expect(res.body.error).toContain('required when reason is "other"');
+    });
+
+    it('POST /api/advisor/suppressions should 201 when reason is "other" with a note', async () => {
+      vi.spyOn(DatabaseAdvisorService.getInstance(), 'createSuppression').mockResolvedValue({
+        id: '66666666-6666-6666-6666-666666666666',
+        ruleId: 'rls-select-only',
+        affectedObject: null,
+        scope: 'rule',
+        reason: 'other',
+        note: 'team decision',
+        createdBy: 'admin-id',
+        createdAt: new Date().toISOString(),
+      });
+
+      const res = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'rls-select-only', scope: 'rule', reason: 'other', note: 'team decision' })
+        .expect(201);
+      expect(res.body.reason).toBe('other');
+    });
+
     it('POST /api/advisor/suppressions should 400 when instance scope lacks affectedObject', async () => {
       const res = await request(app)
         .post('/api/advisor/suppressions')

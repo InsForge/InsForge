@@ -36,7 +36,7 @@ export interface AdvisorIssue {
  * them, so adding/removing a value updates both at once.
  */
 export const SUPPRESSION_SCOPES = ['instance', 'rule'] as const;
-export const SUPPRESSION_REASONS = ['false_positive', 'accepted_risk', 'wont_fix'] as const;
+export const SUPPRESSION_REASONS = ['false_positive', 'accepted_risk', 'wont_fix', 'other'] as const;
 
 export type AdvisorSuppressionScope = (typeof SUPPRESSION_SCOPES)[number];
 export type AdvisorSuppressionReason = (typeof SUPPRESSION_REASONS)[number];
