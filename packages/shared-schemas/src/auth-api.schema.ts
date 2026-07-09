@@ -440,13 +440,6 @@ export const upsertSmtpConfigRequestSchema = z
         message: 'SMTP host is required',
       });
     }
-    if (data.username.length < 1) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['username'],
-        message: 'SMTP username is required',
-      });
-    }
     if (!z.string().email().safeParse(data.senderEmail).success) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

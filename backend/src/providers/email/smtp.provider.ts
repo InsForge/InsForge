@@ -32,12 +32,15 @@ export class SmtpEmailProvider implements EmailProvider {
   }
 
   private createTransporter(config: RawSmtpConfig) {
-    const hasAuth = config.username && config.password;
+    // Skip auth entirely only when no username is configured (e.g. Mailhog, local
+    // dev SMTP). If a username is present, always send credentials — a blank
+    // password can be intentional and must not suppress the auth header.
+    const hasAuth = !!config.username;
     return nodemailer.createTransport({
       host: config.host,
       port: config.port,
       secure: config.port === 465,
-      auth: hasAuth ? { user: config.username, pass: config.password } : false,
+      ...(hasAuth ? { auth: { user: config.username, pass: config.password } } : {}),
       connectionTimeout: 10000,
     });
   }
