@@ -40,6 +40,7 @@ Dokploy
 docker
 dockerfile
 env
+Firebase
 flyctl
 github
 hardcoding
@@ -101,6 +102,7 @@ rmcp
 roocode
 runbook
 runtimes
+Schemaless
 sdk
 SDKs
 select_account
@@ -113,6 +115,7 @@ stderr
 subcommand
 subcommands
 sudo
+Supabase
 systemd
 tmpfs
 transactionally

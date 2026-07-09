@@ -5,6 +5,7 @@ import {
   useAdvisorCategoryCounts,
   useAdvisorIssues,
   useAdvisorLatest,
+  useAdvisorSuppressions,
   useTriggerAdvisorScan,
 } from '#features/dashboard/hooks/useAdvisor';
 import type {
@@ -18,6 +19,7 @@ import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import { EmptyState, PaginationControls } from '#components';
 import { AdvisoryItem } from './AdvisoryItem';
 import { AdvisoryTabs, type AdvisoryTabValue } from './AdvisoryTabs';
+import { IgnoredList, selectIgnoredRows } from './IgnoredList';
 import { SeverityFilterDropdown } from './SeverityFilterDropdown';
 import { formatRemediationPromptBatch } from './remediationPrompt';
 
@@ -56,6 +58,7 @@ const ADVISOR_BUTTON_CLASS =
 
 export function BackendAdvisorSection() {
   const [tab, setTab] = useState<AdvisoryTabValue>('all');
+  const [view, setView] = useState<'active' | 'ignored'>('active');
   const [selectedSeverities, setSelectedSeverities] = useState<Set<DashboardAdvisorSeverity>>(
     () => new Set(ALL_SEVERITIES)
   );
@@ -73,10 +76,10 @@ export function BackendAdvisorSection() {
   const categoryFilter: DashboardAdvisorCategory | undefined =
     tab === 'all' ? undefined : (tab as DashboardAdvisorCategory);
 
-  // Reset to first page when filters change.
+  // Reset to first page when filters or the active/ignored view change.
   useEffect(() => {
     setCurrentPage(1);
-  }, [tab, pageSize, selectedSeverities]);
+  }, [tab, pageSize, selectedSeverities, view]);
 
   // Collapse any expanded item when filters or page change so the visible row set stays in sync.
   useEffect(() => {
@@ -95,8 +98,11 @@ export function BackendAdvisorSection() {
     [serverSeverity, categoryFilter, clientSideSeverityFilter, pageSize, currentPage]
   );
   const latest = useAdvisorLatest();
-  const issues = useAdvisorIssues(issuesQuery);
-  const categoryCounts = useAdvisorCategoryCounts();
+  // Active-scan queries pause on the Ignored view; the suppressions query only
+  // runs when the Ignored view needs it.
+  const issues = useAdvisorIssues(issuesQuery, view === 'active');
+  const categoryCounts = useAdvisorCategoryCounts(view === 'active');
+  const suppressions = useAdvisorSuppressions(view === 'ignored');
   const trigger = useTriggerAdvisorScan();
   const host = useDashboardHost();
   const { showToast } = useToast();
@@ -133,6 +139,10 @@ export function BackendAdvisorSection() {
           setIsScanning(false);
           void queryClient.invalidateQueries({ queryKey: ['advisor', 'issues'] });
           void queryClient.invalidateQueries({ queryKey: ['advisor', 'category-counts'] });
+          // Suppressions are enriched (title/severity/category) from the latest
+          // completed scan, so refresh them too or the Ignored view and its tab
+          // counts go stale after a re-scan.
+          void queryClient.invalidateQueries({ queryKey: ['advisor', 'suppressions'] });
           if (data.status === 'failed') {
             showToast('Scan failed. Check backend logs.', 'error');
           } else {
@@ -188,6 +198,24 @@ export function BackendAdvisorSection() {
       }
     : undefined;
 
+  // Ignored-view tab counts come from the suppressions themselves (not the
+  // active scan), computed via the same selector the list uses so they match.
+  const ignoredRows = suppressions.data ?? [];
+  const ignoredAllCount = selectIgnoredRows(ignoredRows, undefined, selectedSeverities).length;
+  const ignoredCategoryCounts: Record<DashboardAdvisorCategory, number> = {
+    security: selectIgnoredRows(ignoredRows, 'security', selectedSeverities).length,
+    performance: selectIgnoredRows(ignoredRows, 'performance', selectedSeverities).length,
+    health: selectIgnoredRows(ignoredRows, 'health', selectedSeverities).length,
+  };
+  // Total rows the Ignored view will render for the current filters — drives
+  // its client-side pagination (same 10/page scheme as the Active view).
+  const ignoredVisibleTotal = selectIgnoredRows(
+    ignoredRows,
+    categoryFilter,
+    selectedSeverities
+  ).length;
+  const ignoredTotalPages = Math.max(1, Math.ceil(ignoredVisibleTotal / pageSize));
+
   // Predict filtered total so reserved height matches what this page will render.
   const predictedFilteredTotal = noSeveritiesSelected
     ? 0
@@ -221,6 +249,16 @@ export function BackendAdvisorSection() {
       ? filteredIssues.length
       : fetchedTotal;
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+
+  // Clamp the page if the visible set shrinks under it — e.g. restoring the
+  // last ignored item on the last page, or ignoring the last active item —
+  // so the user never lands on a blank page.
+  const activePageBound = view === 'ignored' ? ignoredTotalPages : totalPages;
+  useEffect(() => {
+    if (currentPage > activePageBound) {
+      setCurrentPage(activePageBound);
+    }
+  }, [currentPage, activePageBound]);
 
   const handleCopyAll = async () => {
     const fetcher = host.onRequestAdvisorIssues;
@@ -272,12 +310,30 @@ export function BackendAdvisorSection() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <AdvisoryTabs
-          value={tab}
-          onChange={setTab}
-          totalCount={filteredAllCount}
-          categoryCounts={filteredCategoryCounts}
-        />
+        <div className="flex items-center gap-3">
+          <div className="flex items-center rounded border border-[var(--alpha-8)] p-0.5">
+            {(['active', 'ignored'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setView(v)}
+                className={`rounded px-2 py-1 text-sm leading-5 capitalize ${
+                  view === v
+                    ? 'bg-[var(--alpha-8)] text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+          <AdvisoryTabs
+            value={tab}
+            onChange={setTab}
+            totalCount={view === 'ignored' ? ignoredAllCount : filteredAllCount}
+            categoryCounts={view === 'ignored' ? ignoredCategoryCounts : filteredCategoryCounts}
+          />
+        </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -293,14 +349,16 @@ export function BackendAdvisorSection() {
             <span>{isScanning ? 'Scanning…' : 'Re-scan'}</span>
           </button>
           <SeverityFilterDropdown selected={selectedSeverities} onChange={setSelectedSeverities} />
-          <button
-            type="button"
-            onClick={() => void handleCopyAll()}
-            className={ADVISOR_BUTTON_CLASS}
-          >
-            {copiedAll ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            <span>{copiedAll ? 'Copied' : 'Copy All'}</span>
-          </button>
+          {view === 'active' && (
+            <button
+              type="button"
+              onClick={() => void handleCopyAll()}
+              className={ADVISOR_BUTTON_CLASS}
+            >
+              {copiedAll ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              <span>{copiedAll ? 'Copied' : 'Copy All'}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -309,7 +367,14 @@ export function BackendAdvisorSection() {
         className="flex flex-col gap-4"
       >
         <div className="flex flex-col rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)]">
-          {!hasScan && !latest.isLoading ? (
+          {view === 'ignored' ? (
+            <IgnoredList
+              category={categoryFilter}
+              selectedSeverities={selectedSeverities}
+              page={currentPage}
+              pageSize={pageSize}
+            />
+          ) : !hasScan && !latest.isLoading ? (
             <EmptyState
               className="h-32 gap-1"
               title="No scan yet"
@@ -343,7 +408,7 @@ export function BackendAdvisorSection() {
           )}
         </div>
 
-        {hasScan && totalRecords > 0 && (
+        {view === 'active' && hasScan && totalRecords > 0 && (
           <PaginationControls
             currentPage={currentPage}
             totalPages={totalPages}
@@ -351,6 +416,17 @@ export function BackendAdvisorSection() {
             totalRecords={totalRecords}
             pageSize={pageSize}
             recordLabel="issues"
+          />
+        )}
+
+        {view === 'ignored' && ignoredVisibleTotal > 0 && (
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={ignoredTotalPages}
+            onPageChange={setCurrentPage}
+            totalRecords={ignoredVisibleTotal}
+            pageSize={pageSize}
+            recordLabel="ignored issues"
           />
         )}
       </div>

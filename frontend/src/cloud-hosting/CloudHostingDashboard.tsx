@@ -23,9 +23,6 @@ export function CloudHostingDashboard() {
     requestUserApiKey,
     requestModelCredits,
     requestProjectMetrics,
-    requestAdvisorLatest,
-    requestAdvisorIssues,
-    triggerAdvisorScan,
     connectPosthog,
     openPosthog,
     subscribePosthogConnectionStatus,
@@ -57,9 +54,6 @@ export function CloudHostingDashboard() {
       onRequestUserApiKey={requestUserApiKey}
       onRequestModelCredits={requestModelCredits}
       onRequestProjectMetrics={requestProjectMetrics}
-      onRequestAdvisorLatest={requestAdvisorLatest}
-      onRequestAdvisorIssues={requestAdvisorIssues}
-      onTriggerAdvisorScan={triggerAdvisorScan}
       onConnectPosthog={connectPosthog}
       onOpenPosthog={openPosthog}
       subscribePosthogConnectionStatus={subscribePosthogConnectionStatus}

@@ -14,6 +14,8 @@ import type {
   DashboardAdvisorSummary,
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
+  DashboardAdvisorSuppression,
+  DashboardAdvisorSuppressRequest,
 } from '#types';
 
 interface DashboardHostContextValue {
@@ -46,6 +48,9 @@ interface DashboardHostContextValue {
     query: DashboardAdvisorIssuesQuery
   ) => Promise<DashboardAdvisorIssuesResponse>;
   onTriggerAdvisorScan?: () => Promise<void>;
+  onRequestAdvisorSuppressions?: () => Promise<DashboardAdvisorSuppression[]>;
+  onSuppressAdvisorIssue?: (req: DashboardAdvisorSuppressRequest) => Promise<void>;
+  onUnsuppressAdvisorIssue?: (id: string) => Promise<void>;
   onConnectPosthog?: (projectId: string) => void;
   subscribePosthogConnectionStatus?: (
     cb: (event: DashboardPosthogConnectionStatus) => void
