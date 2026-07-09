@@ -6,6 +6,8 @@ import type {
   DashboardAdvisorIssuesResponse,
   DashboardAdvisorSeverity,
   DashboardAdvisorSummary,
+  DashboardAdvisorSuppression,
+  DashboardAdvisorSuppressRequest,
 } from '#types';
 
 export type AdvisorCategorySeverityMatrix = DashboardAdvisorCategoryCountsResponse;
@@ -22,6 +24,7 @@ export const ADVISOR_QUERY_KEYS = {
       q.offset ?? 0,
     ] as const,
   categoryCounts: ['advisor', 'category-counts'] as const,
+  suppressions: ['advisor', 'suppressions'] as const,
 };
 
 export function useAdvisorLatest() {
@@ -38,15 +41,14 @@ export function useAdvisorLatest() {
   });
 }
 
-export function useAdvisorIssues(query: DashboardAdvisorIssuesQuery) {
+export function useAdvisorIssues(query: DashboardAdvisorIssuesQuery, enabled = true) {
   const host = useDashboardHost();
   const fetcher = host.onRequestAdvisorIssues;
-  const isEnabled = !!fetcher;
 
   return useQuery<DashboardAdvisorIssuesResponse, Error>({
     queryKey: ADVISOR_QUERY_KEYS.issues(query),
     queryFn: () => (fetcher ? fetcher(query) : Promise.resolve({ issues: [], total: 0 })),
-    enabled: isEnabled,
+    enabled: enabled && !!fetcher,
     retry: false,
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,
@@ -64,10 +66,9 @@ function emptyMatrix(): AdvisorCategorySeverityMatrix {
 
 const ADVISOR_COUNT_PAGE_SIZE = 100;
 
-export function useAdvisorCategoryCounts() {
+export function useAdvisorCategoryCounts(enabled = true) {
   const host = useDashboardHost();
   const fetcher = host.onRequestAdvisorIssues;
-  const isEnabled = !!fetcher;
 
   return useQuery<AdvisorCategorySeverityMatrix, Error>({
     queryKey: ADVISOR_QUERY_KEYS.categoryCounts,
@@ -92,7 +93,7 @@ export function useAdvisorCategoryCounts() {
       }
       return matrix;
     },
-    enabled: isEnabled,
+    enabled: enabled && !!fetcher,
     retry: false,
     staleTime: 60 * 1000,
   });
@@ -105,6 +106,47 @@ export function useTriggerAdvisorScan() {
 
   return useMutation<void, Error, void>({
     mutationFn: () => (trigger ? trigger() : Promise.reject(new Error('Scan unavailable'))),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['advisor'] });
+    },
+  });
+}
+
+export function useAdvisorSuppressions(enabled = true) {
+  const host = useDashboardHost();
+  const fetcher = host.onRequestAdvisorSuppressions;
+
+  return useQuery<DashboardAdvisorSuppression[], Error>({
+    queryKey: ADVISOR_QUERY_KEYS.suppressions,
+    queryFn: () => (fetcher ? fetcher() : Promise.resolve([])),
+    enabled: enabled && !!fetcher,
+    retry: false,
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useSuppressAdvisorIssue() {
+  const host = useDashboardHost();
+  const suppress = host.onSuppressAdvisorIssue;
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, DashboardAdvisorSuppressRequest>({
+    mutationFn: (req) =>
+      suppress ? suppress(req) : Promise.reject(new Error('Ignore unavailable')),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['advisor'] });
+    },
+  });
+}
+
+export function useUnsuppressAdvisorIssue() {
+  const host = useDashboardHost();
+  const unsuppress = host.onUnsuppressAdvisorIssue;
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: (id) =>
+      unsuppress ? unsuppress(id) : Promise.reject(new Error('Restore unavailable')),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['advisor'] });
     },
