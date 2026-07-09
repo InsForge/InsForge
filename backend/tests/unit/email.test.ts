@@ -407,30 +407,34 @@ describe('EmailService', () => {
       const { appConfig } = await import('../../src/infra/config/app.config');
       appConfig.cloud.projectId = 'local';
 
-      await expect(
-        emailService.sendRaw({
-          to: 'user@example.com',
-          subject: 'Hello',
-          html: '<p>Hello</p>',
-        })
-      ).rejects.toThrow('PROJECT_ID is not configured');
-
-      appConfig.cloud.projectId = 'test-project-123';
+      try {
+        await expect(
+          emailService.sendRaw({
+            to: 'user@example.com',
+            subject: 'Hello',
+            html: '<p>Hello</p>',
+          })
+        ).rejects.toThrow('PROJECT_ID is not configured');
+      } finally {
+        appConfig.cloud.projectId = 'test-project-123';
+      }
     });
 
     it('throws error if JWT_SECRET is not configured', async () => {
       const { appConfig } = await import('../../src/infra/config/app.config');
       appConfig.app.jwtSecret = '';
 
-      await expect(
-        emailService.sendRaw({
-          to: 'user@example.com',
-          subject: 'Hello',
-          html: '<p>Hello</p>',
-        })
-      ).rejects.toThrow('JWT_SECRET is not configured');
-
-      appConfig.app.jwtSecret = 'test-jwt-secret';
+      try {
+        await expect(
+          emailService.sendRaw({
+            to: 'user@example.com',
+            subject: 'Hello',
+            html: '<p>Hello</p>',
+          })
+        ).rejects.toThrow('JWT_SECRET is not configured');
+      } finally {
+        appConfig.app.jwtSecret = 'test-jwt-secret';
+      }
     });
 
     it('throws error if cloud service returns unsuccessful response', async () => {
@@ -587,14 +591,17 @@ describe('EmailService', () => {
       service.cloudProvider = {
         supportsTemplates: () => true,
       };
-      await expect(
-        emailService.sendRaw({
-          to: 'user@example.com',
-          subject: 'Hello',
-          html: '<p>Hello</p>',
-        })
-      ).rejects.toThrow('Current email provider does not support raw email sending');
-      service.cloudProvider = originalProvider;
+      try {
+        await expect(
+          emailService.sendRaw({
+            to: 'user@example.com',
+            subject: 'Hello',
+            html: '<p>Hello</p>',
+          })
+        ).rejects.toThrow('Current email provider does not support raw email sending');
+      } finally {
+        service.cloudProvider = originalProvider;
+      }
     });
   });
 });
