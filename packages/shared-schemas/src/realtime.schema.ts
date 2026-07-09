@@ -145,35 +145,6 @@ export const subscribeResponseSchema = z.discriminatedUnion('ok', [
 export type SubscribeResponse = z.infer<typeof subscribeResponseSchema>;
 
 /**
- * Payload for realtime:auth client event — re-authenticate a live socket with
- * a refreshed token, without dropping the connection. Only valid for the same
- * identity; identity changes require a reconnect.
- */
-export const realtimeAuthPayloadSchema = z.object({
-  token: z.string().min(1),
-});
-
-export type RealtimeAuthPayload = z.infer<typeof realtimeAuthPayloadSchema>;
-
-/**
- * Response for realtime:auth (used in Socket.IO ack callbacks)
- */
-export const realtimeAuthResponseSchema = z.discriminatedUnion('ok', [
-  z.object({
-    ok: z.literal(true),
-  }),
-  z.object({
-    ok: z.literal(false),
-    error: z.object({
-      code: z.string().min(1),
-      message: z.string().min(1),
-    }),
-  }),
-]);
-
-export type RealtimeAuthResponse = z.infer<typeof realtimeAuthResponseSchema>;
-
-/**
  * Payload for realtime:error server event (for unsolicited errors like publish failures)
  */
 export const realtimeErrorPayloadSchema = z.object({

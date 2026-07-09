@@ -315,7 +315,7 @@ If you render directly from `getPresenceState()`, `presence:sync` is simply your
 
 ### Token refreshes
 
-When the signed-in user's access token refreshes, the SDK re-authenticates the live connection in-band — no reconnect, no presence churn for other members. The socket only reconnects when the identity actually changes: sign-in, sign-out, or switching users.
+When the signed-in user's access token refreshes, the SDK leaves an established socket connected — there is no in-band re-authentication, reconnect, or presence churn. A later initial connection or network reconnect obtains the latest access token before its handshake. Sign-in, sign-out, or switching users reconnects the socket under the new identity.
 
 Access *reductions* apply lazily on a live connection: publishing is re-checked against RLS on every message and new subscribes are re-checked at join time, but continued receipt on already-joined channels persists until the client unsubscribes or reconnects.
 
