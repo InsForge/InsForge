@@ -30,10 +30,23 @@ usageRouter.post(
       // Create MCP usage record via service
       const result = await usageService.recordMCPUsage(tool_name, success);
 
-      // Broadcast MCP tool usage to frontend via socket
-      const socketService = SocketManager.getInstance();
+      // Auto-set MCP status to connected on tool use (if not already)
+      // Skip this if the tool name is 'cli.mcp.disconnect'
+      if (tool_name !== 'cli.mcp.disconnect') {
+        const currentStatus = await usageService.getMCPConnectionStatus();
+        if (currentStatus !== 'connected') {
+          await usageService.updateMCPConnectionStatus('connected');
+          SocketManager.getInstance().broadcastToRoom(
+            'role:project_admin',
+            ServerEvents.MCP_STATUS_CHANGED,
+            { status: 'connected' },
+            'system'
+          );
+        }
+      }
 
-      socketService.broadcastToRoom(
+      // Broadcast MCP tool usage to frontend via socket
+      SocketManager.getInstance().broadcastToRoom(
         'role:project_admin',
         ServerEvents.MCP_CONNECTED,
         { tool_name, created_at: result.created_at },
@@ -41,6 +54,52 @@ usageRouter.post(
       );
 
       successResponse(res, { success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Get MCP connection status
+usageRouter.get(
+  '/mcp/status',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const status = await usageService.getMCPConnectionStatus();
+      successResponse(res, { status });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Update MCP connection status (called by CLI connect/disconnect)
+usageRouter.post(
+  '/mcp/status',
+  verifyApiKey,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { status } = req.body;
+
+      if (status !== 'connected' && status !== 'disconnected') {
+        throw new AppError(
+          'status must be "connected" or "disconnected"',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      await usageService.updateMCPConnectionStatus(status);
+
+      SocketManager.getInstance().broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.MCP_STATUS_CHANGED,
+        { status },
+        'system'
+      );
+
+      successResponse(res, { success: true, status });
     } catch (error) {
       next(error);
     }

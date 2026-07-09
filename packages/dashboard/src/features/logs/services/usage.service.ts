@@ -11,7 +11,25 @@ export interface McpUsageResponse {
   records: McpUsageRecord[];
 }
 
+export type McpConnectionStatus = 'connected' | 'disconnected';
+
+export interface McpConnectionStatusResponse {
+  status: McpConnectionStatus;
+}
+
 export class UsageService {
+  /**
+   * Get the current MCP connection status
+   */
+  async getMcpConnectionStatus(signal?: AbortSignal): Promise<McpConnectionStatus> {
+    const data = (await apiClient.request('/usage/mcp/status', {
+      headers: apiClient.withAccessToken(),
+      signal,
+    })) as McpConnectionStatusResponse;
+
+    return data.status ?? 'disconnected';
+  }
+
   /**
    * Get MCP usage records
    */

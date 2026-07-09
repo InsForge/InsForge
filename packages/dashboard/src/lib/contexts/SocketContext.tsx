@@ -31,6 +31,7 @@ export enum ServerEvents {
   NOTIFICATION = 'notification',
   DATA_UPDATE = 'data:update',
   MCP_CONNECTED = 'mcp:connected',
+  MCP_STATUS_CHANGED = 'mcp:status_changed',
 }
 
 // ============================================================================
@@ -340,12 +341,19 @@ export function SocketProvider({ children }: SocketProviderProps) {
       onMcpConnectedSuccess(toolName);
     };
 
+    // Handle MCP_STATUS_CHANGED events - update the connection status UI
+    const handleMcpStatusChanged = () => {
+      void queryClient.invalidateQueries({ queryKey: ['mcp-status'] });
+    };
+
     socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
     socket.on(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+    socket.on(ServerEvents.MCP_STATUS_CHANGED, handleMcpStatusChanged);
 
     return () => {
       socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
       socket.off(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+      socket.off(ServerEvents.MCP_STATUS_CHANGED, handleMcpStatusChanged);
     };
   }, [state.isConnected, queryClient, onMcpConnectedSuccess]);
 
