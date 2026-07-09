@@ -100,6 +100,10 @@ export interface AppConfig {
   ai: {
     openrouterApiKey: string | undefined;
   };
+  marketplace: {
+    // URL of the hosted marketplace.json catalog; empty = bundled catalog only
+    catalogUrl: string;
+  };
   telemetry: {
     disabled: boolean;
   };
@@ -229,6 +233,11 @@ export function loadConfig(): AppConfig {
     },
     ai: {
       openrouterApiKey: process.env.OPENROUTER_API_KEY || undefined,
+    },
+    marketplace: {
+      catalogUrl:
+        process.env.MARKETPLACE_CATALOG_URL ||
+        'https://api.insforge.dev/marketplace/v1/catalog',
     },
     telemetry: {
       disabled: parseEnvBool(process.env.INSFORGE_TELEMETRY_DISABLED),

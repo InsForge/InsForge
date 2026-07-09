@@ -18,6 +18,7 @@ import {
   BookOpen,
   CreditCard,
   Megaphone,
+  ShoppingBag,
 } from 'lucide-react';
 
 export interface DashboardSecondaryMenuItem {
@@ -115,6 +116,12 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     label: 'Payments',
     href: '/dashboard/payments',
     icon: CreditCard,
+  },
+  {
+    id: 'marketplace',
+    label: 'Marketplace',
+    href: '/dashboard/marketplace',
+    icon: ShoppingBag,
     sectionEnd: true,
   },
   {
