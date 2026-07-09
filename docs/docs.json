@@ -34,6 +34,7 @@
             "pages": [
               "introduction",
               "products",
+              "comparison",
               {
                 "group": "Quickstart",
                 "expanded": true,
@@ -151,7 +152,8 @@
           {
             "group": "Resources",
             "pages": [
-              "showcase"
+              "showcase",
+              "pricing"
             ]
           }
         ]

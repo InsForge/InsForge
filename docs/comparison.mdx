@@ -1,0 +1,80 @@
+---
+title: "InsForge vs. Supabase and Firebase"
+description: "How InsForge compares as the agent-native cloud infrastructure platform."
+---
+
+InsForge is the **agent-native cloud infrastructure platform**. A coding agent
+gives any app a Postgres database, authentication, storage, edge functions,
+compute, hosting, and an AI model gateway, driven end to end through one CLI. It
+is open source (Apache-2.0).
+
+Its MCP server and CLI expose that infrastructure as structured,
+machine-readable context, so AI coding agents can plan and execute operations
+autonomously within scoped permissions. The shift in the human's role: with
+traditional platforms you **implement and execute**; with InsForge you **define
+intent and review**.
+
+<Note>
+  For the full, always-current write-ups see
+  [InsForge vs Supabase](https://insforge.dev/alternatives/insforge-vs-supabase)
+  and [InsForge vs Firebase](https://insforge.dev/alternatives/insforge-vs-firebase).
+</Note>
+
+## InsForge vs. Supabase
+
+Supabase is an open-source, Postgres-based backend built for human developers.
+InsForge shares the Postgres foundation but is built for AI coding agents as
+first-class operators.
+
+| Dimension | Supabase | InsForge |
+|---|---|---|
+| Primary operator | Human developers | AI coding agents |
+| Configuration model | Explicit UI, SQL, CLI | Agent-executed operations |
+| Permission design | Developer-managed access | Scoped agent autonomy |
+| System context | Implicit, developer-maintained | Structured, machine-readable (MCP) |
+| Payments | Via app code | Built-in Stripe integration |
+| AI model access | External model wiring | Built-in model gateway |
+| Security | Per-integration implementation | Production-ready defaults |
+| Agent readiness | Requires manual wiring | End-to-end operable |
+
+## InsForge vs. Firebase
+
+Firebase targets rapid prototyping on document-oriented NoSQL with human
+operators. InsForge targets agentic coding on relational Postgres.
+
+| Dimension | Firebase | InsForge |
+|---|---|---|
+| Database | Document-oriented NoSQL | Relational Postgres |
+| Data model | Schemaless JSON | Structured tables with relations |
+| Joins | Not natively supported | Native joins and queries |
+| Transactions | Supported with limits | Full ACID transactions |
+| Self-hosting | Not supported | Docker / self-hostable |
+| Primary operator | Human developers | AI coding agents |
+| System context | Implicit, fragmented | Structured, machine-readable (MCP) |
+| AI integration | External setup | Built-in model gateway |
+| Payments | Manual integration | Built-in Stripe primitive |
+
+## Why teams pick InsForge
+
+<CardGroup cols={2}>
+  <Card title="Agent-native by design" icon="robot">
+    One MCP server exposes schemas, permissions, and logs as structured context,
+    so an AI coding agent can provision and operate the whole stack end to end,
+    not just query a database.
+  </Card>
+  <Card title="Production-ready primitives" icon="layer-group">
+    Payments (Stripe), an AI model gateway, and deployment are included out of
+    the box, instead of wiring each integration yourself.
+  </Card>
+  <Card title="Relational Postgres" icon="database">
+    Native joins, full ACID transactions, and schema enforcement, so your data
+    and skills transfer. No proprietary document model to design around.
+  </Card>
+  <Card title="Open source, self-hostable" icon="server">
+    Run it on your own infrastructure with Docker, or use the managed cloud.
+  </Card>
+</CardGroup>
+
+<Card title="Start building" icon="rocket" href="https://insforge.dev/auth/sign-up">
+  Create a project and connect your favorite AI coding agent.
+</Card>
