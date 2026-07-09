@@ -76,10 +76,10 @@ export function BackendAdvisorSection() {
   const categoryFilter: DashboardAdvisorCategory | undefined =
     tab === 'all' ? undefined : (tab as DashboardAdvisorCategory);
 
-  // Reset to first page when filters change.
+  // Reset to first page when filters or the active/ignored view change.
   useEffect(() => {
     setCurrentPage(1);
-  }, [tab, pageSize, selectedSeverities]);
+  }, [tab, pageSize, selectedSeverities, view]);
 
   // Collapse any expanded item when filters or page change so the visible row set stays in sync.
   useEffect(() => {
@@ -207,6 +207,14 @@ export function BackendAdvisorSection() {
     performance: selectIgnoredRows(ignoredRows, 'performance', selectedSeverities).length,
     health: selectIgnoredRows(ignoredRows, 'health', selectedSeverities).length,
   };
+  // Total rows the Ignored view will render for the current filters — drives
+  // its client-side pagination (same 10/page scheme as the Active view).
+  const ignoredVisibleTotal = selectIgnoredRows(
+    ignoredRows,
+    categoryFilter,
+    selectedSeverities
+  ).length;
+  const ignoredTotalPages = Math.max(1, Math.ceil(ignoredVisibleTotal / pageSize));
 
   // Predict filtered total so reserved height matches what this page will render.
   const predictedFilteredTotal = noSeveritiesSelected
@@ -350,7 +358,12 @@ export function BackendAdvisorSection() {
       >
         <div className="flex flex-col rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)]">
           {view === 'ignored' ? (
-            <IgnoredList category={categoryFilter} selectedSeverities={selectedSeverities} />
+            <IgnoredList
+              category={categoryFilter}
+              selectedSeverities={selectedSeverities}
+              page={currentPage}
+              pageSize={pageSize}
+            />
           ) : !hasScan && !latest.isLoading ? (
             <EmptyState
               className="h-32 gap-1"
@@ -393,6 +406,17 @@ export function BackendAdvisorSection() {
             totalRecords={totalRecords}
             pageSize={pageSize}
             recordLabel="issues"
+          />
+        )}
+
+        {view === 'ignored' && ignoredVisibleTotal > 0 && (
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={ignoredTotalPages}
+            onPageChange={setCurrentPage}
+            totalRecords={ignoredVisibleTotal}
+            pageSize={pageSize}
+            recordLabel="ignored issues"
           />
         )}
       </div>

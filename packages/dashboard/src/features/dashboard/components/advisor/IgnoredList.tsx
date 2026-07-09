@@ -40,14 +40,17 @@ export function selectIgnoredRows(
 interface IgnoredListProps {
   category?: DashboardAdvisorCategory;
   selectedSeverities: Set<DashboardAdvisorSeverity>;
+  page: number;
+  pageSize: number;
 }
 
-export function IgnoredList({ category, selectedSeverities }: IgnoredListProps) {
+export function IgnoredList({ category, selectedSeverities, page, pageSize }: IgnoredListProps) {
   const suppressions = useAdvisorSuppressions();
   const unsuppress = useUnsuppressAdvisorIssue();
   const { showToast } = useToast();
 
-  const rows = selectIgnoredRows(suppressions.data ?? [], category, selectedSeverities);
+  const allRows = selectIgnoredRows(suppressions.data ?? [], category, selectedSeverities);
+  const rows = allRows.slice((page - 1) * pageSize, page * pageSize);
 
   const handleRestore = (id: string) => {
     unsuppress.mutate(id, {
@@ -70,7 +73,7 @@ export function IgnoredList({ category, selectedSeverities }: IgnoredListProps) 
       </div>
     );
   }
-  if (rows.length === 0) {
+  if (allRows.length === 0) {
     return (
       <EmptyState
         className="h-32 gap-1"
