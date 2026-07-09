@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react';
-import { Button, cn } from '@insforge/ui';
+import { Button } from '@insforge/ui';
 import type { MarketplacePluginWithStatus } from '@insforge/shared-schemas';
 import { PluginAvatar } from '#features/marketplace/components/PluginAvatar';
 
@@ -12,13 +12,9 @@ export function PluginCard({ plugin, onOpen }: PluginCardProps) {
   return (
     <div
       onClick={onOpen}
-      className={cn(
-        'group relative flex min-h-[148px] cursor-pointer flex-col gap-3 rounded-lg border border-[var(--border)] bg-card p-5',
-        'transition-[border-color,box-shadow] duration-100',
-        'hover:border-[rgb(var(--primary)/0.6)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)]'
-      )}
+      className="group relative flex min-h-[148px] cursor-pointer flex-col gap-3 rounded-lg border border-[var(--alpha-8)] bg-card p-5"
     >
-      <div className="pointer-events-none absolute inset-0 rounded-lg transition-colors duration-100 group-hover:bg-[var(--alpha-4)]" />
+      <div className="pointer-events-none absolute inset-0 rounded-lg transition-colors group-hover:bg-[var(--alpha-4)] group-active:bg-[var(--alpha-8)]" />
       <div className="relative">
         <div className="absolute right-0 top-0">
           {plugin.installed ? (
