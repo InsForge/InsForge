@@ -123,7 +123,8 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { ruleId, affectedObject, scope, reason, note } = req.body ?? {};
-      if (typeof ruleId !== 'string' || ruleId.length === 0 || ruleId.length > 200) {
+      const trimmedRuleId = typeof ruleId === 'string' ? ruleId.trim() : '';
+      if (trimmedRuleId.length === 0 || trimmedRuleId.length > 200) {
         throw new AppError(
           'Invalid ruleId: must be a non-empty string',
           400,
@@ -146,15 +147,17 @@ router.post(
       }
       if (
         scope === 'instance' &&
-        (typeof affectedObject !== 'string' || affectedObject.length === 0)
+        (typeof affectedObject !== 'string' ||
+          affectedObject.length === 0 ||
+          affectedObject.length > 500)
       ) {
         throw new AppError(
-          'Invalid affectedObject: required for instance scope',
+          'Invalid affectedObject: required for instance scope, at most 500 characters',
           400,
           ERROR_CODES.INVALID_INPUT
         );
       }
-      if (note !== undefined && (typeof note !== 'string' || note.length > 1000)) {
+      if (note !== undefined && note !== null && (typeof note !== 'string' || note.length > 1000)) {
         throw new AppError(
           'Invalid note: must be a string of at most 1000 characters',
           400,
@@ -162,11 +165,12 @@ router.post(
         );
       }
       const suppression = await advisorService.createSuppression({
-        ruleId,
+        ruleId: trimmedRuleId,
         affectedObject: scope === 'instance' ? affectedObject : null,
         scope,
         reason,
         note: note ?? null,
+        createdBy: req.user?.id ?? null,
       });
       successResponse(res, suppression, 201);
     } catch (error: unknown) {
@@ -185,6 +189,10 @@ router.delete(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(req.params.id)) {
+        throw new AppError('Invalid id: must be a valid UUID', 400, ERROR_CODES.INVALID_INPUT);
+      }
       const deleted = await advisorService.deleteSuppression(req.params.id);
       if (!deleted) {
         throw new AppError('Suppression not found', 404, ERROR_CODES.NOT_FOUND);

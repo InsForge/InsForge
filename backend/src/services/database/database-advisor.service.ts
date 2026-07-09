@@ -439,7 +439,11 @@ export class DatabaseAdvisorService {
           )
           SELECT
             'max_connections' AS affected_object,
-            CASE WHEN (total_conns / max_conns) * 100 >= 95.0 THEN 'connection-critical' ELSE 'connection-high' END AS rule_id,
+            -- Stable rule_id regardless of the threshold crossed: suppressions
+            -- fingerprint on (rule_id, affected_object), so a dynamic id would
+            -- let an ignored finding reappear once high (>=80%) tips into
+            -- critical (>=95%). Severity/title stay dynamic below.
+            'connection-usage' AS rule_id,
             CASE WHEN (total_conns / max_conns) * 100 >= 95.0 THEN 'critical' ELSE 'warning' END AS severity,
             'performance' AS category,
             CASE WHEN (total_conns / max_conns) * 100 >= 95.0 THEN 'Database Connections Critical' ELSE 'Database Connections High' END AS title,
@@ -1001,6 +1005,7 @@ export class DatabaseAdvisorService {
     scope: AdvisorSuppressionScope;
     reason: AdvisorSuppressionReason;
     note?: string | null;
+    createdBy?: string | null;
   }): Promise<AdvisorSuppression> {
     const pool = this.dbManager.getPool();
     const affectedObject = input.scope === 'rule' ? null : (input.affectedObject ?? null);
@@ -1016,11 +1021,18 @@ export class DatabaseAdvisorService {
         created_at: Date;
       }>(
         `
-          INSERT INTO system.advisor_suppressions (rule_id, affected_object, scope, reason, note)
-          VALUES ($1, $2, $3, $4, $5)
+          INSERT INTO system.advisor_suppressions (rule_id, affected_object, scope, reason, note, created_by)
+          VALUES ($1, $2, $3, $4, $5, $6)
           RETURNING id, rule_id, affected_object, scope, reason, note, created_by, created_at
         `,
-        [input.ruleId, affectedObject, input.scope, input.reason, input.note ?? null]
+        [
+          input.ruleId,
+          affectedObject,
+          input.scope,
+          input.reason,
+          input.note ?? null,
+          input.createdBy ?? null,
+        ]
       );
       const row = result.rows[0];
       return {

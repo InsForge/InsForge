@@ -397,6 +397,90 @@ describe('Database Advisor Unit Tests', () => {
       expect(res.body.scope).toBe('rule');
     });
 
+    it('POST /api/advisor/suppressions should 201 on instance scope and pass through the fingerprint', async () => {
+      const createSpy = vi
+        .spyOn(DatabaseAdvisorService.getInstance(), 'createSuppression')
+        .mockResolvedValue({
+          id: '44444444-4444-4444-4444-444444444444',
+          ruleId: 'dangerous-function',
+          affectedObject: 'public.f()',
+          scope: 'instance',
+          reason: 'false_positive',
+          note: null,
+          createdBy: 'admin-id',
+          createdAt: new Date().toISOString(),
+        });
+
+      const res = await request(app)
+        .post('/api/advisor/suppressions')
+        // Leading/trailing whitespace on ruleId must be trimmed before persisting.
+        .send({
+          ruleId: '  dangerous-function  ',
+          scope: 'instance',
+          reason: 'false_positive',
+          affectedObject: 'public.f()',
+          note: null,
+        })
+        .expect(201);
+
+      expect(res.body.scope).toBe('instance');
+      expect(createSpy).toHaveBeenCalledWith({
+        ruleId: 'dangerous-function',
+        affectedObject: 'public.f()',
+        scope: 'instance',
+        reason: 'false_positive',
+        note: null,
+        createdBy: 'admin-id',
+      });
+    });
+
+    it('POST /api/advisor/suppressions should null out affectedObject for rule scope', async () => {
+      const createSpy = vi
+        .spyOn(DatabaseAdvisorService.getInstance(), 'createSuppression')
+        .mockResolvedValue({
+          id: '55555555-5555-5555-5555-555555555555',
+          ruleId: 'rls-select-only',
+          affectedObject: null,
+          scope: 'rule',
+          reason: 'accepted_risk',
+          note: null,
+          createdBy: 'admin-id',
+          createdAt: new Date().toISOString(),
+        });
+
+      await request(app)
+        .post('/api/advisor/suppressions')
+        // A stray affectedObject on a rule-scope request must be dropped.
+        .send({
+          ruleId: 'rls-select-only',
+          scope: 'rule',
+          reason: 'accepted_risk',
+          affectedObject: 'ignored.for.rule.scope',
+        })
+        .expect(201);
+
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ scope: 'rule', affectedObject: null })
+      );
+    });
+
+    it('DELETE /api/advisor/suppressions/:id should 200 with { deleted: true } on success', async () => {
+      vi.spyOn(DatabaseAdvisorService.getInstance(), 'deleteSuppression').mockResolvedValue(true);
+
+      const res = await request(app)
+        .delete('/api/advisor/suppressions/33333333-3333-3333-3333-333333333333')
+        .expect(200);
+      expect(res.body.deleted).toBe(true);
+    });
+
+    it('DELETE /api/advisor/suppressions/:id should 400 on a malformed (non-UUID) id', async () => {
+      const deleteSpy = vi.spyOn(DatabaseAdvisorService.getInstance(), 'deleteSuppression');
+
+      const res = await request(app).delete('/api/advisor/suppressions/not-a-uuid').expect(400);
+      expect(res.body.error).toContain('Invalid id');
+      expect(deleteSpy).not.toHaveBeenCalled();
+    });
+
     it('DELETE /api/advisor/suppressions/:id should 404 when missing', async () => {
       vi.spyOn(DatabaseAdvisorService.getInstance(), 'deleteSuppression').mockResolvedValue(false);
 
