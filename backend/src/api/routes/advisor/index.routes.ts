@@ -145,11 +145,10 @@ router.post(
           ERROR_CODES.INVALID_INPUT
         );
       }
+      const trimmedAffectedObject = typeof affectedObject === 'string' ? affectedObject.trim() : '';
       if (
         scope === 'instance' &&
-        (typeof affectedObject !== 'string' ||
-          affectedObject.length === 0 ||
-          affectedObject.length > 500)
+        (trimmedAffectedObject.length === 0 || trimmedAffectedObject.length > 500)
       ) {
         throw new AppError(
           'Invalid affectedObject: required for instance scope, at most 500 characters',
@@ -173,7 +172,7 @@ router.post(
       }
       const suppression = await advisorService.createSuppression({
         ruleId: trimmedRuleId,
-        affectedObject: scope === 'instance' ? affectedObject : null,
+        affectedObject: scope === 'instance' ? trimmedAffectedObject : null,
         scope,
         reason,
         note: note ?? null,

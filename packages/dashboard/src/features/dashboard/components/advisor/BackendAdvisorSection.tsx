@@ -139,6 +139,10 @@ export function BackendAdvisorSection() {
           setIsScanning(false);
           void queryClient.invalidateQueries({ queryKey: ['advisor', 'issues'] });
           void queryClient.invalidateQueries({ queryKey: ['advisor', 'category-counts'] });
+          // Suppressions are enriched (title/severity/category) from the latest
+          // completed scan, so refresh them too or the Ignored view and its tab
+          // counts go stale after a re-scan.
+          void queryClient.invalidateQueries({ queryKey: ['advisor', 'suppressions'] });
           if (data.status === 'failed') {
             showToast('Scan failed. Check backend logs.', 'error');
           } else {

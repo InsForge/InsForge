@@ -180,16 +180,21 @@ export class DatabaseAdvisorService {
       const queries: { [key: string]: string } = {
         'rls-disabled': `
           SELECT
-            c.relname AS affected_object,
+            (n.nspname || '.' || c.relname) AS affected_object,
             'rls-disabled' AS rule_id,
             'critical' AS severity,
             'security' AS category,
-            'Table publicly accessible' AS title,
-            'RLS is disabled and the table is exposed via PostgREST, so any client with the anon key can read and modify all rows.' AS description,
-            format($d$Table "%s.%s" has RLS disabled and is exposed via PostgREST. Any client with the anon key can read and modify all rows.$d$, n.nspname, c.relname) AS detail,
-            format($r$ALTER TABLE %s.%s ENABLE ROW LEVEL SECURITY;
+            CASE WHEN pg_catalog.has_table_privilege('anon', c.oid, 'SELECT')
+              THEN 'Table publicly accessible'
+              ELSE 'Table accessible to all authenticated users' END AS title,
+            'RLS is disabled while the table is exposed via PostgREST, so every row is readable and writable by whichever roles hold table privileges.' AS description,
+            format($d$Table %I.%I has RLS disabled and is exposed via PostgREST. %s can read and modify all rows.$d$,
+              n.nspname, c.relname,
+              CASE WHEN pg_catalog.has_table_privilege('anon', c.oid, 'SELECT')
+                THEN 'Any client with the anon key' ELSE 'Any authenticated user' END) AS detail,
+            format($r$ALTER TABLE %I.%I ENABLE ROW LEVEL SECURITY;
 -- Also force RLS for table owners (owners bypass RLS by default):
-ALTER TABLE %s.%s FORCE ROW LEVEL SECURITY;$r$, n.nspname, c.relname, n.nspname, c.relname) AS remediation
+ALTER TABLE %I.%I FORCE ROW LEVEL SECURITY;$r$, n.nspname, c.relname, n.nspname, c.relname) AS remediation
           FROM pg_catalog.pg_class c
           JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
           WHERE c.relkind = 'r'
@@ -248,7 +253,16 @@ ALTER TABLE %s.%s FORCE ROW LEVEL SECURITY;$r$, n.nspname, c.relname, n.nspname,
               ) THEN true ELSE false END AS has_permissive_using,
               CASE WHEN normalized_with_check IN (
                 'true', '(true)', 'true::boolean', '(true::boolean)', '(true)::boolean', '1=1', '(1=1)'
-              ) THEN true ELSE false END AS has_permissive_with_check
+              ) THEN true ELSE false END AS has_permissive_with_check,
+              -- critical only when the policy targets anon/PUBLIC AND that role can
+              -- actually reach the table (holds SELECT) — a TO PUBLIC policy on a
+              -- table anon was never granted is not really publicly accessible.
+              (
+                (0::oid = ANY(polroles)
+                 OR EXISTS (SELECT 1 FROM unnest(polroles) AS r WHERE r::regrole::text = 'anon'))
+                AND pg_catalog.has_table_privilege(
+                  'anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'SELECT')
+              ) AS anon_exposed
             FROM policies p
             WHERE is_rls_active AND is_permissive
               AND (
@@ -258,43 +272,39 @@ ALTER TABLE %s.%s FORCE ROW LEVEL SECURITY;$r$, n.nspname, c.relname, n.nspname,
               )
           )
           SELECT
-            table_name AS affected_object,
+            (schema_name || '.' || table_name || ' (' || policy_name || ')') AS affected_object,
             'rls-permissive' AS rule_id,
-            -- critical when the permissive policy is reachable by anon/public
-            -- (effectively public data), warning when only authenticated roles
-            -- can reach it (cloud parity).
-            CASE
-              WHEN 0::oid = ANY(polroles)
-                OR EXISTS (SELECT 1 FROM unnest(polroles) AS r WHERE r::regrole::text = 'anon')
-              THEN 'critical'
-              ELSE 'warning'
-            END AS severity,
+            CASE WHEN anon_exposed THEN 'critical' ELSE 'warning' END AS severity,
             'security' AS category,
-            CASE
-              WHEN 0::oid = ANY(polroles)
-                OR EXISTS (SELECT 1 FROM unnest(polroles) AS r WHERE r::regrole::text = 'anon')
+            CASE WHEN anon_exposed
               THEN 'Permissive RLS policy exposes data to anonymous users'
               ELSE 'Overly permissive RLS policy'
             END AS title,
             'An RLS policy uses an always-true expression like USING (true) or WITH CHECK (true), granting unrestricted access.' AS description,
-            format($d$Policy "%s" on "%s.%s" grants unrestricted %s access to roles: %s. This effectively makes the table publicly accessible despite RLS being enabled.$d$, policy_name, schema_name, table_name, command, array_to_string(roles, ', ')) AS detail,
-            format($r$Review and tighten the policy. Example:
-CREATE POLICY "%s" ON %s.%s FOR %s TO %s USING ((select auth.uid()) = user_id);
--- Note: Wrap auth.uid() in a subquery (select auth.uid()) so it is evaluated once, not per row.$r$, policy_name, schema_name, table_name, command, array_to_string(roles, ', ')) AS remediation
+            format($d$Policy %I on %I.%I grants unrestricted %s access to roles: %s.%s$d$,
+              policy_name, schema_name, table_name, command, array_to_string(roles, ', '),
+              CASE WHEN anon_exposed THEN ' This effectively makes the table publicly accessible despite RLS being enabled.' ELSE '' END) AS detail,
+            format($r$Review and tighten the policy in place:
+ALTER POLICY %I ON %I.%I %s;
+-- Replace the always-true rule with a real check, e.g. (select auth.uid()) = user_id.
+-- Wrap auth.uid() in a subquery so it is evaluated once, not per row.$r$,
+              policy_name, schema_name, table_name,
+              CASE WHEN command = 'INSERT' THEN 'WITH CHECK ((select auth.uid()) = user_id)'
+                   ELSE 'USING ((select auth.uid()) = user_id)' END) AS remediation
           FROM permissive_patterns
           WHERE has_permissive_using OR has_permissive_with_check
         `,
         'rls-no-policy': `
           SELECT
-            c.relname AS affected_object,
+            (n.nspname || '.' || c.relname) AS affected_object,
             'rls-no-policy' AS rule_id,
             'critical' AS severity,
             'security' AS category,
             'RLS enabled but no policies defined' AS title,
             'RLS is enabled on the table but no policies exist, which blocks all access — likely a misconfiguration.' AS description,
-            format($d$Table "%s.%s" has RLS enabled but no policies. This blocks all access — likely a misconfiguration.$d$, n.nspname, c.relname) AS detail,
+            format($d$Table %I.%I has RLS enabled but no policies. This blocks all access — likely a misconfiguration.$d$, n.nspname, c.relname) AS detail,
             format($r$Add at least one RLS policy, e.g.:
-CREATE POLICY "allow_authenticated" ON %s.%s FOR ALL TO authenticated USING (auth.uid() = user_id);$r$, n.nspname, c.relname) AS remediation
+CREATE POLICY "allow_authenticated" ON %I.%I FOR ALL TO authenticated USING (auth.uid() = user_id);$r$, n.nspname, c.relname) AS remediation
           FROM pg_catalog.pg_class c
           LEFT JOIN pg_catalog.pg_policy p ON p.polrelid = c.oid
           JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
@@ -312,19 +322,21 @@ CREATE POLICY "allow_authenticated" ON %s.%s FOR ALL TO authenticated USING (aut
         `,
         'dangerous-function': `
           SELECT
-            function_name AS affected_object,
+            (schema_name || '.' || function_name || '(' || function_args || ')') AS affected_object,
             'dangerous-function' AS rule_id,
             'critical' AS severity,
             'security' AS category,
             'Dangerous SECURITY DEFINER function' AS title,
             'A SECURITY DEFINER function is callable by anon/authenticated and runs with the owner privileges, which could escalate access.' AS description,
-            format($d$Function "%s.%s(%s)" is SECURITY DEFINER and callable by: %s. It executes with the owner's privileges, which could escalate access.$d$, schema_name, function_name, function_args, role_name) AS detail,
-            format($r$-- Revoke access from the dangerous role:
-REVOKE EXECUTE ON FUNCTION %s.%s(%s) FROM %s;
+            format($d$Function %I.%I(%s) is SECURITY DEFINER and callable by: %s. It executes with the owner's privileges, which could escalate access.$d$, schema_name, function_name, function_args, role_name) AS detail,
+            format($r$-- Revoke EXECUTE from the exposing role AND from PUBLIC — a PUBLIC grant
+-- keeps the function callable by everyone regardless of role-specific revokes:
+REVOKE EXECUTE ON FUNCTION %I.%I(%s) FROM %I;
+REVOKE EXECUTE ON FUNCTION %I.%I(%s) FROM PUBLIC;
 -- If the function must remain SECURITY DEFINER, lock down search_path to prevent hijacking:
-ALTER FUNCTION %s.%s(%s) SET search_path = '';
+ALTER FUNCTION %I.%I(%s) SET search_path = '';
 -- Consider converting to SECURITY INVOKER if owner privileges are not needed:
-ALTER FUNCTION %s.%s(%s) SECURITY INVOKER;$r$, schema_name, function_name, function_args, role_name, schema_name, function_name, function_args, schema_name, function_name, function_args) AS remediation
+ALTER FUNCTION %I.%I(%s) SECURITY INVOKER;$r$, schema_name, function_name, function_args, role_name, schema_name, function_name, function_args, schema_name, function_name, function_args, schema_name, function_name, function_args) AS remediation
           FROM (
             SELECT
               n.nspname AS schema_name,
@@ -357,15 +369,15 @@ ALTER FUNCTION %s.%s(%s) SECURITY INVOKER;$r$, schema_name, function_name, funct
         `,
         'rls-select-only': `
           SELECT
-            c.relname AS affected_object,
+            (n.nspname || '.' || c.relname) AS affected_object,
             'rls-select-only' AS rule_id,
             'info' AS severity,
             'security' AS category,
             'Table has only SELECT RLS policy' AS title,
             'The table has RLS policies for SELECT only. If it should accept writes, add INSERT/UPDATE/DELETE policies; if read-only is intentional, this can be ignored.' AS description,
-            format($d$Table "%s.%s" has RLS policies for SELECT only. If this table should accept writes, add INSERT/UPDATE/DELETE policies. If read-only is intentional, this can be ignored.$d$, n.nspname, c.relname) AS detail,
+            format($d$Table %I.%I has RLS policies for SELECT only. If this table should accept writes, add INSERT/UPDATE/DELETE policies. If read-only is intentional, this can be ignored.$d$, n.nspname, c.relname) AS detail,
             format($r$If writes are needed:
-CREATE POLICY "allow_insert" ON %s.%s FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);$r$, n.nspname, c.relname) AS remediation
+CREATE POLICY "allow_insert" ON %I.%I FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);$r$, n.nspname, c.relname) AS remediation
           FROM pg_catalog.pg_class c
           JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
           WHERE c.relkind = 'r'
@@ -411,16 +423,16 @@ CREATE POLICY "allow_insert" ON %s.%s FOR INSERT TO authenticated WITH CHECK (au
             WHERE indisvalid
           )
           SELECT
-            fk.table_name AS affected_object,
+            (fk.schema_name || '.' || fk.table_name || '.' || fk.fkey_name) AS affected_object,
             'missing-fk-index' AS rule_id,
             'warning' AS severity,
             'performance' AS category,
             'Foreign key column missing index' AS title,
-            'A foreign key column has no covering index. JOINs require full table scans and ON DELETE CASCADE takes a full table lock while scanning for referencing rows.' AS description,
-            format($d$Column "%s" on table "%s.%s" is a foreign key (%s) but has no index. JOINs will require full table scans, and ON DELETE CASCADE will acquire a full table lock while scanning for referencing rows — blocking all writes to the table.$d$,
+            'A foreign key column has no covering index. JOINs require full table scans, and deleting or updating rows in the referenced table scans the whole referencing table.' AS description,
+            format($d$Column %s on table %I.%I is a foreign key (%s) but has no index. JOINs require full table scans, and deleting or updating rows in the referenced table requires scanning the entire referencing table — potentially acquiring locks that block writes.$d$,
               (SELECT string_agg(quote_ident(a.attname), ', ') FROM pg_attribute a WHERE a.attrelid = fk.table_oid AND a.attnum = ANY(fk.col_attnums)),
               fk.schema_name, fk.table_name, fk.fkey_name) AS detail,
-            format($r$CREATE INDEX CONCURRENTLY ON %s.%s (%s);$r$, fk.schema_name, fk.table_name,
+            format($r$CREATE INDEX CONCURRENTLY ON %I.%I (%s);$r$, fk.schema_name, fk.table_name,
               (SELECT string_agg(quote_ident(a.attname), ', ') FROM pg_attribute a WHERE a.attrelid = fk.table_oid AND a.attnum = ANY(fk.col_attnums))
             ) AS remediation
           FROM foreign_keys fk
@@ -433,14 +445,14 @@ CREATE POLICY "allow_insert" ON %s.%s FOR INSERT TO authenticated WITH CHECK (au
         `,
         'unused-index': `
           SELECT
-            psui.relname AS affected_object,
+            (psui.schemaname || '.' || psui.indexrelname) AS affected_object,
             'unused-index' AS rule_id,
             'info' AS severity,
             'performance' AS category,
             'Unused index' AS title,
             'An index has never been used (0 scans) and adds overhead to write operations.' AS description,
-            format($d$Index "%s" on table "%s.%s" has never been used (0 scans) and is %s. It adds overhead to write operations.$d$, psui.indexrelname, psui.schemaname, psui.relname, pg_size_pretty(pg_relation_size(psui.indexrelid))) AS detail,
-            format($r$DROP INDEX CONCURRENTLY "%s"."%s";$r$, psui.schemaname, psui.indexrelname) AS remediation
+            format($d$Index %I on table %I.%I has never been used (0 scans) and is %s. It adds overhead to write operations.$d$, psui.indexrelname, psui.schemaname, psui.relname, pg_size_pretty(pg_relation_size(psui.indexrelid))) AS detail,
+            format($r$DROP INDEX CONCURRENTLY %I.%I;$r$, psui.schemaname, psui.indexrelname) AS remediation
           FROM pg_catalog.pg_stat_user_indexes psui
           JOIN pg_catalog.pg_index pi ON psui.indexrelid = pi.indexrelid
           LEFT JOIN pg_catalog.pg_depend dep ON psui.relid = dep.objid
@@ -449,10 +461,10 @@ CREATE POLICY "allow_insert" ON %s.%s FOR INSERT TO authenticated WITH CHECK (au
           WHERE psui.idx_scan = 0
             AND NOT pi.indisunique
             AND NOT pi.indisprimary
-            -- Cloud parity: ignore indexes smaller than one 8 KB page so a
-            -- brand-new, near-empty index on a fresh project isn't flagged
-            -- just because no query has touched it yet.
-            AND pg_relation_size(psui.indexrelid) >= 8192
+            -- Ignore one-page (or smaller) indexes: a brand-new, near-empty index
+            -- on a fresh project allocates exactly one 8 KB page, and flagging it
+            -- just because no query has touched it yet is noise.
+            AND pg_relation_size(psui.indexrelid) > 8192
             AND dep.objid IS NULL
             AND psui.schemaname NOT IN (
               ${ADVISOR_EXCLUDED_SCHEMAS}
@@ -576,18 +588,19 @@ ALTER DATABASE current_database SET statement_timeout = '60s';$r$, pid, pid, pid
               AND pa.polname = pb.policyname
           )
           SELECT
-            table_name AS affected_object,
+            (schema_name || '.' || table_name || ' (' || policy_name || ')') AS affected_object,
             'rls-policy-perf' AS rule_id,
             'warning' AS severity,
             'performance' AS category,
-            'RLS policy calls auth.uid() per row' AS title,
-            'An RLS policy calls auth.uid() without a subquery wrapper, so it is re-evaluated for every row.' AS description,
-            format($d$Policy "%s" on "%s.%s" calls auth.uid() without a subquery wrapper. On large tables this function is evaluated for every row, causing severe performance degradation (100x+ slower).$d$, policy_name, schema_name, table_name) AS detail,
-            format($r$Wrap auth.uid() in a subquery so it is evaluated once:
+            'RLS policy re-evaluates auth/current_setting per row' AS title,
+            'An RLS policy calls auth.<function>() or current_setting() without a subquery wrapper, so it is re-evaluated for every row.' AS description,
+            format($d$Policy %I on %I.%I re-evaluates auth.<function>() or current_setting() for every row (no subquery wrapper). On large tables this causes severe performance degradation (100x+ slower).$d$, policy_name, schema_name, table_name) AS detail,
+            format($r$Wrap the call in a subquery so it is evaluated once, not per row:
 -- Before (slow):
 USING (auth.uid() = user_id)
 -- After (fast):
-USING ((select auth.uid()) = user_id)$r$) AS remediation
+USING ((select auth.uid()) = user_id)
+-- The same applies to auth.jwt(), auth.role(), auth.email(), and current_setting().$r$) AS remediation
           FROM policies
           WHERE is_rls_active
             AND schema_name NOT IN (
@@ -638,14 +651,14 @@ USING ((select auth.uid()) = user_id)$r$) AS remediation
             WHERE indisvalid
           )
           SELECT
-            tc.table_name AS affected_object,
+            (tc.schema_name || '.' || tc.table_name || '.' || tc.column_name) AS affected_object,
             'missing-rls-index' AS rule_id,
             'warning' AS severity,
             'performance' AS category,
             'RLS policy column missing index' AS title,
             'A column referenced in an RLS policy lacks an index, forcing sequential scans on every query.' AS description,
-            format($d$Policy "%s" on "%s.%s" filters on column "%s" but no index exists for it. RLS conditions are evaluated on every query — without an index this forces sequential scans on the entire table.$d$, p.policy_name, tc.schema_name, tc.table_name, tc.column_name) AS detail,
-            format($r$CREATE INDEX CONCURRENTLY idx_%s_%s ON %s.%s (%s);$r$, tc.table_name, tc.column_name, tc.schema_name, tc.table_name, tc.column_name) AS remediation
+            format($d$Policy %I on %I.%I filters on column %I but no index exists for it. RLS conditions are evaluated on every query — without an index this forces sequential scans on the entire table.$d$, p.policy_name, tc.schema_name, tc.table_name, tc.column_name) AS detail,
+            format($r$CREATE INDEX CONCURRENTLY idx_%s_%s ON %I.%I (%I);$r$, tc.table_name, tc.column_name, tc.schema_name, tc.table_name, tc.column_name) AS remediation
           FROM table_cols tc
           JOIN policies p ON tc.table_oid = p.table_oid
           LEFT JOIN table_indices ti ON tc.table_oid = ti.table_oid AND tc.attnum = ANY(ti.col_attnums)
@@ -657,18 +670,18 @@ USING ((select auth.uid()) = user_id)$r$) AS remediation
         `,
         'dead-tuples': `
           SELECT
-            relname AS affected_object,
+            (schemaname || '.' || relname) AS affected_object,
             'dead-tuples' AS rule_id,
             CASE WHEN dead_ratio > 50.0 THEN 'warning' ELSE 'info' END AS severity,
             'health' AS category,
             'High dead tuple ratio' AS title,
             'The dead-tuple ratio is high, wasting disk space and slowing sequential scans; autovacuum may be falling behind.' AS description,
-            format($d$Table "%s.%s" has %s dead tuples (%s%% of %s total). This wastes disk space and slows sequential scans. Autovacuum may be falling behind on this table.$d$, schemaname, relname, n_dead_tup, round(dead_ratio::numeric, 0), (n_live_tup + n_dead_tup)) AS detail,
+            format($d$Table %I.%I has %s dead tuples (%s%% of %s total). This wastes disk space and slows sequential scans. Autovacuum may be falling behind on this table.$d$, schemaname, relname, n_dead_tup, round(dead_ratio::numeric, 0), (n_live_tup + n_dead_tup)) AS detail,
             format($r$-- Immediate fix:
-VACUUM ANALYZE %s.%s;
+VACUUM ANALYZE %I.%I;
 
 -- Prevent recurrence by tuning autovacuum for this high-churn table:
-ALTER TABLE %s.%s SET (
+ALTER TABLE %I.%I SET (
   autovacuum_vacuum_scale_factor = 0.05,  -- vacuum at 5%% dead tuples (default 20%%)
   autovacuum_analyze_scale_factor = 0.02  -- analyze at 2%% changes (default 10%%)
 );$r$, schemaname, relname, schemaname, relname) AS remediation
@@ -691,7 +704,7 @@ ALTER TABLE %s.%s SET (
         `,
         'stale-statistics': `
           SELECT
-            relname AS affected_object,
+            (schemaname || '.' || relname) AS affected_object,
             'stale-statistics' AS rule_id,
             CASE
               WHEN (last_analyze IS NULL AND last_autoanalyze IS NULL) OR n_mod_since_analyze > 100000
@@ -700,12 +713,12 @@ ALTER TABLE %s.%s SET (
             'health' AS category,
             CASE WHEN last_analyze IS NULL AND last_autoanalyze IS NULL THEN 'Table never analyzed' ELSE 'Stale table statistics' END AS title,
             'Optimizer statistics are stale because the table has significant modifications since its last analyze.' AS description,
-            format($d$Table "%s.%s" has %s modifications since its last analyze (live tuples: %s, mutated: %s%%). The query planner may choose poor plans from stale statistics.$d$, schemaname, relname, n_mod_since_analyze, n_live_tup, round(pct_mutated::numeric, 2)) AS detail,
+            format($d$Table %I.%I has %s modifications since its last analyze (live tuples: %s, mutated: %s%%). The query planner may choose poor plans from stale statistics.$d$, schemaname, relname, n_mod_since_analyze, n_live_tup, round(pct_mutated::numeric, 2)) AS detail,
             format($r$-- Update statistics immediately:
-ANALYZE %s.%s;
+ANALYZE %I.%I;
 
 -- Tune autovacuum to analyze more frequently:
-ALTER TABLE %s.%s SET (
+ALTER TABLE %I.%I SET (
   autovacuum_analyze_scale_factor = 0.02  -- analyze at 2%% changes (default 10%%)
 );$r$, schemaname, relname, schemaname, relname) AS remediation
           FROM (
@@ -731,18 +744,18 @@ ALTER TABLE %s.%s SET (
         `,
         'sequence-exhaustion': `
           SELECT
-            sequencename AS affected_object,
+            (schemaname || '.' || sequencename) AS affected_object,
             'sequence-exhaustion' AS rule_id,
             CASE WHEN pct_used >= 90.0 THEN 'critical' ELSE 'warning' END AS severity,
             'health' AS category,
             'Sequence approaching exhaustion' AS title,
             'A sequence is close to its maximum value; once exhausted, INSERTs that use it will fail.' AS description,
-            format($d$Sequence "%s.%s" is at %s%% capacity (current: %s, max: %s). When exhausted, INSERT operations will fail with "nextval: reached maximum value of sequence".$d$, schemaname, sequencename, round(pct_used::numeric, 2), last_value, max_value) AS detail,
+            format($d$Sequence %I.%I is at %s%% capacity (current: %s, max: %s). When exhausted, INSERT operations will fail with "nextval: reached maximum value of sequence".$d$, schemaname, sequencename, round(pct_used::numeric, 2), last_value, max_value) AS detail,
             format($r$-- Option 1: migrate the owning column to bigint (recommended, requires table rewrite):
 ALTER TABLE <table> ALTER COLUMN <col> TYPE bigint;
 
 -- Option 2: if the sequence is already on a bigint column, widen the sequence:
-ALTER SEQUENCE "%s"."%s" AS bigint;
+ALTER SEQUENCE %I.%I AS bigint;
 
 -- Check which table/column uses this sequence:
 SELECT table_name, column_name FROM information_schema.columns WHERE column_default LIKE '%%%s%%';$r$, schemaname, sequencename, sequencename) AS remediation
@@ -763,7 +776,7 @@ SELECT table_name, column_name FROM information_schema.columns WHERE column_defa
         `,
         'autovacuum-blocked': `
           SELECT
-            c.relname AS affected_object,
+            (n.nspname || '.' || c.relname) AS affected_object,
             'autovacuum-blocked' AS rule_id,
             -- Kept OSS's precise lock-based detection (fires only when an
             -- autovacuum worker is actually blocked) rather than cloud's

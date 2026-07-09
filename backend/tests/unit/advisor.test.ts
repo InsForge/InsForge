@@ -370,30 +370,43 @@ describe('Database Advisor Unit Tests', () => {
     });
 
     it('POST /api/advisor/suppressions should 400 when reason is "other" without a note', async () => {
-      const res = await request(app)
+      const missing = await request(app)
         .post('/api/advisor/suppressions')
         .send({ ruleId: 'x', scope: 'rule', reason: 'other' })
         .expect(400);
-      expect(res.body.error).toContain('required when reason is "other"');
+      expect(missing.body.error).toContain('required when reason is "other"');
+
+      // Whitespace-only note must also be rejected (trim-based check).
+      const whitespace = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'x', scope: 'rule', reason: 'other', note: '   ' })
+        .expect(400);
+      expect(whitespace.body.error).toContain('required when reason is "other"');
     });
 
     it('POST /api/advisor/suppressions should 201 when reason is "other" with a note', async () => {
-      vi.spyOn(DatabaseAdvisorService.getInstance(), 'createSuppression').mockResolvedValue({
-        id: '66666666-6666-6666-6666-666666666666',
-        ruleId: 'rls-select-only',
-        affectedObject: null,
-        scope: 'rule',
-        reason: 'other',
-        note: 'team decision',
-        createdBy: 'admin-id',
-        createdAt: new Date().toISOString(),
-      });
+      const createSpy = vi
+        .spyOn(DatabaseAdvisorService.getInstance(), 'createSuppression')
+        .mockResolvedValue({
+          id: '66666666-6666-6666-6666-666666666666',
+          ruleId: 'rls-select-only',
+          affectedObject: null,
+          scope: 'rule',
+          reason: 'other',
+          note: 'team decision',
+          createdBy: 'admin-id',
+          createdAt: new Date().toISOString(),
+        });
 
       const res = await request(app)
         .post('/api/advisor/suppressions')
         .send({ ruleId: 'rls-select-only', scope: 'rule', reason: 'other', note: 'team decision' })
         .expect(201);
       expect(res.body.reason).toBe('other');
+      // The note must actually be forwarded to the service, not dropped.
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'other', note: 'team decision' })
+      );
     });
 
     it('POST /api/advisor/suppressions should 400 when instance scope lacks affectedObject', async () => {

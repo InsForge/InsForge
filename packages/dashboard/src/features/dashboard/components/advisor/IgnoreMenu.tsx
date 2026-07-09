@@ -4,6 +4,7 @@ import type {
   DashboardAdvisorIssue,
   DashboardAdvisorSuppressionReason,
   DashboardAdvisorSuppressionScope,
+  DashboardAdvisorSuppressRequest,
 } from '#types';
 import {
   useToast,
@@ -40,6 +41,11 @@ export function IgnoreMenu({ issue, visibilityClass }: IgnoreMenuProps) {
   const openForm = (scope: DashboardAdvisorSuppressionScope) => {
     setReason(null);
     setNote('');
+    // Close the dropdown before opening the dialog. The onSelect handlers call
+    // e.preventDefault() (to keep Radix from stealing focus), which also
+    // suppresses the menu's own auto-close, so we must close it explicitly —
+    // otherwise it reappears after the dialog closes.
+    setMenuOpen(false);
     setFormScope(scope);
   };
 
@@ -51,27 +57,30 @@ export function IgnoreMenu({ issue, visibilityClass }: IgnoreMenuProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit || formScope === null) {
+    if (!reason || formScope === null || (noteRequired && note.trim().length === 0)) {
       return;
     }
-    suppress.mutate(
-      {
-        ruleId: issue.ruleId,
-        affectedObject: formScope === 'instance' ? issue.affectedObject : undefined,
-        scope: formScope,
-        reason,
-        note: note.trim() ? note.trim() : undefined,
+    const trimmedNote = note.trim();
+    const base = {
+      ruleId: issue.ruleId,
+      affectedObject: formScope === 'instance' ? issue.affectedObject : undefined,
+      scope: formScope,
+    };
+    // `canSubmit` guarantees a non-empty note when reason is 'other', so the
+    // discriminated union is satisfied in both branches.
+    const request: DashboardAdvisorSuppressRequest =
+      reason === 'other'
+        ? { ...base, reason, note: trimmedNote }
+        : { ...base, reason, note: trimmedNote || undefined };
+    suppress.mutate(request, {
+      onSuccess: () => {
+        closeForm();
+        showToast('Issue ignored', 'success');
       },
-      {
-        onSuccess: () => {
-          closeForm();
-          showToast('Issue ignored', 'success');
-        },
-        onError: (error) => {
-          showToast(`Failed to ignore: ${error.message}`, 'error');
-        },
-      }
-    );
+      onError: (error) => {
+        showToast(`Failed to ignore: ${error.message}`, 'error');
+      },
+    });
   };
 
   return (

@@ -151,13 +151,23 @@ export interface DashboardAdvisorSuppression {
   category?: DashboardAdvisorCategory;
 }
 
-export interface DashboardAdvisorSuppressRequest {
+interface DashboardAdvisorSuppressRequestBase {
   ruleId: string;
   affectedObject?: string;
   scope: DashboardAdvisorSuppressionScope;
-  reason: DashboardAdvisorSuppressionReason;
-  note?: string;
 }
+
+/**
+ * `reason: 'other'` must carry a non-empty `note` (the backend rejects it
+ * otherwise), so the request is a discriminated union: the compiler forces a
+ * `note` for `'other'` and keeps it optional for the preset reasons.
+ */
+export type DashboardAdvisorSuppressRequest =
+  | (DashboardAdvisorSuppressRequestBase & {
+      reason: Exclude<DashboardAdvisorSuppressionReason, 'other'>;
+      note?: string;
+    })
+  | (DashboardAdvisorSuppressRequestBase & { reason: 'other'; note: string });
 
 /** Status event posted from cloud-shell after the PostHog OAuth flow finishes. */
 export interface DashboardPosthogConnectionStatus {
