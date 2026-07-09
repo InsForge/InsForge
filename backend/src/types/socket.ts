@@ -25,7 +25,6 @@ export enum ClientEvents {
   REALTIME_SUBSCRIBE = 'realtime:subscribe',
   REALTIME_UNSUBSCRIBE = 'realtime:unsubscribe',
   REALTIME_PUBLISH = 'realtime:publish',
-  REALTIME_AUTH = 'realtime:auth',
 }
 
 /**
