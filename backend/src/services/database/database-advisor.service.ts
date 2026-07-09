@@ -239,18 +239,15 @@ ALTER TABLE %s.%s FORCE ROW LEVEL SECURITY;$r$, n.nspname, c.relname, n.nspname,
           permissive_patterns AS (
             SELECT
               p.*,
-              CASE WHEN (
-                command IN ('UPDATE', 'DELETE', 'ALL')
-                AND (
-                  normalized_qual IN ('true', '(true)', '1=1', '(1=1)')
-                  OR (qual IS NULL AND is_permissive)
-                )
+              -- Cloud parity: a policy is permissive when its USING or WITH CHECK
+              -- expression is literally always-true, for ANY command — SELECT
+              -- included. We intentionally do not gate on command, so an
+              -- anonymous SELECT USING (true) is flagged just like cloud flags it.
+              CASE WHEN normalized_qual IN (
+                'true', '(true)', 'true::boolean', '(true::boolean)', '(true)::boolean', '1=1', '(1=1)'
               ) THEN true ELSE false END AS has_permissive_using,
-              CASE WHEN (
-                normalized_with_check IN ('true', '(true)', '1=1', '(1=1)')
-                OR (with_check IS NULL AND is_permissive AND command = 'INSERT')
-                OR (with_check IS NULL AND is_permissive AND command IN ('UPDATE', 'ALL')
-                    AND normalized_qual IN ('true', '(true)', '1=1', '(1=1)'))
+              CASE WHEN normalized_with_check IN (
+                'true', '(true)', 'true::boolean', '(true::boolean)', '(true)::boolean', '1=1', '(1=1)'
               ) THEN true ELSE false END AS has_permissive_with_check
             FROM policies p
             WHERE is_rls_active AND is_permissive
