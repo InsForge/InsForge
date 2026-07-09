@@ -250,6 +250,16 @@ export function BackendAdvisorSection() {
       : fetchedTotal;
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
 
+  // Clamp the page if the visible set shrinks under it — e.g. restoring the
+  // last ignored item on the last page, or ignoring the last active item —
+  // so the user never lands on a blank page.
+  const activePageBound = view === 'ignored' ? ignoredTotalPages : totalPages;
+  useEffect(() => {
+    if (currentPage > activePageBound) {
+      setCurrentPage(activePageBound);
+    }
+  }, [currentPage, activePageBound]);
+
   const handleCopyAll = async () => {
     const fetcher = host.onRequestAdvisorIssues;
     if (!fetcher || totalRecords === 0) {

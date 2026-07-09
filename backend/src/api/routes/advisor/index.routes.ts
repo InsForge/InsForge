@@ -145,10 +145,13 @@ router.post(
           ERROR_CODES.INVALID_INPUT
         );
       }
-      const trimmedAffectedObject = typeof affectedObject === 'string' ? affectedObject.trim() : '';
+      // Reject whitespace-only, but store the value verbatim: advisor findings
+      // build affected_object straight from catalog identifiers without
+      // trimming, so a stored-trimmed value would never match on re-scan.
+      const affectedObjectStr = typeof affectedObject === 'string' ? affectedObject : '';
       if (
         scope === 'instance' &&
-        (trimmedAffectedObject.length === 0 || trimmedAffectedObject.length > 500)
+        (affectedObjectStr.trim().length === 0 || affectedObjectStr.length > 500)
       ) {
         throw new AppError(
           'Invalid affectedObject: required for instance scope, at most 500 characters',
@@ -172,7 +175,7 @@ router.post(
       }
       const suppression = await advisorService.createSuppression({
         ruleId: trimmedRuleId,
-        affectedObject: scope === 'instance' ? trimmedAffectedObject : null,
+        affectedObject: scope === 'instance' ? affectedObjectStr : null,
         scope,
         reason,
         note: note ?? null,

@@ -184,13 +184,15 @@ export class DatabaseAdvisorService {
             'rls-disabled' AS rule_id,
             'critical' AS severity,
             'security' AS category,
-            CASE WHEN pg_catalog.has_table_privilege('anon', c.oid, 'SELECT')
+            CASE WHEN (EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+                       AND pg_catalog.has_table_privilege('anon', c.oid, 'SELECT'))
               THEN 'Table publicly accessible'
               ELSE 'Table accessible to all authenticated users' END AS title,
             'RLS is disabled while the table is exposed via PostgREST, so every row is readable and writable by whichever roles hold table privileges.' AS description,
             format($d$Table %I.%I has RLS disabled and is exposed via PostgREST. %s can read and modify all rows.$d$,
               n.nspname, c.relname,
-              CASE WHEN pg_catalog.has_table_privilege('anon', c.oid, 'SELECT')
+              CASE WHEN (EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+                         AND pg_catalog.has_table_privilege('anon', c.oid, 'SELECT'))
                 THEN 'Any client with the anon key' ELSE 'Any authenticated user' END) AS detail,
             format($r$ALTER TABLE %I.%I ENABLE ROW LEVEL SECURITY;
 -- Also force RLS for table owners (owners bypass RLS by default):
@@ -255,13 +257,20 @@ ALTER TABLE %I.%I FORCE ROW LEVEL SECURITY;$r$, n.nspname, c.relname, n.nspname,
                 'true', '(true)', 'true::boolean', '(true::boolean)', '(true)::boolean', '1=1', '(1=1)'
               ) THEN true ELSE false END AS has_permissive_with_check,
               -- critical only when the policy targets anon/PUBLIC AND that role can
-              -- actually reach the table (holds SELECT) — a TO PUBLIC policy on a
-              -- table anon was never granted is not really publicly accessible.
+              -- actually exercise it — holding the privilege that matches the
+              -- policy's command, not just SELECT (a permissive INSERT policy
+              -- matters when anon can INSERT). Guard on the anon role existing so
+              -- a hardened DB that dropped anon doesn't error the whole query.
               (
                 (0::oid = ANY(polroles)
                  OR EXISTS (SELECT 1 FROM unnest(polroles) AS r WHERE r::regrole::text = 'anon'))
-                AND pg_catalog.has_table_privilege(
-                  'anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'SELECT')
+                AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+                AND CASE command
+                  WHEN 'INSERT' THEN pg_catalog.has_table_privilege('anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'INSERT')
+                  WHEN 'UPDATE' THEN pg_catalog.has_table_privilege('anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'UPDATE')
+                  WHEN 'DELETE' THEN pg_catalog.has_table_privilege('anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'DELETE')
+                  ELSE pg_catalog.has_table_privilege('anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'SELECT')
+                END
               ) AS anon_exposed
             FROM policies p
             WHERE is_rls_active AND is_permissive
@@ -289,8 +298,15 @@ ALTER POLICY %I ON %I.%I %s;
 -- Replace the always-true rule with a real check, e.g. (select auth.uid()) = user_id.
 -- Wrap auth.uid() in a subquery so it is evaluated once, not per row.$r$,
               policy_name, schema_name, table_name,
-              CASE WHEN command = 'INSERT' THEN 'WITH CHECK ((select auth.uid()) = user_id)'
-                   ELSE 'USING ((select auth.uid()) = user_id)' END) AS remediation
+              -- Fix the clause that is actually permissive: INSERT policies and
+              -- policies whose WITH CHECK (not USING) is always-true need
+              -- WITH CHECK; everything else needs USING.
+              CASE
+                WHEN command = 'INSERT'
+                  OR (has_permissive_with_check AND NOT has_permissive_using)
+                THEN 'WITH CHECK ((select auth.uid()) = user_id)'
+                ELSE 'USING ((select auth.uid()) = user_id)'
+              END) AS remediation
           FROM permissive_patterns
           WHERE has_permissive_using OR has_permissive_with_check
         `,
