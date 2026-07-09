@@ -184,15 +184,17 @@ export class DatabaseAdvisorService {
             'rls-disabled' AS rule_id,
             'critical' AS severity,
             'security' AS category,
-            CASE WHEN (EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
-                       AND pg_catalog.has_table_privilege('anon', c.oid, 'SELECT'))
+            CASE WHEN (CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+                            THEN pg_catalog.has_table_privilege('anon', c.oid, 'SELECT')
+                            ELSE false END)
               THEN 'Table publicly accessible'
               ELSE 'Table accessible to all authenticated users' END AS title,
             'RLS is disabled while the table is exposed via PostgREST, so every row is readable and writable by whichever roles hold table privileges.' AS description,
             format($d$Table %I.%I has RLS disabled and is exposed via PostgREST. %s can read and modify all rows.$d$,
               n.nspname, c.relname,
-              CASE WHEN (EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
-                         AND pg_catalog.has_table_privilege('anon', c.oid, 'SELECT'))
+              CASE WHEN (CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+                              THEN pg_catalog.has_table_privilege('anon', c.oid, 'SELECT')
+                              ELSE false END)
                 THEN 'Any client with the anon key' ELSE 'Any authenticated user' END) AS detail,
             format($r$ALTER TABLE %I.%I ENABLE ROW LEVEL SECURITY;
 -- Also force RLS for table owners (owners bypass RLS by default):
@@ -264,13 +266,18 @@ ALTER TABLE %I.%I FORCE ROW LEVEL SECURITY;$r$, n.nspname, c.relname, n.nspname,
               (
                 (0::oid = ANY(polroles)
                  OR EXISTS (SELECT 1 FROM unnest(polroles) AS r WHERE r::regrole::text = 'anon'))
-                AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
-                AND CASE command
-                  WHEN 'INSERT' THEN pg_catalog.has_table_privilege('anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'INSERT')
-                  WHEN 'UPDATE' THEN pg_catalog.has_table_privilege('anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'UPDATE')
-                  WHEN 'DELETE' THEN pg_catalog.has_table_privilege('anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'DELETE')
-                  ELSE pg_catalog.has_table_privilege('anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'SELECT')
-                END
+                -- Nest the privilege check inside a CASE so it is only evaluated
+                -- when anon exists. AND does not short-circuit in Postgres, so an
+                -- unguarded has_table_privilege('anon', ...) would still error on a
+                -- DB that dropped anon; CASE only evaluates the matching branch.
+                AND CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+                  CASE command
+                    WHEN 'INSERT' THEN pg_catalog.has_table_privilege('anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'INSERT')
+                    WHEN 'UPDATE' THEN pg_catalog.has_table_privilege('anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'UPDATE')
+                    WHEN 'DELETE' THEN pg_catalog.has_table_privilege('anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'DELETE')
+                    ELSE pg_catalog.has_table_privilege('anon', (quote_ident(schema_name) || '.' || quote_ident(table_name))::regclass, 'SELECT')
+                  END
+                ELSE false END
               ) AS anon_exposed
             FROM policies p
             WHERE is_rls_active AND is_permissive

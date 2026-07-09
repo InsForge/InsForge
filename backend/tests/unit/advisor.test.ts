@@ -474,6 +474,45 @@ describe('Database Advisor Unit Tests', () => {
       });
     });
 
+    it('POST /api/advisor/suppressions should 400 when instance affectedObject is whitespace-only', async () => {
+      const res = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'x', scope: 'instance', reason: 'wont_fix', affectedObject: '   ' })
+        .expect(400);
+      expect(res.body.error).toContain('Invalid affectedObject');
+    });
+
+    it('POST /api/advisor/suppressions should store affectedObject verbatim (no trimming)', async () => {
+      const createSpy = vi
+        .spyOn(DatabaseAdvisorService.getInstance(), 'createSuppression')
+        .mockResolvedValue({
+          id: '77777777-7777-7777-7777-777777777777',
+          ruleId: 'rls-disabled',
+          affectedObject: '  public.spaced  ',
+          scope: 'instance',
+          reason: 'false_positive',
+          note: null,
+          createdBy: 'admin-id',
+          createdAt: new Date().toISOString(),
+        });
+
+      await request(app)
+        .post('/api/advisor/suppressions')
+        // Leading/trailing spaces are significant: advisor findings build
+        // affected_object from catalog identifiers without trimming, so a
+        // trimmed store would never match on re-scan.
+        .send({
+          ruleId: 'rls-disabled',
+          scope: 'instance',
+          reason: 'false_positive',
+          affectedObject: '  public.spaced  ',
+        })
+        .expect(201);
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ affectedObject: '  public.spaced  ' })
+      );
+    });
+
     it('POST /api/advisor/suppressions should null out affectedObject for rule scope', async () => {
       const createSpy = vi
         .spyOn(DatabaseAdvisorService.getInstance(), 'createSuppression')
