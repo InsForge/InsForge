@@ -151,6 +151,8 @@
           {
             "group": "Resources",
             "pages": [
+              "alternatives",
+              "pricing",
               "showcase"
             ]
           }
