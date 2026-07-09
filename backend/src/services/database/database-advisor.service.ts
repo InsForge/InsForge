@@ -184,10 +184,12 @@ export class DatabaseAdvisorService {
             'rls-disabled' AS rule_id,
             'critical' AS severity,
             'security' AS category,
-            'Row Level Security (RLS) is disabled' AS title,
-            'Row Level Security is not enabled on this table, exposing it to unauthorized access if standard SQL privileges permit.' AS description,
-            format('Table "%s.%s" does not have Row Level Security enabled.', n.nspname, c.relname) AS detail,
-            format('ALTER TABLE "%s"."' || c.relname || '" ENABLE ROW LEVEL SECURITY;', n.nspname) AS remediation
+            'Table publicly accessible' AS title,
+            'RLS is disabled and the table is exposed via PostgREST, so any client with the anon key can read and modify all rows.' AS description,
+            format($d$Table "%s.%s" has RLS disabled and is exposed via PostgREST. Any client with the anon key can read and modify all rows.$d$, n.nspname, c.relname) AS detail,
+            format($r$ALTER TABLE %s.%s ENABLE ROW LEVEL SECURITY;
+-- Also force RLS for table owners (owners bypass RLS by default):
+ALTER TABLE %s.%s FORCE ROW LEVEL SECURITY;$r$, n.nspname, c.relname, n.nspname, c.relname) AS remediation
           FROM pg_catalog.pg_class c
           JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
           WHERE c.relkind = 'r'
@@ -271,10 +273,17 @@ export class DatabaseAdvisorService {
               ELSE 'warning'
             END AS severity,
             'security' AS category,
-            'RLS Policy Always True' AS title,
-            'Detects RLS policies that use overly permissive expressions like USING (true) or WITH CHECK (true) for UPDATE, DELETE, or INSERT operations.' AS description,
-            format('Table "%s.%s" has an RLS policy "%s" for "%s" that allows unrestricted access.', schema_name, table_name, policy_name, command) AS detail,
-            'Review policy conditions and restrict access using valid conditions.' AS remediation
+            CASE
+              WHEN 0::oid = ANY(polroles)
+                OR EXISTS (SELECT 1 FROM unnest(polroles) AS r WHERE r::regrole::text = 'anon')
+              THEN 'Permissive RLS policy exposes data to anonymous users'
+              ELSE 'Overly permissive RLS policy'
+            END AS title,
+            'An RLS policy uses an always-true expression like USING (true) or WITH CHECK (true), granting unrestricted access.' AS description,
+            format($d$Policy "%s" on "%s.%s" grants unrestricted %s access to roles: %s. This effectively makes the table publicly accessible despite RLS being enabled.$d$, policy_name, schema_name, table_name, command, array_to_string(roles, ', ')) AS detail,
+            format($r$Review and tighten the policy. Example:
+CREATE POLICY "%s" ON %s.%s FOR %s TO %s USING ((select auth.uid()) = user_id);
+-- Note: Wrap auth.uid() in a subquery (select auth.uid()) so it is evaluated once, not per row.$r$, policy_name, schema_name, table_name, command, array_to_string(roles, ', ')) AS remediation
           FROM permissive_patterns
           WHERE has_permissive_using OR has_permissive_with_check
         `,
@@ -284,10 +293,11 @@ export class DatabaseAdvisorService {
             'rls-no-policy' AS rule_id,
             'critical' AS severity,
             'security' AS category,
-            'RLS Enabled No Policy' AS title,
-            'Detects cases where row level security (RLS) has been enabled on a table but no RLS policies have been created.' AS description,
-            format('Table "%s.%s" has RLS enabled, but no policies exist.', n.nspname, c.relname) AS detail,
-            format('Create RLS policies for "%s"."%s" or disable RLS.', n.nspname, c.relname) AS remediation
+            'RLS enabled but no policies defined' AS title,
+            'RLS is enabled on the table but no policies exist, which blocks all access — likely a misconfiguration.' AS description,
+            format($d$Table "%s.%s" has RLS enabled but no policies. This blocks all access — likely a misconfiguration.$d$, n.nspname, c.relname) AS detail,
+            format($r$Add at least one RLS policy, e.g.:
+CREATE POLICY "allow_authenticated" ON %s.%s FOR ALL TO authenticated USING (auth.uid() = user_id);$r$, n.nspname, c.relname) AS remediation
           FROM pg_catalog.pg_class c
           LEFT JOIN pg_catalog.pg_policy p ON p.polrelid = c.oid
           JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
@@ -309,10 +319,15 @@ export class DatabaseAdvisorService {
             'dangerous-function' AS rule_id,
             'critical' AS severity,
             'security' AS category,
-            'Public Can Execute SECURITY DEFINER Function' AS title,
-            'Detects SECURITY DEFINER functions that are callable without signing in or by authenticated users, bypassing RLS.' AS description,
-            format('Function "%s.%s(%s)" can be executed by %s as a SECURITY DEFINER function.', schema_name, function_name, function_args, role_name) AS detail,
-            'Revoke EXECUTE, switch to SECURITY INVOKER, or set a secure search_path.' AS remediation
+            'Dangerous SECURITY DEFINER function' AS title,
+            'A SECURITY DEFINER function is callable by anon/authenticated and runs with the owner privileges, which could escalate access.' AS description,
+            format($d$Function "%s.%s(%s)" is SECURITY DEFINER and callable by: %s. It executes with the owner's privileges, which could escalate access.$d$, schema_name, function_name, function_args, role_name) AS detail,
+            format($r$-- Revoke access from the dangerous role:
+REVOKE EXECUTE ON FUNCTION %s.%s(%s) FROM %s;
+-- If the function must remain SECURITY DEFINER, lock down search_path to prevent hijacking:
+ALTER FUNCTION %s.%s(%s) SET search_path = '';
+-- Consider converting to SECURITY INVOKER if owner privileges are not needed:
+ALTER FUNCTION %s.%s(%s) SECURITY INVOKER;$r$, schema_name, function_name, function_args, role_name, schema_name, function_name, function_args, schema_name, function_name, function_args) AS remediation
           FROM (
             SELECT
               n.nspname AS schema_name,
@@ -349,10 +364,11 @@ export class DatabaseAdvisorService {
             'rls-select-only' AS rule_id,
             'info' AS severity,
             'security' AS category,
-            'Only SELECT Policy Exists on Table' AS title,
-            'Table has RLS enabled but only has SELECT policies, leaving write operations unprotected or completely denied by default.' AS description,
-            format('Table "%s.%s" only has SELECT policies defined.', n.nspname, c.relname) AS detail,
-            'Define policies for INSERT, UPDATE, and DELETE operations if write operations are required.' AS remediation
+            'Table has only SELECT RLS policy' AS title,
+            'The table has RLS policies for SELECT only. If it should accept writes, add INSERT/UPDATE/DELETE policies; if read-only is intentional, this can be ignored.' AS description,
+            format($d$Table "%s.%s" has RLS policies for SELECT only. If this table should accept writes, add INSERT/UPDATE/DELETE policies. If read-only is intentional, this can be ignored.$d$, n.nspname, c.relname) AS detail,
+            format($r$If writes are needed:
+CREATE POLICY "allow_insert" ON %s.%s FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);$r$, n.nspname, c.relname) AS remediation
           FROM pg_catalog.pg_class c
           JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
           WHERE c.relkind = 'r'
@@ -402,10 +418,12 @@ export class DatabaseAdvisorService {
             'missing-fk-index' AS rule_id,
             'warning' AS severity,
             'performance' AS category,
-            'Unindexed Foreign Key' AS title,
-            'Identifies foreign key constraints without a covering index, which can impact join performance.' AS description,
-            format('Table "%s.%s" has a foreign key "%s" without a covering index.', fk.schema_name, fk.table_name, fk.fkey_name) AS detail,
-            format('CREATE INDEX ON "%s"."%s" (%s);', fk.schema_name, fk.table_name,
+            'Foreign key column missing index' AS title,
+            'A foreign key column has no covering index. JOINs require full table scans and ON DELETE CASCADE takes a full table lock while scanning for referencing rows.' AS description,
+            format($d$Column "%s" on table "%s.%s" is a foreign key (%s) but has no index. JOINs will require full table scans, and ON DELETE CASCADE will acquire a full table lock while scanning for referencing rows — blocking all writes to the table.$d$,
+              (SELECT string_agg(quote_ident(a.attname), ', ') FROM pg_attribute a WHERE a.attrelid = fk.table_oid AND a.attnum = ANY(fk.col_attnums)),
+              fk.schema_name, fk.table_name, fk.fkey_name) AS detail,
+            format($r$CREATE INDEX CONCURRENTLY ON %s.%s (%s);$r$, fk.schema_name, fk.table_name,
               (SELECT string_agg(quote_ident(a.attname), ', ') FROM pg_attribute a WHERE a.attrelid = fk.table_oid AND a.attnum = ANY(fk.col_attnums))
             ) AS remediation
           FROM foreign_keys fk
@@ -422,10 +440,10 @@ export class DatabaseAdvisorService {
             'unused-index' AS rule_id,
             'info' AS severity,
             'performance' AS category,
-            'Unused Index' AS title,
-            'Detects if an index has never been used and may be a candidate for removal.' AS description,
-            format('Index "%s" on table "%s.%s" has not been used.', psui.indexrelname, psui.schemaname, psui.relname) AS detail,
-            format('DROP INDEX "%s"."%s";', psui.schemaname, psui.indexrelname) AS remediation
+            'Unused index' AS title,
+            'An index has never been used (0 scans) and adds overhead to write operations.' AS description,
+            format($d$Index "%s" on table "%s.%s" has never been used (0 scans) and is %s. It adds overhead to write operations.$d$, psui.indexrelname, psui.schemaname, psui.relname, pg_size_pretty(pg_relation_size(psui.indexrelid))) AS detail,
+            format($r$DROP INDEX CONCURRENTLY "%s"."%s";$r$, psui.schemaname, psui.indexrelname) AS remediation
           FROM pg_catalog.pg_stat_user_indexes psui
           JOIN pg_catalog.pg_index pi ON psui.indexrelid = pi.indexrelid
           LEFT JOIN pg_catalog.pg_depend dep ON psui.relid = dep.objid
@@ -458,10 +476,15 @@ export class DatabaseAdvisorService {
             'connection-usage' AS rule_id,
             CASE WHEN (total_conns / max_conns) * 100 >= 95.0 THEN 'critical' ELSE 'warning' END AS severity,
             'performance' AS category,
-            CASE WHEN (total_conns / max_conns) * 100 >= 95.0 THEN 'Database Connections Critical' ELSE 'Database Connections High' END AS title,
-            'The number of open database connections is high relative to max_connections. Idle connections still occupy connection slots and count toward the limit.' AS description,
-            format('Database has %s connections out of %s max_connections (%s%% used).', total_conns, max_conns, round(((total_conns / max_conns) * 100)::numeric, 2)) AS detail,
-            'Close idle connections, implement connection pooling, or scale up your compute resources.' AS remediation
+            CASE WHEN (total_conns / max_conns) * 100 >= 95.0 THEN 'Connection pool nearly exhausted' ELSE 'Connection pool utilization high' END AS title,
+            'Open connections are high relative to max_connections. Idle connections still occupy slots and count toward the limit.' AS description,
+            format($d$%s of %s total connections in use (%s%%). Approaching the limit may cause connection timeouts.$d$, total_conns, max_conns, round(((total_conns / max_conns) * 100)::numeric, 2)) AS detail,
+            $r$Check for connection leaks — especially idle-in-transaction connections that hold locks:
+SELECT pid, state, query_start, query FROM pg_stat_activity WHERE state = 'idle in transaction';
+
+Consider using PgBouncer in transaction mode. Recommended pool size formula: (CPU cores * 2) + effective_spindle_count.
+Also consider setting idle_in_transaction_session_timeout to auto-terminate stale transactions:
+ALTER SYSTEM SET idle_in_transaction_session_timeout = '30s';$r$ AS remediation
           FROM conn_stats
           WHERE (total_conns / max_conns) * 100 >= 80.0
         `,
@@ -471,10 +494,17 @@ export class DatabaseAdvisorService {
             'idle-in-transaction' AS rule_id,
             'warning' AS severity,
             'performance' AS category,
-            'Idle Connection in Transaction' AS title,
-            'A connection has been idle in a transaction for more than 5 minutes, holding locks and preventing autovacuum.' AS description,
-            format('PID %s has been idle in transaction for %s.', pid, age(clock_timestamp(), state_change)) AS detail,
-            format('SELECT pg_terminate_backend(%s);', pid) AS remediation
+            'Idle transaction holding locks' AS title,
+            'A connection is idle in a transaction, holding locks and preventing VACUUM from reclaiming dead tuples, causing table bloat over time.' AS description,
+            format($d$PID %s has been idle in transaction for %s. Idle-in-transaction connections hold locks and prevent VACUUM from reclaiming dead tuples, causing table bloat over time.$d$, pid, age(clock_timestamp(), state_change)) AS detail,
+            $r$Investigate long-running transactions:
+SELECT pid, now() - query_start AS duration, query FROM pg_stat_activity WHERE state = 'idle in transaction' ORDER BY query_start;
+
+Set a timeout to auto-terminate stale transactions:
+ALTER SYSTEM SET idle_in_transaction_session_timeout = '30s';
+SELECT pg_reload_conf();
+
+Check application code for missing transaction commits/rollbacks — common causes include unhandled errors in try/catch blocks or missing connection.release() calls.$r$ AS remediation
           FROM pg_stat_activity
           WHERE state = 'idle in transaction'
             AND age(clock_timestamp(), state_change) > interval '5 minutes'
@@ -490,10 +520,15 @@ export class DatabaseAdvisorService {
             'low-cache-hit-ratio' AS rule_id,
             CASE WHEN ratio < 90.0 THEN 'critical' ELSE 'warning' END AS severity,
             'performance' AS category,
-            'Low Cache Hit Ratio' AS title,
+            'Low buffer cache hit ratio' AS title,
             'The database buffer cache hit ratio is below 95%, so queries are frequently reading from disk instead of memory, which increases latency.' AS description,
-            format('Database buffer cache hit ratio is %s%%.', round(ratio::numeric, 2)) AS detail,
-            'Increase shared_buffers (a common target is ~25% of RAM) or add indexes so the working set fits in memory.' AS remediation
+            format($d$Buffer cache hit ratio is %s%%. A healthy database should maintain >=99%% cache hits. Low ratio means queries are reading from disk instead of memory, significantly increasing latency.$d$, round(ratio::numeric, 2)) AS detail,
+            $r$Check current shared_buffers setting:
+SELECT name, setting, unit FROM pg_settings WHERE name = 'shared_buffers';
+
+Recommended: shared_buffers = 25% of total RAM.
+Also review queries with high shared_blks_read in pg_stat_statements — these are the disk-heavy queries that would benefit most from indexing or caching:
+SELECT query, shared_blks_read, shared_blks_hit, calls FROM pg_stat_statements ORDER BY shared_blks_read DESC LIMIT 10;$r$ AS remediation
           FROM (
             SELECT
               CASE
@@ -511,10 +546,18 @@ export class DatabaseAdvisorService {
             'long-running-query' AS rule_id,
             CASE WHEN age(clock_timestamp(), query_start) > interval '30 minutes' THEN 'critical' ELSE 'warning' END AS severity,
             'performance' AS category,
-            'Long Running Query' AS title,
-            'A query has been running actively for more than 5 minutes.' AS description,
-            format('PID %s has been active for %s. Query: %s', pid, age(clock_timestamp(), query_start), substring(query from 1 for 100)) AS detail,
-            format('SELECT pg_terminate_backend(%s);', pid) AS remediation
+            format($t$Query running for %s minutes$t$, round(extract(epoch from age(clock_timestamp(), query_start)) / 60)::int) AS title,
+            'A query has been running actively for over 5 minutes, holding locks and preventing autovacuum.' AS description,
+            format($d$PID %s has been executing for %s (state: %s). Query: %s$d$, pid, age(clock_timestamp(), query_start), state, substring(query from 1 for 100)) AS detail,
+            format($r$Investigate the query:
+SELECT pid, now() - query_start AS duration, state, wait_event_type, query FROM pg_stat_activity WHERE pid = %s;
+
+If safe to terminate:
+SELECT pg_cancel_backend(%s);  -- graceful cancel
+SELECT pg_terminate_backend(%s);  -- force terminate
+
+Long-running queries hold locks and prevent autovacuum. Consider setting a statement_timeout:
+ALTER DATABASE current_database SET statement_timeout = '60s';$r$, pid, pid, pid) AS remediation
           FROM pg_stat_activity
           WHERE state = 'active'
             AND age(clock_timestamp(), query_start) > interval '5 minutes'
@@ -540,10 +583,14 @@ export class DatabaseAdvisorService {
             'rls-policy-perf' AS rule_id,
             'warning' AS severity,
             'performance' AS category,
-            'Auth RLS Initialization Plan' AS title,
-            'Detects if calls to current_setting() and auth.<function>() in RLS policies are being unnecessarily re-evaluated for each row.' AS description,
-            format('Table "%s.%s" has an RLS policy "%s" that re-evaluates current_setting() or auth.<function>() for each row.', schema_name, table_name, policy_name) AS detail,
-            format('Wrap the function call in a subquery: (SELECT auth.uid()) instead of auth.uid().') AS remediation
+            'RLS policy calls auth.uid() per row' AS title,
+            'An RLS policy calls auth.uid() without a subquery wrapper, so it is re-evaluated for every row.' AS description,
+            format($d$Policy "%s" on "%s.%s" calls auth.uid() without a subquery wrapper. On large tables this function is evaluated for every row, causing severe performance degradation (100x+ slower).$d$, policy_name, schema_name, table_name) AS detail,
+            format($r$Wrap auth.uid() in a subquery so it is evaluated once:
+-- Before (slow):
+USING (auth.uid() = user_id)
+-- After (fast):
+USING ((select auth.uid()) = user_id)$r$) AS remediation
           FROM policies
           WHERE is_rls_active
             AND schema_name NOT IN (
@@ -598,10 +645,10 @@ export class DatabaseAdvisorService {
             'missing-rls-index' AS rule_id,
             'warning' AS severity,
             'performance' AS category,
-            'Missing Index on RLS Policy Column' AS title,
-            'A column referenced in an RLS policy lacks an index, causing PostgreSQL to execute sequential scans for every row query evaluation.' AS description,
-            format('Column "%s" of table "%s.%s" is referenced in policy "%s" but has no index.', tc.column_name, tc.schema_name, tc.table_name, p.policy_name) AS detail,
-            format('CREATE INDEX ON "%s"."%s" (%s);', tc.schema_name, tc.table_name, tc.column_name) AS remediation
+            'RLS policy column missing index' AS title,
+            'A column referenced in an RLS policy lacks an index, forcing sequential scans on every query.' AS description,
+            format($d$Policy "%s" on "%s.%s" filters on column "%s" but no index exists for it. RLS conditions are evaluated on every query — without an index this forces sequential scans on the entire table.$d$, p.policy_name, tc.schema_name, tc.table_name, tc.column_name) AS detail,
+            format($r$CREATE INDEX CONCURRENTLY idx_%s_%s ON %s.%s (%s);$r$, tc.table_name, tc.column_name, tc.schema_name, tc.table_name, tc.column_name) AS remediation
           FROM table_cols tc
           JOIN policies p ON tc.table_oid = p.table_oid
           LEFT JOIN table_indices ti ON tc.table_oid = ti.table_oid AND tc.attnum = ANY(ti.col_attnums)
@@ -617,10 +664,17 @@ export class DatabaseAdvisorService {
             'dead-tuples' AS rule_id,
             CASE WHEN dead_ratio > 50.0 THEN 'warning' ELSE 'info' END AS severity,
             'health' AS category,
-            'High Dead Tuples Ratio' AS title,
-            'The ratio of dead tuples to live tuples is above 20%, which can cause table bloat and degrade performance.' AS description,
-            format('Table "%s.%s" has %s dead tuples and %s live tuples (ratio: %s%%).', schemaname, relname, n_dead_tup, n_live_tup, round(dead_ratio::numeric, 2)) AS detail,
-            format('Run VACUUM "%s"."%s" or configure autovacuum settings.', schemaname, relname) AS remediation
+            'High dead tuple ratio' AS title,
+            'The dead-tuple ratio is high, wasting disk space and slowing sequential scans; autovacuum may be falling behind.' AS description,
+            format($d$Table "%s.%s" has %s dead tuples (%s%% of %s total). This wastes disk space and slows sequential scans. Autovacuum may be falling behind on this table.$d$, schemaname, relname, n_dead_tup, round(dead_ratio::numeric, 0), (n_live_tup + n_dead_tup)) AS detail,
+            format($r$-- Immediate fix:
+VACUUM ANALYZE %s.%s;
+
+-- Prevent recurrence by tuning autovacuum for this high-churn table:
+ALTER TABLE %s.%s SET (
+  autovacuum_vacuum_scale_factor = 0.05,  -- vacuum at 5%% dead tuples (default 20%%)
+  autovacuum_analyze_scale_factor = 0.02  -- analyze at 2%% changes (default 10%%)
+);$r$, schemaname, relname, schemaname, relname) AS remediation
           FROM (
             SELECT
               schemaname,
@@ -647,10 +701,16 @@ export class DatabaseAdvisorService {
               THEN 'warning' ELSE 'info'
             END AS severity,
             'health' AS category,
-            'Stale Database Statistics' AS title,
-            'The database optimizer statistics are stale because the table has significant modifications since the last analyze operation.' AS description,
-            format('Table "%s.%s" has %s modified rows since analyze (live tuples: %s, mutated: %s%%).', schemaname, relname, n_mod_since_analyze, n_live_tup, round(pct_mutated::numeric, 2)) AS detail,
-            format('Run ANALYZE "%s"."%s" to refresh statistics.', schemaname, relname) AS remediation
+            CASE WHEN last_analyze IS NULL AND last_autoanalyze IS NULL THEN 'Table never analyzed' ELSE 'Stale table statistics' END AS title,
+            'Optimizer statistics are stale because the table has significant modifications since its last analyze.' AS description,
+            format($d$Table "%s.%s" has %s modifications since its last analyze (live tuples: %s, mutated: %s%%). The query planner may choose poor plans from stale statistics.$d$, schemaname, relname, n_mod_since_analyze, n_live_tup, round(pct_mutated::numeric, 2)) AS detail,
+            format($r$-- Update statistics immediately:
+ANALYZE %s.%s;
+
+-- Tune autovacuum to analyze more frequently:
+ALTER TABLE %s.%s SET (
+  autovacuum_analyze_scale_factor = 0.02  -- analyze at 2%% changes (default 10%%)
+);$r$, schemaname, relname, schemaname, relname) AS remediation
           FROM (
             SELECT
               schemaname,
@@ -678,10 +738,17 @@ export class DatabaseAdvisorService {
             'sequence-exhaustion' AS rule_id,
             CASE WHEN pct_used >= 90.0 THEN 'critical' ELSE 'warning' END AS severity,
             'health' AS category,
-            'Sequence Near Exhaustion' AS title,
-            'A sequence is close to its maximum limit, which will block further row inserts once exhausted.' AS description,
-            format('Sequence "%s.%s" is %s%% used (current: %s, max: %s).', schemaname, sequencename, round(pct_used::numeric, 2), last_value, max_value) AS detail,
-            format('ALTER SEQUENCE "%s"."%s" AS bigint;', schemaname, sequencename) AS remediation
+            'Sequence approaching exhaustion' AS title,
+            'A sequence is close to its maximum value; once exhausted, INSERTs that use it will fail.' AS description,
+            format($d$Sequence "%s.%s" is at %s%% capacity (current: %s, max: %s). When exhausted, INSERT operations will fail with "nextval: reached maximum value of sequence".$d$, schemaname, sequencename, round(pct_used::numeric, 2), last_value, max_value) AS detail,
+            format($r$-- Option 1: migrate the owning column to bigint (recommended, requires table rewrite):
+ALTER TABLE <table> ALTER COLUMN <col> TYPE bigint;
+
+-- Option 2: if the sequence is already on a bigint column, widen the sequence:
+ALTER SEQUENCE "%s"."%s" AS bigint;
+
+-- Check which table/column uses this sequence:
+SELECT table_name, column_name FROM information_schema.columns WHERE column_default LIKE '%%%s%%';$r$, schemaname, sequencename, sequencename) AS remediation
           FROM (
             SELECT
               schemaname,
@@ -741,10 +808,14 @@ export class DatabaseAdvisorService {
             'slow-query' AS rule_id,
             'warning' AS severity,
             'performance' AS category,
-            'Slow Query Detected' AS title,
-            'A query was executed with a mean duration greater than 1 second.' AS description,
-            format('Query "%s" has a mean execution time of %s ms.', substring(query from 1 for 100), (total_exec_time / calls)::numeric(10,2)) AS detail,
-            'Optimize the query by adding indexes, rewriting the query, or checking database resource limits.' AS remediation
+            'Slow query detected' AS title,
+            'A query has a mean execution time above 1 second.' AS description,
+            format($d$Query averages %s ms over %s calls (total: %s s): %s$d$, (total_exec_time / calls)::numeric(10,2), calls, round((total_exec_time / 1000)::numeric, 0), substring(query from 1 for 100)) AS detail,
+            format($r$Analyze with:
+EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) <your query>
+
+Look for sequential scans on large tables, and check the buffer hit ratio — low shared_blks_hit vs shared_blks_read indicates missing indexes or insufficient shared_buffers.
+Consider adding indexes on columns used in WHERE, JOIN, and ORDER BY clauses.$r$) AS remediation
           FROM pg_stat_statements
           WHERE calls > 0 AND (total_exec_time / calls) > 1000
           ORDER BY (total_exec_time / calls) DESC
