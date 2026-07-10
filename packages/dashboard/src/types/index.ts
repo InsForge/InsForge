@@ -15,6 +15,8 @@ export interface DashboardUserInfo {
   userId: string;
   email: string;
   name?: string;
+  /** Account-level BCP 47 locale preference; null when the user has none. */
+  preferredLocale?: string | null;
 }
 
 export interface DashboardBackup {
@@ -208,6 +210,7 @@ export interface DashboardProps {
   ) => Promise<{ success: boolean; instanceType?: string; error?: string }>;
   onUpdateVersion?: () => Promise<void>;
   onRequestUserInfo?: () => Promise<DashboardUserInfo>;
+  onUpdatePreferredLocale?: (locale: string) => void;
   onRequestUserApiKey?: () => Promise<string>;
   onRequestModelCredits?: () => Promise<DashboardModelCreditUsage>;
   onRequestProjectMetrics?: (range: DashboardMetricsRange) => Promise<DashboardMetricsResponse>;

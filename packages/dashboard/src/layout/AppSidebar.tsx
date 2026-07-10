@@ -15,6 +15,7 @@ import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { isInsForgeCloudProject } from '#lib/utils/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from '@insforge/ui';
 import { ProjectSettingsMenuDialog } from '#features/dashboard/components';
+import { LanguageSelect } from '#components';
 import { getFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
@@ -243,6 +244,14 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
           <div className="flex-1" />
 
           <div className={cn('w-full', isCollapsed ? 'space-y-2' : 'space-y-1.5')}>
+            {/* In cloud-hosting the AppHeader (which hosts LanguageSelect in
+                self-host mode) is hidden inside the iframe, so the language
+                picker lives here instead. */}
+            {host.mode === 'cloud-hosting' ? (
+              <div className={cn('flex', isCollapsed ? 'justify-center' : 'px-1')}>
+                <LanguageSelect />
+              </div>
+            ) : null}
             {bottomItemsList.map((item, index) =>
               index === inlineToggleHost ? (
                 <div key={item.id} className="flex items-center gap-2">

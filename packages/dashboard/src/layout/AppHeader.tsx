@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
   cn,
 } from '@insforge/ui';
-import { Avatar, AvatarFallback, Separator, ThemeSelect } from '#components';
+import { Avatar, AvatarFallback, LanguageSelect, Separator, ThemeSelect } from '#components';
 import { useTheme } from '#lib/contexts/ThemeContext';
 import { useAuth } from '#lib/contexts/AuthContext';
 import { useOpenConnectDialog } from './ConnectDialogContext';
@@ -129,6 +129,7 @@ export default function AppHeader() {
             )}
           </a>
           <Separator className="h-5 mx-2" orientation="vertical" />
+          <LanguageSelect />
           <ThemeSelect />
           <Separator className="h-5 mx-2" orientation="vertical" />
           {/* MCP Connection Status */}
