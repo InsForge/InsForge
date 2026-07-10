@@ -119,6 +119,7 @@ vi.mock('../../src/infra/config/app.config.js', () => {
   };
 });
 
+import { appConfig } from '../../src/infra/config/app.config.js';
 import { AuthService } from '../../src/services/auth/auth.service.js';
 
 describe('AuthService.adminLogin', () => {
@@ -173,16 +174,40 @@ describe('AuthService.adminLogin', () => {
     expectAdminLoginError('', '');
   });
 
-  it('handles credentials of different lengths safely up to 256 characters', () => {
-    const longUsername = 'a'.repeat(256);
-    const longPassword = 'b'.repeat(256);
+  it('handles credentials of different lengths safely up to 4096 characters', () => {
+    const longUsername = 'a'.repeat(4096);
+    const longPassword = 'b'.repeat(4096);
     expectAdminLoginError(longUsername, longPassword);
   });
 
-  it('immediately rejects credentials exceeding 256 characters', () => {
-    const hugeUsername = 'a'.repeat(257);
-    const hugePassword = 'b'.repeat(257);
+  it('immediately rejects credentials exceeding 4096 characters', () => {
+    const hugeUsername = 'a'.repeat(5000);
+    const hugePassword = 'b'.repeat(5000);
     expectAdminLoginError(hugeUsername, 'admin-password');
     expectAdminLoginError('admin@test.com', hugePassword);
+  });
+
+  it('throws a fatal error during initialization if root admin credentials exceed 4096 characters', () => {
+    const originalUsername = appConfig.auth.rootAdminUsername;
+    appConfig.auth.rootAdminUsername = 'a'.repeat(4097);
+    
+    try {
+      // Clear instance to force re-instantiation and constructor execution
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (AuthService as any).instance = undefined;
+      AuthService.getInstance();
+      expect.fail('Should have thrown a fatal error');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(Error);
+      const err = error as Error;
+      expect(err.message).toBe(
+        'ROOT_ADMIN_USERNAME and ROOT_ADMIN_PASSWORD must not exceed 4096 characters to prevent DoS vulnerabilities.'
+      );
+    } finally {
+      // Restore config state
+      appConfig.auth.rootAdminUsername = originalUsername;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (AuthService as any).instance = undefined;
+    }
   });
 });

@@ -81,6 +81,12 @@ export class AuthService {
       );
     }
 
+    if (this.adminUsername.length > 4096 || this.adminPassword.length > 4096) {
+      throw new Error(
+        'ROOT_ADMIN_USERNAME and ROOT_ADMIN_PASSWORD must not exceed 4096 characters to prevent DoS vulnerabilities.'
+      );
+    }
+
     this.adminUsernameHash = crypto.createHash('sha256').update(this.adminUsername).digest();
     this.adminPasswordHash = crypto.createHash('sha256').update(this.adminPassword).digest();
 
@@ -662,7 +668,7 @@ export class AuthService {
    * Admin login (validates against env variables only)
    */
   adminLogin(username: string, password: string): CreateAdminSessionResponse {
-    if (username.length > 256 || password.length > 256) {
+    if (username.length > 4096 || password.length > 4096) {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
