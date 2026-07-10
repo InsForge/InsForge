@@ -43,6 +43,13 @@ describe('normalizeLocale', () => {
     expect(normalizeLocale('en-GB')).toBe('en');
   });
 
+  it('maps Traditional-Chinese regions to zh-TW', () => {
+    expect(normalizeLocale('zh-HK')).toBe('zh-TW');
+    expect(normalizeLocale('zh-Hant')).toBe('zh-TW');
+    expect(normalizeLocale('zh-MO')).toBe('zh-TW');
+    expect(normalizeLocale('zh-Hans-CN')).toBe('zh-CN');
+  });
+
   it('returns null for unsupported or invalid values', () => {
     expect(normalizeLocale('fr')).toBeNull();
     expect(normalizeLocale('')).toBeNull();
@@ -95,6 +102,36 @@ describe('LocaleProvider', () => {
 
     await waitFor(() => expect(onRequestUserInfo).toHaveBeenCalled());
     expect(screen.getByTestId('locale').textContent).toBe('zh-CN');
+  });
+
+  it('a user selection made before the account preference arrives is not clobbered', async () => {
+    let resolveUserInfo!: (v: unknown) => void;
+    const onRequestUserInfo = vi.fn().mockReturnValue(
+      new Promise((resolve) => {
+        resolveUserInfo = resolve;
+      })
+    );
+    const onUpdatePreferredLocale = vi.fn();
+    renderWithHost({ mode: 'cloud-hosting', onRequestUserInfo, onUpdatePreferredLocale });
+
+    // User picks Spanish while the shell's USER_INFO is still in flight...
+    await userEvent.click(screen.getByText('set-es'));
+    // ...then a stale account preference lands.
+    resolveUserInfo({ userId: 'u1', email: 't@insforge.dev', preferredLocale: 'zh-TW' });
+    await waitFor(() => expect(onRequestUserInfo).toHaveBeenCalled());
+
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+    expect(window.localStorage.getItem(LOCAL_STORAGE_KEYS.locale)).toBe('es');
+  });
+
+  it('falls back to navigator.language when localStorage is empty', () => {
+    const spy = vi.spyOn(window.navigator, 'language', 'get').mockReturnValue('zh-TW');
+    try {
+      renderWithHost({ mode: 'self-hosting' });
+      expect(screen.getByTestId('locale').textContent).toBe('zh-TW');
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('self-hosting mode uses localStorage and never calls host callbacks', async () => {

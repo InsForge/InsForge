@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { LOCAL_STORAGE_KEYS } from '#lib/utils/constants';
 import { getLocalStorageItem, setLocalStorageItem } from '#lib/utils/local-storage';
@@ -16,11 +16,16 @@ export function normalizeLocale(value: unknown): Locale | null {
   if (typeof value !== 'string' || !value) {
     return null;
   }
-  const exact = SUPPORTED_LOCALES.find((l) => l.toLowerCase() === value.toLowerCase());
+  const lower = value.toLowerCase();
+  const exact = SUPPORTED_LOCALES.find((l) => l.toLowerCase() === lower);
   if (exact) {
     return exact;
   }
-  const language = value.split('-')[0].toLowerCase();
+  // Traditional-Chinese regions/scripts map to zh-TW, not the first zh match.
+  if (/^zh(-|$)/.test(lower)) {
+    return /hant|tw|hk|mo/.test(lower) ? 'zh-TW' : 'zh-CN';
+  }
+  const language = lower.split('-')[0];
   return SUPPORTED_LOCALES.find((l) => l.split('-')[0] === language) ?? null;
 }
 
@@ -50,6 +55,9 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       normalizeLocale(typeof navigator !== 'undefined' ? navigator.language : null) ??
       'en'
   );
+  // An explicit user selection must win over a late-arriving account value
+  // from the shell (the adoption request below resolves asynchronously).
+  const userTouchedRef = useRef(false);
 
   // Cloud mode: adopt the account-level preference once user info arrives.
   useEffect(() => {
@@ -60,7 +68,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     onRequestUserInfo()
       .then((info) => {
         const accountLocale = normalizeLocale(info.preferredLocale);
-        if (accountLocale && !cancelled) {
+        if (accountLocale && !cancelled && !userTouchedRef.current) {
           setLocaleState(accountLocale);
           setLocalStorageItem(LOCAL_STORAGE_KEYS.locale, accountLocale);
         }
@@ -74,6 +82,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   }, [onRequestUserInfo]);
 
   const setLocale = (next: Locale) => {
+    userTouchedRef.current = true;
     setLocaleState(next);
     setLocalStorageItem(LOCAL_STORAGE_KEYS.locale, next);
     onUpdatePreferredLocale?.(next);

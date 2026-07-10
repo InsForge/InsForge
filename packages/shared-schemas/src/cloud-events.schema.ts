@@ -127,7 +127,9 @@ export const posthogConnectionStatusEventSchema = z.object({
 // cloud shell persists it on the account (users.preferred_locale).
 export const updatePreferredLocaleEventSchema = z.object({
   type: z.literal('UPDATE_PREFERRED_LOCALE'),
-  locale: z.string(),
+  // Free string (not an enum) so old/new locale lists interoperate; bounded
+  // to the BCP 47 max the backend column accepts.
+  locale: z.string().max(35),
 });
 
 export const posthogConnectRequestEventSchema = z.object({
