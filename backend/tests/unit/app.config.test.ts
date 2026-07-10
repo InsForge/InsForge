@@ -308,6 +308,27 @@ describe('config.server', () => {
     expect(loadConfig().server.trustProxy).toBe('loopback, 10.0.0.0/8');
   });
 
+  it('defaults keepAliveTimeoutMs to 65000', () => {
+    unsetEnvKeys('KEEP_ALIVE_TIMEOUT_MS');
+    expect(loadConfig().server.keepAliveTimeoutMs).toBe(65000);
+  });
+
+  it('parses KEEP_ALIVE_TIMEOUT_MS as number', () => {
+    process.env.KEEP_ALIVE_TIMEOUT_MS = '120000';
+    expect(loadConfig().server.keepAliveTimeoutMs).toBe(120000);
+  });
+
+  it('falls back to default keepAliveTimeoutMs for invalid values', () => {
+    process.env.KEEP_ALIVE_TIMEOUT_MS = 'not-a-number';
+    expect(loadConfig().server.keepAliveTimeoutMs).toBe(65000);
+
+    process.env.KEEP_ALIVE_TIMEOUT_MS = '0';
+    expect(loadConfig().server.keepAliveTimeoutMs).toBe(65000);
+
+    process.env.KEEP_ALIVE_TIMEOUT_MS = '-5000';
+    expect(loadConfig().server.keepAliveTimeoutMs).toBe(65000);
+  });
+
   it('robustly falls back to defaults for 0 or negative limits', () => {
     process.env.MAX_FILES_PER_FIELD = '0';
     process.env.MAX_FILE_SIZE = '0';

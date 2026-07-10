@@ -34,6 +34,7 @@ import { StorageService } from '@/services/storage/storage.service.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
 import { seedBackend } from '@/utils/seed.js';
+import { applyServerTimeouts } from '@/utils/server-timeouts.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
@@ -330,6 +331,7 @@ async function initializeServer() {
     const server = app.listen(PORT, () => {
       logger.info(`Backend API service listening on port ${PORT}`);
     });
+    applyServerTimeouts(server, appConfig.server.keepAliveTimeoutMs);
 
     // Initialize Socket.IO service
     const socketService = SocketManager.getInstance();
