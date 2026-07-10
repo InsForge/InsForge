@@ -403,7 +403,6 @@ export default function TablesPage() {
   };
 
   const handleCreateTable = () => {
-    pendingCreateDraftClearSchemasRef.current.delete(selectedSchema);
     setEditingTable(null);
     setShowTableForm(true);
   };

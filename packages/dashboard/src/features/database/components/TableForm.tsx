@@ -274,6 +274,7 @@ export function TableForm({
         foreignKeys: foreignKeysRef.current,
       };
       if (hasCreateDraftData(currentDraft)) {
+        skipNextDraftSaveRef.current = false;
         return;
       }
 
