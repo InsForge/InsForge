@@ -216,7 +216,7 @@ suspend fun rpcRaw(
 - `functionName` (String) - Name of the PostgreSQL function to call
 - `args` (`Map\<String, Any?\>?`, optional) - Arguments to pass to the function
 
-### Implementation Details
+### Implementation details
 
 - **No arguments**: Uses GET request to `/api/database/rpc/{functionName}`
 - **With arguments**: Uses POST request with JSON body to `/api/database/rpc/{functionName}`

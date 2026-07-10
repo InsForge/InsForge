@@ -317,7 +317,7 @@ If you render directly from `getPresenceState()`, `presence:sync` is simply your
 
 When the signed-in user's access token refreshes, the SDK leaves an established socket connected — there is no in-band re-authentication, reconnect, or presence churn. A later initial connection or network reconnect obtains the latest access token before its handshake. Sign-in, sign-out, or switching users reconnects the socket under the new identity.
 
-Access *reductions* apply lazily on a live connection: publishing is re-checked against RLS on every message and new subscribes are re-checked at join time, but continued receipt on already-joined channels persists until the client unsubscribes or reconnects.
+Access *reductions* apply lazily on a live connection. Publishing is re-checked against RLS on every message, and new subscribes are re-checked at join time. Continued receipt on already-joined channels persists until the client unsubscribes or reconnects.
 
 ## Properties
 
