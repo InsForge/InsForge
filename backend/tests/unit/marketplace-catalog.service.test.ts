@@ -113,13 +113,28 @@ describe('MarketplaceCatalogService', () => {
   });
 
   it('falls back to the bundled catalog when the payload fails schema validation', async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse({ version: 1, plugins: [{ slug: 'broken' }] })
-    );
+    fetchMock.mockResolvedValue(jsonResponse({ version: 1, plugins: [{ slug: 'broken' }] }));
 
     const catalog = await service.getCatalog();
 
     expect(catalog).toEqual(DEFAULT_MARKETPLACE_CATALOG);
+  });
+
+  it('shares one fetch across concurrent cold requests', async () => {
+    let resolveFetch: (value: Response) => void = () => {};
+    fetchMock.mockReturnValue(
+      new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      })
+    );
+
+    const first = service.getCatalog();
+    const second = service.getCatalog();
+    resolveFetch(jsonResponse(REMOTE_CATALOG));
+
+    expect(await first).toEqual(REMOTE_CATALOG);
+    expect(await second).toEqual(REMOTE_CATALOG);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('does not retry an unreachable catalog URL within the TTL', async () => {

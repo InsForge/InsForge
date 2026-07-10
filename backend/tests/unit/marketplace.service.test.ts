@@ -26,7 +26,7 @@ vi.mock('../../src/services/marketplace/catalog.service', () => ({
 
 vi.mock('../../src/services/email/smtp-config.service', () => ({
   isPrivateIp: (ip: string) =>
-    ip.startsWith('127.') || ip.startsWith('10.') || ip.startsWith('192.168.'),
+    ip.startsWith('127.') || ip.startsWith('10.') || ip.startsWith('192.168.') || ip === '::1',
 }));
 
 vi.mock('dns/promises', () => ({
@@ -210,6 +210,58 @@ describe('MarketplaceService', () => {
         statusCode: 400,
       });
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects validation endpoints whose IPv6 records are private', async () => {
+      mockResolve4.mockResolvedValue([]);
+      mockResolve6.mockResolvedValue(['::1']);
+
+      await expect(service.installPlugin('resend', 're_key')).rejects.toMatchObject({
+        statusCode: 400,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when the validation hostname does not resolve', async () => {
+      mockResolve4.mockResolvedValue([]);
+      mockResolve6.mockResolvedValue([]);
+
+      await expect(service.installPlugin('resend', 're_key')).rejects.toMatchObject({
+        statusCode: 400,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('vets IP-literal validation hosts without DNS resolution', async () => {
+      const ipCatalog: MarketplaceCatalog = {
+        version: 1,
+        plugins: [
+          {
+            ...CATALOG.plugins[0],
+            slug: 'ip-plugin',
+            install: {
+              ...CATALOG.plugins[0].install,
+              validation: { url: 'https://127.0.0.1/verify', method: 'GET' },
+            },
+          },
+        ],
+      };
+      mockGetCatalog.mockResolvedValue(ipCatalog);
+
+      await expect(service.installPlugin('ip-plugin', 'key')).rejects.toMatchObject({
+        statusCode: 400,
+      });
+      expect(mockResolve4).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('maps a failed secret write to a 500 error', async () => {
+      mockSecretService.listSecrets.mockResolvedValue([secret({ isActive: false })]);
+      mockSecretService.updateSecret.mockResolvedValue(false);
+
+      await expect(service.installPlugin('resend', 're_key')).rejects.toMatchObject({
+        statusCode: 500,
+      });
     });
 
     it('404s for an unknown plugin slug', async () => {

@@ -118,6 +118,8 @@ export function InstallPluginDialog({
           </div>
           {!plugin.installed && (
             <InputField
+              type="password"
+              autoComplete="off"
               label={plugin.install.secretName}
               placeholder={plugin.install.placeholder}
               value={apiKeyValue}

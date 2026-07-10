@@ -52,6 +52,9 @@ export class MarketplaceService {
 
     const secretName = plugin.install.secretName;
     const secrets = await this.secretService.listSecrets();
+    // An existing non-reserved secret (active or not) is updated in place:
+    // API-level installs deliberately act as "set/replace the key". The
+    // dashboard offers uninstall instead when a plugin is already installed.
     const existing = secrets.find((s) => s.key === secretName);
 
     if (existing?.isReserved) {
@@ -161,17 +164,18 @@ export class MarketplaceService {
     );
   }
 
+  // Known gap: fetch() re-resolves DNS after this check, so a rebinding
+  // attacker who controls the hostname could still swap in a private address
+  // between check and connect. Accepted for now: validation URLs come from
+  // the first-party hosted catalog (https-only, redirect: 'error'), not user
+  // input. Closing it fully would need connect-time IP pinning (undici Agent).
   private async assertPublicHost(hostname: string): Promise<void> {
-    const reject = () => {
-      throw new AppError(
-        'Plugin validation endpoint resolves to a private address, which is not allowed',
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
+    const reject = (message: string) => {
+      throw new AppError(message, 400, ERROR_CODES.INVALID_INPUT);
     };
     if (net.isIP(hostname)) {
       if (isPrivateIp(hostname)) {
-        reject();
+        reject('Plugin validation endpoint resolves to a private address, which is not allowed');
       }
       return;
     }
@@ -179,8 +183,13 @@ export class MarketplaceService {
       dns.resolve4(hostname).catch(() => []),
       dns.resolve6(hostname).catch(() => []),
     ]);
-    if ([...ipv4, ...ipv6].some(isPrivateIp)) {
-      reject();
+    const addresses = [...ipv4, ...ipv6];
+    // Fail closed: an unresolvable host can't be vetted (and can't be valid)
+    if (addresses.length === 0) {
+      reject('Plugin validation endpoint hostname could not be resolved');
+    }
+    if (addresses.some(isPrivateIp)) {
+      reject('Plugin validation endpoint resolves to a private address, which is not allowed');
     }
   }
 }

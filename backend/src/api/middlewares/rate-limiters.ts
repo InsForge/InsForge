@@ -448,3 +448,30 @@ function createWriteEndpointLimiter(category: WriteLimiterCategory) {
 export const functionsWriteLimiter = createWriteEndpointLimiter('functions');
 export const deploymentsWriteLimiter = createWriteEndpointLimiter('deployments');
 export const computeWriteLimiter = createWriteEndpointLimiter('compute');
+
+/**
+ * Per-IP rate limiter for marketplace plugin install/uninstall. Installs make
+ * an outbound validation request to the provider with the submitted key, so
+ * this caps key-enumeration attempts and provider hammering from a
+ * compromised admin session. Admin-only routes; normal use is a handful of
+ * installs per project lifetime.
+ *
+ * Limits: 20 requests per 15 minutes per IP.
+ */
+export const marketplaceInstallRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many marketplace install requests from this IP. Please try again in 15 minutes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+  skipSuccessfulRequests: false,
+  skipFailedRequests: false,
+});

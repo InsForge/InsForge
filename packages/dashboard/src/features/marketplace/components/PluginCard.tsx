@@ -11,8 +11,17 @@ interface PluginCardProps {
 export function PluginCard({ plugin, onOpen }: PluginCardProps) {
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`${plugin.name} plugin details`}
       onClick={onOpen}
-      className="group relative flex min-h-[148px] cursor-pointer flex-col gap-3 rounded-lg border border-[var(--alpha-8)] bg-card p-5"
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      className="group relative flex min-h-[148px] cursor-pointer flex-col gap-3 rounded-lg border border-[var(--alpha-8)] bg-card p-5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(var(--foreground))]"
     >
       <div className="pointer-events-none absolute inset-0 rounded-lg transition-colors group-hover:bg-[var(--alpha-4)] group-active:bg-[var(--alpha-8)]" />
       <div className="relative">

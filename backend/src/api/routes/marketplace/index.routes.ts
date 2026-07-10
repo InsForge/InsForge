@@ -9,6 +9,7 @@ import { MarketplaceService } from '@/services/marketplace/marketplace.service.j
 import { FunctionService } from '@/services/functions/function.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { marketplaceInstallRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 
@@ -49,6 +50,7 @@ router.get(
 router.post(
   '/plugins/:slug/install',
   verifyAdmin,
+  marketplaceInstallRateLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { slug } = req.params;
@@ -91,6 +93,7 @@ router.post(
 router.delete(
   '/plugins/:slug',
   verifyAdmin,
+  marketplaceInstallRateLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { slug } = req.params;

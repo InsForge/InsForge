@@ -18,7 +18,10 @@ export const marketplaceInstallSpecSchema = z.object({
 });
 
 export const marketplacePluginSchema = z.object({
-  slug: z.string().min(1),
+  // Used as a route parameter (/marketplace/plugins/:slug/install)
+  slug: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9-]*$/, 'Slug must be lowercase alphanumeric with hyphens'),
   name: z.string().min(1),
   publisher: z.string(),
   category: z.string(),
@@ -38,7 +41,18 @@ export const marketplacePluginSchema = z.object({
 // schema and falls back to its bundled catalog when it doesn't conform.
 export const marketplaceCatalogSchema = z.object({
   version: z.number().int().nonnegative(),
-  plugins: z.array(marketplacePluginSchema),
+  plugins: z.array(marketplacePluginSchema).superRefine((plugins, ctx) => {
+    const seen = new Set<string>();
+    for (const plugin of plugins) {
+      if (seen.has(plugin.slug)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate plugin slug: ${plugin.slug}`,
+        });
+      }
+      seen.add(plugin.slug);
+    }
+  }),
 });
 
 export type MarketplaceInstallSpec = z.infer<typeof marketplaceInstallSpecSchema>;

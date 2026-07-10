@@ -52,6 +52,7 @@ export function PluginAvatar({ plugin, size }: PluginAvatarProps) {
         <img
           src={plugin.iconUrl}
           alt={`${plugin.name} logo`}
+          referrerPolicy="no-referrer"
           className={cn('object-contain', size === 'sm' ? 'h-5 w-5' : 'h-6 w-6')}
           onError={() => setIconFailed(true)}
         />

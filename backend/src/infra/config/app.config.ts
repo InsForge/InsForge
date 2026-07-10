@@ -235,9 +235,10 @@ export function loadConfig(): AppConfig {
       openrouterApiKey: process.env.OPENROUTER_API_KEY || undefined,
     },
     marketplace: {
+      // ?? preserves an explicitly empty MARKETPLACE_CATALOG_URL as the
+      // documented "bundled catalog only" opt-out for offline self-hosts
       catalogUrl:
-        process.env.MARKETPLACE_CATALOG_URL ||
-        'https://api.insforge.dev/marketplace/v1/catalog',
+        process.env.MARKETPLACE_CATALOG_URL ?? 'https://api.insforge.dev/marketplace/v1/catalog',
     },
     telemetry: {
       disabled: parseEnvBool(process.env.INSFORGE_TELEMETRY_DISABLED),
