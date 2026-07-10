@@ -657,8 +657,15 @@ export class AuthService {
    * Admin login (validates against env variables only)
    */
   adminLogin(username: string, password: string): CreateAdminSessionResponse {
-    // Simply validate against environment variables
-    if (username !== this.adminUsername || password !== this.adminPassword) {
+    const hashedUserProvided = crypto.createHash('sha256').update(username).digest();
+    const hashedUserActual = crypto.createHash('sha256').update(this.adminUsername).digest();
+    const hashedPassProvided = crypto.createHash('sha256').update(password).digest();
+    const hashedPassActual = crypto.createHash('sha256').update(this.adminPassword).digest();
+
+    const usernameMatch = crypto.timingSafeEqual(hashedUserProvided, hashedUserActual);
+    const passwordMatch = crypto.timingSafeEqual(hashedPassProvided, hashedPassActual);
+
+    if (!usernameMatch || !passwordMatch) {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
