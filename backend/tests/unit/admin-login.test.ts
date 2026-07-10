@@ -83,14 +83,28 @@ vi.mock('../../src/infra/security/token.manager.js', () => ({
   },
 }));
 
-vi.mock('../../src/providers/oauth/google.provider.js', () => ({ GoogleOAuthProvider: mockOAuthProvider }));
-vi.mock('../../src/providers/oauth/github.provider.js', () => ({ GitHubOAuthProvider: mockOAuthProvider }));
-vi.mock('../../src/providers/oauth/discord.provider.js', () => ({ DiscordOAuthProvider: mockOAuthProvider }));
-vi.mock('../../src/providers/oauth/linkedin.provider.js', () => ({ LinkedInOAuthProvider: mockOAuthProvider }));
-vi.mock('../../src/providers/oauth/facebook.provider.js', () => ({ FacebookOAuthProvider: mockOAuthProvider }));
-vi.mock('../../src/providers/oauth/microsoft.provider.js', () => ({ MicrosoftOAuthProvider: mockOAuthProvider }));
+vi.mock('../../src/providers/oauth/google.provider.js', () => ({
+  GoogleOAuthProvider: mockOAuthProvider,
+}));
+vi.mock('../../src/providers/oauth/github.provider.js', () => ({
+  GitHubOAuthProvider: mockOAuthProvider,
+}));
+vi.mock('../../src/providers/oauth/discord.provider.js', () => ({
+  DiscordOAuthProvider: mockOAuthProvider,
+}));
+vi.mock('../../src/providers/oauth/linkedin.provider.js', () => ({
+  LinkedInOAuthProvider: mockOAuthProvider,
+}));
+vi.mock('../../src/providers/oauth/facebook.provider.js', () => ({
+  FacebookOAuthProvider: mockOAuthProvider,
+}));
+vi.mock('../../src/providers/oauth/microsoft.provider.js', () => ({
+  MicrosoftOAuthProvider: mockOAuthProvider,
+}));
 vi.mock('../../src/providers/oauth/x.provider.js', () => ({ XOAuthProvider: mockOAuthProvider }));
-vi.mock('../../src/providers/oauth/apple.provider.js', () => ({ AppleOAuthProvider: mockOAuthProvider }));
+vi.mock('../../src/providers/oauth/apple.provider.js', () => ({
+  AppleOAuthProvider: mockOAuthProvider,
+}));
 
 vi.mock('../../src/infra/config/app.config.js', () => {
   const c = {
