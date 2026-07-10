@@ -56,6 +56,8 @@ export class AuthService {
   private static instance: AuthService;
   private adminUsername: string;
   private adminPassword: string;
+  private adminUsernameHash: Buffer;
+  private adminPasswordHash: Buffer;
   private pool: Pool | null = null;
   private tokenManager: TokenManager;
 
@@ -78,6 +80,9 @@ export class AuthService {
         'ROOT_ADMIN_USERNAME and ROOT_ADMIN_PASSWORD environment variables are required'
       );
     }
+
+    this.adminUsernameHash = crypto.createHash('sha256').update(this.adminUsername).digest();
+    this.adminPasswordHash = crypto.createHash('sha256').update(this.adminPassword).digest();
 
     // Initialize token manager
     this.tokenManager = TokenManager.getInstance();
@@ -657,13 +662,15 @@ export class AuthService {
    * Admin login (validates against env variables only)
    */
   adminLogin(username: string, password: string): CreateAdminSessionResponse {
-    const hashedUserProvided = crypto.createHash('sha256').update(username).digest();
-    const hashedUserActual = crypto.createHash('sha256').update(this.adminUsername).digest();
-    const hashedPassProvided = crypto.createHash('sha256').update(password).digest();
-    const hashedPassActual = crypto.createHash('sha256').update(this.adminPassword).digest();
+    if (username.length > 256 || password.length > 256) {
+      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
 
-    const usernameMatch = crypto.timingSafeEqual(hashedUserProvided, hashedUserActual);
-    const passwordMatch = crypto.timingSafeEqual(hashedPassProvided, hashedPassActual);
+    const hashedUserProvided = crypto.createHash('sha256').update(username).digest();
+    const hashedPassProvided = crypto.createHash('sha256').update(password).digest();
+
+    const usernameMatch = crypto.timingSafeEqual(hashedUserProvided, this.adminUsernameHash);
+    const passwordMatch = crypto.timingSafeEqual(hashedPassProvided, this.adminPasswordHash);
 
     if (!usernameMatch || !passwordMatch) {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);

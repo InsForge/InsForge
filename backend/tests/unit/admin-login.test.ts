@@ -132,6 +132,19 @@ describe('AuthService.adminLogin', () => {
     authService = AuthService.getInstance();
   });
 
+  function expectAdminLoginError(username: string, password: string) {
+    try {
+      authService.adminLogin(username, password);
+      expect.fail('Should have thrown an error');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(AppError);
+      const appErr = error as AppError;
+      expect(appErr.message).toBe('Invalid admin credentials');
+      expect(appErr.statusCode).toBe(401);
+      expect(appErr.code).toBe(ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+  }
+
   it('successfully logs in with correct credentials', () => {
     const result = authService.adminLogin('admin@test.com', 'admin-password');
     expect(result).toEqual({
@@ -145,70 +158,31 @@ describe('AuthService.adminLogin', () => {
   });
 
   it('throws AppError when username is incorrect but password is correct', () => {
-    try {
-      authService.adminLogin('wrong-admin@test.com', 'admin-password');
-      expect.fail('Should have thrown an error');
-    } catch (error: unknown) {
-      expect(error).toBeInstanceOf(AppError);
-      const appErr = error as AppError;
-      expect(appErr.message).toBe('Invalid admin credentials');
-      expect(appErr.statusCode).toBe(401);
-      expect(appErr.code).toBe(ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
+    expectAdminLoginError('wrong-admin@test.com', 'admin-password');
   });
 
   it('throws AppError when password is incorrect but username is correct', () => {
-    try {
-      authService.adminLogin('admin@test.com', 'wrong-password');
-      expect.fail('Should have thrown an error');
-    } catch (error: unknown) {
-      expect(error).toBeInstanceOf(AppError);
-      const appErr = error as AppError;
-      expect(appErr.message).toBe('Invalid admin credentials');
-      expect(appErr.statusCode).toBe(401);
-      expect(appErr.code).toBe(ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
+    expectAdminLoginError('admin@test.com', 'wrong-password');
   });
 
   it('throws AppError when both username and password are incorrect', () => {
-    try {
-      authService.adminLogin('wrong-admin@test.com', 'wrong-password');
-      expect.fail('Should have thrown an error');
-    } catch (error: unknown) {
-      expect(error).toBeInstanceOf(AppError);
-      const appErr = error as AppError;
-      expect(appErr.message).toBe('Invalid admin credentials');
-      expect(appErr.statusCode).toBe(401);
-      expect(appErr.code).toBe(ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
+    expectAdminLoginError('wrong-admin@test.com', 'wrong-password');
   });
 
   it('throws AppError when inputs are empty strings', () => {
-    try {
-      authService.adminLogin('', '');
-      expect.fail('Should have thrown an error');
-    } catch (error: unknown) {
-      expect(error).toBeInstanceOf(AppError);
-      const appErr = error as AppError;
-      expect(appErr.message).toBe('Invalid admin credentials');
-      expect(appErr.statusCode).toBe(401);
-      expect(appErr.code).toBe(ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
+    expectAdminLoginError('', '');
   });
 
-  it('handles credentials of significantly different lengths safely without crashing', () => {
-    const longUsername = 'a'.repeat(1000);
-    const longPassword = 'b'.repeat(1000);
+  it('handles credentials of different lengths safely up to 256 characters', () => {
+    const longUsername = 'a'.repeat(256);
+    const longPassword = 'b'.repeat(256);
+    expectAdminLoginError(longUsername, longPassword);
+  });
 
-    try {
-      authService.adminLogin(longUsername, longPassword);
-      expect.fail('Should have thrown an error');
-    } catch (error: unknown) {
-      expect(error).toBeInstanceOf(AppError);
-      const appErr = error as AppError;
-      expect(appErr.message).toBe('Invalid admin credentials');
-      expect(appErr.statusCode).toBe(401);
-      expect(appErr.code).toBe(ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
+  it('immediately rejects credentials exceeding 256 characters', () => {
+    const hugeUsername = 'a'.repeat(257);
+    const hugePassword = 'b'.repeat(257);
+    expectAdminLoginError(hugeUsername, 'admin-password');
+    expectAdminLoginError('admin@test.com', hugePassword);
   });
 });
