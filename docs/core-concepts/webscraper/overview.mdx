@@ -57,7 +57,7 @@ After connecting, the empty state ships a scrape prompt you can paste into your 
 Use the insforge webscraper apify skill to scrape <what you want> and return the results.
 ```
 
-Behind the prompt, `npx @insforge/cli webscraper apify login` fetches your InsForge-managed Apify token, logs the local Apify CLI in headlessly (no browser OAuth), and installs the Apify agent skills. From there the agent picks an actor from the Apify Store, starts runs, and reads the results back.
+Behind the prompt, `npx @insforge/cli webscraper apify login` fetches your InsForge-managed Apify token, authenticates the local Apify CLI headlessly (no browser OAuth), and installs the Apify agent skills. From there the agent picks an actor from the Apify Store, starts runs, and reads the results back.
 
 ### Actors
 
