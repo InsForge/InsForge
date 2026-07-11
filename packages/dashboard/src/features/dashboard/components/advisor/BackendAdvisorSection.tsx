@@ -166,7 +166,7 @@ export function BackendAdvisorSection() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [isScanning, refetchLatest, queryClient, showToast]);
+  }, [isScanning, refetchLatest, queryClient, showToast, t]);
 
   const handleRunScan = () => {
     baselineScanIdRef.current = latest.data?.scanId;
@@ -175,7 +175,7 @@ export function BackendAdvisorSection() {
     trigger.mutate(undefined, {
       onError: (error) => {
         setIsScanning(false);
-        showToast(`Failed to start scan: ${error.message}`, 'error');
+        showToast(t('advisor.toast.startFailed', { message: error.message }), 'error');
       },
     });
   };

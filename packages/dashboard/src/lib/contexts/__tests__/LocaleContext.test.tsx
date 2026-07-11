@@ -48,6 +48,8 @@ describe('normalizeLocale', () => {
     expect(normalizeLocale('zh-Hant')).toBe('zh-TW');
     expect(normalizeLocale('zh-MO')).toBe('zh-TW');
     expect(normalizeLocale('zh-Hans-CN')).toBe('zh-CN');
+    expect(normalizeLocale('zh-Hans-HK')).toBe('zh-CN');
+    expect(normalizeLocale('zh-Hans-MO')).toBe('zh-CN');
   });
 
   it('returns null for unsupported or invalid values', () => {

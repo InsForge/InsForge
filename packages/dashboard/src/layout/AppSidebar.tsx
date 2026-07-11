@@ -247,10 +247,11 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
           <div className="flex-1" />
 
           <div className={cn('w-full', isCollapsed ? 'space-y-2' : 'space-y-1.5')}>
-            {/* In cloud-hosting the AppHeader (which hosts LanguageSelect in
-                self-host mode) is hidden inside the iframe, so the language
-                picker lives here instead. */}
-            {host.mode === 'cloud-hosting' ? (
+            {/* The AppHeader hosts LanguageSelect when the navbar shows; when
+                it is hidden (cloud-hosting inside the iframe) the picker
+                lives here instead. Gate on the navbar actually being hidden
+                so the two can never render together. */}
+            {!(host.showNavbar ?? true) ? (
               <div className={cn('flex', isCollapsed ? 'justify-center' : 'px-1')}>
                 <LanguageSelect />
               </div>

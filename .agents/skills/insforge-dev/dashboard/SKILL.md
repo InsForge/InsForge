@@ -97,8 +97,10 @@ Mark every hardcode with a trailing `// LOCAL DEBUG: <original expression>` comm
 
 ## Locale / language preference
 
-The dashboard has a language **preference** layer (selector + cloud sync); its
-strings are still English — translation is a separate, future workstream.
+The dashboard has a language preference layer (selector + cloud sync) and
+bundled react-i18next translations for the chrome, overview page, and Backend
+Advisor (`lib/i18n/`, namespace `chrome`). Feature pages beyond those are
+still English — extend the same namespace as they get translated.
 
 - `lib/contexts/LocaleContext.tsx` — `LocaleProvider` / `useLocale` /
   `SUPPORTED_LOCALES` / `normalizeLocale`. Resolution order: cloud account
@@ -121,6 +123,11 @@ strings are still English — translation is a separate, future workstream.
   surface can't render. Route locale-ish input through `normalizeLocale`.
 - Self-host mode must work with zero cloud callbacks (localStorage only);
   extend `lib/contexts/__tests__/LocaleContext.test.tsx` when touching this.
+- Every key added to `lib/i18n/locales/en.json` must exist in all four locale
+  files — `lib/i18n/__tests__/localeParity.test.ts` fails CI otherwise
+  (plural suffixes normalized; zh carries only `_other`).
+- Never translate user-generated names (tables, buckets) — only static ids.
+  See the note in `components/FeatureSidebar.tsx`.
 
 ## Validation
 

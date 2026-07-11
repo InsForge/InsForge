@@ -22,8 +22,12 @@ export function normalizeLocale(value: unknown): Locale | null {
   if (exact) {
     return exact;
   }
-  // Traditional-Chinese regions/scripts map to zh-TW, not the first zh match.
+  // Chinese: an explicit script subtag wins (zh-Hans-HK is Simplified);
+  // otherwise Traditional-Chinese regions map to zh-TW.
   if (/^zh(-|$)/.test(lower)) {
+    if (/hans/.test(lower)) {
+      return 'zh-CN';
+    }
     return /hant|tw|hk|mo/.test(lower) ? 'zh-TW' : 'zh-CN';
   }
   const language = lower.split('-')[0];
@@ -71,17 +75,25 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
-    onRequestUserInfo()
-      .then((info) => {
-        const accountLocale = normalizeLocale(info.preferredLocale);
-        if (accountLocale && !cancelled && !userTouchedRef.current) {
-          setLocaleState(accountLocale);
-          setLocalStorageItem(LOCAL_STORAGE_KEYS.locale, accountLocale);
+    // The shell's user-info bridge allows one in-flight request at a time, and
+    // other consumers (analytics identify, StrictMode double-mount) can hold
+    // the slot when we fire — retry briefly instead of silently giving up.
+    const adopt = async () => {
+      for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
+        try {
+          const info = await onRequestUserInfo();
+          const accountLocale = normalizeLocale(info.preferredLocale);
+          if (accountLocale && !cancelled && !userTouchedRef.current) {
+            setLocaleState(accountLocale);
+            setLocalStorageItem(LOCAL_STORAGE_KEYS.locale, accountLocale);
+          }
+          return;
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
         }
-      })
-      .catch(() => {
-        // No account preference available; keep the local resolution.
-      });
+      }
+    };
+    void adopt();
     return () => {
       cancelled = true;
     };

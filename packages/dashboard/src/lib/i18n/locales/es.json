@@ -26,7 +26,8 @@
     "connect": "Conectar",
     "signOut": "Cerrar sesión",
     "admin": "Admin",
-    "administrator": "Administrador"
+    "administrator": "Administrador",
+    "language": "Idioma"
   },
   "theme": {
     "light": "Claro",
@@ -95,7 +96,10 @@
       "justNow": "justo ahora",
       "minutesAgo": "hace {{count}} min",
       "hoursAgo": "hace {{count}} h",
-      "daysAgo": "hace {{count}} días"
+      "daysAgo": "hace {{count}} días",
+      "minutesAgo_one": "hace {{count}} min",
+      "hoursAgo_one": "hace {{count}} h",
+      "daysAgo_one": "hace {{count}} día"
     },
     "toast": {
       "scanFailed": "El escaneo falló. Revisa los logs del backend.",
@@ -104,7 +108,9 @@
       "scanStarted": "Escaneando… suele tardar 5–10 s",
       "nothingToCopy": "Nada que copiar",
       "noRemediations": "No hay remediaciones disponibles",
-      "copyFailed": "No se pudieron copiar las remediaciones"
-    }
+      "copyFailed": "No se pudieron copiar las remediaciones",
+      "startFailed": "No se pudo iniciar el escaneo: {{message}}"
+    },
+    "selectedCount_one": "{{count}} seleccionada"
   }
 }

@@ -1,4 +1,5 @@
 import { Languages } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useLocale, SUPPORTED_LOCALES, type Locale } from '#lib/contexts/LocaleContext';
 import {
   Select,
@@ -17,16 +18,18 @@ const LOCALE_LABELS: Record<Locale, string> = {
   es: 'Español',
 };
 
-// Immediate feedback in the chosen language: the preference saves before the
-// UI itself is translated, so the switch must not feel like a no-op.
+// Immediate feedback in the chosen language. Deliberately states only the
+// switch itself: account persistence is fire-and-forget over postMessage and
+// may be dropped by an older shell, so the toast must not overclaim it.
 const CONFIRMATIONS: Record<Locale, string> = {
-  en: 'Language preference saved. Interface translation is coming soon.',
-  'zh-CN': '语言偏好已保存，界面翻译即将推出。',
-  'zh-TW': '語言偏好已儲存，介面翻譯即將推出。',
-  es: 'Preferencia de idioma guardada. La traducción de la interfaz llegará pronto.',
+  en: 'Language set to English',
+  'zh-CN': '语言已切换为简体中文',
+  'zh-TW': '語言已切換為繁體中文',
+  es: 'Idioma cambiado a Español',
 };
 
 export function LanguageSelect() {
+  const { t } = useTranslation('chrome');
   const { locale, setLocale } = useLocale();
   const { showToast } = useToast();
 
@@ -43,7 +46,7 @@ export function LanguageSelect() {
     <Select value={locale} onValueChange={handleChange}>
       <SelectTrigger
         className="h-9 w-9 justify-center rounded-lg border-0 bg-transparent p-0 focus:ring-0 focus:ring-offset-0 [&>svg]:hidden"
-        aria-label="Language"
+        aria-label={t('header.language')}
       >
         <SelectValue aria-label={locale}>
           <Languages className="h-5 w-5 text-gray-600 dark:text-gray-400" />

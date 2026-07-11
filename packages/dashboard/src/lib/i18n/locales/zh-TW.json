@@ -26,7 +26,8 @@
     "connect": "連接",
     "signOut": "登出",
     "admin": "管理員",
-    "administrator": "系統管理員"
+    "administrator": "系統管理員",
+    "language": "語言"
   },
   "theme": {
     "light": "淺色",
@@ -101,7 +102,8 @@
       "scanStarted": "掃描中…通常需要 5–10 秒",
       "nothingToCopy": "沒有可複製的內容",
       "noRemediations": "暫無修復建議",
-      "copyFailed": "複製修復建議失敗"
+      "copyFailed": "複製修復建議失敗",
+      "startFailed": "啟動掃描失敗：{{message}}"
     }
   }
 }

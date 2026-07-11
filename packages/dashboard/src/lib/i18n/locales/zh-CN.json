@@ -26,7 +26,8 @@
     "connect": "连接",
     "signOut": "退出登录",
     "admin": "管理员",
-    "administrator": "系统管理员"
+    "administrator": "系统管理员",
+    "language": "语言"
   },
   "theme": {
     "light": "浅色",
@@ -101,7 +102,8 @@
       "scanStarted": "扫描中…通常需要 5–10 秒",
       "nothingToCopy": "没有可复制的内容",
       "noRemediations": "暂无修复建议",
-      "copyFailed": "复制修复建议失败"
+      "copyFailed": "复制修复建议失败",
+      "startFailed": "启动扫描失败：{{message}}"
     }
   }
 }

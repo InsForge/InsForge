@@ -1,5 +1,4 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Link, useMatch } from 'react-router-dom';
 import { LucideIcon, MoreVertical } from 'lucide-react';
 import { ScrollArea } from './radix/ScrollArea';
@@ -78,8 +77,10 @@ function FeatureSidebarItemRow({
   onItemMenuClick,
   itemActions,
 }: FeatureSidebarItemProps) {
-  const { t } = useTranslation('chrome');
-  const label = t(`menu.${item.id}`, { defaultValue: item.label });
+  // NOTE: item.id/label here are often user-generated resource names (tables,
+  // buckets) — never run them through the menu.* translation namespace or a
+  // table named 'email' would render as the menu label.
+  const label = item.label;
   // Each item determines its own active state using React Router's useMatch
   const match = useMatch({ path: item.href ?? '/__secondary_menu_no_match__', end: false });
   const hasExternalActiveItem = activeItemId !== null && activeItemId !== undefined;
