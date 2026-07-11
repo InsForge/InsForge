@@ -22,15 +22,18 @@ certbot
 CI
 claude
 cli
+Codable
 code_challenge
 code_verifier
 codeVerifier
 comment_id
 comment_votes
+Composable
 config
 Containarium
 Containarium's
 cooldown
+Coroutines
 created_at
 cron
 declaratively
@@ -40,6 +43,7 @@ Dokploy
 docker
 dockerfile
 env
+Firebase
 flyctl
 github
 hardcoding
@@ -54,6 +58,7 @@ insforge
 IPs
 iptables
 IVFFlat
+Jetpack
 Keycloak
 kotlin
 KPIs
@@ -101,6 +106,7 @@ rmcp
 roocode
 runbook
 runtimes
+Schemaless
 sdk
 SDKs
 select_account
@@ -113,6 +119,7 @@ stderr
 subcommand
 subcommands
 sudo
+Supabase
 systemd
 tmpfs
 transactionally
@@ -135,5 +142,6 @@ walkthrough
 walkthroughs
 websocket
 websockets
+Xcode
 Zeabur
 Zod

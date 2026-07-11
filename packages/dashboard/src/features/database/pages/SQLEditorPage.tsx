@@ -439,7 +439,7 @@ export default function SQLEditorPage() {
   return (
     <div className="flex flex-col h-full bg-[rgb(var(--semantic-1))] overflow-hidden">
       {/* Tab Header: Figma h-56, items-center, bg #1b1b1b, border-b */}
-      <div className="flex items-center h-14 min-w-[800px] bg-[rgb(var(--semantic-1))] border-b border-[var(--alpha-8)] shrink-0">
+      <div className="flex items-center h-14 bg-[rgb(var(--semantic-1))] border-b border-[var(--alpha-8)] shrink-0">
         {/* Title: h-full, px-16, py-12 */}
         <div className="flex items-center h-full overflow-clip px-4 py-3 shrink-0">
           <span className="text-base font-medium leading-7 text-black dark:text-white whitespace-nowrap">

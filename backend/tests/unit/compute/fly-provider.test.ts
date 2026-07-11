@@ -20,6 +20,7 @@ vi.mock('@/utils/logger.js', () => ({
 }));
 
 import { FlyProvider } from '@/providers/compute/fly.provider.js';
+import { MachineGoneError } from '@/providers/compute/compute.provider.js';
 
 const FLY_API_BASE = 'https://api.machines.dev/v1';
 const FLY_GRAPHQL_ENDPOINT = 'https://api.fly.io/graphql';
@@ -185,6 +186,60 @@ describe('FlyProvider', () => {
       expect(body.config.services[0].autostart).toBe(true);
       expect(body.config.services[0].min_machines_running).toBe(0);
       expect(body.region).toBe('iad');
+    });
+
+    // scaleToZero: false flips the autostop block to always-on. min_machines_running
+    // must be 1 (not just autostop 'off') so Fly restarts the machine if it
+    // exits — always-on services should survive crashes, not just skip the
+    // idle stop.
+    it('scaleToZero: false sends autostop off with one machine kept running', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 'machine-always-on' })),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.launchMachine({
+        appId: 'my-app',
+        image: 'registry.fly.io/my-app:latest',
+        port: 8080,
+        cpu: 'shared-1x',
+        memory: 256,
+        envVars: {},
+        region: 'iad',
+        scaleToZero: false,
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.config.services[0].autostop).toBe('off');
+      expect(body.config.services[0].autostart).toBe(true);
+      expect(body.config.services[0].min_machines_running).toBe(1);
+    });
+
+    // scaleToZero: true must be byte-identical to omitting the field — only
+    // an explicit `false` may change the wire format.
+    it('scaleToZero: true keeps the scale-to-zero defaults', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 'machine-stz' })),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.launchMachine({
+        appId: 'my-app',
+        image: 'registry.fly.io/my-app:latest',
+        port: 8080,
+        cpu: 'shared-1x',
+        memory: 256,
+        envVars: {},
+        region: 'iad',
+        scaleToZero: true,
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.config.services[0].autostop).toBe('stop');
+      expect(body.config.services[0].autostart).toBe(true);
+      expect(body.config.services[0].min_machines_running).toBe(0);
     });
 
     // INS-271: protocol: 'tcp' switches the edge-handler shape from the
@@ -419,5 +474,90 @@ describe('FlyProvider', () => {
 
       await expect(provider.getLogs('my-app', 'machine-123')).rejects.toThrow(/401/);
     });
+  });
+});
+
+// A definitive 404 from a machine-scoped Fly call means the machine no longer
+// exists (idle reaping, out-of-band delete). The provider must translate it
+// into MachineGoneError so the service layer heals stale DB rows; transient
+// errors pass through, and startMachine must fail fast instead of polling the
+// dead machine for 30s.
+describe('FlyProvider machine-gone translation', () => {
+  let provider: FlyProvider;
+
+  beforeEach(() => {
+    provider = FlyProvider.getInstance();
+    vi.restoreAllMocks();
+  });
+
+  const notFound = () =>
+    Promise.resolve({
+      ok: false,
+      status: 404,
+      text: async () => 'machine not found',
+    } as Response);
+
+  it('translates 404s on machine-scoped calls into MachineGoneError', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(notFound));
+
+    await expect(provider.getMachineStatus('my-app', 'm1')).rejects.toBeInstanceOf(
+      MachineGoneError
+    );
+    await expect(provider.getEvents('my-app', 'm1')).rejects.toBeInstanceOf(MachineGoneError);
+    await expect(provider.stopMachine('my-app', 'm1')).rejects.toBeInstanceOf(MachineGoneError);
+    await expect(provider.destroyMachine('my-app', 'm1')).rejects.toBeInstanceOf(MachineGoneError);
+    await expect(
+      provider.updateMachine({
+        appId: 'my-app',
+        machineId: 'm1',
+        image: 'img',
+        port: 8080,
+        cpu: 'shared-1x',
+        memory: 256,
+        envVars: {},
+      })
+    ).rejects.toBeInstanceOf(MachineGoneError);
+  });
+
+  it('startMachine fails fast on a gone machine instead of polling for 30s', async () => {
+    const mockFetch = vi.fn().mockImplementation(notFound);
+    vi.stubGlobal('fetch', mockFetch);
+
+    await expect(provider.startMachine('my-app', 'm1')).rejects.toBeInstanceOf(MachineGoneError);
+    // One status poll, then immediate fail — no 1s-interval retry loop.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT translate a logs-API 404 (app-scoped — means the APP is gone)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() =>
+        Promise.resolve({
+          ok: false,
+          status: 404,
+          text: async () => 'app not found',
+        } as Response)
+      )
+    );
+
+    const err = await provider.getLogs('my-app', 'm1').catch((e: unknown) => e);
+    expect(err).not.toBeInstanceOf(MachineGoneError);
+    expect((err as Error).message).toMatch(/404/);
+  });
+
+  it('does NOT translate non-404 Fly errors', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: async () => 'internal',
+      } as Response)
+    );
+
+    const err = await provider.getMachineStatus('my-app', 'm1').catch((e: unknown) => e);
+    expect(err).not.toBeInstanceOf(MachineGoneError);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toMatch(/500/);
   });
 });

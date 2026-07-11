@@ -335,5 +335,238 @@ describe('Database Advisor Unit Tests', () => {
         .expect(400);
       expect(res2.body.error).toContain('Invalid category parameter');
     });
+
+    it('GET /api/advisor/suppressions should return suppressions list', async () => {
+      vi.spyOn(DatabaseAdvisorService.getInstance(), 'listSuppressions').mockResolvedValue([
+        {
+          id: '11111111-1111-1111-1111-111111111111',
+          ruleId: 'dangerous-function',
+          affectedObject: 'public.f()',
+          scope: 'instance',
+          reason: 'false_positive',
+          note: null,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+      const res = await request(app).get('/api/advisor/suppressions').expect(200);
+
+      expect(res.body.suppressions).toHaveLength(1);
+      expect(res.body.suppressions[0].ruleId).toBe('dangerous-function');
+    });
+
+    it('POST /api/advisor/suppressions should 400 on bad scope/reason', async () => {
+      const bad1 = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'x', scope: 'nope', reason: 'false_positive', affectedObject: 'y' })
+        .expect(400);
+      expect(bad1.body.error).toContain('Invalid scope');
+
+      const bad2 = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'x', scope: 'instance', reason: 'nope', affectedObject: 'y' })
+        .expect(400);
+      expect(bad2.body.error).toContain('Invalid reason');
+    });
+
+    it('POST /api/advisor/suppressions should 400 when reason is "other" without a note', async () => {
+      const missing = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'x', scope: 'rule', reason: 'other' })
+        .expect(400);
+      expect(missing.body.error).toContain('required when reason is "other"');
+
+      // Whitespace-only note must also be rejected (trim-based check).
+      const whitespace = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'x', scope: 'rule', reason: 'other', note: '   ' })
+        .expect(400);
+      expect(whitespace.body.error).toContain('required when reason is "other"');
+    });
+
+    it('POST /api/advisor/suppressions should 201 when reason is "other" with a note', async () => {
+      const createSpy = vi
+        .spyOn(DatabaseAdvisorService.getInstance(), 'createSuppression')
+        .mockResolvedValue({
+          id: '66666666-6666-6666-6666-666666666666',
+          ruleId: 'rls-select-only',
+          affectedObject: null,
+          scope: 'rule',
+          reason: 'other',
+          note: 'team decision',
+          createdBy: 'admin-id',
+          createdAt: new Date().toISOString(),
+        });
+
+      const res = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'rls-select-only', scope: 'rule', reason: 'other', note: 'team decision' })
+        .expect(201);
+      expect(res.body.reason).toBe('other');
+      // The note must actually be forwarded to the service, not dropped.
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'other', note: 'team decision' })
+      );
+    });
+
+    it('POST /api/advisor/suppressions should 400 when instance scope lacks affectedObject', async () => {
+      const res = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'x', scope: 'instance', reason: 'wont_fix' })
+        .expect(400);
+      expect(res.body.error).toContain('Invalid affectedObject');
+    });
+
+    it('POST /api/advisor/suppressions should 201 on valid rule-scope body', async () => {
+      vi.spyOn(DatabaseAdvisorService.getInstance(), 'createSuppression').mockResolvedValue({
+        id: '22222222-2222-2222-2222-222222222222',
+        ruleId: 'rls-select-only',
+        affectedObject: null,
+        scope: 'rule',
+        reason: 'accepted_risk',
+        note: null,
+        createdAt: new Date().toISOString(),
+      });
+
+      const res = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'rls-select-only', scope: 'rule', reason: 'accepted_risk' })
+        .expect(201);
+
+      expect(res.body.id).toBe('22222222-2222-2222-2222-222222222222');
+      expect(res.body.scope).toBe('rule');
+    });
+
+    it('POST /api/advisor/suppressions should 201 on instance scope and pass through the fingerprint', async () => {
+      const createSpy = vi
+        .spyOn(DatabaseAdvisorService.getInstance(), 'createSuppression')
+        .mockResolvedValue({
+          id: '44444444-4444-4444-4444-444444444444',
+          ruleId: 'dangerous-function',
+          affectedObject: 'public.f()',
+          scope: 'instance',
+          reason: 'false_positive',
+          note: null,
+          createdBy: 'admin-id',
+          createdAt: new Date().toISOString(),
+        });
+
+      const res = await request(app)
+        .post('/api/advisor/suppressions')
+        // Leading/trailing whitespace on ruleId must be trimmed before persisting.
+        .send({
+          ruleId: '  dangerous-function  ',
+          scope: 'instance',
+          reason: 'false_positive',
+          affectedObject: 'public.f()',
+          note: null,
+        })
+        .expect(201);
+
+      expect(res.body.scope).toBe('instance');
+      expect(createSpy).toHaveBeenCalledWith({
+        ruleId: 'dangerous-function',
+        affectedObject: 'public.f()',
+        scope: 'instance',
+        reason: 'false_positive',
+        note: null,
+        createdBy: 'admin-id',
+      });
+    });
+
+    it('POST /api/advisor/suppressions should 400 when instance affectedObject is whitespace-only', async () => {
+      const res = await request(app)
+        .post('/api/advisor/suppressions')
+        .send({ ruleId: 'x', scope: 'instance', reason: 'wont_fix', affectedObject: '   ' })
+        .expect(400);
+      expect(res.body.error).toContain('Invalid affectedObject');
+    });
+
+    it('POST /api/advisor/suppressions should store affectedObject verbatim (no trimming)', async () => {
+      const createSpy = vi
+        .spyOn(DatabaseAdvisorService.getInstance(), 'createSuppression')
+        .mockResolvedValue({
+          id: '77777777-7777-7777-7777-777777777777',
+          ruleId: 'rls-disabled',
+          affectedObject: '  public.spaced  ',
+          scope: 'instance',
+          reason: 'false_positive',
+          note: null,
+          createdBy: 'admin-id',
+          createdAt: new Date().toISOString(),
+        });
+
+      await request(app)
+        .post('/api/advisor/suppressions')
+        // Leading/trailing spaces are significant: advisor findings build
+        // affected_object from catalog identifiers without trimming, so a
+        // trimmed store would never match on re-scan.
+        .send({
+          ruleId: 'rls-disabled',
+          scope: 'instance',
+          reason: 'false_positive',
+          affectedObject: '  public.spaced  ',
+        })
+        .expect(201);
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ affectedObject: '  public.spaced  ' })
+      );
+    });
+
+    it('POST /api/advisor/suppressions should null out affectedObject for rule scope', async () => {
+      const createSpy = vi
+        .spyOn(DatabaseAdvisorService.getInstance(), 'createSuppression')
+        .mockResolvedValue({
+          id: '55555555-5555-5555-5555-555555555555',
+          ruleId: 'rls-select-only',
+          affectedObject: null,
+          scope: 'rule',
+          reason: 'accepted_risk',
+          note: null,
+          createdBy: 'admin-id',
+          createdAt: new Date().toISOString(),
+        });
+
+      await request(app)
+        .post('/api/advisor/suppressions')
+        // A stray affectedObject on a rule-scope request must be dropped.
+        .send({
+          ruleId: 'rls-select-only',
+          scope: 'rule',
+          reason: 'accepted_risk',
+          affectedObject: 'ignored.for.rule.scope',
+        })
+        .expect(201);
+
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ scope: 'rule', affectedObject: null })
+      );
+    });
+
+    it('DELETE /api/advisor/suppressions/:id should 200 with { deleted: true } on success', async () => {
+      vi.spyOn(DatabaseAdvisorService.getInstance(), 'deleteSuppression').mockResolvedValue(true);
+
+      const res = await request(app)
+        .delete('/api/advisor/suppressions/33333333-3333-3333-3333-333333333333')
+        .expect(200);
+      expect(res.body.deleted).toBe(true);
+    });
+
+    it('DELETE /api/advisor/suppressions/:id should 400 on a malformed (non-UUID) id', async () => {
+      const deleteSpy = vi.spyOn(DatabaseAdvisorService.getInstance(), 'deleteSuppression');
+
+      const res = await request(app).delete('/api/advisor/suppressions/not-a-uuid').expect(400);
+      expect(res.body.error).toContain('Invalid id');
+      expect(deleteSpy).not.toHaveBeenCalled();
+    });
+
+    it('DELETE /api/advisor/suppressions/:id should 404 when missing', async () => {
+      vi.spyOn(DatabaseAdvisorService.getInstance(), 'deleteSuppression').mockResolvedValue(false);
+
+      const res = await request(app)
+        .delete('/api/advisor/suppressions/33333333-3333-3333-3333-333333333333')
+        .expect(404);
+      expect(res.body.error).toBe('Suppression not found');
+    });
   });
 });

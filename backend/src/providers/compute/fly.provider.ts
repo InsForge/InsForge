@@ -1,6 +1,11 @@
 import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
-import type { ComputeProvider, ComputeLogsResult } from './compute.provider.js';
+import {
+  MachineGoneError,
+  translateMachineGone,
+  type ComputeProvider,
+  type ComputeLogsResult,
+} from './compute.provider.js';
 
 const FLY_API_BASE = 'https://api.machines.dev/v1';
 // Container stdout/stderr lives on a different host + auth scheme than the
@@ -35,6 +40,19 @@ type FlyLogsResponse = {
   }[];
   meta?: { next_token?: string | number };
 };
+
+// Carries the HTTP status of a failed Fly API call so callers can distinguish
+// a definitive 404 (machine/app gone) from transient failures. Message format
+// is unchanged from the previous plain Error for anything matching on it.
+export class FlyHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'FlyHttpError';
+  }
+}
 
 export class FlyProvider implements ComputeProvider {
   private static instance: FlyProvider;
@@ -72,7 +90,7 @@ export class FlyProvider implements ComputeProvider {
     if (!response.ok) {
       const text = await response.text();
       logger.error('Fly API error', { url, status: response.status, body: text });
-      throw new Error(`Fly API error (${response.status}): ${text}`);
+      throw new FlyHttpError(response.status, `Fly API error (${response.status}): ${text}`);
     }
 
     const text = await response.text();
@@ -197,17 +215,29 @@ export class FlyProvider implements ComputeProvider {
     await this.request(`/apps/${appId}`, { method: 'DELETE' });
   }
 
-  // Scale-to-zero is v1's only mode — see compute-deploy.md in the skill
-  // for the rationale. Callers don't pass autostop overrides today. When
-  // we do want to expose `--autostop` / `--min-machines` CLI flags later,
-  // this is the one spot to plumb them through: extend `ScaleOptions` and
-  // pass it from launchMachine/updateMachine. The defaults stay correct
-  // regardless of how callers evolve.
+  // Scale-to-zero is the default mode — see compute-deploy.md in the skill
+  // for the rationale. Callers opt out per-service via the boolean
+  // `scaleToZero: false` on launch/update (surfaced as `--always-on` in the
+  // CLI); `scaleOptions` maps that onto the Fly autostop block. The defaults
+  // stay correct regardless of how callers evolve.
   private static readonly SCALE_TO_ZERO: ScaleOptions = {
     autostop: 'stop',
     autostart: true,
     min_machines_running: 0,
   };
+
+  // `min_machines_running: 1` (not just autostop 'off') so Fly restarts the
+  // machine if it exits — always-on services should survive crashes, not
+  // just skip the idle stop.
+  private static readonly ALWAYS_ON: ScaleOptions = {
+    autostop: 'off',
+    autostart: true,
+    min_machines_running: 1,
+  };
+
+  private static scaleOptions(scaleToZero: boolean | undefined): ScaleOptions {
+    return scaleToZero === false ? FlyProvider.ALWAYS_ON : FlyProvider.SCALE_TO_ZERO;
+  }
 
   // Single source of truth for the per-machine service block. Both launch
   // and update need to send the same shape, including the autostop fields:
@@ -262,6 +292,7 @@ export class FlyProvider implements ComputeProvider {
     envVars: Record<string, string>;
     region: string;
     protocol?: 'http' | 'tcp';
+    scaleToZero?: boolean;
   }): Promise<{ machineId: string }> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
     const result = await this.requestJson<{ id: string }>(`/apps/${params.appId}/machines`, {
@@ -271,12 +302,32 @@ export class FlyProvider implements ComputeProvider {
           image: params.image,
           guest,
           env: params.envVars,
-          services: [this.serviceConfig(params.port, params.protocol ?? 'http')],
+          services: [
+            this.serviceConfig(
+              params.port,
+              params.protocol ?? 'http',
+              FlyProvider.scaleOptions(params.scaleToZero)
+            ),
+          ],
         },
         region: params.region,
       }),
     });
     return { machineId: result.id };
+  }
+
+  // A definitive 404 from a machine-scoped Fly call means the machine no
+  // longer exists (idle reaping, manual delete via the Fly dashboard, host
+  // migration). Translate to MachineGoneError so the service layer can heal
+  // DB state that still points at the dead machine. Transient errors (5xx,
+  // network) pass through untouched.
+  private machineScoped<T>(appId: string, machineId: string, fn: () => Promise<T>): Promise<T> {
+    return translateMachineGone(
+      appId,
+      machineId,
+      (err) => err instanceof FlyHttpError && err.status === 404,
+      fn
+    );
   }
 
   async updateMachine(params: {
@@ -288,29 +339,42 @@ export class FlyProvider implements ComputeProvider {
     memory: number;
     envVars: Record<string, string>;
     protocol?: 'http' | 'tcp';
+    scaleToZero?: boolean;
   }): Promise<void> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
-    await this.request(`/apps/${params.appId}/machines/${params.machineId}`, {
-      method: 'POST',
-      body: JSON.stringify({
-        config: {
-          image: params.image,
-          guest,
-          env: params.envVars,
-          services: [this.serviceConfig(params.port, params.protocol ?? 'http')],
-        },
-      }),
-    });
+    await this.machineScoped(params.appId, params.machineId, () =>
+      this.request(`/apps/${params.appId}/machines/${params.machineId}`, {
+        method: 'POST',
+        body: JSON.stringify({
+          config: {
+            image: params.image,
+            guest,
+            env: params.envVars,
+            services: [
+              this.serviceConfig(
+                params.port,
+                params.protocol ?? 'http',
+                FlyProvider.scaleOptions(params.scaleToZero)
+              ),
+            ],
+          },
+        }),
+      })
+    );
   }
 
   async stopMachine(appId: string, machineId: string): Promise<void> {
-    await this.request(`/apps/${appId}/machines/${machineId}/stop`, { method: 'POST' });
+    await this.machineScoped(appId, machineId, () =>
+      this.request(`/apps/${appId}/machines/${machineId}/stop`, { method: 'POST' })
+    );
   }
 
   async startMachine(appId: string, machineId: string): Promise<void> {
-    // Wait for machine to reach a startable state (stopped/created)
-    await this.waitForState(appId, machineId, ['stopped', 'created'], 30_000);
-    await this.request(`/apps/${appId}/machines/${machineId}/start`, { method: 'POST' });
+    await this.machineScoped(appId, machineId, async () => {
+      // Wait for machine to reach a startable state (stopped/created)
+      await this.waitForState(appId, machineId, ['stopped', 'created'], 30_000);
+      await this.request(`/apps/${appId}/machines/${machineId}/start`, { method: 'POST' });
+    });
   }
 
   async waitForState(
@@ -327,6 +391,12 @@ export class FlyProvider implements ComputeProvider {
           return state;
         }
       } catch (error) {
+        // Definitive machine-gone (getMachineStatus translates Fly 404s):
+        // polling for 30 more seconds won't bring the machine back. Fail
+        // fast so the service layer can heal the stale row.
+        if (error instanceof MachineGoneError) {
+          throw error;
+        }
         logger.warn('Transient error polling machine state, retrying', { appId, machineId, error });
       }
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -341,7 +411,9 @@ export class FlyProvider implements ComputeProvider {
     // Fly returns 412 `failed_precondition: unable to destroy machine, not
     // currently stopped, suspended, failed, or pending` and the caller's
     // delete path 502s, leaving the Fly app + DB row orphaned.
-    await this.request(`/apps/${appId}/machines/${machineId}?force=true`, { method: 'DELETE' });
+    await this.machineScoped(appId, machineId, () =>
+      this.request(`/apps/${appId}/machines/${machineId}?force=true`, { method: 'DELETE' })
+    );
   }
 
   async listMachines(appId: string): Promise<{ id: string; state: string; region: string }[]> {
@@ -352,8 +424,8 @@ export class FlyProvider implements ComputeProvider {
   }
 
   async getMachineStatus(appId: string, machineId: string): Promise<{ state: string }> {
-    const result = await this.requestJson<{ state: string }>(
-      `/apps/${appId}/machines/${machineId}`
+    const result = await this.machineScoped(appId, machineId, () =>
+      this.requestJson<{ state: string }>(`/apps/${appId}/machines/${machineId}`)
     );
     return { state: result.state };
   }
@@ -368,9 +440,11 @@ export class FlyProvider implements ComputeProvider {
     machineId: string,
     options?: { limit?: number }
   ): Promise<{ timestamp: number; message: string }[]> {
-    const events = await this.request<
-      { type: string; status: string; source: string; timestamp: number }[]
-    >(`/apps/${appId}/machines/${machineId}/events`);
+    const events = await this.machineScoped(appId, machineId, () =>
+      this.request<{ type: string; status: string; source: string; timestamp: number }[]>(
+        `/apps/${appId}/machines/${machineId}/events`
+      )
+    );
 
     const mapped = (events ?? []).map((e) => ({
       timestamp: e.timestamp,
@@ -429,7 +503,13 @@ export class FlyProvider implements ComputeProvider {
     if (!response.ok) {
       const text = await response.text();
       logger.error('Fly logs API error', { url, status: response.status, body: text });
-      throw new Error(`Fly logs API error (${response.status}): ${text}`);
+      // NOT translated to MachineGoneError: the logs API is app-scoped, so a
+      // 404 here means the whole APP is gone (a reclaimed machine alone still
+      // returns 200 with zero lines). Machine-level healing would be wrong —
+      // it keeps fly_app_id and advertises a redeploy that launches into the
+      // deleted app and fails forever. App-gone recovery is reconcile
+      // territory, not this path.
+      throw new FlyHttpError(response.status, `Fly logs API error (${response.status}): ${text}`);
     }
 
     const raw = await response.text();

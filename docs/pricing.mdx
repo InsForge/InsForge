@@ -1,0 +1,60 @@
+---
+title: "Pricing FAQ"
+description: "Plans, what's included, and how usage-based billing works."
+---
+
+InsForge has a free tier for prototypes and side projects, and paid plans for
+production. This page mirrors the [pricing page](https://insforge.dev/pricing).
+
+## Plans
+
+|  | Free | Pro | Enterprise |
+|---|---|---|---|
+| **Price** | $0 / mo | $25 / mo | Custom |
+| Best for | Prototypes & side projects | Production apps that scale | Security & compliance |
+| AI model credits | $1 | $10 | Custom |
+| Monthly active users | 50,000 | 100,000 | Custom |
+| Database | 500 MB | 8 GB | Custom |
+| Bandwidth | 5 GB | 250 GB | Custom |
+| File storage | 1 GB | 100 GB | Custom |
+| Edge function calls | 100,000 | 100,000 | Custom |
+| Site build time | 600 min | Unlimited | Unlimited |
+| Custom compute | 120h (default spec) | Billed by usage | Billed by usage |
+| Compute credits included | — | $10 / mo | $10 / mo |
+| Compliance & SSO | — | — | SOC2, SSO, HIPAA add-on |
+
+On Pro, usage beyond the included amounts is pay-as-you-go (see rates in the FAQ
+below). Free projects are paused after 1 week of inactivity.
+[Contact us](https://insforge.dev/pricing) for Enterprise.
+
+## FAQ
+
+<AccordionGroup>
+  <Accordion title="What do overages cost on Pro?">
+    Pro includes generous allowances, then bills only for usage beyond them:
+
+    | Resource | Rate beyond the included amount |
+    |---|---|
+    | Monthly active users | $0.00325 / MAU |
+    | Database | $0.125 / GB |
+    | Bandwidth | $0.09 / GB |
+    | File storage | $0.021 / GB |
+    | Edge function calls | $0.01 / 1,000 calls |
+  </Accordion>
+
+  <Accordion title="How does custom compute billing work?">
+    The Free plan includes **120 hours of custom compute per month on the
+    default spec**. On Pro, custom compute is **billed by usage**: run your own
+    containers and long-running workloads and pay for what you use. Each month
+    also comes with **$10 of InsForge Compute credits** to offset it.
+  </Accordion>
+
+  <Accordion title="What happens after I use up the $10 compute credit?">
+    Nothing stops — the $10 monthly InsForge Compute credit (on Pro) covers the
+    first $10 of compute, and beyond that compute continues on pay-as-you-go.
+  </Accordion>
+</AccordionGroup>
+
+<Card title="See full pricing" icon="tag" href="https://insforge.dev/pricing">
+  Compare plans and subscribe.
+</Card>

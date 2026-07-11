@@ -1,6 +1,6 @@
 ---
-title: Realtime SDK Reference
-description: Subscribe to channels, publish events, and track presence with the InsForge Kotlin SDK.
+title: Kotlin realtime SDK reference
+description: Connect over Socket.IO, subscribe to channels, publish events, track presence, and handle reconnects with the InsForge Kotlin realtime client.
 ---
 
 import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
@@ -9,13 +9,13 @@ import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
 
 <KotlinSdkInstallation />
 
-## Mental Model
+## Mental model
 
 The Kotlin SDK connects to InsForge Realtime over Socket.IO. Subscribe to channel names such as `order:123` or `chat:room-1`, then listen for event names published to those channels.
 
 Events are published by database triggers that call `realtime.publish(...)` or by clients that publish to a channel they have already joined. See [Realtime overview](/core-concepts/realtime/overview) for the channel and RLS model.
 
-## Quick Start
+## Quick start
 
 ```kotlin
 import dev.insforge.realtime.models.SocketMessage

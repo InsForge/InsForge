@@ -43,7 +43,6 @@ export default function SecretsPage() {
     <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <TableHeader
         title="Secrets"
-        className="min-w-[960px]"
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
         searchDebounceTime={300}
