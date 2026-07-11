@@ -168,6 +168,8 @@ interface TableFormProps {
   mode?: 'create' | 'edit';
   editTable?: TableSchema;
   setFormIsDirty: (dirty: boolean) => void;
+  skipCreateDraftRestore?: boolean;
+  onCreateDraftDiscardHandled?: (schemaName: string) => void;
 }
 
 export function TableForm({
@@ -178,6 +180,8 @@ export function TableForm({
   mode = 'create',
   editTable,
   setFormIsDirty,
+  skipCreateDraftRestore = false,
+  onCreateDraftDiscardHandled,
 }: TableFormProps) {
   const { projectId, isLoading: isProjectIdLoading } = useProjectId();
   const draftScope = projectId ? `project:${projectId}` : undefined;
@@ -275,6 +279,20 @@ export function TableForm({
       };
       if (hasCreateDraftData(currentDraft)) {
         skipNextDraftSaveRef.current = false;
+        if (skipCreateDraftRestore) {
+          onCreateDraftDiscardHandled?.(schemaName);
+        }
+        return;
+      }
+
+      if (skipCreateDraftRestore) {
+        skipNextDraftSaveRef.current = false;
+        form.reset({
+          tableName: '',
+          columns: createDefaultColumns(),
+        });
+        setForeignKeys([]);
+        onCreateDraftDiscardHandled?.(schemaName);
         return;
       }
 
@@ -296,7 +314,17 @@ export function TableForm({
       });
       setForeignKeys([]);
     }
-  }, [draftScope, editTable, form, isProjectIdLoading, mode, open, schemaName]);
+  }, [
+    draftScope,
+    editTable,
+    form,
+    isProjectIdLoading,
+    mode,
+    onCreateDraftDiscardHandled,
+    open,
+    schemaName,
+    skipCreateDraftRestore,
+  ]);
   useEffect(() => {
     if (!open || mode !== 'create') {
       return;

@@ -403,10 +403,13 @@ export default function TablesPage() {
   };
 
   const handleCreateTable = () => {
-    pendingCreateDraftClearSchemasRef.current.delete(selectedSchema);
     setEditingTable(null);
     setShowTableForm(true);
   };
+
+  const handleCreateDraftDiscardHandled = useCallback((schemaName: string) => {
+    pendingCreateDraftClearSchemasRef.current.delete(schemaName);
+  }, []);
 
   const handleEditTable = (tableName: string) => {
     selectTable(tableName);
@@ -502,7 +505,11 @@ export default function TablesPage() {
   const canMutateSelectedSchema = !selectedSchemaInfo.isProtected;
 
   useEffect(() => {
-    if (isProjectIdLoading || pendingCreateDraftClearSchemasRef.current.size === 0) {
+    if (
+      isProjectIdLoading ||
+      showTableForm ||
+      pendingCreateDraftClearSchemasRef.current.size === 0
+    ) {
       return;
     }
 
@@ -510,7 +517,7 @@ export default function TablesPage() {
       clearTableFormCreateDraft(tableFormDraftScope, schemaName);
     });
     pendingCreateDraftClearSchemasRef.current.clear();
-  }, [isProjectIdLoading, tableFormDraftScope]);
+  }, [isProjectIdLoading, showTableForm, tableFormDraftScope]);
 
   // Show template preview - takes full width without sidebar
   if (previewingTemplate) {
@@ -552,6 +559,8 @@ export default function TablesPage() {
             mode={editingTable ? 'edit' : 'create'}
             editTable={editingTable ? editingTableSchema : undefined}
             setFormIsDirty={setIsTableFormDirty}
+            skipCreateDraftRestore={pendingCreateDraftClearSchemasRef.current.has(selectedSchema)}
+            onCreateDraftDiscardHandled={handleCreateDraftDiscardHandled}
             onSuccess={(newTableName?: string) => {
               void refetchTables();
               void refetchTableData();
