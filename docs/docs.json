@@ -118,6 +118,12 @@
                 "pages": [
                   "core-concepts/analytics/overview"
                 ]
+              },
+              {
+                "group": "Web Scraper",
+                "pages": [
+                  "core-concepts/webscraper/overview"
+                ]
               }
             ]
           },

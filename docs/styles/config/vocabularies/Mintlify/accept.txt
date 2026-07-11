@@ -4,6 +4,7 @@ additionalParams
 agentic
 allowlisted
 allowlists
+Apify
 apis
 APNs
 Astro
@@ -47,6 +48,7 @@ Firebase
 flyctl
 github
 hardcoding
+headlessly
 healthchecks
 hetzner
 hoc
@@ -127,6 +129,7 @@ Twilio
 typecheck
 unencrypted
 updated_at
+upserts
 upvote
 Upvoting
 user_id
@@ -140,6 +143,7 @@ vue
 vultr
 walkthrough
 walkthroughs
+webscraper
 websocket
 websockets
 Xcode
