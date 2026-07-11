@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 
 import { DatabaseManager } from '@/infra/database/database.manager.js';
@@ -10,6 +11,7 @@ import {
   maskPaystackKey,
 } from '@/providers/payments/paystack.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import { toISOStringOrNull } from '@/utils/dates.js';
 import logger from '@/utils/logger.js';
 import { withPaymentSessionAdvisoryLock } from '@/services/payments/payments-advisory-lock.js';
 import {
@@ -17,7 +19,12 @@ import {
   type PaystackEnvironment,
   type PaystackConnectionRow,
 } from '@/types/payments.js';
-import { ERROR_CODES, type PaystackKeyConfig } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  type GetPaystackWebhookSetupResponse,
+  type PaystackConnection,
+  type PaystackKeyConfig,
+} from '@insforge/shared-schemas';
 
 const PAYSTACK_SECRET_KEY_BY_ENVIRONMENT: Record<PaystackEnvironment, string> = {
   test: 'PAYSTACK_TEST_SECRET_KEY',
@@ -35,6 +42,15 @@ function getPaystackSecretKeyName(environment: PaystackEnvironment): string {
 
 function getPaystackPublicKeyName(environment: PaystackEnvironment): string {
   return PAYSTACK_PUBLIC_KEY_BY_ENVIRONMENT[environment];
+}
+
+/**
+ * One-way fingerprint of a secret key, persisted in the connection row's `raw`
+ * JSONB so key changes remain detectable after the secret itself is
+ * deactivated. Never store or log the raw key alongside the connection.
+ */
+function fingerprintPaystackSecretKey(secretKey: string): string {
+  return createHash('sha256').update(secretKey).digest('hex');
 }
 
 export class PaystackConfigService {
@@ -89,7 +105,7 @@ export class PaystackConfigService {
     environment: PaystackEnvironment,
     secretKey: string,
     publicKey?: string | null
-  ): Promise<PaystackConnectionRow> {
+  ): Promise<PaystackConnection> {
     return this.withEnvironmentLock(environment, async () => {
       const trimmedSecretKey = secretKey.trim();
       const trimmedPublicKey = publicKey?.trim();
@@ -105,16 +121,18 @@ export class PaystackConfigService {
 
       const secretKeyKey = getPaystackSecretKeyName(environment);
       const publicKeyKey = getPaystackPublicKeyName(environment);
-      const secretService = SecretService.getInstance();
-
-      const existingSecretKey = await secretService.getSecretByKey(secretKeyKey);
 
       const provider = new PaystackProvider({ environment, secretKey: trimmedSecretKey });
       const account = await provider.retrieveAccount();
       // Paystack has no stable account identifier, so a secret key change is the
       // closest signal that the connection now points at different account data.
+      // Compare fingerprints persisted on the connection row rather than the
+      // active secret: removePaystackKeys deactivates the secret but keeps the
+      // fingerprint, so re-adding a different key after removal still wipes.
+      const secretKeyFingerprint = fingerprintPaystackSecretKey(trimmedSecretKey);
+      const storedFingerprint = await this.getStoredSecretKeyFingerprint(environment);
       const shouldClearPaymentData =
-        existingSecretKey !== null && existingSecretKey !== trimmedSecretKey;
+        storedFingerprint !== null && storedFingerprint !== secretKeyFingerprint;
 
       const encryptedSecretKey = EncryptionManager.encrypt(trimmedSecretKey);
 
@@ -174,9 +192,11 @@ export class PaystackConfigService {
              last_synced_at,
              last_sync_status,
              last_sync_error,
-             last_sync_counts
+             last_sync_counts,
+             raw
            )
-           VALUES ('paystack', $1, 'connected', $2, $3, $4, NULL, NULL, NULL, NULL, NULL, NULL, '{}'::JSONB)
+           VALUES ('paystack', $1, 'connected', $2, $3, $4, NULL, NULL, NULL, NULL, NULL, NULL, '{}'::JSONB,
+                   jsonb_build_object('secretKeyFingerprint', $6::TEXT))
            ON CONFLICT (provider, environment) DO UPDATE SET
              status = 'connected',
              provider_account_id = EXCLUDED.provider_account_id,
@@ -210,8 +230,17 @@ export class PaystackConfigService {
                WHEN $5 THEN '{}'::JSONB
                ELSE payments.provider_connections.last_sync_counts
              END,
+             raw = payments.provider_connections.raw
+                     || jsonb_build_object('secretKeyFingerprint', $6::TEXT),
              updated_at = NOW()`,
-          [environment, account.id, account.accountEmail, account.livemode, shouldClearPaymentData]
+          [
+            environment,
+            account.id,
+            account.accountEmail,
+            account.livemode,
+            shouldClearPaymentData,
+            secretKeyFingerprint,
+          ]
         );
 
         await client.query('COMMIT');
@@ -222,7 +251,7 @@ export class PaystackConfigService {
         client.release();
       }
 
-      return this.requireConnection(environment);
+      return this.getConnection(environment);
     });
   }
 
@@ -244,6 +273,9 @@ export class PaystackConfigService {
 
         const removed = (resultSecretKey.rowCount ?? 0) > 0 || (resultPublicKey.rowCount ?? 0) > 0;
         if (removed) {
+          // Intentionally leaves `raw` (and its secretKeyFingerprint) untouched:
+          // setPaystackKeys compares fingerprints to decide whether stale payment
+          // data must be wiped when keys are configured again after removal.
           await client.query(
             `UPDATE payments.provider_connections
              SET status = 'unconfigured',
@@ -284,63 +316,39 @@ export class PaystackConfigService {
     return new PaystackProvider({ environment, secretKey });
   }
 
-  async getConnection(environment: PaystackEnvironment): Promise<PaystackConnectionRow | null> {
-    const result = await this.getPool().query<PaystackConnectionRow>(
+  async getConnection(environment: PaystackEnvironment): Promise<PaystackConnection> {
+    const row = await this.getPool().query<PaystackConnectionRow>(
       `SELECT
-         id,
          environment,
          status,
          provider_account_id      AS "accountId",
          account_email            AS "accountEmail",
          account_livemode         AS "accountLivemode",
          webhook_endpoint_url     AS "webhookEndpointUrl",
-         (SELECT s.id FROM system.secrets s
-           WHERE s.key = $2 AND s.is_active = true) AS "secretKeyId",
-         (SELECT s.id FROM system.secrets s
-           WHERE s.key = $3 AND s.is_active = true) AS "publicKeyId",
          webhook_configured_at    AS "webhookConfiguredAt",
          last_synced_at           AS "lastSyncedAt",
          last_sync_status         AS "lastSyncStatus",
          last_sync_error          AS "lastSyncError",
-         last_sync_counts         AS "lastSyncCounts",
-         raw,
-         created_at               AS "createdAt",
-         updated_at               AS "updatedAt"
+         last_sync_counts         AS "lastSyncCounts"
        FROM payments.provider_connections
        WHERE provider = 'paystack'
          AND environment = $1`,
-      [environment, getPaystackSecretKeyName(environment), getPaystackPublicKeyName(environment)]
+      [environment]
     );
 
-    if (result.rowCount === 0) {
-      return null;
+    if (row.rowCount === 0) {
+      return this.buildUnconfiguredConnection(environment);
     }
 
-    return result.rows[0] as PaystackConnectionRow;
+    const secretKey = await this.getPaystackSecretKey(environment);
+    const maskedKey = secretKey ? maskPaystackKey(secretKey) : null;
+
+    return this.normalizeConnectionRow(row.rows[0] as PaystackConnectionRow, maskedKey);
   }
 
-  private async requireConnection(
-    environment: PaystackEnvironment
-  ): Promise<PaystackConnectionRow> {
-    const connection = await this.getConnection(environment);
-    if (!connection) {
-      throw new AppError(
-        `Paystack ${environment} connection was not found`,
-        404,
-        ERROR_CODES.PAYMENT_CONFIG_NOT_FOUND
-      );
-    }
-    return connection;
-  }
-
-  async getPaystackStatus(): Promise<PaystackConnectionRow[]> {
+  async getPaystackStatus(): Promise<PaystackConnection[]> {
     const environments = this.listPaystackEnvironments();
-    const connections = await Promise.all(
-      environments.map((environment) => this.getConnection(environment))
-    );
-    return connections.map(
-      (connection, index) => connection ?? this.buildUnconfiguredConnectionRow(environments[index])
-    );
+    return Promise.all(environments.map((env) => this.getConnection(env)));
   }
 
   async getKeyConfig(): Promise<PaystackKeyConfig[]> {
@@ -358,12 +366,30 @@ export class PaystackConfigService {
     keyType: PaystackKeyConfig['keyType'],
     secretName: string
   ): Promise<PaystackKeyConfig> {
+    // Admin-only endpoint: return the raw stored value (Stripe/Razorpay parity).
+    // The settings panel hydrates and resaves these values, so masking here
+    // would corrupt the stored keys on resave.
     const raw = await SecretService.getInstance().getSecretByKey(secretName);
     return {
       environment,
       keyType,
-      value: raw ? maskPaystackKey(raw) : null,
+      value: raw,
     };
+  }
+
+  private async getStoredSecretKeyFingerprint(
+    environment: PaystackEnvironment
+  ): Promise<string | null> {
+    const result = await this.getPool().query(
+      `SELECT raw->>'secretKeyFingerprint' AS "secretKeyFingerprint"
+       FROM payments.provider_connections
+       WHERE provider = 'paystack'
+         AND environment = $1`,
+      [environment]
+    );
+
+    const row = result.rows[0] as { secretKeyFingerprint: string | null } | undefined;
+    return row?.secretKeyFingerprint ?? null;
   }
 
   private async clearPaymentData(
@@ -393,7 +419,7 @@ export class PaystackConfigService {
 
   async getWebhookSetup(
     environment: PaystackEnvironment
-  ): Promise<{ connection: PaystackConnectionRow; webhookUrl: string }> {
+  ): Promise<GetPaystackWebhookSetupResponse> {
     // The secret key doubles as the webhook HMAC key, so there is no separate
     // webhook secret to provision — only the endpoint URL to surface.
     await this.createPaystackProvider(environment);
@@ -402,7 +428,7 @@ export class PaystackConfigService {
     await this.upsertManualWebhookConnection(environment, webhookUrl);
 
     return {
-      connection: await this.requireConnection(environment),
+      connection: await this.getConnection(environment),
       webhookUrl,
     };
   }
@@ -433,27 +459,40 @@ export class PaystackConfigService {
     });
   }
 
-  private buildUnconfiguredConnectionRow(environment: PaystackEnvironment): PaystackConnectionRow {
-    const now = new Date().toISOString();
+  private normalizeConnectionRow(
+    row: PaystackConnectionRow,
+    maskedKey: string | null
+  ): PaystackConnection {
     return {
-      // Placeholder for environments without a persisted connection row.
-      id: '',
+      environment: row.environment,
+      status: row.status,
+      accountId: row.accountId ?? null,
+      accountEmail: row.accountEmail ?? null,
+      accountLivemode: row.accountLivemode ?? null,
+      webhookEndpointUrl: row.webhookEndpointUrl ?? null,
+      webhookConfiguredAt: toISOStringOrNull(row.webhookConfiguredAt),
+      maskedKey,
+      lastSyncedAt: toISOStringOrNull(row.lastSyncedAt),
+      lastSyncStatus: row.lastSyncStatus ?? null,
+      lastSyncError: row.lastSyncError ?? null,
+      lastSyncCounts: row.lastSyncCounts ?? {},
+    };
+  }
+
+  private buildUnconfiguredConnection(environment: PaystackEnvironment): PaystackConnection {
+    return {
       environment,
       status: 'unconfigured',
       accountId: null,
       accountEmail: null,
       accountLivemode: null,
       webhookEndpointUrl: null,
-      secretKeyId: null,
-      publicKeyId: null,
       webhookConfiguredAt: null,
+      maskedKey: null,
       lastSyncedAt: null,
       lastSyncStatus: null,
       lastSyncError: null,
       lastSyncCounts: {},
-      raw: {},
-      createdAt: now,
-      updatedAt: now,
     };
   }
 }

@@ -2,21 +2,29 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import type { PaystackWebhookEventRow } from '../../src/services/payments/paystack/webhook.service';
 
-const { mockPool, mockConfigService, mockProvider, mockRecordStart, mockMark, mockUpsertCharge } =
-  vi.hoisted(() => ({
-    mockPool: {
-      query: vi.fn(),
-    },
-    mockConfigService: {
-      createPaystackProvider: vi.fn(),
-    },
-    mockProvider: {
-      verifyWebhookSignature: vi.fn(),
-    },
-    mockRecordStart: vi.fn(),
-    mockMark: vi.fn(),
-    mockUpsertCharge: vi.fn(),
-  }));
+const {
+  mockPool,
+  mockConfigService,
+  mockProvider,
+  mockRecordStart,
+  mockMark,
+  mockUpsertCharge,
+  mockUpsertRefund,
+} = vi.hoisted(() => ({
+  mockPool: {
+    query: vi.fn(),
+  },
+  mockConfigService: {
+    createPaystackProvider: vi.fn(),
+  },
+  mockProvider: {
+    verifyWebhookSignature: vi.fn(),
+  },
+  mockRecordStart: vi.fn(),
+  mockMark: vi.fn(),
+  mockUpsertCharge: vi.fn(),
+  mockUpsertRefund: vi.fn(),
+}));
 
 vi.mock('../../src/infra/database/database.manager', () => ({
   DatabaseManager: {
@@ -45,6 +53,7 @@ vi.mock('../../src/services/payments/paystack/transaction.service', () => ({
   PaystackTransactionService: {
     getInstance: () => ({
       upsertChargeTransaction: mockUpsertCharge,
+      upsertRefundTransaction: mockUpsertRefund,
     }),
   },
 }));
@@ -106,6 +115,7 @@ describe('PaystackWebhookService', () => {
     mockRecordStart.mockResolvedValue({ shouldProcess: true, row: makeWebhookRow() });
     mockMark.mockResolvedValue(makeWebhookRow());
     mockUpsertCharge.mockResolvedValue('succeeded');
+    mockUpsertRefund.mockResolvedValue(undefined);
   });
 
   it('rejects invalid webhook signatures before recording anything', async () => {
@@ -182,11 +192,71 @@ describe('PaystackWebhookService', () => {
     );
   });
 
-  it('acknowledges refund.processed as handled without projecting a charge', async () => {
+  it('projects refund.processed into the shared ledger as a refunded refund', async () => {
+    const refundData = {
+      id: 777,
+      transaction_reference: 'ps_ref_123',
+      amount: 1200,
+      currency: 'NGN',
+      status: 'processed',
+    };
+
+    const result = await PaystackWebhookService.getInstance().handlePaystackWebhook(
+      'test',
+      makeRawWebhookBody('refund.processed', refundData),
+      'signature'
+    );
+
+    expect(result).toEqual({ received: true, handled: true });
+    expect(mockUpsertRefund).toHaveBeenCalledWith(
+      'test',
+      expect.objectContaining(refundData),
+      'refunded'
+    );
+    expect(mockUpsertCharge).not.toHaveBeenCalled();
+    expect(mockMark).toHaveBeenCalledWith(
+      'paystack',
+      'test',
+      'refund.processed.777',
+      'processed',
+      null
+    );
+  });
+
+  it('projects refund.failed into the shared ledger as a failed refund', async () => {
+    const refundData = {
+      id: 778,
+      transaction: 12345,
+      amount: 1200,
+      currency: 'NGN',
+      status: 'failed',
+    };
+
+    const result = await PaystackWebhookService.getInstance().handlePaystackWebhook(
+      'test',
+      makeRawWebhookBody('refund.failed', refundData),
+      'signature'
+    );
+
+    expect(result).toEqual({ received: true, handled: true });
+    expect(mockUpsertRefund).toHaveBeenCalledWith(
+      'test',
+      expect.objectContaining(refundData),
+      'failed'
+    );
+    expect(mockMark).toHaveBeenCalledWith(
+      'paystack',
+      'test',
+      'refund.failed.778',
+      'processed',
+      null
+    );
+  });
+
+  it('ignores refund events without a refund id instead of projecting them', async () => {
     const result = await PaystackWebhookService.getInstance().handlePaystackWebhook(
       'test',
       makeRawWebhookBody('refund.processed', {
-        id: 777,
         transaction_reference: 'ps_ref_123',
         amount: 1200,
         currency: 'NGN',
@@ -195,15 +265,40 @@ describe('PaystackWebhookService', () => {
       'signature'
     );
 
-    expect(result).toEqual({ received: true, handled: true });
-    expect(mockUpsertCharge).not.toHaveBeenCalled();
-    expect(mockPool.query).not.toHaveBeenCalled();
+    expect(result).toEqual({ received: true, handled: false });
+    expect(mockUpsertRefund).not.toHaveBeenCalled();
+    expect(mockMark).toHaveBeenCalledWith(
+      'paystack',
+      'test',
+      'refund.processed.no_entity',
+      'ignored',
+      null
+    );
+  });
+
+  it('marks the event failed when the refund projection throws', async () => {
+    mockUpsertRefund.mockRejectedValue(new Error('ledger unavailable'));
+
+    await expect(
+      PaystackWebhookService.getInstance().handlePaystackWebhook(
+        'test',
+        makeRawWebhookBody('refund.processed', {
+          id: 777,
+          transaction_reference: 'ps_ref_123',
+          amount: 1200,
+          currency: 'NGN',
+          status: 'processed',
+        }),
+        'signature'
+      )
+    ).rejects.toThrow('ledger unavailable');
+
     expect(mockMark).toHaveBeenCalledWith(
       'paystack',
       'test',
       'refund.processed.777',
-      'processed',
-      null
+      'failed',
+      'ledger unavailable'
     );
   });
 

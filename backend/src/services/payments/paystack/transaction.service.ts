@@ -19,6 +19,7 @@ import type {
 } from '@/types/payments.js';
 import type {
   PaystackInitializeResult,
+  PaystackRefundResource,
   PaystackTransactionResource,
 } from '@/providers/payments/paystack.provider.js';
 import {
@@ -63,7 +64,7 @@ export type PaystackPaymentTransactionStatus =
   | 'refunded'
   | 'partially_refunded';
 
-type PaystackTransactionType = 'one_time_payment' | 'failed_payment';
+type PaystackTransactionType = 'one_time_payment' | 'failed_payment' | 'refund';
 
 interface TransactionObjectRef {
   type: string;
@@ -246,6 +247,55 @@ export class PaystackTransactionService {
     });
 
     return status;
+  }
+
+  /**
+   * Project a Paystack refund (from a refund.processed / refund.failed webhook)
+   * into the shared payments.transactions ledger and refresh the original
+   * charge's refunded state, mirroring Razorpay's upsertRefundTransaction.
+   */
+  async upsertRefundTransaction(
+    environment: PaystackEnvironment,
+    refund: PaystackRefundResource,
+    status: PaystackPaymentTransactionStatus
+  ): Promise<void> {
+    const refundId = String(refund.id);
+    const transactionId = this.getRefundOriginTransactionId(refund);
+    const transactionReference = this.getRefundOriginTransactionReference(refund);
+
+    await this.upsertTransaction(this.getPool(), {
+      environment,
+      type: 'refund',
+      status,
+      subject: null,
+      providerCustomerId: null,
+      customerEmailSnapshot: null,
+      providerObjectType: 'refund',
+      providerObjectId: refundId,
+      providerParentObjectType: transactionId ? 'transaction' : null,
+      providerParentObjectId: transactionId,
+      relatedObjectIds: {
+        refund: refundId,
+        transaction: transactionId,
+        reference: transactionReference,
+      },
+      amount: refund.amount,
+      amountRefunded: refund.amount,
+      currency: refund.currency.toLowerCase(),
+      description: null,
+      paidAt: null,
+      failedAt: status === 'failed' ? this.fromPaystackTimestamp(refund.created_at) : null,
+      refundedAt:
+        status === 'refunded'
+          ? (this.fromPaystackTimestamp(refund.refunded_at) ??
+            this.fromPaystackTimestamp(refund.created_at))
+          : null,
+      providerCreatedAt: this.fromPaystackTimestamp(refund.created_at),
+      raw: refund,
+      matchObjectRefs: [{ type: 'refund', id: refundId }],
+    });
+
+    await this.refreshOriginalChargeRefundState(environment, transactionId, transactionReference);
   }
 
   private async upsertTransaction(
@@ -604,6 +654,150 @@ export class PaystackTransactionService {
     );
 
     return (result.rows[0] as BillingSubject | undefined) ?? null;
+  }
+
+  private getRefundOriginTransactionId(refund: PaystackRefundResource): string | null {
+    const { transaction } = refund;
+    if (typeof transaction === 'number') {
+      return String(transaction);
+    }
+    if (
+      this.isRecord(transaction) &&
+      (typeof transaction.id === 'number' || typeof transaction.id === 'string')
+    ) {
+      return String(transaction.id);
+    }
+    return null;
+  }
+
+  private getRefundOriginTransactionReference(refund: PaystackRefundResource): string | null {
+    if (
+      typeof refund.transaction_reference === 'string' &&
+      refund.transaction_reference.length > 0
+    ) {
+      return refund.transaction_reference;
+    }
+    const { transaction } = refund;
+    if (typeof transaction === 'string' && transaction.length > 0) {
+      return transaction;
+    }
+    if (
+      this.isRecord(transaction) &&
+      typeof transaction.reference === 'string' &&
+      transaction.reference.length > 0
+    ) {
+      return transaction.reference;
+    }
+    return null;
+  }
+
+  /**
+   * Recompute the original charge's refunded amount/status from its refund
+   * rows and backfill subject/customer context onto those refund rows. The
+   * original charge is keyed by Paystack transaction id and/or reference —
+   * refund webhooks may carry either.
+   */
+  private async refreshOriginalChargeRefundState(
+    environment: PaystackEnvironment,
+    transactionId: string | null,
+    transactionReference: string | null
+  ): Promise<void> {
+    if (!transactionId && !transactionReference) {
+      return;
+    }
+
+    await this.getPool().query(
+      `WITH refund_totals AS (
+         SELECT
+           COALESCE(SUM(amount) FILTER (WHERE status = 'refunded'), 0)::BIGINT AS amount_refunded,
+           MAX(refunded_at) FILTER (WHERE status = 'refunded') AS refunded_at
+         FROM payments.transactions
+         WHERE provider = 'paystack'
+           AND environment = $1
+           AND type = 'refund'
+           AND (
+             ($2::TEXT IS NOT NULL AND (
+               (provider_parent_object_type = 'transaction' AND provider_parent_object_id = $2)
+               OR related_object_ids->>'transaction' = $2
+             ))
+             OR ($3::TEXT IS NOT NULL AND related_object_ids->>'reference' = $3)
+           )
+       ),
+       original_context AS (
+         SELECT
+           subject_type,
+           subject_id,
+           provider_customer_id,
+           customer_email_snapshot,
+           related_object_ids,
+           description
+         FROM payments.transactions
+         WHERE provider = 'paystack'
+           AND environment = $1
+           AND type <> 'refund'
+           AND (
+             ($2::TEXT IS NOT NULL AND (
+               (provider_object_type = 'transaction' AND provider_object_id = $2)
+               OR related_object_ids->>'transaction' = $2
+             ))
+             OR ($3::TEXT IS NOT NULL AND related_object_ids->>'reference' = $3)
+           )
+         ORDER BY created_at DESC
+         LIMIT 1
+       ),
+       updated_original AS (
+         UPDATE payments.transactions original
+         SET amount_refunded = refund_totals.amount_refunded,
+             status = CASE
+               WHEN refund_totals.amount_refunded > 0
+                 AND original.amount IS NOT NULL
+                 AND refund_totals.amount_refunded >= original.amount
+                 THEN 'refunded'
+               WHEN refund_totals.amount_refunded > 0
+                 THEN 'partially_refunded'
+               WHEN original.status IN ('refunded', 'partially_refunded')
+                 THEN CASE WHEN original.failed_at IS NOT NULL THEN 'failed' ELSE 'succeeded' END
+               ELSE original.status
+             END,
+             refunded_at = CASE
+               WHEN refund_totals.amount_refunded > 0 THEN refund_totals.refunded_at
+               ELSE NULL
+             END,
+             updated_at = NOW()
+         FROM refund_totals
+         WHERE original.provider = 'paystack'
+           AND original.environment = $1
+           AND original.type <> 'refund'
+           AND (
+             ($2::TEXT IS NOT NULL AND (
+               (original.provider_object_type = 'transaction' AND original.provider_object_id = $2)
+               OR original.related_object_ids->>'transaction' = $2
+             ))
+             OR ($3::TEXT IS NOT NULL AND original.related_object_ids->>'reference' = $3)
+           )
+         RETURNING original.id
+       )
+       UPDATE payments.transactions refund
+       SET subject_type = COALESCE(refund.subject_type, original_context.subject_type),
+           subject_id = COALESCE(refund.subject_id, original_context.subject_id),
+           provider_customer_id = COALESCE(refund.provider_customer_id, original_context.provider_customer_id),
+           customer_email_snapshot = COALESCE(refund.customer_email_snapshot, original_context.customer_email_snapshot),
+           related_object_ids = original_context.related_object_ids || refund.related_object_ids,
+           description = COALESCE(refund.description, original_context.description),
+           updated_at = NOW()
+       FROM original_context
+       WHERE refund.provider = 'paystack'
+         AND refund.environment = $1
+         AND refund.type = 'refund'
+         AND (
+           ($2::TEXT IS NOT NULL AND (
+             (refund.provider_parent_object_type = 'transaction' AND refund.provider_parent_object_id = $2)
+             OR refund.related_object_ids->>'transaction' = $2
+           ))
+           OR ($3::TEXT IS NOT NULL AND refund.related_object_ids->>'reference' = $3)
+         )`,
+      [environment, transactionId, transactionReference]
+    );
   }
 
   private getSafeUserContext(user: UserContext): UserContext {

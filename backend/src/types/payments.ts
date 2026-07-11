@@ -347,8 +347,6 @@ export interface PaystackConnectionRow {
   accountEmail: string | null;
   accountLivemode: boolean | null;
   webhookEndpointUrl: string | null;
-  secretKeyId: string | null;
-  publicKeyId: string | null;
   webhookConfiguredAt: Date | string | null;
   lastSyncedAt: Date | string | null;
   lastSyncStatus: PaystackLatestSyncStatus | null;

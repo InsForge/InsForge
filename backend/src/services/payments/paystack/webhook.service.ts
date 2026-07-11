@@ -2,10 +2,16 @@ import type { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { PaystackConfigService } from '@/services/payments/paystack/config.service.js';
 import { WebhookStoreService } from '@/services/payments/webhook-store.service.js';
-import { PaystackTransactionService } from '@/services/payments/paystack/transaction.service.js';
+import {
+  PaystackTransactionService,
+  type PaystackPaymentTransactionStatus,
+} from '@/services/payments/paystack/transaction.service.js';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
-import type { PaystackTransactionResource } from '@/providers/payments/paystack.provider.js';
+import type {
+  PaystackRefundResource,
+  PaystackTransactionResource,
+} from '@/providers/payments/paystack.provider.js';
 import type { PaystackEnvironment } from '@/types/payments.js';
 import {
   ERROR_CODES,
@@ -258,19 +264,54 @@ export class PaystackWebhookService {
     return true;
   }
 
-  private handleRefund(
+  private async handleRefund(
     environment: PaystackEnvironment,
     payload: PaystackWebhookPayload,
     event: string
-  ): boolean {
-    // Phase 1 records refund events for auditability but does not project them
-    // into payments.transactions; refund amounts stay on the original charge.
-    logger.info('[Paystack Webhook] Refund event recorded', {
+  ): Promise<boolean> {
+    const refund = this.getRefundEntity(payload);
+    if (!refund) {
+      logger.warn('[Paystack Webhook] refund event: no refund entity', { event });
+      return false;
+    }
+
+    const refundStatus = this.mapRefundStatus(refund, event);
+    await this.transactionService.upsertRefundTransaction(environment, refund, refundStatus);
+
+    logger.info('[Paystack Webhook] Refund processed', {
       environment,
       event,
+      refundId: String(refund.id),
       reference: this.getRefundTransactionReference(payload),
     });
     return true;
+  }
+
+  private mapRefundStatus(
+    refund: PaystackRefundResource,
+    event: string
+  ): PaystackPaymentTransactionStatus {
+    if (event === 'refund.failed' || refund.status === 'failed') {
+      return 'failed';
+    }
+
+    if (event === 'refund.processed' || refund.status === 'processed') {
+      return 'refunded';
+    }
+
+    return 'pending';
+  }
+
+  private getRefundEntity(payload: PaystackWebhookPayload): PaystackRefundResource | null {
+    const { id, amount, currency } = payload.data;
+    if (typeof id !== 'number' && typeof id !== 'string') {
+      return null;
+    }
+    if (typeof amount !== 'number' || typeof currency !== 'string') {
+      return null;
+    }
+
+    return payload.data as unknown as PaystackRefundResource;
   }
 
   private getChargeEntity(payload: PaystackWebhookPayload): PaystackTransactionResource | null {

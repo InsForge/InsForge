@@ -339,4 +339,147 @@ describe('PaystackTransactionService', () => {
 
     expect(mockPoolQuery).toHaveBeenCalledTimes(1);
   });
+
+  it('projects a processed refund into the shared ledger and refreshes the original charge', async () => {
+    const refund = {
+      id: 777,
+      transaction: 12345,
+      amount: 200000,
+      currency: 'NGN',
+      status: 'processed',
+      created_at: '2026-07-02T10:00:00.000Z',
+    };
+
+    await PaystackTransactionService.getInstance().upsertRefundTransaction(
+      'test',
+      refund,
+      'refunded'
+    );
+
+    expect(mockPoolQuery).toHaveBeenNthCalledWith(
+      1,
+      expect.stringMatching(
+        /WITH refs[\s\S]*tx\.provider = 'paystack'[\s\S]*INSERT INTO payments\.transactions/i
+      ),
+      [
+        'test',
+        'refund',
+        '777',
+        'transaction',
+        '12345',
+        'refund',
+        'refunded',
+        null,
+        null,
+        null,
+        null,
+        JSON.stringify({ refund: '777', transaction: '12345' }),
+        200000,
+        200000,
+        'ngn',
+        null,
+        null,
+        null,
+        new Date('2026-07-02T10:00:00.000Z'),
+        new Date('2026-07-02T10:00:00.000Z'),
+        refund,
+        JSON.stringify([{ type: 'refund', id: '777' }]),
+      ]
+    );
+    // The original charge's refunded amount/status is recomputed afterwards.
+    expect(mockPoolQuery).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(
+        /WITH refund_totals[\s\S]*provider = 'paystack'[\s\S]*type = 'refund'/i
+      ),
+      ['test', '12345', null]
+    );
+  });
+
+  it('projects a failed refund keyed by transaction reference', async () => {
+    const refund = {
+      id: 888,
+      transaction: 'ps_ref_123',
+      amount: 1200,
+      currency: 'NGN',
+      status: 'failed',
+      created_at: '2026-07-02T10:00:00.000Z',
+    };
+
+    await PaystackTransactionService.getInstance().upsertRefundTransaction(
+      'test',
+      refund,
+      'failed'
+    );
+
+    const [, params] = mockPoolQuery.mock.calls[0] as [string, unknown[]];
+    expect(params[1]).toBe('refund'); // provider object type
+    expect(params[2]).toBe('888'); // provider object id
+    // A reference-only refund has no parent transaction id to attach.
+    expect(params[3]).toBeNull();
+    expect(params[4]).toBeNull();
+    expect(params[6]).toBe('failed'); // ledger status
+    expect(JSON.parse(String(params[11]))).toEqual({
+      refund: '888',
+      reference: 'ps_ref_123',
+    });
+    expect(params[17]).toEqual(new Date('2026-07-02T10:00:00.000Z')); // failedAt
+    expect(params[18]).toBeNull(); // refundedAt
+    expect(mockPoolQuery).toHaveBeenNthCalledWith(2, expect.stringMatching(/WITH refund_totals/i), [
+      'test',
+      null,
+      'ps_ref_123',
+    ]);
+  });
+
+  it('extracts the origin transaction from an embedded transaction object', async () => {
+    const refund = {
+      id: 999,
+      transaction: { id: 12345, reference: 'ps_ref_123' },
+      amount: 500,
+      currency: 'NGN',
+      status: 'processed',
+      created_at: '2026-07-02T10:00:00.000Z',
+    };
+
+    await PaystackTransactionService.getInstance().upsertRefundTransaction(
+      'test',
+      refund,
+      'refunded'
+    );
+
+    const [, params] = mockPoolQuery.mock.calls[0] as [string, unknown[]];
+    expect(params[3]).toBe('transaction');
+    expect(params[4]).toBe('12345');
+    expect(JSON.parse(String(params[11]))).toEqual({
+      refund: '999',
+      transaction: '12345',
+      reference: 'ps_ref_123',
+    });
+    expect(mockPoolQuery).toHaveBeenNthCalledWith(2, expect.stringMatching(/WITH refund_totals/i), [
+      'test',
+      '12345',
+      'ps_ref_123',
+    ]);
+  });
+
+  it('skips the original-charge refresh when the refund names no transaction', async () => {
+    const refund = {
+      id: 1000,
+      transaction: null,
+      amount: 500,
+      currency: 'NGN',
+      status: 'processed',
+      created_at: '2026-07-02T10:00:00.000Z',
+    };
+
+    await PaystackTransactionService.getInstance().upsertRefundTransaction(
+      'test',
+      refund,
+      'refunded'
+    );
+
+    expect(mockPoolQuery).toHaveBeenCalledTimes(1);
+    expect(String(mockPoolQuery.mock.calls[0][0])).not.toMatch(/WITH refund_totals/i);
+  });
 });

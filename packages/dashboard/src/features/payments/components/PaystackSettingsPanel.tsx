@@ -125,6 +125,7 @@ export function usePaystackSettings(open: boolean) {
   const handleSave = (environment: PaymentEnvironment) => {
     const secretKey = secretKeyInputs.values[environment].trim();
     const publicKey = publicKeyInputs.values[environment].trim();
+    const savedPublicKey = getPaystackKeyValue(keys, environment, 'public_key');
     const expectedSecretPrefix = PAYSTACK_SECRET_KEY_PREFIX_BY_ENVIRONMENT[environment];
     const expectedPublicPrefix = PAYSTACK_PUBLIC_KEY_PREFIX_BY_ENVIRONMENT[environment];
 
@@ -153,7 +154,15 @@ export function usePaystackSettings(open: boolean) {
     }
 
     setErrors((current) => ({ ...current, [environment]: undefined }));
-    saveKey.mutate({ environment, secretKey, publicKey: publicKey || undefined });
+    // The public key input hydrates with the saved raw value, so an empty
+    // input alongside a configured key means the user cleared it: send null to
+    // clear. With no key configured, an empty input stays a no-op (undefined =
+    // keep existing), so a secret-key-only edit never touches the public key.
+    saveKey.mutate({
+      environment,
+      secretKey,
+      publicKey: publicKey || (savedPublicKey ? null : undefined),
+    });
   };
 
   const handleRemove = async (environment: PaymentEnvironment) => {

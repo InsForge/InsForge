@@ -81,6 +81,56 @@ describe('normalizePaystackError', () => {
     });
   });
 
+  it('clamps API errors carrying a success status to a 502 upstream failure', () => {
+    // Paystack can report a body-level failure ({ status: false }) on an HTTP
+    // 200; emitting that status from the error middleware would look like
+    // success to clients.
+    const normalized = normalizePaystackError(new PaystackApiError('Transaction not found', 200));
+
+    expect(normalized).toMatchObject({
+      statusCode: 502,
+      code: ERROR_CODES.UPSTREAM_FAILURE,
+      message: 'Transaction not found',
+    });
+  });
+
+  it('clamps any sub-400 API error status to 502', () => {
+    const normalized = normalizePaystackError(new PaystackApiError('Moved', 302));
+
+    expect(normalized).toMatchObject({
+      statusCode: 502,
+      code: ERROR_CODES.UPSTREAM_FAILURE,
+      message: 'Moved',
+    });
+  });
+
+  it('wraps provider network failures as upstream errors preserving the cause text', () => {
+    const normalized = normalizePaystackError(
+      new PaystackApiError(
+        'Paystack request failed: fetch failed (getaddrinfo ENOTFOUND api.paystack.co)',
+        502
+      )
+    );
+
+    expect(normalized).toMatchObject({
+      statusCode: 502,
+      code: ERROR_CODES.UPSTREAM_FAILURE,
+      message: 'Paystack request failed: fetch failed (getaddrinfo ENOTFOUND api.paystack.co)',
+    });
+  });
+
+  it('maps provider timeouts to a 504 upstream failure', () => {
+    const normalized = normalizePaystackError(
+      new PaystackApiError('Paystack request timed out after 30000ms', 504)
+    );
+
+    expect(normalized).toMatchObject({
+      statusCode: 504,
+      code: ERROR_CODES.UPSTREAM_FAILURE,
+      message: 'Paystack request timed out after 30000ms',
+    });
+  });
+
   it('falls back to a literal message when the API error message is blank', () => {
     const normalized = normalizePaystackError(new PaystackApiError('   ', 500));
 

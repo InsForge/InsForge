@@ -3,6 +3,9 @@ import type { PaystackEnvironment } from '@/types/payments.js';
 
 export const PAYSTACK_API_BASE_URL = 'https://api.paystack.co';
 
+/** Abort Paystack REST calls that receive no response within this window. */
+export const PAYSTACK_REQUEST_TIMEOUT_MS = 30_000;
+
 const PAYSTACK_SHA512_SIGNATURE_HEX = /^[0-9a-f]{128}$/i;
 
 export class PaystackKeyValidationError extends Error {
@@ -24,6 +27,33 @@ export class PaystackApiError extends Error {
     super(message);
     this.name = 'PaystackApiError';
   }
+}
+
+/**
+ * Wrap a rejected `fetch` (no HTTP response at all) as a PaystackApiError:
+ * timeout aborts surface as 504, other network failures (DNS, connection
+ * refused, TLS) as 502. The underlying cause text is preserved.
+ */
+function toPaystackFetchError(error: unknown): PaystackApiError {
+  if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+    return new PaystackApiError(
+      `Paystack request timed out after ${PAYSTACK_REQUEST_TIMEOUT_MS}ms`,
+      504
+    );
+  }
+
+  // Undici reports network failures as `TypeError: fetch failed` with the
+  // useful detail (e.g. "getaddrinfo ENOTFOUND api.paystack.co") on `cause`.
+  const cause = error instanceof Error ? error.cause : undefined;
+  const causeMessage =
+    cause instanceof Error ? cause.message : typeof cause === 'string' ? cause : null;
+  const baseMessage =
+    error instanceof Error && error.message.trim() ? error.message : String(error);
+  const message = causeMessage
+    ? `Paystack request failed: ${baseMessage} (${causeMessage})`
+    : `Paystack request failed: ${baseMessage}`;
+
+  return new PaystackApiError(message, 502);
 }
 
 type PaystackKeyKind = 'secret' | 'public';
@@ -121,6 +151,21 @@ export interface PaystackTransactionResource {
     channel: string | null;
     reusable: boolean | null;
   } | null;
+}
+
+/**
+ * Refund entity delivered by refund.* webhooks. `transaction` arrives either
+ * as the original transaction's reference/id or as an embedded object.
+ */
+export interface PaystackRefundResource {
+  id: number | string;
+  transaction: number | string | { id?: number | string | null; reference?: string | null } | null;
+  amount: number;
+  currency: string;
+  status?: string | null;
+  transaction_reference?: string | null;
+  refunded_at?: string | null;
+  created_at?: string | null;
 }
 
 /** Every successful Paystack response wraps its payload in this envelope. */
@@ -221,14 +266,24 @@ export class PaystackProvider {
     path: string,
     options: { method?: 'GET' | 'POST'; body?: Record<string, unknown> } = {}
   ): Promise<T> {
-    const response = await fetch(`${PAYSTACK_API_BASE_URL}${path}`, {
-      method: options.method ?? 'GET',
-      headers: {
-        Authorization: `Bearer ${this.secretKey}`,
-        'Content-Type': 'application/json',
-      },
-      ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${PAYSTACK_API_BASE_URL}${path}`, {
+        method: options.method ?? 'GET',
+        headers: {
+          Authorization: `Bearer ${this.secretKey}`,
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(PAYSTACK_REQUEST_TIMEOUT_MS),
+        ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+      });
+    } catch (error) {
+      // fetch rejects (rather than resolving with an error status) on network
+      // failures — DNS, connection refused, TLS — and on timeout aborts. Wrap
+      // both as PaystackApiError so they normalize to upstream failures instead
+      // of leaking as generic 500s.
+      throw toPaystackFetchError(error);
+    }
 
     let payload: PaystackEnvelope<T> | null = null;
     try {

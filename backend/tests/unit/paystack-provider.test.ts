@@ -138,6 +138,9 @@ describe('PaystackProvider', () => {
           Authorization: `Bearer ${TEST_PAYSTACK_SECRET_KEY}`,
           'Content-Type': 'application/json',
         },
+        // Every request carries a timeout signal so a hung upstream cannot
+        // stall the caller indefinitely.
+        signal: expect.any(AbortSignal),
       })
     );
     const requestInit = mockFetch.mock.calls[0][1] as RequestInit;
@@ -211,6 +214,7 @@ describe('PaystackProvider', () => {
           Authorization: `Bearer ${TEST_PAYSTACK_SECRET_KEY}`,
           'Content-Type': 'application/json',
         },
+        signal: expect.any(AbortSignal),
       })
     );
     expect(mockFetch.mock.calls[0][1]).not.toHaveProperty('body');
@@ -268,10 +272,61 @@ describe('PaystackProvider', () => {
         .mockResolvedValue(jsonResponse(200, { status: false, message: 'Transaction not found' }))
     );
 
+    // The provider preserves the raw HTTP status; normalizePaystackError clamps
+    // sub-400 statuses to 502 before they reach the error middleware.
     await expect(provider.verifyTransaction('ps_ref_123')).rejects.toMatchObject({
       name: 'PaystackApiError',
       message: 'Transaction not found',
       statusCode: 200,
+    });
+  });
+
+  it('wraps network-level fetch failures as PaystackApiError 502 with the cause text', async () => {
+    const provider = new PaystackProvider({
+      environment: 'test',
+      secretKey: TEST_PAYSTACK_SECRET_KEY,
+    });
+    const networkError = new TypeError('fetch failed');
+    (networkError as { cause?: unknown }).cause = new Error(
+      'getaddrinfo ENOTFOUND api.paystack.co'
+    );
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkError));
+
+    await expect(provider.verifyTransaction('ps_ref_123')).rejects.toMatchObject({
+      name: 'PaystackApiError',
+      statusCode: 502,
+      message: 'Paystack request failed: fetch failed (getaddrinfo ENOTFOUND api.paystack.co)',
+    });
+  });
+
+  it('wraps network failures without a cause using the error message', async () => {
+    const provider = new PaystackProvider({
+      environment: 'test',
+      secretKey: TEST_PAYSTACK_SECRET_KEY,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+
+    await expect(provider.verifyTransaction('ps_ref_123')).rejects.toMatchObject({
+      name: 'PaystackApiError',
+      statusCode: 502,
+      message: 'Paystack request failed: fetch failed',
+    });
+  });
+
+  it('surfaces timeout aborts as PaystackApiError 504', async () => {
+    const provider = new PaystackProvider({
+      environment: 'test',
+      secretKey: TEST_PAYSTACK_SECRET_KEY,
+    });
+    // AbortSignal.timeout rejects fetch with a DOMException named TimeoutError.
+    const timeoutError = new Error('The operation was aborted due to timeout');
+    timeoutError.name = 'TimeoutError';
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(timeoutError));
+
+    await expect(provider.verifyTransaction('ps_ref_123')).rejects.toMatchObject({
+      name: 'PaystackApiError',
+      statusCode: 504,
+      message: 'Paystack request timed out after 30000ms',
     });
   });
 });

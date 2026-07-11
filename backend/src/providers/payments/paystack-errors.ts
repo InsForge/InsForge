@@ -19,6 +19,13 @@ export function normalizePaystackError(error: unknown): Error {
   const status = getUpstreamStatus(error);
   const message = error.message.trim() ? error.message : 'Paystack request failed';
 
+  // A body-level failure (`{ status: false }`) can arrive with an HTTP 2xx
+  // status; letting it flow into UpstreamError would make the error middleware
+  // emit a success status. Clamp anything below 400 to 502.
+  if (status < 400) {
+    return new AppError(message, 502, ERROR_CODES.UPSTREAM_FAILURE);
+  }
+
   if (status === 429) {
     return new AppError(message, 429, ERROR_CODES.RATE_LIMITED);
   }

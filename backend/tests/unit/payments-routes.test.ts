@@ -100,6 +100,22 @@ describe('payments route schemas', () => {
     resolve(__dirname, '../../src/providers/payments/razorpay.provider.ts'),
     'utf-8'
   );
+  const paystackRouteSource = readFileSync(
+    resolve(__dirname, '../../src/api/routes/payments/paystack/index.routes.ts'),
+    'utf-8'
+  );
+  const paystackConfigRouteSource = readFileSync(
+    resolve(__dirname, '../../src/api/routes/payments/paystack/config.routes.ts'),
+    'utf-8'
+  );
+  const paystackWebhookRouteSource = readFileSync(
+    resolve(__dirname, '../../src/api/routes/webhooks/paystack.routes.ts'),
+    'utf-8'
+  );
+  const paystackWebhookServiceSource = readFileSync(
+    resolve(__dirname, '../../src/services/payments/paystack/webhook.service.ts'),
+    'utf-8'
+  );
 
   it('keeps checkout session creation on runtime auth before environment admin routes', () => {
     const adminGuardIndex = stripeRouteSource.indexOf('environmentRouter.use(verifyAdmin)');
@@ -392,6 +408,122 @@ describe('payments route schemas', () => {
     expect(razorpayWebhookServiceSource).toContain('verifyWebhookSignature');
     expect(razorpayWebhookServiceSource).toContain('recordWebhookEventStart');
     expect(razorpayWebhookRouteSource).toMatch(/export \{ router as razorpayWebhookRouter \}/);
+  });
+
+  it('mounts Paystack environment-scoped config routes under the Paystack admin guard', () => {
+    const adminGuardIndex = paystackRouteSource.indexOf('environmentRouter.use(verifyAdmin)');
+    expect(adminGuardIndex).toBeGreaterThan(-1);
+    expect(paystackRouteSource).toContain(
+      'const environmentRouter = Router({ mergeParams: true });'
+    );
+    expect(
+      paystackRouteSource.indexOf('environmentRouter.use(paystackConfigRouter)')
+    ).toBeGreaterThan(adminGuardIndex);
+    expect(paystackRouteSource).toContain("router.use('/:environment', environmentRouter)");
+    expect(paystackRouteSource).toContain("from './config.routes.js'");
+    expect(paystackRouteSource).not.toContain("router.put('/:environment/config'");
+    expect(paystackRouteSource).not.toContain('paymentEnvironmentSchema');
+    expect(paystackRouteSource).toMatch(/router\.get\(\s*'\/status',\s*verifyAdmin/);
+    expect(paystackRouteSource).toMatch(/router\.get\(\s*'\/config',\s*verifyAdmin/);
+    expect(paymentsRouteSource).toContain("router.use('/paystack', paystackRouter)");
+    expect(paymentsRouteSource).toContain("from './paystack/index.routes.js'");
+  });
+
+  it('mounts Paystack transaction flows under user auth before admin routes', () => {
+    const adminGuardIndex = paystackRouteSource.indexOf('environmentRouter.use(verifyAdmin)');
+    expect(adminGuardIndex).toBeGreaterThan(-1);
+
+    for (const route of ["'/transactions/initialize'", "'/transactions/verify'"]) {
+      expect(paystackRouteSource.indexOf(route)).toBeGreaterThan(-1);
+      expect(paystackRouteSource.indexOf(route)).toBeLessThan(adminGuardIndex);
+    }
+
+    expect(paystackRouteSource).toMatch(
+      /environmentRouter\.post\(\s*'\/transactions\/initialize',\s*verifyUser[\s\S]*initializePaystackTransactionBodySchema/
+    );
+    expect(paystackRouteSource).toMatch(
+      /environmentRouter\.post\(\s*'\/transactions\/verify',\s*verifyUser[\s\S]*verifyPaystackTransactionBodySchema/
+    );
+    expect(paystackRouteSource).toContain(
+      'Paystack transaction initialization requires a user token'
+    );
+    expect(paystackRouteSource).toContain(
+      'Paystack transaction verification requires a user token'
+    );
+
+    expect(paystackRouteSource.indexOf("'/transactions'")).toBeGreaterThan(adminGuardIndex);
+    expect(paystackRouteSource.indexOf("'/customers'")).toBeGreaterThan(adminGuardIndex);
+    expect(paystackRouteSource).toContain('PaymentTransactionService');
+    expect(paystackRouteSource).not.toContain('ProjectionService');
+    expect(paystackRouteSource).toMatch(
+      /customerService\.listCustomers\(\{ environment, \.\.\.query \},\s*'paystack'\)/
+    );
+    expect(paystackRouteSource).toMatch(
+      /transactionService\.listTransactions\(\s*\{[\s\S]*environment,[\s\S]*\.\.\.query,[\s\S]*\},\s*'paystack'/
+    );
+    expect(paystackRouteSource).not.toContain('checkout-sessions');
+    expect(paystackRouteSource).not.toContain('payment-links');
+  });
+
+  it('keeps Paystack environment-scoped config routes in the dedicated Paystack config router', () => {
+    expect(paystackConfigRouteSource).toContain('const router = Router({ mergeParams: true });');
+    expect(paystackConfigRouteSource).toMatch(
+      /router\.put\(\s*'\/config'[\s\S]*upsertPaystackConfigBodySchema/
+    );
+    // publicKey is tri-state (undefined = keep, null = clear, string = set);
+    // collapsing undefined to null would deactivate a stored public key on
+    // secret-only updates.
+    expect(paystackConfigRouteSource).toContain(
+      'configService.setPaystackKeys(environment, body.secretKey, body.publicKey)'
+    );
+    expect(paystackConfigRouteSource).not.toContain('body.publicKey ?? null');
+    expect(paystackConfigRouteSource).toMatch(/router\.delete\(\s*'\/config'/);
+    expect(paystackConfigRouteSource).toMatch(/router\.get\(\s*'\/webhook'/);
+    expect(paystackConfigRouteSource).toContain('configService.getWebhookSetup(environment)');
+    expect(paystackConfigRouteSource).not.toMatch(/router\.post\(\s*'\/webhook'/);
+    expect(paystackConfigRouteSource).not.toContain('verifyAdmin');
+    expect(paystackConfigRouteSource).not.toMatch(/router\.get\(\s*'\/status'/);
+    expect(paystackConfigRouteSource).not.toMatch(/router\.get\(\s*'\/config'/);
+    expect(paystackConfigRouteSource).toMatch(/export \{ router as paystackConfigRouter \}/);
+  });
+
+  it('keeps Paystack route validation schemas in shared-schemas', () => {
+    expect(paymentsApiSchemaSource).toContain('paystackEnvironmentParamsSchema');
+    expect(paymentsApiSchemaSource).toContain('paystackWebhookParamsSchema');
+    expect(paymentsApiSchemaSource).toContain('upsertPaystackConfigBodySchema');
+    expect(paymentsApiSchemaSource).toContain('getPaystackWebhookSetupResponseSchema');
+    expect(paymentsApiSchemaSource).toContain('getPaystackStatusResponseSchema');
+    expect(paymentsApiSchemaSource).toContain('getPaystackConfigResponseSchema');
+    expect(paymentsApiSchemaSource).toContain('initializePaystackTransactionBodySchema');
+    expect(paymentsApiSchemaSource).toContain('initializePaystackTransactionResponseSchema');
+    expect(paymentsApiSchemaSource).toContain('verifyPaystackTransactionBodySchema');
+    expect(paymentsApiSchemaSource).toContain('verifyPaystackTransactionResponseSchema');
+    expect(paystackConfigRouteSource).toContain('parseZodSchema');
+    expect(paystackConfigRouteSource).toContain('upsertPaystackConfigBodySchema');
+    expect(paystackRouteSource).toContain('initializePaystackTransactionBodySchema');
+    expect(paystackRouteSource).toContain('verifyPaystackTransactionBodySchema');
+    expect(paystackRouteSource).toContain("from '@insforge/shared-schemas'");
+    expect(paystackConfigRouteSource).toContain("from '@insforge/shared-schemas'");
+    expect(paystackConfigRouteSource).not.toContain("from 'zod'");
+    expect(paystackConfigRouteSource).not.toContain('paymentEnvironmentSchema');
+    expect(paystackConfigRouteSource).not.toContain('function getEnvironment');
+  });
+
+  it('mounts Paystack inbound webhooks under the dedicated webhook router', () => {
+    expect(webhooksRouteSource).toContain("router.use('/paystack', paystackWebhookRouter)");
+    expect(paystackWebhookRouteSource).toMatch(/router\.post\(\s*'\/:environment'/);
+    expect(paystackWebhookRouteSource).toContain('x-paystack-signature');
+    expect(paystackWebhookRouteSource).toContain('paystackWebhookParamsSchema');
+    expect(paystackWebhookRouteSource).toContain('handlePaystackWebhook');
+    expect(paystackWebhookRouteSource).not.toContain('HANDLED_PAYSTACK_EVENTS');
+    expect(paystackWebhookRouteSource).not.toContain('PaystackConfigService');
+    expect(paystackWebhookRouteSource).not.toContain('logger');
+    expect(paystackWebhookRouteSource).not.toContain('verifyWebhookSignature');
+    expect(paystackWebhookRouteSource).not.toContain('recordWebhookEventStart');
+    expect(paystackWebhookServiceSource).toContain('HANDLED_PAYSTACK_EVENTS');
+    expect(paystackWebhookServiceSource).toContain('verifyWebhookSignature');
+    expect(paystackWebhookServiceSource).toContain('recordWebhookEventStart');
+    expect(paystackWebhookRouteSource).toMatch(/export \{ router as paystackWebhookRouter \}/);
   });
 
   it('accepts only the supported payment environment path params', () => {

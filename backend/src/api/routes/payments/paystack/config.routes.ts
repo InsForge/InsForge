@@ -17,7 +17,10 @@ router.put('/config', async (req: AuthRequest, res: Response, next: NextFunction
     const { environment } = parseZodSchema(paystackEnvironmentParamsSchema, req.params);
     const body = parseZodSchema(upsertPaystackConfigBodySchema, req.body);
 
-    await configService.setPaystackKeys(environment, body.secretKey, body.publicKey ?? null);
+    // Pass `publicKey` through unchanged: undefined keeps the stored public key,
+    // null explicitly clears it — collapsing undefined to null would deactivate
+    // a stored public key on secret-only updates.
+    await configService.setPaystackKeys(environment, body.secretKey, body.publicKey);
 
     const keys = await configService.getKeyConfig();
     successResponse(res, { keys });

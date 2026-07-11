@@ -36,8 +36,11 @@ export class PaystackService {
   }
 
   async upsertConfig(input: UpsertPaystackConfigRequest): Promise<GetPaystackConfigResponse> {
-    const body: Record<string, string> = { secretKey: input.secretKey };
-    if (input.publicKey) {
+    // publicKey is a tri-state update: undefined = keep existing, null = clear,
+    // string = set. Omit it from the body only when undefined so an explicit
+    // null reaches the backend.
+    const body: Record<string, string | null> = { secretKey: input.secretKey };
+    if (input.publicKey !== undefined) {
       body.publicKey = input.publicKey;
     }
     return apiClient.request(`/payments/paystack/${input.environment}/config`, {
