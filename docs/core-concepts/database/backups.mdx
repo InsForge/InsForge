@@ -1,0 +1,67 @@
+---
+title: "Database backups"
+description: "Automated daily backups on InsForge Cloud, plus manual backup and restore on every deployment"
+---
+
+Every InsForge database can be backed up and restored from the dashboard under **Database → Backups**. InsForge Cloud runs automated daily backups; manual backup and restore work on both Cloud and self-hosted deployments.
+
+## Automated daily backups
+
+InsForge Cloud backs up every active project on a paid plan once a day at 3:00 AM UTC. Each backup is a full compressed SQL dump of the project database, stored in S3 and retained for 7 days. Older scheduled backups are cleaned up automatically.
+
+Scheduled backups appear in the dashboard alongside manual ones. Creating a manual backup does not affect the daily schedule.
+
+## Manual backups
+
+Create a backup any time from **Database → Backups** in the dashboard. Backups run in the background; the list shows each backup's status (`running`, `completed`, or `failed`), size, and creation time. You can name, rename, and delete backups. Only one backup runs at a time.
+
+## Restore
+
+Restore any completed backup from the same page. A restore replaces the current database contents with the backup. On self-hosted deployments the restore runs in a single transaction, so a failed restore rolls back and leaves the database untouched.
+
+## Self-hosting
+
+Self-hosted backups use `pg_dump` (custom format) and store the archive with the rest of your storage:
+
+- Local storage: `${STORAGE_DIR}/_database_backups/`
+- S3 storage configured: `<app-key>/_database_backups/` in your bucket
+
+The official Docker image ships the PostgreSQL client tools. If you run the backend outside the image, install them so `pg_dump` and `pg_restore` are on the `PATH`.
+
+Backups are kept until you delete them — there is no automatic retention on self-hosted deployments.
+
+### API
+
+All endpoints require admin credentials (an admin session or your `ACCESS_API_KEY`).
+
+```bash
+# List backups
+curl http://localhost:7130/api/database/backups \
+  -H "Authorization: Bearer $ACCESS_API_KEY"
+
+# Create a backup (name is optional)
+curl -X POST http://localhost:7130/api/database/backups \
+  -H "Authorization: Bearer $ACCESS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "before-schema-change"}'
+
+# Restore a backup
+curl -X POST http://localhost:7130/api/database/backups/<backup-id>/restore \
+  -H "Authorization: Bearer $ACCESS_API_KEY"
+```
+
+Rename with `PATCH /api/database/backups/<backup-id>` and delete with `DELETE /api/database/backups/<backup-id>`.
+
+### Scheduling daily backups
+
+Self-hosted deployments do not include a built-in scheduler. Point a cron job at the API to get the same daily cadence as Cloud:
+
+```bash
+0 3 * * * curl -s -X POST http://localhost:7130/api/database/backups -H "Authorization: Bearer $ACCESS_API_KEY"
+```
+
+## More resources
+
+- [Database overview](/core-concepts/database/overview) for how the database is exposed to your app.
+- [Database migrations](/core-concepts/database/migrations) to version schema changes instead of restoring to undo them.
+- [Database branching](/agent-native/branching) to rehearse risky changes on a copy.

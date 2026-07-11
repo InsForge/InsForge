@@ -50,6 +50,7 @@
                 "pages": [
                   "core-concepts/database/overview",
                   "core-concepts/database/migrations",
+                  "core-concepts/database/backups",
                   "core-concepts/database/pgvector"
                 ]
               },
