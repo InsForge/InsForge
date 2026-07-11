@@ -20,6 +20,7 @@ import type { PaymentProvider } from '@insforge/shared-schemas';
 import { PaymentProviderSelect, PAYMENT_PROVIDER_LABELS } from './PaymentProviderSelect';
 import { StripeSettingsPanel, useStripeSettings } from './StripeSettingsPanel';
 import { RazorpaySettingsPanel, useRazorpaySettings } from './RazorpaySettingsPanel';
+import { PaystackSettingsPanel, usePaystackSettings } from './PaystackSettingsPanel';
 
 export type PaymentsSettingsTab = 'keys' | 'webhooks' | 'sync';
 
@@ -38,12 +39,13 @@ export function PaymentsSettingsDialog({
 }: PaymentsSettingsDialogProps) {
   const stripe = useStripeSettings(open);
   const razorpay = useRazorpaySettings(open);
+  const paystack = usePaystackSettings(open);
 
   const [activeTab, setActiveTab] = useState<PaymentsSettingsTab>('keys');
 
-  // A pending mutation on either provider locks the whole dialog so a
+  // A pending mutation on any provider locks the whole dialog so a
   // provider switch mid-save can't fire conflicting actions.
-  const isBusy = stripe.isPending || razorpay.isPending;
+  const isBusy = stripe.isPending || razorpay.isPending || paystack.isPending;
   const canClose = !isBusy;
   const title =
     activeTab === 'keys' ? 'Connection Keys' : activeTab === 'webhooks' ? 'Webhooks' : 'Sync';
@@ -57,10 +59,20 @@ export function PaymentsSettingsDialog({
     if (!nextOpen) {
       stripe.reset();
       razorpay.reset();
+      paystack.reset();
       setActiveTab('keys');
     }
 
     onOpenChange(nextOpen);
+  };
+
+  const handleProviderChange = (nextProvider: PaymentProvider) => {
+    // Paystack has no sync flow, so its Sync tab is hidden; leave the
+    // now-orphaned tab before switching.
+    if (nextProvider === 'paystack' && activeTab === 'sync') {
+      setActiveTab('keys');
+    }
+    setProvider(nextProvider);
   };
 
   return (
@@ -73,7 +85,7 @@ export function PaymentsSettingsDialog({
           <MenuDialogNav>
             <PaymentProviderSelect
               value={provider}
-              onValueChange={setProvider}
+              onValueChange={handleProviderChange}
               triggerClassName="h-8 w-full rounded"
               contentClassName="w-[176px]"
             />
@@ -92,13 +104,15 @@ export function PaymentsSettingsDialog({
               >
                 Webhooks
               </MenuDialogNavItem>
-              <MenuDialogNavItem
-                icon={<RefreshCw className="h-5 w-5" />}
-                active={activeTab === 'sync'}
-                onClick={() => setActiveTab('sync')}
-              >
-                Sync
-              </MenuDialogNavItem>
+              {provider !== 'paystack' && (
+                <MenuDialogNavItem
+                  icon={<RefreshCw className="h-5 w-5" />}
+                  active={activeTab === 'sync'}
+                  onClick={() => setActiveTab('sync')}
+                >
+                  Sync
+                </MenuDialogNavItem>
+              )}
             </MenuDialogNavList>
           </MenuDialogNav>
         </MenuDialogSideNav>
@@ -116,10 +130,17 @@ export function PaymentsSettingsDialog({
           <MenuDialogBody>
             {provider === 'stripe' ? (
               <StripeSettingsPanel activeTab={activeTab} state={stripe} isBusy={isBusy} />
-            ) : (
+            ) : provider === 'razorpay' ? (
               <RazorpaySettingsPanel
                 activeTab={activeTab}
                 state={razorpay}
+                isBusy={isBusy}
+                onGoToKeys={() => setActiveTab('keys')}
+              />
+            ) : (
+              <PaystackSettingsPanel
+                activeTab={activeTab}
+                state={paystack}
                 isBusy={isBusy}
                 onGoToKeys={() => setActiveTab('keys')}
               />

@@ -26,7 +26,7 @@ export interface PaymentsOutletContext {
 }
 
 function isPaymentProvider(value: unknown): value is PaymentProvider {
-  return value === 'stripe' || value === 'razorpay';
+  return value === 'stripe' || value === 'razorpay' || value === 'paystack';
 }
 
 function isPaymentEnvironment(value: unknown): value is PaymentEnvironment {

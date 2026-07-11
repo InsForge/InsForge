@@ -6,7 +6,7 @@ type StripeResourceData<T> = Omit<T, 'lastResponse'>;
 export const DEFAULT_PAYMENT_ENVIRONMENTS = ['test', 'live'] as const;
 export type PaymentEnvironment = (typeof DEFAULT_PAYMENT_ENVIRONMENTS)[number];
 export type StripeEnvironment = PaymentEnvironment;
-export type PaymentProvider = 'stripe' | 'razorpay';
+export type PaymentProvider = 'stripe' | 'razorpay' | 'paystack';
 
 export type StripeConnectionStatus = 'unconfigured' | 'connected' | 'error';
 export type StripeLatestSyncStatus = 'succeeded' | 'failed';
@@ -17,6 +17,12 @@ export type RazorpayEnvironment = PaymentEnvironment;
 
 export type RazorpayConnectionStatus = 'unconfigured' | 'connected' | 'error';
 export type RazorpayLatestSyncStatus = 'succeeded' | 'failed';
+
+export const PAYSTACK_ENVIRONMENTS = DEFAULT_PAYMENT_ENVIRONMENTS;
+export type PaystackEnvironment = PaymentEnvironment;
+
+export type PaystackConnectionStatus = 'unconfigured' | 'connected' | 'error';
+export type PaystackLatestSyncStatus = 'succeeded' | 'failed';
 
 export type StripeAccount = Awaited<ReturnType<Stripe['accounts']['retrieveCurrent']>>;
 export type StripeProduct = AsyncIterableItem<ReturnType<Stripe['products']['list']>>;
@@ -328,6 +334,53 @@ export interface RazorpayOrderRow {
   verifiedPaymentId: string | null;
   verifiedAt: Date | string | null;
   notes: Record<string, string>;
+  lastError: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface PaystackConnectionRow {
+  id: string;
+  environment: PaystackEnvironment;
+  status: PaystackConnectionStatus;
+  accountId: string | null;
+  accountEmail: string | null;
+  accountLivemode: boolean | null;
+  webhookEndpointUrl: string | null;
+  secretKeyId: string | null;
+  publicKeyId: string | null;
+  webhookConfiguredAt: Date | string | null;
+  lastSyncedAt: Date | string | null;
+  lastSyncStatus: PaystackLatestSyncStatus | null;
+  lastSyncError: string | null;
+  lastSyncCounts: Record<string, number> | null;
+  raw: Record<string, unknown>;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export type PaystackTransactionStatus =
+  | 'initialized'
+  | 'pending'
+  | 'success'
+  | 'failed'
+  | 'abandoned';
+
+export interface PaystackTransactionRow {
+  id: string;
+  environment: PaystackEnvironment;
+  status: PaystackTransactionStatus;
+  subjectType: string | null;
+  subjectId: string | null;
+  customerEmail: string | null;
+  reference: string | null;
+  accessCode: string | null;
+  authorizationUrl: string | null;
+  amount: number | string;
+  currency: string;
+  verifiedTransactionId: string | null;
+  verifiedAt: Date | string | null;
+  metadata: Record<string, string>;
   lastError: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
