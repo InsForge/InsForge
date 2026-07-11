@@ -132,6 +132,11 @@
             ]
           },
           {
+            "group": "Referral Program",
+            "root": "referral-program",
+            "pages": []
+          },
+          {
             "group": "Partnership",
             "pages": [
               "partnership",

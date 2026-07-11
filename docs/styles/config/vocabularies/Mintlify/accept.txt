@@ -22,15 +22,18 @@ certbot
 CI
 claude
 cli
+Codable
 code_challenge
 code_verifier
 codeVerifier
 comment_id
 comment_votes
+Composable
 config
 Containarium
 Containarium's
 cooldown
+Coroutines
 created_at
 cron
 declaratively
@@ -55,6 +58,7 @@ insforge
 IPs
 iptables
 IVFFlat
+Jetpack
 Keycloak
 kotlin
 KPIs
@@ -138,5 +142,6 @@ walkthrough
 walkthroughs
 websocket
 websockets
+Xcode
 Zeabur
 Zod
