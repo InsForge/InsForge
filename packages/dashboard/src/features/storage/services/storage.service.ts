@@ -1,8 +1,10 @@
 import { apiClient } from '#lib/api/client';
 import {
+  DELETE_OBJECTS_MAX_KEYS,
   StorageFileSchema,
   StorageBucketSchema,
   ListObjectsResponseSchema,
+  type DeleteObjectsResponse,
   type UploadStrategyResponse,
 } from '@insforge/shared-schemas';
 
@@ -243,21 +245,62 @@ export const storageService = {
     bucketName: string,
     objectKeys: string[]
   ): Promise<{ success: string[]; failures: { key: string; error: Error }[] }> {
+    if (objectKeys.length === 0) {
+      return { success: [], failures: [] };
+    }
+
+    const batches: string[][] = [];
+    for (let index = 0; index < objectKeys.length; index += DELETE_OBJECTS_MAX_KEYS) {
+      batches.push(objectKeys.slice(index, index + DELETE_OBJECTS_MAX_KEYS));
+    }
+
     const results = await Promise.allSettled(
-      objectKeys.map((key) => this.deleteObject(bucketName, key))
+      batches.map(async (keys) => {
+        const response: DeleteObjectsResponse = await apiClient.request(
+          `/storage/buckets/${encodeURIComponent(bucketName)}/objects`,
+          {
+            method: 'DELETE',
+            headers: apiClient.withAccessToken(),
+            body: JSON.stringify({ keys }),
+          }
+        );
+        return { keys, response };
+      })
     );
+
     const success: string[] = [];
     const failures: { key: string; error: Error }[] = [];
 
     results.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
-        success.push(objectKeys[index]);
-      } else {
-        failures.push({ key: objectKeys[index], error: result.reason as Error });
+      const keys = batches[index];
+      if (result.status === 'rejected') {
+        const error =
+          result.reason instanceof Error ? result.reason : new Error(String(result.reason));
+        failures.push(...keys.map((key) => ({ key, error })));
+        return;
       }
+
+      const response = result.value.response;
+      response.results.forEach((deleteResult) => {
+        if (deleteResult.status === 'deleted') {
+          success.push(deleteResult.key);
+          return;
+        }
+        failures.push({
+          key: deleteResult.key,
+          error: new Error(
+            deleteResult.status === 'notFound'
+              ? 'Object not found'
+              : (deleteResult.message ?? 'Failed to delete object')
+          ),
+        });
+      });
     });
 
-    return { success, failures };
+    return {
+      success,
+      failures,
+    };
   },
 
   // Create a new bucket

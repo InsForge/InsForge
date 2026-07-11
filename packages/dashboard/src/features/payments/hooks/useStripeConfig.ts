@@ -6,7 +6,7 @@ import type {
 } from '@insforge/shared-schemas';
 import { stripeService } from '#features/payments/services/stripe.service';
 import { stripeQueryKeys } from '#features/payments/queryKeys';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 
 // Every data view that depends on the configured key set; invalidated together
 // whenever a key is saved or removed.

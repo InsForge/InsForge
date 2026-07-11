@@ -215,12 +215,10 @@ export class SocketManager {
       void socket.join(`role:${metadata.role}`);
     }
 
-    // Log connection with reconnection status
     logger.info('Socket client connected', {
       socketId: socket.id,
       userId: metadata.userId,
       role: metadata.role,
-      restoredSubscriptions: metadata.subscriptions.size,
     });
   }
 

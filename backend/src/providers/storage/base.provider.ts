@@ -12,6 +12,11 @@ export interface GetObjectResult extends ObjectMetadata {
   body: Readable;
 }
 
+export interface DeleteObjectsResult {
+  deleted: string[];
+  failed: Array<{ key: string; message: string }>;
+}
+
 /**
  * Storage provider interface
  * Defines the contract that all storage providers must implement
@@ -27,6 +32,7 @@ export interface StorageProvider {
   putObject(bucket: string, key: string, file: Express.Multer.File): Promise<{ etag: string }>;
   getObject(bucket: string, key: string): Promise<Buffer | null>;
   deleteObject(bucket: string, key: string): Promise<void>;
+  deleteObjects(bucket: string, keys: string[]): Promise<DeleteObjectsResult>;
   createBucket(bucket: string): Promise<void>;
   deleteBucket(bucket: string): Promise<void>;
 
@@ -36,7 +42,8 @@ export interface StorageProvider {
     bucket: string,
     key: string,
     metadata: { contentType?: string; size?: number },
-    maxFileSizeBytes: number
+    maxFileSizeBytes: number,
+    contentType?: string
   ): Promise<UploadStrategyResponse>;
   /**
    * Generate a download URL. The optional `version` is a cache-bust stamp
@@ -53,7 +60,8 @@ export interface StorageProvider {
     key: string,
     expiresIn?: number,
     isPublic?: boolean,
-    version?: string | null
+    version?: string | null,
+    options?: { asAttachment?: boolean }
   ): Promise<DownloadStrategyResponse>;
   /**
    * Confirms an object exists in the backing store and returns its

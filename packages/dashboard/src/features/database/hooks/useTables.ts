@@ -2,7 +2,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
 import { tableService } from '#features/database/services/table.service';
 import { databaseTableQueryKeys } from '#features/database/queryKeys';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 import {
   ColumnSchema,
   GetTableSchemaResponse,

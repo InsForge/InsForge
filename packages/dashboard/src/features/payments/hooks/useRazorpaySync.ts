@@ -9,7 +9,7 @@ import {
   type SyncRazorpayPaymentsResponse,
 } from '#features/payments/services/razorpay.service';
 import { razorpayQueryKeys } from '#features/payments/queryKeys';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 
 const ENVIRONMENT_LABEL: Record<RazorpayEnvironment, string> = {
   test: 'Test',

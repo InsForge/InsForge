@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UpdateRealtimeConfigRequest } from '@insforge/shared-schemas';
 import { realtimeService } from '#features/realtime/services/realtime.service';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 
 const REALTIME_CONFIG_QUERY_KEY = ['realtime', 'config'] as const;
 const REALTIME_STATS_QUERY_KEY = ['realtime', 'stats'] as const;

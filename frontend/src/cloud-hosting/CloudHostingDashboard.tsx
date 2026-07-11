@@ -8,6 +8,7 @@ export function CloudHostingDashboard() {
     projectInfo,
     reportRouteChange,
     showUpgradeDialog,
+    openWhatsNew,
     renameProject,
     deleteProject,
     requestBackupInfo,
@@ -22,9 +23,6 @@ export function CloudHostingDashboard() {
     requestUserApiKey,
     requestModelCredits,
     requestProjectMetrics,
-    requestAdvisorLatest,
-    requestAdvisorIssues,
-    triggerAdvisorScan,
     connectPosthog,
     openPosthog,
     subscribePosthogConnectionStatus,
@@ -41,6 +39,7 @@ export function CloudHostingDashboard() {
       project={projectInfo}
       onRouteChange={reportRouteChange}
       onShowUpgradeDialog={showUpgradeDialog}
+      onOpenWhatsNew={openWhatsNew}
       onRenameProject={renameProject}
       onDeleteProject={deleteProject}
       onRequestBackupInfo={requestBackupInfo}
@@ -55,9 +54,6 @@ export function CloudHostingDashboard() {
       onRequestUserApiKey={requestUserApiKey}
       onRequestModelCredits={requestModelCredits}
       onRequestProjectMetrics={requestProjectMetrics}
-      onRequestAdvisorLatest={requestAdvisorLatest}
-      onRequestAdvisorIssues={requestAdvisorIssues}
-      onTriggerAdvisorScan={triggerAdvisorScan}
       onConnectPosthog={connectPosthog}
       onOpenPosthog={openPosthog}
       subscribePosthogConnectionStatus={subscribePosthogConnectionStatus}

@@ -16,11 +16,16 @@ vi.mock('#features/auth/hooks/useUsers', () => ({
   }),
 }));
 
-vi.mock('#lib/hooks/useToast', () => ({
-  useToast: () => ({
-    showToast: hookMocks.showToast,
-  }),
-}));
+vi.mock('@insforge/ui', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@insforge/ui')>();
+
+  return {
+    ...actual,
+    useToast: () => ({
+      showToast: hookMocks.showToast,
+    }),
+  };
+});
 
 describe('UserFormDialog', () => {
   afterEach(() => {
@@ -29,8 +34,12 @@ describe('UserFormDialog', () => {
     hookMocks.showToast.mockReset();
   });
 
-  it('submits a new user and closes the dialog on success', async () => {
-    const user = userEvent.setup();
+  // Extended timeout: this test drives three typed fields through the dialog,
+  // which can be slow on loaded CI runners even without inter-keystroke delay (#1568).
+  it('submits a new user and closes the dialog on success', { timeout: 10_000 }, async () => {
+    // No inter-keystroke delay: with the default delay the ~60 keystrokes below
+    // can exceed the 5s test timeout when the suite runs under load (#1568).
+    const user = userEvent.setup({ delay: null });
     const onOpenChange = vi.fn();
     hookMocks.register.mockResolvedValue(undefined);
     hookMocks.refetch.mockResolvedValue(undefined);

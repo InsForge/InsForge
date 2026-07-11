@@ -8,12 +8,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
   cn,
+  useToast,
 } from '@insforge/ui';
 import { useDeployments } from '#features/deployments/hooks/useDeployments';
 import { useDeploymentMetadata } from '#features/deployments/hooks/useDeploymentMetadata';
 import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import { useCustomDomains } from '#features/deployments/hooks/useCustomDomains';
-import { useToast } from '#lib/hooks/useToast';
 import { formatTime } from '#lib/utils/utils';
 
 const statusColors: Record<string, string> = {

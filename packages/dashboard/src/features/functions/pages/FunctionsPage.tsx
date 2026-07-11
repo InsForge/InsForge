@@ -2,10 +2,8 @@ import { ArrowLeft, Download, Edit3, Trash2, Upload } from 'lucide-react';
 import { FunctionRow } from '#features/functions/components/FunctionRow';
 import FunctionEmptyState from '#features/functions/components/FunctionEmptyState';
 import { useFunctions } from '#features/functions/hooks/useFunctions';
-import { useToast } from '#lib/hooks/useToast';
-import { useState, useCallback, useRef, useEffect } from 'react';
-import RefreshIcon from '#assets/icons/refresh.svg?react';
 import {
+  useToast,
   Button,
   ConfirmDialog,
   Tooltip,
@@ -14,6 +12,8 @@ import {
   TooltipTrigger,
   Skeleton,
 } from '@insforge/ui';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { CodeEditor, TableHeader } from '#components';
 import { useConfirm } from '#lib/hooks/useConfirm';
 
@@ -336,7 +336,6 @@ export default function FunctionsPage() {
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <TableHeader
-        className="min-w-[800px]"
         leftContent={
           <div className="flex flex-1 items-center overflow-clip">
             <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">

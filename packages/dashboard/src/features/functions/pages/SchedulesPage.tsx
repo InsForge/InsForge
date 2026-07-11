@@ -201,7 +201,6 @@ export default function SchedulesPage() {
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <TableHeader
-        className="min-w-[800px]"
         leftContent={
           <div className="flex flex-1 items-center overflow-clip">
             <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Schedules</h1>

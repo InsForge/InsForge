@@ -7,6 +7,7 @@ import {
   dashboardDTestInstallMenuItem,
   dashboardSettingsMenuItem,
   dashboardStaticMenuItems,
+  dashboardWhatsNewMenuItem,
   type DashboardPrimaryMenuItem,
 } from '#navigation/menuItems';
 import { Link, useLocation, matchPath } from 'react-router-dom';
@@ -29,6 +30,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
 
   const isCloud = isInsForgeCloudProject();
   const host = useDashboardHost();
+  const { mode: hostMode, onOpenWhatsNew } = host;
   const isDTest =
     getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT) === FEATURE_FLAG_VARIANTS.D_TEST;
   const isDTestCloud = isDTest && host.mode === 'cloud-hosting';
@@ -63,9 +65,12 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
       items.push({ ...dashboardDTestInstallMenuItem });
       items.push({ ...dashboardDTestDocMenuItem });
     }
+    if (hostMode === 'cloud-hosting' && onOpenWhatsNew) {
+      items.push({ ...dashboardWhatsNewMenuItem, onClick: () => onOpenWhatsNew() });
+    }
     items.push({ ...dashboardSettingsMenuItem, onClick: () => setIsSettingsDialogOpen(true) });
     return items;
-  }, [isDTestCloud]);
+  }, [isDTestCloud, hostMode, onOpenWhatsNew]);
 
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)

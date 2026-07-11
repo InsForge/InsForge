@@ -47,6 +47,14 @@ export const createServiceSchema = z.object({
    * sending `'http'` at every fallback site downstream.
    */
   protocol: z.enum(['http', 'tcp']).optional(),
+  /**
+   * Scale-to-zero. `true` (default) is the existing behaviour — Fly stops the
+   * machine when idle and cold-starts it on the next request. `false` keeps
+   * the machine running 24/7 (Fly autostop 'off', one machine always warm)
+   * for services that can't tolerate cold-start latency. Optional and
+   * back-compat: omitting the field is identical to sending `true`.
+   */
+  scaleToZero: z.boolean().optional(),
 });
 
 export const updateServiceSchema = z
@@ -109,6 +117,11 @@ export const updateServiceSchema = z
      * on update; omitting it leaves the existing service's protocol in place.
      */
     protocol: z.enum(['http', 'tcp']).optional(),
+    /**
+     * Scale-to-zero — same semantics as createServiceSchema.scaleToZero.
+     * Optional on update; omitting it leaves the existing setting in place.
+     */
+    scaleToZero: z.boolean().optional(),
   })
   .refine((data) => !(data.envVars !== undefined && data.envVarsPatch !== undefined), {
     message:

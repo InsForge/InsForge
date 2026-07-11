@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SmtpConfigSchema, UpsertSmtpConfigRequest } from '@insforge/shared-schemas';
 import { smtpConfigService } from '#features/auth/services/smtp-config.service';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 
 export function useSmtpConfig() {
   const queryClient = useQueryClient();

@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { storageConfigSchema, storageFileSchema } from './storage.schema.js';
 
+export const DELETE_OBJECTS_MAX_KEYS = 1000;
+export const DELETE_OBJECT_FAILURE_MESSAGE = 'Failed to delete object';
+
 export const createBucketRequestSchema = z.object({
   bucketName: z.string().min(1, 'Bucket name cannot be empty'),
   isPublic: z.boolean().default(true),
@@ -17,6 +20,26 @@ export const listObjectsResponseSchema = z.object({
     limit: z.number(),
     total: z.number(),
   }),
+});
+
+export const deleteObjectsRequestSchema = z.object({
+  keys: z
+    .array(z.string().min(1, 'Object key cannot be empty'))
+    .min(1, 'At least one object key is required')
+    .max(
+      DELETE_OBJECTS_MAX_KEYS,
+      `Cannot delete more than ${DELETE_OBJECTS_MAX_KEYS} objects at once`
+    ),
+});
+
+export const deleteObjectResultSchema = z.object({
+  key: z.string(),
+  status: z.enum(['deleted', 'notFound', 'failed']),
+  message: z.string().optional(),
+});
+
+export const deleteObjectsResponseSchema = z.object({
+  results: z.array(deleteObjectResultSchema),
 });
 
 // Upload strategy schemas
@@ -66,6 +89,9 @@ export const getStorageConfigResponseSchema = storageConfigSchema;
 export type CreateBucketRequest = z.infer<typeof createBucketRequestSchema>;
 export type UpdateBucketRequest = z.infer<typeof updateBucketRequestSchema>;
 export type ListObjectsResponseSchema = z.infer<typeof listObjectsResponseSchema>;
+export type DeleteObjectsRequest = z.infer<typeof deleteObjectsRequestSchema>;
+export type DeleteObjectResult = z.infer<typeof deleteObjectResultSchema>;
+export type DeleteObjectsResponse = z.infer<typeof deleteObjectsResponseSchema>;
 export type UploadStrategyRequest = z.infer<typeof uploadStrategyRequestSchema>;
 export type UploadStrategyResponse = z.infer<typeof uploadStrategyResponseSchema>;
 export type DownloadStrategyResponse = z.infer<typeof downloadStrategyResponseSchema>;

@@ -7,6 +7,9 @@ import { withUserContext } from '@/services/database/user-context.service.js';
 import { StorageRecord } from '@/types/storage.js';
 import {
   ERROR_CODES,
+  DELETE_OBJECT_FAILURE_MESSAGE,
+  DeleteObjectResult,
+  DeleteObjectsResponse,
   StorageBucketSchema,
   StorageFileSchema,
   StorageMetadataSchema,
@@ -83,14 +86,22 @@ export class StorageService {
   private validateBucketName(bucket: string): void {
     // Simple validation: alphanumeric, hyphens, underscores
     if (!/^[a-zA-Z0-9_-]+$/.test(bucket)) {
-      throw new Error('Invalid bucket name. Use only letters, numbers, hyphens, and underscores.');
+      throw new AppError(
+        'Invalid bucket name. Use only letters, numbers, hyphens, and underscores.',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
     }
   }
 
   private validateKey(key: string): void {
     // Prevent directory traversal
     if (key.includes('..') || key.startsWith('/')) {
-      throw new Error('Invalid key. Cannot use ".." or start with "/"');
+      throw new AppError(
+        'Invalid key. Cannot use ".." or start with "/"',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
     }
   }
 
@@ -286,33 +297,23 @@ export class StorageService {
     ctx: UserContext | undefined,
     bucket: string,
     key: string,
-    hasApiKey: boolean = false
+    hasApiKey: boolean = false,
+    prefetchedMetadata?: StorageRecord | null
   ): Promise<StorageObjectResult | null> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    const selectObjectMetadata = async (db: PoolClient) => {
-      const result = await db.query(
-        'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
-        [bucket, key]
-      );
-      return result.rows[0] as StorageRecord | undefined;
-    };
-
-    let metadata: StorageRecord | undefined;
-    if (hasApiKey || ctx?.role === 'project_admin' || (await this.isBucketPublic(bucket))) {
-      metadata = await runWithRootAccess(this.getPool(), selectObjectMetadata);
-    } else if (!ctx) {
-      return null;
-    } else {
-      metadata = await withUserContext(this.getPool(), ctx, selectObjectMetadata);
+    let metadata = prefetchedMetadata;
+    if (metadata && (metadata.bucket !== bucket || metadata.key !== key)) {
+      metadata = null;
     }
 
+    metadata = metadata ?? (await this.getObjectMetadataVisible(ctx, bucket, key, hasApiKey));
     if (!metadata) {
       return null;
     }
 
-    const file = await this.provider.getObject(metadata.bucket, metadata.key);
+    const file = await this.provider.getObject(bucket, key);
     if (!file) {
       return null;
     }
@@ -320,16 +321,12 @@ export class StorageService {
     return {
       file,
       metadata: {
-        key: metadata.key,
-        bucket: metadata.bucket,
+        key,
+        bucket,
         size: metadata.size,
         mimeType: metadata.mime_type,
         uploadedAt: metadata.uploaded_at,
-        url: this.buildObjectUrl(
-          metadata.bucket,
-          metadata.key,
-          metadata.etag || metadata.uploaded_at
-        ),
+        url: this.buildObjectUrl(bucket, key, metadata.etag || metadata.uploaded_at),
       },
     };
   }
@@ -340,38 +337,98 @@ export class StorageService {
     key: string,
     hasApiKey: boolean = false
   ): Promise<boolean> {
-    this.validateBucketName(bucket);
-    this.validateKey(key);
+    const result = await this.deleteObjects(ctx, bucket, [key], hasApiKey);
+    return result.results.some((entry) => entry.key === key && entry.status !== 'notFound');
+  }
 
-    // DB DELETE first (RLS DELETE policy gates authorization) so a permissive
-    // SELECT + restrictive DELETE policy combo can't be exploited to destroy
-    // other users' blobs. If rowCount=0 the caller had no DELETE permission
-    // (or the row was already gone) — return false without touching storage.
-    // Provider delete then runs outside the tx; failure here leaves an orphan
-    // blob that an external GC sweep can reclaim, but never an orphan row.
-    const deleteObjectRow = async (db: PoolClient) => {
-      const result = await db.query('DELETE FROM storage.objects WHERE bucket = $1 AND key = $2', [
-        bucket,
-        key,
-      ]);
-      return (result.rowCount ?? 0) > 0;
+  async deleteObjects(
+    ctx: UserContext | undefined,
+    bucket: string,
+    keys: string[],
+    hasApiKey: boolean = false
+  ): Promise<DeleteObjectsResponse> {
+    this.validateBucketName(bucket);
+    const uniqueKeys = [...new Set(keys)];
+    uniqueKeys.forEach((key) => this.validateKey(key));
+
+    const deleteObjectRows = async (db: PoolClient): Promise<string[]> => {
+      const result = await db.query<{ key: string }>(
+        'DELETE FROM storage.objects WHERE bucket = $1 AND key = ANY($2::text[]) RETURNING key',
+        [bucket, uniqueKeys]
+      );
+      return result.rows.map((row) => row.key);
     };
-    let deleted: boolean;
+
+    let dbDeletedKeys: string[];
     if (hasApiKey || ctx?.role === 'project_admin') {
-      deleted = await runWithRootAccess(this.getPool(), deleteObjectRow);
+      dbDeletedKeys = await runWithRootAccess(this.getPool(), deleteObjectRows);
     } else {
       if (!ctx) {
         throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
       }
-      deleted = await withUserContext(this.getPool(), ctx, deleteObjectRow);
+      dbDeletedKeys = await withUserContext(this.getPool(), ctx, deleteObjectRows);
     }
 
-    if (!deleted) {
-      return false;
+    const dbDeletedKeySet = new Set(dbDeletedKeys);
+    if (dbDeletedKeys.length === 0) {
+      return {
+        results: uniqueKeys.map((key) => ({ key, status: 'notFound' })),
+      };
     }
 
-    await this.provider.deleteObject(bucket, key);
-    return true;
+    try {
+      const providerResult = await this.provider.deleteObjects(bucket, dbDeletedKeys);
+      const providerDeletedKeys = new Set(
+        providerResult.deleted.filter((key) => dbDeletedKeySet.has(key))
+      );
+      const failedByKey = new Map(
+        providerResult.failed
+          .filter((failure) => dbDeletedKeySet.has(failure.key))
+          .map((failure) => [failure.key, failure.message])
+      );
+
+      const results: DeleteObjectResult[] = uniqueKeys.map((key) => {
+        if (!dbDeletedKeySet.has(key)) {
+          return { key, status: 'notFound' };
+        }
+        const failureMessage = failedByKey.get(key);
+        if (failureMessage) {
+          return { key, status: 'failed', message: failureMessage };
+        }
+        if (providerDeletedKeys.has(key)) {
+          return { key, status: 'deleted' };
+        }
+        return { key, status: 'failed', message: DELETE_OBJECT_FAILURE_MESSAGE };
+      });
+
+      const failed = results
+        .filter((result) => result.status === 'failed')
+        .map((result) => ({
+          key: result.key,
+          message: result.message ?? DELETE_OBJECT_FAILURE_MESSAGE,
+        }));
+
+      if (failed.length > 0) {
+        logger.warn('Storage provider batch delete partially failed after DB rows were deleted', {
+          bucket,
+          failed,
+        });
+      }
+      return { results };
+    } catch (error) {
+      logger.error('Storage provider batch delete failed', {
+        bucket,
+        keys: dbDeletedKeys,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {
+        results: uniqueKeys.map((key) =>
+          dbDeletedKeySet.has(key)
+            ? { key, status: 'failed', message: DELETE_OBJECT_FAILURE_MESSAGE }
+            : { key, status: 'notFound' }
+        ),
+      };
+    }
   }
 
   async listObjects(
@@ -532,7 +589,8 @@ export class StorageService {
       contentType?: string;
       size?: number;
     },
-    hasApiKey: boolean = false
+    hasApiKey: boolean = false,
+    contentType: string = 'application/octet-stream'
   ) {
     this.validateBucketName(bucket);
 
@@ -543,7 +601,7 @@ export class StorageService {
     const key = await this.generateNextAvailableKey(bucket, metadata.filename, this.getPool());
     const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
     if (hasApiKey || ctx?.role === 'project_admin') {
-      return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
+      return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes, contentType);
     }
     if (!ctx) {
       throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
@@ -562,10 +620,15 @@ export class StorageService {
         await client.query('RELEASE SAVEPOINT upload_strategy_rls_probe');
       }
     });
-    return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
+    return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes, contentType);
   }
 
-  async getDownloadStrategy(bucket: string, key: string, requestedExpiresIn?: number) {
+  async getDownloadStrategy(
+    bucket: string,
+    key: string,
+    requestedExpiresIn?: number,
+    options?: { asAttachment?: boolean; prefetchedMetadata?: StorageRecord | null }
+  ) {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
@@ -592,48 +655,53 @@ export class StorageService {
     // appending after signing would yield SignatureDoesNotMatch 403s. The DB
     // read uses the normal backend pool because the caller already gated
     // access through RLS, an API key, or a public bucket check.
-    const versionRow = await this.getPool().query(
-      'SELECT etag, uploaded_at FROM storage.objects WHERE bucket = $1 AND key = $2',
-      [bucket, key]
-    );
-    const version = this.toVersionStamp(
-      (versionRow.rows[0]?.etag as string | null) ??
-        (versionRow.rows[0]?.uploaded_at as Date | null) ??
-        null
-    );
+    let etag = options?.prefetchedMetadata?.etag;
+    let uploadedAt = options?.prefetchedMetadata?.uploaded_at;
 
-    return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic, version || null);
+    if (!etag && !uploadedAt) {
+      const versionRow = await this.getPool().query(
+        'SELECT etag, uploaded_at as "uploadedAt" FROM storage.objects WHERE bucket = $1 AND key = $2 LIMIT 1',
+        [bucket, key]
+      );
+      etag = versionRow.rows[0]?.etag;
+      uploadedAt = versionRow.rows[0]?.uploadedAt;
+    }
+    const version = this.toVersionStamp((etag as string | null) ?? uploadedAt ?? null);
+
+    return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic, version || null, {
+      asAttachment: options?.asAttachment,
+    });
   }
 
   /**
-   * RLS-gated existence check. Returns true iff the caller is allowed by
+   * RLS-gated existence check. Returns the StorageRecord iff the caller is allowed by
    * `storage.objects` RLS policies to see this row. Public bucket rows are
-   * visible by definition, but missing rows still return false.
+   * visible by definition, but missing rows still return null.
    * Admin/API-key callers bypass RLS here because they can manage every object
    * through the storage API; end-user callers are scoped by storage.objects RLS.
    */
-  async objectIsVisible(
+  async getObjectMetadataVisible(
     ctx: UserContext | undefined,
     bucket: string,
     key: string,
     hasApiKey: boolean = false
-  ): Promise<boolean> {
+  ): Promise<StorageRecord | null> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
     const checkVisibleObject = async (db: PoolClient) => {
       const result = await db.query(
-        'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+        'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
         [bucket, key]
       );
-      return (result.rowCount ?? 0) > 0;
+      return result.rows[0] || null;
     };
 
     if (hasApiKey || ctx?.role === 'project_admin' || (await this.isBucketPublic(bucket))) {
       return runWithRootAccess(this.getPool(), checkVisibleObject);
     }
     if (!ctx) {
-      return false;
+      return null;
     }
     return withUserContext(this.getPool(), ctx, checkVisibleObject);
   }

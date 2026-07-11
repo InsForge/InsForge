@@ -5,7 +5,7 @@ import type {
   UpdateCustomOAuthConfigRequest,
   ListCustomOAuthConfigsResponse,
 } from '@insforge/shared-schemas';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 import { customOAuthConfigService } from '#features/auth/services/custom-oauth-config.service';
 
 export function useCustomOAuthConfig(selectedKey?: string | null) {

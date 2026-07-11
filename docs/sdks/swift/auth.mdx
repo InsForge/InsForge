@@ -1,6 +1,6 @@
 ---
-title: Authentication SDK Reference
-description: User authentication and profile management with the InsForge Swift SDK
+title: Swift authentication SDK reference
+description: Sign up, sign in, verify email, manage sessions, and configure OAuth URL schemes for iOS, macOS, tvOS, and watchOS with the InsForge Swift SDK.
 ---
 
 import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
@@ -407,7 +407,7 @@ struct LoginView: View {
 }
 ```
 
-### URL Scheme Configuration
+### URL scheme configuration
 
 Register a callback URL for your app, pass that exact value to `redirectTo`, and add the same value to `allowedRedirectUrls` in Auth Settings. For example, you can use a deep link such as `yourapp://auth/callback` or a claimed HTTPS callback such as `https://app.example.com/auth/callback`. Requests fail with HTTP 400 if `redirectTo` is not allowlisted.
 

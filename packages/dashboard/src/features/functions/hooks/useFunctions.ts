@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { functionService } from '#features/functions/services/function.service';
 import { FunctionSchema, type UpdateFunctionRequest } from '@insforge/shared-schemas';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 
 function getDeploymentFailureMessage(buildLogs?: string[]): string {
   const logs = buildLogs?.map((log) => log.trim()).filter(Boolean) ?? [];

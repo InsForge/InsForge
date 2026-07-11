@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: ghcr.io/insforge/postgres:v15.13.4

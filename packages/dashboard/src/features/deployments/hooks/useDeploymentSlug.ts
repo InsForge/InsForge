@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { deploymentsService } from '#features/deployments/services/deployments.service';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 
 export function useDeploymentSlug() {
   const { showToast } = useToast();

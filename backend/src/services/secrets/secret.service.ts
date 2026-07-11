@@ -1,9 +1,10 @@
 import { Pool, PoolClient } from 'pg';
 import crypto from 'crypto';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
-import { SecretSchema, CreateSecretRequest } from '@insforge/shared-schemas';
+import { SecretSchema, CreateSecretRequest, ERROR_CODES } from '@insforge/shared-schemas';
 import { appConfig } from '@/infra/config/app.config.js';
 
 export interface CreateSecretInput extends CreateSecretRequest {
@@ -67,6 +68,27 @@ export class SecretService {
       const encryptedValue = EncryptionManager.encrypt(input.value);
       const executor = client ?? this.getPool();
 
+      // The dashboard's DELETE endpoint deactivates rows instead of removing
+      // them, but UNIQUE(key) counts inactive rows too — so a soft-deleted
+      // row would block every future INSERT of the same key (23505) with no
+      // way to recover from the dashboard. Revive such a row instead.
+      const revived = await executor.query(
+        `UPDATE system.secrets
+         SET value_ciphertext = $2,
+             is_reserved = $3,
+             expires_at = $4,
+             is_active = true,
+             last_used_at = NULL
+         WHERE key = $1 AND is_active = false AND is_reserved = false
+         RETURNING id`,
+        [input.key, encryptedValue, input.isReserved || false, input.expiresAt || null]
+      );
+
+      if (revived.rows.length) {
+        logger.info('Secret revived', { id: revived.rows[0].id, key: input.key });
+        return { id: revived.rows[0].id };
+      }
+
       const result = await executor.query(
         `INSERT INTO system.secrets (key, value_ciphertext, is_reserved, expires_at)
          VALUES ($1, $2, $3, $4)
@@ -78,6 +100,14 @@ export class SecretService {
       return { id: result.rows[0].id };
     } catch (error) {
       logger.error('Failed to create secret', { error, key: input.key });
+      if ((error as { code?: string }).code === '23505') {
+        throw new AppError(
+          `Secret already exists: ${input.key}`,
+          409,
+          ERROR_CODES.SECRET_ALREADY_EXISTS,
+          `A secret named ${input.key} already exists in this project. Update or delete it in the Secrets tab, or use a different name.`
+        );
+      }
       throw new Error('Failed to create secret');
     }
   }
@@ -796,5 +826,95 @@ export class SecretService {
     }
 
     return apiKey;
+  }
+
+  /**
+   * Initialize JWT asymmetric keypair on startup.
+   */
+  async initializeJwtKeyPair(): Promise<{ privateKey: string; publicKey: string; kid: string }> {
+    const [existingPrivateKey, existingPublicKey, existingKid] = await Promise.all([
+      this.getSecretByKey('JWT_PRIVATE_KEY'),
+      this.getSecretByKey('JWT_PUBLIC_KEY'),
+      this.getSecretByKey('JWT_KEY_ID'),
+    ]);
+
+    if (existingPrivateKey && existingPublicKey && existingKid) {
+      logger.info('✅ JWT asymmetric keypair exists in database');
+      return {
+        privateKey: existingPrivateKey,
+        publicKey: existingPublicKey,
+        kid: existingKid,
+      };
+    }
+
+    // Generate new RSA-2048 keypair
+    const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: {
+        type: 'spki',
+        format: 'pem',
+      },
+      privateKeyEncoding: {
+        type: 'pkcs8',
+        format: 'pem',
+      },
+    });
+
+    const kid = 'kid_' + crypto.randomBytes(16).toString('hex');
+
+    const client = await this.getPool().connect();
+    try {
+      await client.query('BEGIN');
+
+      // Check one more time inside transaction to prevent race conditions
+      const checkRes = await client.query(
+        "SELECT key FROM system.secrets WHERE key IN ('JWT_PRIVATE_KEY', 'JWT_PUBLIC_KEY', 'JWT_KEY_ID') FOR UPDATE"
+      );
+
+      if (checkRes.rows.length === 3) {
+        await client.query('ROLLBACK');
+        // Retrieve them again
+        const pKey = await this.getSecretByKey('JWT_PRIVATE_KEY');
+        const pubKey = await this.getSecretByKey('JWT_PUBLIC_KEY');
+        const kId = await this.getSecretByKey('JWT_KEY_ID');
+        if (!pKey || !pubKey || !kId) {
+          throw new Error('Asymmetric keys were missing or corrupted in database');
+        }
+        return {
+          privateKey: pKey,
+          publicKey: pubKey,
+          kid: kId,
+        };
+      }
+
+      // Delete any partial keys just in case
+      await client.query(
+        "DELETE FROM system.secrets WHERE key IN ('JWT_PRIVATE_KEY', 'JWT_PUBLIC_KEY', 'JWT_KEY_ID')"
+      );
+
+      // Create new ones
+      const privEncrypted = EncryptionManager.encrypt(privateKey);
+      const pubEncrypted = EncryptionManager.encrypt(publicKey);
+      const kidEncrypted = EncryptionManager.encrypt(kid);
+
+      await client.query(
+        `INSERT INTO system.secrets (key, value_ciphertext, is_reserved, is_active)
+         VALUES 
+           ('JWT_PRIVATE_KEY', $1, true, true),
+           ('JWT_PUBLIC_KEY', $2, true, true),
+           ('JWT_KEY_ID', $3, true, true)`,
+        [privEncrypted, pubEncrypted, kidEncrypted]
+      );
+
+      await client.query('COMMIT');
+      logger.info('✅ JWT asymmetric keypair generated and stored');
+      return { privateKey, publicKey, kid };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Failed to initialize JWT keypair', { error });
+      throw new Error('Failed to initialize JWT keypair');
+    } finally {
+      client.release();
+    }
   }
 }

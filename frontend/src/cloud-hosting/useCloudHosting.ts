@@ -12,9 +12,6 @@ import type {
   DashboardMetricName,
   DashboardMetricsRange,
   DashboardMetricsResponse,
-  DashboardAdvisorSummary,
-  DashboardAdvisorIssuesQuery,
-  DashboardAdvisorIssuesResponse,
 } from '@insforge/dashboard';
 import { partnerService } from './partner.service';
 
@@ -28,8 +25,6 @@ const VALID_METRIC_NAMES: readonly DashboardMetricName[] = [
   'network_in',
   'network_out',
 ] as const;
-const VALID_ADVISOR_SEVERITIES = ['critical', 'warning', 'info'] as const;
-const VALID_ADVISOR_CATEGORIES = ['security', 'performance', 'health'] as const;
 
 type InstanceTypeChangeResult = {
   success: boolean;
@@ -57,10 +52,7 @@ type PendingRequestKey =
   | 'userInfo'
   | 'userApiKey'
   | 'modelCredits'
-  | 'projectMetrics'
-  | 'advisorLatest'
-  | 'advisorIssues'
-  | 'advisorScan';
+  | 'projectMetrics';
 
 type PendingRequest<T> = {
   resolve: (value: T) => void;
@@ -84,9 +76,6 @@ type PendingRequestValues = {
   userApiKey: string;
   modelCredits: DashboardModelCreditUsage;
   projectMetrics: DashboardMetricsResponse;
-  advisorLatest: DashboardAdvisorSummary;
-  advisorIssues: DashboardAdvisorIssuesResponse;
-  advisorScan: void;
 };
 
 type PendingRequests = {
@@ -286,7 +275,16 @@ function normalizeProjectInfo(
 
 export function useCloudHosting() {
   const currentOrigin = getCurrentOrigin();
-  const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo>();
+  // PROJECT_INFO can only arrive from a parent iframe: REQUEST_PROJECT_INFO is
+  // posted to the parent window, and opener messages are restricted to the
+  // authorization-code types. When the dashboard runs in its own tab (partner
+  // new-tab flow), start from a default so consumers that wait on project info
+  // (e.g. the cloud login redirect) don't block forever.
+  const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo | undefined>(() =>
+    getParentWindow()
+      ? undefined
+      : { id: currentOrigin, name: 'Project', region: '', instanceType: '' }
+  );
   const parentOriginRef = useRef<string | null>(getParentOrigin());
   const openerOriginRef = useRef<string | null>(null);
   const parentOriginTrustedRef = useRef(false);
@@ -354,17 +352,6 @@ export function useCloudHosting() {
         case 'projectMetrics':
           pendingRequestsRef.current.projectMetrics =
             pendingRequest as PendingRequest<DashboardMetricsResponse>;
-          return;
-        case 'advisorLatest':
-          pendingRequestsRef.current.advisorLatest =
-            pendingRequest as PendingRequest<DashboardAdvisorSummary>;
-          return;
-        case 'advisorIssues':
-          pendingRequestsRef.current.advisorIssues =
-            pendingRequest as PendingRequest<DashboardAdvisorIssuesResponse>;
-          return;
-        case 'advisorScan':
-          pendingRequestsRef.current.advisorScan = pendingRequest as PendingRequest<void>;
           return;
         default: {
           const exhaustiveKey: never = key;
@@ -793,92 +780,6 @@ export function useCloudHosting() {
             );
             return;
           }
-          case 'ADVISOR_LATEST': {
-            const summaryRaw = message.summary as Record<string, unknown> | undefined;
-            const finiteCount = (key: string): number => {
-              const v = summaryRaw?.[key];
-              return typeof v === 'number' && Number.isFinite(v) ? v : 0;
-            };
-            resolvePendingRequest('advisorLatest', {
-              scanId: typeof message.scanId === 'string' ? message.scanId : '',
-              status:
-                message.status === 'running' || message.status === 'failed'
-                  ? message.status
-                  : 'completed',
-              scanType: message.scanType === 'manual' ? 'manual' : 'scheduled',
-              scannedAt: typeof message.scannedAt === 'string' ? message.scannedAt : '',
-              summary: {
-                total: finiteCount('total'),
-                critical: finiteCount('critical'),
-                warning: finiteCount('warning'),
-                info: finiteCount('info'),
-              },
-            });
-            return;
-          }
-          case 'ADVISOR_LATEST_ERROR': {
-            rejectPendingRequest(
-              'advisorLatest',
-              getErrorMessage(message.error, 'Failed to load advisor summary')
-            );
-            return;
-          }
-          case 'ADVISOR_ISSUES': {
-            type AdvisorIssue = DashboardAdvisorIssuesResponse['issues'][number];
-            const issues = Array.isArray(message.issues)
-              ? message.issues.flatMap((entry: unknown): AdvisorIssue[] => {
-                  if (!entry || typeof entry !== 'object') {
-                    return [];
-                  }
-                  const i = entry as Record<string, unknown>;
-                  if (!VALID_ADVISOR_SEVERITIES.includes(i.severity as AdvisorIssue['severity'])) {
-                    return [];
-                  }
-                  if (!VALID_ADVISOR_CATEGORIES.includes(i.category as AdvisorIssue['category'])) {
-                    return [];
-                  }
-                  return [
-                    {
-                      id: typeof i.id === 'string' ? i.id : '',
-                      ruleId: typeof i.ruleId === 'string' ? i.ruleId : '',
-                      severity: i.severity as AdvisorIssue['severity'],
-                      category: i.category as AdvisorIssue['category'],
-                      title: typeof i.title === 'string' ? i.title : '',
-                      description: typeof i.description === 'string' ? i.description : '',
-                      affectedObject:
-                        typeof i.affectedObject === 'string' ? i.affectedObject : undefined,
-                      recommendation:
-                        typeof i.recommendation === 'string' ? i.recommendation : undefined,
-                    },
-                  ];
-                })
-              : [];
-            const totalRaw = message.total;
-            const total =
-              typeof totalRaw === 'number' && Number.isFinite(totalRaw) && totalRaw >= 0
-                ? Math.floor(totalRaw)
-                : issues.length;
-            resolvePendingRequest('advisorIssues', { issues, total });
-            return;
-          }
-          case 'ADVISOR_ISSUES_ERROR': {
-            rejectPendingRequest(
-              'advisorIssues',
-              getErrorMessage(message.error, 'Failed to load advisor issues')
-            );
-            return;
-          }
-          case 'ADVISOR_SCAN_RESULT': {
-            if (message.success === true) {
-              resolvePendingRequest('advisorScan', undefined);
-              return;
-            }
-            rejectPendingRequest(
-              'advisorScan',
-              getErrorMessage(message.error, 'Failed to trigger advisor scan')
-            );
-            return;
-          }
           case 'POSTHOG_CONNECTION_STATUS': {
             const status = message.status;
             if (status !== 'connected' && status !== 'error' && status !== 'cancelled') {
@@ -1086,49 +987,12 @@ export function useCloudHosting() {
     [createPendingRequest, sendMessageToParent]
   );
 
-  const requestAdvisorLatest = useCallback(async (): Promise<DashboardAdvisorSummary> => {
-    await sendMessageToParent(
-      { type: 'REQUEST_ADVISOR_LATEST' },
-      'Unable to request advisor summary from the parent window'
-    );
-    return createPendingRequest('advisorLatest', 'Advisor latest request');
-  }, [createPendingRequest, sendMessageToParent]);
-
-  const advisorIssuesLockRef = useRef<Promise<unknown>>(Promise.resolve());
-
-  const requestAdvisorIssues = useCallback(
-    (query: DashboardAdvisorIssuesQuery): Promise<DashboardAdvisorIssuesResponse> => {
-      const next = advisorIssuesLockRef.current
-        .catch(() => undefined)
-        .then(async () => {
-          await sendMessageToParent(
-            {
-              type: 'REQUEST_ADVISOR_ISSUES',
-              severity: query.severity,
-              category: query.category,
-              limit: query.limit,
-              offset: query.offset,
-            },
-            'Unable to request advisor issues from the parent window'
-          );
-          return createPendingRequest('advisorIssues', 'Advisor issues request');
-        });
-      advisorIssuesLockRef.current = next.catch(() => undefined);
-      return next;
-    },
-    [createPendingRequest, sendMessageToParent]
-  );
-
-  const triggerAdvisorScan = useCallback(async (): Promise<void> => {
-    await sendMessageToParent(
-      { type: 'TRIGGER_ADVISOR_SCAN' },
-      'Unable to trigger advisor scan from the parent window'
-    );
-    return createPendingRequest('advisorScan', 'Advisor scan trigger');
-  }, [createPendingRequest, sendMessageToParent]);
-
   const showUpgradeDialog = useCallback(() => {
     void postMessageToParent({ type: 'SHOW_UPGRADE_DIALOG' });
+  }, [postMessageToParent]);
+
+  const openWhatsNew = useCallback(() => {
+    void postMessageToParent({ type: 'OPEN_WHATS_NEW' });
   }, [postMessageToParent]);
 
   const reportRouteChange = useCallback(
@@ -1263,13 +1127,11 @@ export function useCloudHosting() {
     deleteProject,
     updateVersion,
     showUpgradeDialog,
+    openWhatsNew,
     requestUserInfo,
     requestUserApiKey,
     requestModelCredits,
     requestProjectMetrics,
-    requestAdvisorLatest,
-    requestAdvisorIssues,
-    triggerAdvisorScan,
     connectPosthog,
     openPosthog,
     subscribePosthogConnectionStatus,

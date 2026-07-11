@@ -1,14 +1,23 @@
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
-import { StorageProvider, ObjectMetadata, GetObjectResult } from './base.provider.js';
+import {
+  StorageProvider,
+  ObjectMetadata,
+  GetObjectResult,
+  DeleteObjectsResult,
+} from './base.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
 import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
   DownloadStrategyResponse,
+  DELETE_OBJECT_FAILURE_MESSAGE,
   UploadStrategyResponse,
 } from '@insforge/shared-schemas';
+import logger from '@/utils/logger.js';
+
+const DELETE_OBJECTS_CONCURRENCY = 25;
 
 /**
  * Local filesystem storage implementation
@@ -81,6 +90,41 @@ export class LocalStorageProvider implements StorageProvider {
     }
   }
 
+  async deleteObjects(bucket: string, keys: string[]): Promise<DeleteObjectsResult> {
+    const deleted: string[] = [];
+    const failed: Array<{ key: string; message: string }> = [];
+
+    for (let index = 0; index < keys.length; index += DELETE_OBJECTS_CONCURRENCY) {
+      const batchKeys = keys.slice(index, index + DELETE_OBJECTS_CONCURRENCY);
+      const results = await Promise.allSettled(
+        batchKeys.map(async (key) => {
+          await this.deleteObject(bucket, key);
+          return key;
+        })
+      );
+
+      results.forEach((result, resultIndex) => {
+        const key = batchKeys[resultIndex];
+        if (result.status === 'fulfilled') {
+          deleted.push(key);
+        } else {
+          const reason = result.reason;
+          logger.warn('Local storage object delete failed', {
+            bucket,
+            key,
+            error: reason instanceof Error ? reason.message : String(reason),
+          });
+          failed.push({
+            key,
+            message: DELETE_OBJECT_FAILURE_MESSAGE,
+          });
+        }
+      });
+    }
+
+    return { deleted, failed };
+  }
+
   async createBucket(bucket: string): Promise<void> {
     const bucketPath = this.getValidatedPath(bucket);
     await fs.mkdir(bucketPath, { recursive: true });
@@ -107,7 +151,8 @@ export class LocalStorageProvider implements StorageProvider {
     bucket: string,
     key: string,
     _metadata: { contentType?: string; size?: number },
-    _maxFileSizeBytes: number
+    _maxFileSizeBytes: number,
+    _contentType?: string
   ): Promise<UploadStrategyResponse> {
     // For local storage, return direct upload strategy with absolute URL
     const baseUrl = getApiBaseUrl();

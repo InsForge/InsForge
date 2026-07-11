@@ -6,7 +6,7 @@ import {
   type UpsertRazorpayConfigRequest,
 } from '#features/payments/services/razorpay.service';
 import { razorpayQueryKeys } from '#features/payments/queryKeys';
-import { useToast } from '#lib/hooks/useToast';
+import { useToast } from '@insforge/ui';
 
 export function useRazorpayConfig() {
   const queryClient = useQueryClient();

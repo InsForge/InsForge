@@ -53,6 +53,7 @@ describe('SecretService anon key', () => {
     mockClientQuery.mockReset();
     mockClientRelease.mockClear();
     mockConnect.mockClear();
+    vi.stubEnv('ACCESS_ANON_KEY', '');
   });
 
   afterEach(() => {

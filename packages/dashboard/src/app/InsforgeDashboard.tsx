@@ -3,14 +3,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from '#lib/contexts/AuthContext';
 import { AppRoutes } from '#router/AppRoutes';
-import { ToastProvider } from '#lib/hooks/useToast';
+import { ToastProvider } from '@insforge/ui';
 import { SocketProvider } from '#lib/contexts/SocketContext';
 import { PostHogAnalyticsProvider } from '#lib/analytics/posthog';
 import { SQLEditorProvider } from '#features/database/contexts/SQLEditorContext';
 import { DashboardHostProvider, DashboardProjectProvider } from '#lib/config/DashboardHostContext';
 import { setDashboardBackendUrl } from '#lib/config/runtime';
 import { advisorService } from '#features/dashboard/services/advisor.service';
-import type { InsForgeDashboardProps } from '#types';
+import type {
+  InsForgeDashboardProps,
+  DashboardAdvisorIssuesQuery,
+  DashboardAdvisorSuppressRequest,
+} from '#types';
 
 function normalizeBackendUrl(url?: string) {
   return url?.replace(/\/$/, '') || undefined;
@@ -24,6 +28,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
     showNavbar,
     onRouteChange,
     onShowUpgradeDialog,
+    onOpenWhatsNew,
     onRenameProject,
     onDeleteProject,
     onRequestBackupInfo,
@@ -38,9 +43,6 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
     onRequestUserApiKey,
     onRequestModelCredits,
     onRequestProjectMetrics,
-    onRequestAdvisorLatest,
-    onRequestAdvisorIssues,
-    onTriggerAdvisorScan,
     onConnectPosthog,
     subscribePosthogConnectionStatus,
     onOpenPosthog,
@@ -60,6 +62,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       useAuthorizationCodeRefresh,
       onRouteChange,
       onShowUpgradeDialog,
+      onOpenWhatsNew,
       onRenameProject,
       onDeleteProject,
       onRequestBackupInfo,
@@ -74,15 +77,14 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onRequestUserApiKey,
       onRequestModelCredits,
       onRequestProjectMetrics,
-      onRequestAdvisorLatest:
-        onRequestAdvisorLatest ??
-        (mode === 'self-hosting' ? () => advisorService.getLatest() : undefined),
-      onRequestAdvisorIssues:
-        onRequestAdvisorIssues ??
-        (mode === 'self-hosting' ? (q) => advisorService.getIssues(q) : undefined),
-      onTriggerAdvisorScan:
-        onTriggerAdvisorScan ??
-        (mode === 'self-hosting' ? () => advisorService.triggerScan() : undefined),
+      onRequestAdvisorLatest: () => advisorService.getLatest(),
+      onRequestAdvisorIssues: (q: DashboardAdvisorIssuesQuery) => advisorService.getIssues(q),
+      onTriggerAdvisorScan: () => advisorService.triggerScan(),
+      onRequestAdvisorSuppressions: () =>
+        advisorService.getSuppressions().then((r) => r.suppressions),
+      onSuppressAdvisorIssue: (req: DashboardAdvisorSuppressRequest) =>
+        advisorService.suppress(req),
+      onUnsuppressAdvisorIssue: (id: string) => advisorService.unsuppress(id),
       onConnectPosthog,
       subscribePosthogConnectionStatus,
       onOpenPosthog,
@@ -97,6 +99,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       useAuthorizationCodeRefresh,
       onRouteChange,
       onShowUpgradeDialog,
+      onOpenWhatsNew,
       onRenameProject,
       onDeleteProject,
       onRequestBackupInfo,
@@ -111,9 +114,6 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onRequestUserApiKey,
       onRequestModelCredits,
       onRequestProjectMetrics,
-      onRequestAdvisorLatest,
-      onRequestAdvisorIssues,
-      onTriggerAdvisorScan,
       onConnectPosthog,
       subscribePosthogConnectionStatus,
       onOpenPosthog,

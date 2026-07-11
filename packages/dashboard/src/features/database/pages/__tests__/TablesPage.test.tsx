@@ -87,10 +87,8 @@ vi.mock('#lib/hooks/useConfirm', () => ({
   }),
 }));
 
-vi.mock('#lib/hooks/useToast', () => ({
-  useToast: () => ({
-    showToast: vi.fn(),
-  }),
+const toastMocks = vi.hoisted(() => ({
+  showToast: vi.fn(),
 }));
 
 vi.mock('#features/database/components/DatabaseSidebar', () => ({
@@ -155,6 +153,9 @@ vi.mock('@insforge/ui', () => ({
   TooltipContent: () => null,
   TooltipProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   TooltipTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useToast: () => ({
+    showToast: toastMocks.showToast,
+  }),
 }));
 
 vi.mock('#assets/icons/pencil.svg?react', () => ({
