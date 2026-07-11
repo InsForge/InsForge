@@ -9,7 +9,11 @@ import {
   type BulkUpsertResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { checkSqlExecutionGuards, parseSQLStatements } from '@/utils/sql-parser.js';
+import {
+  checkSqlExecutionGuards,
+  parseSQLStatements,
+  checkSqlReadOnly,
+} from '@/utils/sql-parser.js';
 import { validateSchemaName, validateTableName } from '@/utils/validations.js';
 import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
@@ -141,6 +145,10 @@ export class DatabaseAdvanceService {
     params: unknown[] = [],
     asRoot: boolean = false
   ): Promise<RawSQLResponse> {
+    const readOnlyError = checkSqlReadOnly(query);
+    if (readOnlyError) {
+      throw new AppError(readOnlyError, 400, ERROR_CODES.INVALID_INPUT);
+    }
     const sanitizedQuery = this.sanitizeQuery(query);
     const pool = this.dbManager.getPool();
     const client = await pool.connect();

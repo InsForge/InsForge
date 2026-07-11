@@ -66,32 +66,21 @@ router.post(
         ? await dbAdvanceService.executeExplain(query, params, true)
         : await dbAdvanceService.executeRawSQL(query, params, true);
 
-      if (explain) {
-        await auditService.log({
-          actor: req.hasApiKey ? 'api-key' : req.user?.id,
-          action: 'EXPLAIN_RAW_SQL_UNRESTRICTED',
-          module: 'DATABASE',
-          details: {
-            query: query.substring(0, 300), // Limit query length in audit log
-            paramCount: params.length,
-            executionRole: 'root',
-          },
-          ip_address: req.ip,
-        });
-      } else {
-        await auditService.log({
-          actor: req.hasApiKey ? 'api-key' : req.user?.id,
-          action: 'EXECUTE_RAW_SQL_UNRESTRICTED',
-          module: 'DATABASE',
-          details: {
-            query: query.substring(0, 300), // Limit query length in audit log
-            paramCount: params.length,
-            rowsAffected: response.rowCount,
-            executionRole: 'root',
-          },
-          ip_address: req.ip,
-        });
+      await auditService.log({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'EXECUTE_RAW_SQL_UNRESTRICTED',
+        module: 'DATABASE',
+        details: {
+          query: query.substring(0, 300), // Limit query length in audit log
+          paramCount: params.length,
+          executionRole: 'root',
+          explain,
+          ...(explain ? {} : { rowsAffected: response.rowCount }),
+        },
+        ip_address: req.ip,
+      });
 
+      if (!explain) {
         // Broadcast changes if any modifying statements detected
         const changes = analyzeQuery(query);
         if (changes.length > 0) {
@@ -136,32 +125,21 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
       ? await dbAdvanceService.executeExplain(query, params)
       : await dbAdvanceService.executeRawSQL(query, params);
 
-    if (explain) {
-      await auditService.log({
-        actor: req.hasApiKey ? 'api-key' : req.user?.id,
-        action: 'EXPLAIN_RAW_SQL',
-        module: 'DATABASE',
-        details: {
-          query: query.substring(0, 300), // Limit query length in audit log
-          paramCount: params.length,
-          executionRole: 'project_admin',
-        },
-        ip_address: req.ip,
-      });
-    } else {
-      await auditService.log({
-        actor: req.hasApiKey ? 'api-key' : req.user?.id,
-        action: 'EXECUTE_RAW_SQL',
-        module: 'DATABASE',
-        details: {
-          query: query.substring(0, 300), // Limit query length in audit log
-          paramCount: params.length,
-          rowsAffected: response.rowCount,
-          executionRole: 'project_admin',
-        },
-        ip_address: req.ip,
-      });
+    await auditService.log({
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
+      action: 'EXECUTE_RAW_SQL',
+      module: 'DATABASE',
+      details: {
+        query: query.substring(0, 300), // Limit query length in audit log
+        paramCount: params.length,
+        executionRole: 'project_admin',
+        explain,
+        ...(explain ? {} : { rowsAffected: response.rowCount }),
+      },
+      ip_address: req.ip,
+    });
 
+    if (!explain) {
       // Broadcast changes if any modifying statements detected
       const changes = analyzeQuery(query);
       if (changes.length > 0) {

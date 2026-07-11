@@ -345,6 +345,7 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
     ]);
     expect(queryMock).toHaveBeenNthCalledWith(8, 'ROLLBACK');
     expect(queryMock).toHaveBeenNthCalledWith(9, 'SET statement_timeout = 0');
+    expect(queryMock).not.toHaveBeenCalledWith('COMMIT');
     expect(releaseMock).toHaveBeenCalled();
   });
 
@@ -378,6 +379,14 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
     expect(queryMock).toHaveBeenNthCalledWith(5, 'SET statement_timeout = 0');
     expect(queryMock).not.toHaveBeenCalledWith('SET ROLE project_admin');
     expect(queryMock).not.toHaveBeenCalledWith('RESET ROLE');
+    expect(queryMock).not.toHaveBeenCalledWith('COMMIT');
     expect(releaseMock).toHaveBeenCalled();
+  });
+
+  it('rejects mutating query in explain mode', async () => {
+    const service = DatabaseAdvanceService.getInstance();
+    await expect(
+      service.executeExplain("INSERT INTO products (name) VALUES ('test')", [])
+    ).rejects.toThrow('Only SELECT statements are allowed in EXPLAIN mode.');
   });
 });
