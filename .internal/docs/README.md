@@ -15,6 +15,6 @@ Home for working documents that support development but are not part of the publ
 
 ## The rule
 
-`docs/` is the public Mintlify tree: every `.mdx`/`.md` page there (outside `snippets/` and repo housekeeping like `README.md`) should be reachable from `docs/docs.json`. Plans, specs, audits, and other internal working files go under `.internal/docs/` — never under `docs/` — even when they relate to a documentation feature.
+`docs/` is the public Mintlify tree, and the navigation contract runs both ways: every `.mdx`/`.md` page there (outside `snippets/` and repo housekeeping like `README.md`) should be reachable from `docs/docs.json`, and every navigation entry in `docs/docs.json` should resolve to an existing page. Plans, specs, audits, and other internal working files go under `.internal/docs/` — never under `docs/` — even when they relate to a documentation feature.
 
 Established in #1400 / PR #1433; this README exists so future audits have a convention to point at.
