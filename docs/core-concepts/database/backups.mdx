@@ -1,64 +1,36 @@
 ---
 title: "Database backups"
-description: "Automated daily backups on InsForge Cloud, plus manual backup and restore on every deployment"
+description: "Back up and restore your database from the dashboard, with automated daily backups on InsForge Cloud"
 ---
 
-Every InsForge database can be backed up and restored from the dashboard under **Database → Backups**. InsForge Cloud runs automated daily backups; manual backup and restore work on both Cloud and self-hosted deployments.
+Back up and restore your database from the dashboard under **Database → Backup & Restore**. InsForge Cloud also backs up your project automatically every day, so you always have a recent copy to roll back to.
 
-## Automated daily backups
+## Scheduled backups
 
-InsForge Cloud backs up every active project on a paid plan once a day at 3:00 AM UTC. Each backup is a full compressed SQL dump of the project database, stored in S3 and retained for 7 days. Older scheduled backups are cleaned up automatically.
+InsForge Cloud backs up every active project on a paid plan once a day. Each backup is a full dump of the project database. Scheduled backups are retained for 7 days — the **Scheduled Backups** list shows when each one expires — and can be restored at any time.
 
-Scheduled backups appear in the dashboard alongside manual ones. Creating a manual backup does not affect the daily schedule.
+Creating a manual backup does not affect the daily schedule.
 
 ## Manual backups
 
-Create a backup any time from **Database → Backups** in the dashboard. Backups run in the background; the list shows each backup's status (`running`, `completed`, or `failed`), size, and creation time. You can name, rename, and delete backups. Only one backup runs at a time.
+Take a backup any time before a risky change:
+
+1. Open **Database → Backup & Restore** in the dashboard.
+2. Click **Create a Backup** and optionally give it a name.
+
+The backup runs in the background; the list shows its status, size, and creation time. You can rename or delete a backup from the same list. On InsForge Cloud, the Free plan includes 1 manual backup slot and paid plans include 5; manual backups are kept until you delete them.
 
 ## Restore
 
-Restore any completed backup from the same page. A restore replaces the current database contents with the backup. On self-hosted deployments the restore runs in a single transaction, so a failed restore rolls back and leaves the database untouched.
+Click **Restore** next to any completed backup — scheduled or manual. Restoring replaces the current database contents with the backup:
+
+- Your project is offline during the restore.
+- Any data created after the backup was taken is lost.
+- The restore cannot be undone, so consider taking a manual backup first.
 
 ## Self-hosting
 
-Self-hosted backups use `pg_dump` (custom format) and store the archive with the rest of your storage:
-
-- Local storage: `${STORAGE_DIR}/_database_backups/`
-- S3 storage configured: `<app-key>/_database_backups/` in your bucket
-
-The official Docker image ships the PostgreSQL client tools. If you run the backend outside the image, install them so `pg_dump` and `pg_restore` are on the `PATH`.
-
-Backups are kept until you delete them — there is no automatic retention on self-hosted deployments.
-
-### API
-
-All endpoints require admin credentials (an admin session or your `ACCESS_API_KEY`).
-
-```bash
-# List backups
-curl http://localhost:7130/api/database/backups \
-  -H "Authorization: Bearer $ACCESS_API_KEY"
-
-# Create a backup (name is optional)
-curl -X POST http://localhost:7130/api/database/backups \
-  -H "Authorization: Bearer $ACCESS_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "before-schema-change"}'
-
-# Restore a backup
-curl -X POST http://localhost:7130/api/database/backups/<backup-id>/restore \
-  -H "Authorization: Bearer $ACCESS_API_KEY"
-```
-
-Rename with `PATCH /api/database/backups/<backup-id>` and delete with `DELETE /api/database/backups/<backup-id>`.
-
-### Scheduling daily backups
-
-Self-hosted deployments do not include a built-in scheduler. Point a cron job at the API to get the same daily cadence as Cloud:
-
-```bash
-0 3 * * * curl -s -X POST http://localhost:7130/api/database/backups -H "Authorization: Bearer $ACCESS_API_KEY"
-```
+Self-hosted deployments have the same **Backup & Restore** page in the dashboard for manual backups and restores. Backup archives are stored with the rest of your storage — under `${STORAGE_DIR}/_database_backups/` on local storage, or in your S3 bucket when S3 storage is configured — and are kept until you delete them. The official Docker image includes everything needed; no extra setup is required.
 
 ## More resources
 
