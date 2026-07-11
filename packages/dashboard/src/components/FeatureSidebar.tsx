@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useMatch } from 'react-router-dom';
 import { LucideIcon, MoreVertical } from 'lucide-react';
 import { ScrollArea } from './radix/ScrollArea';
@@ -77,6 +78,8 @@ function FeatureSidebarItemRow({
   onItemMenuClick,
   itemActions,
 }: FeatureSidebarItemProps) {
+  const { t } = useTranslation('chrome');
+  const label = t(`menu.${item.id}`, { defaultValue: item.label });
   // Each item determines its own active state using React Router's useMatch
   const match = useMatch({ path: item.href ?? '/__secondary_menu_no_match__', end: false });
   const hasExternalActiveItem = activeItemId !== null && activeItemId !== undefined;
@@ -102,7 +105,7 @@ function FeatureSidebarItemRow({
       >
         {item.disabled ? (
           <div className="flex min-w-0 flex-1 items-center px-2 py-1.5">
-            <p className="truncate text-sm leading-5">{item.label}</p>
+            <p className="truncate text-sm leading-5">{label}</p>
           </div>
         ) : item.href ? (
           <Link
@@ -111,7 +114,7 @@ function FeatureSidebarItemRow({
             className="flex min-w-0 flex-1 items-center px-2 py-1.5"
           >
             <p className={cn('truncate text-sm leading-5', isSelected && 'text-inherit')}>
-              {item.label}
+              {label}
             </p>
           </Link>
         ) : (
@@ -119,7 +122,7 @@ function FeatureSidebarItemRow({
             className="h-auto min-w-0 flex-1 justify-start pl-2 pr-1 py-1.5 text-left text-sm leading-5 text-inherit cursor-pointer"
             onClick={handleItemClick}
           >
-            <p className="truncate">{item.label}</p>
+            <p className="truncate">{label}</p>
           </div>
         )}
 

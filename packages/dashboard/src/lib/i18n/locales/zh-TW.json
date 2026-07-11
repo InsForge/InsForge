@@ -1,0 +1,36 @@
+{
+  "menu": {
+    "dashboard": "總覽",
+    "authentication": "身分驗證",
+    "users-list": "使用者",
+    "auth-methods": "驗證方式",
+    "email": "電子郵件",
+    "database": "資料庫",
+    "storage": "儲存",
+    "sql-editor": "SQL 編輯器",
+    "functions": "函式",
+    "realtime": "即時",
+    "ai": "模型閘道",
+    "compute": "運算",
+    "payments": "金流",
+    "logs": "日誌",
+    "settings": "設定",
+    "whats-new": "最新消息",
+    "deployments": "網站",
+    "analytics": "分析",
+    "webscraper": "網頁擷取",
+    "dtest-install": "安裝",
+    "dtest-doc": "文件"
+  },
+  "header": {
+    "connect": "連接",
+    "signOut": "登出",
+    "admin": "管理員",
+    "administrator": "系統管理員"
+  },
+  "theme": {
+    "light": "淺色",
+    "dark": "深色",
+    "system": "跟隨系統"
+  }
+}

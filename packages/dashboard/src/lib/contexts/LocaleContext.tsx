@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { LOCAL_STORAGE_KEYS } from '#lib/utils/constants';
 import { getLocalStorageItem, setLocalStorageItem } from '#lib/utils/local-storage';
+import i18n from '#lib/i18n';
 
 export const SUPPORTED_LOCALES = ['en', 'zh-CN', 'zh-TW', 'es'] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
@@ -58,6 +59,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   // An explicit user selection must win over a late-arriving account value
   // from the shell (the adoption request below resolves asynchronously).
   const userTouchedRef = useRef(false);
+
+  // Keep the bundled UI translations in step with the active locale.
+  useEffect(() => {
+    void i18n.changeLanguage(locale);
+  }, [locale]);
 
   // Cloud mode: adopt the account-level preference once user info arrives.
   useEffect(() => {

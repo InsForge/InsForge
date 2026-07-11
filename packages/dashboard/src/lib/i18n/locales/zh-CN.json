@@ -1,0 +1,36 @@
+{
+  "menu": {
+    "dashboard": "总览",
+    "authentication": "身份认证",
+    "users-list": "用户",
+    "auth-methods": "认证方式",
+    "email": "邮件",
+    "database": "数据库",
+    "storage": "存储",
+    "sql-editor": "SQL 编辑器",
+    "functions": "函数",
+    "realtime": "实时",
+    "ai": "模型网关",
+    "compute": "计算",
+    "payments": "支付",
+    "logs": "日志",
+    "settings": "设置",
+    "whats-new": "新功能",
+    "deployments": "站点",
+    "analytics": "分析",
+    "webscraper": "网页抓取",
+    "dtest-install": "安装",
+    "dtest-doc": "文档"
+  },
+  "header": {
+    "connect": "连接",
+    "signOut": "退出登录",
+    "admin": "管理员",
+    "administrator": "系统管理员"
+  },
+  "theme": {
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统"
+  }
+}

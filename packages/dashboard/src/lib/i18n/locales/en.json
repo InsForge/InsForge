@@ -1,0 +1,36 @@
+{
+  "menu": {
+    "dashboard": "Dashboard",
+    "authentication": "Authentication",
+    "users-list": "Users",
+    "auth-methods": "Auth Methods",
+    "email": "Email",
+    "database": "Database",
+    "storage": "Storage",
+    "sql-editor": "SQL Editor",
+    "functions": "Functions",
+    "realtime": "Realtime",
+    "ai": "Model Gateway",
+    "compute": "Compute",
+    "payments": "Payments",
+    "logs": "Logs",
+    "settings": "Settings",
+    "whats-new": "What's New",
+    "deployments": "Sites",
+    "analytics": "Analytics",
+    "webscraper": "Web Scraper",
+    "dtest-install": "Install",
+    "dtest-doc": "Doc"
+  },
+  "header": {
+    "connect": "Connect",
+    "signOut": "Sign Out",
+    "admin": "Admin",
+    "administrator": "Administrator"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  }
+}

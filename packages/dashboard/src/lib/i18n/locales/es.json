@@ -1,0 +1,36 @@
+{
+  "menu": {
+    "dashboard": "Panel",
+    "authentication": "Autenticación",
+    "users-list": "Usuarios",
+    "auth-methods": "Métodos de acceso",
+    "email": "Correo",
+    "database": "Base de datos",
+    "storage": "Almacenamiento",
+    "sql-editor": "Editor SQL",
+    "functions": "Funciones",
+    "realtime": "Tiempo real",
+    "ai": "Model Gateway",
+    "compute": "Cómputo",
+    "payments": "Pagos",
+    "logs": "Registros",
+    "settings": "Ajustes",
+    "whats-new": "Novedades",
+    "deployments": "Sitios",
+    "analytics": "Analítica",
+    "webscraper": "Web Scraper",
+    "dtest-install": "Instalar",
+    "dtest-doc": "Docs"
+  },
+  "header": {
+    "connect": "Conectar",
+    "signOut": "Cerrar sesión",
+    "admin": "Admin",
+    "administrator": "Administrador"
+  },
+  "theme": {
+    "light": "Claro",
+    "dark": "Oscuro",
+    "system": "Sistema"
+  }
+}
