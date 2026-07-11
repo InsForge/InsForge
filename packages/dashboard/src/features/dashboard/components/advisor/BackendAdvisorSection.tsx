@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, Copy, Loader2, RotateCw } from 'lucide-react';
 import {
@@ -30,33 +31,34 @@ const SCAN_POLL_MAX_DURATION_MS = 30_000;
 
 const ALL_SEVERITIES: readonly DashboardAdvisorSeverity[] = ['critical', 'warning', 'info'];
 
-function formatRelative(iso: string | undefined): string {
+function formatRelative(iso: string | undefined): { key: string; count?: number } {
   if (!iso) {
-    return 'never';
+    return { key: 'advisor.time.never' };
   }
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) {
-    return 'never';
+  const timestamp = new Date(iso).getTime();
+  if (Number.isNaN(timestamp)) {
+    return { key: 'advisor.time.never' };
   }
-  const minutes = Math.floor((Date.now() - t) / 60_000);
+  const minutes = Math.floor((Date.now() - timestamp) / 60_000);
   if (minutes < 1) {
-    return 'just now';
+    return { key: 'advisor.time.justNow' };
   }
   if (minutes < 60) {
-    return `${minutes}m ago`;
+    return { key: 'advisor.time.minutesAgo', count: minutes };
   }
   const hours = Math.floor(minutes / 60);
   if (hours < 24) {
-    return `${hours}h ago`;
+    return { key: 'advisor.time.hoursAgo', count: hours };
   }
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return { key: 'advisor.time.daysAgo', count: days };
 }
 
 const ADVISOR_BUTTON_CLASS =
   'flex h-8 items-center gap-1 rounded border border-[var(--alpha-8)] bg-card px-2 text-sm leading-5 text-foreground transition-colors hover:bg-[var(--alpha-4)] disabled:opacity-50';
 
 export function BackendAdvisorSection() {
+  const { t } = useTranslation('chrome');
   const [tab, setTab] = useState<AdvisoryTabValue>('all');
   const [view, setView] = useState<'active' | 'ignored'>('active');
   const [selectedSeverities, setSelectedSeverities] = useState<Set<DashboardAdvisorSeverity>>(
@@ -144,9 +146,9 @@ export function BackendAdvisorSection() {
           // counts go stale after a re-scan.
           void queryClient.invalidateQueries({ queryKey: ['advisor', 'suppressions'] });
           if (data.status === 'failed') {
-            showToast('Scan failed. Check backend logs.', 'error');
+            showToast(t('advisor.toast.scanFailed'), 'error');
           } else {
-            showToast('Scan complete', 'success');
+            showToast(t('advisor.toast.scanComplete'), 'success');
           }
           return;
         }
@@ -155,7 +157,7 @@ export function BackendAdvisorSection() {
           cancelled = true;
           window.clearInterval(interval);
           setIsScanning(false);
-          showToast('Scan still running. Refresh later to see results.', 'info');
+          showToast(t('advisor.toast.scanRunning'), 'info');
         }
       });
     }, SCAN_POLL_INTERVAL_MS);
@@ -169,7 +171,7 @@ export function BackendAdvisorSection() {
   const handleRunScan = () => {
     baselineScanIdRef.current = latest.data?.scanId;
     setIsScanning(true);
-    showToast('Scanning… typically takes 5–10s', 'info');
+    showToast(t('advisor.toast.scanStarted'), 'info');
     trigger.mutate(undefined, {
       onError: (error) => {
         setIsScanning(false);
@@ -178,7 +180,8 @@ export function BackendAdvisorSection() {
     });
   };
 
-  const lastScanLabel = formatRelative(latest.data?.scannedAt);
+  const lastScanRelative = formatRelative(latest.data?.scannedAt);
+  const lastScanLabel = t(lastScanRelative.key, { count: lastScanRelative.count });
   const hasScan = !!latest.data?.scanId;
 
   const summary = latest.data?.summary;
@@ -263,7 +266,7 @@ export function BackendAdvisorSection() {
   const handleCopyAll = async () => {
     const fetcher = host.onRequestAdvisorIssues;
     if (!fetcher || totalRecords === 0) {
-      showToast('Nothing to copy', 'info');
+      showToast(t('advisor.toast.nothingToCopy'), 'info');
       return;
     }
     try {
@@ -288,25 +291,27 @@ export function BackendAdvisorSection() {
       }
       const actionable = all.filter((issue) => issue.recommendation);
       if (actionable.length === 0) {
-        showToast('No remediations available', 'info');
+        showToast(t('advisor.toast.noRemediations'), 'info');
         return;
       }
       const copiedOk = await copy(formatRemediationPromptBatch(actionable));
       if (!copiedOk) {
-        showToast('Failed to copy remediations', 'error');
+        showToast(t('advisor.toast.copyFailed'), 'error');
       }
     } catch {
       // Guards the paginated advisor fetch above — `copy()` handles its own
       // failure via the `copiedOk` check, so this only fires for fetch errors.
-      showToast('Failed to copy remediations', 'error');
+      showToast(t('advisor.toast.copyFailed'), 'error');
     }
   };
 
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-xl font-medium leading-7 text-foreground">Backend Advisor</h2>
-        <span className="text-xs leading-4 text-muted-foreground">Last scan {lastScanLabel}</span>
+        <h2 className="text-xl font-medium leading-7 text-foreground">{t('advisor.title')}</h2>
+        <span className="text-xs leading-4 text-muted-foreground">
+          {t('advisor.lastScan', { label: lastScanLabel })}
+        </span>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -323,7 +328,7 @@ export function BackendAdvisorSection() {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {v}
+                {t(`advisor.${v}`)}
               </button>
             ))}
           </div>
@@ -346,7 +351,7 @@ export function BackendAdvisorSection() {
             ) : (
               <RotateCw className="h-4 w-4" />
             )}
-            <span>{isScanning ? 'Scanning…' : 'Re-scan'}</span>
+            <span>{isScanning ? t('advisor.scanning') : t('advisor.rescan')}</span>
           </button>
           <SeverityFilterDropdown selected={selectedSeverities} onChange={setSelectedSeverities} />
           {view === 'active' && (
@@ -356,7 +361,7 @@ export function BackendAdvisorSection() {
               className={ADVISOR_BUTTON_CLASS}
             >
               {copiedAll ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              <span>{copiedAll ? 'Copied' : 'Copy All'}</span>
+              <span>{copiedAll ? t('advisor.copied') : t('advisor.copyAll')}</span>
             </button>
           )}
         </div>
@@ -377,8 +382,8 @@ export function BackendAdvisorSection() {
           ) : !hasScan && !latest.isLoading ? (
             <EmptyState
               className="h-32 gap-1"
-              title="No scan yet"
-              description="Click Re-scan above to start your first scan"
+              title={t('advisor.noScanYet')}
+              description={t('advisor.clickRescan')}
             />
           ) : issues.isLoading ? (
             <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">

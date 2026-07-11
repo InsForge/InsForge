@@ -32,5 +32,79 @@
     "light": "Light",
     "dark": "Dark",
     "system": "System"
+  },
+  "overview": {
+    "myProject": "My InsForge Project",
+    "status": "Status",
+    "agent": "Agent",
+    "connected": "Connected",
+    "notConnected": "Not Connected",
+    "healthy": "Healthy",
+    "issue": "Issue",
+    "loading": "Loading...",
+    "gettingStarted": "Getting Started",
+    "useMcp": "Use MCP to link your agent to this project",
+    "runCli": "Run this command to link your agent to this project",
+    "user": "User",
+    "database": "Database",
+    "storage": "Storage",
+    "edgeFunctions": "Edge Functions",
+    "functionsUnit_one": "Function",
+    "functionsUnit_other": "Functions",
+    "step1": "Step 1 - Install InsForge",
+    "installOneClick": "Install in one click",
+    "step2": "Step 2 - Verify Connection",
+    "sendPrompt": "Send the prompt below to your AI coding agent to verify the connection.",
+    "promptLabel": "prompt",
+    "mcpConfiguration": "MCP Configuration",
+    "terminalCommand": "Terminal Command",
+    "databaseCard": "Database",
+    "tablesCreated_one": "{{count}} table created",
+    "tablesCreated_other": "{{count}} tables created",
+    "agentCard": "Agent",
+    "connectAgent": "Connect agent",
+    "mcpCalls_one": "{{count}} MCP Call",
+    "mcpCalls_other": "{{count}} MCP Calls"
+  },
+  "advisor": {
+    "title": "Backend Advisor",
+    "lastScan": "Last scan {{label}}",
+    "active": "Active",
+    "ignored": "Ignored",
+    "rescan": "Re-scan",
+    "scanning": "Scanning…",
+    "copyAll": "Copy All",
+    "copied": "Copied",
+    "severity": "Severity:",
+    "selectedCount": "{{count}} selected",
+    "noScanYet": "No scan yet",
+    "clickRescan": "Click Re-scan above to start your first scan",
+    "tabs": {
+      "all": "All",
+      "security": "Security",
+      "performance": "Performance",
+      "health": "Health"
+    },
+    "severities": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Info"
+    },
+    "time": {
+      "never": "never",
+      "justNow": "just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago"
+    },
+    "toast": {
+      "scanFailed": "Scan failed. Check backend logs.",
+      "scanComplete": "Scan complete",
+      "scanRunning": "Scan still running. Refresh later to see results.",
+      "scanStarted": "Scanning… typically takes 5–10s",
+      "nothingToCopy": "Nothing to copy",
+      "noRemediations": "No remediations available",
+      "copyFailed": "Failed to copy remediations"
+    }
   }
 }

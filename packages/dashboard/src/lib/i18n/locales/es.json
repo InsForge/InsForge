@@ -32,5 +32,79 @@
     "light": "Claro",
     "dark": "Oscuro",
     "system": "Sistema"
+  },
+  "overview": {
+    "myProject": "Mi proyecto de InsForge",
+    "status": "Estado",
+    "agent": "Agente",
+    "connected": "Conectado",
+    "notConnected": "No conectado",
+    "healthy": "Correcto",
+    "issue": "Con problemas",
+    "loading": "Cargando...",
+    "gettingStarted": "Primeros pasos",
+    "useMcp": "Usa MCP para vincular tu agente a este proyecto",
+    "runCli": "Ejecuta este comando para vincular tu agente a este proyecto",
+    "user": "Usuarios",
+    "database": "Base de datos",
+    "storage": "Almacenamiento",
+    "edgeFunctions": "Funciones edge",
+    "functionsUnit_one": "función",
+    "functionsUnit_other": "funciones",
+    "step1": "Paso 1 - Instalar InsForge",
+    "installOneClick": "Instala en un clic",
+    "step2": "Paso 2 - Verificar conexión",
+    "sendPrompt": "Envía el siguiente prompt a tu agente de código de IA para verificar la conexión.",
+    "promptLabel": "prompt",
+    "mcpConfiguration": "Configuración MCP",
+    "terminalCommand": "Comando de terminal",
+    "databaseCard": "Base de datos",
+    "tablesCreated_one": "{{count}} tabla creada",
+    "tablesCreated_other": "{{count}} tablas creadas",
+    "agentCard": "Agente",
+    "connectAgent": "Conectar agente",
+    "mcpCalls_one": "{{count}} llamada MCP",
+    "mcpCalls_other": "{{count}} llamadas MCP"
+  },
+  "advisor": {
+    "title": "Asesor del backend",
+    "lastScan": "Último escaneo: {{label}}",
+    "active": "Activos",
+    "ignored": "Ignorados",
+    "rescan": "Reescanear",
+    "scanning": "Escaneando…",
+    "copyAll": "Copiar todo",
+    "copied": "Copiado",
+    "severity": "Severidad:",
+    "selectedCount": "{{count}} seleccionadas",
+    "noScanYet": "Sin escaneos aún",
+    "clickRescan": "Pulsa Reescanear arriba para iniciar el primer escaneo",
+    "tabs": {
+      "all": "Todos",
+      "security": "Seguridad",
+      "performance": "Rendimiento",
+      "health": "Salud"
+    },
+    "severities": {
+      "critical": "Crítico",
+      "warning": "Advertencia",
+      "info": "Información"
+    },
+    "time": {
+      "never": "nunca",
+      "justNow": "justo ahora",
+      "minutesAgo": "hace {{count}} min",
+      "hoursAgo": "hace {{count}} h",
+      "daysAgo": "hace {{count}} días"
+    },
+    "toast": {
+      "scanFailed": "El escaneo falló. Revisa los logs del backend.",
+      "scanComplete": "Escaneo completado",
+      "scanRunning": "El escaneo sigue en curso. Actualiza más tarde para ver resultados.",
+      "scanStarted": "Escaneando… suele tardar 5–10 s",
+      "nothingToCopy": "Nada que copiar",
+      "noRemediations": "No hay remediaciones disponibles",
+      "copyFailed": "No se pudieron copiar las remediaciones"
+    }
   }
 }

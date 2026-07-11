@@ -32,5 +32,76 @@
     "light": "浅色",
     "dark": "深色",
     "system": "跟随系统"
+  },
+  "overview": {
+    "myProject": "我的 InsForge 项目",
+    "status": "状态",
+    "agent": "Agent",
+    "connected": "已连接",
+    "notConnected": "未连接",
+    "healthy": "健康",
+    "issue": "异常",
+    "loading": "加载中...",
+    "gettingStarted": "快速开始",
+    "useMcp": "使用 MCP 将你的 Agent 连接到此项目",
+    "runCli": "运行此命令将你的 Agent 连接到此项目",
+    "user": "用户",
+    "database": "数据库",
+    "storage": "存储",
+    "edgeFunctions": "边缘函数",
+    "functionsUnit_other": "个函数",
+    "step1": "第一步 - 安装 InsForge",
+    "installOneClick": "一键安装",
+    "step2": "第二步 - 验证连接",
+    "sendPrompt": "将下方提示词发送给你的 AI 编程 Agent 以验证连接。",
+    "promptLabel": "提示词",
+    "mcpConfiguration": "MCP 配置",
+    "terminalCommand": "终端命令",
+    "databaseCard": "数据库",
+    "tablesCreated_other": "已创建 {{count}} 张表",
+    "agentCard": "Agent",
+    "connectAgent": "连接 Agent",
+    "mcpCalls_other": "{{count}} 次 MCP 调用"
+  },
+  "advisor": {
+    "title": "后端顾问",
+    "lastScan": "上次扫描：{{label}}",
+    "active": "活跃",
+    "ignored": "已忽略",
+    "rescan": "重新扫描",
+    "scanning": "扫描中…",
+    "copyAll": "全部复制",
+    "copied": "已复制",
+    "severity": "严重程度：",
+    "selectedCount": "已选 {{count}} 项",
+    "noScanYet": "尚未扫描",
+    "clickRescan": "点击上方“重新扫描”开始首次扫描",
+    "tabs": {
+      "all": "全部",
+      "security": "安全",
+      "performance": "性能",
+      "health": "健康"
+    },
+    "severities": {
+      "critical": "严重",
+      "warning": "警告",
+      "info": "提示"
+    },
+    "time": {
+      "never": "从未",
+      "justNow": "刚刚",
+      "minutesAgo": "{{count}} 分钟前",
+      "hoursAgo": "{{count}} 小时前",
+      "daysAgo": "{{count}} 天前"
+    },
+    "toast": {
+      "scanFailed": "扫描失败，请检查后端日志。",
+      "scanComplete": "扫描完成",
+      "scanRunning": "扫描仍在进行，稍后刷新查看结果。",
+      "scanStarted": "扫描中…通常需要 5–10 秒",
+      "nothingToCopy": "没有可复制的内容",
+      "noRemediations": "暂无修复建议",
+      "copyFailed": "复制修复建议失败"
+    }
   }
 }

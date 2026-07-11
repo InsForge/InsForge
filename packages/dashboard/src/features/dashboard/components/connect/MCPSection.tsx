@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown } from 'lucide-react';
 import {
   CodeBlock,
@@ -29,6 +30,7 @@ export function MCPSection({
   className,
   onAgentChange,
 }: MCPSectionProps) {
+  const { t } = useTranslation('chrome');
   const [selectedAgent, setSelectedAgent] = useState<MCPAgent>(MCP_AGENTS[0]);
 
   const handleAgentChange = (agent: MCPAgent) => {
@@ -50,10 +52,12 @@ export function MCPSection({
       <div className="flex w-full flex-col gap-3">
         <div className="flex flex-col">
           <p className="text-sm font-medium leading-6 text-foreground">
-            <span>Step 1 - Install InsForge</span>
+            <span>{t('overview.step1')}</span>
           </p>
           {(selectedAgent.id === 'cursor' || selectedAgent.id === 'qoder') && (
-            <p className="text-sm leading-6 text-muted-foreground">Install in one click</p>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {t('overview.installOneClick')}
+            </p>
           )}
           {selectedAgent.id === 'mcp' && (
             <p className="text-sm leading-6 text-muted-foreground">
@@ -121,7 +125,9 @@ export function MCPSection({
               {/* Header - fixed at top */}
               <div className="flex items-center justify-between border-b border-[var(--alpha-8)] bg-semantic-0 p-3">
                 <div className="px-2">
-                  <span className="text-xs text-muted-foreground">MCP Configuration</span>
+                  <span className="text-xs text-muted-foreground">
+                    {t('overview.mcpConfiguration')}
+                  </span>
                 </div>
                 <CopyButton text={mcpJsonConfig} showText={false} className="shrink-0" />
               </div>
@@ -135,7 +141,7 @@ export function MCPSection({
           ) : (
             <CodeBlock
               code={installCommand}
-              label="Terminal Command"
+              label={t('overview.terminalCommand')}
               className={cn('bg-semantic-0', isLoading && 'animate-pulse')}
             />
           )}
@@ -145,16 +151,16 @@ export function MCPSection({
       <div className="flex flex-col gap-3">
         <div className="flex flex-col">
           <p className="text-sm font-medium leading-6 text-foreground">
-            <span>Step 2 - Verify Connection</span>
+            <span>{t('overview.step2')}</span>
           </p>
-          <p className="text-sm leading-6 text-muted-foreground">
-            Send the prompt below to your AI coding agent to verify the connection.
-          </p>
+          <p className="text-sm leading-6 text-muted-foreground">{t('overview.sendPrompt')}</p>
         </div>
         <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 p-3">
           <div className="flex items-center justify-between">
             <div className="flex h-5 items-center rounded bg-[var(--alpha-8)] px-2">
-              <span className="text-xs font-medium leading-4 text-muted-foreground">prompt</span>
+              <span className="text-xs font-medium leading-4 text-muted-foreground">
+                {t('overview.promptLabel')}
+              </span>
             </div>
             <CopyButton text={MCP_VERIFY_CONNECTION_PROMPT} showText={false} className="shrink-0" />
           </div>

@@ -32,5 +32,76 @@
     "light": "淺色",
     "dark": "深色",
     "system": "跟隨系統"
+  },
+  "overview": {
+    "myProject": "我的 InsForge 專案",
+    "status": "狀態",
+    "agent": "Agent",
+    "connected": "已連接",
+    "notConnected": "未連接",
+    "healthy": "健康",
+    "issue": "異常",
+    "loading": "載入中...",
+    "gettingStarted": "快速開始",
+    "useMcp": "使用 MCP 將你的 Agent 連接到此專案",
+    "runCli": "執行此指令將你的 Agent 連接到此專案",
+    "user": "使用者",
+    "database": "資料庫",
+    "storage": "儲存",
+    "edgeFunctions": "邊緣函式",
+    "functionsUnit_other": "個函式",
+    "step1": "步驟一 - 安裝 InsForge",
+    "installOneClick": "一鍵安裝",
+    "step2": "步驟二 - 驗證連接",
+    "sendPrompt": "將下方提示詞傳送給你的 AI 程式開發 Agent 以驗證連接。",
+    "promptLabel": "提示詞",
+    "mcpConfiguration": "MCP 設定",
+    "terminalCommand": "終端機指令",
+    "databaseCard": "資料庫",
+    "tablesCreated_other": "已建立 {{count}} 張資料表",
+    "agentCard": "Agent",
+    "connectAgent": "連接 Agent",
+    "mcpCalls_other": "{{count}} 次 MCP 呼叫"
+  },
+  "advisor": {
+    "title": "後端顧問",
+    "lastScan": "上次掃描：{{label}}",
+    "active": "有效",
+    "ignored": "已忽略",
+    "rescan": "重新掃描",
+    "scanning": "掃描中…",
+    "copyAll": "全部複製",
+    "copied": "已複製",
+    "severity": "嚴重程度：",
+    "selectedCount": "已選 {{count}} 項",
+    "noScanYet": "尚未掃描",
+    "clickRescan": "點擊上方「重新掃描」開始首次掃描",
+    "tabs": {
+      "all": "全部",
+      "security": "資安",
+      "performance": "效能",
+      "health": "健康"
+    },
+    "severities": {
+      "critical": "嚴重",
+      "warning": "警告",
+      "info": "提示"
+    },
+    "time": {
+      "never": "從未",
+      "justNow": "剛剛",
+      "minutesAgo": "{{count}} 分鐘前",
+      "hoursAgo": "{{count}} 小時前",
+      "daysAgo": "{{count}} 天前"
+    },
+    "toast": {
+      "scanFailed": "掃描失敗，請檢查後端日誌。",
+      "scanComplete": "掃描完成",
+      "scanRunning": "掃描仍在進行，稍後重新整理查看結果。",
+      "scanStarted": "掃描中…通常需要 5–10 秒",
+      "nothingToCopy": "沒有可複製的內容",
+      "noRemediations": "暫無修復建議",
+      "copyFailed": "複製修復建議失敗"
+    }
   }
 }
