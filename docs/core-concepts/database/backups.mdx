@@ -1,0 +1,30 @@
+---
+title: "Database backups"
+description: "Back up and restore your database from the dashboard, with automated daily backups on InsForge Cloud"
+---
+
+Back up and restore your database from **Database → Backup & Restore** in the dashboard. InsForge Cloud also backs up your project automatically every day, so you always have a recent copy to roll back to.
+
+Backups cover the database only — files uploaded to Storage are not included.
+
+## Scheduled backups
+
+InsForge Cloud takes a full backup of every active project on a paid plan once a day, retained for 7 days. The **Scheduled Backups** list shows when each backup expires, and any of them can be restored at any time. Manual backups don't affect the daily schedule.
+
+## Manual backups
+
+Click **Create a Backup** before a risky change and optionally give it a name. The backup runs in the background; the list shows its status, size, and creation time, and lets you rename or delete it. The Free plan includes 1 manual backup slot, paid plans include 5, and manual backups are kept until you delete them.
+
+## Restore
+
+Click **Restore** next to any completed backup — scheduled or manual. Restoring replaces the current database with the backup: the project is offline during the restore, data created after the backup is lost, and the action can't be undone, so take a manual backup first if you're unsure.
+
+## Self-hosting
+
+Self-hosted deployments have the same **Backup & Restore** page for manual backups and restores. Backups are stored alongside your project's storage (local disk, or your S3 bucket when configured) and kept until you delete them. The official Docker image needs no extra setup.
+
+## More resources
+
+- [Database overview](/core-concepts/database/overview) for how the database is exposed to your app.
+- [Database migrations](/core-concepts/database/migrations) to version schema changes instead of restoring to undo them.
+- [Database branching](/agent-native/branching) to rehearse risky changes on a copy.
