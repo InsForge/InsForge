@@ -270,6 +270,7 @@ export default function SQLEditorPage() {
   const [exportError, setExportError] = useState<Error | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const lastExplainedQueryRef = useRef<string>('');
 
   const { executeSQL, isPending, data, isSuccess, error, isError } = useRawSQL({
     showSuccessToast: true,
@@ -309,11 +310,16 @@ export default function SQLEditorPage() {
 
   // Automatically execute explain when switching to the explain tab or active tab changes while on explain tab
   useEffect(() => {
-    if (resultView === 'explain' && activeTab?.query.trim() && !isExplainPending) {
+    if (
+      resultView === 'explain' &&
+      activeTab?.query.trim() &&
+      !isExplainPending &&
+      lastExplainedQueryRef.current !== activeTab.query
+    ) {
+      lastExplainedQueryRef.current = activeTab.query;
       executeExplain({ query: activeTab.query, params: [], explain: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resultView, activeTabId]);
+  }, [resultView, activeTabId, activeTab?.query, isExplainPending, executeExplain]);
 
   const handleExecuteQuery = () => {
     if (!activeTab?.query.trim() || isPending || isExplainPending) {
@@ -324,6 +330,7 @@ export default function SQLEditorPage() {
     setExportError(null);
 
     if (resultView === 'explain') {
+      lastExplainedQueryRef.current = activeTab.query;
       executeExplain({ query: activeTab.query, params: [], explain: true });
     } else {
       executeSQL({ query: activeTab.query, params: [] });
@@ -645,7 +652,11 @@ export default function SQLEditorPage() {
             )}
           >
             {resultView === 'explain' ? (
-              explainError ? (
+              isExplainPending ? (
+                <p className="font-mono text-sm leading-5 text-foreground px-4 py-3 animate-pulse">
+                  Analyzing execution plan...
+                </p>
+              ) : explainError ? (
                 <div className="px-4 py-3">
                   <ErrorViewer error={explainError} />
                 </div>
@@ -653,10 +664,6 @@ export default function SQLEditorPage() {
                 <div className="px-4 py-3">
                   <ErrorViewer error={planNodeResult.error} />
                 </div>
-              ) : isExplainPending ? (
-                <p className="font-mono text-sm leading-5 text-foreground px-4 py-3 animate-pulse">
-                  Analyzing execution plan...
-                </p>
               ) : planNodeResult ? (
                 <QueryPlanView planWrapper={planNodeResult} />
               ) : (
