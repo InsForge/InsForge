@@ -170,6 +170,7 @@ describe('PaystackTransactionService', () => {
         'team',
         'team_123',
         'buyer@example.com',
+        AUTHENTICATED_USER.id,
         null,
         500000,
         'ngn',
@@ -258,6 +259,7 @@ describe('PaystackTransactionService', () => {
     const transaction = buildProviderTransaction();
     mockVerifyTransaction.mockResolvedValue(transaction);
     mockPoolQuery
+      .mockResolvedValueOnce({ rows: [{ created_by: AUTHENTICATED_USER.id }], rowCount: 1 })
       .mockResolvedValueOnce({
         rows: [
           buildTransactionRow({
@@ -272,13 +274,20 @@ describe('PaystackTransactionService', () => {
 
     const result = await PaystackTransactionService.getInstance().verifyTransaction(
       'test',
-      'ps_ref_123'
+      'ps_ref_123',
+      AUTHENTICATED_USER
     );
 
+    // Ownership is checked before the provider or any row mutation.
+    expect(mockPoolQuery).toHaveBeenNthCalledWith(
+      1,
+      expect.stringMatching(/SELECT created_by[\s\S]*FROM payments\.paystack_transactions/i),
+      ['test', 'ps_ref_123']
+    );
     // Server-side verify only: the provider is asked for the transaction by reference.
     expect(mockVerifyTransaction).toHaveBeenCalledWith('ps_ref_123');
     expect(mockPoolQuery).toHaveBeenNthCalledWith(
-      1,
+      2,
       expect.stringMatching(
         /UPDATE payments\.paystack_transactions[\s\S]*verified_transaction_id = COALESCE\(verified_transaction_id, \$4\)/i
       ),
@@ -331,13 +340,68 @@ describe('PaystackTransactionService', () => {
     mockPoolQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
     await expect(
-      PaystackTransactionService.getInstance().verifyTransaction('test', 'ps_ref_missing')
+      PaystackTransactionService.getInstance().verifyTransaction(
+        'test',
+        'ps_ref_missing',
+        AUTHENTICATED_USER
+      )
     ).rejects.toMatchObject({
       statusCode: 404,
       code: ERROR_CODES.PAYMENT_NOT_FOUND,
     });
 
     expect(mockPoolQuery).toHaveBeenCalledTimes(1);
+    expect(mockVerifyTransaction).not.toHaveBeenCalled();
+  });
+
+  it('raises 404 for verify by a non-owner without calling the provider or mutating', async () => {
+    mockVerifyTransaction.mockResolvedValue(buildProviderTransaction());
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ created_by: 'someone_else' }], rowCount: 1 });
+
+    await expect(
+      PaystackTransactionService.getInstance().verifyTransaction(
+        'test',
+        'ps_ref_123',
+        AUTHENTICATED_USER
+      )
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      code: ERROR_CODES.PAYMENT_NOT_FOUND,
+    });
+
+    expect(mockVerifyTransaction).not.toHaveBeenCalled();
+    expect(mockPoolQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows verify of anon-created rows (null created_by) and by project admins', async () => {
+    const transaction = buildProviderTransaction();
+    mockVerifyTransaction.mockResolvedValue(transaction);
+    // Anon-created row, authenticated caller.
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [{ created_by: null }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [buildTransactionRow({ status: 'success' })], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+    await expect(
+      PaystackTransactionService.getInstance().verifyTransaction(
+        'test',
+        'ps_ref_123',
+        AUTHENTICATED_USER
+      )
+    ).resolves.toMatchObject({ verified: true });
+
+    // Owned row, admin caller.
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [{ created_by: 'someone_else' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [buildTransactionRow({ status: 'success' })], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+    await expect(
+      PaystackTransactionService.getInstance().verifyTransaction('test', 'ps_ref_123', {
+        role: 'project_admin',
+        id: 'admin_1',
+      })
+    ).resolves.toMatchObject({ verified: true });
   });
 
   it('projects a processed refund into the shared ledger and refreshes the original charge', async () => {

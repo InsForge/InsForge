@@ -14,6 +14,10 @@ CREATE TABLE IF NOT EXISTS payments.paystack_transactions (
   subject_type TEXT,
   subject_id TEXT,
   customer_email TEXT,
+  -- Owning authenticated user; NULL for anon-initiated sessions. Verification
+  -- is bound to this identity because Paystack references leak through
+  -- callback URLs and receipts, unlike Razorpay's client-held HMAC proof.
+  created_by UUID,
   -- Nullable until provider initialization succeeds. Unique only when non-null;
   -- the initialize flow updates rows by the local UUID id.
   reference TEXT,

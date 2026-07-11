@@ -89,7 +89,8 @@ environmentRouter.post(
 
       const result = await paystackTransactionService.verifyTransaction(
         environment,
-        body.reference
+        body.reference,
+        req.user
       );
       successResponse(res, result);
     } catch (error) {

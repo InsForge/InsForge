@@ -260,6 +260,30 @@ describe('PaystackProvider', () => {
     });
   });
 
+  it('surfaces a timeout that fires while the body is being read as 504, not a parse fallthrough', async () => {
+    const provider = new PaystackProvider({
+      environment: 'test',
+      secretKey: TEST_PAYSTACK_SECRET_KEY,
+    });
+    const timeoutError = new Error('The operation was aborted due to timeout');
+    timeoutError.name = 'TimeoutError';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => {
+          throw timeoutError;
+        },
+      } as unknown as Response)
+    );
+
+    await expect(provider.verifyTransaction('ps_ref_123')).rejects.toMatchObject({
+      name: 'PaystackApiError',
+      statusCode: 504,
+    });
+  });
+
   it('treats a 2xx response with a false envelope status as an API failure', async () => {
     const provider = new PaystackProvider({
       environment: 'test',

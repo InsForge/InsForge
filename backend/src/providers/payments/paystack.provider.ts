@@ -288,7 +288,15 @@ export class PaystackProvider {
     let payload: PaystackEnvelope<T> | null = null;
     try {
       payload = (await response.json()) as PaystackEnvelope<T>;
-    } catch {
+    } catch (error) {
+      // The timeout signal can also fire while the body is being read; keep
+      // that surfacing as a 504 instead of a body-parse fallthrough.
+      if (
+        error instanceof Error &&
+        (error.name === 'TimeoutError' || error.name === 'AbortError')
+      ) {
+        throw toPaystackFetchError(error);
+      }
       // Non-JSON body (e.g. a gateway error page); fall through to the status check.
       payload = null;
     }

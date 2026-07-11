@@ -164,8 +164,16 @@ export class PaystackTransactionService {
 
   async verifyTransaction(
     environment: PaystackEnvironment,
-    reference: string
+    reference: string,
+    user: UserContext
   ): Promise<VerifyPaystackTransactionResponse> {
+    // Paystack references leak through callback URLs and receipts, and unlike
+    // Razorpay's verify there is no client-held signature proving involvement,
+    // so bind verification to the transaction's owner before touching the
+    // provider or mutating any row. Mismatches 404 to avoid confirming that a
+    // guessed reference exists.
+    await this.assertVerifiableBy(environment, reference, user);
+
     const provider = await this.configService.createPaystackProvider(environment);
     const transaction = await provider.verifyTransaction(reference);
     const status = this.mapPaystackTransactionStatus(transaction.status);
@@ -489,19 +497,23 @@ export class PaystackTransactionService {
              subject_type,
              subject_id,
              customer_email,
+             created_by,
              reference,
              amount,
              currency,
              callback_url,
              metadata
            )
-           VALUES ($1, $2, 'initialized', $3, $4, $5, $6, $7, $8, $9, $10::JSONB)`,
+           VALUES ($1, $2, 'initialized', $3, $4, $5, $6, $7, $8, $9, $10, $11::JSONB)`,
             [
               id,
               environment,
               input.subject?.type ?? null,
               input.subject?.id ?? null,
               input.email,
+              // Only the authenticated UUID is a row-ownership identity; anon
+              // and admin labels never reach uuid-typed columns.
+              user.role === 'authenticated' ? user.id : null,
               input.reference ?? null,
               input.amount,
               input.currency.toLowerCase(),
@@ -566,6 +578,42 @@ export class PaystackTransactionService {
 
     const row = result.rows[0] as PaystackTransactionRow | undefined;
     return row ? this.normalizeTransactionRow(row) : null;
+  }
+
+  /**
+   * Verification is owner-bound: rows created by an authenticated user may
+   * only be verified by that user (or a project admin); rows created through
+   * anon flows carry no owning UUID and stay verifiable by any caller, which
+   * matches what an anon checkout can already observe. Unknown references and
+   * ownership mismatches both 404 so a guessed reference is never confirmed.
+   */
+  private async assertVerifiableBy(
+    environment: PaystackEnvironment,
+    reference: string,
+    user: UserContext
+  ): Promise<void> {
+    const result = await this.getPool().query<{ created_by: string | null }>(
+      `SELECT created_by
+       FROM payments.paystack_transactions
+       WHERE environment = $1
+         AND reference = $2`,
+      [environment, reference]
+    );
+
+    const row = result.rows[0];
+    const allowed =
+      row !== undefined &&
+      (row.created_by === null ||
+        user.role === 'project_admin' ||
+        (user.role === 'authenticated' && user.id === row.created_by));
+
+    if (!allowed) {
+      throw new AppError(
+        `Paystack ${environment} transaction not found: ${reference}`,
+        404,
+        ERROR_CODES.PAYMENT_NOT_FOUND
+      );
+    }
   }
 
   private async markTransactionVerified(
