@@ -4,7 +4,7 @@ sidebarTitle: "Overview"
 description: "Web scraping for your app, powered by Apify."
 ---
 
-Use InsForge Web Scraper to give your coding agent live access to external data: connect your own Apify account once, and your agent can run scrapers (Apify calls them actors) on demand, while the dashboard shows your actors, run history, and scraped datasets without leaving InsForge.
+Use InsForge Web Scraper to give your coding agent live access to external data. Connect your own Apify account once, and your agent can run scrapers (Apify calls them actors) on demand. The dashboard shows your actors, run history, and scraped datasets without leaving InsForge.
 
 Connect Apify with one click, then paste the scrape prompt into your coding agent. The agent authenticates with your InsForge-managed Apify token, picks the right actor for the job, and returns the results.
 
@@ -73,7 +73,7 @@ Datasets produced by your runs, with item counts, creation time, and the actor t
 
 ### Landing scraped data in your database
 
-Scraped results live in Apify datasets by default; nothing is written to your project's Postgres unless you want it there. For small scrapes, your agent can just return the results. For anything you want to keep or refresh on a schedule, have the agent deploy an [edge function](/core-concepts/functions/overview) or [compute service](/core-concepts/compute/overview) that fetches the dataset from Apify and upserts rows into a table.
+Scraped results live in Apify datasets by default; nothing is written to your project's Postgres unless you want it there. For small scrapes, your agent can just return the results. For anything you want to keep or refresh on a schedule, have the agent deploy an [edge function](/core-concepts/functions/overview) or [compute service](/core-concepts/compute/overview). The function fetches the dataset from Apify and upserts rows into a table.
 
 ### Settings and disconnect
 
