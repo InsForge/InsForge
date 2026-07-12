@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   DataGridEmptyState,
   DataGrid,
@@ -38,6 +39,7 @@ function mapPoliciesToRows(policies: RlsPolicy[]): PolicyRow[] {
 }
 
 export default function RealtimePermissionsPage() {
+  const { t } = useTranslation('chrome');
   const [activeTab, setActiveTab] = useState<TabType>('subscribe');
   const [searchQuery, setSearchQuery] = useState('');
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
@@ -77,7 +79,7 @@ export default function RealtimePermissionsPage() {
     () => [
       {
         key: 'policyName',
-        name: 'Policy Name',
+        name: t('realtime.policyName', { defaultValue: 'Policy Name' }),
         width: 'minmax(200px, 2fr)',
         resizable: true,
         sortable: true,
@@ -99,7 +101,7 @@ export default function RealtimePermissionsPage() {
       },
       {
         key: 'command',
-        name: 'Command',
+        name: t('realtime.command', { defaultValue: 'Command' }),
         width: 'minmax(100px, 1fr)',
         resizable: true,
         sortable: true,
@@ -111,27 +113,32 @@ export default function RealtimePermissionsPage() {
       },
       {
         key: 'roles',
-        name: 'Roles',
+        name: t('realtime.roles', { defaultValue: 'Roles' }),
         width: 'minmax(150px, 1.5fr)',
         resizable: true,
       },
       {
         key: 'using',
-        name: 'Using',
+        name: t('realtime.using', { defaultValue: 'Using' }),
         width: 'minmax(200px, 2fr)',
         resizable: true,
         renderCell: ({ row }) => (
           <SQLCellButton
             value={row.using}
             onClick={() =>
-              row.using && setSqlModal({ open: true, title: 'Using', value: row.using })
+              row.using &&
+              setSqlModal({
+                open: true,
+                title: t('realtime.using', { defaultValue: 'Using' }),
+                value: row.using,
+              })
             }
           />
         ),
       },
       {
         key: 'withCheck',
-        name: 'With Check',
+        name: t('realtime.withCheck', { defaultValue: 'With Check' }),
         width: 'minmax(200px, 2fr)',
         resizable: true,
         renderCell: ({ row }) => (
@@ -139,21 +146,31 @@ export default function RealtimePermissionsPage() {
             value={row.withCheck}
             onClick={() =>
               row.withCheck &&
-              setSqlModal({ open: true, title: 'With Check', value: row.withCheck })
+              setSqlModal({
+                open: true,
+                title: t('realtime.withCheck', { defaultValue: 'With Check' }),
+                value: row.withCheck,
+              })
             }
           />
         ),
       },
     ],
-    [setSqlModal]
+    [setSqlModal, t]
   );
 
   if (error) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <EmptyState
-          title="Failed to load permissions"
-          description={error instanceof Error ? error.message : 'An error occurred'}
+          title={t('realtime.failedToLoadPermissions', {
+            defaultValue: 'Failed to load permissions',
+          })}
+          description={
+            error instanceof Error
+              ? error.message
+              : t('realtime.anErrorOccurred', { defaultValue: 'An error occurred' })
+          }
         />
       </div>
     );
@@ -165,28 +182,35 @@ export default function RealtimePermissionsPage() {
         leftContent={
           <div className="flex flex-1 items-center overflow-clip">
             <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
-              Permissions
+              {t('realtime.permissions', { defaultValue: 'Permissions' })}
             </h1>
             <div className="flex h-5 w-5 shrink-0 items-center justify-center">
               <div className="h-5 w-px bg-[var(--alpha-8)]" />
             </div>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <Tab value="subscribe">Subscribe Policies</Tab>
-              <Tab value="publish">Publish Policies</Tab>
+              <Tab value="subscribe">
+                {t('realtime.subscribePolicies', { defaultValue: 'Subscribe Policies' })}
+              </Tab>
+              <Tab value="publish">
+                {t('realtime.publishPolicies', { defaultValue: 'Publish Policies' })}
+              </Tab>
             </Tabs>
           </div>
         }
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}
         searchDebounceTime={300}
-        searchPlaceholder="Search policies"
+        searchPlaceholder={t('realtime.searchPolicies', { defaultValue: 'Search policies' })}
       />
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
-            <EmptyState title="Loading policies..." description="Please wait" />
+            <EmptyState
+              title={t('realtime.loadingPolicies', { defaultValue: 'Loading policies...' })}
+              description={t('realtime.pleaseWait', { defaultValue: 'Please wait' })}
+            />
           </div>
         ) : (
           <DataGrid
@@ -199,7 +223,11 @@ export default function RealtimePermissionsPage() {
             emptyState={
               <DataGridEmptyState
                 message={
-                  searchQuery ? 'No policies match your search criteria' : 'No policies found'
+                  searchQuery
+                    ? t('realtime.noPoliciesMatchSearch', {
+                        defaultValue: 'No policies match your search criteria',
+                      })
+                    : t('realtime.noPoliciesFound', { defaultValue: 'No policies found' })
                 }
               />
             }

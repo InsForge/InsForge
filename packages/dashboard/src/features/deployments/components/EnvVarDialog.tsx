@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ClipboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2 } from 'lucide-react';
 import {
   Button,
@@ -37,14 +38,19 @@ export function EnvVarDialog({
   onSave,
   isSaving = false,
 }: EnvVarDialogProps) {
+  const { t } = useTranslation('chrome');
   const { showToast } = useToast();
   const [key, setKey] = useState('');
   const [value, setValue] = useState<string | null>('');
   const [manualDrafts, setManualDrafts] = useState<EnvVarDraft[]>([createEnvVarDraft()]);
 
   const isEditMode = !!envVar;
-  const title = isEditMode ? 'Edit Environment Variable' : 'Add Environment Variables';
-  const submitLabel = isEditMode ? 'Save' : 'Add';
+  const title = isEditMode
+    ? t('deployments.editEnvVar', { defaultValue: 'Edit Environment Variable' })
+    : t('deployments.addEnvVars', { defaultValue: 'Add Environment Variables' });
+  const submitLabel = isEditMode
+    ? t('deployments.save', { defaultValue: 'Save' })
+    : t('deployments.add', { defaultValue: 'Add' });
 
   useEffect(() => {
     if (!open) {
@@ -101,7 +107,12 @@ export function EnvVarDialog({
         handleClose();
       }
     } catch {
-      showToast('Failed to save environment variables. Please try again.', 'error');
+      showToast(
+        t('deployments.saveEnvVarsFailed', {
+          defaultValue: 'Failed to save environment variables. Please try again.',
+        }),
+        'error'
+      );
     }
   };
 
@@ -187,7 +198,10 @@ export function EnvVarDialog({
       const pasteResult = applyPastedEnvVars(draftIndex, pastedText);
       if (pasteResult.invalidLineNumbers?.length) {
         showToast(
-          `Invalid .env lines: ${pasteResult.invalidLineNumbers.join(', ')}. Fix them before pasting again.`,
+          t('deployments.invalidEnvLines', {
+            defaultValue: 'Invalid .env lines: {{lines}}. Fix them before pasting again.',
+            lines: pasteResult.invalidLineNumbers.join(', '),
+          }),
           'error'
         );
         event.preventDefault();
@@ -216,11 +230,14 @@ export function EnvVarDialog({
     const hasAnyValue = trimmedKey !== '' || draft.value !== '';
 
     if (hasAnyValue && trimmedKey === '') {
-      return 'Key is required.';
+      return t('deployments.keyRequired', { defaultValue: 'Key is required.' });
     }
 
     if (duplicateManualKeys.has(trimmedKey) && trimmedKey) {
-      return `Duplicate key: ${trimmedKey}`;
+      return t('deployments.duplicateKey', {
+        defaultValue: 'Duplicate key: {{key}}',
+        key: trimmedKey,
+      });
     }
 
     return null;
@@ -235,7 +252,9 @@ export function EnvVarDialog({
           </DialogTitle>
         </div>
         <DialogDescription className="sr-only">
-          Configure site environment variables
+          {t('deployments.envVarDialogDescription', {
+            defaultValue: 'Configure site environment variables',
+          })}
         </DialogDescription>
 
         <div className="flex max-h-[70vh] flex-col gap-6 overflow-y-auto p-6">
@@ -246,11 +265,11 @@ export function EnvVarDialog({
                   htmlFor="deployment-env-var-key"
                   className="w-30 shrink-0 text-sm text-zinc-950 dark:text-neutral-50"
                 >
-                  Key
+                  {t('deployments.key', { defaultValue: 'Key' })}
                 </label>
                 <Input
                   id="deployment-env-var-key"
-                  placeholder="e.g CLIENT_KEY"
+                  placeholder={t('deployments.keyPlaceholder', { defaultValue: 'e.g CLIENT_KEY' })}
                   value={key}
                   readOnly
                   className="flex-1"
@@ -262,11 +281,13 @@ export function EnvVarDialog({
                   htmlFor="deployment-env-var-value"
                   className="w-30 shrink-0 text-sm text-zinc-950 dark:text-neutral-50"
                 >
-                  Value
+                  {t('deployments.value', { defaultValue: 'Value' })}
                 </label>
                 <Input
                   id="deployment-env-var-value"
-                  placeholder="Enter a replacement value"
+                  placeholder={t('deployments.valuePlaceholder', {
+                    defaultValue: 'Enter a replacement value',
+                  })}
                   value={value ?? ''}
                   onChange={(e) => setValue(e.target.value)}
                   className="flex-1"
@@ -277,17 +298,21 @@ export function EnvVarDialog({
             <>
               <div className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground dark:text-neutral-400">
-                  Add multiple variables at once, or paste a `.env` block into any row to split it
-                  into separate entries automatically.
+                  {t('deployments.envVarsPasteHint', {
+                    defaultValue:
+                      'Add multiple variables at once, or paste a `.env` block into any row to split it into separate entries automatically.',
+                  })}
                 </p>
               </div>
 
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-zinc-950 dark:text-white">Variables</p>
+                  <p className="text-sm font-medium text-zinc-950 dark:text-white">
+                    {t('deployments.variables', { defaultValue: 'Variables' })}
+                  </p>
                   <Button variant="secondary" size="sm" onClick={addManualDraft}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Add row
+                    {t('deployments.addRow', { defaultValue: 'Add row' })}
                   </Button>
                 </div>
 
@@ -301,18 +326,27 @@ export function EnvVarDialog({
                         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3">
                           <Input
                             id={`deployment-env-var-key-${draft.id}`}
-                            aria-label={`Environment variable key ${index + 1}`}
+                            aria-label={t('deployments.envVarKeyAria', {
+                              defaultValue: 'Environment variable key {{index}}',
+                              index: index + 1,
+                            })}
                             aria-invalid={Boolean(keyError)}
                             aria-describedby={keyError ? keyErrorId : undefined}
-                            placeholder={`Key ${index + 1}`}
+                            placeholder={t('deployments.keyIndexPlaceholder', {
+                              defaultValue: 'Key {{index}}',
+                              index: index + 1,
+                            })}
                             value={draft.key}
                             onChange={(e) => updateManualDraft(draft.id, 'key', e.target.value)}
                             onPaste={handleDraftPaste(index, 'key')}
                           />
                           <Input
                             id={`deployment-env-var-value-${draft.id}`}
-                            aria-label={`Environment variable value ${index + 1}`}
-                            placeholder="Value"
+                            aria-label={t('deployments.envVarValueAria', {
+                              defaultValue: 'Environment variable value {{index}}',
+                              index: index + 1,
+                            })}
+                            placeholder={t('deployments.value', { defaultValue: 'Value' })}
                             value={draft.value}
                             onChange={(e) => updateManualDraft(draft.id, 'value', e.target.value)}
                             onPaste={handleDraftPaste(index, 'value')}
@@ -323,7 +357,10 @@ export function EnvVarDialog({
                             size="icon"
                             onClick={() => removeManualDraft(draft.id)}
                             className="h-9 w-9"
-                            aria-label={`Remove environment variable row ${index + 1}`}
+                            aria-label={t('deployments.removeEnvVarRowAria', {
+                              defaultValue: 'Remove environment variable row {{index}}',
+                              index: index + 1,
+                            })}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -340,12 +377,16 @@ export function EnvVarDialog({
 
                 {hasIncompleteManualRows && (
                   <p className="text-sm text-amber-600 dark:text-amber-400">
-                    One or more rows are missing a key.
+                    {t('deployments.rowsMissingKey', {
+                      defaultValue: 'One or more rows are missing a key.',
+                    })}
                   </p>
                 )}
                 {hasDuplicateManualKeys && (
                   <p className="text-sm text-amber-600 dark:text-amber-400">
-                    Each environment variable key must be unique.
+                    {t('deployments.keysMustBeUnique', {
+                      defaultValue: 'Each environment variable key must be unique.',
+                    })}
                   </p>
                 )}
               </div>
@@ -359,14 +400,14 @@ export function EnvVarDialog({
             onClick={handleClose}
             className="flex-1 h-9 bg-neutral-200 dark:bg-neutral-600 hover:bg-neutral-300 dark:hover:bg-neutral-500 text-zinc-950 dark:text-white"
           >
-            Cancel
+            {t('deployments.cancel', { defaultValue: 'Cancel' })}
           </Button>
           <Button
             onClick={() => void handleSubmit()}
             disabled={!isValid || isSaving}
             className="flex-1 h-9 bg-zinc-950 text-white hover:bg-zinc-800 disabled:opacity-40 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
           >
-            {isSaving ? 'Saving...' : submitLabel}
+            {isSaving ? t('deployments.saving', { defaultValue: 'Saving...' }) : submitLabel}
           </Button>
         </div>
       </DialogContent>

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Link2, AlertCircle, X } from 'lucide-react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
@@ -33,6 +34,7 @@ interface ForeignKeyCellProps {
 }
 
 export function ForeignKeyCell({ value, foreignKey, row, onJumpToTable }: ForeignKeyCellProps) {
+  const { t } = useTranslation('chrome');
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const isAuthUsers = foreignKey.table === AUTH_USERS_TABLE;
@@ -133,7 +135,9 @@ export function ForeignKeyCell({ value, foreignKey, row, onJumpToTable }: Foreig
                 </Button>
               </PopoverTrigger>
             </TooltipTrigger>
-            <TooltipContent>View linked record</TooltipContent>
+            <TooltipContent>
+              {t('database.viewLinkedRecord', { defaultValue: 'View linked record' })}
+            </TooltipContent>
           </Tooltip>
         </TooltipProvider>
 
@@ -152,7 +156,7 @@ export function ForeignKeyCell({ value, foreignKey, row, onJumpToTable }: Foreig
             <div className="flex items-center justify-between px-6 py-4 border-b border-border-gray dark:border-neutral-700">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground dark:text-white">
-                  Referencing record from
+                  {t('database.referencingRecordFrom', { defaultValue: 'Referencing record from' })}
                 </span>
                 <TypeBadge
                   type={`${foreignKey.table}.${foreignKey.columns.map((c) => c.referenceColumn).join(',')}`}
@@ -166,7 +170,9 @@ export function ForeignKeyCell({ value, foreignKey, row, onJumpToTable }: Foreig
               {error && (
                 <div className="flex items-center gap-2 p-3 text-sm text-destructive">
                   <AlertCircle className="h-4 w-4" />
-                  <span>Failed to load record</span>
+                  <span>
+                    {t('database.failedToLoadRecord', { defaultValue: 'Failed to load record' })}
+                  </span>
                 </div>
               )}
 
@@ -200,7 +206,9 @@ export function ForeignKeyCell({ value, foreignKey, row, onJumpToTable }: Foreig
                           setOpen(false);
                         }}
                       >
-                        {isAuthUsers ? 'Open Users' : 'Open Table'}
+                        {isAuthUsers
+                          ? t('database.openUsers', { defaultValue: 'Open Users' })
+                          : t('database.openTable', { defaultValue: 'Open Table' })}
                       </Button>
                     </div>
                   )}

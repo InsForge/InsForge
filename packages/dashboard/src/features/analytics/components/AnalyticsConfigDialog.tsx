@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Settings } from 'lucide-react';
 import TerminalIcon from '#assets/icons/terminal.svg?react';
 import {
@@ -40,6 +41,7 @@ export function AnalyticsConfigDialog({
   connection,
   projectId,
 }: AnalyticsConfigDialogProps) {
+  const { t } = useTranslation('chrome');
   const [section, setSection] = useState<Section>('general');
   const [revealed, setRevealed] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -61,7 +63,10 @@ export function AnalyticsConfigDialog({
       : '•'.repeat(connection.apiKey.length)
     : '';
 
-  const title = section === 'general' ? 'General' : 'Setup Prompt';
+  const title =
+    section === 'general'
+      ? t('analytics.config.general', { defaultValue: 'General' })
+      : t('analytics.config.setupPrompt', { defaultValue: 'Setup Prompt' });
 
   const directUrl = connection ? `${connection.host}/project/${connection.posthogProjectId}` : '';
 
@@ -75,14 +80,24 @@ export function AnalyticsConfigDialog({
     }
     const newTab = window.open('about:blank', '_blank');
     if (!newTab) {
-      showToast('Could not open PostHog. Please allow popups and try again.', 'error');
+      showToast(
+        t('analytics.config.openPosthogPopupBlocked', {
+          defaultValue: 'Could not open PostHog. Please allow popups and try again.',
+        }),
+        'error'
+      );
       return;
     }
     try {
       newTab.opener = null;
     } catch {
       newTab.close();
-      showToast('Could not open PostHog. Please try again.', 'error');
+      showToast(
+        t('analytics.config.openPosthogFailed', {
+          defaultValue: 'Could not open PostHog. Please try again.',
+        }),
+        'error'
+      );
       return;
     }
     onOpenPosthog(projectId)
@@ -91,12 +106,22 @@ export function AnalyticsConfigDialog({
           newTab.location.href = result.url;
         } else {
           newTab.close();
-          showToast('Could not open PostHog. Please try again.', 'error');
+          showToast(
+            t('analytics.config.openPosthogFailed', {
+              defaultValue: 'Could not open PostHog. Please try again.',
+            }),
+            'error'
+          );
         }
       })
       .catch(() => {
         newTab.close();
-        showToast('Could not open PostHog. Please try again.', 'error');
+        showToast(
+          t('analytics.config.openPosthogFailed', {
+            defaultValue: 'Could not open PostHog. Please try again.',
+          }),
+          'error'
+        );
       });
   };
 
@@ -106,7 +131,9 @@ export function AnalyticsConfigDialog({
         <MenuDialogContent>
           <MenuDialogSideNav>
             <MenuDialogSideNavHeader>
-              <MenuDialogSideNavTitle>Analytics Config</MenuDialogSideNavTitle>
+              <MenuDialogSideNavTitle>
+                {t('analytics.config.title', { defaultValue: 'Analytics Config' })}
+              </MenuDialogSideNavTitle>
             </MenuDialogSideNavHeader>
             <MenuDialogNav>
               <MenuDialogNavList>
@@ -115,14 +142,14 @@ export function AnalyticsConfigDialog({
                   active={section === 'general'}
                   onClick={() => setSection('general')}
                 >
-                  General
+                  {t('analytics.config.general', { defaultValue: 'General' })}
                 </MenuDialogNavItem>
                 <MenuDialogNavItem
                   icon={<TerminalIcon className="h-5 w-5" />}
                   active={section === 'setup-prompt'}
                   onClick={() => setSection('setup-prompt')}
                 >
-                  Setup Prompt
+                  {t('analytics.config.setupPrompt', { defaultValue: 'Setup Prompt' })}
                 </MenuDialogNavItem>
               </MenuDialogNavList>
             </MenuDialogNav>
@@ -159,21 +186,27 @@ export function AnalyticsConfigDialog({
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <Button variant="secondary" onClick={handleOpenPosthog}>
-                          Open in PostHog
+                          {t('analytics.config.openInPosthog', {
+                            defaultValue: 'Open in PostHog',
+                          })}
                         </Button>
                         <Button
                           variant="secondary"
                           className="border-warning bg-warning/10 text-warning hover:bg-warning/20"
                           onClick={() => setDisconnecting(true)}
                         >
-                          Disconnect
+                          {t('analytics.config.disconnect', { defaultValue: 'Disconnect' })}
                         </Button>
                       </div>
                     </div>
 
                     <div className="h-px w-full bg-[var(--alpha-8)]" />
 
-                    <FieldRow label="Project API Key">
+                    <FieldRow
+                      label={t('analytics.config.projectApiKey', {
+                        defaultValue: 'Project API Key',
+                      })}
+                    >
                       <div className="relative flex-1">
                         <Input
                           readOnly
@@ -182,7 +215,13 @@ export function AnalyticsConfigDialog({
                         />
                         <button
                           type="button"
-                          aria-label={revealed ? 'Hide API key' : 'Reveal API key'}
+                          aria-label={
+                            revealed
+                              ? t('analytics.config.hideApiKey', { defaultValue: 'Hide API key' })
+                              : t('analytics.config.revealApiKey', {
+                                  defaultValue: 'Reveal API key',
+                                })
+                          }
                           onClick={() => setRevealed((v) => !v)}
                           className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-[var(--alpha-8)] hover:text-foreground"
                         >
@@ -192,52 +231,67 @@ export function AnalyticsConfigDialog({
                       <CopyButton
                         text={connection.apiKey}
                         showText={false}
-                        aria-label="Copy API key"
+                        aria-label={t('analytics.config.copyApiKey', {
+                          defaultValue: 'Copy API key',
+                        })}
                       />
                     </FieldRow>
 
                     <div className="h-px w-full bg-[var(--alpha-8)]" />
 
-                    <FieldRow label="Host">
+                    <FieldRow label={t('analytics.config.host', { defaultValue: 'Host' })}>
                       <Input readOnly value={connection.host} className="font-mono" />
-                      <CopyButton text={connection.host} showText={false} aria-label="Copy host" />
+                      <CopyButton
+                        text={connection.host}
+                        showText={false}
+                        aria-label={t('analytics.config.copyHost', { defaultValue: 'Copy host' })}
+                      />
                     </FieldRow>
 
                     <div className="h-px w-full bg-[var(--alpha-8)]" />
 
-                    <FieldRow label="Project ID">
+                    <FieldRow
+                      label={t('analytics.config.projectId', { defaultValue: 'Project ID' })}
+                    >
                       <Input readOnly value={connection.posthogProjectId} className="font-mono" />
                       <CopyButton
                         text={connection.posthogProjectId}
                         showText={false}
-                        aria-label="Copy Project ID"
+                        aria-label={t('analytics.config.copyProjectId', {
+                          defaultValue: 'Copy Project ID',
+                        })}
                       />
                     </FieldRow>
                   </div>
                 ) : (
                   <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-center">
                     <p className="text-sm leading-6 text-foreground">
-                      You haven&apos;t connected PostHog yet.
+                      {t('analytics.config.notConnected', {
+                        defaultValue: "You haven't connected PostHog yet.",
+                      })}
                     </p>
                     <Button
                       variant="primary"
                       disabled={!onConnectPosthog}
                       onClick={() => onConnectPosthog?.(projectId)}
                     >
-                      Connect PostHog
+                      {t('analytics.connectPosthog', { defaultValue: 'Connect PostHog' })}
                     </Button>
                   </div>
                 )
               ) : (
                 <div className="flex flex-col gap-3">
                   <p className="text-sm leading-6 text-muted-foreground">
-                    Paste this into your coding agent to set up PostHog analytics for your app
+                    {t('analytics.setupPromptDescription', {
+                      defaultValue:
+                        'Paste this into your coding agent to set up PostHog analytics for your app',
+                    })}
                   </p>
                   <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex h-5 items-center rounded bg-[var(--alpha-8)] px-2">
                         <span className="text-xs font-medium leading-4 text-muted-foreground">
-                          setup prompt
+                          {t('analytics.setupPromptBadge', { defaultValue: 'setup prompt' })}
                         </span>
                       </div>
                       <CopyButton

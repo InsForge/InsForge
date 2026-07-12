@@ -198,10 +198,15 @@ export default function TablesPage() {
         // Clear sorting on error
         setSortColumns([]);
         setIsSorting(false);
-        showToast('Sorting failed. Please try a different sort option.', 'error');
+        showToast(
+          t('database.sortingFailed', {
+            defaultValue: 'Sorting failed. Please try a different sort option.',
+          }),
+          'error'
+        );
       }
     },
-    [showToast]
+    [showToast, t]
   );
 
   // Fetch schema for selected table
@@ -238,12 +243,18 @@ export default function TablesPage() {
   } = useCSVImport(selectedTable || '', selectedSchema, {
     onSuccess: (data) => {
       if (data.success) {
-        showToast(data.message || 'Import successful!', 'success');
+        showToast(
+          data.message || t('database.importSuccessful', { defaultValue: 'Import successful!' }),
+          'success'
+        );
         void refetchTableData();
       } else {
         // This case handles validation errors returned with a 200 OK but success: false
         const errorMessage =
-          data.message || 'CSV import failed due to validation errors. Please check the file.';
+          data.message ||
+          t('database.csvImportFailed', {
+            defaultValue: 'CSV import failed due to validation errors. Please check the file.',
+          });
         showToast(errorMessage, 'error');
       }
       resetImport();
@@ -251,7 +262,10 @@ export default function TablesPage() {
     onError: (error: Error) => {
       // This handles 400/500 errors from the API client
       const message =
-        error?.message || 'An unexpected error occurred during import. Please try again.';
+        error?.message ||
+        t('database.importUnexpectedError', {
+          defaultValue: 'An unexpected error occurred during import. Please try again.',
+        });
       showToast(message, 'error');
       resetImport();
     },
@@ -263,7 +277,7 @@ export default function TablesPage() {
     reset: resetExport,
   } = useCSVExport(selectedTable || '', selectedSchema, {
     onSuccess: () => {
-      showToast('Export successful!', 'success');
+      showToast(t('database.exportSuccessful', { defaultValue: 'Export successful!' }), 'success');
       resetExport();
     },
     onWarning: (message: string) => {
@@ -271,7 +285,10 @@ export default function TablesPage() {
     },
     onError: (error: Error) => {
       const message =
-        error?.message || 'An unexpected error occurred during export. Please try again.';
+        error?.message ||
+        t('database.exportUnexpectedError', {
+          defaultValue: 'An unexpected error occurred during export. Please try again.',
+        });
       showToast(message, 'error');
       resetExport();
     },
@@ -338,9 +355,12 @@ export default function TablesPage() {
   const handleTableFormClose = async (): Promise<boolean> => {
     if (isTableFormDirty) {
       const confirmOptions = {
-        title: 'Unsaved Changes',
-        description: `You have unsaved changes. Do you want to discard the changes and exit the form?`,
-        confirmText: 'Discard',
+        title: t('database.unsavedChanges', { defaultValue: 'Unsaved Changes' }),
+        description: t('database.unsavedChangesDescription', {
+          defaultValue:
+            'You have unsaved changes. Do you want to discard the changes and exit the form?',
+        }),
+        confirmText: t('common.discard', { defaultValue: 'Discard' }),
         destructive: true,
       };
 
@@ -396,9 +416,13 @@ export default function TablesPage() {
 
   const handleDeleteTable = async (tableName: string) => {
     const confirmOptions = {
-      title: 'Delete Table',
-      description: `Are you sure you want to delete the table "${tableName}"? This will permanently delete all records in this table. This action cannot be undone.`,
-      confirmText: 'Delete',
+      title: t('database.deleteTable', { defaultValue: 'Delete Table' }),
+      description: t('database.deleteTableConfirm', {
+        tableName,
+        defaultValue:
+          'Are you sure you want to delete the table "{{tableName}}"? This will permanently delete all records in this table. This action cannot be undone.',
+      }),
+      confirmText: t('common.delete', { defaultValue: 'Delete' }),
       destructive: true,
     };
 
@@ -437,7 +461,10 @@ export default function TablesPage() {
         const conversionResult = convertValueForColumn(columnSchema.type, newValue);
 
         if (!conversionResult.success) {
-          showToast(conversionResult.error || 'Invalid value', 'error');
+          showToast(
+            conversionResult.error || t('database.invalidValue', { defaultValue: 'Invalid value' }),
+            'error'
+          );
           return;
         }
         const updates = { [columnKey]: conversionResult.value };
@@ -447,7 +474,10 @@ export default function TablesPage() {
         });
       }
     } catch (error) {
-      showToast('Failed to update record', 'error');
+      showToast(
+        t('database.failedToUpdateRecord', { defaultValue: 'Failed to update record' }),
+        'error'
+      );
       throw error;
     }
   };
@@ -459,9 +489,18 @@ export default function TablesPage() {
     }
 
     const shouldDelete = await confirm({
-      title: `Delete ${rowKeys.length} ${rowKeys.length === 1 ? 'Record' : 'Records'}`,
-      description: `Are you sure you want to delete ${rowKeys.length} ${rowKeys.length === 1 ? 'record' : 'records'}? This action cannot be undone.`,
-      confirmText: 'Delete',
+      title: t('database.deleteRecordsTitle', {
+        count: rowKeys.length,
+        defaultValue: rowKeys.length === 1 ? 'Delete {{count}} Record' : 'Delete {{count}} Records',
+      }),
+      description: t('database.deleteRecordsConfirm', {
+        count: rowKeys.length,
+        defaultValue:
+          rowKeys.length === 1
+            ? 'Are you sure you want to delete {{count}} record? This action cannot be undone.'
+            : 'Are you sure you want to delete {{count}} records? This action cannot be undone.',
+      }),
+      confirmText: t('common.delete', { defaultValue: 'Delete' }),
       destructive: true,
     });
 
@@ -557,7 +596,7 @@ export default function TablesPage() {
                       </h1>
                       {selectedSchemaInfo.isProtected && (
                         <span className="rounded bg-alpha-4 px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                          Protected
+                          {t('database.protectedBadge', { defaultValue: 'Protected' })}
                         </span>
                       )}
                       <div className="flex h-5 w-5 shrink-0 items-center justify-center">
@@ -577,7 +616,9 @@ export default function TablesPage() {
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" align="center">
-                              <p>Edit table</p>
+                              <p>
+                                {t('database.editTableTooltip', { defaultValue: 'Edit table' })}
+                              </p>
                             </TooltipContent>
                           </Tooltip>
                         )}
@@ -596,7 +637,13 @@ export default function TablesPage() {
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" align="center">
-                            <p>{isRefreshing ? 'Refreshing...' : 'Refresh records'}</p>
+                            <p>
+                              {isRefreshing
+                                ? t('common.refreshing', { defaultValue: 'Refreshing...' })
+                                : t('database.refreshRecords', {
+                                    defaultValue: 'Refresh records',
+                                  })}
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -612,7 +659,9 @@ export default function TablesPage() {
                             onClick={() => setShowRecordForm(true)}
                           >
                             <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
-                            <span className="px-1 text-sm font-medium leading-5">Add Record</span>
+                            <span className="px-1 text-sm font-medium leading-5">
+                              {t('database.addRecord', { defaultValue: 'Add Record' })}
+                            </span>
                           </Button>
                           <Button
                             variant="ghost"
@@ -623,7 +672,9 @@ export default function TablesPage() {
                           >
                             <FolderInput className="h-6 w-6 stroke-[1.5]" />
                             <span className="px-1 text-sm font-medium leading-5">
-                              {isImporting ? 'Importing...' : 'Import CSV'}
+                              {isImporting
+                                ? t('database.importing', { defaultValue: 'Importing...' })
+                                : t('database.importCsv', { defaultValue: 'Import CSV' })}
                             </span>
                           </Button>
                         </>
@@ -637,7 +688,9 @@ export default function TablesPage() {
                       >
                         <FolderOutput className="h-6 w-6 stroke-[1.5]" />
                         <span className="px-1 text-sm font-medium leading-5">
-                          {isExporting ? 'Exporting...' : 'Export CSV'}
+                          {isExporting
+                            ? t('database.exporting', { defaultValue: 'Exporting...' })
+                            : t('database.exportCsv', { defaultValue: 'Export CSV' })}
                         </span>
                       </Button>
                     </div>
@@ -646,7 +699,9 @@ export default function TablesPage() {
                 searchValue={searchValue}
                 onSearchChange={handleSearchChange}
                 searchDebounceTime={300}
-                searchPlaceholder="Search records"
+                searchPlaceholder={t('database.searchRecordsPlaceholder', {
+                  defaultValue: 'Search records',
+                })}
               />
             )}
 
@@ -678,8 +733,10 @@ export default function TablesPage() {
               ) : !selectedTable ? (
                 <div className="flex-1 flex items-center justify-center">
                   <EmptyState
-                    title="No Table Selected"
-                    description="Select a table from the sidebar to view its data"
+                    title={t('database.noTableSelected', { defaultValue: 'No Table Selected' })}
+                    description={t('database.noTableSelectedDescription', {
+                      defaultValue: 'Select a table from the sidebar to view its data',
+                    })}
                   />
                 </div>
               ) : (
@@ -710,14 +767,16 @@ export default function TablesPage() {
                   pageSize={pageSize}
                   pageSizeOptions={pageSizeOptions}
                   totalRecords={tableData?.totalRecords || 0}
-                  paginationRecordLabel="records"
+                  paginationRecordLabel={t('database.recordsRecordLabel', {
+                    defaultValue: 'records',
+                  })}
                   onPageChange={setCurrentPage}
                   onPageSizeChange={handlePageSizeChange}
                   emptyState={
                     <div className="flex flex-col items-center gap-2 pb-12 pt-6 text-center">
                       <EmptyStateIllustration />
                       <p className="text-sm font-medium leading-6 text-muted-foreground">
-                        No Records Found
+                        {t('database.noRecordsFoundTitle', { defaultValue: 'No Records Found' })}
                       </p>
                       {!searchQuery && canMutateSelectedSchema && (
                         <button
@@ -725,7 +784,7 @@ export default function TablesPage() {
                           className="text-xs leading-4 text-primary hover:underline"
                           onClick={() => setShowRecordForm(true)}
                         >
-                          Add Record
+                          {t('database.addRecord', { defaultValue: 'Add Record' })}
                         </button>
                       )}
                     </div>

@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { storageService, type ListObjectsParams } from '#features/storage/services/storage.service';
 import { useToast } from '@insforge/ui';
 
 export function useStorageObjects() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -46,18 +48,40 @@ export function useStorageObjects() {
       const successCount = success.length;
       const failureCount = failures.length;
       if (failureCount > 0 && successCount > 0) {
+        const deletedPart = t('storage.filesDeletedPart', {
+          count: successCount,
+          defaultValue_one: '{{count}} file deleted',
+          defaultValue_other: '{{count}} files deleted',
+        });
+        const failedPart = t('storage.filesFailedToDeletePart', {
+          count: failureCount,
+          defaultValue_one: '{{count}} file failed to delete',
+          defaultValue_other: '{{count}} files failed to delete',
+        });
         showToast(
-          `${successCount} ${successCount > 1 ? 'files' : 'file'} deleted, ${failureCount} ${failureCount > 1 ? 'files' : 'file'} failed to delete.`,
+          t('storage.filesDeletedPartially', {
+            defaultValue: '{{deletedPart}}, {{failedPart}}.',
+            deletedPart,
+            failedPart,
+          }),
           'warn'
         );
       } else if (failureCount > 0) {
         showToast(
-          `Failed to delete ${failureCount} ${failureCount > 1 ? 'files' : 'file'}`,
+          t('storage.failedToDeleteFiles', {
+            count: failureCount,
+            defaultValue_one: 'Failed to delete {{count}} file',
+            defaultValue_other: 'Failed to delete {{count}} files',
+          }),
           'error'
         );
       } else if (successCount > 0) {
         showToast(
-          `${successCount} ${successCount > 1 ? 'files' : 'file'} deleted successfully.`,
+          t('storage.filesDeletedSuccessfully', {
+            count: successCount,
+            defaultValue_one: '{{count}} file deleted successfully.',
+            defaultValue_other: '{{count}} files deleted successfully.',
+          }),
           'success'
         );
       }
@@ -65,7 +89,10 @@ export function useStorageObjects() {
       void queryClient.invalidateQueries({ queryKey: ['storage'] });
     },
     onError: (error: Error) => {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete file';
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : t('storage.failedToDeleteFile', { defaultValue: 'Failed to delete file' });
       showToast(errorMessage, 'error');
     },
   });

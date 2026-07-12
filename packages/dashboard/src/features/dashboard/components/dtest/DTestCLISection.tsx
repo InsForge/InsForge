@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CopyButton, cn } from '@insforge/ui';
 import { useProjectId } from '#lib/hooks/useMetadata';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
@@ -25,6 +26,7 @@ function buildCliPrompt(projectId: string | null | undefined, apiKey: string | n
 }
 
 export function DTestCLISection({ className, agentName }: DTestCLISectionProps) {
+  const { t } = useTranslation('chrome');
   const { projectId } = useProjectId();
   const host = useDashboardHost();
   const onRequestUserApiKey = host.onRequestUserApiKey;
@@ -50,7 +52,13 @@ export function DTestCLISection({ className, agentName }: DTestCLISectionProps) 
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setKeyError(err instanceof Error ? err.message : 'Failed to generate API key');
+          setKeyError(
+            err instanceof Error
+              ? err.message
+              : t('overview.failedToGenerateApiKey', {
+                  defaultValue: 'Failed to generate API key',
+                })
+          );
         }
       })
       .finally(() => {
@@ -61,7 +69,7 @@ export function DTestCLISection({ className, agentName }: DTestCLISectionProps) 
     return () => {
       cancelled = true;
     };
-  }, [onRequestUserApiKey]);
+  }, [onRequestUserApiKey, t]);
 
   const prompt = useMemo(() => buildCliPrompt(projectId, apiKey), [projectId, apiKey]);
   const canCopy = Boolean(projectId) && Boolean(apiKey);
@@ -74,16 +82,21 @@ export function DTestCLISection({ className, agentName }: DTestCLISectionProps) 
       )}
     >
       <div className="flex flex-col gap-1">
-        <p className="text-base font-medium leading-7 text-foreground">Copy the setup prompt</p>
+        <p className="text-base font-medium leading-7 text-foreground">
+          {t('overview.copySetupPrompt', { defaultValue: 'Copy the setup prompt' })}
+        </p>
         <p className="text-sm leading-5 text-muted-foreground">
-          Paste this into {agentName || 'your agent'} to install InsForge CLI and skills.
+          {t('overview.pasteSetupPrompt', {
+            agent: agentName || t('overview.yourAgent', { defaultValue: 'your agent' }),
+            defaultValue: 'Paste this into {{agent}} to install InsForge CLI and skills.',
+          })}
         </p>
       </div>
 
       <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-1 p-3">
         <div className="flex items-center justify-between">
           <span className="rounded bg-[var(--alpha-8)] px-2 py-0.5 text-xs font-medium leading-4 text-muted-foreground">
-            Prompt
+            {t('overview.promptBadge', { defaultValue: 'Prompt' })}
           </span>
           <CopyButton text={prompt} showText={false} className="shrink-0" disabled={!canCopy} />
         </div>
@@ -91,11 +104,16 @@ export function DTestCLISection({ className, agentName }: DTestCLISectionProps) 
           {prompt}
         </pre>
         {isFetchingKey && (
-          <p className="text-xs leading-4 text-muted-foreground">Generating API key…</p>
+          <p className="text-xs leading-4 text-muted-foreground">
+            {t('overview.generatingApiKey', { defaultValue: 'Generating API key…' })}
+          </p>
         )}
         {keyError && (
           <p className="text-xs leading-4 text-destructive">
-            Could not generate API key: {keyError}
+            {t('overview.couldNotGenerateApiKey', {
+              error: keyError,
+              defaultValue: 'Could not generate API key: {{error}}',
+            })}
           </p>
         )}
       </div>

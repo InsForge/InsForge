@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowDownToLine, ArrowUpFromLine, Cpu, HardDrive, MemoryStick } from 'lucide-react';
 import { useProjectMetrics } from '#features/dashboard/hooks/useProjectMetrics';
 import type { DashboardMetricName, DashboardMetricsRange } from '#types';
@@ -15,6 +16,7 @@ const RANGE_SECONDS: Record<DashboardMetricsRange, number> = {
 
 interface MetricConfig {
   metric: DashboardMetricName;
+  i18nKey: string;
   title: string;
   icon: React.ReactNode;
   format: (value: number) => string;
@@ -50,6 +52,7 @@ const BYTES_SIZE = (value: number) => {
 const METRICS: MetricConfig[] = [
   {
     metric: 'cpu_usage',
+    i18nKey: 'cpuUsage',
     title: 'CPU Usage',
     icon: <Cpu className="h-5 w-5" />,
     format: PERCENT,
@@ -59,6 +62,7 @@ const METRICS: MetricConfig[] = [
   },
   {
     metric: 'memory_usage',
+    i18nKey: 'memoryUsage',
     title: 'Memory Usage',
     icon: <MemoryStick className="h-5 w-5" />,
     format: PERCENT,
@@ -68,6 +72,7 @@ const METRICS: MetricConfig[] = [
   },
   {
     metric: 'network_in',
+    i18nKey: 'networkIn',
     title: 'Network In',
     icon: <ArrowDownToLine className="h-5 w-5" />,
     format: BYTES_PER_SEC,
@@ -76,6 +81,7 @@ const METRICS: MetricConfig[] = [
   },
   {
     metric: 'network_out',
+    i18nKey: 'networkOut',
     title: 'Network Out',
     icon: <ArrowUpFromLine className="h-5 w-5" />,
     format: BYTES_PER_SEC,
@@ -88,6 +94,7 @@ const METRICS: MetricConfig[] = [
 const DISK_GRID_INDEX = 2;
 
 export function ObservabilitySection() {
+  const { t } = useTranslation('chrome');
   const [range, setRange] = useState<DashboardMetricsRange>('1h');
   const { data, isLoading, isUnavailable, error } = useProjectMetrics(range);
 
@@ -111,10 +118,12 @@ export function ObservabilitySection() {
   return (
     <section className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-medium leading-7 text-foreground">Observability</h2>
+        <h2 className="text-xl font-medium leading-7 text-foreground">
+          {t('overview.observability', { defaultValue: 'Observability' })}
+        </h2>
         <div
           role="group"
-          aria-label="Time range"
+          aria-label={t('overview.timeRange', { defaultValue: 'Time range' })}
           className="flex items-center overflow-hidden rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)]"
         >
           {RANGES.map((value) => (
@@ -137,11 +146,15 @@ export function ObservabilitySection() {
 
       {isUnavailable ? (
         <div className="flex h-32 items-center justify-center rounded border border-dashed border-[var(--alpha-8)] bg-card text-sm text-muted-foreground">
-          Metrics unavailable for this instance
+          {t('overview.metricsUnavailable', {
+            defaultValue: 'Metrics unavailable for this instance',
+          })}
         </div>
       ) : error ? (
         <div className="flex h-32 items-center justify-center rounded border border-dashed border-[var(--alpha-8)] bg-card text-sm text-destructive">
-          Failed to load metrics. Please try again.
+          {t('overview.metricsLoadFailed', {
+            defaultValue: 'Failed to load metrics. Please try again.',
+          })}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -151,14 +164,18 @@ export function ObservabilitySection() {
               return (
                 <MetricChartCard
                   key={config.metric}
-                  title={config.title}
+                  title={t(`overview.metrics.${config.i18nKey}.title`, {
+                    defaultValue: config.title,
+                  })}
                   icon={config.icon}
                   data={series?.data ?? []}
                   rangeSeconds={RANGE_SECONDS[range]}
                   formatValue={config.format}
                   isLoading={isLoading}
                   threshold={config.threshold}
-                  description={config.description}
+                  description={t(`overview.metrics.${config.i18nKey}.description`, {
+                    defaultValue: config.description,
+                  })}
                 />
               );
             });
@@ -168,7 +185,7 @@ export function ObservabilitySection() {
               0,
               <MetricChartCard
                 key="disk_used"
-                title="Disk Usage"
+                title={t('overview.metrics.diskUsed.title', { defaultValue: 'Disk Usage' })}
                 icon={<HardDrive className="h-5 w-5" />}
                 data={diskCardProps.data}
                 rangeSeconds={RANGE_SECONDS[range]}
@@ -177,7 +194,10 @@ export function ObservabilitySection() {
                 threshold={diskCardProps.threshold}
                 fixedDomain={diskCardProps.fixedDomain}
                 formatAxisLabel={BYTES_SIZE}
-                description="How much of your instance's storage the database, files, and logs are using. A full disk stops writes and can take the backend offline."
+                description={t('overview.metrics.diskUsed.description', {
+                  defaultValue:
+                    "How much of your instance's storage the database, files, and logs are using. A full disk stops writes and can take the backend offline.",
+                })}
               />
             );
             return cards;

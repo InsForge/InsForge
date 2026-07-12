@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Settings } from 'lucide-react';
 import type { PosthogConnection } from '@insforge/shared-schemas';
 import {
@@ -14,22 +15,23 @@ interface AnalyticsSidebarProps {
 }
 
 export function AnalyticsSidebar({ connection, projectId }: AnalyticsSidebarProps) {
+  const { t } = useTranslation('chrome');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const items: FeatureSidebarListItem[] = [
     {
       id: 'traffic',
-      label: 'Traffic',
+      label: t('analytics.sidebar.traffic', { defaultValue: 'Traffic' }),
       href: '/dashboard/analytics/traffic',
     },
     {
       id: 'retention',
-      label: 'User Retention',
+      label: t('analytics.sidebar.userRetention', { defaultValue: 'User Retention' }),
       href: '/dashboard/analytics/retention',
     },
     {
       id: 'session-replay',
-      label: 'Session Replay',
+      label: t('analytics.sidebar.sessionReplay', { defaultValue: 'Session Replay' }),
       href: '/dashboard/analytics/session-replay',
     },
   ];
@@ -37,7 +39,7 @@ export function AnalyticsSidebar({ connection, projectId }: AnalyticsSidebarProp
   const headerButtons: FeatureSidebarHeaderButton[] = [
     {
       id: 'analytics-settings',
-      label: 'Analytics Config',
+      label: t('analytics.config.title', { defaultValue: 'Analytics Config' }),
       icon: Settings,
       onClick: () => setSettingsOpen(true),
       disabled: !projectId,
@@ -46,7 +48,11 @@ export function AnalyticsSidebar({ connection, projectId }: AnalyticsSidebarProp
 
   return (
     <>
-      <FeatureSidebar title="Analytics" items={items} headerButtons={headerButtons} />
+      <FeatureSidebar
+        title={t('analytics.sidebar.title', { defaultValue: 'Analytics' })}
+        items={items}
+        headerButtons={headerButtons}
+      />
       <AnalyticsConfigDialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronRight, Trash2 } from 'lucide-react';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import {
@@ -18,6 +19,7 @@ import type { RealtimeMessage } from '#features/realtime/services/realtime.servi
 import { useConfirm } from '#lib/hooks/useConfirm';
 
 export default function RealtimeMessagesPage() {
+  const { t } = useTranslation('chrome');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<RealtimeMessage | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,10 +69,12 @@ export default function RealtimeMessagesPage() {
 
   const handleClearMessages = async () => {
     const shouldClear = await confirm({
-      title: 'Clear Realtime Messages',
-      description:
-        'This will permanently delete every stored realtime message. This action cannot be undone.',
-      confirmText: 'Clear Messages',
+      title: t('realtime.clearMessagesTitle', { defaultValue: 'Clear Realtime Messages' }),
+      description: t('realtime.clearMessagesDescription', {
+        defaultValue:
+          'This will permanently delete every stored realtime message. This action cannot be undone.',
+      }),
+      confirmText: t('realtime.clearMessagesConfirm', { defaultValue: 'Clear Messages' }),
       destructive: true,
     });
 
@@ -94,7 +98,7 @@ export default function RealtimeMessagesPage() {
             onClick={() => setSelectedMessage(null)}
             className="text-base font-medium leading-7 text-muted-foreground hover:text-foreground transition-colors"
           >
-            Messages
+            {t('realtime.messages', { defaultValue: 'Messages' })}
           </button>
           <ChevronRight className="w-5 h-5 text-muted-foreground" />
           <p className="text-base font-medium leading-7 text-foreground">
@@ -106,36 +110,50 @@ export default function RealtimeMessagesPage() {
           <div className="mx-auto max-w-[1024px] w-4/5 space-y-4">
             <div className="grid grid-cols-3 gap-4">
               <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-                <p className="text-sm text-muted-foreground mb-1">Channel</p>
+                <p className="text-sm text-muted-foreground mb-1">
+                  {t('realtime.channel', { defaultValue: 'Channel' })}
+                </p>
                 <p className="text-sm text-foreground">{selectedMessage.channelName}</p>
               </div>
               <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-                <p className="text-sm text-muted-foreground mb-1">Sender Type</p>
+                <p className="text-sm text-muted-foreground mb-1">
+                  {t('realtime.senderType', { defaultValue: 'Sender Type' })}
+                </p>
                 <p className="text-sm text-foreground">{selectedMessage.senderType}</p>
               </div>
               <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-                <p className="text-sm text-muted-foreground mb-1">Created</p>
+                <p className="text-sm text-muted-foreground mb-1">
+                  {t('realtime.created', { defaultValue: 'Created' })}
+                </p>
                 <p className="text-sm text-foreground">{selectedMessage.createdAt}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
               <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-                <p className="text-sm text-muted-foreground mb-1">WebSockets Audience</p>
+                <p className="text-sm text-muted-foreground mb-1">
+                  {t('realtime.webSocketsAudience', { defaultValue: 'WebSockets Audience' })}
+                </p>
                 <p className="text-sm text-foreground">{selectedMessage.wsAudienceCount}</p>
               </div>
               <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-                <p className="text-sm text-muted-foreground mb-1">Webhooks Audience</p>
+                <p className="text-sm text-muted-foreground mb-1">
+                  {t('realtime.webhooksAudience', { defaultValue: 'Webhooks Audience' })}
+                </p>
                 <p className="text-sm text-foreground">{selectedMessage.whAudienceCount}</p>
               </div>
               <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-                <p className="text-sm text-muted-foreground mb-1">Webhooks Delivered</p>
+                <p className="text-sm text-muted-foreground mb-1">
+                  {t('realtime.webhooksDelivered', { defaultValue: 'Webhooks Delivered' })}
+                </p>
                 <p className="text-sm text-foreground">{selectedMessage.whDeliveredCount}</p>
               </div>
             </div>
 
             <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-              <p className="text-sm text-muted-foreground mb-2">Payload</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                {t('realtime.payload', { defaultValue: 'Payload' })}
+              </p>
               <pre className="text-sm text-foreground font-mono whitespace-pre-wrap overflow-auto">
                 {JSON.stringify(selectedMessage.payload, null, 2)}
               </pre>
@@ -152,7 +170,9 @@ export default function RealtimeMessagesPage() {
       <TableHeader
         leftContent={
           <div className="flex flex-1 items-center overflow-clip gap-1">
-            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Messages</h1>
+            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
+              {t('realtime.messages', { defaultValue: 'Messages' })}
+            </h1>
             <div className="flex h-5 w-5 shrink-0 items-center justify-center">
               <div className="h-5 w-px bg-[var(--alpha-8)]" />
             </div>
@@ -170,7 +190,11 @@ export default function RealtimeMessagesPage() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">
-                  <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                  <p>
+                    {isRefreshing
+                      ? t('realtime.refreshing', { defaultValue: 'Refreshing...' })
+                      : t('realtime.refresh', { defaultValue: 'Refresh' })}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -180,7 +204,7 @@ export default function RealtimeMessagesPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Clear messages"
+                    aria-label={t('realtime.clearMessages', { defaultValue: 'Clear messages' })}
                     onClick={() => void handleClearMessages()}
                     disabled={isClearingMessages}
                     className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
@@ -189,7 +213,11 @@ export default function RealtimeMessagesPage() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">
-                  <p>{isClearingMessages ? 'Clearing...' : 'Clear messages'}</p>
+                  <p>
+                    {isClearingMessages
+                      ? t('realtime.clearing', { defaultValue: 'Clearing...' })
+                      : t('realtime.clearMessages', { defaultValue: 'Clear messages' })}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -198,7 +226,7 @@ export default function RealtimeMessagesPage() {
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}
         searchDebounceTime={300}
-        searchPlaceholder="Search message"
+        searchPlaceholder={t('realtime.searchMessage', { defaultValue: 'Search message' })}
       />
 
       {/* Scrollable Content */}
@@ -217,12 +245,24 @@ export default function RealtimeMessagesPage() {
           <div className="mx-auto max-w-[1024px] w-4/5">
             <div className="flex items-center h-8 text-sm text-muted-foreground">
               <div className="w-[30px] shrink-0" />
-              <div className="flex-1 py-1.5 px-2.5">Event</div>
-              <div className="flex-1 py-1.5 px-2.5">Channel</div>
-              <div className="w-[80px] shrink-0 py-1.5 px-2.5">Sender</div>
-              <div className="w-[100px] shrink-0 py-1.5 px-2.5">WebSockets</div>
-              <div className="w-[100px] shrink-0 py-1.5 px-2.5">Webhooks</div>
-              <div className="flex-1 py-1.5 px-2.5">Sent At</div>
+              <div className="flex-1 py-1.5 px-2.5">
+                {t('realtime.event', { defaultValue: 'Event' })}
+              </div>
+              <div className="flex-1 py-1.5 px-2.5">
+                {t('realtime.channel', { defaultValue: 'Channel' })}
+              </div>
+              <div className="w-[80px] shrink-0 py-1.5 px-2.5">
+                {t('realtime.sender', { defaultValue: 'Sender' })}
+              </div>
+              <div className="w-[100px] shrink-0 py-1.5 px-2.5">
+                {t('realtime.webSockets', { defaultValue: 'WebSockets' })}
+              </div>
+              <div className="w-[100px] shrink-0 py-1.5 px-2.5">
+                {t('realtime.webhooks', { defaultValue: 'Webhooks' })}
+              </div>
+              <div className="flex-1 py-1.5 px-2.5">
+                {t('realtime.sentAt', { defaultValue: 'Sent At' })}
+              </div>
             </div>
           </div>
         </div>
@@ -253,7 +293,9 @@ export default function RealtimeMessagesPage() {
           <div className="absolute inset-0 bg-[rgb(var(--semantic-1))] flex items-center justify-center z-50">
             <div className="flex items-center gap-1">
               <div className="w-5 h-5 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-muted-foreground">Loading</span>
+              <span className="text-sm text-muted-foreground">
+                {t('realtime.loading', { defaultValue: 'Loading' })}
+              </span>
             </div>
           </div>
         )}
@@ -268,7 +310,7 @@ export default function RealtimeMessagesPage() {
             onPageChange={setMessagesPage}
             totalRecords={messagesTotalCount}
             pageSize={messagesPageSize}
-            recordLabel="messages"
+            recordLabel={t('realtime.messagesRecordLabel', { defaultValue: 'messages' })}
           />
         </div>
       )}

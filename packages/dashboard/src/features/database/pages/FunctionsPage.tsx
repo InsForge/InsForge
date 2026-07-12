@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -50,6 +51,7 @@ function parseFunctionsFromResponse(
 }
 
 export default function FunctionsPage() {
+  const { t } = useTranslation('chrome');
   const location = useLocation();
   const navigate = useNavigate();
   const { selectedSchema, setSelectedSchema } = useDatabaseSchemaSelection();
@@ -100,20 +102,24 @@ export default function FunctionsPage() {
     () => [
       {
         key: 'functionName',
-        name: 'Name',
+        name: t('common.nameColumn', { defaultValue: 'Name' }),
         width: 'minmax(200px, 2fr)',
         resizable: true,
         sortable: true,
       },
       {
         key: 'kind',
-        name: 'Type',
+        name: t('common.typeColumn', { defaultValue: 'Type' }),
         width: 'minmax(120px, 1fr)',
         resizable: true,
         sortable: true,
         renderCell: ({ row }) => {
           const kindLabel =
-            row.kind === 'f' ? 'Function' : row.kind === 'p' ? 'Procedure' : row.kind;
+            row.kind === 'f'
+              ? t('database.functionKind', { defaultValue: 'Function' })
+              : row.kind === 'p'
+                ? t('database.procedureKind', { defaultValue: 'Procedure' })
+                : row.kind;
           return (
             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
               {kindLabel}
@@ -123,20 +129,24 @@ export default function FunctionsPage() {
       },
       {
         key: 'functionDef',
-        name: 'Definition',
+        name: t('database.definitionColumn', { defaultValue: 'Definition' }),
         width: 'minmax(400px, 8fr)',
         resizable: true,
         renderCell: ({ row }) => (
           <SQLCellButton
             value={row.functionDef}
             onClick={() =>
-              setSqlModal({ open: true, title: 'Function Definition', value: row.functionDef })
+              setSqlModal({
+                open: true,
+                title: t('database.functionDefinition', { defaultValue: 'Function Definition' }),
+                value: row.functionDef,
+              })
             }
           />
         ),
       },
     ],
-    [setSqlModal]
+    [setSqlModal, t]
   );
 
   useEffect(() => {
@@ -164,7 +174,11 @@ export default function FunctionsPage() {
           </Button>
         </TooltipTrigger>
         <TooltipContent side="bottom" align="center">
-          <p>{isRefreshing ? 'Refreshing...' : 'Refresh functions'}</p>
+          <p>
+            {isRefreshing
+              ? t('common.refreshing', { defaultValue: 'Refreshing...' })
+              : t('database.refreshFunctions', { defaultValue: 'Refresh functions' })}
+          </p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -186,8 +200,14 @@ export default function FunctionsPage() {
         />
         <div className="min-w-0 flex-1 flex items-center justify-center bg-[rgb(var(--semantic-1))]">
           <EmptyState
-            title="Failed to load functions"
-            description={error instanceof Error ? error.message : 'An error occurred'}
+            title={t('database.failedToLoadFunctions', {
+              defaultValue: 'Failed to load functions',
+            })}
+            description={
+              error instanceof Error
+                ? error.message
+                : t('common.anErrorOccurred', { defaultValue: 'An error occurred' })
+            }
           />
         </div>
       </div>
@@ -209,7 +229,7 @@ export default function FunctionsPage() {
       />
       <div className="min-w-0 flex-1 flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
         <TableHeader
-          title="Database Functions"
+          title={t('database.databaseFunctions', { defaultValue: 'Database Functions' })}
           showDividerAfterTitle
           titleButtons={
             <div className="w-56">
@@ -228,11 +248,14 @@ export default function FunctionsPage() {
           leftSlot={refreshButton}
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
-          searchPlaceholder="Search function"
+          searchPlaceholder={t('database.searchFunction', { defaultValue: 'Search function' })}
         />
         {isLoading ? (
           <div className="min-h-0 flex-1 flex items-center justify-center">
-            <EmptyState title="Loading functions..." description="Please wait" />
+            <EmptyState
+              title={t('database.loadingFunctions', { defaultValue: 'Loading functions...' })}
+              description={t('common.pleaseWait', { defaultValue: 'Please wait' })}
+            />
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-hidden">
@@ -246,7 +269,9 @@ export default function FunctionsPage() {
               pageSize={pageSize}
               pageSizeOptions={pageSizeOptions}
               totalRecords={filteredFunctions.length}
-              paginationRecordLabel="functions"
+              paginationRecordLabel={t('database.functionsRecordLabel', {
+                defaultValue: 'functions',
+              })}
               onPageChange={setCurrentPage}
               onPageSizeChange={onPageSizeChange}
               noPadding={true}
@@ -255,7 +280,11 @@ export default function FunctionsPage() {
               emptyState={
                 <DataGridEmptyState
                   message={
-                    searchQuery ? 'No functions match your search criteria' : 'No functions found'
+                    searchQuery
+                      ? t('database.noFunctionsMatchSearch', {
+                          defaultValue: 'No functions match your search criteria',
+                        })
+                      : t('database.noFunctionsFound', { defaultValue: 'No functions found' })
                   }
                 />
               }

@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useRawSQL } from '#features/database/hooks/useRawSQL';
 import { useSQLEditorContext } from '#features/database/contexts/SQLEditorContext';
 import { Button, Tabs, Tab, cn } from '@insforge/ui';
@@ -104,6 +105,7 @@ function ErrorViewer({ error }: ErrorViewerProps) {
 }
 
 export default function SQLEditorPage() {
+  const { t } = useTranslation('chrome');
   const {
     tabs,
     activeTab,
@@ -217,7 +219,11 @@ export default function SQLEditorPage() {
       convertToCSV(exportData, filename);
       setIsExportMenuOpen(false);
     } catch (err) {
-      setExportError(err instanceof Error ? err : new Error('Failed to export CSV'));
+      setExportError(
+        err instanceof Error
+          ? err
+          : new Error(t('database.failedToExportCsv', { defaultValue: 'Failed to export CSV' }))
+      );
     }
   };
 
@@ -234,7 +240,11 @@ export default function SQLEditorPage() {
       convertToJSON(exportData, filename);
       setIsExportMenuOpen(false);
     } catch (err) {
-      setExportError(err instanceof Error ? err : new Error('Failed to export JSON'));
+      setExportError(
+        err instanceof Error
+          ? err
+          : new Error(t('database.failedToExportJson', { defaultValue: 'Failed to export JSON' }))
+      );
     }
   };
 
@@ -245,7 +255,7 @@ export default function SQLEditorPage() {
         {/* Title: h-full, px-16, py-12 */}
         <div className="flex items-center h-full overflow-clip px-4 py-3 shrink-0">
           <span className="text-base font-medium leading-7 text-black dark:text-white whitespace-nowrap">
-            SQL Editor
+            {t('menu.sql-editor', { defaultValue: 'SQL Editor' })}
           </span>
         </div>
 
@@ -324,7 +334,7 @@ export default function SQLEditorPage() {
                             'flex items-center justify-center shrink-0 rounded',
                             tabs.length <= 1 && 'invisible'
                           )}
-                          aria-label="Close tab"
+                          aria-label={t('database.closeTab', { defaultValue: 'Close tab' })}
                         >
                           <X className="w-5 h-5 text-neutral-400 hover:text-black dark:hover:text-white" />
                         </button>
@@ -375,19 +385,19 @@ export default function SQLEditorPage() {
             {/* Tabs */}
             <Tabs value={resultView} onValueChange={setResultView}>
               <Tab value="result">
-                Result
+                {t('database.result', { defaultValue: 'Result' })}
                 {isSuccess && data && isRowData(Array.isArray(data) ? data : data.rows) && (
                   <span className="flex items-center justify-center px-2 py-0.5 rounded bg-[var(--alpha-8)] text-xs font-medium text-muted-foreground">
                     {(Array.isArray(data) ? data : data.rows).length}
                   </span>
                 )}
               </Tab>
-              <Tab value="table">Table View</Tab>
+              <Tab value="table">{t('database.tableView', { defaultValue: 'Table View' })}</Tab>
             </Tabs>
             {/* Run Button + Export Menu */}
             <div className="flex items-center gap-2 relative">
               <Button onClick={handleExecuteQuery} disabled={isPending || !activeTab?.query.trim()}>
-                Run
+                {t('database.run', { defaultValue: 'Run' })}
               </Button>
 
               {/* Export Dropdown */}
@@ -401,8 +411,12 @@ export default function SQLEditorPage() {
                       ? 'hover:bg-[var(--alpha-8)] text-foreground cursor-pointer'
                       : 'text-muted-foreground opacity-50 cursor-not-allowed'
                   )}
-                  aria-label="Export results"
-                  title={getExportTableData() ? 'Export results' : 'No data to export'}
+                  aria-label={t('database.exportResults', { defaultValue: 'Export results' })}
+                  title={
+                    getExportTableData()
+                      ? t('database.exportResults', { defaultValue: 'Export results' })
+                      : t('database.noDataToExport', { defaultValue: 'No data to export' })
+                  }
                 >
                   <Download className="w-5 h-5" />
                 </button>
@@ -415,7 +429,7 @@ export default function SQLEditorPage() {
                       className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-[var(--alpha-4)] rounded-t-lg flex items-center gap-2 transition-colors"
                     >
                       <Download className="w-4 h-4" />
-                      Download as CSV
+                      {t('database.downloadAsCsv', { defaultValue: 'Download as CSV' })}
                     </button>
                     <div className="border-t border-[var(--alpha-8)]" />
                     <button
@@ -423,7 +437,7 @@ export default function SQLEditorPage() {
                       className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-[var(--alpha-4)] rounded-b-lg flex items-center gap-2 transition-colors"
                     >
                       <FileJson className="w-4 h-4" />
-                      Download as JSON
+                      {t('database.downloadAsJson', { defaultValue: 'Download as JSON' })}
                     </button>
                   </div>
                 )}
@@ -459,7 +473,11 @@ export default function SQLEditorPage() {
                   resultView !== 'result' && 'px-4 py-3'
                 )}
               >
-                {isPending ? 'Executing query...' : 'Click Run to execute your query'}
+                {isPending
+                  ? t('database.executingQuery', { defaultValue: 'Executing query...' })
+                  : t('database.clickRunToExecute', {
+                      defaultValue: 'Click Run to execute your query',
+                    })}
               </p>
             )}
           </div>

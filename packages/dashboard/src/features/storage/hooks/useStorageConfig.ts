@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { StorageConfigSchema, UpdateStorageConfigRequest } from '@insforge/shared-schemas';
 import { storageConfigService } from '#features/storage/services/storage-config.service';
 import { useToast } from '@insforge/ui';
@@ -8,6 +9,7 @@ import { useToast } from '@insforge/ui';
  * Provides config data, loading/updating states, and a mutate function.
  */
 export function useStorageConfig() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -25,10 +27,21 @@ export function useStorageConfig() {
     mutationFn: (input: UpdateStorageConfigRequest) => storageConfigService.updateConfig(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['storage-config'] });
-      showToast('Storage configuration updated successfully', 'success');
+      showToast(
+        t('storage.configUpdatedSuccessfully', {
+          defaultValue: 'Storage configuration updated successfully',
+        }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to update storage configuration', 'error');
+      showToast(
+        error.message ||
+          t('storage.failedToUpdateConfig', {
+            defaultValue: 'Failed to update storage configuration',
+          }),
+        'error'
+      );
     },
   });
 

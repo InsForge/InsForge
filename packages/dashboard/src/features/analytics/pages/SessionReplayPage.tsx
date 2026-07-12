@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   EmptyStateIllustration,
   ErrorState,
@@ -15,9 +16,13 @@ const WINDOW_SIZE = 50;
 const PAGE_SIZE = 10;
 
 export function SessionReplayPage() {
+  const { t } = useTranslation('chrome');
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-semantic-1">
-      <TableHeader title="Session Replay" showSearch={false} />
+      <TableHeader
+        title={t('analytics.sidebar.sessionReplay', { defaultValue: 'Session Replay' })}
+        showSearch={false}
+      />
       <div className="min-h-0 flex-1">
         <RequireAnalyticsConnection>
           <SessionReplayPageBody />
@@ -28,6 +33,7 @@ export function SessionReplayPage() {
 }
 
 function SessionReplayPageBody() {
+  const { t } = useTranslation('chrome');
   const { data, isLoading, error } = useRecordings(WINDOW_SIZE, true);
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -47,33 +53,50 @@ function SessionReplayPageBody() {
           {/* Table header */}
           <div className="flex items-center pl-1.5">
             <div className="flex h-8 flex-1 items-center px-2.5">
-              <span className="text-sm text-muted-foreground">Replay</span>
+              <span className="text-sm text-muted-foreground">
+                {t('analytics.columns.replay', { defaultValue: 'Replay' })}
+              </span>
             </div>
             <div className="flex h-8 flex-[1.5] items-center px-2.5">
-              <span className="text-sm text-muted-foreground">Link</span>
+              <span className="text-sm text-muted-foreground">
+                {t('analytics.columns.link', { defaultValue: 'Link' })}
+              </span>
             </div>
             <div className="flex h-8 w-24 items-center px-2.5">
-              <span className="text-sm text-muted-foreground">Duration</span>
+              <span className="text-sm text-muted-foreground">
+                {t('analytics.columns.duration', { defaultValue: 'Duration' })}
+              </span>
             </div>
             <div className="flex h-8 flex-1 items-center px-2.5">
-              <span className="text-sm text-muted-foreground">Time Recorded</span>
+              <span className="text-sm text-muted-foreground">
+                {t('analytics.columns.timeRecorded', { defaultValue: 'Time Recorded' })}
+              </span>
             </div>
           </div>
 
           {/* Table body */}
           <div className="mt-1 flex flex-col gap-1">
             {isLoading ? (
-              <LoadingState message="Loading replays…" />
+              <LoadingState
+                message={t('analytics.loadingReplays', { defaultValue: 'Loading replays…' })}
+              />
             ) : error ? (
-              <ErrorState title="Failed to load replays" error="Please try again." />
+              <ErrorState
+                title={t('analytics.replaysLoadError', {
+                  defaultValue: 'Failed to load replays',
+                })}
+                error={t('analytics.pleaseTryAgain', { defaultValue: 'Please try again.' })}
+              />
             ) : pageItems.length === 0 ? (
               <div className="flex flex-col items-center gap-2 pb-12 pt-6 text-center">
                 <EmptyStateIllustration />
                 <p className="text-sm font-medium leading-6 text-muted-foreground">
-                  No replays yet
+                  {t('analytics.noReplays', { defaultValue: 'No replays yet' })}
                 </p>
                 <p className="text-xs leading-4 text-muted-foreground">
-                  Make sure session_recording is enabled in your PostHog project.
+                  {t('analytics.noReplaysHint', {
+                    defaultValue: 'Make sure session_recording is enabled in your PostHog project.',
+                  })}
                 </p>
               </div>
             ) : (
@@ -89,7 +112,7 @@ function SessionReplayPageBody() {
           totalPages={totalPages}
           totalRecords={allItems.length}
           pageSize={PAGE_SIZE}
-          recordLabel="replays"
+          recordLabel={t('analytics.replaysRecordLabel', { defaultValue: 'replays' })}
           onPageChange={setPage}
         />
       )}

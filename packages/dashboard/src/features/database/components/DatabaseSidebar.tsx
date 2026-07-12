@@ -300,7 +300,7 @@ export function DatabaseSidebar({
             }
             itemActions={getItemActions}
             showSearch={!showEmptyState}
-            searchPlaceholder="Search tables..."
+            searchPlaceholder={t('database.searchTables', { defaultValue: 'Search tables...' })}
           />
         </div>
 

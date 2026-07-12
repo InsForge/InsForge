@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CopyButton, cn } from '@insforge/ui';
 import { ShowPasswordButton } from './ShowPasswordButton';
 import { useDatabaseConnectionString, useDatabasePassword } from '#lib/hooks/useMetadata';
@@ -25,6 +26,7 @@ export function ConnectionStringSectionV2({
   className,
   variant = 'horizontal',
 }: ConnectionStringSectionV2Props) {
+  const { t } = useTranslation('chrome');
   const [showConnectionPassword, setShowConnectionPassword] = useState(false);
   const [showParamsPassword, setShowParamsPassword] = useState(false);
 
@@ -110,10 +112,12 @@ export function ConnectionStringSectionV2({
             isVertical ? 'text-base' : 'text-sm leading-6'
           )}
         >
-          Connection String
+          {t('overview.connectionString', { defaultValue: 'Connection String' })}
         </p>
         <p className="text-sm leading-5 text-muted-foreground">
-          Copy the connection details for your database.
+          {t('overview.connectionStringDescription', {
+            defaultValue: 'Copy the connection details for your database.',
+          })}
         </p>
       </div>
       <div className="flex flex-1 flex-col gap-3">
@@ -121,7 +125,7 @@ export function ConnectionStringSectionV2({
           <div className="flex items-center justify-between">
             <div className="flex h-5 items-center justify-center rounded bg-[var(--alpha-8)] px-2">
               <span className="text-xs font-medium leading-4 text-muted-foreground">
-                connection string
+                {t('overview.connectionStringLabel', { defaultValue: 'connection string' })}
               </span>
             </div>
             <div className="flex items-center gap-[5px]">
@@ -133,7 +137,7 @@ export function ConnectionStringSectionV2({
             </div>
           </div>
           <p className="break-all font-mono text-sm leading-6 text-foreground">
-            {connectionStringDisplay || 'Loading...'}
+            {connectionStringDisplay || t('overview.loading', { defaultValue: 'Loading...' })}
           </p>
         </div>
 
@@ -141,7 +145,7 @@ export function ConnectionStringSectionV2({
           <div className="flex items-center justify-between">
             <div className="flex h-5 items-center justify-center rounded bg-[var(--alpha-8)] px-2">
               <span className="text-xs font-medium leading-4 text-muted-foreground">
-                parameters
+                {t('overview.parametersLabel', { defaultValue: 'parameters' })}
               </span>
             </div>
             <div className="flex items-center gap-[5px]">

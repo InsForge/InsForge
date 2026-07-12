@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -52,6 +53,7 @@ function parseTriggersFromResponse(response: DatabaseTriggersResponse | undefine
 }
 
 export default function TriggersPage() {
+  const { t } = useTranslation('chrome');
   const location = useLocation();
   const navigate = useNavigate();
   const { selectedSchema, setSelectedSchema } = useDatabaseSchemaSelection();
@@ -106,21 +108,21 @@ export default function TriggersPage() {
     () => [
       {
         key: 'tableName',
-        name: 'Table',
+        name: t('database.tableColumn', { defaultValue: 'Table' }),
         width: 'minmax(180px, 1.5fr)',
         resizable: true,
         sortable: true,
       },
       {
         key: 'triggerName',
-        name: 'Name',
+        name: t('common.nameColumn', { defaultValue: 'Name' }),
         width: 'minmax(200px, 2fr)',
         resizable: true,
         sortable: true,
       },
       {
         key: 'actionTiming',
-        name: 'Timing',
+        name: t('database.timingColumn', { defaultValue: 'Timing' }),
         width: 'minmax(100px, 1fr)',
         resizable: true,
         sortable: true,
@@ -135,7 +137,7 @@ export default function TriggersPage() {
       },
       {
         key: 'eventManipulation',
-        name: 'Event',
+        name: t('database.eventColumn', { defaultValue: 'Event' }),
         width: 'minmax(100px, 1fr)',
         resizable: true,
         sortable: true,
@@ -150,20 +152,24 @@ export default function TriggersPage() {
       },
       {
         key: 'actionStatement',
-        name: 'Statement',
+        name: t('database.statementColumn', { defaultValue: 'Statement' }),
         width: 'minmax(300px, 3fr)',
         resizable: true,
         renderCell: ({ row }) => (
           <SQLCellButton
             value={row.actionStatement}
             onClick={() =>
-              setSqlModal({ open: true, title: 'Trigger Statement', value: row.actionStatement })
+              setSqlModal({
+                open: true,
+                title: t('database.triggerStatement', { defaultValue: 'Trigger Statement' }),
+                value: row.actionStatement,
+              })
             }
           />
         ),
       },
     ],
-    [setSqlModal]
+    [setSqlModal, t]
   );
 
   useEffect(() => {
@@ -191,7 +197,11 @@ export default function TriggersPage() {
           </Button>
         </TooltipTrigger>
         <TooltipContent side="bottom" align="center">
-          <p>{isRefreshing ? 'Refreshing...' : 'Refresh triggers'}</p>
+          <p>
+            {isRefreshing
+              ? t('common.refreshing', { defaultValue: 'Refreshing...' })
+              : t('database.refreshTriggers', { defaultValue: 'Refresh triggers' })}
+          </p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -213,8 +223,14 @@ export default function TriggersPage() {
         />
         <div className="min-w-0 flex-1 flex items-center justify-center bg-[rgb(var(--semantic-1))]">
           <EmptyState
-            title="Failed to load triggers"
-            description={error instanceof Error ? error.message : 'An error occurred'}
+            title={t('database.failedToLoadTriggers', {
+              defaultValue: 'Failed to load triggers',
+            })}
+            description={
+              error instanceof Error
+                ? error.message
+                : t('common.anErrorOccurred', { defaultValue: 'An error occurred' })
+            }
           />
         </div>
       </div>
@@ -236,7 +252,7 @@ export default function TriggersPage() {
       />
       <div className="min-w-0 flex-1 flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
         <TableHeader
-          title="Database Triggers"
+          title={t('database.databaseTriggers', { defaultValue: 'Database Triggers' })}
           showDividerAfterTitle
           titleButtons={
             <div className="w-56">
@@ -255,11 +271,14 @@ export default function TriggersPage() {
           leftSlot={refreshButton}
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
-          searchPlaceholder="Search trigger"
+          searchPlaceholder={t('database.searchTrigger', { defaultValue: 'Search trigger' })}
         />
         {isLoading ? (
           <div className="min-h-0 flex-1 flex items-center justify-center">
-            <EmptyState title="Loading triggers..." description="Please wait" />
+            <EmptyState
+              title={t('database.loadingTriggers', { defaultValue: 'Loading triggers...' })}
+              description={t('common.pleaseWait', { defaultValue: 'Please wait' })}
+            />
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-hidden">
@@ -273,7 +292,9 @@ export default function TriggersPage() {
               pageSize={pageSize}
               pageSizeOptions={pageSizeOptions}
               totalRecords={filteredTriggers.length}
-              paginationRecordLabel="triggers"
+              paginationRecordLabel={t('database.triggersRecordLabel', {
+                defaultValue: 'triggers',
+              })}
               onPageChange={setCurrentPage}
               onPageSizeChange={onPageSizeChange}
               noPadding={true}
@@ -282,7 +303,11 @@ export default function TriggersPage() {
               emptyState={
                 <DataGridEmptyState
                   message={
-                    searchQuery ? 'No triggers match your search criteria' : 'No triggers found'
+                    searchQuery
+                      ? t('database.noTriggersMatchSearch', {
+                          defaultValue: 'No triggers match your search criteria',
+                        })
+                      : t('database.noTriggersFound', { defaultValue: 'No triggers found' })
                   }
                 />
               }

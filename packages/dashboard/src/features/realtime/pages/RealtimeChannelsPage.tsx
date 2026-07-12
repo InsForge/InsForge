@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CirclePlus } from 'lucide-react';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import {
@@ -20,6 +21,7 @@ import type { RealtimeChannel } from '#features/realtime/services/realtime.servi
 import type { CreateChannelRequest, UpdateChannelRequest } from '@insforge/shared-schemas';
 
 export default function RealtimeChannelsPage() {
+  const { t } = useTranslation('chrome');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<RealtimeChannel | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -79,9 +81,13 @@ export default function RealtimeChannelsPage() {
 
   const handleDelete = async (channel: RealtimeChannel) => {
     const shouldDelete = await confirm({
-      title: 'Delete Channel',
-      description: `Are you sure you want to delete the channel "${channel.pattern}"? This action cannot be undone.`,
-      confirmText: 'Delete',
+      title: t('realtime.deleteChannelTitle', { defaultValue: 'Delete Channel' }),
+      description: t('realtime.deleteChannelConfirmDescription', {
+        defaultValue:
+          'Are you sure you want to delete the channel "{{pattern}}"? This action cannot be undone.',
+        pattern: channel.pattern,
+      }),
+      confirmText: t('realtime.delete', { defaultValue: 'Delete' }),
       destructive: true,
     });
 
@@ -120,7 +126,9 @@ export default function RealtimeChannelsPage() {
       <TableHeader
         leftContent={
           <div className="flex flex-1 items-center overflow-clip">
-            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Channels</h1>
+            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
+              {t('realtime.channels', { defaultValue: 'Channels' })}
+            </h1>
             <div className="flex h-5 w-5 shrink-0 items-center justify-center">
               <div className="h-5 w-px bg-[var(--alpha-8)]" />
             </div>
@@ -138,7 +146,11 @@ export default function RealtimeChannelsPage() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">
-                  <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                  <p>
+                    {isRefreshing
+                      ? t('realtime.refreshing', { defaultValue: 'Refreshing...' })
+                      : t('realtime.refresh', { defaultValue: 'Refresh' })}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -154,7 +166,9 @@ export default function RealtimeChannelsPage() {
               onClick={openCreateDialog}
             >
               <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
-              <span className="px-1 text-sm font-medium leading-5">Add Channel</span>
+              <span className="px-1 text-sm font-medium leading-5">
+                {t('realtime.addChannel', { defaultValue: 'Add Channel' })}
+              </span>
             </Button>
           </div>
         }
@@ -162,7 +176,7 @@ export default function RealtimeChannelsPage() {
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}
         searchDebounceTime={300}
-        searchPlaceholder="Search channel"
+        searchPlaceholder={t('realtime.searchChannel', { defaultValue: 'Search channel' })}
       />
 
       {/* Scrollable Content */}
@@ -181,9 +195,15 @@ export default function RealtimeChannelsPage() {
           <div className="mx-auto max-w-[1024px] w-4/5">
             <div className="flex items-center pl-1.5 h-8 text-sm text-muted-foreground">
               <div className="w-[62px] shrink-0 py-1.5 px-2.5" />
-              <div className="flex-1 py-1.5 px-2.5">Pattern</div>
-              <div className="flex-[2.5] py-1.5 px-2.5">Description</div>
-              <div className="flex-1 py-1.5 px-2.5">Created</div>
+              <div className="flex-1 py-1.5 px-2.5">
+                {t('realtime.pattern', { defaultValue: 'Pattern' })}
+              </div>
+              <div className="flex-[2.5] py-1.5 px-2.5">
+                {t('realtime.description', { defaultValue: 'Description' })}
+              </div>
+              <div className="flex-1 py-1.5 px-2.5">
+                {t('realtime.created', { defaultValue: 'Created' })}
+              </div>
               <div className="w-[52px] shrink-0" />
             </div>
           </div>
@@ -223,7 +243,9 @@ export default function RealtimeChannelsPage() {
           <div className="absolute inset-0 bg-[rgb(var(--semantic-1))] flex items-center justify-center z-50">
             <div className="flex items-center gap-1">
               <div className="w-5 h-5 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-muted-foreground">Loading</span>
+              <span className="text-sm text-muted-foreground">
+                {t('realtime.loading', { defaultValue: 'Loading' })}
+              </span>
             </div>
           </div>
         )}

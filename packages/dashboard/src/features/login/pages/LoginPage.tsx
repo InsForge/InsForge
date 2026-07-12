@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,6 +25,7 @@ import { useAuth } from '#lib/contexts/AuthContext';
 import { loginFormSchema, LoginForm } from '#lib/utils/schemaValidations';
 
 export default function LoginPage() {
+  const { t } = useTranslation('chrome');
   const navigate = useNavigate();
   const { loginWithPassword, isAuthenticated } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,10 +47,15 @@ export default function LoginPage() {
       const success = await loginWithPassword(data.username, data.password);
 
       if (!success) {
-        throw new Error('Invalid username or password');
+        throw new Error(
+          t('loginPage.invalidCredentials', { defaultValue: 'Invalid username or password' })
+        );
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : t('loginPage.genericError', { defaultValue: 'An error occurred' });
       setSubmitError(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -69,8 +76,12 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-lg mb-4">
             <Lock className="h-8 w-8 text-[rgb(var(--inverse))]" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Insforge Admin</h1>
-          <p className="text-sm text-muted-foreground mt-2">Sign in to access your dashboard</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            {t('loginPage.title', { defaultValue: 'Insforge Admin' })}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            {t('loginPage.subtitle', { defaultValue: 'Sign in to access your dashboard' })}
+          </p>
         </div>
 
         {/* Login Card */}
@@ -78,8 +89,12 @@ export default function LoginPage() {
           <Form {...form}>
             <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)}>
               <CardHeader>
-                <CardTitle>Sign In</CardTitle>
-                <CardDescription>Enter your admin credentials to continue</CardDescription>
+                <CardTitle>{t('loginPage.signIn', { defaultValue: 'Sign In' })}</CardTitle>
+                <CardDescription>
+                  {t('loginPage.cardDescription', {
+                    defaultValue: 'Enter your admin credentials to continue',
+                  })}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <FormField
@@ -87,7 +102,7 @@ export default function LoginPage() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Username</FormLabel>
+                      <FormLabel>{t('loginPage.username', { defaultValue: 'Username' })}</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -110,14 +125,16 @@ export default function LoginPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel>{t('loginPage.password', { defaultValue: 'Password' })}</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                           <Input
                             {...field}
                             type="password"
-                            placeholder="Enter your password"
+                            placeholder={t('loginPage.passwordPlaceholder', {
+                              defaultValue: 'Enter your password',
+                            })}
                             className="pl-10"
                             autoComplete="current-password"
                           />
@@ -137,10 +154,14 @@ export default function LoginPage() {
               <CardFooter className="flex flex-col space-y-4">
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {isSubmitting ? 'Signing in...' : 'Sign in'}
+                  {isSubmitting
+                    ? t('loginPage.signingIn', { defaultValue: 'Signing in...' })
+                    : t('loginPage.signInButton', { defaultValue: 'Sign in' })}
                 </Button>
                 <p className="text-xs text-center text-muted-foreground">
-                  Use the credentials configured in your .env file
+                  {t('loginPage.envCredentialsHint', {
+                    defaultValue: 'Use the credentials configured in your .env file',
+                  })}
                 </p>
               </CardFooter>
             </form>
@@ -150,7 +171,9 @@ export default function LoginPage() {
         {/* Footer */}
         <div className="mt-8 text-center">
           <p className="text-xs text-muted-foreground">
-            Insforge - Self-hosted Backend as a Service
+            {t('loginPage.footer', {
+              defaultValue: 'Insforge - Self-hosted Backend as a Service',
+            })}
           </p>
         </div>
       </div>

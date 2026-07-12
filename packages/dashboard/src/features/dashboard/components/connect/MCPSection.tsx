@@ -61,14 +61,19 @@ export function MCPSection({
           )}
           {selectedAgent.id === 'mcp' && (
             <p className="text-sm leading-6 text-muted-foreground">
-              Add this configuration to your MCP settings
+              {t('overview.addMcpConfiguration', {
+                defaultValue: 'Add this configuration to your MCP settings',
+              })}
             </p>
           )}
           {selectedAgent.id !== 'cursor' &&
             selectedAgent.id !== 'qoder' &&
             selectedAgent.id !== 'mcp' && (
               <p className="text-sm leading-6 text-muted-foreground">
-                Run the following command in terminal to install InsForge MCP Server
+                {t('overview.runInstallCommand', {
+                  defaultValue:
+                    'Run the following command in terminal to install InsForge MCP Server',
+                })}
               </p>
             )}
         </div>

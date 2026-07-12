@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CopyButton, cn } from '@insforge/ui';
 import {
   MCP_AGENTS,
@@ -69,6 +70,7 @@ export function DTestMCPSection({
   agentId,
   hideQuickStartPrompt = false,
 }: DTestMCPSectionProps) {
+  const { t } = useTranslation('chrome');
   const agent = useMemo(() => MCP_AGENTS.find((a) => a.id === agentId) ?? MCP_AGENTS[0], [agentId]);
 
   // While credentials load, caller may pass a masked placeholder (ik_***…). Treat it
@@ -97,13 +99,20 @@ export function DTestMCPSection({
     return (
       <div className={cn('flex flex-col gap-3', className)}>
         <section className="flex flex-col rounded border border-[var(--alpha-8)] bg-card p-6">
-          <Step number={1} title="Install InsForge MCP" description="Install in one click">
+          <Step
+            number={1}
+            title={t('overview.installInsForgeMcp', { defaultValue: 'Install InsForge MCP' })}
+            description={t('overview.installOneClick', { defaultValue: 'Install in one click' })}
+          >
             <InstallDeeplinkButton agent={agent} deeplink={deeplink} />
           </Step>
           <Step
             number={2}
-            title="Verify Connection"
-            description="Send the prompt below to your AI coding agent to verify the connection."
+            title={t('overview.verifyConnection', { defaultValue: 'Verify Connection' })}
+            description={t('overview.sendPrompt', {
+              defaultValue:
+                'Send the prompt below to your AI coding agent to verify the connection.',
+            })}
             isLast
           >
             <PastePromptButton agent={agent} prompt={MCP_VERIFY_CONNECTION_PROMPT} />
@@ -117,7 +126,10 @@ export function DTestMCPSection({
     <div className={cn('flex flex-col gap-3', className)}>
       {!hideQuickStartPrompt && (
         <QuickStartPromptCard
-          subtitle={`Paste this into ${agent.displayName} to setup InsForge MCP`}
+          subtitle={t('overview.pasteMcpSubtitle', {
+            agent: agent.displayName,
+            defaultValue: 'Paste this into {{agent}} to setup InsForge MCP',
+          })}
           prompt={quickStartPrompt}
         />
       )}
@@ -125,21 +137,36 @@ export function DTestMCPSection({
       {/* Step by Step card */}
       <section className="flex flex-col gap-6 rounded border border-[var(--alpha-8)] bg-card p-6">
         <span className="w-fit rounded bg-[var(--alpha-8)] px-1.5 py-0.5 text-xs font-medium leading-4 text-[rgb(var(--warning))]">
-          Step by Step
+          {t('overview.stepByStep', { defaultValue: 'Step by Step' })}
         </span>
 
         <div className="flex flex-col">
           <Step
             number={1}
-            title={isMcpJson ? 'Add MCP Configuration' : 'Install InsForge MCP'}
+            title={
+              isMcpJson
+                ? t('overview.addMcpConfigurationTitle', {
+                    defaultValue: 'Add MCP Configuration',
+                  })
+                : t('overview.installInsForgeMcp', { defaultValue: 'Install InsForge MCP' })
+            }
             description={
               isMcpJson
-                ? 'Add this configuration to your MCP settings.'
-                : 'Run the following command in terminal to install InsForge MCP Server'
+                ? t('overview.addMcpConfigDescription', {
+                    defaultValue: 'Add this configuration to your MCP settings.',
+                  })
+                : t('overview.runInstallCommand', {
+                    defaultValue:
+                      'Run the following command in terminal to install InsForge MCP Server',
+                  })
             }
           >
             <CodeBlock
-              badge={isMcpJson ? 'MCP JSON' : 'terminal command'}
+              badge={
+                isMcpJson
+                  ? 'MCP JSON'
+                  : t('overview.terminalCommandLower', { defaultValue: 'terminal command' })
+              }
               code={installBody}
               isLoading={isLoading}
               mono
@@ -149,11 +176,18 @@ export function DTestMCPSection({
 
           <Step
             number={2}
-            title="Verify Connection"
-            description="Send the prompt below to your AI coding agent to verify the connection."
+            title={t('overview.verifyConnection', { defaultValue: 'Verify Connection' })}
+            description={t('overview.sendPrompt', {
+              defaultValue:
+                'Send the prompt below to your AI coding agent to verify the connection.',
+            })}
             isLast
           >
-            <CodeBlock badge="prompt" code={MCP_VERIFY_CONNECTION_PROMPT} mono />
+            <CodeBlock
+              badge={t('overview.promptLabel', { defaultValue: 'prompt' })}
+              code={MCP_VERIFY_CONNECTION_PROMPT}
+              mono
+            />
           </Step>
         </div>
       </section>
@@ -167,6 +201,7 @@ interface InstallDeeplinkButtonProps {
 }
 
 function InstallDeeplinkButton({ agent, deeplink }: InstallDeeplinkButtonProps) {
+  const { t } = useTranslation('chrome');
   const handleClick = useCallback(() => {
     window.open(deeplink, '_blank');
   }, [deeplink]);
@@ -175,7 +210,10 @@ function InstallDeeplinkButton({ agent, deeplink }: InstallDeeplinkButtonProps) 
     <WhiteActionButton
       onClick={handleClick}
       agent={agent}
-      label={`Install to ${agent.displayName}`}
+      label={t('overview.installToAgent', {
+        agent: agent.displayName,
+        defaultValue: 'Install to {{agent}}',
+      })}
     />
   );
 }
@@ -186,6 +224,7 @@ interface PastePromptButtonProps {
 }
 
 function PastePromptButton({ agent, prompt }: PastePromptButtonProps) {
+  const { t } = useTranslation('chrome');
   const deeplink = useMemo(() => buildPromptDeeplink(agent.id, prompt), [agent.id, prompt]);
 
   const handleClick = useCallback(() => {
@@ -208,7 +247,10 @@ function PastePromptButton({ agent, prompt }: PastePromptButtonProps) {
     <WhiteActionButton
       onClick={handleClick}
       agent={agent}
-      label={`Paste Prompt to ${agent.displayName}`}
+      label={t('overview.pastePromptToAgent', {
+        agent: agent.displayName,
+        defaultValue: 'Paste Prompt to {{agent}}',
+      })}
     />
   );
 }

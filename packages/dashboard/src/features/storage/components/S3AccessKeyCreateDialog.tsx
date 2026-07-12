@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import {
   Button,
@@ -36,6 +37,7 @@ export function S3AccessKeyCreateDialog({
   onCreate,
   isCreating,
 }: S3AccessKeyCreateDialogProps) {
+  const { t } = useTranslation('chrome');
   const [description, setDescription] = useState('');
   const [result, setResult] = useState<S3AccessKeyWithSecretSchema | null>(null);
   const [secretVisible, setSecretVisible] = useState(false);
@@ -78,11 +80,20 @@ export function S3AccessKeyCreateDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-[520px]">
         <DialogHeader>
-          <DialogTitle>{showingSecret ? 'S3 Access Key Created' : 'New S3 Access Key'}</DialogTitle>
+          <DialogTitle>
+            {showingSecret
+              ? t('storage.s3AccessKeyCreated', { defaultValue: 'S3 Access Key Created' })
+              : t('storage.newS3AccessKeyTitle', { defaultValue: 'New S3 Access Key' })}
+          </DialogTitle>
           <DialogDescription>
             {showingSecret
-              ? 'Copy the secret access key now. Acknowledgement is required before closing.'
-              : 'Create a new S3 access key. The secret is shown only once.'}
+              ? t('storage.s3AccessKeyCreatedDescription', {
+                  defaultValue:
+                    'Copy the secret access key now. Acknowledgement is required before closing.',
+                })
+              : t('storage.newS3AccessKeyDescription', {
+                  defaultValue: 'Create a new S3 access key. The secret is shown only once.',
+                })}
           </DialogDescription>
         </DialogHeader>
 
@@ -90,10 +101,15 @@ export function S3AccessKeyCreateDialog({
           {!showingSecret ? (
             <div className="flex flex-col gap-3">
               <label className="text-sm text-foreground">
-                Description <span className="text-muted-foreground">(optional)</span>
+                {t('storage.description', { defaultValue: 'Description' })}{' '}
+                <span className="text-muted-foreground">
+                  {t('storage.optional', { defaultValue: '(optional)' })}
+                </span>
               </label>
               <Input
-                placeholder="e.g. backup-script, ci-uploader"
+                placeholder={t('storage.s3KeyDescriptionPlaceholder', {
+                  defaultValue: 'e.g. backup-script, ci-uploader',
+                })}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 maxLength={200}
@@ -101,7 +117,10 @@ export function S3AccessKeyCreateDialog({
                 autoFocus
               />
               <p className="text-xs text-muted-foreground">
-                A short label to help you identify this key later. Only you see it.
+                {t('storage.s3KeyDescriptionHelp', {
+                  defaultValue:
+                    'A short label to help you identify this key later. Only you see it.',
+                })}
               </p>
             </div>
           ) : (
@@ -109,15 +128,24 @@ export function S3AccessKeyCreateDialog({
               <div className="flex items-start gap-2 rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-foreground">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
                 <div>
-                  <p className="font-medium">Copy the Secret Access Key now.</p>
+                  <p className="font-medium">
+                    {t('storage.copySecretNow', {
+                      defaultValue: 'Copy the Secret Access Key now.',
+                    })}
+                  </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    We will not show it again. If you lose it, revoke this key and create a new one.
+                    {t('storage.secretNotShownAgain', {
+                      defaultValue:
+                        'We will not show it again. If you lose it, revoke this key and create a new one.',
+                    })}
                   </p>
                 </div>
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-sm text-foreground">Access Key ID</label>
+                <label className="text-sm text-foreground">
+                  {t('storage.accessKeyId', { defaultValue: 'Access Key ID' })}
+                </label>
                 <div className="flex items-center gap-2">
                   <Input readOnly value={result.accessKeyId} className="font-mono text-sm" />
                   <CopyButton text={result.accessKeyId} showText={false} />
@@ -125,7 +153,9 @@ export function S3AccessKeyCreateDialog({
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-sm text-foreground">Secret Access Key</label>
+                <label className="text-sm text-foreground">
+                  {t('storage.secretAccessKey', { defaultValue: 'Secret Access Key' })}
+                </label>
                 <div className="flex items-center gap-2">
                   <Input
                     readOnly
@@ -137,7 +167,11 @@ export function S3AccessKeyCreateDialog({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    aria-label={secretVisible ? 'Hide secret' : 'Show secret'}
+                    aria-label={
+                      secretVisible
+                        ? t('storage.hideSecret', { defaultValue: 'Hide secret' })
+                        : t('storage.showSecret', { defaultValue: 'Show secret' })
+                    }
                     onClick={() => setSecretVisible((v) => !v)}
                   >
                     {secretVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -152,7 +186,11 @@ export function S3AccessKeyCreateDialog({
                   onCheckedChange={(v) => setAcknowledged(v === true)}
                   className="mt-0.5"
                 />
-                <span>I have saved the Secret Access Key in a safe place.</span>
+                <span>
+                  {t('storage.savedSecretAcknowledgement', {
+                    defaultValue: 'I have saved the Secret Access Key in a safe place.',
+                  })}
+                </span>
               </label>
             </div>
           )}
@@ -167,15 +205,17 @@ export function S3AccessKeyCreateDialog({
                 onClick={() => onOpenChange(false)}
                 disabled={isCreating}
               >
-                Cancel
+                {t('storage.cancel', { defaultValue: 'Cancel' })}
               </Button>
               <Button type="button" onClick={() => void handleCreate()} disabled={isCreating}>
-                {isCreating ? 'Creating...' : 'Create'}
+                {isCreating
+                  ? t('storage.creating', { defaultValue: 'Creating...' })
+                  : t('storage.create', { defaultValue: 'Create' })}
               </Button>
             </>
           ) : (
             <Button type="button" onClick={() => onOpenChange(false)} disabled={!acknowledged}>
-              Done
+              {t('storage.done', { defaultValue: 'Done' })}
             </Button>
           )}
         </DialogFooter>

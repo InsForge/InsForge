@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button, CopyButton } from '@insforge/ui';
 import { Database, Globe } from 'lucide-react';
@@ -131,6 +132,7 @@ interface StepperCardProps {
 }
 
 function StepperCard({ onDismiss, completedSteps, showDismiss = false }: StepperCardProps) {
+  const { t } = useTranslation('chrome');
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
   const currentStep = PROMPT_STEPS[activeStep];
@@ -141,7 +143,9 @@ function StepperCard({ onDismiss, completedSteps, showDismiss = false }: Stepper
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <p className="text-[20px] font-medium leading-7 text-foreground">
-            Your Agent can now do the work for you
+            {t('overview.agentCanDoWork', {
+              defaultValue: 'Your Agent can now do the work for you',
+            })}
           </p>
           {allCompleted ? (
             <Button
@@ -150,7 +154,7 @@ function StepperCard({ onDismiss, completedSteps, showDismiss = false }: Stepper
               onClick={onDismiss}
               className="rounded bg-primary text-sm font-medium text-[rgb(var(--inverse))] hover:bg-primary/90"
             >
-              Close
+              {t('common.close', { defaultValue: 'Close' })}
             </Button>
           ) : showDismiss ? (
             <Button
@@ -159,12 +163,14 @@ function StepperCard({ onDismiss, completedSteps, showDismiss = false }: Stepper
               onClick={onDismiss}
               className="rounded border border-[var(--alpha-8)] bg-card text-sm font-medium text-muted-foreground hover:text-foreground"
             >
-              Dismiss
+              {t('common.dismiss', { defaultValue: 'Dismiss' })}
             </Button>
           ) : null}
         </div>
         <p className="text-[13px] leading-[18px] text-muted-foreground">
-          Open your coding agent and start building your project with prompts
+          {t('overview.openAgentStartBuilding', {
+            defaultValue: 'Open your coding agent and start building your project with prompts',
+          })}
         </p>
       </div>
 
@@ -186,13 +192,13 @@ function StepperCard({ onDismiss, completedSteps, showDismiss = false }: Stepper
                   <span
                     className={`rounded bg-[var(--alpha-8)] px-1.5 py-0.5 text-xs leading-5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
                   >
-                    {step.category}
+                    {t(`overview.steps.${step.key}.category`, { defaultValue: step.category })}
                   </span>
                 </div>
                 <p
                   className={`text-base leading-7 text-foreground ${isCompleted ? 'line-through' : ''}`}
                 >
-                  {step.title}
+                  {t(`overview.steps.${step.key}.title`, { defaultValue: step.title })}
                 </p>
               </button>
             );
@@ -202,14 +208,16 @@ function StepperCard({ onDismiss, completedSteps, showDismiss = false }: Stepper
         <div className="relative flex flex-1 flex-col items-start self-stretch overflow-hidden bg-toast p-6">
           <div className="relative z-10 flex max-w-[640px] flex-col items-start gap-3">
             <div className="h-12 w-12">{currentStep.icon}</div>
-            <p className="text-[20px] font-medium leading-7 text-foreground">{currentStep.title}</p>
+            <p className="text-[20px] font-medium leading-7 text-foreground">
+              {t(`overview.steps.${currentStep.key}.title`, { defaultValue: currentStep.title })}
+            </p>
             <PromptDisplay text={currentStep.prompt} />
             <div className="flex items-center gap-2">
               <CopyButton
                 text={currentStep.prompt}
                 showText
-                copyText="Copy Prompt"
-                copiedText="Copied!"
+                copyText={t('overview.copyPrompt', { defaultValue: 'Copy Prompt' })}
+                copiedText={t('common.copied', { defaultValue: 'Copied!' })}
                 className="h-9 rounded bg-primary px-2 text-sm font-medium text-[rgb(var(--inverse))] hover:bg-primary/90"
               />
               {currentStep.navigateTo && (
@@ -223,7 +231,9 @@ function StepperCard({ onDismiss, completedSteps, showDismiss = false }: Stepper
                   }}
                   className="h-9 rounded border border-[var(--alpha-8)] bg-transparent px-3 text-sm font-medium text-foreground hover:bg-[var(--alpha-4)]"
                 >
-                  {currentStep.navigateTo.label}
+                  {t(`overview.steps.${currentStep.key}.goTo`, {
+                    defaultValue: currentStep.navigateTo.label,
+                  })}
                 </Button>
               )}
             </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CircleAlert, Info, Loader2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -41,6 +42,7 @@ function formatBackupTimestamp(timestamp: string) {
 }
 
 export default function BackupsPage() {
+  const { t } = useTranslation('chrome');
   const location = useLocation();
   const navigate = useNavigate();
   const host = useDashboardHost();
@@ -79,7 +81,12 @@ export default function BackupsPage() {
       return;
     }
 
-    showToast('Subscription management is only available in cloud-hosting mode.', 'info');
+    showToast(
+      t('database.subscriptionCloudOnly', {
+        defaultValue: 'Subscription management is only available in cloud-hosting mode.',
+      }),
+      'info'
+    );
   };
 
   const handleOpenRestoreBackupDialog = (backupId: string, timestampLabel: string) => {
@@ -91,7 +98,12 @@ export default function BackupsPage() {
 
   const handleRestoreBackupClick = async (backupId: string) => {
     if (!backupActions.restoreBackup) {
-      showToast('Backup restore is not available in the current dashboard mode.', 'info');
+      showToast(
+        t('database.restoreNotAvailable', {
+          defaultValue: 'Backup restore is not available in the current dashboard mode.',
+        }),
+        'info'
+      );
       return;
     }
 
@@ -102,7 +114,11 @@ export default function BackupsPage() {
       // its own restore error notifications.
       if (!isCloudHostingMode) {
         showToast(
-          error instanceof Error ? error.message : 'Failed to restore the backup.',
+          error instanceof Error
+            ? error.message
+            : t('database.failedToRestoreBackup', {
+                defaultValue: 'Failed to restore the backup.',
+              }),
           'error'
         );
       }
@@ -111,7 +127,10 @@ export default function BackupsPage() {
 
     if (!isCloudHostingMode) {
       // The cloud host surfaces its own restore notifications.
-      showToast('Database restored successfully.', 'success');
+      showToast(
+        t('database.databaseRestored', { defaultValue: 'Database restored successfully.' }),
+        'success'
+      );
       await refetch();
     }
   };
@@ -125,7 +144,11 @@ export default function BackupsPage() {
 
   const handleCreateBackup = async (backupName: string) => {
     if (!backupActions.createBackup) {
-      throw new Error('Backup creation is not available in the current dashboard mode.');
+      throw new Error(
+        t('database.backupCreationNotAvailable', {
+          defaultValue: 'Backup creation is not available in the current dashboard mode.',
+        })
+      );
     }
 
     try {
@@ -134,7 +157,12 @@ export default function BackupsPage() {
       // Rethrow so CreateBackupDialog stays open; the cloud host surfaces its
       // own error notifications.
       if (!isCloudHostingMode) {
-        showToast(error instanceof Error ? error.message : 'Failed to create the backup.', 'error');
+        showToast(
+          error instanceof Error
+            ? error.message
+            : t('database.failedToCreateBackup', { defaultValue: 'Failed to create the backup.' }),
+          'error'
+        );
       }
       throw error;
     }
@@ -144,10 +172,14 @@ export default function BackupsPage() {
 
   const handleDeleteBackupClick = async (backupId: string, backupLabel: string) => {
     const shouldDelete = await confirm({
-      title: 'Delete Backup',
-      description: `Are you sure you want to delete "${backupLabel}"? This action cannot be undone.`,
-      confirmText: 'Delete',
-      cancelText: 'Close',
+      title: t('database.deleteBackup', { defaultValue: 'Delete Backup' }),
+      description: t('database.deleteBackupConfirm', {
+        backupLabel,
+        defaultValue:
+          'Are you sure you want to delete "{{backupLabel}}"? This action cannot be undone.',
+      }),
+      confirmText: t('common.delete', { defaultValue: 'Delete' }),
+      cancelText: t('common.close', { defaultValue: 'Close' }),
       destructive: true,
     });
 
@@ -156,7 +188,12 @@ export default function BackupsPage() {
     }
 
     if (!backupActions.deleteBackup) {
-      showToast('Backup deletion is not available in the current dashboard mode.', 'info');
+      showToast(
+        t('database.backupDeletionNotAvailable', {
+          defaultValue: 'Backup deletion is not available in the current dashboard mode.',
+        }),
+        'info'
+      );
       return;
     }
 
@@ -166,7 +203,12 @@ export default function BackupsPage() {
     } catch (error) {
       // The cloud host is responsible for delete failure toasts.
       if (!isCloudHostingMode) {
-        showToast(error instanceof Error ? error.message : 'Failed to delete the backup.', 'error');
+        showToast(
+          error instanceof Error
+            ? error.message
+            : t('database.failedToDeleteBackup', { defaultValue: 'Failed to delete the backup.' }),
+          'error'
+        );
       }
     }
   };
@@ -187,7 +229,9 @@ export default function BackupsPage() {
         />
         <div className="min-w-0 flex-1 overflow-auto bg-[rgb(var(--semantic-1))]">
           <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-6 px-4 pb-10 pt-8 sm:px-6 sm:pt-10 lg:px-10">
-            <h1 className="text-2xl font-medium leading-8 text-foreground">Backup &amp; Restore</h1>
+            <h1 className="text-2xl font-medium leading-8 text-foreground">
+              {t('database.backupAndRestore', { defaultValue: 'Backup & Restore' })}
+            </h1>
 
             <div className="overflow-hidden rounded-lg border border-[var(--alpha-8)] bg-card">
               <div
@@ -198,15 +242,31 @@ export default function BackupsPage() {
                 <div className="min-w-0">
                   <h2 className="text-xl font-medium leading-7 text-foreground">
                     {hasManualBackupQuota
-                      ? `Manual Backups (${manualBackups.length}/${isFreePlan ? 1 : 5})`
-                      : `Manual Backups (${manualBackups.length})`}
+                      ? t('database.manualBackupsWithQuota', {
+                          count: manualBackups.length,
+                          quota: isFreePlan ? 1 : 5,
+                          defaultValue: 'Manual Backups ({{count}}/{{quota}})',
+                        })
+                      : t('database.manualBackups', {
+                          count: manualBackups.length,
+                          defaultValue: 'Manual Backups ({{count}})',
+                        })}
                   </h2>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
                     {!hasManualBackupQuota
-                      ? 'Create manual backups of your database and restore them at any time.'
+                      ? t('database.manualBackupsSelfHostDescription', {
+                          defaultValue:
+                            'Create manual backups of your database and restore them at any time.',
+                        })
                       : isFreePlan && manualBackups.length === 0
-                        ? 'Create a manual backup. Free plan allows 1 manual backup.'
-                        : 'You can create up to 5 backups manually and can be restored at any time.'}
+                        ? t('database.manualBackupsFreeDescription', {
+                            defaultValue:
+                              'Create a manual backup. Free plan allows 1 manual backup.',
+                          })
+                        : t('database.manualBackupsPaidDescription', {
+                            defaultValue:
+                              'You can create up to 5 backups manually and can be restored at any time.',
+                          })}
                   </p>
                 </div>
                 {isFreePlan && manualBackups.length >= 1 ? (
@@ -216,7 +276,9 @@ export default function BackupsPage() {
                     className="h-8 shrink-0 rounded border-[var(--alpha-12)] bg-transparent px-3 text-sm font-medium text-foreground hover:bg-[var(--alpha-4)]"
                     onClick={handleUpgradeClick}
                   >
-                    Upgrade for More Backups
+                    {t('database.upgradeForMoreBackups', {
+                      defaultValue: 'Upgrade for More Backups',
+                    })}
                   </Button>
                 ) : (
                   <Button
@@ -225,15 +287,17 @@ export default function BackupsPage() {
                     className="h-8 shrink-0 rounded border-[var(--alpha-12)] bg-transparent px-3 text-sm font-medium text-foreground hover:bg-[var(--alpha-4)]"
                     onClick={handleCreateBackupClick}
                   >
-                    Create a Backup
+                    {t('database.createBackup', { defaultValue: 'Create a Backup' })}
                   </Button>
                 )}
               </div>
 
               {manualBackups.length === 0 ? (
                 <DatabaseEmptyState
-                  title="No Backup Found"
-                  actionLabel="Create a new backup"
+                  title={t('database.noBackupFound', { defaultValue: 'No Backup Found' })}
+                  actionLabel={t('database.createNewBackup', {
+                    defaultValue: 'Create a new backup',
+                  })}
                   onAction={handleCreateBackupClick}
                 />
               ) : (
@@ -257,7 +321,10 @@ export default function BackupsPage() {
                             <button
                               type="button"
                               className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-                              aria-label={`Rename ${backupLabel}`}
+                              aria-label={t('database.renameBackupLabel', {
+                                backupLabel,
+                                defaultValue: 'Rename {{backupLabel}}',
+                              })}
                               onClick={() => handleRenameBackupClick(backup.id, backupLabel)}
                             >
                               <Pencil className="h-4 w-4" />
@@ -265,7 +332,7 @@ export default function BackupsPage() {
                             {showStatus && backup.status === 'running' && (
                               <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                                 <Loader2 className="h-3 w-3 animate-spin" />
-                                Backing up…
+                                {t('database.backingUp', { defaultValue: 'Backing up…' })}
                               </span>
                             )}
                             {showStatus && backup.status === 'failed' && (
@@ -274,12 +341,17 @@ export default function BackupsPage() {
                                 title={backup.errorMessage ?? undefined}
                               >
                                 <CircleAlert className="h-3 w-3" />
-                                Failed
+                                {t('common.failed', { defaultValue: 'Failed' })}
                               </span>
                             )}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-4 text-muted-foreground">
-                            <span>Saved on: {savedOnLabel}</span>
+                            <span>
+                              {t('database.savedOn', {
+                                date: savedOnLabel,
+                                defaultValue: 'Saved on: {{date}}',
+                              })}
+                            </span>
                             {showStatus && backup.status === 'failed' && backup.errorMessage && (
                               <span
                                 className="truncate text-destructive"
@@ -305,7 +377,7 @@ export default function BackupsPage() {
                               );
                             }}
                           >
-                            Restore
+                            {t('database.restore', { defaultValue: 'Restore' })}
                           </Button>
 
                           <DropdownMenu>
@@ -315,7 +387,10 @@ export default function BackupsPage() {
                                 variant="secondary"
                                 size="icon-sm"
                                 className="h-7 w-7 rounded border-[var(--alpha-8)] text-muted-foreground hover:text-foreground"
-                                aria-label={`More actions for ${backupLabel}`}
+                                aria-label={t('database.moreActionsFor', {
+                                  backupLabel,
+                                  defaultValue: 'More actions for {{backupLabel}}',
+                                })}
                               >
                                 <MoreHorizontal className="h-5 w-5" />
                               </Button>
@@ -328,7 +403,7 @@ export default function BackupsPage() {
                                 className="cursor-pointer gap-2 text-destructive"
                               >
                                 <Trash2 className="h-5 w-5" />
-                                Delete Backup
+                                {t('database.deleteBackup', { defaultValue: 'Delete Backup' })}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -345,11 +420,13 @@ export default function BackupsPage() {
                 <div className="px-6 py-6">
                   <div className="min-w-0">
                     <h2 className="text-xl font-medium leading-7 text-foreground">
-                      Scheduled Backups
+                      {t('database.scheduledBackups', { defaultValue: 'Scheduled Backups' })}
                     </h2>
                     <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      Projects are auto backed up each day around midnight in the project&apos;s
-                      region and can be restored at any time.
+                      {t('database.scheduledBackupsDescription', {
+                        defaultValue:
+                          "Projects are auto backed up each day around midnight in the project's region and can be restored at any time.",
+                      })}
                     </p>
                   </div>
                 </div>
@@ -357,8 +434,10 @@ export default function BackupsPage() {
                 {scheduledBackups.length === 0 ? (
                   <div className="border-t border-[var(--alpha-8)]">
                     <DatabaseEmptyState
-                      title="No Backup Found"
-                      description="Check back tomorrow or backup manually"
+                      title={t('database.noBackupFound', { defaultValue: 'No Backup Found' })}
+                      description={t('database.checkBackTomorrow', {
+                        defaultValue: 'Check back tomorrow or backup manually',
+                      })}
                     />
                   </div>
                 ) : (
@@ -375,7 +454,12 @@ export default function BackupsPage() {
                             </p>
                             {backup.expiresAt && (
                               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-4 text-muted-foreground">
-                                <span>Expire on: {formatBackupTimestamp(backup.expiresAt)}</span>
+                                <span>
+                                  {t('database.expireOn', {
+                                    date: formatBackupTimestamp(backup.expiresAt),
+                                    defaultValue: 'Expire on: {{date}}',
+                                  })}
+                                </span>
                               </div>
                             )}
                           </div>
@@ -393,7 +477,7 @@ export default function BackupsPage() {
                                 );
                               }}
                             >
-                              Restore
+                              {t('database.restore', { defaultValue: 'Restore' })}
                             </Button>
                           </div>
                         </div>
@@ -414,10 +498,14 @@ export default function BackupsPage() {
 
                     <div className="min-w-0">
                       <p className="text-base font-normal leading-7 text-foreground">
-                        Free Plan does not have Scheduled Backups
+                        {t('database.freePlanNoScheduledBackups', {
+                          defaultValue: 'Free Plan does not have Scheduled Backups',
+                        })}
                       </p>
                       <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                        Upgrade to a paid plan to unlock scheduled backups.
+                        {t('database.upgradeToUnlockScheduledBackups', {
+                          defaultValue: 'Upgrade to a paid plan to unlock scheduled backups.',
+                        })}
                       </p>
                     </div>
                   </div>
@@ -427,7 +515,7 @@ export default function BackupsPage() {
                     className="h-8 shrink-0 rounded bg-primary px-3 text-sm font-medium text-[rgb(var(--inverse))] hover:opacity-90"
                     onClick={handleUpgradeClick}
                   >
-                    Upgrade to Pro
+                    {t('database.upgradeToPro', { defaultValue: 'Upgrade to Pro' })}
                   </Button>
                 </div>
               </div>
@@ -456,7 +544,11 @@ export default function BackupsPage() {
           const renameBackup = backupActions.renameBackup;
           if (!renameBackup) {
             return Promise.reject(
-              new Error('Backup rename is not available in the current dashboard mode.')
+              new Error(
+                t('database.backupRenameNotAvailable', {
+                  defaultValue: 'Backup rename is not available in the current dashboard mode.',
+                })
+              )
             );
           }
 
@@ -469,7 +561,11 @@ export default function BackupsPage() {
               // surfaces its own error notifications.
               if (!isCloudHostingMode) {
                 showToast(
-                  error instanceof Error ? error.message : 'Failed to rename the backup.',
+                  error instanceof Error
+                    ? error.message
+                    : t('database.failedToRenameBackup', {
+                        defaultValue: 'Failed to rename the backup.',
+                      }),
                   'error'
                 );
               }
