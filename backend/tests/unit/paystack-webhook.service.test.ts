@@ -10,6 +10,7 @@ const {
   mockMark,
   mockUpsertCharge,
   mockUpsertRefund,
+  mockExtractBoundTransactionId,
 } = vi.hoisted(() => ({
   mockPool: {
     query: vi.fn(),
@@ -24,6 +25,7 @@ const {
   mockMark: vi.fn(),
   mockUpsertCharge: vi.fn(),
   mockUpsertRefund: vi.fn(),
+  mockExtractBoundTransactionId: vi.fn(),
 }));
 
 vi.mock('../../src/infra/database/database.manager', () => ({
@@ -54,6 +56,7 @@ vi.mock('../../src/services/payments/paystack/transaction.service', () => ({
     getInstance: () => ({
       upsertChargeTransaction: mockUpsertCharge,
       upsertRefundTransaction: mockUpsertRefund,
+      extractBoundTransactionId: mockExtractBoundTransactionId,
     }),
   },
 }));
@@ -116,6 +119,7 @@ describe('PaystackWebhookService', () => {
     mockMark.mockResolvedValue(makeWebhookRow());
     mockUpsertCharge.mockResolvedValue('succeeded');
     mockUpsertRefund.mockResolvedValue(undefined);
+    mockExtractBoundTransactionId.mockReturnValue('local_txn_123');
   });
 
   it('rejects invalid webhook signatures before recording anything', async () => {
@@ -172,8 +176,16 @@ describe('PaystackWebhookService', () => {
       },
     });
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE payments\.paystack_transactions[\s\S]*SET status = 'success'/i),
-      ['test', 'ps_ref_123', '12345', expect.objectContaining({ reference: 'ps_ref_123' })]
+      expect.stringMatching(
+        /UPDATE payments\.paystack_transactions[\s\S]*SET status = 'success'[\s\S]*AND id = \$5/i
+      ),
+      [
+        'test',
+        'ps_ref_123',
+        '12345',
+        expect.objectContaining({ reference: 'ps_ref_123' }),
+        'local_txn_123',
+      ]
     );
     expect(mockUpsertCharge).toHaveBeenCalledWith(
       'test',
@@ -189,6 +201,33 @@ describe('PaystackWebhookService', () => {
       'charge.success.12345',
       'processed',
       null
+    );
+  });
+
+  it('projects an unbound charge.success without touching any local row or borrowing its subject', async () => {
+    // A signed charge whose metadata does not claim a local session (created
+    // outside this project, or pointed at a foreign reference) must not mark
+    // any row or lend a row's subject to the ledger projection.
+    mockExtractBoundTransactionId.mockReturnValue(null);
+
+    const result = await PaystackWebhookService.getInstance().handlePaystackWebhook(
+      'test',
+      makeRawWebhookBody('charge.success', CHARGE_DATA),
+      'signature'
+    );
+
+    expect(result).toEqual({ received: true, handled: true });
+    expect(mockPool.query).not.toHaveBeenCalledWith(
+      expect.stringMatching(/UPDATE payments\.paystack_transactions/i),
+      expect.anything()
+    );
+    expect(mockUpsertCharge).toHaveBeenCalledWith(
+      'test',
+      expect.objectContaining({ reference: 'ps_ref_123' }),
+      {
+        subjectFallback: null,
+        customerEmailFallback: null,
+      }
     );
   });
 

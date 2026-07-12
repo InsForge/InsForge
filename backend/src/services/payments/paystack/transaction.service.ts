@@ -240,7 +240,12 @@ export class PaystackTransactionService {
     const subject =
       getBillingSubjectFromProviderAttributes(metadata) ??
       options.subjectFallback ??
-      (await this.resolveSubjectFromTransactionRow(client, environment, transaction.reference));
+      (await this.resolveSubjectFromTransactionRow(
+        client,
+        environment,
+        transaction.reference,
+        metadata[PAYSTACK_TRANSACTION_METADATA_KEY] ?? null
+      ));
     const type = status === 'failed' ? 'failed_payment' : 'one_time_payment';
     const transactionId = String(transaction.id);
 
@@ -709,12 +714,20 @@ export class PaystackTransactionService {
     return paystackMetadata;
   }
 
+  /**
+   * Resolve a billing subject from the local session row — but only from the
+   * row the provider transaction is actually bound to. Requiring the row id
+   * that initialize stamped into the charge's metadata prevents a row that
+   * merely shares the reference (e.g. one initialized with a foreign
+   * reference) from lending its subject to someone else's payment.
+   */
   private async resolveSubjectFromTransactionRow(
     client: Pool | PoolClient,
     environment: PaystackEnvironment,
-    reference: string | null
+    reference: string | null,
+    boundTransactionId: string | null
   ): Promise<BillingSubject | null> {
-    if (!reference) {
+    if (!reference || !boundTransactionId) {
       return null;
     }
 
@@ -723,10 +736,11 @@ export class PaystackTransactionService {
        FROM payments.paystack_transactions
        WHERE environment = $1
          AND reference = $2
+         AND id = $3
          AND subject_type IS NOT NULL
          AND subject_id IS NOT NULL
        LIMIT 1`,
-      [environment, reference]
+      [environment, reference, boundTransactionId]
     );
 
     return (result.rows[0] as BillingSubject | undefined) ?? null;
@@ -914,6 +928,15 @@ export class PaystackTransactionService {
       default:
         return 'pending';
     }
+  }
+
+  /**
+   * The local session row id a provider transaction claims to belong to
+   * (stamped into Paystack metadata at initialize), or null when the
+   * transaction was not created by this project.
+   */
+  extractBoundTransactionId(value: unknown): string | null {
+    return this.normalizeMetadata(value)[PAYSTACK_TRANSACTION_METADATA_KEY] ?? null;
   }
 
   private normalizeMetadata(value: unknown): Record<string, string> {

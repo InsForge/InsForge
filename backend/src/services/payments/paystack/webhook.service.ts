@@ -345,6 +345,21 @@ export class PaystackWebhookService {
     environment: PaystackEnvironment,
     charge: PaystackTransactionResource
   ): Promise<PaystackChargeRowContext | null> {
+    // Same binding as the direct verify flow: a signed charge proves the
+    // payment happened on this Paystack account, not that it belongs to the
+    // local row sharing its reference. Only the session whose id was stamped
+    // into the charge's metadata at initialize may be marked by it; unbound
+    // charges are still projected into the ledger by the caller, just without
+    // borrowing any local row's subject.
+    const boundTransactionId = this.transactionService.extractBoundTransactionId(charge.metadata);
+    if (!boundTransactionId) {
+      logger.warn('[Paystack Webhook] charge.success without a bound local transaction id', {
+        environment,
+        reference: charge.reference,
+      });
+      return null;
+    }
+
     const result = await this.getPool().query(
       `UPDATE payments.paystack_transactions
        SET status = 'success',
@@ -355,11 +370,12 @@ export class PaystackWebhookService {
            updated_at = NOW()
        WHERE environment = $1
          AND reference = $2
+         AND id = $5
        RETURNING
          subject_type AS "subjectType",
          subject_id AS "subjectId",
          customer_email AS "customerEmail"`,
-      [environment, charge.reference, String(charge.id), charge]
+      [environment, charge.reference, String(charge.id), charge, boundTransactionId]
     );
 
     const row = result.rows[0] as
@@ -367,7 +383,7 @@ export class PaystackWebhookService {
       | undefined;
 
     if (!row) {
-      logger.warn('[Paystack Webhook] charge.success for unknown transaction reference', {
+      logger.warn('[Paystack Webhook] charge.success did not match a bound local transaction', {
         environment,
         reference: charge.reference,
       });
