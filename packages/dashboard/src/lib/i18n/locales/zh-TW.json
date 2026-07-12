@@ -105,5 +105,57 @@
       "copyFailed": "複製修復建議失敗",
       "startFailed": "啟動掃描失敗：{{message}}"
     }
+  },
+  "database": {
+    "paneTitle": "資料庫",
+    "createFirstTable": "建立你的第一張資料表",
+    "createTable": "建立資料表",
+    "orChooseTemplate": "或從範本開始",
+    "databaseStudio": "Database Studio",
+    "noTableYet": "尚無資料表",
+    "createFirstTableLink": "建立第一張資料表",
+    "toGetStarted": "即可開始",
+    "fromSidebar": "從側邊欄建立一張資料表即可開始。",
+    "tablesCount_other": "{{count}} 張資料表",
+    "editTable": "編輯資料表",
+    "deleteTable": "刪除資料表",
+    "studio": {
+      "indexes": "索引",
+      "triggers": "觸發器",
+      "functions": "函式",
+      "policies": "政策",
+      "migrations": "遷移",
+      "templates": "範本",
+      "backupRestore": "備份與還原"
+    },
+    "templates_data": {
+      "crm-system": {
+        "title": "CRM",
+        "description": "一個用於管理聯絡人、公司、商機、任務和跟進的簡單 CRM"
+      },
+      "ai-chatbot": {
+        "title": "AI 聊天機器人",
+        "description": "一個包含對話、訊息歷史、圖片上傳和使用者專屬資料的聊天應用"
+      },
+      "ecommerce-platform": {
+        "title": "電商",
+        "description": "一個包含商品列表、購物車、結帳和商家商品管理的線上商店"
+      },
+      "reddit-clone": {
+        "title": "Reddit 複製版",
+        "description": "一個包含貼文、留言、討論串回覆和投票的社群空間"
+      },
+      "instagram-clone": {
+        "title": "Instagram 複製版",
+        "description": "一個 Instagram 風格的照片分享應用，包含貼文、留言、按讚和追蹤"
+      },
+      "notion-clone": {
+        "title": "Notion 複製版",
+        "description": "一個包含頁面、搜尋、富文字編輯和彈性存取控制的筆記工作區"
+      }
+    },
+    "back": "返回",
+    "noTablesInSchema": "{{schema}} 中尚無資料表",
+    "schemaProtected": "此 schema 在儀表板中受保護。"
   }
 }

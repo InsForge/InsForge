@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CirclePlus, FolderInput, FolderOutput } from 'lucide-react';
 import PencilIcon from '#assets/icons/pencil.svg?react';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
@@ -48,6 +49,7 @@ import {
 } from '#features/database/helpers';
 
 export default function TablesPage() {
+  const { t } = useTranslation('chrome');
   const location = useLocation();
   const { selectedSchema, setSelectedSchema } = useDatabaseSchemaSelection();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -665,11 +667,11 @@ export default function TablesPage() {
               ) : showEmptyState ? (
                 <div className="flex-1 flex items-center justify-center">
                   <EmptyState
-                    title={`No tables in ${selectedSchema}`}
+                    title={t('database.noTablesInSchema', { schema: selectedSchema })}
                     description={
                       selectedSchemaInfo.isProtected
-                        ? 'This schema is protected in the dashboard.'
-                        : 'Create a table from the sidebar to get started.'
+                        ? t('database.schemaProtected')
+                        : t('database.fromSidebar')
                     }
                   />
                 </div>

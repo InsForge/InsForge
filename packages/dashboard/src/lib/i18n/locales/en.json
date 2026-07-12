@@ -108,5 +108,58 @@
       "copyFailed": "Failed to copy remediations",
       "startFailed": "Failed to start scan: {{message}}"
     }
+  },
+  "database": {
+    "paneTitle": "Database",
+    "createFirstTable": "Create Your First Table",
+    "createTable": "Create Table",
+    "orChooseTemplate": "or choose a template to start",
+    "databaseStudio": "Database Studio",
+    "noTableYet": "No Table Yet",
+    "createFirstTableLink": "Create your first table",
+    "toGetStarted": "to get started",
+    "fromSidebar": "Create a table from the sidebar to get started.",
+    "tablesCount_one": "{{count}} Table",
+    "tablesCount_other": "{{count}} Tables",
+    "editTable": "Edit Table",
+    "deleteTable": "Delete Table",
+    "studio": {
+      "indexes": "Indexes",
+      "triggers": "Triggers",
+      "functions": "Functions",
+      "policies": "Policies",
+      "migrations": "Migrations",
+      "templates": "Templates",
+      "backupRestore": "Backup & Restore"
+    },
+    "templates_data": {
+      "crm-system": {
+        "title": "CRM",
+        "description": "A simple CRM for managing contacts, companies, deals, tasks, and follow ups"
+      },
+      "ai-chatbot": {
+        "title": "AI Chatbot",
+        "description": "A chatbot app with conversations, message history, image uploads, and user specific data"
+      },
+      "ecommerce-platform": {
+        "title": "E-commerce",
+        "description": "An online store with product listings, carts, checkout, and owner product management"
+      },
+      "reddit-clone": {
+        "title": "Reddit Clone",
+        "description": "A community space with posts, comments, threaded replies, and voting"
+      },
+      "instagram-clone": {
+        "title": "Instagram Clone",
+        "description": "An Instagram-style photo sharing app with posts, comments, likes, and follows"
+      },
+      "notion-clone": {
+        "title": "Notion Clone",
+        "description": "A notes workspace with pages, search, rich text editing, and flexible access"
+      }
+    },
+    "back": "Back",
+    "noTablesInSchema": "No tables in {{schema}}",
+    "schemaProtected": "This schema is protected in the dashboard."
   }
 }

@@ -105,5 +105,57 @@
       "copyFailed": "复制修复建议失败",
       "startFailed": "启动扫描失败：{{message}}"
     }
+  },
+  "database": {
+    "paneTitle": "数据库",
+    "createFirstTable": "创建你的第一张表",
+    "createTable": "创建表",
+    "orChooseTemplate": "或从模板开始",
+    "databaseStudio": "Database Studio",
+    "noTableYet": "暂无数据表",
+    "createFirstTableLink": "创建第一张表",
+    "toGetStarted": "即可开始",
+    "fromSidebar": "从侧边栏创建一张表即可开始。",
+    "tablesCount_other": "{{count}} 张表",
+    "editTable": "编辑表",
+    "deleteTable": "删除表",
+    "studio": {
+      "indexes": "索引",
+      "triggers": "触发器",
+      "functions": "函数",
+      "policies": "策略",
+      "migrations": "迁移",
+      "templates": "模板",
+      "backupRestore": "备份与恢复"
+    },
+    "templates_data": {
+      "crm-system": {
+        "title": "CRM",
+        "description": "一个用于管理联系人、公司、商机、任务和跟进的简单 CRM"
+      },
+      "ai-chatbot": {
+        "title": "AI 聊天机器人",
+        "description": "一个包含会话、消息历史、图片上传和用户专属数据的聊天应用"
+      },
+      "ecommerce-platform": {
+        "title": "电商",
+        "description": "一个包含商品列表、购物车、结算和商家商品管理的在线商店"
+      },
+      "reddit-clone": {
+        "title": "Reddit 克隆",
+        "description": "一个包含帖子、评论、盖楼回复和投票的社区空间"
+      },
+      "instagram-clone": {
+        "title": "Instagram 克隆",
+        "description": "一个 Instagram 风格的图片分享应用，包含帖子、评论、点赞和关注"
+      },
+      "notion-clone": {
+        "title": "Notion 克隆",
+        "description": "一个包含页面、搜索、富文本编辑和灵活访问控制的笔记工作区"
+      }
+    },
+    "back": "返回",
+    "noTablesInSchema": "{{schema}} 中暂无数据表",
+    "schemaProtected": "该 schema 在控制台中受保护。"
   }
 }

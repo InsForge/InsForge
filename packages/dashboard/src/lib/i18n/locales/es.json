@@ -112,5 +112,58 @@
       "startFailed": "No se pudo iniciar el escaneo: {{message}}"
     },
     "selectedCount_one": "{{count}} seleccionada"
+  },
+  "database": {
+    "paneTitle": "Base de datos",
+    "createFirstTable": "Crea tu primera tabla",
+    "createTable": "Crear tabla",
+    "orChooseTemplate": "o empieza desde una plantilla",
+    "databaseStudio": "Database Studio",
+    "noTableYet": "Aún no hay tablas",
+    "createFirstTableLink": "Crea tu primera tabla",
+    "toGetStarted": "para empezar",
+    "fromSidebar": "Crea una tabla desde la barra lateral para empezar.",
+    "tablesCount_one": "{{count}} tabla",
+    "tablesCount_other": "{{count}} tablas",
+    "editTable": "Editar tabla",
+    "deleteTable": "Eliminar tabla",
+    "studio": {
+      "indexes": "Índices",
+      "triggers": "Triggers",
+      "functions": "Funciones",
+      "policies": "Políticas",
+      "migrations": "Migraciones",
+      "templates": "Plantillas",
+      "backupRestore": "Copia y restauración"
+    },
+    "templates_data": {
+      "crm-system": {
+        "title": "CRM",
+        "description": "Un CRM sencillo para gestionar contactos, empresas, oportunidades, tareas y seguimientos"
+      },
+      "ai-chatbot": {
+        "title": "Chatbot de IA",
+        "description": "Una app de chat con conversaciones, historial de mensajes, subida de imágenes y datos por usuario"
+      },
+      "ecommerce-platform": {
+        "title": "E-commerce",
+        "description": "Una tienda online con catálogo de productos, carrito, checkout y gestión de productos"
+      },
+      "reddit-clone": {
+        "title": "Clon de Reddit",
+        "description": "Un espacio comunitario con publicaciones, comentarios, respuestas anidadas y votos"
+      },
+      "instagram-clone": {
+        "title": "Clon de Instagram",
+        "description": "Una app de fotos estilo Instagram con publicaciones, comentarios, likes y seguidores"
+      },
+      "notion-clone": {
+        "title": "Clon de Notion",
+        "description": "Un espacio de notas con páginas, búsqueda, edición de texto enriquecido y acceso flexible"
+      }
+    },
+    "back": "Atrás",
+    "noTablesInSchema": "No hay tablas en {{schema}}",
+    "schemaProtected": "Este esquema está protegido en el panel."
   }
 }
