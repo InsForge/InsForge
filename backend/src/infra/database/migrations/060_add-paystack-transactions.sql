@@ -35,6 +35,12 @@ CREATE TABLE IF NOT EXISTS payments.paystack_transactions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Idempotency guard: if the table pre-exists from a partial deployment of an
+-- earlier revision of this migration, CREATE TABLE IF NOT EXISTS above will
+-- not add newer columns.
+ALTER TABLE payments.paystack_transactions
+  ADD COLUMN IF NOT EXISTS created_by UUID;
+
 DROP TRIGGER IF EXISTS trg_payments_paystack_transactions_updated_at
   ON payments.paystack_transactions;
 CREATE TRIGGER trg_payments_paystack_transactions_updated_at

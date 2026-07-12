@@ -874,6 +874,10 @@ export const initializePaystackTransactionResponseSchema = z.object({
 
 const verifyPaystackTransactionFields = {
   reference: z.string().trim().min(1, 'Paystack transaction reference is required'),
+  // Local transaction id returned by initialize. Required to verify sessions
+  // created without an authenticated identity, since the Paystack reference
+  // alone leaks through callback URLs.
+  transactionId: z.string().trim().uuid().optional(),
 };
 
 export const verifyPaystackTransactionBodySchema = z

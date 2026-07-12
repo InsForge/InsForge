@@ -3688,6 +3688,13 @@ components:
           type: string
           minLength: 1
           example: "order-team_123-pro"
+        transactionId:
+          type: string
+          format: uuid
+          description: >-
+            Local transaction id returned by initialize. Required to verify
+            sessions created without an authenticated identity, since the
+            Paystack reference alone leaks through callback URLs.
 
     VerifyPaystackTransactionResponse:
       type: object

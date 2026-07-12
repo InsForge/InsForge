@@ -72,6 +72,7 @@ function buildTransactionRow(overrides: Record<string, unknown> = {}) {
     metadata: {
       insforge_subject_type: 'team',
       insforge_subject_id: 'team_123',
+      insforge_transaction_id: 'local_txn_123',
     },
     lastError: null,
     createdAt: new Date('2026-07-01T09:58:00.000Z'),
@@ -100,6 +101,7 @@ function buildProviderTransaction(
     metadata: {
       insforge_subject_type: 'team',
       insforge_subject_id: 'team_123',
+      insforge_transaction_id: 'local_txn_123',
     },
     customer: {
       id: 99,
@@ -259,7 +261,10 @@ describe('PaystackTransactionService', () => {
     const transaction = buildProviderTransaction();
     mockVerifyTransaction.mockResolvedValue(transaction);
     mockPoolQuery
-      .mockResolvedValueOnce({ rows: [{ created_by: AUTHENTICATED_USER.id }], rowCount: 1 })
+      .mockResolvedValueOnce({
+        rows: [{ id: 'local_txn_123', created_by: AUTHENTICATED_USER.id }],
+        rowCount: 1,
+      })
       .mockResolvedValueOnce({
         rows: [
           buildTransactionRow({
@@ -281,7 +286,7 @@ describe('PaystackTransactionService', () => {
     // Ownership is checked before the provider or any row mutation.
     expect(mockPoolQuery).toHaveBeenNthCalledWith(
       1,
-      expect.stringMatching(/SELECT created_by[\s\S]*FROM payments\.paystack_transactions/i),
+      expect.stringMatching(/SELECT id, created_by[\s\S]*FROM payments\.paystack_transactions/i),
       ['test', 'ps_ref_123']
     );
     // Server-side verify only: the provider is asked for the transaction by reference.
@@ -356,7 +361,10 @@ describe('PaystackTransactionService', () => {
 
   it('raises 404 for verify by a non-owner without calling the provider or mutating', async () => {
     mockVerifyTransaction.mockResolvedValue(buildProviderTransaction());
-    mockPoolQuery.mockResolvedValueOnce({ rows: [{ created_by: 'someone_else' }], rowCount: 1 });
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{ id: 'local_txn_123', created_by: 'someone_else' }],
+      rowCount: 1,
+    });
 
     await expect(
       PaystackTransactionService.getInstance().verifyTransaction(
@@ -373,12 +381,12 @@ describe('PaystackTransactionService', () => {
     expect(mockPoolQuery).toHaveBeenCalledTimes(1);
   });
 
-  it('allows verify of anon-created rows (null created_by) and by project admins', async () => {
+  it('verifies anon-created rows only with the local transaction id, and lets admins verify any row', async () => {
     const transaction = buildProviderTransaction();
     mockVerifyTransaction.mockResolvedValue(transaction);
-    // Anon-created row, authenticated caller.
+    // Anon-created row + correct local transaction id.
     mockPoolQuery
-      .mockResolvedValueOnce({ rows: [{ created_by: null }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: 'local_txn_123', created_by: null }], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [buildTransactionRow({ status: 'success' })], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
@@ -386,13 +394,33 @@ describe('PaystackTransactionService', () => {
       PaystackTransactionService.getInstance().verifyTransaction(
         'test',
         'ps_ref_123',
-        AUTHENTICATED_USER
+        AUTHENTICATED_USER,
+        'local_txn_123'
       )
     ).resolves.toMatchObject({ verified: true });
 
+    // Anon-created row without the id: rejected before the provider is called.
+    mockVerifyTransaction.mockClear();
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{ id: 'local_txn_123', created_by: null }],
+      rowCount: 1,
+    });
+
+    await expect(
+      PaystackTransactionService.getInstance().verifyTransaction(
+        'test',
+        'ps_ref_123',
+        AUTHENTICATED_USER
+      )
+    ).rejects.toMatchObject({ statusCode: 404, code: ERROR_CODES.PAYMENT_NOT_FOUND });
+    expect(mockVerifyTransaction).not.toHaveBeenCalled();
+
     // Owned row, admin caller.
     mockPoolQuery
-      .mockResolvedValueOnce({ rows: [{ created_by: 'someone_else' }], rowCount: 1 })
+      .mockResolvedValueOnce({
+        rows: [{ id: 'local_txn_123', created_by: 'someone_else' }],
+        rowCount: 1,
+      })
       .mockResolvedValueOnce({ rows: [buildTransactionRow({ status: 'success' })], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
@@ -402,6 +430,29 @@ describe('PaystackTransactionService', () => {
         id: 'admin_1',
       })
     ).resolves.toMatchObject({ verified: true });
+  });
+
+  it('rejects verification when the provider transaction does not echo the local row id', async () => {
+    // The row exists and the caller owns it, but the Paystack transaction the
+    // reference resolves to was not created by this row (foreign reference).
+    mockVerifyTransaction.mockResolvedValue(
+      buildProviderTransaction({ metadata: { insforge_transaction_id: 'someone_elses_row' } })
+    );
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{ id: 'local_txn_123', created_by: AUTHENTICATED_USER.id }],
+      rowCount: 1,
+    });
+
+    await expect(
+      PaystackTransactionService.getInstance().verifyTransaction(
+        'test',
+        'ps_ref_123',
+        AUTHENTICATED_USER
+      )
+    ).rejects.toMatchObject({ statusCode: 404, code: ERROR_CODES.PAYMENT_NOT_FOUND });
+
+    // The local row and shared ledger are never touched.
+    expect(mockPoolQuery).toHaveBeenCalledTimes(1);
   });
 
   it('projects a processed refund into the shared ledger and refreshes the original charge', async () => {
