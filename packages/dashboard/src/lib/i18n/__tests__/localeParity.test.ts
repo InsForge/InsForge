@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import en from '../locales/en.json';
-import zhCN from '../locales/zh-CN.json';
-import zhTW from '../locales/zh-TW.json';
-import es from '../locales/es.json';
+import en from '#lib/i18n/locales/en.json';
+import zhCN from '#lib/i18n/locales/zh-CN.json';
+import zhTW from '#lib/i18n/locales/zh-TW.json';
+import es from '#lib/i18n/locales/es.json';
 
 // Every key present in en must exist in every other locale (and vice versa),
 // so a string added in one file can't silently ship untranslated. Plural
