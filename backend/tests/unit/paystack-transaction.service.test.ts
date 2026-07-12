@@ -381,10 +381,8 @@ describe('PaystackTransactionService', () => {
     expect(mockPoolQuery).toHaveBeenCalledTimes(1);
   });
 
-  it('verifies anon-created rows only with the local transaction id, and lets admins verify any row', async () => {
-    const transaction = buildProviderTransaction();
-    mockVerifyTransaction.mockResolvedValue(transaction);
-    // Anon-created row + correct local transaction id.
+  it('verifies an anon-created row when the caller presents the local transaction id', async () => {
+    mockVerifyTransaction.mockResolvedValue(buildProviderTransaction());
     mockPoolQuery
       .mockResolvedValueOnce({ rows: [{ id: 'local_txn_123', created_by: null }], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [buildTransactionRow({ status: 'success' })], rowCount: 1 })
@@ -398,9 +396,10 @@ describe('PaystackTransactionService', () => {
         'local_txn_123'
       )
     ).resolves.toMatchObject({ verified: true });
+  });
 
-    // Anon-created row without the id: rejected before the provider is called.
-    mockVerifyTransaction.mockClear();
+  it('rejects verify of an anon-created row without the local transaction id', async () => {
+    mockVerifyTransaction.mockResolvedValue(buildProviderTransaction());
     mockPoolQuery.mockResolvedValueOnce({
       rows: [{ id: 'local_txn_123', created_by: null }],
       rowCount: 1,
@@ -414,8 +413,10 @@ describe('PaystackTransactionService', () => {
       )
     ).rejects.toMatchObject({ statusCode: 404, code: ERROR_CODES.PAYMENT_NOT_FOUND });
     expect(mockVerifyTransaction).not.toHaveBeenCalled();
+  });
 
-    // Owned row, admin caller.
+  it('lets project admins verify rows they did not create', async () => {
+    mockVerifyTransaction.mockResolvedValue(buildProviderTransaction());
     mockPoolQuery
       .mockResolvedValueOnce({
         rows: [{ id: 'local_txn_123', created_by: 'someone_else' }],
