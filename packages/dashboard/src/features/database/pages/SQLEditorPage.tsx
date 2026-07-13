@@ -1,9 +1,18 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useRawSQL } from '#features/database/hooks/useRawSQL';
 import { useSQLEditorContext } from '#features/database/contexts/SQLEditorContext';
-import { Button, Tabs, Tab, cn } from '@insforge/ui';
+import {
+  Button,
+  Tabs,
+  Tab,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+  cn,
+} from '@insforge/ui';
 import { CodeEditor, DataGrid, type DataGridColumn, type DataGridRow } from '#components';
-import { X, Plus, Download, FileJson } from 'lucide-react';
+import { X, Plus, Download, FileJson, ChevronRight, HelpCircle } from 'lucide-react';
 import { convertToCSV, convertToJSON, getExportFilename } from '#lib/utils/data-export';
 
 interface ResultsViewerProps {
@@ -103,6 +112,145 @@ function ErrorViewer({ error }: ErrorViewerProps) {
   );
 }
 
+interface PlanNode {
+  'Node Type': string;
+  'Startup Cost'?: number;
+  'Total Cost'?: number;
+  'Plan Rows'?: number;
+  'Actual Startup Time'?: number;
+  'Actual Total Time'?: number;
+  'Actual Rows'?: number;
+  'Actual Loops'?: number;
+  Plans?: PlanNode[];
+  [key: string]: unknown;
+}
+
+interface PlanTreeNodeProps {
+  node: PlanNode;
+  depth: number;
+}
+
+function PlanTreeNode({ node, depth }: PlanTreeNodeProps) {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const hasChildren = Array.isArray(node.Plans) && node.Plans.length > 0;
+
+  const nodeType = node['Node Type'] || 'Unknown Node';
+  const totalCost = node['Total Cost'] ?? 0;
+  const planRows = node['Plan Rows'] ?? 0;
+  const actualTime = node['Actual Total Time'] ?? 0;
+  const actualRows = node['Actual Rows'] ?? 0;
+
+  const costStr = `cost ${totalCost.toFixed(2)}, estimated ${planRows.toLocaleString()} rows`;
+  const actualStr = `${actualTime.toFixed(2)}ms / ${actualRows.toLocaleString()} rows`;
+
+  return (
+    <div className="flex flex-col w-full">
+      <div className="flex items-stretch w-full border-b border-[var(--alpha-8)] hover:bg-[var(--alpha-2)] transition-colors group">
+        <div
+          className="flex-1 flex items-center min-w-0 py-3 pr-4"
+          style={{ paddingLeft: `${Math.max(16, depth * 24)}px` }}
+        >
+          <button
+            onClick={() => hasChildren && setIsExpanded(!isExpanded)}
+            className={cn(
+              'w-5 h-5 flex items-center justify-center shrink-0 mr-2 rounded hover:bg-[var(--alpha-4)] transition-colors',
+              !hasChildren && 'pointer-events-none opacity-50'
+            )}
+            type="button"
+          >
+            {hasChildren ? (
+              <ChevronRight
+                className={cn(
+                  'w-4 h-4 text-neutral-400 dark:text-neutral-500 transition-transform duration-200',
+                  isExpanded && 'rotate-90 text-neutral-600 dark:text-neutral-300'
+                )}
+              />
+            ) : (
+              <span className="w-1.5 h-1.5 rounded-full bg-neutral-300 dark:bg-neutral-600" />
+            )}
+          </button>
+
+          <div className="flex flex-wrap items-baseline gap-2 min-w-0">
+            <span className="font-mono text-sm font-semibold text-black dark:text-white uppercase truncate">
+              {nodeType}
+            </span>
+            <span className="font-mono text-xs text-neutral-400 dark:text-neutral-500 whitespace-nowrap">
+              ({costStr})
+            </span>
+          </div>
+        </div>
+
+        <div className="w-[200px] sm:w-[240px] shrink-0 border-l border-[var(--alpha-8)] bg-[var(--alpha-2)] group-hover:bg-[var(--alpha-4)] h-stretch flex items-center px-4 font-mono text-xs text-neutral-600 dark:text-neutral-300 whitespace-nowrap transition-colors select-none">
+          {actualStr}
+        </div>
+      </div>
+
+      {hasChildren && isExpanded && (
+        <div className="flex flex-col w-full">
+          {node.Plans?.map((childPlan, index) => (
+            <PlanTreeNode key={index} node={childPlan} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface QueryPlanViewProps {
+  planWrapper: {
+    Plan: PlanNode;
+    'Planning Time': number;
+    'Execution Time': number;
+    [key: string]: unknown;
+  };
+}
+
+function QueryPlanView({ planWrapper }: QueryPlanViewProps) {
+  const rootNode = planWrapper.Plan;
+  const planningTime = planWrapper['Planning Time'] || 0;
+  const executionTime = planWrapper['Execution Time'] || 0;
+  const totalTime = planningTime + executionTime;
+
+  return (
+    <div className="flex flex-col h-full border border-[var(--alpha-8)] rounded-lg bg-[rgb(var(--semantic-0))] overflow-hidden">
+      <div className="flex items-center px-4 py-3 bg-[var(--alpha-2)] border-b border-[var(--alpha-8)] shrink-0 justify-between">
+        <div className="flex items-center gap-1.5 select-none">
+          <span className="text-sm font-semibold text-black dark:text-white">
+            Query Execution Plan
+          </span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className="text-neutral-400 hover:text-foreground transition-colors cursor-help outline-none"
+                  type="button"
+                >
+                  <HelpCircle className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs font-normal">
+                This visual tree shows the PostgreSQL execution plan. Nodes show estimated cost/rows
+                and actual time/rows per step. Use it to find bottlenecks and missing indexes.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <span className="text-neutral-300 dark:text-neutral-600">/</span>
+          <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">
+            Total time:{' '}
+            <span className="font-bold font-mono text-black dark:text-white">
+              {totalTime.toFixed(2)}ms
+            </span>
+          </span>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        <PlanTreeNode node={rootNode} depth={0} />
+      </div>
+    </div>
+  );
+}
+
 export default function SQLEditorPage() {
   const {
     tabs,
@@ -117,15 +265,26 @@ export default function SQLEditorPage() {
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTabName, setEditingTabName] = useState('');
-  const [resultView, setResultView] = useState<'result' | 'table'>('result');
+  const [resultView, setResultView] = useState<'result' | 'table' | 'explain'>('result');
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [exportError, setExportError] = useState<Error | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const lastExplainedQueryRef = useRef<string>('');
 
   const { executeSQL, isPending, data, isSuccess, error, isError } = useRawSQL({
     showSuccessToast: true,
     showErrorToast: false, // Don't show toast, we'll display in results
+  });
+
+  const {
+    executeSQL: executeExplain,
+    isPending: isExplainPending,
+    data: explainData,
+    error: explainError,
+  } = useRawSQL({
+    showSuccessToast: false,
+    showErrorToast: false,
   });
 
   useEffect(() => {
@@ -149,16 +308,62 @@ export default function SQLEditorPage() {
     }
   }, [isExportMenuOpen]);
 
+  // Automatically execute explain when switching to the explain tab or active tab changes while on explain tab
+  useEffect(() => {
+    if (
+      resultView === 'explain' &&
+      activeTab?.query.trim() &&
+      !isExplainPending &&
+      lastExplainedQueryRef.current !== activeTab.query
+    ) {
+      lastExplainedQueryRef.current = activeTab.query;
+      executeExplain({ query: activeTab.query, params: [], explain: true });
+    }
+  }, [resultView, activeTabId, activeTab?.query, isExplainPending, executeExplain]);
+
   const handleExecuteQuery = () => {
-    if (!activeTab?.query.trim() || isPending) {
+    if (!activeTab?.query.trim() || isPending || isExplainPending) {
       return;
     }
 
     // Clear any previous export error when running a new query
     setExportError(null);
 
-    executeSQL({ query: activeTab.query, params: [] });
+    if (resultView === 'explain') {
+      lastExplainedQueryRef.current = activeTab.query;
+      executeExplain({ query: activeTab.query, params: [], explain: true });
+    } else {
+      executeSQL({ query: activeTab.query, params: [] });
+    }
   };
+
+  const planNodeResult = useMemo(() => {
+    if (!explainData || !explainData.rows || explainData.rows.length === 0) {
+      return null;
+    }
+
+    try {
+      const row = explainData.rows[0];
+      const planKey = Object.keys(row).find((k) => k.toLowerCase() === 'query plan');
+      if (!planKey) {
+        throw new Error('No query plan column found in results.');
+      }
+
+      const planVal = row[planKey];
+      const planObj = typeof planVal === 'string' ? JSON.parse(planVal) : planVal;
+
+      const planArray = Array.isArray(planObj) ? planObj : [planObj];
+      if (planArray.length === 0 || !planArray[0].Plan) {
+        throw new Error('Invalid query plan format.');
+      }
+
+      return planArray[0];
+    } catch (err) {
+      return {
+        error: err instanceof Error ? err : new Error('Failed to parse query plan'),
+      };
+    }
+  }, [explainData]);
 
   const handleQueryChange = (newQuery: string) => {
     if (activeTabId) {
@@ -383,10 +588,14 @@ export default function SQLEditorPage() {
                 )}
               </Tab>
               <Tab value="table">Table View</Tab>
+              <Tab value="explain">Explain</Tab>
             </Tabs>
             {/* Run Button + Export Menu */}
             <div className="flex items-center gap-2 relative">
-              <Button onClick={handleExecuteQuery} disabled={isPending || !activeTab?.query.trim()}>
+              <Button
+                onClick={handleExecuteQuery}
+                disabled={isPending || isExplainPending || !activeTab?.query.trim()}
+              >
                 Run
               </Button>
 
@@ -435,10 +644,34 @@ export default function SQLEditorPage() {
           <div
             className={cn(
               'flex-1 min-h-0 w-full overflow-auto bg-[rgb(var(--semantic-0))]',
-              resultView === 'result' && 'px-4 py-3'
+              resultView === 'result' && 'px-4 py-3',
+              resultView === 'explain' &&
+                planNodeResult &&
+                !('error' in planNodeResult) &&
+                'overflow-hidden'
             )}
           >
-            {exportError ? (
+            {resultView === 'explain' ? (
+              isExplainPending ? (
+                <p className="font-mono text-sm leading-5 text-foreground px-4 py-3 animate-pulse">
+                  Analyzing execution plan...
+                </p>
+              ) : explainError ? (
+                <div className="px-4 py-3">
+                  <ErrorViewer error={explainError} />
+                </div>
+              ) : planNodeResult && 'error' in planNodeResult ? (
+                <div className="px-4 py-3">
+                  <ErrorViewer error={planNodeResult.error} />
+                </div>
+              ) : planNodeResult ? (
+                <QueryPlanView planWrapper={planNodeResult} />
+              ) : (
+                <p className="font-mono text-sm leading-5 text-foreground px-4 py-3">
+                  Click Run to analyze query execution plan
+                </p>
+              )
+            ) : exportError ? (
               <div className={resultView !== 'result' ? 'px-4 py-3' : ''}>
                 <ErrorViewer error={exportError} />
               </div>
