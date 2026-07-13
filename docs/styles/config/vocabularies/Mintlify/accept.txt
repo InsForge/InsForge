@@ -61,8 +61,10 @@ IPs
 iptables
 IVFFlat
 Jetpack
+JWTs
 Keycloak
 kotlin
+Kotlinx
 KPIs
 linode
 localStorage
@@ -106,6 +108,7 @@ resync
 resyncs
 rmcp
 roocode
+rpcRaw
 runbook
 runtimes
 Schemaless

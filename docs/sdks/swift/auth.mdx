@@ -45,7 +45,7 @@ public struct SignUpResponse: Codable, Sendable {
 }
 ```
 
-### Example (Complete Flow with Verification)
+### Example (complete flow with verification)
 
 ```swift
 func handleSignUp(email: String, password: String, name: String?) async {
@@ -91,7 +91,7 @@ func handleResendCode(email: String) async {
 }
 ```
 
-### Email Verification
+### Email verification
 
 For users who register with email, the InsForge backend provides three options:
 
@@ -106,7 +106,7 @@ When `requireEmailVerification` is `true`, the response will have:
 
 This indicates that verification via option 2 or 3 is required before the user can sign in.
 
-### Related Methods
+### Related methods
 
 | Method | Description |
 |--------|-------------|
@@ -141,7 +141,7 @@ do {
 }
 ```
 
-### Email Verification
+### Email verification
 
 If the sign in response is:
 ```json
@@ -210,7 +210,7 @@ do {
 
 ---
 
-## Password Reset
+## Password reset
 
 InsForge supports two password reset methods, configured in the backend:
 
@@ -316,7 +316,7 @@ Sign in directly with a specific OAuth provider. This method opens the OAuth pro
 
 On iOS 12+ and macOS 10.15+, the SDK uses `ASWebAuthenticationSession` to present an in-app authentication browser with automatic callback handling.
 
-### Supported Providers
+### Supported providers
 
 ```swift
 public enum OAuthProvider: String, Sendable {
@@ -347,7 +347,7 @@ AuthResponse
 
 Returns `AuthResponse` containing the authenticated user and session tokens.
 
-### Authentication Flow
+### Authentication flow
 
 ```
 1. App calls signInWithOAuthView(provider:redirectTo:)
@@ -413,7 +413,7 @@ Register a callback URL for your app, pass that exact value to `redirectTo`, and
 
 ---
 
-## Error Handling
+## Error handling
 
 ```swift
 do {
