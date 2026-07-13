@@ -73,7 +73,7 @@ Datasets produced by your runs, with item counts, creation time, and the actor t
 
 ### Landing scraped data in your database
 
-Scraped results live in Apify datasets by default; nothing is written to your project's Postgres unless you want it there. For small scrapes, your agent can just return the results. For anything you want to keep or refresh on a schedule, have the agent deploy an [edge function](/core-concepts/functions/overview) or [compute service](/core-concepts/compute/overview). The function fetches the dataset from Apify and upserts rows into a table.
+Scraped results live in Apify datasets by default; nothing is written to your project's Postgres unless you want it there. For small scrapes, your agent can just return the results. For anything you want to keep or refresh on a schedule, have the agent deploy an [edge function](/core-concepts/functions/overview) or [compute service](/core-concepts/compute/overview). Either one fetches the dataset from Apify and upserts rows into a table.
 
 ### Settings and disconnect
 
