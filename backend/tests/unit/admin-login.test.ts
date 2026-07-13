@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppError } from '../../src/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 
 // Required env vars before any imports
@@ -134,16 +133,13 @@ describe('AuthService.adminLogin', () => {
   });
 
   function expectAdminLoginError(username: string, password: string) {
-    try {
-      authService.adminLogin(username, password);
-      expect.fail('Should have thrown an error');
-    } catch (error: unknown) {
-      expect(error).toBeInstanceOf(AppError);
-      const appErr = error as AppError;
-      expect(appErr.message).toBe('Invalid admin credentials');
-      expect(appErr.statusCode).toBe(401);
-      expect(appErr.code).toBe(ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
+    expect(() => authService.adminLogin(username, password)).toThrow(
+      expect.objectContaining({
+        message: 'Invalid admin credentials',
+        statusCode: 401,
+        code: ERROR_CODES.AUTH_UNAUTHORIZED,
+      })
+    );
   }
 
   it('successfully logs in with correct credentials', () => {
@@ -187,10 +183,10 @@ describe('AuthService.adminLogin', () => {
     expectAdminLoginError('admin@test.com', hugePassword);
   });
 
-  it('throws a fatal error during initialization if root admin credentials exceed 4096 characters', () => {
+  it('throws a fatal error during initialization if root admin username exceeds 4096 characters', () => {
     const originalUsername = appConfig.auth.rootAdminUsername;
     appConfig.auth.rootAdminUsername = 'a'.repeat(4097);
-
+    
     try {
       // Clear instance to force re-instantiation and constructor execution
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -206,6 +202,30 @@ describe('AuthService.adminLogin', () => {
     } finally {
       // Restore config state
       appConfig.auth.rootAdminUsername = originalUsername;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (AuthService as any).instance = undefined;
+    }
+  });
+
+  it('throws a fatal error during initialization if root admin password exceeds 4096 characters', () => {
+    const originalPassword = appConfig.auth.rootAdminPassword;
+    appConfig.auth.rootAdminPassword = 'b'.repeat(4097);
+    
+    try {
+      // Clear instance to force re-instantiation and constructor execution
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (AuthService as any).instance = undefined;
+      AuthService.getInstance();
+      expect.fail('Should have thrown a fatal error');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(Error);
+      const err = error as Error;
+      expect(err.message).toBe(
+        'ROOT_ADMIN_USERNAME and ROOT_ADMIN_PASSWORD must not exceed 4096 characters to prevent DoS vulnerabilities.'
+      );
+    } finally {
+      // Restore config state
+      appConfig.auth.rootAdminPassword = originalPassword;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (AuthService as any).instance = undefined;
     }

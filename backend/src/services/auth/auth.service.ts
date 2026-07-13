@@ -54,8 +54,6 @@ import {
  */
 export class AuthService {
   private static instance: AuthService;
-  private adminUsername: string;
-  private adminPassword: string;
   private adminUsernameHash: Buffer;
   private adminPasswordHash: Buffer;
   private pool: Pool | null = null;
@@ -72,23 +70,23 @@ export class AuthService {
   private appleOAuthProvider: AppleOAuthProvider;
 
   private constructor() {
-    this.adminUsername = appConfig.auth.rootAdminUsername;
-    this.adminPassword = appConfig.auth.rootAdminPassword;
+    const adminUsername = appConfig.auth.rootAdminUsername;
+    const adminPassword = appConfig.auth.rootAdminPassword;
 
-    if (!this.adminUsername || !this.adminPassword) {
+    if (!adminUsername || !adminPassword) {
       throw new Error(
         'ROOT_ADMIN_USERNAME and ROOT_ADMIN_PASSWORD environment variables are required'
       );
     }
 
-    if (this.adminUsername.length > 4096 || this.adminPassword.length > 4096) {
+    if (adminUsername.length > 4096 || adminPassword.length > 4096) {
       throw new Error(
         'ROOT_ADMIN_USERNAME and ROOT_ADMIN_PASSWORD must not exceed 4096 characters to prevent DoS vulnerabilities.'
       );
     }
 
-    this.adminUsernameHash = crypto.createHash('sha256').update(this.adminUsername).digest();
-    this.adminPasswordHash = crypto.createHash('sha256').update(this.adminPassword).digest();
+    this.adminUsernameHash = crypto.createHash('sha256').update(adminUsername).digest();
+    this.adminPasswordHash = crypto.createHash('sha256').update(adminPassword).digest();
 
     // Initialize token manager
     this.tokenManager = TokenManager.getInstance();
@@ -668,6 +666,7 @@ export class AuthService {
    * Admin login (validates against env variables only)
    */
   adminLogin(username: string, password: string): CreateAdminSessionResponse {
+    // input-sanity guard (defense-in-depth against route validation bypasses)
     if (username.length > 4096 || password.length > 4096) {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
