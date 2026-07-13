@@ -104,7 +104,7 @@ describe('AIOverviewPage OpenRouter key rotation', () => {
   });
 
   it('confirms before rotating the active OpenRouter key', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     render(
       <MemoryRouter>
@@ -125,7 +125,7 @@ describe('AIOverviewPage OpenRouter key rotation', () => {
   });
 
   it('does not rotate when the confirmation is cancelled', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     render(
       <MemoryRouter>
