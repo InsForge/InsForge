@@ -34,7 +34,6 @@ import { StorageService } from '@/services/storage/storage.service.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
 import { seedBackend } from '@/utils/seed.js';
-import { applyServerTimeouts } from '@/utils/server-timeouts.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
@@ -331,7 +330,11 @@ async function initializeServer() {
     const server = app.listen(PORT, () => {
       logger.info(`Backend API service listening on port ${PORT}`);
     });
-    applyServerTimeouts(server, appConfig.server.keepAliveTimeoutMs);
+    // Node's 5s default keepAliveTimeout lets long-interval keep-alive clients
+    // reuse sockets the server already closed; keep it above LB idle timeouts,
+    // with headersTimeout just past it so header reads never lose the race.
+    server.keepAliveTimeout = appConfig.server.keepAliveTimeoutMs;
+    server.headersTimeout = server.keepAliveTimeout + 1000;
 
     // Initialize Socket.IO service
     const socketService = SocketManager.getInstance();
