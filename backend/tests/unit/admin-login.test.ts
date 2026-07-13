@@ -186,7 +186,7 @@ describe('AuthService.adminLogin', () => {
   it('throws a fatal error during initialization if root admin username exceeds 4096 characters', () => {
     const originalUsername = appConfig.auth.rootAdminUsername;
     appConfig.auth.rootAdminUsername = 'a'.repeat(4097);
-    
+
     try {
       // Clear instance to force re-instantiation and constructor execution
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -210,7 +210,7 @@ describe('AuthService.adminLogin', () => {
   it('throws a fatal error during initialization if root admin password exceeds 4096 characters', () => {
     const originalPassword = appConfig.auth.rootAdminPassword;
     appConfig.auth.rootAdminPassword = 'b'.repeat(4097);
-    
+
     try {
       // Clear instance to force re-instantiation and constructor execution
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
