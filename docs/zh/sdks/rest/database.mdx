@@ -1,0 +1,844 @@
+---
+title: 数据库API参考
+description: 通过REST API的PostgREST风格数据库操作
+---
+
+## 概览
+
+数据库API为您的数据库表提供PostgREST风格的CRUD操作。所有请求都需要身份验证标头。
+
+## 标头
+
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+Content-Type: application/json
+```
+
+---
+
+## 查询记录
+
+使用过滤、排序和分页从表中检索记录。
+
+```
+GET /api/database/records/{tableName}
+```
+
+### 查询参数
+
+| 参数 | 类型 | 说明 |
+|-----------|------|-------------|
+| `limit` | integer | 返回的最大记录数（1-1000，默认值：100） |
+| `offset` | integer | 用于分页的跳过记录数（默认值：0） |
+| `order` | string | 排序顺序（例如，`createdAt.desc`、`name.asc`） |
+| `select` | string | 逗号分隔的要返回的列 |
+| `{field}` | string | PostgREST过滤器（例如，`status=eq.active`） |
+
+### 过滤操作符
+
+| 操作符 | 说明 | 示例 |
+|----------|-------------|---------|
+| `eq` | 等于 | `status=eq.active` |
+| `neq` | 不等于 | `status=neq.deleted` |
+| `gt` | 大于 | `age=gt.18` |
+| `gte` | 大于或等于 | `price=gte.100` |
+| `lt` | 小于 | `quantity=lt.10` |
+| `lte` | 小于或等于 | `score=lte.50` |
+| `like` | 模式匹配（区分大小写） | `name=like.*john*` |
+| `ilike` | 模式匹配（不区分大小写） | `email=ilike.*@gmail.com` |
+| `in` | 在列表中 | `status=in.(active,pending)` |
+| `is` | 为null/true/false | `deleted_at=is.null` |
+
+### 示例
+
+```bash
+# Get all posts
+curl "https://your-app.insforge.app/api/database/records/posts" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Get posts with filters
+curl "https://your-app.insforge.app/api/database/records/posts?status=eq.published&order=createdAt.desc&limit=10" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Select specific columns
+curl "https://your-app.insforge.app/api/database/records/posts?select=id,title,author" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### 响应
+
+```json
+[
+  {
+    "id": "248373e1-0aea-45ce-8844-5ef259203749",
+    "title": "Getting Started with InsForge",
+    "content": "This is a guide to help you get started...",
+    "createdAt": "2025-07-18T05:37:24.338Z",
+    "updatedAt": "2025-07-18T05:37:24.338Z"
+  }
+]
+```
+
+### 响应标头
+
+| 标头 | 说明 |
+|--------|-------------|
+| `X-Total-Count` | 与查询匹配的总记录数 |
+| `Content-Range` | 返回的记录范围（例如，`0-99/1234`） |
+
+---
+
+## 创建记录
+
+在表中创建一条或多条记录。
+
+```
+POST /api/database/records/{tableName}
+```
+
+<Warning>
+**重要**：请求正文必须是数组，即使是单个记录也是如此。
+</Warning>
+
+### 标头
+
+| 标头 | 值 | 说明 |
+|--------|-------|-------------|
+| `Prefer` | `return=representation` | 包含以返回创建的记录 |
+
+### 示例
+
+```bash
+# Create a single record
+curl -X POST "https://your-app.insforge.app/api/database/records/posts" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '[{
+    "title": "My First Post",
+    "content": "Hello world!",
+    "published": true
+  }]'
+
+# Create multiple records
+curl -X POST "https://your-app.insforge.app/api/database/records/posts" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '[
+    {"title": "Post 1", "content": "Content 1"},
+    {"title": "Post 2", "content": "Content 2"}
+  ]'
+```
+
+### 响应
+
+不使用`Prefer`标头：
+```json
+[]
+```
+
+使用`Prefer: return=representation`：
+```json
+[
+  {
+    "id": "248373e1-0aea-45ce-8844-5ef259203749",
+    "title": "My First Post",
+    "content": "Hello world!",
+    "published": true,
+    "createdAt": "2025-07-18T05:37:24.338Z",
+    "updatedAt": "2025-07-18T05:37:24.338Z"
+  }
+]
+```
+
+---
+
+## 更新记录
+
+更新与查询过滤器匹配的记录。
+
+```
+PATCH /api/database/records/{tableName}
+```
+
+### 查询参数
+
+使用过滤操作符指定要更新的记录。
+
+### 标头
+
+| 标头 | 值 | 说明 |
+|--------|-------|-------------|
+| `Prefer` | `return=representation` | 包含以返回更新的记录 |
+
+### 示例
+
+```bash
+# Update a single record by ID
+curl -X PATCH "https://your-app.insforge.app/api/database/records/posts?id=eq.248373e1-0aea-45ce-8844-5ef259203749" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '{
+    "title": "Updated Post Title",
+    "content": "This content has been updated."
+  }'
+
+# Update multiple records
+curl -X PATCH "https://your-app.insforge.app/api/database/records/posts?status=eq.draft" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "archived"}'
+```
+
+### 响应
+
+```json
+[
+  {
+    "id": "248373e1-0aea-45ce-8844-5ef259203749",
+    "title": "Updated Post Title",
+    "content": "This content has been updated.",
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-21T11:00:00Z"
+  }
+]
+```
+
+---
+
+## 删除记录
+
+删除与查询过滤器匹配的记录。
+
+```
+DELETE /api/database/records/{tableName}
+```
+
+### 查询参数
+
+使用过滤操作符指定要删除的记录。
+
+### 标头
+
+| 标头 | 值 | 说明 |
+|--------|-------|-------------|
+| `Prefer` | `return=representation` | 包含以返回删除的记录 |
+
+### 示例
+
+```bash
+# Delete by ID
+curl -X DELETE "https://your-app.insforge.app/api/database/records/posts?id=eq.248373e1-0aea-45ce-8844-5ef259203749" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Delete with Prefer header to see deleted records
+curl -X DELETE "https://your-app.insforge.app/api/database/records/posts?status=eq.archived" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Prefer: return=representation"
+```
+
+### 响应
+
+不使用`Prefer`标头：`204 No Content`
+
+使用`Prefer: return=representation`：
+```json
+[
+  {
+    "id": "248373e1-0aea-45ce-8844-5ef259203749",
+    "title": "Deleted Post",
+    "createdAt": "2025-01-01T00:00:00Z"
+  }
+]
+```
+
+---
+
+## 错误响应
+
+### 找不到表（404）
+
+```json
+{
+  "error": "TABLE_NOT_FOUND",
+  "message": "Table 'nonexistent' does not exist",
+  "statusCode": 404,
+  "nextActions": "Check table name and try again"
+}
+```
+
+### 无效的查询（400）
+
+```json
+{
+  "error": "INVALID_QUERY",
+  "message": "Invalid filter syntax",
+  "statusCode": 400,
+  "nextActions": "Check PostgREST filter documentation"
+}
+```
+
+### 验证错误（400）
+
+```json
+{
+  "error": "VALIDATION_ERROR",
+  "message": "Invalid field type: expected boolean for 'published'",
+  "statusCode": 400,
+  "nextActions": "Ensure field types match the table schema"
+}
+```
+
+---
+
+## 示例
+
+### 分页
+
+```bash
+# Page 1 (first 20 records)
+curl "https://your-app.insforge.app/api/database/records/posts?limit=20&offset=0"
+
+# Page 2 (next 20 records)
+curl "https://your-app.insforge.app/api/database/records/posts?limit=20&offset=20"
+```
+
+### 复杂过滤器
+
+```bash
+# Multiple conditions
+curl "https://your-app.insforge.app/api/database/records/posts?status=eq.published&author_id=eq.123&order=createdAt.desc"
+
+# Search with pattern
+curl "https://your-app.insforge.app/api/database/records/users?email=ilike.*@company.com"
+
+# In list
+curl "https://your-app.insforge.app/api/database/records/orders?status=in.(pending,processing)"
+
+# Null check
+curl "https://your-app.insforge.app/api/database/records/tasks?completed_at=is.null"
+```
+
+### 更新插入（插入或更新）
+
+插入记录或在唯一约束发生冲突时更新它。
+
+```
+POST /api/database/records/{tableName}
+```
+
+#### 标头
+
+| 标头 | 值 | 说明 |
+|--------|-------|-------------|
+| `Prefer` | `resolution=merge-duplicates` | 冲突时更新现有记录 |
+| `Prefer` | `resolution=ignore-duplicates` | 如果记录存在，忽略插入 |
+
+#### 示例
+
+```bash
+# Upsert: insert or update on conflict
+curl -X POST "https://your-app.insforge.app/api/database/records/user_settings" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: resolution=merge-duplicates,return=representation" \
+  -d '[{
+    "user_id": "123e4567-e89b-12d3-a456-426614174000",
+    "theme": "dark",
+    "notifications": true
+  }]'
+```
+
+#### 响应
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "user_id": "123e4567-e89b-12d3-a456-426614174000",
+    "theme": "dark",
+    "notifications": true,
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-21T11:00:00Z"
+  }
+]
+```
+
+<Note>
+更新插入需要表上的唯一约束（例如，主键或唯一索引）。冲突解决基于此约束。
+</Note>
+
+---
+
+## 调用RPC函数
+
+通过PostgREST RPC执行数据库函数。支持所有HTTP方法（GET、POST、PUT、PATCH、DELETE）。
+
+```
+POST /api/database/rpc/{functionName}
+```
+
+### 示例
+
+```bash
+# Call a function with parameters
+curl -X POST "https://your-app.insforge.app/api/database/rpc/get_user_stats" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "123e4567-e89b-12d3-a456-426614174000"}'
+
+# Call a function without parameters
+curl -X POST "https://your-app.insforge.app/api/database/rpc/get_total_count" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### 响应
+
+```json
+{
+  "total_posts": 42,
+  "total_comments": 128,
+  "last_activity": "2025-01-15T10:30:00Z"
+}
+```
+
+---
+
+## 管理员端点
+
+以下端点需要管理员身份验证。
+
+### 管理员端点标头
+
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
+Content-Type: application/json
+```
+
+---
+
+## 列出数据库函数
+
+获取public模式中的所有数据库函数。**需要管理员身份验证。**
+
+```
+GET /api/database/functions
+```
+
+### 示例
+
+```bash
+curl "https://your-app.insforge.app/api/database/functions" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### 响应
+
+```json
+[
+  {
+    "name": "get_user_stats",
+    "schema": "public",
+    "language": "plpgsql",
+    "returnType": "json",
+    "arguments": "user_id uuid",
+    "definition": "BEGIN ... END;"
+  }
+]
+```
+
+---
+
+## 列出数据库索引
+
+获取所有数据库索引。**需要管理员身份验证。**
+
+```
+GET /api/database/indexes
+```
+
+### 示例
+
+```bash
+curl "https://your-app.insforge.app/api/database/indexes" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### 响应
+
+```json
+[
+  {
+    "name": "posts_pkey",
+    "tableName": "posts",
+    "columns": ["id"],
+    "isUnique": true,
+    "isPrimary": true,
+    "definition": "CREATE UNIQUE INDEX posts_pkey ON public.posts USING btree (id)"
+  }
+]
+```
+
+---
+
+## 列出RLS策略
+
+获取所有行级安全策略。**需要管理员身份验证。**
+
+```
+GET /api/database/policies
+```
+
+### 示例
+
+```bash
+curl "https://your-app.insforge.app/api/database/policies" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### 响应
+
+```json
+[
+  {
+    "name": "Users can view own posts",
+    "tableName": "posts",
+    "command": "SELECT",
+    "roles": ["authenticated"],
+    "using": "(auth.uid() = user_id)",
+    "withCheck": null
+  }
+]
+```
+
+---
+
+## 列出数据库触发器
+
+获取所有数据库触发器。**需要管理员身份验证。**
+
+```
+GET /api/database/triggers
+```
+
+### 示例
+
+```bash
+curl "https://your-app.insforge.app/api/database/triggers" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### 响应
+
+```json
+[
+  {
+    "name": "update_timestamp",
+    "tableName": "posts",
+    "timing": "BEFORE",
+    "events": ["UPDATE"],
+    "functionName": "update_updated_at_column",
+    "enabled": true
+  }
+]
+```
+
+---
+
+## 列出数据库迁移
+
+获取成功自定义迁移的历史记录。InsForge将这些存储在`system.custom_migrations`中，但端点仅返回迁移元数据和执行的语句。**需要管理员身份验证。**
+
+```
+GET /api/database/migrations
+```
+
+### 示例
+
+```bash
+curl "https://your-app.insforge.app/api/database/migrations" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### 响应
+
+```json
+{
+  "migrations": [
+    {
+      "version": "20260416170500",
+      "name": "create-posts-table",
+      "statements": [
+        "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+      ],
+      "createdAt": "2026-04-16T17:05:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+## 创建数据库迁移
+
+创建并立即对数据库执行自定义迁移。只有在每个语句都成功时，才会记录迁移。**需要管理员身份验证。**
+
+```
+POST /api/database/migrations
+```
+
+### 请求正文
+
+| 字段 | 类型 | 必需 | 说明 |
+|-------|------|----------|-------------|
+| `version` | string | 是 | 数字迁移版本（最多64位数字）。接受Drizzle风格的顺序前缀（例如`0001`）或`YYYYMMDDHHmmss`时间戳。版本按数值进行比较。InsForge CLI为本地迁移文件名生成14位数字UTC时间戳。 |
+| `name` | string | 是 | 仅使用小写字母、数字和连字符的迁移名称 |
+| `sql` | string | 是 | 要解析和执行的SQL文本 |
+
+### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/migrations" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "version": "20260416170500",
+    "name": "create-posts-table",
+    "sql": "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+  }'
+```
+
+### 响应
+
+```json
+{
+  "version": "20260416170500",
+  "name": "create-posts-table",
+  "statements": [
+    "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+  ],
+  "createdAt": "2026-04-16T17:05:00.000Z",
+  "message": "Migration executed successfully"
+}
+```
+
+<Warning>
+不要在自定义迁移中包含`BEGIN`、`COMMIT`或`ROLLBACK`。InsForge在其自己的事务中执行迁移。
+</Warning>
+
+---
+
+## 执行原始SQL（严格模式）
+
+使用严格清理执行原始SQL查询。阻止访问系统表和auth.users。**需要管理员身份验证。**
+
+```
+POST /api/database/advance/rawsql
+```
+
+### 请求正文
+
+| 字段 | 类型 | 必需 | 说明 |
+|-------|------|----------|-------------|
+| `query` | string | 是 | 要执行的SQL查询 |
+| `params` | array | 否 | 参数化查询的查询参数 |
+
+### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT * FROM posts WHERE published = $1",
+    "params": [true]
+  }'
+```
+
+### 响应
+
+```json
+{
+  "rows": [
+    {
+      "id": "248373e1-0aea-45ce-8844-5ef259203749",
+      "title": "My Post",
+      "published": true
+    }
+  ],
+  "rowCount": 1,
+  "command": "SELECT"
+}
+```
+
+---
+
+## 执行原始SQL（宽松模式）
+
+使用宽松清理执行原始SQL查询。允许SELECT和INSERT到系统表。**谨慎使用。需要管理员身份验证。**
+
+```
+POST /api/database/advance/rawsql/unrestricted
+```
+
+### 请求正文
+
+| 字段 | 类型 | 必需 | 说明 |
+|-------|------|----------|-------------|
+| `query` | string | 是 | 要执行的SQL查询 |
+| `params` | array | 否 | 参数化查询的查询参数 |
+
+### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql/unrestricted" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT * FROM auth.users LIMIT 10"
+  }'
+```
+
+### 响应
+
+```json
+{
+  "rows": [...],
+  "rowCount": 10,
+  "command": "SELECT"
+}
+```
+
+<Warning>
+此端点限制宽松，可以访问系统表。仅在必要时使用，并确保正确授权。
+</Warning>
+
+---
+
+## 导出数据库
+
+以SQL或JSON格式导出数据库模式和/或数据。**需要管理员身份验证。**
+
+```
+POST /api/database/advance/export
+```
+
+### 请求正文
+
+| 字段 | 类型 | 必需 | 默认值 | 说明 |
+|-------|------|----------|---------|-------------|
+| `tables` | array | 否 | all | 要导出的表列表 |
+| `format` | string | 否 | sql | 导出格式（`sql`或`json`） |
+| `includeData` | boolean | 否 | true | 包含表数据 |
+| `includeFunctions` | boolean | 否 | false | 包含数据库函数 |
+| `includeSequences` | boolean | 否 | false | 包含序列 |
+| `includeViews` | boolean | 否 | false | 包含视图 |
+| `rowLimit` | integer | 否 | - | 每个表的最大行数 |
+
+### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/export" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tables": ["posts", "comments"],
+    "format": "sql",
+    "includeData": true,
+    "rowLimit": 1000
+  }'
+```
+
+### 响应
+
+```json
+{
+  "format": "sql",
+  "content": "CREATE TABLE posts (...); INSERT INTO posts VALUES (...);",
+  "tables": ["posts", "comments"]
+}
+```
+
+---
+
+## 导入数据库
+
+从SQL文件导入数据库。**需要管理员身份验证。**
+
+```
+POST /api/database/advance/import
+```
+
+### 请求（multipart/form-data）
+
+| 字段 | 类型 | 必需 | 默认值 | 说明 |
+|-------|------|----------|---------|-------------|
+| `file` | file | 是 | - | 要导入的SQL文件 |
+| `truncate` | boolean | 否 | false | 在导入前截断现有表 |
+
+### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/import" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -F "file=@backup.sql" \
+  -F "truncate=false"
+```
+
+### 响应
+
+```json
+{
+  "filename": "backup.sql",
+  "fileSize": 102400,
+  "tables": ["posts", "comments", "users"],
+  "rowsImported": 1500
+}
+```
+
+---
+
+## 批量更新插入
+
+从CSV或JSON文件批量插入或更新数据。**需要管理员身份验证。**
+
+```
+POST /api/database/advance/bulk-upsert
+```
+
+### 请求（multipart/form-data）
+
+| 字段 | 类型 | 必需 | 说明 |
+|-------|------|----------|-------------|
+| `file` | file | 是 | 包含数据的CSV或JSON文件 |
+| `table` | string | 是 | 目标表名 |
+| `upsertKey` | string | 否 | 用于更新插入冲突解决的列名 |
+
+### 示例
+
+```bash
+# Import from CSV
+curl -X POST "https://your-app.insforge.app/api/database/advance/bulk-upsert" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -F "file=@data.csv" \
+  -F "table=posts" \
+  -F "upsertKey=id"
+
+# Import from JSON
+curl -X POST "https://your-app.insforge.app/api/database/advance/bulk-upsert" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -F "file=@data.json" \
+  -F "table=posts"
+```
+
+### 响应
+
+```json
+{
+  "rowsAffected": 150,
+  "totalRecords": 150,
+  "table": "posts"
+}
+```

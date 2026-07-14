@@ -1,0 +1,66 @@
+---
+title: "Alternativas"
+description: "Cómo InsForge se compara con Supabase y Firebase."
+---
+
+InsForge es la **plataforma de infraestructura en la nube nativa de agentes**. Un agente de codificación proporciona a cualquier aplicación una base de datos Postgres, autenticación, almacenamiento, funciones perimetrales, computación, alojamiento y una puerta de enlace de modelo de IA, impulsada de extremo a extremo a través de un CLI. Es de código abierto (Apache-2.0).
+
+Su servidor MCP y CLI exponen esa infraestructura como contexto estructurado y legible por máquinas, para que los agentes de codificación de IA puedan planificar y ejecutar operaciones de forma autónoma dentro de permisos limitados. El cambio en el rol del humano: con plataformas tradicionales **implementa y ejecuta**; con InsForge **define intención y revisa**.
+
+<Note>
+  Para los resúmenes completos y siempre actualizados, consulte
+  [InsForge vs Supabase](https://insforge.dev/alternatives/insforge-vs-supabase)
+  y [InsForge vs Firebase](https://insforge.dev/alternatives/insforge-vs-firebase).
+</Note>
+
+## InsForge vs. Supabase
+
+Supabase es un backend de código abierto basado en Postgres construido para desarrolladores humanos. InsForge comparte la base de Postgres pero está construido para agentes de codificación de IA como operadores de primera clase.
+
+| Dimensión | Supabase | InsForge |
+|---|---|---|
+| Operador principal | Desarrolladores humanos | Agentes de codificación de IA |
+| Modelo de configuración | UI explícita, SQL, CLI | Operaciones ejecutadas por agentes |
+| Diseño de permisos | Acceso gestionado por desarrollador | Autonomía de agente limitada |
+| Contexto del sistema | Implícito, mantenido por desarrollador | Estructurado, legible por máquinas (MCP) |
+| Pagos | A través del código de la aplicación | Integración Stripe integrada |
+| Acceso al modelo de IA | Conexión de modelo externo | Puerta de enlace de modelo integrada |
+| Seguridad | Implementación por integración | Valores predeterminados listos para producción |
+| Preparación del agente | Requiere conexión manual | Operable de extremo a extremo |
+
+## InsForge vs. Firebase
+
+Firebase se enfoca en prototipos rápidos en NoSQL orientado a documentos con operadores humanos. InsForge se enfoca en codificación agentica en Postgres relacional.
+
+| Dimensión | Firebase | InsForge |
+|---|---|---|
+| Base de datos | NoSQL orientada a documentos | Postgres relacional |
+| Modelo de datos | JSON sin esquema | Tablas estructuradas con relaciones |
+| Combinaciones | No soportado de forma nativa | Combinaciones y consultas nativas |
+| Transacciones | Compatible con limitaciones | Transacciones ACID completas |
+| Auto-alojamiento | No soportado | Docker / auto-hospedable |
+| Operador principal | Desarrolladores humanos | Agentes de codificación de IA |
+| Contexto del sistema | Implícito, fragmentado | Estructurado, legible por máquinas (MCP) |
+| Integración de IA | Configuración externa | Puerta de enlace de modelo integrada |
+| Pagos | Integración manual | Primitivo Stripe integrado |
+
+## Por qué los equipos eligen InsForge
+
+<CardGroup cols={2}>
+  <Card title="Diseño nativo de agentes" icon="robot">
+    Un servidor MCP expone esquemas, permisos y registros como contexto estructurado, para que un agente de codificación de IA pueda aprovisionar y operar toda la pila de extremo a extremo, no solo consultar una base de datos.
+  </Card>
+  <Card title="Primitivos listos para producción" icon="layer-group">
+    Los pagos (Stripe), una puerta de enlace de modelo de IA y la implementación se incluyen de forma inmediata, en lugar de conectar cada integración usted mismo.
+  </Card>
+  <Card title="Postgres relacional" icon="database">
+    Combinaciones nativas, transacciones ACID completas y aplicación de esquema, para que sus datos y habilidades sean transferibles. Sin modelo de documento patentado para diseñar.
+  </Card>
+  <Card title="Código abierto, auto-hospedable" icon="server">
+    Ejecútelo en su propia infraestructura con Docker o use la nube administrada.
+  </Card>
+</CardGroup>
+
+<Card title="Comenzar a construir" icon="rocket" href="https://insforge.dev/auth/sign-up">
+  Cree un proyecto y conecte su agente de codificación de IA favorito.
+</Card>

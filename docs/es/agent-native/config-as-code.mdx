@@ -1,0 +1,224 @@
+---
+title: Configuración como código
+description: Administre la configuración de autenticación, SMTP, almacenamiento, retención e implementación de InsForge de forma declarativa desde un único insforge.toml usando el flujo de trabajo de plan, aplicación y exportación de la CLI.
+---
+
+## Descripción general
+
+`insforge.toml` es una instantánea de control de versiones declarativa de un subconjunto de la configuración de su proyecto: política de autenticación, URL de redirección permitidas, reglas de contraseña, SMTP, tamaño de carga de almacenamiento, retención en tiempo real y programación, y subdominio de implementación. La CLI proporciona tres comandos que funcionan con este archivo:
+
+- **`config plan`**: diferencie `insforge.toml` con el proyecto vinculado. Muestra qué cambiaría.
+- **`config apply`**: inserte el diff en el proyecto en vivo. Control de capacidad por cambio, secretos resueltos por entorno, modo de ejecución en seco.
+- **`config export`**: extraiga el estado del proyecto actual y escriba un nuevo `insforge.toml`. Útil para arrancar desde un proyecto existente.
+
+Usted mantiene **un** `insforge.toml` en su repositorio. Para aplicarlo a un entorno diferente (staged, producción, backend local de un compañero de equipo, o instancia autohospedada), apunte la CLI a un proyecto diferente (revinculación o use `--project-id`). Los secretos se leen de variables de entorno a través de referencias `env(...)`, por lo que el archivo en sí permanece libre de credenciales y puede ser confirmado de forma segura.
+
+Esto funciona de la misma manera en los proyectos de InsForge Cloud y en implementaciones OSS autohospedadas.
+
+<Note>
+  Todos los ejemplos usan `npx @insforge/cli`. No instale la CLI globalmente.
+</Note>
+
+## Resumen de comandos
+
+| Comando | Propósito |
+|---------|---------|
+| `config plan` | Mostrar diferencia entre `insforge.toml` y estado del proyecto en vivo |
+| `config apply` | Aplicar `insforge.toml` al proyecto en vivo |
+| `config apply --dry-run` | Imprimir el plan sin aplicar |
+| `config apply --auto-approve` | Omitir el mensaje de confirmación interactivo (requerido en modo `--json`) |
+| `config export` | Extraer configuración activa y escribir `insforge.toml` |
+| `config export --force` | Sobrescribir un `insforge.toml` existente sin confirmación |
+
+`config plan` y `config apply` leen `insforge.toml`; pase `--file <path>` si se encuentra en otro lugar. `config export` escribe el archivo; pase `--out <path>` para escribirlo en una ubicación personalizada.
+
+## Flujo de trabajo recomendado
+
+<Steps>
+  <Step title="Arranque desde un proyecto existente">
+    Si ya ha configurado el proyecto a través del panel, exporte una vez para obtener un archivo de trabajo:
+
+    ```bash
+    npx @insforge/cli config export
+    ```
+
+    Esto escribe `insforge.toml` reflejando el estado del backend actual.
+  </Step>
+
+  <Step title="Confirmarlo">
+    Verifique `insforge.toml` en control de versiones. Los secretos se hacen referencia a través de `env(...)`, por lo que el archivo es seguro.
+  </Step>
+
+  <Step title="Editar y planificar">
+    Cambie el TOML, luego obtenga una vista previa de la diferencia antes de aplicar:
+
+    ```bash
+    npx @insforge/cli config plan
+    ```
+  </Step>
+
+  <Step title="Aplicar">
+    ```bash
+    npx @insforge/cli config apply
+    ```
+
+    Revise el plan renderizado y confirme. En CI, pase `--auto-approve` y `--json`.
+  </Step>
+
+  <Step title="Aplicar el mismo archivo en otro lugar">
+    Para insertar la misma configuración en almacenamiento provisional o un backend autohospedado, apunte la CLI al otro proyecto y vuelva a ejecutar aplicar:
+
+    ```bash
+    npx @insforge/cli --project-id <staging-project-id> config apply
+    ```
+
+    Los secretos que difieren entre entornos (contraseña SMTP, etc.) se resuelven por entorno desde el shell local, por lo que el TOML no necesita cambiar.
+  </Step>
+</Steps>
+
+## Qué cubre `insforge.toml`
+
+El archivo refleja un subconjunto curado de la configuración del proyecto, las partes que son útiles para administrar de forma declarativa. Cualquier cosa que no esté en esta lista aún vive en el panel y la API.
+
+| Sección | Claves |
+|---------|------|
+| `[auth]` | `allowed_redirect_urls`, `require_email_verification`, `verify_email_method`, `reset_password_method`, `disable_signup` |
+| `[auth.password]` | `min_length`, `require_number`, `require_lowercase`, `require_uppercase`, `require_special_char` |
+| `[auth.smtp]` | `enabled`, `host`, `port`, `username`, `password`, `sender_email`, `sender_name`, `min_interval_seconds` |
+| `[storage]` | `max_file_size_mb` |
+| `[realtime]` | `retention_days` |
+| `[schedules]` | `retention_days` |
+| `[deployments]` | `subdomain` |
+
+Debido a que TOML no tiene un literal `null`, use `retention_days = 0` para deshabilitar la limpieza de retención para mensajes en tiempo real o registros de ejecución de cronograma; `config apply` envía `null` al backend para ese valor. Las plantillas de correo electrónico, las credenciales de la aplicación del proveedor OAuth, los depósitos, los canales en tiempo real, las funciones, las variables de entorno de implementación y los secretos no se administran a través de este archivo.
+
+Un ejemplo completo:
+
+```toml
+[auth]
+require_email_verification = true
+verify_email_method = "code"
+reset_password_method = "code"
+disable_signup = false
+allowed_redirect_urls = [
+  "https://app.example.com/auth/callback",
+  "http://localhost:3000/auth/callback",
+]
+
+[auth.password]
+min_length = 12
+require_number = true
+require_lowercase = true
+require_uppercase = true
+require_special_char = false
+
+[auth.smtp]
+enabled = true
+host = "smtp.sendgrid.net"
+port = 587
+username = "apikey"
+password = "env(SENDGRID_API_KEY)"
+sender_email = "noreply@example.com"
+sender_name = "Acme"
+
+[storage]
+max_file_size_mb = 100
+
+[realtime]
+retention_days = 7
+
+[schedules]
+retention_days = 0
+
+[deployments]
+subdomain = "acme-prod"
+```
+
+## `config plan`
+
+```bash
+npx @insforge/cli config plan
+npx @insforge/cli config plan --file ./config/insforge.toml
+npx @insforge/cli --json config plan
+```
+
+`plan` lee `insforge.toml`, obtiene el estado activo a través de `/api/metadata` y los puntos finales de configuración opcionales para almacenamiento, tiempo real y programaciones, luego imprime una diferencia renderizada. También etiqueta cualquier sección que el backend activo aún no expose (versiones autohospedadas más antiguas, etc.). Aplicar omitirá esos en lugar de fallar la ejecución completa.
+
+Use `plan` antes de cada `apply` en sesiones interactivas y como puerta de CI para detectar desviaciones no intencionadas.
+
+## `config apply`
+
+```bash
+npx @insforge/cli config apply
+npx @insforge/cli config apply --dry-run
+npx @insforge/cli config apply --auto-approve
+npx @insforge/cli --json config apply --auto-approve
+```
+
+`apply` ejecuta la misma diferencia que `plan`, luego recorre el conjunto de cambios:
+
+1. **Control de capacidad por cambio.** Cada cambio se verifica contra los metadatos del backend o el punto final de configuración de la sección. Si el backend no admite una sección (por ejemplo, una instancia autohospedada más antigua sin SMTP expuesta), esa sección se omite con una advertencia nombrada, y el resto de los cambios aún se aplican.
+2. **Resolución de secretos.** Las referencias `env(...)` en el TOML se resuelven en el momento de la aplicación desde el entorno local. Si falta una variable referenciada, el comando se cancela antes de enviar cualquier actualización, por lo que el backend no se queda medio configurado.
+3. **Envío por sección.** Cada cambio se envía al punto final de backend apropiado (`/api/auth/config`, `/api/auth/smtp-config`, `/api/storage/config`, `/api/realtime/config`, `/api/schedules/config`, `/api/deployments/slug`, etc.). Los cambios son independientes, por lo que una falla en una sección no revertirá secciones exitosas anteriores.
+
+Banderas:
+
+- `--dry-run` imprime el plan y sale sin aplicar.
+- `--auto-approve` omite la confirmación interactiva. Requerido cuando se establece `--json`, ya que no hay TTY para el símbolo del sistema.
+- `--file <path>` anula la ubicación predeterminada `./insforge.toml`.
+
+## `config export`
+
+```bash
+npx @insforge/cli config export
+npx @insforge/cli config export --out ./config/insforge.toml
+npx @insforge/cli config export --force
+```
+
+`export` extrae la superficie configurable del proyecto activo y la escribe en un archivo TOML. Úsalo para:
+
+- Arrancar un `insforge.toml` desde un proyecto que ha estado configurando a través del panel.
+- Diff ediciones manuales contra el estado actual del backend exportando a un archivo temporal y comparando.
+- Snapshot de configuración antes de un cambio arriesgado para que pueda reaplicar la snapshot si necesita revertir.
+
+El archivo escrito por `export` tiene la misma forma que espera la CLI de `apply`, por lo que se admite la bidireccionalidad.
+
+Sin `--force`, `export` se niega a sobrescribir un archivo existente en modo interactivo y muestra un error `OUTPUT_EXISTS` en modo `--json`.
+
+## Referencias secretas
+
+`auth.smtp.password` y cualquier otro campo sensible se pueden expresar como `env(VAR_NAME)` en lugar de un valor literal:
+
+```toml
+[auth.smtp]
+password = "env(SENDGRID_API_KEY)"
+```
+
+En el momento de la aplicación, la CLI lee `SENDGRID_API_KEY` del entorno local, valida que esté presente y envía el valor resuelto al backend. El TOML en sí nunca contiene el secreto, por lo que se puede confirmar.
+
+Esto es lo que permite que un `insforge.toml` se aplique limpiamente a múltiples entornos: los backends de desarrollo y producción difieren solo en **cuál** `SENDGRID_API_KEY` está en el alcance cuando ejecuta `apply`.
+
+Los refs `env(...)` en un TOML que es el destino de `apply` reenvían la contraseña resuelta en cada ejecución. Esa es la única forma en que la CLI puede decirle al backend "el secreto puede haberse rotado, actualice". Los campos sin una ref `env(...)` se tratan como preservar existentes.
+
+## Cuándo usar esto
+
+- **Control de versiones para la configuración del proyecto.** Las URL de redirección, la política de registro, la política de contraseña, el modo de verificación de correo electrónico, SMTP, el tamaño de carga de almacenamiento y las ventanas de retención viven en un archivo que su equipo revisa a través de PR.
+- **Paridad multiambiental.** Un TOML, aplicado a desarrollo, almacenamiento provisional y producción, mantiene los ajustes de proyecto compatibles alineados en todas partes. Los valores específicos del entorno (subdominio, credenciales SMTP) fluyen a través de anulaciones `--project-id` y refs `env(...)`.
+- **Cambios de configuración impulsados por CI.** Ejecute `config apply --auto-approve --json` desde su canalización de implementación. Combine con `config plan` como puerta de PR para que los revisores vean qué cambiará la fusión en producción.
+- **Recuperación ante desastres.** Un `insforge.toml` confirmado es una instantánea de configuración conocida. Vuelva a aplicarlo después de restaurar un proyecto para que los ajustes de autenticación, SMTP, almacenamiento, retención e implementación vuelvan a la forma esperada en segundos.
+- **Desarrollo OSS autohospedado y local.** Ejecute `npx @insforge/cli link --api-base-url http://localhost:7130 --api-key <local-key>` contra una pila docker-compose, luego apunte los comandos de configuración de la CLI a su instancia OSS local de la misma manera que apuntaría a cloud.
+
+## Solución de problemas
+
+**`Refusing to apply in --json mode without --auto-approve or --yes`.** La CLI nunca aplica silenciosamente cambios en ejecuciones no interactivas. Pasar `--auto-approve` (o `-y`) explícitamente.
+
+**`your backend doesn't expose <section>`.** El backend vinculado está en una versión que aún no tiene la API relevante. El resto de sus cambios aún se aplicaron. Actualice el backend (o espere el próximo lanzamiento) para aplicar esa sección.
+
+**`env(...)` reference resolves to nothing.** La CLI se cancela antes de cualquier llamada a la API cuando falta una variable de entorno referenciada. Establezca la variable en su shell o almacén de secretos de CI y vuelva a ejecutar.
+
+**`Slug is already taken`.** `deployments.subdomain` entra en conflicto con el subdominio de otro proyecto en el mismo backend. Elige un valor diferente.
+
+## Relacionado
+
+- [Arnés CLI](/agent-native/cli-harness): la superficie de comando completa que impulsa un agente
+- [Guía de seguridad de implementación](/deployment/deployment-security-guide): endurecimiento de un backend autohospedado después de la implementación

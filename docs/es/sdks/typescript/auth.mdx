@@ -1,0 +1,715 @@
+---
+title: Referencia de SDK de Autenticación
+description: Autenticación de usuarios y gestión de perfiles con el SDK de TypeScript para InsForge
+---
+
+## Instalación
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## signUp()
+
+Crea una nueva cuenta de usuario con correo electrónico y contraseña.
+
+### Parámetros
+
+- `email` (string, required) - Dirección de correo electrónico del usuario
+- `password` (string, required) - Contraseña del usuario
+- `name` (string, optional) - Nombre para mostrar del usuario
+- `redirectTo` (string, optional) - Utilizado para verificación de correo electrónico basada en enlaces. El enlace de correo electrónico siempre abre primero un punto final del servidor InsForge; después de verificar el token, InsForge redirige el navegador a esta URL con el resultado de la verificación. Requerido cuando `verifyEmailMethod` se establece en `link`. Esta URL debe incluirse en `allowedRedirectUrls`. Recomendado: usa tu página de inicio de sesión de la aplicación.
+
+### Devoluciones
+
+```typescript
+{
+  data: {
+    user?: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
+    accessToken: string | null,
+    requireEmailVerification?: boolean,
+    csrfToken?: string | null
+  } | null,
+  error: Error | null
+}
+```
+
+<Note>
+  Cuando `requireEmailVerification` es verdadero, `accessToken` será nulo hasta que el usuario verifique su correo electrónico. InsForge envía un correo de verificación con un enlace o código de 6 dígitos, según la configuración del panel (`verifyEmailMethod`). Para verificación por código, implementa una página que pida al usuario ingresar el código (ver [verifyEmail()](#verifyemail)). Para verificación por enlace, proporciona una URL `redirectTo` que debería recibir el navegador después de que InsForge verifique el token. Recomendado: usa tu página de inicio de sesión como `redirectTo`, luego muestra un mensaje de éxito y pide al usuario que inicie sesión con su correo electrónico y contraseña.
+</Note>
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.auth.signUp({
+  email: 'user@example.com',
+  password: 'secure_password123',
+  name: 'John Doe',
+  redirectTo: 'http://localhost:3000/sign-in',
+});
+
+if (data?.requireEmailVerification) {
+  // For code verification: redirect to page where user enters the 6-digit code
+  // For link verification: wait for the user to click the email link
+  console.log('Please verify your email');
+} else if (data?.accessToken) {
+  // User is signed in (email verification disabled)
+  console.log('Welcome!', data.user.email);
+}
+```
+
+### Salida
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "emailVerified": false,
+      "providers": ["email"],
+      "createdAt": "2024-01-15T10:00:00Z",
+      "updatedAt": "2024-01-15T10:00:00Z",
+      "profile": {
+        "name": "John Doe",
+        "avatar_url": null
+      },
+      "metadata": {}
+    },
+    "requireEmailVerification": true,
+    "accessToken": null,
+    "csrfToken": null
+  },
+  "error": null
+}
+```
+
+---
+
+## signInWithPassword()
+
+Inicia sesión con un usuario existente usando correo electrónico y contraseña.
+
+### Parámetros
+
+- `email` (string, required) - Dirección de correo electrónico del usuario
+- `password` (string, required) - Contraseña del usuario
+
+### Devoluciones
+
+```typescript
+{
+  data: {
+    user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
+    accessToken: string,
+    csrfToken?: string | null
+  } | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'secure_password123',
+});
+
+if (data) {
+  console.log('Signed in as:', data.user.email);
+}
+```
+
+### Salida
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "emailVerified": true,
+      "providers": ["email"],
+      "createdAt": "2024-01-15T10:00:00Z",
+      "updatedAt": "2024-01-15T10:00:00Z",
+      "profile": {
+        "name": "John Doe",
+        "avatar_url": "https://example.com/avatar.jpg"
+      },
+      "metadata": {}
+    },
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "csrfToken": "5758d38259fb..."
+  },
+  "error": null
+}
+```
+
+---
+
+## signInWithOAuth()
+
+Inicia el flujo de autenticación OAuth con proveedores configurados (proveedores integrados como Google/GitHub, más cualquier clave de proveedor personalizado configurado desde el panel).
+
+### Parámetros
+
+- `provider` (string, required) - Clave del proveedor OAuth (p. ej., `google`, `github`, o clave de proveedor personalizado como `okta-company`)
+- `redirectTo` (string, required) - URL a la que redirigir después de la autenticación
+- `additionalParams` (`Record<string, string>`, optional) - Pistas OAuth específicas del proveedor como `prompt=select_account` de Google
+- `skipBrowserRedirect` (boolean, optional) - Si es verdadero, devuelve la URL de OAuth sin redirigir automáticamente (para flujos renderizados en servidor o móvil)
+
+### Devoluciones
+
+```typescript
+{
+  data: { url?: string, provider?: string, codeVerifier?: string },
+  error: Error | null
+}
+```
+
+<Note>
+  Después del redireccionamiento OAuth, el SDK detecta automáticamente el `insforge_code` de devolución de llamada, lo intercambia por una sesión y guarda la sesión automáticamente.
+</Note>
+
+### Ejemplo
+
+```javascript
+// Default: auto-redirect
+await insforge.auth.signInWithOAuth('google', {
+  redirectTo: 'http://localhost:3000/dashboard',
+  additionalParams: { prompt: 'select_account' },
+});
+// Browser immediately redirects to Google
+
+// skipBrowserRedirect: get URL for manual handling
+const { data } = await insforge.auth.signInWithOAuth('google', {
+  redirectTo: 'http://localhost:3000/dashboard',
+  skipBrowserRedirect: true,
+});
+
+window.location.href = data.url; // Redirect when ready
+```
+
+<Note>
+  `additionalParams` es solo para pistas opcionales específicas del proveedor. No pases campos OAuth propiedad del servidor como `client_id`, `redirect_uri`, `code_challenge`, `state`, `response_type` o `scope`; InsForge establece esos valores en el servidor e ignora las claves proporcionadas por el cliente en conflicto.
+</Note>
+
+<Note>
+  Los proveedores personalizados deben configurarse primero en el panel de InsForge bajo `Auth Methods` con credenciales de cliente y una URL de descubrimiento OIDC.
+</Note>
+
+### Salida
+
+```json
+{
+  "data": {
+    "url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...",
+    "provider": "google"
+  },
+  "error": null
+}
+```
+
+---
+
+## signOut()
+
+Cierra la sesión del usuario actual y limpia la sesión.
+
+### Parámetros
+
+Ninguno
+
+### Devoluciones
+
+```typescript
+{
+  error: Error | null;
+}
+```
+
+### Ejemplo
+
+```javascript
+const { error } = await insforge.auth.signOut();
+```
+
+### Salida
+
+```json
+{
+  "error": null
+}
+```
+
+---
+
+## getCurrentUser()
+
+Obtén el usuario que ha iniciado sesión actualmente.
+
+Para aplicaciones de navegador, llama a `auth.getCurrentUser()` durante el inicio. Si existe una cookie de actualización válida httpOnly, el SDK actualizará automáticamente la sesión antes de devolver el usuario.
+
+Para modo servidor, llama explícitamente a `refreshSession({ refreshToken })` cuando necesites actualizar un token de acceso expirado.
+
+### Parámetros
+
+Ninguno
+
+### Devoluciones
+
+```typescript
+{
+  data: {
+    user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata } | null
+  },
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.auth.getCurrentUser();
+
+if (data.user) {
+  console.log('User:', data.user.email);
+}
+```
+
+### Salida
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "emailVerified": true,
+      "createdAt": "2024-01-15T10:00:00Z",
+      "updatedAt": "2024-01-15T10:00:00Z",
+      "providers": ["email"],
+      "profile": {
+        "name": "John Doe",
+        "avatar_url": "https://example.com/avatar.jpg"
+      },
+      "metadata": {}
+    }
+  },
+  "error": null
+}
+```
+
+---
+
+## getProfile()
+
+Obtén el perfil público de cualquier usuario por ID. Devuelve un objeto de perfil plano con todos los campos en el nivel superior.
+
+### Parámetros
+
+- `userId` (string, required) - ID de usuario para obtener el perfil
+
+### Devoluciones
+
+```typescript
+{
+  data: {
+    id: string,
+    name?: string,
+    avatar_url?: string,
+    createdAt?: string,
+    updatedAt?: string,
+    ...customFields
+  } | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.auth.getProfile('usr_xyz789');
+
+if (data) {
+  console.log(data.name);
+  console.log(data.avatar_url);
+}
+```
+
+### Salida
+
+```json
+{
+  "data": {
+    "id": "usr_xyz789",
+    "name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "bio": "Full-stack developer",
+    "createdAt": "2024-01-15T10:00:00Z",
+    "updatedAt": "2024-01-15T10:00:00Z"
+  },
+  "error": null
+}
+```
+
+---
+
+## setProfile()
+
+Actualiza el perfil del usuario actual en la tabla de usuarios. Admite cualquier campo dinámico y devuelve el perfil actualizado como un objeto plano.
+
+### Parámetros
+
+- `profile` (object) - Un mapa clave-valor de campos de perfil a actualizar. Se aceptan cualquier campos.
+
+**Campos comunes:**
+
+- `name` (predefined, string) - Nombre para mostrar del usuario
+- `avatar_url` (predefined, string) - URL de la foto de perfil
+
+### Devoluciones
+
+```typescript
+{
+  data: {
+    id: string,
+    name?: string,
+    avatar_url?: string,
+    createdAt?: string,
+    updatedAt?: string,
+    ...customFields
+  } | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.auth.setProfile({
+  name: 'JohnDev',
+  bio: 'Full-stack developer',
+  avatar_url: 'https://example.com/avatar.jpg',
+  custom_field: 'any value', // Any custom fields are supported
+});
+```
+
+### Salida
+
+```json
+{
+  "data": {
+    "id": "usr_abc123",
+    "name": "JohnDev",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "bio": "Full-stack developer",
+    "custom_field": "any value",
+    "createdAt": "2024-01-15T10:00:00Z",
+    "updatedAt": "2024-01-15T12:30:00Z"
+  },
+  "error": null
+}
+```
+
+---
+
+## resendVerificationEmail()
+
+Reenvía la verificación de correo cuando el OTP anterior ha expirado o no fue recibido. Usa el método configurado en la configuración de autenticación (`verifyEmailMethod`). Cuando el método es `code`, envía un código numérico de 6 dígitos. Cuando el método es `link`, envía un enlace de verificación del navegador que primero va a través de un punto final del servidor InsForge.
+
+<Note>
+  Este punto final previene la enumeración de usuarios al devolver éxito incluso si el correo electrónico no existe.
+</Note>
+
+### Parámetros
+
+- `email` (string, required) - Dirección de correo electrónico del usuario
+- `redirectTo` (string, optional) - Utilizado para verificación de correo electrónico basada en enlaces. El enlace de correo electrónico siempre abre primero un punto final del servidor InsForge; después de verificar el token, InsForge redirige el navegador a esta URL con el resultado de la verificación. Requerido cuando `verifyEmailMethod` se establece en `link`. Esta URL debe incluirse en `allowedRedirectUrls`. Recomendado: usa tu página de inicio de sesión de la aplicación.
+
+### Devoluciones
+
+```typescript
+{
+  data: { success: boolean, message: string } | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.auth.resendVerificationEmail({
+  email: 'user@example.com',
+  redirectTo: 'http://localhost:3000/sign-in',
+});
+
+if (data?.success) {
+  console.log('Verification email sent!');
+}
+```
+
+### Salida
+
+```json
+{
+  "data": {
+    "success": true,
+    "message": "Verification email sent"
+  },
+  "error": null
+}
+```
+
+---
+
+## verifyEmail()
+
+Verifica una dirección de correo electrónico con un código de 6 dígitos.
+
+Para verificación basada en enlaces, los usuarios deben hacer clic en el enlace de correo, que abre `GET /api/auth/email/verify-link` en el navegador.
+
+Los usuarios verificados exitosamente que usan este punto final de código recibirán un token de sesión.
+
+Para verificación basada en enlaces, tu frontend debe manejar el redireccionamiento del navegador así:
+
+- Éxito: `?insforge_status=success&insforge_type=verify_email`
+- Error: `?insforge_status=error&insforge_type=verify_email&insforge_error=...`
+- `insforge_status`: Resultado del flujo de enlace del navegador. Para verificación, los valores son `success` o `error`.
+- `insforge_type`: Identificador de flujo. Para enlaces de verificación esto es siempre `verify_email`.
+- `insforge_error`: Presente solo cuando `insforge_status=error`. Mensaje de error legible por humanos para mostrar o registrar.
+
+Manejo recomendado: usa tu página de inicio de sesión como `redirectTo`. Cuando `insforge_status=success`, muestra un mensaje de confirmación y pide al usuario que inicie sesión con su correo electrónico y contraseña.
+
+### Parámetros
+
+- `email` (string, required) - Dirección de correo electrónico del usuario
+- `otp` (string, required) - Código de verificación de 6 dígitos
+
+### Devoluciones
+
+```typescript
+{
+  data: {
+    accessToken: string,
+    user: { id, email, emailVerified, ... }
+  } | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.auth.verifyEmail({
+  email: 'user@example.com',
+  otp: '123456',
+});
+
+if (data) {
+  console.log('Email verified!', data.accessToken);
+}
+```
+
+### Salida
+
+```json
+{
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "emailVerified": true
+    }
+  },
+  "error": null
+}
+```
+
+---
+
+## sendResetPasswordEmail()
+
+Envía correo de restablecimiento de contraseña usando el método configurado en la configuración de autenticación (`resetPasswordMethod`). Cuando el método es `code`, envía un código numérico de 6 dígitos para flujo de dos pasos. Cuando el método es `link`, envía un enlace de restablecimiento de navegador que primero va a través de un punto final del servidor InsForge.
+
+<Note>
+  Este punto final previene la enumeración de usuarios al devolver éxito incluso si el correo electrónico no existe.
+</Note>
+
+### Parámetros
+
+- `email` (string, required) - Dirección de correo electrónico del usuario
+- `redirectTo` (string, optional) - Utilizado para restablecimiento de contraseña basado en enlaces. El enlace de correo electrónico siempre abre primero un punto final del servidor InsForge; InsForge entonces redirige el navegador a esta URL con el `token` de restablecimiento en la cadena de consulta para que tu aplicación pueda renderizar su propia página de restablecimiento de contraseña. Requerido cuando `resetPasswordMethod` se establece en `link`. Esta URL debe incluirse en `allowedRedirectUrls`. Recomendado: usa tu página dedicada de restablecimiento de contraseña de la aplicación.
+
+### Devoluciones
+
+```typescript
+{
+  data: { success: boolean, message: string } | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.auth.sendResetPasswordEmail({
+  email: 'user@example.com',
+  redirectTo: 'http://localhost:3000/reset-password',
+});
+
+if (data?.success) {
+  console.log('Password reset email sent!');
+}
+```
+
+### Salida
+
+```json
+{
+  "data": {
+    "success": true,
+    "message": "Password reset email sent"
+  },
+  "error": null
+}
+```
+
+---
+
+## exchangeResetPasswordToken()
+
+Intercambia un código de restablecimiento de contraseña de 6 dígitos por un token de restablecimiento. Este es el paso 1 del flujo de restablecimiento de contraseña de dos pasos (solo se usa cuando `resetPasswordMethod` es `code`).
+
+<Note>
+  Este punto final no se usa cuando `resetPasswordMethod` es `link`, porque el flujo de enlace de restablecimiento del navegador usa el token de enlace por correo electrónico directamente.
+</Note>
+
+### Parámetros
+
+- `email` (string, required) - Dirección de correo electrónico del usuario
+- `code` (string, required) - Código de 6 dígitos del correo electrónico
+
+### Devoluciones
+
+```typescript
+{
+  data: { token: string, expiresAt: string } | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.auth.exchangeResetPasswordToken({
+  email: 'user@example.com',
+  code: '123456',
+});
+
+if (data) {
+  // Use token to reset password
+  await insforge.auth.resetPassword({
+    newPassword: 'newSecurePassword123',
+    otp: data.token,
+  });
+}
+```
+
+### Salida
+
+```json
+{
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresAt": "2024-01-15T11:00:00Z"
+  },
+  "error": null
+}
+```
+
+---
+
+## resetPassword()
+
+Restablece la contraseña del usuario con un token. El token puede ser:
+- **Token de enlace mágico**: Proporcionado en la URL de la página de restablecimiento de `sendResetPasswordEmail` cuando el método es `link`
+- **Token de restablecimiento**: De `exchangeResetPasswordToken` después de la verificación del código cuando el método es `code`
+
+### Parámetros
+
+- `newPassword` (string, required) - Nueva contraseña para el usuario
+- `otp` (string, required) - Token de restablecimiento o token de enlace mágico
+
+Para restablecimiento de contraseña basado en enlaces, tu frontend debe manejar el redireccionamiento del navegador así:
+
+- Listo para restablecer: `?token=...&insforge_status=ready&insforge_type=reset_password`
+- Error: `?insforge_status=error&insforge_type=reset_password&insforge_error=...`
+- `token`: Presente solo cuando `insforge_status=ready`. Pasa este valor a `resetPassword({ otp })`.
+- `insforge_status`: Resultado del flujo de enlace del navegador. Para enlaces de restablecimiento, los valores son `ready` o `error`.
+- `insforge_type`: Identificador de flujo. Para enlaces de restablecimiento esto es siempre `reset_password`.
+- `insforge_error`: Presente solo cuando `insforge_status=error`. Mensaje de error legible por humanos para mostrar o registrar.
+
+Solo renderiza el formulario de restablecimiento de contraseña cuando `insforge_status=ready` y `token` está presente.
+
+### Devoluciones
+
+```typescript
+{
+  data: { message: string } | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+// Code method flow: after exchangeResetPasswordToken
+const { data, error } = await insforge.auth.resetPassword({
+  newPassword: 'newSecurePassword123',
+  otp: resetToken, // Token from exchangeResetPasswordToken
+});
+
+// Link method flow: token from the reset page URL
+const { data, error } = await insforge.auth.resetPassword({
+  newPassword: 'newSecurePassword123',
+  otp: 'a1b2c3d4e5f6...', // Token from the magic link URL
+});
+
+if (data) {
+  console.log('Password reset successful!');
+}
+```
+
+### Salida
+
+```json
+{
+  "data": {
+    "message": "Password reset successfully. Please login with your new password."
+  },
+  "error": null
+}
+```
+
+---
+
+## Manejo de Errores
+
+Todos los métodos de autenticación devuelven errores estructurados:
+
+```javascript
+const { data, error } = await insforge.auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'wrong_password',
+});
+
+if (error) {
+  console.error(error.statusCode); // 401
+  console.error(error.error); // 'INVALID_CREDENTIALS'
+  console.error(error.message); // 'Invalid login credentials'
+  console.error(error.nextActions); // 'Check email and password'
+}
+```

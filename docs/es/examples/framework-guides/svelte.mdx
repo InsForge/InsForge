@@ -1,0 +1,113 @@
+---
+title: Svelte
+description: Aprenda cómo crear un proyecto InsForge y crear una aplicación Svelte usando IA
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+Aprenda cómo crear un proyecto InsForge y crear una aplicación Svelte usando herramientas de IA como Cursor.
+
+## 1. Crear un proyecto InsForge
+
+Cree un nuevo proyecto InsForge en [insforge.dev](https://insforge.dev).
+
+## 2. Conectar InsForge
+
+- **Enlace CLI** — vea [Inicio rápido](/quickstart)
+- **Configuración de MCP** — vea [Configuración de MCP](/mcp-setup)
+
+## 3. Construye tu app con un solo aviso
+
+```
+Create a new Svelte app with TypeScript and Vite.
+Add Tailwind CSS 3.4 for styling.
+Install the InsForge SDK and set up the client configuration.
+
+In my InsForge database, create a sports table with id and name columns.
+Add sample data: basketball, soccer, and tennis. Make it publicly readable.
+
+Create a component that fetches and displays all sports from the database.
+```
+
+## 4. Cliente InsForge
+
+```typescript src/lib/insforge.ts
+import { createClient } from '@insforge/sdk';
+
+export const insforge = createClient({
+  baseUrl: 'https://your-project.us-east.insforge.app',
+  anonKey: 'your-anon-key'
+});
+```
+
+## 5. Componente de deportes
+
+```svelte src/lib/components/Sports.svelte
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { insforge } from '../insforge';
+
+  interface Sport {
+    id: string;
+    name: string;
+  }
+
+  let sports: Sport[] = [];
+  let loading = true;
+  let error: string | null = null;
+
+  onMount(async () => {
+    try {
+      const { data, error: fetchError } = await insforge.database
+        .from('sports')
+        .select();
+
+      if (fetchError) {
+        error = fetchError.message;
+      } else {
+        sports = data || [];
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'An unexpected error occurred';
+    } finally {
+      loading = false;
+    }
+  });
+</script>
+
+<div class="min-h-screen p-8">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-4xl font-bold mb-8">Sports</h1>
+
+    {#if loading}
+      <div class="flex items-center justify-center py-8">
+        <p class="text-gray-600">Loading...</p>
+      </div>
+    {:else if error}
+      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <h2 class="text-2xl font-bold mb-2">Error</h2>
+        <p>{error}</p>
+      </div>
+    {:else if sports.length > 0}
+      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {#each sports as sport (sport.id)}
+          <div class="p-6 bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow">
+            <h2 class="text-xl font-semibold text-gray-800 capitalize">{sport.name}</h2>
+            <p class="text-sm text-gray-500 mt-2">ID: {sport.id}</p>
+          </div>
+        {/each}
+      </div>
+    {:else}
+      <p class="text-gray-600">No sports found.</p>
+    {/if}
+  </div>
+</div>
+```
+
+## 6. Inicia la aplicación
+
+Ejecuta `npm run dev` y visita [http://localhost:5173](http://localhost:5173)
+
+## Amplía tu aplicación
+
+Intenta agregar formularios, autenticación, favoritos y características de IA.

@@ -1,0 +1,116 @@
+---
+title: "OAuth 服务器"
+description: "InsForge OAuth 服务器允许您的应用充当 OAuth 提供者，使其他应用和客户端可以通过 OAuth 连接到它。"
+---
+
+InsForge OAuth 服务器允许您的应用充当 OAuth 提供者。将您的应用与 InsForge 身份验证结合使用，您可以使第三方应用能够代表用户获得权限和访问。
+
+## 启用 OAuth 服务器模式
+
+在您的 InsForge 项目设置中启用 OAuth 服务器模式。一旦启用，您将获得客户端 ID 和客户端密钥来配置您的 OAuth 客户端。
+
+## OAuth 流程
+
+InsForge 支持标准的 OAuth 2.0 授权代码流程。
+
+### 1. 授权请求
+
+将用户重定向到 InsForge 授权端点：
+
+```
+https://your-project.us-east.insforge.app/oauth/authorize?
+  client_id=YOUR_CLIENT_ID&
+  redirect_uri=YOUR_REDIRECT_URI&
+  response_type=code&
+  scope=openid profile email
+```
+
+### 2. 用户授权
+
+用户登录并授权您的应用访问他们的数据。
+
+### 3. 授权代码回调
+
+InsForge 将用户重定向回您的应用，带有授权代码：
+
+```
+YOUR_REDIRECT_URI?code=AUTH_CODE&state=STATE
+```
+
+### 4. 交换令牌
+
+您的后端使用授权代码交换访问令牌：
+
+```bash
+curl -X POST https://your-project.us-east.insforge.app/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code&code=AUTH_CODE&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET&redirect_uri=YOUR_REDIRECT_URI"
+```
+
+### 5. 使用访问令牌
+
+使用访问令牌代表用户进行 API 调用：
+
+```bash
+curl https://your-project.us-east.insforge.app/api/auth/user \
+  -H "Authorization: Bearer ACCESS_TOKEN"
+```
+
+## 作用域
+
+支持的作用域包括：
+
+- `openid` - 包含用户 ID
+- `profile` - 用户配置文件信息
+- `email` - 用户电子邮件地址
+- `offline_access` - 刷新令牌
+
+## 刷新令牌
+
+要获取刷新令牌，在授权请求中请求 `offline_access` 作用域，并在令牌交换中包含 `offline_access`。
+
+使用刷新令牌获取新的访问令牌：
+
+```bash
+curl -X POST https://your-project.us-east.insforge.app/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=refresh_token&refresh_token=REFRESH_TOKEN&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET"
+```
+
+## 用户信息端点
+
+获取当前经过身份验证的用户的信息：
+
+```bash
+curl https://your-project.us-east.insforge.app/oauth/userinfo \
+  -H "Authorization: Bearer ACCESS_TOKEN"
+```
+
+返回：
+
+```json
+{
+  "sub": "user-id",
+  "name": "User Name",
+  "email": "user@example.com",
+  "email_verified": true
+}
+```
+
+## 撤销令牌
+
+撤销访问令牌或刷新令牌：
+
+```bash
+curl -X POST https://your-project.us-east.insforge.app/oauth/revoke \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "token=TOKEN&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET"
+```
+
+## 最佳实践
+
+- 始终在后端安全地存储您的客户端密钥
+- 使用 HTTPS 用于所有 OAuth 通信
+- 验证授权请求中的 `state` 参数以防止 CSRF 攻击
+- 使用短期访问令牌和刷新令牌
+- 在安全的 HTTP-only 存储中存储刷新令牌

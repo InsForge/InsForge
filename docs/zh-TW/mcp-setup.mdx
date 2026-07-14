@@ -1,0 +1,165 @@
+---
+title: "為 Cursor、Claude、Windsurf 等設置 MCP"
+sidebarTitle: "MCP 設置"
+description: "透過 MCP 將 Cursor、Claude、Windsurf 和其他編輯器連接到 InsForge，以便 AI 代理可以查詢您的資料庫、身份驗證、儲存和函數。"
+---
+
+## 概覽
+
+InsForge MCP 伺服器為您的 AI 編碼助手提供對您的後端的直接存取：資料庫查詢、綱要管理、儲存等。
+
+按照下面針對您的 AI 用戶端的說明進行操作。看不到您的工具？瀏覽[代理目錄](https://insforge.dev/agents)以取得完整的經過測試的整合清單。
+
+## 先決條件
+
+- 一個 **AI 編碼助手**（Cursor、Claude Code、GitHub Copilot 等）
+- 一個 **InsForge 專案** - 如果您還沒有[建立一個](https://insforge.dev)
+
+## 本地 MCP 配置（推薦）
+
+如果您更喜歡在本地設定 MCP，請在下方選擇您的 AI 編碼助手：
+
+<AccordionGroup>
+  <Accordion title="Cursor">
+    ### 安裝
+
+    您可以透過按一下下面屏幕截圖中的「新增至 Cursor」按鈕來一鍵在 Cursor 中安裝 MCP 伺服器：
+
+    ![連接專案](/images/mcp-setup/connect-project.png)
+
+    或者，您可以手動安裝 InsForge MCP 伺服器：
+
+    1. 開啟 **Cursor 設定**
+    2. 前往**工具和 MCP**
+    3. 按一下**新 MCP 伺服器（新增自訂 MCP 伺服器）**
+
+    <Frame>
+      <video
+        src="/images/mcp-setup/Cursor-MCP-1.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    </Frame>
+
+    4. 從您的 InsForge 專案貼上 MCP JSON
+    5. 儲存設定檔
+    6. 您應該看到綠點，表示 InsForge 已成功安裝
+
+    <Frame>
+      <video
+        src="/images/mcp-setup/Cursor-MCP-2.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    </Frame>
+
+    ### 驗證安裝
+
+    要驗證連接，在 **Cursor** 中啟動新的聊天工作階段並向您的代理傳送此提示：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果連接成功，您會在 InsForge 儀表板上看到**已連接**狀態指示器（右上角）。
+
+    <video
+      controls
+      autoPlay
+      muted
+      loop
+      playsInline
+      width="100%"
+      src="/images/mcp-setup/Cursor-MCP-3.mp4"
+    />
+  </Accordion>
+
+  <Accordion title="Claude Code">
+    ### 安裝
+
+    將 InsForge MCP 伺服器新增到您的 **Claude Code**：
+
+    1. 在下拉式清單中選取 **Claude Code**
+    2. 在您的終端中複製並貼上以下安裝命令
+
+    ![Claude Code 連接](/images/mcp-setup/claude-code-connect.png)
+
+    3. 執行命令
+
+    <Frame>
+      <video
+        src="/images/mcp-setup/CC-MCP-1.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    </Frame>
+
+    ### 驗證安裝
+
+    要驗證連接，在 **Claude Code** 中啟動新的聊天工作階段並向您的代理傳送此提示：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果連接成功，您會在 InsForge 儀表板上看到 **MCP 已連接**狀態指示器（右上角）。
+
+    <video
+      controls
+      autoPlay
+      muted
+      loop
+      playsInline
+      width="100%"
+      src="/images/mcp-setup/CC-MCP-2.mp4"
+    />
+  </Accordion>
+</AccordionGroup>
+
+## 遠端 MCP
+
+開始使用的最快方式是遠端 MCP。單一命令會嘗試安裝，並會嘗試處理身份驗證和專案繫結。
+
+在您的終端中執行以下命令：
+
+```bash
+npx add-mcp https://mcp.insforge.dev/mcp
+```
+
+<Note>
+  `add-mcp` 命令適用於大多數編碼代理，但不是全部。目前它支援：
+  Claude Code、Claude Desktop、Codex、Cursor、Gemini CLI、Goose、GitHub Copilot、OpenCode、VS Code、Zed。
+</Note>
+
+執行該命令後，系統將自動為您的編碼代理產生設定檔。
+
+### 連接和繫結專案
+
+某些 MCP 用戶端會在設定期間自動提示您登入，而其他用戶端可能需要手動身份驗證或專案繫結步驟。
+
+### 驗證安裝
+
+要驗證連接，在您的 AI 編碼助手中啟動新的聊天工作階段並傳送此提示：
+
+```
+I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+learn about InsForge instructions.
+```
+
+如果連接成功，您會在 InsForge 儀表板（右上角）看到 **MCP 已連接**狀態指示器。
+
+![MCP 已連接](/images/mcp-setup/mcp-connected.png)
+
+## 故障排除
+
+<Accordion title="更改不生效">
+  大多數 AI 用戶端在 MCP 設定更改後需要完全重新啟動。關閉並重新開啟應用程式。
+</Accordion>

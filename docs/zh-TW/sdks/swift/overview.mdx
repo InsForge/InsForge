@@ -1,0 +1,73 @@
+---
+title: iOS、macOS、tvOS、watchOS 用 Swift SDK
+description: 透過 Swift Package Manager 安裝和初始化官方 InsForge Swift SDK，以在 Apple 平台上使用驗證、資料庫、儲存體和即時功能。
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+InsForge Swift SDK 為從 iOS、macOS、tvOS 和 watchOS 應用與 InsForge 服務互動提供了原生 Swift 用戶端。
+
+## 安裝
+
+### Swift Package Manager
+
+<SwiftSdkInstallation />
+
+或透過 Xcode 新增：
+1. File → Add Packages...
+2. 輸入：`https://github.com/insforge/insforge-swift.git`
+
+### CocoaPods（即將推出）
+
+```ruby
+pod 'InsForge', '~> 1.0'
+```
+
+## 快速入門
+
+```swift
+import InsForge
+
+let insforge = InsForgeClient(
+    baseUrl: "https://your-app.insforge.app",
+    anonKey: "your-anon-key"
+)
+```
+
+## 功能
+
+- **資料庫** - 支援 Codable 的類型安全 CRUD 操作
+- **驗證** - 電子郵件/密碼和 OAuth 驗證
+- **儲存體** - 檔案上傳、下載和管理
+- **AI** - 聊天完成和影像生成
+- **即時** - 基於 WebSocket 的發佈/訂閱訊息
+- **SwiftUI 整合** - 屬性包裝和環境值
+
+## 平台支援
+
+| 平台 | 最低版本 |
+|----------|----------------|
+| iOS | 15.0+ |
+| macOS | 12.0+ |
+| tvOS | 15.0+ |
+| watchOS | 8.0+ |
+
+## SDK 參考
+
+<CardGroup cols={2}>
+  <Card title="Database" icon="database" href="/sdks/swift/database">
+    CRUD operations with Codable models
+  </Card>
+  <Card title="Authentication" icon="lock" href="/sdks/swift/auth">
+    Sign up, sign in, OAuth, and user management
+  </Card>
+  <Card title="Storage" icon="cloud-arrow-up" href="/sdks/swift/storage">
+    File upload, download, and management
+  </Card>
+  <Card title="AI" icon="brain" href="/sdks/swift/ai">
+    Chat completions and image generation
+  </Card>
+  <Card title="Realtime" icon="signal-stream" href="/sdks/swift/realtime">
+    WebSocket pub/sub messaging
+  </Card>
+</CardGroup>

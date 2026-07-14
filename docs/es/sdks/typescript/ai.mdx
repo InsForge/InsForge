@@ -1,0 +1,298 @@
+---
+title: Puerta de Enlace de Modelos
+description: Construye funcionalidades de IA con el SDK de OpenAI y la clave de OpenRouter aprovisionada por InsForge
+---
+
+## Descripción general
+
+InsForge provisiona una clave de API de OpenRouter para proyectos de Model Gateway. Para nuevas funcionalidades de IA, usa esa clave directamente con la API compatible con OpenAI de OpenRouter en lugar de los métodos de proxy de IA de InsForge ya deprecados.
+
+Usa el panel de InsForge para copiar la clave activa de OpenRouter, almacénala en `OPENROUTER_API_KEY`, e invoca OpenRouter desde código del lado del servidor confiable.
+
+<Warning>
+No expongas `OPENROUTER_API_KEY` en paquetes del navegador. En React, Next.js, Vue, Svelte y aplicaciones similares, coloca las llamadas a OpenRouter detrás de una ruta de backend, acción de servidor, función u otro límite solo de servidor.
+</Warning>
+
+## Instalación
+
+```bash
+npm install openai
+```
+
+Para scripts locales, también podrías querer:
+
+```bash
+npm install dotenv
+```
+
+## Entorno
+
+```bash
+OPENROUTER_API_KEY=<your-openrouter-api-key>
+```
+
+## Crear un Cliente
+
+```typescript
+import OpenAI from 'openai';
+
+export const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+  defaultHeaders: {
+    'HTTP-Referer': 'https://your-app.example',
+    'X-Title': 'Your App',
+  },
+});
+```
+
+Los encabezados `HTTP-Referer` y `X-Title` son encabezados opcionales de metadatos de OpenRouter. Mantenlos si deseas atribución de OpenRouter y rankings para tu aplicación.
+
+## Completamiento de Chat
+
+```typescript
+const completion = await openai.chat.completions.create({
+  model: 'openai/gpt-4o',
+  messages: [
+    { role: 'system', content: 'You are a concise assistant.' },
+    { role: 'user', content: 'What is the capital of France?' },
+  ],
+});
+
+console.log(completion.choices[0]?.message?.content);
+```
+
+## Streaming
+
+```typescript
+const stream = await openai.chat.completions.create({
+  model: 'anthropic/claude-3.5-haiku',
+  messages: [{ role: 'user', content: 'Write a short product update.' }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  const text = chunk.choices[0]?.delta?.content;
+  if (text) process.stdout.write(text);
+}
+```
+
+## Llamada de Herramientas
+
+```typescript
+const completion = await openai.chat.completions.create({
+  model: 'openai/gpt-4o-mini',
+  messages: [{ role: 'user', content: 'Look up order 123 and summarize it.' }],
+  tools: [
+    {
+      type: 'function',
+      function: {
+        name: 'get_order',
+        description: 'Fetch an order by ID',
+        parameters: {
+          type: 'object',
+          properties: {
+            orderId: { type: 'string' },
+          },
+          required: ['orderId'],
+        },
+      },
+    },
+  ],
+});
+
+console.log(completion.choices[0]?.message?.tool_calls);
+```
+
+## Entrada de Imagen
+
+```typescript
+const completion = await openai.chat.completions.create({
+  model: 'openai/gpt-4o',
+  messages: [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Describe this image.' },
+        {
+          type: 'image_url',
+          image_url: {
+            url: 'https://example.com/photo.jpg',
+          },
+        },
+      ],
+    },
+  ],
+});
+
+console.log(completion.choices[0]?.message?.content);
+```
+
+## Generación de Imágenes
+
+Usa un modelo que admita salida de imagen y solicita la modalidad de imagen. OpenRouter admite campos que puede que aún no estén en la superficie de tipos del SDK de OpenAI, así que extiende localmente los tipos de solicitud y respuesta.
+
+```typescript
+type OpenRouterImageRequest =
+  OpenAI.Chat.ChatCompletionCreateParamsNonStreaming & {
+    modalities?: Array<'image' | 'text'>;
+  };
+
+type OpenRouterImage = {
+  type: 'image_url';
+  image_url: {
+    url: string;
+  };
+};
+
+type OpenRouterImageMessage = OpenAI.Chat.ChatCompletionMessage & {
+  images?: OpenRouterImage[];
+};
+
+const request: OpenRouterImageRequest = {
+  model: 'google/gemini-2.5-flash-image',
+  modalities: ['image', 'text'],
+  messages: [
+    { role: 'user', content: 'Generate a clean product mockup on a white background.' },
+  ],
+};
+
+const completion = await openai.chat.completions.create(request);
+
+const message = completion.choices[0]?.message as OpenRouterImageMessage | undefined;
+console.log(message?.content);
+console.log(message?.images?.[0]?.image_url?.url);
+```
+
+## Incrustaciones
+
+```typescript
+const response = await openai.embeddings.create({
+  model: 'openai/text-embedding-3-small',
+  input: 'Your text here',
+});
+
+console.log(response.data[0].embedding);
+```
+
+## Generación de Video
+
+La generación de video de OpenRouter usa directamente los puntos finales HTTP de OpenRouter.
+
+```typescript
+const response = await fetch('https://openrouter.ai/api/v1/videos', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    model: 'google/veo-3.1',
+    prompt: 'A golden retriever playing fetch on a sunny beach.',
+  }),
+});
+
+if (!response.ok) {
+  const body = await response.text();
+  throw new Error(`OpenRouter video request failed: ${response.status} ${body}`);
+}
+
+const job = await response.json();
+console.log(job);
+```
+
+## Ejemplo de Ruta de Next.js
+
+Reemplaza `verifySessionToken` con el proveedor de autenticación de tu aplicación o verificador de sesión.
+
+```typescript
+// app/api/chat/route.ts
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+
+declare function verifySessionToken(token: string): Promise<boolean>;
+
+export async function POST(request: Request) {
+  const authorization = request.headers.get('Authorization');
+  const sessionToken = authorization?.startsWith('Bearer ')
+    ? authorization.slice('Bearer '.length)
+    : undefined;
+
+  if (!sessionToken || !(await verifySessionToken(sessionToken))) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+
+  if (!prompt || prompt.length > 4000) {
+    return Response.json(
+      { error: 'Prompt must be between 1 and 4000 characters.' },
+      { status: 400 }
+    );
+  }
+
+  const completion = await openai.chat.completions.create({
+    model: 'openai/gpt-4o-mini',
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  return Response.json({
+    text: completion.choices[0]?.message?.content ?? '',
+  });
+}
+```
+
+## Usar Datos de InsForge con IA
+
+Usa el SDK de InsForge para base de datos, autenticación, almacenamiento, funciones y tiempo real. Usa OpenRouter directamente para llamadas de modelo.
+
+```typescript
+import { createClient } from '@insforge/sdk';
+import OpenAI from 'openai';
+
+const insforge = createClient({
+  baseUrl: process.env.INSFORGE_BASE_URL!,
+  anonKey: process.env.INSFORGE_ANON_KEY!,
+});
+
+const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+
+const { data: documents } = await insforge.database
+  .from('documents')
+  .select()
+  .limit(5);
+
+const completion = await openai.chat.completions.create({
+  model: 'openai/gpt-4o-mini',
+  messages: [
+    {
+      role: 'user',
+      content: `Summarize these records:\n${JSON.stringify(documents)}`,
+    },
+  ],
+});
+
+console.log(completion.choices[0]?.message?.content);
+```
+
+## Proxy de IA de InsForge Heredado
+
+Los métodos anteriores del SDK de IA de InsForge están deprecados:
+
+- `insforge.ai.chat.completions.create()`
+- `insforge.ai.images.generate()`
+- `insforge.ai.embeddings.create()`
+
+Mapean a rutas de proxy de backend que aún existen para compatibilidad, pero nuevas integraciones deben usar OpenRouter directamente. La ruta directa proporciona acceso a la superficie de API completa y en evolución de OpenRouter sin esperar a actualizaciones del wrapper del SDK de InsForge.
+
+## Catálogo de Modelos
+
+Usa el panel de InsForge o el catálogo de modelos de OpenRouter para elegir un modelo. Los IDs de modelo usan el formato `provider/model`, como `openai/gpt-4o`, `anthropic/claude-3.5-haiku` y `google/gemini-2.5-flash-image`.

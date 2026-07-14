@@ -1,0 +1,193 @@
+---
+title: "为 Cursor、Claude、Windsurf 等设置 MCP"
+sidebarTitle: "MCP 设置"
+description: "通过 MCP 将 Cursor、Claude、Windsurf 和其他编辑器连接到 InsForge，以便 AI 代理可以查询您的数据库、身份验证、存储和函数。"
+---
+
+## 概览
+
+InsForge MCP 服务器为您的 AI 编码助手提供对您的后端的直接访问：数据库查询、模式管理、存储等。
+
+按照下面针对您的 AI 客户端的说明进行操作。看不到您的工具？浏览[代理目录](https://insforge.dev/agents)以获取完整的经过测试的集成列表。
+
+## 先决条件
+
+- 一个**AI 编码助手**（Cursor、Claude Code、GitHub Copilot 等）
+- 一个 **InsForge 项目** - 如果您还没有[创建一个](https://insforge.dev)
+
+## 本地 MCP 配置（推荐）
+
+如果您更喜欢在本地配置 MCP，请在下方选择您的 AI 编码助手：
+
+<AccordionGroup>
+  <Accordion title="Cursor">
+    ### 安装
+
+    您可以通过点击下面屏幕截图中的"添加到 Cursor"按钮来一键安装 Cursor 中的 MCP 服务器：
+
+    ![连接项目](/images/mcp-setup/connect-project.png)
+
+    或者，您可以手动安装 InsForge MCP 服务器：
+
+    1. 打开 **Cursor 设置**
+    2. 转到 **工具和 MCP**
+    3. 点击**新 MCP 服务器（添加自定义 MCP 服务器）**
+
+    <Frame>
+      <video
+        src="/images/mcp-setup/Cursor-MCP-1.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    </Frame>
+
+    4. 从您的 InsForge 项目粘贴 MCP JSON
+    5. 保存配置文件
+    6. 您应该看到一个绿点，表示 InsForge 已成功安装
+
+    <Frame>
+      <video
+        src="/images/mcp-setup/Cursor-MCP-2.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    </Frame>
+
+    ### 验证安装
+
+    要验证连接，在 **Cursor** 中启动新的聊天会话并向您的代理发送此提示：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果连接成功，您会在 InsForge 仪表板上看到**已连接**状态指示器（右上角）。
+
+    <video
+      controls
+      autoPlay
+      muted
+      loop
+      playsInline
+      width="100%"
+      src="/images/mcp-setup/Cursor-MCP-3.mp4"
+    />
+  </Accordion>
+
+  <Accordion title="Claude Code">
+    ### 安装
+
+    将 InsForge MCP 服务器添加到您的 **Claude Code**：
+
+    1. 在下拉列表中选择 **Claude Code**
+    2. 在您的终端中复制并粘贴以下安装命令
+
+    ![Claude Code 连接](/images/mcp-setup/claude-code-connect.png)
+
+    3. 运行命令
+
+    <Frame>
+      <video
+        src="/images/mcp-setup/CC-MCP-1.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    </Frame>
+
+    ### 验证安装
+
+    要验证连接，在 **Claude Code** 中启动新的聊天会话并向您的代理发送此提示：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果连接成功，您会在 InsForge 仪表板上看到 **MCP 已连接**状态指示器（右上角）。
+
+    <video
+      controls
+      autoPlay
+      muted
+      loop
+      playsInline
+      width="100%"
+      src="/images/mcp-setup/CC-MCP-2.mp4"
+    />
+  </Accordion>
+
+  <Accordion title="GitHub Copilot">
+    ### 安装
+
+    将 InsForge MCP 服务器添加到您的 **GitHub Copilot**：
+
+    1. 在下拉列表中选择 **Copilot**
+    2. 打开终端并在您的 **GitHub Copilot** 终端中粘贴以下安装命令
+
+    ![Copilot 设置](/images/mcp-setup/copilot-1.png)
+
+    3. 运行命令
+
+    ![Copilot 安装](/images/mcp-setup/copilot-2.png)
+
+    ### 验证安装
+
+    要验证连接，在 **Copilot** 中启动新的聊天会话并向您的代理发送此提示：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果连接成功，您会在 InsForge 仪表板上看到 **MCP 已连接**状态指示器（右上角）。
+
+    ![MCP 已连接](/images/mcp-setup/mcp-connected.png)
+  </Accordion>
+</AccordionGroup>
+
+## 远程 MCP
+
+开始使用的最快方式是远程 MCP。单个命令会尝试安装，并会尝试处理身份验证和项目绑定，但如果自动流程无法完成，可能仍会提示您进行手动身份验证或项目绑定步骤。
+
+在您的终端中运行以下命令：
+
+```bash
+npx add-mcp https://mcp.insforge.dev/mcp
+```
+
+<Note>
+  `add-mcp` 命令适用于大多数编码代理，但不是全部。目前它支持：
+  Claude Code、Claude Desktop、Codex、Cursor、Gemini CLI、Goose、GitHub Copilot、OpenCode、VS Code、Zed。
+</Note>
+
+运行该命令后，系统将自动为您的编码代理生成配置文件。
+
+### 连接和绑定项目
+
+某些 MCP 客户端会在设置期间自动提示您登录，而其他客户端可能需要手动身份验证或项目绑定步骤。无论如何，身份验证都会打开一个浏览器窗口，您可以在其中登录到您的 InsForge 帐户并向 MCP 客户端授予组织/项目访问权限。
+
+### 验证安装
+
+要验证连接，在您的 AI 编码助手中启动新的聊天会话并发送此提示：
+
+```
+I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+learn about InsForge instructions.
+```
+
+如果连接成功，您会在 InsForge 仪表板（右上角）看到 **MCP 已连接**状态指示器。
+
+![MCP 已连接](/images/mcp-setup/mcp-connected.png)
+
+## 故障排除
+
+<Accordion title="更改不生效">
+  大多数 AI 客户端在 MCP 配置更改后需要完全重启。关闭并重新打开应用程序。
+</Accordion>

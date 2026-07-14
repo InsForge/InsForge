@@ -1,0 +1,36 @@
+---
+title: "网络爬虫"
+sidebarTitle: "Overview"
+description: "为您的应用进行网络爬取，由 Apify 提供支持。"
+---
+
+使用 InsForge Web Scraper 为您的编码代理提供对外部数据的实时访问：只需连接一次您自己的 Apify 账户，您的代理就可以按需运行爬虫（Apify 称之为 actors），同时仪表板显示您的 actors、运行历史和爬取的数据集，无需离开 InsForge。
+
+一键连接 Apify，然后将爬取提示粘贴到您的编码代理中。代理使用您的 InsForge 管理的 Apify 令牌进行身份验证，为工作选择正确的 actor，并返回结果。
+
+<Frame caption="Web Scraper 仪表板：连接的 actors 及其最后运行和总运行计数。">
+  <img src="/images/dashboard-webscraper.png" alt="InsForge Web Scraper 仪表板显示 Actors 选项卡，带有连接的 Apify actors、它们的最后运行时间和运行计数" />
+</Frame>
+
+<Note>
+  Apify 仍然是 actors、运行和数据集的真实来源。InsForge 为日常检查呈现一个集中的子集，然后对于超出其范围的任何内容都深入链接到 Apify 控制台。Web Scraper 集成在 InsForge Cloud 上可用；自托管部署在这些路由上返回 `501 Not Implemented`。
+</Note>
+
+## 功能
+
+### 一键 Apify 连接
+
+从仪表板中的 Web Scraper 页面连接 Apify。InsForge 引导您完成 Apify OAuth 流、在服务器端存储凭证并为您保持访问令牌刷新。原始令牌永远不会落在您的存储库或前端；代理和函数在需要时从后端获取实时令牌。
+
+### 通过您的编码代理进行爬取
+
+连接后，空状态会提示您一个爬取提示，您可以将其粘贴到您的编码代理中：
+
+```
+使用 insforge webscraper apify 技能来爬取 <您想要的东西> 并返回结果。
+```
+
+## 下一步
+
+- 从仪表板打开 Web Scraper 页面并点击 **连接 Apify**。
+- 将爬取提示粘贴到您的编码代理中。

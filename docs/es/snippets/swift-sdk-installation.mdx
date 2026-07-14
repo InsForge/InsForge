@@ -1,0 +1,60 @@
+Agrega InsForge a las dependencias de tu Swift Package Manager:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/insforge/insforge-swift.git", from: "0.0.9")
+]
+```
+
+```swift
+import InsForge
+
+let insforge = InsForgeClient(
+    baseURL: URL(string: "https://your-app.insforge.app")!,
+    anonKey: "your-anon-key"
+)
+```
+
+### Habilitar Registro (Opcional)
+
+Para depuración, puedes configurar el nivel de registro y el destino del SDK:
+
+```swift
+let options = InsForgeClientOptions(
+    global: .init(
+        logLevel: .debug,
+        logDestination: .osLog,
+        logSubsystem: "com.example.MyApp"
+    )
+)
+
+let insforge = InsForgeClient(
+    baseURL: URL(string: "https://your-app.insforge.app")!,
+    anonKey: "your-anon-key",
+    options: options
+)
+```
+
+**Niveles de Registro:**
+
+| Nivel | Descripción |
+|-------|-------------|
+| `.trace` | El más detallado, incluye todos los detalles internos |
+| `.debug` | Información detallada para depuración |
+| `.info` | Información operacional general (predeterminado) |
+| `.warning` | Advertencias que no impiden la operación |
+| `.error` | Errores que afectan la funcionalidad |
+| `.critical` | Fallas críticas |
+
+**Destinos de Registro:**
+
+| Destino | Descripción |
+|-------------|-------------|
+| `.console` | Salida estándar (print) |
+| `.osLog` | Sistema de registro unificado de Apple (recomendado para iOS/macOS) |
+| `.none` | Deshabilitar registro |
+| `.custom` | Proporciona tu propia fábrica de LogHandler |
+
+<Note>
+  Usa `.info` o `.error` en producción para evitar exponer datos sensibles en los registros.
+</Note>

@@ -1,0 +1,43 @@
+---
+title: "排程：cron 觸發的函式"
+description: "使用 pg_cron 在 cron 排程上執行函式"
+---
+
+排程在定期 cron 運算式上呼叫函式。[pg_cron](https://github.com/citusdata/pg_cron) 在每個刻度處向函式 URL 傳送 HTTP 請求並記錄結果。
+
+## 概念
+
+排程是 cron 運算式、目標 URL 和標頭。在建立時，標頭中的 `${{secrets.KEY}}` 佔位符被解析並使用 `pgcrypto` 加密。在每個刻度處，`execute_job()` 解密標頭、呼叫函式並將狀態和持續時間寫入 `schedules.job_logs`。
+
+## 用法
+
+標準 5 欄位 cron（無秒數）。在標頭中參考祕密，而不是硬編碼金鑰。
+
+```text
+*/5 * * * *   每 5 分鐘
+0 * * * *     每小時
+0 0 * * *     每天午夜
+0 9 * * 1     每個星期一上午 9 點
+0 0 1 * *     每個月的第一天
+```
+
+透過儀表板或 SQL 建立：
+
+```sql
+select schedules.create_job(
+  name       => 'daily-cleanup',
+  schedule   => '0 0 * * *',
+  url        => 'https://myapp.functions.insforge.app/cleanup',
+  headers    => jsonb_build_object('Authorization', 'Bearer ${{secrets.CRON_TOKEN}}')
+);
+```
+
+## 限制
+
+最小間隔為 1 分鐘 (pg_cron)。失敗的執行被記錄但不重試，所以函式必須是等冪的。刪除被參考的祕密會破壞使用它的每個工作，直到您更新或停用排程。
+
+## 更多資源
+
+- [pg_cron docs](https://github.com/citusdata/pg_cron) 用於 cron 語法。
+- [Functions overview](/core-concepts/functions/overview) 用於執行時。
+- [crontab.guru](https://crontab.guru) 檢查運算式。

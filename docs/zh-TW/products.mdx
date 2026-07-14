@@ -1,0 +1,69 @@
+---
+title: "產品"
+description: "InsForge 的每個產品都在一個地方。按一下任何卡片深入瞭解。"
+---
+
+InsForge 提供十個產品，每個產品都透過相同的 REST 表面、相同的 JWT 身份驗證、相同的 MCP 伺服器和相同的 SDK 公開。
+
+<CardGroup cols={2}>
+  <Card title="資料庫" icon="database" href="/core-concepts/database/overview">
+    每個專案的 Postgres。遷移、分支、pgvector、S3 備份支持。
+    每個表都變成型別化的 REST 和 SDK 表面。
+  </Card>
+
+  <Card title="身份驗證" icon="shield" href="/core-concepts/authentication/overview">
+    透過一個 API 的電子郵件和密碼、無密碼、OAuth 和行動登入。JWT 工作階段、列級安全、OAuth 伺服器模式。
+  </Card>
+
+  <Card title="儲存" icon="folder" href="/core-concepts/storage/overview">
+    S3 相容的物件儲存，帶有簽署的 URL 和列級原則。
+    與 rclone、AWS CLI、Terraform 配合使用。
+  </Card>
+
+  <Card title="即時" icon="tower-broadcast" href="/core-concepts/realtime/overview">
+    資料庫更新、廣播和狀態透過一個 WebSocket 連接。
+    訂閱和用戶端發布使用 RLS 檢查。
+  </Card>
+
+  <Card title="邊緣函數" icon="bolt" href="/core-concepts/functions/overview">
+    Deno 驅動的無伺服器 TypeScript，帶有一流的排程。按需叫用、從資料庫觸發程式鏈結或按 cron 執行。
+  </Card>
+
+  <Card title="模型網關" icon="sparkles" href="/core-concepts/ai/overview">
+    OpenRouter 支援的聊天、串流和嵌入透過一個 InsForge 管理的金鑰。按專案配額和使用跟蹤。
+  </Card>
+
+  <Card title="網站" icon="globe" href="/core-concepts/sites/overview">
+    將前端部署到 InsForge 管理的託管並自動將其連結到您的專案後端。
+  </Card>
+
+  <Card title="訊息傳遞" icon="envelope" href="/core-concepts/messaging/overview">
+    現在的事務性電子郵件；簡訊和推送在藍圖上。一個 API。
+  </Card>
+
+  <Card title="支付" icon="credit-card" href="/core-concepts/payments/overview">
+    Stripe 結帳、訂閱和客戶入口網站流程。
+  </Card>
+
+  <Card title="運算" icon="server" href="/core-concepts/compute/overview">
+    超越邊緣函數模型的長期執行的服務。
+  </Card>
+</CardGroup>
+
+## 它們如何配合
+
+每個產品共享相同的身份驗證身分識別、相同的列級安全原則和相同的 AI 代理 MCP 表面。透過**身份驗證**登入的使用者獲得 JWT，**資料庫**、**儲存**、**即時**和**邊緣函數**層都使用它來強制相同的存取規則。
+
+<CardGroup cols={3}>
+  <Card title="MCP 伺服器" icon="plug" href="/mcp-setup">
+    連接代理以讀取綱要、執行查詢和部署程式碼。
+  </Card>
+
+  <Card title="SDK" icon="code" href="/sdks/typescript/overview">
+    TypeScript、Swift、Kotlin 和純 REST API。
+  </Card>
+
+  <Card title="自託管" icon="server" href="/deployment/deploy-to-aws-ec2">
+    在您自己的基礎設施上執行整個堆疊。
+  </Card>
+</CardGroup>

@@ -1,0 +1,116 @@
+---
+title: "OAuth 伺服器"
+description: "InsForge OAuth 伺服器允許您的應用充當 OAuth 提供者，使其他應用和用戶端可以透過 OAuth 連接到它。"
+---
+
+InsForge OAuth 伺服器允許您的應用充當 OAuth 提供者。結合 InsForge 身份驗證，您可以使第三方應用能夠代表使用者獲得權限和存取。
+
+## 啟用 OAuth 伺服器模式
+
+在您的 InsForge 專案設定中啟用 OAuth 伺服器模式。一旦啟用，您將獲得用戶端 ID 和用戶端密鑰來設定您的 OAuth 用戶端。
+
+## OAuth 流程
+
+InsForge 支援標準的 OAuth 2.0 授權代碼流程。
+
+### 1. 授權要求
+
+將使用者重新導向到 InsForge 授權端點：
+
+```
+https://your-project.us-east.insforge.app/oauth/authorize?
+  client_id=YOUR_CLIENT_ID&
+  redirect_uri=YOUR_REDIRECT_URI&
+  response_type=code&
+  scope=openid profile email
+```
+
+### 2. 使用者授權
+
+使用者登入並授權您的應用存取他們的資料。
+
+### 3. 授權代碼回呼
+
+InsForge 將使用者重新導向回您的應用，帶有授權代碼：
+
+```
+YOUR_REDIRECT_URI?code=AUTH_CODE&state=STATE
+```
+
+### 4. 交換令牌
+
+您的後端使用授權代碼交換存取令牌：
+
+```bash
+curl -X POST https://your-project.us-east.insforge.app/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code&code=AUTH_CODE&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET&redirect_uri=YOUR_REDIRECT_URI"
+```
+
+### 5. 使用存取令牌
+
+使用存取令牌代表使用者進行 API 呼叫：
+
+```bash
+curl https://your-project.us-east.insforge.app/api/auth/user \
+  -H "Authorization: Bearer ACCESS_TOKEN"
+```
+
+## 範圍
+
+支援的範圍包括：
+
+- `openid` - 包含使用者 ID
+- `profile` - 使用者設定檔資訊
+- `email` - 使用者電子郵件位址
+- `offline_access` - 重新整理令牌
+
+## 重新整理令牌
+
+要取得重新整理令牌，在授權要求中要求 `offline_access` 範圍，並在令牌交換中包含 `offline_access`。
+
+使用重新整理令牌取得新的存取令牌：
+
+```bash
+curl -X POST https://your-project.us-east.insforge.app/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=refresh_token&refresh_token=REFRESH_TOKEN&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET"
+```
+
+## 使用者資訊端點
+
+取得目前經過身份驗證之使用者的資訊：
+
+```bash
+curl https://your-project.us-east.insforge.app/oauth/userinfo \
+  -H "Authorization: Bearer ACCESS_TOKEN"
+```
+
+傳回：
+
+```json
+{
+  "sub": "user-id",
+  "name": "User Name",
+  "email": "user@example.com",
+  "email_verified": true
+}
+```
+
+## 撤銷令牌
+
+撤銷存取令牌或重新整理令牌：
+
+```bash
+curl -X POST https://your-project.us-east.insforge.app/oauth/revoke \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "token=TOKEN&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET"
+```
+
+## 最佳做法
+
+- 始終在後端安全地儲存您的用戶端密鑰
+- 使用 HTTPS 進行所有 OAuth 通訊
+- 驗證授權要求中的 `state` 參數以防止 CSRF 攻擊
+- 使用短期存取令牌和重新整理令牌
+- 在安全的 HTTP-only 儲存中儲存重新整理令牌

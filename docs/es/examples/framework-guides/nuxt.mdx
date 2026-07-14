@@ -1,0 +1,118 @@
+---
+title: Nuxt
+description: Aprenda cómo crear un proyecto InsForge y crear una aplicación Nuxt usando IA
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+Aprenda cómo crear un proyecto InsForge y crear una aplicación Nuxt usando herramientas de IA como Cursor.
+
+## 1. Crear un proyecto InsForge
+
+Cree un nuevo proyecto InsForge en [insforge.dev](https://insforge.dev).
+
+## 2. Conectar InsForge
+
+- **Enlace CLI** — vea [Inicio rápido](/quickstart)
+- **Configuración de MCP** — vea [Configuración de MCP](/mcp-setup)
+
+## 3. Construye tu app con un solo aviso
+
+```
+Create a new Nuxt app with TypeScript.
+Add Tailwind CSS 3.4 for styling.
+Install the InsForge SDK and set up the client configuration.
+
+In my InsForge database, create a sports table with id and name columns.
+Add sample data: basketball, soccer, and tennis. Make it publicly readable.
+
+Create a page that fetches and displays all sports from the database.
+```
+
+## 4. Configuración de tiempo de ejecución
+
+```typescript nuxt.config.ts
+export default defineNuxtConfig({
+  runtimeConfig: {
+    public: {
+      insforgeBaseUrl: process.env.NUXT_PUBLIC_INSFORGE_BASE_URL,
+      insforgeAnonKey: process.env.NUXT_PUBLIC_INSFORGE_ANON_KEY
+    }
+  }
+})
+```
+
+## 5. Ruta de API del servidor
+
+```typescript server/api/sports.get.ts
+import { createClient } from '@insforge/sdk';
+
+export default defineEventHandler(async (event) => {
+  const config = useRuntimeConfig()
+
+  const client = createClient({
+    baseUrl: config.public.insforgeBaseUrl,
+    anonKey: config.public.insforgeAnonKey
+  })
+
+  const { data, error } = await client.database
+    .from('sports')
+    .select('*')
+
+  if (error) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: error.message || 'Failed to fetch sports'
+    })
+  }
+
+  return data
+})
+```
+
+## 6. Página de deportes
+
+```vue pages/sports.vue
+<script setup lang="ts">
+interface Sport {
+  id: string;
+  name: string;
+}
+
+const { data: sports, pending, error } = await useFetch<Sport[]>('/api/sports')
+</script>
+
+<template>
+  <div class="min-h-screen p-8">
+    <div v-if="pending" class="flex items-center justify-center min-h-screen">
+      <p class="text-gray-600">Loading...</p>
+    </div>
+
+    <div v-else-if="error" class="flex items-center justify-center min-h-screen">
+      <div class="text-red-600">
+        <h1 class="text-2xl font-bold mb-2">Error</h1>
+        <p>{{ error.message }}</p>
+      </div>
+    </div>
+
+    <div v-else class="max-w-4xl mx-auto">
+      <h1 class="text-4xl font-bold mb-8">Sports</h1>
+      <div v-if="sports && sports.length > 0" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div v-for="sport in sports" :key="sport.id" class="p-6 bg-white rounded-lg shadow-md border border-gray-200">
+          <h2 class="text-xl font-semibold text-gray-800 capitalize">{{ sport.name }}</h2>
+          <p class="text-sm text-gray-500 mt-2">ID: {{ sport.id }}</p>
+        </div>
+      </div>
+      <p v-else class="text-gray-600">No sports found.</p>
+    </div>
+  </div>
+</template>
+```
+
+## 7. Inicia la aplicación
+
+Ejecuta `npm run dev` y visita [http://localhost:3000/sports](http://localhost:3000/sports)
+
+## Amplía tu aplicación
+
+Intenta agregar formularios, autenticación, favoritos y características de IA.

@@ -1,0 +1,69 @@
+---
+title: "Productos"
+description: "Cada producto de InsForge en un solo lugar. Haga clic en cualquier tarjeta para profundizar."
+---
+
+InsForge proporciona diez productos, cada uno expuesto a través de la misma superficie REST, la misma autenticación JWT, el mismo servidor MCP y los mismos SDK.
+
+<CardGroup cols={2}>
+  <Card title="Base de datos" icon="database" href="/core-concepts/database/overview">
+    Postgres para cada proyecto. Migraciones, ramificación, pgvector, copias de seguridad respaldadas por S3.
+    Cada tabla se convierte en una superficie REST y SDK escrita.
+  </Card>
+
+  <Card title="Autenticación" icon="shield" href="/core-concepts/authentication/overview">
+    Correo electrónico y contraseña, sin contraseña, OAuth e inicios de sesión móviles a través de una API. Sesiones JWT, seguridad a nivel de fila, modo servidor OAuth.
+  </Card>
+
+  <Card title="Almacenamiento" icon="folder" href="/core-concepts/storage/overview">
+    Almacenamiento de objetos compatible con S3 con URL firmadas y políticas a nivel de fila.
+    Funciona con rclone, AWS CLI, Terraform.
+  </Card>
+
+  <Card title="Tiempo real" icon="tower-broadcast" href="/core-concepts/realtime/overview">
+    Cambios de base de datos, transmisión y presencia en una conexión WebSocket.
+    Las suscripciones y publicaciones de clientes utilizan verificaciones RLS.
+  </Card>
+
+  <Card title="Funciones de borde" icon="bolt" href="/core-concepts/functions/overview">
+    TypeScript sin servidor impulsado por Deno con horarios de primera clase. Invoque bajo demanda, encadene desde desencadenadores de DB o ejecute en cron.
+  </Card>
+
+  <Card title="Puerta de enlace de modelo" icon="sparkles" href="/core-concepts/ai/overview">
+    Chat, streaming e incrustaciones respaldados por OpenRouter a través de una clave administrada por InsForge. Cuotas por proyecto y seguimiento de uso.
+  </Card>
+
+  <Card title="Sitios" icon="globe" href="/core-concepts/sites/overview">
+    Implemente frontends en alojamiento administrado por InsForge y vincúlelos automáticamente a su backend de proyecto.
+  </Card>
+
+  <Card title="Mensajería" icon="envelope" href="/core-concepts/messaging/overview">
+    Correo electrónico transaccional hoy; SMS y push en la hoja de ruta. Una API.
+  </Card>
+
+  <Card title="Pagos" icon="credit-card" href="/core-concepts/payments/overview">
+    Flujos de pago de Stripe, suscripciones y portal de clientes.
+  </Card>
+
+  <Card title="Computación" icon="server" href="/core-concepts/compute/overview">
+    Servicios de larga duración más allá del modelo de función perimetral.
+  </Card>
+</CardGroup>
+
+## Cómo encajan
+
+Cada producto comparte la misma identidad de autenticación, las mismas políticas de seguridad a nivel de fila y la misma superficie MCP para agentes de IA. Un usuario que inició sesión a través de **Autenticación** obtiene un JWT que las capas de **Base de datos**, **Almacenamiento**, **Tiempo real** y **Funciones de borde** utilizan para aplicar las mismas reglas de acceso.
+
+<CardGroup cols={3}>
+  <Card title="Servidor MCP" icon="plug" href="/mcp-setup">
+    Conecte agentes para leer esquemas, ejecutar consultas e implementar código.
+  </Card>
+
+  <Card title="SDK" icon="code" href="/sdks/typescript/overview">
+    TypeScript, Swift, Kotlin y una API REST plana.
+  </Card>
+
+  <Card title="Auto-alojamiento" icon="server" href="/deployment/deploy-to-aws-ec2">
+    Ejecute la pila completa en su propia infraestructura.
+  </Card>
+</CardGroup>

@@ -1,0 +1,60 @@
+将 InsForge 添加到您的 Swift Package Manager 依赖项：
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/insforge/insforge-swift.git", from: "0.0.9")
+]
+```
+
+```swift
+import InsForge
+
+let insforge = InsForgeClient(
+    baseURL: URL(string: "https://your-app.insforge.app")!,
+    anonKey: "your-anon-key"
+)
+```
+
+### 启用日志记录（可选）
+
+对于调试，您可以配置 SDK 日志级别和目标：
+
+```swift
+let options = InsForgeClientOptions(
+    global: .init(
+        logLevel: .debug,
+        logDestination: .osLog,
+        logSubsystem: "com.example.MyApp"
+    )
+)
+
+let insforge = InsForgeClient(
+    baseURL: URL(string: "https://your-app.insforge.app")!,
+    anonKey: "your-anon-key",
+    options: options
+)
+```
+
+**日志级别：**
+
+| 级别 | 描述 |
+|-------|-------------|
+| `.trace` | 最详细，包括所有内部详情 |
+| `.debug` | 用于调试的详细信息 |
+| `.info` | 一般运行信息（默认） |
+| `.warning` | 不阻止操作的警告 |
+| `.error` | 影响功能的错误 |
+| `.critical` | 严重故障 |
+
+**日志目标：**
+
+| 目标 | 描述 |
+|-------------|-------------|
+| `.console` | 标准输出（print） |
+| `.osLog` | Apple 的统一日志系统（推荐用于 iOS/macOS） |
+| `.none` | 禁用日志记录 |
+| `.custom` | 提供您自己的 LogHandler 工厂 |
+
+<Note>
+  在生产环境中使用 `.info` 或 `.error` 以避免在日志中暴露敏感数据。
+</Note>

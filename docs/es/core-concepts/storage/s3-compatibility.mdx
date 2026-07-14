@@ -1,0 +1,60 @@
+---
+title: Puerta de enlace compatible con S3
+description: Use cualquier cliente AWS SigV4 contra InsForge Storage
+---
+
+InsForge Storage habla el [protocolo de AWS S3](https://docs.aws.amazon.com/AmazonS3/latest/API/Welcome.html) en `/storage/v1/s3`. Solo proyectos en la nube.
+
+## Conceptos
+
+Claves de acceso de larga duración firmadas con SigV4. Alcance de administrador de proyectos en todos los depósitos, solo URL de estilo de ruta. Las cargas de S3 aparecen inmediatamente en la API REST y el Panel. Genere claves en **Storage → Settings → S3 Configuration**.
+
+## Uso
+
+Obtenga el punto final y la región del Panel o `GET /api/storage/s3/config`.
+
+```ini
+# ~/.aws/credentials
+[insforge]
+aws_access_key_id = your_access_key_id
+aws_secret_access_key = your_secret_access_key
+
+# ~/.aws/config
+[profile insforge]
+region = us-east-2
+endpoint_url = https://project_ref.region.insforge.app/storage/v1/s3
+s3 =
+  addressing_style = path
+```
+
+```bash
+aws --profile insforge s3 cp ./photo.jpg s3://my-bucket/photo.jpg
+aws --profile insforge s3 sync ./dist s3://my-bucket/dist
+```
+
+En el código, establezca `forcePathStyle: true` y apunte `endpoint` a `/storage/v1/s3`.
+
+```ts
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+
+const client = new S3Client({
+  forcePathStyle: true,
+  region: 'us-east-2',
+  endpoint: 'https://project_ref.region.insforge.app/storage/v1/s3',
+  credentials: { accessKeyId: '...', secretAccessKey: '...' },
+});
+
+await client.send(new PutObjectCommand({ Bucket: 'my-bucket', Key: 'hello.txt', Body: 'hello' }));
+```
+
+## Límites
+
+`PutObject` limita a 5 GB, multipart a 5 TB. 50 claves por proyecto, sesgo de reloj de 15 minutos. Las claves secretas se muestran una vez al crear.
+
+No compatible: URL presignadas (use `POST /api/storage/buckets/:bucket/upload-strategy`), tokens de sesión, URL virtuales alojadas. El versionado, SSE-C/KMS, ACL, bloqueo de objetos, etiquetado, ciclo de vida y CORS devuelven `501 NotImplemented`.
+
+## Más recursos
+
+- [Storage overview](/core-concepts/storage/overview) para los internos de la puerta de enlace.
+- [TypeScript storage SDK](/sdks/typescript/storage) para cargas del navegador.
+- [Referencia AWS SigV4](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-signing.html) para detalles de firma.

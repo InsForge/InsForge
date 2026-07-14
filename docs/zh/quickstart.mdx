@@ -1,0 +1,58 @@
+---
+title: "CLI 设置"
+sidebarTitle: "CLI 设置 · 推荐"
+description: "安装 InsForge CLI，链接项目，并从终端在大约五分钟内从终端生成类型，以开始针对您的后端构建。"
+---
+
+## 步骤 1：创建您的项目
+
+<Card title="转到 InsForge Cloud" icon="cloud" href="https://insforge.dev">
+  访问 [insforge.dev](https://insforge.dev) 并创建免费帐户
+</Card>
+
+登录后：
+
+<Steps>
+  <Step title="创建项目">
+    单击**"创建新项目"**
+  </Step>
+  <Step title="等待后端">
+    您的后端将在 ~3 秒内准备就绪
+  </Step>
+  <Step title="复制项目 ID">
+    您将被重定向到项目控制台 — 从浏览器 URL 复制**项目 ID**：
+  </Step>
+</Steps>
+
+```
+https://insforge.dev/dashboard/project/<your-project-id>
+```
+
+您在步骤 2 中需要此项目 ID。
+
+## 步骤 2：链接 CLI
+
+从您的项目目录中，将您的本地代码链接到您的 InsForge 项目。将 `<your-project-id>` 替换为步骤 1 中的 ID。
+
+```bash
+npx @insforge/cli link --project-id <your-project-id>
+```
+
+通过 `npx` 运行会将 CLI 保留在全局安装路径之外。链接文件最终会在当前目录中，并告诉后续命令它们属于哪个项目。
+
+## 步骤 3：验证安装
+
+向您的 AI 编码代理发送以下提示以验证设置：
+
+`我正在使用 InsForge 作为我的后端平台。读取当前目录，确保 InsForge 技能已安装，并使用 InsForge CLI 进行后端任务。`
+
+## 了解更多
+
+要探索 InsForge CLI 的完整功能：
+
+- 查看 [npm 包文档](https://www.npmjs.com/package/@insforge/cli)
+- 运行内置帮助命令：
+
+```bash
+npx @insforge/cli --help
+```

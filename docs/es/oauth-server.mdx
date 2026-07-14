@@ -1,0 +1,116 @@
+---
+title: "Servidor OAuth"
+description: "El servidor InsForge OAuth permite que su aplicación actúe como proveedor de OAuth, permitiendo que otras aplicaciones se conecten a través de OAuth."
+---
+
+El servidor InsForge OAuth permite que su aplicación actúe como proveedor de OAuth. Combinado con la autenticación de InsForge, puede permitir que aplicaciones de terceros obtengan permiso y acceso en nombre del usuario.
+
+## Habilitar modo de servidor OAuth
+
+Habilite el modo de servidor OAuth en la configuración de su proyecto InsForge. Una vez habilitado, recibirá un ID de cliente y secreto de cliente para configurar sus clientes OAuth.
+
+## Flujo OAuth
+
+InsForge admite el flujo de código de autorización OAuth 2.0 estándar.
+
+### 1. Solicitud de autorización
+
+Redirija al usuario al punto final de autorización de InsForge:
+
+```
+https://your-project.us-east.insforge.app/oauth/authorize?
+  client_id=YOUR_CLIENT_ID&
+  redirect_uri=YOUR_REDIRECT_URI&
+  response_type=code&
+  scope=openid profile email
+```
+
+### 2. Autorización del usuario
+
+El usuario inicia sesión y autoriza que su aplicación acceda a sus datos.
+
+### 3. Devolución de llamada de código de autorización
+
+InsForge redirige al usuario a su aplicación con un código de autorización:
+
+```
+YOUR_REDIRECT_URI?code=AUTH_CODE&state=STATE
+```
+
+### 4. Intercambiar token
+
+Su backend intercambia el código de autorización por un token de acceso:
+
+```bash
+curl -X POST https://your-project.us-east.insforge.app/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code&code=AUTH_CODE&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET&redirect_uri=YOUR_REDIRECT_URI"
+```
+
+### 5. Usar token de acceso
+
+Use el token de acceso para realizar llamadas API en nombre del usuario:
+
+```bash
+curl https://your-project.us-east.insforge.app/api/auth/user \
+  -H "Authorization: Bearer ACCESS_TOKEN"
+```
+
+## Alcances
+
+Los alcances admitidos incluyen:
+
+- `openid` - Incluye ID de usuario
+- `profile` - Información de perfil de usuario
+- `email` - Dirección de correo electrónico del usuario
+- `offline_access` - Token de actualización
+
+## Tokens de actualización
+
+Para obtener un token de actualización, solicite el alcance `offline_access` en la solicitud de autorización e incluya `offline_access` en el intercambio de tokens.
+
+Use el token de actualización para obtener un nuevo token de acceso:
+
+```bash
+curl -X POST https://your-project.us-east.insforge.app/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=refresh_token&refresh_token=REFRESH_TOKEN&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET"
+```
+
+## Punto final de información del usuario
+
+Obtenga información del usuario autenticado actualmente:
+
+```bash
+curl https://your-project.us-east.insforge.app/oauth/userinfo \
+  -H "Authorization: Bearer ACCESS_TOKEN"
+```
+
+Devuelve:
+
+```json
+{
+  "sub": "user-id",
+  "name": "User Name",
+  "email": "user@example.com",
+  "email_verified": true
+}
+```
+
+## Revocar token
+
+Revoque un token de acceso o token de actualización:
+
+```bash
+curl -X POST https://your-project.us-east.insforge.app/oauth/revoke \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "token=TOKEN&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET"
+```
+
+## Mejores prácticas
+
+- Siempre almacene su secreto de cliente de forma segura en el backend
+- Use HTTPS para todas las comunicaciones OAuth
+- Valide el parámetro `state` en la solicitud de autorización para prevenir ataques CSRF
+- Use tokens de acceso y tokens de actualización de corta duración
+- Almacene tokens de actualización en almacenamiento seguro de solo HTTP

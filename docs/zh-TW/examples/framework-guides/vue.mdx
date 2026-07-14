@@ -1,0 +1,125 @@
+---
+title: Vue
+description: 瞭解如何建立 InsForge 專案並使用 AI 建構 Vue 應用程式
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+瞭解如何建立 InsForge 專案並使用 AI 工具（如 Cursor）建構 Vue 應用程式。
+
+## 1. 建立 InsForge 專案
+
+在 [insforge.dev](https://insforge.dev) 建立新的 InsForge 專案。
+
+## 2. 連接 InsForge
+
+兩個部分：
+
+- **CLI 連結** — 查看[快速開始](/quickstart)以執行 `npx @insforge/cli link --project-id <your-project-id>`
+- **MCP 設置** — 查看 [MCP 設置](/mcp-setup) 瞭解編輯器設定
+
+## 3. 透過一個提示構建您的應用
+
+```
+Create a new Vue app with TypeScript and Vite.
+Add Tailwind CSS 3.4 for styling.
+Install the InsForge SDK and set up the client configuration.
+
+In my InsForge database, create a sports table with id and name columns.
+Add sample data: basketball, soccer, and tennis. Make it publicly readable.
+
+Create a component that fetches and displays all sports from the database.
+```
+
+## 4. InsForge 用戶端
+
+```typescript src/lib/insforge.ts
+import { createClient } from '@insforge/sdk';
+
+export const insforge = createClient({
+  baseUrl: 'https://your-project.us-east.insforge.app',
+  anonKey: 'your-anon-key'
+});
+```
+
+## 5. 運動元件
+
+```vue src/components/Sports.vue
+<template>
+  <div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Sports</h1>
+
+    <div v-if="loading" class="text-center py-8">
+      <p class="text-gray-600">Loading sports...</p>
+    </div>
+
+    <div v-else-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+      <p>Error: {{ error }}</p>
+    </div>
+
+    <div v-else-if="sports && sports.length > 0" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div
+        v-for="sport in sports"
+        :key="sport.id"
+        class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+      >
+        <h2 class="text-xl font-semibold text-gray-800 capitalize">{{ sport.name }}</h2>
+        <p class="text-sm text-gray-500 mt-2">ID: {{ sport.id }}</p>
+      </div>
+    </div>
+
+    <div v-else class="text-center py-8">
+      <p class="text-gray-600">No sports found.</p>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { insforge } from '../lib/insforge';
+
+interface Sport {
+  id: string;
+  name: string;
+  created_at?: string;
+}
+
+const sports = ref<Sport[]>([]);
+const loading = ref(true);
+const error = ref<string | null>(null);
+
+const fetchSports = async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+
+    const { data, error: fetchError } = await insforge.database
+      .from('sports')
+      .select();
+
+    if (fetchError) {
+      error.value = fetchError.message || 'Failed to fetch sports';
+      return;
+    }
+
+    sports.value = data || [];
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'An unexpected error occurred';
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchSports();
+});
+</script>
+```
+
+## 6. 啟動應用程式
+
+執行 `npm run dev` 並訪問 [http://localhost:5173](http://localhost:5173)
+
+## 擴展您的應用程式
+
+嘗試添加表單、身份驗證、收藏夾功能、圖像儲存或 AI 聊天功能。
