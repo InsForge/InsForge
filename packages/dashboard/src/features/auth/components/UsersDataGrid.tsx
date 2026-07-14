@@ -245,7 +245,10 @@ export function createUsersColumns(
       minWidth: 160,
       sortable: true,
       renderCell: ({ row }) => (
-        <span className="truncate text-[13px] leading-[18px] text-foreground" title={row.email}>
+        <span
+          className="truncate text-[13px] leading-[18px] text-foreground"
+          title={row.email ?? 'Anonymous'}
+        >
           {row.email}
         </span>
       ),
@@ -300,7 +303,7 @@ const UserSelectionCell = ({
   const avatarUrl = profile?.avatar_url as string | undefined;
   const rawName = profile?.name;
   const name =
-    (typeof rawName === 'string' && rawName.trim()) || row.email.split('@')[0] || 'Unknown';
+    (typeof rawName === 'string' && rawName.trim()) || row.email?.split('@')[0] || 'Unknown';
 
   return (
     <div className="flex h-full w-full items-center gap-2 pr-2">

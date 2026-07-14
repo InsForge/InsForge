@@ -144,4 +144,34 @@ else
     track_test_failure
 fi
 
+# 6. Anonymous sign in
+echo "👻 Testing anonymous sign in..."
+anon_response=$(curl -s -X POST "$API_BASE/auth/users/anonymous" \
+    -H "Content-Type: application/json")
+
+if echo "$anon_response" | grep -q '"accessToken"'; then
+    print_success "Anonymous sign in success"
+    # Get the token just to verify it's valid
+    ANON_TOKEN=$(echo "$anon_response" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4)
+    
+    # Verify we can use this token to get current user info
+    echo "👤 Verifying anonymous user info..."
+    anon_me_response=$(curl -s -X GET "$API_BASE/auth/sessions/current" \
+        -H "Authorization: Bearer $ANON_TOKEN" \
+        -H "Content-Type: application/json")
+        
+    if echo "$anon_me_response" | grep -q '"isAnonymous":true'; then
+        print_success "Anonymous token works and user is marked anonymous!"
+    else
+        print_fail "Failed to verify anonymous token"
+        track_test_failure
+    fi
+else
+    print_fail "Anonymous sign in failed"
+    echo "Response: $anon_response"
+    track_test_failure
+fi
+
+echo ""
+
 print_success "🎉 Auth router test completed!" 

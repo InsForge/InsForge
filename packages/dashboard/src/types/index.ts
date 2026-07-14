@@ -13,7 +13,7 @@ export interface DashboardProjectInfo {
 
 export interface DashboardUserInfo {
   userId: string;
-  email: string;
+  email: string | null;
   name?: string;
 }
 
