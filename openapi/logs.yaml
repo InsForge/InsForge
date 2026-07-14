@@ -4,9 +4,11 @@ info:
   version: 2.0.0
   description: >-
     Audit logs and system log sources. All endpoints require project admin
-    authentication. List endpoints paginate PostgREST-style: metadata is
-    returned in `Content-Range` / `Preference-Applied` headers and partial
-    results use HTTP `206`.
+    authentication. The audit list and search endpoints paginate
+    PostgREST-style: metadata is returned in `Content-Range` /
+    `Preference-Applied` headers and partial results use HTTP `206`. Other
+    list endpoints (`/sources`, `/stats`, `/{source}`) return plain `200`
+    JSON bodies.
 
 paths:
   /api/logs/audits:
@@ -385,9 +387,9 @@ paths:
     get:
       summary: Get logs from a source
       description: >-
-        Returns recent log entries from a single system log source, newest
-        first. Use `before_timestamp` to page backwards through older
-        entries.
+        Returns recent log entries from a single system log source in
+        chronological order (oldest of the returned window first). Use
+        `before_timestamp` to page backwards through older entries.
       tags:
         - Admin
       security:
@@ -430,7 +432,10 @@ paths:
                       $ref: '#/components/schemas/Log'
                   total:
                     type: integer
-                    description: Total number of entries available in the source
+                    description: >-
+                      Number of entries returned in this window (not a
+                      source-wide total; both storage providers report the
+                      fetched count).
               example:
                 logs:
                   - id: "log-123"
@@ -472,7 +477,11 @@ components:
       schema:
         type: integer
         default: 0
-      description: Number of entries to skip.
+      description: >-
+        Number of entries to skip. Only honored by local log storage;
+        CloudWatch-backed deployments do not support offset pagination and
+        ignore this parameter, and their `Content-Range` total reflects the
+        fetched window rather than a source-wide count.
 
   responses:
     AuditLogList:
@@ -621,7 +630,10 @@ components:
           description: Log source name
         count:
           type: integer
-          description: Number of entries in the source
+          description: >-
+            Number of entries in the source. CloudWatch-backed deployments
+            always report `0` here (the provider does not compute per-source
+            counts); local log storage reports real counts.
         lastActivity:
           type: string
           format: date-time
