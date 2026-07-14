@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { ChatCompletionService } from '@/services/ai/chat-completion.service.js';
 import { AuthRequest, verifyAdmin, verifyUser } from '../../middlewares/auth.js';
 import { ImageGenerationService } from '@/services/ai/image-generation.service.js';
@@ -162,8 +163,10 @@ async function checkAIQuota(req: AuthRequest, _res: Response, next: NextFunction
     }
 
     const model = req.body?.model || req.params?.model;
-    if (model) {
+    if (model !== undefined && model !== null) {
       await aiUsageService.checkQuota(req.user.id, model);
+    } else {
+      await aiUsageService.checkQuota(req.user.id, '');
     }
     next();
   } catch (error) {
@@ -228,15 +231,19 @@ router.post(
           res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
 
           if (req.user) {
-            aiUsageService.logUsage(
-              req.user.id,
-              options.model,
-              finalPromptTokens,
-              finalCompletionTokens,
-              'chat'
-            ).catch((error) => {
-              logger.warn('Failed to log streaming chat usage', { error: String(error) });
-            });
+            const cost = aiUsageService.estimateCost(finalPromptTokens, finalCompletionTokens, options.model);
+            aiUsageService
+              .logUsage(
+                req.user.id,
+                options.model,
+                finalPromptTokens,
+                finalCompletionTokens,
+                'chat',
+                cost
+              )
+              .catch((error) => {
+                logger.warn('Failed to log streaming chat usage', { error: String(error) });
+              });
           }
         } catch (streamError) {
           logger.error('Stream error during chat completion', {
@@ -258,15 +265,21 @@ router.post(
       // Log usage after successful completion
       if (req.user) {
         const usage = result.metadata?.usage;
-        aiUsageService.logUsage(
-          req.user.id,
-          options.model,
-          usage?.promptTokens || 0,
-          usage?.completionTokens || 0,
-          'chat'
-        ).catch((error) => {
-          logger.warn('Failed to log chat usage', { error: String(error) });
-        });
+        const promptTokens = usage?.promptTokens || 0;
+        const completionTokens = usage?.completionTokens || 0;
+        const cost = aiUsageService.estimateCost(promptTokens, completionTokens, options.model);
+        aiUsageService
+          .logUsage(
+            req.user.id,
+            options.model,
+            promptTokens,
+            completionTokens,
+            'chat',
+            cost
+          )
+          .catch((error) => {
+            logger.warn('Failed to log chat usage', { error: String(error) });
+          });
       }
 
       successResponse(res, result);
@@ -311,15 +324,21 @@ router.post(
       // Log usage after successful generation
       if (req.user) {
         const usage = result.metadata?.usage;
-        aiUsageService.logUsage(
-          req.user.id,
-          validationResult.data.model,
-          usage?.promptTokens || 0,
-          usage?.completionTokens || 0,
-          'image'
-        ).catch((error) => {
-          logger.warn('Failed to log image generation usage', { error: String(error) });
-        });
+        const promptTokens = usage?.promptTokens || 0;
+        const completionTokens = usage?.completionTokens || 0;
+        const cost = aiUsageService.estimateCost(promptTokens, completionTokens, validationResult.data.model);
+        aiUsageService
+          .logUsage(
+            req.user.id,
+            validationResult.data.model,
+            promptTokens,
+            completionTokens,
+            'image',
+            cost
+          )
+          .catch((error) => {
+            logger.warn('Failed to log image generation usage', { error: String(error) });
+          });
       }
 
       successResponse(res, result);
@@ -365,15 +384,20 @@ router.post(
       // Log usage after successful embedding
       if (req.user) {
         const usage = result.metadata?.usage;
-        aiUsageService.logUsage(
-          req.user.id,
-          validationResult.data.model,
-          usage?.promptTokens || 0,
-          0,
-          'embedding'
-        ).catch((error) => {
-          logger.warn('Failed to log embedding usage', { error: String(error) });
-        });
+        const promptTokens = usage?.promptTokens || 0;
+        const cost = aiUsageService.estimateCost(promptTokens, 0, validationResult.data.model);
+        aiUsageService
+          .logUsage(
+            req.user.id,
+            validationResult.data.model,
+            promptTokens,
+            0,
+            'embedding',
+            cost
+          )
+          .catch((error) => {
+            logger.warn('Failed to log embedding usage', { error: String(error) });
+          });
       }
 
       successResponse(res, result);
@@ -424,45 +448,41 @@ router.get(
  * GET /api/ai/quotas
  * Get all quota configs, or a specific user's quota. Admin-only.
  */
-router.get(
-  '/quotas',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const userId = req.query.userId as string | undefined;
-      const configs = await aiUsageService.getQuotaConfig(userId);
-      successResponse(res, configs);
-    } catch (error) {
-      next(error);
+router.get('/quotas', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const rawUserId = req.query.userId as string | undefined;
+    const userId = rawUserId ? usageReportQuerySchema.shape.userId.parse(rawUserId) : undefined;
+    const configs = await aiUsageService.getQuotaConfig(userId);
+    successResponse(res, configs);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return next(new AppError('Invalid userId format', 400, ERROR_CODES.INVALID_INPUT));
     }
+    next(error);
   }
-);
+});
 
 /**
  * PUT /api/ai/quotas
  * Create or update a quota config for a user (or global default). Admin-only.
  */
-router.put(
-  '/quotas',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = updateQuotaConfigRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const targetUserId = (req.body.userId as string | null) ?? null;
-      const config = await aiUsageService.upsertQuotaConfig(targetUserId, validationResult.data);
-      successResponse(res, config);
-    } catch (error) {
-      next(error);
+router.put('/quotas', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = updateQuotaConfigRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
+
+    const targetUserId = validationResult.data.userId ?? null;
+    const config = await aiUsageService.upsertQuotaConfig(targetUserId, validationResult.data);
+    successResponse(res, config);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 export { router as aiRouter };

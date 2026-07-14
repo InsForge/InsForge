@@ -4,19 +4,7 @@ import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 
-const AI_ENDPOINTS = ['chat', 'image', 'embedding'] as const;
-export type AIEndpoint = (typeof AI_ENDPOINTS)[number];
-
-interface UsageLogRow {
-  id: string;
-  user_id: string;
-  model: string;
-  prompt_tokens: number;
-  completion_tokens: number;
-  estimated_cost: number;
-  endpoint: string;
-  created_at: string;
-}
+export type AIEndpoint = 'chat' | 'image' | 'embedding';
 
 interface QuotaConfigRow {
   id: string;
@@ -90,10 +78,36 @@ export class AIUsageService {
       `SELECT * FROM ai.quota_config WHERE user_id = $1
        UNION ALL
        SELECT * FROM ai.quota_config WHERE user_id IS NULL
+       ORDER BY user_id NULLS LAST
        LIMIT 1`,
       [userId]
     );
-    return result.rows[0] as QuotaConfigRow | undefined ?? null;
+    return (result.rows[0] as QuotaConfigRow | undefined) ?? null;
+  }
+
+  /**
+   * Roughly estimate the cost of an AI request based on model and token counts.
+   * Returns 0 for image generation (cost varies by provider/model).
+   */
+  estimateCost(promptTokens: number, completionTokens: number, model: string): number {
+    const modelLower = model.toLowerCase();
+    let promptRate: number;
+    let completionRate: number;
+
+    if (modelLower.includes('gpt-4') || modelLower.includes('claude-3-opus') || modelLower.includes('claude-3.5-sonnet')) {
+      promptRate = 0.01;
+      completionRate = 0.03;
+    } else if (modelLower.includes('gpt-3.5') || modelLower.includes('claude-3-haiku') || modelLower.includes('claude-instant')) {
+      promptRate = 0.001;
+      completionRate = 0.002;
+    } else if (modelLower.includes('dall-e') || modelLower.includes('stable-diffusion')) {
+      return 0.04;
+    } else {
+      promptRate = 0.003;
+      completionRate = 0.015;
+    }
+
+    return (promptTokens / 1000000) * promptRate + (completionTokens / 1000000) * completionRate;
   }
 
   /**
@@ -303,7 +317,7 @@ export class AIUsageService {
            COUNT(*)::int AS request_count
          FROM ai.usage_log
          ${whereClause}`,
-        params.slice(0, params.length - 2)
+        params
       );
 
       return {
@@ -384,15 +398,27 @@ export class AIUsageService {
       throw new AppError('No quota config found and no fields to update', 404, ERROR_CODES.NOT_FOUND);
     }
 
-    setClauses.push(`updated_at = NOW()`);
+    const insertColumns = setClauses.map((s) => s.split(' = ')[0]);
+    const insertValues = params.map((_, i) => `$${i + 2}`);
 
-    const result = await pool.query(
-      `INSERT INTO ai.quota_config (user_id, ${setClauses.map((s) => s.split(' = ')[0]).join(', ')})
-       VALUES ($1, ${params.map((_, i) => `$${i + 2}`).join(', ')})
-       ON CONFLICT (user_id) DO UPDATE SET ${setClauses.join(', ')}
-       RETURNING *`,
-      [userId, ...params]
-    );
+    let query: string;
+    let queryParams: unknown[];
+
+    if (userId !== null) {
+      query = `INSERT INTO ai.quota_config (user_id, ${insertColumns.join(', ')})
+               VALUES ($1, ${insertValues.join(', ')})
+               ON CONFLICT (user_id) DO UPDATE SET ${setClauses.join(', ')}, updated_at = NOW()
+               RETURNING *`;
+      queryParams = [userId, ...params];
+    } else {
+      query = `UPDATE ai.quota_config
+               SET ${setClauses.join(', ')}, updated_at = NOW()
+               WHERE user_id IS NULL
+               RETURNING *`;
+      queryParams = params;
+    }
+
+    const result = await pool.query(query, queryParams);
 
     return result.rows[0] as QuotaConfigRow;
   }

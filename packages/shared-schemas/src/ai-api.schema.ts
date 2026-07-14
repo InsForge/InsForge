@@ -360,6 +360,7 @@ export const updateQuotaConfigRequestSchema = z.object({
   maxTokensPerMonth: z.number().int().positive().nullable().optional(),
   monthlySpendCapUsd: z.number().positive().nullable().optional(),
   modelAllowlist: z.array(z.string()).nullable().optional(),
+  userId: z.string().uuid().nullable().optional(),
 });
 
 export const usageReportQuerySchema = z.object({

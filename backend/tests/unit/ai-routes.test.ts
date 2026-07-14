@@ -26,8 +26,12 @@ describe('ai route wiring', () => {
     methods: Object.keys(layer.route?.methods ?? {}).sort(),
   }));
 
-  const getHandlerNames = (path: string): string[] => {
-    const route = routeLayers.find((layer) => layer.route?.path === path);
+  const getHandlerNames = (path: string, method?: string): string[] => {
+    const route = routeLayers.find(
+      (layer) =>
+        layer.route?.path === path &&
+        (!method || Object.keys(layer.route?.methods ?? {}).includes(method))
+    );
     return route?.route?.stack.map((handler) => handler.handle.name) ?? [];
   };
 
@@ -51,9 +55,10 @@ describe('ai route wiring', () => {
   });
 
   it('guards the chat completion route with verifyUser, rate limiter, and quota check', () => {
-    const handlerNames = getHandlerNames('/chat/completion');
-    expect(handlerNames).toContain('verifyUser');
-    expect(handlerNames).toContain('checkAIQuota');
+    const handlerNames = getHandlerNames('/chat/completion', 'post');
+    expect(handlerNames[0]).toBe('verifyUser');
+    expect(handlerNames[2]).toBe('checkAIQuota');
+    expect(handlerNames).toHaveLength(4);
   });
 
   it('registers the image generation route', () => {
@@ -64,9 +69,10 @@ describe('ai route wiring', () => {
   });
 
   it('guards the image generation route with verifyUser, rate limiter, and quota check', () => {
-    const handlerNames = getHandlerNames('/image/generation');
-    expect(handlerNames).toContain('verifyUser');
-    expect(handlerNames).toContain('checkAIQuota');
+    const handlerNames = getHandlerNames('/image/generation', 'post');
+    expect(handlerNames[0]).toBe('verifyUser');
+    expect(handlerNames[2]).toBe('checkAIQuota');
+    expect(handlerNames).toHaveLength(4);
   });
 
   it('registers the embeddings route', () => {
@@ -77,9 +83,10 @@ describe('ai route wiring', () => {
   });
 
   it('guards the embeddings route with verifyUser, rate limiter, and quota check', () => {
-    const handlerNames = getHandlerNames('/embeddings');
-    expect(handlerNames).toContain('verifyUser');
-    expect(handlerNames).toContain('checkAIQuota');
+    const handlerNames = getHandlerNames('/embeddings', 'post');
+    expect(handlerNames[0]).toBe('verifyUser');
+    expect(handlerNames[2]).toBe('checkAIQuota');
+    expect(handlerNames).toHaveLength(4);
   });
 
   it('registers the usage report route', () => {
@@ -108,8 +115,13 @@ describe('ai route wiring', () => {
     });
   });
 
-  it('guards the quotas routes with verifyAdmin', () => {
-    const handlerNames = getHandlerNames('/quotas');
+  it('guards the quotas GET route with verifyAdmin', () => {
+    const handlerNames = getHandlerNames('/quotas', 'get');
+    expect(handlerNames).toContain('verifyAdmin');
+  });
+
+  it('guards the quotas PUT route with verifyAdmin', () => {
+    const handlerNames = getHandlerNames('/quotas', 'put');
     expect(handlerNames).toContain('verifyAdmin');
   });
 

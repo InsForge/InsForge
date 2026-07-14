@@ -432,7 +432,11 @@ export class ChatCompletionService {
 
           // Only yield tokenUsage when actual non-zero values are present
           // to avoid emitting zero-value intermediate events that confuse clients
-          if (tokenUsage.promptTokens > 0 || tokenUsage.completionTokens > 0 || tokenUsage.totalTokens > 0) {
+          if (
+            tokenUsage.promptTokens > 0 ||
+            tokenUsage.completionTokens > 0 ||
+            tokenUsage.totalTokens > 0
+          ) {
             yield { tokenUsage: { ...tokenUsage } };
           }
         }

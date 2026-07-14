@@ -69,13 +69,13 @@ CREATE TABLE IF NOT EXISTS ai.quota_config (
   created_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_quota_config_user UNIQUE (user_id),
-  CONSTRAINT ck_quota_config_user_or_default CHECK (
-    (user_id IS NOT NULL) OR
-    (user_id IS NULL AND NOT EXISTS (
-      SELECT 1 FROM ai.quota_config qc2 WHERE qc2.user_id IS NULL AND qc2.id <> ai.quota_config.id
-    ))
-  )
+  CONSTRAINT ck_quota_config_user_not_null CHECK (user_id IS NOT NULL OR user_id IS NULL)
 );
+
+-- Enforce at most one global-default row via a partial unique index.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_quota_config_single_global_default
+  ON ai.quota_config ((TRUE))
+  WHERE user_id IS NULL;
 
 COMMENT ON TABLE ai.quota_config IS
   'Per-user or global-default AI usage quota limits. user_id=null row is the fallback default.';
@@ -84,7 +84,7 @@ COMMENT ON COLUMN ai.quota_config.user_id IS
 COMMENT ON COLUMN ai.quota_config.model_allowlist IS
   'If non-NULL and non-empty, restricts this user to only these model IDs.';
 
-GRANT SELECT, INSERT, UPDATE ON ai.quota_config TO authenticated;
+-- quota_config is admin-only; access goes through the API routes (verifyAdmin).
 
 -- Seed a global-default quota row if none exists yet.
 INSERT INTO ai.quota_config (

@@ -457,7 +457,7 @@ export const computeWriteLimiter = createWriteEndpointLimiter('compute');
  * across multiple devices or IPs.
  *
  * Chat:  60 requests per minute (bursts of streaming completions)
- * Image: 30 requests per 5 minutes (image gen is expensive)
+ * Image: 30 requests per minute (image gen is expensive)
  * Embed: 120 requests per minute (batch embedding jobs)
  */
 
@@ -472,13 +472,7 @@ function createUserAILimiter(maxPerMinute: number) {
       return authReq.user?.id ?? authReq.ip ?? 'unknown';
     },
     handler: (_req: Request, _res: Response, next: NextFunction) => {
-      next(
-        new AppError(
-          'Too many AI requests. Please slow down.',
-          429,
-          ERROR_CODES.TOO_MANY_REQUESTS
-        )
-      );
+      next(new AppError('Too many AI requests. Please slow down.', 429, ERROR_CODES.TOO_MANY_REQUESTS));
     },
     skipSuccessfulRequests: false,
     skipFailedRequests: false,
