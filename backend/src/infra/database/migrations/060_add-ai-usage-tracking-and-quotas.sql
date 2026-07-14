@@ -7,7 +7,7 @@ CREATE SCHEMA IF NOT EXISTS ai;
 -- ============================================================================
 -- ai.usage_log — one row per AI gateway request
 -- ============================================================================
-CREATE TABLE ai.usage_log (
+CREATE TABLE IF NOT EXISTS ai.usage_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id TEXT NOT NULL,
   user_role TEXT NOT NULL DEFAULT 'authenticated',
@@ -22,19 +22,20 @@ CREATE TABLE ai.usage_log (
 );
 
 -- Indexes for efficient per-user and time-range queries
-CREATE INDEX idx_ai_usage_log_user_created
+CREATE INDEX IF NOT EXISTS idx_ai_usage_log_user_created
   ON ai.usage_log (user_id, created_at DESC);
 
-CREATE INDEX idx_ai_usage_log_created
+CREATE INDEX IF NOT EXISTS idx_ai_usage_log_created
   ON ai.usage_log (created_at DESC);
 
 -- ============================================================================
 -- ai.quota_configs — per-user or global default quota configuration
 -- ============================================================================
-CREATE TABLE ai.quota_configs (
+CREATE TABLE IF NOT EXISTS ai.quota_configs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  -- NULL user_id means this is the global default config
-  user_id TEXT UNIQUE,
+  -- NULL user_id means this is the global default config.
+  -- NULLS NOT DISTINCT ensures only one NULL row can exist (Postgres 15+).
+  user_id TEXT UNIQUE NULLS NOT DISTINCT,
   max_requests_per_day INT,
   max_tokens_per_day INT,
   max_tokens_per_month INT,
@@ -48,7 +49,7 @@ CREATE TABLE ai.quota_configs (
 -- Trigger to auto-update updated_at
 CREATE TRIGGER update_ai_quota_configs_updated_at
   BEFORE UPDATE ON ai.quota_configs
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
 
 -- Insert global default row (no limits by default — admins opt in)
 INSERT INTO ai.quota_configs (user_id, is_enabled)

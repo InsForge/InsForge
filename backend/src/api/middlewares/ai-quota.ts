@@ -87,6 +87,8 @@ export async function enforceAIQuota(req: AuthRequest, _res: Response, next: Nex
     }
 
     if (quota.maxSpendUsdPerMonth !== null && stats.costThisMonth >= quota.maxSpendUsdPerMonth) {
+      // Note: spend tracking requires cost estimation to be wired into recordUsage().
+      // Until then, this check only triggers if costs are manually populated.
       throw new AppError(
         `Monthly spend cap reached ($${quota.maxSpendUsdPerMonth}/month). Resets next month.`,
         429,

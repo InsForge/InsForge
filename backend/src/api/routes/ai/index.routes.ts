@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { ChatCompletionService } from '@/services/ai/chat-completion.service.js';
 import { AuthRequest, verifyAdmin, verifyUser } from '../../middlewares/auth.js';
 import { enforceAIQuota } from '../../middlewares/ai-quota.js';
-import { AIUsageService, type AIUsageLogEntry } from '@/services/ai/ai-usage.service.js';
+import { AIUsageService } from '@/services/ai/ai-usage.service.js';
 import { AIQuotaService } from '@/services/ai/ai-quota.service.js';
 import { ImageGenerationService } from '@/services/ai/image-generation.service.js';
 import { EmbeddingService } from '@/services/ai/embedding.service.js';
@@ -21,6 +21,11 @@ import {
 const router = Router();
 const chatService = ChatCompletionService.getInstance();
 type AIProvider = 'openrouter';
+
+// TODO: Wire cost estimation into recordUsage() calls below.
+// Currently estimatedCostUsd is logged as 0. The spend-cap quota check
+// (maxSpendUsdPerMonth) will only trigger once real costs are computed
+// from model pricing data and token counts.
 
 /**
  * GET /api/ai/models
@@ -480,23 +485,19 @@ router.get(
  * GET /api/ai/quotas
  * List all quota configurations (admin only)
  */
-router.get(
-  '/quotas',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const { limit, offset } = req.query;
-      const quotaService = AIQuotaService.getInstance();
-      const result = await quotaService.listQuotas({
-        limit: limit ? parseInt(limit as string) : undefined,
-        offset: offset ? parseInt(offset as string) : undefined,
-      });
-      successResponse(res, result);
-    } catch (error) {
-      next(error);
-    }
+router.get('/quotas', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { limit, offset } = req.query;
+    const quotaService = AIQuotaService.getInstance();
+    const result = await quotaService.listQuotas({
+      limit: limit ? parseInt(limit as string) : undefined,
+      offset: offset ? parseInt(offset as string) : undefined,
+    });
+    successResponse(res, result);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 /**
  * GET /api/ai/quotas/default

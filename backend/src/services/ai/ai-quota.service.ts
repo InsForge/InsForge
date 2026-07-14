@@ -157,7 +157,7 @@ export class AIQuotaService {
       maxRequestsPerDay: row.max_requests_per_day as number | null,
       maxTokensPerDay: row.max_tokens_per_day as number | null,
       maxTokensPerMonth: row.max_tokens_per_month as number | null,
-      maxSpendUsdPerMonth: row.max_spend_usd_per_month as number | null,
+      maxSpendUsdPerMonth: row.max_spend_usd_per_month != null ? parseFloat(String(row.max_spend_usd_per_month)) : null,
       allowedModels: row.allowed_models as string[] | null,
       isEnabled: row.is_enabled as boolean,
       createdAt: (row.created_at as Date).toISOString(),
