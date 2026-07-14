@@ -40,7 +40,7 @@ Minimum interval is 1 minute (pg_cron). Failed runs are logged but not retried, 
 
 The backend closes idle HTTP connections after 65 seconds by default (configurable with `KEEP_ALIVE_TIMEOUT_MS`). A job that fires less often than that — every 5 minutes, for example — always finds a reused keep-alive socket already closed on the server side. This can stall the first request in a warm function for ~30 seconds.
 
-When a scheduled function calls other APIs, either set a short client timeout (well under 30 seconds) and retry once on a fresh connection, or disable connection reuse by sending `Connection: close` so every tick opens a fresh socket.
+When a scheduled function calls other APIs, you have two options. Set a short client timeout (well under 30 seconds) and retry once on a fresh connection. Or disable connection reuse by sending `Connection: close` so every tick opens a fresh socket.
 
 ## More resources
 
