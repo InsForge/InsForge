@@ -444,7 +444,7 @@ paths:
                     body:
                       metadata:
                         level: "info"
-                total: 4210
+                total: 1
         '401':
           description: Unauthorized
         '403':
