@@ -36,7 +36,7 @@ The `secrets` commands manage the same store your edge functions read from. Ever
 |-----|------------|
 | `ANON_KEY` | Public client key, passed as `anonKey` when you create an SDK client |
 | `API_KEY` | Admin API key (`ik_...`) for privileged server-side and CLI access |
-| `JWT_SECRET` | The secret InsForge uses to sign and verify JWTs |
+| `JWT_SECRET` | Secret for HS256-signed JWTs that InsForge accepts, seeded from the deployment's `JWT_SECRET` env var |
 | `INSFORGE_BASE_URL` | The project's API base URL |
 
 ```bash
