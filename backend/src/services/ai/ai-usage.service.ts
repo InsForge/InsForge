@@ -95,12 +95,16 @@ export class AIUsageService {
     let completionRate: number;
 
     if (
-      modelLower.includes('gpt-4') || modelLower.includes('claude-3-opus') || modelLower.includes('claude-3.5-sonnet')
+      modelLower.includes('gpt-4') ||
+      modelLower.includes('claude-3-opus') ||
+      modelLower.includes('claude-3.5-sonnet')
     ) {
       promptRate = 0.01;
       completionRate = 0.03;
     } else if (
-      modelLower.includes('gpt-3.5') || modelLower.includes('claude-3-haiku') || modelLower.includes('claude-instant')
+      modelLower.includes('gpt-3.5') ||
+      modelLower.includes('claude-3-haiku') ||
+      modelLower.includes('claude-instant')
     ) {
       promptRate = 0.001;
       completionRate = 0.002;
@@ -395,8 +399,14 @@ export class AIUsageService {
     }
 
     if (setClauses.length === 0) {
-      const existing = await this.getQuotaConfig(userId ?? undefined);
-      if (existing.length > 0) { return existing[0]; }
+      const pool = this.getPool();
+      const existing = await pool.query(
+        'SELECT * FROM ai.quota_config WHERE user_id IS NOT DISTINCT FROM $1',
+        [userId]
+      );
+      if (existing.rows.length > 0) {
+        return existing.rows[0] as QuotaConfigRow;
+      }
       throw new AppError(
         'No quota config found and no fields to update',
         404,

@@ -271,10 +271,14 @@ describe('AIUsageService', () => {
 
       await service.logUsage(TEST_USER_ID, 'openai/gpt-4', 100, 50, 'chat', 0.001);
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO ai.usage_log'),
-        [TEST_USER_ID, 'openai/gpt-4', 100, 50, 0.001, 'chat']
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO ai.usage_log'), [
+        TEST_USER_ID,
+        'openai/gpt-4',
+        100,
+        50,
+        0.001,
+        'chat',
+      ]);
     });
 
     it('does not throw when insert fails', async () => {
