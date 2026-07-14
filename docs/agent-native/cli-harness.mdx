@@ -19,7 +19,7 @@ A dashboard is built for a human pointer; a CLI is built for anything that can w
 | Area | Commands |
 |------|----------|
 | Auth & context | `login`, `logout`, `whoami`, `current`, `list` |
-| Project | `create`, `link` |
+| Project | `create`, `link`, `projects update-version`, `projects delete` |
 | Schema | `db migrations new`, `db migrations up`, `db migrations list` |
 | Config as code | `config plan`, `config apply`, `config export` |
 | Branching | `branch create`, `branch merge`, `branch reset`, `branch delete` |
@@ -27,6 +27,19 @@ A dashboard is built for a human pointer; a CLI is built for anything that can w
 | Diagnose | `diagnose`, `diagnose advisor`, `diagnose db`, `diagnose logs`, `metadata` |
 
 Run `npx @insforge/cli help <command>` for the flags on any of these.
+
+## Upgrading and deleting a project
+
+```bash
+npx @insforge/cli projects update-version
+npx @insforge/cli projects delete --project <id>
+```
+
+`projects update-version` moves the project to the latest InsForge backend version. It targets the linked project by default (pass `--project <id>` to pick another) and restarts the instance, so expect a brief downtime; add `--wait` to block until the update finishes.
+
+`projects delete` permanently deletes the project: its database, storage, and every other resource, including its backend branches. Here `--project` is required and never falls back to the linked project, so a stray ambient value can't point the deletion at the wrong one. Both commands confirm before acting, but only in interactive mode: `--yes` and `--json` each skip the prompt, so `projects delete --project <id> --json` deletes immediately. Deletion is irreversible. Never pass `--yes` here, and have a human verify the exact project id before the command runs.
+
+To do either from the dashboard instead, both live under **Settings → General**.
 
 ## A typical agent run
 
