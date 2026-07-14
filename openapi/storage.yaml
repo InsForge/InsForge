@@ -22,8 +22,16 @@ paths:
                 $ref: '#/components/schemas/StorageConfig'
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
     put:
       summary: Update storage configuration
@@ -55,10 +63,22 @@ paths:
                 $ref: '#/components/schemas/StorageConfig'
         '400':
           description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/storage/buckets:
     get:
@@ -1329,6 +1349,11 @@ components:
 
     StorageConfig:
       type: object
+      required:
+        - id
+        - maxFileSizeMb
+        - createdAt
+        - updatedAt
       properties:
         id:
           type: string

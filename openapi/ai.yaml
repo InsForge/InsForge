@@ -54,13 +54,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: provider
-          in: path
-          required: true
-          schema:
-            type: string
-            enum: [openrouter]
-          description: AI provider identifier
+        - $ref: '#/components/parameters/AIProvider'
       responses:
         '200':
           description: Active provider API key details
@@ -84,13 +78,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: provider
-          in: path
-          required: true
-          schema:
-            type: string
-            enum: [openrouter]
-          description: AI provider identifier
+        - $ref: '#/components/parameters/AIProvider'
       responses:
         '200':
           description: API key rotated successfully
@@ -223,6 +211,16 @@ paths:
           description: Failed to generate embeddings
 
 components:
+  parameters:
+    AIProvider:
+      name: provider
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [openrouter]
+      description: AI provider identifier
+
   securitySchemes:
     bearerAuth:
       type: http

@@ -1972,7 +1972,10 @@ paths:
 
     put:
       summary: Update SMTP configuration
-      description: Create or update SMTP email configuration (admin only)
+      description: |
+        Create or update SMTP email configuration (admin only).
+        When `enabled` is true, the fields `host`, `username`, `senderEmail`, and `senderName` are required by the backend validation.
+        When `enabled` is false, these fields may be empty.
       tags:
         - Admin
       security:
@@ -1990,21 +1993,26 @@ paths:
               properties:
                 enabled:
                   type: boolean
+                  description: When true, host/username/senderEmail/senderName become required
                 host:
                   type: string
+                  description: Required when enabled is true
                 port:
                   type: integer
                   enum: [25, 465, 587, 2525]
                 username:
                   type: string
+                  description: Required when enabled is true
                 password:
                   type: string
                   description: SMTP password (optional on update if unchanged)
                 senderEmail:
                   type: string
                   format: email
+                  description: Required when enabled is true
                 senderName:
                   type: string
+                  description: Required when enabled is true
                 minIntervalSeconds:
                   type: integer
                   minimum: 0
