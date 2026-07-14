@@ -607,7 +607,10 @@ router.delete(
       if (!deleted) {
         throw new AppError('No quota config found for this user', 404, ERROR_CODES.NOT_FOUND);
       }
-      successResponse(res, { success: true, message: 'User quota deleted. Global default applies.' });
+      successResponse(res, {
+        success: true,
+        message: 'User quota deleted. Global default applies.',
+      });
     } catch (error) {
       next(error);
     }

@@ -56,7 +56,9 @@ export class AIQuotaService {
       [userId]
     );
 
-    if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) {
+      return null;
+    }
     return this.mapRow(result.rows[0]);
   }
 
@@ -67,7 +69,9 @@ export class AIQuotaService {
     const result = await this.pool.query(
       `SELECT * FROM ai.quota_configs WHERE user_id IS NULL LIMIT 1`
     );
-    if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) {
+      return null;
+    }
     return this.mapRow(result.rows[0]);
   }
 
@@ -79,7 +83,9 @@ export class AIQuotaService {
       `SELECT * FROM ai.quota_configs WHERE user_id = $1 LIMIT 1`,
       [userId]
     );
-    if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) {
+      return null;
+    }
     return this.mapRow(result.rows[0]);
   }
 
@@ -143,10 +149,9 @@ export class AIQuotaService {
    * Delete a per-user quota config (reverts to global default).
    */
   async deleteUserQuota(userId: string): Promise<boolean> {
-    const result = await this.pool.query(
-      `DELETE FROM ai.quota_configs WHERE user_id = $1`,
-      [userId]
-    );
+    const result = await this.pool.query(`DELETE FROM ai.quota_configs WHERE user_id = $1`, [
+      userId,
+    ]);
     return (result.rowCount ?? 0) > 0;
   }
 
@@ -157,7 +162,10 @@ export class AIQuotaService {
       maxRequestsPerDay: row.max_requests_per_day as number | null,
       maxTokensPerDay: row.max_tokens_per_day as number | null,
       maxTokensPerMonth: row.max_tokens_per_month as number | null,
-      maxSpendUsdPerMonth: row.max_spend_usd_per_month != null ? parseFloat(String(row.max_spend_usd_per_month)) : null,
+      maxSpendUsdPerMonth:
+        row.max_spend_usd_per_month !== null
+          ? parseFloat(String(row.max_spend_usd_per_month))
+          : null,
       allowedModels: row.allowed_models as string[] | null,
       isEnabled: row.is_enabled as boolean,
       createdAt: (row.created_at as Date).toISOString(),
