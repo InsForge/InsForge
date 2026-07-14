@@ -87,17 +87,21 @@ export class AIUsageService {
 
   /**
    * Roughly estimate the cost of an AI request based on model and token counts.
-   * Returns 0 for image generation (cost varies by provider/model).
+   * Rates are per 1K tokens.
    */
   estimateCost(promptTokens: number, completionTokens: number, model: string): number {
     const modelLower = model.toLowerCase();
     let promptRate: number;
     let completionRate: number;
 
-    if (modelLower.includes('gpt-4') || modelLower.includes('claude-3-opus') || modelLower.includes('claude-3.5-sonnet')) {
+    if (
+      modelLower.includes('gpt-4') || modelLower.includes('claude-3-opus') || modelLower.includes('claude-3.5-sonnet')
+    ) {
       promptRate = 0.01;
       completionRate = 0.03;
-    } else if (modelLower.includes('gpt-3.5') || modelLower.includes('claude-3-haiku') || modelLower.includes('claude-instant')) {
+    } else if (
+      modelLower.includes('gpt-3.5') || modelLower.includes('claude-3-haiku') || modelLower.includes('claude-instant')
+    ) {
       promptRate = 0.001;
       completionRate = 0.002;
     } else if (modelLower.includes('dall-e') || modelLower.includes('stable-diffusion')) {
@@ -107,7 +111,7 @@ export class AIUsageService {
       completionRate = 0.015;
     }
 
-    return (promptTokens / 1000000) * promptRate + (completionTokens / 1000000) * completionRate;
+    return (promptTokens / 1000) * promptRate + (completionTokens / 1000) * completionRate;
   }
 
   /**
@@ -346,9 +350,7 @@ export class AIUsageService {
       );
       return result.rows as QuotaConfigRow[];
     }
-    const result = await pool.query(
-      `SELECT * FROM ai.quota_config ORDER BY user_id NULLS LAST`
-    );
+    const result = await pool.query(`SELECT * FROM ai.quota_config ORDER BY user_id NULLS LAST`);
     return result.rows as QuotaConfigRow[];
   }
 
@@ -394,12 +396,17 @@ export class AIUsageService {
 
     if (setClauses.length === 0) {
       const existing = await this.getQuotaConfig(userId ?? undefined);
-      if (existing.length > 0) return existing[0];
-      throw new AppError('No quota config found and no fields to update', 404, ERROR_CODES.NOT_FOUND);
+      if (existing.length > 0) { return existing[0]; }
+      throw new AppError(
+        'No quota config found and no fields to update',
+        404,
+        ERROR_CODES.NOT_FOUND
+      );
     }
 
     const insertColumns = setClauses.map((s) => s.split(' = ')[0]);
     const insertValues = params.map((_, i) => `$${i + 2}`);
+    const updateClauses = insertColumns.map((col) => `${col} = EXCLUDED.${col}`);
 
     let query: string;
     let queryParams: unknown[];
@@ -407,7 +414,7 @@ export class AIUsageService {
     if (userId !== null) {
       query = `INSERT INTO ai.quota_config (user_id, ${insertColumns.join(', ')})
                VALUES ($1, ${insertValues.join(', ')})
-               ON CONFLICT (user_id) DO UPDATE SET ${setClauses.join(', ')}, updated_at = NOW()
+               ON CONFLICT (user_id) DO UPDATE SET ${updateClauses.join(', ')}, updated_at = NOW()
                RETURNING *`;
       queryParams = [userId, ...params];
     } else {

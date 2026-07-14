@@ -68,8 +68,7 @@ CREATE TABLE IF NOT EXISTS ai.quota_config (
   model_allowlist            TEXT[],
   created_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT uq_quota_config_user UNIQUE (user_id),
-  CONSTRAINT ck_quota_config_user_not_null CHECK (user_id IS NOT NULL OR user_id IS NULL)
+  CONSTRAINT uq_quota_config_user UNIQUE (user_id)
 );
 
 -- Enforce at most one global-default row via a partial unique index.

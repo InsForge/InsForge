@@ -472,7 +472,9 @@ function createUserAILimiter(maxPerMinute: number) {
       return authReq.user?.id ?? authReq.ip ?? 'unknown';
     },
     handler: (_req: Request, _res: Response, next: NextFunction) => {
-      next(new AppError('Too many AI requests. Please slow down.', 429, ERROR_CODES.TOO_MANY_REQUESTS));
+      next(
+        new AppError('Too many AI requests. Please slow down.', 429, ERROR_CODES.TOO_MANY_REQUESTS)
+      );
     },
     skipSuccessfulRequests: false,
     skipFailedRequests: false,

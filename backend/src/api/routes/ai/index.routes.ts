@@ -231,16 +231,13 @@ router.post(
           res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
 
           if (req.user) {
-            const cost = aiUsageService.estimateCost(finalPromptTokens, finalCompletionTokens, options.model);
+            const cost = aiUsageService.estimateCost(
+              finalPromptTokens,
+              finalCompletionTokens,
+              options.model
+            );
             aiUsageService
-              .logUsage(
-                req.user.id,
-                options.model,
-                finalPromptTokens,
-                finalCompletionTokens,
-                'chat',
-                cost
-              )
+              .logUsage(req.user.id, options.model, finalPromptTokens, finalCompletionTokens, 'chat', cost)
               .catch((error) => {
                 logger.warn('Failed to log streaming chat usage', { error: String(error) });
               });
@@ -267,16 +264,13 @@ router.post(
         const usage = result.metadata?.usage;
         const promptTokens = usage?.promptTokens || 0;
         const completionTokens = usage?.completionTokens || 0;
-        const cost = aiUsageService.estimateCost(promptTokens, completionTokens, options.model);
+        const cost = aiUsageService.estimateCost(
+          promptTokens,
+          completionTokens,
+          options.model
+        );
         aiUsageService
-          .logUsage(
-            req.user.id,
-            options.model,
-            promptTokens,
-            completionTokens,
-            'chat',
-            cost
-          )
+          .logUsage(req.user.id, options.model, promptTokens, completionTokens, 'chat', cost)
           .catch((error) => {
             logger.warn('Failed to log chat usage', { error: String(error) });
           });
@@ -326,16 +320,13 @@ router.post(
         const usage = result.metadata?.usage;
         const promptTokens = usage?.promptTokens || 0;
         const completionTokens = usage?.completionTokens || 0;
-        const cost = aiUsageService.estimateCost(promptTokens, completionTokens, validationResult.data.model);
+        const cost = aiUsageService.estimateCost(
+          promptTokens,
+          completionTokens,
+          validationResult.data.model
+        );
         aiUsageService
-          .logUsage(
-            req.user.id,
-            validationResult.data.model,
-            promptTokens,
-            completionTokens,
-            'image',
-            cost
-          )
+          .logUsage(req.user.id, validationResult.data.model, promptTokens, completionTokens, 'image', cost)
           .catch((error) => {
             logger.warn('Failed to log image generation usage', { error: String(error) });
           });
@@ -385,16 +376,13 @@ router.post(
       if (req.user) {
         const usage = result.metadata?.usage;
         const promptTokens = usage?.promptTokens || 0;
-        const cost = aiUsageService.estimateCost(promptTokens, 0, validationResult.data.model);
+        const cost = aiUsageService.estimateCost(
+          promptTokens,
+          0,
+          validationResult.data.model
+        );
         aiUsageService
-          .logUsage(
-            req.user.id,
-            validationResult.data.model,
-            promptTokens,
-            0,
-            'embedding',
-            cost
-          )
+          .logUsage(req.user.id, validationResult.data.model, promptTokens, 0, 'embedding', cost)
           .catch((error) => {
             logger.warn('Failed to log embedding usage', { error: String(error) });
           });
