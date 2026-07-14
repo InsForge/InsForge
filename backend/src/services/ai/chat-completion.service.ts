@@ -424,14 +424,17 @@ export class ChatCompletionService {
         }
 
         // Check if this chunk contains usage data
+        // OpenAI / OpenRouter typically includes usage only on the final chunk.
         if (chunk.usage) {
-          // Accumulate tokens instead of replacing
-          tokenUsage.promptTokens += chunk.usage.prompt_tokens || 0;
-          tokenUsage.completionTokens += chunk.usage.completion_tokens || 0;
-          tokenUsage.totalTokens += chunk.usage.total_tokens || 0;
+          tokenUsage.promptTokens = chunk.usage.prompt_tokens || 0;
+          tokenUsage.completionTokens = chunk.usage.completion_tokens || 0;
+          tokenUsage.totalTokens = chunk.usage.total_tokens || 0;
 
-          // Yield the accumulated usage
-          yield { tokenUsage: { ...tokenUsage } };
+          // Only yield tokenUsage when actual non-zero values are present
+          // to avoid emitting zero-value intermediate events that confuse clients
+          if (tokenUsage.promptTokens > 0 || tokenUsage.completionTokens > 0 || tokenUsage.totalTokens > 0) {
+            yield { tokenUsage: { ...tokenUsage } };
+          }
         }
       }
 
