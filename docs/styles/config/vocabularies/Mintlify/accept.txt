@@ -34,6 +34,8 @@ config
 Containarium
 Containarium's
 cooldown
+Coolify
+Coolify's
 Coroutines
 created_at
 cron
@@ -127,6 +129,7 @@ sudo
 Supabase
 systemd
 tmpfs
+Traefik
 transactionally
 Twilio
 typecheck
