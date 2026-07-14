@@ -1,4 +1,4 @@
-1. Add InsForge dependencies to your project
+1. 將 InsForge 相依性新增到您的專案
 
 <Tabs>
   <Tab title="Maven Central">
@@ -15,15 +15,15 @@
     ```
   </Tab>
   <Tab title="GitHub Packages">
-    First, create a GitHub Personal Access Token:
-    - Go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
-    - Select permission: `read:packages`
+    首先，建立一個 GitHub 個人存取令牌：
+    - 前往 GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+    - 選擇權限：`read:packages`
 
-    Then configure your project using one of the following methods:
+    然後使用以下方法之一設定您的專案：
 
     <AccordionGroup>
-      <Accordion title="Option A: Environment Variables">
-        settings.gradle.kts (or build.gradle.kts):
+      <Accordion title="選項 A：環境變數">
+        settings.gradle.kts（或 build.gradle.kts）：
         ```kotlin
         repositories {
             mavenCentral()
@@ -44,14 +44,14 @@
         }
         ```
 
-        Set environment variables before building:
+        在建置之前設定環境變數：
         ```bash
         export GITHUB_USER="your-github-username"
         export GITHUB_TOKEN="your-personal-access-token"
         ```
       </Accordion>
-      <Accordion title="Option B: gradle.properties (Local Development)">
-        Add credentials to your global Gradle properties file:
+      <Accordion title="選項 B：gradle.properties（本機開發）">
+        將認證新增到您的全域 Gradle 屬性檔案：
 
         ~/.gradle/gradle.properties:
         ```properties
@@ -81,14 +81,14 @@
         ```
 
         <Note>
-          The `~/.gradle/gradle.properties` file is stored outside your project, so credentials won't be accidentally committed to version control.
+          `~/.gradle/gradle.properties` 檔案儲存在您的專案之外，因此認證不會意外提交到版本控制。
         </Note>
       </Accordion>
     </AccordionGroup>
   </Tab>
 </Tabs>
 
-2. Initialize InsForge SDK
+2. 初始化 InsForge SDK
 
 ```kotlin
 import dev.insforge.createInsforgeClient
@@ -115,9 +115,9 @@ val client = createInsforgeClient(
 }
 ```
 
-3. Enable Logging (Optional)
+3. 啟用記錄（選用）
 
-For debugging, you can configure the SDK log level:
+對於偵錯，您可以設定 SDK 記錄層級：
 
 ```kotlin
 import dev.insforge.InsforgeLogLevel
@@ -136,22 +136,22 @@ val client = createInsforgeClient(
 }
 ```
 
-| Log Level | Description |
+| 記錄層級 | 描述 |
 |-----------|-------------|
-| `NONE` | No logging (default, recommended for production) |
-| `ERROR` | Only errors |
-| `WARN` | Warnings and errors |
-| `INFO` | Informational messages |
-| `DEBUG` | Debug info (request method, URL, response status) |
-| `VERBOSE` | Full details (headers, request/response bodies) |
+| `NONE` | 無記錄（預設，推薦用於生產） |
+| `ERROR` | 僅錯誤 |
+| `WARN` | 警告和錯誤 |
+| `INFO` | 資訊性訊息 |
+| `DEBUG` | 偵錯資訊（要求方法、URL、回應狀態） |
+| `VERBOSE` | 完整詳情（標頭、要求/回應本文） |
 
 <Note>
-  Use `NONE` or `ERROR` in production to avoid exposing sensitive data in logs.
+  在生產環境中使用 `NONE` 或 `ERROR` 以避免在記錄中公開敏感資料。
 </Note>
 
-### Android Initialization
+### Android 初始化
 
-1. Add Chrome Custom Tabs dependency to your `build.gradle.kts`:
+1. 將 Chrome Custom Tabs 相依性新增到您的 `build.gradle.kts`：
 
 ```kotlin
 dependencies {
@@ -159,7 +159,7 @@ dependencies {
 }
 ```
 
-2. Initialize InsForge SDK (With Chrome Custom Tabs and Session Storage)
+2. 初始化 InsForge SDK（使用 Chrome Custom Tabs 和工作階段儲存）
 
 ```kotlin
 import android.app.Activity
@@ -240,7 +240,7 @@ class InsforgeManager(private val context: Context) {
 }
 ```
 
-3. Use Jetpack DataStore for Session Storage (Optional)
+3. 使用 Jetpack DataStore 進行工作階段儲存（選用）
 
 ```kotlin
 import androidx.datastore.core.DataStore

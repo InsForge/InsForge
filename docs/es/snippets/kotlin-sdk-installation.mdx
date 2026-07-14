@@ -1,4 +1,4 @@
-1. Add InsForge dependencies to your project
+1. Agrega las dependencias de InsForge a tu proyecto
 
 <Tabs>
   <Tab title="Maven Central">
@@ -15,15 +15,15 @@
     ```
   </Tab>
   <Tab title="GitHub Packages">
-    First, create a GitHub Personal Access Token:
-    - Go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
-    - Select permission: `read:packages`
+    Primero, crea un token de acceso personal de GitHub:
+    - Ve a GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+    - Selecciona el permiso: `read:packages`
 
-    Then configure your project using one of the following methods:
+    Luego configura tu proyecto usando uno de los siguientes métodos:
 
     <AccordionGroup>
-      <Accordion title="Option A: Environment Variables">
-        settings.gradle.kts (or build.gradle.kts):
+      <Accordion title="Opción A: Variables de Entorno">
+        settings.gradle.kts (o build.gradle.kts):
         ```kotlin
         repositories {
             mavenCentral()
@@ -44,14 +44,14 @@
         }
         ```
 
-        Set environment variables before building:
+        Establece las variables de entorno antes de compilar:
         ```bash
         export GITHUB_USER="your-github-username"
         export GITHUB_TOKEN="your-personal-access-token"
         ```
       </Accordion>
-      <Accordion title="Option B: gradle.properties (Local Development)">
-        Add credentials to your global Gradle properties file:
+      <Accordion title="Opción B: gradle.properties (Desarrollo Local)">
+        Agrega las credenciales a tu archivo global de propiedades de Gradle:
 
         ~/.gradle/gradle.properties:
         ```properties
@@ -81,14 +81,14 @@
         ```
 
         <Note>
-          The `~/.gradle/gradle.properties` file is stored outside your project, so credentials won't be accidentally committed to version control.
+          El archivo `~/.gradle/gradle.properties` se almacena fuera de tu proyecto, por lo que las credenciales no se confirmarán accidentalmente en el control de versiones.
         </Note>
       </Accordion>
     </AccordionGroup>
   </Tab>
 </Tabs>
 
-2. Initialize InsForge SDK
+2. Inicializa el SDK de InsForge
 
 ```kotlin
 import dev.insforge.createInsforgeClient
@@ -115,9 +115,9 @@ val client = createInsforgeClient(
 }
 ```
 
-3. Enable Logging (Optional)
+3. Habilitar Registro (Opcional)
 
-For debugging, you can configure the SDK log level:
+Para depuración, puedes configurar el nivel de registro del SDK:
 
 ```kotlin
 import dev.insforge.InsforgeLogLevel
@@ -136,22 +136,22 @@ val client = createInsforgeClient(
 }
 ```
 
-| Log Level | Description |
+| Nivel de Registro | Descripción |
 |-----------|-------------|
-| `NONE` | No logging (default, recommended for production) |
-| `ERROR` | Only errors |
-| `WARN` | Warnings and errors |
-| `INFO` | Informational messages |
-| `DEBUG` | Debug info (request method, URL, response status) |
-| `VERBOSE` | Full details (headers, request/response bodies) |
+| `NONE` | Sin registro (predeterminado, recomendado para producción) |
+| `ERROR` | Solo errores |
+| `WARN` | Advertencias y errores |
+| `INFO` | Mensajes informativos |
+| `DEBUG` | Información de depuración (método de solicitud, URL, estado de respuesta) |
+| `VERBOSE` | Detalles completos (encabezados, cuerpos de solicitud/respuesta) |
 
 <Note>
-  Use `NONE` or `ERROR` in production to avoid exposing sensitive data in logs.
+  Usa `NONE` o `ERROR` en producción para evitar exponer datos sensibles en los registros.
 </Note>
 
-### Android Initialization
+### Inicialización de Android
 
-1. Add Chrome Custom Tabs dependency to your `build.gradle.kts`:
+1. Agrega la dependencia de Chrome Custom Tabs a tu `build.gradle.kts`:
 
 ```kotlin
 dependencies {
@@ -159,7 +159,7 @@ dependencies {
 }
 ```
 
-2. Initialize InsForge SDK (With Chrome Custom Tabs and Session Storage)
+2. Inicializa el SDK de InsForge (Con Chrome Custom Tabs y Almacenamiento de Sesión)
 
 ```kotlin
 import android.app.Activity
@@ -240,7 +240,7 @@ class InsforgeManager(private val context: Context) {
 }
 ```
 
-3. Use Jetpack DataStore for Session Storage (Optional)
+3. Usa Jetpack DataStore para Almacenamiento de Sesión (Opcional)
 
 ```kotlin
 import androidx.datastore.core.DataStore
