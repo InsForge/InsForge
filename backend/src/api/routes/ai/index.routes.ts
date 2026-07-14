@@ -1,6 +1,9 @@
 import { Router, Response, NextFunction } from 'express';
 import { ChatCompletionService } from '@/services/ai/chat-completion.service.js';
 import { AuthRequest, verifyAdmin, verifyUser } from '../../middlewares/auth.js';
+import { enforceAIQuota } from '../../middlewares/ai-quota.js';
+import { AIUsageService, type AIUsageLogEntry } from '@/services/ai/ai-usage.service.js';
+import { AIQuotaService } from '@/services/ai/ai-quota.service.js';
 import { ImageGenerationService } from '@/services/ai/image-generation.service.js';
 import { EmbeddingService } from '@/services/ai/embedding.service.js';
 import { AIModelService } from '@/services/ai/ai-model.service.js';
@@ -147,7 +150,11 @@ function rotateProviderApiKey(provider: AIProvider, openRouterProvider: OpenRout
 router.post(
   '/chat/completion',
   verifyUser,
+  enforceAIQuota,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const userId = req.user?.id || 'anonymous';
+    const userRole = req.user?.role || 'anon';
+
     try {
       const validationResult = chatCompletionRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
@@ -168,6 +175,10 @@ router.post(
         res.setHeader('Connection', 'keep-alive');
 
         // Create and process the stream
+        let totalPromptTokens = 0;
+        let totalCompletionTokens = 0;
+        let totalTokensAccum = 0;
+
         try {
           const streamGenerator = chatService.streamChat(messages, options);
 
@@ -176,7 +187,17 @@ router.post(
               res.write(`data: ${JSON.stringify({ chunk: data.chunk })}\n\n`);
             }
             if (data.tokenUsage) {
-              res.write(`data: ${JSON.stringify({ tokenUsage: data.tokenUsage })}\n\n`);
+              // Only emit tokenUsage when actual data arrives (fix: skip all-zero events)
+              if (
+                data.tokenUsage.promptTokens ||
+                data.tokenUsage.completionTokens ||
+                data.tokenUsage.totalTokens
+              ) {
+                totalPromptTokens = data.tokenUsage.promptTokens || 0;
+                totalCompletionTokens = data.tokenUsage.completionTokens || 0;
+                totalTokensAccum = data.tokenUsage.totalTokens || 0;
+                res.write(`data: ${JSON.stringify({ tokenUsage: data.tokenUsage })}\n\n`);
+              }
             }
             if (data.tool_calls) {
               res.write(`data: ${JSON.stringify({ tool_calls: data.tool_calls })}\n\n`);
@@ -188,6 +209,19 @@ router.post(
 
           // Send completion signal
           res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+
+          // Log usage after stream completes
+          void AIUsageService.getInstance().recordUsage({
+            userId,
+            userRole,
+            model: options.model,
+            endpoint: 'chat/completion',
+            promptTokens: totalPromptTokens,
+            completionTokens: totalCompletionTokens,
+            totalTokens: totalTokensAccum,
+            estimatedCostUsd: 0,
+            status: 'success',
+          });
         } catch (streamError) {
           // If error occurs during streaming, send it in SSE format
           logger.error('Stream error during chat completion', {
@@ -197,6 +231,18 @@ router.post(
           res.write(
             `data: ${JSON.stringify({ error: true, message: streamError instanceof Error ? streamError.message : String(streamError) })}\n\n`
           );
+
+          void AIUsageService.getInstance().recordUsage({
+            userId,
+            userRole,
+            model: options.model,
+            endpoint: 'chat/completion',
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0,
+            estimatedCostUsd: 0,
+            status: 'error',
+          });
         }
 
         res.end();
@@ -205,8 +251,34 @@ router.post(
 
       // Non-streaming requests
       const result = await chatService.chat(messages, options);
+
+      // Log usage
+      void AIUsageService.getInstance().recordUsage({
+        userId,
+        userRole,
+        model: options.model,
+        endpoint: 'chat/completion',
+        promptTokens: result.metadata?.usage?.promptTokens || 0,
+        completionTokens: result.metadata?.usage?.completionTokens || 0,
+        totalTokens: result.metadata?.usage?.totalTokens || 0,
+        estimatedCostUsd: 0,
+        status: 'success',
+      });
+
       successResponse(res, result);
     } catch (error) {
+      void AIUsageService.getInstance().recordUsage({
+        userId,
+        userRole,
+        model: req.body?.model || 'unknown',
+        endpoint: 'chat/completion',
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        estimatedCostUsd: 0,
+        status: 'error',
+      });
+
       if (error instanceof AppError) {
         next(error);
       } else {
@@ -229,7 +301,11 @@ router.post(
 router.post(
   '/image/generation',
   verifyUser,
+  enforceAIQuota,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const userId = req.user?.id || 'anonymous';
+    const userRole = req.user?.role || 'anon';
+
     try {
       const validationResult = imageGenerationRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
@@ -242,8 +318,33 @@ router.post(
 
       const result = await ImageGenerationService.generate(validationResult.data);
 
+      // Log usage
+      void AIUsageService.getInstance().recordUsage({
+        userId,
+        userRole,
+        model: validationResult.data.model,
+        endpoint: 'image/generation',
+        promptTokens: result.metadata?.usage?.promptTokens || 0,
+        completionTokens: result.metadata?.usage?.completionTokens || 0,
+        totalTokens: result.metadata?.usage?.totalTokens || 0,
+        estimatedCostUsd: 0,
+        status: 'success',
+      });
+
       successResponse(res, result);
     } catch (error) {
+      void AIUsageService.getInstance().recordUsage({
+        userId,
+        userRole,
+        model: req.body?.model || 'unknown',
+        endpoint: 'image/generation',
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        estimatedCostUsd: 0,
+        status: 'error',
+      });
+
       if (error instanceof AppError) {
         next(error);
       } else {
@@ -266,7 +367,11 @@ router.post(
 router.post(
   '/embeddings',
   verifyUser,
+  enforceAIQuota,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const userId = req.user?.id || 'anonymous';
+    const userRole = req.user?.role || 'anon';
+
     try {
       const validationResult = embeddingsRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
@@ -280,8 +385,33 @@ router.post(
       const embeddingService = EmbeddingService.getInstance();
       const result = await embeddingService.createEmbeddings(validationResult.data);
 
+      // Log usage
+      void AIUsageService.getInstance().recordUsage({
+        userId,
+        userRole,
+        model: validationResult.data.model,
+        endpoint: 'embeddings',
+        promptTokens: result.metadata?.usage?.promptTokens || 0,
+        completionTokens: 0,
+        totalTokens: result.metadata?.usage?.totalTokens || 0,
+        estimatedCostUsd: 0,
+        status: 'success',
+      });
+
       successResponse(res, result);
     } catch (error) {
+      void AIUsageService.getInstance().recordUsage({
+        userId,
+        userRole,
+        model: req.body?.model || 'unknown',
+        endpoint: 'embeddings',
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        estimatedCostUsd: 0,
+        status: 'error',
+      });
+
       if (error instanceof AppError) {
         next(error);
       } else {
@@ -293,6 +423,192 @@ router.post(
           )
         );
       }
+    }
+  }
+);
+
+// ============================================================================
+// Admin endpoints — AI Usage & Quota Management
+// ============================================================================
+
+/**
+ * GET /api/ai/usage/report
+ * Get aggregated AI usage report (admin only)
+ */
+router.get(
+  '/usage/report',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { start_date, end_date, limit, offset } = req.query;
+
+      const usageService = AIUsageService.getInstance();
+      const report = await usageService.getUsageReport({
+        startDate: start_date as string | undefined,
+        endDate: end_date as string | undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined,
+      });
+
+      successResponse(res, report);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/ai/usage/:userId
+ * Get usage stats for a specific user (admin only)
+ */
+router.get(
+  '/usage/:userId',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req.params;
+      const usageService = AIUsageService.getInstance();
+      const stats = await usageService.getUserStats(userId);
+      successResponse(res, stats);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/ai/quotas
+ * List all quota configurations (admin only)
+ */
+router.get(
+  '/quotas',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { limit, offset } = req.query;
+      const quotaService = AIQuotaService.getInstance();
+      const result = await quotaService.listQuotas({
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined,
+      });
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/ai/quotas/default
+ * Get global default quota config (admin only)
+ */
+router.get(
+  '/quotas/default',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const quotaService = AIQuotaService.getInstance();
+      const config = await quotaService.getGlobalDefault();
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * PUT /api/ai/quotas/default
+ * Update global default quota config (admin only)
+ */
+router.put(
+  '/quotas/default',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const quotaService = AIQuotaService.getInstance();
+      const config = await quotaService.upsertQuota({
+        userId: null,
+        maxRequestsPerDay: req.body.maxRequestsPerDay,
+        maxTokensPerDay: req.body.maxTokensPerDay,
+        maxTokensPerMonth: req.body.maxTokensPerMonth,
+        maxSpendUsdPerMonth: req.body.maxSpendUsdPerMonth,
+        allowedModels: req.body.allowedModels,
+        isEnabled: req.body.isEnabled,
+      });
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/ai/quotas/:userId
+ * Get quota config for a specific user (admin only)
+ */
+router.get(
+  '/quotas/:userId',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req.params;
+      const quotaService = AIQuotaService.getInstance();
+      const config = await quotaService.getUserQuota(userId);
+      if (!config) {
+        throw new AppError('No quota config found for this user', 404, ERROR_CODES.NOT_FOUND);
+      }
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * PUT /api/ai/quotas/:userId
+ * Create or update quota config for a specific user (admin only)
+ */
+router.put(
+  '/quotas/:userId',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req.params;
+      const quotaService = AIQuotaService.getInstance();
+      const config = await quotaService.upsertQuota({
+        userId,
+        maxRequestsPerDay: req.body.maxRequestsPerDay,
+        maxTokensPerDay: req.body.maxTokensPerDay,
+        maxTokensPerMonth: req.body.maxTokensPerMonth,
+        maxSpendUsdPerMonth: req.body.maxSpendUsdPerMonth,
+        allowedModels: req.body.allowedModels,
+        isEnabled: req.body.isEnabled,
+      });
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * DELETE /api/ai/quotas/:userId
+ * Delete per-user quota config (reverts to global default) (admin only)
+ */
+router.delete(
+  '/quotas/:userId',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req.params;
+      const quotaService = AIQuotaService.getInstance();
+      const deleted = await quotaService.deleteUserQuota(userId);
+      if (!deleted) {
+        throw new AppError('No quota config found for this user', 404, ERROR_CODES.NOT_FOUND);
+      }
+      successResponse(res, { success: true, message: 'User quota deleted. Global default applies.' });
+    } catch (error) {
+      next(error);
     }
   }
 );
