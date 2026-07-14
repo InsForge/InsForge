@@ -35,7 +35,7 @@ npx @insforge/cli projects update-version
 npx @insforge/cli projects delete --project <id>
 ```
 
-`projects update-version` moves the project to the latest InsForge backend version. It targets the linked project by default (pass `--project <id>` to pick another) and restarts the instance, so expect a brief downtime; add `--wait` to block until the update finishes.
+`projects update-version` moves the project to the latest InsForge backend version. It targets the linked project by default; pass `--project <id>` to pick another. The command restarts the instance, so expect a brief downtime. Add `--wait` to block until the update finishes.
 
 `projects delete` permanently deletes the project: its database, storage, and every other resource, including its backend branches. Here `--project` is required and never falls back to the linked project, so a stray ambient value can't point the deletion at the wrong one. Both commands confirm before acting, but only in interactive mode: `--yes` and `--json` each skip the prompt, so `projects delete --project <id> --json` deletes immediately. Deletion is irreversible. Never pass `--yes` here, and have a human verify the exact project id before the command runs.
 
