@@ -41,19 +41,31 @@ This directory contains deployment guides for self-hosting InsForge on various p
   - Multi-tenant: many isolated InsForge projects per host
   - Optional agent-driven deploy via MCP
 
+### Self-Hosted PaaS
+
+- **[Coolify](./deploy-to-coolify.md)** - Deploy InsForge on a Coolify server
+  - One compose file, no manual configuration
+  - Secrets and admin password auto-generated via magic variables
+  - Domain, routing, and TLS handled by Coolify
+
+- **[Dokploy](./deploy-to-dokploy.md)** - Deploy InsForge on a Dokploy server
+  - Ready-made compose file with prebuilt images
+  - Domain, routing, and TLS handled by Dokploy
+  - Environment variables managed in the Dokploy UI
+
 ### Coming Soon
 
 - **Digital Ocean** - Droplet deployment guide
 - **Hetzner** - VPS deployment guide
 - **Kubernetes** - Production-grade Kubernetes deployment
-- **Railway** - One-click Railway deployment
 - **Fly.io** - Global edge deployment
 
 ## 🎯 Choosing a Platform
 
 ### For Beginners
+- **Coolify** - Paste one compose file, everything else is generated
 - **AWS EC2** - Well-documented, widely used
-- **Railway** (Coming Soon) - One-click deployment
+- **[Railway](https://railway.com/deploy/insforge)** - One-click template deployment
 
 ### For Production
 - **AWS EC2** - Reliable, scalable, extensive features

@@ -157,6 +157,8 @@
               "deployment/deploy-to-aws-ec2",
               "deployment/deploy-to-azure-virtual-machines",
               "deployment/deploy-to-containarium",
+              "deployment/deploy-to-coolify",
+              "deployment/deploy-to-dokploy",
               "deployment/deploy-to-google-cloud-compute-engine"
             ]
           },
