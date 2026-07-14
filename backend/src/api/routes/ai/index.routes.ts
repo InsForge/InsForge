@@ -4,6 +4,7 @@ import { AuthRequest, verifyAdmin, verifyUser } from '../../middlewares/auth.js'
 import { ImageGenerationService } from '@/services/ai/image-generation.service.js';
 import { EmbeddingService } from '@/services/ai/embedding.service.js';
 import { AIModelService } from '@/services/ai/ai-model.service.js';
+import { AIUsageService } from '@/services/ai/ai-usage.service.js';
 import { AppError } from '@/utils/errors.js';
 import { errorResponse, successResponse } from '@/utils/response.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
@@ -13,10 +14,18 @@ import {
   chatCompletionRequestSchema,
   embeddingsRequestSchema,
   imageGenerationRequestSchema,
+  usageReportQuerySchema,
+  updateQuotaConfigRequestSchema,
 } from '@insforge/shared-schemas';
+import {
+  aiChatRateLimiter,
+  aiImageRateLimiter,
+  aiEmbeddingRateLimiter,
+} from '../../middlewares/rate-limiters.js';
 
 const router = Router();
 const chatService = ChatCompletionService.getInstance();
+const aiUsageService = AIUsageService.getInstance();
 type AIProvider = 'openrouter';
 
 /**
@@ -141,12 +150,36 @@ function rotateProviderApiKey(provider: AIProvider, openRouterProvider: OpenRout
 }
 
 /**
+ * Middleware that checks AI quota for the authenticated user.
+ * Must run after verifyUser so req.user is populated.
+ */
+async function checkAIQuota(req: AuthRequest, _res: Response, next: NextFunction) {
+  try {
+    if (!req.user) {
+      return next(
+        new AppError('Authentication required', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS)
+      );
+    }
+
+    const model = req.body?.model || req.params?.model;
+    if (model) {
+      await aiUsageService.checkQuota(req.user.id, model);
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
  * POST /api/ai/chat/completion
  * Send a chat message to any supported model
  */
 router.post(
   '/chat/completion',
   verifyUser,
+  aiChatRateLimiter,
+  checkAIQuota,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = chatCompletionRequestSchema.safeParse(req.body);
@@ -162,14 +195,14 @@ router.post(
 
       // Handle streaming requests
       if (stream) {
-        // Now we know the model is valid, set headers for SSE
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
 
-        // Create and process the stream
         try {
           const streamGenerator = chatService.streamChat(messages, options);
+          let finalPromptTokens = 0;
+          let finalCompletionTokens = 0;
 
           for await (const data of streamGenerator) {
             if (data.chunk) {
@@ -177,6 +210,12 @@ router.post(
             }
             if (data.tokenUsage) {
               res.write(`data: ${JSON.stringify({ tokenUsage: data.tokenUsage })}\n\n`);
+              if (data.tokenUsage.promptTokens) {
+                finalPromptTokens = data.tokenUsage.promptTokens;
+              }
+              if (data.tokenUsage.completionTokens) {
+                finalCompletionTokens = data.tokenUsage.completionTokens;
+              }
             }
             if (data.tool_calls) {
               res.write(`data: ${JSON.stringify({ tool_calls: data.tool_calls })}\n\n`);
@@ -186,10 +225,20 @@ router.post(
             }
           }
 
-          // Send completion signal
           res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+
+          if (req.user) {
+            aiUsageService.logUsage(
+              req.user.id,
+              options.model,
+              finalPromptTokens,
+              finalCompletionTokens,
+              'chat'
+            ).catch((error) => {
+              logger.warn('Failed to log streaming chat usage', { error: String(error) });
+            });
+          }
         } catch (streamError) {
-          // If error occurs during streaming, send it in SSE format
           logger.error('Stream error during chat completion', {
             error: streamError instanceof Error ? streamError.message : String(streamError),
             stack: streamError instanceof Error ? streamError.stack : undefined,
@@ -205,6 +254,21 @@ router.post(
 
       // Non-streaming requests
       const result = await chatService.chat(messages, options);
+
+      // Log usage after successful completion
+      if (req.user) {
+        const usage = result.metadata?.usage;
+        aiUsageService.logUsage(
+          req.user.id,
+          options.model,
+          usage?.promptTokens || 0,
+          usage?.completionTokens || 0,
+          'chat'
+        ).catch((error) => {
+          logger.warn('Failed to log chat usage', { error: String(error) });
+        });
+      }
+
       successResponse(res, result);
     } catch (error) {
       if (error instanceof AppError) {
@@ -229,6 +293,8 @@ router.post(
 router.post(
   '/image/generation',
   verifyUser,
+  aiImageRateLimiter,
+  checkAIQuota,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = imageGenerationRequestSchema.safeParse(req.body);
@@ -241,6 +307,20 @@ router.post(
       }
 
       const result = await ImageGenerationService.generate(validationResult.data);
+
+      // Log usage after successful generation
+      if (req.user) {
+        const usage = result.metadata?.usage;
+        aiUsageService.logUsage(
+          req.user.id,
+          validationResult.data.model,
+          usage?.promptTokens || 0,
+          usage?.completionTokens || 0,
+          'image'
+        ).catch((error) => {
+          logger.warn('Failed to log image generation usage', { error: String(error) });
+        });
+      }
 
       successResponse(res, result);
     } catch (error) {
@@ -266,6 +346,8 @@ router.post(
 router.post(
   '/embeddings',
   verifyUser,
+  aiEmbeddingRateLimiter,
+  checkAIQuota,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = embeddingsRequestSchema.safeParse(req.body);
@@ -280,6 +362,20 @@ router.post(
       const embeddingService = EmbeddingService.getInstance();
       const result = await embeddingService.createEmbeddings(validationResult.data);
 
+      // Log usage after successful embedding
+      if (req.user) {
+        const usage = result.metadata?.usage;
+        aiUsageService.logUsage(
+          req.user.id,
+          validationResult.data.model,
+          usage?.promptTokens || 0,
+          0,
+          'embedding'
+        ).catch((error) => {
+          logger.warn('Failed to log embedding usage', { error: String(error) });
+        });
+      }
+
       successResponse(res, result);
     } catch (error) {
       if (error instanceof AppError) {
@@ -293,6 +389,78 @@ router.post(
           )
         );
       }
+    }
+  }
+);
+
+/**
+ * GET /api/ai/usage/report
+ * Get aggregated AI usage report. Admin-only.
+ */
+router.get(
+  '/usage/report',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const queryValidation = usageReportQuerySchema.safeParse(req.query);
+      if (!queryValidation.success) {
+        throw new AppError(
+          `Validation error: ${queryValidation.error.errors.map((e) => e.message).join(', ')}`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const { period, userId, model, limit, offset } = queryValidation.data;
+      const report = await aiUsageService.getUsageReport(period, userId, model, limit, offset);
+      successResponse(res, report);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/ai/quotas
+ * Get all quota configs, or a specific user's quota. Admin-only.
+ */
+router.get(
+  '/quotas',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.query.userId as string | undefined;
+      const configs = await aiUsageService.getQuotaConfig(userId);
+      successResponse(res, configs);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * PUT /api/ai/quotas
+ * Create or update a quota config for a user (or global default). Admin-only.
+ */
+router.put(
+  '/quotas',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = updateQuotaConfigRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const targetUserId = (req.body.userId as string | null) ?? null;
+      const config = await aiUsageService.upsertQuotaConfig(targetUserId, validationResult.data);
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
     }
   }
 );

@@ -184,6 +184,112 @@ paths:
         '500':
           description: Failed to generate embeddings
 
+  /api/ai/usage/report:
+    get:
+      summary: Get aggregated AI usage report
+      description: Returns AI usage aggregated by user and model for the given time period. Admin-only.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month, all]
+            default: month
+          description: Aggregation window
+        - name: userId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by user ID
+        - name: model
+          in: query
+          schema:
+            type: string
+          description: Filter by model name
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Maximum number of entries
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Pagination offset
+      responses:
+        '200':
+          description: Aggregated usage report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageReportResponse'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Failed to generate report
+
+  /api/ai/quotas:
+    get:
+      summary: Get AI quota configs
+      description: Returns all quota configurations, or a specific user's if userId query param is given. Admin-only.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by user ID (returns all if omitted)
+      responses:
+        '200':
+          description: Array of quota configurations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QuotaConfig'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Failed to fetch quotas
+    put:
+      summary: Create or update AI quota config
+      description: Creates or updates a quota configuration for a user (or global default when userId is null). Admin-only.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateQuotaConfigRequest'
+      responses:
+        '200':
+          description: Updated quota configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaConfig'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Failed to update quota config
+
 components:
   securitySchemes:
     bearerAuth:
@@ -669,6 +775,128 @@ components:
         index:
           type: integer
           description: Index of this embedding in the input array
+
+    # ============= Usage Tracking & Quota Schemas =============
+
+    UsageReportResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          description: Usage aggregated by user and model
+          items:
+            $ref: '#/components/schemas/UsageReportEntry'
+        totals:
+          $ref: '#/components/schemas/UsageTotals'
+        period:
+          type: string
+          enum: [day, week, month, all]
+          description: The aggregation window
+
+    UsageReportEntry:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: User who made the requests
+        model:
+          type: string
+          description: AI model used
+        promptTokens:
+          type: integer
+          description: Total prompt tokens consumed
+        completionTokens:
+          type: integer
+          description: Total completion tokens generated
+        totalTokens:
+          type: integer
+          description: Total tokens (prompt + completion)
+        estimatedCost:
+          type: number
+          format: double
+          description: Estimated cost in USD
+        requestCount:
+          type: integer
+          description: Number of requests
+
+    UsageTotals:
+      type: object
+      properties:
+        promptTokens:
+          type: integer
+        completionTokens:
+          type: integer
+        totalTokens:
+          type: integer
+        estimatedCost:
+          type: number
+        requestCount:
+          type: integer
+
+    QuotaConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+          nullable: true
+          description: NULL represents project-wide default
+        maxRequestsPerDay:
+          type: integer
+          nullable: true
+          description: Maximum API requests per day
+        maxTokensPerDay:
+          type: integer
+          nullable: true
+          description: Maximum total tokens per day
+        maxTokensPerMonth:
+          type: integer
+          nullable: true
+          description: Maximum total tokens per month
+        monthlySpendCapUsd:
+          type: number
+          format: double
+          nullable: true
+          description: Maximum spend per month in USD
+        modelAllowlist:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: If set, restricts user to only these model IDs
+        updatedAt:
+          type: string
+          format: date-time
+
+    UpdateQuotaConfigRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          nullable: true
+          description: NULL to update global defaults
+        maxRequestsPerDay:
+          type: integer
+          nullable: true
+        maxTokensPerDay:
+          type: integer
+          nullable: true
+        maxTokensPerMonth:
+          type: integer
+          nullable: true
+        monthlySpendCapUsd:
+          type: number
+          nullable: true
+        modelAllowlist:
+          type: array
+          items:
+            type: string
+          nullable: true
 
     ErrorResponse:
       type: object

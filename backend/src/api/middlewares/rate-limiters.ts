@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
+import type { AuthRequest } from './auth.js';
 
 /**
  * Store for tracking per-email cooldowns
@@ -448,3 +449,42 @@ function createWriteEndpointLimiter(category: WriteLimiterCategory) {
 export const functionsWriteLimiter = createWriteEndpointLimiter('functions');
 export const deploymentsWriteLimiter = createWriteEndpointLimiter('deployments');
 export const computeWriteLimiter = createWriteEndpointLimiter('compute');
+
+/**
+ * Per-user rate limiters for AI endpoints.
+ * Uses req.user.id as the key so limits are tracked per authenticated user,
+ * not per IP. This prevents a single user from exhausting the AI budget
+ * across multiple devices or IPs.
+ *
+ * Chat:  60 requests per minute (bursts of streaming completions)
+ * Image: 30 requests per 5 minutes (image gen is expensive)
+ * Embed: 120 requests per minute (batch embedding jobs)
+ */
+
+function createUserAILimiter(maxPerMinute: number) {
+  return rateLimit({
+    windowMs: 60 * 1000,
+    max: maxPerMinute,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+      const authReq = req as AuthRequest;
+      return authReq.user?.id ?? authReq.ip ?? 'unknown';
+    },
+    handler: (_req: Request, _res: Response, next: NextFunction) => {
+      next(
+        new AppError(
+          'Too many AI requests. Please slow down.',
+          429,
+          ERROR_CODES.TOO_MANY_REQUESTS
+        )
+      );
+    },
+    skipSuccessfulRequests: false,
+    skipFailedRequests: false,
+  });
+}
+
+export const aiChatRateLimiter = createUserAILimiter(60);
+export const aiImageRateLimiter = createUserAILimiter(30);
+export const aiEmbeddingRateLimiter = createUserAILimiter(120);
