@@ -330,6 +330,11 @@ async function initializeServer() {
     const server = app.listen(PORT, () => {
       logger.info(`Backend API service listening on port ${PORT}`);
     });
+    // Node's 5s default keepAliveTimeout lets long-interval keep-alive clients
+    // reuse sockets the server already closed; keep it above LB idle timeouts,
+    // with headersTimeout just past it so header reads never lose the race.
+    server.keepAliveTimeout = appConfig.server.keepAliveTimeoutMs;
+    server.headersTimeout = server.keepAliveTimeout + 1000;
 
     // Initialize Socket.IO service
     const socketService = SocketManager.getInstance();
