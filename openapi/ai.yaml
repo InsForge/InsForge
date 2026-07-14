@@ -45,27 +45,65 @@ paths:
         '500':
           description: Failed to fetch overview
 
-  /api/ai/openrouter/api-key:
+  /api/ai/{provider}/api-key:
     get:
-      summary: Get active OpenRouter API key
-      description: Returns the active OpenRouter API key details for admin copy workflows.
+      summary: Get active provider API key
+      description: Returns the active provider API key details for admin copy workflows. Currently only `openrouter` is supported.
       tags:
         - Admin
       security:
         - bearerAuth: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [openrouter]
+          description: AI provider identifier
       responses:
         '200':
-          description: Active OpenRouter API key details
+          description: Active provider API key details
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OpenRouterKeyResponse'
         '400':
-          description: Missing OpenRouter API key
+          description: Missing or unsupported provider API key
         '401':
           description: Unauthorized
         '500':
           description: Failed to fetch API key details
+
+  /api/ai/{provider}/api-key/rotate:
+    post:
+      summary: Rotate provider API key
+      description: Rotate the active provider API key for cloud-managed Model Gateway credentials. Currently only `openrouter` is supported.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [openrouter]
+          description: AI provider identifier
+      responses:
+        '200':
+          description: API key rotated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenRouterKeyResponse'
+        '400':
+          description: Unsupported provider
+        '401':
+          description: Unauthorized
+        '500':
+          description: Failed to rotate API key
 
   /api/ai/chat/completion:
     post:

@@ -1863,6 +1863,240 @@ paths:
                 format: uri
                 description: Redirect URL with authentication parameters
 
+  /api/auth/id-token:
+    post:
+      summary: Sign in with ID token (Google One Tap, native SDKs)
+      description: |
+        Authenticate a user using an ID token obtained from a native SDK (e.g., Google One Tap).
+        Currently only the `google` provider is supported.
+      tags:
+        - Client
+      parameters:
+        - name: client_type
+          in: query
+          schema:
+            type: string
+            enum: [web, mobile, desktop, server]
+            default: web
+          description: |
+            Client type determines how refresh tokens are returned:
+            - web: Refresh token stored in httpOnly cookie, csrfToken returned in response
+            - mobile/desktop/server: refreshToken returned directly in response body
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - provider
+                - token
+              properties:
+                provider:
+                  type: string
+                  enum: [google]
+                  description: Identity provider that issued the token
+                token:
+                  type: string
+                  description: Raw ID token from the provider SDK
+      responses:
+        '200':
+          description: Sign-in successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
+                  accessToken:
+                    type: string
+                  csrfToken:
+                    type: string
+                    nullable: true
+                    description: CSRF token for use with refresh endpoint (web clients only)
+                  refreshToken:
+                    type: string
+                    nullable: true
+                    description: Refresh token for mobile/desktop/server clients (null for web clients)
+        '400':
+          description: Invalid request - unsupported provider or missing token
+
+  /api/auth/admin/sessions/current:
+    get:
+      summary: Get current admin session
+      description: Returns the currently authenticated admin's basic info from the access token.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current admin session info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  admin:
+                    type: object
+                    properties:
+                      sub:
+                        type: string
+                        description: Admin subject identifier
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  /api/auth/smtp-config:
+    get:
+      summary: Get SMTP configuration
+      description: Get current SMTP email configuration (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      x-internal: true
+      responses:
+        '200':
+          description: SMTP configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmtpConfig'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+    put:
+      summary: Update SMTP configuration
+      description: Create or update SMTP email configuration (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      x-internal: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enabled
+                - port
+              properties:
+                enabled:
+                  type: boolean
+                host:
+                  type: string
+                port:
+                  type: integer
+                  enum: [25, 465, 587, 2525]
+                username:
+                  type: string
+                password:
+                  type: string
+                  description: SMTP password (optional on update if unchanged)
+                senderEmail:
+                  type: string
+                  format: email
+                senderName:
+                  type: string
+                minIntervalSeconds:
+                  type: integer
+                  minimum: 0
+                  default: 60
+                  description: Minimum interval between emails in seconds
+      responses:
+        '200':
+          description: SMTP configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmtpConfig'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+  /api/auth/email-templates:
+    get:
+      summary: Get all email templates
+      description: Returns all configurable email templates (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      x-internal: true
+      responses:
+        '200':
+          description: List of email templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EmailTemplate'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+  /api/auth/email-templates/{type}:
+    put:
+      summary: Update email template
+      description: Update a specific email template by type (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      x-internal: true
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [email-verification-code, email-verification-link, reset-password-code, reset-password-link]
+          description: Template type to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subject
+                - bodyHtml
+              properties:
+                subject:
+                  type: string
+                  description: Email subject line
+                bodyHtml:
+                  type: string
+                  description: HTML body of the email template
+      responses:
+        '200':
+          description: Template updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailTemplate'
+        '400':
+          description: Invalid template type or request body
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2066,3 +2300,55 @@ components:
           type: string
           description: Suggested action to resolve the error
           example: "Please use a different email address"
+
+    SmtpConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        enabled:
+          type: boolean
+        host:
+          type: string
+        port:
+          type: integer
+        username:
+          type: string
+        hasPassword:
+          type: boolean
+          description: Whether a password is set (actual password is never exposed)
+        senderEmail:
+          type: string
+          format: email
+        senderName:
+          type: string
+        minIntervalSeconds:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    EmailTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        templateType:
+          type: string
+          enum: [email-verification-code, email-verification-link, reset-password-code, reset-password-link]
+        subject:
+          type: string
+        bodyHtml:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
