@@ -330,6 +330,68 @@ export const openRouterKeySchema = z.object({
   maskedKey: z.string(),
 });
 
+// ============= AI Usage Tracking & Quota Schemas =============
+
+export const usageLogSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid(),
+  model: z.string(),
+  promptTokens: z.number().int().nonnegative(),
+  completionTokens: z.number().int().nonnegative(),
+  estimatedCost: z.number().nonnegative(),
+  endpoint: z.enum(['chat', 'image', 'embedding']),
+  createdAt: z.string().datetime(),
+});
+
+export const quotaConfigSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid().nullable(),
+  maxRequestsPerDay: z.number().int().positive().nullable(),
+  maxTokensPerDay: z.number().int().positive().nullable(),
+  maxTokensPerMonth: z.number().int().positive().nullable(),
+  monthlySpendCapUsd: z.number().positive().nullable(),
+  modelAllowlist: z.array(z.string()).nullable(),
+  updatedAt: z.string().datetime(),
+});
+
+export const updateQuotaConfigRequestSchema = z.object({
+  maxRequestsPerDay: z.number().int().positive().nullable().optional(),
+  maxTokensPerDay: z.number().int().positive().nullable().optional(),
+  maxTokensPerMonth: z.number().int().positive().nullable().optional(),
+  monthlySpendCapUsd: z.number().positive().nullable().optional(),
+  modelAllowlist: z.array(z.string()).nullable().optional(),
+});
+
+export const usageReportQuerySchema = z.object({
+  userId: z.string().uuid().optional(),
+  period: z.enum(['day', 'week', 'month', 'all']).optional().default('month'),
+  model: z.string().optional(),
+  limit: z.coerce.number().int().positive().optional().default(50),
+  offset: z.coerce.number().int().nonnegative().optional().default(0),
+});
+
+export const usageReportEntrySchema = z.object({
+  userId: z.string().uuid(),
+  model: z.string(),
+  promptTokens: z.number().int().nonnegative(),
+  completionTokens: z.number().int().nonnegative(),
+  totalTokens: z.number().int().nonnegative(),
+  estimatedCost: z.number().nonnegative(),
+  requestCount: z.number().int().nonnegative(),
+});
+
+export const usageReportSchema = z.object({
+  entries: z.array(usageReportEntrySchema),
+  totals: z.object({
+    promptTokens: z.number().int().nonnegative(),
+    completionTokens: z.number().int().nonnegative(),
+    totalTokens: z.number().int().nonnegative(),
+    estimatedCost: z.number().nonnegative(),
+    requestCount: z.number().int().nonnegative(),
+  }),
+  period: z.enum(['day', 'week', 'month', 'all']),
+});
+
 // Export types
 export type ToolFunction = z.infer<typeof toolFunctionSchema>;
 export type Tool = z.infer<typeof toolSchema>;
@@ -345,7 +407,6 @@ export type WebSearchPlugin = z.infer<typeof webSearchPluginSchema>;
 export type FileParserPlugin = z.infer<typeof fileParserPluginSchema>;
 export type UrlCitationAnnotation = z.infer<typeof urlCitationAnnotationSchema>;
 export type FileAnnotation = z.infer<typeof fileAnnotationSchema>;
-export type Annotation = z.infer<typeof annotationSchema>;
 export type ChatCompletionRequest = z.infer<typeof chatCompletionRequestSchema>;
 export type ChatCompletionResponse = z.infer<typeof chatCompletionResponseSchema>;
 export type ImageGenerationRequest = z.infer<typeof imageGenerationRequestSchema>;
@@ -357,3 +418,8 @@ export type AIModelSchema = z.infer<typeof aiModelSchema>;
 export type AIOverviewMetricPoint = z.infer<typeof aiOverviewMetricPointSchema>;
 export type AIOverview = z.infer<typeof aiOverviewSchema>;
 export type OpenRouterKey = z.infer<typeof openRouterKeySchema>;
+export type UsageLog = z.infer<typeof usageLogSchema>;
+export type QuotaConfig = z.infer<typeof quotaConfigSchema>;
+export type UpdateQuotaConfigRequest = z.infer<typeof updateQuotaConfigRequestSchema>;
+export type UsageReportQuery = z.infer<typeof usageReportQuerySchema>;
+export type UsageReport = z.infer<typeof usageReportSchema>;

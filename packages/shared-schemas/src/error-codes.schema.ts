@@ -54,7 +54,14 @@ const realtimeErrorCodes = [
   'REALTIME_UNAUTHORIZED',
 ] as const;
 
-const aiErrorCodes = ['AI_INVALID_API_KEY', 'AI_INVALID_MODEL', 'AI_UPSTREAM_UNAVAILABLE'] as const;
+const aiErrorCodes = [
+  'AI_INVALID_API_KEY',
+  'AI_INVALID_MODEL',
+  'AI_UPSTREAM_UNAVAILABLE',
+  'AI_QUOTA_EXCEEDED',
+  'AI_MODEL_NOT_ALLOWED',
+  'AI_USAGE_REPORT_ERROR',
+] as const;
 
 const analyticsErrorCodes = ['ANALYTICS_NOT_CONNECTED', 'ANALYTICS_UNAVAILABLE'] as const;
 
