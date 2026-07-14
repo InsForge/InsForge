@@ -28,6 +28,24 @@ A dashboard is built for a human pointer; a CLI is built for anything that can w
 
 Run `npx @insforge/cli help <command>` for the flags on any of these.
 
+## Built-in secrets
+
+The `secrets` commands manage the same store your edge functions read from. Every project ships with reserved keys that you can read but not edit or delete:
+
+| Key | What it is |
+|-----|------------|
+| `ANON_KEY` | Public client key, passed as `anonKey` when you create an SDK client |
+| `API_KEY` | Admin API key (`ik_...`) for privileged server-side and CLI access |
+| `JWT_SECRET` | Secret for HS256-signed JWTs that InsForge accepts, seeded from the deployment's `JWT_SECRET` env var |
+| `INSFORGE_BASE_URL` | The project's API base URL |
+
+```bash
+npx @insforge/cli secrets list          # every key, values hidden
+npx @insforge/cli secrets get ANON_KEY  # decrypted value of one key
+```
+
+Use `secrets add`, `secrets update`, and `secrets delete` for your own keys, and `secrets rotate api-key` or `secrets rotate anon-key` to reissue a project key with an optional grace period. The API key and anon key are also in the dashboard: click **Install** and open **API Keys**.
+
 ## Upgrading and deleting a project
 
 ```bash
