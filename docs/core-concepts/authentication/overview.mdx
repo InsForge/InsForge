@@ -72,7 +72,7 @@ The auth JWT flows through every InsForge SDK call automatically. Postgres RLS p
 
 User state lives in your project's Postgres database in the `auth` schema. Join `auth.users` to your application tables via foreign keys, react to identity changes with triggers, and back the whole thing up the same way you back up everything else.
 
-When you add a user from the dashboard, the Auto-confirm toggle sets `email_verified` on the new row: enable it to mark the email as verified at creation, so the user can sign in without confirming it.
+When you add a user from the dashboard, the Auto-confirm toggle sets `email_verified` on the new row. Enable it to mark the email as verified at creation, so the user can sign in without confirming it.
 
 ## Build with it
 
