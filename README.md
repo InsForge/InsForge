@@ -126,7 +126,7 @@ Or run from source:
 ```bash
 # Run with Docker
 git clone https://github.com/InsForge/InsForge.git
-cd insforge
+cd InsForge
 cp .env.example .env
 docker compose -f docker-compose.prod.yml up
 ```
