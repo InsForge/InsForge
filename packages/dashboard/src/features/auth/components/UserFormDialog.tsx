@@ -268,7 +268,10 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                     >
                       Auto-confirm
                     </label>
-                    <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
+                    <p
+                      id="auto-confirm-description"
+                      className="pb-2 text-[13px] leading-[18px] text-muted-foreground"
+                    >
                       Automatically mark the email as verified, so the user can sign in without
                       confirming it.
                     </p>
@@ -276,6 +279,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                   <div className="min-w-0 flex justify-end py-1.5">
                     <Switch
                       id="auto-confirm"
+                      aria-describedby="auto-confirm-description"
                       checked={autoConfirm}
                       onCheckedChange={setAutoConfirm}
                     />
