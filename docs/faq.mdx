@@ -128,4 +128,10 @@ description: "Answers to common InsForge questions: Edge Functions vs database, 
 
     The key grants full access to your account, so keep it secret and rotate it if it leaks.
   </Accordion>
+
+  <Accordion title="What is FLY_API_TOKEN?">
+    It's an environment variable you only set when you self-host InsForge and want to use [Custom Compute](/core-concepts/compute/overview). Custom Compute runs your long-lived containers on [Fly.io](https://fly.io), so a self-hosted instance needs your own Fly account: set `FLY_API_TOKEN` (a Fly API token from `fly tokens create org`) and `FLY_ORG` (your Fly org slug from `fly orgs list`) in your `.env`, then restart. Both are required, and until they're set, compute endpoints return `503 COMPUTE_NOT_CONFIGURED`.
+
+    On InsForge Cloud you never touch this. Compute is managed for you, and the rest of the platform (database, auth, storage, edge functions) needs no Fly token at all.
+  </Accordion>
 </AccordionGroup>
