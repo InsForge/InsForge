@@ -1,0 +1,62 @@
+---
+title: "Preguntas frecuentes"
+sidebarTitle: "Preguntas frecuentes"
+description: "Respuestas a preguntas habituales sobre cómo funciona InsForge."
+---
+
+<AccordionGroup>
+  <Accordion title="¿Leer o escribir en la base de datos es una edge function? ¿Qué diferencia hay entre llamadas a la base de datos, edge functions y custom compute?">
+    No. Cuando lees o escribes una tabla no se ejecuta ninguna función, así que no es una edge function.
+
+    En InsForge tu código habla con el backend de tres formas distintas, y es fácil confundirlas:
+
+    | | Cómo se activa | ¿Sigue en ejecución? | Para qué sirve |
+    |----|----------------|----------------------|----------------|
+    | **Llamada a la base de datos** (REST API autogenerada) | Tu cliente envía una petición SDK o REST | No, está totalmente gestionada | Leer y escribir filas de tablas |
+    | **Edge Function** | Una petición HTTP, una programación cron o un trigger de base de datos | No, se ejecuta una vez y termina | Endpoints propios, webhooks, lógica de triggers, llamar a servicios externos |
+    | **Custom Compute** | Tú inicias un proceso de larga duración | Sí, se mantiene activo | Workers de cola, bucles de inferencia de IA, websockets, cualquier cosa con estado |
+
+    **Llamada a la base de datos.** Defines una tabla y InsForge te da al instante un conjunto de endpoints REST (como `GET /api/database/records/{table}`) y un SDK tipado. Llamar a `select` o `insert` lee y escribe la base de datos directamente, sin nada que desplegar y sin nada en ejecución. Es todo lo que necesitas para el CRUD normal. Consulta [Base de datos](/core-concepts/database/overview).
+
+    **Edge Function.** Úsala cuando la API autogenerada no basta y quieres tu propia lógica de servidor: un webhook de pago, un auth hook, código que se dispara cuando una fila se `INSERT`a, `UPDATE`a o `DELETE`a, o un trabajo programado. La clave es que se ejecuta una vez por petición o evento y luego termina. Consulta [Edge Functions](/core-concepts/functions/overview).
+
+    **Custom Compute.** Úsalo cuando necesitas un proceso que se mantenga activo, como un worker de cola o un bucle de inferencia de IA. Una edge function no puede hacerlo porque no se ejecuta de forma continua. Consulta [Custom Compute](/core-concepts/compute/overview).
+
+    Regla rápida: ¿solo mueves datos de entrada y salida? Es la base de datos (REST automática). ¿Escribes lógica que se ejecuta y termina? Edge function. ¿Necesitas algo funcionando todo el tiempo? Custom compute.
+  </Accordion>
+
+  <Accordion title="¿Cómo comparto un proyecto con otro administrador o invito a un compañero de equipo?">
+    El acceso se comparte a nivel de **organización**, no por proyecto. Invitas a alguien a la organización propietaria de tus proyectos y obtiene acceso a todos los proyectos que contiene. No existe un flujo aparte para "compartir solo este proyecto".
+
+    Para invitar a alguien:
+
+    1. En el dashboard, abre la organización propietaria del proyecto usando el selector de organización en la esquina superior izquierda.
+    2. Haz clic en **Members** en la barra lateral izquierda.
+    3. Haz clic en **Invite Member**, introduce su email y elige un rol:
+       - **Administrator** tiene control total: gestionar proyectos, además de invitar, eliminar y cambiar los roles de otros miembros.
+       - **Developer** tiene acceso normal a los proyectos de la organización, pero no puede gestionar miembros.
+    4. Reciben una invitación por email válida durante 7 días. Cuando inician sesión en InsForge **con esa misma dirección de email** y la aceptan, se unen a la organización con el rol que elegiste.
+
+    Para añadir otro administrador en concreto, elige el rol **Administrator** al invitar, o cambia su rol más tarde desde la lista de Members. Solo los Administrators pueden invitar o gestionar miembros.
+
+    Transferir la organización por completo a un nuevo **Owner** es una acción distinta de invitar miembros. Para hacerlo, abre **Organization Settings** y usa **Transfer Ownership** (solo el owner actual puede iniciarlo, y el destinatario debe ser un usuario verificado de InsForge que acepte la solicitud enviada por email).
+  </Accordion>
+
+  <Accordion title="¿Por qué se pausó mi proyecto y cómo evito que se pause?">
+    La pausa solo ocurre en el plan Free, por dos motivos:
+
+    - **Inactividad.** Un proyecto free se pausa tras 7 días sin ninguna petición. Te avisamos por correo antes, y cualquier petición reinicia el contador de 7 días.
+    - **Límite de uso.** Si tu organización supera los límites de uso del plan Free, sus proyectos siguen pausados hasta que la actualices.
+
+    En ambos casos tus datos quedan intactos. Para que los proyectos no se pausen nunca, actualiza la organización a Pro. Consulta [Pricing](/pricing).
+  </Accordion>
+
+  <Accordion title="Mi proyecto está pausado. ¿Cómo lo reinicio?">
+    Abre el proyecto en el dashboard y haz clic en **Restore Project**. Vuelve en unos minutos con tus datos intactos. Ten en cuenta un par de casos:
+
+    - Puedes restaurar un proyecto free desde el dashboard hasta **30 días** después de que se pause. Pasado ese plazo se archiva y solo puedes descargar la copia de la base de datos y los archivos de Storage (sin pérdida de datos).
+    - Si se pausó porque la organización alcanzó su límite de uso, haz **Upgrade to Pro** para restaurarlo.
+
+    ¿Sigues atascado? Pregunta en nuestro [Discord](https://discord.com/invite/DvBtaEc9Jz) para la respuesta más rápida.
+  </Accordion>
+</AccordionGroup>
