@@ -1,0 +1,240 @@
+---
+title: Razorpay 支付 SDK
+description: 從 TypeScript 應用建立 Razorpay 訂單和訂閱
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## 概述
+
+TypeScript SDK 為產生的應用前端公開 Razorpay 執行時助手：
+
+- `insforge.payments.razorpay.createOrder(...)`
+- `insforge.payments.razorpay.verifyOrder(...)`
+- `insforge.payments.razorpay.createSubscription(...)`
+- `insforge.payments.razorpay.verifySubscription(...)`
+- `insforge.payments.razorpay.cancelSubscription(...)`
+- `insforge.payments.razorpay.pauseSubscription(...)`
+- `insforge.payments.razorpay.resumeSubscription(...)`
+
+Razorpay 不傳回託管的 Checkout URL。後端建立 Razorpay 訂單或訂閱並傳回 `checkoutOptions`。瀏覽器載入 Razorpay Checkout 並使用這些選項開啟它。
+
+<Note>
+  有關提供商設定、手動 webhook、資料庫表和履行模式，請參見 [Razorpay 支付](/core-concepts/payments/razorpay)。
+</Note>
+
+## SDK 設定
+
+```typescript
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-project.insforge.app',
+  anonKey: 'your-anon-key'
+});
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+  }
+}
+
+```
+
+SDK 使用目前 InsForge 使用者令牌呼叫 Razorpay 執行時路由。不要使用提供商密鑰呼叫這些路由。
+
+## 載入 Razorpay Checkout
+
+```typescript
+function loadRazorpayCheckout(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.Razorpay) {
+      resolve();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Razorpay Checkout'));
+    document.body.appendChild(script);
+  });
+}
+```
+
+## 一次性訂單
+
+首先建立一個應用擁有的待處理訂單。然後透過 InsForge 建立 Razorpay 訂單：
+
+Razorpay 訂單可以是僅金額的，但為一次性可售產品建立 Razorpay 商品是一個好做法，因為同步的商品使目錄在 InsForge 和 Razorpay 中可見。將訂單視為付款嘗試。
+
+```typescript
+type CreateRazorpayOrderResponse = {
+  order: {
+    id: string;
+    orderId: string | null;
+    status: string;
+  };
+  checkoutOptions: {
+    key: string;
+    amount: number;
+    currency: string;
+    order_id: string;
+    name?: string | null;
+    description?: string | null;
+    callback_url?: string | null;
+    prefill: {
+      name?: string | null;
+      email?: string | null;
+      contact?: string | null;
+    };
+  };
+};
+
+const { data: orderResponse, error } =
+  await insforge.payments.razorpay.createOrder('test', {
+    amount: 50000,
+    currency: 'INR',
+    receipt: order.id,
+    subject: { type: 'team', id: teamId },
+    customerEmail: user.email,
+    notes: { order_id: order.id }
+  });
+
+if (error) throw error;
+if (!orderResponse) throw new Error('Razorpay order creation returned no data');
+```
+
+如果您的 webhook 觸發器讀取 `notes.order_id`，請在建立訂單時傳遞 `notes: { order_id: ... }`。
+
+開啟 Razorpay Checkout 並驗證傳回的簽章：
+
+```typescript
+await loadRazorpayCheckout();
+
+const RazorpayCheckout = window.Razorpay;
+if (!RazorpayCheckout) {
+  throw new Error('Razorpay Checkout failed to load');
+}
+
+const checkout = new RazorpayCheckout({
+  ...orderResponse.checkoutOptions,
+  handler: async (response: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }) => {
+    const { error } = await insforge.payments.razorpay.verifyOrder('test', {
+      orderId: response.razorpay_order_id,
+      paymentId: response.razorpay_payment_id,
+      signature: response.razorpay_signature
+    });
+
+    if (error) throw error;
+  }
+});
+
+checkout.open();
+```
+
+簽章驗證保護即時的瀏覽器回呼。持久履行仍應來自已驗證的 Razorpay webhook 事件。
+
+## 訂閱
+
+首先建立或同步一個 Razorpay 計劃。然後透過 InsForge 建立訂閱：
+
+```typescript
+type CreateRazorpaySubscriptionResponse = {
+  subscription: {
+    subscriptionId: string;
+    status: string;
+  };
+  checkoutOptions: {
+    key: string;
+    subscription_id: string;
+    name?: string | null;
+    description?: string | null;
+    callback_url?: string | null;
+    prefill: {
+      name?: string | null;
+      email?: string | null;
+      contact?: string | null;
+    };
+  };
+};
+
+const { data: subscriptionResponse, error } =
+  await insforge.payments.razorpay.createSubscription('test', {
+    planId: 'plan_123',
+    totalCount: 12,
+    subject: { type: 'team', id: teamId },
+    customerEmail: user.email
+  });
+
+if (error) throw error;
+if (!subscriptionResponse) throw new Error('Razorpay subscription creation returned no data');
+```
+
+當 webhook 觸發器稍後需要應用識別碼時，傳遞 Razorpay 訂閱 `notes`。
+
+使用傳回的訂閱 ID 開啟 Razorpay Checkout：
+
+```typescript
+await loadRazorpayCheckout();
+
+const RazorpayCheckout = window.Razorpay;
+if (!RazorpayCheckout) {
+  throw new Error('Razorpay Checkout failed to load');
+}
+
+const checkout = new RazorpayCheckout({
+  ...subscriptionResponse.checkoutOptions,
+  handler: async (response: {
+    razorpay_subscription_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }) => {
+    const { error } = await insforge.payments.razorpay.verifySubscription('test', {
+      subscriptionId: response.razorpay_subscription_id,
+      paymentId: response.razorpay_payment_id,
+      signature: response.razorpay_signature
+    });
+
+    if (error) throw error;
+  }
+});
+
+checkout.open();
+```
+
+## 管理訂閱
+
+Razorpay 不提供 Stripe 計費入口的等價物。使用後端路由進行訂閱管理：
+
+```typescript
+await insforge.payments.razorpay.cancelSubscription('test', 'sub_123', {
+  cancelAtCycleEnd: false
+});
+
+await insforge.payments.razorpay.pauseSubscription('test', 'sub_123');
+
+await insforge.payments.razorpay.resumeSubscription('test', 'sub_123');
+```
+
+訂閱建立檢查 `payments.razorpay_subscriptions` 上的 `INSERT` 原則。取消、暫停和恢復檢查同一表上的 `UPDATE` 原則。PostgreSQL 還將 `SELECT` 原則套用於 `INSERT/UPDATE ... RETURNING` 傳回的列，因此當原則探測需要傳回列時，為同一計費主體新增相符的 `SELECT` 可見性。在為共享主體公開這些控制項之前，新增應用特定的 RLS 或伺服器端成員資格檢查。
+
+## 履行
+
+不要僅從 Checkout 處理常式標記訂單已付款、授予積分或啟用訂閱。使用 `payments.webhook_events` 中已驗證的 Razorpay webhook 事件。不要將履行觸發器附加到提供商鏡像表，如 `payments.razorpay_subscriptions`。
+
+建立帶有 RLS 的應用擁有的履行表，然後從 webhook 觸發器更新它們。有關觸發器範例，請參見 [Razorpay 支付](/core-concepts/payments/razorpay)。
+
+## 生產/測試環境
+
+在開發時將 `'test'` 作為第一個 SDK 引數傳遞。僅在開發者明確核准生產 Razorpay 變更並設定了生產商品、計劃和 webhook 後才切換到 `'live'`。
+
+<Warning>
+  永遠不要將 Razorpay Key Secret 或 webhook 密鑰放在前端程式碼中。前端僅接收作為 `checkoutOptions.key` 的公開 Razorpay Key ID。
+</Warning>

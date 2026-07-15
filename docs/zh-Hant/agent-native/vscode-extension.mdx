@@ -1,0 +1,73 @@
+---
+title: "VS Code 擴充功能"
+description: "從 VS Code 登入 InsForge、選擇組織和專案，並透過一次按一下為您的 AI 編碼助手安裝 InsForge MCP 伺服器。"
+---
+
+## 概覽
+
+InsForge VS Code 擴充功能：
+
+- 讓您登入 InsForge（OAuth + PKCE）
+- 讓您選擇組織/專案
+- 為您的 AI 用戶端安裝 InsForge MCP
+
+它透過您的專案的 API 金鑰和 API 基礎 URL 啟動 MCP 安裝程式（`npx @insforge/install`）。
+
+## 連結
+
+- [VS Code 市場](https://marketplace.visualstudio.com/items?itemName=InsForge.insforge)
+- [開放 VSX](https://open-vsx.org/extension/InsForge/insforge)
+
+## 安裝
+
+1. 打開 VS Code
+2. 前往**擴充功能**
+3. 搜尋**InsForge**
+4. 安裝由**insforge**發佈的擴充功能
+
+## 使用擴充功能
+
+<Steps>
+  <Step title="打開 InsForge 面板">
+    按一下活動列（左側邊欄）中的**InsForge**圖示。
+  </Step>
+
+  <Step title="登入">
+    按一下**使用 InsForge 登入**並在您的瀏覽器中完成登入流程。
+
+    <Note>回呼是 <code>http://127.0.0.1:54321/callback</code>。</Note>
+  </Step>
+
+  <Step title="選擇專案">
+    從 InsForge 樹狀檢視中選擇組織和專案，或從命令面板執行 <code>InsForge: Select Project</code>。
+  </Step>
+
+  <Step title="安裝 MCP">
+    執行 <code>InsForge: Install MCP</code>（或以滑鼠右鍵按一下專案並選擇**安裝 MCP**），然後選擇您要設定的 AI 用戶端。
+
+    安裝程式在 VS Code 終端機中執行。
+  </Step>
+</Steps>
+
+## 支援的 AI 用戶端
+
+擴充功能支援下列 MCP"用戶端"（傳遞給 `@insforge/install` 的值）：
+
+| 用戶端 | 典型配置位置 |
+|---|---|
+| `cursor` | `~/.cursor/mcp.json` |
+| `claude-code` | 工作區中的 `.mcp.json`（專案本機） |
+| `copilot` | 工作區中的 `.vscode/mcp.json`（專案本機） |
+| `windsurf` | `~/.codeium/windsurf/` |
+| `cline` | Cline VS Code 擴充功能配置 |
+| `roocode` | Roo Code VS Code 擴充功能配置 |
+| `codex` | OpenAI Codex CLI 配置 |
+| `trae` | Trae IDE 配置 |
+| `qoder` | Qoder IDE 配置 |
+
+如果您的用戶端未列出，請手動執行安裝程式（請參閱<a href="/quickstart">快速入門</a>）。
+
+## 注意
+
+- **專案本機安裝**：`claude-code` 和 `copilot` 需要打開的工作區資料夾。
+- **連埠在使用中**：釋放 `54321` 並重試登入。

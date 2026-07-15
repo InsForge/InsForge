@@ -483,7 +483,8 @@
     "usingColumn": "Using",
     "versionColumn": "版本",
     "viewLinkedRecord": "查看关联记录",
-    "withCheckColumn": "With Check"
+    "withCheckColumn": "With Check",
+    "explain": "解释"
   },
   "ai": {
     "sidebar": {
@@ -954,7 +955,8 @@
     "oauthDeletedToast": "已成功删除 {{provider}} 的 OAuth 配置",
     "oauthDeleteFailed": "删除 OAuth 配置失败",
     "smtpConfigUpdatedToast": "SMTP 配置更新成功",
-    "smtpConfigUpdateFailed": "更新 SMTP 配置失败"
+    "smtpConfigUpdateFailed": "更新 SMTP 配置失败",
+    "autoConfirmDescription": "自动将邮箱标记为已验证，用户无需确认即可登录。"
   },
   "common": {
     "anErrorOccurred": "发生了一个错误",

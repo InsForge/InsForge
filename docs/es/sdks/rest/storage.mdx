@@ -1,0 +1,554 @@
+---
+title: Referencia de API de almacenamiento
+description: Almacenamiento de archivos y gestión de cubos a través de API REST
+---
+
+## Descripción general
+
+La API de almacenamiento proporciona almacenamiento de archivos basado en depósitos similar a S3. Carga, descarga y gestiona archivos con soporte para backend de almacenamiento local y compatible con S3.
+
+## Encabezados
+
+Para invocaciones de funciones autenticadas:
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+Content-Type: application/json
+```
+
+Para puntos finales de administrador:
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
+Content-Type: application/json
+```
+
+---
+
+## Cargar objeto con estrategia de carga
+
+InsForge admite dos tipos de backend de almacenamiento:
+1. **Almacenamiento local**: Los archivos se almacenan en el sistema de archivos local. Usar para desarrollo o producción de bajo volumen.
+2. **Compatible con S3**: Los archivos se almacenan en almacenamiento de objetos compatible con S3. Usar para producción de alto volumen.
+
+Los pasos para cargar un archivo son:
+1. Obtener estrategia de carga
+2. Cargar archivo
+3. Confirmar carga (solo S3)
+
+---
+
+### Paso 1: Obtener estrategia de carga
+
+Obtén la estrategia de carga óptima (URL directo o presignado) según el backend de almacenamiento.
+La API de estrategia de carga devuelve el método de carga óptimo según el backend de almacenamiento:
+- **Almacenamiento local**: Carga directa a la API de InsForge
+- **Compatible con S3**: URL presignada para carga directa a S3
+
+```
+POST /api/storage/buckets/{bucketName}/upload-strategy
+```
+
+#### Cuerpo de la solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `filename` | string | Sí | Nombre de archivo original |
+| `contentType` | string | No | Tipo MIME del archivo |
+| `size` | integer | No | Tamaño de archivo en bytes |
+
+#### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-strategy" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "profile-photo.jpg",
+    "contentType": "image/jpeg",
+    "size": 102400
+  }'
+```
+
+#### Respuesta (Backend S3)
+
+```json
+{
+  "method": "presigned",
+  "uploadUrl": "https://s3-bucket.amazonaws.com/",
+  "fields": {
+    "bucket": "my-s3-bucket",
+    "key": "app-key/avatars/profile-photo-1234567890-abc123.jpg",
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": "...",
+    "Policy": "...",
+    "X-Amz-Signature": "..."
+  },
+  "key": "profile-photo-1234567890-abc123.jpg",
+  "confirmRequired": true,
+  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg/confirm-upload",
+  "expiresAt": "2025-09-05T01:00:00Z"
+}
+```
+
+#### Respuesta (Almacenamiento local)
+
+```json
+{
+  "method": "direct",
+  "uploadUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg",
+  "key": "profile-photo-1234567890-abc123.jpg",
+  "confirmRequired": false
+}
+```
+
+---
+
+### Paso 2: Cargar archivo
+
+Carga el archivo a la URL especificada usando el método proporcionado.
+- **Almacenamiento local**: Usa una solicitud PUT a `uploadUrl` con `multipart/form-data` y un campo `file`.
+- **Compatible con S3**: Usa una solicitud POST a `uploadUrl` con `multipart/form-data` y un campo `file`. Incluye todos los campos del objeto `fields` en la solicitud.
+
+### Paso 3: Confirmar carga presignada (solo S3)
+
+Confirma que un archivo se ha cargado correctamente a S3 usando URL presignada.
+
+```
+POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
+```
+
+#### Cuerpo de la solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `size` | integer | Sí | Tamaño de archivo en bytes |
+| `contentType` | string | No | Tipo MIME del archivo |
+| `etag` | string | No | ETag S3 del objeto cargado |
+
+#### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo-123.jpg/confirm-upload" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "size": 102400,
+    "contentType": "image/jpeg"
+  }'
+```
+
+#### Respuesta
+
+```json
+{
+  "bucket": "avatars",
+  "key": "profile-photo-123.jpg",
+  "size": 102400,
+  "mimeType": "image/jpeg",
+  "uploadedAt": "2024-01-21T10:30:00Z",
+  "url": "/api/storage/buckets/avatars/objects/profile-photo-123.jpg"
+}
+```
+
+---
+
+## Cargar objeto (Depreciado)
+
+Carga un archivo a un cubo con una clave específica.
+
+```
+PUT /api/storage/buckets/{bucketName}/objects/{objectKey}
+```
+
+### Parámetros de ruta
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `bucketName` | string | Nombre del cubo |
+| `objectKey` | string | Clave de objeto (puede incluir `/` para carpetas pseudocargas) |
+
+### Cuerpo de la solicitud
+
+`multipart/form-data` con un campo `file`.
+
+### Ejemplo
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/storage/buckets/avatars/objects/users/profile.jpg" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -F "file=@/path/to/image.jpg"
+```
+
+### Respuesta
+
+```json
+{
+  "bucket": "avatars",
+  "key": "users/profile.jpg",
+  "size": 102400,
+  "mimeType": "image/jpeg",
+  "uploadedAt": "2024-01-15T10:30:00Z",
+  "url": "/api/storage/buckets/avatars/objects/users/profile.jpg"
+}
+```
+
+---
+
+## Cargar con clave generada automáticamente (Depreciado)
+
+Carga un archivo con una clave única generada automáticamente.
+
+```
+POST /api/storage/buckets/{bucketName}/objects
+```
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/uploads/objects" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -F "file=@/path/to/document.pdf"
+```
+
+### Respuesta
+
+```json
+{
+  "bucket": "uploads",
+  "key": "document-1737546841234-a3f2b1.pdf",
+  "size": 204800,
+  "mimeType": "application/pdf",
+  "uploadedAt": "2024-01-21T10:30:00Z",
+  "url": "/api/storage/buckets/uploads/objects/document-1737546841234-a3f2b1.pdf"
+}
+```
+
+---
+
+## Descargar objeto con estrategia de descarga
+
+InsForge admite dos tipos de backend de almacenamiento:
+1. **Almacenamiento local**: Los archivos se almacenan en el sistema de archivos local. Usar para desarrollo o producción de bajo volumen.
+2. **Compatible con S3**: Los archivos se almacenan en almacenamiento de objetos compatible con S3. Usar para producción de alto volumen.
+
+Los pasos para descargar un archivo son:
+1. Obtener estrategia de descarga
+2. Descargar archivo de la URL devuelta
+
+### Paso 1: Obtener estrategia de descarga
+
+Obtén la estrategia de descarga óptima (URL directo o presignado) según el backend de almacenamiento y la visibilidad del cubo.
+
+La API de estrategia de descarga devuelve el método de descarga óptimo según el backend de almacenamiento y la visibilidad del cubo:
+- **Almacenamiento local**: Descarga directa de la API de InsForge
+- **Compatible con S3**: URL presignada para S3.
+
+```
+GET /api/storage/buckets/{bucketName}/download-strategy/objects/{objectKey}
+```
+
+<Note>
+  La expiración (para URL presignadas) se calcula automáticamente en el servidor desde el cubo
+  visibilidad. El punto final no toma cuerpo de solicitud. `objectKey` puede contener
+  `/` (carpetas pseudocargas) — no codifiques por porcentaje los separadores.
+
+  `POST /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy`
+  se retiene como un alias deprecado en la ruta original para versiones más antiguas de SDK
+  y se eliminará en una futura versión principal. Migra a `GET`.
+</Note>
+
+#### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/download-strategy/objects/profile.jpg" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+#### Respuesta (Cubo S3 público)
+
+```json
+{
+  "method": "direct",
+  "url": "https://s3-bucket.s3.us-east-2.amazonaws.com/app-key/avatars/profile.jpg"
+}
+```
+
+#### Respuesta (Cubo S3 privado)
+
+```json
+{
+  "method": "presigned",
+  "url": "https://s3-bucket.s3.us-east-2.amazonaws.com/app-key/avatars/profile.jpg?X-Amz-Algorithm=...",
+  "expiresAt": "2025-09-05T01:00:00Z"
+}
+```
+
+### Paso 2: Descargar archivo
+
+Descarga el archivo de la URL devuelta, usando el método apropiado.
+
+---
+
+## Descargar objeto (Depreciado)
+
+Descarga un archivo de un cubo.
+
+```
+GET /api/storage/buckets/{bucketName}/objects/{objectKey}
+```
+
+### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects/users/profile.jpg" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -o profile.jpg
+```
+
+### Respuesta
+
+Contenido de archivo binario con encabezados `Content-Type` y `Content-Length` apropiados.
+
+---
+
+## Eliminar objeto
+
+Elimina un archivo de un cubo.
+
+```
+DELETE /api/storage/buckets/{bucketName}/objects/{objectKey}
+```
+
+### Ejemplo
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/avatars/objects/users/profile.jpg" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Respuesta
+
+```json
+{
+  "message": "Object deleted successfully"
+}
+```
+
+---
+
+## Listar objetos en cubo
+
+Lista todos los objetos en un cubo con filtrado opcional.
+
+```
+GET /api/storage/buckets/{bucketName}/objects
+```
+
+### Parámetros de consulta
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `prefix` | string | Filtrar por prefijo de clave (ej., `users/`) |
+| `search` | string | Buscar objetos por clave (coincidencia parcial) |
+| `limit` | integer | Máximo de objetos a devolver (1-1000, predeterminado: 100) |
+| `offset` | integer | Número de objetos a omitir |
+
+### Ejemplo
+
+```bash
+# Filter by prefix
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects?prefix=users/&limit=50" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Search by key
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects?search=profile" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Respuesta
+
+```json
+{
+  "data": [
+    {
+      "bucket": "avatars",
+      "key": "users/user123.jpg",
+      "size": 102400,
+      "mimeType": "image/jpeg",
+      "uploadedAt": "2024-01-15T10:30:00Z",
+      "url": "/api/storage/buckets/avatars/objects/users/user123.jpg"
+    },
+    {
+      "bucket": "avatars",
+      "key": "users/user456.png",
+      "size": 204800,
+      "mimeType": "image/png",
+      "uploadedAt": "2024-01-16T11:00:00Z",
+      "url": "/api/storage/buckets/avatars/objects/users/user456.png"
+    }
+  ],
+  "pagination": {
+    "offset": 0,
+    "limit": 100,
+    "total": 2
+  }
+}
+```
+
+---
+
+## Gestión de cubos (Administrador)
+
+### Listar todos los cubos
+
+```
+GET /api/storage/buckets
+```
+
+### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/storage/buckets" \
+  -H "Authorization: Bearer admin-jwt-token"
+```
+
+### Respuesta
+
+```json
+{
+  "buckets": ["avatars", "documents", "uploads", "public"]
+}
+```
+
+### Crear cubo
+
+```
+POST /api/storage/buckets
+```
+
+### Cuerpo de la solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `bucketName` | string | Sí | Nombre de cubo (alfanumérico, guión bajo, guión) |
+| `isPublic` | boolean | No | Si el cubo es accesible públicamente (predeterminado: true) |
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bucketName": "user-uploads",
+    "isPublic": false
+  }'
+```
+
+### Respuesta
+
+```json
+{
+  "message": "Bucket created successfully",
+  "bucket": "user-uploads"
+}
+```
+
+### Actualizar cubo
+
+```
+PATCH /api/storage/buckets/{bucketName}
+```
+
+### Cuerpo de la solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `isPublic` | boolean | Sí | Si el cubo es accesible públicamente |
+
+### Ejemplo
+
+```bash
+curl -X PATCH "https://your-app.insforge.app/api/storage/buckets/user-uploads" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"isPublic": true}'
+```
+
+### Respuesta
+
+```json
+{
+  "message": "Bucket visibility updated",
+  "bucket": "user-uploads",
+  "isPublic": true
+}
+```
+
+### Eliminar cubo
+
+```
+DELETE /api/storage/buckets/{bucketName}
+```
+
+### Ejemplo
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/old-uploads" \
+  -H "Authorization: Bearer admin-jwt-token"
+```
+
+### Respuesta
+
+```json
+{
+  "message": "Bucket deleted successfully"
+}
+```
+
+---
+
+## Respuestas de error
+
+### Cubo no encontrado (404)
+
+```json
+{
+  "error": "BUCKET_NOT_FOUND",
+  "message": "Bucket 'nonexistent' does not exist",
+  "statusCode": 404,
+  "nextActions": "Create the bucket first"
+}
+```
+
+### Objeto no encontrado (404)
+
+```json
+{
+  "error": "OBJECT_NOT_FOUND",
+  "message": "Object 'missing.jpg' not found in bucket 'avatars'",
+  "statusCode": 404,
+  "nextActions": "Check the bucket and key combination"
+}
+```
+
+### Archivo inválido (400)
+
+```json
+{
+  "error": "INVALID_FILE",
+  "message": "No file provided in the request",
+  "statusCode": 400,
+  "nextActions": "Include a file in the multipart form data"
+}
+```
+
+### El cubo ya existe (409)
+
+```json
+{
+  "error": "BUCKET_EXISTS",
+  "message": "Bucket 'avatars' already exists",
+  "statusCode": 409,
+  "nextActions": "Choose a different bucket name"
+}
+```

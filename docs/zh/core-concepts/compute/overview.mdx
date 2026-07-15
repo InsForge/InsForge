@@ -1,0 +1,58 @@
+---
+title: "自定义计算"
+sidebarTitle: "Overview"
+description: "在 InsForge 项目旁运行长期容器。"
+---
+
+使用 InsForge 自定义计算在您的项目旁运行长期容器：队列工作者、后台处理器、AI 推理循环、websocket 服务器、爬虫、任何需要保持运行的东西。容器使用函数会使用的相同凭证附加到您的项目的数据库、存储和身份验证。
+
+<Note>
+  **只需要处理请求？** 对请求/响应工作和短工作使用 [Edge Functions](/core-concepts/functions/overview)。自定义计算适用于需要连续运行的流程。
+</Note>
+
+```mermaid
+graph TB
+    Dashboard[InsForge Dashboard] --> Service[Compute Service]
+    CLI[InsForge CLI] --> Service
+
+    Service --> Container[Long-lived Container]
+
+    Container --> DB[(Database)]
+    Container --> Storage[Storage]
+    Container --> Auth[Auth]
+
+    style Dashboard fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style CLI fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style Service fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Container fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style DB fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Storage fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Auth fill:#0e7490,stroke:#06b6d4,color:#cffafe
+```
+
+## 功能
+
+### 容器部署
+
+将任何 Docker 映像推送到 InsForge，它就会运行。使用来自您的存储库的 `Dockerfile` 或指向注册表上的预构建映像。无需学习专有的构建管道。
+
+### 项目链接凭证
+
+容器作为环境变量接收 InsForge 项目 URL、服务角色 JWT 和 S3 存储凭证。连接到 Postgres、调用 SDK 并读取对象，无需配置任何东西。
+
+### 缩放
+
+对于单个工作者运行一个实例，或对无状态工作负载进行水平缩放。内存、CPU 和副本计数可以按服务配置。
+
+### 日志
+
+每个容器的结构化日志，可按服务和时间范围查询。在仪表盘、CLI 或 MCP 中跟踪，无需 `kubectl exec` 进入任何东西。
+
+### 秘密和环境变量
+
+为每个服务设置环境变量和秘密，与您的边缘函数秘密分开。不需重新部署即可轮换。
+
+## 下一步
+
+- 设置 [CLI](/quickstart) 以链接您的项目（推荐的路径）。
+- 如果您只需要请求/响应，请查看 [Edge Functions](/core-concepts/functions/overview)。

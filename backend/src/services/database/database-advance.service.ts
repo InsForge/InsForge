@@ -9,7 +9,11 @@ import {
   type BulkUpsertResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { checkSqlExecutionGuards, parseSQLStatements } from '@/utils/sql-parser.js';
+import {
+  checkSqlExecutionGuards,
+  parseSQLStatements,
+  checkSqlReadOnly,
+} from '@/utils/sql-parser.js';
 import { validateSchemaName, validateTableName } from '@/utils/validations.js';
 import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
@@ -131,6 +135,72 @@ export class DatabaseAdvanceService {
     } finally {
       await client.query('SET statement_timeout = 0').catch((error: unknown) => {
         releaseError = error instanceof Error ? error : new Error(String(error));
+      });
+      client.release(releaseError);
+    }
+  }
+
+  async executeExplain(
+    query: string,
+    params: unknown[] = [],
+    asRoot: boolean = false
+  ): Promise<RawSQLResponse> {
+    const readOnlyError = checkSqlReadOnly(query);
+    if (readOnlyError) {
+      throw new AppError(readOnlyError, 400, ERROR_CODES.INVALID_INPUT);
+    }
+    const sanitizedQuery = this.sanitizeQuery(query);
+    const pool = this.dbManager.getPool();
+    const client = await pool.connect();
+    let releaseError: Error | undefined;
+
+    try {
+      // Set statement timeout at session level (30 seconds)
+      await client.query('SET statement_timeout = 30000');
+
+      // Start transaction block
+      await client.query('BEGIN');
+
+      const explainQuery = `EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) ${sanitizedQuery}`;
+
+      const result = asRoot
+        ? await client.query<Record<string, unknown>>(explainQuery, params)
+        : await withAdminContext(
+            client,
+            () => client.query<Record<string, unknown>>(explainQuery, params),
+            true,
+            (error) => {
+              releaseError = error;
+            }
+          );
+
+      const response: RawSQLResponse = {
+        rows: result.rows || [],
+        rowCount: result.rowCount,
+        fields: result.fields?.map((field: { name: string; dataTypeID: number }) => ({
+          name: field.name,
+          dataTypeID: field.dataTypeID,
+        })),
+      };
+
+      return response;
+    } catch (error) {
+      // Handle timeout errors specifically for better error messages
+      if (hasPgErrorCode(error, '57014')) {
+        throw new Error('Query timeout: The query took longer than 30 seconds to execute');
+      }
+      throw error;
+    } finally {
+      // Always rollback transaction to discard any mutations/context changes
+      await client.query('ROLLBACK').catch((error: unknown) => {
+        if (!releaseError) {
+          releaseError = error instanceof Error ? error : new Error(String(error));
+        }
+      });
+      await client.query('SET statement_timeout = 0').catch((error: unknown) => {
+        if (!releaseError) {
+          releaseError = error instanceof Error ? error : new Error(String(error));
+        }
       });
       client.release(releaseError);
     }

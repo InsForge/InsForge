@@ -1,0 +1,43 @@
+---
+title: "时间表：cron 触发的函数"
+description: "使用 pg_cron 在 cron 时间表上运行函数"
+---
+
+时间表在定期 cron 表达式上调用函数。[pg_cron](https://github.com/citusdata/pg_cron) 在每个刻度处向函数 URL 发送 HTTP 请求并记录结果。
+
+## 概念
+
+时间表是 cron 表达式、目标 URL 和标头。在创建时，标头中的 `${{secrets.KEY}}` 占位符被解析并使用 `pgcrypto` 加密。在每个刻度处，`execute_job()` 解密标头、调用函数并将状态和持续时间写入 `schedules.job_logs`。
+
+## 用法
+
+标准 5 字段 cron（无秒数）。在标头中引用秘密，而不是硬编码密钥。
+
+```text
+*/5 * * * *   每 5 分钟
+0 * * * *     每小时
+0 0 * * *     每天午夜
+0 9 * * 1     每个星期一上午 9 点
+0 0 1 * *     每个月的第一天
+```
+
+通过仪表盘或 SQL 创建：
+
+```sql
+select schedules.create_job(
+  name       => 'daily-cleanup',
+  schedule   => '0 0 * * *',
+  url        => 'https://myapp.functions.insforge.app/cleanup',
+  headers    => jsonb_build_object('Authorization', 'Bearer ${{secrets.CRON_TOKEN}}')
+);
+```
+
+## 限制
+
+最小间隔为 1 分钟 (pg_cron)。失败的运行被记录但不重试，所以函数必须是幂等的。删除被引用的秘密会破坏使用它的每个工作，直到您更新或禁用时间表。
+
+## 更多资源
+
+- [pg_cron docs](https://github.com/citusdata/pg_cron) 用于 cron 语法。
+- [Functions overview](/core-concepts/functions/overview) 用于运行时。
+- [crontab.guru](https://crontab.guru) 检查表达式。

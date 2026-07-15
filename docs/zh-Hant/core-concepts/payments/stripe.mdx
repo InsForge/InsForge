@@ -1,0 +1,210 @@
+---
+title: "Stripe 付款"
+sidebarTitle: "Stripe"
+description: "將 Stripe Checkout、Billing Portal、目錄同步和 webhook 履行與 InsForge 整合。"
+---
+
+當您想要 Stripe 託管的 Checkout、Stripe Products 和 Prices、Stripe Subscriptions 和託管的 Billing Portal 時，使用 Stripe 整合。
+
+InsForge 在伺服器端儲存 Stripe 密鑰、從您的應用建立 Checkout 和 Billing Portal 工作階段、當您的後端可存取時自動管理 Stripe webhook 端點、將 Stripe 狀態鏡像到 `payments` 架構，並記錄已驗證的 webhook 事件。
+
+## Stripe 模型
+
+| Stripe 概念 | InsForge 資料表或 API |
+|----------------|-----------------------|
+| Product | `payments.stripe_products` |
+| Price | `payments.stripe_prices` |
+| Checkout Session | `POST /api/payments/stripe/{environment}/checkout-sessions` 和 `payments.stripe_checkout_sessions` |
+| Billing Portal Session | `POST /api/payments/stripe/{environment}/customer-portal-sessions` 和 `payments.stripe_customer_portal_sessions` |
+| Subscription | `payments.stripe_subscriptions` 和 `payments.stripe_subscription_items` |
+| Customer mapping | `payments.customer_mappings` 帶 `provider = 'stripe'` |
+| Webhook event | `payments.webhook_events` 帶 `provider = 'stripe'` |
+| Dashboard transaction row | `payments.transactions` 帶 `provider = 'stripe'` |
+
+## 設定
+
+在 Dashboard -> Payments -> Settings、CLI 或管理 API 中配置 `test` 和 `live` Stripe 密鑰。
+
+```bash
+npx @insforge/cli payments stripe status
+npx @insforge/cli payments stripe config set --environment test sk_test_xxx
+npx @insforge/cli payments stripe sync --environment test
+npx @insforge/cli payments stripe webhooks configure --environment test
+```
+
+連接密鑰後，InsForge 驗證帳戶、在祕密儲存中儲存密鑰、嘗試建立託管的 Stripe webhook 端點，並為 Products、Prices、Customers 和 Subscriptions 執行同步。
+
+## Checkout
+
+從前端程式碼使用目前 InsForge 使用者令牌建立 Checkout Sessions。
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCheckoutSession('test', {
+  mode: 'payment',
+  lineItems: [{ priceId: 'price_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/checkout/success`,
+  cancelUrl: `${window.location.origin}/pricing`,
+  customerEmail: user?.email ?? null,
+  metadata: { order_id: orderId },
+  idempotencyKey: `order:${orderId}`
+});
+
+if (error) throw error;
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+對於訂閱 Checkout，傳遞計費主體。主體是您的應用擁有的計費所有者，如使用者、團隊、工作區、組織、租戶或群組。
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCheckoutSession('test', {
+  mode: 'subscription',
+  subject: { type: 'team', id: teamId },
+  lineItems: [{ priceId: 'price_monthly_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/billing/success`,
+  cancelUrl: `${window.location.origin}/billing`,
+  customerEmail: user.email,
+  idempotencyKey: `team:${teamId}:pro-monthly`
+});
+
+if (error) throw error;
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+Checkout 使用呼叫者的 InsForge 令牌在 `payments.stripe_checkout_sessions` 中插入一列。新增 RLS 原則，以便使用者只能為他們被允許計費的主體建立工作階段。PostgreSQL 對 `INSERT ... RETURNING` 傳回和等冪查詢的列應用 `SELECT` 原則，因此重試也需要相同主體和等冪密鑰的匹配 `SELECT` 原則。
+
+## Billing Portal
+
+對現有 Stripe 客戶對應使用託管的 Billing Portal。
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCustomerPortalSession('test', {
+  subject: { type: 'team', id: teamId },
+  returnUrl: `${window.location.origin}/billing`
+});
+
+if (error) {
+  if ('statusCode' in error && error.statusCode === 404) {
+    return;
+  }
+
+  throw error;
+}
+
+if (data?.customerPortalSession.url) {
+  window.location.assign(data.customerPortalSession.url);
+}
+```
+
+Portal 建立需要已驗證的使用者和主體的現有 `payments.customer_mappings` 列。使用 RLS 或伺服器端成員資格檢查保護 portal 建立，以便使用者無法為他們不管理的團隊或組織開啟計費設定。
+
+## Webhooks 和履行
+
+當後端具有公開 URL 時，Stripe webhook 會自動管理。InsForge 侦聽保持 checkout 嘗試、客戶、訂閱、退款和交易投影最新所需的事件。
+
+Stripe 還建議從 webhook 而不是成功 URL 履行 Checkout 訂單。在 InsForge 中，將履行觸發器附加到 `payments.webhook_events`。
+
+```sql
+CREATE OR REPLACE FUNCTION public.fulfill_stripe_order()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.provider = 'stripe'
+     AND NEW.event_type = 'checkout.session.completed'
+     AND NEW.processing_status = 'processed'
+     AND (NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'order_id') IS NOT NULL THEN
+    UPDATE public.orders
+    SET status = 'paid',
+        paid_at = COALESCE(NEW.processed_at, NOW())
+    WHERE id::text = NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'order_id'
+      AND status = 'pending';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER fulfill_stripe_order_from_webhook
+  AFTER INSERT OR UPDATE ON payments.webhook_events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fulfill_stripe_order();
+```
+
+### 事件排序
+
+Webhook 事件獨立驗證和處理。InsForge 在將事件標記為 `processed` 之前提交派生自事件的每一列，但 Stripe 不保證事件間的排序：`invoice.paid` 可以在 `checkout.session.completed` 之前處理，所以另一個事件建立的列（如 `payments.customer_mappings`）在觸發器觸發時可能不存在。
+
+對於訂閱事件，首先從事件有效負荷解析計費主體 — InsForge 在 checkout 處將 `insforge_subject_type` 和 `insforge_subject_id` 戳入訂閱中繼資料，Stripe 將其快照到訂閱產生的發票上，作為 `parent.subscription_details.metadata`。接下來檢查 `invoice.metadata`，然後回退到 `payments.customer_mappings`（InsForge 內部使用的相同順序）：
+
+```sql
+CREATE OR REPLACE FUNCTION public.grant_subscription_access()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_subject_type TEXT;
+  v_subject_id TEXT;
+BEGIN
+  IF NEW.provider = 'stripe'
+     AND NEW.event_type = 'invoice.paid'
+     AND NEW.processing_status = 'processed' THEN
+    v_subject_type := COALESCE(
+      NEW.payload -> 'data' -> 'object' -> 'parent'
+        -> 'subscription_details' -> 'metadata' ->> 'insforge_subject_type',
+      NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'insforge_subject_type'
+    );
+    v_subject_id := COALESCE(
+      NEW.payload -> 'data' -> 'object' -> 'parent'
+        -> 'subscription_details' -> 'metadata' ->> 'insforge_subject_id',
+      NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'insforge_subject_id'
+    );
+
+    IF v_subject_id IS NULL THEN
+      SELECT m.subject_type, m.subject_id
+      INTO v_subject_type, v_subject_id
+      FROM payments.customer_mappings m
+      WHERE m.provider = NEW.provider
+        AND m.environment = NEW.environment
+        AND m.provider_customer_id = NEW.payload -> 'data' -> 'object' ->> 'customer';
+    END IF;
+
+    IF v_subject_id IS NULL THEN
+      RAISE WARNING 'Stripe event % has no resolvable billing subject', NEW.provider_event_id;
+      RETURN NEW;
+    END IF;
+
+    -- 在 checkout 處傳送的主體類型上分支；team_id 是這裡的 UUID，
+    -- 所以類型檢查也保護轉換。
+    IF v_subject_type = 'team' THEN
+      INSERT INTO public.team_entitlements (team_id, plan, active, updated_at)
+      VALUES (v_subject_id::uuid, 'pro', true, NOW())
+      ON CONFLICT (team_id) DO UPDATE SET
+        plan = EXCLUDED.plan,
+        active = true,
+        updated_at = NOW();
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER grant_subscription_access_from_stripe_webhook
+  AFTER INSERT OR UPDATE ON payments.webhook_events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.grant_subscription_access();
+```
+
+永遠不要讓履行靜默跳過 — 記錄或死信您無法解析的事件，以便可以重播。
+
+## 同步和儀表板狀態
+
+Stripe 同步鏡像 Products、Prices、Customers 和 Subscriptions。Webhooks 在 Stripe 發出事件時維護工作階段、訂閱、客戶、退款和交易狀態。
+
+`payments.transactions` 是儀表板的報告投影。它為您提供支付意圖、費用、發票、checkout 工作階段和退款 ID 等提供商參考 ID，以便您可以在 Stripe Dashboard 中查找詳細資料。將使用者面向的訂單、信用或權利狀態保留在您自己的資料表中。
+
+## 參考
+
+- [Stripe Checkout fulfillment](https://docs.stripe.com/checkout/fulfillment)
+- [Stripe Billing Portal Sessions API](https://docs.stripe.com/api/customer_portal/sessions/create)
+- [TypeScript Stripe payments guide](/sdks/typescript/payments-stripe)

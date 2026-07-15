@@ -270,13 +270,28 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                   <div className="h-px w-full bg-[var(--alpha-8)]" />
                 </div>
 
-                <div className="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-6">
-                  <label className="text-sm leading-5 text-foreground">
-                    {t('auth.autoConfirm', { defaultValue: 'Auto-confirm' })}
-                  </label>
-                  <div className="min-w-0 flex justify-end">
+                <div className="grid grid-cols-[200px_minmax(0,1fr)] items-start gap-6">
+                  <div>
+                    <label
+                      htmlFor="auto-confirm"
+                      className="block py-1.5 text-sm leading-5 text-foreground"
+                    >
+                      {t('auth.autoConfirm', { defaultValue: 'Auto-confirm' })}
+                    </label>
+                    <p
+                      id="auto-confirm-description"
+                      className="pb-2 text-[13px] leading-[18px] text-muted-foreground"
+                    >
+                      {t('auth.autoConfirmDescription', {
+                        defaultValue:
+                          'Automatically mark the email as verified, so the user can sign in without confirming it.',
+                      })}
+                    </p>
+                  </div>
+                  <div className="min-w-0 flex justify-end py-1.5">
                     <Switch
                       id="auto-confirm"
+                      aria-describedby="auto-confirm-description"
                       checked={autoConfirm}
                       onCheckedChange={setAutoConfirm}
                     />

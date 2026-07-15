@@ -497,7 +497,8 @@
     "usingColumn": "Using",
     "versionColumn": "Version",
     "viewLinkedRecord": "View linked record",
-    "withCheckColumn": "With Check"
+    "withCheckColumn": "With Check",
+    "explain": "Explain"
   },
   "ai": {
     "sidebar": {
@@ -973,7 +974,8 @@
     "oauthDeletedToast": "OAuth configuration for {{provider}} deleted successfully",
     "oauthDeleteFailed": "Failed to delete OAuth configuration",
     "smtpConfigUpdatedToast": "SMTP configuration updated successfully",
-    "smtpConfigUpdateFailed": "Failed to update SMTP configuration"
+    "smtpConfigUpdateFailed": "Failed to update SMTP configuration",
+    "autoConfirmDescription": "Automatically mark the email as verified, so the user can sign in without confirming it."
   },
   "common": {
     "anErrorOccurred": "An error occurred",

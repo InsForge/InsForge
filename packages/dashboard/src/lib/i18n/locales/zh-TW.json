@@ -483,7 +483,8 @@
     "usingColumn": "Using",
     "versionColumn": "版本",
     "viewLinkedRecord": "檢視關聯記錄",
-    "withCheckColumn": "With Check"
+    "withCheckColumn": "With Check",
+    "explain": "解釋"
   },
   "ai": {
     "sidebar": {
@@ -954,7 +955,8 @@
     "oauthDeletedToast": "已成功刪除 {{provider}} 的 OAuth 設定",
     "oauthDeleteFailed": "刪除 OAuth 設定失敗",
     "smtpConfigUpdatedToast": "已成功更新 SMTP 設定",
-    "smtpConfigUpdateFailed": "更新 SMTP 設定失敗"
+    "smtpConfigUpdateFailed": "更新 SMTP 設定失敗",
+    "autoConfirmDescription": "自動將電子郵件標記為已驗證，使用者無需確認即可登入。"
   },
   "common": {
     "anErrorOccurred": "發生了一個錯誤",

@@ -1,0 +1,52 @@
+---
+title: "Migraciones de base de datos"
+description: "Rastrear cambios de esquema en git y aplicarlos con InsForge CLI"
+---
+
+Las migraciones son archivos SQL versionados en `migrations/` aplicados con `@insforge/cli`. Cada ejecución exitosa se registra en `system.custom_migrations`. El flujo de trabajo es de solo avance.
+
+## Conceptos
+
+Una migración es un archivo SQL prefijado con una marca de tiempo UTC de 14 dígitos: `<YYYYMMDDHHmmss>_<name>.sql`. El CLI aplica archivos pendientes en orden dentro de una transacción, establece `search_path` en `public` y registra el historial solo en caso de éxito. PostgREST recarga automáticamente los metadatos del esquema. `BEGIN`/`COMMIT`/`ROLLBACK` dentro de un archivo se rechaza.
+
+## Uso
+
+Vincule el backend y luego cree un archivo.
+
+```bash
+npx @insforge/cli login
+npx @insforge/cli link
+npx @insforge/cli db migrations new create-employees-table
+```
+
+Escriba el SQL.
+
+```sql
+create table if not exists public.employees (
+  id bigint primary key generated always as identity,
+  name text not null,
+  email text,
+  created_at timestamptz default now()
+);
+```
+
+Aplique migraciones pendientes y verifique el historial.
+
+```bash
+npx @insforge/cli db migrations up --all
+npx @insforge/cli db migrations list
+```
+
+Apunte a un archivo único con `up <version>`, o aplique todo pendiente hasta e incluyendo un destino con `up --to <version>`.
+
+## Casos de uso específicos
+
+Adoptar migraciones en un proyecto existente: ejecute `db migrations fetch` primero para materializar el historial remoto en archivos locales. Una vez aplicado remotamente, nunca edite una migración in situ. En su lugar, escriba una migración hacia adelante.
+
+Una vez que opte por participar, rute todos los cambios de esquema a través de archivos. Las ediciones ad hoc del panel causan una desviación entre git y `system.custom_migrations`.
+
+## Más recursos
+
+- [Database branching](/agent-native/branching) para ensayar una migración en una copia.
+- [Database overview](/core-concepts/database/overview) para saber cómo PostgREST recoge cambios de esquema.
+- [PostgreSQL DDL docs](https://www.postgresql.org/docs/15/ddl.html) para el SQL que escribe.

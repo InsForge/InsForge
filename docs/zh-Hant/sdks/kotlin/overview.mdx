@@ -1,0 +1,50 @@
+---
+title: Android 和多平台的 Kotlin SDK
+description: 安裝並初始化官方 InsForge Kotlin SDK，以便從 Android 和 Kotlin 多平台應用程式存取身份驗證、資料庫、儲存空間和即時功能。
+---
+
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
+InsForge Kotlin SDK 為從 Android 應用程式和 Kotlin 多平台專案與 InsForge 服務互動提供了原生 Kotlin 用戶端。
+
+## 安裝
+
+<KotlinSdkInstallation />
+
+## 功能
+
+- **資料庫** - 使用 Kotlin 序列化實現類型安全的 CRUD 作業
+- **身份驗證** - 電子郵件/密碼和 OAuth 身份驗證
+- **儲存空間** - 檔案上傳、下載和管理
+- **AI** - 聊天完成和圖像生成
+- **即時** - 基於 WebSocket 的發佈/訂閱訊息傳遞
+- **協程** - 完整的 Kotlin 協程支援
+- **Jetpack Compose** - 可組合函式和狀態管理
+
+## 平台支援
+
+| 平台 | 支援 |
+|------|------|
+| Android | 5.0+ (API 21+) |
+| JVM | Java 11+ |
+| Kotlin 多平台（即將推出） | iOS、macOS、JS（實驗性） |
+
+## SDK 參考
+
+<CardGroup cols={2}>
+  <Card title="資料庫" icon="database" href="/sdks/kotlin/database">
+    使用 Kotlin 資料類的 CRUD 作業
+  </Card>
+  <Card title="身份驗證" icon="lock" href="/sdks/kotlin/auth">
+    註冊、登入、OAuth 和使用者管理
+  </Card>
+  <Card title="儲存空間" icon="cloud-arrow-up" href="/sdks/kotlin/storage">
+    檔案上傳、下載和管理
+  </Card>
+  <Card title="AI" icon="brain" href="/sdks/kotlin/ai">
+    聊天完成和圖像生成
+  </Card>
+  <Card title="即時" icon="signal-stream" href="/sdks/kotlin/realtime">
+    WebSocket 發佈/訂閱訊息傳遞
+  </Card>
+</CardGroup>

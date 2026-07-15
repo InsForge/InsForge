@@ -1,0 +1,48 @@
+---
+title: "匿名自託管遙測"
+description: "瞭解匿名使用數據 InsForge 自託管部署發送、永遠不會收集的內容以及如何使用 INSFORGE_TELEMETRY_DISABLED 選擇退出。"
+---
+
+InsForge 從自託管部署中收集匿名遙測數據，以瞭解活躍安裝、版本採用、部署方法以及配置了哪些可選服務。這有助於維護人員優先考慮修復、安全通知和開源專案的部署工作。
+
+遙測是選擇性的。您可以隨時禁用它。
+InsForge 不會從 InsForge Cloud 發送此遙測。
+自託管事件包括粗略的執行時標籤，例如生產、開發、測試、ci 或未知，因此維護人員可以將本地和自動化執行與生產部署分開。
+
+## InsForge 發送什麼
+
+InsForge 在後端啟動時發送 `oss_instance_started` 事件，並在後端執行時大約每 24 小時發送一次 `oss_heartbeat` 事件。
+事件透過 InsForge 的 PostHog 代理在 `https://b.insforge.dev/capture/` 使用 PostHog 的擷取 API 格式發送。
+
+每個事件包含：
+
+- PostHog 事件名稱：`oss_instance_started` 或 `oss_heartbeat`
+- 本地儲存在 `LOGS_DIR/.insforge-installation-id` 中的匿名安裝 ID，用作 PostHog `distinct_id`
+- InsForge 版本
+- 事件時間戳
+- 託管模式，如 `self-hosted` 或 `cloud`
+- 粗略的部署方法，例如 Docker Compose、Railway、Zeabur、Sealos、Dokploy、Kubernetes 或未知
+- 作業系統、CPU 架構、Node.js 版本、執行時環境以及該過程是否似乎在 CI 中執行
+- 儲存後端類別：本地檔案系統、S3 或 S3 相容
+- 可選功能是否已配置的布林值標誌：網站部署、函數、運算和 OpenRouter
+
+## InsForge 永遠不會發送什麼
+
+遙測不包括：
+
+- 環境變數值
+- API 金鑰、JWT 金鑰、密碼、OAuth 金鑰或支付金鑰
+- 資料庫內容、綱要、表名或列數
+- 日誌、錯誤堆疊追蹤、檔案內容或檔案路徑
+- 專案名稱、網域、值區名稱、電子郵件位址或使用者資料
+
+## 禁用遙測
+
+在您的環境中設定 `INSFORGE_TELEMETRY_DISABLED=1` 並重新啟動後端。
+對於 Docker Compose 部署，將相同的行新增到您的 `.env` 檔案：
+
+```bash
+INSFORGE_TELEMETRY_DISABLED=1
+```
+
+網路故障已記錄並忽略，因此遙測永遠不會阻止啟動或正常要求。

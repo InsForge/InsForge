@@ -501,7 +501,8 @@
     "usingColumn": "Using",
     "versionColumn": "Versión",
     "viewLinkedRecord": "Ver registro vinculado",
-    "withCheckColumn": "With Check"
+    "withCheckColumn": "With Check",
+    "explain": "Explicar"
   },
   "ai": {
     "sidebar": {
@@ -977,7 +978,8 @@
     "oauthDeletedToast": "Configuración de OAuth para {{provider}} eliminada correctamente",
     "oauthDeleteFailed": "Error al eliminar la configuración de OAuth",
     "smtpConfigUpdatedToast": "Configuración SMTP actualizada correctamente",
-    "smtpConfigUpdateFailed": "Error al actualizar la configuración SMTP"
+    "smtpConfigUpdateFailed": "Error al actualizar la configuración SMTP",
+    "autoConfirmDescription": "Marca el correo como verificado automáticamente, para que el usuario pueda iniciar sesión sin confirmarlo."
   },
   "common": {
     "anErrorOccurred": "Se produjo un error",

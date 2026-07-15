@@ -1,0 +1,34 @@
+---
+title: "Database backups and restore"
+description: "Create manual database backups, restore snapshots from the InsForge dashboard, and use automated daily backups on InsForge Cloud with 7-day retention."
+---
+
+Back up and restore your database from **Database → Backup & Restore** in the dashboard. InsForge Cloud also backs up your project automatically every day, so you always have a recent copy to roll back to.
+
+Backups cover the database only — files uploaded to Storage are not included.
+
+<Frame caption="Here is where it lives in the UI: Database → Backup & Restore.">
+  <img src="/images/dashboard-backup-restore.png" alt="InsForge dashboard Backup & Restore page showing manual backups and scheduled backups with a Restore button" />
+</Frame>
+
+## Scheduled backups
+
+InsForge Cloud takes a full backup of every active project on a paid plan once a day, retained for 7 days. The **Scheduled Backups** list shows when each backup expires, and any of them can be restored at any time. Manual backups don't affect the daily schedule.
+
+## Manual backups
+
+Click **Create a Backup** before a risky change and optionally give it a name. The backup runs in the background; the list shows its status, size, and creation time, and lets you rename or delete it. The Free plan includes 1 manual backup slot; paid plans include 5. Manual backups are kept until you delete them.
+
+## Restore
+
+Click **Restore** next to any completed backup — scheduled or manual. Restoring replaces the current database with the backup: the project goes offline during the restore, you lose data created after the backup, and you can't undo the action. Take a manual backup first if you're unsure.
+
+## Self-hosting
+
+Self-hosted deployments have the same **Backup & Restore** page for manual backups and restores. Backups are stored alongside your project's storage (local disk, or your S3 bucket when configured) and kept until you delete them. The official Docker image needs no extra setup.
+
+## More resources
+
+- [Database overview](/core-concepts/database/overview) for how the database is exposed to your app.
+- [Database migrations](/core-concepts/database/migrations) to version schema changes instead of restoring to undo them.
+- [Database branching](/agent-native/branching) to rehearse risky changes on a copy.

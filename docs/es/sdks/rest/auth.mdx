@@ -1,0 +1,1071 @@
+---
+title: Referencia de API de Autenticación
+description: Autenticación de usuario y gestión de sesiones a través de API REST
+---
+
+## Descripción General
+
+La API de Autenticación proporciona puntos finales para registro de usuario, inicio de sesión, verificación de correo electrónico, restablecimiento de contraseña e integración de OAuth.
+
+## Encabezados
+
+Para invocaciones de funciones autenticadas:
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+Content-Type: application/json
+```
+
+Para puntos finales de administrador:
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
+Content-Type: application/json
+```
+
+---
+
+## Registrar Usuario
+
+Crear una nueva cuenta de usuario.
+
+```
+POST /api/auth/users
+```
+
+### Parámetros de Consulta
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Tipo de cliente: `web` (predeterminado), `mobile`, `desktop` o `server` |
+
+### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `email` | string | Sí | Dirección de correo electrónico del usuario |
+| `password` | string | Sí | Contraseña (debe cumplir los requisitos configurados) |
+| `name` | string | No | Nombre para mostrar del usuario |
+| `redirectTo` | string | No | Se utiliza para verificación de correo electrónico basada en enlace. El enlace de correo electrónico siempre abre primero un punto final del servidor InsForge; después de verificar el token, InsForge redirige el navegador a esta URL con el resultado de la verificación. Requerido cuando `verifyEmailMethod` es `link`. Esta URL debe incluirse en `allowedRedirectUrls`. Recomendado: utiliza la página de inicio de sesión de tu aplicación. |
+
+### Ejemplo (Cliente Web)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/users" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123",
+    "name": "John Doe",
+    "redirectTo": "http://localhost:3000/sign-in"
+  }'
+```
+
+### Ejemplo (Cliente No Web)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/users?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123",
+    "name": "John Doe",
+    "redirectTo": "myapp://sign-in"
+  }'
+```
+
+### Respuesta (Cliente Web)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": false,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123...",
+  "requireEmailVerification": false
+}
+```
+
+### Respuesta (Cliente No Web)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": false,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
+  "requireEmailVerification": false
+}
+```
+
+<Note>
+- Para **clientes web**: Se devuelve un `csrfToken` y el token de actualización se almacena en una cookie httpOnly.
+- Para **clientes no web** (`mobile`, `desktop`, `server`): Un `refreshToken` se devuelve directamente en la respuesta. Guárdalo de forma segura en tu cliente o servidor.
+- Usa **`server`** para llamadores del lado del servidor de confianza, como aplicaciones SSR, BFF o CLI que no pueden depender de cookies del navegador.
+- Si `requireEmailVerification` es `true`, `accessToken` y los tokens serán `null` y el usuario debe verificar su correo electrónico antes de iniciar sesión.
+</Note>
+
+---
+
+## Iniciar Sesión
+
+Autenticar usuario y obtener token de acceso.
+
+```
+POST /api/auth/sessions
+```
+
+### Parámetros de Consulta
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Tipo de cliente: `web` (predeterminado), `mobile`, `desktop` o `server` |
+
+### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `email` | string | Sí | Dirección de correo electrónico del usuario |
+| `password` | string | Sí | Contraseña del usuario |
+
+### Ejemplo (Cliente Web)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123"
+  }'
+```
+
+### Ejemplo (Cliente No Web)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123"
+  }'
+```
+
+### Respuesta (Cliente Web)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123..."
+}
+```
+
+### Respuesta (Cliente No Web)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+<Note>
+- Para **clientes web**: Se devuelve un `csrfToken` y el token de actualización se almacena en una cookie httpOnly. Incluye el `csrfToken` en el encabezado `X-CSRF-Token` cuando llames a `/api/auth/refresh`.
+- Para **clientes no web** (`mobile`, `desktop`, `server`): Un `refreshToken` se devuelve directamente. Guárdalo de forma segura e inclúyelo en el cuerpo de la solicitud cuando llames a `/api/auth/refresh`.
+</Note>
+
+---
+
+## Actualizar Token
+
+Actualizar token de acceso usando token de actualización.
+
+```
+POST /api/auth/refresh
+```
+
+### Parámetros de Consulta
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Tipo de cliente: `web` (predeterminado), `mobile`, `desktop` o `server` |
+
+### Encabezados (Cliente Web)
+
+| Encabezado | Tipo | Requerido | Descripción |
+|--------|------|----------|-------------|
+| `X-CSRF-Token` | string | Sí | Token CSRF recibido de la respuesta de inicio de sesión/registro |
+
+### Cuerpo de Solicitud (Cliente No Web)
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `refreshToken` | string | Sí | Token de actualización recibido de la respuesta de inicio de sesión/registro |
+
+### Ejemplo (Cliente Web)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/refresh" \
+  -H "X-CSRF-Token: abc123..." \
+  --cookie "refresh_token=..."
+```
+
+### Ejemplo (Cliente No Web)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/refresh?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+  }'
+```
+
+### Respuesta (Cliente Web)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "def456..."
+}
+```
+
+### Respuesta (Cliente No Web)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+<Note>
+La rotación de token se implementa para la seguridad:
+- **Clientes web**: Cada actualización devuelve un nuevo `csrfToken` que debe usarse para solicitudes de actualización posteriores.
+- **Clientes no web** (`mobile`, `desktop`, `server`): Cada actualización devuelve un nuevo `refreshToken`. Debes persistir este nuevo token y usarlo para la siguiente actualización. Actualiza el `accessToken` en memoria.
+</Note>
+
+---
+
+## Cerrar Sesión
+
+Cerrar sesión y borrar cookie de token de actualización.
+
+```
+POST /api/auth/logout
+```
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/logout"
+```
+
+### Respuesta
+
+```json
+{
+  "success": true,
+  "message": "Logged out successfully"
+}
+```
+
+---
+
+## Obtener Usuario Actual
+
+Obtener información del usuario autenticado actual desde el token JWT.
+
+Este punto final de REST no actualiza automáticamente tokens de acceso expirados.
+
+- Para clientes REST sin procesar, llama a `POST /api/auth/refresh` cuando sea necesario.
+- Para aplicaciones de navegador usando el SDK de TypeScript, llama a `auth.getCurrentUser()` durante el inicio. El SDK utilizará automáticamente la cookie de actualización httpOnly cuando pueda actualizar la sesión.
+- Este comportamiento de actualización automática es solo para navegadores. Los clientes servidor, móvil y otros no navegadores deben actualizar explícitamente.
+
+```
+GET /api/auth/sessions/current
+```
+
+### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/auth/sessions/current" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Respuesta
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "role": "authenticated"
+  }
+}
+```
+
+---
+
+## Actualizar Perfil
+
+Actualizar el perfil del usuario actual.
+
+```
+PATCH /api/auth/profiles/current
+```
+
+### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `profile` | object | Sí | Datos de perfil (nombre, URL de avatar, campos personalizados) |
+
+### Ejemplo
+
+```bash
+curl -X PATCH "https://your-app.insforge.app/api/auth/profiles/current" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "profile": {
+      "name": "John Doe",
+      "avatar_url": "https://example.com/avatar.jpg"
+    }
+  }'
+```
+
+### Respuesta
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "profile": {
+    "name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg"
+  }
+}
+```
+
+---
+
+## Obtener Perfil de Usuario
+
+Obtener información de perfil público para un usuario por ID.
+
+```
+GET /api/auth/profiles/{userId}
+```
+
+### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/auth/profiles/123e4567-e89b-12d3-a456-426614174000"
+```
+
+### Respuesta
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "profile": {
+    "name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg"
+  }
+}
+```
+
+---
+
+## Verificación de Correo Electrónico
+
+### Enviar Correo Electrónico de Verificación
+
+```
+POST /api/auth/email/send-verification
+```
+
+### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `email` | string | Sí | Dirección de correo electrónico del usuario |
+| `redirectTo` | string | No | Se utiliza para verificación de correo electrónico basada en enlace. El enlace de correo electrónico siempre abre primero un punto final del servidor InsForge; después de verificar el token, InsForge redirige el navegador a esta URL con el resultado de la verificación. Requerido cuando `verifyEmailMethod` es `link`. Esta URL debe incluirse en `allowedRedirectUrls`. Recomendado: utiliza la página de inicio de sesión de tu aplicación. |
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-verification" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "redirectTo": "http://localhost:3000/sign-in"
+  }'
+```
+
+### Respuesta
+
+```json
+{
+  "success": true,
+  "message": "If your email is registered, we have sent you a verification code/link."
+}
+```
+
+### Verificar Correo Electrónico
+
+```
+POST /api/auth/email/verify
+```
+
+### Parámetros de Consulta
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Tipo de cliente: `web` (predeterminado), `mobile`, `desktop` o `server` |
+
+### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `email` | string | Sí | Dirección de correo electrónico del usuario |
+| `otp` | string | Sí | Código de verificación de 6 dígitos |
+
+Para verificación basada en enlace, los clics de correo electrónico utilizan:
+
+```
+GET /api/auth/email/verify-link?token=...
+```
+
+Este flujo orientado al navegador verifica el token en el servidor y redirige a la URL `redirectTo` almacenada. `POST /api/auth/email/verify` es la API JSON para envíos de código de 6 dígitos.
+
+Maneja el redireccionamiento del navegador de esta manera:
+
+- Éxito: `?insforge_status=success&insforge_type=verify_email`
+- Error: `?insforge_status=error&insforge_type=verify_email&insforge_error=...`
+- `insforge_status`: Resultado del flujo de enlace del navegador. Para verificación, los valores son `success` o `error`.
+- `insforge_type`: Identificador de flujo. Para enlaces de verificación, esto es siempre `verify_email`.
+- `insforge_error`: Presente solo cuando `insforge_status=error`. Mensaje de error legible por humanos para mostrar o registrar.
+- Manejo recomendado: utiliza tu página de inicio de sesión como `redirectTo`. Cuando `insforge_status=success`, muestra un mensaje de confirmación y pide al usuario que inicie sesión con su correo electrónico y contraseña.
+- Si `redirectTo` no está en la lista de permitidos, InsForge devuelve un error `400` cuyo mensaje incluye la URL rechazada, y `nextActions` te dice que la agregues a `allowedRedirectUrls`.
+
+### Ejemplo (Cliente Web)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/verify" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "otp": "123456"
+  }'
+```
+
+### Ejemplo (Cliente No Web)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/verify?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "otp": "123456"
+  }'
+```
+
+### Respuesta (Cliente Web)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123..."
+}
+```
+
+### Respuesta (Cliente No Web)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+---
+
+## Restablecer Contraseña
+
+### Enviar Correo Electrónico de Restablecimiento
+
+```
+POST /api/auth/email/send-reset-password
+```
+
+### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `email` | string | Sí | Dirección de correo electrónico del usuario |
+| `redirectTo` | string | No | Se utiliza para restablecimiento de contraseña basado en enlace. El enlace de correo electrónico siempre abre primero un punto final del servidor InsForge; luego InsForge redirige el navegador a esta URL con el `token` de restablecimiento en la cadena de consulta para que tu aplicación pueda renderizar su propia página de restablecimiento de contraseña. Requerido cuando `resetPasswordMethod` es `link`. Esta URL debe incluirse en `allowedRedirectUrls`. Recomendado: utiliza la página de restablecimiento de contraseña dedicada de tu aplicación. |
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-reset-password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "redirectTo": "http://localhost:3000/reset-password"
+  }'
+```
+
+### Intercambiar Código por Token (Solo Método de Código)
+
+```
+POST /api/auth/email/exchange-reset-password-token
+```
+
+### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `email` | string | Sí | Dirección de correo electrónico del usuario |
+| `code` | string | Sí | Código de 6 dígitos del correo electrónico |
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/exchange-reset-password-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "code": "123456"
+  }'
+```
+
+### Respuesta
+
+```json
+{
+  "token": "abc123...",
+  "expiresAt": "2024-01-15T11:00:00Z"
+}
+```
+
+### Restablecer Contraseña
+
+```
+POST /api/auth/email/reset-password
+```
+
+Para restablecimiento de contraseña basado en enlace, los clics de correo electrónico utilizan:
+
+```
+GET /api/auth/email/reset-password-link?token=...
+```
+
+Este flujo orientado al navegador valida el token en el servidor y redirige a la URL `redirectTo` almacenada con el token de restablecimiento en la cadena de consulta. `POST /api/auth/email/reset-password` sigue siendo la API JSON que acepta la nueva contraseña.
+
+Maneja el redireccionamiento del navegador de esta manera:
+
+- Listo para restablecer: `?token=...&insforge_status=ready&insforge_type=reset_password`
+- Error: `?insforge_status=error&insforge_type=reset_password&insforge_error=...`
+- `token`: Presente solo cuando `insforge_status=ready`. Pasa este valor a `POST /api/auth/email/reset-password` como `otp`.
+- `insforge_status`: Resultado del flujo de enlace del navegador. Para enlaces de restablecimiento, los valores son `ready` o `error`.
+- `insforge_type`: Identificador de flujo. Para enlaces de restablecimiento, esto es siempre `reset_password`.
+- `insforge_error`: Presente solo cuando `insforge_status=error`. Mensaje de error legible por humanos para mostrar o registrar.
+- Tu aplicación solo debe renderizar el formulario de restablecimiento de contraseña cuando `insforge_status=ready` y `token` está presente.
+
+### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `newPassword` | string | Sí | Nueva contraseña |
+| `otp` | string | Sí | Token de restablecimiento de la URL de enlace mágico o punto final de intercambio de código |
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/reset-password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "newPassword": "newSecurePassword123",
+    "otp": "abc123..."
+  }'
+```
+
+### Respuesta
+
+```json
+{
+  "message": "Password reset successfully"
+}
+```
+
+---
+
+## Autenticación OAuth
+
+La autenticación OAuth ahora usa el flujo PKCE (Proof Key for Code Exchange) para mayor seguridad. En lugar de devolver tokens directamente en la URL de redireccionamiento, se devuelve un código de autorización que debe intercambiarse por tokens.
+
+### Iniciar Flujo OAuth
+
+```
+GET /api/auth/oauth/{provider}
+```
+
+Para proveedores personalizados configurados en el panel, utiliza:
+
+```
+GET /api/auth/oauth/custom/{key}
+```
+
+### Parámetros de Consulta
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|----------|-------------|
+| `redirect_uri` | string | Sí | URL a la que redirigirse después de la autenticación |
+| `code_challenge` | string | Sí | Desafío de código PKCE (hash SHA256 codificado en base64 de code_verifier) |
+| Otros parámetros de cadena de consulta | string | No | Pistas OAuth específicas del proveedor, como `prompt=select_account` de Google |
+
+<Note>
+  Los parámetros de consulta adicionales se reenvían como pistas específicas del proveedor solo cuando no entran en conflicto
+  con campos OAuth propiedad del servidor. No pases `client_id`, `redirect_uri`, `code_challenge`, `state`,
+  `response_type` o `scope`; los valores generados por InsForge/proveedor ganan y los valores del cliente que entran en conflicto se ignoran.
+</Note>
+
+### Proveedores Admitidos
+
+- `google`
+- `github`
+- `discord`
+- `linkedin`
+- `facebook`
+- `apple`
+- `microsoft`
+- `x`
+- `spotify`
+- Cualquier clave de proveedor personalizada devuelta por `GET /api/auth/public-config` en `customOAuthProviders`
+
+### Ejemplo
+
+```bash
+# Generate code_verifier (random string, 43-128 characters)
+CODE_VERIFIER=$(openssl rand -base64 32 | tr -d '=' | tr '/+' '_-')
+
+# Generate code_challenge (SHA256 hash of code_verifier, Base64 URL-encoded)
+CODE_CHALLENGE=$(echo -n $CODE_VERIFIER | openssl dgst -sha256 -binary | base64 | tr -d '=' | tr '/+' '_-')
+
+curl "https://your-app.insforge.app/api/auth/oauth/google?redirect_uri=https://myapp.com/callback&code_challenge=$CODE_CHALLENGE&prompt=select_account"
+```
+
+```bash
+# Custom provider example
+curl "https://your-app.insforge.app/api/auth/oauth/custom/acme?redirect_uri=https://myapp.com/callback&code_challenge=$CODE_CHALLENGE"
+```
+
+### Respuesta
+
+```json
+{
+  "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?client_id=..."
+}
+```
+
+### Devolución de llamada OAuth
+
+Después de que el usuario se autentica con el proveedor, será redirigido a tu `redirect_uri` con un código de autorización:
+
+```
+https://myapp.com/callback?insforge_code=abc123...
+```
+
+<Note>
+El `insforge_code` es un código de autorización temporal que debe intercambiarse por tokens usando el punto final `/api/auth/oauth/exchange`.
+</Note>
+
+---
+
+### Intercambiar Código por Tokens
+
+Intercambiar el código de autorización por tokens de acceso y actualización.
+
+```
+POST /api/auth/oauth/exchange
+```
+
+### Parámetros de Consulta
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Tipo de cliente: `web` (predeterminado), `mobile`, `desktop` o `server` |
+
+### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `code` | string | Sí | El `insforge_code` recibido en la devolución de llamada |
+| `code_verifier` | string | Sí | El code_verifier original usado para generar el code_challenge |
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/oauth/exchange?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "abc123...",
+    "code_verifier": "your-original-code-verifier"
+  }'
+```
+
+### Respuesta
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["google"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+<Note>
+- Para **clientes web**: El `refreshToken` será `null` y se devuelve un `csrfToken`. El token de actualización se almacena en una cookie httpOnly.
+- Para **clientes no web** (`mobile`, `desktop`, `server`): Un `refreshToken` se devuelve directamente. Guárdalo de forma segura.
+</Note>
+
+---
+
+### Ejemplo de Flujo OAuth Completo (No Web)
+
+```swift
+// 1. Generate PKCE code verifier and challenge
+let codeVerifier = generateRandomString(length: 43)
+let codeChallenge = sha256(codeVerifier).base64URLEncoded()
+
+// 2. Initiate OAuth flow
+let authURL = "https://your-app.insforge.app/api/auth/oauth/google" +
+    "?redirect_uri=myapp://callback" +
+    "&code_challenge=\(codeChallenge)"
+
+// 3. Open browser/WebView and wait for callback
+// User completes authentication...
+
+// 4. Handle callback with insforge_code
+// myapp://callback?insforge_code=abc123...
+
+// 5. Exchange code for tokens
+let response = POST("/api/auth/oauth/exchange?client_type=mobile", body: {
+    "code": insforgeCode,
+    "code_verifier": codeVerifier
+})
+
+// 6. Store tokens
+accessToken = response.accessToken
+refreshToken = response.refreshToken  // Persist securely
+```
+
+---
+
+## Configuración Pública
+
+Obtener configuración de autenticación pública (no requiere autenticación).
+
+```
+GET /api/auth/public-config
+```
+
+### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/auth/public-config"
+```
+
+### Respuesta
+
+```json
+{
+  "oAuthProviders": ["google", "github"],
+  "customOAuthProviders": ["acme"],
+  "requireEmailVerification": true,
+  "passwordMinLength": 8,
+  "requireNumber": true,
+  "requireLowercase": true,
+  "requireUppercase": false,
+  "requireSpecialChar": false,
+  "verifyEmailMethod": "code",
+  "resetPasswordMethod": "link"
+}
+```
+
+---
+
+## Puntos Finales de Administrador
+
+Estos puntos finales requieren rol `project_admin`.
+
+### Listar Todos los Usuarios
+
+```
+GET /api/auth/users?offset=0&limit=10&search=john
+```
+
+### Obtener Usuario por ID
+
+```
+GET /api/auth/users/{userId}
+```
+
+### Eliminar Usuarios
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/auth/users" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"userIds": ["user-id-1", "user-id-2"]}'
+```
+
+### Generar Token Anónimo
+
+```
+POST /api/auth/tokens/anon
+```
+
+### Obtener Configuración de Autenticación
+
+Obtener configuración actual de autenticación (solo administrador).
+
+```
+GET /api/auth/config
+```
+
+#### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/auth/config" \
+  -H "Authorization: Bearer admin-jwt-token"
+```
+
+#### Respuesta
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "requireEmailVerification": true,
+  "passwordMinLength": 8,
+  "requireNumber": true,
+  "requireLowercase": true,
+  "requireUppercase": false,
+  "requireSpecialChar": false,
+  "verifyEmailMethod": "code",
+  "resetPasswordMethod": "link",
+  "allowedRedirectUrls": ["https://myapp.com/dashboard", "https://*.myapp.com"],
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z"
+}
+```
+
+Las entradas `allowedRedirectUrls` coinciden con el valor completo de `redirectTo`, incluyendo esquema, host, puerto opcional y ruta.
+
+- Las entradas exactas deben coincidir exactamente, como `https://myapp.com/dashboard`.
+- Los comodines se admiten solo en la porción del host, como `https://*.myapp.com/callback`.
+- Los enlaces profundos se permiten cuando se enumeran explícitamente, como `com.example.app:/oauth2redirect` o `myapp://auth/callback`.
+- Si `allowedRedirectUrls` está vacío, InsForge permite todos los redireccionamientos por conveniencia del desarrollador. Esto no es seguro para producción y debe evitarse fuera del desarrollo local.
+
+### Actualizar Configuración de Autenticación
+
+Actualizar configuración de autenticación (solo administrador).
+
+```
+PUT /api/auth/config
+```
+
+#### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `requireEmailVerification` | boolean | No | Si se requiere verificación de correo electrónico |
+| `passwordMinLength` | integer | No | Longitud mínima de contraseña (4-128) |
+| `requireNumber` | boolean | No | Requiere números en la contraseña |
+| `requireLowercase` | boolean | No | Requiere minúsculas en la contraseña |
+| `requireUppercase` | boolean | No | Requiere mayúsculas en la contraseña |
+| `requireSpecialChar` | boolean | No | Requiere caracteres especiales en la contraseña |
+| `verifyEmailMethod` | string | No | Método de verificación de correo electrónico (`code` o `link`) |
+| `resetPasswordMethod` | string | No | Método de restablecimiento de contraseña (`code` o `link`) |
+| `allowedRedirectUrls` | array | No | Lista de URL de redireccionamiento permitidas. Las entradas coinciden con el valor completo de `redirectTo`. Las URL exactas deben coincidir exactamente, se admiten comodines de host como `https://*.domain.com/callback`, y los enlaces profundos personalizados como `com.example.app:/oauth2redirect` se permiten cuando se enumeran explícitamente. Si está vacío, se permiten todos los redireccionamientos, lo que no es seguro para producción. |
+
+#### Ejemplo
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/auth/config" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "requireEmailVerification": true,
+    "passwordMinLength": 10,
+    "verifyEmailMethod": "link"
+  }'
+```
+
+### Intercambiar Sesión de Administrador
+
+Intercambiar código de autorización del proveedor en la nube por una sesión de administrador.
+
+```
+POST /api/auth/admin/sessions/exchange
+```
+
+#### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `code` | string | Sí | Código de autorización o JWT de Insforge Cloud |
+
+#### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/admin/sessions/exchange" \
+  -H "Content-Type: application/json" \
+  -d '{"code": "eyJhbGciOiJIUzI1NiIs..."}'
+```
+
+#### Respuesta
+
+```json
+{
+  "admin": {
+    "sub": "cloud:user_123"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123..."
+}
+```
+
+### Obtener Sesión de Administrador Actual
+
+Obtener la sesión de administrador del panel actual desde un token de acceso de administrador del proyecto.
+
+```
+GET /api/auth/admin/sessions/current
+```
+
+#### Respuesta
+
+```json
+{
+  "admin": {
+    "sub": "local:admin"
+  }
+}
+```
+
+### Actualizar Sesión de Administrador
+
+Actualizar token de acceso de administrador del panel. Este punto final utiliza la cookie httpOnly `insforge_admin_refresh_token` solo del panel y no comparte la cookie de actualización de aplicación/usuario.
+
+```
+POST /api/auth/admin/refresh
+```
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/admin/refresh" \
+  -H "X-CSRF-Token: abc123..." \
+  --cookie "insforge_admin_refresh_token=..."
+```
+
+### Cerrar Sesión de Administrador
+
+```
+POST /api/auth/admin/logout
+```
+
+---
+
+## Respuestas de Error
+
+### Credenciales Inválidas (401)
+
+```json
+{
+  "error": "INVALID_CREDENTIALS",
+  "message": "Invalid email or password",
+  "statusCode": 401,
+  "nextActions": "Check your email and password"
+}
+```
+
+### Usuario Ya Existe (409)
+
+```json
+{
+  "error": "USER_EXISTS",
+  "message": "User with this email already exists",
+  "statusCode": 409,
+  "nextActions": "Use a different email or sign in"
+}
+```
+
+### Correo Electrónico No Verificado (403)
+
+```json
+{
+  "error": "EMAIL_NOT_VERIFIED",
+  "message": "Please verify your email before signing in",
+  "statusCode": 403,
+  "nextActions": "Check your inbox for verification email"
+}
+```

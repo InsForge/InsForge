@@ -1,0 +1,56 @@
+---
+title: 自定义 SMTP
+description: 通过您自己的 SMTP 服务器路由每个传出电子邮件
+---
+
+启用后，每个电子邮件（身份验证流和 `emails.send()` 调用）都通过您的 SMTP 服务器路由。关闭以还原；凭证被保留。
+
+## 概念
+
+提供商在每次发送时被解析，所以保存在下次请求时生效。InsForge 在保存前运行 `transporter.verify()`，所以持久化的配置总是有效的。密码在静止时使用 AES-256-GCM 加密，API 永远不会返回。
+
+## 用法
+
+在 **Authentication → Email** 下配置 SMTP。
+
+<Steps>
+  <Step title="启用自定义 SMTP">
+    在 **SMTP Provider** 卡上打开开关。
+  </Step>
+  <Step title="输入凭证">
+    主机、端口 (`25`、`465`、`587`、`2525`)、用户名、密码、发件人电子邮件、发件人名称。私有 IP 和自签名证书被拒绝。
+  </Step>
+  <Step title="保存">
+    InsForge 在持久化前运行 SMTP 握手。错误的凭证会快速失败。
+  </Step>
+  <Step title="编辑模板（可选）">
+    **Email Templates** 卡解锁四个身份验证模板。
+  </Step>
+</Steps>
+
+`From:` 标头始终是您配置的发件人。SDK 调用者无法欺骗它。
+
+## 电子邮件模板
+
+模板从 `email.templates` 在本地呈现。变量使用 `{{ variable }}`，并进行 HTML 转义。
+
+| 模板 | 何时发送 |
+|----------|---------------|
+| `email-verification-code` | 带有 6 位数代码的新用户验证 |
+| `email-verification-link` | 带有可点击链接的新用户验证 |
+| `reset-password-code` | 带有 6 位数代码的密码重置 |
+| `reset-password-link` | 带有可点击链接的密码重置 |
+
+变量：`{{ token }}` (代码模板)、`{{ link }}` (链接模板，必须以 `http://` 或 `https://` 开头)、`{{ name }}` 和 `{{ email }}` (所有模板)。
+
+## 考虑
+
+- **速率限制。** **最小间隔（秒）** 限制每收件人频率。冷却时间内的发送返回 HTTP `429`。默认为 `60`；`0` 禁用。
+- **SSRF 保护。** 私有、环回、链接本地和运营商 NAT 范围被拒绝。
+- **审计日志。** 配置保存日志 `UPDATE_SMTP_CONFIG`；模板编辑日志 `UPDATE_EMAIL_TEMPLATE`。
+
+## 更多资源
+
+- [Messaging overview](/core-concepts/messaging/overview) 用于路由模型。
+- [nodemailer SMTP transport](https://nodemailer.com/smtp/) 用于连接选项。
+- [Authentication overview](/core-concepts/authentication/overview) 用于发送这些电子邮件的流。

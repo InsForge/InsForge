@@ -1,0 +1,60 @@
+---
+title: S3 相容閘道
+description: 針對 InsForge Storage 使用任何 AWS SigV4 用戶端
+---
+
+InsForge Storage 在 `/storage/v1/s3` 處使用 [AWS S3 通訊協定](https://docs.aws.amazon.com/AmazonS3/latest/API/Welcome.html)。僅限雲端專案。
+
+## 概念
+
+使用 SigV4 簽署的長期存取金鑰。跨每個儲存貯體的專案管理員範圍，僅限路徑樣式 URL。S3 上傳立即顯示在 REST API 和 Dashboard 中。在 **Storage → Settings → S3 Configuration** 中產生金鑰。
+
+## 用法
+
+從 Dashboard 或 `GET /api/storage/s3/config` 取得端點和地區。
+
+```ini
+# ~/.aws/credentials
+[insforge]
+aws_access_key_id = your_access_key_id
+aws_secret_access_key = your_secret_access_key
+
+# ~/.aws/config
+[profile insforge]
+region = us-east-2
+endpoint_url = https://project_ref.region.insforge.app/storage/v1/s3
+s3 =
+  addressing_style = path
+```
+
+```bash
+aws --profile insforge s3 cp ./photo.jpg s3://my-bucket/photo.jpg
+aws --profile insforge s3 sync ./dist s3://my-bucket/dist
+```
+
+在程式碼中，設定 `forcePathStyle: true` 並將 `endpoint` 指向 `/storage/v1/s3`。
+
+```ts
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+
+const client = new S3Client({
+  forcePathStyle: true,
+  region: 'us-east-2',
+  endpoint: 'https://project_ref.region.insforge.app/storage/v1/s3',
+  credentials: { accessKeyId: '...', secretAccessKey: '...' },
+});
+
+await client.send(new PutObjectCommand({ Bucket: 'my-bucket', Key: 'hello.txt', Body: 'hello' }));
+```
+
+## 限制
+
+`PutObject` 上限為 5 GB，多部分上限為 5 TB。每個專案 50 個金鑰，15 分鐘時鐘偏差。祕密金鑰在建立時顯示一次。
+
+不支援：預簽署 URL（使用 `POST /api/storage/buckets/:bucket/upload-strategy`）、工作階段令牌、虛擬託管 URL。版本化、SSE-C/KMS、ACL、物件鎖定、標籤、生命週期和 CORS 傳回 `501 NotImplemented`。
+
+## 更多資源
+
+- [Storage overview](/core-concepts/storage/overview) 用於閘道內部。
+- [TypeScript storage SDK](/sdks/typescript/storage) 用於瀏覽器上傳。
+- [AWS SigV4 reference](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-signing.html) 用於簽署詳細資料。
