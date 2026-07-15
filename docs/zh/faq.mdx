@@ -41,4 +41,22 @@ description: "关于 InsForge 工作方式的常见问题解答。"
 
     把整个组织「移交给新 Owner」是另一个独立操作，跟邀请成员不是一回事。要移交的话，打开 **Organization Settings**，用里面的 **Transfer Ownership**（只有当前 Owner 能发起，且对方必须是已验证的 InsForge 用户并接受邮件里的请求）。
   </Accordion>
+
+  <Accordion title="为什么我的项目被暂停了？怎么避免被暂停？">
+    只有 Free 计划会出现暂停，原因有两种：
+
+    - **闲置**：free 项目连续 7 天没有任何请求后会被暂停。我们会先发邮件提醒，任意一次请求都会重置这 7 天的计时。
+    - **超出用量**：如果你的 organization 超过了 Free 的用量额度，它下面的项目会一直保持暂停，直到你升级。
+
+    无论哪种情况，你的数据都完好无损。想彻底不再被暂停，把 organization 升级到 Pro。参见 [Pricing](/pricing)。
+  </Accordion>
+
+  <Accordion title="我的项目被暂停了，怎么重新启动？">
+    在 dashboard 里打开这个项目，点 **Restore Project**，几分钟后就会带着完整数据恢复。有几种情况要注意：
+
+    - free 项目在暂停后的 **30 天内**都可以在 dashboard 直接恢复。超过之后项目会被归档，你只能下载数据库备份和 Storage 文件（数据仍然不会丢失）。
+    - 如果是因为 organization 超出用量而暂停，需要 **Upgrade to Pro** 才能恢复。
+
+    还是卡住？到我们的 [Discord](https://discord.com/invite/DvBtaEc9Jz) 提问，响应最快。
+  </Accordion>
 </AccordionGroup>

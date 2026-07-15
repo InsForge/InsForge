@@ -124,11 +124,7 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
       throw new AppError('Invalid admin refresh session type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
-    if (!tokenManager.verifyCsrfToken(csrfHeader, payload)) {
-      logger.warn('[Auth:AdminRefresh] CSRF token validation failed');
-      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
+    tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:AdminRefresh');
 
     const newAccessToken = tokenManager.generateAccessToken({
       sub: payload.sub,
@@ -160,33 +156,14 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
 
     if (refreshToken) {
       const tokenManager = TokenManager.getInstance();
-      let payload: RefreshTokenPayload;
-
+      let payload: RefreshTokenPayload | null = null;
       try {
         payload = tokenManager.verifyRefreshToken(refreshToken);
       } catch {
-        clearAdminRefreshTokenCookie(res);
-        successResponse(res, {
-          success: true,
-          message: 'Logged out successfully',
-        });
-        return;
+        // Stale or invalid cookie: fall through and clear it idempotently.
       }
-
-      if (payload.sessionType !== 'admin') {
-        clearAdminRefreshTokenCookie(res);
-        successResponse(res, {
-          success: true,
-          message: 'Logged out successfully',
-        });
-        return;
-      }
-
-      const csrfHeader = req.headers['x-csrf-token'];
-      const csrfToken = typeof csrfHeader === 'string' ? csrfHeader : undefined;
-      if (!tokenManager.verifyCsrfToken(csrfToken, payload)) {
-        logger.warn('[Auth:AdminLogout] CSRF token validation failed');
-        throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+      if (payload?.sessionType === 'admin') {
+        tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:AdminLogout');
       }
     }
 
