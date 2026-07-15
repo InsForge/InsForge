@@ -1,0 +1,58 @@
+---
+title: "CLI 設置"
+sidebarTitle: "CLI 設置 · 推薦"
+description: "安裝 InsForge CLI，連結專案，並從終端在大約五分鐘內生成類型，以開始針對您的後端構建。"
+---
+
+## 步驟 1：建立您的專案
+
+<Card title="轉到 InsForge Cloud" icon="cloud" href="https://insforge.dev">
+  訪問 [insforge.dev](https://insforge.dev) 並建立免費帳戶
+</Card>
+
+登入後：
+
+<Steps>
+  <Step title="建立專案">
+    按一下**"建立新專案"**
+  </Step>
+  <Step title="等待後端">
+    您的後端將在 ~3 秒內準備就緒
+  </Step>
+  <Step title="複製專案 ID">
+    您將被重新導向到專案控制臺 — 從瀏覽器 URL 複製**專案 ID**：
+  </Step>
+</Steps>
+
+```
+https://insforge.dev/dashboard/project/<your-project-id>
+```
+
+您在步驟 2 中需要此專案 ID。
+
+## 步驟 2：連結 CLI
+
+從您的專案目錄中，將您的本地程式碼連結到您的 InsForge 專案。將 `<your-project-id>` 取代為步驟 1 中的 ID。
+
+```bash
+npx @insforge/cli link --project-id <your-project-id>
+```
+
+透過 `npx` 執行會將 CLI 保留在全域安裝路徑之外。連結檔案最終會在目前目錄中，並告訴後續命令它們屬於哪個專案。
+
+## 步驟 3：驗證安裝
+
+向您的 AI 編碼代理傳送以下提示以驗證設置：
+
+`我正在使用 InsForge 作為我的後端平台。讀取目前目錄，確保 InsForge 技能已安裝，並使用 InsForge CLI 進行後端任務。`
+
+## 瞭解更多
+
+要探索 InsForge CLI 的完整功能：
+
+- 查看 [npm 套件文檔](https://www.npmjs.com/package/@insforge/cli)
+- 執行內置說明命令：
+
+```bash
+npx @insforge/cli --help
+```

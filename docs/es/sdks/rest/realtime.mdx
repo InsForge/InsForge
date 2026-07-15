@@ -1,0 +1,390 @@
+---
+title: Referencia de API en tiempo real
+description: Administra canales en tiempo real, inspecciona el historial de mensajes y usa pub/sub de Socket.IO sin procesar.
+---
+
+## Descripción general
+
+El tiempo real tiene dos superficies:
+
+- **API REST** para gestión de canales, historial de mensajes, estadísticas de entrega, permisos y configuración de retención.
+- **Socket.IO** para suscripción en vivo, publicación, presencia y eventos entregados.
+
+<Note>
+  La API REST no transmite mensajes. Usa la conexión Socket.IO o el [SDK de TypeScript](/sdks/typescript/realtime) para eventos en vivo.
+</Note>
+
+## Autenticación
+
+Los puntos finales REST de administrador requieren un token de administrador de proyecto o clave API.
+
+```bash
+Authorization: Bearer <project-admin-jwt-or-ik_api_key>
+Content-Type: application/json
+```
+
+También puedes pasar claves API con:
+
+```bash
+X-API-Key: <ik_api_key>
+```
+
+Las conexiones Socket.IO se autentican a través del objeto Socket.IO `auth`:
+
+```javascript
+const socket = io('https://your-app.insforge.app', {
+  auth: {
+    token: '<user-jwt-or-anon-token>'
+  }
+});
+```
+
+Los clientes de servidor/administrador pueden pasar una clave API:
+
+```javascript
+const socket = io('https://your-app.insforge.app', {
+  auth: {
+    apiKey: '<ik_api_key>'
+  }
+});
+```
+
+## Pub/Sub de Socket.IO
+
+Instala el cliente Socket.IO cuando no estés usando el SDK de InsForge:
+
+```bash
+npm install socket.io-client
+```
+
+### Conectar y suscribirse
+
+```javascript
+import { io } from 'socket.io-client';
+
+const socket = io('https://your-app.insforge.app', {
+  auth: {
+    token: '<user-jwt-or-anon-token>'
+  }
+});
+
+socket.emit('realtime:subscribe', { channel: 'order:123' }, (response) => {
+  if (response.ok) {
+    console.log('Subscribed:', response.channel);
+    console.log('Presence:', response.presence.members);
+  } else {
+    console.error(response.error.code, response.error.message);
+  }
+});
+```
+
+### Escuchar eventos
+
+```javascript
+socket.on('status_changed', (message) => {
+  console.log(message.status);
+  console.log(message.meta.messageId);
+  console.log(message.meta.senderType);
+});
+
+socket.on('presence:join', (message) => {
+  console.log('Joined:', message.member);
+});
+
+socket.on('presence:leave', (message) => {
+  console.log('Left:', message.member);
+});
+
+socket.on('realtime:error', (error) => {
+  console.error(error.channel, error.code, error.message);
+});
+```
+
+### Publicar
+
+```javascript
+socket.emit('realtime:publish', {
+  channel: 'order:123',
+  event: 'customer_viewed',
+  payload: {
+    viewedAt: new Date().toISOString()
+  }
+});
+```
+
+<Warning>
+  El socket debe suscribirse correctamente a un canal antes de poder publicar en ese canal.
+</Warning>
+
+### Cancelar suscripción
+
+```javascript
+socket.emit('realtime:unsubscribe', { channel: 'order:123' });
+socket.disconnect();
+```
+
+### Eventos de socket
+
+| Evento | Dirección | Descripción |
+|-------|-----------|-------------|
+| `realtime:subscribe` | Cliente a servidor | Suscribirse a un canal. El reconocimiento devuelve éxito/error e instantánea de presencia. |
+| `realtime:unsubscribe` | Cliente a servidor | Abandonar un canal. |
+| `realtime:publish` | Cliente a servidor | Insertar un mensaje de usuario en la tubería en tiempo real. |
+| Custom event name | Servidor a cliente | Mensaje entregado, emitido bajo el `eventName` del mensaje. |
+| `presence:join` | Servidor a cliente | Un miembro lógico se hace presente en el canal. |
+| `presence:leave` | Servidor a cliente | Un miembro lógico ya no está presente en el canal. |
+| `realtime:error` | Servidor a cliente | La suscripción o publicación falló. |
+
+## Patrones de canal
+
+Crea definiciones de canal antes de que los clientes se suscriban.
+
+| Patrón | Coincide |
+|---------|---------|
+| `orders` | `orders` |
+| `order:%` | `order:123`, `order:456` |
+| `chat:%:messages` | `chat:room-1:messages` |
+
+La coincidencia de patrones usa SQL `LIKE`, por lo que `%` es el comodín. `_` no se acepta en patrones de canal porque también es un comodín SQL.
+
+## Canales
+
+### Listar canales
+
+```http
+GET /api/realtime/channels
+```
+
+```bash
+curl "https://your-app.insforge.app/api/realtime/channels" \
+  -H "Authorization: Bearer <project-admin-jwt-or-ik_api_key>"
+```
+
+Respuesta:
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "pattern": "order:%",
+    "description": "Order updates",
+    "webhookUrls": ["https://example.com/webhook"],
+    "enabled": true,
+    "createdAt": "2026-04-25T17:00:00.000Z",
+    "updatedAt": "2026-04-25T17:00:00.000Z"
+  }
+]
+```
+
+### Crear canal
+
+```http
+POST /api/realtime/channels
+```
+
+Cuerpo de la solicitud:
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `pattern` | `string` | Sí | Patrón de canal. |
+| `description` | `string` | No | Descripción legible por humanos. |
+| `webhookUrls` | `string[]` | No | URLs de webhook para cada mensaje entregado. |
+| `enabled` | `boolean` | No | Por defecto es `true`. Los canales deshabilitados no pueden unirse ni entregarse. |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/realtime/channels" \
+  -H "Authorization: Bearer <project-admin-jwt-or-ik_api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pattern": "chat:%",
+    "description": "Chat rooms",
+    "webhookUrls": ["https://example.com/realtime-webhook"],
+    "enabled": true
+  }'
+```
+
+### Obtener canal
+
+```http
+GET /api/realtime/channels/{id}
+```
+
+### Actualizar canal
+
+```http
+PUT /api/realtime/channels/{id}
+```
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/realtime/channels/550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer <project-admin-jwt-or-ik_api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Active order updates",
+    "enabled": true
+  }'
+```
+
+### Eliminar canal
+
+```http
+DELETE /api/realtime/channels/{id}
+```
+
+```json
+{
+  "message": "Channel deleted"
+}
+```
+
+El historial de mensajes se conserva. Los canales eliminados establecen valores `channelId` de mensajes existentes en `null`.
+
+## Mensajes
+
+### Listar mensajes
+
+```http
+GET /api/realtime/messages
+```
+
+Parámetros de consulta:
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `channelId` | `uuid` | Filtrar por ID de canal. |
+| `eventName` | `string` | Filtrar por nombre de evento. |
+| `limit` | `integer` | 1 a 1000. Por defecto es 100. |
+| `offset` | `integer` | Por defecto es 0. |
+
+```bash
+curl "https://your-app.insforge.app/api/realtime/messages?eventName=status_changed&limit=50" \
+  -H "Authorization: Bearer <project-admin-jwt-or-ik_api_key>"
+```
+
+Respuesta:
+
+```json
+[
+  {
+    "id": "660e8400-e29b-41d4-a716-446655440000",
+    "eventName": "status_changed",
+    "channelId": "550e8400-e29b-41d4-a716-446655440000",
+    "channelName": "order:123",
+    "payload": {
+      "id": "123",
+      "status": "shipped"
+    },
+    "senderType": "system",
+    "senderId": null,
+    "wsAudienceCount": 5,
+    "whAudienceCount": 1,
+    "whDeliveredCount": 1,
+    "createdAt": "2026-04-25T17:00:00.000Z"
+  }
+]
+```
+
+### Estadísticas de mensajes
+
+```http
+GET /api/realtime/messages/stats
+```
+
+Parámetros de consulta:
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `channelId` | `uuid` | Filtrar estadísticas por ID de canal. |
+| `since` | `date-time` | Incluir solo mensajes creados después de esta marca de tiempo. |
+
+```json
+{
+  "totalMessages": 1250,
+  "whDeliveryRate": 0.98,
+  "topEvents": [
+    {
+      "eventName": "status_changed",
+      "count": 450
+    }
+  ],
+  "retentionDays": null
+}
+```
+
+`retentionDays: null` significa que los mensajes se retienen indefinidamente.
+
+## Permisos
+
+```http
+GET /api/realtime/permissions
+```
+
+Devuelve políticas RLS definidas por el usuario para:
+
+- Comprobaciones de suscripción en `realtime.channels`.
+- Comprobaciones de publicación en `realtime.messages`.
+
+```json
+{
+  "subscribe": {
+    "policies": [
+      {
+        "policyName": "users_subscribe_own_orders",
+        "tableName": "channels",
+        "command": "SELECT",
+        "roles": ["authenticated"],
+        "using": "pattern = 'order:%'",
+        "withCheck": null
+      }
+    ]
+  },
+  "publish": {
+    "policies": []
+  }
+}
+```
+
+## Configuración
+
+### Obtener configuración en tiempo real
+
+```http
+GET /api/realtime/config
+```
+
+```json
+{
+  "retentionDays": null
+}
+```
+
+### Actualizar configuración en tiempo real
+
+```http
+PATCH /api/realtime/config
+```
+
+```bash
+curl -X PATCH "https://your-app.insforge.app/api/realtime/config" \
+  -H "Authorization: Bearer <project-admin-jwt-or-ik_api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "retentionDays": 90
+  }'
+```
+
+Usa `null` para retener mensajes indefinidamente. Los enteros positivos retienen mensajes durante esa cantidad de días.
+
+## Webhooks
+
+Cuando un canal tiene `webhookUrls`, cada mensaje entregado a través de ese canal se envía a cada URL.
+
+El cuerpo de la solicitud es la carga útil de mensaje original. Los encabezados identifican la entrega:
+
+| Encabezado | Valor |
+|--------|-------|
+| `X-InsForge-Event` | Nombre del evento |
+| `X-InsForge-Channel` | Nombre del canal resuelto |
+| `X-InsForge-Message-Id` | UUID del mensaje |
+
+Los intentos de entrega se reflejan en `whAudienceCount` y `whDeliveredCount` en el historial de mensajes.

@@ -1,0 +1,254 @@
+---
+title: 儲存空間 SDK 參考
+description: 使用 InsForge TypeScript SDK 進行檔案上傳、下載和管理
+---
+
+## 安裝
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## from()
+
+取得儲存空間貯體例項以進行檔案操作。
+
+### 參數
+
+- `bucketName` (string, required) - 儲存空間貯體的名稱
+
+### 傳回
+
+```typescript
+StorageBucket // Instance with upload, uploadAuto, download, remove methods
+```
+
+### 範例
+
+```javascript
+const bucket = insforge.storage.from('images')
+```
+
+---
+
+## upload()
+
+使用特定路徑/金鑰上傳檔案。
+
+### 參數
+
+- `path` (string, required) - 檔案的物件金鑰/路徑
+- `file` (File | Blob, required) - 要上傳的檔案或 Blob
+
+### 傳回
+
+```typescript
+{
+  data: {
+    bucket: string,
+    key: string,
+    size: number,
+    mimeType: string,
+    uploadedAt: string,
+    url: string
+  } | null,
+  error: Error | null
+}
+```
+
+<Warning>
+如果存在具有相同金鑰的檔案，後端會自動重新命名。一律使用傳回的 `key` 和 `url`。
+</Warning>
+
+### 範例
+
+```javascript
+const { data, error } = await insforge.storage
+  .from('images')
+  .upload('posts/post-123/cover.jpg', fileObject)
+
+// Save BOTH url and key to database
+await insforge.database
+  .from('posts')
+  .update({
+    image_url: data.url,
+    image_key: data.key  // Save key for download/delete operations
+  })
+  .eq('id', 'post-123')
+```
+
+### 輸出
+
+```json
+{
+  "data": {
+    "bucket": "images",
+    "key": "posts/post-123/cover.jpg",
+    "size": 45678,
+    "mimeType": "image/jpeg",
+    "uploadedAt": "2024-01-15T10:30:00Z",
+    "url": "https://your-app.region.insforge.app/api/storage/buckets/images/objects/posts%2Fpost-123%2Fcover.jpg"
+  },
+  "error": null
+}
+```
+
+---
+
+## uploadAuto()
+
+使用自動產生的唯一金鑰上傳檔案。
+
+### 參數
+
+- `file` (File | Blob, required) - 要上傳的檔案或 Blob
+
+### 傳回
+
+```typescript
+{
+  data: {
+    bucket: string,
+    key: string,
+    size: number,
+    mimeType: string,
+    uploadedAt: string,
+    url: string
+  } | null,
+  error: Error | null
+}
+```
+
+### 範例
+
+```javascript
+const { data, error } = await insforge.storage
+  .from('uploads')
+  .uploadAuto(fileObject)
+
+// Save url and key to database
+await insforge.database
+  .from('posts')
+  .insert([{
+    image_url: data.url,
+    image_key: data.key,  // Save key for download/delete operations
+    user_id: userId
+  }])
+```
+
+### 輸出
+
+```json
+{
+  "data": {
+    "bucket": "uploads",
+    "key": "myfile-1705315200000-abc123.jpg",
+    "size": 45678,
+    "mimeType": "image/jpeg",
+    "uploadedAt": "2024-01-15T10:30:00Z",
+    "url": "https://your-app.region.insforge.app/api/storage/buckets/uploads/objects/myfile-1705315200000-abc123.jpg"
+  },
+  "error": null
+}
+```
+
+---
+
+## download()
+
+將檔案下載為 Blob。
+
+### 參數
+
+- `path` (string, required) - 要下載的物件金鑰/路徑
+
+### 傳回
+
+```typescript
+{
+  data: Blob | null,
+  error: Error | null
+}
+```
+
+### 範例
+
+```javascript
+// 1. Get the file key from your database
+const { data: post, error: dbError } = await insforge.database
+  .from('posts')
+  .select('image_key')
+  .eq('id', 'post-123')
+  .single()
+
+// 2. Download the file using the key
+const { data: blob, error } = await insforge.storage
+  .from('images')
+  .download(post.image_key)
+
+// 3. Create download link or display image
+const url = URL.createObjectURL(blob)
+const img = document.querySelector('img')
+img.src = url
+```
+
+### 輸出
+
+```json
+{
+  "data": "Blob { size: 45678, type: 'image/jpeg' }",
+  "error": null
+}
+```
+
+---
+
+## remove()
+
+從儲存空間刪除檔案。
+
+### 參數
+
+- `path` (string, required) - 要刪除的物件金鑰/路徑
+
+### 傳回
+
+```typescript
+{
+  data: { message: string } | null,
+  error: Error | null
+}
+```
+
+### 範例
+
+```javascript
+// 1. Get the file key from your database
+const { data: post, error: dbError } = await insforge.database
+  .from('posts')
+  .select('image_key')
+  .eq('id', 'post-123')
+  .single()
+
+// 2. Delete the file from storage
+const { data, error } = await insforge.storage
+  .from('images')
+  .remove(post.image_key)
+
+// 3. Clear the database reference
+await insforge.database
+  .from('posts')
+  .update({ image_url: null, image_key: null })
+  .eq('id', 'post-123')
+```
+
+### 輸出
+
+```json
+{
+  "data": {
+    "message": "Object deleted successfully"
+  },
+  "error": null
+}
+```

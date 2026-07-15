@@ -1,0 +1,100 @@
+---
+title: "Base de datos"
+sidebarTitle: "Overview"
+description: "Use InsForge para administrar sus datos."
+---
+
+Cada proyecto de InsForge viene con una base de datos [Postgres](https://www.postgresql.org/) completa. Cada tabla es automáticamente un punto final REST y SDK escrito. Los tokens de autenticación limitan cada lectura y escritura a través de seguridad a nivel de fila. El mismo Postgres maneja consultas relacionales, búsqueda semántica a través de pgvector y fuentes de cambios en tiempo real.
+
+<Frame caption="El editor de tablas: columnas escrita, edición en línea, importación CSV y estudio SQL.">
+  <img src="/images/database-table-editor.png" alt="Editor de tablas del panel de InsForge que muestra una tabla de mensajes con columnas escritas" />
+</Frame>
+
+<Note>
+  **¿Busca almacenamiento de archivos?** Utilice [Storage](/core-concepts/storage/overview) para imágenes, PDF y otro contenido binario. La base de datos almacena filas; el almacenamiento almacena objetos.
+</Note>
+
+```mermaid
+graph TB
+    Client[Client Application] --> SDK[InsForge SDK]
+    SDK --> API[InsForge API]
+    API --> PostgREST[PostgREST v12.2]
+    PostgREST --> PG[(PostgreSQL 15)]
+    API --> PG
+
+    PG --> RLS[Row Level Security]
+    PG --> Triggers[Database Triggers]
+    PG --> Functions[Stored Functions]
+    PG --> Schemas[Multiple Schemas]
+
+    style Client fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style API fill:#166534,stroke:#22c55e,color:#dcfce7
+    style PostgREST fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style PG fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style RLS fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style Triggers fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style Functions fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style Schemas fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+```
+
+## Características
+
+### Tablas como API
+
+Defina una tabla y obtendrá inmediatamente puntos finales REST más un cliente SDK escrito para ella. Sin paso de generación de código. El JWT de autenticación limita cada consulta a través de RLS.
+
+### Migraciones
+
+Rastrear y aplicar cambios SQL en orden. [Migrations](/core-concepts/database/migrations) se envían como archivos `.sql` simples en su repositorio, aplicados con `npx @insforge/cli db migrations up --all` o mediante la herramienta MCP.
+
+### Ramificación
+
+Cree una rama de base de datos aislada para probar cambios de esquema arriesgados en relación con una copia de datos de producción. Ver [Branching](/agent-native/branching).
+
+### pgvector
+
+Búsqueda de vectores nativos para incrustaciones, con índices HNSW e IVFFlat. Ver [pgvector](/core-concepts/database/pgvector).
+
+### Seguridad a nivel de fila
+
+Las políticas RLS de Postgres aplican acceso a nivel de fila. Las políticas leen el JWT de autenticación, por lo que la misma regla se aplica a consultas REST, llamadas SDK, suscripciones en tiempo real y solicitudes de almacenamiento.
+
+## Conceptos
+
+<CardGroup cols={2}>
+  <Card title="Migrations" icon="layer-group" href="/core-concepts/database/migrations">
+    Aplicar cambios SQL en orden, de forma segura.
+  </Card>
+  <Card title="Branching" icon="code-branch" href="/agent-native/branching">
+    Bases de datos aisladas para vista previa y cambios arriesgados.
+  </Card>
+  <Card title="pgvector" icon="brain" href="/core-concepts/database/pgvector">
+    Búsqueda de vectores para incrustaciones.
+  </Card>
+</CardGroup>
+
+## Construir con él
+
+<CardGroup cols={2}>
+  <Card title="SDK de TypeScript" icon="js" href="/sdks/typescript/database">
+    Consultas, inserciones y actualizaciones escritas desde Node, navegador y borde.
+  </Card>
+
+  <Card title="SDK de Swift" icon="swift" href="/sdks/swift/database">
+    Cliente de base de datos Swift nativo para iOS y macOS.
+  </Card>
+
+  <Card title="SDK de Kotlin" icon="android" href="/sdks/kotlin/database">
+    Cliente de base de datos orientado a corrutinas para Android y JVM.
+  </Card>
+
+  <Card title="API REST" icon="code" href="/sdks/rest/database">
+    Puntos finales de base de datos HTTP simples, invocables desde cualquier idioma.
+  </Card>
+</CardGroup>
+
+## Próximos pasos
+
+- Configure el [CLI](/quickstart) para vincular su proyecto (la ruta recomendada).
+- Explore la [referencia del SDK de TypeScript](/sdks/typescript/database) para consultas escritas.

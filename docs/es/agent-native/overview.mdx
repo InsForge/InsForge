@@ -1,0 +1,50 @@
+---
+title: "Iniciativas agnósticas de agentes"
+sidebarTitle: "Overview"
+description: "Los primitivos que permiten a un agente de codificación operar su backend, no solo a un humano haciendo clic en un panel."
+---
+
+La mayoría de los backends asumen un humano en un panel. InsForge asume un agente de codificación en una terminal. Los productos (Base de datos, Autenticación, Almacenamiento y el resto) son los bloques de construcción; los primitivos en esta página son cómo un agente los opera: como archivos que puede editar, ramas que puede probar y un backend que puede diagnosticar y reparar por sí mismo.
+
+<Note>
+  ¿Nuevo por aquí? Comience con [Conectar a través de CLI](/quickstart) para vincular su proyecto. Esta sección trata sobre cómo un agente *funciona* con el backend una vez que está conectado.
+</Note>
+
+## Los primitivos
+
+<CardGroup cols={2}>
+  <Card title="Arnés CLI" icon="terminal" href="/agent-native/cli-harness">
+    Las manos del agente. Una interfaz de terminal para inicio de sesión, esquema, implementaciones, configuración y diagnósticos.
+  </Card>
+  <Card title="Diagnósticos y asesor" icon="stethoscope" href="/agent-native/diagnostics">
+    Extraiga hallazgos del asesor, salud de DB, métricas y registros de errores que el agente pueda leer y reparar.
+  </Card>
+  <Card title="Configuración como código" icon="file-code" href="/agent-native/config-as-code">
+    La autenticación, SMTP, almacenamiento, retención y la configuración de implementación viven en `insforge.toml`. Planifique y aplique como infraestructura.
+  </Card>
+  <Card title="Ramificación" icon="code-branch" href="/agent-native/branching">
+    Clone todo el backend en una rama aislada para probar cambios riesgosos, luego fusione o restablezca.
+  </Card>
+</CardGroup>
+
+## Por qué importa
+
+Una persona y un agente quieren cosas diferentes de un backend. Una persona quiere una interfaz para hacer clic. Un agente quiere una interfaz de texto estable que pueda conducir, leer y razonar. Esto se muestra en todas partes en InsForge.
+
+Los cambios de esquema son [migraciones](/core-concepts/database/migrations) en su repositorio, y la configuración del proyecto es un archivo [`insforge.toml`](/agent-native/config-as-code), por lo que el agente edita texto, lo confirma y lo revisa en un PR en lugar de hacer clic en formularios. Cuando quiere intentar algo arriesgado, genera una [rama de backend](/agent-native/branching), ejecuta el cambio contra una copia y descarta la rama si algo sale mal. Cuando algo parece incorrecto, obtiene [hallazgos de diagnósticos y asesor](/agent-native/diagnostics) directamente con `npx @insforge/cli diagnose`, sin panel en el bucle, y eso es lo que le permite cerrar brechas de seguridad como una política RLS permisiva por sí mismo, en lugar de esperar a que un humano recuerde revisarla. Y lee esquemas, registros y metadatos actuales directamente desde el backend con `npx @insforge/cli metadata`, por lo que funciona a partir del estado real en lugar de adivinar.
+
+## El bucle
+
+Estos se encadenan juntos. Una sesión típicamente va:
+
+1. Lea el estado actual con `npx @insforge/cli metadata`.
+2. Rama el backend, escriba una [migración](/core-concepts/database/migrations) y verifique qué está pendiente con `npx @insforge/cli db migrations list`, o edite `insforge.toml` y obtenga una vista previa de la diferencia de configuración con `npx @insforge/cli config plan`.
+3. Aplíquelo con `npx @insforge/cli db migrations up --all` o `config apply`, contra la rama primero, luego el padre.
+4. Ejecute `npx @insforge/cli diagnose` para verificar los hallazgos del asesor y los registros de errores, y pregunte `diagnose --ai` para interpretarlos.
+5. Aplique la remediación, vuelva a ejecutar diagnóstico y fusione la rama.
+
+## Próximos pasos
+
+- Lea el [arnés CLI](/agent-native/cli-harness) para ver la superficie de comando completa que impulsa un agente.
+- Configure [configuración como código](/agent-native/config-as-code) para que los ajustes de proyecto vivan en control de versiones.
+- Use [diagnósticos](/agent-native/diagnostics) para dejar que el agente encuentre y corrija problemas de backend.

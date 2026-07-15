@@ -1,0 +1,27 @@
+---
+title: "常見問題"
+sidebarTitle: "常見問題"
+description: "關於 InsForge 運作方式的常見問題解答。"
+---
+
+<AccordionGroup>
+  <Accordion title="讀寫資料庫算 Edge Function 嗎？資料庫、Edge Function、Custom Compute 有什麼差別？">
+    不算。你平常對資料表做增刪改查的時候，其實沒有執行任何函式，當然也就不是 Edge Function。
+
+    在 InsForge 裡，你的程式碼有三種方式跟後端打交道，很容易搞混：
+
+    | | 怎麼觸發 | 會不會一直執行 | 用來做什麼 |
+    |----|---------|--------------|---------|
+    | **讀寫資料庫**（自動產生的 REST API） | 用戶端發一個 SDK 或 REST 請求 | 不用你管，後端託管 | 增刪改查資料表 |
+    | **Edge Function** | HTTP 請求、定時（cron），或資料庫觸發器 | 跑一次就結束 | 自訂 API、webhook、觸發邏輯、呼叫外部服務 |
+    | **Custom Compute** | 你自己啟動一個常駐行程 | 一直開著 | 佇列 worker、AI 推論迴圈、websocket、需要一直保持狀態的工作 |
+
+    **讀寫資料庫。** 你建好一張表，InsForge 自動就給你一套 REST 介面（例如 `GET /api/database/records/{table}`）和一個帶型別的 SDK。你呼叫 `select`、`insert` 這些，就是直接在讀寫資料庫，不用部署也不用跑任何東西。日常的增刪改查用這個就夠了，參見[資料庫](/core-concepts/database/overview)。
+
+    **Edge Function。** 當自動介面滿足不了、你想寫自己的伺服器端邏輯時才用它，例如接付款回呼（webhook）、登入掛鉤、在某列資料發生 `INSERT`/`UPDATE`/`DELETE` 時觸發一段程式碼，或者定時任務。它的特點是跑完一次請求就結束，不會一直待著。參見 [Edge Functions](/core-concepts/functions/overview)。
+
+    **Custom Compute。** 當你需要一個一直開著的行程時才用它，例如佇列 worker 或者 AI 推論迴圈。這種工作 Edge Function 做不到，因為它不常駐。參見 [Custom Compute](/core-concepts/compute/overview)。
+
+    一句話判斷：只是讀寫資料，就走資料庫（自動 REST）；要寫一段跑完就結束的邏輯，用 Edge Function；要一直執行，用 Custom Compute。
+  </Accordion>
+</AccordionGroup>

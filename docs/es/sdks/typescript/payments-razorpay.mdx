@@ -1,0 +1,240 @@
+---
+title: SDK de Pagos de Razorpay
+description: Crea órdenes y suscripciones de Razorpay desde una aplicación TypeScript
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## Descripción general
+
+El SDK de TypeScript expone asistentes de tiempo de ejecución de Razorpay para frontends de aplicaciones generadas:
+
+- `insforge.payments.razorpay.createOrder(...)`
+- `insforge.payments.razorpay.verifyOrder(...)`
+- `insforge.payments.razorpay.createSubscription(...)`
+- `insforge.payments.razorpay.verifySubscription(...)`
+- `insforge.payments.razorpay.cancelSubscription(...)`
+- `insforge.payments.razorpay.pauseSubscription(...)`
+- `insforge.payments.razorpay.resumeSubscription(...)`
+
+Razorpay no devuelve una URL de Checkout alojada. El backend crea una orden o suscripción de Razorpay y devuelve `checkoutOptions`. El navegador carga Razorpay Checkout y lo abre con esas opciones.
+
+<Note>
+  Consulta [Pagos con Razorpay](/core-concepts/payments/razorpay) para la configuración del proveedor, webhooks manuales, tablas de base de datos y patrones de cumplimiento.
+</Note>
+
+## Configuración del SDK
+
+```typescript
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-project.insforge.app',
+  anonKey: 'your-anon-key'
+});
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+  }
+}
+
+```
+
+El SDK llama a las rutas de tiempo de ejecución de Razorpay con el token de usuario actual de InsForge. No llames a estas rutas con claves secretas del proveedor.
+
+## Cargar Razorpay Checkout
+
+```typescript
+function loadRazorpayCheckout(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.Razorpay) {
+      resolve();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Razorpay Checkout'));
+    document.body.appendChild(script);
+  });
+}
+```
+
+## Orden única
+
+Crea primero una orden pendiente propiedad de la aplicación. Luego crea la orden de Razorpay a través de InsForge:
+
+Las órdenes de Razorpay pueden ser solo de importe, pero crear artículos de Razorpay para productos vendibles de una sola vez es una buena práctica porque los artículos sincronizados hacen que el catálogo sea visible en InsForge y Razorpay. Trata las órdenes como intentos de pago.
+
+```typescript
+type CreateRazorpayOrderResponse = {
+  order: {
+    id: string;
+    orderId: string | null;
+    status: string;
+  };
+  checkoutOptions: {
+    key: string;
+    amount: number;
+    currency: string;
+    order_id: string;
+    name?: string | null;
+    description?: string | null;
+    callback_url?: string | null;
+    prefill: {
+      name?: string | null;
+      email?: string | null;
+      contact?: string | null;
+    };
+  };
+};
+
+const { data: orderResponse, error } =
+  await insforge.payments.razorpay.createOrder('test', {
+    amount: 50000,
+    currency: 'INR',
+    receipt: order.id,
+    subject: { type: 'team', id: teamId },
+    customerEmail: user.email,
+    notes: { order_id: order.id }
+  });
+
+if (error) throw error;
+if (!orderResponse) throw new Error('Razorpay order creation returned no data');
+```
+
+Si tu disparador de webhook lee `notes.order_id`, pasa `notes: { order_id: ... }` al crear la orden.
+
+Abre Razorpay Checkout y verifica la firma devuelta:
+
+```typescript
+await loadRazorpayCheckout();
+
+const RazorpayCheckout = window.Razorpay;
+if (!RazorpayCheckout) {
+  throw new Error('Razorpay Checkout failed to load');
+}
+
+const checkout = new RazorpayCheckout({
+  ...orderResponse.checkoutOptions,
+  handler: async (response: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }) => {
+    const { error } = await insforge.payments.razorpay.verifyOrder('test', {
+      orderId: response.razorpay_order_id,
+      paymentId: response.razorpay_payment_id,
+      signature: response.razorpay_signature
+    });
+
+    if (error) throw error;
+  }
+});
+
+checkout.open();
+```
+
+La verificación de firma protege la devolución de llamada inmediata del navegador. El cumplimiento duradero todavía debe provenir de eventos de webhook de Razorpay verificados.
+
+## Suscripción
+
+Crea o sincroniza primero un plan de Razorpay. Luego crea la suscripción a través de InsForge:
+
+```typescript
+type CreateRazorpaySubscriptionResponse = {
+  subscription: {
+    subscriptionId: string;
+    status: string;
+  };
+  checkoutOptions: {
+    key: string;
+    subscription_id: string;
+    name?: string | null;
+    description?: string | null;
+    callback_url?: string | null;
+    prefill: {
+      name?: string | null;
+      email?: string | null;
+      contact?: string | null;
+    };
+  };
+};
+
+const { data: subscriptionResponse, error } =
+  await insforge.payments.razorpay.createSubscription('test', {
+    planId: 'plan_123',
+    totalCount: 12,
+    subject: { type: 'team', id: teamId },
+    customerEmail: user.email
+  });
+
+if (error) throw error;
+if (!subscriptionResponse) throw new Error('Razorpay subscription creation returned no data');
+```
+
+Pasa las `notes` de suscripción de Razorpay cuando los disparadores de webhook necesiten identificadores de la aplicación más adelante.
+
+Abre Razorpay Checkout con el ID de suscripción devuelto:
+
+```typescript
+await loadRazorpayCheckout();
+
+const RazorpayCheckout = window.Razorpay;
+if (!RazorpayCheckout) {
+  throw new Error('Razorpay Checkout failed to load');
+}
+
+const checkout = new RazorpayCheckout({
+  ...subscriptionResponse.checkoutOptions,
+  handler: async (response: {
+    razorpay_subscription_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }) => {
+    const { error } = await insforge.payments.razorpay.verifySubscription('test', {
+      subscriptionId: response.razorpay_subscription_id,
+      paymentId: response.razorpay_payment_id,
+      signature: response.razorpay_signature
+    });
+
+    if (error) throw error;
+  }
+});
+
+checkout.open();
+```
+
+## Gestionar suscripciones
+
+Razorpay no proporciona un equivalente al Portal de Facturación de Stripe. Usa rutas de backend para la gestión de suscripciones:
+
+```typescript
+await insforge.payments.razorpay.cancelSubscription('test', 'sub_123', {
+  cancelAtCycleEnd: false
+});
+
+await insforge.payments.razorpay.pauseSubscription('test', 'sub_123');
+
+await insforge.payments.razorpay.resumeSubscription('test', 'sub_123');
+```
+
+La creación de suscripciones verifica las políticas `INSERT` en `payments.razorpay_subscriptions`. Cancelar, pausar y reanudar verifican las políticas `UPDATE` en la misma tabla. PostgreSQL también aplica políticas `SELECT` a las filas devueltas por `INSERT/UPDATE ... RETURNING`, así que agrega una visibilidad `SELECT` coincidente para el mismo sujeto de facturación cuando una sonda de política necesite devolver la fila. Agrega RLS específico de la aplicación o verificaciones de membresía del lado del servidor antes de exponer estos controles para sujetos compartidos.
+
+## Cumplimiento
+
+No marques órdenes como pagadas, otorgues créditos ni actives suscripciones solo desde el manejador de Checkout. Usa eventos de webhook de Razorpay verificados en `payments.webhook_events`. No adjuntes disparadores de cumplimiento a tablas espejo del proveedor como `payments.razorpay_subscriptions`.
+
+Crea tablas de cumplimiento propiedad de la aplicación con RLS, luego actualízalas desde disparadores de webhook. Consulta [Pagos con Razorpay](/core-concepts/payments/razorpay) para un ejemplo de disparador.
+
+## Entorno de producción/prueba
+
+Pasa `'test'` como el primer argumento del SDK durante el desarrollo. Solo cambia a `'live'` después de que el desarrollador apruebe explícitamente los cambios de producción de Razorpay y estén configurados los artículos, planes y webhooks en producción.
+
+<Warning>
+  Nunca pongas la clave secreta de Razorpay ni el secreto del webhook en el código del frontend. El frontend solo recibe el ID de clave pública de Razorpay como `checkoutOptions.key`.
+</Warning>

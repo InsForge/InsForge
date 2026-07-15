@@ -1,7 +1,7 @@
 ---
 title: "Authentication"
 sidebarTitle: "Overview"
-description: "Use InsForge to authenticate and authorize your users."
+description: "Authenticate and authorize users in InsForge with email, magic links, one-time codes, OAuth, OIDC providers, and JWT-based sessions."
 ---
 
 Use InsForge Authentication to handle sign-up, login, sessions, and identity for your app. Users can sign in with email and password, magic link, one-time code, OAuth providers (Google, GitHub, Apple, and others), or any OIDC-compliant identity provider you bring. InsForge issues JSON Web Tokens on login, and every other product on the platform consumes the same token.
@@ -72,7 +72,7 @@ The auth JWT flows through every InsForge SDK call automatically. Postgres RLS p
 
 User state lives in your project's Postgres database in the `auth` schema. Join `auth.users` to your application tables via foreign keys, react to identity changes with triggers, and back the whole thing up the same way you back up everything else.
 
-When you add a user from the dashboard, the Auto-confirm toggle sets `email_verified` on the new row: enable it to mark the email as verified at creation, so the user can sign in without confirming it.
+When you add a user from the dashboard, the Auto-confirm toggle sets `email_verified` on the new row. Enable it to mark the email as verified at creation, so the user can sign in without confirming it.
 
 ## Build with it
 

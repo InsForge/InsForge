@@ -4,7 +4,7 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { AuthOTPService, OTPPurpose } from '@/services/auth/auth-otp.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { TokenManager } from '@/infra/security/token.manager.js';
+import { TokenManager, type RefreshTokenPayload } from '@/infra/security/token.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
@@ -613,6 +613,40 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
     const clientType = parseClientType(req.query.client_type);
 
     if (clientType === 'web') {
+      const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
+
+      if (refreshToken) {
+        const tokenManager = TokenManager.getInstance();
+        let payload: RefreshTokenPayload;
+
+        try {
+          payload = tokenManager.verifyRefreshToken(refreshToken);
+        } catch {
+          clearRefreshTokenCookie(res);
+          successResponse(res, {
+            success: true,
+            message: 'Logged out successfully',
+          });
+          return;
+        }
+
+        if (payload.sessionType !== 'user') {
+          clearRefreshTokenCookie(res);
+          successResponse(res, {
+            success: true,
+            message: 'Logged out successfully',
+          });
+          return;
+        }
+
+        const csrfHeader = req.headers['x-csrf-token'];
+        const csrfToken = typeof csrfHeader === 'string' ? csrfHeader : undefined;
+        if (!tokenManager.verifyCsrfToken(csrfToken, payload)) {
+          logger.warn('[Auth:Logout] CSRF token validation failed');
+          throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+        }
+      }
+
       clearRefreshTokenCookie(res);
     }
     // For non-web clients: no server-side cleanup needed.

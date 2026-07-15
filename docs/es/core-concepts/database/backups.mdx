@@ -1,0 +1,35 @@
+---
+title: "Copias de seguridad y restauración de bases de datos"
+sidebarTitle: "Backups"
+description: "Crear copias de seguridad manuales de bases de datos, restaurar instantáneas desde el panel de InsForge y usar copias de seguridad diarias automatizadas en InsForge Cloud con retención de 7 días."
+---
+
+Realice copias de seguridad y restaure su base de datos desde **Database → Backup & Restore** en el panel. InsForge Cloud también respalda automáticamente su proyecto todos los días, por lo que siempre tiene una copia reciente para revertir.
+
+Las copias de seguridad cubren solo la base de datos — los archivos cargados en Storage no están incluidos.
+
+<Frame caption="Aquí es donde vive en la interfaz de usuario: Database → Backup & Restore.">
+  <img src="/images/dashboard-backup-restore.png" alt="Página de copia de seguridad y restauración del panel de InsForge mostrando copias de seguridad manuales y copias de seguridad programadas con un botón Restaurar" />
+</Frame>
+
+## Copias de seguridad programadas
+
+InsForge Cloud realiza una copia de seguridad completa de cada proyecto activo en un plan pagado una vez al día, retenida durante 7 días. La lista **Scheduled Backups** muestra cuándo expira cada copia de seguridad, y cualquiera de ellas se puede restaurar en cualquier momento. Las copias de seguridad manuales no afectan la programación diaria.
+
+## Copias de seguridad manuales
+
+Haga clic en **Create a Backup** antes de un cambio arriesgado y opcionalmente déle un nombre. La copia de seguridad se ejecuta en segundo plano; la lista muestra su estado, tamaño y hora de creación, y le permite cambiar el nombre o eliminarlo. El plan gratuito incluye 1 espacio de copia de seguridad manual, los planes pagados incluyen 5, y las copias de seguridad manuales se mantienen hasta que las elimine.
+
+## Restaurar
+
+Haga clic en **Restore** junto a cualquier copia de seguridad completada — programada o manual. Restaurar reemplaza la base de datos actual con la copia de seguridad: el proyecto está sin conexión durante la restauración, se pierden los datos creados después de la copia de seguridad y la acción no se puede deshacer, así que haga una copia de seguridad manual primero si no está seguro.
+
+## Autohospedaje
+
+Las implementaciones autohospedadas tienen la misma página **Backup & Restore** para copias de seguridad y restauraciones manuales. Las copias de seguridad se almacenan junto con el almacenamiento de su proyecto (disco local o su depósito S3 cuando se configura) y se conservan hasta que las elimine. La imagen oficial de Docker no necesita configuración adicional.
+
+## Más recursos
+
+- [Database overview](/core-concepts/database/overview) para saber cómo se expone la base de datos a su aplicación.
+- [Database migrations](/core-concepts/database/migrations) para versionar cambios de esquema en lugar de restaurar para deshacerlos.
+- [Database branching](/agent-native/branching) para ensayar cambios arriesgados en una copia.

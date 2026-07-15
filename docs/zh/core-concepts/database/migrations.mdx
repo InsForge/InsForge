@@ -1,0 +1,52 @@
+---
+title: "数据库迁移"
+description: "在 git 中跟踪架构变更，并使用 InsForge CLI 应用它们"
+---
+
+迁移是 `migrations/` 中应用于 `@insforge/cli` 的版本化 SQL 文件。每次成功运行都记录在 `system.custom_migrations` 中。工作流是仅向前的。
+
+## 概念
+
+迁移是一个带有 14 位数 UTC 时间戳前缀的 SQL 文件：`<YYYYMMDDHHmmss>_<name>.sql`。CLI 在事务内按顺序应用待处理文件，将 `search_path` 设置为 `public`，并仅在成功时记录历史。PostgREST 自动重新加载架构元数据。文件内的 `BEGIN`/`COMMIT`/`ROLLBACK` 被拒绝。
+
+## 用法
+
+链接后端，然后创建文件。
+
+```bash
+npx @insforge/cli login
+npx @insforge/cli link
+npx @insforge/cli db migrations new create-employees-table
+```
+
+编写 SQL。
+
+```sql
+create table if not exists public.employees (
+  id bigint primary key generated always as identity,
+  name text not null,
+  email text,
+  created_at timestamptz default now()
+);
+```
+
+应用待处理的迁移并检查历史。
+
+```bash
+npx @insforge/cli db migrations up --all
+npx @insforge/cli db migrations list
+```
+
+使用 `up <version>` 针对单个文件，或使用 `up --to <version>` 应用到目标为止的所有待处理项。
+
+## 特定用法案例
+
+在现有项目上采用迁移：首先运行 `db migrations fetch` 来将远程历史具体化为本地文件。一旦应用于远程，永远不要就地编辑迁移。改为编写前向迁移。
+
+选择加入后，通过文件路由所有架构变更。临时仪表盘编辑会在 git 和 `system.custom_migrations` 之间造成漂移。
+
+## 更多资源
+
+- [Database branching](/agent-native/branching) 在副本上排练迁移。
+- [Database overview](/core-concepts/database/overview) 了解 PostgREST 如何拾取架构变更。
+- [PostgreSQL DDL docs](https://www.postgresql.org/docs/15/ddl.html) 用于您编写的 SQL。

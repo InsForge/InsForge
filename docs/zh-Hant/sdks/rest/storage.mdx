@@ -1,0 +1,554 @@
+---
+title: 存儲API參考
+description: 透過REST API的檔案存儲和貯體管理
+---
+
+## 概述
+
+存儲API提供基於貯體的檔案存儲，類似於S3。上傳、下載和管理檔案，支援本機和S3相容儲存後端。
+
+## 標頭
+
+針對經過驗証的函數調用：
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+Content-Type: application/json
+```
+
+針對管理員端點：
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
+Content-Type: application/json
+```
+
+---
+
+## 使用上傳策略上傳物件
+
+InsForge支援兩種類型的儲存後端：
+1. **本機儲存**：檔案儲存在本機檔案系統上。用於開發或低容量生產。
+2. **S3相容**：檔案儲存在S3相容物件儲存上。用於高容量生產。
+
+上傳檔案的步驟是：
+1. 取得上傳策略
+2. 上傳檔案
+3. 確認上傳（僅限S3）
+
+---
+
+### 步驟1：取得上傳策略
+
+根據儲存後端取得最優上傳策略（直接或預簽名URL）。
+上傳策略API根據儲存後端傳回最優上傳方法：
+- **本機儲存**：直接上傳到InsForge API
+- **S3相容**：預簽名URL用於直接上傳到S3
+
+```
+POST /api/storage/buckets/{bucketName}/upload-strategy
+```
+
+#### 請求本文
+
+| 欄位 | 類型 | 必需 | 說明 |
+|-------|------|----------|-------------|
+| `filename` | string | 是 | 原始檔案名稱 |
+| `contentType` | string | 否 | 檔案的MIME類型 |
+| `size` | integer | 否 | 檔案大小（位元組） |
+
+#### 範例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-strategy" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "profile-photo.jpg",
+    "contentType": "image/jpeg",
+    "size": 102400
+  }'
+```
+
+#### 回應（S3後端）
+
+```json
+{
+  "method": "presigned",
+  "uploadUrl": "https://s3-bucket.amazonaws.com/",
+  "fields": {
+    "bucket": "my-s3-bucket",
+    "key": "app-key/avatars/profile-photo-1234567890-abc123.jpg",
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": "...",
+    "Policy": "...",
+    "X-Amz-Signature": "..."
+  },
+  "key": "profile-photo-1234567890-abc123.jpg",
+  "confirmRequired": true,
+  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg/confirm-upload",
+  "expiresAt": "2025-09-05T01:00:00Z"
+}
+```
+
+#### 回應（本機儲存）
+
+```json
+{
+  "method": "direct",
+  "uploadUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg",
+  "key": "profile-photo-1234567890-abc123.jpg",
+  "confirmRequired": false
+}
+```
+
+---
+
+### 步驟2：上傳檔案
+
+使用提供的方法將檔案上傳到指定的URL。
+- **本機儲存**：使用PUT請求到`uploadUrl`，使用`multipart/form-data`和`file`欄位。
+- **S3相容**：使用POST請求到`uploadUrl`，使用`multipart/form-data`和`file`欄位。包括請求中`fields`物件的所有欄位。
+
+### 步驟3：確認預簽名上傳（僅限S3）
+
+確認檔案已成功使用預簽名URL上傳到S3。
+
+```
+POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
+```
+
+#### 請求本文
+
+| 欄位 | 類型 | 必需 | 說明 |
+|-------|------|----------|-------------|
+| `size` | integer | 是 | 檔案大小（位元組） |
+| `contentType` | string | 否 | 檔案的MIME類型 |
+| `etag` | string | 否 | 上傳物件的S3 ETag |
+
+#### 範例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo-123.jpg/confirm-upload" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "size": 102400,
+    "contentType": "image/jpeg"
+  }'
+```
+
+#### 回應
+
+```json
+{
+  "bucket": "avatars",
+  "key": "profile-photo-123.jpg",
+  "size": 102400,
+  "mimeType": "image/jpeg",
+  "uploadedAt": "2024-01-21T10:30:00Z",
+  "url": "/api/storage/buckets/avatars/objects/profile-photo-123.jpg"
+}
+```
+
+---
+
+## 上傳物件（已淘汰）
+
+使用特定金鑰將檔案上傳到貯體。
+
+```
+PUT /api/storage/buckets/{bucketName}/objects/{objectKey}
+```
+
+### 路徑參數
+
+| 參數 | 類型 | 說明 |
+|-----------|------|-------------|
+| `bucketName` | string | 貯體的名稱 |
+| `objectKey` | string | 物件金鑰（可以包括`/`用於虛擬資料夾） |
+
+### 請求本文
+
+`multipart/form-data`帶有`file`欄位。
+
+### 範例
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/storage/buckets/avatars/objects/users/profile.jpg" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -F "file=@/path/to/image.jpg"
+```
+
+### 回應
+
+```json
+{
+  "bucket": "avatars",
+  "key": "users/profile.jpg",
+  "size": 102400,
+  "mimeType": "image/jpeg",
+  "uploadedAt": "2024-01-15T10:30:00Z",
+  "url": "/api/storage/buckets/avatars/objects/users/profile.jpg"
+}
+```
+
+---
+
+## 使用自動產生的金鑰上傳（已淘汰）
+
+使用自動產生的唯一金鑰上傳檔案。
+
+```
+POST /api/storage/buckets/{bucketName}/objects
+```
+
+### 範例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/uploads/objects" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -F "file=@/path/to/document.pdf"
+```
+
+### 回應
+
+```json
+{
+  "bucket": "uploads",
+  "key": "document-1737546841234-a3f2b1.pdf",
+  "size": 204800,
+  "mimeType": "application/pdf",
+  "uploadedAt": "2024-01-21T10:30:00Z",
+  "url": "/api/storage/buckets/uploads/objects/document-1737546841234-a3f2b1.pdf"
+}
+```
+
+---
+
+## 使用下載策略下載物件
+
+InsForge支援兩種類型的儲存後端：
+1. **本機儲存**：檔案儲存在本機檔案系統上。用於開發或低容量生產。
+2. **S3相容**：檔案儲存在S3相容物件儲存上。用於高容量生產。
+
+下載檔案的步驟是：
+1. 取得下載策略
+2. 從傳回的URL下載檔案
+
+### 步驟1：取得下載策略
+
+根據儲存後端和貯體可見性取得最優下載策略（直接URL或預簽名URL）。
+
+下載策略API根據儲存後端和貯體可見性傳回最優下載方法：
+- **本機儲存**：從InsForge API直接下載
+- **S3相容**：S3的預簽名URL。
+
+```
+GET /api/storage/buckets/{bucketName}/download-strategy/objects/{objectKey}
+```
+
+<Note>
+  過期時間（用於預簽名URL）從貯體的
+  可見性自動計算伺服器端。端點不需要請求本文。`objectKey`可能包含
+  `/`（虛擬資料夾）——不要百分比編碼分隔符。
+
+  `POST /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy`
+  在原始路徑上保留為已淘汰的別名，以支援較舊的SDK
+  版本，將在未來的主要版本中移除。遷移到`GET`。
+</Note>
+
+#### 範例
+
+```bash
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/download-strategy/objects/profile.jpg" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+#### 回應（S3公開貯體）
+
+```json
+{
+  "method": "direct",
+  "url": "https://s3-bucket.s3.us-east-2.amazonaws.com/app-key/avatars/profile.jpg"
+}
+```
+
+#### 回應（S3私人貯體）
+
+```json
+{
+  "method": "presigned",
+  "url": "https://s3-bucket.s3.us-east-2.amazonaws.com/app-key/avatars/profile.jpg?X-Amz-Algorithm=...",
+  "expiresAt": "2025-09-05T01:00:00Z"
+}
+```
+
+### 步驟2：下載檔案
+
+使用適當的方法從傳回的URL下載檔案。
+
+---
+
+## 下載物件（已淘汰）
+
+從貯體下載檔案。
+
+```
+GET /api/storage/buckets/{bucketName}/objects/{objectKey}
+```
+
+### 範例
+
+```bash
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects/users/profile.jpg" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -o profile.jpg
+```
+
+### 回應
+
+二進位檔案內容，具有適當的`Content-Type`和`Content-Length`標頭。
+
+---
+
+## 刪除物件
+
+從貯體中刪除檔案。
+
+```
+DELETE /api/storage/buckets/{bucketName}/objects/{objectKey}
+```
+
+### 範例
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/avatars/objects/users/profile.jpg" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### 回應
+
+```json
+{
+  "message": "Object deleted successfully"
+}
+```
+
+---
+
+## 列出貯體中的物件
+
+列出貯體中的所有物件，支援選用篩選。
+
+```
+GET /api/storage/buckets/{bucketName}/objects
+```
+
+### 查詢參數
+
+| 參數 | 類型 | 說明 |
+|-----------|------|-------------|
+| `prefix` | string | 按金鑰前置詞篩選（例如，`users/`） |
+| `search` | string | 按金鑰搜尋物件（部分相符） |
+| `limit` | integer | 傳回的最大物件數（1-1000，預設：100） |
+| `offset` | integer | 要跳過的物件數 |
+
+### 範例
+
+```bash
+# Filter by prefix
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects?prefix=users/&limit=50" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Search by key
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects?search=profile" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### 回應
+
+```json
+{
+  "data": [
+    {
+      "bucket": "avatars",
+      "key": "users/user123.jpg",
+      "size": 102400,
+      "mimeType": "image/jpeg",
+      "uploadedAt": "2024-01-15T10:30:00Z",
+      "url": "/api/storage/buckets/avatars/objects/users/user123.jpg"
+    },
+    {
+      "bucket": "avatars",
+      "key": "users/user456.png",
+      "size": 204800,
+      "mimeType": "image/png",
+      "uploadedAt": "2024-01-16T11:00:00Z",
+      "url": "/api/storage/buckets/avatars/objects/users/user456.png"
+    }
+  ],
+  "pagination": {
+    "offset": 0,
+    "limit": 100,
+    "total": 2
+  }
+}
+```
+
+---
+
+## 貯體管理（管理員）
+
+### 列出所有貯體
+
+```
+GET /api/storage/buckets
+```
+
+### 範例
+
+```bash
+curl "https://your-app.insforge.app/api/storage/buckets" \
+  -H "Authorization: Bearer admin-jwt-token"
+```
+
+### 回應
+
+```json
+{
+  "buckets": ["avatars", "documents", "uploads", "public"]
+}
+```
+
+### 建立貯體
+
+```
+POST /api/storage/buckets
+```
+
+### 請求本文
+
+| 欄位 | 類型 | 必需 | 說明 |
+|-------|------|----------|-------------|
+| `bucketName` | string | 是 | 貯體名稱（英數字、下底線、連字號） |
+| `isPublic` | boolean | 否 | 貯體是否可公開存取（預設：true） |
+
+### 範例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bucketName": "user-uploads",
+    "isPublic": false
+  }'
+```
+
+### 回應
+
+```json
+{
+  "message": "Bucket created successfully",
+  "bucket": "user-uploads"
+}
+```
+
+### 更新貯體
+
+```
+PATCH /api/storage/buckets/{bucketName}
+```
+
+### 請求本文
+
+| 欄位 | 類型 | 必需 | 說明 |
+|-------|------|----------|-------------|
+| `isPublic` | boolean | 是 | 貯體是否可公開存取 |
+
+### 範例
+
+```bash
+curl -X PATCH "https://your-app.insforge.app/api/storage/buckets/user-uploads" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"isPublic": true}'
+```
+
+### 回應
+
+```json
+{
+  "message": "Bucket visibility updated",
+  "bucket": "user-uploads",
+  "isPublic": true
+}
+```
+
+### 刪除貯體
+
+```
+DELETE /api/storage/buckets/{bucketName}
+```
+
+### 範例
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/old-uploads" \
+  -H "Authorization: Bearer admin-jwt-token"
+```
+
+### 回應
+
+```json
+{
+  "message": "Bucket deleted successfully"
+}
+```
+
+---
+
+## 錯誤回應
+
+### 找不到貯體（404）
+
+```json
+{
+  "error": "BUCKET_NOT_FOUND",
+  "message": "Bucket 'nonexistent' does not exist",
+  "statusCode": 404,
+  "nextActions": "Create the bucket first"
+}
+```
+
+### 找不到物件（404）
+
+```json
+{
+  "error": "OBJECT_NOT_FOUND",
+  "message": "Object 'missing.jpg' not found in bucket 'avatars'",
+  "statusCode": 404,
+  "nextActions": "Check the bucket and key combination"
+}
+```
+
+### 無效檔案（400）
+
+```json
+{
+  "error": "INVALID_FILE",
+  "message": "No file provided in the request",
+  "statusCode": 400,
+  "nextActions": "Include a file in the multipart form data"
+}
+```
+
+### 貯體已存在（409）
+
+```json
+{
+  "error": "BUCKET_EXISTS",
+  "message": "Bucket 'avatars' already exists",
+  "statusCode": 409,
+  "nextActions": "Choose a different bucket name"
+}
+```

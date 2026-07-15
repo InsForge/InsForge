@@ -1,0 +1,27 @@
+---
+title: "Preguntas frecuentes"
+sidebarTitle: "Preguntas frecuentes"
+description: "Respuestas a preguntas habituales sobre cómo funciona InsForge."
+---
+
+<AccordionGroup>
+  <Accordion title="¿Leer o escribir en la base de datos es una edge function? ¿Qué diferencia hay entre llamadas a la base de datos, edge functions y custom compute?">
+    No. Cuando lees o escribes una tabla no se ejecuta ninguna función, así que no es una edge function.
+
+    En InsForge tu código habla con el backend de tres formas distintas, y es fácil confundirlas:
+
+    | | Cómo se activa | ¿Sigue en ejecución? | Para qué sirve |
+    |----|----------------|----------------------|----------------|
+    | **Llamada a la base de datos** (REST API autogenerada) | Tu cliente envía una petición SDK o REST | No, está totalmente gestionada | Leer y escribir filas de tablas |
+    | **Edge Function** | Una petición HTTP, una programación cron o un trigger de base de datos | No, se ejecuta una vez y termina | Endpoints propios, webhooks, lógica de triggers, llamar a servicios externos |
+    | **Custom Compute** | Tú inicias un proceso de larga duración | Sí, se mantiene activo | Workers de cola, bucles de inferencia de IA, websockets, cualquier cosa con estado |
+
+    **Llamada a la base de datos.** Defines una tabla y InsForge te da al instante un conjunto de endpoints REST (como `GET /api/database/records/{table}`) y un SDK tipado. Llamar a `select` o `insert` lee y escribe la base de datos directamente, sin nada que desplegar y sin nada en ejecución. Es todo lo que necesitas para el CRUD normal. Consulta [Base de datos](/core-concepts/database/overview).
+
+    **Edge Function.** Úsala cuando la API autogenerada no basta y quieres tu propia lógica de servidor: un webhook de pago, un auth hook, código que se dispara cuando una fila se `INSERT`a, `UPDATE`a o `DELETE`a, o un trabajo programado. La clave es que se ejecuta una vez por petición o evento y luego termina. Consulta [Edge Functions](/core-concepts/functions/overview).
+
+    **Custom Compute.** Úsalo cuando necesitas un proceso que se mantenga activo, como un worker de cola o un bucle de inferencia de IA. Una edge function no puede hacerlo porque no se ejecuta de forma continua. Consulta [Custom Compute](/core-concepts/compute/overview).
+
+    Regla rápida: ¿solo mueves datos de entrada y salida? Es la base de datos (REST automática). ¿Escribes lógica que se ejecuta y termina? Edge function. ¿Necesitas algo funcionando todo el tiempo? Custom compute.
+  </Accordion>
+</AccordionGroup>

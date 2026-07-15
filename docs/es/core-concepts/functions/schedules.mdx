@@ -1,0 +1,43 @@
+---
+title: "Cronogramas: funciones activadas por cron"
+description: "Ejecute una función en un cronograma cron usando pg_cron"
+---
+
+Los cronogramas invocan funciones en una expresión cron recurrente. [pg_cron](https://github.com/citusdata/pg_cron) envía una solicitud HTTP a la URL de la función en cada marca y registra el resultado.
+
+## Conceptos
+
+Un cronograma es una expresión cron, una URL de destino y encabezados. En la creación, los marcadores de posición `${{secrets.KEY}}` en los encabezados se resuelven y se cifran con `pgcrypto`. En cada marca, `execute_job()` descifra encabezados, llama a la función y escribe estado y duración en `schedules.job_logs`.
+
+## Uso
+
+Cron estándar de 5 campos (sin segundos). Haga referencia a secretos en encabezados en lugar de codificar claves.
+
+```text
+*/5 * * * *   cada 5 minutos
+0 * * * *     cada hora
+0 0 * * *     diariamente a medianoche
+0 9 * * 1     cada lunes a las 9am
+0 0 1 * *     primero de cada mes
+```
+
+Crear a través del panel o SQL:
+
+```sql
+select schedules.create_job(
+  name       => 'daily-cleanup',
+  schedule   => '0 0 * * *',
+  url        => 'https://myapp.functions.insforge.app/cleanup',
+  headers    => jsonb_build_object('Authorization', 'Bearer ${{secrets.CRON_TOKEN}}')
+);
+```
+
+## Límites
+
+El intervalo mínimo es 1 minuto (pg_cron). Las ejecuciones fallidas se registran pero no se reintentan, por lo que la función debe ser idempotente. Eliminar un secreto referenciado interrumpe cada trabajo que lo usa hasta que actualice o desactive el cronograma.
+
+## Más recursos
+
+- [pg_cron docs](https://github.com/citusdata/pg_cron) para sintaxis cron.
+- [Functions overview](/core-concepts/functions/overview) para el runtime.
+- [crontab.guru](https://crontab.guru) para verificar una expresión.

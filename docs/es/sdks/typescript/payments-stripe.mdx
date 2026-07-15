@@ -1,0 +1,226 @@
+---
+title: SDK de Pagos de Stripe
+description: Crea sesiones de Stripe Checkout y Portal de Facturación con el SDK de TypeScript para InsForge
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## Descripción general
+
+El SDK de TypeScript expone asistentes de tiempo de ejecución de Stripe para frontends de aplicaciones generadas:
+
+- `insforge.payments.stripe.createCheckoutSession(...)`
+- `insforge.payments.stripe.createCustomerPortalSession(...)`
+
+Las claves secretas de Stripe, la gestión del catálogo, la configuración de webhooks y la supervisión de pagos son operaciones de administración. Configúralas desde el panel o la CLI antes de usar el SDK.
+
+```bash
+npx @insforge/cli payments stripe status
+npx @insforge/cli payments stripe catalog --environment test
+```
+
+<Note>
+  Consulta [Pagos con Stripe](/core-concepts/payments/stripe) para la configuración, tablas de base de datos, proyecciones de webhook y patrones de cumplimiento.
+</Note>
+
+Los métodos del SDK requieren el token de usuario actual de InsForge. Los tokens anónimos de InsForge se pueden usar para el pago único de invitados, pero una clave de API de InsForge no es un sustituto porque el backend necesita el contexto del usuario para las filas de sesión locales.
+
+## createCheckoutSession()
+
+Crea una sesión de Stripe Checkout a través del backend de InsForge.
+
+### Parámetros
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|----------|-------------|
+| primer argumento | `'test' \| 'live'` | Sí | Entorno de Stripe al que apuntar |
+| `mode` | `'payment' \| 'subscription'` | Sí | Modo de Checkout |
+| `lineItems` | `{ priceId: string; quantity?: number }[]` | Sí | IDs de precio de Stripe y cantidades. La cantidad predeterminada es `1` |
+| `successUrl` | `string` | Sí | URL a la que Stripe redirige después de que se completa el Checkout |
+| `cancelUrl` | `string` | Sí | URL a la que Stripe redirige si el cliente cancela |
+| `subject` | `{ type: string; id: string }` | Requerido para suscripciones | Propietario de facturación definido por la aplicación |
+| `customerEmail` | `string \| null` | No | Pista de correo electrónico para la creación de clientes de Checkout |
+| `metadata` | `Record<string, string>` | No | Metadatos de la aplicación copiados a Stripe Checkout |
+| `idempotencyKey` | `string` | No | Clave estable para la creación de Checkout segura ante reintentos |
+
+<Warning>
+  Las claves de metadatos que comienzan con `insforge_` están reservadas.
+</Warning>
+
+### Devoluciones
+
+```typescript
+{
+  data: {
+    checkoutSession: {
+      id: string
+      environment: 'test' | 'live'
+      mode: 'payment' | 'subscription'
+      status: 'initialized' | 'open' | 'completed' | 'expired' | 'failed'
+      paymentStatus: 'paid' | 'unpaid' | 'no_payment_required' | null
+      subjectType: string | null
+      subjectId: string | null
+      customerEmail: string | null
+      checkoutSessionId: string | null
+      customerId: string | null
+      paymentIntentId: string | null
+      subscriptionId: string | null
+      url: string | null
+      lastError: string | null
+      createdAt: string
+      updatedAt: string
+    }
+  } | null,
+  error: Error | null
+}
+```
+
+### Pago único
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCheckoutSession('test', {
+  mode: 'payment',
+  lineItems: [{ priceId: 'price_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/checkout/success`,
+  cancelUrl: `${window.location.origin}/pricing`,
+  customerEmail: user?.email ?? null,
+  metadata: { order_id: orderId },
+  idempotencyKey: `order:${orderId}`
+});
+
+if (error) {
+  console.error('Checkout failed:', error.message);
+  return;
+}
+
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+Para compras únicas anónimas, omite `subject` y pasa `customerEmail` cuando esté disponible.
+
+Si un pago único incluye un `subject` y aún no existe un mapeo de cliente de Stripe, InsForge permite que Stripe cree el cliente durante el Checkout y rellena el mapeo del sujeto desde el webhook de finalización.
+
+### Pago de suscripción
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCheckoutSession('test', {
+  mode: 'subscription',
+  subject: { type: 'team', id: teamId },
+  lineItems: [{ priceId: 'price_monthly_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/billing/success`,
+  cancelUrl: `${window.location.origin}/billing`,
+  customerEmail: user.email,
+  idempotencyKey: `team:${teamId}:pro-monthly`
+});
+
+if (error) throw error;
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+El pago de suscripción requiere `subject` porque el acceso recurrente pertenece a un propietario de facturación definido por la aplicación, como un usuario, equipo, organización, espacio de trabajo, inquilino o grupo.
+
+<Warning>
+  No trates la URL de éxito como prueba de pago. Usa eventos de webhook verificados para cumplir órdenes y otorgar acceso a suscripciones.
+</Warning>
+
+## createCustomerPortalSession()
+
+Crea una sesión del Portal de Facturación de Stripe para un sujeto de facturación mapeado.
+
+### Parámetros
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|----------|-------------|
+| primer argumento | `'test' \| 'live'` | Sí | Entorno de Stripe al que apuntar |
+| `subject` | `{ type: string; id: string }` | Sí | Propietario de facturación definido por la aplicación |
+| `returnUrl` | `string` | No | URL a la que Stripe redirige cuando el cliente abandona el portal |
+| `configuration` | `string` | No | ID de configuración del Portal de Facturación de Stripe |
+
+### Devoluciones
+
+```typescript
+{
+  data: {
+    customerPortalSession: {
+      id: string
+      environment: 'test' | 'live'
+      status: 'initialized' | 'created' | 'failed'
+      subjectType: string
+      subjectId: string
+      customerId: string | null
+      returnUrl: string | null
+      configuration: string | null
+      url: string | null
+      lastError: string | null
+      createdAt: string
+      updatedAt: string
+    }
+  } | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCustomerPortalSession('test', {
+  subject: { type: 'team', id: teamId },
+  returnUrl: `${window.location.origin}/billing`
+});
+
+if (error) {
+  if ('statusCode' in error && error.statusCode === 404) {
+    return;
+  }
+
+  throw error;
+}
+
+if (data?.customerPortalSession.url) {
+  window.location.assign(data.customerPortalSession.url);
+}
+```
+
+Las sesiones del portal de clientes requieren un usuario autenticado y un mapeo de cliente existente para el sujeto. El mapeo generalmente se crea después de que una sesión de Checkout se completa y Stripe devuelve un cliente.
+
+## Autorización y RLS
+
+Los métodos del SDK llaman a las rutas de tiempo de ejecución usando el token actual de InsForge. El backend inserta filas de sesión locales usando el contexto del llamante:
+
+- `payments.stripe_checkout_sessions` para intentos de Checkout
+- `payments.stripe_customer_portal_sessions` para intentos del Portal de Facturación
+
+Si los usuarios pueden pasar sujetos compartidos como equipos u organizaciones, agrega un límite de autorización antes de exponer la UI de checkout, suscripción o portal de clientes. Por ejemplo, habilita RLS en las tablas de tiempo de ejecución de Stripe con políticas que verifiquen la membresía del equipo, o llama a Pagos a través de tu propio punto final del servidor que verifique la membresía primero.
+
+PostgreSQL aplica políticas `SELECT` a las filas devueltas por `INSERT ... RETURNING` y a las búsquedas de reintento idempotentes. Si aparece un error de RLS aunque exista una política `INSERT`, agrega una política `SELECT` coincidente para el mismo sujeto de facturación y clave de idempotencia.
+
+<Warning>
+  No permitas que los usuarios envíen valores arbitrarios de `subject.type` y `subject.id` a menos que tu aplicación verifique que pueden gestionar ese sujeto de facturación.
+</Warning>
+
+## Lectura del estado de pago
+
+El SDK de Pagos no expone lecturas genéricas para usuarios finales de `payments.customers`, `payments.stripe_subscriptions` o `payments.transactions`. Esas tablas son registros operacionales usados para la visibilidad del panel y los informes.
+
+Para el estado de facturación orientado al usuario, crea tablas propiedad de la aplicación con RLS y rellénalas desde disparadores de eventos de webhook del proveedor:
+
+- `public.orders`
+- `public.credit_ledger`
+- `public.user_entitlements`
+- `public.team_billing_status`
+
+Consulta [Pagos con Stripe](/core-concepts/payments/stripe) para ejemplos de cumplimiento.
+
+## Entorno de producción/prueba
+
+Pasa `'test'` como el primer argumento del SDK durante el desarrollo. Solo cambia a `'live'` después de que el desarrollador apruebe explícitamente los cambios de producción de Stripe y estén configurados los precios en producción.
+
+<Warning>
+  Nunca pongas claves secretas de Stripe en el código del frontend ni en variables de entorno de despliegue público. Configura las claves de Stripe a través del panel de InsForge o la CLI.
+</Warning>
