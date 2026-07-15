@@ -22,6 +22,10 @@ Send custom HTML emails to one or more recipients.
 - `replyTo` (string, optional) - Reply-to email address, must be a valid email address
 
 <Note>
+By default, emails are sent from `noreply@<your-project>.send.insforge.dev`, a per-project subdomain that InsForge Cloud provisions and verifies for you, so no domain setup is required. The `from` field only sets the display name shown next to that address; on the default provider you cannot change the address or domain. To send from your own domain, configure [Custom SMTP](/core-concepts/messaging/custom-smtp).
+</Note>
+
+<Note>
 When [Custom SMTP](/core-concepts/messaging/custom-smtp) is enabled for your project, the `from` field is ignored. The sender name and email are always taken from your SMTP configuration to prevent spoofing through your server.
 </Note>
 
