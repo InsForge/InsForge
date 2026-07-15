@@ -7,7 +7,6 @@ import { withUserContext } from '@/services/database/user-context.service.js';
 import { StorageRecord } from '@/types/storage.js';
 import {
   ERROR_CODES,
-  DELETE_OBJECT_FAILURE_MESSAGE,
   DeleteObjectResult,
   DeleteObjectsResponse,
   StorageBucketSchema,
@@ -398,14 +397,14 @@ export class StorageService {
         if (providerDeletedKeys.has(key)) {
           return { key, status: 'deleted' };
         }
-        return { key, status: 'failed', message: DELETE_OBJECT_FAILURE_MESSAGE };
+        return { key, status: 'failed', message: 'Failed to delete object' };
       });
 
       const failed = results
         .filter((result) => result.status === 'failed')
         .map((result) => ({
           key: result.key,
-          message: result.message ?? DELETE_OBJECT_FAILURE_MESSAGE,
+          message: result.message ?? 'Failed to delete object',
         }));
 
       if (failed.length > 0) {
@@ -424,7 +423,7 @@ export class StorageService {
       return {
         results: uniqueKeys.map((key) =>
           dbDeletedKeySet.has(key)
-            ? { key, status: 'failed', message: DELETE_OBJECT_FAILURE_MESSAGE }
+            ? { key, status: 'failed', message: 'Failed to delete object' }
             : { key, status: 'notFound' }
         ),
       };

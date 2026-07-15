@@ -17,11 +17,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl as getCloudFrontSignedUrl } from '@aws-sdk/cloudfront-signer';
 import { Readable } from 'stream';
-import {
-  UploadStrategyResponse,
-  DownloadStrategyResponse,
-  DELETE_OBJECT_FAILURE_MESSAGE,
-} from '@insforge/shared-schemas';
+import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
 import {
   StorageProvider,
   ObjectMetadata,
@@ -282,7 +278,7 @@ export class S3StorageProvider implements StorageProvider {
         const originalKey = s3KeyToOriginalKey.get(error.Key) ?? error.Key;
         return {
           key: originalKey,
-          message: DELETE_OBJECT_FAILURE_MESSAGE,
+          message: 'Failed to delete object',
         };
       });
 
