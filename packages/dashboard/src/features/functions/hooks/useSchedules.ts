@@ -189,7 +189,7 @@ export function useSchedules() {
       if (!scheduleId) {
         return null;
       }
-      return queryClient.fetchQuery({
+      return await queryClient.fetchQuery({
         queryKey: ['schedules', scheduleId],
         queryFn: () => scheduleService.getSchedule(scheduleId),
         staleTime: 30 * 1000,

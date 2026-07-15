@@ -698,7 +698,16 @@ export class AuthService {
    */
   async adminLoginWithAuthorizationCode(code: string): Promise<CreateAdminSessionResponse> {
     const { payload } = await this.tokenManager.verifyCloudToken(code);
-    const sub = `cloud:${payload.userId}`;
+    const userId = payload['userId'];
+    if (typeof userId !== 'string' || userId.trim().length === 0) {
+      throw new AppError(
+        'Invalid cloud admin token: missing user identity',
+        401,
+        ERROR_CODES.AUTH_UNAUTHORIZED
+      );
+    }
+
+    const sub = `cloud:${userId.trim()}`;
     const accessToken = this.tokenManager.generateAccessToken({
       sub,
       role: 'project_admin',
@@ -972,6 +981,10 @@ export class AuthService {
       verifyEmailMethod: authConfig.verifyEmailMethod,
       resetPasswordMethod: authConfig.resetPasswordMethod,
       allowedRedirectUrls: authConfig.allowedRedirectUrls ?? [],
+      verifyEmailCodeExpiryMinutes: authConfig.verifyEmailCodeExpiryMinutes,
+      verifyEmailLinkExpiryMinutes: authConfig.verifyEmailLinkExpiryMinutes,
+      resetPasswordCodeExpiryMinutes: authConfig.resetPasswordCodeExpiryMinutes,
+      resetPasswordLinkExpiryMinutes: authConfig.resetPasswordLinkExpiryMinutes,
       disableSignup: authConfig.disableSignup,
     };
   }
