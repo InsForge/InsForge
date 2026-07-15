@@ -25,6 +25,23 @@ description: "关于 InsForge 工作方式的常见问题解答。"
     一句话判断：只是读写数据，就走数据库（自动 REST）；要写一段跑完就结束的逻辑，用 Edge Function；要一直运行，用 Custom Compute。
   </Accordion>
 
+  <Accordion title="怎么把项目分享给另一个管理员，或者邀请队友？">
+    访问权限是按 **organization（组织）** 共享的，不是按单个 project。你是把人邀请进拥有这些 project 的组织，他就能访问组织下的所有 project，没有「只分享某一个 project」的入口。
+
+    邀请步骤：
+
+    1. 在 dashboard 里，用左上角的组织切换器打开拥有该 project 的组织。
+    2. 点左侧栏的 **Members**。
+    3. 点 **Invite Member**，填对方邮箱，选一个角色：
+       - **Administrator（管理员）**：完全控制，既能管理 project，也能邀请、移除成员、修改成员角色。
+       - **Developer（开发者）**：能正常访问组织的 project，但不能管理成员。
+    4. 对方会收到一封邀请邮件（7 天内有效）。他用「收到邀请的那个邮箱」登录 InsForge 并接受后，就以你选的角色加入组织。
+
+    想专门加一个管理员，邀请时选 **Administrator** 即可，之后也能在 Members 列表里改角色。只有 Administrator 能邀请和管理成员。
+
+    把整个组织「移交给新 Owner」是另一个独立操作，跟邀请成员不是一回事。要移交的话，打开 **Organization Settings**，用里面的 **Transfer Ownership**（只有当前 Owner 能发起，且对方必须是已验证的 InsForge 用户并接受邮件里的请求）。
+  </Accordion>
+
   <Accordion title="为什么我的项目被暂停了？怎么避免被暂停？">
     只有 Free 计划会出现暂停，原因有两种：
 
