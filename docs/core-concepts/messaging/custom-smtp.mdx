@@ -6,7 +6,7 @@ description: Route every outgoing email through your own SMTP server
 When enabled, every email (auth flows and `emails.send()` calls) routes through your SMTP server. Toggle off to revert; credentials are preserved.
 
 <Note>
-  **Self-hosted instances need this to send any email at all.** The zero-setup managed sender routes through InsForge Cloud and is only available to cloud-linked projects. A self-hosted instance with no SMTP configured cannot deliver auth emails, so email verification, magic links, and password resets will silently fail until you complete the setup below.
+  **Self-hosted instances need this to send any email at all.** The zero-setup managed sender routes through InsForge Cloud and is only available to cloud-linked projects. A self-hosted instance with no SMTP configured cannot deliver auth emails, so email verification, magic links, and password resets will not be delivered until you complete the setup below.
 </Note>
 
 ## Concepts
