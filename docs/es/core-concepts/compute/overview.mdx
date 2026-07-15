@@ -52,6 +52,15 @@ Registros estructurados por contenedor, consultables por servicio y rango de tie
 
 Establezca variables de entorno y secretos por servicio, separados de sus secretos de función de borde. Rotar sin reimplementar.
 
+## Autoalojamiento: habilitar compute
+
+Custom Compute ejecuta sus contenedores en [Fly.io](https://fly.io). En InsForge Cloud esto está totalmente gestionado y no configura nada. Cuando se autoaloja, usa su propia cuenta de Fly y activa el compute con dos variables de entorno en su `.env`:
+
+- `FLY_API_TOKEN`: un token de la API de Fly.io, creado con `fly tokens create org`. InsForge lo usa para crear y gestionar sus contenedores de compute.
+- `FLY_ORG`: el slug de su organización de Fly, obtenido con `fly orgs list`. Es la organización donde se crean los contenedores.
+
+Ambos son obligatorios. Un token sin organización no tiene nada contra qué autenticarse, y una organización sin token no se puede invocar. Defínalos y reinicie el contenedor. Hasta que ambos estén presentes, los endpoints de compute devuelven `503 COMPUTE_NOT_CONFIGURED`.
+
 ## Próximos pasos
 
 - Configure el [CLI](/quickstart) para vincular su proyecto (la ruta recomendada).

@@ -42,4 +42,10 @@ description: "Respuestas a preguntas habituales sobre cómo funciona InsForge."
 
     ¿Sigues atascado? Pregunta en nuestro [Discord](https://discord.com/invite/DvBtaEc9Jz) para la respuesta más rápida.
   </Accordion>
+
+  <Accordion title="¿Qué es FLY_API_TOKEN?">
+    Es una variable de entorno que solo defines cuando alojas InsForge por tu cuenta (self-hosting) y quieres usar [Custom Compute](/core-concepts/compute/overview). Custom Compute ejecuta tus contenedores de larga duración en [Fly.io](https://fly.io), así que una instancia autoalojada necesita tu propia cuenta de Fly: define `FLY_API_TOKEN` (un token de la API de Fly creado con `fly tokens create org`) y `FLY_ORG` (el slug de tu organización de Fly, obtenido con `fly orgs list`) en tu `.env` y reinicia. Ambos son obligatorios y, hasta que se definan, los endpoints de compute devuelven `503 COMPUTE_NOT_CONFIGURED`.
+
+    En InsForge Cloud nunca tocas esto. El compute está gestionado por nosotros, y el resto de la plataforma (base de datos, autenticación, Storage, edge functions) no necesita ningún token de Fly.
+  </Accordion>
 </AccordionGroup>
