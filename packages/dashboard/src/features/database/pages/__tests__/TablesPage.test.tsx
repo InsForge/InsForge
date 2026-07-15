@@ -80,6 +80,15 @@ vi.mock('#lib/hooks/usePageSize', () => ({
   }),
 }));
 
+vi.mock('#lib/hooks/useMetadata', () => ({
+  useProjectId: () => ({
+    projectId: 'test-project',
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock('#lib/hooks/useConfirm', () => ({
   useConfirm: () => ({
     confirm: vi.fn(),
