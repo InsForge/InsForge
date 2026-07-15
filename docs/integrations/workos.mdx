@@ -23,27 +23,7 @@ description: "Add WorkOS enterprise SSO, SCIM provisioning, and directory sync t
 3. Navigate to **Redirects** and add `http://localhost:3000/callback`
 4. Enable your desired authentication methods (email/password, social login, SSO, etc.)
 
-## Step 2: Configure a JWT Template in WorkOS
-
-1. In the WorkOS Dashboard, go to **Authentication** > **Sessions**
-2. Click **Configure JWT Template**
-3. Set the template to include InsForge-compatible claims:
-
-```json
-{
-  "role": "authenticated",
-  "aud": "insforge-api",
-  "user_email": {{ user.email }}
-}
-```
-
-<Note>
-`sub` is a reserved claim automatically included by WorkOS — do not add it manually.
-</Note>
-
-4. Save the template
-
-## Step 3: Set Up Your InsForge Project
+## Step 2: Set Up Your InsForge Project
 
 Create a new project or link an existing one:
 
@@ -64,7 +44,7 @@ npx @insforge/cli secrets get JWT_SECRET
 
 Note down the **URL** and **Anon Key** from the InsForge dashboard.
 
-## Step 4: Set Up Your Application
+## Step 3: Set Up Your Application
 
 Install the required dependencies:
 
@@ -88,7 +68,7 @@ NEXT_PUBLIC_INSFORGE_ANON_KEY='YOUR_INSFORGE_ANON_KEY'
 INSFORGE_JWT_SECRET='YOUR_INSFORGE_JWT_SECRET'
 ```
 
-## Step 5: Set Up InsForge Integration
+## Step 4: Set Up InsForge Integration
 
 Ask your agent to complete the following steps:
 
@@ -124,7 +104,7 @@ Build a todo list page with full CRUD — create, read, update, and delete todos
 
 This creates a page that uses the InsForge client to manage todos. RLS ensures users only see their own data.
 
-## Step 6: Run Your Application
+## Step 5: Run Your Application
 
 ```bash
 # Install dependencies if you haven't already
