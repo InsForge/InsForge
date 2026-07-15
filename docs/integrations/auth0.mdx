@@ -6,7 +6,7 @@ description: "Add Auth0 enterprise authentication and SSO to your InsForge backe
 
 ## Overview
 
-[Auth0](https://auth0.com) is an authentication and authorization platform that supports social logins, enterprise federation, and passwordless authentication. This guide shows how to integrate Auth0 with InsForge using a **Post Login Action** that signs a custom JWT with InsForge's secret, so InsForge accepts Auth0 tokens natively for Row Level Security.
+[Auth0](https://auth0.com) is an authentication and authorization platform that supports social logins, enterprise federation, and passwordless authentication. This guide shows how to integrate Auth0 with InsForge in a Next.js application. Auth0 handles authentication, while InsForge manages data authorization through Row Level Security (RLS) policies. On each server request, the app signs a fresh InsForge JWT from the Auth0 session using your InsForge secret, so InsForge accepts it natively.
 
 - [Live Demo](https://auth0auth.insforge.site) — A sample app using Auth0 authentication with InsForge
 - [Source Code](https://github.com/InsForge/insforge-integration/tree/main/auth/auth0) — GitHub repository for the sample app
@@ -46,47 +46,15 @@ Then get your project credentials:
 npx @insforge/cli secrets get JWT_SECRET
 ```
 
-Note down the **URL** and **Anon Key** from the InsForge dashboard. You'll use the JWT Secret from the CLI output in the next step to sign tokens Auth0 issues.
+Note down the **URL** and **Anon Key** from the InsForge dashboard. You'll use the JWT Secret from the CLI output in a later step to sign tokens for InsForge.
 
-## Step 3: Create a Post Login Action in Auth0
-
-Auth0 uses **Actions** to customize the authentication pipeline. Create an action that signs a separate JWT containing InsForge-compatible claims.
-
-1. In the Auth0 Dashboard, go to **Actions** > **Library** > **Build Custom**
-2. Name it `Generate InsForge Token` and select **Post Login** as the trigger
-3. Add the `jsonwebtoken` dependency (click **Dependencies** > **Add Dependency** > search `jsonwebtoken`)
-4. Replace the code with:
-
-```javascript
-const jwt = require('jsonwebtoken');
-
-exports.onExecutePostLogin = async (event, api) => {
-  const payload = {
-    sub: event.user.user_id,
-    role: 'authenticated',
-    aud: 'insforge-api',
-    email: event.user.email,
-  };
-
-  const insforgeToken = jwt.sign(payload, event.secrets.INSFORGE_JWT_SECRET, {
-    expiresIn: '1h',
-  });
-
-  // Auth0 requires custom claims to use a URL namespace
-  api.idToken.setCustomClaim('https://insforge.dev/insforge_token', insforgeToken);
-};
-```
-
-5. Go to **Secrets** (in the action editor sidebar) and add `INSFORGE_JWT_SECRET` with your InsForge JWT Secret value
-6. Click **Deploy**
-7. Go to **Actions** > **Triggers** > **post-login**, drag your action into the flow, and click **Apply**
-
-## Step 4: Set Up Your Application
+## Step 3: Set Up Your Application
 
 Install the required dependencies:
 
 ```bash
-npm install @auth0/nextjs-auth0 @insforge/sdk
+npm install @auth0/nextjs-auth0 @insforge/sdk jsonwebtoken
+npm install --save-dev @types/jsonwebtoken
 ```
 
 Add environment variables to `.env.local`:
@@ -102,21 +70,30 @@ AUTH0_CLIENT_SECRET='YOUR_CLIENT_SECRET'
 # InsForge
 NEXT_PUBLIC_INSFORGE_URL='YOUR_INSFORGE_URL'
 NEXT_PUBLIC_INSFORGE_ANON_KEY='YOUR_INSFORGE_ANON_KEY'
+INSFORGE_JWT_SECRET='YOUR_INSFORGE_JWT_SECRET'
 ```
 
-## Step 5: Set Up InsForge Integration
+## Step 4: Set Up InsForge Integration
 
 Ask your agent to complete the following steps:
 
-### 1. Set up Auth0 and InsForge integration
+### 1. Set up Auth0 authentication
 
 ```text
-Set up Auth0 and InsForge integration for my Next.js app — Auth0 client, middleware, provider, and InsForge client utility.
+Set up Auth0 for my Next.js app — Auth0 client, middleware, and provider.
 ```
 
-This creates the Auth0 client with token extraction (`lib/auth0.ts`), middleware (`middleware.ts`), Auth0Provider wrapper (`app/layout.tsx`), and the InsForge client utility (`lib/insforge.ts`).
+This creates the Auth0 client (`lib/auth0.ts`), middleware (`middleware.ts`), and Auth0Provider wrapper (`app/layout.tsx`).
 
-### 2. Create the database schema
+### 2. Create the InsForge client utility
+
+```text
+Create the InsForge client utility that uses the Auth0 session to sign a JWT for InsForge.
+```
+
+This creates a server-side utility (`lib/insforge.ts`) that gets the Auth0 user via `auth0.getSession()`, signs a JWT with the InsForge secret, and passes it as `edgeFunctionToken`.
+
+### 3. Create the database schema
 
 ```text
 Create a todos table with RLS. Columns: id, user_id, title, is_complete, created_at. Users should only be able to access their own todos.
@@ -124,7 +101,7 @@ Create a todos table with RLS. Columns: id, user_id, title, is_complete, created
 
 This creates the `requesting_user_id()` helper function (since Auth0 user IDs are strings, not UUIDs) and a `todos` table with Row Level Security policies.
 
-### 3. Build the todo list page
+### 4. Build the todo list page
 
 ```text
 Build a todo list page with full CRUD — create, read, update, and delete todos.
@@ -132,7 +109,7 @@ Build a todo list page with full CRUD — create, read, update, and delete todos
 
 This creates a page that uses the InsForge client to manage todos. RLS ensures users only see their own data.
 
-## Step 6: Run Your Application
+## Step 5: Run Your Application
 
 ```bash
 # Install dependencies if you haven't already
