@@ -1,0 +1,34 @@
+---
+title: "Auth Integrations"
+sidebarTitle: "Overview"
+description: "Bring your own authentication provider to InsForge. Each provider signs a JWT with your InsForge secret, so PostgREST and Row Level Security accept the request natively."
+---
+
+## Overview
+
+InsForge ships with native authentication, but you can also bring your own provider. In every integration below, the provider handles sign-up, sign-in, and user records, then a JWT is signed with your InsForge **JWT Secret** carrying InsForge-compatible claims (`role: authenticated`, `aud: insforge-api`, and the user's `sub`). InsForge accepts that token natively, and your Row Level Security policies scope data to the correct user through `requesting_user_id()`.
+
+Because the provider owns the identity, the InsForge **Auth > Users** page stays empty — user records live in the provider's dashboard, and InsForge only sees the JWT claims that RLS needs.
+
+## Find an Integration
+
+<CardGroup cols={2}>
+  <Card title="Clerk" img="/images/integrations/clerk.webp" href="/integrations/clerk">
+    Add Clerk drop-in auth and user management with JWT verification, RLS policies, and synced user records.
+  </Card>
+  <Card title="Auth0" img="/images/integrations/auth0.webp" href="/integrations/auth0">
+    Add Auth0 enterprise authentication and SSO with JWT validation, RLS policies, and user sync.
+  </Card>
+  <Card title="WorkOS" img="/images/integrations/workos.webp" href="/integrations/workos">
+    Add WorkOS enterprise SSO, SCIM provisioning, and directory sync with JWT and RLS setup.
+  </Card>
+  <Card title="Kinde" img="/images/integrations/kinde.webp" href="/integrations/kinde">
+    Connect Kinde authentication with JWT validation, RLS policies, and user provisioning.
+  </Card>
+  <Card title="Stytch" img="/images/integrations/stytch.webp" href="/integrations/stytch">
+    Add Stytch passwordless authentication with JWT verification and RLS policies.
+  </Card>
+  <Card title="Better Auth" img="/images/integrations/better-auth.webp" href="/integrations/better-auth">
+    Run Better Auth in your own Postgres alongside InsForge with a same-origin HS256 bridge JWT.
+  </Card>
+</CardGroup>

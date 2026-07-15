@@ -1,0 +1,124 @@
+---
+title: "Stytch Passwordless Auth for InsForge"
+sidebarTitle: "Stytch"
+description: "Add Stytch passwordless authentication to your InsForge app. JWT verification, RLS policies, and user records via the InsForge SDK."
+---
+
+## Overview
+
+[Stytch](https://stytch.com) is a passwordless authentication platform that provides email magic links, OAuth, OTP, and WebAuthn. This guide shows how to integrate Stytch with InsForge in a Next.js application. Stytch handles user authentication and session management, while InsForge manages data authorization through Row Level Security (RLS) policies.
+
+- [Live Demo](https://stytchauth.insforge.site) — A sample app using Stytch authentication with InsForge
+- [Source Code](https://github.com/InsForge/insforge-integration/tree/main/auth/stytch) — GitHub repository for the sample app
+
+## Prerequisites
+
+- An InsForge project (self-hosted or cloud)
+- A [Stytch](https://stytch.com) account
+
+## Step 1: Configure Stytch
+
+1. Log in to your [Stytch Dashboard](https://stytch.com/dashboard)
+2. Navigate to **Redirect URLs** (in Test environment)
+3. Add a redirect URL:
+   - **URL**: `http://localhost:3000/authenticate`
+   - **Type**: All
+4. Navigate to **Frontend SDK** > **Configuration** and add `http://localhost:3000` as an authorized domain
+5. Go to **Project overview** > **Project ID & API keys** and note down the **Project ID**, **Public Token**, and **Secret**
+
+## Step 2: Set Up Your InsForge Project
+
+Create a new project or link an existing one:
+
+```bash
+# Create a new project
+npx @insforge/cli create
+
+# Or link an existing project
+npx @insforge/cli link --project-id <your-project-id>
+```
+
+Then get your project credentials:
+
+```bash
+# Get the JWT Secret
+npx @insforge/cli secrets get JWT_SECRET
+```
+
+Note down the **URL** and **Anon Key** from the InsForge dashboard. You'll use the JWT Secret from the CLI output to sign tokens for InsForge.
+
+## Step 3: Set Up Your Application
+
+Install the required dependencies:
+
+```bash
+npm install @stytch/nextjs @stytch/vanilla-js @insforge/sdk stytch jsonwebtoken
+```
+
+Add environment variables to `.env.local`:
+
+```env
+# Stytch
+STYTCH_PROJECT_ENV='test'
+STYTCH_PROJECT_ID='YOUR_PROJECT_ID'
+NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN='YOUR_PUBLIC_TOKEN'
+STYTCH_SECRET='YOUR_SECRET'
+
+# InsForge
+NEXT_PUBLIC_INSFORGE_URL='YOUR_INSFORGE_URL'
+NEXT_PUBLIC_INSFORGE_ANON_KEY='YOUR_INSFORGE_ANON_KEY'
+INSFORGE_JWT_SECRET='YOUR_INSFORGE_JWT_SECRET'
+```
+
+## Step 4: Set Up InsForge Integration
+
+Ask your agent to complete the following steps:
+
+### 1. Set up the Stytch authentication flow
+
+```text
+Set up the Stytch authentication flow for my Next.js app — provider, login page with magic links, and authentication callback page.
+```
+
+This creates the Stytch provider wrapper (`app/stytch-provider.tsx`), login page (`app/login/page.tsx`), and callback page (`app/authenticate/page.tsx`). The callback must be a client-side page, not a route handler.
+
+### 2. Create the InsForge client utility
+
+```text
+Create the InsForge client utility that validates the Stytch session and signs a JWT for InsForge.
+```
+
+This creates a server-side utility (`lib/insforge.ts`) that reads the Stytch session cookie, validates it with the Stytch Node SDK, signs a JWT with the InsForge secret, and passes it as `edgeFunctionToken`.
+
+### 3. Create the database schema
+
+```text
+Create a todos table with RLS. Columns: id, user_id, title, is_complete, created_at. Users should only be able to access their own todos.
+```
+
+This creates the `requesting_user_id()` helper function (since Stytch user IDs are strings, not UUIDs) and a `todos` table with Row Level Security policies.
+
+### 4. Build the todo list page
+
+```text
+Build a todo list page with full CRUD — create, read, update, and delete todos.
+```
+
+This creates a page that uses the InsForge client to manage todos. RLS ensures users only see their own data.
+
+## Step 5: Run Your Application
+
+```bash
+# Install dependencies if you haven't already
+npm install
+
+npm run dev
+```
+
+Open `http://localhost:3000` and sign up with a new user through Stytch.
+
+<Note>
+Since authentication is handled entirely by Stytch, you will **not** see any users in the InsForge dashboard under **Auth > Users**. User records are managed in the [Stytch Dashboard](https://stytch.com/dashboard) — check **Users** there to confirm the sign-up was successful.
+</Note>
+
+![InsForge Auth Users — empty because Stytch manages users](/images/integrations/insforge-no-users.webp)

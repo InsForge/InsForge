@@ -128,6 +128,18 @@
             ]
           },
           {
+            "group": "Integrations",
+            "pages": [
+              "integrations/overview",
+              "integrations/clerk",
+              "integrations/auth0",
+              "integrations/workos",
+              "integrations/kinde",
+              "integrations/stytch",
+              "integrations/better-auth"
+            ]
+          },
+          {
             "group": "Agent-Native Initiatives",
             "pages": [
               "agent-native/overview",
