@@ -124,7 +124,7 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
       throw new AppError('Invalid admin refresh session type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    tokenManager.assertCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:AdminRefresh');
+    tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:AdminRefresh');
 
     const newAccessToken = tokenManager.generateAccessToken({
       sub: payload.sub,
@@ -163,7 +163,7 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
         // Stale or invalid cookie: fall through and clear it idempotently.
       }
       if (payload?.sessionType === 'admin') {
-        tokenManager.assertCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:AdminLogout');
+        tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:AdminLogout');
       }
     }
 

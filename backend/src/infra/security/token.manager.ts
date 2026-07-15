@@ -365,33 +365,27 @@ export class TokenManager {
   }
 
   /**
-   * Verify CSRF token by re-computing from refresh-session claims.
-   * Uses timing-safe comparison to prevent timing attacks
-   */
-  verifyCsrfToken(csrfHeader: string | undefined, payload: RefreshTokenPayload): boolean {
-    if (!csrfHeader) {
-      return false;
-    }
-
-    try {
-      const expectedCsrf = this.generateCsrfToken(payload);
-      return crypto.timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(expectedCsrf));
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Assert the X-CSRF-Token header matches the refresh-session claims.
+   * Verify the X-CSRF-Token header by re-computing from refresh-session claims.
    * Accepts the raw header value; multi-valued headers are invalid.
+   * Uses timing-safe comparison and throws 403 FORBIDDEN on mismatch.
    */
-  assertCsrfToken(
+  verifyCsrfToken(
     csrfHeader: string | string[] | undefined,
     payload: RefreshTokenPayload,
     logTag: string
   ): void {
     const csrfToken = typeof csrfHeader === 'string' ? csrfHeader : undefined;
-    if (!this.verifyCsrfToken(csrfToken, payload)) {
+    let valid = false;
+    if (csrfToken) {
+      try {
+        const expectedCsrf = this.generateCsrfToken(payload);
+        valid = crypto.timingSafeEqual(Buffer.from(csrfToken), Buffer.from(expectedCsrf));
+      } catch {
+        valid = false;
+      }
+    }
+
+    if (!valid) {
       logger.warn(`[${logTag}] CSRF token validation failed`);
       throw new AppError('Invalid CSRF token', 403, ERROR_CODES.FORBIDDEN);
     }

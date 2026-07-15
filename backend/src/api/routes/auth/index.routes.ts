@@ -545,7 +545,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     }
 
     if (clientType === 'web') {
-      tokenManager.assertCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:Refresh');
+      tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:Refresh');
     }
 
     // Fetch current user data from DB.
@@ -620,7 +620,7 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
           // Stale or invalid cookie: fall through and clear it idempotently.
         }
         if (payload?.sessionType === 'user') {
-          tokenManager.assertCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:Logout');
+          tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:Logout');
         }
       }
 

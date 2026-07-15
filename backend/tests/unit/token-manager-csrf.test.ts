@@ -8,6 +8,18 @@ vi.hoisted(() => {
 import { AppError } from '../../src/utils/errors';
 import { TokenManager } from '../../src/infra/security/token.manager';
 
+function expectForbidden(fn: () => void): void {
+  let caught: unknown;
+  try {
+    fn();
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(AppError);
+  expect((caught as AppError).statusCode).toBe(403);
+  expect((caught as AppError).code).toBe('FORBIDDEN');
+}
+
 describe('TokenManager refresh CSRF tokens', () => {
   const userId = 'user-csrf-1';
   const tokenManager = TokenManager.getInstance();
@@ -38,7 +50,7 @@ describe('TokenManager refresh CSRF tokens', () => {
     expect(rotatedPayload.csrfNonce).toBe(initialPayload.csrfNonce);
     expect(rotatedPayload.sessionType).toBe('user');
     expect(rotatedCsrfToken).toBe(initialCsrfToken);
-    expect(tokenManager.verifyCsrfToken(initialCsrfToken, rotatedPayload)).toBe(true);
+    expect(() => tokenManager.verifyCsrfToken(initialCsrfToken, rotatedPayload, 'Test')).not.toThrow();
   });
 
   it('rejects CSRF tokens from another refresh-token family', () => {
@@ -49,7 +61,7 @@ describe('TokenManager refresh CSRF tokens', () => {
     );
     const secondPayload = tokenManager.verifyRefreshToken(secondRefreshToken);
 
-    expect(tokenManager.verifyCsrfToken(firstCsrfToken, secondPayload)).toBe(false);
+    expectForbidden(() => tokenManager.verifyCsrfToken(firstCsrfToken, secondPayload, 'Test'));
   });
 
   it('separates user and admin refresh token session types', () => {
@@ -66,7 +78,7 @@ describe('TokenManager refresh CSRF tokens', () => {
 
     expect(payload.sub).toBe(userId);
     expect(payload.sessionType).toBe('user');
-    expect(tokenManager.verifyCsrfToken(csrfToken, payload)).toBe(true);
+    expect(() => tokenManager.verifyCsrfToken(csrfToken, payload, 'Test')).not.toThrow();
   });
 
   it('includes refresh session type in CSRF derivation', () => {
@@ -136,20 +148,8 @@ describe('TokenManager refresh CSRF tokens', () => {
   });
 });
 
-describe('TokenManager assertCsrfToken', () => {
+describe('TokenManager verifyCsrfToken header handling', () => {
   const tokenManager = TokenManager.getInstance();
-
-  function expectForbidden(fn: () => void): void {
-    let caught: unknown;
-    try {
-      fn();
-    } catch (error) {
-      caught = error;
-    }
-    expect(caught).toBeInstanceOf(AppError);
-    expect((caught as AppError).statusCode).toBe(403);
-    expect((caught as AppError).code).toBe('FORBIDDEN');
-  }
 
   it('accepts a matching CSRF header', () => {
     const payload = tokenManager.verifyRefreshToken(
@@ -157,7 +157,7 @@ describe('TokenManager assertCsrfToken', () => {
     );
     const csrfToken = tokenManager.generateCsrfToken(payload);
 
-    expect(() => tokenManager.assertCsrfToken(csrfToken, payload, 'Test')).not.toThrow();
+    expect(() => tokenManager.verifyCsrfToken(csrfToken, payload, 'Test')).not.toThrow();
   });
 
   it('throws 403 FORBIDDEN for missing, mismatched, or multi-valued headers', () => {
@@ -166,8 +166,8 @@ describe('TokenManager assertCsrfToken', () => {
     );
     const csrfToken = tokenManager.generateCsrfToken(payload);
 
-    expectForbidden(() => tokenManager.assertCsrfToken(undefined, payload, 'Test'));
-    expectForbidden(() => tokenManager.assertCsrfToken('wrong-token', payload, 'Test'));
-    expectForbidden(() => tokenManager.assertCsrfToken([csrfToken, csrfToken], payload, 'Test'));
+    expectForbidden(() => tokenManager.verifyCsrfToken(undefined, payload, 'Test'));
+    expectForbidden(() => tokenManager.verifyCsrfToken('wrong-token', payload, 'Test'));
+    expectForbidden(() => tokenManager.verifyCsrfToken([csrfToken, csrfToken], payload, 'Test'));
   });
 });
