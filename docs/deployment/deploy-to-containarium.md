@@ -15,7 +15,7 @@ This guide walks through self-hosting the InsForge platform on a [Containarium](
   This guide is community-maintained and can lag the latest InsForge release. The canonical, always-current setup is the `deploy/docker-compose/` directory in the [InsForge repo](https://github.com/InsForge/InsForge).
 </Note>
 
-## When to choose containarium
+## When to choose Containarium
 
 Containarium fits InsForge deployments where you want:
 
