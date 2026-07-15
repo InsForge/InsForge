@@ -1,22 +1,28 @@
 ---
 title: Nuxt
-description: 了解如何创建 InsForge 项目并使用 AI 构建 Nuxt 应用程序
+description: 了解如何创建 InsForge 项目并使用 AI 构建 Nuxt 应用
 ---
 
 import Installation from '/snippets/sdk-installation.mdx';
 
-了解如何创建 InsForge 项目并使用 AI 工具（如 Cursor）构建 Nuxt 应用程序。
+了解如何创建 InsForge 项目，并使用 Cursor 等 AI 工具构建 Nuxt 应用。
 
 ## 1. 创建 InsForge 项目
 
-在 [insforge.dev](https://insforge.dev) 创建新的 InsForge 项目。
+在 [insforge.dev](https://insforge.dev) 创建一个新的 InsForge 项目。
 
 ## 2. 连接 InsForge
 
-- **CLI 链接** — 查看[快速开始](/quickstart)
-- **MCP 设置** — 查看 [MCP 设置](/mcp-setup)
+分为两部分：
 
-## 3. 通过一个提示构建应用
+- **CLI 链接** — 参阅 [快速入门](/quickstart)，运行 `npx @insforge/cli link --project-id <your-project-id>`，让智能体能够读取你的项目 ID 和密钥。
+- **MCP 设置** — 参阅 [MCP 设置](/mcp-setup) 了解各编辑器（Cursor、Claude Code、Windsurf、Codex、VS Code）的配置方法。
+
+两者都配置好后，智能体就可以从你的编辑器中读取模式（schema）、运行查询并部署代码。
+
+## 3. 用一个提示词构建你的应用
+
+在 Cursor 或你的 AI 助手中，使用以下提示词：
 
 ```
 Create a new Nuxt app with TypeScript.
@@ -29,7 +35,13 @@ Add sample data: basketball, soccer, and tennis. Make it publicly readable.
 Create a page that fetches and displays all sports from the database.
 ```
 
-## 4. 运行时配置
+你的 AI 将生成完整的应用，包括数据库设置和 UI。无需手动编写代码——AI 会为你创建一切。
+
+## 4. AI 生成的内容
+
+你的 AI 助手会自动创建如下文件。你不需要手动修改它们。
+
+**运行时配置** 位于 `nuxt.config.ts`：
 
 ```typescript nuxt.config.ts
 export default defineNuxtConfig({
@@ -42,7 +54,7 @@ export default defineNuxtConfig({
 })
 ```
 
-## 5. 服务器 API 路由
+**服务器 API 路由** 位于 `server/api/sports.get.ts`：
 
 ```typescript server/api/sports.get.ts
 import { createClient } from '@insforge/sdk';
@@ -70,7 +82,7 @@ export default defineEventHandler(async (event) => {
 })
 ```
 
-## 6. 运动页面
+**Sports 页面** 位于 `pages/sports.vue`：
 
 ```vue pages/sports.vue
 <script setup lang="ts">
@@ -84,10 +96,12 @@ const { data: sports, pending, error } = await useFetch<Sport[]>('/api/sports')
 
 <template>
   <div class="min-h-screen p-8">
+    <!-- Loading state -->
     <div v-if="pending" class="flex items-center justify-center min-h-screen">
       <p class="text-gray-600">Loading...</p>
     </div>
 
+    <!-- Error state -->
     <div v-else-if="error" class="flex items-center justify-center min-h-screen">
       <div class="text-red-600">
         <h1 class="text-2xl font-bold mb-2">Error</h1>
@@ -95,24 +109,62 @@ const { data: sports, pending, error } = await useFetch<Sport[]>('/api/sports')
       </div>
     </div>
 
+    <!-- Success state -->
     <div v-else class="max-w-4xl mx-auto">
       <h1 class="text-4xl font-bold mb-8">Sports</h1>
+
       <div v-if="sports && sports.length > 0" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <div v-for="sport in sports" :key="sport.id" class="p-6 bg-white rounded-lg shadow-md border border-gray-200">
-          <h2 class="text-xl font-semibold text-gray-800 capitalize">{{ sport.name }}</h2>
+        <div
+          v-for="sport in sports"
+          :key="sport.id"
+          class="p-6 bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow"
+        >
+          <h2 class="text-xl font-semibold text-gray-800 capitalize">
+            {{ sport.name }}
+          </h2>
           <p class="text-sm text-gray-500 mt-2">ID: {{ sport.id }}</p>
         </div>
       </div>
+
       <p v-else class="text-gray-600">No sports found.</p>
     </div>
   </div>
 </template>
 ```
 
-## 7. 启动应用
+## 5. 启动应用
 
-运行 `npm run dev` 并访问 [http://localhost:3000/sports](http://localhost:3000/sports)
+运行开发服务器，在浏览器中打开 [http://localhost:3000/sports](http://localhost:3000/sports)，你应该能看到运动项目列表。
 
-## 扩展应用
+```bash
+npm run dev
+```
 
-尝试添加表单、身份验证、收藏夹和 AI 功能。
+## 下一步：用更多提示词扩展你的应用
+
+尝试使用以下提示词为你的应用添加更多功能：
+
+```
+Add a form to create new sports and save them to the database.
+Include validation and error handling.
+```
+
+```
+Add user authentication with sign up and login pages.
+Only allow authenticated users to add new sports.
+```
+
+```
+Add a favorites feature where users can mark their favorite sports.
+Store favorites in a user_favorites table with user_id and sport_id.
+```
+
+```
+Add images to each sport using InsForge Storage.
+Allow users to upload sport images and display them in the grid.
+```
+
+```
+Add an AI chat feature that can answer questions about sports.
+Use InsForge AI with streaming responses.
+```

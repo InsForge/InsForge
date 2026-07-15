@@ -1,22 +1,28 @@
 ---
 title: Svelte
-description: Aprenda cómo crear un proyecto InsForge y crear una aplicación Svelte usando IA
+description: Aprende a crear un proyecto de InsForge y desarrollar una aplicación Svelte con IA
 ---
 
 import Installation from '/snippets/sdk-installation.mdx';
 
-Aprenda cómo crear un proyecto InsForge y crear una aplicación Svelte usando herramientas de IA como Cursor.
+Aprende a crear un proyecto de InsForge y a desarrollar una aplicación Svelte utilizando herramientas de IA como Cursor.
 
-## 1. Crear un proyecto InsForge
+## 1. Crear un proyecto de InsForge
 
-Cree un nuevo proyecto InsForge en [insforge.dev](https://insforge.dev).
+Crea un nuevo proyecto de InsForge en [insforge.dev](https://insforge.dev).
 
 ## 2. Conectar InsForge
 
-- **Enlace CLI** — vea [Inicio rápido](/quickstart)
-- **Configuración de MCP** — vea [Configuración de MCP](/mcp-setup)
+Dos partes:
 
-## 3. Construye tu app con un solo aviso
+- **Enlace de la CLI** — consulta la [Guía rápida](/quickstart) para ejecutar `npx @insforge/cli link --project-id <your-project-id>` y que el agente pueda leer el ID de tu proyecto y tus claves.
+- **Configuración de MCP** — consulta [Configuración de MCP](/mcp-setup) para conocer la configuración de cada editor (Cursor, Claude Code, Windsurf, Codex, VS Code).
+
+Con ambas cosas configuradas, el agente puede leer esquemas, ejecutar consultas y desplegar código desde tu editor.
+
+## 3. Crea tu aplicación con un solo prompt
+
+En Cursor o tu asistente de IA, usa este prompt:
 
 ```
 Create a new Svelte app with TypeScript and Vite.
@@ -29,7 +35,13 @@ Add sample data: basketball, soccer, and tennis. Make it publicly readable.
 Create a component that fetches and displays all sports from the database.
 ```
 
-## 4. Cliente InsForge
+Tu IA generará la aplicación completa, incluyendo la configuración de la base de datos y la interfaz de usuario. No necesitas escribir código manualmente: la IA lo crea todo por ti.
+
+## 4. Qué genera la IA
+
+Tu asistente de IA creará automáticamente archivos como estos. No necesitas modificarlos manualmente.
+
+**Cliente de InsForge** en `src/lib/insforge.ts`:
 
 ```typescript src/lib/insforge.ts
 import { createClient } from '@insforge/sdk';
@@ -40,7 +52,7 @@ export const insforge = createClient({
 });
 ```
 
-## 5. Componente de deportes
+**Componente de Sports** en `src/lib/components/Sports.svelte`:
 
 ```svelte src/lib/components/Sports.svelte
 <script lang="ts">
@@ -91,8 +103,12 @@ export const insforge = createClient({
     {:else if sports.length > 0}
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {#each sports as sport (sport.id)}
-          <div class="p-6 bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow">
-            <h2 class="text-xl font-semibold text-gray-800 capitalize">{sport.name}</h2>
+          <div
+            class="p-6 bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow"
+          >
+            <h2 class="text-xl font-semibold text-gray-800 capitalize">
+              {sport.name}
+            </h2>
             <p class="text-sm text-gray-500 mt-2">ID: {sport.id}</p>
           </div>
         {/each}
@@ -104,10 +120,39 @@ export const insforge = createClient({
 </div>
 ```
 
-## 6. Inicia la aplicación
+## 5. Inicia la aplicación
 
-Ejecuta `npm run dev` y visita [http://localhost:5173](http://localhost:5173)
+Ejecuta el servidor de desarrollo, ve a [http://localhost:5173](http://localhost:5173) en un navegador y deberías ver la lista de deportes.
 
-## Amplía tu aplicación
+```bash
+npm run dev
+```
 
-Intenta agregar formularios, autenticación, favoritos y características de IA.
+## Siguiente paso: amplía tu aplicación con más prompts
+
+Prueba estos prompts para añadir más funciones a tu aplicación:
+
+```
+Add a form to create new sports and save them to the database.
+Include validation and error handling.
+```
+
+```
+Add user authentication with sign up and login pages.
+Only allow authenticated users to add new sports.
+```
+
+```
+Add a favorites feature where users can mark their favorite sports.
+Store favorites in a user_favorites table with user_id and sport_id.
+```
+
+```
+Add images to each sport using InsForge Storage.
+Allow users to upload sport images and display them in the grid.
+```
+
+```
+Add an AI chat feature that can answer questions about sports.
+Use InsForge AI with streaming responses.
+```

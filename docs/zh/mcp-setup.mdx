@@ -1,37 +1,37 @@
 ---
-title: "为 Cursor、Claude、Windsurf 等设置 MCP"
-sidebarTitle: "MCP 设置"
-description: "通过 MCP 将 Cursor、Claude、Windsurf 和其他编辑器连接到 InsForge，以便 AI 代理可以查询您的数据库、身份验证、存储和函数。"
+title: "为 Cursor、Claude、Windsurf 等编辑器设置 MCP"
+sidebarTitle: "MCP setup"
+description: "通过 MCP 将 Cursor、Claude、Windsurf 和其他编辑器连接到 InsForge，让 AI 智能体可以查询你的数据库、身份验证、存储和函数。"
 ---
 
-## 概览
+## 概述
 
-InsForge MCP 服务器为您的 AI 编码助手提供对您的后端的直接访问：数据库查询、模式管理、存储等。
+InsForge MCP 服务器让你的 AI 编程助手可以直接访问你的后端：数据库查询、模式管理、存储等。
 
-按照下面针对您的 AI 客户端的说明进行操作。看不到您的工具？浏览[代理目录](https://insforge.dev/agents)以获取完整的经过测试的集成列表。
+请按照以下针对你的 AI 客户端的说明进行操作。没有看到你的工具？浏览[智能体目录](https://insforge.dev/agents)查看完整的已测试集成列表。
 
-## 先决条件
+## 前提条件
 
-- 一个**AI 编码助手**（Cursor、Claude Code、GitHub Copilot 等）
-- 一个 **InsForge 项目** - 如果您还没有[创建一个](https://insforge.dev)
+- 一个 **AI 编程助手**（Cursor、Claude Code、GitHub Copilot 等）
+- 一个 **InsForge 项目** - 如果还没有，[点此创建](https://insforge.dev)
 
 ## 本地 MCP 配置（推荐）
 
-如果您更喜欢在本地配置 MCP，请在下方选择您的 AI 编码助手：
+如果你更喜欢在本地配置 MCP，请在下方选择你的 AI 编程助手：
 
 <AccordionGroup>
   <Accordion title="Cursor">
     ### 安装
 
-    您可以通过点击下面屏幕截图中的"添加到 Cursor"按钮来一键安装 Cursor 中的 MCP 服务器：
+    你可以在 Cursor 中点击下方截图里的 "Add to Cursor" 按钮，一键安装 MCP 服务器：
 
     ![连接项目](/images/mcp-setup/connect-project.png)
 
-    或者，您可以手动安装 InsForge MCP 服务器：
+    或者，你也可以手动安装 InsForge MCP 服务器：
 
-    1. 打开 **Cursor 设置**
-    2. 转到 **工具和 MCP**
-    3. 点击**新 MCP 服务器（添加自定义 MCP 服务器）**
+    1. 打开 **Cursor Settings**
+    2. 进入 **Tools & MCP**
+    3. 点击 **New MCP Server (Add a Custom MCP Server)**
 
     <Frame>
       <video
@@ -43,9 +43,9 @@ InsForge MCP 服务器为您的 AI 编码助手提供对您的后端的直接访
       />
     </Frame>
 
-    4. 从您的 InsForge 项目粘贴 MCP JSON
+    4. 粘贴来自你 InsForge 项目的 MCP JSON
     5. 保存配置文件
-    6. 您应该看到一个绿点，表示 InsForge 已成功安装
+    6. 你应该会看到一个绿点，表示 InsForge 已成功安装
 
     <Frame>
       <video
@@ -59,14 +59,14 @@ InsForge MCP 服务器为您的 AI 编码助手提供对您的后端的直接访
 
     ### 验证安装
 
-    要验证连接，在 **Cursor** 中启动新的聊天会话并向您的代理发送此提示：
+    要验证连接，请在 **Cursor** 中开始一个新的聊天会话，并向你的智能体发送以下提示词：
 
     ```
     I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
     learn about InsForge instructions.
     ```
 
-    如果连接成功，您会在 InsForge 仪表板上看到**已连接**状态指示器（右上角）。
+    如果连接成功，你会在 InsForge 控制台（右上角）看到 **Connected** 状态指示。
 
     <video
       controls
@@ -82,14 +82,14 @@ InsForge MCP 服务器为您的 AI 编码助手提供对您的后端的直接访
   <Accordion title="Claude Code">
     ### 安装
 
-    将 InsForge MCP 服务器添加到您的 **Claude Code**：
+    将 InsForge MCP 服务器添加到你的 **Claude Code**：
 
     1. 在下拉列表中选择 **Claude Code**
-    2. 在您的终端中复制并粘贴以下安装命令
+    2. 复制以下安装命令并粘贴到你的终端中
 
     ![Claude Code 连接](/images/mcp-setup/claude-code-connect.png)
 
-    3. 运行命令
+    3. 运行该命令
 
     <Frame>
       <video
@@ -103,14 +103,14 @@ InsForge MCP 服务器为您的 AI 编码助手提供对您的后端的直接访
 
     ### 验证安装
 
-    要验证连接，在 **Claude Code** 中启动新的聊天会话并向您的代理发送此提示：
+    要验证连接，请在 **Claude Code** 中开始一个新的聊天会话，并向你的智能体发送以下提示词：
 
     ```
     I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
     learn about InsForge instructions.
     ```
 
-    如果连接成功，您会在 InsForge 仪表板上看到 **MCP 已连接**状态指示器（右上角）。
+    如果连接成功，你会在 InsForge 控制台（右上角）看到 **MCP Connected** 状态指示。
 
     <video
       controls
@@ -126,27 +126,331 @@ InsForge MCP 服务器为您的 AI 编码助手提供对您的后端的直接访
   <Accordion title="GitHub Copilot">
     ### 安装
 
-    将 InsForge MCP 服务器添加到您的 **GitHub Copilot**：
+    将 InsForge MCP 服务器添加到你的 **GitHub Copilot**：
 
     1. 在下拉列表中选择 **Copilot**
-    2. 打开终端并在您的 **GitHub Copilot** 终端中粘贴以下安装命令
+    2. 打开终端，将以下安装命令粘贴到你的 **GitHub Copilot** 终端中
 
     ![Copilot 设置](/images/mcp-setup/copilot-1.png)
 
-    3. 运行命令
+    3. 运行该命令
 
     ![Copilot 安装](/images/mcp-setup/copilot-2.png)
 
     ### 验证安装
 
-    要验证连接，在 **Copilot** 中启动新的聊天会话并向您的代理发送此提示：
+    要验证连接，请在 **Copilot** 中开始一个新的聊天会话，并向你的智能体发送以下提示词：
 
     ```
     I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
     learn about InsForge instructions.
     ```
 
-    如果连接成功，您会在 InsForge 仪表板上看到 **MCP 已连接**状态指示器（右上角）。
+    如果连接成功，你会在 InsForge 控制台（右上角）看到 **MCP Connected** 状态指示。
+
+    ![MCP 已连接](/images/mcp-setup/mcp-connected.png)
+  </Accordion>
+
+  <Accordion title="Google Antigravity">
+    ### 安装
+
+    将 InsForge MCP 服务器添加到你的 **Antigravity**：
+
+    1. 在下拉列表中选择 **Antigravity**
+    2. 复制以下安装命令并粘贴到你的 **Antigravity** 终端中
+
+    ![Antigravity 设置](/images/mcp-setup/antigravity-1.png)
+
+    3. 运行该命令
+
+    <Frame>
+      <video
+        src="/images/mcp-setup/Antigravity-MCP.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    </Frame>
+
+    ### 验证安装
+
+    要验证连接，请在 **Antigravity** 中开始一个新的聊天会话，并向你的智能体发送以下提示词：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果连接成功，你会在 InsForge 控制台（右上角）看到 **MCP Connected** 状态指示。
+
+    ![MCP 已连接](/images/mcp-setup/mcp-connected.png)
+  </Accordion>
+
+  <Accordion title="Kiro">
+    ### 安装
+
+    将 InsForge MCP 服务器添加到你的 **Kiro**：
+
+    1. 在下拉列表中选择 **Kiro**
+    2. 复制以下安装命令并粘贴到你的 **Kiro** 终端中
+
+    ![Kiro 设置](/images/mcp-setup/kiro-1.png)
+
+    3. 运行该命令
+
+    <Frame>
+      <video
+        src="/images/mcp-setup/Kiro-MCP.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    </Frame>
+
+    ### 验证安装
+
+    要验证连接，请在 **Kiro** 中开始一个新的聊天会话，并向你的智能体发送以下提示词：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果连接成功，你会在 InsForge 控制台（右上角）看到 **MCP Connected** 状态指示。
+
+    ![MCP 已连接](/images/mcp-setup/mcp-connected.png)
+  </Accordion>
+
+  <Accordion title="Codex">
+    ### 安装
+
+    将 InsForge MCP 服务器添加到你的 **Codex**：
+
+    1. 在下拉列表中选择 **Codex**
+    2. 复制以下安装命令并粘贴到你的终端中
+
+    ![Codex 设置](/images/mcp-setup/codex-1.png)
+
+    3. 运行该命令
+
+    <Frame>
+      <video
+        src="/images/mcp-setup/Codex-MCP.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    </Frame>
+
+    ### 验证安装
+
+    要验证连接，请在 **Codex** 中开始一个新的聊天会话，并向你的智能体发送以下提示词：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果连接成功，你会在 InsForge 控制台（右上角）看到 **MCP Connected** 状态指示。
+
+    ![MCP 已连接](/images/mcp-setup/mcp-connected.png)
+  </Accordion>
+
+  <Accordion title="Cline">
+    ### 安装
+
+    将 InsForge MCP 服务器添加到你的 **Cline**：
+
+    1. 在下拉列表中选择 **Cline**
+    2. 复制以下安装命令并粘贴到你的 **Cline** 终端中
+
+    ![Cline 设置](/images/mcp-setup/cline-1.png)
+
+    3. 运行该命令
+
+    ![Cline 安装](/images/mcp-setup/cline-2.png)
+
+    ### 验证安装
+
+    要验证连接，请在 **Cline** 中开始一个新的聊天会话，并向你的智能体发送以下提示词：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果连接成功，你会在 InsForge 控制台（右上角）看到 **MCP Connected** 状态指示。
+
+    ![MCP 已连接](/images/mcp-setup/mcp-connected.png)
+  </Accordion>
+
+  <Accordion title="Windsurf">
+    ### 安装
+
+    将 InsForge MCP 服务器添加到你的 **Windsurf**：
+
+    1. 在下拉列表中选择 **Windsurf**
+    2. 复制以下安装命令并粘贴到你的 Windsurf 终端中
+
+    ![Windsurf 设置](/images/mcp-setup/windsurf-1.png)
+
+    3. 运行该命令
+
+    ### 验证安装
+
+    要验证连接，请在 **Windsurf** 中开始一个新的聊天会话，并向你的智能体发送以下提示词：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果连接成功，你会在 InsForge 控制台（右上角）看到 **MCP Connected** 状态指示。
+
+    ![MCP 已连接](/images/mcp-setup/mcp-connected.png)
+  </Accordion>
+
+  <Accordion title="Trae">
+    ### 安装
+
+    将 InsForge MCP 服务器添加到你的 **Trae**：
+
+    1. 在下拉列表中选择 **Trae**
+    2. 复制以下安装命令并粘贴到你的 **Trae** 终端中
+
+    ![Trae 设置](/images/mcp-setup/trae-1.png)
+
+    3. 运行该命令
+
+    ![Trae 安装](/images/mcp-setup/trae-2.png)
+
+    另外，Trae 还提供与 InsForge 的官方原生集成，你可以直接从 Trae 的官方 MCP 市场安装 InsForge：
+
+    1. 打开 Trae 的 **Settings** → 进入 **MCP**
+    2. 点击 **Add**，然后选择 **Add from Marketplace**
+    3. 搜索 "InsForge" 并从市场中添加
+
+    ![Trae 市场](/images/mcp-setup/trae-3.png)
+
+    4. 所需的凭据 API_KEY 和 API_BASE_URL，可以在你的 InsForge **Settings** 中的 **Connect** 选项卡下找到
+
+    ![Trae 凭据](/images/mcp-setup/trae-4.png)
+
+    ### 验证安装
+
+    要验证连接，请在 **Trae** 中开始一个新的聊天，并向你的智能体发送以下提示词：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果连接成功，你会在 InsForge 控制台（右上角）看到 **MCP Connected** 状态指示。
+
+    ![MCP 已连接](/images/mcp-setup/mcp-connected.png)
+  </Accordion>
+
+  <Accordion title="Qoder">
+    ### 安装
+
+    将 InsForge MCP 服务器添加到你的 **Qoder**：
+
+    1. 在下拉列表中选择 **Qoder**
+    2. 复制以下安装命令并粘贴到你的 **Qoder** 终端中
+
+    ![Qoder 设置](/images/mcp-setup/qoder-1.png)
+
+    3. 运行该命令
+
+    ### 验证安装
+
+    要验证连接，请在 **Qoder** 中开始一个新的聊天会话，并向你的智能体发送以下提示词：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果连接成功，你会在 InsForge 控制台（右上角）看到 **MCP Connected** 状态指示。
+
+    ![MCP 已连接](/images/mcp-setup/mcp-connected.png)
+  </Accordion>
+
+  <Accordion title="Roo Code">
+    ### 安装
+
+    将 InsForge MCP 服务器添加到你的 **Roo Code**：
+
+    1. 在下拉列表中选择 **Roo Code**
+    2. 复制以下安装命令并粘贴到你的 **Roo Code** 终端中
+
+    ![Roo Code 设置](/images/mcp-setup/roocode-1.png)
+
+    3. 运行该命令
+
+    ### 验证安装
+
+    要验证连接，请在 **Roo Code** 中开始一个新的聊天会话，并向你的智能体发送以下提示词：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果连接成功，你会在 InsForge 控制台（右上角）看到 **MCP Connected** 状态指示。
+
+    ![MCP 已连接](/images/mcp-setup/mcp-connected.png)
+  </Accordion>
+
+  <Accordion title="OpenCode">
+    ### 安装
+
+    将 InsForge MCP 服务器添加到你的 **OpenCode**：
+
+    1. 在下拉列表中选择 **OpenCode**
+    2. 复制以下安装命令并粘贴到你的终端中
+
+    ![连接项目](/images/mcp-setup/connect-project.png)
+
+    3. 运行该命令
+
+    ### 验证安装
+
+    要验证连接，请在 **OpenCode** 中开始一个新的聊天会话，并向你的智能体发送以下提示词：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果连接成功，你会在 InsForge 控制台（右上角）看到 **MCP Connected** 状态指示。
+
+    ![MCP 已连接](/images/mcp-setup/mcp-connected.png)
+  </Accordion>
+
+  <Accordion title="MCP JSON">
+    ### 安装
+
+    使用 MCP JSON 将 InsForge MCP 服务器添加到你的编程智能体：
+
+    1. 在下拉列表中选择 **MCP JSON**
+    2. 将以下 **MCP JSON** 配置复制并粘贴到你的智能体中
+
+    ![MCP JSON 设置](/images/mcp-setup/mcp-json-1.png)
+
+    ### 验证安装
+
+    要验证连接，请开始一个新的聊天会话，并向你的智能体发送以下提示词：
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    如果连接成功，你会在 InsForge 控制台（右上角）看到 **MCP Connected** 状态指示。
 
     ![MCP 已连接](/images/mcp-setup/mcp-connected.png)
   </Accordion>
@@ -154,40 +458,211 @@ InsForge MCP 服务器为您的 AI 编码助手提供对您的后端的直接访
 
 ## 远程 MCP
 
-开始使用的最快方式是远程 MCP。单个命令会尝试安装，并会尝试处理身份验证和项目绑定，但如果自动流程无法完成，可能仍会提示您进行手动身份验证或项目绑定步骤。
+最快的入门方式是使用远程 MCP。一条命令即可尝试安装，并会尝试自动处理身份验证和项目绑定，但如果自动流程无法完成，仍可能会提示你手动完成身份验证或项目绑定步骤。
 
-在您的终端中运行以下命令：
+在你的终端中运行以下命令：
 
 ```bash
 npx add-mcp https://mcp.insforge.dev/mcp
 ```
 
 <Note>
-  `add-mcp` 命令适用于大多数编码代理，但不是全部。目前它支持：
+  `add-mcp` 命令适用于大多数编程智能体，但并非所有。目前它支持：
   Claude Code、Claude Desktop、Codex、Cursor、Gemini CLI、Goose、GitHub Copilot、OpenCode、VS Code、Zed。
 </Note>
 
-运行该命令后，系统将自动为您的编码代理生成配置文件。
+运行该命令后，系统会自动为你的编程智能体生成一个配置文件。
 
-### 连接和绑定项目
+### 连接并绑定项目
 
-某些 MCP 客户端会在设置期间自动提示您登录，而其他客户端可能需要手动身份验证或项目绑定步骤。无论如何，身份验证都会打开一个浏览器窗口，您可以在其中登录到您的 InsForge 帐户并向 MCP 客户端授予组织/项目访问权限。
+一些 MCP 客户端会在设置过程中自动提示你登录，而另一些客户端如果自动流程无法完成，则可能需要手动进行身份验证或项目绑定步骤。无论哪种方式，身份验证都会打开一个浏览器窗口，你可以在其中登录你的 InsForge 账户，并授予 MCP 客户端组织/项目访问权限。
+
+<AccordionGroup>
+  <Accordion title="Cursor">
+    你可以在 `.cursor/mcp.json` 中找到配置文件，如下所示：
+
+    ```json
+    {
+      "mcpServers": {
+        "insforge": {
+          "url": "https://mcp.insforge.dev/mcp"
+        }
+      }
+    }
+    ```
+
+    在菜单 **Preferences → Cursor Settings → Tools & MCP** 中，你应该会看到 InsForge MCP 服务器已成功添加。
+    InsForge MCP 服务器状态为 "Needs authentication"，你可以点击 `connect` 按钮进行身份验证。
+  </Accordion>
+
+  <Accordion title="Claude Code">
+    安装完成后，你会在 `.mcp.json` 中找到如下配置文件：
+    ```json
+    {
+      "mcpServers": {
+        "insforge": {
+          "type": "http",
+          "url": "https://mcp.insforge.dev/mcp"
+        }
+      }
+    }
+    ```
+    然后在常规终端（而非 IDE 扩展）中运行：
+    ```sh
+    claude /mcp
+    ```
+    选择 "insforge" 服务器，然后选择 "Authenticate" 开始身份验证流程。
+
+  </Accordion>
+
+  <Accordion title="GitHub Copilot">
+    安装完成后，你会在 `.vscode/mcp.json` 中找到如下配置文件：
+    ```json
+    {
+      "servers": {
+        "insforge": {
+          "type": "http",
+          "url": "https://mcp.insforge.dev/mcp"
+        }
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Google Antigravity">
+    将以下配置添加到 `~/.gemini/antigravity/mcp_config.json`：
+    ```json
+    {
+      "mcpServers": {
+        "insforge": {
+          "serverUrl": "https://mcp.insforge.dev/mcp"
+        }
+      }
+    }
+    ```
+    然后重启 Antigravity，它会自动进行身份验证。
+  </Accordion>
+
+  <Accordion title="Gemini">
+    安装完成后，你会在 `.gemini/settings.json` 中找到如下配置文件：
+    ```json
+    {
+      "mcpServers": {
+        "insforge": {
+          "type": "http",
+          "url": "https://mcp.insforge.dev/mcp"
+        }
+      }
+    }
+    ```
+    启动 Gemini CLI 并运行以下命令以对服务器进行身份验证：
+    ```sh
+    /mcp auth insforge
+    ```
+  </Accordion>
+
+  <Accordion title="Codex">
+    <Note>
+      如果你是第一次使用 Codex，可能需要启用 rmcp 功能。为此，请在你的 `~/.codex/config.toml` 文件中添加以下内容：
+      ```toml
+      [beta]
+      rmcp = true
+      ```
+    </Note>
+    安装完成后，你会在 `.codex/config.toml` 中找到如下配置文件：
+    ```toml
+    [mcp_servers.insforge]
+    type = "http"
+    url = "https://mcp.insforge.dev/mcp"
+    ```
+    然后进行身份验证：
+    ```sh
+    codex mcp login insforge
+    ```
+    最后，在 Codex 中运行 /mcp 以验证身份验证。
+
+    或者，你也可以运行以下命令来安装 MCP 服务器：
+    ```sh
+    codex mcp add insforge --url https://mcp.insforge.dev/mcp
+    ```
+  </Accordion>
+
+  <Accordion title="Cline">
+    你可以在终端中运行以下命令，将 InsForge MCP 服务器安装到你的 **Cline**：
+    ```bash
+    npx -y @smithery/cli mcp add devel/insforge --client cline
+    ```
+    或者，你也可以参考官方 [Cline 文档](https://docs.cline.bot/mcp/connecting-to-a-remote-server)，通过以下参数添加 InsForge MCP 服务器：
+    - Server Name: `insforge`
+    - Server URL: `https://mcp.insforge.dev/mcp`
+    - Transport Type: `Streamable HTTP`
+
+    添加服务器后，你会看到一条要求进行身份验证的错误消息。点击出现的 "Authenticate" 按钮进行身份验证。
+
+  </Accordion>
+
+  <Accordion title="Windsurf">
+    将以下配置添加到 `~/.codeium/windsurf/mcp_config.json`：
+    ```json
+    {
+      "mcpServers": {
+        "insforge": {
+          "command": "npx",
+          "args": [
+            "-y",
+            "mcp-remote",
+            "https://mcp.insforge.dev/mcp"
+          ]
+        }
+      }
+    }
+    ```
+    Windsurf 目前不支持通过 HTTP 传输的远程 MCP 服务器。你需要使用 mcp-remote 包作为代理。
+  </Accordion>
+
+  <Accordion title="Roo Code">
+    你可以在终端中运行以下命令，将 InsForge MCP 服务器安装到你的 **Roo Code**：
+    ```bash
+    npx -y @smithery/cli mcp add devel/insforge --client roocode
+    ```
+  </Accordion>
+
+  <Accordion title="OpenCode">
+    安装完成后，你会在 `./opencode.json` 中找到如下配置文件：
+    ```json
+    {
+      "mcp": {
+        "insforge": {
+          "type": "remote",
+          "url": "https://mcp.insforge.dev/mcp",
+          "enabled": true
+        }
+      }
+    }
+    ```
+    然后运行以下命令进行身份验证：
+    ```sh
+    opencode mcp auth insforge
+    ```
+    这将打开你的浏览器以完成 OAuth 身份验证流程。
+  </Accordion>
+</AccordionGroup>
 
 ### 验证安装
 
-要验证连接，在您的 AI 编码助手中启动新的聊天会话并发送此提示：
+要验证连接，请在你的 AI 编程助手中开始一个新的聊天会话，并发送以下提示词：
 
 ```
 I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
 learn about InsForge instructions.
 ```
 
-如果连接成功，您会在 InsForge 仪表板（右上角）看到 **MCP 已连接**状态指示器。
+如果连接成功，你会在 InsForge 控制台（右上角）看到 **MCP Connected** 状态指示。
 
 ![MCP 已连接](/images/mcp-setup/mcp-connected.png)
 
-## 故障排除
+## 故障排查
 
-<Accordion title="更改不生效">
-  大多数 AI 客户端在 MCP 配置更改后需要完全重启。关闭并重新打开应用程序。
+<Accordion title="更改未生效">
+  大多数 AI 客户端在 MCP 配置更改后需要完全重启。请关闭并重新打开应用程序。
 </Accordion>

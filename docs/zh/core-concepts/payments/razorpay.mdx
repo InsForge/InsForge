@@ -1,12 +1,177 @@
 ---
-title: "Razorpay 付款"
+title: "Razorpay 支付"
 sidebarTitle: "Razorpay"
-description: "将 Razorpay Orders、Subscriptions、手动 webhooks 和 webhook 履行与 InsForge 集成。"
+description: "将 Razorpay 订单、订阅、手动 Webhook 与 Webhook 履约集成到 InsForge 中。"
 ---
 
-当您想要 Razorpay Orders、Razorpay Checkout、Items、Plans 和 Subscriptions 时，使用 Razorpay 集成。Razorpay 不像 Stripe Checkout 那样是托管重定向流...
+如果您需要使用 Razorpay Orders、Razorpay Checkout、Items、Plans 和 Subscriptions，请使用 Razorpay 集成。Razorpay 不像 Stripe Checkout 那样是托管的重定向流程。您的后端创建服务商对象，您的前端打开 Razorpay Checkout 脚本，然后由您的后端验证返回的签名。
 
-## 参考
+## Razorpay 模型
 
-- [Razorpay Standard Checkout integration](https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/integration-steps/)
-- [TypeScript Razorpay payments guide](/sdks/typescript/payments-razorpay)
+| Razorpay 概念 | 在 InsForge 中的含义 |
+|------------------|---------------------|
+| Item | 带金额的可销售单位。镜像同步至 `payments.razorpay_items`。 |
+| Plan | 围绕某个 Item 建立的循环订阅定义。镜像同步至 `payments.razorpay_plans`。 |
+| Order | 一次性支付对象。通过 `POST /api/payments/razorpay/{environment}/orders` 创建，并镜像同步至 `payments.razorpay_orders`。 |
+| Payment | 服务商返回的支付结果。通过 Webhook 与同步投影到 `payments.transactions`。 |
+| Subscription | 与某个 Plan 绑定的 Razorpay 订阅。镜像同步至 `payments.razorpay_subscriptions`。 |
+| Webhook event | 存放于 `payments.webhook_events` 中且 `provider = 'razorpay'` 的已验证服务商事件。 |
+
+Razorpay 没有相当于 Stripe Billing Portal 的功能。InsForge 提供后端路由，在依据 `payments.razorpay_subscriptions` 的 RLS `UPDATE` 策略检查调用方之后，用于取消、暂停和恢复订阅。
+
+对于一次性产品，创建 Razorpay Order 时只需提供金额、货币和 receipt 即可。不过，仍建议为可销售的产品创建 Razorpay Item，这样在同步之后，产品目录就能在 InsForge 和 Razorpay 中可见。请将 Order 视为一次支付尝试，而非您的产品目录。
+
+## 设置
+
+在 Dashboard -> Payments -> Settings 中或通过管理 API 配置 `test` 和 `live` 的 Razorpay Key ID 与 Key Secret。如果尚不存在 Webhook 签名密钥，InsForge 会自动生成一个。
+
+Razorpay 的 Webhook 必须在 Razorpay Dashboard 中手动创建。普通的 Razorpay 商户 API 密钥不支持自动注册 Webhook。
+
+1. 打开 Dashboard -> Payments -> Settings -> Webhooks。
+2. 复制 Razorpay Webhook URL 与 Webhook Secret。
+3. 在 Razorpay Dashboard 中，使用复制的 URL 和密钥创建一个 Webhook。
+4. 选择 InsForge 处理的事件。
+5. 保存 Webhook 并完成一次测试支付以确认送达。
+
+Razorpay 只能将 Webhook 投递到公开的 HTTPS URL。Localhost URL 需要借助公开隧道或已部署的后端。
+
+已处理的事件：
+
+- `payment.authorized`
+- `payment.captured`
+- `payment.failed`
+- `order.paid`
+- `invoice.paid`
+- `invoice.expired`
+- `refund.created`
+- `refund.processed`
+- `refund.failed`
+- `subscription.created`
+- `subscription.activated`
+- `subscription.charged`
+- `subscription.updated`
+- `subscription.cancelled`
+- `subscription.paused`
+- `subscription.resumed`
+- `subscription.halted`
+- `subscription.completed`
+- `subscription.expired`
+
+## 一次性订单
+
+首先创建一个由应用程序拥有的待处理订单（pending order）。然后使用当前 InsForge 用户令牌创建一个 Razorpay Order。
+
+```typescript
+const { data, error } = await insforge.payments.razorpay.createOrder('test', {
+  amount: 50000,
+  currency: 'INR',
+  receipt: 'order_123',
+  subject: { type: 'team', id: 'team_123' },
+  customerEmail: 'buyer@example.com',
+  notes: { order_id: 'order_123' }
+});
+
+if (error) throw error;
+```
+
+该 SDK 封装了 `POST /api/payments/razorpay/{environment}/orders`。响应中包含 `checkoutOptions`，其中带有 Razorpay Checkout 原生字段，例如 `key` 和 `order_id`。请在前端加载 `https://checkout.razorpay.com/v1/checkout.js`，并将这些选项传给 `new Razorpay(options).open()`。
+
+如果您的履约触发器读取 `notes.order_id`，请在创建 Order 或 Subscription 时传入 `notes: { order_id: ... }`。
+
+在 Razorpay Checkout 返回 `razorpay_order_id`、`razorpay_payment_id` 和 `razorpay_signature` 之后，请在后端验证签名：
+
+```typescript
+await insforge.payments.razorpay.verifyOrder('test', {
+  orderId: response.razorpay_order_id,
+  paymentId: response.razorpay_payment_id,
+  signature: response.razorpay_signature
+});
+```
+
+签名验证只能证明该次即时的 Checkout 回调确实来自 Razorpay。持久化的订单履约仍应基于已验证的 Razorpay Webhook 事件来执行。
+
+## 订阅
+
+在创建订阅之前，请先创建或同步一个 Razorpay Plan。Plan 与 Stripe 的 Price 并不是同一回事，它是围绕 Razorpay Item 建立的循环定义。
+
+```typescript
+const { data, error } = await insforge.payments.razorpay.createSubscription('test', {
+  planId: 'plan_123',
+  totalCount: 12,
+  subject: { type: 'team', id: 'team_123' },
+  customerEmail: 'buyer@example.com'
+});
+
+if (error) throw error;
+```
+
+该 SDK 封装了 `POST /api/payments/razorpay/{environment}/subscriptions`。响应中包含 `checkoutOptions.subscription_id`。请使用该订阅 ID 打开 Razorpay Checkout。在 Checkout 返回 `razorpay_subscription_id`、`razorpay_payment_id` 和 `razorpay_signature` 之后，验证该笔授权支付：
+
+```typescript
+await insforge.payments.razorpay.verifySubscription('test', {
+  subscriptionId: response.razorpay_subscription_id,
+  paymentId: response.razorpay_payment_id,
+  signature: response.razorpay_signature
+});
+```
+
+通过后端路由管理订阅：
+
+```typescript
+await insforge.payments.razorpay.cancelSubscription('test', 'sub_123', {
+  cancelAtCycleEnd: false
+});
+
+await insforge.payments.razorpay.pauseSubscription('test', 'sub_123');
+await insforge.payments.razorpay.resumeSubscription('test', 'sub_123');
+```
+
+创建订阅时会评估 `payments.razorpay_subscriptions` 上的 `INSERT` 策略。取消、暂停和恢复操作则会评估同一张表上的 `UPDATE` 策略。PostgreSQL 还会对 `INSERT/UPDATE ... RETURNING` 返回的行应用 `SELECT` 策略，因此当策略检查需要返回该行时，请确保同一主体（subject）对调用方可见。仅授予用户策略检查所需的表访问权限；对服务商的实际变更操作仍通过后端执行。
+
+## Webhook 与履约
+
+Razorpay 的 Checkout 回调与签名验证并不能替代 Webhook。请使用 `payments.webhook_events` 来触发履约。请勿将履约触发器附加到诸如 `payments.razorpay_subscriptions` 之类的服务商镜像表上；同步和 Webhook 投影可能会独立于服务商事件送达而更新这些行。
+
+```sql
+CREATE OR REPLACE FUNCTION public.fulfill_razorpay_order()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.provider = 'razorpay'
+     AND NEW.event_type IN ('payment.captured', 'order.paid', 'invoice.paid')
+     AND NEW.processing_status = 'processed'
+     AND COALESCE(
+       NEW.payload -> 'payload' -> 'payment' -> 'entity' -> 'notes' ->> 'order_id',
+       NEW.payload -> 'payload' -> 'invoice' -> 'entity' -> 'notes' ->> 'order_id'
+     ) IS NOT NULL THEN
+    UPDATE public.orders
+    SET status = 'paid',
+        paid_at = COALESCE(NEW.processed_at, NOW())
+    WHERE id::text = COALESCE(
+      NEW.payload -> 'payload' -> 'payment' -> 'entity' -> 'notes' ->> 'order_id',
+      NEW.payload -> 'payload' -> 'invoice' -> 'entity' -> 'notes' ->> 'order_id'
+    )
+      AND status = 'pending';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER fulfill_razorpay_order_from_webhook
+  AFTER INSERT OR UPDATE ON payments.webhook_events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fulfill_razorpay_order();
+```
+
+## 同步与仪表盘状态
+
+Razorpay 同步会镜像 Items、Plans、Customers、Subscriptions、Invoices 和 Payments。Invoices 与 Payments 会填充 `payments.transactions` 这一仪表盘/报表投影。Transactions 中包含服务商的参照 ID，例如 payment、invoice、order、subscription 和 refund 的 ID，方便您在 Razorpay Dashboard 中查看原始记录。
+
+请将面向用户的订单、余额和权益状态保存在您自己的应用表中。请将 `payments.transactions` 视为仪表盘/报表状态，而非主要的业务流程。
+
+## 参考资料
+
+- [Razorpay 标准 Checkout 集成](https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/integration-steps/)
+- [Razorpay Subscriptions 集成](https://razorpay.com/docs/payments/subscriptions/integration-guide/)
+- [Razorpay Webhooks 设置](https://razorpay.com/docs/payments/dashboard/account-settings/webhooks/)
+- [TypeScript Razorpay 支付指南](/sdks/typescript/payments-razorpay)

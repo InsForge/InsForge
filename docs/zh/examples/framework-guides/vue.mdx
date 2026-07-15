@@ -1,24 +1,28 @@
 ---
 title: Vue
-description: 了解如何创建 InsForge 项目并使用 AI 构建 Vue 应用程序
+description: 了解如何创建 InsForge 项目并使用 AI 构建 Vue 应用
 ---
 
 import Installation from '/snippets/sdk-installation.mdx';
 
-了解如何创建 InsForge 项目并使用 AI 工具（如 Cursor）构建 Vue 应用程序。
+了解如何创建 InsForge 项目，并使用 Cursor 等 AI 工具构建 Vue 应用。
 
 ## 1. 创建 InsForge 项目
 
-在 [insforge.dev](https://insforge.dev) 创建新的 InsForge 项目。
+在 [insforge.dev](https://insforge.dev) 创建一个新的 InsForge 项目。
 
 ## 2. 连接 InsForge
 
-两个部分：
+分为两部分：
 
-- **CLI 链接** — 查看[快速开始](/quickstart)以运行 `npx @insforge/cli link --project-id <your-project-id>`
-- **MCP 设置** — 查看 [MCP 设置](/mcp-setup) 了解编辑器配置
+- **CLI 链接** — 参阅 [快速入门](/quickstart)，运行 `npx @insforge/cli link --project-id <your-project-id>`，让智能体能够读取你的项目 ID 和密钥。
+- **MCP 设置** — 参阅 [MCP 设置](/mcp-setup) 了解各编辑器（Cursor、Claude Code、Windsurf、Codex、VS Code）的配置方法。
 
-## 3. 通过一个提示构建您的应用
+两者都配置好后，智能体就可以从你的编辑器中读取模式（schema）、运行查询并部署代码。
+
+## 3. 用一个提示词构建你的应用
+
+在 Cursor 或你的 AI 助手中，使用以下提示词：
 
 ```
 Create a new Vue app with TypeScript and Vite.
@@ -31,7 +35,13 @@ Add sample data: basketball, soccer, and tennis. Make it publicly readable.
 Create a component that fetches and displays all sports from the database.
 ```
 
-## 4. InsForge 客户端
+你的 AI 将生成完整的应用，包括数据库设置和 UI。无需手动编写代码——AI 会为你创建一切。
+
+## 4. AI 生成的内容
+
+你的 AI 助手会自动创建如下文件。你不需要手动修改它们。
+
+**InsForge 客户端** 位于 `src/lib/insforge.ts`：
 
 ```typescript src/lib/insforge.ts
 import { createClient } from '@insforge/sdk';
@@ -42,7 +52,7 @@ export const insforge = createClient({
 });
 ```
 
-## 5. 运动组件
+**Sports 组件** 位于 `src/components/Sports.vue`：
 
 ```vue src/components/Sports.vue
 <template>
@@ -116,10 +126,39 @@ onMounted(() => {
 </script>
 ```
 
-## 6. 启动应用
+## 5. 启动应用
 
-运行 `npm run dev` 并访问 [http://localhost:5173](http://localhost:5173)
+运行开发服务器，在浏览器中打开 [http://localhost:5173](http://localhost:5173)，你应该能看到运动项目列表。
 
-## 扩展您的应用
+```bash
+npm run dev
+```
 
-尝试添加表单、身份验证、收藏夹功能、图像存储或 AI 聊天功能。
+## 下一步：用更多提示词扩展你的应用
+
+尝试使用以下提示词为你的应用添加更多功能：
+
+```
+Add a form to create new sports and save them to the database.
+Include validation and error handling.
+```
+
+```
+Add user authentication with sign up and login pages.
+Only allow authenticated users to add new sports.
+```
+
+```
+Add a favorites feature where users can mark their favorite sports.
+Store favorites in a user_favorites table with user_id and sport_id.
+```
+
+```
+Add images to each sport using InsForge Storage.
+Allow users to upload sport images and display them in the grid.
+```
+
+```
+Add an AI chat feature that can answer questions about sports.
+Use InsForge AI with streaming responses.
+```

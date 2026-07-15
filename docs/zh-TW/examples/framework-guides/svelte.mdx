@@ -1,22 +1,28 @@
 ---
 title: Svelte
-description: 瞭解如何建立 InsForge 專案並使用 AI 建構 Svelte 應用程式
+description: 了解如何建立 InsForge 專案並使用 AI 建構 Svelte 應用程式
 ---
 
 import Installation from '/snippets/sdk-installation.mdx';
 
-瞭解如何建立 InsForge 專案並使用 AI 工具（如 Cursor）建構 Svelte 應用程式。
+了解如何建立 InsForge 專案，並使用 Cursor 等 AI 工具建構 Svelte 應用程式。
 
 ## 1. 建立 InsForge 專案
 
-在 [insforge.dev](https://insforge.dev) 建立新的 InsForge 專案。
+在 [insforge.dev](https://insforge.dev) 建立一個新的 InsForge 專案。
 
 ## 2. 連接 InsForge
 
-- **CLI 連結** — 查看[快速開始](/quickstart)
-- **MCP 設置** — 查看 [MCP 設置](/mcp-setup)
+分為兩部分：
 
-## 3. 透過一個提示建構應用程式
+- **CLI 連結** — 請參閱 [快速入門](/quickstart)，執行 `npx @insforge/cli link --project-id <your-project-id>`，讓代理程式能夠讀取你的專案 ID 與金鑰。
+- **MCP 設定** — 請參閱 [MCP 設定](/mcp-setup) 以取得各編輯器（Cursor、Claude Code、Windsurf、Codex、VS Code）的設定方式。
+
+兩者都設定完成後，代理程式就能從你的編輯器讀取結構（schema）、執行查詢並部署程式碼。
+
+## 3. 用一個提示詞建構你的應用程式
+
+在 Cursor 或你的 AI 助理中，使用以下提示詞：
 
 ```
 Create a new Svelte app with TypeScript and Vite.
@@ -29,7 +35,13 @@ Add sample data: basketball, soccer, and tennis. Make it publicly readable.
 Create a component that fetches and displays all sports from the database.
 ```
 
-## 4. InsForge 用戶端
+你的 AI 將產生完整的應用程式，包含資料庫設定與 UI。不需要手動撰寫程式碼——AI 會為你建立一切。
+
+## 4. AI 產生的內容
+
+你的 AI 助理會自動建立如下的檔案。你不需要手動修改它們。
+
+**InsForge 用戶端** 位於 `src/lib/insforge.ts`：
 
 ```typescript src/lib/insforge.ts
 import { createClient } from '@insforge/sdk';
@@ -40,7 +52,7 @@ export const insforge = createClient({
 });
 ```
 
-## 5. 運動元件
+**Sports 元件** 位於 `src/lib/components/Sports.svelte`：
 
 ```svelte src/lib/components/Sports.svelte
 <script lang="ts">
@@ -91,8 +103,12 @@ export const insforge = createClient({
     {:else if sports.length > 0}
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {#each sports as sport (sport.id)}
-          <div class="p-6 bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow">
-            <h2 class="text-xl font-semibold text-gray-800 capitalize">{sport.name}</h2>
+          <div
+            class="p-6 bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow"
+          >
+            <h2 class="text-xl font-semibold text-gray-800 capitalize">
+              {sport.name}
+            </h2>
             <p class="text-sm text-gray-500 mt-2">ID: {sport.id}</p>
           </div>
         {/each}
@@ -104,10 +120,39 @@ export const insforge = createClient({
 </div>
 ```
 
-## 6. 啟動應用程式
+## 5. 啟動應用程式
 
-執行 `npm run dev` 並訪問 [http://localhost:5173](http://localhost:5173)
+執行開發伺服器，在瀏覽器中開啟 [http://localhost:5173](http://localhost:5173)，你應該會看到運動項目清單。
 
-## 擴展應用程式
+```bash
+npm run dev
+```
 
-嘗試添加表單、身份驗證、收藏夾和 AI 功能。
+## 下一步：用更多提示詞擴充你的應用程式
+
+試試以下提示詞，為你的應用程式新增更多功能：
+
+```
+Add a form to create new sports and save them to the database.
+Include validation and error handling.
+```
+
+```
+Add user authentication with sign up and login pages.
+Only allow authenticated users to add new sports.
+```
+
+```
+Add a favorites feature where users can mark their favorite sports.
+Store favorites in a user_favorites table with user_id and sport_id.
+```
+
+```
+Add images to each sport using InsForge Storage.
+Allow users to upload sport images and display them in the grid.
+```
+
+```
+Add an AI chat feature that can answer questions about sports.
+Use InsForge AI with streaming responses.
+```

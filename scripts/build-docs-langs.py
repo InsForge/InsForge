@@ -1,73 +1,61 @@
-import json, copy
+#!/usr/bin/env python3
+"""Regenerate docs.json navigation.languages from the English (default) tree.
 
-d = json.load(open('docs/docs.json'))
-tabs = d['navigation']['tabs']
-glob = d['navigation'].get('global')
+Idempotent: reads tabs from navigation.tabs if present (first run) or from the
+en/default language entry (subsequent runs), then rebuilds all locale entries.
+"""
+import json, copy, os
 
-# Human-readable group labels per locale (tab + group names). Page PATHS are
-# prefixed with the locale dir; API Reference (openapi) stays shared/English.
-LABELS = {
- 'zh': {
-  'Docs':'文档','SDK & Examples':'SDK 与示例','API Reference':'API 参考',
-  'Getting Started':'快速开始','Quickstart':'快速上手','Core Concepts':'核心概念',
-  'Database':'数据库','Authentication':'身份认证','Storage':'存储','Edge Functions':'边缘函数',
-  'Model Gateway':'模型网关','Realtime':'实时','Payments':'支付','Messaging':'消息',
-  'Analytics':'分析','Compute':'计算','Sites':'站点','Web Scraper':'网页抓取',
-  'Agent Native':'Agent 原生','SDKs':'SDK','TypeScript':'TypeScript','REST':'REST',
-  'Kotlin':'Kotlin','Swift':'Swift','Examples':'示例','Framework Guides':'框架指南',
- },
- 'zh-TW': {
-  'Docs':'文件','SDK & Examples':'SDK 與範例','API Reference':'API 參考',
-  'Getting Started':'快速開始','Quickstart':'快速上手','Core Concepts':'核心概念',
-  'Database':'資料庫','Authentication':'身分驗證','Storage':'儲存','Edge Functions':'邊緣函式',
-  'Model Gateway':'模型閘道','Realtime':'即時','Payments':'金流','Messaging':'訊息',
-  'Analytics':'分析','Compute':'運算','Sites':'網站','Web Scraper':'網頁擷取',
-  'Agent Native':'Agent 原生','SDKs':'SDK','TypeScript':'TypeScript','REST':'REST',
-  'Kotlin':'Kotlin','Swift':'Swift','Examples':'範例','Framework Guides':'框架指南',
- },
- 'es': {
-  'Docs':'Documentación','SDK & Examples':'SDK y ejemplos','API Reference':'Referencia de API',
-  'Getting Started':'Primeros pasos','Quickstart':'Inicio rápido','Core Concepts':'Conceptos básicos',
-  'Database':'Base de datos','Authentication':'Autenticación','Storage':'Almacenamiento','Edge Functions':'Funciones edge',
-  'Model Gateway':'Model Gateway','Realtime':'Tiempo real','Payments':'Pagos','Messaging':'Mensajería',
-  'Analytics':'Analítica','Compute':'Cómputo','Sites':'Sitios','Web Scraper':'Web Scraper',
-  'Agent Native':'Nativo para agentes','SDKs':'SDKs','TypeScript':'TypeScript','REST':'REST',
-  'Kotlin':'Kotlin','Swift':'Swift','Examples':'Ejemplos','Framework Guides':'Guías de frameworks',
- },
-}
+DOCS = os.path.join(os.path.dirname(__file__), '..', 'docs')
+CFG = os.path.join(DOCS, 'docs.json')
+LOCALES = ['zh', 'zh-TW', 'es']
 
-def prefix_pages(node, loc, translate_openapi_free=True):
-    """Return a deep-translated copy of a groups/pages node for locale `loc`."""
+d = json.load(open(CFG))
+nav = d['navigation']
+if 'tabs' in nav:
+    base_tabs = nav['tabs']
+    glob = nav.get('global')
+else:
+    langs = nav['languages']
+    en = next(l for l in langs if l.get('default') or l['language'] == 'en')
+    # strip the en/ prefix back off (en uses bare paths already, so just copy)
+    base_tabs = copy.deepcopy(en['tabs'])
+    glob = nav.get('global')
+
+LABELS = json.load(open(os.path.join(os.path.dirname(__file__), 'docs-langs-labels.json')))
+
+def resolves(path):
+    p = os.path.join(DOCS, path)
+    return os.path.exists(p + '.mdx') or os.path.exists(p + '.md')
+
+def transform(node, loc):
     if isinstance(node, str):
-        # a page path — prefix with the locale dir
-        return f"{loc}/{node}"
+        prefixed = f"{loc}/{node}"
+        # Skip prefixing a page that has no translated file yet (avoid dead nav
+        # links); fall back to the English page so the entry still resolves.
+        return prefixed if resolves(prefixed) else node
     if isinstance(node, list):
-        return [prefix_pages(x, loc) for x in node]
+        return [transform(x, loc) for x in node]
     if isinstance(node, dict):
         out = {}
         for k, v in node.items():
             if k in ('tab', 'group'):
                 out[k] = LABELS[loc].get(v, v)
             elif k in ('pages', 'groups'):
-                out[k] = [prefix_pages(x, loc) for x in v]
-            elif k == 'openapi':
-                # Shared spec — the API Reference tab is not localized; keep the
-                # openapi ref, but its pages (if any) still get prefixed above.
-                out[k] = v
+                out[k] = [transform(x, loc) for x in v]
             else:
                 out[k] = copy.deepcopy(v)
         return out
     return copy.deepcopy(node)
 
-languages = [{'language':'en','default':True,'tabs':copy.deepcopy(tabs)}]
-for loc in ['zh','zh-TW','es']:
-    languages.append({'language':loc,'tabs':[prefix_pages(t, loc) for t in tabs]})
+languages = [{'language': 'en', 'default': True, 'tabs': copy.deepcopy(base_tabs)}]
+for loc in LOCALES:
+    languages.append({'language': loc, 'tabs': [transform(t, loc) for t in base_tabs]})
 
-new_nav = {'languages': languages}
+nav_out = {'languages': languages}
 if glob is not None:
-    new_nav['global'] = glob
-d['navigation'] = new_nav
-
-json.dump(d, open('docs/docs.json','w'), ensure_ascii=False, indent=2)
-open('docs/docs.json','a').write('\n')
-print('docs.json rebuilt with', len(languages), 'languages')
+    nav_out['global'] = glob
+d['navigation'] = nav_out
+json.dump(d, open(CFG, 'w'), ensure_ascii=False, indent=2)
+open(CFG, 'a').write('\n')
+print(f"docs.json rebuilt: {len(languages)} languages")

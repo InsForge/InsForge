@@ -5,7 +5,7 @@ description: Operaciones de base de datos estilo PostgREST a través de API REST
 
 ## Descripción general
 
-La API de base de datos proporciona operaciones CRUD estilo PostgREST para tus tablas de base de datos. Todas las solicitudes requieren encabezados de autenticación.
+La API de base de datos ofrece operaciones CRUD estilo PostgREST para las tablas de tu base de datos. Todas las solicitudes requieren encabezados de autenticación.
 
 ## Encabezados
 
@@ -18,7 +18,7 @@ Content-Type: application/json
 
 ## Consultar registros
 
-Recupera registros de una tabla con filtrado, clasificación y paginación.
+Recupera registros de una tabla con filtrado, ordenamiento y paginación.
 
 ```
 GET /api/database/records/{tableName}
@@ -28,25 +28,25 @@ GET /api/database/records/{tableName}
 
 | Parámetro | Tipo | Descripción |
 |-----------|------|-------------|
-| `limit` | integer | Máximo número de registros a devolver (1-1000, predeterminado: 100) |
-| `offset` | integer | Registros a omitir para paginación (predeterminado: 0) |
-| `order` | string | Orden de clasificación (ej., `createdAt.desc`, `name.asc`) |
-| `select` | string | Columnas separadas por comas a devolver |
-| `{field}` | string | Filtro PostgREST (ej., `status=eq.active`) |
+| `limit` | integer | Número máximo de registros a devolver (1-1000, valor predeterminado: 100) |
+| `offset` | integer | Registros a omitir para la paginación (valor predeterminado: 0) |
+| `order` | string | Orden de clasificación (por ejemplo, `createdAt.desc`, `name.asc`) |
+| `select` | string | Columnas a devolver, separadas por comas |
+| `{field}` | string | Filtro de PostgREST (por ejemplo, `status=eq.active`) |
 
 ### Operadores de filtro
 
 | Operador | Descripción | Ejemplo |
 |----------|-------------|---------|
 | `eq` | Igual a | `status=eq.active` |
-| `neq` | No igual a | `status=neq.deleted` |
+| `neq` | Distinto de | `status=neq.deleted` |
 | `gt` | Mayor que | `age=gt.18` |
-| `gte` | Mayor o igual a | `price=gte.100` |
+| `gte` | Mayor o igual que | `price=gte.100` |
 | `lt` | Menor que | `quantity=lt.10` |
-| `lte` | Menor o igual a | `score=lte.50` |
-| `like` | Coincidencia de patrones (sensible a mayúsculas) | `name=like.*john*` |
-| `ilike` | Coincidencia de patrones (no sensible a mayúsculas) | `email=ilike.*@gmail.com` |
-| `in` | En lista | `status=in.(active,pending)` |
+| `lte` | Menor o igual que | `score=lte.50` |
+| `like` | Coincidencia de patrón (sensible a mayúsculas y minúsculas) | `name=like.*john*` |
+| `ilike` | Coincidencia de patrón (no sensible a mayúsculas y minúsculas) | `email=ilike.*@gmail.com` |
+| `in` | Está en la lista | `status=in.(active,pending)` |
 | `is` | Es null/true/false | `deleted_at=is.null` |
 
 ### Ejemplo
@@ -84,7 +84,7 @@ curl "https://your-app.insforge.app/api/database/records/posts?select=id,title,a
 | Encabezado | Descripción |
 |--------|-------------|
 | `X-Total-Count` | Total de registros que coinciden con la consulta |
-| `Content-Range` | Rango de registros devueltos (ej., `0-99/1234`) |
+| `Content-Range` | Rango de registros devuelto (por ejemplo, `0-99/1234`) |
 
 ---
 
@@ -97,14 +97,14 @@ POST /api/database/records/{tableName}
 ```
 
 <Warning>
-**Importante**: El cuerpo de la solicitud DEBE ser un array, incluso para un solo registro.
+**Importante**: el cuerpo de la solicitud DEBE ser un arreglo, incluso para registros individuales.
 </Warning>
 
 ### Encabezados
 
 | Encabezado | Valor | Descripción |
 |--------|-------|-------------|
-| `Prefer` | `return=representation` | Incluir para devolver los registros creados |
+| `Prefer` | `return=representation` | Inclúyelo para devolver los registros creados |
 
 ### Ejemplo
 
@@ -133,7 +133,7 @@ curl -X POST "https://your-app.insforge.app/api/database/records/posts" \
 
 ### Respuesta
 
-Sin encabezado `Prefer`:
+Sin el encabezado `Prefer`:
 ```json
 []
 ```
@@ -156,7 +156,7 @@ Con `Prefer: return=representation`:
 
 ## Actualizar registros
 
-Actualiza registros que coinciden con filtros de consulta.
+Actualiza los registros que coincidan con los filtros de la consulta.
 
 ```
 PATCH /api/database/records/{tableName}
@@ -164,13 +164,13 @@ PATCH /api/database/records/{tableName}
 
 ### Parámetros de consulta
 
-Usa operadores de filtro para especificar qué registros actualizar.
+Usa los operadores de filtro para especificar qué registros actualizar.
 
 ### Encabezados
 
 | Encabezado | Valor | Descripción |
 |--------|-------|-------------|
-| `Prefer` | `return=representation` | Incluir para devolver los registros actualizados |
+| `Prefer` | `return=representation` | Inclúyelo para devolver los registros actualizados |
 
 ### Ejemplo
 
@@ -210,7 +210,7 @@ curl -X PATCH "https://your-app.insforge.app/api/database/records/posts?status=e
 
 ## Eliminar registros
 
-Elimina registros que coinciden con filtros de consulta.
+Elimina los registros que coincidan con los filtros de la consulta.
 
 ```
 DELETE /api/database/records/{tableName}
@@ -218,13 +218,13 @@ DELETE /api/database/records/{tableName}
 
 ### Parámetros de consulta
 
-Usa operadores de filtro para especificar qué registros eliminar.
+Usa los operadores de filtro para especificar qué registros eliminar.
 
 ### Encabezados
 
 | Encabezado | Valor | Descripción |
 |--------|-------|-------------|
-| `Prefer` | `return=representation` | Incluir para devolver los registros eliminados |
+| `Prefer` | `return=representation` | Inclúyelo para devolver los registros eliminados |
 
 ### Ejemplo
 
@@ -241,7 +241,7 @@ curl -X DELETE "https://your-app.insforge.app/api/database/records/posts?status=
 
 ### Respuesta
 
-Sin encabezado `Prefer`: `204 No Content`
+Sin el encabezado `Prefer`: `204 No Content`
 
 Con `Prefer: return=representation`:
 ```json
@@ -321,9 +321,9 @@ curl "https://your-app.insforge.app/api/database/records/orders?status=in.(pendi
 curl "https://your-app.insforge.app/api/database/records/tasks?completed_at=is.null"
 ```
 
-### Upsert (Insertar o actualizar)
+### Upsert (insertar o actualizar)
 
-Inserta un registro o actualízalo si ocurre un conflicto en una restricción única.
+Inserta un registro o lo actualiza si se produce un conflicto en una restricción única.
 
 ```
 POST /api/database/records/{tableName}
@@ -334,7 +334,7 @@ POST /api/database/records/{tableName}
 | Encabezado | Valor | Descripción |
 |--------|-------|-------------|
 | `Prefer` | `resolution=merge-duplicates` | Actualiza el registro existente en caso de conflicto |
-| `Prefer` | `resolution=ignore-duplicates` | Ignora la inserción si el registro existe |
+| `Prefer` | `resolution=ignore-duplicates` | Ignora la inserción si el registro ya existe |
 
 #### Ejemplo
 
@@ -367,14 +367,14 @@ curl -X POST "https://your-app.insforge.app/api/database/records/user_settings" 
 ```
 
 <Note>
-Upsert requiere una restricción única (ej., clave primaria o índice único) en la tabla. La resolución de conflictos se basa en esta restricción.
+El upsert requiere una restricción única (por ejemplo, una clave primaria o un índice único) en la tabla. La resolución de conflictos se basa en esa restricción.
 </Note>
 
 ---
 
-## Llamar función RPC
+## Llamar a una función RPC
 
-Ejecuta una función de base de datos a través de RPC de PostgREST. Admite todos los métodos HTTP (GET, POST, PUT, PATCH, DELETE).
+Ejecuta una función de base de datos mediante PostgREST RPC. Admite todos los métodos HTTP (GET, POST, PUT, PATCH, DELETE).
 
 ```
 POST /api/database/rpc/{functionName}
@@ -406,11 +406,11 @@ curl -X POST "https://your-app.insforge.app/api/database/rpc/get_total_count" \
 
 ---
 
-## Puntos finales de administrador
+## Endpoints de administrador
 
-Los siguientes puntos finales requieren autenticación de administrador.
+Los siguientes endpoints requieren autenticación de administrador.
 
-### Encabezados para puntos finales de administrador
+### Encabezados para endpoints de administrador
 
 ```bash
 Authorization: Bearer admin-jwt-token-Or-API-Key
@@ -421,7 +421,7 @@ Content-Type: application/json
 
 ## Listar funciones de base de datos
 
-Obtén todas las funciones de base de datos en el esquema público. **Requiere autenticación de administrador.**
+Obtiene todas las funciones de base de datos en el esquema public. **Requiere autenticación de administrador.**
 
 ```
 GET /api/database/functions
@@ -453,7 +453,7 @@ curl "https://your-app.insforge.app/api/database/functions" \
 
 ## Listar índices de base de datos
 
-Obtén todos los índices de base de datos. **Requiere autenticación de administrador.**
+Obtiene todos los índices de la base de datos. **Requiere autenticación de administrador.**
 
 ```
 GET /api/database/indexes
@@ -485,7 +485,7 @@ curl "https://your-app.insforge.app/api/database/indexes" \
 
 ## Listar políticas RLS
 
-Obtén todas las políticas de seguridad a nivel de fila. **Requiere autenticación de administrador.**
+Obtiene todas las políticas de seguridad a nivel de fila (Row Level Security). **Requiere autenticación de administrador.**
 
 ```
 GET /api/database/policies
@@ -515,9 +515,9 @@ curl "https://your-app.insforge.app/api/database/policies" \
 
 ---
 
-## Listar disparadores de base de datos
+## Listar disparadores (triggers) de base de datos
 
-Obtén todos los disparadores de base de datos. **Requiere autenticación de administrador.**
+Obtiene todos los disparadores de la base de datos. **Requiere autenticación de administrador.**
 
 ```
 GET /api/database/triggers
@@ -549,7 +549,7 @@ curl "https://your-app.insforge.app/api/database/triggers" \
 
 ## Listar migraciones de base de datos
 
-Obtén el historial de migraciones personalizadas exitosas. InsForge almacena estas en `system.custom_migrations`, pero el punto final solo devuelve los metadatos de migración y las sentencias ejecutadas. **Requiere autenticación de administrador.**
+Obtiene el historial de migraciones personalizadas ejecutadas con éxito. InsForge las almacena en `system.custom_migrations`, pero el endpoint devuelve únicamente los metadatos de la migración y las sentencias ejecutadas. **Requiere autenticación de administrador.**
 
 ```
 GET /api/database/migrations
@@ -581,9 +581,9 @@ curl "https://your-app.insforge.app/api/database/migrations" \
 
 ---
 
-## Crear migración de base de datos
+## Crear una migración de base de datos
 
-Crea e inmediatamente ejecuta una migración personalizada contra la base de datos. La migración se registra solo si cada sentencia tiene éxito. **Requiere autenticación de administrador.**
+Crea y ejecuta de inmediato una migración personalizada en la base de datos. La migración solo se registra si todas las sentencias se ejecutan correctamente. **Requiere autenticación de administrador.**
 
 ```
 POST /api/database/migrations
@@ -591,10 +591,10 @@ POST /api/database/migrations
 
 ### Cuerpo de la solicitud
 
-| Campo | Tipo | Requerido | Descripción |
+| Campo | Tipo | Obligatorio | Descripción |
 |-------|------|----------|-------------|
-| `version` | string | Sí | Versión de migración numérica (hasta 64 dígitos). Acepta prefijos secuenciales estilo Drizzle (ej., `0001`) o marca de tiempo `YYYYMMDDHHmmss`. Las versiones se comparan numéricamente. El CLI de InsForge genera marcas de tiempo UTC de 14 dígitos para nombres de archivos de migración locales. |
-| `name` | string | Sí | Nombre de migración usando solo letras minúsculas, números y guiones |
+| `version` | string | Sí | Versión numérica de la migración (hasta 64 dígitos). Admite prefijos secuenciales estilo Drizzle (por ejemplo, `0001`) o una marca de tiempo `YYYYMMDDHHmmss`. Las versiones se comparan numéricamente. La CLI de InsForge genera marcas de tiempo UTC de 14 dígitos para los nombres de archivo de migración locales. |
+| `name` | string | Sí | Nombre de la migración usando solo letras minúsculas, números y guiones |
 | `sql` | string | Sí | Texto SQL a analizar y ejecutar |
 
 ### Ejemplo
@@ -625,14 +625,14 @@ curl -X POST "https://your-app.insforge.app/api/database/migrations" \
 ```
 
 <Warning>
-No incluyas `BEGIN`, `COMMIT` o `ROLLBACK` dentro de una migración personalizada. InsForge ejecuta la migración dentro de su propia transacción.
+No incluyas `BEGIN`, `COMMIT` ni `ROLLBACK` dentro de una migración personalizada. InsForge ejecuta la migración dentro de su propia transacción.
 </Warning>
 
 ---
 
 ## Ejecutar SQL sin procesar (modo estricto)
 
-Ejecuta una consulta SQL sin procesar con desinfección estricta. Bloquea el acceso a tablas del sistema y auth.users. **Requiere autenticación de administrador.**
+Ejecuta una consulta SQL sin procesar con saneamiento estricto. Bloquea el acceso a las tablas del sistema y a auth.users. **Requiere autenticación de administrador.**
 
 ```
 POST /api/database/advance/rawsql
@@ -640,7 +640,7 @@ POST /api/database/advance/rawsql
 
 ### Cuerpo de la solicitud
 
-| Campo | Tipo | Requerido | Descripción |
+| Campo | Tipo | Obligatorio | Descripción |
 |-------|------|----------|-------------|
 | `query` | string | Sí | Consulta SQL a ejecutar |
 | `params` | array | No | Parámetros de consulta para consultas parametrizadas |
@@ -677,7 +677,7 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql" \
 
 ## Ejecutar SQL sin procesar (modo relajado)
 
-Ejecuta una consulta SQL sin procesar con desinfección relajada. Permite SELECT e INSERT en tablas del sistema. **Usar con precaución. Requiere autenticación de administrador.**
+Ejecuta una consulta SQL sin procesar con saneamiento relajado. Permite SELECT e INSERT en tablas del sistema. **Úsalo con precaución. Requiere autenticación de administrador.**
 
 ```
 POST /api/database/advance/rawsql/unrestricted
@@ -685,7 +685,7 @@ POST /api/database/advance/rawsql/unrestricted
 
 ### Cuerpo de la solicitud
 
-| Campo | Tipo | Requerido | Descripción |
+| Campo | Tipo | Obligatorio | Descripción |
 |-------|------|----------|-------------|
 | `query` | string | Sí | Consulta SQL a ejecutar |
 | `params` | array | No | Parámetros de consulta para consultas parametrizadas |
@@ -712,14 +712,14 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql/unrestri
 ```
 
 <Warning>
-Este punto final tiene restricciones relajadas y puede acceder a tablas del sistema. Úsalo solo cuando sea necesario y asegúrate de tener la autorización adecuada.
+Este endpoint tiene restricciones relajadas y puede acceder a tablas del sistema. Úsalo solo cuando sea necesario y asegúrate de contar con la autorización adecuada.
 </Warning>
 
 ---
 
 ## Exportar base de datos
 
-Exporta esquema y/o datos de base de datos en formato SQL o JSON. **Requiere autenticación de administrador.**
+Exporta el esquema y/o los datos de la base de datos en formato SQL o JSON. **Requiere autenticación de administrador.**
 
 ```
 POST /api/database/advance/export
@@ -727,15 +727,15 @@ POST /api/database/advance/export
 
 ### Cuerpo de la solicitud
 
-| Campo | Tipo | Requerido | Predeterminado | Descripción |
+| Campo | Tipo | Obligatorio | Predeterminado | Descripción |
 |-------|------|----------|---------|-------------|
 | `tables` | array | No | all | Lista de tablas a exportar |
 | `format` | string | No | sql | Formato de exportación (`sql` o `json`) |
-| `includeData` | boolean | No | true | Incluir datos de tabla |
-| `includeFunctions` | boolean | No | false | Incluir funciones de base de datos |
+| `includeData` | boolean | No | true | Incluir los datos de las tablas |
+| `includeFunctions` | boolean | No | false | Incluir funciones de la base de datos |
 | `includeSequences` | boolean | No | false | Incluir secuencias |
 | `includeViews` | boolean | No | false | Incluir vistas |
-| `rowLimit` | integer | No | - | Máximo de filas por tabla |
+| `rowLimit` | integer | No | - | Número máximo de filas por tabla |
 
 ### Ejemplo
 
@@ -765,7 +765,7 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/export" \
 
 ## Importar base de datos
 
-Importa base de datos desde archivo SQL. **Requiere autenticación de administrador.**
+Importa la base de datos desde un archivo SQL. **Requiere autenticación de administrador.**
 
 ```
 POST /api/database/advance/import
@@ -773,10 +773,10 @@ POST /api/database/advance/import
 
 ### Solicitud (multipart/form-data)
 
-| Campo | Tipo | Requerido | Predeterminado | Descripción |
+| Campo | Tipo | Obligatorio | Predeterminado | Descripción |
 |-------|------|----------|---------|-------------|
 | `file` | file | Sí | - | Archivo SQL a importar |
-| `truncate` | boolean | No | false | Truncar tablas existentes antes de importar |
+| `truncate` | boolean | No | false | Truncar las tablas existentes antes de importar |
 
 ### Ejemplo
 
@@ -800,9 +800,9 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/import" \
 
 ---
 
-## Upsert en lote
+## Inserción o actualización masiva (Bulk Upsert)
 
-Insertar o actualizar datos masivamente desde archivo CSV o JSON. **Requiere autenticación de administrador.**
+Inserta o actualiza datos de forma masiva a partir de un archivo CSV o JSON. **Requiere autenticación de administrador.**
 
 ```
 POST /api/database/advance/bulk-upsert
@@ -810,11 +810,11 @@ POST /api/database/advance/bulk-upsert
 
 ### Solicitud (multipart/form-data)
 
-| Campo | Tipo | Requerido | Descripción |
+| Campo | Tipo | Obligatorio | Descripción |
 |-------|------|----------|-------------|
-| `file` | file | Sí | Archivo CSV o JSON que contiene datos |
-| `table` | string | Sí | Nombre de tabla de destino |
-| `upsertKey` | string | No | Nombre de columna para resolución de conflictos de upsert |
+| `file` | file | Sí | Archivo CSV o JSON que contiene los datos |
+| `table` | string | Sí | Nombre de la tabla de destino |
+| `upsertKey` | string | No | Nombre de la columna para la resolución de conflictos en el upsert |
 
 ### Ejemplo
 
@@ -841,4 +841,3 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/bulk-upsert" \
   "totalRecords": 150,
   "table": "posts"
 }
-```

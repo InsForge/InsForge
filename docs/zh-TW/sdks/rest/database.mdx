@@ -1,11 +1,11 @@
 ---
-title: 資料庫API參考
-description: 透過REST API的PostgREST風格資料庫操作
+title: 資料庫 API 參考
+description: 透過 REST API 實現 PostgREST 風格的資料庫操作
 ---
 
 ## 概述
 
-資料庫API為您的資料庫表提供PostgREST風格的CRUD操作。所有請求都需要驗証標頭。
+資料庫 API 為你的資料庫資料表提供 PostgREST 風格的 CRUD 操作。所有請求都需要身分驗證標頭。
 
 ## 標頭
 
@@ -18,7 +18,7 @@ Content-Type: application/json
 
 ## 查詢記錄
 
-使用篩選、排序和分頁從表中檢索記錄。
+從資料表中擷取記錄，支援過濾、排序與分頁。
 
 ```
 GET /api/database/records/{tableName}
@@ -28,13 +28,13 @@ GET /api/database/records/{tableName}
 
 | 參數 | 類型 | 說明 |
 |-----------|------|-------------|
-| `limit` | integer | 傳回的最大記錄數（1-1000，預設：100） |
-| `offset` | integer | 用於分頁的跳過記錄數（預設：0） |
-| `order` | string | 排序順序（例如，`createdAt.desc`、`name.asc`） |
-| `select` | string | 逗號分隔的要傳回的欄 |
-| `{field}` | string | PostgREST篩選器（例如，`status=eq.active`） |
+| `limit` | integer | 回傳的最大記錄數（1-1000，預設值：100） |
+| `offset` | integer | 分頁時要跳過的記錄數（預設值：0） |
+| `order` | string | 排序方式（例如 `createdAt.desc`、`name.asc`） |
+| `select` | string | 要回傳的欄位，以逗號分隔 |
+| `{field}` | string | PostgREST 過濾條件（例如 `status=eq.active`） |
 
-### 篩選運算子
+### 過濾運算子
 
 | 運算子 | 說明 | 範例 |
 |----------|-------------|---------|
@@ -46,8 +46,8 @@ GET /api/database/records/{tableName}
 | `lte` | 小於或等於 | `score=lte.50` |
 | `like` | 模式比對（區分大小寫） | `name=like.*john*` |
 | `ilike` | 模式比對（不區分大小寫） | `email=ilike.*@gmail.com` |
-| `in` | 在列表中 | `status=in.(active,pending)` |
-| `is` | 為null/true/false | `deleted_at=is.null` |
+| `in` | 在清單中 | `status=in.(active,pending)` |
+| `is` | 是否為 null/true/false | `deleted_at=is.null` |
 
 ### 範例
 
@@ -83,28 +83,28 @@ curl "https://your-app.insforge.app/api/database/records/posts?select=id,title,a
 
 | 標頭 | 說明 |
 |--------|-------------|
-| `X-Total-Count` | 與查詢相符的總記錄數 |
-| `Content-Range` | 傳回的記錄範圍（例如，`0-99/1234`） |
+| `X-Total-Count` | 符合查詢條件的總記錄數 |
+| `Content-Range` | 回傳的記錄範圍（例如 `0-99/1234`） |
 
 ---
 
 ## 建立記錄
 
-在表中建立一筆或多筆記錄。
+在資料表中建立一筆或多筆記錄。
 
 ```
 POST /api/database/records/{tableName}
 ```
 
 <Warning>
-**重要**：請求本文必須是陣列，即使是單一記錄也是如此。
+**重要提示**：請求主體必須是陣列，即使只建立單筆記錄也是如此。
 </Warning>
 
 ### 標頭
 
 | 標頭 | 值 | 說明 |
 |--------|-------|-------------|
-| `Prefer` | `return=representation` | 包含以傳回所建立的記錄 |
+| `Prefer` | `return=representation` | 加入此項以回傳已建立的記錄 |
 
 ### 範例
 
@@ -133,12 +133,12 @@ curl -X POST "https://your-app.insforge.app/api/database/records/posts" \
 
 ### 回應
 
-不使用`Prefer`標頭：
+不含 `Prefer` 標頭時：
 ```json
 []
 ```
 
-使用`Prefer: return=representation`：
+含 `Prefer: return=representation` 時：
 ```json
 [
   {
@@ -156,7 +156,7 @@ curl -X POST "https://your-app.insforge.app/api/database/records/posts" \
 
 ## 更新記錄
 
-更新與查詢篩選器相符的記錄。
+更新符合查詢過濾條件的記錄。
 
 ```
 PATCH /api/database/records/{tableName}
@@ -164,13 +164,13 @@ PATCH /api/database/records/{tableName}
 
 ### 查詢參數
 
-使用篩選運算子指定要更新的記錄。
+使用過濾運算子指定要更新的記錄。
 
 ### 標頭
 
 | 標頭 | 值 | 說明 |
 |--------|-------|-------------|
-| `Prefer` | `return=representation` | 包含以傳回所更新的記錄 |
+| `Prefer` | `return=representation` | 加入此項以回傳已更新的記錄 |
 
 ### 範例
 
@@ -210,7 +210,7 @@ curl -X PATCH "https://your-app.insforge.app/api/database/records/posts?status=e
 
 ## 刪除記錄
 
-刪除與查詢篩選器相符的記錄。
+刪除符合查詢過濾條件的記錄。
 
 ```
 DELETE /api/database/records/{tableName}
@@ -218,13 +218,13 @@ DELETE /api/database/records/{tableName}
 
 ### 查詢參數
 
-使用篩選運算子指定要刪除的記錄。
+使用過濾運算子指定要刪除的記錄。
 
 ### 標頭
 
 | 標頭 | 值 | 說明 |
 |--------|-------|-------------|
-| `Prefer` | `return=representation` | 包含以傳回所刪除的記錄 |
+| `Prefer` | `return=representation` | 加入此項以回傳已刪除的記錄 |
 
 ### 範例
 
@@ -241,9 +241,9 @@ curl -X DELETE "https://your-app.insforge.app/api/database/records/posts?status=
 
 ### 回應
 
-不使用`Prefer`標頭：`204 No Content`
+不含 `Prefer` 標頭時：`204 No Content`
 
-使用`Prefer: return=representation`：
+含 `Prefer: return=representation` 時：
 ```json
 [
   {
@@ -258,7 +258,7 @@ curl -X DELETE "https://your-app.insforge.app/api/database/records/posts?status=
 
 ## 錯誤回應
 
-### 找不到表（404）
+### 找不到資料表 (404)
 
 ```json
 {
@@ -269,7 +269,7 @@ curl -X DELETE "https://your-app.insforge.app/api/database/records/posts?status=
 }
 ```
 
-### 無效查詢（400）
+### 無效查詢 (400)
 
 ```json
 {
@@ -280,7 +280,7 @@ curl -X DELETE "https://your-app.insforge.app/api/database/records/posts?status=
 }
 ```
 
-### 驗証錯誤（400）
+### 驗證錯誤 (400)
 
 ```json
 {
@@ -305,7 +305,7 @@ curl "https://your-app.insforge.app/api/database/records/posts?limit=20&offset=0
 curl "https://your-app.insforge.app/api/database/records/posts?limit=20&offset=20"
 ```
 
-### 複雜篩選器
+### 複雜過濾條件
 
 ```bash
 # Multiple conditions
@@ -321,9 +321,9 @@ curl "https://your-app.insforge.app/api/database/records/orders?status=in.(pendi
 curl "https://your-app.insforge.app/api/database/records/tasks?completed_at=is.null"
 ```
 
-### 更新插入（插入或更新）
+### Upsert（插入或更新）
 
-插入記錄或在唯一約束發生衝突時更新它。
+插入一筆記錄，若與唯一約束發生衝突則更新該記錄。
 
 ```
 POST /api/database/records/{tableName}
@@ -333,8 +333,8 @@ POST /api/database/records/{tableName}
 
 | 標頭 | 值 | 說明 |
 |--------|-------|-------------|
-| `Prefer` | `resolution=merge-duplicates` | 衝突時更新現有記錄 |
-| `Prefer` | `resolution=ignore-duplicates` | 如果記錄存在，忽略插入 |
+| `Prefer` | `resolution=merge-duplicates` | 發生衝突時更新現有記錄 |
+| `Prefer` | `resolution=ignore-duplicates` | 記錄已存在時忽略插入 |
 
 #### 範例
 
@@ -367,14 +367,14 @@ curl -X POST "https://your-app.insforge.app/api/database/records/user_settings" 
 ```
 
 <Note>
-更新插入需要表上的唯一約束（例如，主鍵或唯一索引）。衝突解決基於此約束。
+Upsert 需要資料表上存在唯一約束（例如主鍵或唯一索引）。衝突解決方式將依此約束而定。
 </Note>
 
 ---
 
-## 呼叫RPC函式
+## 呼叫 RPC 函式
 
-透過PostgREST RPC執行資料庫函式。支援所有HTTP方法（GET、POST、PUT、PATCH、DELETE）。
+透過 PostgREST RPC 執行資料庫函式。支援所有 HTTP 方法（GET、POST、PUT、PATCH、DELETE）。
 
 ```
 POST /api/database/rpc/{functionName}
@@ -408,9 +408,9 @@ curl -X POST "https://your-app.insforge.app/api/database/rpc/get_total_count" \
 
 ## 管理員端點
 
-以下端點需要管理員驗証。
+以下端點需要管理員身分驗證。
 
-### 管理員端點標頭
+### 管理員端點的標頭
 
 ```bash
 Authorization: Bearer admin-jwt-token-Or-API-Key
@@ -421,7 +421,7 @@ Content-Type: application/json
 
 ## 列出資料庫函式
 
-取得public結構描述中的所有資料庫函式。**需要管理員驗証。**
+取得 public 結構描述下的所有資料庫函式。**需要管理員身分驗證。**
 
 ```
 GET /api/database/functions
@@ -453,7 +453,7 @@ curl "https://your-app.insforge.app/api/database/functions" \
 
 ## 列出資料庫索引
 
-取得所有資料庫索引。**需要管理員驗証。**
+取得所有資料庫索引。**需要管理員身分驗證。**
 
 ```
 GET /api/database/indexes
@@ -483,9 +483,9 @@ curl "https://your-app.insforge.app/api/database/indexes" \
 
 ---
 
-## 列出RLS原則
+## 列出 RLS 政策
 
-取得所有資料列級安全原則。**需要管理員驗証。**
+取得所有資料列層級安全性（Row Level Security）政策。**需要管理員身分驗證。**
 
 ```
 GET /api/database/policies
@@ -515,9 +515,9 @@ curl "https://your-app.insforge.app/api/database/policies" \
 
 ---
 
-## 列出資料庫觸發程序
+## 列出資料庫觸發器
 
-取得所有資料庫觸發程序。**需要管理員驗証。**
+取得所有資料庫觸發器。**需要管理員身分驗證。**
 
 ```
 GET /api/database/triggers
@@ -547,9 +547,9 @@ curl "https://your-app.insforge.app/api/database/triggers" \
 
 ---
 
-## 列出資料庫移轉
+## 列出資料庫遷移
 
-取得成功自訂移轉的歷程記錄。InsForge將這些儲存在`system.custom_migrations`中，但端點只傳回移轉中繼資料和執行的陳述式。**需要管理員驗証。**
+取得已成功執行的自訂遷移歷史記錄。InsForge 會將這些記錄儲存在 `system.custom_migrations` 中，但此端點僅回傳遷移的中繼資料與已執行的陳述式。**需要管理員身分驗證。**
 
 ```
 GET /api/database/migrations
@@ -581,21 +581,21 @@ curl "https://your-app.insforge.app/api/database/migrations" \
 
 ---
 
-## 建立資料庫移轉
+## 建立資料庫遷移
 
-建立並立即對資料庫執行自訂移轉。只有在每個陳述式都成功時，才會記錄移轉。**需要管理員驗証。**
+建立並立即對資料庫執行一次自訂遷移。只有當每一條陳述式都執行成功時，此遷移才會被記錄。**需要管理員身分驗證。**
 
 ```
 POST /api/database/migrations
 ```
 
-### 請求本文
+### 請求主體
 
-| 欄位 | 類型 | 必需 | 說明 |
+| 欄位 | 類型 | 是否必填 | 說明 |
 |-------|------|----------|-------------|
-| `version` | string | 是 | 數字移轉版本（最多64位數字）。接受Drizzle風格的順序前置詞（例如`0001`）或`YYYYMMDDHHmmss`時間戳。版本按數值進行比較。InsForge CLI為本機移轉檔名產生14位數字UTC時間戳。 |
-| `name` | string | 是 | 僅使用小寫字母、數字和連字號的移轉名稱 |
-| `sql` | string | 是 | 要解析和執行的SQL文字 |
+| `version` | string | 是 | 數字形式的遷移版本號（最多 64 位）。可以是 Drizzle 風格的循序前綴（例如 `0001`），也可以是 `YYYYMMDDHHmmss` 格式的時間戳記。版本號依數字大小比較。InsForge CLI 會為本機遷移檔名產生 14 位的 UTC 時間戳記。 |
+| `name` | string | 是 | 遷移名稱，僅能使用小寫字母、數字和連字號 |
+| `sql` | string | 是 | 要剖析並執行的 SQL 文字 |
 
 ### 範例
 
@@ -625,25 +625,25 @@ curl -X POST "https://your-app.insforge.app/api/database/migrations" \
 ```
 
 <Warning>
-不要在自訂移轉中包含`BEGIN`、`COMMIT`或`ROLLBACK`。InsForge在其自己的事務中執行移轉。
+請勿在自訂遷移中包含 `BEGIN`、`COMMIT` 或 `ROLLBACK`。InsForge 會在自己的交易中執行此遷移。
 </Warning>
 
 ---
 
-## 執行原始SQL（嚴格模式）
+## 執行原始 SQL（嚴格模式）
 
-使用嚴格清理執行原始SQL查詢。阻止存取系統表和auth.users。**需要管理員驗証。**
+以嚴格清理規則執行原始 SQL 查詢。禁止存取系統資料表和 auth.users。**需要管理員身分驗證。**
 
 ```
 POST /api/database/advance/rawsql
 ```
 
-### 請求本文
+### 請求主體
 
-| 欄位 | 類型 | 必需 | 說明 |
+| 欄位 | 類型 | 是否必填 | 說明 |
 |-------|------|----------|-------------|
-| `query` | string | 是 | 要執行的SQL查詢 |
-| `params` | array | 否 | 參數化查詢的查詢參數 |
+| `query` | string | 是 | 要執行的 SQL 查詢 |
+| `params` | array | 否 | 用於參數化查詢的查詢參數 |
 
 ### 範例
 
@@ -675,20 +675,20 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql" \
 
 ---
 
-## 執行原始SQL（寬鬆模式）
+## 執行原始 SQL（寬鬆模式）
 
-使用寬鬆清理執行原始SQL查詢。允許SELECT和INSERT到系統表。**謹慎使用。需要管理員驗証。**
+以寬鬆清理規則執行原始 SQL 查詢。允許對系統資料表執行 SELECT 與 INSERT。**請謹慎使用。需要管理員身分驗證。**
 
 ```
 POST /api/database/advance/rawsql/unrestricted
 ```
 
-### 請求本文
+### 請求主體
 
-| 欄位 | 類型 | 必需 | 說明 |
+| 欄位 | 類型 | 是否必填 | 說明 |
 |-------|------|----------|-------------|
-| `query` | string | 是 | 要執行的SQL查詢 |
-| `params` | array | 否 | 參數化查詢的查詢參數 |
+| `query` | string | 是 | 要執行的 SQL 查詢 |
+| `params` | array | 否 | 用於參數化查詢的查詢參數 |
 
 ### 範例
 
@@ -712,30 +712,30 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql/unrestri
 ```
 
 <Warning>
-此端點限制寬鬆，可以存取系統表。僅在必要時使用，並確保適當的授權。
+此端點的限制較為寬鬆，可以存取系統資料表。請僅在必要時使用，並確保具備適當的授權。
 </Warning>
 
 ---
 
 ## 匯出資料庫
 
-以SQL或JSON格式匯出資料庫結構描述和/或資料。**需要管理員驗証。**
+以 SQL 或 JSON 格式匯出資料庫結構描述和/或資料。**需要管理員身分驗證。**
 
 ```
 POST /api/database/advance/export
 ```
 
-### 請求本文
+### 請求主體
 
-| 欄位 | 類型 | 必需 | 預設值 | 說明 |
+| 欄位 | 類型 | 是否必填 | 預設值 | 說明 |
 |-------|------|----------|---------|-------------|
-| `tables` | array | 否 | all | 要匯出的表清單 |
-| `format` | string | 否 | sql | 匯出格式（`sql`或`json`） |
-| `includeData` | boolean | 否 | true | 包含表資料 |
+| `tables` | array | 否 | all | 要匯出的資料表清單 |
+| `format` | string | 否 | sql | 匯出格式（`sql` 或 `json`） |
+| `includeData` | boolean | 否 | true | 包含資料表資料 |
 | `includeFunctions` | boolean | 否 | false | 包含資料庫函式 |
 | `includeSequences` | boolean | 否 | false | 包含序列 |
-| `includeViews` | boolean | 否 | false | 包含檢視 |
-| `rowLimit` | integer | 否 | - | 每個表的最大資料列數 |
+| `includeViews` | boolean | 否 | false | 包含檢視表 |
+| `rowLimit` | integer | 否 | - | 每個資料表的最大列數 |
 
 ### 範例
 
@@ -765,7 +765,7 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/export" \
 
 ## 匯入資料庫
 
-從SQL檔案匯入資料庫。**需要管理員驗証。**
+從 SQL 檔案匯入資料庫。**需要管理員身分驗證。**
 
 ```
 POST /api/database/advance/import
@@ -773,10 +773,10 @@ POST /api/database/advance/import
 
 ### 請求（multipart/form-data）
 
-| 欄位 | 類型 | 必需 | 預設值 | 說明 |
+| 欄位 | 類型 | 是否必填 | 預設值 | 說明 |
 |-------|------|----------|---------|-------------|
-| `file` | file | 是 | - | 要匯入的SQL檔案 |
-| `truncate` | boolean | 否 | false | 在匯入前截斷現有表 |
+| `file` | file | 是 | - | 要匯入的 SQL 檔案 |
+| `truncate` | boolean | 否 | false | 匯入前清空既有資料表 |
 
 ### 範例
 
@@ -800,9 +800,9 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/import" \
 
 ---
 
-## 大量更新插入
+## 批次插入或更新
 
-從CSV或JSON檔案大量插入或更新資料。**需要管理員驗証。**
+從 CSV 或 JSON 檔案批次插入或更新資料。**需要管理員身分驗證。**
 
 ```
 POST /api/database/advance/bulk-upsert
@@ -810,11 +810,11 @@ POST /api/database/advance/bulk-upsert
 
 ### 請求（multipart/form-data）
 
-| 欄位 | 類型 | 必需 | 說明 |
+| 欄位 | 類型 | 是否必填 | 說明 |
 |-------|------|----------|-------------|
-| `file` | file | 是 | 包含資料的CSV或JSON檔案 |
-| `table` | string | 是 | 目標表名稱 |
-| `upsertKey` | string | 否 | 用於更新插入衝突解決的欄名稱 |
+| `file` | file | 是 | 包含資料的 CSV 或 JSON 檔案 |
+| `table` | string | 是 | 目標資料表名稱 |
+| `upsertKey` | string | 否 | 用於衝突解決的欄位名稱 |
 
 ### 範例
 
@@ -841,4 +841,3 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/bulk-upsert" \
   "totalRecords": 150,
   "table": "posts"
 }
-```
