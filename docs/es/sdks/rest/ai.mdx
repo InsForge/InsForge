@@ -1,0 +1,193 @@
+---
+title: Referencia de IA REST
+description: Integración HTTP de OpenRouter directa y puntos finales auxiliares de OpenRouter para la puerta de enlace de modelos de InsForge
+---
+
+## Descripción General
+
+Las nuevas integraciones de IA deben llamar directamente a OpenRouter utilizando la clave de OpenRouter proporcionada por InsForge. Las rutas proxy de IA de InsForge (para chat, generación de imágenes e incrustaciones) son puntos finales de compatibilidad deprecados.
+
+Utiliza el panel de control para copiar la clave OpenRouter activa a una variable de entorno `OPENROUTER_API_KEY` solo para servidor.
+
+## OpenRouter REST Directo
+
+### Encabezados
+
+```bash
+Authorization: Bearer $OPENROUTER_API_KEY
+Content-Type: application/json
+```
+
+### Completación de Chat
+
+```bash
+curl -X POST https://openrouter.ai/api/v1/chat/completions \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-4o",
+    "messages": [
+      { "role": "user", "content": "What is the capital of France?" }
+    ]
+  }'
+```
+
+### Transmisión en Directo
+
+```bash
+curl -X POST https://openrouter.ai/api/v1/chat/completions \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-3.5-haiku",
+    "stream": true,
+    "messages": [
+      { "role": "user", "content": "Write a short product update." }
+    ]
+  }'
+```
+
+### Incrustaciones
+
+```bash
+curl -X POST https://openrouter.ai/api/v1/embeddings \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/text-embedding-3-small",
+    "input": "Hello world"
+  }'
+```
+
+### Modelos
+
+```bash
+curl "https://openrouter.ai/api/v1/models?output_modalities=all"
+```
+
+<Note>
+OpenRouter posee la forma actual de solicitud y respuesta para llamadas del modelo de IA. Consulta la documentación de la API de OpenRouter para parámetros específicos del modelo, modalidades admitidas, complementos y puntos finales de generación de video.
+</Note>
+
+## Puntos Finales Auxiliares del Administrador de InsForge
+
+Estos puntos finales ayudan al panel de control a mostrar la clave del modelo activa, el catálogo de modelos y la descripción general de uso. Requieren autenticación de administrador.
+
+Utiliza un token de portador JWT de administrador o un token de portador de clave de API de InsForge en el encabezado `Authorization`.
+
+### Obtener Modelos Disponibles
+
+```
+GET /api/ai/models
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/models" \
+  -H "Authorization: Bearer <ADMIN_JWT_TOKEN>"
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/models" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>"
+```
+
+<Warning>
+`GET /api/ai/models` ahora devuelve una matriz plana de objetos del modelo. La documentación más antigua de proxy de IA describía un objeto categorizado como `{ "text": [...], "image": [...] }`; actualiza los llamadores existentes que leen propiedades de categoría para filtrar por `inputModality` o `outputModality` en su lugar.
+</Warning>
+
+Devuelve el catálogo de modelos normalizado de OpenRouter como una matriz:
+
+```json
+[
+  {
+    "id": "openai/gpt-4o",
+    "modelId": "openai/gpt-4o",
+    "provider": "openrouter",
+    "inputModality": ["text", "image"],
+    "outputModality": ["text"],
+    "inputPrice": 2.5,
+    "outputPrice": 10,
+    "inputPriceLabel": "$2.50 / 1M tokens",
+    "outputPriceLabel": "$10.00 / 1M tokens"
+  }
+]
+```
+
+### Obtener la Clave OpenRouter Activa
+
+```
+GET /api/ai/openrouter/api-key
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/openrouter/api-key" \
+  -H "Authorization: Bearer <ADMIN_JWT_TOKEN>"
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/openrouter/api-key" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>"
+```
+
+```json
+{
+  "apiKey": "sk-or-...",
+  "maskedKey": "sk-or-abcd••••••••1234"
+}
+```
+
+<Warning>
+`apiKey` es un secreto sin procesar. No lo registres, confirmes, almacenes en el almacenamiento del navegador o lo devuelvas desde puntos finales públicos. Solo `maskedKey` es seguro para mostrar en la interfaz de usuario del cliente.
+</Warning>
+
+### Obtener Descripción General de Uso
+
+```
+GET /api/ai/overview
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/overview" \
+  -H "Authorization: Bearer <ADMIN_JWT_TOKEN>"
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/overview" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>"
+```
+
+Devuelve series de tiempo de uso y actividad de OpenRouter a nivel de clave cuando la clave activa tiene acceso a la actividad.
+
+## Rutas de Proxy de InsForge Deprecadas
+
+Las siguientes rutas aún existen para aplicaciones existentes, pero el código nuevo debe usar OpenRouter directamente.
+
+| Método | Punto Final | Reemplazo |
+|--------|----------|-------------|
+| POST | `/api/ai/chat/completion` | `POST https://openrouter.ai/api/v1/chat/completions` |
+| POST | `/api/ai/image/generation` | Completaciones de chat de OpenRouter con salida de imagen o documentación del modelo con capacidad de imagen de OpenRouter |
+| POST | `/api/ai/embeddings` | `POST https://openrouter.ai/api/v1/embeddings` |
+
+### Proxy de Chat Heredado
+
+```
+POST /api/ai/chat/completion
+```
+
+Esta ruta valida una solicitud con forma de InsForge, la reenvía a OpenRouter y devuelve una respuesta con forma de InsForge. No expone la superficie completa de la API de OpenRouter.
+
+### Proxy de Imagen Heredada
+
+```
+POST /api/ai/image/generation
+```
+
+Esta ruta reenvía una solicitud de imagen con forma de InsForge a completaciones de chat de OpenRouter con salida de imagen. Se retiene solo para compatibilidad.
+
+### Proxy de Incrustaciones Heredado
+
+```
+POST /api/ai/embeddings
+```
+
+Esta ruta reenvía una solicitud de incrustación con forma de InsForge a OpenRouter. Prefiere el punto final de incrustaciones directo de OpenRouter para código nuevo.

@@ -1,0 +1,111 @@
+---
+title: Descripción general de la API REST de InsForge
+description: Accede directamente a todos los servicios de InsForge a través de HTTP con cualquier lenguaje, utilizando claves de API, JWT y convenciones REST estándar.
+---
+
+La API REST de InsForge proporciona acceso HTTP directo a todos los servicios de InsForge. Úsalo cuando necesites integración con lenguajes o plataformas sin un SDK oficial.
+
+## URL Base
+
+```
+https://your-app.insforge.app
+```
+
+## Autenticación
+
+Todas las solicitudes de API requieren autenticación a través del encabezado `Authorization`:
+
+### Bearer Token
+
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+```
+
+## Inicio Rápido
+
+```bash
+# Register a new user
+curl -X POST https://your-app.insforge.app/api/auth/users \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "securepassword123"}'
+
+# Sign in and get token
+curl -X POST https://your-app.insforge.app/api/auth/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "securepassword123"}'
+
+# Use the token for authenticated requests
+curl https://your-app.insforge.app/api/database/records/posts \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+## Formato de Respuesta
+
+### Respuesta Exitosa
+
+Los datos se devuelven directamente en el cuerpo de la respuesta:
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "email": "user@example.com",
+  "createdAt": "2024-01-15T10:30:00Z"
+}
+```
+
+### Respuesta de Error
+
+```json
+{
+  "error": "ERROR_CODE",
+  "message": "Human-readable error message",
+  "statusCode": 400,
+  "nextActions": "Suggested action to resolve the error"
+}
+```
+
+## Códigos de Estado HTTP Comunes
+
+| Estado | Descripción |
+|--------|-------------|
+| `200` | Éxito |
+| `201` | Creado |
+| `204` | Sin Contenido (para DELETE) |
+| `400` | Solicitud Incorrecta - Entrada inválida |
+| `401` | No Autorizado - Token inválido o faltante |
+| `403` | Prohibido - Permisos insuficientes |
+| `404` | No Encontrado |
+| `409` | Conflicto - El recurso ya existe |
+| `500` | Error Interno del Servidor |
+
+## Características
+
+- **Base de Datos** - Operaciones CRUD estilo PostgREST
+- **Autenticación** - Autenticación por correo electrónico/contraseña y OAuth
+- **Almacenamiento** - Carga, descarga y gestión de archivos
+- **Funciones** - Invocar funciones edge sin servidor
+- **IA** - Completiones de chat y generación de imágenes
+- **Tiempo Real** - Gestión de canales e historial de mensajes (WebSocket para tiempo real)
+
+## Referencia de API
+
+<CardGroup cols={2}>
+  <Card title="Base de Datos" icon="database" href="/sdks/rest/database">
+    Operaciones CRUD, filtros y consultas
+  </Card>
+  <Card title="Autenticación" icon="lock" href="/sdks/rest/auth">
+    Registro, inicio de sesión, OAuth y gestión de usuarios
+  </Card>
+  <Card title="Almacenamiento" icon="cloud-arrow-up" href="/sdks/rest/storage">
+    Carga, descarga y gestión de archivos
+  </Card>
+  <Card title="Funciones" icon="bolt" href="/sdks/rest/functions">
+    Invocar funciones edge sin servidor
+  </Card>
+  <Card title="IA" icon="brain" href="/sdks/rest/ai">
+    Completiones de chat y generación de imágenes
+  </Card>
+  <Card title="Tiempo Real" icon="signal-stream" href="/sdks/rest/realtime">
+    Gestión de canales e historial de mensajes
+  </Card>
+</CardGroup>

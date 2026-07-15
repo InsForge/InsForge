@@ -1,0 +1,73 @@
+---
+title: "Extensión de VS Code"
+description: "Inicie sesión en InsForge desde VS Code, seleccione una organización y proyecto e instale el servidor MCP de InsForge en su asistente de codificación de IA con un solo clic."
+---
+
+## Descripción general
+
+La extensión de VS Code de InsForge:
+
+- Te permite iniciar sesión en InsForge (OAuth + PKCE)
+- Te permite seleccionar una organización/proyecto
+- Instala InsForge MCP para tu cliente de IA
+
+Inicia el instalador MCP (`npx @insforge/install`) con la clave de API y URL base de API de su proyecto.
+
+## Enlaces
+
+- [Mercado de VS Code](https://marketplace.visualstudio.com/items?itemName=InsForge.insforge)
+- [VSX abierto](https://open-vsx.org/extension/InsForge/insforge)
+
+## Instalar
+
+1. Abra VS Code
+2. Ir a **Extensiones**
+3. Busque **InsForge**
+4. Instale la extensión publicada por **insforge**
+
+## Usar la extensión
+
+<Steps>
+  <Step title="Abra el panel de InsForge">
+    Haga clic en el icono **InsForge** en la Barra de actividades (barra lateral izquierda).
+  </Step>
+
+  <Step title="Iniciar sesión">
+    Haga clic en **Iniciar sesión con InsForge** y complete el flujo de inicio de sesión en su navegador.
+
+    <Note>La devolución de llamada es <code>http://127.0.0.1:54321/callback</code>.</Note>
+  </Step>
+
+  <Step title="Seleccionar un proyecto">
+    Seleccione una organización y proyecto de la vista de árbol de InsForge, o ejecute <code>InsForge: Select Project</code> desde la Paleta de comandos.
+  </Step>
+
+  <Step title="Instalar MCP">
+    Ejecute <code>InsForge: Install MCP</code> (o haga clic con el botón derecho en un proyecto y elija **Instalar MCP**), luego seleccione el cliente de IA que desea configurar.
+
+    El instalador se ejecuta en una terminal de VS Code.
+  </Step>
+</Steps>
+
+## Clientes de IA admitidos
+
+La extensión admite los siguientes "clientes" MCP (el valor pasado a `@insforge/install`):
+
+| Cliente | Ubicación de configuración típica |
+|---|---|
+| `cursor` | `~/.cursor/mcp.json` |
+| `claude-code` | `.mcp.json` en su espacio de trabajo (local del proyecto) |
+| `copilot` | `.vscode/mcp.json` en su espacio de trabajo (local del proyecto) |
+| `windsurf` | `~/.codeium/windsurf/` |
+| `cline` | Configuración de extensión Cline VS Code |
+| `roocode` | Configuración de extensión Roo Code VS Code |
+| `codex` | Configuración de CLI de OpenAI Codex |
+| `trae` | Configuración del IDE Trae |
+| `qoder` | Configuración del IDE Qoder |
+
+Si su cliente no está en la lista, ejecute el instalador manualmente (consulte <a href="/quickstart">Inicio rápido</a>).
+
+## Notas
+
+- **Instalaciones locales del proyecto**: `claude-code` y `copilot` requieren una carpeta de espacio de trabajo abierta.
+- **Puerto en uso**: libere `54321` e intente iniciar sesión nuevamente.

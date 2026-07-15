@@ -1,0 +1,382 @@
+---
+title: Referencia de API de funciones
+description: Funciones de borde sin servidor a través de API REST
+---
+
+## Descripción general
+
+La API de funciones proporciona puntos finales para invocar y gestionar funciones sin servidor. En entornos en la nube, las funciones se ejecutan en Deno Subhosting en el borde. En entornos auto-hospedados (Docker), las funciones se ejecutan en un entorno de ejecución Deno local.
+
+## Encabezados
+
+```bash
+Content-Type: application/json
+```
+
+Para invocaciones de funciones autenticadas:
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+```
+
+Para puntos finales de administrador:
+```bash
+Authorization: Bearer admin-jwt-token-or-api-key
+```
+
+---
+
+## Invocar función
+
+Ejecuta una función implementada usando cualquier método HTTP (GET, POST, PUT, PATCH, DELETE, etc.). El servidor preserva y reenvía el método original del llamador al entorno de ejecución de la función.
+
+```
+ANY /functions/{slug}
+```
+
+<Note>
+Nota: La invocación de función usa `/functions/{slug}` (sin prefijo `/api`), no `/api/functions/{slug}`.
+</Note>
+
+### Parámetros de ruta
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `slug` | string | Identificador de slug de función |
+
+### Cuerpo de la solicitud
+
+Cualquier carga JSON que la función espere.
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/functions/hello-world" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John"
+  }'
+```
+
+### Respuesta
+
+La respuesta depende de lo que devuelve la función:
+
+```json
+{
+  "message": "Hello, John!"
+}
+```
+
+---
+
+## Puntos finales de administrador
+
+Estos puntos finales requieren autenticación de administrador.
+
+### Listar todas las funciones
+
+```
+GET /api/functions
+```
+
+### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/functions" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+```
+
+### Respuesta
+
+```json
+[
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "slug": "hello-world",
+    "name": "Hello World Function",
+    "description": "Returns a greeting message",
+    "status": "active",
+    "created_at": "2024-01-21T10:30:00Z",
+    "updated_at": "2024-01-21T10:35:00Z",
+    "deployed_at": "2024-01-21T10:35:00Z"
+  },
+  {
+    "id": "223e4567-e89b-12d3-a456-426614174001",
+    "slug": "process-webhook",
+    "name": "Webhook Processor",
+    "description": "Processes incoming webhooks",
+    "status": "draft",
+    "created_at": "2024-01-22T14:20:00Z",
+    "updated_at": "2024-01-22T14:20:00Z",
+    "deployed_at": null
+  }
+]
+```
+
+---
+
+### Obtener detalles de función
+
+```
+GET /api/functions/{slug}
+```
+
+### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/functions/hello-world" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+```
+
+### Respuesta
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "slug": "hello-world",
+  "name": "Hello World Function",
+  "description": "Returns a greeting message",
+  "code": "export default async function(request) {\n  const { name = 'World' } = await request.json();\n  return new Response(\n    JSON.stringify({ message: `Hello, ${name}!` }),\n    { headers: { 'Content-Type': 'application/json' } }\n  );\n}",
+  "status": "active",
+  "created_at": "2024-01-21T10:30:00Z",
+  "updated_at": "2024-01-21T10:35:00Z",
+  "deployed_at": "2024-01-21T10:35:00Z"
+}
+```
+
+---
+
+### Crear función
+
+<Note>
+Actualmente, InsForge solo admite funciones JavaScript/TypeScript que se ejecutan en un entorno Deno.
+</Note>
+
+```
+POST /api/functions
+```
+
+### Cuerpo de la solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `name` | string | Sí | Nombre para mostrar de la función |
+| `code` | string | Sí | Código JavaScript/TypeScript |
+| `slug` | string | No | Identificador amigable para URL (se genera automáticamente si no se proporciona) |
+| `description` | string | No | Descripción de la función |
+| `status` | string | No | `draft` o `active` (predeterminado: `active`) |
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/functions" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Hello World Function",
+    "slug": "hello-world",
+    "description": "Returns a personalized greeting",
+    "code": "export default async function(request) {\n  const { name = \"World\" } = await request.json();\n  return new Response(\n    JSON.stringify({ message: `Hello, ${name}!` }),\n    { headers: { \"Content-Type\": \"application/json\" } }\n  );\n}",
+    "status": "active"
+  }'
+```
+
+### Respuesta
+
+```json
+{
+  "success": true,
+  "function": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "slug": "hello-world",
+    "name": "Hello World Function",
+    "description": "Returns a personalized greeting",
+    "status": "active",
+    "created_at": "2024-01-21T10:30:00Z"
+  }
+}
+```
+
+---
+
+### Actualizar función
+
+```
+PUT /api/functions/{slug}
+```
+
+### Cuerpo de la solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|----------|-------------|
+| `name` | string | No | Nombre para mostrar actualizado |
+| `code` | string | No | Código de función actualizado |
+| `description` | string | No | Descripción actualizada |
+| `status` | string | No | `draft`, `active` o `error` |
+
+### Ejemplo
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/functions/hello-world" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Hello World Function v2",
+    "code": "export default async function(request) {\n  const { name = \"World\" } = await request.json();\n  return new Response(\n    JSON.stringify({ message: `Hello, ${name}! Welcome to v2.`, version: 2 }),\n    { headers: { \"Content-Type\": \"application/json\" } }\n  );\n}"
+  }'
+```
+
+### Respuesta
+
+```json
+{
+  "success": true,
+  "function": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "slug": "hello-world",
+    "name": "Hello World Function v2",
+    "description": "Returns a personalized greeting",
+    "status": "active",
+    "updated_at": "2024-01-21T11:00:00Z"
+  }
+}
+```
+
+---
+
+### Eliminar función
+
+```
+DELETE /api/functions/{slug}
+```
+
+### Ejemplo
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/functions/old-function" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+```
+
+### Respuesta
+
+```json
+{
+  "success": true,
+  "message": "Function old-function deleted successfully"
+}
+```
+
+---
+
+## Estructura de código de función
+
+Las funciones deben exportar una función asíncrona predeterminada que reciba un objeto `Request` y devuelva un `Response`:
+
+```javascript
+export default async function(request) {
+  // Parse request body
+  const body = await request.json();
+
+  // Process request
+  const result = { message: `Hello, ${body.name}!` };
+
+  // Return response
+  return new Response(
+    JSON.stringify(result),
+    {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200
+    }
+  );
+}
+```
+
+### Acceder a datos de solicitud
+
+```javascript
+export default async function(request) {
+  // Get JSON body
+  const body = await request.json();
+
+  // Get headers
+  const authHeader = request.headers.get('Authorization');
+
+  // Get query parameters
+  const url = new URL(request.url);
+  const param = url.searchParams.get('param');
+
+  // Get request method
+  const method = request.method;
+
+  return new Response(JSON.stringify({ body, authHeader, param, method }));
+}
+```
+
+---
+
+## Estado de la función
+
+| Estado | Descripción |
+|--------|-------------|
+| `draft` | La función se guarda pero no se implementa |
+| `active` | La función se implementa y se puede invocar |
+| `error` | La función tiene un error de implementación |
+
+---
+
+## Respuestas de error
+
+### Función no encontrada (404)
+
+```json
+{
+  "error": "Function not found"
+}
+```
+
+### Función no activa (404)
+
+```json
+{
+  "error": "Function not found or not active"
+}
+```
+
+### Error de ejecución (502)
+
+Cuando el entorno de ejecución de la función es inaccesible (auto-hospedado: entorno de ejecución Deno local inactivo; nube: fallo del proxy de subhosting):
+
+```json
+{
+  "error": "Failed to proxy function"
+}
+```
+
+### Error de ejecución de función (500)
+
+Cuando el código de la función genera un error:
+
+```json
+{
+  "error": "Function execution failed",
+  "message": "TypeError: Cannot read property 'name' of undefined"
+}
+```
+
+### Slug ya existe (409)
+
+```json
+{
+  "error": "Function with this slug already exists",
+  "details": "duplicate key value violates unique constraint"
+}
+```
+
+### Código peligroso detectado (400)
+
+```json
+{
+  "error": "Code contains potentially dangerous patterns",
+  "pattern": "/Deno\\.run/i"
+}
+```

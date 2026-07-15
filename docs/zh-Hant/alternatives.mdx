@@ -1,0 +1,66 @@
+---
+title: "替代方案"
+description: "InsForge 如何與 Supabase 和 Firebase 進行比較。"
+---
+
+InsForge 是**代理原生雲基礎設施平台**。編碼代理為任何應用提供 Postgres 資料庫、身份驗證、儲存、邊緣函數、運算、託管和 AI 模型網關，透過一個 CLI 端到端驅動。它是開源的 (Apache-2.0)。
+
+其 MCP 伺服器和 CLI 將該基礎設施公開為結構化的、機器可讀的脈絡，因此 AI 編碼代理可以在限定權限範圍內自主計畫和執行操作。人類角色的轉變：使用傳統平台，您**實現和執行**；使用 InsForge，您**定義意圖並審查**。
+
+<Note>
+  有關完整、始終最新的詳細資訊，請參閱
+  [InsForge vs Supabase](https://insforge.dev/alternatives/insforge-vs-supabase)
+  和 [InsForge vs Firebase](https://insforge.dev/alternatives/insforge-vs-firebase)。
+</Note>
+
+## InsForge vs. Supabase
+
+Supabase 是為人類開發者構建的開源、基於 Postgres 的後端。InsForge 共享 Postgres 基礎，但是為 AI 編碼代理作為一流操作者而構建。
+
+| 維度 | Supabase | InsForge |
+|---|---|---|
+| 主要操作者 | 人類開發者 | AI 編碼代理 |
+| 配置模型 | 明確 UI、SQL、CLI | 代理執行的操作 |
+| 權限設計 | 開發者管理的存取 | 限定的代理自主性 |
+| 系統脈絡 | 隱式、開發者維護 | 結構化、機器可讀 (MCP) |
+| 支付 | 透過應用代碼 | 內置 Stripe 整合 |
+| AI 模型存取 | 外部模型連接 | 內置模型網關 |
+| 安全性 | 按整合實現 | 生產就緒的預設值 |
+| 代理就緒性 | 需要手動連接 | 端到端可操作 |
+
+## InsForge vs. Firebase
+
+Firebase 針對使用人類操作者的面向文件的 NoSQL 快速原型設計。InsForge 針對關係型 Postgres 上的代理編碼。
+
+| 維度 | Firebase | InsForge |
+|---|---|---|
+| 資料庫 | 面向文件的 NoSQL | 關係型 Postgres |
+| 資料模型 | 無綱要 JSON | 具有關係的結構化表 |
+| 聯接 | 不原生支持 | 原生聯接和查詢 |
+| 交易 | 支持但有限制 | 完整 ACID 交易 |
+| 自託管 | 不支持 | Docker / 可自託管 |
+| 主要操作者 | 人類開發者 | AI 編碼代理 |
+| 系統脈絡 | 隱式、分散 | 結構化、機器可讀 (MCP) |
+| AI 整合 | 外部設置 | 內置模型網關 |
+| 支付 | 手動整合 | 內置 Stripe 原始構件 |
+
+## 為什麼團隊選擇 InsForge
+
+<CardGroup cols={2}>
+  <Card title="代理原生設計" icon="robot">
+    一個 MCP 伺服器將綱要、權限和日誌公開為結構化脈絡，因此 AI 編碼代理可以端到端配置和操作整個堆疊，而不僅僅是查詢資料庫。
+  </Card>
+  <Card title="生產就緒的原始構件" icon="layer-group">
+    支付 (Stripe)、AI 模型網關和部署包含在內，而不是自己連接每個整合。
+  </Card>
+  <Card title="關係型 Postgres" icon="database">
+    原生聯接、完整 ACID 交易和綱要強制，因此您的資料和技能可轉移。沒有需要圍繞設計的專有文件模型。
+  </Card>
+  <Card title="開源、可自託管" icon="server">
+    使用 Docker 在您自己的基礎設施上執行，或使用託管雲。
+  </Card>
+</CardGroup>
+
+<Card title="開始構建" icon="rocket" href="https://insforge.dev/auth/sign-up">
+  建立專案並連接您最喜歡的 AI 編碼代理。
+</Card>

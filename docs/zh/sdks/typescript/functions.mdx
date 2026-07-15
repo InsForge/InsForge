@@ -1,0 +1,185 @@
+---
+title: 函数 SDK 参考
+description: 使用 InsForge TypeScript SDK 调用无服务器函数
+---
+
+## 安装
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## invoke()
+
+按名称/段调用无服务器函数。
+
+### 参数
+
+- `slug` (string, required) - 函数 slug/名称
+- `body` (any, optional) - 请求体（JSON 可序列化）
+- `headers` (object, optional) - 自定义头
+- `method` ('GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', optional) - HTTP 方法（默认：POST）
+
+### 返回
+
+```typescript
+{
+  data: any | null,  // Response from function
+  error: Error | null
+}
+```
+
+<Note>
+SDK 自动包含来自登录用户的身份验证令牌。
+</Note>
+
+### 示例（POST 带请求体）
+
+```javascript
+const { data, error } = await insforge.functions.invoke('hello-world', {
+  body: { name: 'World', greeting: 'Hello' }
+})
+
+console.log(data)
+```
+
+### 输出（POST 带请求体）
+
+```json
+{
+  "data": {
+    "message": "Hello, World!",
+    "timestamp": "2024-01-15T10:30:00Z"
+  },
+  "error": null
+}
+```
+
+### 示例（GET 请求）
+
+```javascript
+const { data, error } = await insforge.functions.invoke('get-stats', {
+  method: 'GET'
+})
+
+console.log(data)
+```
+
+### 输出（GET 请求）
+
+```json
+{
+  "data": {
+    "posts": 500,
+    "comments": 1200
+  },
+  "error": null
+}
+```
+
+### 示例（带自定义头）
+
+```javascript
+const { data, error } = await insforge.functions.invoke('api-endpoint', {
+  method: 'PUT',
+  body: { id: '123', status: 'active' },
+  headers: { 'X-Custom-Header': 'value' }
+})
+```
+
+### 输出（带自定义头）
+
+```json
+{
+  "data": {
+    "updated": true,
+    "id": "123"
+  },
+  "error": null
+}
+```
+
+## 完整的无服务器函数示例
+
+### 示例 1：公共函数（不需要身份验证）
+
+```typescript
+import { createClient } from 'npm:@insforge/sdk';
+
+export default async function(req: Request): Promise<Response> {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+  };
+
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  // Create client with anon token - no authentication needed
+  const client = createClient({
+    baseUrl: Deno.env.get('INSFORGE_BASE_URL'),
+    anonKey: Deno.env.get('ANON_KEY')
+  });
+
+  // Access public data
+  const { data, error } = await client.database
+    .from('public_posts')
+    .select('*')
+    .limit(10);
+
+  return new Response(JSON.stringify({ data }), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+```
+
+### 示例 2：认证函数（访问用户数据）
+
+```typescript
+import { createClient } from 'npm:@insforge/sdk';
+
+export default async function(req: Request): Promise<Response> {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+  };
+
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  // Extract token from request headers
+  const authHeader = req.headers.get('Authorization');
+  const userToken = authHeader ? authHeader.replace('Bearer ', '') : null;
+
+  // Create client with user's token for authenticated access
+  const client = createClient({
+    baseUrl: Deno.env.get('INSFORGE_BASE_URL'),
+    edgeFunctionToken: userToken
+  });
+
+  // Get authenticated user
+  const { data: userData } = await client.auth.getCurrentUser();
+  if (!userData?.user?.id) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Access user's private data or create records with user_id
+  await client.database.from('user_posts').insert([{
+    user_id: userData.user.id,
+    content: 'My post'
+  }]);
+
+  return new Response(JSON.stringify({ success: true }), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+```

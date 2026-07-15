@@ -1,0 +1,382 @@
+---
+title: 函數API參考
+description: 透過REST API的無伺服器邊界函數
+---
+
+## 概述
+
+函數API提供用於調用和管理無伺服器函數的端點。在雲端環境中，函數在Deno Subhosting上邊界運行。在自主機（Docker）環境中，函數在本機Deno執行階段中執行。
+
+## 標頭
+
+```bash
+Content-Type: application/json
+```
+
+針對經過驗証的函數調用：
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+```
+
+針對管理員端點：
+```bash
+Authorization: Bearer admin-jwt-token-or-api-key
+```
+
+---
+
+## 呼叫函數
+
+使用任何HTTP方法（GET、POST、PUT、PATCH、DELETE等）執行已部署的函數。伺服器保留並將呼叫者的原始方法轉送到函數執行階段。
+
+```
+ANY /functions/{slug}
+```
+
+<Note>
+注意：函數調用使用`/functions/{slug}`（沒有`/api`前置詞），不是`/api/functions/{slug}`。
+</Note>
+
+### 路徑參數
+
+| 參數 | 類型 | 說明 |
+|-----------|------|-------------|
+| `slug` | string | 函數slug識別碼 |
+
+### 請求本文
+
+函數期望的任何JSON承載。
+
+### 範例
+
+```bash
+curl -X POST "https://your-app.insforge.app/functions/hello-world" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John"
+  }'
+```
+
+### 回應
+
+回應取決於函數傳回的內容：
+
+```json
+{
+  "message": "Hello, John!"
+}
+```
+
+---
+
+## 管理員端點
+
+這些端點需要管理員驗証。
+
+### 列出所有函數
+
+```
+GET /api/functions
+```
+
+### 範例
+
+```bash
+curl "https://your-app.insforge.app/api/functions" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+```
+
+### 回應
+
+```json
+[
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "slug": "hello-world",
+    "name": "Hello World Function",
+    "description": "Returns a greeting message",
+    "status": "active",
+    "created_at": "2024-01-21T10:30:00Z",
+    "updated_at": "2024-01-21T10:35:00Z",
+    "deployed_at": "2024-01-21T10:35:00Z"
+  },
+  {
+    "id": "223e4567-e89b-12d3-a456-426614174001",
+    "slug": "process-webhook",
+    "name": "Webhook Processor",
+    "description": "Processes incoming webhooks",
+    "status": "draft",
+    "created_at": "2024-01-22T14:20:00Z",
+    "updated_at": "2024-01-22T14:20:00Z",
+    "deployed_at": null
+  }
+]
+```
+
+---
+
+### 取得函數詳細資訊
+
+```
+GET /api/functions/{slug}
+```
+
+### 範例
+
+```bash
+curl "https://your-app.insforge.app/api/functions/hello-world" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+```
+
+### 回應
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "slug": "hello-world",
+  "name": "Hello World Function",
+  "description": "Returns a greeting message",
+  "code": "export default async function(request) {\n  const { name = 'World' } = await request.json();\n  return new Response(\n    JSON.stringify({ message: `Hello, ${name}!` }),\n    { headers: { 'Content-Type': 'application/json' } }\n  );\n}",
+  "status": "active",
+  "created_at": "2024-01-21T10:30:00Z",
+  "updated_at": "2024-01-21T10:35:00Z",
+  "deployed_at": "2024-01-21T10:35:00Z"
+}
+```
+
+---
+
+### 建立函數
+
+<Note>
+目前，InsForge只支援在Deno環境中執行的JavaScript/TypeScript函數。
+</Note>
+
+```
+POST /api/functions
+```
+
+### 請求本文
+
+| 欄位 | 類型 | 必需 | 說明 |
+|-------|------|----------|-------------|
+| `name` | string | 是 | 函數的顯示名稱 |
+| `code` | string | 是 | JavaScript/TypeScript代碼 |
+| `slug` | string | 否 | URL友善的識別碼（如果未提供，則自動產生） |
+| `description` | string | 否 | 函數的說明 |
+| `status` | string | 否 | `draft`或`active`（預設：`active`） |
+
+### 範例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/functions" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Hello World Function",
+    "slug": "hello-world",
+    "description": "Returns a personalized greeting",
+    "code": "export default async function(request) {\n  const { name = \"World\" } = await request.json();\n  return new Response(\n    JSON.stringify({ message: `Hello, ${name}!` }),\n    { headers: { \"Content-Type\": \"application/json\" } }\n  );\n}",
+    "status": "active"
+  }'
+```
+
+### 回應
+
+```json
+{
+  "success": true,
+  "function": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "slug": "hello-world",
+    "name": "Hello World Function",
+    "description": "Returns a personalized greeting",
+    "status": "active",
+    "created_at": "2024-01-21T10:30:00Z"
+  }
+}
+```
+
+---
+
+### 更新函數
+
+```
+PUT /api/functions/{slug}
+```
+
+### 請求本文
+
+| 欄位 | 類型 | 必需 | 說明 |
+|-------|------|----------|-------------|
+| `name` | string | 否 | 更新的顯示名稱 |
+| `code` | string | 否 | 更新的函數代碼 |
+| `description` | string | 否 | 更新的說明 |
+| `status` | string | 否 | `draft`、`active`或`error` |
+
+### 範例
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/functions/hello-world" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Hello World Function v2",
+    "code": "export default async function(request) {\n  const { name = \"World\" } = await request.json();\n  return new Response(\n    JSON.stringify({ message: `Hello, ${name}! Welcome to v2.`, version: 2 }),\n    { headers: { \"Content-Type\": \"application/json\" } }\n  );\n}"
+  }'
+```
+
+### 回應
+
+```json
+{
+  "success": true,
+  "function": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "slug": "hello-world",
+    "name": "Hello World Function v2",
+    "description": "Returns a personalized greeting",
+    "status": "active",
+    "updated_at": "2024-01-21T11:00:00Z"
+  }
+}
+```
+
+---
+
+### 刪除函數
+
+```
+DELETE /api/functions/{slug}
+```
+
+### 範例
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/functions/old-function" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+```
+
+### 回應
+
+```json
+{
+  "success": true,
+  "message": "Function old-function deleted successfully"
+}
+```
+
+---
+
+## 函數代碼結構
+
+函數必須匯出一個接收`Request`物件並傳回`Response`的預設異步函數：
+
+```javascript
+export default async function(request) {
+  // Parse request body
+  const body = await request.json();
+
+  // Process request
+  const result = { message: `Hello, ${body.name}!` };
+
+  // Return response
+  return new Response(
+    JSON.stringify(result),
+    {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200
+    }
+  );
+}
+```
+
+### 存取請求資料
+
+```javascript
+export default async function(request) {
+  // Get JSON body
+  const body = await request.json();
+
+  // Get headers
+  const authHeader = request.headers.get('Authorization');
+
+  // Get query parameters
+  const url = new URL(request.url);
+  const param = url.searchParams.get('param');
+
+  // Get request method
+  const method = request.method;
+
+  return new Response(JSON.stringify({ body, authHeader, param, method }));
+}
+```
+
+---
+
+## 函數狀態
+
+| 狀態 | 說明 |
+|--------|-------------|
+| `draft` | 函數已儲存但未部署 |
+| `active` | 函數已部署並可以呼叫 |
+| `error` | 函數有部署錯誤 |
+
+---
+
+## 錯誤回應
+
+### 找不到函數（404）
+
+```json
+{
+  "error": "Function not found"
+}
+```
+
+### 函數未啟用（404）
+
+```json
+{
+  "error": "Function not found or not active"
+}
+```
+
+### 執行錯誤（502）
+
+當函數執行階段無法到達時（自主機：本機Deno執行階段已關閉；雲端：子託管代理失敗）：
+
+```json
+{
+  "error": "Failed to proxy function"
+}
+```
+
+### 函數執行階段錯誤（500）
+
+當函數代碼擲回錯誤時：
+
+```json
+{
+  "error": "Function execution failed",
+  "message": "TypeError: Cannot read property 'name' of undefined"
+}
+```
+
+### Slug已存在（409）
+
+```json
+{
+  "error": "Function with this slug already exists",
+  "details": "duplicate key value violates unique constraint"
+}
+```
+
+### 偵測到危險代碼（400）
+
+```json
+{
+  "error": "Code contains potentially dangerous patterns",
+  "pattern": "/Deno\\.run/i"
+}
+```

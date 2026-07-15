@@ -1,0 +1,304 @@
+---
+title: 資料庫 SDK 參考
+description: 使用 InsForge Swift SDK 進行類型安全的資料庫操作
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+## 安裝
+
+<SwiftSdkInstallation />
+
+## 定義模型
+
+使用 Swift 的 `Codable` 通訊協定定義資料模型：
+
+```swift
+struct Post: Codable {
+    let id: String?
+    let title: String
+    let content: String
+    let userId: String
+    let createdAt: Date?
+}
+```
+
+---
+
+## insert()
+
+將新記錄插入到資料表中。
+
+### 參數
+
+- `values` - 單個 Codable 物件或要插入的物件陣列
+
+### 範例
+
+```swift
+// Single insert
+let post = Post(
+    id: nil,
+    title: "Hello World",
+    content: "My first post!",
+    userId: currentUserId,
+    createdAt: nil
+)
+let inserted = try await insforge.database
+    .from("posts")
+    .insert(post)
+
+// Bulk insert
+let posts = [
+    Post(id: nil, title: "First Post", content: "Hello everyone!", userId: currentUserId, createdAt: nil),
+    Post(id: nil, title: "Second Post", content: "Another update.", userId: currentUserId, createdAt: nil)
+]
+let inserted = try await insforge.database
+    .from("posts")
+    .insert(posts)
+```
+
+---
+
+## update()
+
+更新資料表中的現有記錄。
+
+### 範例
+
+```swift
+// Define update model
+struct PostUpdate: Codable {
+    let title: String
+}
+
+// Update by ID
+let updated: [Post] = try await insforge.database
+    .from("posts")
+    .eq("id", value: postId)
+    .update(PostUpdate(title: "Updated Title"))
+
+// Update multiple records
+struct TaskUpdate: Codable {
+    let status: String
+}
+
+let updated: [Task] = try await insforge.database
+    .from("tasks")
+    .in("id", values: ["task-1", "task-2"])
+    .update(TaskUpdate(status: "completed"))
+```
+
+---
+
+## delete()
+
+從資料表中刪除記錄。
+
+### 範例
+
+```swift
+// Delete by ID
+try await insforge.database
+    .from("posts")
+    .eq("id", value: postId)
+    .delete()
+
+// Delete with filter
+try await insforge.database
+    .from("sessions")
+    .lt("expires_at", value: Date())
+    .delete()
+```
+
+---
+
+## select()
+
+從資料表查詢記錄。
+
+### 範例
+
+```swift
+// Get all posts
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .execute()
+
+// Filter and sort
+let recentPosts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .eq("userId", value: currentUserId)
+    .order("createdAt", ascending: false)
+    .limit(20)
+    .execute()
+
+// Multiple filters
+let activePosts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .eq("userId", value: currentUserId)
+    .eq("status", value: "published")
+    .execute()
+
+// Specific columns
+let posts = try await insforge.database
+    .from("posts")
+    .select("id, title, content")
+    .execute()
+
+// With relationships
+let posts = try await insforge.database
+    .from("posts")
+    .select("*, comments(id, content)")
+    .execute()
+```
+
+---
+
+## rpc()
+
+呼叫 PostgreSQL 預存程式（RPC - 遠端程序呼叫）。此方法可讓您直接叫用在資料庫中定義的 SQL 函數。
+
+### 參數
+
+- `functionName` (String) - 要呼叫的 PostgreSQL 函數名稱
+- `args` ([String: Any]?, optional) - 要傳遞給函數的引數
+
+### 範例
+
+```swift
+// Define response models
+struct UserStats: Decodable {
+    let totalPosts: Int
+    let totalComments: Int
+}
+
+struct User: Decodable {
+    let id: String
+    let name: String
+    let email: String
+}
+
+// Call function with parameters, returning array
+let stats: [UserStats] = try await insforge.database
+    .rpc("get_user_stats", args: ["user_id": "123"])
+    .execute()
+
+// Call function with parameters, returning single result
+let stat: UserStats = try await insforge.database
+    .rpc("get_user_stats", args: ["user_id": "123"])
+    .executeSingle()
+
+// Call function without parameters
+let users: [User] = try await insforge.database
+    .rpc("get_all_active_users")
+    .execute()
+
+// Call function with multiple parameters
+let results: [Post] = try await insforge.database
+    .rpc("search_posts", args: [
+        "search_term": "swift",
+        "limit": 10,
+        "offset": 0
+    ])
+    .execute()
+
+// Call function with no return value (void function)
+try await insforge.database
+    .rpc("cleanup_old_records", args: ["days": 30])
+    .execute()
+
+// Call function returning a single primitive value
+let count: Int = try await insforge.database
+    .rpc("count_active_posts")
+    .executeSingle()
+```
+
+### 實作詳細資料
+
+- **無引數**：使用 GET 要求至 `/api/database/rpc/{functionName}`
+- **含引數**：使用 POST 要求搭配 JSON 主體至 `/api/database/rpc/{functionName}`
+- 對於傳回陣列或 void 的函數，使用 `execute()`
+- 對於傳回單一物件或值的函數，使用 `executeSingle()`
+
+---
+
+## 篩選器
+
+| 篩選器 | 描述 | 範例 |
+|--------|-------------|---------|
+| `.eq(column, value:)` | 等於 | `.eq("status", value: "active")` |
+| `.neq(column, value:)` | 不等於 | `.neq("status", value: "banned")` |
+| `.gt(column, value:)` | 大於 | `.gt("age", value: 18)` |
+| `.gte(column, value:)` | 大於或等於 | `.gte("price", value: 100)` |
+| `.lt(column, value:)` | 小於 | `.lt("stock", value: 10)` |
+| `.lte(column, value:)` | 小於或等於 | `.lte("priority", value: 3)` |
+| `.like(column, pattern:)` | 區分大小寫的模式 | `.like("name", pattern: "%Widget%")` |
+| `.ilike(column, pattern:)` | 不區分大小寫的模式 | `.ilike("email", pattern: "%@gmail.com")` |
+| `.in(column, values:)` | 值在陣列中 | `.in("status", values: ["pending", "active"])` |
+| `.is(column, value:)` | 完全等於（用於 nil/bool） | `.is("deleted_at", value: nil)` |
+
+```swift
+// Chain multiple filters
+let products: [Product] = try await insforge.database
+    .from("products")
+    .select()
+    .eq("category", value: "electronics")
+    .gte("price", value: 50)
+    .lte("price", value: 500)
+    .execute()
+
+// Pattern matching
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .ilike("title", pattern: "%swift%")
+    .execute()
+
+// Filter by multiple values
+let tasks: [Task] = try await insforge.database
+    .from("tasks")
+    .select()
+    .in("status", values: ["pending", "in_progress"])
+    .execute()
+
+// Check for null or boolean
+let activePosts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .is("deleted_at", value: nil)
+    .is("published", value: true)
+    .execute()
+```
+
+---
+
+## 修飾詞
+
+| 修飾詞 | 描述 | 範例 |
+|----------|-------------|---------|
+| `.order(column, ascending:)` | 排序結果 | `.order("createdAt", ascending: false)` |
+| `.limit(count)` | 限制列數 | `.limit(10)` |
+| `.offset(count)` | 跳過列數 | `.offset(20)` |
+| `.range(from:, to:)` | 範圍分頁 | `.range(from: 0, to: 9)` |
+
+```swift
+// Pagination with sorting
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .order("createdAt", ascending: false)
+    .limit(10)
+    .offset(20)
+    .execute()
+
+// Range pagination (get items 10-19)
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .range(from: 10, to: 19)
+    .execute()
+```

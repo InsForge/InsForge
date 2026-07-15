@@ -1,0 +1,1069 @@
+---
+title: 认证 API 参考
+description: 通过 REST API 进行用户认证和会话管理
+---
+
+## 概述
+
+认证 API 提供用户注册、登录、电子邮件验证、密码重置和 OAuth 集成的端点。
+
+## 标头
+
+对于已认证的函数调用：
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+Content-Type: application/json
+```
+
+对于管理员端点：
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
+Content-Type: application/json
+```
+
+---
+
+## 注册用户
+
+创建新用户账户。
+
+```
+POST /api/auth/users
+```
+
+### 查询参数
+
+| 参数 | 类型 | 必需 | 描述 |
+|-----------|------|----------|-------------|
+| `client_type` | string | 否 | 客户端类型：`web`（默认）、`mobile`、`desktop` 或 `server` |
+
+### 请求体
+
+| 字段 | 类型 | 必需 | 描述 |
+|-------|------|----------|-------------|
+| `email` | string | 是 | 用户电子邮件地址 |
+| `password` | string | 是 | 密码（必须符合配置的要求） |
+| `name` | string | 否 | 用户显示名称 |
+| `redirectTo` | string | 否 | 用于基于链接的电子邮件验证。电子邮件链接始终先打开 InsForge 后端端点；令牌验证后，InsForge 将浏览器重定向到此 URL 并显示验证结果。当 `verifyEmailMethod` 为 `link` 时需要。此 URL 必须包含在 `allowedRedirectUrls` 中。推荐：使用您的应用的登录页面。 |
+
+### 示例（Web 客户端）
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/users" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123",
+    "name": "John Doe",
+    "redirectTo": "http://localhost:3000/sign-in"
+  }'
+```
+
+### 示例（非 Web 客户端）
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/users?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123",
+    "name": "John Doe",
+    "redirectTo": "myapp://sign-in"
+  }'
+```
+
+### 响应（Web 客户端）
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": false,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123...",
+  "requireEmailVerification": false
+}
+```
+
+### 响应（非 Web 客户端）
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": false,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
+  "requireEmailVerification": false
+}
+```
+
+<Note>
+- 对于 **Web 客户端**：返回 `csrfToken`，刷新令牌存储在 httpOnly Cookie 中。
+- 对于 **非 Web 客户端**（`mobile`、`desktop`、`server`）：直接在响应中返回 `refreshToken`。安全地将其存储在您的客户端或服务器运行时中。
+- 使用 **`server`** 用于受信任的服务器端调用者，例如 SSR 应用、BFF 或无法依赖浏览器 Cookie 的 CLI。
+- 如果 `requireEmailVerification` 为 `true`，`accessToken` 和令牌将为 `null`，用户必须在登录前验证其电子邮件。
+</Note>
+
+---
+
+## 登录
+
+认证用户并获取访问令牌。
+
+```
+POST /api/auth/sessions
+```
+
+### 查询参数
+
+| 参数 | 类型 | 必需 | 描述 |
+|-----------|------|----------|-------------|
+| `client_type` | string | 否 | 客户端类型：`web`（默认）、`mobile`、`desktop` 或 `server` |
+
+### 请求体
+
+| 字段 | 类型 | 必需 | 描述 |
+|-------|------|----------|-------------|
+| `email` | string | 是 | 用户电子邮件地址 |
+| `password` | string | 是 | 用户密码 |
+
+### 示例（Web 客户端）
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123"
+  }'
+```
+
+### 示例（非 Web 客户端）
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123"
+  }'
+```
+
+### 响应（Web 客户端）
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123..."
+}
+```
+
+### 响应（非 Web 客户端）
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+<Note>
+- 对于 **Web 客户端**：返回 `csrfToken`，刷新令牌存储在 httpOnly Cookie 中。调用 `/api/auth/refresh` 时在 `X-CSRF-Token` 标头中包含 `csrfToken`。
+- 对于 **非 Web 客户端**（`mobile`、`desktop`、`server`）：直接返回 `refreshToken`。安全地存储它，并在调用 `/api/auth/refresh` 时在请求体中包含它。
+</Note>
+
+---
+
+## 刷新令牌
+
+使用刷新令牌刷新访问令牌。
+
+```
+POST /api/auth/refresh
+```
+
+### 查询参数
+
+| 参数 | 类型 | 必需 | 描述 |
+|-----------|------|----------|-------------|
+| `client_type` | string | 否 | 客户端类型：`web`（默认）、`mobile`、`desktop` 或 `server` |
+
+### 标头（Web 客户端）
+
+| 标头 | 类型 | 必需 | 描述 |
+|--------|------|----------|-------------|
+| `X-CSRF-Token` | string | 是 | 从登录/注册响应接收的 CSRF 令牌 |
+
+### 请求体（非 Web 客户端）
+
+| 字段 | 类型 | 必需 | 描述 |
+|-------|------|----------|-------------|
+| `refreshToken` | string | 是 | 从登录/注册响应接收的刷新令牌 |
+
+### 示例（Web 客户端）
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/refresh" \
+  -H "X-CSRF-Token: abc123..." \
+  --cookie "refresh_token=..."
+```
+
+### 示例（非 Web 客户端）
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/refresh?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+  }'
+```
+
+### 响应（Web 客户端）
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "def456..."
+}
+```
+
+### 响应（非 Web 客户端）
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+<Note>
+令牌轮换已为安全性而实现：
+- **Web 客户端**：每次刷新都返回一个新的 `csrfToken`，该令牌必须用于后续刷新请求。
+- **非 Web 客户端**（`mobile`、`desktop`、`server`）：每次刷新都返回一个新的 `refreshToken`。您必须持久化此新令牌并将其用于下一次刷新。在内存中更新 `accessToken`。
+</Note>
+
+---
+
+## 登出
+
+登出并清除刷新令牌 Cookie。
+
+```
+POST /api/auth/logout
+```
+
+### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/logout"
+```
+
+### 响应
+
+```json
+{
+  "success": true,
+  "message": "Logged out successfully"
+}
+```
+
+---
+
+## 获取当前用户
+
+从 JWT 令牌获取当前已认证用户的信息。
+
+此 REST 端点不会自动刷新过期的访问令牌。
+
+- 对于原始 REST 客户端，在需要时调用 `POST /api/auth/refresh`。
+- 对于使用 TypeScript SDK 的浏览器应用，在启动期间调用 `auth.getCurrentUser()`。SDK 将在可以刷新会话时自动使用 httpOnly 刷新 Cookie。
+- 此自动刷新行为仅限浏览器。服务器、移动和其他非浏览器客户端应显式刷新。
+
+```
+GET /api/auth/sessions/current
+```
+
+### 示例
+
+```bash
+curl "https://your-app.insforge.app/api/auth/sessions/current" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### 响应
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "role": "authenticated"
+  }
+}
+```
+
+---
+
+## 更新个人资料
+
+更新当前用户的个人资料。
+
+```
+PATCH /api/auth/profiles/current
+```
+
+### 请求体
+
+| 字段 | 类型 | 必需 | 描述 |
+|-------|------|----------|-------------|
+| `profile` | object | 是 | 个人资料数据（名称、头像 URL、自定义字段） |
+
+### 示例
+
+```bash
+curl -X PATCH "https://your-app.insforge.app/api/auth/profiles/current" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "profile": {
+      "name": "John Doe",
+      "avatar_url": "https://example.com/avatar.jpg"
+    }
+  }'
+```
+
+### 响应
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "profile": {
+    "name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg"
+  }
+}
+```
+
+---
+
+## 获取用户个人资料
+
+按 ID 获取用户的公开个人资料信息。
+
+```
+GET /api/auth/profiles/{userId}
+```
+
+### 示例
+
+```bash
+curl "https://your-app.insforge.app/api/auth/profiles/123e4567-e89b-12d3-a456-426614174000"
+```
+
+### 响应
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "profile": {
+    "name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg"
+  }
+}
+```
+
+---
+
+## 电子邮件验证
+
+### 发送验证电子邮件
+
+```
+POST /api/auth/email/send-verification
+```
+
+### 请求体
+
+| 字段 | 类型 | 必需 | 描述 |
+|-------|------|----------|-------------|
+| `email` | string | 是 | 用户电子邮件地址 |
+| `redirectTo` | string | 否 | 用于基于链接的电子邮件验证。电子邮件链接始终先打开 InsForge 后端端点；令牌验证后，InsForge 将浏览器重定向到此 URL 并显示验证结果。当 `verifyEmailMethod` 为 `link` 时需要。此 URL 必须包含在 `allowedRedirectUrls` 中。推荐：使用您的应用的登录页面。 |
+
+### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-verification" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "redirectTo": "http://localhost:3000/sign-in"
+  }'
+```
+
+### 响应
+
+```json
+{
+  "success": true,
+  "message": "If your email is registered, we have sent you a verification code/link."
+}
+```
+
+### 验证电子邮件
+
+```
+POST /api/auth/email/verify
+```
+
+### 查询参数
+
+| 参数 | 类型 | 必需 | 描述 |
+|-----------|------|----------|-------------|
+| `client_type` | string | 否 | 客户端类型：`web`（默认）、`mobile`、`desktop` 或 `server` |
+
+### 请求体
+
+| 字段 | 类型 | 必需 | 描述 |
+|-------|------|----------|-------------|
+| `email` | string | 是 | 用户电子邮件地址 |
+| `otp` | string | 是 | 6 位验证码 |
+
+对于基于链接的验证，电子邮件点击使用：
+
+```
+GET /api/auth/email/verify-link?token=...
+```
+
+该面向浏览器的 GET 流在后端验证令牌并重定向到存储的 `redirectTo` URL。`POST /api/auth/email/verify` 是用于 6 位代码提交的 JSON API。
+
+像这样处理浏览器重定向：
+
+- 成功：`?insforge_status=success&insforge_type=verify_email`
+- 错误：`?insforge_status=error&insforge_type=verify_email&insforge_error=...`
+- `insforge_status`：浏览器链接流的结果。对于验证，值为 `success` 或 `error`。
+- `insforge_type`：流标识符。对于验证链接，这始终是 `verify_email`。
+- `insforge_error`：仅当 `insforge_status=error` 时出现。可显示或记录的人类可读错误消息。
+- 推荐处理：使用您的登录页面作为 `redirectTo`。当 `insforge_status=success` 时，显示确认消息并要求用户使用其电子邮件和密码登录。
+- 如果 `redirectTo` 未被允许列表，InsForge 会返回 `400` 错误，其消息包括被拒绝的 URL，`nextActions` 告诉您将其添加到 `allowedRedirectUrls`。
+
+### 示例（Web 客户端）
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/verify" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "otp": "123456"
+  }'
+```
+
+### 示例（非 Web 客户端）
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/verify?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "otp": "123456"
+  }'
+```
+
+### 响应（Web 客户端）
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123..."
+}
+```
+
+### 响应（非 Web 客户端）
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+---
+
+## 密码重置
+
+### 发送重置电子邮件
+
+```
+POST /api/auth/email/send-reset-password
+```
+
+### 请求体
+
+| 字段 | 类型 | 必需 | 描述 |
+|-------|------|----------|-------------|
+| `email` | string | 是 | 用户电子邮件地址 |
+| `redirectTo` | string | 否 | 用于基于链接的密码重置。电子邮件链接始终先打开 InsForge 后端端点；InsForge 然后将浏览器重定向到此 URL，并在查询字符串中包含重置 `token`，以便您的应用可以呈现其自己的重置密码页面。当 `resetPasswordMethod` 为 `link` 时需要。此 URL 必须包含在 `allowedRedirectUrls` 中。推荐：使用您的应用的专用重置密码页面。 |
+
+### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-reset-password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "redirectTo": "http://localhost:3000/reset-password"
+  }'
+```
+
+### 交换代码获取令牌（仅代码方法）
+
+```
+POST /api/auth/email/exchange-reset-password-token
+```
+
+### 请求体
+
+| 字段 | 类型 | 必需 | 描述 |
+|-------|------|----------|-------------|
+| `email` | string | 是 | 用户电子邮件地址 |
+| `code` | string | 是 | 电子邮件中的 6 位代码 |
+
+### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/exchange-reset-password-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "code": "123456"
+  }'
+```
+
+### 响应
+
+```json
+{
+  "token": "abc123...",
+  "expiresAt": "2024-01-15T11:00:00Z"
+}
+```
+
+### 重置密码
+
+```
+POST /api/auth/email/reset-password
+```
+
+对于基于链接的密码重置，电子邮件点击使用：
+
+```
+GET /api/auth/email/reset-password-link?token=...
+```
+
+该面向浏览器的 GET 流在后端验证令牌并重定向到存储的 `redirectTo` URL，查询字符串中包含重置令牌。`POST /api/auth/email/reset-password` 仍然是接受新密码的 JSON API。
+
+像这样处理浏览器重定向：
+
+- 准备重置：`?token=...&insforge_status=ready&insforge_type=reset_password`
+- 错误：`?insforge_status=error&insforge_type=reset_password&insforge_error=...`
+- `token`：仅当 `insforge_status=ready` 时出现。将此值作为 `otp` 传递给 `POST /api/auth/email/reset-password`。
+- `insforge_status`：浏览器链接流的结果。对于重置链接，值为 `ready` 或 `error`。
+- `insforge_type`：流标识符。对于重置链接，这始终是 `reset_password`。
+- `insforge_error`：仅当 `insforge_status=error` 时出现。可显示或记录的人类可读错误消息。
+- 您的应用应仅在 `insforge_status=ready` 和 `token` 存在时呈现重置密码表单。
+
+### 请求体
+
+| 字段 | 类型 | 必需 | 描述 |
+|-------|------|----------|-------------|
+| `newPassword` | string | 是 | 新密码 |
+| `otp` | string | 是 | 来自代码交换端点或魔法链接 URL 的重置令牌 |
+
+### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/reset-password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "newPassword": "newSecurePassword123",
+    "otp": "abc123..."
+  }'
+```
+
+### 响应
+
+```json
+{
+  "message": "Password reset successfully"
+}
+```
+
+---
+
+## OAuth 认证
+
+OAuth 认证现在使用 PKCE（代码交换证明密钥）流以增强安全性。不是直接在重定向 URL 中返回令牌，而是返回必须使用授权码交换令牌的授权码。
+
+### 启动 OAuth 流
+
+```
+GET /api/auth/oauth/{provider}
+```
+
+对于在仪表板中配置的自定义提供程序，使用：
+
+```
+GET /api/auth/oauth/custom/{key}
+```
+
+### 查询参数
+
+| 参数 | 类型 | 必需 | 描述 |
+|-----------|------|----------|-------------|
+| `redirect_uri` | string | 是 | 认证后要重定向到的 URL |
+| `code_challenge` | string | 是 | PKCE 代码挑战（Base64 URL 编码的代码验证器的 SHA256 哈希） |
+| 其他字符串查询参数 | string | 否 | 提供程序特定的 OAuth 提示，例如 Google 的 `prompt=select_account` |
+
+<Note>
+  仅当额外的查询参数与服务器拥有的 OAuth 字段不冲突时，才会将其作为提供程序特定的提示转发。不要传递 `client_id`、`redirect_uri`、`code_challenge`、`state`、`response_type` 或 `scope`；InsForge/提供程序生成的值获胜，冲突的客户端值被忽略。
+</Note>
+
+### 支持的提供程序
+
+- `google`
+- `github`
+- `discord`
+- `linkedin`
+- `facebook`
+- `apple`
+- `microsoft`
+- `x`
+- `spotify`
+- 由 `GET /api/auth/public-config` 在 `customOAuthProviders` 中返回的任何自定义提供程序密钥
+
+### 示例
+
+```bash
+# Generate code_verifier (random string, 43-128 characters)
+CODE_VERIFIER=$(openssl rand -base64 32 | tr -d '=' | tr '/+' '_-')
+
+# Generate code_challenge (SHA256 hash of code_verifier, Base64 URL-encoded)
+CODE_CHALLENGE=$(echo -n $CODE_VERIFIER | openssl dgst -sha256 -binary | base64 | tr -d '=' | tr '/+' '_-')
+
+curl "https://your-app.insforge.app/api/auth/oauth/google?redirect_uri=https://myapp.com/callback&code_challenge=$CODE_CHALLENGE&prompt=select_account"
+```
+
+```bash
+# Custom provider example
+curl "https://your-app.insforge.app/api/auth/oauth/custom/acme?redirect_uri=https://myapp.com/callback&code_challenge=$CODE_CHALLENGE"
+```
+
+### 响应
+
+```json
+{
+  "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?client_id=..."
+}
+```
+
+### OAuth 回调
+
+用户使用提供程序认证后，他们将被重定向到您的 `redirect_uri`，并带上授权码：
+
+```
+https://myapp.com/callback?insforge_code=abc123...
+```
+
+<Note>
+`insforge_code` 是一个临时授权码，必须使用 `/api/auth/oauth/exchange` 端点交换为令牌。
+</Note>
+
+---
+
+### 交换代码获取令牌
+
+交换授权码获取访问令牌和刷新令牌。
+
+```
+POST /api/auth/oauth/exchange
+```
+
+### 查询参数
+
+| 参数 | 类型 | 必需 | 描述 |
+|-----------|------|----------|-------------|
+| `client_type` | string | 否 | 客户端类型：`web`（默认）、`mobile`、`desktop` 或 `server` |
+
+### 请求体
+
+| 字段 | 类型 | 必需 | 描述 |
+|-------|------|----------|-------------|
+| `code` | string | 是 | 回调中接收的 `insforge_code` |
+| `code_verifier` | string | 是 | 用于生成 code_challenge 的原始 code_verifier |
+
+### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/oauth/exchange?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "abc123...",
+    "code_verifier": "your-original-code-verifier"
+  }'
+```
+
+### 响应
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["google"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+<Note>
+- 对于 **Web 客户端**：`refreshToken` 将为 `null`，并返回 `csrfToken`。刷新令牌存储在 httpOnly Cookie 中。
+- 对于 **非 Web 客户端**（`mobile`、`desktop`、`server`）：直接返回 `refreshToken`。安全地存储它。
+</Note>
+
+---
+
+### 完整 OAuth 流示例（非 Web）
+
+```swift
+// 1. Generate PKCE code verifier and challenge
+let codeVerifier = generateRandomString(length: 43)
+let codeChallenge = sha256(codeVerifier).base64URLEncoded()
+
+// 2. Initiate OAuth flow
+let authURL = "https://your-app.insforge.app/api/auth/oauth/google" +
+    "?redirect_uri=myapp://callback" +
+    "&code_challenge=\(codeChallenge)"
+
+// 3. Open browser/WebView and wait for callback
+// User completes authentication...
+
+// 4. Handle callback with insforge_code
+// myapp://callback?insforge_code=abc123...
+
+// 5. Exchange code for tokens
+let response = POST("/api/auth/oauth/exchange?client_type=mobile", body: {
+    "code": insforgeCode,
+    "code_verifier": codeVerifier
+})
+
+// 6. Store tokens
+accessToken = response.accessToken
+refreshToken = response.refreshToken  // Persist securely
+```
+
+---
+
+## 公开配置
+
+获取公开认证设置（无需认证）。
+
+```
+GET /api/auth/public-config
+```
+
+### 示例
+
+```bash
+curl "https://your-app.insforge.app/api/auth/public-config"
+```
+
+### 响应
+
+```json
+{
+  "oAuthProviders": ["google", "github"],
+  "customOAuthProviders": ["acme"],
+  "requireEmailVerification": true,
+  "passwordMinLength": 8,
+  "requireNumber": true,
+  "requireLowercase": true,
+  "requireUppercase": false,
+  "requireSpecialChar": false,
+  "verifyEmailMethod": "code",
+  "resetPasswordMethod": "link"
+}
+```
+
+---
+
+## 管理员端点
+
+这些端点需要 `project_admin` 角色。
+
+### 列出所有用户
+
+```
+GET /api/auth/users?offset=0&limit=10&search=john
+```
+
+### 按 ID 获取用户
+
+```
+GET /api/auth/users/{userId}
+```
+
+### 删除用户
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/auth/users" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"userIds": ["user-id-1", "user-id-2"]}'
+```
+
+### 生成匿名令牌
+
+```
+POST /api/auth/tokens/anon
+```
+
+### 获取认证配置
+
+获取当前认证设置（仅管理员）。
+
+```
+GET /api/auth/config
+```
+
+#### 示例
+
+```bash
+curl "https://your-app.insforge.app/api/auth/config" \
+  -H "Authorization: Bearer admin-jwt-token"
+```
+
+#### 响应
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "requireEmailVerification": true,
+  "passwordMinLength": 8,
+  "requireNumber": true,
+  "requireLowercase": true,
+  "requireUppercase": false,
+  "requireSpecialChar": false,
+  "verifyEmailMethod": "code",
+  "resetPasswordMethod": "link",
+  "allowedRedirectUrls": ["https://myapp.com/dashboard", "https://*.myapp.com"],
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z"
+}
+```
+
+`allowedRedirectUrls` 条目与完整的 `redirectTo` 值匹配，包括方案、主机、可选端口和路径。
+
+- 精确条目必须完全匹配，例如 `https://myapp.com/dashboard`。
+- 通配符仅在主机部分支持，例如 `https://*.myapp.com/callback`。
+- 深层链接在明确列出时允许，例如 `com.example.app:/oauth2redirect` 或 `myapp://auth/callback`。
+- 如果 `allowedRedirectUrls` 为空，InsForge 允许所有重定向以方便开发者。这对生产不安全，应在本地开发之外避免。
+
+### 更新认证配置
+
+更新认证设置（仅管理员）。
+
+```
+PUT /api/auth/config
+```
+
+#### 请求体
+
+| 字段 | 类型 | 必需 | 描述 |
+|-------|------|----------|-------------|
+| `requireEmailVerification` | boolean | 否 | 是否需要电子邮件验证 |
+| `passwordMinLength` | integer | 否 | 最小密码长度（4-128） |
+| `requireNumber` | boolean | 否 | 密码中需要数字 |
+| `requireLowercase` | boolean | 否 | 密码中需要小写字母 |
+| `requireUppercase` | boolean | 否 | 密码中需要大写字母 |
+| `requireSpecialChar` | boolean | 否 | 密码中需要特殊字符 |
+| `verifyEmailMethod` | string | 否 | 电子邮件验证方法（`code` 或 `link`） |
+| `resetPasswordMethod` | string | 否 | 密码重置方法（`code` 或 `link`） |
+| `allowedRedirectUrls` | array | 否 | 允许重定向 URL 的列表。条目与完整的 `redirectTo` 值匹配。精确 URL 必须完全匹配，支持主机通配符如 `https://*.domain.com/callback`，当明确列出时允许自定义深层链接如 `com.example.app:/oauth2redirect`。如果为空，允许所有重定向，这对生产不安全。 |
+
+#### 示例
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/auth/config" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "requireEmailVerification": true,
+    "passwordMinLength": 10,
+    "verifyEmailMethod": "link"
+  }'
+```
+
+### 交换管理员会话
+
+交换云提供程序授权码获取管理员会话。
+
+```
+POST /api/auth/admin/sessions/exchange
+```
+
+#### 请求体
+
+| 字段 | 类型 | 必需 | 描述 |
+|-------|------|----------|-------------|
+| `code` | string | 是 | Insforge Cloud 的授权码或 JWT |
+
+#### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/admin/sessions/exchange" \
+  -H "Content-Type: application/json" \
+  -d '{"code": "eyJhbGciOiJIUzI1NiIs..."}'
+```
+
+#### 响应
+
+```json
+{
+  "admin": {
+    "sub": "cloud:user_123"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123..."
+}
+```
+
+### 获取当前管理员会话
+
+从项目管理员访问令牌获取当前仪表板管理员会话。
+
+```
+GET /api/auth/admin/sessions/current
+```
+
+#### 响应
+
+```json
+{
+  "admin": {
+    "sub": "local:admin"
+  }
+}
+```
+
+### 刷新管理员会话
+
+刷新仪表板管理员访问令牌。此端点使用仅限仪表板的 `insforge_admin_refresh_token` httpOnly Cookie，不共享应用/用户刷新 Cookie。
+
+```
+POST /api/auth/admin/refresh
+```
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/admin/refresh" \
+  -H "X-CSRF-Token: abc123..." \
+  --cookie "insforge_admin_refresh_token=..."
+```
+
+### 登出管理员会话
+
+```
+POST /api/auth/admin/logout
+```
+
+---
+
+## 错误响应
+
+### 无效凭据 (401)
+
+```json
+{
+  "error": "INVALID_CREDENTIALS",
+  "message": "Invalid email or password",
+  "statusCode": 401,
+  "nextActions": "Check your email and password"
+}
+```
+
+### 用户已存在 (409)
+
+```json
+{
+  "error": "USER_EXISTS",
+  "message": "User with this email already exists",
+  "statusCode": 409,
+  "nextActions": "Use a different email or sign in"
+}
+```
+
+### 电子邮件未验证 (403)
+
+```json
+{
+  "error": "EMAIL_NOT_VERIFIED",
+  "message": "Please verify your email before signing in",
+  "statusCode": 403,
+  "nextActions": "Check your inbox for verification email"
+}
+```

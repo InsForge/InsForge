@@ -1,0 +1,254 @@
+---
+title: Referencia de SDK de Almacenamiento
+description: Carga, descarga y gestión de archivos con el SDK de TypeScript para InsForge
+---
+
+## Instalación
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## from()
+
+Obtén una instancia de bucket para operaciones de archivo.
+
+### Parámetros
+
+- `bucketName` (string, required) - Nombre del bucket de almacenamiento
+
+### Devoluciones
+
+```typescript
+StorageBucket // Instance with upload, uploadAuto, download, remove methods
+```
+
+### Ejemplo
+
+```javascript
+const bucket = insforge.storage.from('images')
+```
+
+---
+
+## upload()
+
+Carga un archivo con una ruta/clave específica.
+
+### Parámetros
+
+- `path` (string, required) - La clave/ruta del objeto para el archivo
+- `file` (File | Blob, required) - Archivo o Blob a cargar
+
+### Devoluciones
+
+```typescript
+{
+  data: {
+    bucket: string,
+    key: string,
+    size: number,
+    mimeType: string,
+    uploadedAt: string,
+    url: string
+  } | null,
+  error: Error | null
+}
+```
+
+<Warning>
+Si existe un archivo con la misma clave, el backend lo renombra automáticamente. Siempre usa la `key` y `url` devueltas.
+</Warning>
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.storage
+  .from('images')
+  .upload('posts/post-123/cover.jpg', fileObject)
+
+// Save BOTH url and key to database
+await insforge.database
+  .from('posts')
+  .update({
+    image_url: data.url,
+    image_key: data.key  // Save key for download/delete operations
+  })
+  .eq('id', 'post-123')
+```
+
+### Salida
+
+```json
+{
+  "data": {
+    "bucket": "images",
+    "key": "posts/post-123/cover.jpg",
+    "size": 45678,
+    "mimeType": "image/jpeg",
+    "uploadedAt": "2024-01-15T10:30:00Z",
+    "url": "https://your-app.region.insforge.app/api/storage/buckets/images/objects/posts%2Fpost-123%2Fcover.jpg"
+  },
+  "error": null
+}
+```
+
+---
+
+## uploadAuto()
+
+Carga un archivo con una clave única generada automáticamente.
+
+### Parámetros
+
+- `file` (File | Blob, required) - Archivo o Blob a cargar
+
+### Devoluciones
+
+```typescript
+{
+  data: {
+    bucket: string,
+    key: string,
+    size: number,
+    mimeType: string,
+    uploadedAt: string,
+    url: string
+  } | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.storage
+  .from('uploads')
+  .uploadAuto(fileObject)
+
+// Save url and key to database
+await insforge.database
+  .from('posts')
+  .insert([{
+    image_url: data.url,
+    image_key: data.key,  // Save key for download/delete operations
+    user_id: userId
+  }])
+```
+
+### Salida
+
+```json
+{
+  "data": {
+    "bucket": "uploads",
+    "key": "myfile-1705315200000-abc123.jpg",
+    "size": 45678,
+    "mimeType": "image/jpeg",
+    "uploadedAt": "2024-01-15T10:30:00Z",
+    "url": "https://your-app.region.insforge.app/api/storage/buckets/uploads/objects/myfile-1705315200000-abc123.jpg"
+  },
+  "error": null
+}
+```
+
+---
+
+## download()
+
+Descarga un archivo como Blob.
+
+### Parámetros
+
+- `path` (string, required) - La clave/ruta del objeto a descargar
+
+### Devoluciones
+
+```typescript
+{
+  data: Blob | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+// 1. Get the file key from your database
+const { data: post, error: dbError } = await insforge.database
+  .from('posts')
+  .select('image_key')
+  .eq('id', 'post-123')
+  .single()
+
+// 2. Download the file using the key
+const { data: blob, error } = await insforge.storage
+  .from('images')
+  .download(post.image_key)
+
+// 3. Create download link or display image
+const url = URL.createObjectURL(blob)
+const img = document.querySelector('img')
+img.src = url
+```
+
+### Salida
+
+```json
+{
+  "data": "Blob { size: 45678, type: 'image/jpeg' }",
+  "error": null
+}
+```
+
+---
+
+## remove()
+
+Elimina un archivo del almacenamiento.
+
+### Parámetros
+
+- `path` (string, required) - La clave/ruta del objeto a eliminar
+
+### Devoluciones
+
+```typescript
+{
+  data: { message: string } | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+// 1. Get the file key from your database
+const { data: post, error: dbError } = await insforge.database
+  .from('posts')
+  .select('image_key')
+  .eq('id', 'post-123')
+  .single()
+
+// 2. Delete the file from storage
+const { data, error } = await insforge.storage
+  .from('images')
+  .remove(post.image_key)
+
+// 3. Clear the database reference
+await insforge.database
+  .from('posts')
+  .update({ image_url: null, image_key: null })
+  .eq('id', 'post-123')
+```
+
+### Salida
+
+```json
+{
+  "data": {
+    "message": "Object deleted successfully"
+  },
+  "error": null
+}
+```

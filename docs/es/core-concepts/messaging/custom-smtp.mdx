@@ -1,0 +1,56 @@
+---
+title: SMTP personalizado
+description: Enrutar todos los correos electrónicos salientes a través de su propio servidor SMTP
+---
+
+Cuando está habilitado, cada correo electrónico (flujos de autenticación y llamadas `emails.send()`) se enruta a través de su servidor SMTP. Apáguelo para revertir; las credenciales se conservan.
+
+## Conceptos
+
+El proveedor se resuelve en cada envío, por lo que los cambios surten efecto en la siguiente solicitud. InsForge ejecuta `transporter.verify()` antes de guardar, por lo que una configuración persistente siempre funciona. Las contraseñas se cifran en reposo con AES-256-GCM y nunca las devuelve la API.
+
+## Uso
+
+Configure SMTP en **Authentication → Email**.
+
+<Steps>
+  <Step title="Habilitar SMTP personalizado">
+    Voltee el interruptor en la tarjeta **SMTP Provider**.
+  </Step>
+  <Step title="Ingresar credenciales">
+    Host, puerto (`25`, `465`, `587`, `2525`), nombre de usuario, contraseña, correo electrónico del remitente, nombre del remitente. Las direcciones IP privadas y los certificados autofirmados se rechaza.
+  </Step>
+  <Step title="Guardar">
+    InsForge ejecuta un apretón de manos SMTP antes de persistir. Las malas credenciales fallan rápidamente.
+  </Step>
+  <Step title="Editar plantillas (opcional)">
+    La tarjeta **Email Templates** desbloquea las cuatro plantillas de autenticación.
+  </Step>
+</Steps>
+
+El encabezado `From:` siempre es el remitente configurado. Los llamadores de SDK no pueden falsificarlo.
+
+## Plantillas de correo electrónico
+
+Las plantillas se representan localmente desde `email.templates`. Las variables usan `{{ variable }}` y tienen escape HTML.
+
+| Plantilla | Cuándo envía |
+|----------|---------------|
+| `email-verification-code` | Verificación de nuevo usuario con código de 6 dígitos |
+| `email-verification-link` | Verificación de nuevo usuario con enlace que se puede hacer clic |
+| `reset-password-code` | Restablecimiento de contraseña con código de 6 dígitos |
+| `reset-password-link` | Restablecimiento de contraseña con enlace que se puede hacer clic |
+
+Variables: `{{ token }}` (plantillas de código), `{{ link }}` (plantillas de enlace, debe comenzar con `http://` o `https://`), `{{ name }}` y `{{ email }}` (todas las plantillas).
+
+## Consideraciones
+
+- **Limitación de velocidad.** **Intervalo mínimo (segundos)** limita la frecuencia por destinatario. Los envíos dentro del período de enfriamiento devuelven HTTP `429`. El valor predeterminado es `60`; `0` lo deshabilita.
+- **Protección SSRF.** Los rangos privados, loopback, link-local y NAT de operador se rechaza.
+- **Registro de auditoría.** Los cambios de configuración registran `UPDATE_SMTP_CONFIG`; las ediciones de plantilla registran `UPDATE_EMAIL_TEMPLATE`.
+
+## Más recursos
+
+- [Messaging overview](/core-concepts/messaging/overview) para el modelo de enrutamiento.
+- [nodemailer SMTP transport](https://nodemailer.com/smtp/) para opciones de conexión.
+- [Authentication overview](/core-concepts/authentication/overview) para los flujos que emiten estos correos electrónicos.

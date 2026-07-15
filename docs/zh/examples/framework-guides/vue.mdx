@@ -1,0 +1,164 @@
+---
+title: Vue
+description: 了解如何创建 InsForge 项目并使用 AI 构建 Vue 应用
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+了解如何创建 InsForge 项目，并使用 Cursor 等 AI 工具构建 Vue 应用。
+
+## 1. 创建 InsForge 项目
+
+在 [insforge.dev](https://insforge.dev) 创建一个新的 InsForge 项目。
+
+## 2. 连接 InsForge
+
+分为两部分：
+
+- **CLI 链接** — 参阅 [快速入门](/quickstart)，运行 `npx @insforge/cli link --project-id <your-project-id>`，让智能体能够读取你的项目 ID 和密钥。
+- **MCP 设置** — 参阅 [MCP 设置](/mcp-setup) 了解各编辑器（Cursor、Claude Code、Windsurf、Codex、VS Code）的配置方法。
+
+两者都配置好后，智能体就可以从你的编辑器中读取模式（schema）、运行查询并部署代码。
+
+## 3. 用一个提示词构建你的应用
+
+在 Cursor 或你的 AI 助手中，使用以下提示词：
+
+```
+Create a new Vue app with TypeScript and Vite.
+Add Tailwind CSS 3.4 for styling.
+Install the InsForge SDK and set up the client configuration.
+
+In my InsForge database, create a sports table with id and name columns.
+Add sample data: basketball, soccer, and tennis. Make it publicly readable.
+
+Create a component that fetches and displays all sports from the database.
+```
+
+你的 AI 将生成完整的应用，包括数据库设置和 UI。无需手动编写代码——AI 会为你创建一切。
+
+## 4. AI 生成的内容
+
+你的 AI 助手会自动创建如下文件。你不需要手动修改它们。
+
+**InsForge 客户端** 位于 `src/lib/insforge.ts`：
+
+```typescript src/lib/insforge.ts
+import { createClient } from '@insforge/sdk';
+
+export const insforge = createClient({
+  baseUrl: 'https://your-project.us-east.insforge.app',
+  anonKey: 'your-anon-key'
+});
+```
+
+**Sports 组件** 位于 `src/components/Sports.vue`：
+
+```vue src/components/Sports.vue
+<template>
+  <div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Sports</h1>
+
+    <div v-if="loading" class="text-center py-8">
+      <p class="text-gray-600">Loading sports...</p>
+    </div>
+
+    <div v-else-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+      <p>Error: {{ error }}</p>
+    </div>
+
+    <div v-else-if="sports && sports.length > 0" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div
+        v-for="sport in sports"
+        :key="sport.id"
+        class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+      >
+        <h2 class="text-xl font-semibold text-gray-800 capitalize">{{ sport.name }}</h2>
+        <p class="text-sm text-gray-500 mt-2">ID: {{ sport.id }}</p>
+      </div>
+    </div>
+
+    <div v-else class="text-center py-8">
+      <p class="text-gray-600">No sports found.</p>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { insforge } from '../lib/insforge';
+
+interface Sport {
+  id: string;
+  name: string;
+  created_at?: string;
+}
+
+const sports = ref<Sport[]>([]);
+const loading = ref(true);
+const error = ref<string | null>(null);
+
+const fetchSports = async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+
+    const { data, error: fetchError } = await insforge.database
+      .from('sports')
+      .select();
+
+    if (fetchError) {
+      error.value = fetchError.message || 'Failed to fetch sports';
+      return;
+    }
+
+    sports.value = data || [];
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'An unexpected error occurred';
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchSports();
+});
+</script>
+```
+
+## 5. 启动应用
+
+运行开发服务器，在浏览器中打开 [http://localhost:5173](http://localhost:5173)，你应该能看到运动项目列表。
+
+```bash
+npm run dev
+```
+
+## 下一步：用更多提示词扩展你的应用
+
+尝试使用以下提示词为你的应用添加更多功能：
+
+```
+Add a form to create new sports and save them to the database.
+Include validation and error handling.
+```
+
+```
+Add user authentication with sign up and login pages.
+Only allow authenticated users to add new sports.
+```
+
+```
+Add a favorites feature where users can mark their favorite sports.
+Store favorites in a user_favorites table with user_id and sport_id.
+```
+
+```
+Add images to each sport using InsForge Storage.
+Allow users to upload sport images and display them in the grid.
+```
+
+```
+Add an AI chat feature that can answer questions about sports.
+Use InsForge AI with streaming responses.
+```
