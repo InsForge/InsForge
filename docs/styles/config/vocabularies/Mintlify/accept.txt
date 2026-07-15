@@ -117,6 +117,7 @@ roocode
 rpcRaw
 runbook
 runtimes
+sanitization
 Schemaless
 sdk
 SDKs
@@ -126,6 +127,7 @@ Sealos
 serverless
 Sinch
 skipBrowserRedirect
+sql
 stderr
 Stytch
 subcommand
@@ -142,6 +144,7 @@ twoFactor
 typecheck
 unencrypted
 updated_at
+upsert
 upserts
 upvote
 Upvoting
