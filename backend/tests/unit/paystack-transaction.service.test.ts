@@ -257,6 +257,33 @@ describe('PaystackTransactionService', () => {
     expect(mockPoolQuery).not.toHaveBeenCalled();
   });
 
+  it('maps duplicate reference unique violations on insert to a 409 without calling the provider', async () => {
+    mockUserClientQuery.mockRejectedValueOnce({
+      code: '23505',
+      constraint: 'idx_payments_paystack_transactions_environment_reference',
+    });
+
+    await expect(
+      PaystackTransactionService.getInstance().initializeTransaction(
+        'test',
+        {
+          amount: 500000,
+          currency: 'NGN',
+          email: 'buyer@example.com',
+          reference: 'ref_duplicate_123',
+        },
+        AUTHENTICATED_USER
+      )
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: ERROR_CODES.PAYMENT_CHECKOUT_ALREADY_EXISTS,
+    });
+
+    expect(mockCreatePaystackProvider).not.toHaveBeenCalled();
+    expect(mockInitializeTransaction).not.toHaveBeenCalled();
+    expect(mockPoolQuery).not.toHaveBeenCalled();
+  });
+
   it('verifies server-side, updates the local row, and projects the shared transaction', async () => {
     const transaction = buildProviderTransaction();
     mockVerifyTransaction.mockResolvedValue(transaction);

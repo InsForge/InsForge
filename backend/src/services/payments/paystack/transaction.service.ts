@@ -8,6 +8,7 @@ import {
   addBillingSubjectToProviderAttributes,
   getBillingSubjectFromProviderAttributes,
   isPostgresPermissionError,
+  isPostgresUniqueViolationError,
 } from '@/services/payments/helpers.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
 import { toISOString, toISOStringOrNull } from '@/utils/dates.js';
@@ -33,6 +34,9 @@ import {
 } from '@insforge/shared-schemas';
 
 const PAYSTACK_TRANSACTION_METADATA_KEY = 'insforge_transaction_id';
+
+const PAYSTACK_TRANSACTION_REFERENCE_UNIQUE_INDEX =
+  'idx_payments_paystack_transactions_environment_reference';
 
 const PAYSTACK_TRANSACTION_COLUMNS = `
   id,
@@ -987,6 +991,14 @@ export class PaystackTransactionService {
         'Paystack transaction initialization is not allowed by payments.paystack_transactions RLS policies',
         403,
         ERROR_CODES.AUTH_UNAUTHORIZED
+      );
+    }
+
+    if (isPostgresUniqueViolationError(error, PAYSTACK_TRANSACTION_REFERENCE_UNIQUE_INDEX)) {
+      return new AppError(
+        'A Paystack transaction with this reference already exists in this environment',
+        409,
+        ERROR_CODES.PAYMENT_CHECKOUT_ALREADY_EXISTS
       );
     }
 
