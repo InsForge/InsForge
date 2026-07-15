@@ -311,6 +311,17 @@ describe('config.server', () => {
     expect(loadConfig().server.maxFileSize).toBe(100);
   });
 
+  it('rejects non-positive MAX_FILE_SIZE ("0") without the misleading unit-suffix hint', () => {
+    const warnSpy = spyOnWarn();
+    process.env.MAX_FILE_SIZE = '0';
+    const c = loadConfig();
+
+    expect(c.server.maxFileSize).toBeUndefined();
+    const message = warnMessages(warnSpy).find((m) => m.includes('MAX_FILE_SIZE'));
+    expect(message).toContain('must be a positive integer');
+    expect(message).not.toContain('unit suffix');
+  });
+
   it('REGRESSION: plain numeric MAX_FILE_SIZE still parses without warning', () => {
     const warnSpy = spyOnWarn();
     process.env.MAX_FILE_SIZE = '10485760';
@@ -619,6 +630,16 @@ describe('config.storage', () => {
 
   it('disables path style for case and whitespace variants of false', () => {
     for (const value of ['false', 'False', 'FALSE', ' false ']) {
+      process.env.S3_FORCE_PATH_STYLE = value;
+      expect(
+        loadConfig().storage.s3ForcePathStyle,
+        `S3_FORCE_PATH_STYLE=${JSON.stringify(value)}`
+      ).toBe(false);
+    }
+  });
+
+  it('disables path style for 0, including whitespace variants', () => {
+    for (const value of ['0', ' 0 ']) {
       process.env.S3_FORCE_PATH_STYLE = value;
       expect(
         loadConfig().storage.s3ForcePathStyle,

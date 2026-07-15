@@ -132,10 +132,16 @@ function parseStrictEnvInt<T extends number | undefined>(
 ): number | T {
   if (!val) return fallback;
   const trimmed = val.trim();
-  const parsed = /^\d+$/.test(trimmed) ? Number(trimmed) : NaN;
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+  if (!/^\d+$/.test(trimmed)) {
     console.warn(
       `Invalid ${name} value "${val}": expected a plain positive integer (bytes, no unit suffix); falling back to default.`
+    );
+    return fallback;
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    console.warn(
+      `Invalid ${name} value "${val}": must be a positive integer; falling back to default.`
     );
     return fallback;
   }
@@ -234,9 +240,12 @@ export function loadConfig(): AppConfig {
       awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID || undefined,
       awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || undefined,
       s3EndpointUrl: process.env.S3_ENDPOINT_URL || undefined,
-      // Default true (MinIO etc.). Set S3_FORCE_PATH_STYLE=false for providers
-      // that require virtual-hosted-style addressing (Tencent COS, Aliyun OSS).
-      s3ForcePathStyle: (process.env.S3_FORCE_PATH_STYLE ?? '').trim().toLowerCase() !== 'false',
+      // Default true (MinIO etc.). Set S3_FORCE_PATH_STYLE=false (or 0) for
+      // providers that require virtual-hosted-style addressing (Tencent COS,
+      // Aliyun OSS).
+      s3ForcePathStyle: !['false', '0'].includes(
+        (process.env.S3_FORCE_PATH_STYLE ?? '').trim().toLowerCase()
+      ),
       awsConfigBucket: process.env.AWS_CONFIG_BUCKET || 'insforge-config',
       awsConfigRegion: process.env.AWS_CONFIG_REGION || 'us-east-2',
       maxS3UploadSize: parseEnvBytes(process.env.S3_MAX_OBJECT_SIZE_BYTES, 5 * 1024 * 1024 * 1024),
