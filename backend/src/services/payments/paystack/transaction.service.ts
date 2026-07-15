@@ -6,7 +6,6 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { PaystackConfigService } from '@/services/payments/paystack/config.service.js';
 import {
   addBillingSubjectToProviderAttributes,
-  getBillingSubjectFromProviderAttributes,
   isPostgresPermissionError,
   isPostgresUniqueViolationError,
 } from '@/services/payments/helpers.js';
@@ -241,8 +240,12 @@ export class PaystackTransactionService {
   ): Promise<PaystackPaymentTransactionStatus> {
     const status = this.mapChargeTransactionStatus(transaction.status);
     const metadata = this.normalizeMetadata(transaction.metadata);
+    // Subject attribution must come from the bound local row (directly via
+    // the caller's fallback, or looked up by the bound local id) — never from
+    // the charge's own metadata. A signed charge proves account authenticity,
+    // not row ownership: unbound charges carrying insforge_subject_* keys
+    // must not attribute the ledger row to that subject.
     const subject =
-      getBillingSubjectFromProviderAttributes(metadata) ??
       options.subjectFallback ??
       (await this.resolveSubjectFromTransactionRow(
         client,

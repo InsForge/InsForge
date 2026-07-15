@@ -284,6 +284,40 @@ describe('PaystackTransactionService', () => {
     expect(mockPoolQuery).not.toHaveBeenCalled();
   });
 
+  it('does not attribute an unbound charge to the subject claimed in its provider metadata', async () => {
+    // A signed charge proves account authenticity, not row ownership: a charge
+    // whose metadata carries insforge_subject_* keys but no matching bound
+    // local transaction must project into the ledger with NO subject.
+    const transaction = buildProviderTransaction({
+      metadata: {
+        insforge_subject_type: 'team',
+        insforge_subject_id: 'team_victim',
+        insforge_transaction_id: 'foreign_txn_999',
+      },
+    });
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // bound-row subject lookup finds nothing
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }); // ledger upsert
+
+    await PaystackTransactionService.getInstance().upsertChargeTransaction('test', transaction, {
+      subjectFallback: null,
+      customerEmailFallback: null,
+    });
+
+    expect(mockPoolQuery).toHaveBeenNthCalledWith(
+      1,
+      expect.stringMatching(/SELECT subject_type AS "type"[\s\S]*AND id = \$3/i),
+      ['test', 'ps_ref_123', 'foreign_txn_999']
+    );
+    const upsertCall = mockPoolQuery.mock.calls.find(([sql]) =>
+      /INSERT INTO payments\.transactions/i.test(String(sql))
+    );
+    expect(upsertCall).toBeDefined();
+    const params = upsertCall?.[1] as unknown[];
+    expect(params[7]).toBeNull();
+    expect(params[8]).toBeNull();
+  });
+
   it('verifies server-side, updates the local row, and projects the shared transaction', async () => {
     const transaction = buildProviderTransaction();
     mockVerifyTransaction.mockResolvedValue(transaction);
