@@ -25,6 +25,37 @@ description: "Answers to common questions about how InsForge works."
     Quick rule: just moving data in and out? That's the database (auto REST). Writing logic that runs and finishes? Edge function. Need something running all the time? Custom compute.
   </Accordion>
 
+  <Accordion title="How do I query a table in a schema other than `public`?">
+    By default all of your tables live in `public`. You only have another schema if you created one yourself with `CREATE SCHEMA` (InsForge's own internal schemas, like `auth` and `storage`, are hidden and can't be queried this way). Once you have one, you can read and write it from the dashboard, the REST API, and the CLI. The one place that only sees `public` today is the `@insforge/sdk` query builder.
+
+    The examples below use a schema you created called `my_schema`.
+
+    **Dashboard.** Open **Database** and use the schema selector at the top of the sidebar. Any schema you created is listed alongside `public`, and picking it browses that schema's tables.
+
+    **REST API.** The records endpoint takes the target schema either as a query param or as a PostgREST profile header:
+
+    ```bash
+    # query param
+    curl "$PROJECT_URL/api/database/records/mytable?schema=my_schema" \
+      -H "Authorization: Bearer $TOKEN"
+
+    # or a profile header: Accept-Profile for reads, Content-Profile for writes and RPC
+    curl "$PROJECT_URL/api/database/records/mytable" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Accept-Profile: my_schema"
+    ```
+
+    **CLI.** Use raw SQL and schema-qualify the table:
+
+    ```bash
+    insforge db query "SELECT * FROM my_schema.mytable"
+    ```
+
+    **SDK.** `client.database.from('mytable')` always targets `public` and there is no schema option yet, so for another schema call the REST endpoint above directly (with the `?schema=` param or the `Accept-Profile` / `Content-Profile` header) instead of the query builder.
+
+    One thing to check either way: the schema is reachable, but the `anon` and `authenticated` roles still need privileges on it. If reads come back empty or denied, grant access and add RLS, for example `GRANT USAGE ON SCHEMA my_schema TO authenticated;` plus the table grants and policies. Tables you created as the project admin are owned by it and work without extra grants.
+  </Accordion>
+
   <Accordion title="How do I share a project with another admin, or invite a teammate?">
     Access is shared at the **organization** level, not per project. You invite someone to the organization that owns your projects, and they get access to every project inside it. There is no separate "share just this one project" flow.
 
