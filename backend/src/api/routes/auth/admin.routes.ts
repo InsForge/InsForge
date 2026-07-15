@@ -1,8 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { AuthRequest, verifyToken } from '@/api/middlewares/auth.js';
-import { TokenManager } from '@/infra/security/token.manager.js';
-import { assertLogoutCsrf } from './logout-csrf.js';
+import { TokenManager, type RefreshTokenPayload } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import {
@@ -125,11 +124,7 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
       throw new AppError('Invalid admin refresh session type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
-    if (!tokenManager.verifyCsrfToken(csrfHeader, payload)) {
-      logger.warn('[Auth:AdminRefresh] CSRF token validation failed');
-      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.FORBIDDEN);
-    }
+    tokenManager.assertCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:AdminRefresh');
 
     const newAccessToken = tokenManager.generateAccessToken({
       sub: payload.sub,
@@ -157,7 +152,20 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
 // POST /api/auth/admin/logout - Logout dashboard session
 router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
   try {
-    assertLogoutCsrf(req, ADMIN_REFRESH_TOKEN_COOKIE_NAME, 'admin', 'Auth:AdminLogout');
+    const refreshToken = req.cookies?.[ADMIN_REFRESH_TOKEN_COOKIE_NAME];
+
+    if (refreshToken) {
+      const tokenManager = TokenManager.getInstance();
+      let payload: RefreshTokenPayload | null = null;
+      try {
+        payload = tokenManager.verifyRefreshToken(refreshToken);
+      } catch {
+        // Stale or invalid cookie: fall through and clear it idempotently.
+      }
+      if (payload?.sessionType === 'admin') {
+        tokenManager.assertCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:AdminLogout');
+      }
+    }
 
     clearAdminRefreshTokenCookie(res);
 

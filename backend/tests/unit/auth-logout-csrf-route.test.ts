@@ -88,6 +88,14 @@ vi.mock('@/infra/security/token.manager.js', () => ({
     getInstance: () => ({
       verifyRefreshToken: mocks.verifyRefreshToken,
       verifyCsrfToken: mocks.verifyCsrfToken,
+      // Mirrors the real assertCsrfToken so tests exercise the routes' branching
+      // while CSRF acceptance stays controlled through mocks.verifyCsrfToken.
+      assertCsrfToken: vi.fn((csrfHeader: unknown, payload: unknown) => {
+        const csrfToken = typeof csrfHeader === 'string' ? csrfHeader : undefined;
+        if (!mocks.verifyCsrfToken(csrfToken, payload)) {
+          throw new AppError('Invalid CSRF token', 403, ERROR_CODES.FORBIDDEN);
+        }
+      }),
       generateAccessToken: vi.fn(),
       generateRefreshToken: vi.fn(),
       generateRefreshTokenWithCsrf: vi.fn(),

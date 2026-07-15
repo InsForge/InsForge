@@ -135,3 +135,39 @@ describe('TokenManager refresh CSRF tokens', () => {
     expect(payload.email).toBeUndefined();
   });
 });
+
+describe('TokenManager assertCsrfToken', () => {
+  const tokenManager = TokenManager.getInstance();
+
+  function expectForbidden(fn: () => void): void {
+    let caught: unknown;
+    try {
+      fn();
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(AppError);
+    expect((caught as AppError).statusCode).toBe(403);
+    expect((caught as AppError).code).toBe('FORBIDDEN');
+  }
+
+  it('accepts a matching CSRF header', () => {
+    const payload = tokenManager.verifyRefreshToken(
+      tokenManager.generateRefreshToken('user-assert-1', 'user')
+    );
+    const csrfToken = tokenManager.generateCsrfToken(payload);
+
+    expect(() => tokenManager.assertCsrfToken(csrfToken, payload, 'Test')).not.toThrow();
+  });
+
+  it('throws 403 FORBIDDEN for missing, mismatched, or multi-valued headers', () => {
+    const payload = tokenManager.verifyRefreshToken(
+      tokenManager.generateRefreshToken('user-assert-2', 'user')
+    );
+    const csrfToken = tokenManager.generateCsrfToken(payload);
+
+    expectForbidden(() => tokenManager.assertCsrfToken(undefined, payload, 'Test'));
+    expectForbidden(() => tokenManager.assertCsrfToken('wrong-token', payload, 'Test'));
+    expectForbidden(() => tokenManager.assertCsrfToken([csrfToken, csrfToken], payload, 'Test'));
+  });
+});
