@@ -25,6 +25,46 @@ description: "關於 InsForge 運作方式的常見問題解答。"
     一句話判斷：只是讀寫資料，就走資料庫（自動 REST）；要寫一段跑完就結束的邏輯，用 Edge Function；要一直執行，用 Custom Compute。
   </Accordion>
 
+  <Accordion title="怎麼查詢 public 以外 schema 裡的表？">
+    預設你所有的表都在 `public` 裡。只有當你自己用 `CREATE SCHEMA` 建過別的 schema，才會有非 `public` 的 schema（InsForge 自己的內部 schema，例如 `auth`、`storage`，是隱藏的，沒辦法這樣查）。一旦有了，dashboard、REST API、CLI 都能讀寫它。目前唯一只認 `public` 的是 `@insforge/sdk` 的查詢建構器。
+
+    下面的例子用一個你自己建立、名叫 `my_schema` 的 schema。
+
+    **Dashboard。** 打開 **Database**，用側邊欄頂部的 schema 選擇器。你建的任何 schema 都會和 `public` 並列出現，選中它就能瀏覽該 schema 下的表。
+
+    **REST API。** records 介面既接受 query 參數，也接受 PostgREST 的 profile header。讀用 `Accept-Profile`，寫和 RPC 用 `Content-Profile`：
+
+    ```bash
+    # 讀：?schema= 參數，或 Accept-Profile header
+    curl "$PROJECT_URL/api/database/records/mytable?schema=my_schema" \
+      -H "Authorization: Bearer $TOKEN"
+
+    # 寫：帶上 Content-Profile
+    curl -X POST "$PROJECT_URL/api/database/records/mytable" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Profile: my_schema" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "hello"}'
+    ```
+
+    **CLI。** CLI 用 `db query` 就能讀寫任意 schema，把表名加上 schema 前綴即可：
+
+    ```bash
+    insforge db query "SELECT * FROM my_schema.mytable"
+    ```
+
+    **SDK。** `client.database.from('mytable')` 永遠指向 `public`，目前沒有指定 schema 的選項，所以要存取別的 schema，請直接呼叫上面的 REST 介面（用 `?schema=` 參數，或 `Accept-Profile` / `Content-Profile` header），而不是用查詢建構器。
+
+    不管走哪條路，存取 API 都還有一步：自建 schema 只是「可路由」，不等於「可讀」。在你顯式授權之前，`anon` 和 `authenticated` 角色對它沒有任何權限，跟表的 owner 是誰無關，所以授權前呼叫只會回傳空結果或權限不足。給你要開放的每個角色授權，再加 RLS：
+
+    ```sql
+    GRANT USAGE ON SCHEMA my_schema TO anon, authenticated;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA my_schema TO anon, authenticated;
+    ```
+
+    之後列級可見性照常由 RLS 控制。project_admin 擁有表，只是讓它能管理並直接查詢這些表（例如在 dashboard 的 SQL 編輯器裡），並不會給 API 角色存取權限。
+  </Accordion>
+
   <Accordion title="怎麼把專案分享給另一個管理員，或者邀請隊友？">
     存取權限是按 **organization（組織）** 共享的，不是按單個 project。你是把人邀請進擁有這些 project 的組織，他就能存取組織下的所有 project，沒有「只分享某一個 project」的入口。
 
@@ -58,5 +98,34 @@ description: "關於 InsForge 運作方式的常見問題解答。"
     - 如果是因為 organization 超出用量而暫停，需要 **Upgrade to Pro** 才能恢復。
 
     還是卡住？到我們的 [Discord](https://discord.com/invite/DvBtaEc9Jz) 提問，回應最快。
+  </Accordion>
+
+  <Accordion title="不打開瀏覽器，怎麼幫 CLI 登入驗證？">
+    `npx @insforge/cli login` 會打開瀏覽器登入。在無介面機器、遠端伺服器或 CI 上，改用 user API key，不需要瀏覽器。
+
+    最快的方式是用 dashboard 裡的 setup prompt，它會幫你登入並關聯好專案：
+
+    <Steps>
+      <Step title="打開 Install 頁">
+        在 dashboard 裡打開你的專案，進入 **Install** 頁。
+      </Step>
+      <Step title="選擇你的 coding agent">
+        在 **Install in Agent** 下點你在用的 agent，然後切到 **CLI** 分頁。
+      </Step>
+      <Step title="複製 prompt">
+        複製 setup prompt 貼給你的 agent，它會一步搞定登入和專案關聯。
+      </Step>
+    </Steps>
+
+    這個 prompt 會填好一條限定到你帳號的登入命令，後面跟著關聯命令：
+
+    ```bash
+    npx @insforge/cli login --user-api-key <your-user-api-key>
+    npx @insforge/cli link --project-id <your-project-id>
+    ```
+
+    如果你只需要那把 key（例如在 CI 裡跑 CLI），打開帳號選單，進入 **Profile → API Keys**，建立一把 key（設個有效期，或選 **Never**）。把它存成 CI secret，再用它跑 `login --user-api-key`。加上 `--json` 可以得到機器可讀的輸出。
+
+    這把 key 擁有你帳號的完整權限，所以要保密，一旦外洩就輪換掉。
   </Accordion>
 </AccordionGroup>
