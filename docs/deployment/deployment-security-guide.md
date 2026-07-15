@@ -5,6 +5,10 @@ description: "Deploy InsForge on a generic Linux VPS, harden it with firewall, S
 
 # Deployment & Security Guide for VPS Installation
 
+<Note>
+  **This deploys the InsForge platform itself onto your own server (self-hosting), not the app you built.** If you just want to take your app live, use [Sites](/core-concepts/sites/overview) instead. Read on only if you want to run the InsForge backend on infrastructure you control.
+</Note>
+
 This comprehensive guide covers deploying InsForge on a generic VPS (Virtual Private Server) for production, hardening your instance with security best practices, and maintaining it over time with safe updates and rollback procedures.
 
 > **Scope**: This guide is provider-agnostic. It works on any Linux VPS — Ubuntu/Debian recommended — from providers such as DigitalOcean, Hetzner, Linode, Vultr, OVH, or a bare-metal server. For cloud-specific guides (AWS EC2, GCP, Azure, Render), see the other guides in this section.

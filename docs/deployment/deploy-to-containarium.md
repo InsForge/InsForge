@@ -1,11 +1,15 @@
 ---
-title: "Deploy InsForge to Containarium"
-description: "Run InsForge on a Containarium LXC host with per-tenant containers, ZFS snapshots, and MCP-driven provisioning for agent-native deployments."
+title: "Self-Host InsForge on Containarium"
+description: "Self-host the InsForge platform on a Containarium LXC host with per-tenant containers, ZFS snapshots, and MCP-driven provisioning for agent-native deployments."
 ---
 
-# Deploy InsForge to Containarium
+# Self-Host InsForge on Containarium
 
-This guide walks through deploying InsForge on a [Containarium](https://github.com/footprintai/containarium) host. Containarium is an open-source, self-hostable platform that gives each tenant a persistent Linux container (LXC) with first-class SSH, MCP, and TLS-on-a-hostname primitives — a natural fit for agent-driven InsForge deployments.
+This guide walks through self-hosting the InsForge platform on a [Containarium](https://github.com/footprintai/containarium) host. Containarium is an open-source, self-hostable platform that gives each tenant a persistent Linux container (LXC) with first-class SSH, MCP, and TLS-on-a-hostname primitives, a natural fit for agent-driven InsForge deployments.
+
+<Note>
+  **This deploys InsForge itself, not the app you built.** If you just want to take your app live, use [Sites](/core-concepts/sites/overview) instead. This guide is for running the InsForge backend on your own infrastructure.
+</Note>
 
 <Note>
   This guide is community-maintained and can lag the latest InsForge release. The canonical, always-current setup is the `deploy/docker-compose/` directory in the [InsForge repo](https://github.com/InsForge/InsForge).
