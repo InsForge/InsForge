@@ -2,6 +2,8 @@
 
 The docs are a Mintlify site (`docs/docs.json`, `theme: mint`). Supported UI
 languages: **en (default), zh (Simplified), zh-TW (Traditional/Taiwan), es**.
+Codes per Mintlify's internationalization guide (zh / zh-Hans / zh-CN all map
+to Simplified; zh-Hant / zh-TW to Traditional) — we use `zh` and `zh-TW`.
 
 ## How Mintlify localization works here
 
@@ -49,10 +51,15 @@ pass was done.)
 
 - `npx mint broken-links` (or the repo's docs build) — no broken links, all
   `languages` paths resolve.
-- Every English `docs/<p>.mdx` has `docs/{zh,zh-TW,es}/<p>.mdx`. Quick check:
-  `scripts/check-docs-i18n-parity.sh` (fails if any locale is missing a page).
+- `scripts/check-docs-i18n-parity.sh` validates against docs.json: every nav
+  path resolves, every non-en nav entry is locale-prefixed (no silent English
+  fallback), and every English nav page has a translated file in all 3 locales.
 - Spot-check the rendered site: the language switcher lists all four, and a
   translated page renders with code blocks intact.
 
 Blogs, changelogs, and customer stories are a separate CMS (insforge-cloud),
 not these docs — do not translate them here.
+
+Snippets (`snippets/*.mdx`) are NOT localized: pages import them by absolute
+path (`/snippets/x.mdx`), which always resolves to English, so per-locale
+snippet copies would be dead files. Leave snippet includes English.

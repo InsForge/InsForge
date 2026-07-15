@@ -10,7 +10,7 @@ DOCS = os.path.join(os.path.dirname(__file__), '..', 'docs')
 CFG = os.path.join(DOCS, 'docs.json')
 LOCALES = ['zh', 'zh-TW', 'es']
 
-d = json.load(open(CFG))
+d = json.load(open(CFG, encoding='utf-8'))
 nav = d['navigation']
 if 'tabs' in nav:
     base_tabs = nav['tabs']
@@ -22,7 +22,7 @@ else:
     base_tabs = copy.deepcopy(en['tabs'])
     glob = nav.get('global')
 
-LABELS = json.load(open(os.path.join(os.path.dirname(__file__), 'docs-langs-labels.json')))
+LABELS = json.load(open(os.path.join(os.path.dirname(__file__), 'docs-langs-labels.json'), encoding='utf-8'))
 
 def resolves(path):
     p = os.path.join(DOCS, path)
@@ -56,6 +56,7 @@ nav_out = {'languages': languages}
 if glob is not None:
     nav_out['global'] = glob
 d['navigation'] = nav_out
-json.dump(d, open(CFG, 'w'), ensure_ascii=False, indent=2)
-open(CFG, 'a').write('\n')
+with open(CFG, 'w', encoding='utf-8') as fh:
+    json.dump(d, fh, ensure_ascii=False, indent=2)
+    fh.write('\n')
 print(f"docs.json rebuilt: {len(languages)} languages")
