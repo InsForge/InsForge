@@ -610,7 +610,7 @@
         ]
       },
       {
-        "language": "zh-TW",
+        "language": "zh-Hant",
         "tabs": [
           {
             "tab": "文件",
@@ -618,14 +618,14 @@
               {
                 "group": "快速開始",
                 "pages": [
-                  "zh-TW/introduction",
-                  "zh-TW/products",
+                  "zh-Hant/introduction",
+                  "zh-Hant/products",
                   {
                     "group": "快速上手",
                     "expanded": true,
                     "pages": [
-                      "zh-TW/quickstart",
-                      "zh-TW/mcp-setup"
+                      "zh-Hant/quickstart",
+                      "zh-Hant/mcp-setup"
                     ]
                   }
                 ]
@@ -637,81 +637,81 @@
                   {
                     "group": "資料庫",
                     "pages": [
-                      "zh-TW/core-concepts/database/overview",
-                      "zh-TW/core-concepts/database/migrations",
-                      "zh-TW/core-concepts/database/backups",
-                      "zh-TW/core-concepts/database/pgvector"
+                      "zh-Hant/core-concepts/database/overview",
+                      "zh-Hant/core-concepts/database/migrations",
+                      "zh-Hant/core-concepts/database/backups",
+                      "zh-Hant/core-concepts/database/pgvector"
                     ]
                   },
                   {
                     "group": "身分驗證",
                     "pages": [
-                      "zh-TW/core-concepts/authentication/overview"
+                      "zh-Hant/core-concepts/authentication/overview"
                     ]
                   },
                   {
                     "group": "儲存",
                     "pages": [
-                      "zh-TW/core-concepts/storage/overview",
-                      "zh-TW/core-concepts/storage/s3-compatibility"
+                      "zh-Hant/core-concepts/storage/overview",
+                      "zh-Hant/core-concepts/storage/s3-compatibility"
                     ]
                   },
                   {
                     "group": "即時",
                     "pages": [
-                      "zh-TW/core-concepts/realtime/overview"
+                      "zh-Hant/core-concepts/realtime/overview"
                     ]
                   },
                   {
                     "group": "邊緣函式",
                     "pages": [
-                      "zh-TW/core-concepts/functions/overview",
-                      "zh-TW/core-concepts/functions/schedules"
+                      "zh-Hant/core-concepts/functions/overview",
+                      "zh-Hant/core-concepts/functions/schedules"
                     ]
                   },
                   {
                     "group": "模型閘道",
                     "pages": [
-                      "zh-TW/core-concepts/ai/overview"
+                      "zh-Hant/core-concepts/ai/overview"
                     ]
                   },
                   {
                     "group": "網站",
                     "pages": [
-                      "zh-TW/core-concepts/sites/overview"
+                      "zh-Hant/core-concepts/sites/overview"
                     ]
                   },
                   {
                     "group": "訊息",
                     "pages": [
-                      "zh-TW/core-concepts/messaging/overview",
-                      "zh-TW/core-concepts/messaging/custom-smtp"
+                      "zh-Hant/core-concepts/messaging/overview",
+                      "zh-Hant/core-concepts/messaging/custom-smtp"
                     ]
                   },
                   {
                     "group": "金流",
                     "pages": [
-                      "zh-TW/core-concepts/payments/overview",
-                      "zh-TW/core-concepts/payments/stripe",
-                      "zh-TW/core-concepts/payments/razorpay"
+                      "zh-Hant/core-concepts/payments/overview",
+                      "zh-Hant/core-concepts/payments/stripe",
+                      "zh-Hant/core-concepts/payments/razorpay"
                     ]
                   },
                   {
                     "group": "Custom Compute",
                     "pages": [
-                      "zh-TW/core-concepts/compute/overview"
+                      "zh-Hant/core-concepts/compute/overview"
                     ]
                   },
                   {
                     "group": "分析",
                     "pages": [
-                      "zh-TW/core-concepts/analytics/overview"
+                      "zh-Hant/core-concepts/analytics/overview"
                     ]
                   },
                   {
                     "group": "網頁擷取",
                     "pages": [
-                      "zh-TW/core-concepts/webscraper/overview"
+                      "zh-Hant/core-concepts/webscraper/overview"
                     ]
                   }
                 ]
@@ -719,12 +719,12 @@
               {
                 "group": "Agent-Native Initiatives",
                 "pages": [
-                  "zh-TW/agent-native/overview",
-                  "zh-TW/agent-native/vscode-extension",
-                  "zh-TW/agent-native/cli-harness",
-                  "zh-TW/agent-native/diagnostics",
-                  "zh-TW/agent-native/config-as-code",
-                  "zh-TW/agent-native/branching"
+                  "zh-Hant/agent-native/overview",
+                  "zh-Hant/agent-native/vscode-extension",
+                  "zh-Hant/agent-native/cli-harness",
+                  "zh-Hant/agent-native/diagnostics",
+                  "zh-Hant/agent-native/config-as-code",
+                  "zh-Hant/agent-native/branching"
                 ]
               },
               {
@@ -735,26 +735,26 @@
               {
                 "group": "Partnership",
                 "pages": [
-                  "zh-TW/partnership",
-                  "zh-TW/oauth-server"
+                  "zh-Hant/partnership",
+                  "zh-Hant/oauth-server"
                 ]
               },
               {
                 "group": "Self-Hosting",
                 "pages": [
-                  "zh-TW/deployment/deployment-security-guide",
-                  "zh-TW/deployment/deploy-to-aws-ec2",
-                  "zh-TW/deployment/deploy-to-azure-virtual-machines",
-                  "zh-TW/deployment/deploy-to-containarium",
-                  "zh-TW/deployment/deploy-to-google-cloud-compute-engine"
+                  "zh-Hant/deployment/deployment-security-guide",
+                  "zh-Hant/deployment/deploy-to-aws-ec2",
+                  "zh-Hant/deployment/deploy-to-azure-virtual-machines",
+                  "zh-Hant/deployment/deploy-to-containarium",
+                  "zh-Hant/deployment/deploy-to-google-cloud-compute-engine"
                 ]
               },
               {
                 "group": "Resources",
                 "pages": [
-                  "zh-TW/alternatives",
-                  "zh-TW/pricing",
-                  "zh-TW/showcase"
+                  "zh-Hant/alternatives",
+                  "zh-Hant/pricing",
+                  "zh-Hant/showcase"
                 ]
               }
             ]
@@ -766,30 +766,30 @@
                 "group": "TypeScript",
                 "icon": "js",
                 "pages": [
-                  "zh-TW/sdks/typescript/overview",
-                  "zh-TW/sdks/typescript/database",
-                  "zh-TW/sdks/typescript/auth",
-                  "zh-TW/sdks/typescript/storage",
-                  "zh-TW/sdks/typescript/functions",
-                  "zh-TW/sdks/typescript/ai",
-                  "zh-TW/sdks/typescript/realtime",
-                  "zh-TW/sdks/typescript/email",
+                  "zh-Hant/sdks/typescript/overview",
+                  "zh-Hant/sdks/typescript/database",
+                  "zh-Hant/sdks/typescript/auth",
+                  "zh-Hant/sdks/typescript/storage",
+                  "zh-Hant/sdks/typescript/functions",
+                  "zh-Hant/sdks/typescript/ai",
+                  "zh-Hant/sdks/typescript/realtime",
+                  "zh-Hant/sdks/typescript/email",
                   {
                     "group": "金流",
                     "pages": [
-                      "zh-TW/sdks/typescript/payments",
-                      "zh-TW/sdks/typescript/payments-stripe",
-                      "zh-TW/sdks/typescript/payments-razorpay"
+                      "zh-Hant/sdks/typescript/payments",
+                      "zh-Hant/sdks/typescript/payments-stripe",
+                      "zh-Hant/sdks/typescript/payments-razorpay"
                     ]
                   },
                   {
                     "group": "框架指南",
                     "pages": [
-                      "zh-TW/examples/framework-guides/nextjs",
-                      "zh-TW/examples/framework-guides/react",
-                      "zh-TW/examples/framework-guides/vue",
-                      "zh-TW/examples/framework-guides/nuxt",
-                      "zh-TW/examples/framework-guides/svelte"
+                      "zh-Hant/examples/framework-guides/nextjs",
+                      "zh-Hant/examples/framework-guides/react",
+                      "zh-Hant/examples/framework-guides/vue",
+                      "zh-Hant/examples/framework-guides/nuxt",
+                      "zh-Hant/examples/framework-guides/svelte"
                     ]
                   }
                 ]
@@ -798,45 +798,45 @@
                 "group": "Swift",
                 "icon": "swift",
                 "pages": [
-                  "zh-TW/sdks/swift/overview",
-                  "zh-TW/sdks/swift/database",
-                  "zh-TW/sdks/swift/auth",
-                  "zh-TW/sdks/swift/storage",
-                  "zh-TW/sdks/swift/functions",
-                  "zh-TW/sdks/swift/ai",
-                  "zh-TW/sdks/swift/realtime"
+                  "zh-Hant/sdks/swift/overview",
+                  "zh-Hant/sdks/swift/database",
+                  "zh-Hant/sdks/swift/auth",
+                  "zh-Hant/sdks/swift/storage",
+                  "zh-Hant/sdks/swift/functions",
+                  "zh-Hant/sdks/swift/ai",
+                  "zh-Hant/sdks/swift/realtime"
                 ]
               },
               {
                 "group": "Kotlin",
                 "icon": "android",
                 "pages": [
-                  "zh-TW/sdks/kotlin/overview",
-                  "zh-TW/sdks/kotlin/database",
-                  "zh-TW/sdks/kotlin/auth",
-                  "zh-TW/sdks/kotlin/storage",
-                  "zh-TW/sdks/kotlin/functions",
-                  "zh-TW/sdks/kotlin/ai",
-                  "zh-TW/sdks/kotlin/realtime"
+                  "zh-Hant/sdks/kotlin/overview",
+                  "zh-Hant/sdks/kotlin/database",
+                  "zh-Hant/sdks/kotlin/auth",
+                  "zh-Hant/sdks/kotlin/storage",
+                  "zh-Hant/sdks/kotlin/functions",
+                  "zh-Hant/sdks/kotlin/ai",
+                  "zh-Hant/sdks/kotlin/realtime"
                 ]
               },
               {
                 "group": "REST API",
                 "icon": "code",
                 "pages": [
-                  "zh-TW/sdks/rest/overview",
-                  "zh-TW/sdks/rest/database",
-                  "zh-TW/sdks/rest/auth",
-                  "zh-TW/sdks/rest/storage",
-                  "zh-TW/sdks/rest/functions",
-                  "zh-TW/sdks/rest/ai",
-                  "zh-TW/sdks/rest/realtime"
+                  "zh-Hant/sdks/rest/overview",
+                  "zh-Hant/sdks/rest/database",
+                  "zh-Hant/sdks/rest/auth",
+                  "zh-Hant/sdks/rest/storage",
+                  "zh-Hant/sdks/rest/functions",
+                  "zh-Hant/sdks/rest/ai",
+                  "zh-Hant/sdks/rest/realtime"
                 ]
               },
               {
                 "group": "範例",
                 "pages": [
-                  "zh-TW/examples/overview"
+                  "zh-Hant/examples/overview"
                 ]
               }
             ]

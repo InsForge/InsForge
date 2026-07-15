@@ -1,14 +1,15 @@
 # Translating the docs (Mintlify i18n)
 
 The docs are a Mintlify site (`docs/docs.json`, `theme: mint`). Supported UI
-languages: **en (default), zh (Simplified), zh-TW (Traditional/Taiwan), es**.
-Codes per Mintlify's internationalization guide (zh / zh-Hans / zh-CN all map
-to Simplified; zh-Hant / zh-TW to Traditional) — we use `zh` and `zh-TW`.
+languages: **en (default), zh (Simplified), zh-Hant (Traditional), es**.
+Use ONLY codes in Mintlify's docs.json schema enum (en|cn|zh|zh-Hans|zh-Hant|es|…).
+`zh-TW` is NOT accepted — the CLI (`mint dev`) rejects it; Traditional must be
+`zh-Hant`. Verify any new locale with `mint dev` before mass-translating.
 
 ## How Mintlify localization works here
 
 - **One folder per non-default locale**, mirroring the English tree:
-  `docs/zh/<path>.mdx`, `docs/zh-TW/<path>.mdx`, `docs/es/<path>.mdx` for every
+  `docs/zh/<path>.mdx`, `docs/zh-Hant/<path>.mdx`, `docs/es/<path>.mdx` for every
   English `docs/<path>.mdx`. Same filenames, same structure.
 - **`docs.json` drives it, not the folders.** Navigation is a
   `navigation.languages` array — one entry per language, each with the FULL

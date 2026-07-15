@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 python3 - <<'PY'
 import json, os, sys
-DOCS='docs'; LOCALES=['zh','zh-TW','es']
+DOCS='docs'; LOCALES=['zh','zh-Hant','es']
 d=json.load(open(os.path.join(DOCS,'docs.json'), encoding='utf-8'))
 def walk(node,out):
     if isinstance(node,str): out.append(node)

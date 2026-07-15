@@ -8,7 +8,7 @@ import json, copy, os
 
 DOCS = os.path.join(os.path.dirname(__file__), '..', 'docs')
 CFG = os.path.join(DOCS, 'docs.json')
-LOCALES = ['zh', 'zh-TW', 'es']
+LOCALES = ['zh', 'zh-Hant', 'es']
 
 d = json.load(open(CFG, encoding='utf-8'))
 nav = d['navigation']
