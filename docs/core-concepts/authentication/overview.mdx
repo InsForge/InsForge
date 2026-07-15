@@ -52,6 +52,10 @@ graph TB
 
 The default. New users sign up with an email and password, get a confirmation email, and receive a session JWT on login. Password reset, email verification, and brute-force throttling are built in.
 
+<Note>
+  **Self-hosting?** Sending these emails requires an email provider. Cloud-linked projects use the managed sender automatically; a self-hosted instance must set up [Custom SMTP](/core-concepts/messaging/custom-smtp) first, otherwise verification and reset emails silently fail to send.
+</Note>
+
 ### Magic link and OTP
 
 Send a one-time link or six-digit code to the user's email. Passwordless sign-in, account recovery, and step-up auth all use the same primitive.
