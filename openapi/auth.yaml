@@ -1921,6 +1921,8 @@ paths:
                     description: Refresh token for mobile/desktop/server clients (null for web clients)
         '400':
           description: Invalid request - unsupported provider or missing token
+        '401':
+          description: Invalid or expired ID token
 
   /api/auth/admin/sessions/current:
     get:
