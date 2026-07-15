@@ -1,0 +1,11 @@
+---
+title: "Auth Integrations"
+sidebarTitle: "Overview"
+description: "Bring your own authentication provider to InsForge. Each provider signs a JWT with your InsForge secret, so PostgREST and Row Level Security accept the request natively."
+---
+
+## Overview
+
+InsForge ships with native authentication, but you can also bring your own provider. In each integration, the provider handles sign-up, sign-in, and user records, then a JWT is signed with your InsForge **JWT Secret** carrying InsForge-compatible claims (`role: authenticated`, `aud: insforge-api`, and the user's `sub`). InsForge accepts that token natively, and your Row Level Security policies scope data to the correct user through `requesting_user_id()`.
+
+Because the provider owns the identity, the InsForge **Auth > Users** page stays empty — user records live in the provider's dashboard, and InsForge only sees the JWT claims that RLS needs.
