@@ -401,6 +401,101 @@ describe('PaystackTransactionService', () => {
     );
   });
 
+  it('REGRESSION: verify of a reversed transaction projects a terminal refunded ledger row', async () => {
+    // Paystack marks refunded transactions and successful chargebacks as
+    // `reversed`. Mapping it to pending would be ignored by the ledger's
+    // terminal-state guard, leaving a succeeded payment succeeded forever.
+    const transaction = buildProviderTransaction({ status: 'reversed' });
+    mockVerifyTransaction.mockResolvedValue(transaction);
+    mockPoolQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: 'local_txn_123', created_by: AUTHENTICATED_USER.id }],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          buildTransactionRow({
+            status: 'reversed',
+            verifiedTransactionId: '12345',
+          }),
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+    const result = await PaystackTransactionService.getInstance().verifyTransaction(
+      'test',
+      'ps_ref_123',
+      AUTHENTICATED_USER
+    );
+
+    // The local row moves to reversed; the guard keeps reversed terminal and
+    // lets it supersede success.
+    expect(mockPoolQuery).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(
+        /WHEN status = 'reversed' THEN status[\s\S]*WHEN status = 'success' AND \$3 <> 'reversed' THEN status/i
+      ),
+      ['test', 'ps_ref_123', 'reversed', '12345', false, transaction]
+    );
+
+    const upsertCall = mockPoolQuery.mock.calls.find(([sql]) =>
+      /INSERT INTO payments\.transactions/i.test(String(sql))
+    );
+    const params = upsertCall?.[1] as unknown[];
+    expect(params[6]).toBe('refunded'); // terminal ledger status
+    expect(params[12]).toBe(500000); // amount
+    expect(params[13]).toBe(500000); // fully reversed → amount_refunded = amount
+    expect(params[16]).toBeNull(); // paidAt
+    expect(params[18]).toEqual(new Date('2026-07-01T10:00:00.000Z')); // refundedAt
+    expect(result).toEqual(
+      expect.objectContaining({
+        verified: false,
+        transaction: expect.objectContaining({ status: 'reversed' }),
+      })
+    );
+  });
+
+  it('falls back to the reference as durable identity when the provider id exceeds safe integers', async () => {
+    // Paystack ids are unsigned 64-bit: JSON.parse rounds values above
+    // Number.MAX_SAFE_INTEGER, so the rounded id must not become identity.
+    const unsafeId = Number.MAX_SAFE_INTEGER + 1;
+    const transaction = buildProviderTransaction({ id: unsafeId });
+    mockVerifyTransaction.mockResolvedValue(transaction);
+    mockPoolQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: 'local_txn_123', created_by: AUTHENTICATED_USER.id }],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [buildTransactionRow({ status: 'success' })],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+    await PaystackTransactionService.getInstance().verifyTransaction(
+      'test',
+      'ps_ref_123',
+      AUTHENTICATED_USER
+    );
+
+    // The session row stores no rounded id.
+    const sessionUpdate = mockPoolQuery.mock.calls[1] as [string, unknown[]];
+    expect(sessionUpdate[1][3]).toBeNull();
+
+    const upsertCall = mockPoolQuery.mock.calls.find(([sql]) =>
+      /INSERT INTO payments\.transactions/i.test(String(sql))
+    );
+    const params = upsertCall?.[1] as unknown[];
+    expect(params[1]).toBe('transaction');
+    expect(params[2]).toBe('ps_ref_123'); // reference as durable identity
+    expect(JSON.parse(String(params[11]))).toEqual({ reference: 'ps_ref_123' });
+    expect(JSON.parse(String(params[21]))).toEqual([
+      { type: 'transaction', id: 'ps_ref_123' },
+      { type: 'reference', id: 'ps_ref_123' },
+    ]);
+  });
+
   it('raises 404 for verify of an unknown reference without projecting a transaction', async () => {
     mockVerifyTransaction.mockResolvedValue(buildProviderTransaction());
     mockPoolQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
@@ -519,7 +614,7 @@ describe('PaystackTransactionService', () => {
 
   it('projects a processed refund into the shared ledger and refreshes the original charge', async () => {
     const refund = {
-      id: 777,
+      id: '777',
       transaction: 12345,
       amount: 200000,
       currency: 'NGN',
@@ -575,7 +670,7 @@ describe('PaystackTransactionService', () => {
 
   it('projects a failed refund keyed by transaction reference', async () => {
     const refund = {
-      id: 888,
+      id: '888',
       transaction: 'ps_ref_123',
       amount: 1200,
       currency: 'NGN',
@@ -611,7 +706,7 @@ describe('PaystackTransactionService', () => {
 
   it('extracts the origin transaction from an embedded transaction object', async () => {
     const refund = {
-      id: 999,
+      id: '999',
       transaction: { id: 12345, reference: 'ps_ref_123' },
       amount: 500,
       currency: 'NGN',
@@ -642,7 +737,7 @@ describe('PaystackTransactionService', () => {
 
   it('skips the original-charge refresh when the refund names no transaction', async () => {
     const refund = {
-      id: 1000,
+      id: '1000',
       transaction: null,
       amount: 500,
       currency: 'NGN',

@@ -9,6 +9,7 @@ import {
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import type {
+  NormalizedPaystackRefund,
   PaystackRefundResource,
   PaystackTransactionResource,
 } from '@/providers/payments/paystack.provider.js';
@@ -200,16 +201,33 @@ export class PaystackWebhookService {
 
   /**
    * Paystack sends no event-id header, so derive a stable idempotency id from
-   * the event type plus the payload entity: `${event}.${data.id ?? data.reference}`.
+   * the event type plus the payload entity. Charge payloads carry `id` and
+   * `reference`; the documented refund.* payload carries neither — identify
+   * refunds by `refund_reference`, falling back to `transaction_reference`
+   * plus `created_at` so distinct refunds on one transaction never share a
+   * key (a shared key would make the replay guard swallow the second refund).
+   * Numeric ids above Number.MAX_SAFE_INTEGER are already rounded by
+   * JSON.parse, so they are skipped in favor of the reference-based keys.
    */
   private getWebhookEventId(payload: PaystackWebhookPayload): string {
-    const { id, reference } = payload.data;
+    const data = payload.data;
+    const { id, reference } = data;
+    const refundReference = data.refund_reference;
+    const transactionReference = data.transaction_reference;
+    const createdAt = data.created_at;
+
     const entityId =
-      typeof id === 'number' || typeof id === 'string'
-        ? String(id)
-        : typeof reference === 'string' && reference.length > 0
-          ? reference
-          : 'no_entity';
+      typeof id === 'string' && id.length > 0
+        ? id
+        : typeof id === 'number' && Number.isSafeInteger(id)
+          ? String(id)
+          : typeof reference === 'string' && reference.length > 0
+            ? reference
+            : typeof refundReference === 'string' && refundReference.length > 0
+              ? refundReference
+              : typeof transactionReference === 'string' && transactionReference.length > 0
+                ? `${transactionReference}.${typeof createdAt === 'string' ? createdAt : 'no_ts'}`
+                : 'no_entity';
 
     return `${payload.event}.${entityId}`;
   }
@@ -302,16 +320,48 @@ export class PaystackWebhookService {
     return 'pending';
   }
 
-  private getRefundEntity(payload: PaystackWebhookPayload): PaystackRefundResource | null {
-    const { id, amount, currency } = payload.data;
-    if (typeof id !== 'number' && typeof id !== 'string') {
-      return null;
-    }
-    if (typeof amount !== 'number' || typeof currency !== 'string') {
+  private getRefundEntity(payload: PaystackWebhookPayload): NormalizedPaystackRefund | null {
+    const data = payload.data;
+    const { id, amount, currency } = data;
+    const refundReference = data.refund_reference;
+
+    // Paystack's documented refund.* payload has no `data.id` and sends
+    // `amount` as a numeric string; API-fetched refund resources carry a
+    // numeric id and amount. Accept both shapes. Numeric ids above
+    // Number.MAX_SAFE_INTEGER were already rounded by JSON.parse, so only
+    // safe integers are used as identity before falling back to
+    // `refund_reference`.
+    const refundId =
+      typeof id === 'string' && id.length > 0
+        ? id
+        : typeof id === 'number' && Number.isSafeInteger(id)
+          ? String(id)
+          : typeof refundReference === 'string' && refundReference.length > 0
+            ? refundReference
+            : null;
+    if (refundId === null) {
       return null;
     }
 
-    return payload.data as unknown as PaystackRefundResource;
+    const normalizedAmount =
+      typeof amount === 'number'
+        ? amount
+        : typeof amount === 'string' && /^\d+$/.test(amount.trim())
+          ? Number(amount.trim())
+          : NaN;
+    if (!Number.isSafeInteger(normalizedAmount) || normalizedAmount < 0) {
+      return null;
+    }
+
+    if (typeof currency !== 'string' || currency.length === 0) {
+      return null;
+    }
+
+    return {
+      ...(data as unknown as PaystackRefundResource),
+      id: refundId,
+      amount: normalizedAmount,
+    };
   }
 
   private getChargeEntity(payload: PaystackWebhookPayload): PaystackTransactionResource | null {

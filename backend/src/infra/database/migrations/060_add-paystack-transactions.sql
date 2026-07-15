@@ -7,9 +7,10 @@ CREATE TABLE IF NOT EXISTS payments.paystack_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   environment TEXT NOT NULL CHECK (environment IN ('test', 'live')),
   -- initialized and failed are InsForge-local lifecycle states; pending,
-  -- success, and abandoned mirror Paystack transaction statuses.
+  -- success, abandoned, and reversed mirror Paystack transaction statuses
+  -- (reversed = refunded transaction or successful chargeback).
   status TEXT NOT NULL DEFAULT 'initialized' CHECK (
-    status IN ('initialized', 'pending', 'success', 'failed', 'abandoned')
+    status IN ('initialized', 'pending', 'success', 'failed', 'abandoned', 'reversed')
   ),
   subject_type TEXT,
   subject_id TEXT,

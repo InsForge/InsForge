@@ -362,7 +362,8 @@ export type PaystackTransactionStatus =
   | 'pending'
   | 'success'
   | 'failed'
-  | 'abandoned';
+  | 'abandoned'
+  | 'reversed';
 
 export interface PaystackTransactionRow {
   id: string;

@@ -247,9 +247,10 @@ describe('PaystackWebhookService', () => {
     );
 
     expect(result).toEqual({ received: true, handled: true });
+    // The service normalizes the entity id to a lossless string.
     expect(mockUpsertRefund).toHaveBeenCalledWith(
       'test',
-      expect.objectContaining(refundData),
+      expect.objectContaining({ ...refundData, id: '777' }),
       'refunded'
     );
     expect(mockUpsertCharge).not.toHaveBeenCalled();
@@ -280,7 +281,7 @@ describe('PaystackWebhookService', () => {
     expect(result).toEqual({ received: true, handled: true });
     expect(mockUpsertRefund).toHaveBeenCalledWith(
       'test',
-      expect.objectContaining(refundData),
+      expect.objectContaining({ ...refundData, id: '778' }),
       'failed'
     );
     expect(mockMark).toHaveBeenCalledWith(
@@ -292,7 +293,7 @@ describe('PaystackWebhookService', () => {
     );
   });
 
-  it('ignores refund events without a refund id instead of projecting them', async () => {
+  it('ignores refund events without any refund identity instead of projecting them', async () => {
     const result = await PaystackWebhookService.getInstance().handlePaystackWebhook(
       'test',
       makeRawWebhookBody('refund.processed', {
@@ -306,13 +307,84 @@ describe('PaystackWebhookService', () => {
 
     expect(result).toEqual({ received: true, handled: false });
     expect(mockUpsertRefund).not.toHaveBeenCalled();
+    // Even without an id/refund_reference, the event key stays unique via
+    // the transaction reference instead of collapsing to `no_entity`.
     expect(mockMark).toHaveBeenCalledWith(
       'paystack',
       'test',
-      'refund.processed.no_entity',
+      'refund.processed.ps_ref_123.no_ts',
       'ignored',
       null
     );
+  });
+
+  it('projects the documented refund payload (no id, string amount, refund_reference)', async () => {
+    // Paystack's documented refund.* webhook payload: no `data.id`, `amount`
+    // as a numeric string, identity in `refund_reference`.
+    const refundData = {
+      status: 'processed',
+      transaction_reference: 'ps_ref_123',
+      refund_reference: 'ps_refund_456',
+      amount: '1200',
+      currency: 'NGN',
+      created_at: '2026-07-02T10:00:00.000Z',
+    };
+
+    const result = await PaystackWebhookService.getInstance().handlePaystackWebhook(
+      'test',
+      makeRawWebhookBody('refund.processed', refundData),
+      'signature'
+    );
+
+    expect(result).toEqual({ received: true, handled: true });
+    expect(mockUpsertRefund).toHaveBeenCalledWith(
+      'test',
+      expect.objectContaining({
+        ...refundData,
+        id: 'ps_refund_456',
+        amount: 1200,
+      }),
+      'refunded'
+    );
+    expect(mockMark).toHaveBeenCalledWith(
+      'paystack',
+      'test',
+      'refund.processed.ps_refund_456',
+      'processed',
+      null
+    );
+  });
+
+  it('derives distinct event keys for distinct refunds on the same transaction', async () => {
+    const base = {
+      status: 'processed',
+      transaction_reference: 'ps_ref_123',
+      currency: 'NGN',
+    };
+
+    await PaystackWebhookService.getInstance().handlePaystackWebhook(
+      'test',
+      makeRawWebhookBody('refund.processed', {
+        ...base,
+        refund_reference: 'ps_refund_1',
+        amount: '600',
+      }),
+      'signature'
+    );
+    await PaystackWebhookService.getInstance().handlePaystackWebhook(
+      'test',
+      makeRawWebhookBody('refund.processed', {
+        ...base,
+        refund_reference: 'ps_refund_2',
+        amount: '600',
+      }),
+      'signature'
+    );
+
+    const eventIds = mockMark.mock.calls.map((call) => call[2] as string);
+    expect(eventIds).toContain('refund.processed.ps_refund_1');
+    expect(eventIds).toContain('refund.processed.ps_refund_2');
+    expect(mockUpsertRefund).toHaveBeenCalledTimes(2);
   });
 
   it('marks the event failed when the refund projection throws', async () => {

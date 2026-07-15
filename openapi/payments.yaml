@@ -1387,7 +1387,11 @@ paths:
   /api/payments/paystack/config:
     get:
       summary: Get Paystack Key Configuration
-      description: Return masked Paystack key configuration for test and live environments.
+      description: >-
+        Return the stored Paystack keys for test and live environments. Values
+        are the raw stored keys, not masked: the admin settings panel hydrates
+        and resaves them, so masking here would corrupt stored keys on resave.
+        Admin-only.
       tags:
         - Paystack Payments
       security:
@@ -3111,8 +3115,10 @@ components:
         value:
           type: string
           nullable: true
-          description: Masked key value, or null when the key is not configured.
-          example: "sk_test_...abcd"
+          description: >-
+            Raw stored key value (not masked), or null when the key is not
+            configured.
+          example: "sk_test_xxx"
 
     CreateStripeProductBody:
       type: object
@@ -3539,6 +3545,7 @@ components:
         - success
         - failed
         - abandoned
+        - reversed
 
     PaystackTransaction:
       type: object

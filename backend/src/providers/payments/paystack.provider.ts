@@ -113,6 +113,10 @@ export interface PaystackInitializeResult {
 
 /** Transaction resource returned by GET /transaction/verify/:reference. */
 export interface PaystackTransactionResource {
+  // Paystack ids are unsigned 64-bit; JSON.parse rounds values above
+  // Number.MAX_SAFE_INTEGER and the digits are unrecoverable afterwards.
+  // Consumers must not use this as durable identity unless it is a safe
+  // integer — the transaction `reference` is the durable identity.
   id: number;
   domain: string;
   status:
@@ -156,16 +160,29 @@ export interface PaystackTransactionResource {
 /**
  * Refund entity delivered by refund.* webhooks. `transaction` arrives either
  * as the original transaction's reference/id or as an embedded object.
+ * Paystack's documented refund.* webhook payload carries no `id` and sends
+ * `amount` as a numeric string; API-fetched refund resources have a numeric
+ * id and amount. `refund_reference` identifies the refund on webhook payloads.
  */
 export interface PaystackRefundResource {
-  id: number | string;
-  transaction: number | string | { id?: number | string | null; reference?: string | null } | null;
-  amount: number;
+  id?: number | string | null;
+  transaction?: number | string | { id?: number | string | null; reference?: string | null } | null;
+  amount: number | string;
   currency: string;
   status?: string | null;
   transaction_reference?: string | null;
+  refund_reference?: string | null;
   refunded_at?: string | null;
   created_at?: string | null;
+}
+
+/**
+ * Refund shape after webhook normalization: identity resolved to a lossless
+ * string (id, else refund_reference) and amount parsed to subunit integer.
+ */
+export interface NormalizedPaystackRefund extends Omit<PaystackRefundResource, 'id' | 'amount'> {
+  id: string;
+  amount: number;
 }
 
 /** Every successful Paystack response wraps its payload in this envelope. */

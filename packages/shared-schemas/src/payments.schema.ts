@@ -177,6 +177,7 @@ export const paystackTransactionStatusSchema = z.enum([
   'success',
   'failed',
   'abandoned',
+  'reversed',
 ]);
 export type PaystackTransactionStatus = z.infer<typeof paystackTransactionStatusSchema>;
 

@@ -18,6 +18,7 @@ import type {
   PaystackTransactionStatus,
 } from '@/types/payments.js';
 import type {
+  NormalizedPaystackRefund,
   PaystackInitializeResult,
   PaystackRefundResource,
   PaystackTransactionResource,
@@ -254,7 +255,7 @@ export class PaystackTransactionService {
         metadata[PAYSTACK_TRANSACTION_METADATA_KEY] ?? null
       ));
     const type = status === 'failed' ? 'failed_payment' : 'one_time_payment';
-    const transactionId = String(transaction.id);
+    const transactionId = this.toSafeProviderId(transaction.id);
 
     await this.upsertTransaction(client, {
       environment,
@@ -264,13 +265,17 @@ export class PaystackTransactionService {
       providerCustomerId: transaction.customer?.customer_code ?? null,
       customerEmailSnapshot: transaction.customer?.email ?? options.customerEmailFallback ?? null,
       providerObjectType: 'transaction',
-      providerObjectId: transactionId,
+      // The reference is the durable identity: numeric ids above
+      // Number.MAX_SAFE_INTEGER arrive rounded from JSON.parse.
+      providerObjectId: transactionId ?? transaction.reference,
       relatedObjectIds: {
         transaction: transactionId,
         reference: transaction.reference,
       },
       amount: transaction.amount,
-      amountRefunded: 0,
+      // Paystack reports a fully reversed charge (refund or chargeback) via
+      // status alone; the transaction resource carries no refunded amount.
+      amountRefunded: status === 'refunded' ? transaction.amount : 0,
       currency: transaction.currency.toLowerCase(),
       description: null,
       paidAt:
@@ -279,7 +284,11 @@ export class PaystackTransactionService {
             this.fromPaystackTimestamp(transaction.created_at))
           : null,
       failedAt: status === 'failed' ? this.fromPaystackTimestamp(transaction.created_at) : null,
-      refundedAt: null,
+      refundedAt:
+        status === 'refunded'
+          ? (this.fromPaystackTimestamp(transaction.paid_at) ??
+            this.fromPaystackTimestamp(transaction.created_at))
+          : null,
       providerCreatedAt: this.fromPaystackTimestamp(transaction.created_at),
       raw: transaction,
       matchObjectRefs: [
@@ -298,10 +307,10 @@ export class PaystackTransactionService {
    */
   async upsertRefundTransaction(
     environment: PaystackEnvironment,
-    refund: PaystackRefundResource,
+    refund: NormalizedPaystackRefund,
     status: PaystackPaymentTransactionStatus
   ): Promise<void> {
-    const refundId = String(refund.id);
+    const refundId = refund.id;
     const transactionId = this.getRefundOriginTransactionId(refund);
     const transactionReference = this.getRefundOriginTransactionReference(refund);
 
@@ -665,7 +674,11 @@ export class PaystackTransactionService {
   ): Promise<PaystackTransactionResponse> {
     const result = await this.getPool().query(
       `UPDATE payments.paystack_transactions
-       SET status = CASE WHEN status = 'success' THEN status ELSE $3 END,
+       SET status = CASE
+             WHEN status = 'reversed' THEN status
+             WHEN status = 'success' AND $3 <> 'reversed' THEN status
+             ELSE $3
+           END,
            verified_transaction_id = COALESCE(verified_transaction_id, $4),
            verified_at = CASE WHEN $5 THEN COALESCE(verified_at, NOW()) ELSE verified_at END,
            raw = $6,
@@ -674,7 +687,7 @@ export class PaystackTransactionService {
        WHERE environment = $1
          AND reference = $2
        RETURNING ${PAYSTACK_TRANSACTION_COLUMNS}`,
-      [environment, reference, status, String(transaction.id), verified, transaction]
+      [environment, reference, status, this.toSafeProviderId(transaction.id), verified, transaction]
     );
 
     const row = result.rows[0] as PaystackTransactionRow | undefined;
@@ -756,13 +769,14 @@ export class PaystackTransactionService {
   private getRefundOriginTransactionId(refund: PaystackRefundResource): string | null {
     const { transaction } = refund;
     if (typeof transaction === 'number') {
-      return String(transaction);
+      return this.toSafeProviderId(transaction);
     }
-    if (
-      this.isRecord(transaction) &&
-      (typeof transaction.id === 'number' || typeof transaction.id === 'string')
-    ) {
-      return String(transaction.id);
+    if (this.isRecord(transaction)) {
+      return this.toSafeProviderId(
+        typeof transaction.id === 'number' || typeof transaction.id === 'string'
+          ? transaction.id
+          : null
+      );
     }
     return null;
   }
@@ -919,6 +933,10 @@ export class PaystackTransactionService {
         return 'failed';
       case 'abandoned':
         return 'abandoned';
+      // Paystack marks a refunded transaction or successful chargeback as
+      // `reversed` — a terminal state, never pending again.
+      case 'reversed':
+        return 'reversed';
       default:
         return 'pending';
     }
@@ -932,9 +950,30 @@ export class PaystackTransactionService {
         return 'succeeded';
       case 'failed':
         return 'failed';
+      // A reversed charge is fully refunded (refund or chargeback); mapping
+      // it to pending would be ignored by the ledger's terminal-state guard
+      // and leave a succeeded payment succeeded forever.
+      case 'reversed':
+        return 'refunded';
       default:
         return 'pending';
     }
+  }
+
+  /**
+   * Paystack ids are unsigned 64-bit; JSON.parse rounds values above
+   * Number.MAX_SAFE_INTEGER and String() cannot recover the digits. Only
+   * safe integers become provider-id strings — callers fall back to the
+   * transaction reference as the durable identity.
+   */
+  private toSafeProviderId(id: number | string | null | undefined): string | null {
+    if (typeof id === 'string' && id.length > 0) {
+      return id;
+    }
+    if (typeof id === 'number' && Number.isSafeInteger(id)) {
+      return String(id);
+    }
+    return null;
   }
 
   /**
