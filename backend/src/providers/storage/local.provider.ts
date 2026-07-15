@@ -12,7 +12,6 @@ import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
   DownloadStrategyResponse,
-  DELETE_OBJECT_FAILURE_MESSAGE,
   UploadStrategyResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
@@ -116,7 +115,7 @@ export class LocalStorageProvider implements StorageProvider {
           });
           failed.push({
             key,
-            message: DELETE_OBJECT_FAILURE_MESSAGE,
+            message: 'Failed to delete object',
           });
         }
       });

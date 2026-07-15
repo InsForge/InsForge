@@ -545,11 +545,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     }
 
     if (clientType === 'web') {
-      const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
-      if (!tokenManager.verifyCsrfToken(csrfHeader, payload)) {
-        logger.warn('[Auth:Refresh] CSRF token validation failed');
-        throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
-      }
+      tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:Refresh');
     }
 
     // Fetch current user data from DB.
@@ -617,33 +613,14 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
 
       if (refreshToken) {
         const tokenManager = TokenManager.getInstance();
-        let payload: RefreshTokenPayload;
-
+        let payload: RefreshTokenPayload | null = null;
         try {
           payload = tokenManager.verifyRefreshToken(refreshToken);
         } catch {
-          clearRefreshTokenCookie(res);
-          successResponse(res, {
-            success: true,
-            message: 'Logged out successfully',
-          });
-          return;
+          // Stale or invalid cookie: fall through and clear it idempotently.
         }
-
-        if (payload.sessionType !== 'user') {
-          clearRefreshTokenCookie(res);
-          successResponse(res, {
-            success: true,
-            message: 'Logged out successfully',
-          });
-          return;
-        }
-
-        const csrfHeader = req.headers['x-csrf-token'];
-        const csrfToken = typeof csrfHeader === 'string' ? csrfHeader : undefined;
-        if (!tokenManager.verifyCsrfToken(csrfToken, payload)) {
-          logger.warn('[Auth:Logout] CSRF token validation failed');
-          throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+        if (payload?.sessionType === 'user') {
+          tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:Logout');
         }
       }
 
