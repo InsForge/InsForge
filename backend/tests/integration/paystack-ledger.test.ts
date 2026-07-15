@@ -73,7 +73,7 @@ async function ledgerRow() {
   };
 }
 
-const subject = { subjectFallback: { type: 'user', id: 'user_ledger_test' } };
+const chargeOptions = { subjectFallback: { type: 'user', id: 'user_ledger_test' } };
 
 beforeAll(async () => {
   ({ db, teardown } = await getConnections());
@@ -97,30 +97,28 @@ describe('paystack ledger terminal states (behavioral)', () => {
     const service = PaystackTransactionService.getInstance();
 
     // 1. Normal success projects a succeeded charge.
-    await service.upsertChargeTransaction('test', providerTransaction('success'), subject);
+    await service.upsertChargeTransaction('test', providerTransaction('success'), chargeOptions);
     let row = await ledgerRow();
     expect(row.status).toBe('succeeded');
     expect(Number(row.amountRefunded)).toBe(0);
 
     // 2. Re-verify after a refund/chargeback: reversed → terminal refunded.
-    await service.upsertChargeTransaction('test', providerTransaction('reversed'), subject);
+    await service.upsertChargeTransaction('test', providerTransaction('reversed'), chargeOptions);
     row = await ledgerRow();
     expect(row.status).toBe('refunded');
     expect(Number(row.amountRefunded)).toBe(500000);
     expect(row.refundedAt).not.toBeNull();
 
     // 3. Delayed charge.success webhook replays the old success payload.
-    await service.upsertChargeTransaction('test', providerTransaction('success'), subject);
+    await service.upsertChargeTransaction('test', providerTransaction('success'), chargeOptions);
     row = await ledgerRow();
     expect(row.status).toBe('refunded');
     expect(Number(row.amountRefunded)).toBe(500000);
     expect(row.refundedAt).not.toBeNull();
-  });
 
-  it('pending updates still cannot downgrade a terminal row', async () => {
-    const service = PaystackTransactionService.getInstance();
-    await service.upsertChargeTransaction('test', providerTransaction('pending'), subject);
-    const row = await ledgerRow();
+    // 4. Stale pending cannot downgrade the terminal row either.
+    await service.upsertChargeTransaction('test', providerTransaction('pending'), chargeOptions);
+    row = await ledgerRow();
     expect(row.status).toBe('refunded');
   });
 });
