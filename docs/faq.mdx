@@ -59,4 +59,29 @@ description: "Answers to common questions about how InsForge works."
 
     Still stuck? Ask in our [Discord](https://discord.com/invite/DvBtaEc9Jz) for the fastest response.
   </Accordion>
+
+  <Accordion title="How do I authenticate the CLI without a browser?">
+    `npx @insforge/cli login` opens a browser to sign in. On a headless machine, a remote server, or CI, use the setup prompt from the dashboard instead. It signs the CLI in with a user API key, no browser needed.
+
+    <Steps>
+      <Step title="Open the Install page">
+        Open your project in the dashboard and go to the **Install** page.
+      </Step>
+      <Step title="Pick your coding agent">
+        Under **Install in Agent**, click the agent you use, then open the **CLI** tab.
+      </Step>
+      <Step title="Copy the prompt">
+        Copy the setup prompt and paste it into your agent. It signs the CLI in and links the project in one step.
+      </Step>
+    </Steps>
+
+    The prompt fills in a login command scoped to your account, followed by the link command:
+
+    ```bash
+    npx @insforge/cli login --user-api-key <your-user-api-key>
+    npx @insforge/cli link --project-id <your-project-id>
+    ```
+
+    In CI, store the key as a secret and run these directly; add `--json` for machine-readable output. The key grants full access to your account, so keep it secret and rotate it if it leaks.
+  </Accordion>
 </AccordionGroup>
