@@ -494,7 +494,7 @@ components:
         Preference-Applied:
           schema:
             type: string
-          description: Count preference applied by the backend.
+          description: Always the literal `count=exact`.
       content:
         application/json:
           schema:
@@ -529,7 +529,7 @@ components:
         Preference-Applied:
           schema:
             type: string
-          description: Count preference applied by the backend.
+          description: Always the literal `count=exact`.
       content:
         application/json:
           schema:
@@ -633,7 +633,8 @@ components:
           description: >-
             Number of entries in the source. CloudWatch-backed deployments
             always report `0` here (the provider does not compute per-source
-            counts); local log storage reports real counts.
+            counts); local log storage counts up to the most recent 1000
+            entries, so sources with more entries report `1000`.
         lastActivity:
           type: string
           format: date-time
