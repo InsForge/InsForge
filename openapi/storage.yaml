@@ -5,6 +5,81 @@ info:
   description: Bucket-based storage system similar to S3
 
 paths:
+  /api/storage/config:
+    get:
+      summary: Get storage configuration
+      description: Returns the current storage configuration including file size limits (admin only)
+      tags:
+        - Admin
+      security:
+        - apiKey: []
+      responses:
+        '200':
+          description: Storage configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorageConfig'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      summary: Update storage configuration
+      description: Update storage settings such as maximum file size (admin only)
+      tags:
+        - Admin
+      security:
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - maxFileSizeMb
+              properties:
+                maxFileSizeMb:
+                  type: integer
+                  minimum: 1
+                  maximum: 200
+                  description: Maximum file upload size in megabytes
+      responses:
+        '200':
+          description: Storage configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorageConfig'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/storage/buckets:
     get:
       summary: List All Buckets
@@ -1271,6 +1346,29 @@ components:
           type: object
           description: Optional headers to include in the download request
           additionalProperties: true
+
+    StorageConfig:
+      type: object
+      required:
+        - id
+        - maxFileSizeMb
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        maxFileSizeMb:
+          type: integer
+          minimum: 1
+          maximum: 200
+          description: Maximum file upload size in megabytes
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
 
     ErrorResponse:
       type: object
