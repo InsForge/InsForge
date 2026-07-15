@@ -50,7 +50,9 @@ describe('TokenManager refresh CSRF tokens', () => {
     expect(rotatedPayload.csrfNonce).toBe(initialPayload.csrfNonce);
     expect(rotatedPayload.sessionType).toBe('user');
     expect(rotatedCsrfToken).toBe(initialCsrfToken);
-    expect(() => tokenManager.verifyCsrfToken(initialCsrfToken, rotatedPayload, 'Test')).not.toThrow();
+    expect(() =>
+      tokenManager.verifyCsrfToken(initialCsrfToken, rotatedPayload, 'Test')
+    ).not.toThrow();
   });
 
   it('rejects CSRF tokens from another refresh-token family', () => {
