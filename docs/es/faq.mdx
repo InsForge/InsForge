@@ -24,4 +24,21 @@ description: "Respuestas a preguntas habituales sobre cómo funciona InsForge."
 
     Regla rápida: ¿solo mueves datos de entrada y salida? Es la base de datos (REST automática). ¿Escribes lógica que se ejecuta y termina? Edge function. ¿Necesitas algo funcionando todo el tiempo? Custom compute.
   </Accordion>
+
+  <Accordion title="¿Cómo comparto un proyecto con otro administrador o invito a un compañero de equipo?">
+    El acceso se comparte a nivel de **organización**, no por proyecto. Invitas a alguien a la organización propietaria de tus proyectos y obtiene acceso a todos los proyectos que contiene. No existe un flujo aparte para "compartir solo este proyecto".
+
+    Para invitar a alguien:
+
+    1. En el dashboard, abre la organización propietaria del proyecto usando el selector de organización en la esquina superior izquierda.
+    2. Haz clic en **Members** en la barra lateral izquierda.
+    3. Haz clic en **Invite Member**, introduce su email y elige un rol:
+       - **Administrator** tiene control total: gestionar proyectos, además de invitar, eliminar y cambiar los roles de otros miembros.
+       - **Developer** tiene acceso normal a los proyectos de la organización, pero no puede gestionar miembros.
+    4. Reciben una invitación por email válida durante 7 días. Cuando inician sesión en InsForge **con esa misma dirección de email** y la aceptan, se unen a la organización con el rol que elegiste.
+
+    Para añadir otro administrador en concreto, elige el rol **Administrator** al invitar, o cambia su rol más tarde desde la lista de Members. Solo los Administrators pueden invitar o gestionar miembros.
+
+    Transferir la organización por completo a un nuevo **owner** es una acción distinta de invitar miembros.
+  </Accordion>
 </AccordionGroup>

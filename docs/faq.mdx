@@ -24,4 +24,21 @@ description: "Answers to common questions about how InsForge works."
 
     Quick rule: just moving data in and out? That's the database (auto REST). Writing logic that runs and finishes? Edge function. Need something running all the time? Custom compute.
   </Accordion>
+
+  <Accordion title="How do I share a project with another admin, or invite a teammate?">
+    Access is shared at the **organization** level, not per project. You invite someone to the organization that owns your projects, and they get access to every project inside it. There is no separate "share just this one project" flow.
+
+    To invite someone:
+
+    1. In the dashboard, open the organization that owns the project using the org switcher in the top-left.
+    2. Click **Members** in the left sidebar.
+    3. Click **Invite Member**, enter their email, and pick a role:
+       - **Administrator** has full control: manage projects, plus invite, remove, and change the roles of other members.
+       - **Developer** has normal access to the organization's projects but cannot manage members.
+    4. They get an email invite that is valid for 7 days. When they sign in to InsForge **with that same email address** and accept it, they join the organization with the role you chose.
+
+    To add another admin specifically, choose the **Administrator** role when inviting, or change their role later from the Members list. Only Administrators can invite or manage members.
+
+    Handing the organization over to a new **owner** entirely is a separate action from inviting members.
+  </Accordion>
 </AccordionGroup>
