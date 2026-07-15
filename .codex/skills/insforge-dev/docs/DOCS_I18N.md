@@ -45,7 +45,7 @@ natural-language text changes. No summarizing, adding, or dropping content.
 For a full-site pass, split the `.mdx` list into balanced groups and dispatch
 one subagent per group at a **cheap model tier (haiku)** — the work is
 mechanical. Each agent writes all three locale copies for its files. Then run
-the parity + build check below. (This is exactly how the initial zh/zh-TW/es
+the parity + build check below. (This is exactly how the initial zh/zh-Hant/es
 pass was done.)
 
 ## Verify
