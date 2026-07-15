@@ -25,6 +25,63 @@ description: "Respuestas a preguntas habituales sobre cómo funciona InsForge."
     Regla rápida: ¿solo mueves datos de entrada y salida? Es la base de datos (REST automática). ¿Escribes lógica que se ejecuta y termina? Edge function. ¿Necesitas algo funcionando todo el tiempo? Custom compute.
   </Accordion>
 
+  <Accordion title="¿Cómo consulto una tabla en un schema distinto de `public`?">
+    Por defecto todas tus tablas están en `public`. Solo tienes otro schema si creaste uno tú mismo con `CREATE SCHEMA` (los schemas internos de InsForge, como `auth` y `storage`, están ocultos y no se pueden consultar así). Una vez que tienes uno, puedes leerlo y escribirlo desde el dashboard, la REST API y la CLI. El único lugar que hoy solo ve `public` es el constructor de consultas de `@insforge/sdk`.
+
+    Los ejemplos de abajo usan un schema que creaste llamado `my_schema`.
+
+    **Dashboard.** Abre **Database** y usa el selector de schema en la parte superior de la barra lateral. Cualquier schema que creaste aparece junto a `public`, y al elegirlo navegas por las tablas de ese schema.
+
+    **REST API.** El endpoint de records acepta el schema destino como parámetro de query o como cabecera de perfil de PostgREST. Las lecturas usan `Accept-Profile`; las escrituras y RPC usan `Content-Profile`:
+
+    ```bash
+    # lectura: parámetro ?schema=, o cabecera Accept-Profile
+    curl "$PROJECT_URL/api/database/records/mytable?schema=my_schema" \
+      -H "Authorization: Bearer $TOKEN"
+
+    # escritura: envía Content-Profile
+    curl -X POST "$PROJECT_URL/api/database/records/mytable" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Profile: my_schema" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "hello"}'
+    ```
+
+    **CLI.** La CLI lee y escribe cualquier schema con `db query`, solo cualifica la tabla con el schema:
+
+    ```bash
+    insforge db query "SELECT * FROM my_schema.mytable"
+    ```
+
+    **SDK.** `client.database.from('mytable')` siempre apunta a `public` y todavía no hay opción de schema, así que para otro schema llama directamente al endpoint REST de arriba (con el parámetro `?schema=` o la cabecera `Accept-Profile` / `Content-Profile`) en lugar del constructor de consultas.
+
+    Un paso más para el acceso por API: un schema propio solo es enrutable, no legible. Los roles `anon` y `authenticated` no tienen privilegios sobre él hasta que se los concedes, sin importar quién sea el propietario de las tablas, así que las llamadas devuelven vacío o permiso denegado hasta que lo hagas. Concede privilegios a cada rol que expongas y luego añade RLS:
+
+    ```sql
+    GRANT USAGE ON SCHEMA my_schema TO anon, authenticated;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA my_schema TO anon, authenticated;
+    ```
+
+    La visibilidad de filas queda gobernada por RLS como siempre. Que el project-admin sea propietario solo le permite gestionar y consultar las tablas directamente (por ejemplo desde el editor SQL del dashboard); no da acceso a los roles de la API.
+  </Accordion>
+
+  <Accordion title="¿Cómo comparto un proyecto con otro administrador o invito a un compañero de equipo?">
+    El acceso se comparte a nivel de **organización**, no por proyecto. Invitas a alguien a la organización propietaria de tus proyectos y obtiene acceso a todos los proyectos que contiene. No existe un flujo aparte para "compartir solo este proyecto".
+
+    Para invitar a alguien:
+
+    1. En el dashboard, abre la organización propietaria del proyecto usando el selector de organización en la esquina superior izquierda.
+    2. Haz clic en **Members** en la barra lateral izquierda.
+    3. Haz clic en **Invite Member**, introduce su email y elige un rol:
+       - **Administrator** tiene control total: gestionar proyectos, además de invitar, eliminar y cambiar los roles de otros miembros.
+       - **Developer** tiene acceso normal a los proyectos de la organización, pero no puede gestionar miembros.
+    4. Reciben una invitación por email válida durante 7 días. Cuando inician sesión en InsForge **con esa misma dirección de email** y la aceptan, se unen a la organización con el rol que elegiste.
+
+    Para añadir otro administrador en concreto, elige el rol **Administrator** al invitar, o cambia su rol más tarde desde la lista de Members. Solo los Administrators pueden invitar o gestionar miembros.
+
+    Transferir la organización por completo a un nuevo **Owner** es una acción distinta de invitar miembros. Para hacerlo, abre **Organization Settings** y usa **Transfer Ownership** (solo el owner actual puede iniciarlo, y el destinatario debe ser un usuario verificado de InsForge que acepte la solicitud enviada por email).
+  </Accordion>
+
   <Accordion title="¿Por qué se pausó mi proyecto y cómo evito que se pause?">
     La pausa solo ocurre en el plan Free, por dos motivos:
 
@@ -41,6 +98,35 @@ description: "Respuestas a preguntas habituales sobre cómo funciona InsForge."
     - Si se pausó porque la organización alcanzó su límite de uso, haz **Upgrade to Pro** para restaurarlo.
 
     ¿Sigues atascado? Pregunta en nuestro [Discord](https://discord.com/invite/DvBtaEc9Jz) para la respuesta más rápida.
+  </Accordion>
+
+  <Accordion title="¿Cómo autentico la CLI sin navegador?">
+    `npx @insforge/cli login` abre un navegador para iniciar sesión. En una máquina sin interfaz, un servidor remoto o CI, usa una user API key en su lugar. No hace falta navegador.
+
+    La forma más rápida es el prompt de configuración del dashboard, que inicia sesión y vincula el proyecto por ti:
+
+    <Steps>
+      <Step title="Abre la página Install">
+        Abre tu proyecto en el dashboard y ve a la página **Install**.
+      </Step>
+      <Step title="Elige tu coding agent">
+        En **Install in Agent**, haz clic en el agent que usas y abre la pestaña **CLI**.
+      </Step>
+      <Step title="Copia el prompt">
+        Copia el prompt de configuración y pégalo en tu agent. Inicia sesión en la CLI y vincula el proyecto en un solo paso.
+      </Step>
+    </Steps>
+
+    El prompt rellena un comando de login limitado a tu cuenta, seguido del comando de vinculación:
+
+    ```bash
+    npx @insforge/cli login --user-api-key <your-user-api-key>
+    npx @insforge/cli link --project-id <your-project-id>
+    ```
+
+    Si solo necesitas la key, por ejemplo para ejecutar la CLI en CI, abre el menú de tu cuenta y ve a **Profile → API Keys**, luego crea una key (ponle una caducidad, o **Never**). Guárdala como secreto de CI y ejecuta `login --user-api-key` con ella. Añade `--json` para una salida legible por máquina.
+
+    La key da acceso completo a tu cuenta, así que mantenla en secreto y rótala si se filtra.
   </Accordion>
 
   <Accordion title="¿Qué es FLY_API_TOKEN?">
