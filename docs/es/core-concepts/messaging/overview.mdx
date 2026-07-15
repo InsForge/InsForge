@@ -10,6 +10,10 @@ InsForge Messaging envía notificaciones transaccionales desde su proyecto: reci
   **¿Solo enviar correos electrónicos de autenticación?** Los enlaces mágicos, los códigos de verificación y los restablecimientos de contraseña están integrados en [Authentication](/core-concepts/authentication/overview). Solo necesita este producto para mensajes transaccionales más allá de la autenticación.
 </Note>
 
+<Warning>
+  **¿Autohospedado?** El remitente gestionado de InsForge Cloud solo está disponible para proyectos vinculados a la nube. En una instancia autohospedada debe configurar [Custom SMTP](/core-concepts/messaging/custom-smtp) antes de que se pueda enviar cualquier correo electrónico, incluidos los de autenticación. Sin él, activar la verificación de correo electrónico deja los nuevos registros atascados en un estado no verificado sin que se entregue ningún correo, porque el fallo de envío se registra y se descarta en lugar de mostrarse. Configure SMTP primero, o deje la verificación de correo electrónico desactivada (el valor por defecto).
+</Warning>
+
 ```mermaid
 graph TB
     Client[Client Application] --> SDK[InsForge SDK]

@@ -52,6 +52,10 @@ graph TB
 
 El valor por defecto. Los nuevos usuarios se registran con un correo electrónico y contraseña, reciben un correo electrónico de confirmación e reciben un JWT de sesión al iniciar sesión. El restablecimiento de contraseña, la verificación de correo electrónico y el limitador de fuerza bruta están integrados.
 
+<Note>
+  **¿Autohospedado?** El envío de estos correos electrónicos, incluido el inicio de sesión sin contraseña mediante enlace mágico y código de un solo uso, requiere un proveedor de correo electrónico. Los proyectos vinculados a la nube usan el remitente gestionado automáticamente; una instancia autohospedada debe configurar [Custom SMTP](/core-concepts/messaging/custom-smtp) primero, de lo contrario los correos de verificación, restablecimiento e inicio de sesión no se entregarán.
+</Note>
+
 ### Enlace mágico y OTP
 
 Envíe un enlace de un solo uso o un código de seis dígitos al correo electrónico del usuario. El inicio de sesión sin contraseña, la recuperación de cuenta y la autenticación de paso a paso utilizan la misma primitiva.

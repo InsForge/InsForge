@@ -5,6 +5,10 @@ description: Enrutar todos los correos electrónicos salientes a través de su p
 
 Cuando está habilitado, cada correo electrónico (flujos de autenticación y llamadas `emails.send()`) se enruta a través de su servidor SMTP. Apáguelo para revertir; las credenciales se conservan.
 
+<Note>
+  **Las instancias autohospedadas necesitan esto para poder enviar cualquier correo electrónico.** El remitente gestionado sin configuración se enruta a través de InsForge Cloud y solo está disponible para proyectos vinculados a la nube. Una instancia autohospedada sin SMTP configurado no puede entregar correos de autenticación, por lo que la verificación de correo electrónico, los enlaces mágicos y los restablecimientos de contraseña no se entregarán hasta que complete la configuración a continuación.
+</Note>
+
 ## Conceptos
 
 El proveedor se resuelve en cada envío, por lo que los cambios surten efecto en la siguiente solicitud. InsForge ejecuta `transporter.verify()` antes de guardar, por lo que una configuración persistente siempre funciona. Las contraseñas se cifran en reposo con AES-256-GCM y nunca las devuelve la API.
