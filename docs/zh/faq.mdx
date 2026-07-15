@@ -128,4 +128,10 @@ description: "关于 InsForge 工作方式的常见问题解答。"
 
     这把 key 拥有你账号的完整权限，所以要保密，一旦泄露就轮换掉。
   </Accordion>
+
+  <Accordion title="FLY_API_TOKEN 是什么？">
+    只有当你自托管 InsForge 并且想使用 [Custom Compute](/core-concepts/compute/overview) 时才需要设置这个环境变量。Custom Compute 把你的长驻容器跑在 [Fly.io](https://fly.io) 上，所以自托管实例需要你自己的 Fly 账号：在 `.env` 里设置 `FLY_API_TOKEN`（用 `fly tokens create org` 生成的 Fly API token）和 `FLY_ORG`（用 `fly orgs list` 查到的 Fly org slug），然后重启。两者都必填，在设置之前 compute 接口会返回 `503 COMPUTE_NOT_CONFIGURED`。
+
+    在 InsForge Cloud 上你完全不用碰这个。Compute 由平台托管，平台其余部分（数据库、认证、Storage、Edge Functions）都不需要任何 Fly token。
+  </Accordion>
 </AccordionGroup>
