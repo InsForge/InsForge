@@ -1,0 +1,27 @@
+---
+title: "FAQ"
+sidebarTitle: "FAQ"
+description: "Answers to common questions about how InsForge works."
+---
+
+<AccordionGroup>
+  <Accordion title="Is reading or writing the database an edge function? What's the difference between database calls, edge functions, and custom compute?">
+    No. When you read or write a table, no function runs at all, so it isn't an edge function.
+
+    In InsForge your code talks to the backend in three different ways, and they're easy to mix up:
+
+    | | How it's triggered | Does it keep running? | What it's for |
+    |----|--------------------|-----------------------|---------------|
+    | **Database call** (auto-generated REST API) | Your client sends an SDK or REST request | No, it's fully managed | Reading and writing table rows |
+    | **Edge Function** | An HTTP request, a cron schedule, or a database trigger | No, it runs once and exits | Custom endpoints, webhooks, trigger logic, calling external services |
+    | **Custom Compute** | You start a long-running process | Yes, it stays up | Queue workers, AI inference loops, websockets, anything that holds state |
+
+    **Database call.** Define a table and InsForge instantly gives you a set of REST endpoints (like `GET /api/database/records/{table}`) and a typed SDK. Calling `select` or `insert` reads and writes the database directly, with nothing to deploy and nothing running. This is all you need for ordinary create/read/update/delete. See [Database](/core-concepts/database/overview).
+
+    **Edge Function.** Reach for one when the auto-generated API isn't enough and you want your own server-side logic: a payment webhook, an auth hook, code that fires when a row is `INSERT`ed / `UPDATE`d / `DELETE`d, or a scheduled job. The point is that it runs once per request or event and then exits. See [Edge Functions](/core-concepts/functions/overview).
+
+    **Custom Compute.** Use this when you need a process that stays up, like a queue worker or an AI inference loop. An edge function can't do this because it doesn't run continuously. See [Custom Compute](/core-concepts/compute/overview).
+
+    Quick rule: just moving data in and out? That's the database (auto REST). Writing logic that runs and finishes? Edge function. Need something running all the time? Custom compute.
+  </Accordion>
+</AccordionGroup>
