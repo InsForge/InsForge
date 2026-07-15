@@ -25,6 +25,23 @@ description: "InsForge 常見問題解答：資料庫呼叫、Edge Function 與 
     一句話判斷：只是讀寫資料，就走資料庫（自動 REST）；要寫一段跑完就結束的邏輯，用 Edge Function；要一直執行，用 Custom Compute。
   </Accordion>
 
+  <Accordion title="怎麼把專案分享給另一個管理員，或者邀請隊友？">
+    存取權限是按 **organization（組織）** 共享的，不是按單個 project。你是把人邀請進擁有這些 project 的組織，他就能存取組織下的所有 project，沒有「只分享某一個 project」的入口。
+
+    邀請步驟：
+
+    1. 在 dashboard 裡，用左上角的組織切換器打開擁有該 project 的組織。
+    2. 點左側欄的 **Members**。
+    3. 點 **Invite Member**，填對方信箱，選一個角色：
+       - **Administrator（管理員）**：完全控制，既能管理 project，也能邀請、移除成員、修改成員角色。
+       - **Developer（開發者）**：能正常存取組織的 project，但不能管理成員。
+    4. 對方會收到一封邀請郵件（7 天內有效）。他用「收到邀請的那個信箱」登入 InsForge 並接受後，就以你選的角色加入組織。
+
+    想專門加一個管理員，邀請時選 **Administrator** 即可，之後也能在 Members 列表裡改角色。只有 Administrator 能邀請和管理成員。
+
+    把整個組織「移交給新 Owner」是另一個獨立操作，跟邀請成員不是一回事。要移交的話，打開 **Organization Settings**，用裡面的 **Transfer Ownership**（只有目前的 Owner 能發起，且對方必須是已驗證的 InsForge 使用者並接受郵件裡的請求）。
+  </Accordion>
+
   <Accordion title="為什麼我的專案被暫停了？要怎麼避免被暫停？">
     只有 Free 方案會出現暫停，原因有兩種：
 
