@@ -24,4 +24,22 @@ description: "Answers to common questions about how InsForge works."
 
     Quick rule: just moving data in and out? That's the database (auto REST). Writing logic that runs and finishes? Edge function. Need something running all the time? Custom compute.
   </Accordion>
+
+  <Accordion title="Why did my project get paused, and how do I keep it from pausing?">
+    Pausing only happens on the Free plan, for two reasons:
+
+    - **Inactivity.** A free project is paused after 7 days with no requests. We email a heads-up first, and any request resets the 7-day clock.
+    - **Usage limit.** If your organization goes over the Free usage limits, its projects stay paused until you upgrade.
+
+    Your data stays intact either way. To stop projects from pausing at all, upgrade the organization to Pro. See [Pricing](/pricing).
+  </Accordion>
+
+  <Accordion title="My project is paused. How do I restart it?">
+    Open the project in the dashboard and click **Restore Project**. It comes back in a few minutes with your data intact. A couple of cases to know:
+
+    - You can restore a free project from the dashboard for up to **30 days** after it pauses. After that it's archived and you can only download the database backup and storage files (still no data loss).
+    - If it was paused because the organization hit its usage limit, **Upgrade to Pro** to restore it.
+
+    Still stuck? Ask in our [Discord](https://discord.com/invite/DvBtaEc9Jz) for the fastest response.
+  </Accordion>
 </AccordionGroup>
