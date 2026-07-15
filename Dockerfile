@@ -156,7 +156,11 @@ USER node
 EXPOSE 7130 7131
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "cd backend && npm run migrate:up && cd .. && exec npm start"]
+# Exec node directly instead of `npm start`: the npm wrapper chain
+# (npm start -> npm run start -> node) keeps two extra npm processes resident
+# (~20-40MB on a 512MB nano) and breaks direct signal delivery. cwd stays
+# /app/backend, matching what `npm run start` ("node ../dist/server.js") used.
+CMD ["sh", "-c", "cd backend && npm run migrate:up && exec node ../dist/server.js"]
 
 
 # ============================================================
