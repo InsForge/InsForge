@@ -1,6 +1,8 @@
 # InsForge Deployment Guides
 
-This directory contains deployment guides for self-hosting InsForge on various platforms.
+This directory contains deployment guides for self-hosting the InsForge platform on various platforms.
+
+> Looking to deploy the app you built on InsForge (take it live)? That is [Sites](../core-concepts/sites/overview), not self-hosting. The guides below are for running the InsForge backend on infrastructure you control.
 
 ## 📚 Available Guides
 
