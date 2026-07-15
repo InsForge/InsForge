@@ -8,12 +8,14 @@ Apify
 apis
 APNs
 Astro
+Auth's
 autocapture
 autostart
 avatar_url
 backend
 backfills
 backoff
+better_auth
 betterstack
 boolean
 bundler
@@ -63,6 +65,7 @@ IVFFlat
 Jetpack
 JWTs
 Keycloak
+Kinde
 kotlin
 Kotlinx
 KPIs
@@ -70,7 +73,9 @@ linode
 localStorage
 loopback
 lookups
+magicLink
 mcp
+middleware
 monorepo
 Multiplatform
 namespace
@@ -95,6 +100,7 @@ pgvector
 postgres
 PostHog
 preemptible
+preformatted
 presigned
 proxied
 queryable
@@ -121,14 +127,18 @@ serverless
 Sinch
 skipBrowserRedirect
 stderr
+Stytch
 subcommand
 subcommands
 sudo
 Supabase
 systemd
 tmpfs
+todo
+todos
 transactionally
 Twilio
+twoFactor
 typecheck
 unencrypted
 updated_at
@@ -136,6 +146,7 @@ upserts
 upvote
 Upvoting
 user_id
+UUIDs
 vcpus
 vercel
 Vite
