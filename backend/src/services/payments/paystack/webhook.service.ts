@@ -410,9 +410,14 @@ export class PaystackWebhookService {
       return null;
     }
 
+    // A reversed session is terminal: Paystack retries webhooks and delivery
+    // order is not guaranteed, so a delayed charge.success must not restore
+    // a session that verify already recorded as reversed. Ids above
+    // Number.MAX_SAFE_INTEGER arrive rounded from JSON.parse and are not
+    // stored (same rule as the direct verify path).
     const result = await this.getPool().query(
       `UPDATE payments.paystack_transactions
-       SET status = 'success',
+       SET status = CASE WHEN status = 'reversed' THEN status ELSE 'success' END,
            verified_transaction_id = COALESCE(verified_transaction_id, $3),
            verified_at = COALESCE(verified_at, NOW()),
            raw = $4,
@@ -425,7 +430,13 @@ export class PaystackWebhookService {
          subject_type AS "subjectType",
          subject_id AS "subjectId",
          customer_email AS "customerEmail"`,
-      [environment, charge.reference, String(charge.id), charge, boundTransactionId]
+      [
+        environment,
+        charge.reference,
+        this.transactionService.toSafeProviderId(charge.id),
+        charge,
+        boundTransactionId,
+      ]
     );
 
     const row = result.rows[0] as

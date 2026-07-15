@@ -9,9 +9,7 @@ CREATE TABLE IF NOT EXISTS payments.paystack_transactions (
   -- initialized and failed are InsForge-local lifecycle states; pending,
   -- success, abandoned, and reversed mirror Paystack transaction statuses
   -- (reversed = refunded transaction or successful chargeback).
-  status TEXT NOT NULL DEFAULT 'initialized' CHECK (
-    status IN ('initialized', 'pending', 'success', 'failed', 'abandoned', 'reversed')
-  ),
+  status TEXT NOT NULL DEFAULT 'initialized',
   subject_type TEXT,
   subject_id TEXT,
   customer_email TEXT,
@@ -41,6 +39,16 @@ CREATE TABLE IF NOT EXISTS payments.paystack_transactions (
 -- not add newer columns.
 ALTER TABLE payments.paystack_transactions
   ADD COLUMN IF NOT EXISTS created_by UUID;
+
+-- Status constraint managed outside CREATE TABLE for the same reason: an
+-- inline CHECK on a pre-existing table is never amended, so drop-and-add
+-- keeps older tables (whose CHECK lacked 'reversed') consistent.
+ALTER TABLE payments.paystack_transactions
+  DROP CONSTRAINT IF EXISTS paystack_transactions_status_check;
+ALTER TABLE payments.paystack_transactions
+  ADD CONSTRAINT paystack_transactions_status_check CHECK (
+    status IN ('initialized', 'pending', 'success', 'failed', 'abandoned', 'reversed')
+  );
 
 DROP TRIGGER IF EXISTS trg_payments_paystack_transactions_updated_at
   ON payments.paystack_transactions;

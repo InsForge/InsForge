@@ -57,6 +57,12 @@ vi.mock('../../src/services/payments/paystack/transaction.service', () => ({
       upsertChargeTransaction: mockUpsertCharge,
       upsertRefundTransaction: mockUpsertRefund,
       extractBoundTransactionId: mockExtractBoundTransactionId,
+      // Mirrors the real implementation: lossless string or null.
+      toSafeProviderId: (id: number | string | null | undefined) => {
+        if (typeof id === 'string' && id.length > 0) return id;
+        if (typeof id === 'number' && Number.isSafeInteger(id)) return String(id);
+        return null;
+      },
     }),
   },
 }));
@@ -175,9 +181,11 @@ describe('PaystackWebhookService', () => {
         data: expect.objectContaining({ id: 12345, reference: 'ps_ref_123' }),
       },
     });
+    // The status CASE preserves a terminal 'reversed' session against
+    // delayed charge.success deliveries.
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /UPDATE payments\.paystack_transactions[\s\S]*SET status = 'success'[\s\S]*AND id = \$5/i
+        /UPDATE payments\.paystack_transactions[\s\S]*SET status = CASE WHEN status = 'reversed' THEN status ELSE 'success' END[\s\S]*AND id = \$5/i
       ),
       [
         'test',
@@ -228,6 +236,29 @@ describe('PaystackWebhookService', () => {
         subjectFallback: null,
         customerEmailFallback: null,
       }
+    );
+  });
+
+  it('does not store rounded 64-bit charge ids and keys the event by reference instead', async () => {
+    const unsafeId = Number.MAX_SAFE_INTEGER + 1;
+    const result = await PaystackWebhookService.getInstance().handlePaystackWebhook(
+      'test',
+      makeRawWebhookBody('charge.success', { ...CHARGE_DATA, id: unsafeId }),
+      'signature'
+    );
+
+    expect(result).toEqual({ received: true, handled: true });
+    const updateCall = mockPool.query.mock.calls.find(([sql]) =>
+      /UPDATE payments\.paystack_transactions/.test(String(sql))
+    ) as [string, unknown[]];
+    // verified_transaction_id must not persist a JSON.parse-rounded id.
+    expect(updateCall[1][2]).toBeNull();
+    expect(mockMark).toHaveBeenCalledWith(
+      'paystack',
+      'test',
+      'charge.success.ps_ref_123',
+      'processed',
+      null
     );
   });
 

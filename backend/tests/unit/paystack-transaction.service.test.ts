@@ -456,6 +456,30 @@ describe('PaystackTransactionService', () => {
     );
   });
 
+  it('REGRESSION: a delayed success upsert cannot un-refund a ledger row', async () => {
+    // Paystack retries webhooks out of order: a charge.success arriving after
+    // a refund/reversal must not restore the ledger row to succeeded or zero
+    // its refunded amount.
+    await PaystackTransactionService.getInstance().upsertChargeTransaction(
+      'test',
+      buildProviderTransaction(),
+      { subjectFallback: { type: 'team', id: 'team_123' } }
+    );
+
+    const [sql, params] = mockPoolQuery.mock.calls[0] as [string, unknown[]];
+    // Both update paths preserve refunded/partially_refunded against 'succeeded'.
+    expect(sql).toMatch(
+      /WHEN tx\.status IN \('refunded', 'partially_refunded'\)\s*AND \$7 = 'succeeded'\s*THEN tx\.status/
+    );
+    expect(sql).toMatch(
+      /WHEN tx\.status IN \('refunded', 'partially_refunded'\)\s*AND EXCLUDED\.status = 'succeeded'\s*THEN tx\.status/
+    );
+    // A success charge carries no refund information: amount_refunded binds
+    // null so existing refund amounts survive (fresh inserts default to 0).
+    expect(params[6]).toBe('succeeded');
+    expect(params[13]).toBeNull();
+  });
+
   it('falls back to the reference as durable identity when the provider id exceeds safe integers', async () => {
     // Paystack ids are unsigned 64-bit: JSON.parse rounds values above
     // Number.MAX_SAFE_INTEGER, so the rounded id must not become identity.

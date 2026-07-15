@@ -275,7 +275,10 @@ export class PaystackTransactionService {
       amount: transaction.amount,
       // Paystack reports a fully reversed charge (refund or chargeback) via
       // status alone; the transaction resource carries no refunded amount.
-      amountRefunded: status === 'refunded' ? transaction.amount : 0,
+      // Null (not 0) when the charge carries no refund information, so a
+      // delayed charge.success cannot zero an amount the refund recompute
+      // already set.
+      amountRefunded: status === 'refunded' ? transaction.amount : null,
       currency: transaction.currency.toLowerCase(),
       description: null,
       paidAt:
@@ -391,6 +394,11 @@ export class PaystackTransactionService {
                WHEN tx.status IN ('succeeded', 'failed', 'refunded', 'partially_refunded')
                  AND $7 = 'pending'
                  THEN tx.status
+               -- A refund is terminal: a delayed charge.success or re-verify
+               -- must not restore a refunded payment to succeeded.
+               WHEN tx.status IN ('refunded', 'partially_refunded')
+                 AND $7 = 'succeeded'
+                 THEN tx.status
                ELSE $7
              END,
              subject_type = COALESCE($8, tx.subject_type),
@@ -473,6 +481,9 @@ export class PaystackTransactionService {
            WHEN tx.status IN ('succeeded', 'failed', 'refunded', 'partially_refunded')
              AND EXCLUDED.status = 'pending'
              THEN tx.status
+           WHEN tx.status IN ('refunded', 'partially_refunded')
+             AND EXCLUDED.status = 'succeeded'
+             THEN tx.status
            ELSE EXCLUDED.status
          END,
          subject_type = COALESCE(EXCLUDED.subject_type, tx.subject_type),
@@ -483,7 +494,10 @@ export class PaystackTransactionService {
          provider_parent_object_id = COALESCE(EXCLUDED.provider_parent_object_id, tx.provider_parent_object_id),
          related_object_ids = tx.related_object_ids || EXCLUDED.related_object_ids,
          amount = EXCLUDED.amount,
-         amount_refunded = EXCLUDED.amount_refunded,
+         amount_refunded = CASE
+           WHEN $14::BIGINT IS NULL THEN COALESCE(tx.amount_refunded, 0)
+           ELSE EXCLUDED.amount_refunded
+         END,
          currency = EXCLUDED.currency,
          description = COALESCE(EXCLUDED.description, tx.description),
          paid_at = COALESCE(EXCLUDED.paid_at, tx.paid_at),
@@ -966,7 +980,7 @@ export class PaystackTransactionService {
    * safe integers become provider-id strings — callers fall back to the
    * transaction reference as the durable identity.
    */
-  private toSafeProviderId(id: number | string | null | undefined): string | null {
+  toSafeProviderId(id: number | string | null | undefined): string | null {
     if (typeof id === 'string' && id.length > 0) {
       return id;
     }
