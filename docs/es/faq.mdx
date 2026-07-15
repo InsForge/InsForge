@@ -47,7 +47,7 @@ description: "Respuestas a preguntas habituales sobre cómo funciona InsForge."
       -d '{"name": "hello"}'
     ```
 
-    **CLI.** Usa SQL directo y cualifica la tabla con el schema:
+    **CLI.** La CLI lee y escribe cualquier schema con `db query`, solo cualifica la tabla con el schema:
 
     ```bash
     insforge db query "SELECT * FROM my_schema.mytable"

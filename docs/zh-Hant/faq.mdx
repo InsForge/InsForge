@@ -47,7 +47,7 @@ description: "關於 InsForge 運作方式的常見問題解答。"
       -d '{"name": "hello"}'
     ```
 
-    **CLI。** 用 raw SQL，並給表名加上 schema 前綴：
+    **CLI。** CLI 用 `db query` 就能讀寫任意 schema，把表名加上 schema 前綴即可：
 
     ```bash
     insforge db query "SELECT * FROM my_schema.mytable"

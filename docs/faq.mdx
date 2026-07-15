@@ -47,7 +47,7 @@ description: "Answers to common questions about how InsForge works."
       -d '{"name": "hello"}'
     ```
 
-    **CLI.** Use raw SQL and schema-qualify the table:
+    **CLI.** The CLI reads and writes any schema through `db query`, just schema-qualify the table:
 
     ```bash
     insforge db query "SELECT * FROM my_schema.mytable"
