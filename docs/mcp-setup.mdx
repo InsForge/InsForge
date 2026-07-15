@@ -10,6 +10,20 @@ The InsForge MCP server gives your AI coding assistant direct access to your bac
 
 Follow the instructions below for your AI client. Don't see your tool? Browse the [agent directory](https://insforge.dev/agents) for the full list of tested integrations.
 
+## What the MCP server can do
+
+Once connected, the InsForge MCP server exposes these tools to your AI assistant. All run against your own project; write and admin actions require your admin API key.
+
+| Area | Tools | What it does |
+|---|---|---|
+| Database | `get-table-schema`, `run-raw-sql`, `bulk-upsert` | Read schema, run raw SQL (strict mode, admin only), bulk insert/upsert |
+| Storage | `create-bucket`, `list-buckets`, `delete-bucket` | Manage storage buckets |
+| Functions | `create-function`, `get-function`, `update-function`, `delete-function` | Manage Deno edge functions |
+| Deployment | `create-deployment`, `start-deployment`, `get-container-logs` | Deploy your app and read container logs |
+| Setup & docs | `fetch-docs`, `get-anon-key`, `get-backend-metadata` | Pull docs, generate an anon key, index backend metadata |
+
+Raw SQL runs through the same [strict-mode endpoint](/sdks/rest/database) as the REST API: admin key required, system tables and `auth.users` blocked.
+
 ## Prerequisites
 
 - An **AI coding assistant** (Cursor, Claude Code, GitHub Copilot, etc.)
