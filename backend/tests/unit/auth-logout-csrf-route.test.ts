@@ -113,6 +113,15 @@ const adminPayload: RefreshPayload = {
   csrfNonce: 'nonce',
 };
 
+function expectClearedCookie(
+  clearCookie: ReturnType<typeof vi.fn>,
+  name: string,
+  path: string
+): void {
+  expect(clearCookie).toHaveBeenCalledOnce();
+  expect(clearCookie).toHaveBeenCalledWith(name, expect.objectContaining({ path }));
+}
+
 function callLogout(
   router: Router,
   overrides: {
@@ -121,7 +130,7 @@ function callLogout(
     query?: Record<string, string>;
   } = {}
 ): Promise<{ statusCode: number; body: unknown; clearCookie: ReturnType<typeof vi.fn> }> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let statusCode = 200;
 
     const req: Partial<Request> = {
@@ -158,7 +167,11 @@ function callLogout(
             },
             clearCookie,
           });
+          return;
         }
+        reject(
+          error instanceof Error ? error : new Error(`Unexpected next() call: ${String(error)}`)
+        );
       })
     );
   });
@@ -183,7 +196,7 @@ describe('POST /api/auth/logout CSRF policy', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.clearCookie).toHaveBeenCalledOnce();
+    expectClearedCookie(response.clearCookie, 'insforge_refresh_token', '/api/auth');
     expect(mocks.verifyRefreshToken).not.toHaveBeenCalled();
   });
 
@@ -198,7 +211,7 @@ describe('POST /api/auth/logout CSRF policy', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.clearCookie).toHaveBeenCalledOnce();
+    expectClearedCookie(response.clearCookie, 'insforge_refresh_token', '/api/auth');
     expect(mocks.verifyCsrfToken).not.toHaveBeenCalled();
   });
 
@@ -211,6 +224,7 @@ describe('POST /api/auth/logout CSRF policy', () => {
     });
 
     expect(response.statusCode).toBe(403);
+    expect(response.body).toMatchObject({ error: ERROR_CODES.FORBIDDEN });
     expect(response.clearCookie).not.toHaveBeenCalled();
     expect(mocks.verifyCsrfToken).toHaveBeenCalledWith(undefined, userPayload);
   });
@@ -225,6 +239,7 @@ describe('POST /api/auth/logout CSRF policy', () => {
     });
 
     expect(response.statusCode).toBe(403);
+    expect(response.body).toMatchObject({ error: ERROR_CODES.FORBIDDEN });
     expect(response.clearCookie).not.toHaveBeenCalled();
     expect(mocks.verifyCsrfToken).toHaveBeenCalledWith(undefined, userPayload);
   });
@@ -242,7 +257,7 @@ describe('POST /api/auth/logout CSRF policy', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.clearCookie).toHaveBeenCalledOnce();
+    expectClearedCookie(response.clearCookie, 'insforge_refresh_token', '/api/auth');
     expect(mocks.verifyCsrfToken).not.toHaveBeenCalled();
   });
 
@@ -254,7 +269,7 @@ describe('POST /api/auth/logout CSRF policy', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.clearCookie).toHaveBeenCalledOnce();
+    expectClearedCookie(response.clearCookie, 'insforge_refresh_token', '/api/auth');
     expect(mocks.verifyCsrfToken).toHaveBeenCalledWith('csrf-token', userPayload);
   });
 
@@ -287,7 +302,7 @@ describe('POST /api/auth/admin/logout CSRF policy', () => {
     const response = await callLogout(router);
 
     expect(response.statusCode).toBe(200);
-    expect(response.clearCookie).toHaveBeenCalledOnce();
+    expectClearedCookie(response.clearCookie, 'insforge_admin_refresh_token', '/api/auth/admin');
     expect(mocks.verifyRefreshToken).not.toHaveBeenCalled();
   });
 
@@ -301,7 +316,7 @@ describe('POST /api/auth/admin/logout CSRF policy', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.clearCookie).toHaveBeenCalledOnce();
+    expectClearedCookie(response.clearCookie, 'insforge_admin_refresh_token', '/api/auth/admin');
     expect(mocks.verifyCsrfToken).not.toHaveBeenCalled();
   });
 
@@ -313,6 +328,7 @@ describe('POST /api/auth/admin/logout CSRF policy', () => {
     });
 
     expect(response.statusCode).toBe(403);
+    expect(response.body).toMatchObject({ error: ERROR_CODES.FORBIDDEN });
     expect(response.clearCookie).not.toHaveBeenCalled();
     expect(mocks.verifyCsrfToken).toHaveBeenCalledWith(undefined, adminPayload);
   });
@@ -326,6 +342,7 @@ describe('POST /api/auth/admin/logout CSRF policy', () => {
     });
 
     expect(response.statusCode).toBe(403);
+    expect(response.body).toMatchObject({ error: ERROR_CODES.FORBIDDEN });
     expect(response.clearCookie).not.toHaveBeenCalled();
     expect(mocks.verifyCsrfToken).toHaveBeenCalledWith(undefined, adminPayload);
   });
@@ -339,7 +356,7 @@ describe('POST /api/auth/admin/logout CSRF policy', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.clearCookie).toHaveBeenCalledOnce();
+    expectClearedCookie(response.clearCookie, 'insforge_admin_refresh_token', '/api/auth/admin');
     expect(mocks.verifyCsrfToken).not.toHaveBeenCalled();
   });
 
@@ -350,7 +367,7 @@ describe('POST /api/auth/admin/logout CSRF policy', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.clearCookie).toHaveBeenCalledOnce();
+    expectClearedCookie(response.clearCookie, 'insforge_admin_refresh_token', '/api/auth/admin');
     expect(mocks.verifyCsrfToken).toHaveBeenCalledWith('csrf-token', adminPayload);
   });
 });
