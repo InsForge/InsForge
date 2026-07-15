@@ -16,7 +16,7 @@ description: "Connect Kinde authentication to your InsForge backend with JWT val
 - An InsForge project (self-hosted or cloud)
 - A [Kinde](https://kinde.com) account and application
 
-## Step 1: Create a Kinde Application
+## Step 1: Create a Kinde application
 
 1. Log in to your [Kinde Dashboard](https://app.kinde.com)
 2. Select **Add application**
@@ -28,7 +28,7 @@ description: "Connect Kinde authentication to your InsForge backend with JWT val
 6. Enable desired authentication methods (Email, Google, etc.) under **Authentication**
 7. Under **App Keys**, note down the **Domain**, **Client ID**, and **Client Secret**
 
-## Step 2: Set Up Your InsForge Project
+## Step 2: Set up your InsForge project
 
 Create a new project or link an existing one:
 
@@ -49,7 +49,7 @@ npx @insforge/cli secrets get JWT_SECRET
 
 Note down the **URL** and **Anon Key** from the InsForge dashboard. You'll use the JWT Secret from the CLI output in a later step to sign tokens for InsForge.
 
-## Step 3: Set Up Your Application
+## Step 3: Set up your application
 
 Install the required dependencies:
 
@@ -83,7 +83,7 @@ import { handleAuth } from "@kinde-oss/kinde-auth-nextjs/server";
 export const GET = handleAuth();
 ```
 
-## Step 4: Set Up InsForge Integration
+## Step 4: Set up InsForge integration
 
 Ask your agent to complete the following steps:
 
@@ -111,7 +111,7 @@ Build a todo list page with full CRUD — create, read, update, and delete todos
 
 This creates a page that uses the InsForge client to manage todos. RLS ensures users only see their own data.
 
-## Step 5: Run Your Application
+## Step 5: Run your application
 
 ```bash
 # Install dependencies if you haven't already

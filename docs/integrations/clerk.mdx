@@ -16,7 +16,7 @@ description: "Add Clerk drop-in auth and user management to your InsForge app. C
 - An InsForge project (self-hosted or cloud)
 - A [Clerk](https://clerk.com) account and application
 
-## Step 1: Set Up Your InsForge Project
+## Step 1: Set up your InsForge project
 
 Create a new project or link an existing one:
 
@@ -43,7 +43,7 @@ Copy the **Project URL** and **Anon Key** — you'll paste these into `.env.loca
 
 The CLI prints the JWT Secret as `JWT_SECRET=<value>` — you'll use only the `<value>` part (everything after the `=`) when creating the Clerk JWT Template in the next step.
 
-## Step 2: Create a JWT Template in Clerk
+## Step 2: Create a JWT template in Clerk
 
 1. Go to your [Clerk Dashboard](https://dashboard.clerk.com)
 2. Navigate to **Configure** > **Sessions** > **JWT Templates**
@@ -89,7 +89,7 @@ The CLI prints the JWT Secret as `JWT_SECRET=<value>` — you'll use only the `<
 
 9. Click **Save** to create the template
 
-## Step 3: Set Up Your Application
+## Step 3: Set up your application
 
 Find your Clerk **Publishable key** and **Secret key** in the Clerk Dashboard under **Configure > API keys** ([direct link](https://dashboard.clerk.com/last-active?path=api-keys)) — the page also has a one-click **Quick copy** block preformatted for Next.js:
 
@@ -108,7 +108,7 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...        # required
 CLERK_SECRET_KEY=sk_...                          # required by clerkMiddleware
 ```
 
-## Step 4: Set Up InsForge Integration
+## Step 4: Set up InsForge integration
 
 Ask your agent to complete the following steps:
 
@@ -143,7 +143,7 @@ Build a todo list page with full CRUD — create, read, update, and delete todos
 
 This creates a page that uses the InsForge client to manage todos. RLS ensures users only see their own data.
 
-## Step 5: Run Your Application
+## Step 5: Run your application
 
 ```bash
 # Install dependencies if you haven't already
