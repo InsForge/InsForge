@@ -18,11 +18,11 @@ Send custom HTML emails to one or more recipients.
 - `html` (string, required) - HTML content of the email
 - `cc` (string | string[], optional) - CC recipient(s), max 50 recipients
 - `bcc` (string | string[], optional) - BCC recipient(s), max 50 recipients
-- `from` (string, optional) - Custom sender name, max 100 characters
+- `from` (string, optional) - Display name shown next to the sender address, max 100 characters (ignored when Custom SMTP is enabled)
 - `replyTo` (string, optional) - Reply-to email address, must be a valid email address
 
 <Note>
-When [Custom SMTP](/core-concepts/messaging/custom-smtp) is enabled for your project, the `from` field is ignored. The sender name and email are always taken from your SMTP configuration to prevent spoofing through your server.
+By default, emails are sent from `noreply@<your-project>.send.insforge.dev`, a per-project subdomain that InsForge Cloud provisions and verifies for you, so no domain setup is required. The `from` field only sets the display name shown next to that address; on the default provider you cannot change the address or domain. To send from your own domain, configure [Custom SMTP](/core-concepts/messaging/custom-smtp). When Custom SMTP is enabled the `from` field is ignored entirely, and the sender name and email are taken from your SMTP configuration to prevent spoofing through your server.
 </Note>
 
 ### Returns
