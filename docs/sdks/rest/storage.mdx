@@ -23,7 +23,7 @@ Content-Type: application/json
 
 ---
 
-## Upload Object with upload strategy
+## Upload object with upload strategy
 
 InsForge supports two types of storage backends:
 1. **Local Storage**: Files are stored on the local filesystem. Use for development or low-volume production.
@@ -36,7 +36,7 @@ The steps to upload a file are:
 
 ---
 
-### Step 1: Get Upload Strategy
+### Step 1: Get upload strategy
 
 Get the optimal upload strategy (direct or presigned URL) based on storage backend.
 The upload strategy API returns the optimal upload method based on the storage backend:
@@ -47,7 +47,7 @@ The upload strategy API returns the optimal upload method based on the storage b
 POST /api/storage/buckets/{bucketName}/upload-strategy
 ```
 
-#### Request Body
+#### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -68,7 +68,7 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
   }'
 ```
 
-#### Response (S3 Backend)
+#### Response (S3 backend)
 
 ```json
 {
@@ -89,7 +89,7 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
 }
 ```
 
-#### Response (Local Storage)
+#### Response (local storage)
 
 ```json
 {
@@ -102,13 +102,13 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
 
 ---
 
-### Step 2: Upload File
+### Step 2: Upload file
 
 Upload the file to the specified URL using the provided method.
 - **Local Storage**: Use a PUT request to `uploadUrl` with `multipart/form-data` and a `file` field.
 - **S3-Compatible**: Use a POST request to `uploadUrl` with `multipart/form-data` and a `file` field. Include all fields from the `fields` object in the request.
 
-### Step 3: Confirm Presigned Upload (S3 Only)
+### Step 3: Confirm presigned upload (S3 only)
 
 Confirm that a file was successfully uploaded to S3 using presigned URL.
 
@@ -116,7 +116,7 @@ Confirm that a file was successfully uploaded to S3 using presigned URL.
 POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
 ```
 
-#### Request Body
+#### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -151,7 +151,7 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/
 
 ---
 
-## Upload Object (Deprecated)
+## Upload object (deprecated)
 
 Upload a file to a bucket with a specific key.
 
@@ -159,14 +159,14 @@ Upload a file to a bucket with a specific key.
 PUT /api/storage/buckets/{bucketName}/objects/{objectKey}
 ```
 
-### Path Parameters
+### Path parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `bucketName` | string | Name of the bucket |
 | `objectKey` | string | Object key (can include `/` for pseudo-folders) |
 
-### Request Body
+### Request body
 
 `multipart/form-data` with a `file` field.
 
@@ -193,7 +193,7 @@ curl -X PUT "https://your-app.insforge.app/api/storage/buckets/avatars/objects/u
 
 ---
 
-## Upload with Auto-Generated Key (Deprecated)
+## Upload with auto-generated key (deprecated)
 
 Upload a file with an auto-generated unique key.
 
@@ -224,7 +224,7 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/uploads/objects"
 
 ---
 
-## Download Object with download strategy
+## Download object with download strategy
 
 InsForge supports two types of storage backends:
 1. **Local Storage**: Files are stored on the local filesystem. Use for development or low-volume production.
@@ -234,7 +234,7 @@ The steps to download a file are:
 1. Get download strategy
 2. Download file from returned URL
 
-### Step 1: Get Download Strategy
+### Step 1: Get download strategy
 
 Get the optimal download strategy (direct URL or presigned URL) based on storage backend and bucket visibility.
 
@@ -263,7 +263,7 @@ curl "https://your-app.insforge.app/api/storage/buckets/avatars/download-strateg
   -H "Authorization: Bearer your-jwt-token"
 ```
 
-#### Response (S3 Public Bucket)
+#### Response (S3 public bucket)
 
 ```json
 {
@@ -272,7 +272,7 @@ curl "https://your-app.insforge.app/api/storage/buckets/avatars/download-strateg
 }
 ```
 
-#### Response (S3 Private Bucket)
+#### Response (S3 private bucket)
 
 ```json
 {
@@ -282,13 +282,13 @@ curl "https://your-app.insforge.app/api/storage/buckets/avatars/download-strateg
 }
 ```
 
-### Step 2: Download File
+### Step 2: Download file
 
 Download the file from the returned URL, using the appropriate method.
 
 ---
 
-## Download Object (Deprecated)
+## Download object (deprecated)
 
 Download a file from a bucket.
 
@@ -310,7 +310,7 @@ Binary file content with appropriate `Content-Type` and `Content-Length` headers
 
 ---
 
-## Delete Object
+## Delete object
 
 Delete a file from a bucket.
 
@@ -335,7 +335,7 @@ curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/avatars/object
 
 ---
 
-## List Objects in Bucket
+## List objects in bucket
 
 List all objects in a bucket with optional filtering.
 
@@ -343,7 +343,7 @@ List all objects in a bucket with optional filtering.
 GET /api/storage/buckets/{bucketName}/objects
 ```
 
-### Query Parameters
+### Query parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -396,9 +396,9 @@ curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects?search=p
 
 ---
 
-## Bucket Management (Admin)
+## Bucket management (admin)
 
-### List All Buckets
+### List all buckets
 
 ```
 GET /api/storage/buckets
@@ -419,13 +419,13 @@ curl "https://your-app.insforge.app/api/storage/buckets" \
 }
 ```
 
-### Create Bucket
+### Create bucket
 
 ```
 POST /api/storage/buckets
 ```
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -453,13 +453,13 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets" \
 }
 ```
 
-### Update Bucket
+### Update bucket
 
 ```
 PATCH /api/storage/buckets/{bucketName}
 ```
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -484,7 +484,7 @@ curl -X PATCH "https://your-app.insforge.app/api/storage/buckets/user-uploads" \
 }
 ```
 
-### Delete Bucket
+### Delete bucket
 
 ```
 DELETE /api/storage/buckets/{bucketName}
@@ -507,9 +507,9 @@ curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/old-uploads" \
 
 ---
 
-## Error Responses
+## Error responses
 
-### Bucket Not Found (404)
+### Bucket not found (404)
 
 ```json
 {
@@ -520,7 +520,7 @@ curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/old-uploads" \
 }
 ```
 
-### Object Not Found (404)
+### Object not found (404)
 
 ```json
 {
@@ -531,7 +531,7 @@ curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/old-uploads" \
 }
 ```
 
-### Invalid File (400)
+### Invalid file (400)
 
 ```json
 {
@@ -542,7 +542,7 @@ curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/old-uploads" \
 }
 ```
 
-### Bucket Already Exists (409)
+### Bucket already exists (409)
 
 ```json
 {

@@ -11,7 +11,7 @@ This guide walks through deploying InsForge on a [Containarium](https://github.c
   This guide is community-maintained and can lag the latest InsForge release. The canonical, always-current setup is the `deploy/docker-compose/` directory in the [InsForge repo](https://github.com/InsForge/InsForge).
 </Note>
 
-## When to choose Containarium
+## When to choose containarium
 
 Containarium fits InsForge deployments where you want:
 
@@ -170,7 +170,7 @@ agent: expose on a public hostname
 
 See Containarium's [`docs/MCP-INTEGRATION.md`](https://github.com/footprintai/Containarium/blob/main/docs/MCP-INTEGRATION.md) for the platform MCP tool catalog.
 
-## Multi-tenant: many InsForge projects per host
+## Multi-tenant: Many InsForge projects per host
 
 Each project gets its own LXC and its own hostname; the sentinel routes by SNI. No port collisions (each container has its own network namespace), no shared compose project names.
 

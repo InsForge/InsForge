@@ -31,7 +31,7 @@ npm install dotenv
 OPENROUTER_API_KEY=<your-openrouter-api-key>
 ```
 
-## Create a Client
+## Create a client
 
 ```typescript
 import OpenAI from 'openai';
@@ -48,7 +48,7 @@ export const openai = new OpenAI({
 
 The `HTTP-Referer` and `X-Title` headers are optional OpenRouter metadata headers. Keep them if you want OpenRouter attribution and rankings for your app.
 
-## Chat Completion
+## Chat completion
 
 ```typescript
 const completion = await openai.chat.completions.create({
@@ -77,7 +77,7 @@ for await (const chunk of stream) {
 }
 ```
 
-## Tool Calling
+## Tool calling
 
 ```typescript
 const completion = await openai.chat.completions.create({
@@ -104,7 +104,7 @@ const completion = await openai.chat.completions.create({
 console.log(completion.choices[0]?.message?.tool_calls);
 ```
 
-## Image Input
+## Image input
 
 ```typescript
 const completion = await openai.chat.completions.create({
@@ -128,7 +128,7 @@ const completion = await openai.chat.completions.create({
 console.log(completion.choices[0]?.message?.content);
 ```
 
-## Image Generation
+## Image generation
 
 Use a model that supports image output and request image modality. OpenRouter supports fields that may not be in the OpenAI SDK type surface yet, so extend the request and response types locally.
 
@@ -175,7 +175,7 @@ const response = await openai.embeddings.create({
 console.log(response.data[0].embedding);
 ```
 
-## Video Generation
+## Video generation
 
 OpenRouter video generation uses OpenRouter HTTP endpoints directly.
 
@@ -201,7 +201,7 @@ const job = await response.json();
 console.log(job);
 ```
 
-## Next.js Route Example
+## Next.js route example
 
 Replace `verifySessionToken` with your app's auth provider or session verifier.
 
@@ -247,7 +247,7 @@ export async function POST(request: Request) {
 }
 ```
 
-## Using InsForge Data with AI
+## Using InsForge data with AI
 
 Use the InsForge SDK for database, auth, storage, functions, and realtime. Use OpenRouter directly for model calls.
 
@@ -283,7 +283,7 @@ const completion = await openai.chat.completions.create({
 console.log(completion.choices[0]?.message?.content);
 ```
 
-## Legacy InsForge AI Proxy
+## Legacy InsForge AI proxy
 
 The previous InsForge AI SDK methods are deprecated:
 
@@ -293,6 +293,6 @@ The previous InsForge AI SDK methods are deprecated:
 
 They map to backend proxy routes that still exist for compatibility, but new integrations should use OpenRouter directly. The direct path gives access to OpenRouter's complete and evolving API surface without waiting for InsForge SDK wrapper updates.
 
-## Model Catalog
+## Model catalog
 
 Use the InsForge dashboard or OpenRouter model catalog to choose a model. Model IDs use the `provider/model` format, such as `openai/gpt-4o`, `anthropic/claude-3.5-haiku`, and `google/gemini-2.5-flash-image`.

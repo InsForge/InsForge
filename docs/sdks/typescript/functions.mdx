@@ -77,7 +77,7 @@ console.log(data)
 }
 ```
 
-### Example (With custom headers)
+### Example (with custom headers)
 
 ```javascript
 const { data, error } = await insforge.functions.invoke('api-endpoint', {
@@ -87,7 +87,7 @@ const { data, error } = await insforge.functions.invoke('api-endpoint', {
 })
 ```
 
-### Output (With custom headers)
+### Output (with custom headers)
 
 ```json
 {
@@ -99,9 +99,9 @@ const { data, error } = await insforge.functions.invoke('api-endpoint', {
 }
 ```
 
-## Complete Serverless Function Examples
+## Complete Serverless function examples
 
-### Example 1: Public Function (No Authentication Required)
+### Example 1: Public function (no authentication required)
 
 ```typescript
 import { createClient } from 'npm:@insforge/sdk';
@@ -136,7 +136,7 @@ export default async function(req: Request): Promise<Response> {
 }
 ```
 
-### Example 2: Authenticated Function (Access User Data)
+### Example 2: Authenticated function (access user data)
 
 ```typescript
 import { createClient } from 'npm:@insforge/sdk';

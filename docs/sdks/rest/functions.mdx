@@ -25,7 +25,7 @@ Authorization: Bearer admin-jwt-token-or-api-key
 
 ---
 
-## Invoke Function
+## Invoke function
 
 Execute a deployed function using any HTTP method (GET, POST, PUT, PATCH, DELETE, etc.). The server preserves and forwards the caller's original method to the function runtime.
 
@@ -37,13 +37,13 @@ ANY /functions/{slug}
 Note: Function invocation uses `/functions/{slug}` (without `/api` prefix), not `/api/functions/{slug}`.
 </Note>
 
-### Path Parameters
+### Path parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `slug` | string | Function slug identifier |
 
-### Request Body
+### Request body
 
 Any JSON payload that the function expects.
 
@@ -69,11 +69,11 @@ The response depends on what the function returns:
 
 ---
 
-## Admin Endpoints
+## Admin endpoints
 
 These endpoints require admin authentication.
 
-### List All Functions
+### List all functions
 
 ```
 GET /api/functions
@@ -115,7 +115,7 @@ curl "https://your-app.insforge.app/api/functions" \
 
 ---
 
-### Get Function Details
+### Get function details
 
 ```
 GET /api/functions/{slug}
@@ -146,7 +146,7 @@ curl "https://your-app.insforge.app/api/functions/hello-world" \
 
 ---
 
-### Create Function
+### Create function
 
 <Note>
 Currently, InsForge only supports JavaScript/TypeScript functions running in a Deno environment.
@@ -156,7 +156,7 @@ Currently, InsForge only supports JavaScript/TypeScript functions running in a D
 POST /api/functions
 ```
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -199,13 +199,13 @@ curl -X POST "https://your-app.insforge.app/api/functions" \
 
 ---
 
-### Update Function
+### Update function
 
 ```
 PUT /api/functions/{slug}
 ```
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -244,7 +244,7 @@ curl -X PUT "https://your-app.insforge.app/api/functions/hello-world" \
 
 ---
 
-### Delete Function
+### Delete function
 
 ```
 DELETE /api/functions/{slug}
@@ -268,7 +268,7 @@ curl -X DELETE "https://your-app.insforge.app/api/functions/old-function" \
 
 ---
 
-## Function Code Structure
+## Function code structure
 
 Functions must export a default async function that receives a `Request` object and returns a `Response`:
 
@@ -291,7 +291,7 @@ export default async function(request) {
 }
 ```
 
-### Accessing Request Data
+### Accessing request data
 
 ```javascript
 export default async function(request) {
@@ -314,7 +314,7 @@ export default async function(request) {
 
 ---
 
-## Function Status
+## Function status
 
 | Status | Description |
 |--------|-------------|
@@ -324,9 +324,9 @@ export default async function(request) {
 
 ---
 
-## Error Responses
+## Error responses
 
-### Function Not Found (404)
+### Function not found (404)
 
 ```json
 {
@@ -334,7 +334,7 @@ export default async function(request) {
 }
 ```
 
-### Function Not Active (404)
+### Function not active (404)
 
 ```json
 {
@@ -342,7 +342,7 @@ export default async function(request) {
 }
 ```
 
-### Execution Error (502)
+### Execution error (502)
 
 When the function runtime is unreachable (self-hosted: local Deno runtime down; cloud: subhosting proxy failure):
 
@@ -352,7 +352,7 @@ When the function runtime is unreachable (self-hosted: local Deno runtime down; 
 }
 ```
 
-### Function Runtime Error (500)
+### Function runtime error (500)
 
 When the function code throws an error:
 
@@ -363,7 +363,7 @@ When the function code throws an error:
 }
 ```
 
-### Slug Already Exists (409)
+### Slug already exists (409)
 
 ```json
 {
@@ -372,7 +372,7 @@ When the function code throws an error:
 }
 ```
 
-### Dangerous Code Detected (400)
+### Dangerous code detected (400)
 
 ```json
 {

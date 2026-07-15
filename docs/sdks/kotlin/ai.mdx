@@ -9,7 +9,7 @@ InsForge provisions an OpenRouter API key for Model Gateway projects. New Kotlin
 
 The previous InsForge Kotlin AI SDK methods are deprecated compatibility wrappers. Use the InsForge SDK for database, auth, storage, functions, and realtime; use OpenRouter for model calls.
 
-## Recommended Architecture
+## Recommended architecture
 
 ```mermaid
 sequenceDiagram
@@ -23,7 +23,7 @@ sequenceDiagram
     API-->>App: App-specific response
 ```
 
-## Server-Side OpenRouter Call
+## Server-side OpenRouter call
 
 Use the OpenAI SDK or REST from your backend. For TypeScript backends:
 
@@ -41,7 +41,7 @@ const completion = await openai.chat.completions.create({
 });
 ```
 
-## Calling Your Backend from Kotlin
+## Calling your backend from Kotlin
 
 ```kotlin
 import io.ktor.client.HttpClient
@@ -78,7 +78,7 @@ suspend fun sendPrompt(prompt: String, sessionToken: String): ChatResponse {
 
 Use an app session token or another user-scoped credential for your backend route. Never send the OpenRouter key from a Kotlin client.
 
-## Legacy InsForge AI Methods
+## Legacy InsForge AI methods
 
 These Kotlin SDK methods are deprecated for new AI integrations:
 
