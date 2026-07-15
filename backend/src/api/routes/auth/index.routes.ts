@@ -4,7 +4,7 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { AuthOTPService, OTPPurpose } from '@/services/auth/auth-otp.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { TokenManager } from '@/infra/security/token.manager.js';
+import { TokenManager, type RefreshTokenPayload } from '@/infra/security/token.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
@@ -545,11 +545,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     }
 
     if (clientType === 'web') {
-      const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
-      if (!tokenManager.verifyCsrfToken(csrfHeader, payload)) {
-        logger.warn('[Auth:Refresh] CSRF token validation failed');
-        throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
-      }
+      tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:Refresh');
     }
 
     // Fetch current user data from DB.
@@ -613,6 +609,21 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
     const clientType = parseClientType(req.query.client_type);
 
     if (clientType === 'web') {
+      const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
+
+      if (refreshToken) {
+        const tokenManager = TokenManager.getInstance();
+        let payload: RefreshTokenPayload | null = null;
+        try {
+          payload = tokenManager.verifyRefreshToken(refreshToken);
+        } catch {
+          // Stale or invalid cookie: fall through and clear it idempotently.
+        }
+        if (payload?.sessionType === 'user') {
+          tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:Logout');
+        }
+      }
+
       clearRefreshTokenCookie(res);
     }
     // For non-web clients: no server-side cleanup needed.

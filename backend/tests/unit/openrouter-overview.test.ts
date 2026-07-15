@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const environmentMock = vi.hoisted(() => ({
+  isCloud: false,
+}));
+
 vi.mock('../../src/utils/environment.js', () => ({
-  isCloudEnvironment: () => false,
+  isCloudEnvironment: () => environmentMock.isCloud,
 }));
 
 vi.mock('../../src/utils/logger.js', () => ({
@@ -9,6 +13,18 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 import { OpenRouterProvider } from '../../src/providers/ai/openrouter.provider.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
+
+type ProviderState = OpenRouterProvider & {
+  cloudCredentials?: unknown;
+  fetchPromise: Promise<string> | null;
+};
+
+function resetProviderState(provider: OpenRouterProvider) {
+  const state = provider as unknown as ProviderState;
+  state.cloudCredentials = undefined;
+  state.fetchPromise = null;
+}
 
 describe('OpenRouterProvider.getOverview', () => {
   let provider: OpenRouterProvider;
@@ -30,14 +46,17 @@ describe('OpenRouterProvider.getOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
+    environmentMock.isCloud = false;
     vi.useFakeTimers();
     vi.setSystemTime(fixedNow);
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     provider = OpenRouterProvider.getInstance();
+    resetProviderState(provider);
   });
 
   afterEach(() => {
+    resetProviderState(provider);
     vi.useRealTimers();
   });
 
@@ -226,4 +245,40 @@ describe('OpenRouterProvider.getOverview', () => {
     expect(overview.key.observabilityAvailable).toBe(false);
     expect(overview.charts.spend).toEqual([]);
   });
+
+  it.each([
+    { mode: 'self-hosting', isCloud: false, upstreamStatus: 401 },
+    { mode: 'cloud-hosting', isCloud: true, upstreamStatus: 403 },
+  ])(
+    'returns a business error instead of $upstreamStatus for an invalid $mode key',
+    async ({ isCloud, upstreamStatus }) => {
+      environmentMock.isCloud = isCloud;
+
+      if (isCloud) {
+        vi.stubEnv('PROJECT_ID', 'project_123');
+        vi.stubEnv('JWT_SECRET', 'test-secret-long-enough-for-signing-32chars');
+        vi.stubEnv('CLOUD_API_HOST', 'https://cloud.example');
+        fetchMock.mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              openrouter: { api_key: 'sk-or-cloud-invalid', limit_remaining: 10 },
+            }),
+        });
+      } else {
+        vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-self-hosted-invalid');
+      }
+
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: upstreamStatus,
+      });
+
+      await expect(provider.getOverview()).rejects.toMatchObject({
+        statusCode: 400,
+        code: ERROR_CODES.AI_INVALID_API_KEY,
+        message: 'Invalid OpenRouter API Key',
+      });
+    }
+  );
 });

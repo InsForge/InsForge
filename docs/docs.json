@@ -135,6 +135,18 @@
                 ]
               },
               {
+                "group": "Integrations",
+                "pages": [
+                  "integrations/overview",
+                  "integrations/clerk",
+                  "integrations/auth0",
+                  "integrations/workos",
+                  "integrations/kinde",
+                  "integrations/stytch",
+                  "integrations/better-auth"
+                ]
+              },
+              {
                 "group": "Agent-Native Initiatives",
                 "pages": [
                   "agent-native/overview",
@@ -173,6 +185,12 @@
                   "alternatives",
                   "pricing",
                   "showcase"
+                ]
+              },
+              {
+                "group": "FAQ",
+                "pages": [
+                  "faq"
                 ]
               }
             ]
@@ -465,6 +483,12 @@
                   "zh/pricing",
                   "zh/showcase"
                 ]
+              },
+              {
+                "group": "常见问题",
+                "pages": [
+                  "zh/faq"
+                ]
               }
             ]
           },
@@ -756,6 +780,12 @@
                   "zh-Hant/pricing",
                   "zh-Hant/showcase"
                 ]
+              },
+              {
+                "group": "常見問題",
+                "pages": [
+                  "zh-Hant/faq"
+                ]
               }
             ]
           },
@@ -1046,6 +1076,12 @@
                   "es/alternatives",
                   "es/pricing",
                   "es/showcase"
+                ]
+              },
+              {
+                "group": "Preguntas frecuentes",
+                "pages": [
+                  "es/faq"
                 ]
               }
             ]

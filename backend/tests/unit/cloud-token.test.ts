@@ -10,6 +10,12 @@ vi.mock('jose', () => ({
   createRemoteJWKSet: vi.fn(() => 'mockedJwks'),
 }));
 
+// The app.config mock below has no `server` key, so the real logger cannot
+// initialize (it reads appConfig.server.logsDir at import time).
+vi.mock('../../src/utils/logger', () => ({
+  default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+}));
+
 vi.mock('../../src/infra/config/app.config', () => {
   const c = {
     cloud: {

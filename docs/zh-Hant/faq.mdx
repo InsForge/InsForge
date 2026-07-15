@@ -1,0 +1,131 @@
+---
+title: "常見問題"
+sidebarTitle: "常見問題"
+description: "關於 InsForge 運作方式的常見問題解答。"
+---
+
+<AccordionGroup>
+  <Accordion title="讀寫資料庫算 Edge Function 嗎？資料庫、Edge Function、Custom Compute 有什麼差別？">
+    不算。你平常對資料表做增刪改查的時候，其實沒有執行任何函式，當然也就不是 Edge Function。
+
+    在 InsForge 裡，你的程式碼有三種方式跟後端打交道，很容易搞混：
+
+    | | 怎麼觸發 | 會不會一直執行 | 用來做什麼 |
+    |----|---------|--------------|---------|
+    | **讀寫資料庫**（自動產生的 REST API） | 用戶端發一個 SDK 或 REST 請求 | 不用你管，後端託管 | 增刪改查資料表 |
+    | **Edge Function** | HTTP 請求、定時（cron），或資料庫觸發器 | 跑一次就結束 | 自訂 API、webhook、觸發邏輯、呼叫外部服務 |
+    | **Custom Compute** | 你自己啟動一個常駐行程 | 一直開著 | 佇列 worker、AI 推論迴圈、websocket、需要一直保持狀態的工作 |
+
+    **讀寫資料庫。** 你建好一張表，InsForge 自動就給你一套 REST 介面（例如 `GET /api/database/records/{table}`）和一個帶型別的 SDK。你呼叫 `select`、`insert` 這些，就是直接在讀寫資料庫，不用部署也不用跑任何東西。日常的增刪改查用這個就夠了，參見[資料庫](/core-concepts/database/overview)。
+
+    **Edge Function。** 當自動介面滿足不了、你想寫自己的伺服器端邏輯時才用它，例如接付款回呼（webhook）、登入掛鉤、在某列資料發生 `INSERT`/`UPDATE`/`DELETE` 時觸發一段程式碼，或者定時任務。它的特點是跑完一次請求就結束，不會一直待著。參見 [Edge Functions](/core-concepts/functions/overview)。
+
+    **Custom Compute。** 當你需要一個一直開著的行程時才用它，例如佇列 worker 或者 AI 推論迴圈。這種工作 Edge Function 做不到，因為它不常駐。參見 [Custom Compute](/core-concepts/compute/overview)。
+
+    一句話判斷：只是讀寫資料，就走資料庫（自動 REST）；要寫一段跑完就結束的邏輯，用 Edge Function；要一直執行，用 Custom Compute。
+  </Accordion>
+
+  <Accordion title="怎麼查詢 public 以外 schema 裡的表？">
+    預設你所有的表都在 `public` 裡。只有當你自己用 `CREATE SCHEMA` 建過別的 schema，才會有非 `public` 的 schema（InsForge 自己的內部 schema，例如 `auth`、`storage`，是隱藏的，沒辦法這樣查）。一旦有了，dashboard、REST API、CLI 都能讀寫它。目前唯一只認 `public` 的是 `@insforge/sdk` 的查詢建構器。
+
+    下面的例子用一個你自己建立、名叫 `my_schema` 的 schema。
+
+    **Dashboard。** 打開 **Database**，用側邊欄頂部的 schema 選擇器。你建的任何 schema 都會和 `public` 並列出現，選中它就能瀏覽該 schema 下的表。
+
+    **REST API。** records 介面既接受 query 參數，也接受 PostgREST 的 profile header。讀用 `Accept-Profile`，寫和 RPC 用 `Content-Profile`：
+
+    ```bash
+    # 讀：?schema= 參數，或 Accept-Profile header
+    curl "$PROJECT_URL/api/database/records/mytable?schema=my_schema" \
+      -H "Authorization: Bearer $TOKEN"
+
+    # 寫：帶上 Content-Profile
+    curl -X POST "$PROJECT_URL/api/database/records/mytable" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Profile: my_schema" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "hello"}'
+    ```
+
+    **CLI。** CLI 用 `db query` 就能讀寫任意 schema，把表名加上 schema 前綴即可：
+
+    ```bash
+    insforge db query "SELECT * FROM my_schema.mytable"
+    ```
+
+    **SDK。** `client.database.from('mytable')` 永遠指向 `public`，目前沒有指定 schema 的選項，所以要存取別的 schema，請直接呼叫上面的 REST 介面（用 `?schema=` 參數，或 `Accept-Profile` / `Content-Profile` header），而不是用查詢建構器。
+
+    不管走哪條路，存取 API 都還有一步：自建 schema 只是「可路由」，不等於「可讀」。在你顯式授權之前，`anon` 和 `authenticated` 角色對它沒有任何權限，跟表的 owner 是誰無關，所以授權前呼叫只會回傳空結果或權限不足。給你要開放的每個角色授權，再加 RLS：
+
+    ```sql
+    GRANT USAGE ON SCHEMA my_schema TO anon, authenticated;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA my_schema TO anon, authenticated;
+    ```
+
+    之後列級可見性照常由 RLS 控制。project_admin 擁有表，只是讓它能管理並直接查詢這些表（例如在 dashboard 的 SQL 編輯器裡），並不會給 API 角色存取權限。
+  </Accordion>
+
+  <Accordion title="怎麼把專案分享給另一個管理員，或者邀請隊友？">
+    存取權限是按 **organization（組織）** 共享的，不是按單個 project。你是把人邀請進擁有這些 project 的組織，他就能存取組織下的所有 project，沒有「只分享某一個 project」的入口。
+
+    邀請步驟：
+
+    1. 在 dashboard 裡，用左上角的組織切換器打開擁有該 project 的組織。
+    2. 點左側欄的 **Members**。
+    3. 點 **Invite Member**，填對方信箱，選一個角色：
+       - **Administrator（管理員）**：完全控制，既能管理 project，也能邀請、移除成員、修改成員角色。
+       - **Developer（開發者）**：能正常存取組織的 project，但不能管理成員。
+    4. 對方會收到一封邀請郵件（7 天內有效）。他用「收到邀請的那個信箱」登入 InsForge 並接受後，就以你選的角色加入組織。
+
+    想專門加一個管理員，邀請時選 **Administrator** 即可，之後也能在 Members 列表裡改角色。只有 Administrator 能邀請和管理成員。
+
+    把整個組織「移交給新 Owner」是另一個獨立操作，跟邀請成員不是一回事。要移交的話，打開 **Organization Settings**，用裡面的 **Transfer Ownership**（只有目前的 Owner 能發起，且對方必須是已驗證的 InsForge 使用者並接受郵件裡的請求）。
+  </Accordion>
+
+  <Accordion title="為什麼我的專案被暫停了？要怎麼避免被暫停？">
+    只有 Free 方案會出現暫停，原因有兩種：
+
+    - **閒置**：free 專案連續 7 天沒有任何請求後會被暫停。我們會先寄信提醒，任何一次請求都會重置這 7 天的計時。
+    - **超出用量**：如果你的 organization 超過 Free 的用量額度，底下的專案會一直保持暫停，直到你升級。
+
+    無論哪種情況，你的資料都完好無損。想徹底不再被暫停，把 organization 升級到 Pro。參見 [Pricing](/pricing)。
+  </Accordion>
+
+  <Accordion title="我的專案被暫停了，要怎麼重新啟動？">
+    在 dashboard 裡打開這個專案，點 **Restore Project**，幾分鐘後就會帶著完整資料恢復。有幾種情況要注意：
+
+    - free 專案在暫停後的 **30 天內**都可以在 dashboard 直接恢復。超過之後專案會被封存，你只能下載資料庫備份和 Storage 檔案（資料仍然不會遺失）。
+    - 如果是因為 organization 超出用量而暫停，需要 **Upgrade to Pro** 才能恢復。
+
+    還是卡住？到我們的 [Discord](https://discord.com/invite/DvBtaEc9Jz) 提問，回應最快。
+  </Accordion>
+
+  <Accordion title="不打開瀏覽器，怎麼幫 CLI 登入驗證？">
+    `npx @insforge/cli login` 會打開瀏覽器登入。在無介面機器、遠端伺服器或 CI 上，改用 user API key，不需要瀏覽器。
+
+    最快的方式是用 dashboard 裡的 setup prompt，它會幫你登入並關聯好專案：
+
+    <Steps>
+      <Step title="打開 Install 頁">
+        在 dashboard 裡打開你的專案，進入 **Install** 頁。
+      </Step>
+      <Step title="選擇你的 coding agent">
+        在 **Install in Agent** 下點你在用的 agent，然後切到 **CLI** 分頁。
+      </Step>
+      <Step title="複製 prompt">
+        複製 setup prompt 貼給你的 agent，它會一步搞定登入和專案關聯。
+      </Step>
+    </Steps>
+
+    這個 prompt 會填好一條限定到你帳號的登入命令，後面跟著關聯命令：
+
+    ```bash
+    npx @insforge/cli login --user-api-key <your-user-api-key>
+    npx @insforge/cli link --project-id <your-project-id>
+    ```
+
+    如果你只需要那把 key（例如在 CI 裡跑 CLI），打開帳號選單，進入 **Profile → API Keys**，建立一把 key（設個有效期，或選 **Never**）。把它存成 CI secret，再用它跑 `login --user-api-key`。加上 `--json` 可以得到機器可讀的輸出。
+
+    這把 key 擁有你帳號的完整權限，所以要保密，一旦外洩就輪換掉。
+  </Accordion>
+</AccordionGroup>

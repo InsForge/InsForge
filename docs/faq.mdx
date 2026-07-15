@@ -1,0 +1,131 @@
+---
+title: "FAQ"
+sidebarTitle: "FAQ"
+description: "Answers to common questions about how InsForge works."
+---
+
+<AccordionGroup>
+  <Accordion title="Is reading or writing the database an edge function? What's the difference between database calls, edge functions, and custom compute?">
+    No. When you read or write a table, no function runs at all, so it isn't an edge function.
+
+    In InsForge your code talks to the backend in three different ways, and they're easy to mix up:
+
+    | | How it's triggered | Does it keep running? | What it's for |
+    |----|--------------------|-----------------------|---------------|
+    | **Database call** (auto-generated REST API) | Your client sends an SDK or REST request | No, it's fully managed | Reading and writing table rows |
+    | **Edge Function** | An HTTP request, a cron schedule, or a database trigger | No, it runs once and exits | Custom endpoints, webhooks, trigger logic, calling external services |
+    | **Custom Compute** | You start a long-running process | Yes, it stays up | Queue workers, AI inference loops, websockets, anything that holds state |
+
+    **Database call.** Define a table and InsForge instantly gives you a set of REST endpoints (like `GET /api/database/records/{table}`) and a typed SDK. Calling `select` or `insert` reads and writes the database directly, with nothing to deploy and nothing running. This is all you need for ordinary create/read/update/delete. See [Database](/core-concepts/database/overview).
+
+    **Edge Function.** Reach for one when the auto-generated API isn't enough and you want your own server-side logic: a payment webhook, an auth hook, code that fires when a row is `INSERT`ed / `UPDATE`d / `DELETE`d, or a scheduled job. The point is that it runs once per request or event and then exits. See [Edge Functions](/core-concepts/functions/overview).
+
+    **Custom Compute.** Use this when you need a process that stays up, like a queue worker or an AI inference loop. An edge function can't do this because it doesn't run continuously. See [Custom Compute](/core-concepts/compute/overview).
+
+    Quick rule: just moving data in and out? That's the database (auto REST). Writing logic that runs and finishes? Edge function. Need something running all the time? Custom compute.
+  </Accordion>
+
+  <Accordion title="How do I query a table in a schema other than `public`?">
+    By default all of your tables live in `public`. You only have another schema if you created one yourself with `CREATE SCHEMA` (InsForge's own internal schemas, like `auth` and `storage`, are hidden and can't be queried this way). Once you have one, you can read and write it from the dashboard, the REST API, and the CLI. The one place that only sees `public` today is the `@insforge/sdk` query builder.
+
+    The examples below use a schema you created called `my_schema`.
+
+    **Dashboard.** Open **Database** and use the schema selector at the top of the sidebar. Any schema you created is listed alongside `public`, and picking it browses that schema's tables.
+
+    **REST API.** The records endpoint takes the target schema either as a query param or as a PostgREST profile header. Reads use `Accept-Profile`, writes and RPC use `Content-Profile`:
+
+    ```bash
+    # read: ?schema= param, or an Accept-Profile header
+    curl "$PROJECT_URL/api/database/records/mytable?schema=my_schema" \
+      -H "Authorization: Bearer $TOKEN"
+
+    # write: send Content-Profile
+    curl -X POST "$PROJECT_URL/api/database/records/mytable" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Profile: my_schema" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "hello"}'
+    ```
+
+    **CLI.** The CLI reads and writes any schema through `db query`, just schema-qualify the table:
+
+    ```bash
+    insforge db query "SELECT * FROM my_schema.mytable"
+    ```
+
+    **SDK.** `client.database.from('mytable')` always targets `public` and there is no schema option yet, so for another schema call the REST endpoint above directly (with the `?schema=` param or the `Accept-Profile` / `Content-Profile` header) instead of the query builder.
+
+    One more step for API access: a custom schema is only routable, not readable. The `anon` and `authenticated` roles have no privileges on it until you grant them, no matter who owns the tables, so calls come back empty or permission-denied until you do. Grant each role you expose, then add RLS:
+
+    ```sql
+    GRANT USAGE ON SCHEMA my_schema TO anon, authenticated;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA my_schema TO anon, authenticated;
+    ```
+
+    Row visibility is then gated by RLS as usual. Project-admin ownership only lets the admin manage and directly query the tables (for example from the dashboard SQL editor); it does not give the API roles access.
+  </Accordion>
+
+  <Accordion title="How do I share a project with another admin, or invite a teammate?">
+    Access is shared at the **organization** level, not per project. You invite someone to the organization that owns your projects, and they get access to every project inside it. There is no separate "share just this one project" flow.
+
+    To invite someone:
+
+    1. In the dashboard, open the organization that owns the project using the org switcher in the top-left.
+    2. Click **Members** in the left sidebar.
+    3. Click **Invite Member**, enter their email, and pick a role:
+       - **Administrator** has full control: manage projects, plus invite, remove, and change the roles of other members.
+       - **Developer** has normal access to the organization's projects but cannot manage members.
+    4. They get an email invite that is valid for 7 days. When they sign in to InsForge **with that same email address** and accept it, they join the organization with the role you chose.
+
+    To add another admin specifically, choose the **Administrator** role when inviting, or change their role later from the Members list. Only Administrators can invite or manage members.
+
+    Handing the organization over to a new **Owner** entirely is a separate action from inviting members. To do that, open **Organization Settings** and use **Transfer Ownership** (only the current owner can start it, and the recipient must be a verified InsForge user who accepts the emailed request).
+  </Accordion>
+
+  <Accordion title="Why did my project get paused, and how do I keep it from pausing?">
+    Pausing only happens on the Free plan, for two reasons:
+
+    - **Inactivity.** A free project is paused after 7 days with no requests. We email a heads-up first, and any request resets the 7-day clock.
+    - **Usage limit.** If your organization goes over the Free usage limits, its projects stay paused until you upgrade.
+
+    Your data stays intact either way. To stop projects from pausing at all, upgrade the organization to Pro. See [Pricing](/pricing).
+  </Accordion>
+
+  <Accordion title="My project is paused. How do I restart it?">
+    Open the project in the dashboard and click **Restore Project**. It comes back in a few minutes with your data intact. A couple of cases to know:
+
+    - You can restore a free project from the dashboard for up to **30 days** after it pauses. After that it's archived and you can only download the database backup and storage files (still no data loss).
+    - If it was paused because the organization hit its usage limit, **Upgrade to Pro** to restore it.
+
+    Still stuck? Ask in our [Discord](https://discord.com/invite/DvBtaEc9Jz) for the fastest response.
+  </Accordion>
+
+  <Accordion title="How do I authenticate the CLI without a browser?">
+    `npx @insforge/cli login` opens a browser to sign in. On a headless machine, a remote server, or CI, use a user API key instead. No browser needed.
+
+    The quickest way is the setup prompt from the dashboard, which signs in and links the project for you:
+
+    <Steps>
+      <Step title="Open the Install page">
+        Open your project in the dashboard and go to the **Install** page.
+      </Step>
+      <Step title="Pick your coding agent">
+        Under **Install in Agent**, click the agent you use, then open the **CLI** tab.
+      </Step>
+      <Step title="Copy the prompt">
+        Copy the setup prompt and paste it into your agent. It signs the CLI in and links the project in one step.
+      </Step>
+    </Steps>
+
+    The prompt fills in a login command scoped to your account, followed by the link command:
+
+    ```bash
+    npx @insforge/cli login --user-api-key <your-user-api-key>
+    npx @insforge/cli link --project-id <your-project-id>
+    ```
+
+    If you only need the key, for example to run the CLI in CI, open your account menu and go to **Profile → API Keys**, then create a key (set an expiry, or **Never**). Store it as a CI secret and run `login --user-api-key` with it. Add `--json` for machine-readable output.
+
+    The key grants full access to your account, so keep it secret and rotate it if it leaks.
+  </Accordion>
+</AccordionGroup>
