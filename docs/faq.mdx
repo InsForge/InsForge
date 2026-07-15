@@ -32,17 +32,19 @@ description: "Answers to common questions about how InsForge works."
 
     **Dashboard.** Open **Database** and use the schema selector at the top of the sidebar. Any schema you created is listed alongside `public`, and picking it browses that schema's tables.
 
-    **REST API.** The records endpoint takes the target schema either as a query param or as a PostgREST profile header:
+    **REST API.** The records endpoint takes the target schema either as a query param or as a PostgREST profile header. Reads use `Accept-Profile`, writes and RPC use `Content-Profile`:
 
     ```bash
-    # query param
+    # read: ?schema= param, or an Accept-Profile header
     curl "$PROJECT_URL/api/database/records/mytable?schema=my_schema" \
       -H "Authorization: Bearer $TOKEN"
 
-    # or a profile header: Accept-Profile for reads, Content-Profile for writes and RPC
-    curl "$PROJECT_URL/api/database/records/mytable" \
+    # write: send Content-Profile
+    curl -X POST "$PROJECT_URL/api/database/records/mytable" \
       -H "Authorization: Bearer $TOKEN" \
-      -H "Accept-Profile: my_schema"
+      -H "Content-Profile: my_schema" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "hello"}'
     ```
 
     **CLI.** Use raw SQL and schema-qualify the table:
@@ -53,7 +55,14 @@ description: "Answers to common questions about how InsForge works."
 
     **SDK.** `client.database.from('mytable')` always targets `public` and there is no schema option yet, so for another schema call the REST endpoint above directly (with the `?schema=` param or the `Accept-Profile` / `Content-Profile` header) instead of the query builder.
 
-    One thing to check either way: the schema is reachable, but the `anon` and `authenticated` roles still need privileges on it. If reads come back empty or denied, grant access and add RLS, for example `GRANT USAGE ON SCHEMA my_schema TO authenticated;` plus the table grants and policies. Tables you created as the project admin are owned by it and work without extra grants.
+    One more step for API access: a custom schema is only routable, not readable. The `anon` and `authenticated` roles have no privileges on it until you grant them, no matter who owns the tables, so calls come back empty or permission-denied until you do. Grant each role you expose, then add RLS:
+
+    ```sql
+    GRANT USAGE ON SCHEMA my_schema TO anon, authenticated;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA my_schema TO anon, authenticated;
+    ```
+
+    Row visibility is then gated by RLS as usual. Project-admin ownership only lets the admin manage and directly query the tables (for example from the dashboard SQL editor); it does not give the API roles access.
   </Accordion>
 
   <Accordion title="How do I share a project with another admin, or invite a teammate?">
