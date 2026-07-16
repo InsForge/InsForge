@@ -86,8 +86,12 @@ describe('ChatCompletionService.streamChat - token usage accounting', () => {
       events.push(event);
     }
 
-    const usageEvent = events.find((event) => event.tokenUsage);
-    expect(usageEvent?.tokenUsage).toEqual({
+    // With include_usage the provider emits exactly one usage-bearing chunk (the
+    // final one); intermediate chunks carry `usage: null`. Assert a single event
+    // so a regression that double-counts usage across chunks would be caught.
+    const usageEvents = events.filter((event) => event.tokenUsage);
+    expect(usageEvents).toHaveLength(1);
+    expect(usageEvents[0].tokenUsage).toEqual({
       promptTokens: 12,
       completionTokens: 8,
       totalTokens: 20,
