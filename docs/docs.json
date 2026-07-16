@@ -1176,6 +1176,10 @@
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
               },
               {
+                "group": "Schedules",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/schedules.yaml"
+              },
+              {
                 "group": "Autenticación",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/auth.yaml"
               },
