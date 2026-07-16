@@ -9,6 +9,7 @@ paths:
   /api/schedules:
     get:
       summary: List schedules
+      description: Returns all schedules configured in the system.
       tags:
         - Admin
       security:
@@ -39,6 +40,7 @@ paths:
 
     post:
       summary: Create schedule
+      description: Creates a new scheduled job.
       tags:
         - Admin
       security:
@@ -89,6 +91,7 @@ paths:
   /api/schedules/config:
     get:
       summary: Get schedules configuration
+      description: Returns schedule retention configuration.
       tags:
         - Admin
       security:
@@ -117,6 +120,7 @@ paths:
 
     patch:
       summary: Update schedules configuration
+      description: Updates schedule retention configuration.
       tags:
         - Admin
       security:
@@ -162,6 +166,7 @@ paths:
   /api/schedules/{id}:
     get:
       summary: Get schedule by ID
+      description: Returns a single schedule by identifier.
       tags:
         - Admin
       security:
@@ -205,6 +210,7 @@ paths:
 
     patch:
       summary: Update schedule
+      description: Updates an existing schedule.
       tags:
         - Admin
       security:
@@ -270,6 +276,7 @@ paths:
 
     delete:
       summary: Delete schedule
+      description: Deletes a schedule.
       tags:
         - Admin
       security:
@@ -317,6 +324,7 @@ paths:
   /api/schedules/{id}/logs:
     get:
       summary: Get execution logs for a schedule
+      description: Returns execution history for a schedule with pagination support.
       tags:
         - Admin
       security:
@@ -377,6 +385,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+        '404':
+          description: Schedule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -398,9 +413,20 @@ components:
           type: string
         statusCode:
           type: integer
+        nextAction:
+          type: string
 
     Schedule:
       type: object
+      required:
+        - id
+        - name
+        - cronSchedule
+        - functionUrl
+        - httpMethod
+        - isActive
+        - createdAt
+        - updatedAt
       properties:
         id:
           type: string
@@ -421,6 +447,7 @@ components:
           additionalProperties:
             type: string
         body:
+          type: object
           nullable: true
         cronJobId:
           type: string

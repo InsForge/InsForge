@@ -285,6 +285,10 @@
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
               },
               {
+                "group": "Schedules",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/schedules.yaml"
+              },
+              {
                 "group": "Authentication",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/auth.yaml"
               },
@@ -582,6 +586,10 @@
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
               },
               {
+                "group": "Schedules",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/schedules.yaml"
+              },
+              {
                 "group": "身份认证",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/auth.yaml"
               },
@@ -877,6 +885,10 @@
               {
                 "group": "Tables",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
+              },
+              {
+                "group": "Schedules",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/schedules.yaml"
               },
               {
                 "group": "身分驗證",
