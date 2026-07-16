@@ -71,7 +71,7 @@ description: "关于 InsForge 工作方式的常见问题解答。"
     - **Anon Key**：公开的，给浏览器用。请求以 `anon` 角色运行，受 RLS 管，`permission denied for schema storage` 就是它撞出来的。
     - **API Key**：全权限管理员 key，只在服务端用，绕过 RLS。
 
-    在 dashboard 的 **Project Settings → General** 里找 API Key（标着 **API Key** 的那一行，写明"对项目有完全控制权限，不要暴露在前端"），或者运行 `npx @insforge/cli secrets get API_KEY`。
+    在 dashboard 的 **Project Settings → General** 里找 API Key（标着 **API Key** 的那一行，写明「对项目有完全控制权限，不要暴露在前端」），或者运行 `npx @insforge/cli secrets get API_KEY`。
 
     在可信的服务端代码里通过 `createAdminClient` 使用，绝不要放到浏览器：
 
