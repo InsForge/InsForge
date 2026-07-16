@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { format, isValid, parse } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { Button, cn } from '@insforge/ui';
 import { Popover, PopoverContent, PopoverTrigger } from '#components';
 import type { DateCellEditorProps } from './types';
@@ -17,7 +18,22 @@ interface TimeColumnProps {
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_KEYS = [
+  'jan',
+  'feb',
+  'mar',
+  'apr',
+  'may',
+  'jun',
+  'jul',
+  'aug',
+  'sep',
+  'oct',
+  'nov',
+  'dec',
+];
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const DATE_FORMAT = 'yyyy-MM-dd';
 const DATE_VALUE_REGEX = /^(\d{4}-\d{2}-\d{2})(?:$|[T\s])/;
 
@@ -81,6 +97,13 @@ export function DateCellEditor({
   onCancel,
   className,
 }: DateCellEditorProps) {
+  const { t } = useTranslation('chrome');
+  const monthLabels = MONTH_KEYS.map((key, index) =>
+    t(`common.months.${key}`, { defaultValue: MONTHS[index] })
+  );
+  const weekdayLabels = WEEKDAY_KEYS.map((key, index) =>
+    t(`common.weekdays.${key}`, { defaultValue: WEEKDAYS[index] })
+  );
   const [open, setOpen] = useState(true);
   const [pickerMode, setPickerMode] = useState<PickerMode>('day');
   const [selectedDate, setSelectedDate] = useState<Date>(
@@ -243,7 +266,7 @@ export function DateCellEditor({
   const formatDisplayValue = () => {
     const date = parseCellDateValue(value, type);
     if (!date) {
-      return 'Select date...';
+      return t('common.selectDate', { defaultValue: 'Select date...' });
     }
 
     return type === ColumnType.DATETIME
@@ -291,7 +314,7 @@ export function DateCellEditor({
   };
 
   const renderMonthPicker = () => {
-    return MONTHS.map((month, index) => {
+    return monthLabels.map((month, index) => {
       const isSelected = selectedDate.getMonth() === index;
       return (
         <button
@@ -384,7 +407,7 @@ export function DateCellEditor({
                   }
                 }}
               >
-                {pickerMode === 'day' && `${MONTHS[displayMonth]} ${displayYear}`}
+                {pickerMode === 'day' && `${monthLabels[displayMonth]} ${displayYear}`}
                 {pickerMode === 'month' && displayYear}
                 {pickerMode === 'year' &&
                   `${Math.floor(displayYear / 10) * 10}-${Math.floor(displayYear / 10) * 10 + 9}`}
@@ -411,7 +434,7 @@ export function DateCellEditor({
                 <>
                   {/* Weekday headers */}
                   <div className="mb-1 grid grid-cols-7 gap-1">
-                    {WEEKDAYS.map((day) => (
+                    {weekdayLabels.map((day) => (
                       <div
                         key={day}
                         className="flex h-8 w-8 items-center justify-center text-xs text-muted-foreground"
@@ -441,19 +464,21 @@ export function DateCellEditor({
               <div className="p-3">
                 <div className="mb-3 flex items-center justify-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">Time</span>
+                  <span className="text-sm font-medium text-foreground">
+                    {t('common.time', { defaultValue: 'Time' })}
+                  </span>
                 </div>
 
                 <div className="flex gap-2">
                   <TimeColumn
-                    label="Hour"
+                    label={t('common.hour', { defaultValue: 'Hour' })}
                     value={selectedHour}
                     range={24}
                     onChange={setSelectedHour}
                     scrollRef={hourScrollRef}
                   />
                   <TimeColumn
-                    label="Min"
+                    label={t('common.minute', { defaultValue: 'Min' })}
                     value={selectedMinute}
                     range={60}
                     onChange={setSelectedMinute}
@@ -481,10 +506,10 @@ export function DateCellEditor({
             }}
             className="flex-1"
           >
-            Cancel
+            {t('common.cancel', { defaultValue: 'Cancel' })}
           </Button>
           <Button size="sm" onClick={handleSave} className="flex-1">
-            Save
+            {t('common.save', { defaultValue: 'Save' })}
           </Button>
         </div>
       </PopoverContent>

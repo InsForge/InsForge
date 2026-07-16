@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Controller, Control } from 'react-hook-form';
 import { X, Key } from 'lucide-react';
 import { Checkbox, Input } from '@insforge/ui';
@@ -24,6 +25,7 @@ export const TableFormColumn = memo(function TableFormColumn({
   isLast,
   column,
 }: TableFormColumnProps) {
+  const { t } = useTranslation('chrome');
   return (
     <div
       className={`group flex h-12 items-center pl-1.5 hover:bg-[var(--alpha-4)] ${
@@ -38,7 +40,7 @@ export const TableFormColumn = memo(function TableFormColumn({
             render={({ field }) => (
               <Input
                 {...field}
-                placeholder="Enter column name"
+                placeholder={t('database.enterColumnName', { defaultValue: 'Enter column name' })}
                 className="h-8 bg-[var(--alpha-4)] border-[var(--alpha-12)] pr-8"
                 disabled={isSystemColumn}
               />
@@ -68,7 +70,7 @@ export const TableFormColumn = memo(function TableFormColumn({
           render={({ field }) => (
             <Input
               {...field}
-              placeholder="Enter default value"
+              placeholder={t('database.enterDefaultValue', { defaultValue: 'Enter default value' })}
               className="h-8 bg-[var(--alpha-4)] border-[var(--alpha-12)]"
               disabled={isSystemColumn}
             />
@@ -112,7 +114,7 @@ export const TableFormColumn = memo(function TableFormColumn({
             type="button"
             onClick={onRemove}
             className="flex size-8 items-center justify-center rounded text-muted-foreground opacity-0 transition-[opacity,colors] group-hover:opacity-100 hover:bg-[var(--alpha-8)] hover:text-foreground focus-visible:opacity-100"
-            aria-label="Remove column"
+            aria-label={t('database.removeColumn', { defaultValue: 'Remove column' })}
           >
             <X className="size-5" />
           </button>

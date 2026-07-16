@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CirclePlus, RefreshCw } from 'lucide-react';
 import {
   Button,
@@ -22,6 +23,7 @@ import { useUsers } from '#features/auth/hooks/useUsers';
 import { usePageSize } from '#lib/hooks/usePageSize';
 
 export default function UsersPage() {
+  const { t } = useTranslation('chrome');
   const [searchValue, setSearchValue] = useState('');
   const searchQuery = searchValue.trim();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -124,11 +126,19 @@ export default function UsersPage() {
       void refetch();
       setSelectedRows(new Set());
       showToast(
-        `${userIds.length} user${userIds.length > 1 ? 's' : ''} deleted successfully`,
+        t('auth.usersDeletedToast', {
+          count: userIds.length,
+          defaultValue: '{{count}} users deleted successfully',
+        }),
         'success'
       );
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to delete users', 'error');
+      showToast(
+        error instanceof Error
+          ? error.message
+          : t('auth.deleteUsersFailed', { defaultValue: 'Failed to delete users' }),
+        'error'
+      );
     }
   };
 
@@ -146,8 +156,11 @@ export default function UsersPage() {
 
   const emptyState = (
     <DataGridEmptyState
-      message="No Users Found"
-      action={{ label: 'Add User', onClick: () => setAddDialogOpen(true) }}
+      message={t('auth.noUsersFound', { defaultValue: 'No Users Found' })}
+      action={{
+        label: t('auth.addUser', { defaultValue: 'Add User' }),
+        onClick: () => setAddDialogOpen(true),
+      }}
     />
   );
 
@@ -170,7 +183,9 @@ export default function UsersPage() {
             </div>
           ) : (
             <div className="flex min-w-0 items-center gap-3">
-              <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Users</h1>
+              <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
+                {t('auth.users', { defaultValue: 'Users' })}
+              </h1>
               <div className="flex h-5 w-5 shrink-0 items-center justify-center">
                 <div className="h-5 w-px bg-[var(--alpha-8)]" />
               </div>
@@ -194,7 +209,11 @@ export default function UsersPage() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" align="center">
-                    <p>{isRefreshing ? 'Refreshing...' : 'Refresh users'}</p>
+                    <p>
+                      {isRefreshing
+                        ? t('auth.refreshing', { defaultValue: 'Refreshing...' })
+                        : t('auth.refreshUsers', { defaultValue: 'Refresh users' })}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -208,7 +227,9 @@ export default function UsersPage() {
                 onClick={() => setAddDialogOpen(true)}
               >
                 <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
-                <span className="px-1 text-sm font-medium leading-5">Add User</span>
+                <span className="px-1 text-sm font-medium leading-5">
+                  {t('auth.addUser', { defaultValue: 'Add User' })}
+                </span>
               </Button>
             </div>
           )
@@ -216,7 +237,7 @@ export default function UsersPage() {
         searchValue={searchValue}
         onSearchChange={setSearchValue}
         searchDebounceTime={300}
-        searchPlaceholder="Search users"
+        searchPlaceholder={t('auth.searchUsers', { defaultValue: 'Search users' })}
       />
 
       <div className="relative min-h-0 flex-1">
@@ -247,15 +268,21 @@ export default function UsersPage() {
       <ConfirmDialog
         open={confirmDeleteOpen}
         onOpenChange={setConfirmDeleteOpen}
-        title={`Delete ${selectedRows.size} ${selectedRows.size === 1 ? 'User' : 'Users'}`}
+        title={t('auth.deleteUsersTitle', {
+          count: selectedRows.size,
+          defaultValue: 'Delete {{count}} Users',
+        })}
         description={
           <span>
-            Are you sure to <strong>permanently delete {selectedRows.size}</strong>{' '}
-            {selectedRows.size === 1 ? 'user' : 'users'}? This action cannot be undone.
+            {t('auth.deleteUsersConfirm', {
+              count: selectedRows.size,
+              defaultValue:
+                'Are you sure to permanently delete {{count}} users? This action cannot be undone.',
+            })}
           </span>
         }
-        confirmText="Delete"
-        cancelText="Cancel"
+        confirmText={t('auth.delete', { defaultValue: 'Delete' })}
+        cancelText={t('auth.cancel', { defaultValue: 'Cancel' })}
         destructive
         onConfirm={handleBulkDelete}
       />

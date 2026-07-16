@@ -1,4 +1,5 @@
 import { ChevronDown } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Checkbox, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@insforge/ui';
 import type { DashboardAdvisorSeverity } from '#types';
 
@@ -14,6 +15,7 @@ interface SeverityFilterDropdownProps {
 }
 
 export function SeverityFilterDropdown({ selected, onChange }: SeverityFilterDropdownProps) {
+  const { t } = useTranslation('chrome');
   const toggle = (severity: DashboardAdvisorSeverity) => {
     const next = new Set(selected);
     if (next.has(severity)) {
@@ -31,8 +33,8 @@ export function SeverityFilterDropdown({ selected, onChange }: SeverityFilterDro
           type="button"
           className="flex h-8 items-center gap-1 rounded border border-[var(--alpha-8)] bg-card px-2 text-sm leading-5 text-foreground transition-colors hover:bg-[var(--alpha-4)]"
         >
-          <span className="text-muted-foreground">Severity:</span>
-          <span>{selected.size} selected</span>
+          <span className="text-muted-foreground">{t('advisor.severity')}</span>
+          <span>{t('advisor.selectedCount', { count: selected.size })}</span>
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
@@ -51,7 +53,9 @@ export function SeverityFilterDropdown({ selected, onChange }: SeverityFilterDro
                 onCheckedChange={() => toggle(severity.value)}
                 onClick={(e) => e.stopPropagation()}
               />
-              <span>{severity.label}</span>
+              <span>
+                {t(`advisor.severities.${severity.value}`, { defaultValue: severity.label })}
+              </span>
             </button>
           );
         })}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button, Input, Tabs, Tab } from '@insforge/ui';
 import { ChevronRight } from 'lucide-react';
 import type { EmailTemplateSchema, UpdateEmailTemplateRequest } from '@insforge/shared-schemas';
@@ -13,64 +14,107 @@ interface EmailTemplateCardProps {
   ) => void;
 }
 
-const TEMPLATE_INFO: Record<string, { title: string; description: string }> = {
-  'email-verification-code': {
-    title: 'Email Verification (Code)',
-    description: 'Sent when a user needs to verify their email with a 6-digit code.',
-  },
-  'email-verification-link': {
-    title: 'Email Verification (Link)',
-    description: 'Sent when a user needs to verify their email via a magic link.',
-  },
-  'reset-password-code': {
-    title: 'Password Reset (Code)',
-    description: 'Sent when a user requests a password reset with a 6-digit code.',
-  },
-  'reset-password-link': {
-    title: 'Password Reset (Link)',
-    description: 'Sent when a user requests a password reset via a magic link.',
-  },
-};
-
-const TEMPLATE_VARIABLES: Record<string, { name: string; description: string; sample: string }[]> =
-  {
-    'email-verification-code': [
-      { name: '{{ token }}', description: '6-digit verification code', sample: '847295' },
-      { name: '{{ email }}', description: "User's email address", sample: 'user@example.com' },
-      { name: '{{ name }}', description: "User's display name", sample: 'John' },
-    ],
-    'email-verification-link': [
-      {
-        name: '{{ link }}',
-        description: 'Email verification URL',
-        sample: 'https://yourapp.com/verify?token=abc123',
-      },
-      { name: '{{ email }}', description: "User's email address", sample: 'user@example.com' },
-      { name: '{{ name }}', description: "User's display name", sample: 'John' },
-    ],
-    'reset-password-code': [
-      { name: '{{ token }}', description: '6-digit reset code', sample: '382916' },
-      { name: '{{ email }}', description: "User's email address", sample: 'user@example.com' },
-      { name: '{{ name }}', description: "User's display name", sample: 'John' },
-    ],
-    'reset-password-link': [
-      {
-        name: '{{ link }}',
-        description: 'Password reset URL',
-        sample: 'https://yourapp.com/reset?token=xyz789',
-      },
-      { name: '{{ email }}', description: "User's email address", sample: 'user@example.com' },
-      { name: '{{ name }}', description: "User's display name", sample: 'John' },
-    ],
-  };
-
 export function EmailTemplateCard({
   templates,
   isLoading,
   isUpdating,
   onSave,
 }: EmailTemplateCardProps) {
-  const templateTypes = useMemo(() => templates.map((t) => t.templateType), [templates]);
+  const { t } = useTranslation('chrome');
+  const templateTypes = useMemo(
+    () => templates.map((template) => template.templateType),
+    [templates]
+  );
+
+  const templateInfo = useMemo<Record<string, { title: string; description: string }>>(
+    () => ({
+      'email-verification-code': {
+        title: t('auth.emailVerificationCodeTitle', {
+          defaultValue: 'Email Verification (Code)',
+        }),
+        description: t('auth.emailVerificationCodeDescription', {
+          defaultValue: 'Sent when a user needs to verify their email with a 6-digit code.',
+        }),
+      },
+      'email-verification-link': {
+        title: t('auth.emailVerificationLinkTitle', {
+          defaultValue: 'Email Verification (Link)',
+        }),
+        description: t('auth.emailVerificationLinkDescription', {
+          defaultValue: 'Sent when a user needs to verify their email via a magic link.',
+        }),
+      },
+      'reset-password-code': {
+        title: t('auth.resetPasswordCodeTitle', { defaultValue: 'Password Reset (Code)' }),
+        description: t('auth.resetPasswordCodeDescription', {
+          defaultValue: 'Sent when a user requests a password reset with a 6-digit code.',
+        }),
+      },
+      'reset-password-link': {
+        title: t('auth.resetPasswordLinkTitle', { defaultValue: 'Password Reset (Link)' }),
+        description: t('auth.resetPasswordLinkDescription', {
+          defaultValue: 'Sent when a user requests a password reset via a magic link.',
+        }),
+      },
+    }),
+    [t]
+  );
+
+  const templateVariables = useMemo<
+    Record<string, { name: string; description: string; sample: string }[]>
+  >(() => {
+    const emailVariable = {
+      name: '{{ email }}',
+      description: t('auth.varUserEmail', { defaultValue: "User's email address" }),
+      sample: 'user@example.com',
+    };
+    const nameVariable = {
+      name: '{{ name }}',
+      description: t('auth.varUserName', { defaultValue: "User's display name" }),
+      sample: 'John',
+    };
+
+    return {
+      'email-verification-code': [
+        {
+          name: '{{ token }}',
+          description: t('auth.varVerificationCode', {
+            defaultValue: '6-digit verification code',
+          }),
+          sample: '847295',
+        },
+        emailVariable,
+        nameVariable,
+      ],
+      'email-verification-link': [
+        {
+          name: '{{ link }}',
+          description: t('auth.varVerificationUrl', { defaultValue: 'Email verification URL' }),
+          sample: 'https://yourapp.com/verify?token=abc123',
+        },
+        emailVariable,
+        nameVariable,
+      ],
+      'reset-password-code': [
+        {
+          name: '{{ token }}',
+          description: t('auth.varResetCode', { defaultValue: '6-digit reset code' }),
+          sample: '382916',
+        },
+        emailVariable,
+        nameVariable,
+      ],
+      'reset-password-link': [
+        {
+          name: '{{ link }}',
+          description: t('auth.varResetUrl', { defaultValue: 'Password reset URL' }),
+          sample: 'https://yourapp.com/reset?token=xyz789',
+        },
+        emailVariable,
+        nameVariable,
+      ],
+    };
+  }, [t]);
 
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'source' | 'preview'>('source');
@@ -79,7 +123,7 @@ export function EmailTemplateCard({
   const [isDirty, setIsDirty] = useState(false);
 
   const selectedTemplate = useMemo(
-    () => templates.find((t) => t.templateType === selectedType),
+    () => templates.find((template) => template.templateType === selectedType),
     [templates, selectedType]
   );
 
@@ -127,7 +171,14 @@ export function EmailTemplateCard({
   };
 
   const handleBack = () => {
-    if (isDirty && !window.confirm('You have unsaved changes. Discard them?')) {
+    if (
+      isDirty &&
+      !window.confirm(
+        t('auth.unsavedChangesDiscard', {
+          defaultValue: 'You have unsaved changes. Discard them?',
+        })
+      )
+    ) {
       return;
     }
     setSelectedType(null);
@@ -135,10 +186,10 @@ export function EmailTemplateCard({
   };
 
   const variables = useMemo(
-    () => (selectedType ? (TEMPLATE_VARIABLES[selectedType] ?? []) : []),
-    [selectedType]
+    () => (selectedType ? (templateVariables[selectedType] ?? []) : []),
+    [selectedType, templateVariables]
   );
-  const info = selectedType ? TEMPLATE_INFO[selectedType] : null;
+  const info = selectedType ? templateInfo[selectedType] : null;
 
   // Render preview HTML with sample values replacing placeholders
   const previewHtml = useMemo(() => {
@@ -156,7 +207,7 @@ export function EmailTemplateCard({
   if (isLoading) {
     return (
       <div className="flex min-h-[120px] items-center justify-center text-sm text-muted-foreground">
-        Loading email templates...
+        {t('auth.loadingEmailTemplates', { defaultValue: 'Loading email templates...' })}
       </div>
     );
   }
@@ -166,7 +217,7 @@ export function EmailTemplateCard({
     return (
       <div className="flex flex-col">
         {templateTypes.map((type, index) => {
-          const templateInfo = TEMPLATE_INFO[type];
+          const currentInfo = templateInfo[type];
           return (
             <button
               key={type}
@@ -177,10 +228,10 @@ export function EmailTemplateCard({
               }`}
             >
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">{templateInfo?.title ?? type}</p>
-                {templateInfo?.description && (
+                <p className="text-sm font-medium text-foreground">{currentInfo?.title ?? type}</p>
+                {currentInfo?.description && (
                   <p className="mt-0.5 text-[13px] text-muted-foreground">
-                    {templateInfo.description}
+                    {currentInfo.description}
                   </p>
                 )}
               </div>
@@ -202,7 +253,7 @@ export function EmailTemplateCard({
         className="flex items-center gap-1 self-start text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ChevronRight className="h-3.5 w-3.5 rotate-180" />
-        Back to templates
+        {t('auth.backToTemplates', { defaultValue: 'Back to templates' })}
       </button>
 
       {info && (
@@ -215,17 +266,19 @@ export function EmailTemplateCard({
       {/* Subject */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email-template-subject" className="text-sm text-foreground">
-          Subject
+          {t('auth.subject', { defaultValue: 'Subject' })}
         </label>
         <Input
           id="email-template-subject"
           type="text"
           value={subject}
           onChange={(e) => handleSubjectChange(e.target.value)}
-          placeholder="Email subject"
+          placeholder={t('auth.emailSubjectPlaceholder', { defaultValue: 'Email subject' })}
         />
         {!subject.trim() && isDirty && (
-          <p className="text-xs text-destructive">Subject is required</p>
+          <p className="text-xs text-destructive">
+            {t('auth.subjectRequired', { defaultValue: 'Subject is required' })}
+          </p>
         )}
       </div>
 
@@ -233,11 +286,11 @@ export function EmailTemplateCard({
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <label htmlFor="email-template-body" className="text-sm text-foreground">
-            Body
+            {t('auth.body', { defaultValue: 'Body' })}
           </label>
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'source' | 'preview')}>
-            <Tab value="source">Source</Tab>
-            <Tab value="preview">Preview</Tab>
+            <Tab value="source">{t('auth.source', { defaultValue: 'Source' })}</Tab>
+            <Tab value="preview">{t('auth.preview', { defaultValue: 'Preview' })}</Tab>
           </Tabs>
         </div>
 
@@ -247,13 +300,13 @@ export function EmailTemplateCard({
             className="min-h-[350px] w-full resize-y rounded bg-[var(--alpha-4)] border border-[var(--alpha-12)] px-3 py-2 font-mono text-xs leading-relaxed text-foreground transition-colors placeholder:text-muted-foreground hover:bg-[var(--alpha-8)] focus:outline-none focus:shadow-[0_0_0_1px_rgb(var(--inverse)),0_0_0_2px_rgb(var(--foreground))]"
             value={bodyHtml}
             onChange={(e) => handleBodyChange(e.target.value)}
-            placeholder="Enter HTML template..."
+            placeholder={t('auth.enterHtmlTemplate', { defaultValue: 'Enter HTML template...' })}
             spellCheck={false}
           />
         ) : (
           <div className="min-h-[350px] overflow-hidden rounded border border-[var(--alpha-12)] bg-white">
             <iframe
-              title="Email template preview"
+              title={t('auth.emailTemplatePreview', { defaultValue: 'Email template preview' })}
               sandbox=""
               srcDoc={previewHtml}
               className="h-[350px] w-full border-0"
@@ -264,16 +317,20 @@ export function EmailTemplateCard({
         {/* Variable reference */}
         {variables.length > 0 && (
           <p className="text-[13px] text-muted-foreground">
-            Use{' '}
+            {t('auth.use', { defaultValue: 'Use' })}{' '}
             {variables.map((v, i) => (
               <span key={v.name}>
-                <code className="font-mono text-xs text-foreground">{v.name}</code> for{' '}
-                {v.description.toLowerCase()}
+                <code className="font-mono text-xs text-foreground">{v.name}</code>{' '}
+                {t('auth.varFor', { defaultValue: 'for' })} {v.description.toLowerCase()}
                 {i < variables.length - 1 ? ', ' : '.'}
               </span>
             ))}{' '}
-            Avoid <code className="font-mono text-xs text-foreground">&lt;script&gt;</code> tags and
-            inline event handlers — most email clients strip or block them.
+            {t('auth.avoidScriptPrefix', { defaultValue: 'Avoid' })}{' '}
+            <code className="font-mono text-xs text-foreground">&lt;script&gt;</code>{' '}
+            {t('auth.avoidScriptSuffix', {
+              defaultValue:
+                'tags and inline event handlers — most email clients strip or block them.',
+            })}
           </p>
         )}
       </div>
@@ -282,14 +339,16 @@ export function EmailTemplateCard({
       {isDirty && (
         <div className="flex items-center justify-end gap-2 border-t border-[var(--alpha-8)] pt-4">
           <Button type="button" variant="secondary" onClick={handleCancel} disabled={isUpdating}>
-            Cancel
+            {t('auth.cancel', { defaultValue: 'Cancel' })}
           </Button>
           <Button
             type="button"
             onClick={handleSave}
             disabled={isUpdating || !subject.trim() || !bodyHtml.trim()}
           >
-            {isUpdating ? 'Saving...' : 'Save changes'}
+            {isUpdating
+              ? t('auth.saving', { defaultValue: 'Saving...' })
+              : t('auth.saveChanges', { defaultValue: 'Save Changes' })}
           </Button>
         </div>
       )}

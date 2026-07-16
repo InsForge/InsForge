@@ -146,3 +146,13 @@ export const CODING_AGENT_GRID_IDS: ClientId[] = [
 ];
 
 export const DIRECT_CONNECT_IDS: ClientId[] = ['connection-string', 'api-keys'];
+
+/**
+ * i18n keys for the non-product-name client labels. Product/agent names
+ * (Cursor, Claude Code, ...) stay untranslated by design.
+ */
+export const CLIENT_LABEL_I18N_KEYS: Partial<Record<ClientId, string>> = {
+  other: 'overview.otherAgents',
+  'connection-string': 'overview.connectionString',
+  'api-keys': 'overview.apiKeysTab',
+};

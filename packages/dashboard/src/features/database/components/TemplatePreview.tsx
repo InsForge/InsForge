@@ -1,4 +1,5 @@
 import { Button } from '@insforge/ui';
+import { useTranslation } from 'react-i18next';
 import { DatabaseTemplate } from '#features/database/templates';
 import { SchemaVisualizer } from '#features/visualizer/components/SchemaVisualizer';
 import { useRawSQL } from '#features/database/hooks/useRawSQL';
@@ -9,6 +10,7 @@ interface TemplatePreviewProps {
 }
 
 export function TemplatePreview({ template, onCancel }: TemplatePreviewProps) {
+  const { t } = useTranslation('chrome');
   const { executeSQL, isPending } = useRawSQL({
     showSuccessToast: true,
     showErrorToast: true,
@@ -27,13 +29,15 @@ export function TemplatePreview({ template, onCancel }: TemplatePreviewProps) {
       {/* Top Bar */}
       <div className="flex items-center justify-center gap-3 h-12 px-4 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
         <p className="text-sm font-normal text-zinc-600 dark:text-neutral-400">
-          You are previewing a template
+          {t('database.previewingTemplate', { defaultValue: 'You are previewing a template' })}
         </p>
         <Button variant="secondary" onClick={onCancel} className="px-4">
-          Cancel
+          {t('common.cancel', { defaultValue: 'Cancel' })}
         </Button>
         <Button className="px-4 font-medium" onClick={handleImplementTemplate} disabled={isPending}>
-          {isPending ? 'Implementing...' : 'Implement Template'}
+          {isPending
+            ? t('database.implementing', { defaultValue: 'Implementing...' })
+            : t('database.implementTemplate', { defaultValue: 'Implement Template' })}
         </Button>
       </div>
 

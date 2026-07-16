@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { aiService } from '#features/ai/services/ai.service';
 import { AI_OVERVIEW_QUERY_KEY } from '#features/ai/hooks/useAIOverview';
 import { useToast } from '@insforge/ui';
@@ -16,6 +17,7 @@ export function useOpenRouterKey() {
 }
 
 export function useRotateOpenRouterKey() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -24,10 +26,19 @@ export function useRotateOpenRouterKey() {
     onSuccess: (key) => {
       queryClient.setQueryData(OPENROUTER_KEY_QUERY_KEY, key);
       void queryClient.invalidateQueries({ queryKey: AI_OVERVIEW_QUERY_KEY });
-      showToast('OpenRouter API key rotated successfully', 'success');
+      showToast(
+        t('ai.overview.keyRotated', { defaultValue: 'OpenRouter API key rotated successfully' }),
+        'success'
+      );
     },
     onError: (error) => {
-      showToast(error.message || 'Failed to rotate OpenRouter API key', 'error');
+      showToast(
+        error.message ||
+          t('ai.overview.keyRotateFailed', {
+            defaultValue: 'Failed to rotate OpenRouter API key',
+          }),
+        'error'
+      );
     },
   });
 }

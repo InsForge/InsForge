@@ -8,6 +8,7 @@ export const BREAKPOINTS = {
 
 export const LOCAL_STORAGE_KEYS = {
   theme: 'insforge-theme',
+  locale: 'insforge-locale',
   selectedLogSource: 'selectedLogSource',
   sqlEditorTabs: 'sql-editor-tabs',
   sqlEditorActiveTab: 'sql-editor-active-tab',

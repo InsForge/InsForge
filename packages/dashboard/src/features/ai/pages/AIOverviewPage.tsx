@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ArrowUpCircle, Loader2, RotateCcw, StopCircle } from 'lucide-react';
 import {
@@ -122,7 +123,12 @@ function OpenRouterKeyBox({
   isLoading?: boolean;
   error?: Error | null;
 }) {
-  const displayValue = isLoading ? 'Loading…' : maskedKey || error?.message || 'Not configured';
+  const { t } = useTranslation('chrome');
+  const displayValue = isLoading
+    ? t('ai.overview.loadingEllipsis', { defaultValue: 'Loading…' })
+    : maskedKey ||
+      error?.message ||
+      t('ai.overview.notConfigured', { defaultValue: 'Not configured' });
   const copyValue = apiKey ?? '';
 
   return (
@@ -201,6 +207,7 @@ function ChartCard({
   value: string;
   valueFormatter?: (value: number) => string;
 }) {
+  const { t } = useTranslation('chrome');
   const chartPoints = points;
   const chartHeight = 176;
   const xAxisPadding = 12;
@@ -231,7 +238,7 @@ function ChartCard({
 
           {chartPoints.length === 0 ? (
             <div className="absolute inset-x-14 bottom-6 top-3 flex items-center justify-center text-[12px] leading-4 text-muted-foreground">
-              No data yet
+              {t('ai.overview.noDataYet', { defaultValue: 'No data yet' })}
             </div>
           ) : (
             <>
@@ -313,6 +320,7 @@ function ModelCreditPopover({
   error?: Error | null;
   isLoading?: boolean;
 }) {
+  const { t } = useTranslation('chrome');
   const used = credits?.used ?? 0;
   const limit = Math.max(credits?.limit ?? 0, 0);
   const isFree = credits?.isFree ?? false;
@@ -337,13 +345,20 @@ function ModelCreditPopover({
       return;
     }
 
-    showToast('Subscription management is only available in cloud-hosting mode.', 'info');
+    showToast(
+      t('ai.overview.subscriptionCloudOnly', {
+        defaultValue: 'Subscription management is only available in cloud-hosting mode.',
+      }),
+      'info'
+    );
   };
 
   if (isLoading) {
     return (
       <div className="w-[358px] rounded-lg border border-[#404040] bg-[#262626] p-5 text-sm text-[#a3a3a3] shadow-[0_4px_4px_rgba(0,0,0,0.4)]">
-        Loading model credit usage...
+        {t('ai.overview.loadingModelCreditUsage', {
+          defaultValue: 'Loading model credit usage...',
+        })}
       </div>
     );
   }
@@ -351,7 +366,10 @@ function ModelCreditPopover({
   if (error || !credits) {
     return (
       <div className="w-[358px] rounded-lg border border-[#404040] bg-[#262626] p-5 text-sm text-[#a3a3a3] shadow-[0_4px_4px_rgba(0,0,0,0.4)]">
-        {error?.message || 'Model credit usage is unavailable.'}
+        {error?.message ||
+          t('ai.overview.creditUsageUnavailable', {
+            defaultValue: 'Model credit usage is unavailable.',
+          })}
       </div>
     );
   }
@@ -361,8 +379,12 @@ function ModelCreditPopover({
       <div className="flex flex-col gap-3 rounded px-3 py-2">
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between text-[#a3a3a3]">
-            <span>Used Credits</span>
-            <span>{hasOverage ? 'Overage Usage' : 'Remaining'}</span>
+            <span>{t('ai.overview.usedCredits', { defaultValue: 'Used Credits' })}</span>
+            <span>
+              {hasOverage
+                ? t('ai.overview.overageUsage', { defaultValue: 'Overage Usage' })
+                : t('ai.overview.remaining', { defaultValue: 'Remaining' })}
+            </span>
           </div>
           <div className="flex items-end justify-between text-white">
             <div>
@@ -386,10 +408,18 @@ function ModelCreditPopover({
         {(isFreeExhausted || isLowCredit || hasOverage) && (
           <p className="leading-[18px] text-white">
             {isFreeExhausted
-              ? 'AI features are paused.'
+              ? t('ai.overview.featuresPaused', { defaultValue: 'AI features are paused.' })
               : isFree
-                ? 'AI features will pause when credits run out.'
-                : `Additional usage ${hasOverage ? 'is' : 'will be'} billed pay-as-you-go.`}
+                ? t('ai.overview.featuresWillPause', {
+                    defaultValue: 'AI features will pause when credits run out.',
+                  })
+                : hasOverage
+                  ? t('ai.overview.overageBilledNow', {
+                      defaultValue: 'Additional usage is billed pay-as-you-go.',
+                    })
+                  : t('ai.overview.overageBilledLater', {
+                      defaultValue: 'Additional usage will be billed pay-as-you-go.',
+                    })}
           </p>
         )}
       </div>
@@ -400,7 +430,9 @@ function ModelCreditPopover({
           className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm font-medium leading-5 text-[#6ee7b7] transition-colors hover:bg-[var(--alpha-4)]"
         >
           <ArrowUpCircle className="size-5 shrink-0" aria-hidden="true" />
-          <span>Upgrade plan for $10 credit</span>
+          <span>
+            {t('ai.overview.upgradePlan', { defaultValue: 'Upgrade plan for $10 credit' })}
+          </span>
         </button>
       )}
     </div>
@@ -416,6 +448,7 @@ function ModelCreditBadge({
   error?: Error | null;
   isLoading?: boolean;
 }) {
+  const { t } = useTranslation('chrome');
   const limit = Math.max(credits?.limit ?? 0, 0);
   const used = credits?.used ?? 0;
   const remaining = Math.max(0, limit - used);
@@ -425,14 +458,23 @@ function ModelCreditBadge({
   const isFreeExhausted = isFree && (limit <= 0 || remaining <= 0);
   const isLowFreeCredit = isFree && !isFreeExhausted && limit > 0 && remaining / limit <= 0.2;
   const label = isLoading
-    ? 'Loading'
+    ? t('ai.overview.loading', { defaultValue: 'Loading' })
     : error
-      ? 'Credit unavailable'
+      ? t('ai.overview.creditUnavailable', { defaultValue: 'Credit unavailable' })
       : isFree
-        ? `${formatModelCredit(remaining)} Credits`
+        ? t('ai.overview.creditsAmount', {
+            defaultValue: '{{amount}} Credits',
+            amount: formatModelCredit(remaining),
+          })
         : hasOverage
-          ? `${formatModelCredit(overage)} Overage`
-          : `${formatModelCredit(remaining, true)} Credits`;
+          ? t('ai.overview.overageAmount', {
+              defaultValue: '{{amount}} Overage',
+              amount: formatModelCredit(overage),
+            })
+          : t('ai.overview.creditsAmount', {
+              defaultValue: '{{amount}} Credits',
+              amount: formatModelCredit(remaining, true),
+            });
   const iconClass = isFreeExhausted
     ? 'size-5 text-[#ef4444]'
     : isLowFreeCredit
@@ -451,7 +493,9 @@ function ModelCreditBadge({
               'flex shrink-0 items-center gap-1 rounded border border-[var(--alpha-8)] bg-card p-2 text-sm font-medium leading-5 text-foreground transition-colors hover:bg-[var(--alpha-4)]',
               isLoading ? 'animate-pulse' : '',
             ].join(' ')}
-            aria-label="Model credit usage"
+            aria-label={t('ai.overview.modelCreditUsage', {
+              defaultValue: 'Model credit usage',
+            })}
           >
             <StopCircle className={iconClass} aria-hidden="true" />
             <span>{label}</span>
@@ -471,6 +515,7 @@ function ModelCreditBadge({
 }
 
 export default function AIOverviewPage() {
+  const { t } = useTranslation('chrome');
   const host = useDashboardHost();
   const [codeTab, setCodeTab] = useState<CodeTab>('sdk');
   const [selectedModelId, setSelectedModelId] = useState<
@@ -500,11 +545,13 @@ export default function AIOverviewPage() {
 
   const handleRotateOpenRouterKey = async () => {
     const confirmed = await confirm({
-      title: 'Rotate OpenRouter key?',
-      description:
-        'The current API key will stop working immediately. Update any apps or services that use it as soon as the new key appears.',
-      confirmText: 'Rotate key',
-      cancelText: 'Cancel',
+      title: t('ai.overview.rotateKeyTitle', { defaultValue: 'Rotate OpenRouter key?' }),
+      description: t('ai.overview.rotateKeyDescription', {
+        defaultValue:
+          'The current API key will stop working immediately. Update any apps or services that use it as soon as the new key appears.',
+      }),
+      confirmText: t('ai.overview.rotateKeyConfirm', { defaultValue: 'Rotate key' }),
+      cancelText: t('ai.overview.cancel', { defaultValue: 'Cancel' }),
       destructive: true,
     });
 
@@ -533,9 +580,14 @@ export default function AIOverviewPage() {
       <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-6 px-10 py-10">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-2">
-            <h1 className="text-2xl font-medium leading-8 text-foreground">Overview</h1>
+            <h1 className="text-2xl font-medium leading-8 text-foreground">
+              {t('ai.overview.title', { defaultValue: 'Overview' })}
+            </h1>
             <p className="text-sm leading-5 text-muted-foreground">
-              Your models are ready — build LLM-powered features or add more integrations.
+              {t('ai.overview.description', {
+                defaultValue:
+                  'Your models are ready — build LLM-powered features or add more integrations.',
+              })}
             </p>
           </div>
           {shouldShowModelCredits && (
@@ -552,16 +604,22 @@ export default function AIOverviewPage() {
             <div className="flex min-w-0 flex-col gap-5">
               <div className="flex flex-col gap-3">
                 <h2 className="text-base font-medium leading-6 text-foreground">
-                  Start using Model Gateway
+                  {t('ai.overview.startUsingGateway', {
+                    defaultValue: 'Start using Model Gateway',
+                  })}
                 </h2>
                 <p className="max-w-[280px] text-sm leading-5 text-muted-foreground">
-                  Powered by OpenRouter, Model Gateway lets you switch between hundreds of models
-                  without managing provider accounts.
+                  {t('ai.overview.gatewayDescription', {
+                    defaultValue:
+                      'Powered by OpenRouter, Model Gateway lets you switch between hundreds of models without managing provider accounts.',
+                  })}
                 </p>
               </div>
               <div className="flex flex-col gap-1.5">
                 <span className="text-[12px] leading-4 text-muted-foreground">
-                  Active OpenRouter key
+                  {t('ai.overview.activeOpenRouterKey', {
+                    defaultValue: 'Active OpenRouter key',
+                  })}
                 </span>
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="min-w-0 flex-1">
@@ -590,7 +648,7 @@ export default function AIOverviewPage() {
                       ) : (
                         <RotateCcw className="size-4" aria-hidden="true" />
                       )}
-                      <span>Rotate</span>
+                      <span>{t('ai.overview.rotate', { defaultValue: 'Rotate' })}</span>
                     </Button>
                   )}
                 </div>
@@ -602,7 +660,9 @@ export default function AIOverviewPage() {
                 size="sm"
                 className="h-8 bg-[#68e5a2] px-4 text-black hover:bg-[#68e5a2]/90"
               >
-                <Link to="/dashboard/ai/quick-start">Quick Start</Link>
+                <Link to="/dashboard/ai/quick-start">
+                  {t('ai.overview.quickStart', { defaultValue: 'Quick Start' })}
+                </Link>
               </Button>
             </div>
           </div>
@@ -661,12 +721,12 @@ export default function AIOverviewPage() {
                 );
               })}
               <span className="text-muted-foreground">
-                and{' '}
+                {t('ai.overview.and', { defaultValue: 'and' })}{' '}
                 <Link
                   to="/dashboard/ai/models"
                   className="underline underline-offset-4 hover:text-foreground"
                 >
-                  many more
+                  {t('ai.overview.manyMore', { defaultValue: 'many more' })}
                 </Link>
               </span>
             </div>
@@ -675,8 +735,12 @@ export default function AIOverviewPage() {
 
         <section className="flex flex-col gap-3">
           <div className="flex items-end justify-between gap-4">
-            <h2 className="text-lg font-medium leading-7 text-foreground">Usage</h2>
-            <span className="text-[12px] leading-4 text-muted-foreground">Past 30 UTC days</span>
+            <h2 className="text-lg font-medium leading-7 text-foreground">
+              {t('ai.overview.usage', { defaultValue: 'Usage' })}
+            </h2>
+            <span className="text-[12px] leading-4 text-muted-foreground">
+              {t('ai.overview.past30Days', { defaultValue: 'Past 30 UTC days' })}
+            </span>
           </div>
           {isUsageLoading ? (
             <div className="flex h-[340px] items-center justify-center rounded border border-[var(--alpha-8)] bg-card">
@@ -685,23 +749,28 @@ export default function AIOverviewPage() {
           ) : isUsageError ? (
             <OverviewErrorPanel
               heightClass="h-[340px]"
-              message={usageError?.message || 'Failed to load usage overview.'}
+              message={
+                usageError?.message ||
+                t('ai.overview.usageLoadError', {
+                  defaultValue: 'Failed to load usage overview.',
+                })
+              }
             />
           ) : (
             <div className="grid grid-cols-2 gap-4">
               <ChartCard
-                title="Spend"
+                title={t('ai.overview.spend', { defaultValue: 'Spend' })}
                 points={usageData?.charts.spend ?? []}
                 value={totals.spend}
                 valueFormatter={formatCurrency}
               />
               <ChartCard
-                title="Requests"
+                title={t('ai.overview.requests', { defaultValue: 'Requests' })}
                 points={usageData?.charts.requests ?? []}
                 value={totals.requests}
               />
               <ChartCard
-                title="Tokens"
+                title={t('ai.overview.tokens', { defaultValue: 'Tokens' })}
                 points={usageData?.charts.tokens ?? []}
                 value={totals.tokens}
               />

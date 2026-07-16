@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Dialog,
@@ -30,6 +31,7 @@ export function DeleteServiceDialog({
   onConfirm,
   isLoading = false,
 }: DeleteServiceDialogProps) {
+  const { t } = useTranslation('chrome');
   const [typed, setTyped] = useState('');
 
   // Reset the typed value whenever the dialog (re)opens or the target service
@@ -55,20 +57,26 @@ export function DeleteServiceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Delete service</DialogTitle>
+          <DialogTitle>
+            {t('compute.deleteService', { defaultValue: 'Delete service' })}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="p-4 flex flex-col gap-4">
           <DialogDescription>
-            This will permanently delete{' '}
-            <span className="font-mono font-medium text-foreground">{serviceName}</span> and destroy
-            its Fly.io resources. The container image is garbage-collected shortly after and cannot
-            be recovered.
+            {t('compute.deleteWarningPrefix', { defaultValue: 'This will permanently delete' })}{' '}
+            <span className="font-mono font-medium text-foreground">{serviceName}</span>{' '}
+            {t('compute.deleteWarningSuffix', {
+              defaultValue:
+                'and destroy its Fly.io resources. The container image is garbage-collected shortly after and cannot be recovered.',
+            })}
           </DialogDescription>
 
           <div className="flex flex-col gap-2">
             <label className="text-xs text-muted-foreground" htmlFor="confirm-delete-name">
-              Type <span className="font-mono text-foreground">{serviceName}</span> to confirm:
+              {t('compute.typeToConfirmPrefix', { defaultValue: 'Type' })}{' '}
+              <span className="font-mono text-foreground">{serviceName}</span>{' '}
+              {t('compute.typeToConfirmSuffix', { defaultValue: 'to confirm:' })}
             </label>
             <Input
               id="confirm-delete-name"
@@ -89,7 +97,7 @@ export function DeleteServiceDialog({
             disabled={isLoading}
             onClick={() => onOpenChange(false)}
           >
-            Cancel
+            {t('compute.cancel', { defaultValue: 'Cancel' })}
           </Button>
           <Button
             variant="destructive"
@@ -99,7 +107,9 @@ export function DeleteServiceDialog({
               void handleConfirm();
             }}
           >
-            {isLoading ? 'Deleting…' : 'Delete'}
+            {isLoading
+              ? t('compute.deletingEllipsis', { defaultValue: 'Deleting…' })
+              : t('compute.delete', { defaultValue: 'Delete' })}
           </Button>
         </DialogFooter>
       </DialogContent>

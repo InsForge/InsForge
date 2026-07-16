@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type {
   GetStripeConfigResponse,
   StripeEnvironment,
@@ -20,6 +21,7 @@ const STRIPE_CONFIG_DEPENDENT_KEYS = [
 ];
 
 export function useStripeConfig() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -35,10 +37,17 @@ export function useStripeConfig() {
       await Promise.all(
         STRIPE_CONFIG_DEPENDENT_KEYS.map((queryKey) => queryClient.invalidateQueries({ queryKey }))
       );
-      showToast('Stripe key saved successfully', 'success');
+      showToast(
+        t('payments.stripeKeySaved', { defaultValue: 'Stripe key saved successfully' }),
+        'success'
+      );
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Failed to save Stripe key', 'error');
+      showToast(
+        err.message ||
+          t('payments.saveStripeKeyFailed', { defaultValue: 'Failed to save Stripe key' }),
+        'error'
+      );
     },
   });
 
@@ -48,10 +57,14 @@ export function useStripeConfig() {
       await Promise.all(
         STRIPE_CONFIG_DEPENDENT_KEYS.map((queryKey) => queryClient.invalidateQueries({ queryKey }))
       );
-      showToast('Stripe key removed', 'success');
+      showToast(t('payments.stripeKeyRemoved', { defaultValue: 'Stripe key removed' }), 'success');
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Failed to remove Stripe key', 'error');
+      showToast(
+        err.message ||
+          t('payments.removeStripeKeyFailed', { defaultValue: 'Failed to remove Stripe key' }),
+        'error'
+      );
     },
   });
 

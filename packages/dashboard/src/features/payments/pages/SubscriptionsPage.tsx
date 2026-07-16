@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import type { PaymentCustomer } from '@insforge/shared-schemas';
@@ -19,7 +21,7 @@ import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentC
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
 import type { CatalogPrice, CatalogProduct } from '#features/payments/types/catalog';
 import { usePaymentSubscriptions } from '#features/payments/hooks/usePaymentSubscriptions';
-import { formatDateTime, formatLastSynced, formatPriceAmount } from '#features/payments/helpers';
+import { formatDateTime, formatPriceAmount } from '#features/payments/helpers';
 import type {
   PaymentSubscription,
   PaymentSubscriptionItem,
@@ -45,9 +47,9 @@ const SUBSCRIPTION_ROW_GRID_TEMPLATE =
 
 const SUBSCRIPTION_ITEM_GRID_TEMPLATE = 'minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) 100px';
 
-function formatShortDate(value: string | null) {
+function formatShortDate(value: string | null, t: TFunction<'chrome'>) {
   if (!value) {
-    return 'Not set';
+    return t('payments.notSet', { defaultValue: 'Not set' });
   }
 
   const date = new Date(value);
@@ -69,14 +71,17 @@ function formatStatusLabel(status: PaymentSubscriptionStatus) {
     .join(' ');
 }
 
-function getSubscriptionStatusDisplay(subscription: PaymentSubscription) {
+function getSubscriptionStatusDisplay(subscription: PaymentSubscription, t: TFunction<'chrome'>) {
   const isCancelling = subscription.status !== 'canceled' && !!subscription.cancelAt;
 
   if (isCancelling) {
     return {
-      label: 'Cancelling',
+      label: t('payments.subscriptionStatus.cancelling', { defaultValue: 'Cancelling' }),
       className: SUBSCRIPTION_STATUS_CLASSES.cancelling,
-      tooltip: `Cancels on ${formatDateTime(subscription.cancelAt)}`,
+      tooltip: t('payments.cancelsOn', {
+        defaultValue: 'Cancels on {{date}}',
+        date: formatDateTime(subscription.cancelAt),
+      }),
     };
   }
 
@@ -84,31 +89,50 @@ function getSubscriptionStatusDisplay(subscription: PaymentSubscription) {
     const canceledAt = subscription.canceledAt ?? subscription.cancelAt;
 
     return {
-      label: formatStatusLabel(subscription.status),
+      label: t(`payments.subscriptionStatus.${subscription.status}`, {
+        defaultValue: formatStatusLabel(subscription.status),
+      }),
       className: SUBSCRIPTION_STATUS_CLASSES[subscription.status],
-      tooltip: canceledAt ? `Canceled on ${formatDateTime(canceledAt)}` : null,
+      tooltip: canceledAt
+        ? t('payments.canceledOn', {
+            defaultValue: 'Canceled on {{date}}',
+            date: formatDateTime(canceledAt),
+          })
+        : null,
     };
   }
 
   return {
-    label: formatStatusLabel(subscription.status),
+    label: t(`payments.subscriptionStatus.${subscription.status}`, {
+      defaultValue: formatStatusLabel(subscription.status),
+    }),
     className: SUBSCRIPTION_STATUS_CLASSES[subscription.status],
     tooltip: null,
   };
 }
 
-function formatPeriod(subscription: PaymentSubscription) {
+function formatPeriod(subscription: PaymentSubscription, t: TFunction<'chrome'>) {
   if (!subscription.currentPeriodStart && !subscription.currentPeriodEnd) {
-    return 'No active period';
+    return t('payments.noActivePeriod', { defaultValue: 'No active period' });
   }
 
-  return `${formatShortDate(subscription.currentPeriodStart)} - ${formatShortDate(
-    subscription.currentPeriodEnd
+  return `${formatShortDate(subscription.currentPeriodStart, t)} - ${formatShortDate(
+    subscription.currentPeriodEnd,
+    t
   )}`;
 }
 
-function getCustomerLabel(customer: PaymentCustomer | null, subscription: PaymentSubscription) {
-  return customer?.email ?? customer?.name ?? subscription.providerCustomerId ?? 'Unknown Customer';
+function getCustomerLabel(
+  customer: PaymentCustomer | null,
+  subscription: PaymentSubscription,
+  t: TFunction<'chrome'>
+) {
+  return (
+    customer?.email ??
+    customer?.name ??
+    subscription.providerCustomerId ??
+    t('payments.unknownCustomer', { defaultValue: 'Unknown Customer' })
+  );
 }
 
 function getSubscriptionItemProductLabel(
@@ -123,7 +147,8 @@ function getSubscriptionItemPriceLabel(item: PaymentSubscriptionItem, price: Cat
 }
 
 function SubscriptionStatus({ subscription }: { subscription: PaymentSubscription }) {
-  const display = getSubscriptionStatusDisplay(subscription);
+  const { t } = useTranslation('chrome');
+  const display = getSubscriptionStatusDisplay(subscription, t);
   const badge = (
     <span
       className={cn(
@@ -152,15 +177,26 @@ function SubscriptionStatus({ subscription }: { subscription: PaymentSubscriptio
 }
 
 function EmptySubscriptionsState({ hasSearchQuery }: { hasSearchQuery: boolean }) {
+  const { t } = useTranslation('chrome');
   return (
     <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
       <p className="text-sm font-medium text-foreground">
-        {hasSearchQuery ? 'No subscriptions match your search' : 'No subscriptions found'}
+        {hasSearchQuery
+          ? t('payments.noSubscriptionsMatchSearch', {
+              defaultValue: 'No subscriptions match your search',
+            })
+          : t('payments.noSubscriptionsFound', { defaultValue: 'No subscriptions found' })}
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
         {hasSearchQuery
-          ? 'Try a different subscription, customer, invoice, or product reference.'
-          : 'Completed subscription checkouts will appear after provider webhooks are processed.'}
+          ? t('payments.tryDifferentSubscriptionSearch', {
+              defaultValue:
+                'Try a different subscription, customer, invoice, or product reference.',
+            })
+          : t('payments.emptySubscriptionsHint', {
+              defaultValue:
+                'Completed subscription checkouts will appear after provider webhooks are processed.',
+            })}
       </p>
     </div>
   );
@@ -175,12 +211,18 @@ function SubscriptionItemsTable({
   productsById: Map<string, CatalogProduct>;
   pricesById: Map<string, CatalogPrice>;
 }) {
+  const { t } = useTranslation('chrome');
   if (items.length === 0) {
     return (
       <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
-        <p className="text-sm font-medium text-foreground">No subscription items found</p>
+        <p className="text-sm font-medium text-foreground">
+          {t('payments.noSubscriptionItems', { defaultValue: 'No subscription items found' })}
+        </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Provider items will appear after the subscription webhook projection is updated.
+          {t('payments.subscriptionItemsHint', {
+            defaultValue:
+              'Provider items will appear after the subscription webhook projection is updated.',
+          })}
         </p>
       </div>
     );
@@ -192,10 +234,10 @@ function SubscriptionItemsTable({
         className="grid border-b border-[var(--alpha-8)] bg-alpha-4 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
         style={{ gridTemplateColumns: SUBSCRIPTION_ITEM_GRID_TEMPLATE }}
       >
-        <div>Item</div>
-        <div>Product</div>
-        <div>Price</div>
-        <div>Quantity</div>
+        <div>{t('payments.item', { defaultValue: 'Item' })}</div>
+        <div>{t('payments.product', { defaultValue: 'Product' })}</div>
+        <div>{t('payments.price', { defaultValue: 'Price' })}</div>
+        <div>{t('payments.quantity', { defaultValue: 'Quantity' })}</div>
       </div>
 
       {items.map((item) => {
@@ -260,6 +302,7 @@ function SubscriptionRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation('chrome');
   const items = subscription.items ?? [];
   const detailsId = `subscription-details-${subscription.providerSubscriptionId}`;
 
@@ -292,9 +335,9 @@ function SubscriptionRow({
           <div className="min-w-0 px-2 py-3">
             <span
               className="block truncate text-foreground"
-              title={getCustomerLabel(customer, subscription)}
+              title={getCustomerLabel(customer, subscription, t)}
             >
-              {getCustomerLabel(customer, subscription)}
+              {getCustomerLabel(customer, subscription, t)}
             </span>
           </div>
 
@@ -303,7 +346,7 @@ function SubscriptionRow({
           </div>
 
           <div className="min-w-0 px-2 py-3">
-            <span className="truncate text-foreground">{formatPeriod(subscription)}</span>
+            <span className="truncate text-foreground">{formatPeriod(subscription, t)}</span>
           </div>
 
           <div className="min-w-0 px-2 py-3">
@@ -326,9 +369,14 @@ function SubscriptionRow({
           <div className="bg-[rgb(var(--semantic-1))] px-4 py-4">
             <div className="flex flex-col gap-2">
               <div>
-                <h2 className="text-base font-medium text-foreground">Subscription Items</h2>
+                <h2 className="text-base font-medium text-foreground">
+                  {t('payments.subscriptionItems', { defaultValue: 'Subscription Items' })}
+                </h2>
                 <p className="text-sm text-muted-foreground">
-                  Items associated with this subscription, including product and price links.
+                  {t('payments.subscriptionItemsDescription', {
+                    defaultValue:
+                      'Items associated with this subscription, including product and price links.',
+                  })}
                 </p>
               </div>
               <SubscriptionItemsTable
@@ -345,6 +393,7 @@ function SubscriptionRow({
 }
 
 export default function SubscriptionsPage() {
+  const { t } = useTranslation('chrome');
   const { openPaymentsSettings, provider, setProvider, environment } =
     useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
@@ -418,7 +467,7 @@ export default function SubscriptionsPage() {
         ];
       });
 
-      const statusDisplay = getSubscriptionStatusDisplay(subscription);
+      const statusDisplay = getSubscriptionStatusDisplay(subscription, t);
 
       return [
         subscription.providerSubscriptionId,
@@ -429,13 +478,13 @@ export default function SubscriptionsPage() {
         statusDisplay.label,
         statusDisplay.tooltip,
         subscription.providerLatestInvoiceId,
-        formatPeriod(subscription),
+        formatPeriod(subscription, t),
         ...itemValues,
       ]
         .filter((value): value is string => typeof value === 'string' && value.length > 0)
         .some((value) => value.toLowerCase().includes(normalizedSearch));
     });
-  }, [customersById, pricesById, productsById, searchQuery, subscriptions]);
+  }, [customersById, pricesById, productsById, searchQuery, subscriptions, t]);
 
   useEffect(() => {
     if (
@@ -474,21 +523,31 @@ export default function SubscriptionsPage() {
           className="h-14 min-h-14"
           leftClassName="py-0"
           rightClassName="py-0"
-          title="Subscriptions"
+          title={t('payments.subscriptions', { defaultValue: 'Subscriptions' })}
           showDividerAfterTitle
           leftSlot={
             <span className="text-xs text-muted-foreground">
-              Last synced:{' '}
-              {formatLastSynced(
-                activeConnection?.lastSyncedAt ?? activeRazorpayConnection?.lastSyncedAt ?? null
-              )}
+              {t('payments.lastSynced', {
+                defaultValue: 'Last synced: {{time}}',
+                time: (() => {
+                  const lastSyncedAt =
+                    activeConnection?.lastSyncedAt ??
+                    activeRazorpayConnection?.lastSyncedAt ??
+                    null;
+                  return lastSyncedAt
+                    ? formatDateTime(lastSyncedAt)
+                    : t('payments.never', { defaultValue: 'Never' });
+                })(),
+              })}
             </span>
           }
           showSearch
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
           searchDebounceTime={300}
-          searchPlaceholder="Search subscription"
+          searchPlaceholder={t('payments.searchSubscription', {
+            defaultValue: 'Search subscription',
+          })}
           searchInputClassName="w-[280px]"
         />
       )}
@@ -497,7 +556,11 @@ export default function SubscriptionsPage() {
         {error ? (
           <ErrorState error={error as Error} onRetry={() => void refetch()} />
         ) : isLoading ? (
-          <LoadingState message="Loading subscriptions..." />
+          <LoadingState
+            message={t('payments.loadingSubscriptions', {
+              defaultValue: 'Loading subscriptions...',
+            })}
+          />
         ) : !hasActiveKey ? (
           <PaymentsOnboardingState
             provider={provider}
@@ -512,7 +575,11 @@ export default function SubscriptionsPage() {
                 {activeConnection?.lastSyncError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Latest Stripe sync failed</AlertTitle>
+                    <AlertTitle>
+                      {t('payments.stripeSyncFailedTitle', {
+                        defaultValue: 'Latest Stripe sync failed',
+                      })}
+                    </AlertTitle>
                     <AlertDescription className="mt-2">
                       {activeConnection.lastSyncError}
                     </AlertDescription>
@@ -521,7 +588,11 @@ export default function SubscriptionsPage() {
                 {activeRazorpayConnection?.lastSyncError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Latest Razorpay sync failed</AlertTitle>
+                    <AlertTitle>
+                      {t('payments.razorpaySyncFailedTitle', {
+                        defaultValue: 'Latest Razorpay sync failed',
+                      })}
+                    </AlertTitle>
                     <AlertDescription className="mt-2">
                       {activeRazorpayConnection.lastSyncError}
                     </AlertDescription>
@@ -533,11 +604,21 @@ export default function SubscriptionsPage() {
                   style={{ gridTemplateColumns: SUBSCRIPTION_ROW_GRID_TEMPLATE }}
                 >
                   <div />
-                  <div className="px-2 py-1.5">Subscription</div>
-                  <div className="px-2 py-1.5">Customer</div>
-                  <div className="px-2 py-1.5">Status</div>
-                  <div className="px-2 py-1.5">Current Period</div>
-                  <div className="px-2 py-1.5">Latest Invoice</div>
+                  <div className="px-2 py-1.5">
+                    {t('payments.subscription', { defaultValue: 'Subscription' })}
+                  </div>
+                  <div className="px-2 py-1.5">
+                    {t('payments.customer', { defaultValue: 'Customer' })}
+                  </div>
+                  <div className="px-2 py-1.5">
+                    {t('payments.status', { defaultValue: 'Status' })}
+                  </div>
+                  <div className="px-2 py-1.5">
+                    {t('payments.currentPeriod', { defaultValue: 'Current Period' })}
+                  </div>
+                  <div className="px-2 py-1.5">
+                    {t('payments.latestInvoice', { defaultValue: 'Latest Invoice' })}
+                  </div>
                 </div>
 
                 {filteredSubscriptions.length === 0 ? (
@@ -578,7 +659,9 @@ export default function SubscriptionsPage() {
                   onPageChange={setCurrentPage}
                   totalRecords={filteredSubscriptions.length}
                   pageSize={pageSize}
-                  recordLabel="subscriptions"
+                  recordLabel={t('payments.recordSubscriptions', {
+                    defaultValue: 'subscriptions',
+                  })}
                 />
               </div>
             )}

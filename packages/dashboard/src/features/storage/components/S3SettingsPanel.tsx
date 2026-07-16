@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { KeyRound, Trash2 } from 'lucide-react';
 import { Button, ConfirmDialog, CopyButton, Input } from '@insforge/ui';
 import type { S3AccessKeySchema } from '@insforge/shared-schemas';
@@ -6,7 +8,7 @@ import { useS3AccessKeys, useS3GatewayConfig } from '#features/storage/hooks/use
 import { S3AccessKeyCreateDialog } from './S3AccessKeyCreateDialog';
 
 /** Formats an ISO timestamp as "N minutes/hours/days ago", or "—" when null. */
-function formatRelative(iso: string | null): string {
+function formatRelative(iso: string | null, t: TFunction): string {
   if (!iso) {
     return '—';
   }
@@ -20,19 +22,19 @@ function formatRelative(iso: string | null): string {
   }
   const sec = Math.floor(diffMs / 1000);
   if (sec < 60) {
-    return `${sec}s ago`;
+    return t('storage.secondsAgo', { defaultValue: '{{count}}s ago', count: sec });
   }
   const min = Math.floor(sec / 60);
   if (min < 60) {
-    return `${min}m ago`;
+    return t('storage.minutesAgo', { defaultValue: '{{count}}m ago', count: min });
   }
   const hr = Math.floor(min / 60);
   if (hr < 48) {
-    return `${hr}h ago`;
+    return t('storage.hoursAgo', { defaultValue: '{{count}}h ago', count: hr });
   }
   const day = Math.floor(hr / 24);
   if (day < 30) {
-    return `${day}d ago`;
+    return t('storage.daysAgo', { defaultValue: '{{count}}d ago', count: day });
   }
   return new Date(then).toLocaleDateString();
 }
@@ -63,6 +65,7 @@ function Section({ title, description, children }: SectionProps) {
  * used by SigV4-signing clients (aws CLI, AWS SDKs, rclone, etc.).
  */
 export function S3SettingsPanel() {
+  const { t } = useTranslation('chrome');
   const { keys, isLoading, error, createAccessKey, isCreating, deleteAccessKey, isDeleting } =
     useS3AccessKeys();
   const gatewayConfigQuery = useS3GatewayConfig();
@@ -75,8 +78,11 @@ export function S3SettingsPanel() {
   return (
     <div className="flex flex-col gap-8 p-6">
       <Section
-        title="Endpoint"
-        description="Configure any S3-compatible client with this endpoint. Path-style URLs are required (forcePathStyle: true)."
+        title={t('storage.endpoint', { defaultValue: 'Endpoint' })}
+        description={t('storage.endpointDescription', {
+          defaultValue:
+            'Configure any S3-compatible client with this endpoint. Path-style URLs are required (forcePathStyle: true).',
+        })}
       >
         <div className="flex items-center gap-2">
           <Input readOnly value={endpoint} className="font-mono text-sm" />
@@ -85,8 +91,11 @@ export function S3SettingsPanel() {
       </Section>
 
       <Section
-        title="Region"
-        description="SigV4 signing region expected by the gateway. Clients must sign with this exact value (configurable server-side via AWS_REGION)."
+        title={t('storage.region', { defaultValue: 'Region' })}
+        description={t('storage.regionDescription', {
+          defaultValue:
+            'SigV4 signing region expected by the gateway. Clients must sign with this exact value (configurable server-side via AWS_REGION).',
+        })}
       >
         <div className="flex items-center gap-2">
           <Input readOnly value={region} className="w-48 font-mono text-sm" />
@@ -95,30 +104,46 @@ export function S3SettingsPanel() {
       </Section>
 
       <Section
-        title="Access Keys"
-        description="Access keys grant project-admin-level access to all buckets via the S3 protocol. The Secret Access Key is only shown once at creation — save it somewhere safe."
+        title={t('storage.accessKeys', { defaultValue: 'Access Keys' })}
+        description={t('storage.accessKeysDescription', {
+          defaultValue:
+            'Access keys grant project-admin-level access to all buckets via the S3 protocol. The Secret Access Key is only shown once at creation — save it somewhere safe.',
+        })}
       >
         {isLoading ? (
-          <div className="text-sm text-muted-foreground">Loading access keys...</div>
+          <div className="text-sm text-muted-foreground">
+            {t('storage.loadingAccessKeys', { defaultValue: 'Loading access keys...' })}
+          </div>
         ) : error ? (
           <div className="text-sm text-destructive">
-            Failed to load access keys: {error instanceof Error ? error.message : String(error)}
+            {t('storage.failedToLoadAccessKeys', {
+              defaultValue: 'Failed to load access keys: {{error}}',
+              error: error instanceof Error ? error.message : String(error),
+            })}
           </div>
         ) : (
           <div className="flex flex-col gap-3">
             {keys.length === 0 ? (
               <div className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                No access keys yet.
+                {t('storage.noAccessKeysYet', { defaultValue: 'No access keys yet.' })}
               </div>
             ) : (
               <div className="overflow-hidden rounded-md border border-border">
                 <table className="w-full text-sm">
                   <thead className="bg-[rgb(var(--semantic-1))] text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
-                      <th className="px-4 py-2 font-medium">Access Key ID</th>
-                      <th className="px-4 py-2 font-medium">Description</th>
-                      <th className="px-4 py-2 font-medium">Created</th>
-                      <th className="px-4 py-2 font-medium">Last Used</th>
+                      <th className="px-4 py-2 font-medium">
+                        {t('storage.accessKeyId', { defaultValue: 'Access Key ID' })}
+                      </th>
+                      <th className="px-4 py-2 font-medium">
+                        {t('storage.description', { defaultValue: 'Description' })}
+                      </th>
+                      <th className="px-4 py-2 font-medium">
+                        {t('storage.created', { defaultValue: 'Created' })}
+                      </th>
+                      <th className="px-4 py-2 font-medium">
+                        {t('storage.lastUsed', { defaultValue: 'Last Used' })}
+                      </th>
                       <th className="px-4 py-2" />
                     </tr>
                   </thead>
@@ -136,14 +161,16 @@ export function S3SettingsPanel() {
                           {new Date(k.createdAt).toLocaleDateString()}
                         </td>
                         <td className="px-4 py-2 text-muted-foreground">
-                          {formatRelative(k.lastUsedAt)}
+                          {formatRelative(k.lastUsedAt, t)}
                         </td>
                         <td className="px-4 py-2 text-right">
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            aria-label="Revoke access key"
+                            aria-label={t('storage.revokeAccessKey', {
+                              defaultValue: 'Revoke access key',
+                            })}
                             onClick={() => setPendingDelete(k)}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -157,7 +184,7 @@ export function S3SettingsPanel() {
             )}
             <div>
               <Button type="button" onClick={() => setCreateOpen(true)}>
-                New access key
+                {t('storage.newAccessKey', { defaultValue: 'New access key' })}
               </Button>
             </div>
           </div>
@@ -174,14 +201,18 @@ export function S3SettingsPanel() {
       <ConfirmDialog
         open={pendingDelete !== null}
         onOpenChange={(o) => !o && setPendingDelete(null)}
-        title="Revoke S3 access key?"
+        title={t('storage.revokeS3AccessKeyTitle', { defaultValue: 'Revoke S3 access key?' })}
         description={
           pendingDelete
-            ? `The access key ${pendingDelete.accessKeyId} will stop working immediately. Any client still using it will start getting InvalidAccessKeyId errors.`
+            ? t('storage.revokeS3AccessKeyDescription', {
+                defaultValue:
+                  'The access key {{accessKeyId}} will stop working immediately. Any client still using it will start getting InvalidAccessKeyId errors.',
+                accessKeyId: pendingDelete.accessKeyId,
+              })
             : ''
         }
-        confirmText="Revoke"
-        cancelText="Cancel"
+        confirmText={t('storage.revoke', { defaultValue: 'Revoke' })}
+        cancelText={t('storage.cancel', { defaultValue: 'Cancel' })}
         destructive
         isLoading={isDeleting}
         onConfirm={() => {

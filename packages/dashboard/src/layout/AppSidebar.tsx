@@ -15,8 +15,10 @@ import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { isInsForgeCloudProject } from '#lib/utils/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from '@insforge/ui';
 import { ProjectSettingsMenuDialog } from '#features/dashboard/components';
+import { LanguageSelect } from '#components';
 import { getFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
+import { useTranslation } from 'react-i18next';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
@@ -30,6 +32,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
 
   const isCloud = isInsForgeCloudProject();
   const host = useDashboardHost();
+  const { t } = useTranslation('chrome');
   const { mode: hostMode, onOpenWhatsNew } = host;
   const isDTest =
     getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT) === FEATURE_FLAG_VARIANTS.D_TEST;
@@ -135,13 +138,14 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
     item: DashboardPrimaryMenuItem;
     isBottom?: boolean;
   }) => {
+    const label = t(`menu.${item.id}`, { defaultValue: item.label });
     const isActive = item.id === activeMenu?.id;
     const itemClasses = menuItemBaseClasses(isActive);
 
     const content = (
       <>
         <MenuItemIcon item={item} isActive={isActive} />
-        {!isCollapsed && <MenuItemLabel label={item.label} isActive={isActive} />}
+        {!isCollapsed && <MenuItemLabel label={label} isActive={isActive} />}
         {!isCollapsed && isBottom && item.external && (
           <ExternalLink className="ml-auto h-4 w-4 text-muted-foreground" />
         )}
@@ -165,7 +169,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
           {isCollapsed && (
             <TooltipContent side="right">
               <div className="flex items-center gap-2">
-                <p>{item.label}</p>
+                <p>{label}</p>
                 {item.external && <ExternalLink className="h-3 w-3" />}
               </div>
             </TooltipContent>
@@ -183,7 +187,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
         </TooltipTrigger>
         {isCollapsed && (
           <TooltipContent side="right">
-            <p>{item.label}</p>
+            <p>{label}</p>
           </TooltipContent>
         )}
       </Tooltip>
@@ -243,6 +247,15 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
           <div className="flex-1" />
 
           <div className={cn('w-full', isCollapsed ? 'space-y-2' : 'space-y-1.5')}>
+            {/* The AppHeader hosts LanguageSelect when the navbar shows; when
+                it is hidden (cloud-hosting inside the iframe) the picker
+                lives here instead. Gate on the navbar actually being hidden
+                so the two can never render together. */}
+            {!(host.showNavbar ?? true) ? (
+              <div className={cn('flex', isCollapsed ? 'justify-center' : 'px-1')}>
+                <LanguageSelect />
+              </div>
+            ) : null}
             {bottomItemsList.map((item, index) =>
               index === inlineToggleHost ? (
                 <div key={item.id} className="flex items-center gap-2">

@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ErrorState, LoadingState } from '#components';
@@ -10,6 +11,7 @@ import { analyticsQueryKeys, useAnalyticsConnection } from '#features/analytics/
 import { AnalyticsSidebar } from './AnalyticsSidebar';
 
 export default function AnalyticsLayout() {
+  const { t } = useTranslation('chrome');
   const conn = useAnalyticsConnection();
   const { projectId, isLoading: projectIdLoading, error: projectIdError } = useProjectId();
   const qc = useQueryClient();
@@ -30,17 +32,27 @@ export default function AnalyticsLayout() {
       if (e.status === 'error') {
         showToast(
           e.reason
-            ? `PostHog connection failed: ${e.reason}`
-            : 'PostHog connection failed. Please try again.',
+            ? t('analytics.connectionFailedReason', {
+                defaultValue: 'PostHog connection failed: {{reason}}',
+                reason: e.reason,
+              })
+            : t('analytics.connectionFailed', {
+                defaultValue: 'PostHog connection failed. Please try again.',
+              }),
           'error'
         );
         return;
       }
       if (e.status === 'cancelled') {
-        showToast('PostHog connection cancelled.', 'info');
+        showToast(
+          t('analytics.connectionCancelled', {
+            defaultValue: 'PostHog connection cancelled.',
+          }),
+          'info'
+        );
       }
     });
-  }, [qc, navigate, showToast, subscribePosthogConnectionStatus]);
+  }, [qc, navigate, showToast, subscribePosthogConnectionStatus, t]);
 
   const connection = conn.data ?? null;
 
@@ -48,7 +60,10 @@ export default function AnalyticsLayout() {
   if (conn.isLoading || projectIdLoading) {
     topLevelStatus = (
       <div className="flex h-full min-h-0 items-center justify-center">
-        <LoadingState className="py-0" message="Loading Analytics…" />
+        <LoadingState
+          className="py-0"
+          message={t('analytics.loadingAnalytics', { defaultValue: 'Loading Analytics…' })}
+        />
       </div>
     );
   } else if (conn.isError) {
@@ -56,8 +71,12 @@ export default function AnalyticsLayout() {
       <div className="flex h-full min-h-0 items-center justify-center px-6">
         <div className="w-full max-w-[420px]">
           <ErrorState
-            title="Failed to load PostHog connection"
-            error="Please refresh, or contact support if the problem persists."
+            title={t('analytics.connectionLoadError', {
+              defaultValue: 'Failed to load PostHog connection',
+            })}
+            error={t('analytics.refreshOrContactSupport', {
+              defaultValue: 'Please refresh, or contact support if the problem persists.',
+            })}
           />
         </div>
       </div>
@@ -67,8 +86,12 @@ export default function AnalyticsLayout() {
       <div className="flex h-full min-h-0 items-center justify-center px-6">
         <div className="w-full max-w-[420px]">
           <ErrorState
-            title="Failed to load project ID"
-            error="Please refresh, or contact support if the problem persists."
+            title={t('analytics.projectIdLoadError', {
+              defaultValue: 'Failed to load project ID',
+            })}
+            error={t('analytics.refreshOrContactSupport', {
+              defaultValue: 'Please refresh, or contact support if the problem persists.',
+            })}
           />
         </div>
       </div>

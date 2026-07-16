@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, type DragEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
 import PencilIcon from '#assets/icons/pencil.svg?react';
@@ -37,6 +38,7 @@ interface BucketFormState {
 }
 
 export default function BucketsPage() {
+  const { t } = useTranslation('chrome');
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedBucketFromQuery = searchParams.get('bucket')?.trim();
   const [searchValue, setSearchValue] = useState('');
@@ -142,9 +144,19 @@ export default function BucketsPage() {
     }
 
     const shouldDelete = await confirm({
-      title: `Delete ${fileKeys.length} ${fileKeys.length === 1 ? 'file' : 'files'}`,
-      description: `Are you sure you want to delete ${fileKeys.length} ${fileKeys.length === 1 ? 'file' : 'files'}? This action cannot be undone.`,
-      confirmText: 'Delete',
+      title: t('storage.deleteFilesTitle', {
+        count: fileKeys.length,
+        defaultValue_one: 'Delete {{count}} file',
+        defaultValue_other: 'Delete {{count}} files',
+      }),
+      description: t('storage.deleteFilesDescription', {
+        count: fileKeys.length,
+        defaultValue_one:
+          'Are you sure you want to delete {{count}} file? This action cannot be undone.',
+        defaultValue_other:
+          'Are you sure you want to delete {{count}} files? This action cannot be undone.',
+      }),
+      confirmText: t('storage.delete', { defaultValue: 'Delete' }),
       destructive: true,
     });
 
@@ -199,11 +211,28 @@ export default function BucketsPage() {
         const fileName = files[i].name;
 
         // Show individual file error (but don't stop the overall process)
-        const errorMessage = error instanceof Error ? error.message : 'Upload failed';
-        showToast(`Failed to upload "${fileName}": ${errorMessage}`, 'error');
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : t('storage.uploadFailed', { defaultValue: 'Upload failed' });
+        showToast(
+          t('storage.failedToUploadFile', {
+            defaultValue: 'Failed to upload "{{fileName}}": {{errorMessage}}',
+            fileName,
+            errorMessage,
+          }),
+          'error'
+        );
       }
     }
-    showToast(`${successCount} files uploaded successfully`, 'success');
+    showToast(
+      t('storage.filesUploadedSuccessfully', {
+        count: successCount,
+        defaultValue_one: '{{count}} file uploaded successfully',
+        defaultValue_other: '{{count}} files uploaded successfully',
+      }),
+      'success'
+    );
 
     // Complete the upload toast
     cancelUpload(toastId);
@@ -225,6 +254,7 @@ export default function BucketsPage() {
     showUploadToast,
     updateUploadProgress,
     uploadObject,
+    t,
   ]);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -233,9 +263,13 @@ export default function BucketsPage() {
 
   const handleDeleteBucket = async (bucketName: string) => {
     const confirmOptions = {
-      title: 'Delete Bucket',
-      description: `Are you sure you want to delete the bucket "${bucketName}"? This will permanently delete all files in this bucket. This action cannot be undone.`,
-      confirmText: 'Delete',
+      title: t('storage.deleteBucket', { defaultValue: 'Delete Bucket' }),
+      description: t('storage.deleteBucketDescription', {
+        defaultValue:
+          'Are you sure you want to delete the bucket "{{bucketName}}"? This will permanently delete all files in this bucket. This action cannot be undone.',
+        bucketName,
+      }),
+      confirmText: t('storage.delete', { defaultValue: 'Delete' }),
       destructive: true,
     };
 
@@ -251,7 +285,10 @@ export default function BucketsPage() {
           selectBucket(nextBucket, true);
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to delete bucket';
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : t('storage.failedToDeleteBucket', { defaultValue: 'Failed to delete bucket' });
         showToast(errorMessage, 'error');
       }
     }
@@ -367,7 +404,7 @@ export default function BucketsPage() {
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" align="center">
-                          <p>Edit bucket</p>
+                          <p>{t('storage.editBucketTooltip', { defaultValue: 'Edit bucket' })}</p>
                         </TooltipContent>
                       </Tooltip>
                       <Tooltip>
@@ -385,7 +422,11 @@ export default function BucketsPage() {
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" align="center">
-                          <p>{isRefreshing ? 'Refreshing...' : 'Refresh files'}</p>
+                          <p>
+                            {isRefreshing
+                              ? t('storage.refreshing', { defaultValue: 'Refreshing...' })
+                              : t('storage.refreshFiles', { defaultValue: 'Refresh files' })}
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -401,7 +442,9 @@ export default function BucketsPage() {
                     >
                       <Upload className="h-5 w-5 stroke-[1.5]" />
                       <span className="px-1 text-sm font-medium leading-5">
-                        {isUploading ? 'Uploading...' : 'Upload File'}
+                        {isUploading
+                          ? t('storage.uploading', { defaultValue: 'Uploading...' })
+                          : t('storage.uploadFile', { defaultValue: 'Upload File' })}
                       </span>
                     </Button>
                   </div>
@@ -410,7 +453,7 @@ export default function BucketsPage() {
               searchValue={searchValue}
               onSearchChange={setSearchValue}
               searchDebounceTime={300}
-              searchPlaceholder="Search files"
+              searchPlaceholder={t('storage.searchFiles', { defaultValue: 'Search files' })}
             />
 
             {/* Content (supports drag-and-drop file upload) */}
@@ -442,7 +485,9 @@ export default function BucketsPage() {
         )}
         {!selectedBucket && (
           <div className="flex flex-1 items-center justify-center">
-            <DataGridEmptyState message="No bucket selected" />
+            <DataGridEmptyState
+              message={t('storage.noBucketSelected', { defaultValue: 'No bucket selected' })}
+            />
           </div>
         )}
       </div>

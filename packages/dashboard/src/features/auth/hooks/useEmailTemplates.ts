@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { ListEmailTemplatesResponse, UpdateEmailTemplateRequest } from '@insforge/shared-schemas';
 import { emailTemplateService } from '#features/auth/services/email-template.service';
 import { useToast } from '@insforge/ui';
 
 export function useEmailTemplates() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -19,10 +21,21 @@ export function useEmailTemplates() {
       emailTemplateService.updateTemplate(type, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['email-templates'] });
-      showToast('Email template updated successfully', 'success');
+      showToast(
+        t('auth.emailTemplateUpdatedToast', {
+          defaultValue: 'Email template updated successfully',
+        }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to update email template', 'error');
+      showToast(
+        error.message ||
+          t('auth.emailTemplateUpdateFailed', {
+            defaultValue: 'Failed to update email template',
+          }),
+        'error'
+      );
     },
   });
 

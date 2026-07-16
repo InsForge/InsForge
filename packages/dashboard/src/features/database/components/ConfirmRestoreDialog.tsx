@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CircleAlert } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Dialog,
@@ -24,6 +25,7 @@ export function ConfirmRestoreDialog({
   onOpenChange,
   onRestore,
 }: ConfirmRestoreDialogProps) {
+  const { t } = useTranslation('chrome');
   const [isRestoring, setIsRestoring] = useState(false);
 
   const handleRestore = async () => {
@@ -46,9 +48,13 @@ export function ConfirmRestoreDialog({
           <DialogHeader className="gap-0">
             <div className="flex w-full items-center gap-3">
               <div className="min-w-0 flex-1">
-                <DialogTitle>Restore from Backup</DialogTitle>
+                <DialogTitle>
+                  {t('database.restoreFromBackup', { defaultValue: 'Restore from Backup' })}
+                </DialogTitle>
                 <DialogDescription className="sr-only">
-                  Confirm restoring the database from a selected backup.
+                  {t('database.restoreDialogDescription', {
+                    defaultValue: 'Confirm restoring the database from a selected backup.',
+                  })}
                 </DialogDescription>
               </div>
               <DialogCloseButton className="relative right-auto top-auto h-7 w-7 rounded p-1" />
@@ -57,17 +63,29 @@ export function ConfirmRestoreDialog({
 
           <div className="flex flex-col gap-2 p-4">
             <p className="text-sm leading-6 text-foreground">
-              This will restore your database to the selected backup from{' '}
+              {t('database.restoreBodyPrefix', {
+                defaultValue: 'This will restore your database to the selected backup from',
+              })}{' '}
               <span className="font-bold">{backupTimestampLabel}</span>
             </p>
 
             <div className="flex items-start gap-2 text-[rgb(var(--warning))]">
               <CircleAlert className="mt-0.5 h-6 w-6 shrink-0" />
               <div className="min-w-0">
-                <p className="text-sm font-medium leading-6">This action cannot be undone</p>
+                <p className="text-sm font-medium leading-6">
+                  {t('database.cannotBeUndone', { defaultValue: 'This action cannot be undone' })}
+                </p>
                 <ul className="list-disc pl-5 text-sm leading-6">
-                  <li>Your project will be offline during the restore</li>
-                  <li>Any data created after this backup will be lost</li>
+                  <li>
+                    {t('database.restoreOfflineWarning', {
+                      defaultValue: 'Your project will be offline during the restore',
+                    })}
+                  </li>
+                  <li>
+                    {t('database.restoreDataLossWarning', {
+                      defaultValue: 'Any data created after this backup will be lost',
+                    })}
+                  </li>
                 </ul>
               </div>
             </div>
@@ -81,7 +99,7 @@ export function ConfirmRestoreDialog({
               disabled={isRestoring}
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t('common.cancel', { defaultValue: 'Cancel' })}
             </Button>
             <Button
               type="button"
@@ -91,7 +109,9 @@ export function ConfirmRestoreDialog({
                 void handleRestore();
               }}
             >
-              {isRestoring ? 'Restoring...' : 'Restore'}
+              {isRestoring
+                ? t('database.restoring', { defaultValue: 'Restoring...' })
+                : t('database.restore', { defaultValue: 'Restore' })}
             </Button>
           </DialogFooter>
         </div>

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type { UpdateRealtimeConfigRequest } from '@insforge/shared-schemas';
 import { realtimeService } from '#features/realtime/services/realtime.service';
 import { useToast } from '@insforge/ui';
@@ -7,6 +8,7 @@ const REALTIME_CONFIG_QUERY_KEY = ['realtime', 'config'] as const;
 const REALTIME_STATS_QUERY_KEY = ['realtime', 'stats'] as const;
 
 export function useRealtimeConfig() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -29,10 +31,21 @@ export function useRealtimeConfig() {
         queryClient.invalidateQueries({ queryKey: REALTIME_CONFIG_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: REALTIME_STATS_QUERY_KEY }),
       ]);
-      showToast('Retention settings saved successfully.', 'success');
+      showToast(
+        t('realtime.retentionSettingsSaved', {
+          defaultValue: 'Retention settings saved successfully.',
+        }),
+        'success'
+      );
     },
     onError: (mutationError: Error) => {
-      showToast(mutationError.message || 'Failed to save retention settings.', 'error');
+      showToast(
+        mutationError.message ||
+          t('realtime.failedToSaveRetentionSettings', {
+            defaultValue: 'Failed to save retention settings.',
+          }),
+        'error'
+      );
     },
   });
 

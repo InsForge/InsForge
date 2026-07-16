@@ -95,6 +95,40 @@ Mark every hardcode with a trailing `// LOCAL DEBUG: <original expression>` comm
 | "Lint passed, so the deleted import doesn't matter." | Lint passed because the import was deleted; on revert the original code needs it back. |
 | "I'll ship the env-var override instead." | No env-var override is wired in the code. Don't invent one on the commit path — restore the original. |
 
+## Locale / language preference
+
+The dashboard has a language preference layer (selector + cloud sync) and
+bundled react-i18next translations for the chrome, overview page, and Backend
+Advisor (`lib/i18n/`, namespace `chrome`). Feature pages beyond those are
+still English — extend the same namespace as they get translated.
+
+- `lib/contexts/LocaleContext.tsx` — `LocaleProvider` / `useLocale` /
+  `SUPPORTED_LOCALES` / `normalizeLocale`. Resolution order: cloud account
+  preference → `insforge-locale` localStorage → `navigator.language` → `en`.
+  Mirrors the ThemeContext pattern.
+- `components/LanguageSelect.tsx` — endonym-labelled selector; rendered in
+  `AppHeader` (self-host) and the `AppSidebar` bottom in cloud-hosting mode
+  (the header is hidden inside the iframe).
+- Cloud sync contract (`@insforge/shared-schemas` cloud-events):
+  parent → child `USER_INFO` carries optional `preferredLocale`;
+  child → parent `UPDATE_PREFERRED_LOCALE { locale }` is fire-and-forget and
+  the shell persists it to `users.preferred_locale` via the profile API
+  (plumbed through the `onUpdatePreferredLocale` host prop).
+- **Version-skew tolerance is a contract**: old shells ignore unknown message
+  types; old dashboards ignore extra `USER_INFO` fields. Never make either
+  side require the locale fields.
+- Adding a language: extend `SUPPORTED_LOCALES` + `LOCALE_LABELS`, and keep
+  the list aligned with the cloud marketing site's `src/i18n/routing.ts`
+  (insforge-cloud repo) or the account preference will name a locale one
+  surface can't render. Route locale-ish input through `normalizeLocale`.
+- Self-host mode must work with zero cloud callbacks (localStorage only);
+  extend `lib/contexts/__tests__/LocaleContext.test.tsx` when touching this.
+- Every key added to `lib/i18n/locales/en.json` must exist in all four locale
+  files — `lib/i18n/__tests__/localeParity.test.ts` fails CI otherwise
+  (plural suffixes normalized; zh carries only `_other`).
+- Never translate user-generated names (tables, buckets) — only static ids.
+  See the note in `components/FeatureSidebar.tsx`.
+
 ## Validation
 
 - `cd packages/dashboard && npm run test:unit` when changing pure helpers or reducers

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ExternalLink,
   Copy,
@@ -44,6 +45,7 @@ function extractSlugFromUrl(url: string | null): string {
  * Displays a colored badge indicating the verification status of a custom domain.
  */
 function StatusBadge({ verified, misconfigured }: { verified: boolean; misconfigured: boolean }) {
+  const { t } = useTranslation('chrome');
   const tone = misconfigured
     ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
     : verified
@@ -51,10 +53,10 @@ function StatusBadge({ verified, misconfigured }: { verified: boolean; misconfig
       : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
 
   const label = misconfigured
-    ? 'Invalid configuration'
+    ? t('deployments.invalidConfiguration', { defaultValue: 'Invalid configuration' })
     : verified
-      ? 'Verified'
-      : 'Pending verification';
+      ? t('deployments.verified', { defaultValue: 'Verified' })
+      : t('deployments.pendingVerification', { defaultValue: 'Pending verification' });
 
   return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${tone}`}>{label}</span>;
 }
@@ -63,18 +65,24 @@ function StatusBadge({ verified, misconfigured }: { verified: boolean; misconfig
  * Small inline copy button used in DNS record tables.
  */
 function CopyIconButton({ value, label }: { value: string; label: string }) {
+  const { t } = useTranslation('chrome');
   const { copied, copy } = useCopyToClipboard(1500);
 
   const handleCopy = async () => {
     await copy(value);
   };
 
+  const copyLabel = t('deployments.copyAria', {
+    defaultValue: 'Copy {{label}}',
+    label,
+  });
+
   return (
     <button
       type="button"
       onClick={() => void handleCopy()}
-      aria-label={`Copy ${label}`}
-      title={`Copy ${label}`}
+      aria-label={copyLabel}
+      title={copyLabel}
       className="inline-flex items-center justify-center rounded p-1 text-neutral-500 transition hover:bg-neutral-200 hover:text-zinc-950 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-white"
     >
       {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -101,14 +109,21 @@ function getSubdomainLabel(domain: string, apexDomain: string): string {
  * Vercel-style table layout for DNS records.
  */
 function RecordsTable({ rows }: { rows: DnsRecordRow[] }) {
+  const { t } = useTranslation('chrome');
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700">
       <table className="w-full border-collapse text-left text-xs">
         <thead className="bg-neutral-50 dark:bg-neutral-800/80">
           <tr className="text-muted-foreground dark:text-neutral-400">
-            <th className="px-4 py-3 font-medium">Type</th>
-            <th className="px-4 py-3 font-medium">Name</th>
-            <th className="px-4 py-3 font-medium">Value</th>
+            <th className="px-4 py-3 font-medium">
+              {t('deployments.type', { defaultValue: 'Type' })}
+            </th>
+            <th className="px-4 py-3 font-medium">
+              {t('deployments.name', { defaultValue: 'Name' })}
+            </th>
+            <th className="px-4 py-3 font-medium">
+              {t('deployments.value', { defaultValue: 'Value' })}
+            </th>
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-[#2f2f2f]">
@@ -121,13 +136,25 @@ function RecordsTable({ rows }: { rows: DnsRecordRow[] }) {
               <td className="px-4 py-3 align-top">
                 <div className="flex items-center gap-2">
                   <span className="font-mono">{row.name}</span>
-                  <CopyIconButton value={row.name} label={`${row.type} record name`} />
+                  <CopyIconButton
+                    value={row.name}
+                    label={t('deployments.recordName', {
+                      defaultValue: '{{type}} record name',
+                      type: row.type,
+                    })}
+                  />
                 </div>
               </td>
               <td className="px-4 py-3 align-top">
                 <div className="flex items-start gap-2">
                   <span className="font-mono break-all">{row.value}</span>
-                  <CopyIconButton value={row.value} label={`${row.type} record value`} />
+                  <CopyIconButton
+                    value={row.value}
+                    label={t('deployments.recordValue', {
+                      defaultValue: '{{type}} record value',
+                      type: row.type,
+                    })}
+                  />
                 </div>
               </td>
             </tr>
@@ -142,6 +169,7 @@ function RecordsTable({ rows }: { rows: DnsRecordRow[] }) {
  * Renders the DNS records returned by Vercel for a domain that is not yet verified.
  */
 function VerificationChallenges({ domain }: { domain: CustomDomain }) {
+  const { t } = useTranslation('chrome');
   const isApexDomain = domain.domain === domain.apexDomain;
   const rows: DnsRecordRow[] = [];
 
@@ -173,21 +201,31 @@ function VerificationChallenges({ domain }: { domain: CustomDomain }) {
     <div className="mt-3 text-xs space-y-3">
       <p className="text-muted-foreground dark:text-neutral-400 font-medium">
         {domain.misconfigured
-          ? 'Update the following DNS records with your domain provider, then click '
-          : 'Add the following DNS records with your domain provider, then click '}
-        <span className="font-semibold">Verify</span>.
+          ? t('deployments.updateDnsRecords', {
+              defaultValue:
+                'Update the following DNS records with your domain provider, then click ',
+            })
+          : t('deployments.addDnsRecords', {
+              defaultValue: 'Add the following DNS records with your domain provider, then click ',
+            })}
+        <span className="font-semibold">{t('deployments.verify', { defaultValue: 'Verify' })}</span>
+        .
       </p>
 
       {rows.length > 0 ? (
         <RecordsTable rows={rows} />
       ) : (
         <p className="text-muted-foreground dark:text-neutral-400">
-          Vercel has not returned any DNS records for this domain yet.
+          {t('deployments.noDnsRecordsYet', {
+            defaultValue: 'Vercel has not returned any DNS records for this domain yet.',
+          })}
         </p>
       )}
 
       <p className="text-muted-foreground dark:text-neutral-400">
-        DNS changes can take time to propagate before verification succeeds.
+        {t('deployments.dnsPropagationHint', {
+          defaultValue: 'DNS changes can take time to propagate before verification succeeds.',
+        })}
       </p>
     </div>
   );
@@ -211,6 +249,7 @@ function CustomDomainRow({
   isVerifying: boolean;
   isRemoving: boolean;
 }) {
+  const { t } = useTranslation('chrome');
   const isReady = domain.verified && !domain.misconfigured;
   const [showVerification, setShowVerification] = useState(!isReady);
   const customDomainUrl = `https://${domain.domain}`;
@@ -249,7 +288,9 @@ function CustomDomainRow({
               ) : (
                 <ChevronDown className="w-3.5 h-3.5" />
               )}
-              <span className="text-xs">Records</span>
+              <span className="text-xs">
+                {t('deployments.records', { defaultValue: 'Records' })}
+              </span>
             </Button>
           )}
           {!isReady && (
@@ -261,7 +302,9 @@ function CustomDomainRow({
               className="h-8 px-3 gap-1 text-xs bg-neutral-200 dark:bg-neutral-600 hover:bg-neutral-300 dark:hover:bg-neutral-500 text-zinc-950 dark:text-white"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isVerifying ? 'animate-spin' : ''}`} />
-              {isVerifying ? 'Verifying...' : 'Verify'}
+              {isVerifying
+                ? t('deployments.verifying', { defaultValue: 'Verifying...' })
+                : t('deployments.verify', { defaultValue: 'Verify' })}
             </Button>
           )}
           {isReady && (
@@ -272,7 +315,7 @@ function CustomDomainRow({
               className="h-8 px-2 gap-1 text-zinc-950 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              <span className="text-xs">Visit</span>
+              <span className="text-xs">{t('deployments.visit', { defaultValue: 'Visit' })}</span>
             </Button>
           )}
           <Button
@@ -280,7 +323,10 @@ function CustomDomainRow({
             size="sm"
             onClick={() => onRemove(domain.domain)}
             disabled={isRemoving}
-            aria-label={`Remove ${domain.domain}`}
+            aria-label={t('deployments.removeDomainAria', {
+              defaultValue: 'Remove {{domain}}',
+              domain: domain.domain,
+            })}
             className="h-8 px-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -299,6 +345,7 @@ function CustomDomainRow({
  * and user-owned custom domains with full DNS verification workflow.
  */
 export default function DeploymentDomainsPage() {
+  const { t } = useTranslation('chrome');
   const { copied: copiedDefault, copy: copyDefault } = useCopyToClipboard();
   const { copied: copiedCustom, copy: copyCustom } = useCopyToClipboard();
   const [isEditing, setIsEditing] = useState(false);
@@ -344,7 +391,10 @@ export default function DeploymentDomainsPage() {
       return;
     }
     if (!(await copyDefault(defaultDomain))) {
-      showToast('Failed to copy to clipboard', 'error');
+      showToast(
+        t('deployments.copyFailed', { defaultValue: 'Failed to copy to clipboard' }),
+        'error'
+      );
     }
   };
 
@@ -353,7 +403,10 @@ export default function DeploymentDomainsPage() {
       return;
     }
     if (!(await copyCustom(customDomainUrl))) {
-      showToast('Failed to copy to clipboard', 'error');
+      showToast(
+        t('deployments.copyFailed', { defaultValue: 'Failed to copy to clipboard' }),
+        'error'
+      );
     }
   };
 
@@ -371,16 +424,29 @@ export default function DeploymentDomainsPage() {
     const trimmedSlug = customSlug.trim() || null;
     if (trimmedSlug) {
       if (trimmedSlug.length < 3) {
-        showToast('Slug must be at least 3 characters', 'error');
+        showToast(
+          t('deployments.slugTooShort', {
+            defaultValue: 'Slug must be at least 3 characters',
+          }),
+          'error'
+        );
         return;
       }
       if (trimmedSlug.length > 63) {
-        showToast('Slug must be at most 63 characters', 'error');
+        showToast(
+          t('deployments.slugTooLong', {
+            defaultValue: 'Slug must be at most 63 characters',
+          }),
+          'error'
+        );
         return;
       }
       if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(trimmedSlug)) {
         showToast(
-          'Slug must be lowercase alphanumeric with hyphens, not starting or ending with hyphen',
+          t('deployments.slugInvalidFormat', {
+            defaultValue:
+              'Slug must be lowercase alphanumeric with hyphens, not starting or ending with hyphen',
+          }),
           'error'
         );
         return;
@@ -407,11 +473,19 @@ export default function DeploymentDomainsPage() {
       return;
     }
     if (!DOMAIN_REGEX.test(trimmed)) {
-      setDomainError('Invalid domain format (e.g. myapp.com or www.myapp.com)');
+      setDomainError(
+        t('deployments.invalidDomainFormat', {
+          defaultValue: 'Invalid domain format (e.g. myapp.com or www.myapp.com)',
+        })
+      );
       return;
     }
     if (trimmed.endsWith(RESERVED_HOSTED_DOMAIN_SUFFIX)) {
-      setDomainError('Domains ending with .insforge.site are reserved by InsForge');
+      setDomainError(
+        t('deployments.reservedDomainSuffix', {
+          defaultValue: 'Domains ending with .insforge.site are reserved by InsForge',
+        })
+      );
       return;
     }
     setDomainError('');
@@ -433,7 +507,7 @@ export default function DeploymentDomainsPage() {
         <div className="flex-1 min-h-0 overflow-auto p-6">
           <div className="w-full max-w-[1080px] mx-auto flex flex-col gap-6">
             <h1 className="text-xl font-semibold text-zinc-950 dark:text-white tracking-[-0.1px]">
-              Domains
+              {t('deployments.domains', { defaultValue: 'Domains' })}
             </h1>
             <Skeleton className="h-[80px] w-full rounded-lg" />
             <Skeleton className="h-[48px] w-full rounded-lg" />
@@ -450,15 +524,19 @@ export default function DeploymentDomainsPage() {
         <div className="w-full max-w-[1080px] mx-auto flex flex-col gap-6">
           {/* Title */}
           <h1 className="text-xl font-semibold text-zinc-950 dark:text-white tracking-[-0.1px]">
-            Domains
+            {t('deployments.domains', { defaultValue: 'Domains' })}
           </h1>
 
           {/* Description */}
           <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-5">
-            The default domain is automatically generated by the system. You can also define a
-            custom domain for your project.
+            {t('deployments.domainsDescription1', {
+              defaultValue:
+                'The default domain is automatically generated by the system. You can also define a custom domain for your project.',
+            })}
             <br />
-            Both domains can be used to access your deployed application.
+            {t('deployments.domainsDescription2', {
+              defaultValue: 'Both domains can be used to access your deployed application.',
+            })}
           </p>
 
           {/* Domain Rows */}
@@ -467,7 +545,7 @@ export default function DeploymentDomainsPage() {
             <div className="bg-white dark:bg-[#333] rounded-lg h-12 flex items-center px-3">
               <div className="flex items-center gap-6">
                 <span className="text-sm text-muted-foreground dark:text-neutral-400 w-[120px]">
-                  Default Domain
+                  {t('deployments.defaultDomain', { defaultValue: 'Default Domain' })}
                 </span>
                 {defaultDomain ? (
                   <div className="flex items-center gap-1">
@@ -486,7 +564,11 @@ export default function DeploymentDomainsPage() {
                       className="h-9 ml-2 px-3 gap-1 text-zinc-950 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700"
                     >
                       {copiedDefault ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      <span className="text-[13px]">{copiedDefault ? 'Copied' : 'Copy'}</span>
+                      <span className="text-[13px]">
+                        {copiedDefault
+                          ? t('deployments.copied', { defaultValue: 'Copied' })
+                          : t('deployments.copy', { defaultValue: 'Copy' })}
+                      </span>
                     </Button>
                     <Button
                       variant="ghost"
@@ -497,12 +579,14 @@ export default function DeploymentDomainsPage() {
                       className="h-9 px-3 gap-1 text-zinc-950 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700"
                     >
                       <ExternalLink className="w-3 h-3" />
-                      <span className="text-[13px]">Visit</span>
+                      <span className="text-[13px]">
+                        {t('deployments.visit', { defaultValue: 'Visit' })}
+                      </span>
                     </Button>
                   </div>
                 ) : (
                   <span className="text-[13px] text-muted-foreground dark:text-neutral-500">
-                    No deployment yet
+                    {t('deployments.noDeploymentYet', { defaultValue: 'No deployment yet' })}
                   </span>
                 )}
               </div>
@@ -512,7 +596,7 @@ export default function DeploymentDomainsPage() {
             <div className="bg-white dark:bg-[#333] rounded-lg h-12 flex items-center justify-between pl-3 pr-2">
               <div className="flex items-center gap-6">
                 <span className="text-sm text-muted-foreground dark:text-neutral-400 w-[120px]">
-                  Custom Domain
+                  {t('deployments.customDomain', { defaultValue: 'Custom Domain' })}
                 </span>
                 {isEditing ? (
                   <div className="flex items-center gap-1">
@@ -544,7 +628,11 @@ export default function DeploymentDomainsPage() {
                       className="h-9 ml-2 px-3 gap-1 text-zinc-950 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700"
                     >
                       {copiedCustom ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      <span className="text-[13px]">{copiedCustom ? 'Copied' : 'Copy'}</span>
+                      <span className="text-[13px]">
+                        {copiedCustom
+                          ? t('deployments.copied', { defaultValue: 'Copied' })
+                          : t('deployments.copy', { defaultValue: 'Copy' })}
+                      </span>
                     </Button>
                     <Button
                       variant="ghost"
@@ -556,7 +644,9 @@ export default function DeploymentDomainsPage() {
                       className="h-9 px-3 gap-1 text-zinc-950 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700"
                     >
                       <ExternalLink className="w-3 h-3" />
-                      <span className="text-[13px]">Visit</span>
+                      <span className="text-[13px]">
+                        {t('deployments.visit', { defaultValue: 'Visit' })}
+                      </span>
                     </Button>
                   </div>
                 ) : null}
@@ -571,7 +661,7 @@ export default function DeploymentDomainsPage() {
                     disabled={isUpdating}
                     className="h-9 w-20 bg-neutral-200 dark:bg-neutral-600 hover:bg-neutral-300 dark:hover:bg-neutral-500 text-zinc-950 dark:text-white"
                   >
-                    Cancel
+                    {t('deployments.cancel', { defaultValue: 'Cancel' })}
                   </Button>
                   <Button
                     size="sm"
@@ -579,7 +669,9 @@ export default function DeploymentDomainsPage() {
                     disabled={!customSlug.trim() || isUpdating}
                     className="h-9 w-20 bg-zinc-950 text-white hover:bg-zinc-800 disabled:opacity-40 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
                   >
-                    {isUpdating ? 'Saving...' : 'Save'}
+                    {isUpdating
+                      ? t('deployments.saving', { defaultValue: 'Saving...' })
+                      : t('deployments.save', { defaultValue: 'Save' })}
                   </Button>
                 </div>
               ) : savedCustomSlug ? (
@@ -590,7 +682,9 @@ export default function DeploymentDomainsPage() {
                   className="h-9 px-3 gap-1.5 bg-neutral-200 dark:bg-neutral-600 hover:bg-neutral-300 dark:hover:bg-neutral-500 text-zinc-950 dark:text-white"
                 >
                   <Pencil className="w-4 h-4" />
-                  <span className="text-sm font-medium">Edit</span>
+                  <span className="text-sm font-medium">
+                    {t('deployments.edit', { defaultValue: 'Edit' })}
+                  </span>
                 </Button>
               ) : (
                 <Button
@@ -600,7 +694,9 @@ export default function DeploymentDomainsPage() {
                   className="h-9 px-3 gap-1.5 bg-neutral-200 dark:bg-neutral-600 hover:bg-neutral-300 dark:hover:bg-neutral-500 text-zinc-950 dark:text-white"
                 >
                   <Plus className="w-4 h-4" />
-                  <span className="text-sm font-medium">Create</span>
+                  <span className="text-sm font-medium">
+                    {t('deployments.create', { defaultValue: 'Create' })}
+                  </span>
                 </Button>
               )}
             </div>
@@ -610,7 +706,7 @@ export default function DeploymentDomainsPage() {
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">
-                Your own domains
+                {t('deployments.yourOwnDomains', { defaultValue: 'Your own domains' })}
               </h2>
               <Button
                 variant="secondary"
@@ -619,7 +715,9 @@ export default function DeploymentDomainsPage() {
                 className="h-9 px-3 gap-1.5 bg-neutral-200 dark:bg-neutral-600 hover:bg-neutral-300 dark:hover:bg-neutral-500 text-zinc-950 dark:text-white"
               >
                 <Globe className="w-4 h-4" />
-                <span className="text-sm font-medium">Add domain</span>
+                <span className="text-sm font-medium">
+                  {t('deployments.addDomain', { defaultValue: 'Add domain' })}
+                </span>
               </Button>
             </div>
 
@@ -628,17 +726,21 @@ export default function DeploymentDomainsPage() {
                 <p className="text-sm text-red-500">
                   {domainsError instanceof Error
                     ? domainsError.message
-                    : 'Failed to load custom domains.'}
+                    : t('deployments.loadDomainsFailed', {
+                        defaultValue: 'Failed to load custom domains.',
+                      })}
                 </p>
                 <Button variant="outline" size="sm" onClick={() => void refetchDomains()}>
-                  Retry
+                  {t('deployments.retry', { defaultValue: 'Retry' })}
                 </Button>
               </div>
             ) : domains.length === 0 ? (
               <div className="bg-white dark:bg-[#333] rounded-lg px-4 py-6 flex flex-col items-center gap-2 text-center">
                 <Globe className="w-8 h-8 text-muted-foreground dark:text-neutral-500" />
                 <p className="text-sm text-muted-foreground dark:text-neutral-400">
-                  No custom domains yet. Add your own domain to get started.
+                  {t('deployments.noCustomDomains', {
+                    defaultValue: 'No custom domains yet. Add your own domain to get started.',
+                  })}
                 </p>
               </div>
             ) : (
@@ -671,19 +773,28 @@ export default function DeploymentDomainsPage() {
             <DialogContent>
               <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-200 dark:border-neutral-700">
                 <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white leading-7">
-                  Add your own domain
+                  {t('deployments.addYourOwnDomain', { defaultValue: 'Add your own domain' })}
                 </DialogTitle>
               </div>
               <DialogDescription className="sr-only">
-                Add a custom domain to your site
+                {t('deployments.addDomainDescription', {
+                  defaultValue: 'Add a custom domain to your site',
+                })}
               </DialogDescription>
 
               <div className="flex flex-col gap-4 p-6">
                 <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
-                  Enter the domain you own (e.g.{' '}
-                  <span className="font-mono text-zinc-950 dark:text-white">myapp.com</span> or{' '}
-                  <span className="font-mono text-zinc-950 dark:text-white">www.myapp.com</span>).
-                  You will receive DNS configuration instructions after adding it.
+                  {t('deployments.addDomainHintBefore', {
+                    defaultValue: 'Enter the domain you own (e.g.',
+                  })}{' '}
+                  <span className="font-mono text-zinc-950 dark:text-white">myapp.com</span>{' '}
+                  {t('deployments.or', { defaultValue: 'or' })}{' '}
+                  <span className="font-mono text-zinc-950 dark:text-white">www.myapp.com</span>
+                  {').'}{' '}
+                  {t('deployments.addDomainHintAfter', {
+                    defaultValue:
+                      'You will receive DNS configuration instructions after adding it.',
+                  })}
                 </p>
 
                 <Input
@@ -718,7 +829,7 @@ export default function DeploymentDomainsPage() {
                     disabled={isAdding}
                     className="h-9 px-4 bg-neutral-200 dark:bg-neutral-600 hover:bg-neutral-300 dark:hover:bg-neutral-500 text-zinc-950 dark:text-white"
                   >
-                    Cancel
+                    {t('deployments.cancel', { defaultValue: 'Cancel' })}
                   </Button>
                   <Button
                     size="sm"
@@ -726,7 +837,9 @@ export default function DeploymentDomainsPage() {
                     disabled={!newDomain.trim() || !!domainError || isAdding}
                     className="h-9 px-4 bg-zinc-950 text-white hover:bg-zinc-800 disabled:opacity-40 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
                   >
-                    {isAdding ? 'Adding...' : 'Add Domain'}
+                    {isAdding
+                      ? t('deployments.adding', { defaultValue: 'Adding...' })
+                      : t('deployments.addDomainAction', { defaultValue: 'Add Domain' })}
                   </Button>
                 </div>
               </div>

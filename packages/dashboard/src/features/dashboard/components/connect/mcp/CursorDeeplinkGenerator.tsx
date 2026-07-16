@@ -1,4 +1,5 @@
 import { useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createMCPServerConfig, type PlatformType } from './helpers';
 import CursorLogo from '#assets/logos/cursor.svg?react';
 import { getBackendUrl } from '#lib/utils/utils';
@@ -14,6 +15,7 @@ export function CursorDeeplinkGenerator({
   apiKey,
   os = 'macos-linux',
 }: CursorDeeplinkGeneratorProps) {
+  const { t } = useTranslation('chrome');
   const deeplink = useMemo(() => {
     const config = createMCPServerConfig(apiKey || '', os, getBackendUrl());
     const configString = JSON.stringify(config);
@@ -39,7 +41,7 @@ export function CursorDeeplinkGenerator({
       className="flex h-8 items-center justify-center gap-2.5 rounded border border-[var(--alpha-8)] bg-semantic-0 px-4 text-sm font-medium text-foreground transition-colors hover:bg-[var(--alpha-4)]"
     >
       <CursorLogo className="h-6 w-6" />
-      <span>Add to Cursor</span>
+      <span>{t('overview.addToAgent', { agent: 'Cursor', defaultValue: 'Add to {{agent}}' })}</span>
     </button>
   );
 }

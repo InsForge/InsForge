@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -87,6 +88,7 @@ function FormField({
 }
 
 export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: SmtpSettingsCardProps) {
+  const { t } = useTranslation('chrome');
   const form = useForm<SmtpFormValues>({
     resolver: zodResolver(upsertSmtpConfigRequestSchema),
     defaultValues,
@@ -117,7 +119,7 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
   if (isLoading) {
     return (
       <div className="flex min-h-[120px] items-center justify-center text-sm text-muted-foreground">
-        Loading SMTP configuration...
+        {t('auth.loadingSmtpConfig', { defaultValue: 'Loading SMTP configuration...' })}
       </div>
     );
   }
@@ -127,9 +129,14 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
       {/* Enable toggle */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-foreground">Enable Custom SMTP</p>
+          <p className="text-sm font-medium text-foreground">
+            {t('auth.enableCustomSmtp', { defaultValue: 'Enable Custom SMTP' })}
+          </p>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
-            Send emails using your own SMTP server instead of the default provider.
+            {t('auth.enableCustomSmtpDescription', {
+              defaultValue:
+                'Send emails using your own SMTP server instead of the default provider.',
+            })}
           </p>
         </div>
         <Controller
@@ -150,8 +157,10 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
         <div className="mt-8 flex flex-col gap-5">
           <FormField
             id="smtp-sender-email"
-            label="Sender email"
-            description="The email address emails are sent from."
+            label={t('auth.senderEmail', { defaultValue: 'Sender email' })}
+            description={t('auth.senderEmailDescription', {
+              defaultValue: 'The email address emails are sent from.',
+            })}
             error={form.formState.errors.senderEmail?.message}
           >
             <Input
@@ -165,14 +174,16 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
 
           <FormField
             id="smtp-sender-name"
-            label="Sender name"
-            description="Name displayed in the recipient's inbox."
+            label={t('auth.senderName', { defaultValue: 'Sender name' })}
+            description={t('auth.senderNameDescription', {
+              defaultValue: "Name displayed in the recipient's inbox.",
+            })}
             error={form.formState.errors.senderName?.message}
           >
             <Input
               id="smtp-sender-name"
               type="text"
-              placeholder="Your App Name"
+              placeholder={t('auth.senderNamePlaceholder', { defaultValue: 'Your App Name' })}
               {...form.register('senderName')}
               className={form.formState.errors.senderName ? 'border-destructive' : ''}
             />
@@ -180,8 +191,10 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
 
           <FormField
             id="smtp-host"
-            label="Host"
-            description="Hostname or IP address of your SMTP server."
+            label={t('auth.host', { defaultValue: 'Host' })}
+            description={t('auth.hostDescription', {
+              defaultValue: 'Hostname or IP address of your SMTP server.',
+            })}
             error={form.formState.errors.host?.message}
           >
             <Input
@@ -195,8 +208,10 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
 
           <FormField
             id="smtp-port"
-            label="Port number"
-            description="Common ports: 587 (STARTTLS), 465 (implicit TLS)."
+            label={t('auth.portNumber', { defaultValue: 'Port number' })}
+            description={t('auth.portNumberDescription', {
+              defaultValue: 'Common ports: 587 (STARTTLS), 465 (implicit TLS).',
+            })}
             error={form.formState.errors.port?.message}
           >
             <Controller
@@ -223,8 +238,10 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
 
           <FormField
             id="smtp-min-interval"
-            label="Minimum interval"
-            description="Seconds between emails to the same user."
+            label={t('auth.minimumInterval', { defaultValue: 'Minimum interval' })}
+            description={t('auth.minimumIntervalDescription', {
+              defaultValue: 'Seconds between emails to the same user.',
+            })}
             error={form.formState.errors.minIntervalSeconds?.message}
           >
             <Input
@@ -238,14 +255,16 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
 
           <FormField
             id="smtp-username"
-            label="Username"
-            description="SMTP authentication username."
+            label={t('auth.username', { defaultValue: 'Username' })}
+            description={t('auth.usernameDescription', {
+              defaultValue: 'SMTP authentication username.',
+            })}
             error={form.formState.errors.username?.message}
           >
             <Input
               id="smtp-username"
               type="text"
-              placeholder="SMTP username"
+              placeholder={t('auth.smtpUsernamePlaceholder', { defaultValue: 'SMTP username' })}
               {...form.register('username')}
               className={form.formState.errors.username ? 'border-destructive' : ''}
             />
@@ -253,14 +272,20 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
 
           <FormField
             id="smtp-password"
-            label="Password"
-            description="Cannot be viewed once saved."
+            label={t('auth.password', { defaultValue: 'Password' })}
+            description={t('auth.smtpPasswordDescription', {
+              defaultValue: 'Cannot be viewed once saved.',
+            })}
             error={form.formState.errors.password?.message}
           >
             <Input
               id="smtp-password"
               type="password"
-              placeholder={config?.hasPassword ? '••••••••••••' : 'SMTP password'}
+              placeholder={
+                config?.hasPassword
+                  ? '••••••••••••'
+                  : t('auth.smtpPasswordPlaceholder', { defaultValue: 'SMTP password' })
+              }
               {...form.register('password')}
               className={form.formState.errors.password ? 'border-destructive' : ''}
             />
@@ -272,10 +297,12 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
       {form.formState.isDirty && (
         <div className="mt-6 flex items-center justify-end gap-2 border-t border-[var(--alpha-8)] pt-4">
           <Button type="button" variant="secondary" onClick={resetForm} disabled={isUpdating}>
-            Cancel
+            {t('auth.cancel', { defaultValue: 'Cancel' })}
           </Button>
           <Button type="button" onClick={handleSubmit} disabled={saveDisabled}>
-            {isUpdating ? 'Saving...' : 'Save changes'}
+            {isUpdating
+              ? t('auth.saving', { defaultValue: 'Saving...' })
+              : t('auth.saveChanges', { defaultValue: 'Save Changes' })}
           </Button>
         </div>
       )}

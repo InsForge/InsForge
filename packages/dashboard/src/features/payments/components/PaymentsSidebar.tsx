@@ -1,4 +1,5 @@
 import { Box, Rocket, Settings } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn } from '@insforge/ui';
 import type { PaymentEnvironment, PaymentProvider } from '@insforge/shared-schemas';
 import {
@@ -8,11 +9,6 @@ import {
 } from '#components';
 import { PaymentProviderSelect } from './PaymentProviderSelect';
 import { usePaymentConnectionStatus } from '#features/payments/hooks/usePaymentConnectionStatus';
-
-const PAYMENT_ENVIRONMENT_LABELS: Record<PaymentEnvironment, string> = {
-  test: 'Test Environment',
-  live: 'Live Environment',
-};
 
 const PAYMENT_ENVIRONMENTS: PaymentEnvironment[] = ['test', 'live'];
 
@@ -33,58 +29,6 @@ function PaymentEnvironmentIcon({
   return <Icon className={cn('size-5 shrink-0 text-muted-foreground', className)} />;
 }
 
-function getPaymentsSidebarItems(disabled: boolean): FeatureSidebarListItem[] {
-  return [
-    {
-      id: 'catalog',
-      label: 'Catalog',
-      href: '/dashboard/payments/catalog',
-      disabled,
-    },
-    {
-      id: 'subscriptions',
-      label: 'Subscriptions',
-      href: '/dashboard/payments/subscriptions',
-      disabled,
-    },
-    {
-      id: 'customers',
-      label: 'Customers',
-      href: '/dashboard/payments/customers',
-      disabled,
-    },
-    {
-      id: 'transactions',
-      label: 'Transactions',
-      href: '/dashboard/payments/transactions',
-      disabled,
-    },
-  ];
-}
-
-const PAYMENTS_FALLBACK_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
-  {
-    id: 'catalog',
-    label: 'Catalog',
-    href: '/dashboard/payments/catalog',
-  },
-  {
-    id: 'subscriptions',
-    label: 'Subscriptions',
-    href: '/dashboard/payments/subscriptions',
-  },
-  {
-    id: 'customers',
-    label: 'Customers',
-    href: '/dashboard/payments/customers',
-  },
-  {
-    id: 'transactions',
-    label: 'Transactions',
-    href: '/dashboard/payments/transactions',
-  },
-];
-
 interface PaymentsSidebarProps {
   onOpenSettings: () => void;
   provider: PaymentProvider;
@@ -100,12 +44,20 @@ function PaymentEnvironmentSelect({
   value: PaymentEnvironment;
   onValueChange: (environment: PaymentEnvironment) => void;
 }) {
+  const { t } = useTranslation('chrome');
+  const environmentLabels: Record<PaymentEnvironment, string> = {
+    test: t('payments.testEnvironment', { defaultValue: 'Test Environment' }),
+    live: t('payments.liveEnvironment', { defaultValue: 'Live Environment' }),
+  };
   return (
     <Select
       value={value}
       onValueChange={(nextValue) => onValueChange(nextValue as PaymentEnvironment)}
     >
-      <SelectTrigger className="h-8 w-full rounded" aria-label="Payment environment">
+      <SelectTrigger
+        className="h-8 w-full rounded"
+        aria-label={t('payments.environmentAriaLabel', { defaultValue: 'Payment environment' })}
+      >
         <span className="!flex min-w-0 items-center gap-2.5">
           <PaymentEnvironmentIcon environment={value} />
           <SelectValue />
@@ -118,7 +70,7 @@ function PaymentEnvironmentSelect({
             value={item}
             icon={<PaymentEnvironmentIcon environment={item} className="mr-1.5" />}
           >
-            {PAYMENT_ENVIRONMENT_LABELS[item]}
+            {environmentLabels[item]}
           </SelectItem>
         ))}
       </SelectContent>
@@ -133,15 +85,40 @@ export function PaymentsSidebar({
   environment,
   setEnvironment,
 }: PaymentsSidebarProps) {
+  const { t } = useTranslation('chrome');
   const { hasActiveKey, isLoading } = usePaymentConnectionStatus(provider, environment);
   const menuDisabled = !isLoading && !hasActiveKey;
-  const sidebarItems = isLoading
-    ? PAYMENTS_FALLBACK_SIDEBAR_ITEMS
-    : getPaymentsSidebarItems(menuDisabled);
+  const itemDisabled = isLoading ? undefined : menuDisabled;
+  const sidebarItems: FeatureSidebarListItem[] = [
+    {
+      id: 'catalog',
+      label: t('payments.catalog', { defaultValue: 'Catalog' }),
+      href: '/dashboard/payments/catalog',
+      disabled: itemDisabled,
+    },
+    {
+      id: 'subscriptions',
+      label: t('payments.subscriptions', { defaultValue: 'Subscriptions' }),
+      href: '/dashboard/payments/subscriptions',
+      disabled: itemDisabled,
+    },
+    {
+      id: 'customers',
+      label: t('payments.customers', { defaultValue: 'Customers' }),
+      href: '/dashboard/payments/customers',
+      disabled: itemDisabled,
+    },
+    {
+      id: 'transactions',
+      label: t('payments.transactions', { defaultValue: 'Transactions' }),
+      href: '/dashboard/payments/transactions',
+      disabled: itemDisabled,
+    },
+  ];
   const headerButtons: FeatureSidebarHeaderButton[] = [
     {
       id: 'payments-settings',
-      label: 'Payments Settings',
+      label: t('payments.settingsTitle', { defaultValue: 'Payments Settings' }),
       icon: Settings,
       onClick: onOpenSettings,
     },
@@ -149,7 +126,7 @@ export function PaymentsSidebar({
 
   return (
     <FeatureSidebar
-      title="Payment"
+      title={t('payments.sidebarTitle', { defaultValue: 'Payment' })}
       items={sidebarItems}
       headerButtons={headerButtons}
       headerContent={
@@ -171,7 +148,7 @@ export function PaymentsSidebar({
         <div
           className={cn('px-2 py-1 text-sm text-muted-foreground', menuDisabled && 'opacity-40')}
         >
-          No payment sections available
+          {t('payments.noSectionsAvailable', { defaultValue: 'No payment sections available' })}
         </div>
       }
     />

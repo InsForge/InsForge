@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Skeleton } from '@insforge/ui';
 import {
@@ -79,12 +80,13 @@ function getFlagUrlByRegion(region?: string): string | undefined {
 }
 
 function AgentConnectorNode({ data }: NodeProps<AgentConnectorNodeType>) {
+  const { t } = useTranslation('chrome');
   return (
     <button
       type="button"
       onClick={data.onOpenConnect}
       className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--alpha-8)] bg-card transition-colors hover:bg-[var(--alpha-4)]"
-      aria-label="Connect agent"
+      aria-label={t('overview.connectAgent')}
     >
       <Plug className="h-5 w-5 text-muted-foreground" />
     </button>
@@ -92,7 +94,8 @@ function AgentConnectorNode({ data }: NodeProps<AgentConnectorNodeType>) {
 }
 
 function AgentCardNode({ data }: NodeProps<AgentCardNodeType>) {
-  const requestLabel = `${data.requestCount} MCP Call${data.requestCount === 1 ? '' : 's'}`;
+  const { t } = useTranslation('chrome');
+  const requestLabel = t('overview.mcpCalls', { count: data.requestCount });
 
   return (
     <div className="w-[240px] overflow-hidden rounded-lg border border-[var(--alpha-8)] bg-card shadow-[0px_4px_4px_rgba(0,0,0,0.08)]">
@@ -110,7 +113,9 @@ function AgentCardNode({ data }: NodeProps<AgentCardNodeType>) {
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium leading-5 text-foreground">Agent</p>
+          <p className="truncate text-sm font-medium leading-5 text-foreground">
+            {t('overview.agent')}
+          </p>
           <p className="truncate text-[13px] leading-[18px] text-muted-foreground">
             {requestLabel}
           </p>
@@ -119,14 +124,15 @@ function AgentCardNode({ data }: NodeProps<AgentCardNodeType>) {
 
       <div className="flex items-center gap-1.5 px-3 py-3">
         <div className="h-2 w-2 rounded-full bg-primary" />
-        <p className="text-sm leading-5 text-primary">Connected</p>
+        <p className="text-sm leading-5 text-primary">{t('overview.connected')}</p>
       </div>
     </div>
   );
 }
 
 function DatabasePreviewNode({ data }: NodeProps<DatabasePreviewNodeType>) {
-  const tableLabel = `${data.tableCount} ${data.tableCount === 1 ? 'table' : 'tables'} created`;
+  const { t } = useTranslation('chrome');
+  const tableLabel = t('overview.tablesCreated', { count: data.tableCount });
   const flagUrl = getFlagUrlByRegion(data.region);
   const hasRegionRow = data.showRegion && !!data.region;
 
@@ -148,7 +154,9 @@ function DatabasePreviewNode({ data }: NodeProps<DatabasePreviewNodeType>) {
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium leading-5 text-foreground">Database</p>
+          <p className="truncate text-sm font-medium leading-5 text-foreground">
+            {t('overview.databaseCard')}
+          </p>
           <p className="truncate text-[13px] leading-[18px] text-muted-foreground">{tableLabel}</p>
         </div>
 
@@ -378,6 +386,7 @@ export default function DashboardPage() {
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey({ enabled: !canShowCliGettingStarted });
   const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
   const project = useDashboardProject();
+  const { t } = useTranslation('chrome');
   const { totalUsers } = useUsers();
   const { hasCompletedOnboarding, recordsCount, isLoading: isMcpUsageLoading } = useMcpUsage();
   const isBranch = project?.isBranch === true;
@@ -391,7 +400,7 @@ export default function DashboardPage() {
   const agentConnected = hasCompletedOnboarding || isBranch;
   const shouldShowLoadingState =
     isMetadataLoading || isMcpUsageLoading || (isCloudProject && isProjectInfoLoading);
-  const projectName = isCloudProject ? projectInfo.name : 'My InsForge Project';
+  const projectName = isCloudProject ? projectInfo.name : t('overview.myProject');
   const instanceType = projectInfo.instanceType?.toUpperCase();
   const showInstanceTypeBadge = isCloudProject && !!instanceType;
   const showRegionInfo = isCloudProject && !!projectInfo.region;
@@ -400,13 +409,13 @@ export default function DashboardPage() {
 
   const projectHealth = useMemo(() => {
     if (metadataError) {
-      return 'Issue';
+      return t('overview.issue');
     }
     if (isMetadataLoading) {
-      return 'Loading...';
+      return t('overview.loading');
     }
-    return 'Healthy';
-  }, [isMetadataLoading, metadataError]);
+    return t('overview.healthy');
+  }, [isMetadataLoading, metadataError, t]);
 
   const openConnectFlow = useCallback(() => {
     openConnectDialog();
@@ -562,13 +571,13 @@ export default function DashboardPage() {
 
               <div className="flex gap-6">
                 <StatusTile
-                  label="Status"
+                  label={t('overview.status')}
                   value={projectHealth}
                   icon={<div className="h-2 w-2 rounded-full bg-emerald-400" />}
                 />
                 <StatusTile
-                  label="Agent"
-                  value={agentConnected ? 'Connected' : 'Not Connected'}
+                  label={t('overview.agent')}
+                  value={agentConnected ? t('overview.connected') : t('overview.notConnected')}
                   icon={
                     agentConnected ? (
                       <CheckCircle className="h-5 w-5 text-primary" />
@@ -583,26 +592,26 @@ export default function DashboardPage() {
             {agentConnected ? (
               <div className="grid grid-cols-2 gap-3">
                 <MetricCard
-                  label="User"
+                  label={t('overview.user')}
                   value={String(totalUsers ?? 0)}
                   icon={<User className="h-4 w-4" />}
                 />
                 <MetricCard
-                  label="Database"
+                  label={t('overview.database')}
                   value={(metadata?.database.totalSizeInGB ?? 0).toFixed(2)}
                   unit="GB"
                   icon={<Database className="h-4 w-4" />}
                 />
                 <MetricCard
-                  label="Storage"
+                  label={t('overview.storage')}
                   value={(storage?.totalSizeInGB ?? 0).toFixed(2)}
                   unit="GB"
                   icon={<HardDrive className="h-4 w-4" />}
                 />
                 <MetricCard
-                  label="Edge Functions"
+                  label={t('overview.edgeFunctions')}
                   value={String(metadata?.functions.length ?? 0)}
-                  unit={(metadata?.functions.length ?? 0) === 1 ? 'Function' : 'Functions'}
+                  unit={t('overview.functionsUnit', { count: metadata?.functions.length ?? 0 })}
                   icon={<Braces className="h-4 w-4" />}
                 />
               </div>
@@ -610,12 +619,10 @@ export default function DashboardPage() {
               <div className="flex flex-col gap-6">
                 <div className="flex flex-col gap-3">
                   <h2 className="text-base font-normal leading-7 text-foreground">
-                    Getting Started
+                    {t('overview.gettingStarted')}
                   </h2>
                   <p className="text-sm leading-6 text-muted-foreground">
-                    {canShowCliGettingStarted
-                      ? 'Run this command to link your agent to this project'
-                      : 'Use MCP to link your agent to this project'}
+                    {canShowCliGettingStarted ? t('overview.runCli') : t('overview.useMcp')}
                   </p>
                 </div>
 

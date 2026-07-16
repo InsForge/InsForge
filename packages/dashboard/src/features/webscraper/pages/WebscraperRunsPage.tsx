@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { ExternalLink } from 'lucide-react';
 import {
   DataGrid,
@@ -23,10 +25,10 @@ type RunRow = ApifyRun & {
   [key: string]: string | number | boolean | null;
 };
 
-const columns: DataGridColumn<RunRow>[] = [
+const getColumns = (t: TFunction<'chrome'>): DataGridColumn<RunRow>[] => [
   {
     key: 'actorName',
-    name: 'Actor',
+    name: t('webscraper.actor', { defaultValue: 'Actor' }),
     width: '1.6fr',
     minWidth: 200,
     sortable: false,
@@ -38,7 +40,7 @@ const columns: DataGridColumn<RunRow>[] = [
   },
   {
     key: 'status',
-    name: 'Status',
+    name: t('webscraper.status', { defaultValue: 'Status' }),
     width: '0.8fr',
     minWidth: 120,
     sortable: false,
@@ -46,7 +48,7 @@ const columns: DataGridColumn<RunRow>[] = [
   },
   {
     key: 'startedAt',
-    name: 'Started',
+    name: t('webscraper.started', { defaultValue: 'Started' }),
     width: '1.2fr',
     minWidth: 160,
     sortable: false,
@@ -58,7 +60,7 @@ const columns: DataGridColumn<RunRow>[] = [
   },
   {
     key: 'usageTotalUsd',
-    name: 'Cost',
+    name: t('webscraper.cost', { defaultValue: 'Cost' }),
     width: '0.6fr',
     minWidth: 90,
     sortable: false,
@@ -82,8 +84,8 @@ const columns: DataGridColumn<RunRow>[] = [
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
         className="text-muted-foreground hover:text-foreground"
-        aria-label="Open in Apify"
-        title="Open in Apify"
+        aria-label={t('webscraper.openInApify', { defaultValue: 'Open in Apify' })}
+        title={t('webscraper.openInApify', { defaultValue: 'Open in Apify' })}
       >
         <ExternalLink className="size-4" aria-hidden />
       </a>
@@ -92,11 +94,13 @@ const columns: DataGridColumn<RunRow>[] = [
 ];
 
 export function WebscraperRunsPage() {
+  const { t } = useTranslation('chrome');
   const { connection } = useWebscraperContext();
   const isActive = connection.status === 'active';
   const runs = useApifyRuns(isActive);
   const actors = useApifyActors(isActive);
   const [search, setSearch] = useState('');
+  const columns = useMemo(() => getColumns(t), [t]);
 
   const nameByActId = useMemo(() => {
     const m = new Map<string, string>();
@@ -112,14 +116,17 @@ export function WebscraperRunsPage() {
   const rows = useMemo<RunRow[]>(() => {
     const all = (runs.data ?? []).map((r) => ({
       ...r,
-      actorName: (r.actId && nameByActId.get(r.actId)) || r.actId || 'Unknown actor',
+      actorName:
+        (r.actId && nameByActId.get(r.actId)) ||
+        r.actId ||
+        t('webscraper.unknownActor', { defaultValue: 'Unknown actor' }),
     }));
     const q = search.trim().toLowerCase();
     if (!q) {
       return all;
     }
     return all.filter((r) => `${r.actorName} ${r.status ?? ''}`.toLowerCase().includes(q));
-  }, [runs.data, nameByActId, search]);
+  }, [runs.data, nameByActId, search, t]);
 
   const { pageRows, setCurrentPage, gridProps } = useClientPagination(rows, 'webscraper-runs');
   // A new search starts from page 1 (clamping alone would keep stale state).
@@ -128,23 +135,32 @@ export function WebscraperRunsPage() {
   const errorMessage =
     runs.error instanceof Error && runs.error.message
       ? runs.error.message
-      : 'Could not load runs from Apify. Try refreshing.';
+      : t('webscraper.loadRunsError', {
+          defaultValue: 'Could not load runs from Apify. Try refreshing.',
+        });
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <TableHeader
-        title="Runs"
+        title={t('webscraper.runs', { defaultValue: 'Runs' })}
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search runs"
+        searchPlaceholder={t('webscraper.searchRuns', { defaultValue: 'Search runs' })}
       />
       <div className="relative min-h-0 flex-1">
         {!isActive ? (
-          <EmptyMessage message="Reconnect to load runs." />
+          <EmptyMessage
+            message={t('webscraper.reconnectToLoadRuns', {
+              defaultValue: 'Reconnect to load runs.',
+            })}
+          />
         ) : runs.isError ? (
           <div className="flex h-full items-center justify-center px-6">
             <div className="w-full max-w-[420px]">
-              <ErrorState title="Failed to load runs" error={errorMessage} />
+              <ErrorState
+                title={t('webscraper.loadRunsFailed', { defaultValue: 'Failed to load runs' })}
+                error={errorMessage}
+              />
             </div>
           </div>
         ) : (
@@ -154,9 +170,11 @@ export function WebscraperRunsPage() {
             loading={runs.isLoading}
             showSelection={false}
             showPagination={true}
-            paginationRecordLabel="runs"
+            paginationRecordLabel={t('webscraper.recordRuns', { defaultValue: 'runs' })}
             showTypeBadge={false}
-            emptyState={<EmptyMessage message="No runs yet." />}
+            emptyState={
+              <EmptyMessage message={t('webscraper.noRunsYet', { defaultValue: 'No runs yet.' })} />
+            }
             {...gridProps}
           />
         )}

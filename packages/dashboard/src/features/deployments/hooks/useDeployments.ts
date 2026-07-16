@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   deploymentsService,
@@ -8,6 +9,7 @@ import { useToast } from '@insforge/ui';
 import type { StartDeploymentRequest } from '@insforge/shared-schemas';
 
 export function useDeployments() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [selectedDeployment, setSelectedDeployment] = useState<DeploymentSchema | null>(null);
@@ -48,10 +50,21 @@ export function useDeployments() {
     mutationFn: () => deploymentsService.createDeployment(),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['deployments'] });
-      showToast('Deployment created successfully', 'success');
+      showToast(
+        t('deployments.deploymentCreated', {
+          defaultValue: 'Deployment created successfully',
+        }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to create deployment', 'error');
+      showToast(
+        error.message ||
+          t('deployments.createDeploymentFailed', {
+            defaultValue: 'Failed to create deployment',
+          }),
+        'error'
+      );
     },
   });
 
@@ -60,10 +73,21 @@ export function useDeployments() {
       deploymentsService.startDeployment(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['deployments'] });
-      showToast('Deployment started successfully', 'success');
+      showToast(
+        t('deployments.deploymentStarted', {
+          defaultValue: 'Deployment started successfully',
+        }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to start deployment', 'error');
+      showToast(
+        error.message ||
+          t('deployments.startDeploymentFailed', {
+            defaultValue: 'Failed to start deployment',
+          }),
+        'error'
+      );
     },
   });
 
@@ -75,10 +99,21 @@ export function useDeployments() {
       if (selectedDeployment?.id === updatedDeployment.id) {
         setSelectedDeployment(updatedDeployment);
       }
-      showToast('Deployment synced successfully', 'success');
+      showToast(
+        t('deployments.deploymentSynced', {
+          defaultValue: 'Deployment synced successfully',
+        }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to sync deployment', 'error');
+      showToast(
+        error.message ||
+          t('deployments.syncDeploymentFailed', {
+            defaultValue: 'Failed to sync deployment',
+          }),
+        'error'
+      );
     },
   });
 
@@ -86,13 +121,24 @@ export function useDeployments() {
     mutationFn: (id: string) => deploymentsService.cancelDeployment(id),
     onSuccess: (_, id) => {
       void queryClient.invalidateQueries({ queryKey: ['deployments'] });
-      showToast('Deployment cancelled successfully', 'success');
+      showToast(
+        t('deployments.deploymentCancelled', {
+          defaultValue: 'Deployment cancelled successfully',
+        }),
+        'success'
+      );
       if (selectedDeployment?.id === id) {
         setSelectedDeployment(null);
       }
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to cancel deployment', 'error');
+      showToast(
+        error.message ||
+          t('deployments.cancelDeploymentFailed', {
+            defaultValue: 'Failed to cancel deployment',
+          }),
+        'error'
+      );
     },
   });
 

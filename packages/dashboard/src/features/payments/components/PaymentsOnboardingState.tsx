@@ -1,4 +1,5 @@
 import { Settings } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button, cn } from '@insforge/ui';
 import type { PaymentEnvironment, PaymentProvider } from '@insforge/shared-schemas';
 import RazorpayWordmark from '#assets/logos/razorpay-wordmark.svg?react';
@@ -97,11 +98,6 @@ const PAYMENT_QUICK_GUIDES: Record<
 const PROVIDER_LABELS: Record<PaymentProvider, string> = {
   stripe: 'Stripe',
   razorpay: 'Razorpay',
-};
-
-const MODE_LABELS: Record<PaymentEnvironment, string> = {
-  test: 'Test',
-  live: 'Live',
 };
 
 interface PaymentsOnboardingStateProps {
@@ -210,10 +206,32 @@ export function PaymentsOnboardingState({
   onConfigure,
   onProviderChange,
 }: PaymentsOnboardingStateProps) {
+  const { t } = useTranslation('chrome');
   const providerLabel = PROVIDER_LABELS[provider];
-  const modeLabel = MODE_LABELS[environment];
-  const keyLabel = provider === 'stripe' ? 'Key' : 'Keys';
-  const quickGuideSteps = PAYMENT_QUICK_GUIDES[provider][environment];
+  const modeLabel =
+    environment === 'test'
+      ? t('payments.modeTest', { defaultValue: 'Test' })
+      : t('payments.modeLive', { defaultValue: 'Live' });
+  const onboardingTitle =
+    provider === 'stripe'
+      ? t('payments.onboardingTitleSingleKey', {
+          defaultValue: 'Configure Your {{provider}} {{mode}} Key',
+          provider: providerLabel,
+          mode: modeLabel,
+        })
+      : t('payments.onboardingTitleMultipleKeys', {
+          defaultValue: 'Configure Your {{provider}} {{mode}} Keys',
+          provider: providerLabel,
+          mode: modeLabel,
+        });
+  const quickGuideSteps = PAYMENT_QUICK_GUIDES[provider][environment].map((step, index) => ({
+    title: t(`payments.quickGuide.${provider}.${environment}.step${index + 1}Title`, {
+      defaultValue: step.title,
+    }),
+    description: t(`payments.quickGuide.${provider}.${environment}.step${index + 1}Description`, {
+      defaultValue: step.description,
+    }),
+  }));
   const alternativeProvider: PaymentProvider = provider === 'stripe' ? 'razorpay' : 'stripe';
 
   return (
@@ -224,9 +242,7 @@ export function PaymentsOnboardingState({
         </div>
 
         <div className="flex w-full flex-col items-center gap-4">
-          <h2 className="text-xl font-medium leading-7 text-foreground">
-            Configure Your {providerLabel} {modeLabel} {keyLabel}
-          </h2>
+          <h2 className="text-xl font-medium leading-7 text-foreground">{onboardingTitle}</h2>
         </div>
 
         <div className="w-full rounded-lg border border-[var(--alpha-8)] bg-card px-6 pb-8 pt-6">
@@ -246,14 +262,19 @@ export function PaymentsOnboardingState({
               className="h-8 rounded px-2.5"
             >
               <Settings className="h-4 w-4" />
-              Configure {providerLabel} API keys
+              {t('payments.configureApiKeys', {
+                defaultValue: 'Configure {{provider}} API keys',
+                provider: providerLabel,
+              })}
             </Button>
           </div>
         </div>
 
         {onProviderChange ? (
           <div className="flex flex-col items-center gap-4">
-            <p className="text-xs leading-4 text-muted-foreground">or change a payment provider</p>
+            <p className="text-xs leading-4 text-muted-foreground">
+              {t('payments.orChangeProvider', { defaultValue: 'or change a payment provider' })}
+            </p>
             <PaymentProviderCard
               provider={alternativeProvider}
               onClick={() => onProviderChange(alternativeProvider)}
