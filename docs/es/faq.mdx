@@ -160,4 +160,18 @@ description: "Respuestas a preguntas habituales sobre cómo funciona InsForge."
 
     En InsForge Cloud nunca tocas esto. El compute está gestionado por nosotros, y el resto de la plataforma (base de datos, autenticación, Storage, edge functions) no necesita ningún token de Fly.
   </Accordion>
+
+  <Accordion title="¿Este asistente puede ayudarme con algo específico de mi propio proyecto?">
+    En realidad no. Este asistente responde a partir de la documentación pública de InsForge, así que no puede ver tu proyecto: no puede depurar un error, mirar tus datos ni responder nada relacionado con tu propio backend o configuración. Para cualquier cosa específica de tu proyecto, usa la CLI: lee tu backend en vivo y puede pasar los resultados a la IA:
+
+    ```bash
+    # Informe de salud completo: hallazgos del advisor, salud de la BD, métricas, registros de error recientes
+    npx @insforge/cli diagnose
+
+    # Pregunta sobre tu backend real, con tus propias palabras
+    npx @insforge/cli diagnose --ai "why is this insert returning 401?"
+    ```
+
+    `diagnose --ai` acepta cualquier pregunta y basa la respuesta en las señales reales de tu proyecto, así que sirve igual para errores, datos y configuración. Consulta [Diagnostics & advisor](/agent-native/diagnostics) para comprobaciones puntuales como `diagnose advisor`, `diagnose db`, `diagnose metrics` y `diagnose logs`.
+  </Accordion>
 </AccordionGroup>
