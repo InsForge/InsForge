@@ -38,6 +38,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
     post:
       summary: Create schedule
       description: Creates a new scheduled job.
@@ -64,6 +71,7 @@ paths:
                     format: uuid
                   cronJobId:
                     type: string
+                    nullable: true
                   message:
                     type: string
 
@@ -83,6 +91,13 @@ paths:
 
         '403':
           description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        '500':
+          description: Internal server error
           content:
             application/json:
               schema:
@@ -113,6 +128,13 @@ paths:
 
         '403':
           description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        '500':
+          description: Internal server error
           content:
             application/json:
               schema:
@@ -163,6 +185,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/schedules/{id}:
     get:
       summary: Get schedule by ID
@@ -187,13 +216,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Schedule'
 
-        '404':
-          description: Schedule not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
         '401':
           description: Unauthorized
           content:
@@ -203,6 +225,13 @@ paths:
 
         '403':
           description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        '500':
+          description: Internal server error
           content:
             application/json:
               schema:
@@ -243,18 +272,12 @@ paths:
                     format: uuid
                   cronJobId:
                     type: string
+                    nullable: true
                   message:
                     type: string
 
         '400':
           description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-        '404':
-          description: Schedule not found
           content:
             application/json:
               schema:
@@ -269,6 +292,13 @@ paths:
 
         '403':
           description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        '500':
+          description: Internal server error
           content:
             application/json:
               schema:
@@ -300,13 +330,6 @@ paths:
                   message:
                     type: string
 
-        '404':
-          description: Schedule not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
         '401':
           description: Unauthorized
           content:
@@ -316,6 +339,13 @@ paths:
 
         '403':
           description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        '500':
+          description: Internal server error
           content:
             application/json:
               schema:
@@ -385,8 +415,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-        '404':
-          description: Schedule not found
+        '500':
+          description: Internal server error
           content:
             application/json:
               schema:
@@ -413,7 +443,7 @@ components:
           type: string
         statusCode:
           type: integer
-        nextAction:
+        nextActions:
           type: string
 
     Schedule:
@@ -447,8 +477,10 @@ components:
           additionalProperties:
             type: string
         body:
-          type: object
           nullable: true
+          oneOf:
+            - type: string
+            - type: object
         cronJobId:
           type: string
           nullable: true
@@ -523,7 +555,10 @@ components:
           additionalProperties:
             type: string
         body:
-          type: object
+          nullable: true
+          oneOf:
+            - type: string
+            - type: object
 
     UpdateScheduleRequest:
       type: object
@@ -544,6 +579,9 @@ components:
           additionalProperties:
             type: string
         body:
-          type: object
+          nullable: true
+          oneOf:
+            - type: string
+            - type: object
         isActive:
           type: boolean
