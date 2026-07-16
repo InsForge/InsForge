@@ -477,10 +477,8 @@ components:
           additionalProperties:
             type: string
         body:
+          type: object
           nullable: true
-          oneOf:
-            - type: string
-            - type: object
         cronJobId:
           type: string
           nullable: true
@@ -555,10 +553,8 @@ components:
           additionalProperties:
             type: string
         body:
+          type: object
           nullable: true
-          oneOf:
-            - type: string
-            - type: object
 
     UpdateScheduleRequest:
       type: object
@@ -579,9 +575,7 @@ components:
           additionalProperties:
             type: string
         body:
+          type: object
           nullable: true
-          oneOf:
-            - type: string
-            - type: object
         isActive:
           type: boolean
