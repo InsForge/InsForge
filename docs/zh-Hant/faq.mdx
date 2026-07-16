@@ -160,4 +160,8 @@ description: "關於 InsForge 運作方式的常見問題解答。"
 
     在 InsForge Cloud 上你完全不用碰這個。Compute 由平台代管，平台其餘部分（資料庫、認證、Storage、Edge Functions）都不需要任何 Fly token。
   </Accordion>
+
+  <Accordion title="這個助手能幫我解決我自己專案裡的具體問題嗎？">
+    基本上不行。這個助手是根據 InsForge 的公開文件來回答的，看不到你的專案：既沒辦法除錯，也讀不到你的資料，更查不了你的設定。凡是跟你自己專案相關的，交給你的編碼 agent 來處理。你的 agent 透過 CLI 或 MCP 連著 InsForge，能讀到你的即時後端、結構、資料和日誌，直接幫你除錯，用白話描述問題就行。想自己拿一份後端健康和報錯報告，跑 `npx @insforge/cli diagnose`。參見 [Diagnostics & advisor](/agent-native/diagnostics)。
+  </Accordion>
 </AccordionGroup>

@@ -160,4 +160,8 @@ description: "Answers to common questions about how InsForge works."
 
     On InsForge Cloud you never touch this. Compute is managed for you, and the rest of the platform (database, auth, storage, edge functions) needs no Fly token at all.
   </Accordion>
+
+  <Accordion title="Can this assistant help with something specific to my own project?">
+    Not really. This assistant answers from InsForge's public docs, so it can't see your project: it can't debug an error, read your data, or check your configuration. Take anything specific to your own project to your coding agent instead. Connected to InsForge through the CLI or MCP, your agent can read your live backend, schema, data, and logs and debug the problem directly. Just describe it in plain words. For a backend health and error report you can run yourself, use `npx @insforge/cli diagnose`. See [Diagnostics & advisor](/agent-native/diagnostics).
+  </Accordion>
 </AccordionGroup>
