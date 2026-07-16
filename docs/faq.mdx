@@ -65,6 +65,32 @@ description: "Answers to common questions about how InsForge works."
     Row visibility is then gated by RLS as usual. Project-admin ownership only lets the admin manage and directly query the tables (for example from the dashboard SQL editor); it does not give the API roles access.
   </Accordion>
 
+  <Accordion title="Does InsForge have a `service_role` key / `INSFORGE_SERVICE_ROLE_KEY`?">
+    Not under that name. InsForge's equivalent is your project's **API Key** (it starts with `ik_`), the full-access admin key. Every project has two keys:
+
+    - **Anon Key**: public, for the browser. Requests run as the `anon` role, gated by RLS. This is the one that hits `permission denied for schema storage`.
+    - **API Key**: full-access admin key, server-only. Bypasses RLS.
+
+    Find the API Key in the dashboard under **Project Settings → General** (the **API Key** row, marked "full access control... do not expose in your frontend"), or run `npx @insforge/cli secrets get API_KEY`.
+
+    Use it from trusted server code through `createAdminClient`, never the browser:
+
+    ```javascript
+    import { createAdminClient } from '@insforge/sdk'
+
+    const admin = createAdminClient({
+      baseUrl: process.env.INSFORGE_URL,
+      apiKey: process.env.INSFORGE_API_KEY, // admin key (ik_...), bypasses RLS
+    })
+
+    const { data, error } = await admin.storage
+      .from('post-images')
+      .upload('posts/post-123/cover.jpg', fileObject)
+    ```
+
+    Keep it in a server-only env var, never one exposed to the browser (no `NEXT_PUBLIC_`, `VITE_`, or `PUBLIC_` prefix).
+  </Accordion>
+
   <Accordion title="How do I share a project with another admin, or invite a teammate?">
     Access is shared at the **organization** level, not per project. You invite someone to the organization that owns your projects, and they get access to every project inside it. There is no separate "share just this one project" flow.
 

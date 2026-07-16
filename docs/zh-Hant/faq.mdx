@@ -65,6 +65,32 @@ description: "關於 InsForge 運作方式的常見問題解答。"
     之後列級可見性照常由 RLS 控制。project_admin 擁有表，只是讓它能管理並直接查詢這些表（例如在 dashboard 的 SQL 編輯器裡），並不會給 API 角色存取權限。
   </Accordion>
 
+  <Accordion title="InsForge 有 `service_role` key / `INSFORGE_SERVICE_ROLE_KEY` 嗎？">
+    沒有叫這個名字的。InsForge 裡的等價物是你專案的 **API Key**（以 `ik_` 開頭），也就是全權限的管理員 key。每個專案有兩個 key：
+
+    - **Anon Key**：公開的，給瀏覽器用。請求以 `anon` 角色執行，受 RLS 管，`permission denied for schema storage` 就是它撞出來的。
+    - **API Key**：全權限管理員 key，只在伺服器端用，繞過 RLS。
+
+    在 dashboard 的 **Project Settings → General** 裡找 API Key（標著 **API Key** 的那一行，寫明「對專案有完全控制權限，不要暴露在前端」），或者執行 `npx @insforge/cli secrets get API_KEY`。
+
+    在可信的伺服器端程式碼裡透過 `createAdminClient` 使用，絕不要放到瀏覽器：
+
+    ```javascript
+    import { createAdminClient } from '@insforge/sdk'
+
+    const admin = createAdminClient({
+      baseUrl: process.env.INSFORGE_URL,
+      apiKey: process.env.INSFORGE_API_KEY, // ik_... 管理員 key，繞過 RLS
+    })
+
+    const { data, error } = await admin.storage
+      .from('post-images')
+      .upload('posts/post-123/cover.jpg', fileObject)
+    ```
+
+    把它放在只有伺服器端能讀的環境變數裡，絕不要用會暴露給瀏覽器的變數（不要帶 `NEXT_PUBLIC_`、`VITE_` 或 `PUBLIC_` 前綴）。
+  </Accordion>
+
   <Accordion title="怎麼把專案分享給另一個管理員，或者邀請隊友？">
     存取權限是按 **organization（組織）** 共享的，不是按單個 project。你是把人邀請進擁有這些 project 的組織，他就能存取組織下的所有 project，沒有「只分享某一個 project」的入口。
 
