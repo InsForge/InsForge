@@ -22,7 +22,7 @@ Configure SMTP en **Authentication → Email**.
     Voltee el interruptor en la tarjeta **SMTP Provider**.
   </Step>
   <Step title="Ingresar credenciales">
-    Host, puerto (`25`, `465`, `587`, `2525`), nombre de usuario, contraseña, correo electrónico del remitente, nombre del remitente. Las direcciones IP privadas y los certificados autofirmados se rechaza.
+    Host, puerto (`25`, `465`, `587`, `2525`), nombre de usuario, contraseña, correo electrónico del remitente, nombre del remitente. Las direcciones IP privadas y los certificados autofirmados se rechazan.
   </Step>
   <Step title="Guardar">
     InsForge ejecuta un apretón de manos SMTP antes de persistir. Las malas credenciales fallan rápidamente.
@@ -50,7 +50,7 @@ Variables: `{{ token }}` (plantillas de código), `{{ link }}` (plantillas de en
 ## Consideraciones
 
 - **Limitación de velocidad.** **Intervalo mínimo (segundos)** limita la frecuencia por destinatario. Los envíos dentro del período de enfriamiento devuelven HTTP `429`. El valor predeterminado es `60`; `0` lo deshabilita.
-- **Protección SSRF.** Los rangos privados, loopback, link-local y NAT de operador se rechaza.
+- **Protección SSRF.** Los rangos privados, loopback, link-local y NAT de operador se rechazan.
 - **Registro de auditoría.** Los cambios de configuración registran `UPDATE_SMTP_CONFIG`; las ediciones de plantilla registran `UPDATE_EMAIL_TEMPLATE`.
 
 ## Más recursos

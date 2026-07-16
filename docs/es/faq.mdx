@@ -65,6 +65,32 @@ description: "Preguntas frecuentes de InsForge: Edge Functions vs base de datos,
     La visibilidad de filas queda gobernada por RLS como siempre. Que el project-admin sea propietario solo le permite gestionar y consultar las tablas directamente (por ejemplo desde el editor SQL del dashboard); no da acceso a los roles de la API.
   </Accordion>
 
+  <Accordion title="¿InsForge tiene una `service_role` key / `INSFORGE_SERVICE_ROLE_KEY`?">
+    No con ese nombre. El equivalente en InsForge es la **API Key** de tu proyecto (empieza por `ik_`), la clave de administrador con acceso total. Cada proyecto tiene dos claves:
+
+    - **Anon Key**: pública, para el navegador. Las peticiones se ejecutan con el rol `anon`, limitadas por RLS. Es la que provoca `permission denied for schema storage`.
+    - **API Key**: clave de administrador con acceso total, solo para el servidor. Omite RLS.
+
+    Encuentra la API Key en el panel, en **Project Settings → General** (la fila **API Key**, marcada con "acceso total... no la expongas en tu frontend"), o ejecuta `npx @insforge/cli secrets get API_KEY`.
+
+    Úsala desde código de servidor de confianza a través de `createAdminClient`, nunca desde el navegador:
+
+    ```javascript
+    import { createAdminClient } from '@insforge/sdk'
+
+    const admin = createAdminClient({
+      baseUrl: process.env.INSFORGE_URL,
+      apiKey: process.env.INSFORGE_API_KEY, // clave admin (ik_...), omite RLS
+    })
+
+    const { data, error } = await admin.storage
+      .from('post-images')
+      .upload('posts/post-123/cover.jpg', fileObject)
+    ```
+
+    Mantenla en una variable de entorno solo de servidor, nunca una expuesta al navegador (sin prefijo `NEXT_PUBLIC_`, `VITE_` ni `PUBLIC_`).
+  </Accordion>
+
   <Accordion title="¿Cómo comparto un proyecto con otro administrador o invito a un compañero de equipo?">
     El acceso se comparte a nivel de **organización**, no por proyecto. Invitas a alguien a la organización propietaria de tus proyectos y obtiene acceso a todos los proyectos que contiene. No existe un flujo aparte para "compartir solo este proyecto".
 
