@@ -162,16 +162,6 @@ description: "Answers to common questions about how InsForge works."
   </Accordion>
 
   <Accordion title="Can this assistant help with something specific to my own project?">
-    Not really. This assistant answers from InsForge's public docs, so it can't see your project: it can't debug an error, look at your data, or answer anything tied to your own backend or configuration. For anything specific to your project, use the CLI. It reads your live backend and can hand the results to AI:
-
-    ```bash
-    # Full health report: advisor findings, DB health, metrics, recent error logs
-    npx @insforge/cli diagnose
-
-    # Ask about your actual backend, in your own words
-    npx @insforge/cli diagnose --ai "why is this insert returning 401?"
-    ```
-
-    `diagnose --ai` takes any question and grounds the answer in your project's real signals, so it works for errors, data, and config questions alike. See [Diagnostics & advisor](/agent-native/diagnostics) for targeted checks like `diagnose advisor`, `diagnose db`, `diagnose metrics`, and `diagnose logs`.
+    Not really. This assistant answers from InsForge's public docs, so it can't see your project: it can't debug an error, read your data, or check your configuration. Take anything specific to your own project to your coding agent instead. Connected to InsForge through the CLI (and MCP), your agent can read your live backend, schema, data, and logs and debug the problem directly. Just describe it in plain words. For a backend health and error report you can run yourself, use `npx @insforge/cli diagnose`. See [Diagnostics & advisor](/agent-native/diagnostics).
   </Accordion>
 </AccordionGroup>

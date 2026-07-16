@@ -162,16 +162,6 @@ description: "关于 InsForge 工作方式的常见问题解答。"
   </Accordion>
 
   <Accordion title="这个助手能帮我解决我自己项目里的具体问题吗？">
-    基本不行。这个助手是基于 InsForge 的公开文档来回答的，看不到你的项目：既没法调试报错，也看不到你的数据，更没法回答任何跟你自己后端或配置相关的问题。凡是跟你项目相关的，都用 CLI，它会读取你的实时后端，还能把结果交给 AI 分析：
-
-    ```bash
-    # 完整健康报告：advisor 发现、数据库健康、指标、最近的错误日志
-    npx @insforge/cli diagnose
-
-    # 用你自己的话，问你真实的后端
-    npx @insforge/cli diagnose --ai "why is this insert returning 401?"
-    ```
-
-    `diagnose --ai` 能接受任意问题，并基于你项目的真实信号来回答，所以报错、数据、配置类问题都管用。想做单项检查（`diagnose advisor`、`diagnose db`、`diagnose metrics`、`diagnose logs`），参见 [Diagnostics & advisor](/agent-native/diagnostics)。
+    基本不行。这个助手是基于 InsForge 的公开文档来回答的，看不到你的项目：既没法调试报错，也读不到你的数据，更查不了你的配置。凡是跟你自己项目相关的，交给你的编码 agent 来处理。你的 agent 通过 CLI（和 MCP）连着 InsForge，能读到你的实时后端、结构、数据和日志，直接帮你调试，用大白话描述问题就行。想自己拿一份后端健康和报错报告，跑 `npx @insforge/cli diagnose`。参见 [Diagnostics & advisor](/agent-native/diagnostics)。
   </Accordion>
 </AccordionGroup>
