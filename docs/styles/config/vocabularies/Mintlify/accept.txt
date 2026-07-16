@@ -8,6 +8,7 @@ Apify
 apis
 APNs
 Astro
+async
 Auth's
 autocapture
 autostart
@@ -35,6 +36,7 @@ Composable
 config
 Containarium
 Containarium's
+contentType
 cooldown
 Coroutines
 created_at
@@ -45,7 +47,10 @@ dev
 Dokploy
 docker
 dockerfile
+Encodable
 env
+ETag
+FFmpeg
 Firebase
 flyctl
 github
@@ -63,6 +68,7 @@ IPs
 iptables
 IVFFlat
 Jetpack
+jpegoptim
 JWTs
 Keycloak
 Kinde
@@ -76,6 +82,7 @@ lookups
 magicLink
 mcp
 middleware
+Mintlify
 monorepo
 Multiplatform
 namespace
@@ -97,12 +104,14 @@ passwordless
 PDFs
 pg_cron
 pgvector
+pngquant
 postgres
 PostHog
 preemptible
 preformatted
 presigned
 proxied
+Qoder
 queryable
 rclone
 Razorpay
@@ -132,12 +141,14 @@ stderr
 Stytch
 subcommand
 subcommands
+Subhosting
 sudo
 Supabase
 systemd
 tmpfs
 todo
 todos
+Trae
 transactionally
 Twilio
 twoFactor
@@ -148,6 +159,7 @@ upsert
 upserts
 upvote
 Upvoting
+Uri
 user_id
 UUIDs
 vcpus
