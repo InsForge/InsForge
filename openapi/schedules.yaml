@@ -554,7 +554,6 @@ components:
             type: string
         body:
           type: object
-          nullable: true
 
     UpdateScheduleRequest:
       type: object
@@ -576,6 +575,5 @@ components:
             type: string
         body:
           type: object
-          nullable: true
         isActive:
           type: boolean
