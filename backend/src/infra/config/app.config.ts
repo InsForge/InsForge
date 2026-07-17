@@ -106,10 +106,20 @@ export interface AppConfig {
   };
 }
 
-function parseEnvInt(val: string | undefined, fallback: number): number {
+function parseEnvInt(val: string | undefined, fallback: number, name?: string): number {
   if (!val) return fallback;
-  const parsed = parseInt(val, 10);
+  const trimmed = val.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    if (name)
+      console.warn(`[Config] Invalid integer for ${name} ('${val}'), falling back to ${fallback}`);
+    return fallback;
+  }
+  const parsed = parseInt(trimmed, 10);
   if (isNaN(parsed) || parsed <= 0 || !Number.isSafeInteger(parsed)) {
+    if (name)
+      console.warn(
+        `[Config] Invalid integer bounds for ${name} ('${val}'), falling back to ${fallback}`
+      );
     return fallback;
   }
   return parsed;
@@ -122,11 +132,22 @@ function parseEnvBool(val: string | undefined): boolean {
 
 const AWS_MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024;
 
-function parseEnvBytes(val: string | undefined, fallback: number): number {
+function parseEnvBytes(val: string | undefined, fallback: number, name?: string): number {
   if (!val) return fallback;
-  if (!/^\d+$/.test(val)) return fallback;
-  const parsed = Number(val);
+  const trimmed = val.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    if (name)
+      console.warn(
+        `[Config] Invalid byte size for ${name} ('${val}'), falling back to ${fallback}`
+      );
+    return fallback;
+  }
+  const parsed = Number(trimmed);
   if (!Number.isFinite(parsed) || !Number.isSafeInteger(parsed) || parsed <= 0) {
+    if (name)
+      console.warn(
+        `[Config] Invalid byte size bounds for ${name} ('${val}'), falling back to ${fallback}`
+      );
     return fallback;
   }
   return Math.min(parsed, AWS_MAX_SINGLE_PUT_BYTES);
@@ -137,7 +158,7 @@ export function loadConfig(): AppConfig {
 
   return {
     app: {
-      port: parseEnvInt(process.env.PORT, 7130),
+      port: parseEnvInt(process.env.PORT, 7130, 'PORT'),
       jwtSecret: process.env.JWT_SECRET || '',
       apiKey: process.env.ACCESS_API_KEY || 'your_api_key',
       logLevel: process.env.LOG_LEVEL || 'info',
@@ -174,19 +195,32 @@ export function loadConfig(): AppConfig {
       maxJsonBodySize: process.env.MAX_JSON_BODY_SIZE || '100mb',
       maxUrlencodedBodySize: process.env.MAX_URLENCODED_BODY_SIZE || '10mb',
       maxFileSize: (() => {
-        const parsed = parseInt(process.env.MAX_FILE_SIZE || '', 10);
-        return isNaN(parsed) || parsed <= 0 ? undefined : parsed;
+        const val = process.env.MAX_FILE_SIZE;
+        if (!val) return undefined;
+        const trimmed = val.trim();
+        if (!/^\d+$/.test(trimmed)) {
+          console.warn(
+            `[Config] Invalid byte size for MAX_FILE_SIZE ('${val}'), falling back to undefined`
+          );
+          return undefined;
+        }
+        const parsed = parseInt(trimmed, 10);
+        return isNaN(parsed) || parsed <= 0 || !Number.isSafeInteger(parsed) ? undefined : parsed;
       })(),
-      maxFilesPerField: parseEnvInt(process.env.MAX_FILES_PER_FIELD, 10),
+      maxFilesPerField: parseEnvInt(process.env.MAX_FILES_PER_FIELD, 10, 'MAX_FILES_PER_FIELD'),
       logsDir,
       trustProxy: parseTrustProxySetting(process.env.TRUST_PROXY),
       // Must exceed the idle timeout of any proxy/LB in front of the backend,
       // otherwise clients can reuse a socket the server already closed.
-      keepAliveTimeoutMs: parseEnvInt(process.env.KEEP_ALIVE_TIMEOUT_MS, 65000),
+      keepAliveTimeoutMs: parseEnvInt(
+        process.env.KEEP_ALIVE_TIMEOUT_MS,
+        65000,
+        'KEEP_ALIVE_TIMEOUT_MS'
+      ),
     },
     database: {
       host: process.env.POSTGRES_HOST || 'localhost',
-      port: parseEnvInt(process.env.POSTGRES_PORT, 5432),
+      port: parseEnvInt(process.env.POSTGRES_PORT, 5432, 'POSTGRES_PORT'),
       name: process.env.POSTGRES_DB || 'insforge',
       user: process.env.POSTGRES_USER || 'postgres',
       password: process.env.POSTGRES_PASSWORD || 'postgres',
@@ -212,10 +246,16 @@ export function loadConfig(): AppConfig {
       s3EndpointUrl: process.env.S3_ENDPOINT_URL || undefined,
       // Default true (MinIO etc.). Set S3_FORCE_PATH_STYLE=false for providers
       // that require virtual-hosted-style addressing (Tencent COS, Aliyun OSS).
-      s3ForcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
+      s3ForcePathStyle: process.env.S3_FORCE_PATH_STYLE
+        ? process.env.S3_FORCE_PATH_STYLE.trim().toLowerCase() !== 'false'
+        : true,
       awsConfigBucket: process.env.AWS_CONFIG_BUCKET || 'insforge-config',
       awsConfigRegion: process.env.AWS_CONFIG_REGION || 'us-east-2',
-      maxS3UploadSize: parseEnvBytes(process.env.S3_MAX_OBJECT_SIZE_BYTES, 5 * 1024 * 1024 * 1024),
+      maxS3UploadSize: parseEnvBytes(
+        process.env.S3_MAX_OBJECT_SIZE_BYTES,
+        5 * 1024 * 1024 * 1024,
+        'S3_MAX_OBJECT_SIZE_BYTES'
+      ),
     },
     functions: {
       denoRuntimeUrl: process.env.DENO_RUNTIME_URL || 'http://localhost:7133',
@@ -224,12 +264,21 @@ export function loadConfig(): AppConfig {
       vercelToken: process.env.VERCEL_TOKEN || undefined,
       vercelTeamId: process.env.VERCEL_TEAM_ID || undefined,
       vercelProjectId: process.env.VERCEL_PROJECT_ID || undefined,
-      maxDeploymentFiles: parseEnvInt(process.env.MAX_DEPLOYMENT_FILES, 5000),
+      maxDeploymentFiles: parseEnvInt(
+        process.env.MAX_DEPLOYMENT_FILES,
+        5000,
+        'MAX_DEPLOYMENT_FILES'
+      ),
       maxDeploymentTotalBytes: parseEnvInt(
         process.env.MAX_DEPLOYMENT_TOTAL_BYTES,
-        100 * 1024 * 1024
+        100 * 1024 * 1024,
+        'MAX_DEPLOYMENT_TOTAL_BYTES'
       ),
-      maxDeploymentFileBytes: parseEnvInt(process.env.MAX_DEPLOYMENT_FILE_BYTES, 100 * 1024 * 1024),
+      maxDeploymentFileBytes: parseEnvInt(
+        process.env.MAX_DEPLOYMENT_FILE_BYTES,
+        100 * 1024 * 1024,
+        'MAX_DEPLOYMENT_FILE_BYTES'
+      ),
     },
     ai: {
       openrouterApiKey: process.env.OPENROUTER_API_KEY || undefined,

@@ -17,23 +17,20 @@ export function useConfirm() {
   const resolveRef = useRef<((value: boolean) => void) | null>(null);
   const pendingPromiseRef = useRef<Promise<boolean> | null>(null);
 
-  const confirm = useCallback(
-    (confirmOptions: ConfirmOptions): Promise<boolean> => {
-      if (pendingPromiseRef.current) {
-        return pendingPromiseRef.current;
-      }
+  const confirm = useCallback((confirmOptions: ConfirmOptions): Promise<boolean> => {
+    if (pendingPromiseRef.current) {
+      return pendingPromiseRef.current;
+    }
 
-      setOptions(confirmOptions);
-      setIsOpen(true);
+    setOptions(confirmOptions);
+    setIsOpen(true);
 
-      const promise = new Promise<boolean>((resolve) => {
-        resolveRef.current = resolve;
-      });
-      pendingPromiseRef.current = promise;
-      return promise;
-    },
-    [],
-  );
+    const promise = new Promise<boolean>((resolve) => {
+      resolveRef.current = resolve;
+    });
+    pendingPromiseRef.current = promise;
+    return promise;
+  }, []);
 
   const resolve = useCallback((value: boolean) => {
     resolveRef.current?.(value);

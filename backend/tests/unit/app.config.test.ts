@@ -336,6 +336,13 @@ describe('config.server', () => {
     expect(c.server.maxFilesPerField).toBe(10);
     expect(c.server.maxFileSize).toBeUndefined();
   });
+
+  it('rejects MAX_FILE_SIZE values with units and falls back to undefined', () => {
+    process.env.MAX_FILE_SIZE = '100mb';
+    expect(loadConfig().server.maxFileSize).toBeUndefined();
+    process.env.MAX_FILE_SIZE = '  500  ';
+    expect(loadConfig().server.maxFileSize).toBe(500);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -551,6 +558,23 @@ describe('config.storage', () => {
     expect(c.storage.awsConfigBucket).toBe('my-config-bucket');
     expect(c.storage.awsConfigRegion).toBe('ap-southeast-1');
   });
+
+  it('safely parses boolean s3ForcePathStyle ignoring case and whitespace', () => {
+    process.env.S3_FORCE_PATH_STYLE = 'False';
+    expect(loadConfig().storage.s3ForcePathStyle).toBe(false);
+
+    process.env.S3_FORCE_PATH_STYLE = ' FALSE ';
+    expect(loadConfig().storage.s3ForcePathStyle).toBe(false);
+
+    process.env.S3_FORCE_PATH_STYLE = 'false';
+    expect(loadConfig().storage.s3ForcePathStyle).toBe(false);
+
+    process.env.S3_FORCE_PATH_STYLE = 'true';
+    expect(loadConfig().storage.s3ForcePathStyle).toBe(true);
+
+    unsetEnvKeys('S3_FORCE_PATH_STYLE');
+    expect(loadConfig().storage.s3ForcePathStyle).toBe(true);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -617,6 +641,17 @@ describe('config.deployments', () => {
     expect(typeof c.deployments.maxDeploymentFiles).toBe('number');
     expect(typeof c.deployments.maxDeploymentTotalBytes).toBe('number');
     expect(typeof c.deployments.maxDeploymentFileBytes).toBe('number');
+  });
+
+  it('rejects deployment size limits with units and falls back to defaults', () => {
+    process.env.MAX_DEPLOYMENT_FILE_BYTES = '100mb';
+    process.env.MAX_DEPLOYMENT_TOTAL_BYTES = '100abc';
+    process.env.MAX_DEPLOYMENT_FILES = ' 100 ';
+    const c = loadConfig();
+
+    expect(c.deployments.maxDeploymentFileBytes).toBe(100 * 1024 * 1024);
+    expect(c.deployments.maxDeploymentTotalBytes).toBe(100 * 1024 * 1024);
+    expect(c.deployments.maxDeploymentFiles).toBe(100);
   });
 });
 
