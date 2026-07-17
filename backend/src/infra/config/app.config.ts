@@ -119,8 +119,8 @@ function parseEnvInt(val: string | undefined, fallback: number): number {
  * Strict positive-integer parser for pure byte-count knobs (MAX_FILE_SIZE,
  * MAX_DEPLOYMENT_*_BYTES). parseInt() silently truncates trailing garbage
  * ("100mb" → 100), which is a trap here because the sibling body-size knobs
- * (MAX_JSON_BODY_SIZE) legitimately accept unit suffixes. Mirrors the
- * /^\d+$/ strictness of parseEnvBytes and warns on rejection so operators
+ * (MAX_JSON_BODY_SIZE) legitimately accept unit suffixes. parseEnvBytes
+ * builds on this parser, and it warns on rejection so operators
  * can see why their value was ignored. Uses console.warn because the shared
  * logger (utils/logger.ts) imports appConfig, so it cannot be used at
  * config-load time.
@@ -155,14 +155,10 @@ function parseEnvBool(val: string | undefined): boolean {
 
 const AWS_MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024;
 
-function parseEnvBytes(val: string | undefined, fallback: number): number {
-  if (!val) return fallback;
-  if (!/^\d+$/.test(val)) return fallback;
-  const parsed = Number(val);
-  if (!Number.isFinite(parsed) || !Number.isSafeInteger(parsed) || parsed <= 0) {
-    return fallback;
-  }
-  return Math.min(parsed, AWS_MAX_SINGLE_PUT_BYTES);
+// Same strict parsing (trim, warn, safe-integer) as every other byte knob,
+// plus the AWS single-PUT ceiling.
+function parseEnvBytes(name: string, val: string | undefined, fallback: number): number {
+  return Math.min(parseStrictEnvInt(name, val, fallback), AWS_MAX_SINGLE_PUT_BYTES);
 }
 
 export function loadConfig(): AppConfig {
@@ -240,15 +236,19 @@ export function loadConfig(): AppConfig {
       awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID || undefined,
       awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || undefined,
       s3EndpointUrl: process.env.S3_ENDPOINT_URL || undefined,
-      // Default true (MinIO etc.). Set S3_FORCE_PATH_STYLE=false (or 0) for
+      // Default true (MinIO etc.). Set S3_FORCE_PATH_STYLE=false/0/no/off for
       // providers that require virtual-hosted-style addressing (Tencent COS,
-      // Aliyun OSS).
-      s3ForcePathStyle: !['false', '0'].includes(
+      // Aliyun OSS). Falsy list mirrors parseEnvBool's truthy list.
+      s3ForcePathStyle: !['false', '0', 'no', 'off'].includes(
         (process.env.S3_FORCE_PATH_STYLE ?? '').trim().toLowerCase()
       ),
       awsConfigBucket: process.env.AWS_CONFIG_BUCKET || 'insforge-config',
       awsConfigRegion: process.env.AWS_CONFIG_REGION || 'us-east-2',
-      maxS3UploadSize: parseEnvBytes(process.env.S3_MAX_OBJECT_SIZE_BYTES, 5 * 1024 * 1024 * 1024),
+      maxS3UploadSize: parseEnvBytes(
+        'S3_MAX_OBJECT_SIZE_BYTES',
+        process.env.S3_MAX_OBJECT_SIZE_BYTES,
+        5 * 1024 * 1024 * 1024
+      ),
     },
     functions: {
       denoRuntimeUrl: process.env.DENO_RUNTIME_URL || 'http://localhost:7133',

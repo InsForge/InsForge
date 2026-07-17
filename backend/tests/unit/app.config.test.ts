@@ -647,6 +647,40 @@ describe('config.storage', () => {
       ).toBe(false);
     }
   });
+
+  it('disables path style for no/off, mirroring parseEnvBool falsy symmetry', () => {
+    for (const value of ['no', 'NO', 'off', ' Off ']) {
+      process.env.S3_FORCE_PATH_STYLE = value;
+      expect(
+        loadConfig().storage.s3ForcePathStyle,
+        `S3_FORCE_PATH_STYLE=${JSON.stringify(value)}`
+      ).toBe(false);
+    }
+  });
+
+  // ── S3_MAX_OBJECT_SIZE_BYTES strict parsing (parseEnvBytes on parseStrictEnvInt)
+  it('rejects S3_MAX_OBJECT_SIZE_BYTES with a unit suffix and warns instead of silently falling back', () => {
+    const warnSpy = spyOnWarn();
+    process.env.S3_MAX_OBJECT_SIZE_BYTES = '100mb';
+    const c = loadConfig();
+
+    expect(c.storage.maxS3UploadSize).toBe(5 * 1024 * 1024 * 1024);
+    expect(
+      warnMessages(warnSpy).some(
+        (m) => m.includes('S3_MAX_OBJECT_SIZE_BYTES') && m.includes('100mb')
+      )
+    ).toBe(true);
+  });
+
+  it('accepts whitespace-padded S3_MAX_OBJECT_SIZE_BYTES like the other byte knobs', () => {
+    process.env.S3_MAX_OBJECT_SIZE_BYTES = ' 1048576 ';
+    expect(loadConfig().storage.maxS3UploadSize).toBe(1048576);
+  });
+
+  it('still clamps S3_MAX_OBJECT_SIZE_BYTES to the AWS single-PUT ceiling', () => {
+    process.env.S3_MAX_OBJECT_SIZE_BYTES = String(6 * 1024 * 1024 * 1024);
+    expect(loadConfig().storage.maxS3UploadSize).toBe(5 * 1024 * 1024 * 1024);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
