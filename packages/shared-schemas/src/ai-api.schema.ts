@@ -97,8 +97,13 @@ export const toolCallSchema = z.object({
 // Chat message supports both OpenAI format and legacy format for backward compatibility
 export const chatMessageSchema = z.object({
   role: z.enum(['user', 'assistant', 'system', 'tool']),
-  // New format: content can be string or array of content parts (OpenAI-compatible)
-  content: z.union([z.string(), z.array(contentSchema)]).nullable(),
+  // Content can be a string or an array of content parts (OpenAI-compatible).
+  // Nullable AND optional: OpenAI treats assistant `content` as optional when
+  // `tool_calls` is present, so clients following that convention omit the field
+  // entirely. `.nullish()` (string | array | null | undefined) keeps those valid
+  // tool-call messages from being rejected; `formatMessages` already coerces a
+  // missing assistant content to null.
+  content: z.union([z.string(), z.array(contentSchema)]).nullish(),
   // Legacy format: separate images field (deprecated but supported for backward compatibility)
   images: z.array(z.object({ url: z.string() })).optional(),
   // Tool calls made by the assistant
