@@ -26,7 +26,7 @@ description: "Respuestas a preguntas habituales sobre cómo funciona InsForge."
   </Accordion>
 
   <Accordion title="¿Cómo consulto una tabla en un schema distinto de `public`?">
-    Por defecto todas tus tablas están en `public`. Solo tienes otro schema si creaste uno tú mismo con `CREATE SCHEMA` (los schemas internos de InsForge, como `auth` y `storage`, no están expuestos a la API de datos, así que `.schema()` y `?schema=` no pueden alcanzarlos; como project admin todavía puedes leerlos con SQL directo, por ejemplo `insforge db query` o el editor SQL del dashboard). Una vez que tienes uno, puedes leerlo y escribirlo desde el dashboard, el SDK, la REST API y la CLI.
+    Por defecto todas tus tablas están en `public`. Solo tienes otro schema si creaste uno tú mismo con `CREATE SCHEMA` (los schemas internos de InsForge, como `auth` y `storage`, no están expuestos a la API de datos, así que `.schema()` y `?schema=` no pueden alcanzarlos; como project admin todavía puedes leerlos con SQL directo, por ejemplo `insforge db query` o el editor SQL del dashboard). Una vez que tienes uno, puedes leerlo y escribirlo desde el dashboard, la REST API, la CLI y el SDK.
 
     Los ejemplos de abajo usan un schema que creaste llamado `my_schema`.
 
@@ -53,7 +53,7 @@ description: "Respuestas a preguntas habituales sobre cómo funciona InsForge."
     insforge db query "SELECT * FROM my_schema.mytable"
     ```
 
-    **SDK.** Encadena `.schema()` antes del constructor de consultas (disponible en la última versión de `@insforge/sdk`). Se traduce a la misma cabecera `Accept-Profile` / `Content-Profile`, así que lecturas, escrituras y RPC se enrutan al schema que indiques:
+    **SDK.** Encadena `.schema()` antes del constructor de consultas (compatible con `@insforge/sdk`). Se traduce a la misma cabecera `Accept-Profile` / `Content-Profile`, así que lecturas, escrituras y RPC se enrutan al schema que indiques:
 
     ```javascript
     // lectura

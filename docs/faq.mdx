@@ -26,7 +26,7 @@ description: "Answers to common questions about how InsForge works."
   </Accordion>
 
   <Accordion title="How do I query a table in a schema other than `public`?">
-    By default all of your tables live in `public`. You only have another schema if you created one yourself with `CREATE SCHEMA` (InsForge's own internal schemas, like `auth` and `storage`, aren't exposed to the data API, so `.schema()` and `?schema=` can't reach them; as project admin you can still read them with raw SQL, e.g. `insforge db query` or the dashboard SQL editor). Once you have one, you can read and write it from the dashboard, the SDK, the REST API, and the CLI.
+    By default all of your tables live in `public`. You only have another schema if you created one yourself with `CREATE SCHEMA` (InsForge's own internal schemas, like `auth` and `storage`, aren't exposed to the data API, so `.schema()` and `?schema=` can't reach them; as project admin you can still read them with raw SQL, e.g. `insforge db query` or the dashboard SQL editor). Once you have one, you can read and write it from the dashboard, the REST API, the CLI, and the SDK.
 
     The examples below use a schema you created called `my_schema`.
 
@@ -53,7 +53,7 @@ description: "Answers to common questions about how InsForge works."
     insforge db query "SELECT * FROM my_schema.mytable"
     ```
 
-    **SDK.** Chain `.schema()` before the query builder (available in the latest `@insforge/sdk`). It maps to the same `Accept-Profile` / `Content-Profile` header, so reads, writes, and RPC all route to the schema you name:
+    **SDK.** Chain `.schema()` before the query builder (supported by `@insforge/sdk`). It maps to the same `Accept-Profile` / `Content-Profile` header, so reads, writes, and RPC all route to the schema you name:
 
     ```javascript
     // read

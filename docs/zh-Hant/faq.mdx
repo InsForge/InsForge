@@ -26,7 +26,7 @@ description: "關於 InsForge 運作方式的常見問題解答。"
   </Accordion>
 
   <Accordion title="怎麼查詢 public 以外 schema 裡的表？">
-    預設你所有的表都在 `public` 裡。只有當你自己用 `CREATE SCHEMA` 建過別的 schema，才會有非 `public` 的 schema（InsForge 自己的內部 schema，例如 `auth`、`storage`，不對資料 API 開放，`.schema()` 和 `?schema=` 查不到；但身為 project admin，你仍可以用原始 SQL 讀它們，例如 `insforge db query` 或 dashboard 的 SQL 編輯器）。一旦有了，dashboard、SDK、REST API、CLI 都能讀寫它。
+    預設你所有的表都在 `public` 裡。只有當你自己用 `CREATE SCHEMA` 建過別的 schema，才會有非 `public` 的 schema（InsForge 自己的內部 schema，例如 `auth`、`storage`，不對資料 API 開放，`.schema()` 和 `?schema=` 查不到；但身為 project admin，你仍可以用原始 SQL 讀它們，例如 `insforge db query` 或 dashboard 的 SQL 編輯器）。一旦有了，dashboard、REST API、CLI、SDK 都能讀寫它。
 
     下面的例子用一個你自己建立、名叫 `my_schema` 的 schema。
 
@@ -53,7 +53,7 @@ description: "關於 InsForge 運作方式的常見問題解答。"
     insforge db query "SELECT * FROM my_schema.mytable"
     ```
 
-    **SDK。** 在查詢建構器前鏈式呼叫 `.schema()`（最新版 `@insforge/sdk` 支援）。它底層對應到同樣的 `Accept-Profile` / `Content-Profile` header，讀、寫、RPC 都會路由到你指定的 schema：
+    **SDK。** 在查詢建構器前鏈式呼叫 `.schema()`（`@insforge/sdk` 支援）。它底層對應到同樣的 `Accept-Profile` / `Content-Profile` header，讀、寫、RPC 都會路由到你指定的 schema：
 
     ```javascript
     // 讀
