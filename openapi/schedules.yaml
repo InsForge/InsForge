@@ -75,6 +75,13 @@ paths:
                   message:
                     type: string
 
+        '404':
+          description: Referenced secret not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
         '400':
           description: Invalid request
           content:
@@ -216,6 +223,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Schedule'
 
+        '404':
+          description: Schedule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
         '401':
           description: Unauthorized
           content:
@@ -275,6 +289,13 @@ paths:
                     nullable: true
                   message:
                     type: string
+
+        '404':
+          description: Schedule not found or referenced secret not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
         '400':
           description: Invalid request
