@@ -95,22 +95,35 @@ export const toolCallSchema = z.object({
 });
 
 // Chat message supports both OpenAI format and legacy format for backward compatibility
-export const chatMessageSchema = z.object({
-  role: z.enum(['user', 'assistant', 'system', 'tool']),
-  // Content can be a string or an array of content parts (OpenAI-compatible).
-  // Nullable AND optional: OpenAI treats assistant `content` as optional when
-  // `tool_calls` is present, so clients following that convention omit the field
-  // entirely. `.nullish()` (string | array | null | undefined) keeps those valid
-  // tool-call messages from being rejected; `formatMessages` already coerces a
-  // missing assistant content to null.
-  content: z.union([z.string(), z.array(contentSchema)]).nullish(),
-  // Legacy format: separate images field (deprecated but supported for backward compatibility)
-  images: z.array(z.object({ url: z.string() })).optional(),
-  // Tool calls made by the assistant
-  tool_calls: z.array(toolCallSchema).optional(),
-  // Tool call ID for tool response messages
-  tool_call_id: z.string().optional(),
-});
+export const chatMessageSchema = z
+  .object({
+    role: z.enum(['user', 'assistant', 'system', 'tool']),
+    // Content can be a string or an array of content parts (OpenAI-compatible).
+    // Nullable AND optional so an assistant tool-call message may omit it (per the
+    // per-role rule enforced below); `formatMessages` coerces a missing assistant
+    // content to null.
+    content: z.union([z.string(), z.array(contentSchema)]).nullish(),
+    // Legacy format: separate images field (deprecated but supported for backward compatibility)
+    images: z.array(z.object({ url: z.string() })).optional(),
+    // Tool calls made by the assistant
+    tool_calls: z.array(toolCallSchema).optional(),
+    // Tool call ID for tool response messages
+    tool_call_id: z.string().optional(),
+  })
+  .superRefine((message, ctx) => {
+    // OpenAI only makes `content` optional on assistant messages (it may be
+    // omitted when `tool_calls` is present). user / system / tool messages must
+    // still carry the field, so an omitted `content` on those roles is rejected
+    // here rather than silently reaching the provider as `undefined`. `null` stays
+    // allowed for every role, matching the prior behavior.
+    if (message.role !== 'assistant' && message.content === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['content'],
+        message: `content is required for ${message.role} messages`,
+      });
+    }
+  });
 
 // Web Search Plugin configuration for OpenRouter
 export const webSearchPluginSchema = z.object({

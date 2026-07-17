@@ -145,6 +145,30 @@ describe('Tool Calling Schemas', () => {
       expect(result.success).toBe(true);
     });
 
+    it('rejects a tool message that omits content (content is only optional on assistant)', () => {
+      const result = chatMessageSchema.safeParse({
+        role: 'tool',
+        tool_call_id: 'call_abc123',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects a user message that omits content', () => {
+      const result = chatMessageSchema.safeParse({ role: 'user' });
+      expect(result.success).toBe(false);
+    });
+
+    it('still accepts null content for a non-assistant role', () => {
+      // The fix only permits omitting content on assistant; null stays valid for
+      // every role, unchanged from the prior schema.
+      const result = chatMessageSchema.safeParse({
+        role: 'tool',
+        content: null,
+        tool_call_id: 'call_abc123',
+      });
+      expect(result.success).toBe(true);
+    });
+
     it('still accepts regular messages without tool fields', () => {
       const result = chatMessageSchema.safeParse({
         role: 'user',
