@@ -26,7 +26,7 @@ description: "Respuestas a preguntas habituales sobre cómo funciona InsForge."
   </Accordion>
 
   <Accordion title="¿Cómo consulto una tabla en un schema distinto de `public`?">
-    Por defecto todas tus tablas están en `public`. Solo tienes otro schema si creaste uno tú mismo con `CREATE SCHEMA` (los schemas internos de InsForge, como `auth` y `storage`, están ocultos y no se pueden consultar así). Una vez que tienes uno, puedes leerlo y escribirlo desde el dashboard, la REST API y la CLI. El único lugar que hoy solo ve `public` es el constructor de consultas de `@insforge/sdk`.
+    Por defecto todas tus tablas están en `public`. Solo tienes otro schema si creaste uno tú mismo con `CREATE SCHEMA` (los schemas internos de InsForge, como `auth` y `storage`, no están expuestos a la API de datos, así que `.schema()` y `?schema=` no pueden alcanzarlos; como project admin todavía puedes leerlos con SQL directo, por ejemplo `insforge db query` o el editor SQL del dashboard). Una vez que tienes uno, puedes leerlo y escribirlo desde el dashboard, el SDK, la REST API y la CLI.
 
     Los ejemplos de abajo usan un schema que creaste llamado `my_schema`.
 
@@ -53,7 +53,24 @@ description: "Respuestas a preguntas habituales sobre cómo funciona InsForge."
     insforge db query "SELECT * FROM my_schema.mytable"
     ```
 
-    **SDK.** `client.database.from('mytable')` siempre apunta a `public` y todavía no hay opción de schema, así que para otro schema llama directamente al endpoint REST de arriba (con el parámetro `?schema=` o la cabecera `Accept-Profile` / `Content-Profile`) en lugar del constructor de consultas.
+    **SDK.** Encadena `.schema()` antes del constructor de consultas (disponible en la última versión de `@insforge/sdk`). Se traduce a la misma cabecera `Accept-Profile` / `Content-Profile`, así que lecturas, escrituras y RPC se enrutan al schema que indiques:
+
+    ```javascript
+    // lectura
+    const { data } = await client.database
+      .schema('my_schema')
+      .from('mytable')
+      .select('*')
+
+    // escritura
+    await client.database
+      .schema('my_schema')
+      .from('mytable')
+      .insert([{ name: 'hello' }])
+
+    // RPC
+    await client.database.schema('my_schema').rpc('my_function', { day: '2026-01-01' })
+    ```
 
     Un paso más para el acceso por API: un schema propio solo es enrutable, no legible. Los roles `anon` y `authenticated` no tienen privilegios sobre él hasta que se los concedes, sin importar quién sea el propietario de las tablas, así que las llamadas devuelven vacío o permiso denegado hasta que lo hagas. Concede privilegios a cada rol que expongas y luego añade RLS:
 

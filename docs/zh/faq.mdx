@@ -26,7 +26,7 @@ description: "关于 InsForge 工作方式的常见问题解答。"
   </Accordion>
 
   <Accordion title="怎么查询 public 以外 schema 里的表？">
-    默认你所有的表都在 `public` 里。只有当你自己用 `CREATE SCHEMA` 建过别的 schema，才会有非 `public` 的 schema（InsForge 自己的内部 schema，比如 `auth`、`storage`，是隐藏的，没法这样查）。一旦有了，dashboard、REST API、CLI 都能读写它。目前唯一只认 `public` 的是 `@insforge/sdk` 的查询构造器。
+    默认你所有的表都在 `public` 里。只有当你自己用 `CREATE SCHEMA` 建过别的 schema，才会有非 `public` 的 schema（InsForge 自己的内部 schema，比如 `auth`、`storage`，不对数据 API 开放，`.schema()` 和 `?schema=` 查不到；但作为 project admin，你仍可以用原始 SQL 读它们，比如 `insforge db query` 或 dashboard 的 SQL 编辑器）。一旦有了，dashboard、SDK、REST API、CLI 都能读写它。
 
     下面的例子用一个你自己建的、名叫 `my_schema` 的 schema。
 
@@ -53,7 +53,24 @@ description: "关于 InsForge 工作方式的常见问题解答。"
     insforge db query "SELECT * FROM my_schema.mytable"
     ```
 
-    **SDK。** `client.database.from('mytable')` 永远指向 `public`，目前没有指定 schema 的选项，所以要访问别的 schema，请直接调用上面的 REST 接口（用 `?schema=` 参数，或 `Accept-Profile` / `Content-Profile` header），而不是用查询构造器。
+    **SDK。** 在查询构造器前链式调用 `.schema()`（最新版 `@insforge/sdk` 支持）。它底层映射到同样的 `Accept-Profile` / `Content-Profile` header，读、写、RPC 都会路由到你指定的 schema：
+
+    ```javascript
+    // 读
+    const { data } = await client.database
+      .schema('my_schema')
+      .from('mytable')
+      .select('*')
+
+    // 写
+    await client.database
+      .schema('my_schema')
+      .from('mytable')
+      .insert([{ name: 'hello' }])
+
+    // RPC
+    await client.database.schema('my_schema').rpc('my_function', { day: '2026-01-01' })
+    ```
 
     不管走哪条路，访问 API 都还有一步：自建 schema 只是「可路由」，不等于「可读」。在你显式授权之前，`anon` 和 `authenticated` 角色对它没有任何权限，跟表的 owner 是谁无关，所以授权前调用只会返回空结果或权限不足。给你要开放的每个角色授权，再加 RLS：
 
