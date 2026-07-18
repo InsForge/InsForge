@@ -167,6 +167,56 @@ export class SecretService {
   }
 
   /**
+   * Quarantine secrets whose ciphertext cannot be decrypted with this
+   * instance's encryption key.
+   *
+   * This happens when a database backup taken on one instance is restored
+   * onto another (e.g. disaster recovery into a fresh project): every
+   * system.secrets row is AES-GCM ciphertext under the SOURCE instance's
+   * ENCRYPTION_KEY/JWT_SECRET, so every read throws — and a single throw
+   * aborts seedBackend(), leaving the restored instance with no usable
+   * ANON_KEY/API_KEY and a 500 on every secrets read.
+   *
+   * Undecryptable rows are renamed to `<KEY>_UNRECOVERABLE_<timestamp>` and
+   * deactivated — never deleted — so the reserved-secret initializers can
+   * regenerate fresh values under this instance's key, while an operator who
+   * still has the source instance's key can recover the original values from
+   * the renamed rows offline.
+   *
+   * Returns the original key names that were quarantined.
+   */
+  async quarantineUndecryptableSecrets(): Promise<string[]> {
+    const result = await this.getPool().query(
+      `SELECT id, key, value_ciphertext FROM system.secrets WHERE is_active = true`
+    );
+
+    const quarantined: string[] = [];
+    for (const row of result.rows) {
+      try {
+        EncryptionManager.decrypt(row.value_ciphertext);
+      } catch {
+        const quarantineKey = `${row.key}_UNRECOVERABLE_${Date.now()}`;
+        await this.getPool().query(
+          `UPDATE system.secrets SET key = $1, is_active = false, updated_at = NOW() WHERE id = $2`,
+          [quarantineKey, row.id]
+        );
+        quarantined.push(row.key);
+      }
+    }
+
+    if (quarantined.length) {
+      logger.warn(
+        "Quarantined secrets that cannot be decrypted with this instance's encryption key " +
+          '(likely a backup restored from another instance); reserved secrets will be regenerated, ' +
+          'user-defined secrets must be re-entered',
+        { keys: quarantined }
+      );
+    }
+
+    return quarantined;
+  }
+
+  /**
    * List all secrets (without decrypting values)
    */
   async listSecrets(): Promise<SecretSchema[]> {

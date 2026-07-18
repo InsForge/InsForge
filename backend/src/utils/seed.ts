@@ -179,6 +179,19 @@ export async function seedBackend(): Promise<void> {
   try {
     logger.info(`\n🚀 Insforge Backend Starting...`);
 
+    // A backup restored from another instance leaves system.secrets full of
+    // ciphertext this instance's key cannot decrypt; quarantine those rows
+    // first so the initializers below regenerate reserved secrets instead of
+    // the first decrypt failure aborting seeding entirely. Non-fatal: on a
+    // healthy database this is a no-op.
+    try {
+      await secretService.quarantineUndecryptableSecrets();
+    } catch (error) {
+      logger.warn('Undecryptable-secret sweep failed; continuing seeding', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
     // Initialize API key (from env or generate)
     const apiKey = await secretService.initializeApiKey();
 
