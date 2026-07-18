@@ -882,9 +882,9 @@
     "emailAddressChangeCodeDescription": "当用户使用 6 位验证码更改邮箱地址时发送。",
     "emailAddressChangeLinkTitle": "更改邮箱地址 (链接)",
     "emailAddressChangeLinkDescription": "当用户通过魔术链接更改邮箱地址时发送。",
-    "varVerificationCode": "6 位验证码",
-    "varUserEmail": "用户的邮箱地址",
-    "varUserName": "用户的显示名称",
+    "varVerificationCode": "6位验证码",
+    "varUserEmail": "用户电子邮件地址",
+    "varUserName": "用户显示名称",
     "varVerificationUrl": "邮箱验证 URL",
     "varResetCode": "6 位重置码",
     "varResetUrl": "密码重置 URL",
@@ -960,7 +960,14 @@
     "oauthDeleteFailed": "删除 OAuth 配置失败",
     "smtpConfigUpdatedToast": "SMTP 配置更新成功",
     "smtpConfigUpdateFailed": "更新 SMTP 配置失败",
-    "autoConfirmDescription": "自动将邮箱标记为已验证，用户无需确认即可登录。"
+    "autoConfirmDescription": "自动将邮箱标记为已验证，用户无需确认即可登录。",
+    "emailTemplatesSidebar": "邮件模板",
+    "emailTemplatesPageDescription": "配置身份验证邮件模板。",
+    "emailTemplatesDescriptionSmtp": "在上方启用自定义SMTP以自定义邮件模板。",
+    "resetToDefaults": "恢复默认设置",
+    "varAppName": "应用程序名称",
+    "varEmailChangeCode": "6位更改邮箱验证码",
+    "varEmailChangeUrl": "更改邮箱URL"
   },
   "common": {
     "anErrorOccurred": "发生了一个错误",

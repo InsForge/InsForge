@@ -906,8 +906,8 @@
     "emailAddressChangeLinkTitle": "Cambio de dirección de correo (Enlace)",
     "emailAddressChangeLinkDescription": "Se envía cuando un usuario cambia su dirección de correo mediante un enlace mágico.",
     "varVerificationCode": "Código de verificación de 6 dígitos",
-    "varUserEmail": "Dirección de correo del usuario",
-    "varUserName": "Nombre visible del usuario",
+    "varUserEmail": "Correo electrónico del usuario",
+    "varUserName": "Nombre para mostrar del usuario",
     "varVerificationUrl": "URL de verificación de correo",
     "varResetCode": "Código de restablecimiento de 6 dígitos",
     "varResetUrl": "URL de restablecimiento de contraseña",
@@ -983,7 +983,14 @@
     "oauthDeleteFailed": "Error al eliminar la configuración de OAuth",
     "smtpConfigUpdatedToast": "Configuración SMTP actualizada correctamente",
     "smtpConfigUpdateFailed": "Error al actualizar la configuración SMTP",
-    "autoConfirmDescription": "Marca el correo como verificado automáticamente, para que el usuario pueda iniciar sesión sin confirmarlo."
+    "autoConfirmDescription": "Marca el correo como verificado automáticamente, para que el usuario pueda iniciar sesión sin confirmarlo.",
+    "emailTemplatesSidebar": "Plantillas de correo electrónico",
+    "emailTemplatesPageDescription": "Configura las plantillas de correo de autenticación.",
+    "emailTemplatesDescriptionSmtp": "Habilita SMTP personalizado arriba para personalizar plantillas.",
+    "resetToDefaults": "Restablecer a los valores predeterminados",
+    "varAppName": "Nombre de la aplicación",
+    "varEmailChangeCode": "Código de cambio de correo (6 dígitos)",
+    "varEmailChangeUrl": "URL de cambio de correo electrónico"
   },
   "common": {
     "anErrorOccurred": "Se produjo un error",

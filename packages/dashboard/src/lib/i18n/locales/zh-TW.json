@@ -882,9 +882,9 @@
     "emailAddressChangeCodeDescription": "當使用者使用 6 位數驗證碼變更其電子郵件地址時傳送。",
     "emailAddressChangeLinkTitle": "變更電子郵件地址 (連結)",
     "emailAddressChangeLinkDescription": "當使用者透過魔術連結變更其電子郵件地址時傳送。",
-    "varVerificationCode": "6 位數驗證碼",
-    "varUserEmail": "使用者的電子郵件地址",
-    "varUserName": "使用者的顯示名稱",
+    "varVerificationCode": "6位驗證碼",
+    "varUserEmail": "用戶電子郵件地址",
+    "varUserName": "用戶顯示名稱",
     "varVerificationUrl": "電子郵件驗證 URL",
     "varResetCode": "6 位數重設碼",
     "varResetUrl": "密碼重設 URL",
@@ -960,7 +960,14 @@
     "oauthDeleteFailed": "刪除 OAuth 設定失敗",
     "smtpConfigUpdatedToast": "已成功更新 SMTP 設定",
     "smtpConfigUpdateFailed": "更新 SMTP 設定失敗",
-    "autoConfirmDescription": "自動將電子郵件標記為已驗證，使用者無需確認即可登入。"
+    "autoConfirmDescription": "自動將電子郵件標記為已驗證，使用者無需確認即可登入。",
+    "emailTemplatesSidebar": "郵件範本",
+    "emailTemplatesPageDescription": "設定您的驗證郵件範本。",
+    "emailTemplatesDescriptionSmtp": "在上方啟用自訂SMTP以自訂郵件範本。",
+    "resetToDefaults": "恢復預設設定",
+    "varAppName": "應用程式名稱",
+    "varEmailChangeCode": "6位更改信箱驗證碼",
+    "varEmailChangeUrl": "更改信箱URL"
   },
   "common": {
     "anErrorOccurred": "發生了一個錯誤",
