@@ -1105,7 +1105,7 @@ router.get(
     try {
       const VALID_PROVIDERS = ['custom_smtp', 'default'] as const;
       const rawProvider = req.query.provider as string;
-      const provider = VALID_PROVIDERS.includes(rawProvider as typeof VALID_PROVIDERS[number])
+      const provider = VALID_PROVIDERS.includes(rawProvider as (typeof VALID_PROVIDERS)[number])
         ? rawProvider
         : 'custom_smtp';
       const templates = await emailTemplateService.getTemplates(provider);
@@ -1142,7 +1142,7 @@ router.put(
       const templateType = req.params.type as EmailTemplate;
       const VALID_PROVIDERS = ['custom_smtp', 'default'] as const;
       const rawProvider = req.query.provider as string;
-      const provider = VALID_PROVIDERS.includes(rawProvider as typeof VALID_PROVIDERS[number])
+      const provider = VALID_PROVIDERS.includes(rawProvider as (typeof VALID_PROVIDERS)[number])
         ? rawProvider
         : 'custom_smtp';
       const template = await emailTemplateService.updateTemplate(

@@ -60,13 +60,17 @@ export function EmailTemplateCard({
         }),
       },
       'email-address-change-code': {
-        title: t('auth.emailAddressChangeCodeTitle', { defaultValue: 'Email Address Change (Code)' }),
+        title: t('auth.emailAddressChangeCodeTitle', {
+          defaultValue: 'Email Address Change (Code)',
+        }),
         description: t('auth.emailAddressChangeCodeDescription', {
           defaultValue: 'Sent when a user changes their email address with a 6-digit code.',
         }),
       },
       'email-address-change-link': {
-        title: t('auth.emailAddressChangeLinkTitle', { defaultValue: 'Email Address Change (Link)' }),
+        title: t('auth.emailAddressChangeLinkTitle', {
+          defaultValue: 'Email Address Change (Link)',
+        }),
         description: t('auth.emailAddressChangeLinkDescription', {
           defaultValue: 'Sent when a user changes their email address via a magic link.',
         }),
@@ -179,7 +183,8 @@ export function EmailTemplateCard({
 
   const resetToDefaults = useCallback(() => {
     if (selectedType && DEFAULT_EMAIL_TEMPLATES[selectedType]) {
-      const { subject: defaultSubject, bodyHtml: defaultBodyHtml } = DEFAULT_EMAIL_TEMPLATES[selectedType];
+      const { subject: defaultSubject, bodyHtml: defaultBodyHtml } =
+        DEFAULT_EMAIL_TEMPLATES[selectedType];
       setSubject(defaultSubject);
       setBodyHtml(defaultBodyHtml);
       setIsDirty(true);
@@ -319,7 +324,9 @@ export function EmailTemplateCard({
             className="bg-[var(--alpha-4)] text-foreground"
           />
           <p className="text-[13px] text-muted-foreground">
-            {t('auth.senderHelp', { defaultValue: 'Emails will be sent from this address by default.' })}
+            {t('auth.senderHelp', {
+              defaultValue: 'Emails will be sent from this address by default.',
+            })}
           </p>
         </div>
       )}

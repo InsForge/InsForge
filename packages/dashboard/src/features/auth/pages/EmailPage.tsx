@@ -22,8 +22,7 @@ export default function EmailPage() {
         <div className="mx-auto mt-1 w-full max-w-[1024px]">
           <p className="text-sm text-muted-foreground">
             {t('auth.emailPageDescription', {
-              defaultValue:
-                'Configure your authentication email templates.',
+              defaultValue: 'Configure your authentication email templates.',
             })}
           </p>
         </div>
@@ -31,7 +30,6 @@ export default function EmailPage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-10 sm:px-10">
         <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-8">
-
           <div className="rounded-lg border border-[var(--alpha-8)] bg-card">
             <div className="border-b border-[var(--alpha-8)] px-6 py-4">
               <h2 className="text-base font-medium text-foreground">
