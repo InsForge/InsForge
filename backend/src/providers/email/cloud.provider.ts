@@ -68,7 +68,7 @@ export class CloudEmailProvider implements EmailProvider {
     try {
       // Fetch custom template from local database
       const { EmailTemplateService } = await import('@/services/email/email-template.service.js');
-      const emailTemplate = await EmailTemplateService.getInstance().getTemplate(template);
+      const emailTemplate = await EmailTemplateService.getInstance().getTemplate(template, 'default');
 
       // Simple template renderer (matches smtp provider)
       const renderTemplate = (str: string, vars: Record<string, string>): string => {

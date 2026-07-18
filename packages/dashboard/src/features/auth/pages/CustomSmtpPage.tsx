@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { useSmtpConfig } from '#features/auth/hooks/useSmtpConfig';
+import { useEmailTemplates } from '#features/auth/hooks/useEmailTemplates';
 import { SmtpSettingsCard } from '#features/auth/components/SmtpSettingsCard';
+import { EmailTemplateCard } from '#features/auth/components/EmailTemplateCard';
 
 export default function CustomSmtpPage() {
   const { t } = useTranslation('chrome');
@@ -10,6 +12,12 @@ export default function CustomSmtpPage() {
     isUpdating: isSmtpUpdating,
     updateConfig: updateSmtpConfig,
   } = useSmtpConfig();
+  const {
+    templates,
+    isLoading: isTemplatesLoading,
+    isUpdating: isTemplatesUpdating,
+    updateTemplate,
+  } = useEmailTemplates('custom_smtp');
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
@@ -43,6 +51,31 @@ export default function CustomSmtpPage() {
                 isLoading={isSmtpLoading}
                 isUpdating={isSmtpUpdating}
                 onSave={updateSmtpConfig}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-[var(--alpha-8)] bg-card">
+            <div className="border-b border-[var(--alpha-8)] px-6 py-4">
+              <h2 className="text-base font-medium text-foreground">
+                {t('auth.emailTemplates', { defaultValue: 'Email Templates' })}
+              </h2>
+              <p className="mt-1 text-[13px] text-muted-foreground">
+                {t('auth.emailTemplatesDescriptionSmtp', {
+                  defaultValue: 'Enable custom SMTP above to customize email templates.',
+                })}
+              </p>
+            </div>
+            <div
+              className={`px-6 py-6 transition-opacity ${
+                !smtpConfig?.enabled ? 'pointer-events-none opacity-50' : 'opacity-100'
+              }`}
+            >
+              <EmailTemplateCard
+                templates={templates}
+                isLoading={isTemplatesLoading}
+                isUpdating={isTemplatesUpdating}
+                onSave={updateTemplate}
               />
             </div>
           </div>

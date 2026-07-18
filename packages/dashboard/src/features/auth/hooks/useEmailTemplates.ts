@@ -4,23 +4,23 @@ import { ListEmailTemplatesResponse, UpdateEmailTemplateRequest } from '@insforg
 import { emailTemplateService } from '#features/auth/services/email-template.service';
 import { useToast } from '@insforge/ui';
 
-export function useEmailTemplates() {
+export function useEmailTemplates(providerType: string = 'custom_smtp') {
   const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
   // Query to fetch email templates
   const { data, isLoading, error, refetch } = useQuery<ListEmailTemplatesResponse>({
-    queryKey: ['email-templates'],
-    queryFn: () => emailTemplateService.getTemplates(),
+    queryKey: ['email-templates', providerType],
+    queryFn: () => emailTemplateService.getTemplates(providerType),
   });
 
   // Mutation to update an email template
   const updateTemplateMutation = useMutation({
     mutationFn: ({ type, data }: { type: string; data: UpdateEmailTemplateRequest }) =>
-      emailTemplateService.updateTemplate(type, data),
+      emailTemplateService.updateTemplate(type, data, providerType),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['email-templates'] });
+      void queryClient.invalidateQueries({ queryKey: ['email-templates', providerType] });
       showToast(
         t('auth.emailTemplateUpdatedToast', {
           defaultValue: 'Email template updated successfully',

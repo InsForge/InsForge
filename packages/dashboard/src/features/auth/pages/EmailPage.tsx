@@ -9,7 +9,7 @@ export default function EmailPage() {
     isLoading: isTemplatesLoading,
     isUpdating: isTemplatesUpdating,
     updateTemplate,
-  } = useEmailTemplates();
+  } = useEmailTemplates('default');
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
