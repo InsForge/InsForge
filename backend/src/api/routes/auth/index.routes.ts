@@ -1103,7 +1103,7 @@ router.get(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const provider = req.query.provider as string || 'custom_smtp';
+      const provider = (req.query.provider as string) || 'custom_smtp';
       const templates = await emailTemplateService.getTemplates(provider);
       successResponse(res, { data: templates });
     } catch (error) {
@@ -1136,7 +1136,7 @@ router.put(
       }
 
       const templateType = req.params.type as EmailTemplate;
-      const provider = req.query.provider as string || 'custom_smtp';
+      const provider = (req.query.provider as string) || 'custom_smtp';
       const template = await emailTemplateService.updateTemplate(
         templateType,
         validationResult.data,

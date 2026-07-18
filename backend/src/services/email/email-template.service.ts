@@ -84,7 +84,10 @@ export class EmailTemplateService {
    * Get a single email template by type
    * Throws 404 if not found
    */
-  async getTemplate(templateType: string, providerType: string = 'custom_smtp'): Promise<EmailTemplateSchema> {
+  async getTemplate(
+    templateType: string,
+    providerType: string = 'custom_smtp'
+  ): Promise<EmailTemplateSchema> {
     try {
       const result = await this.getPool().query(
         `SELECT

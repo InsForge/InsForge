@@ -36,7 +36,7 @@ vi.mock('../../src/services/email/email-template.service', () => ({
         id: '11111111-1111-4111-8111-111111111111',
         templateType: 'email-verification-link',
         subject: 'Verify your email',
-        bodyHtml: '<a href="{{ link }}">Click here</a>',
+        bodyHtml: '<a href="%LINK%">Click here</a>',
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
       }),

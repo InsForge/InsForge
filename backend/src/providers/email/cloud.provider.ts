@@ -66,42 +66,63 @@ export class CloudEmailProvider implements EmailProvider {
     variables?: Record<string, string>
   ): Promise<void> {
     try {
-      // Fetch custom template from local database
-      const { EmailTemplateService } = await import('@/services/email/email-template.service.js');
-      const emailTemplate = await EmailTemplateService.getInstance().getTemplate(template, 'default');
+      const projectId = appConfig.cloud.projectId;
+      const apiHost = appConfig.cloud.apiHost;
+      const signToken = this.generateSignToken();
 
-      // Simple template renderer (matches smtp provider)
-      const renderTemplate = (str: string, vars: Record<string, string>): string => {
-        let result = str;
-        for (const [key, value] of Object.entries(vars)) {
-          const pattern = new RegExp(`%${key}%`, 'g');
-          result = result.replace(pattern, value);
+      // Validate inputs
+      if (!email || !name || !template) {
+        throw new AppError(
+          'Missing required parameters for sending email',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const validTemplates: EmailTemplate[] = [
+        'email-verification-code',
+        'email-verification-link',
+        'reset-password-code',
+        'reset-password-link',
+      ];
+      if (!validTemplates.includes(template)) {
+        throw new AppError(
+          `Invalid template type: ${template}. Must be one of: ${validTemplates.join(', ')}`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const url = `${apiHost}/email/v1/${projectId}/send-with-template`;
+      const response = await axios.post(
+        url,
+        {
+          email,
+          name,
+          template,
+          variables,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            sign: signToken,
+          },
+          timeout: 10000, // 10 second timeout
         }
-        return result;
-      };
+      );
 
-      const allVariables = { 
-        TOKEN: variables?.token || '',
-        LINK: variables?.link || '',
-        EMAIL: email,
-        DISPLAY_NAME: name,
-        APP_NAME: process.env.APP_NAME || 'InsForge'
-      };
-      
-      const subject = renderTemplate(emailTemplate.subject, allVariables);
-      const html = renderTemplate(emailTemplate.bodyHtml, allVariables);
-
-      // Fallback to sending as raw email so cloud provider uses our custom template
-      await this.sendRaw({
-        to: email,
-        subject,
-        html,
-      });
-
-      logger.info('Email sent successfully via cloud raw', {
-        projectId: appConfig.cloud.projectId,
-        template,
-      });
+      if (response.data?.success) {
+        logger.info('Email sent successfully', {
+          projectId,
+          template,
+        });
+      } else {
+        throw new AppError(
+          'Email service returned unsuccessful response',
+          500,
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      }
     } catch (error) {
       // Handle axios errors
       if (axios.isAxiosError(error)) {

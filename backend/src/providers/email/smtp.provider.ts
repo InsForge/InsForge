@@ -107,15 +107,18 @@ export class SmtpEmailProvider implements EmailProvider {
     variables?: Record<string, string>
   ): Promise<void> {
     const config = await this.getRequiredConfig();
-    const emailTemplate = await EmailTemplateService.getInstance().getTemplate(template, 'custom_smtp');
+    const emailTemplate = await EmailTemplateService.getInstance().getTemplate(
+      template,
+      'custom_smtp'
+    );
 
     // Map system variables to Firebase-style percent variables
-    const allVariables: Record<string, string> = { 
+    const allVariables: Record<string, string> = {
       TOKEN: variables?.token || '',
       LINK: variables?.link || '',
       EMAIL: email,
       DISPLAY_NAME: name,
-      APP_NAME: process.env.APP_NAME || 'InsForge'
+      APP_NAME: process.env.APP_NAME || 'InsForge',
     };
 
     await this.send(

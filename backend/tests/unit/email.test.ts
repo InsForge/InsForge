@@ -14,6 +14,20 @@ vi.mock('../../src/utils/logger', () => ({
     warn: vi.fn(),
   },
 }));
+vi.mock('../../src/services/email/email-template.service', () => ({
+  EmailTemplateService: {
+    getInstance: () => ({
+      getTemplate: vi.fn().mockResolvedValue({
+        id: '11111111-1111-4111-8111-111111111111',
+        templateType: 'email-verification-code',
+        subject: 'Verify your email',
+        bodyHtml: '<p>Your code is: %TOKEN%</p>',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      }),
+    }),
+  },
+}));
 vi.mock('../../src/infra/config/app.config', () => {
   const c = {
     app: {
