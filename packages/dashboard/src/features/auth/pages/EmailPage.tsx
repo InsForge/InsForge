@@ -1,9 +1,17 @@
 import { useTranslation } from 'react-i18next';
+import { useSmtpConfig } from '#features/auth/hooks/useSmtpConfig';
 import { useEmailTemplates } from '#features/auth/hooks/useEmailTemplates';
+import { SmtpSettingsCard } from '#features/auth/components/SmtpSettingsCard';
 import { EmailTemplateCard } from '#features/auth/components/EmailTemplateCard';
 
 export default function EmailPage() {
   const { t } = useTranslation('chrome');
+  const {
+    config: smtpConfig,
+    isLoading: isSmtpLoading,
+    isUpdating: isSmtpUpdating,
+    updateConfig: updateSmtpConfig,
+  } = useSmtpConfig();
   const {
     templates,
     isLoading: isTemplatesLoading,
@@ -23,7 +31,7 @@ export default function EmailPage() {
           <p className="text-sm text-muted-foreground">
             {t('auth.emailPageDescription', {
               defaultValue:
-                'Configure your authentication email templates.',
+                'Configure custom SMTP settings and email templates for authentication emails.',
             })}
           </p>
         </div>
@@ -31,6 +39,27 @@ export default function EmailPage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-10 sm:px-10">
         <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-8">
+          <div className="rounded-lg border border-[var(--alpha-8)] bg-card">
+            <div className="border-b border-[var(--alpha-8)] px-6 py-4">
+              <h2 className="text-base font-medium text-foreground">
+                {t('auth.smtpProvider', { defaultValue: 'SMTP Provider' })}
+              </h2>
+              <p className="mt-1 text-[13px] text-muted-foreground">
+                {t('auth.smtpProviderDescription', {
+                  defaultValue:
+                    'Configure a custom SMTP server for sending emails. Your credentials are always encrypted.',
+                })}
+              </p>
+            </div>
+            <div className="px-6 py-6">
+              <SmtpSettingsCard
+                config={smtpConfig}
+                isLoading={isSmtpLoading}
+                isUpdating={isSmtpUpdating}
+                onSave={updateSmtpConfig}
+              />
+            </div>
+          </div>
 
           <div className="rounded-lg border border-[var(--alpha-8)] bg-card">
             <div className="border-b border-[var(--alpha-8)] px-6 py-4">
