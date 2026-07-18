@@ -79,7 +79,7 @@ export function EmailTemplateCard({
     [t]
   );
 
-  const templateVariables = useMemo(() => {
+  const templateVariables = useMemo<Record<string, { name: string; description: string; sample: string }[]>>(() => {
     const emailVariable = {
       name: '%EMAIL%',
       description: t('auth.varUserEmail', { defaultValue: "User's email address" }),
