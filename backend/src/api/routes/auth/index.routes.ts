@@ -1157,6 +1157,7 @@ router.put(
         module: 'EMAIL',
         details: {
           templateType,
+          provider,
         },
         ip_address: req.ip,
       });
