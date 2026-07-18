@@ -61,23 +61,16 @@ export default function EmailPage() {
             </div>
           </div>
 
-          <fieldset
-            disabled={!smtpConfig?.enabled}
-            className={`rounded-lg border border-[var(--alpha-8)] bg-card ${!smtpConfig?.enabled ? 'opacity-50' : ''}`}
-          >
+          <div className="rounded-lg border border-[var(--alpha-8)] bg-card">
             <div className="border-b border-[var(--alpha-8)] px-6 py-4">
               <h2 className="text-base font-medium text-foreground">
                 {t('auth.emailTemplates', { defaultValue: 'Email Templates' })}
               </h2>
               <p className="mt-1 text-[13px] text-muted-foreground">
-                {smtpConfig?.enabled
-                  ? t('auth.emailTemplatesDescription', {
-                      defaultValue:
-                        'Customize the content and appearance of authentication emails.',
-                    })
-                  : t('auth.enableSmtpFirst', {
-                      defaultValue: 'Enable custom SMTP above to customize email templates.',
-                    })}
+                {t('auth.emailTemplatesDescription', {
+                  defaultValue:
+                    'Customize the content and appearance of authentication emails.',
+                })}
               </p>
             </div>
             <div className="px-6 py-6">
@@ -88,7 +81,7 @@ export default function EmailPage() {
                 onSave={(params, options) => updateTemplate(params, options)}
               />
             </div>
-          </fieldset>
+          </div>
         </div>
       </div>
     </div>
