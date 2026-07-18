@@ -24,13 +24,8 @@ export function AuthenticationSidebar() {
       href: '/dashboard/authentication/auth-methods',
     },
     {
-      id: 'custom-smtp',
-      label: t('auth.customSmtp', { defaultValue: 'Custom SMTP' }),
-      href: '/dashboard/authentication/custom-smtp',
-    },
-    {
       id: 'email',
-      label: t('auth.emailTemplatesSidebar', { defaultValue: 'Email Templates' }),
+      label: t('auth.customSmtp', { defaultValue: 'Custom SMTP' }),
       href: '/dashboard/authentication/email',
     },
   ];
