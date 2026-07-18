@@ -14,6 +14,7 @@ import { WebscraperRunsPage } from '#features/webscraper/pages/WebscraperRunsPag
 import { WebscraperDatasetPage } from '#features/webscraper/pages/WebscraperDatasetPage';
 import AuthenticationLayout from '#features/auth/components/AuthenticationLayout';
 import AuthMethodsPage from '#features/auth/pages/AuthMethodsPage';
+import CustomSmtpPage from '#features/auth/pages/CustomSmtpPage';
 import EmailPage from '#features/auth/pages/EmailPage';
 import UsersPage from '#features/auth/pages/UsersPage';
 import ComputePage from '#features/compute/pages/ComputePage';
@@ -87,6 +88,7 @@ function AuthenticatedRoutes() {
           <Route index element={<Navigate to="users" replace />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="auth-methods" element={<AuthMethodsPage />} />
+          <Route path="custom-smtp" element={<CustomSmtpPage />} />
           <Route path="email" element={<EmailPage />} />
         </Route>
         <Route path="/dashboard/database" element={<DatabaseLayout />}>
