@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Input, Tabs, Tab } from '@insforge/ui';
 import { ChevronRight } from 'lucide-react';
+import { DEFAULT_EMAIL_TEMPLATES } from './default-email-templates';
 import type { EmailTemplateSchema, UpdateEmailTemplateRequest } from '@insforge/shared-schemas';
 
 interface EmailTemplateCardProps {
@@ -175,6 +176,15 @@ export function EmailTemplateCard({
       setIsDirty(false);
     }
   }, [selectedTemplate]);
+
+  const resetToDefaults = useCallback(() => {
+    if (selectedType && DEFAULT_EMAIL_TEMPLATES[selectedType]) {
+      const { subject: defaultSubject, bodyHtml: defaultBodyHtml } = DEFAULT_EMAIL_TEMPLATES[selectedType];
+      setSubject(defaultSubject);
+      setBodyHtml(defaultBodyHtml);
+      setIsDirty(true);
+    }
+  }, [selectedType]);
 
   useEffect(() => {
     if (!isDirty) {
@@ -387,22 +397,27 @@ export function EmailTemplateCard({
       </div>
 
       {/* Footer */}
-      {isDirty && (
-        <div className="flex items-center justify-end gap-2 border-t border-[var(--alpha-8)] pt-4">
-          <Button type="button" variant="secondary" onClick={handleCancel} disabled={isUpdating}>
-            {t('auth.cancel', { defaultValue: 'Cancel' })}
-          </Button>
+      <div className="flex items-center justify-between border-t border-[var(--alpha-8)] pt-6 mt-6">
+        <Button type="button" variant="ghost" onClick={resetToDefaults} disabled={isUpdating}>
+          {t('auth.resetToDefaults', { defaultValue: 'Reset to defaults' })}
+        </Button>
+        <div className="flex items-center gap-2">
+          {isDirty && (
+            <Button type="button" variant="secondary" onClick={handleCancel} disabled={isUpdating}>
+              {t('auth.cancel', { defaultValue: 'Cancel' })}
+            </Button>
+          )}
           <Button
             type="button"
             onClick={handleSave}
-            disabled={isUpdating || !subject.trim() || !bodyHtml.trim()}
+            disabled={isUpdating || !isDirty || !subject.trim() || !bodyHtml.trim()}
           >
             {isUpdating
               ? t('auth.saving', { defaultValue: 'Saving...' })
               : t('auth.saveChanges', { defaultValue: 'Save Changes' })}
           </Button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
