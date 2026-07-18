@@ -12,6 +12,7 @@ interface EmailTemplateCardProps {
     params: { type: string; data: UpdateEmailTemplateRequest },
     options?: { onSuccess?: () => void }
   ) => void;
+  senderEmail?: string;
 }
 
 export function EmailTemplateCard({
@@ -19,6 +20,7 @@ export function EmailTemplateCard({
   isLoading,
   isUpdating,
   onSave,
+  senderEmail,
 }: EmailTemplateCardProps) {
   const { t } = useTranslation('chrome');
   const templateTypes = useMemo(
@@ -295,20 +297,22 @@ export function EmailTemplateCard({
       )}
 
       {/* Sender */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm text-foreground">
-          {t('auth.sender', { defaultValue: 'Sender' })}
-        </label>
-        <Input
-          type="text"
-          value="noreply@insforge.dev"
-          disabled
-          className="bg-[var(--alpha-4)] text-muted-foreground opacity-70"
-        />
-        <p className="text-[13px] text-muted-foreground">
-          {t('auth.senderHelp', { defaultValue: 'Emails will be sent from this address by default.' })}
-        </p>
-      </div>
+      {senderEmail && (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm text-foreground">
+            {t('auth.sender', { defaultValue: 'Sender' })}
+          </label>
+          <Input
+            type="text"
+            value={senderEmail}
+            readOnly
+            className="bg-[var(--alpha-4)] text-foreground"
+          />
+          <p className="text-[13px] text-muted-foreground">
+            {t('auth.senderHelp', { defaultValue: 'Emails will be sent from this address by default.' })}
+          </p>
+        </div>
+      )}
 
       {/* Subject */}
       <div className="flex flex-col gap-1.5">

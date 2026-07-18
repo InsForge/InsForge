@@ -39,8 +39,7 @@ export default function EmailPage() {
               </h2>
               <p className="mt-1 text-[13px] text-muted-foreground">
                 {t('auth.emailTemplatesDescription', {
-                  defaultValue:
-                    'Customize the content and appearance of authentication emails.',
+                  defaultValue: 'Customize the content and appearance of authentication emails.',
                 })}
               </p>
             </div>
@@ -49,7 +48,8 @@ export default function EmailPage() {
                 templates={templates}
                 isLoading={isTemplatesLoading}
                 isUpdating={isTemplatesUpdating}
-                onSave={(params, options) => updateTemplate(params, options)}
+                onSave={updateTemplate}
+                senderEmail="noreply@insforge.dev"
               />
             </div>
           </div>
