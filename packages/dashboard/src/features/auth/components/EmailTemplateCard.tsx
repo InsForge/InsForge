@@ -316,18 +316,19 @@ export function EmailTemplateCard({
       {/* Sender */}
       {senderEmail && (
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm text-foreground">
-            {t('auth.sender', { defaultValue: 'Sender' })}
+          <label htmlFor="email-template-sender" className="text-sm text-foreground">
+            {t('auth.senderEmail', { defaultValue: 'Sender email' })}
           </label>
           <Input
+            id="email-template-sender"
             type="text"
             value={senderEmail}
             readOnly
             className="bg-[var(--alpha-4)] text-foreground"
           />
           <p className="text-[13px] text-muted-foreground">
-            {t('auth.senderHelp', {
-              defaultValue: 'Emails will be sent from this address by default.',
+            {t('auth.senderEmailDescription', {
+              defaultValue: 'The email address emails are sent from.',
             })}
           </p>
         </div>

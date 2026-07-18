@@ -21,7 +21,7 @@ export default function EmailPage() {
         </div>
         <div className="mx-auto mt-1 w-full max-w-[1024px]">
           <p className="text-sm text-muted-foreground">
-            {t('auth.emailPageDescription', {
+            {t('auth.emailTemplatesPageDescription', {
               defaultValue: 'Configure your authentication email templates.',
             })}
           </p>

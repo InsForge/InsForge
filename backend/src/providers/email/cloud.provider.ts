@@ -84,6 +84,8 @@ export class CloudEmailProvider implements EmailProvider {
         'email-verification-link',
         'reset-password-code',
         'reset-password-link',
+        'email-address-change-code',
+        'email-address-change-link',
       ];
       if (!validTemplates.includes(template)) {
         throw new AppError(

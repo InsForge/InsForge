@@ -66,9 +66,10 @@ export default function CustomSmtpPage() {
                 })}
               </p>
             </div>
-            <div
-              className={`px-6 py-6 transition-opacity ${
-                !smtpConfig?.enabled ? 'pointer-events-none opacity-50' : 'opacity-100'
+            <fieldset
+              disabled={!smtpConfig?.enabled}
+              className={`border-0 m-0 px-6 py-6 transition-opacity ${
+                !smtpConfig?.enabled ? 'opacity-50' : 'opacity-100'
               }`}
             >
               <EmailTemplateCard
@@ -77,7 +78,7 @@ export default function CustomSmtpPage() {
                 isUpdating={isTemplatesUpdating}
                 onSave={updateTemplate}
               />
-            </div>
+            </fieldset>
           </div>
         </div>
       </div>
