@@ -23,7 +23,9 @@ vi.mock('@/infra/database/database.manager.js', () => ({
 let mockPool: Pool;
 let calls: Array<{ sql: string; params?: unknown[] }>;
 // Per-call queue: each entry is the result for the next .query() call.
-let queryResults: Array<{ rows: unknown[]; rowCount: number }>;
+// An entry with `throwCode` makes that call reject with a pg-style error
+// carrying that SQLSTATE (e.g. '42501' for an RLS violation).
+let queryResults: Array<{ rows: unknown[]; rowCount: number; throwCode?: string }>;
 
 function makeMockPool(): Pool {
   calls = [];
@@ -31,6 +33,11 @@ function makeMockPool(): Pool {
   const query = vi.fn(async (sql: string, params?: unknown[]) => {
     calls.push({ sql, params });
     const result = queryResults.shift() ?? { rows: [], rowCount: 0 };
+    if (result.throwCode) {
+      const error = new Error(`mock pg error ${result.throwCode}`) as Error & { code: string };
+      error.code = result.throwCode;
+      throw error;
+    }
     return result;
   });
   const client = {
@@ -452,6 +459,45 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     expect(upsertCall?.sql).not.toContain('uploaded_by = EXCLUDED');
   });
 
+  it('maps the RLS 42501 raised by the upsert conflict arm to 403 without touching the blob', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      putObject: vi.fn(async () => ({ etag: 'never' })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    // Bob upserts a key whose row belongs to Alice. The ON CONFLICT arm has
+    // no rowCount check by design: Postgres raises 42501 when the existing
+    // row fails the UPDATE policy's USING expression. This test pins that
+    // error path — if the write ever resolved without an error instead, the
+    // provider blob write would run and silently overwrite Alice's object.
+    queryResults = [
+      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
+      { rows: [], rowCount: 0 }, // BEGIN
+      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
+      { rows: [], rowCount: 0 }, // set_config(claims)
+      { rows: [], rowCount: 0, throwCode: '42501' }, // ON CONFLICT arm: RLS violation
+      { rows: [], rowCount: 0 }, // ROLLBACK (withUserContext error path)
+      { rows: [], rowCount: 0 }, // RESET ROLE
+    ];
+
+    await expect(
+      svc.putObject(
+        { id: 'bob-sub', email: 'bob@example.com', role: 'authenticated' },
+        'photos',
+        'alice-note.txt',
+        { size: 8, mimetype: 'text/plain' } as Express.Multer.File,
+        false,
+        { upsert: true }
+      )
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'STORAGE_PERMISSION_DENIED',
+    });
+    expect(provider.putObject).not.toHaveBeenCalled();
+  });
+
   it('rejects an upload strategy for an existing key with 409 when upsert is not set', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
@@ -516,6 +562,9 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     );
 
     expect(strategy).toMatchObject({ method: 'direct', key: 'note.txt' });
+    // The direct uploadUrl must be self-contained: the PUT route it targets
+    // rejects an existing key with 409 unless the upsert flag rides along.
+    expect(strategy.uploadUrl).toBe('/upload?upsert=true');
     const probe = calls.find((c) => c.sql.includes('SET uploaded_at = uploaded_at'));
     expect(probe?.sql).toContain('UPDATE storage.objects');
     expect(calls.map((c) => c.sql)).toContain('ROLLBACK TO SAVEPOINT upload_strategy_rls_probe');
@@ -574,8 +623,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     queryResults = [
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
-      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
-      { rows: [], rowCount: 1 }, // root UPDATE of the existing row
+      { rows: [], rowCount: 1 }, // root ON CONFLICT write (no pre-check for upsert)
     ];
 
     const result = await svc.confirmUpload(
@@ -588,11 +636,11 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     );
 
     expect(result).toMatchObject({ bucket: 'photos', key: 'note.txt', size: 16 });
-    const update = calls.find((c) => c.sql.includes('UPDATE storage.objects'));
-    expect(update?.sql).toContain('SET size = $3');
-    // Ownership column is never touched on replace.
-    expect(update?.sql).not.toContain('uploaded_by');
-    expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(false);
+    // Upsert confirms are a single race-free INSERT ... ON CONFLICT write.
+    const write = calls.find((c) => c.sql.includes('INSERT INTO storage.objects'));
+    expect(write?.sql).toContain('ON CONFLICT (bucket, key) DO UPDATE');
+    // Ownership column is never touched by the conflict arm.
+    expect(write?.sql.split('DO UPDATE')[1]).not.toContain('uploaded_by');
   });
 
   it('confirms presigned uploads for project_admin JWT callers through root access', async () => {

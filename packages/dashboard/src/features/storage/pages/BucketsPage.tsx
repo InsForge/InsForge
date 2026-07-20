@@ -189,13 +189,16 @@ export default function BucketsPage() {
 
       const lastDotIndex = file.name.lastIndexOf('.');
       const baseName = lastDotIndex > 0 ? file.name.slice(0, lastDotIndex) : file.name;
+      // Every key the server has rejected with 409 so far. The search listing
+      // is capped (and a substring match), so a conflicting key can be absent
+      // from it — feeding rejected candidates back in guarantees each retry
+      // advances to a fresh name instead of re-trying the same one.
+      const conflictedKeys = [file.name];
       let lastError: unknown;
       for (let attempt = 0; attempt < 3; attempt++) {
         const { objects } = await storageService.listObjects(bucket, { limit: 1000 }, baseName);
-        // Force the conflicting name into the list: the server said it exists,
-        // even if the (paginated) search listing missed it.
         const candidateKey = nextAvailableObjectKey(
-          [...objects.map((object) => object.key), file.name],
+          [...objects.map((object) => object.key), ...conflictedKeys],
           file.name
         );
         try {
@@ -204,7 +207,9 @@ export default function BucketsPage() {
           if (!isConflict(error)) {
             throw error;
           }
-          // Another upload took the candidate between listing and PUT; re-list.
+          // Candidate taken too (race, or hidden by the listing cap); record
+          // it and re-list.
+          conflictedKeys.push(candidateKey);
           lastError = error;
         }
       }

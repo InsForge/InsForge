@@ -12,6 +12,8 @@ import {
   updateBucketRequestSchema,
   updateStorageConfigRequestSchema,
   createS3AccessKeyRequestSchema,
+  uploadStrategyRequestSchema,
+  confirmUploadRequestSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
@@ -712,11 +714,15 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
-      const { filename, contentType, size, upsert, autoKey } = req.body;
-
-      if (!filename) {
-        throw new AppError('Filename is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+      const validation = uploadStrategyRequestSchema.safeParse(req.body ?? {});
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
       }
+      const { filename, contentType, size, upsert, autoKey } = validation.data;
 
       const requestedType =
         typeof contentType === 'string' && contentType.trim()
@@ -755,18 +761,19 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
-      const { size, etag, upsert } = req.body;
-      let { contentType } = req.body;
-      if (contentType !== undefined && contentType !== null) {
-        const typeStr =
-          typeof contentType === 'string' && contentType.trim()
-            ? contentType
-            : 'application/octet-stream';
-        contentType = isUnsafeMime(typeStr) ? 'application/octet-stream' : typeStr;
+      const validation = confirmUploadRequestSchema.safeParse(req.body ?? {});
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
       }
-
-      if (!size) {
-        throw new AppError('Size is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+      const { size, etag, upsert } = validation.data;
+      let { contentType } = validation.data;
+      if (contentType !== undefined && contentType !== null) {
+        const typeStr = contentType.trim() ? contentType : 'application/octet-stream';
+        contentType = isUnsafeMime(typeStr) ? 'application/octet-stream' : typeStr;
       }
 
       const storageService = StorageService.getInstance();

@@ -199,8 +199,13 @@ export class StorageService {
         // to NULL — same rationale as upsertS3Object). Under an end-user RLS
         // context Postgres applies the table's UPDATE policies (USING against
         // the existing row, WITH CHECK against the result) to the conflict
-        // arm, so replacing an object the caller cannot update raises an RLS
-        // violation instead of silently overwriting another user's blob.
+        // arm. No rowCount check is needed here, unlike the plain-UPDATE
+        // probes elsewhere: the arbiter index already located the row, so a
+        // failing USING policy cannot be silently filtered to a no-op — it
+        // RAISES 42501 (insufficient_privilege), the transaction rolls back
+        // before the provider blob write below, and mapObjectWriteError turns
+        // it into a 403. That error, not a row count, is the cross-user
+        // overwrite guarantee — pinned by a unit test.
         await db.query(
           `
           INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via, uploaded_at)
@@ -632,7 +637,10 @@ export class StorageService {
 
     const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
     if (hasApiKey || ctx?.role === 'project_admin') {
-      return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes, contentType);
+      return this.applyUpsertToStrategy(
+        await this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes, contentType),
+        upsert
+      );
     }
     if (!ctx) {
       throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
@@ -671,7 +679,29 @@ export class StorageService {
         await client.query('RELEASE SAVEPOINT upload_strategy_rls_probe');
       }
     });
-    return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes, contentType);
+    return this.applyUpsertToStrategy(
+      await this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes, contentType),
+      upsert
+    );
+  }
+
+  /**
+   * Make a direct upload strategy self-contained for upsert callers: the
+   * returned uploadUrl targets our own PUT route, which rejects an existing
+   * key with 409 unless ?upsert=true is present. Clients follow the strategy
+   * contract verbatim, so the flag must ride along in the URL itself.
+   * Presigned (S3) URLs need no flag — S3 PUT replaces natively and the
+   * metadata gate runs at strategy issuance + confirm-upload instead.
+   */
+  private applyUpsertToStrategy<T extends { method: string; uploadUrl: string }>(
+    strategy: T,
+    upsert: boolean
+  ): T {
+    if (!upsert || strategy.method !== 'direct') {
+      return strategy;
+    }
+    const separator = strategy.uploadUrl.includes('?') ? '&' : '?';
+    return { ...strategy, uploadUrl: `${strategy.uploadUrl}${separator}upsert=true` };
   }
 
   async getDownloadStrategy(
@@ -797,15 +827,17 @@ export class StorageService {
       throw new Error(`File size exceeds the configured maximum upload size of ${limitMb} MB`);
     }
 
-    // Existence check runs on the admin pool deliberately — the friendly
-    // "already confirmed" error (and correct insert-vs-update choice for
-    // upsert) must fire even when the existing row was uploaded by a
-    // different user (RLS would hide it). Falling through to the INSERT in
-    // that case would either raise a unique constraint violation (worse UX)
-    // or silently shadow the original row depending on the schema.
-    const rowExists = await this.objectKeyExists(bucket, key);
-    if (rowExists && !upsert) {
-      throw new Error(`File "${key}" already confirmed in bucket "${bucket}"`);
+    // Non-upsert only: the friendly "already confirmed" check runs on the
+    // admin pool deliberately so it fires even when the existing row was
+    // uploaded by a different user (RLS would hide it). Falling through to
+    // the INSERT in that case would raise a unique constraint violation
+    // (worse UX). The upsert path needs no pre-check — its ON CONFLICT
+    // write below is race-free by construction.
+    if (!upsert) {
+      const rowExists = await this.objectKeyExists(bucket, key);
+      if (rowExists) {
+        throw new Error(`File "${key}" already confirmed in bucket "${bucket}"`);
+      }
     }
 
     // Writes run through withUserContext for end-user callers, so the RLS
@@ -820,23 +852,25 @@ export class StorageService {
     // solely by the INSERT policy's WITH CHECK, which is the intended check.
     const uploadedAt = new Date();
     const writeObjectRow = async (db: PoolClient) => {
-      if (rowExists) {
-        // Replace: refresh content metadata but leave uploaded_by untouched
-        // so replacing an object never reassigns its ownership. rowCount 0
-        // means RLS hid the row from this caller's UPDATE policy.
-        const updated = await db.query(
-          `UPDATE storage.objects
-           SET size = $3, mime_type = $4, etag = $5, uploaded_via = 'rest', uploaded_at = $6
-           WHERE bucket = $1 AND key = $2`,
-          [bucket, key, fileSize, metadata.contentType || null, finalEtag, uploadedAt]
+      if (upsert) {
+        // Single INSERT ... ON CONFLICT so two concurrent upsert confirms for
+        // the same key can never race each other into a unique violation —
+        // whichever lands second takes the update arm. Mirrors putObject:
+        // uploaded_by stays out of the SET clause so replacing an object
+        // never reassigns its ownership, and under an end-user RLS context a
+        // conflict row the caller may not UPDATE raises 42501 (mapped to 403
+        // by mapObjectWriteError) instead of silently overwriting.
+        await db.query(
+          `INSERT INTO storage.objects (bucket, key, size, mime_type, etag, uploaded_by, uploaded_via, uploaded_at)
+           VALUES ($1, $2, $3, $4, $5, $6, 'rest', $7)
+           ON CONFLICT (bucket, key) DO UPDATE SET
+             size         = EXCLUDED.size,
+             mime_type    = EXCLUDED.mime_type,
+             etag         = EXCLUDED.etag,
+             uploaded_via = EXCLUDED.uploaded_via,
+             uploaded_at  = EXCLUDED.uploaded_at`,
+          [bucket, key, fileSize, metadata.contentType || null, finalEtag, userId, uploadedAt]
         );
-        if ((updated.rowCount ?? 0) === 0) {
-          throw new AppError(
-            `You do not have permission to replace "${key}" in bucket "${bucket}"`,
-            403,
-            ERROR_CODES.STORAGE_PERMISSION_DENIED
-          );
-        }
       } else {
         await db.query(
           `INSERT INTO storage.objects (bucket, key, size, mime_type, etag, uploaded_by, uploaded_via, uploaded_at)
