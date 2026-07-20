@@ -54,6 +54,7 @@ export interface AppConfig {
     maxFilesPerField: number;
     logsDir: string;
     trustProxy: TrustProxySetting;
+    keepAliveTimeoutMs: number;
   };
   database: {
     host: string;
@@ -179,6 +180,9 @@ export function loadConfig(): AppConfig {
       maxFilesPerField: parseEnvInt(process.env.MAX_FILES_PER_FIELD, 10),
       logsDir,
       trustProxy: parseTrustProxySetting(process.env.TRUST_PROXY),
+      // Must exceed the idle timeout of any proxy/LB in front of the backend,
+      // otherwise clients can reuse a socket the server already closed.
+      keepAliveTimeoutMs: parseEnvInt(process.env.KEEP_ALIVE_TIMEOUT_MS, 65000),
     },
     database: {
       host: process.env.POSTGRES_HOST || 'localhost',

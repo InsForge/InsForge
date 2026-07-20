@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Settings } from 'lucide-react';
 import {
   FeatureSidebar,
@@ -7,45 +8,42 @@ import {
 } from '#components';
 import { AuthSettingsMenuDialog } from './AuthSettingsMenuDialog';
 
-const AUTHENTICATION_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
-  {
-    id: 'users-list',
-    label: 'Users',
-    href: '/dashboard/authentication/users',
-  },
-  {
-    id: 'auth-methods',
-    label: 'Auth Methods',
-    href: '/dashboard/authentication/auth-methods',
-  },
-  {
-    id: 'email',
-    label: 'Custom SMTP',
-    href: '/dashboard/authentication/email',
-  },
-];
-
-const AUTHENTICATION_SETTINGS_LABEL = 'Authentication Settings';
-
 export function AuthenticationSidebar() {
+  const { t } = useTranslation('chrome');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  const headerButtons: FeatureSidebarHeaderButton[] = AUTHENTICATION_SETTINGS_LABEL
-    ? [
-        {
-          id: 'authentication-settings',
-          label: AUTHENTICATION_SETTINGS_LABEL,
-          icon: Settings,
-          onClick: () => setIsSettingsOpen(true),
-        },
-      ]
-    : [];
+  const sidebarItems: FeatureSidebarListItem[] = [
+    {
+      id: 'users-list',
+      label: t('auth.users', { defaultValue: 'Users' }),
+      href: '/dashboard/authentication/users',
+    },
+    {
+      id: 'auth-methods',
+      label: t('auth.authMethods', { defaultValue: 'Auth Methods' }),
+      href: '/dashboard/authentication/auth-methods',
+    },
+    {
+      id: 'email',
+      label: t('auth.customSmtp', { defaultValue: 'Custom SMTP' }),
+      href: '/dashboard/authentication/email',
+    },
+  ];
+
+  const headerButtons: FeatureSidebarHeaderButton[] = [
+    {
+      id: 'authentication-settings',
+      label: t('auth.authenticationSettings', { defaultValue: 'Authentication Settings' }),
+      icon: Settings,
+      onClick: () => setIsSettingsOpen(true),
+    },
+  ];
 
   return (
     <>
       <FeatureSidebar
-        title="Authentication"
-        items={AUTHENTICATION_SIDEBAR_ITEMS}
+        title={t('auth.authentication', { defaultValue: 'Authentication' })}
+        items={sidebarItems}
         headerButtons={headerButtons}
       />
       <AuthSettingsMenuDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />

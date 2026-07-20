@@ -1,8 +1,10 @@
 import { Sun, Moon, Monitor } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '#lib/contexts/ThemeContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@insforge/ui';
 
 export function ThemeSelect() {
+  const { t } = useTranslation('chrome');
   const { theme, resolvedTheme, setTheme } = useTheme();
 
   return (
@@ -21,13 +23,13 @@ export function ThemeSelect() {
       </SelectTrigger>
       <SelectContent align="center" className="w-36">
         <SelectItem value="light" icon={<Sun />}>
-          Light
+          {t('theme.light')}
         </SelectItem>
         <SelectItem value="dark" icon={<Moon />}>
-          Dark
+          {t('theme.dark')}
         </SelectItem>
         <SelectItem value="system" icon={<Monitor />}>
-          System
+          {t('theme.system')}
         </SelectItem>
       </SelectContent>
     </Select>

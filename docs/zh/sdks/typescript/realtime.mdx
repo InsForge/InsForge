@@ -1,0 +1,386 @@
+---
+title: TypeScript 实时 SDK 参考
+description: 使用 InsForge TypeScript SDK 通过 Socket.IO 订阅频道、发布事件、追踪在线状态，并处理重新连接和令牌刷新。
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+## 安装
+
+<Installation />
+
+## 思维模型
+
+TypeScript SDK 向您的 InsForge 后端打开一个 Socket.IO 连接。您订阅命名频道、监听事件名称，并可选地将事件发布回您已加入的频道。
+
+事件可以来自两个地方：
+
+- 调用 `realtime.publish(channel, event, payload)` 的数据库触发器。
+- 调用 `insforge.realtime.publish(channel, event, payload)` 的客户端。
+
+有关后端频道和 RLS 模型，请参见[实时概述](/core-concepts/realtime/overview)。
+
+## 快速开始
+
+```typescript
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-app.insforge.app',
+  anonKey: 'your-anon-key'
+});
+
+insforge.realtime.on('connect', () => {
+  console.log('Connected:', insforge.realtime.socketId);
+});
+
+insforge.realtime.on('error', (error) => {
+  console.error(error.code, error.message);
+});
+
+await insforge.realtime.connect();
+
+const subscription = await insforge.realtime.subscribe('order:123');
+
+if (!subscription.ok) {
+  throw new Error(subscription.error.message);
+}
+
+insforge.realtime.on('status_changed', (message) => {
+  console.log(message.status);
+  console.log(message.meta.messageId);
+});
+```
+
+<Tip>
+  在调用 `connect()` 之前注册 `connect`、`disconnect`、`connect_error` 和 `error` 处理程序，以便早期连接失败可见。
+</Tip>
+
+## connect()
+
+建立 WebSocket 连接。
+
+```typescript
+await insforge.realtime.connect();
+```
+
+返回：
+
+```typescript
+Promise<void>
+```
+
+注意事项：
+
+- 当存在当前身份验证令牌时，SDK 会包含它。如果没有登录用户，它可以使用配置的匿名密钥。
+- 在连接已在进行中时的多次 `connect()` 调用会重用相同的连接 promise。
+- 连接尝试在 10 秒后超时。
+
+## subscribe()
+
+订阅频道并接收当前的在线状态快照。
+
+```typescript
+const response = await insforge.realtime.subscribe('chat:room-1');
+
+if (response.ok) {
+  console.log(response.channel);
+  console.log(response.presence.members);
+} else {
+  console.error(response.error.code, response.error.message);
+}
+```
+
+参数：
+
+| 参数 | 类型 | 描述 |
+|-----------|------|-------------|
+| `channel` | `string` | 解析的频道名称，如 `orders`、`order:123` 或 `chat:room-1`。 |
+
+返回：
+
+```typescript
+type SubscribeResponse =
+  | {
+      ok: true;
+      channel: string;
+      presence: {
+        members: PresenceMember[];
+      };
+    }
+  | {
+      ok: false;
+      channel: string;
+      error: {
+        code: string;
+        message: string;
+      };
+    };
+```
+
+`subscribe()` 会在需要时自动连接。仍建议显式调用 `connect()`，以便连接事件处理程序已附加。
+
+`subscribe()` 是幂等的：对您已加入的频道再次调用它会重新请求订阅并解析服务器当前的在线状态快照。服务器按逻辑成员追踪在线状态，因此重复订阅永远不会产生重复成员或虚假的 `presence:join` 事件。
+
+## publish()
+
+将事件发布到频道。
+
+```typescript
+await insforge.realtime.publish('chat:room-1', 'new_message', {
+  text: 'Hello',
+  sentAt: new Date().toISOString()
+});
+```
+
+参数：
+
+| 参数 | 类型 | 描述 |
+|-----------|------|-------------|
+| `channel` | `string` | 要发布到的频道。客户端必须已经订阅。 |
+| `event` | `string` | 订阅者监听的事件名称。 |
+| `payload` | `Record<string, unknown>` | JSON 可序列化的消息载荷。 |
+
+<Warning>
+  发布需要先成功订阅同一频道。如果在 `realtime.messages` 上启用了 RLS，发布也会根据 `INSERT` 策略进行检查。
+</Warning>
+
+发布失败通过 `error` 事件发出。
+
+## on()
+
+监听自定义事件、连接事件、在线状态事件和实时错误。
+
+```typescript
+insforge.realtime.on('new_message', (message) => {
+  console.log(message.text);
+  console.log(message.meta.senderType);
+});
+```
+
+保留事件：
+
+| 事件 | 载荷 | 描述 |
+|-------|---------|-------------|
+| `connect` | 无 | WebSocket 已连接。 |
+| `connect_error` | `Error` | 初始连接或重新连接失败。 |
+| `disconnect` | `string` | WebSocket 已断开连接。 |
+| `error` | `RealtimeErrorPayload` | 订阅或发布失败。 |
+| `presence:join` | `PresenceJoinMessage` | 逻辑成员在频道中变为在线。 |
+| `presence:leave` | `PresenceLeaveMessage` | 逻辑成员在频道中不再在线。 |
+| `presence:sync` | `PresenceSyncEvent` | 频道的新在线状态快照。在每次成功订阅时触发，包括重新连接后的自动重新订阅。 |
+
+## once()
+
+监听事件一次，然后自动移除监听器。
+
+```typescript
+insforge.realtime.once('checkout_completed', (message) => {
+  console.log('Completed:', message.orderId);
+});
+```
+
+## off()
+
+移除事件监听器。
+
+```typescript
+function handleStatus(message: OrderStatusMessage) {
+  console.log(message.status);
+}
+
+insforge.realtime.on('status_changed', handleStatus);
+insforge.realtime.off('status_changed', handleStatus);
+```
+
+## unsubscribe()
+
+离开频道。
+
+```typescript
+insforge.realtime.unsubscribe('chat:room-1');
+```
+
+`unsubscribe()` 是即发即忘的。如果这是逻辑成员的最后一个套接字，其他订阅者会收到 `presence:leave`。
+
+## disconnect()
+
+关闭 WebSocket 并清除本地订阅。
+
+```typescript
+insforge.realtime.disconnect();
+```
+
+## 消息结构
+
+传递的消息包括您的载荷字段加上服务器元数据。
+
+```typescript
+import type { SocketMessage } from '@insforge/sdk';
+
+interface OrderStatusMessage extends SocketMessage {
+  id: string;
+  status: string;
+}
+
+insforge.realtime.on<OrderStatusMessage>('status_changed', (message) => {
+  console.log(message.id);
+  console.log(message.status);
+  console.log(message.meta.messageId);
+  console.log(message.meta.senderType);
+  console.log(message.meta.senderId);
+  console.log(message.meta.timestamp);
+});
+```
+
+元数据：
+
+```typescript
+interface SocketMessageMeta {
+  channel?: string;
+  messageId: string;
+  senderType: 'system' | 'user';
+  senderId?: string;
+  timestamp: string;
+}
+```
+
+对于数据库触发的消息，`senderType` 为 `system`；对于客户端发布的消息，`senderType` 为 `user`。
+
+## 在线状态
+
+成功的订阅会返回当前的在线状态快照。
+
+```typescript
+const response = await insforge.realtime.subscribe('chat:room-1');
+
+if (response.ok) {
+  for (const member of response.presence.members) {
+    console.log(member.type, member.presenceId, member.joinedAt);
+  }
+}
+```
+
+在线状态成员：
+
+```typescript
+type PresenceMember =
+  | {
+      type: 'user';
+      presenceId: string;
+      joinedAt: string;
+    }
+  | {
+      type: 'anonymous';
+      presenceId: string;
+      joinedAt: string;
+    };
+```
+
+监听变化：
+
+```typescript
+insforge.realtime.on('presence:join', (message) => {
+  console.log('Joined:', message.member.presenceId);
+});
+
+insforge.realtime.on('presence:leave', (message) => {
+  console.log('Left:', message.member.presenceId);
+});
+```
+
+### 读取在线状态
+
+SDK 为每个已订阅的频道维护成员列表 — 从订阅快照初始化，并通过 `presence:join`/`presence:leave` 增量和重新连接重新同步保持最新。随时读取它，而不是自己合并增量：
+
+```typescript
+const members = insforge.realtime.getPresenceState('chat:room-1');
+```
+
+对于您未订阅的频道，返回空数组。当套接字短暂断开连接时，它保留最后已知的状态，一旦频道重新订阅就会被新快照替换。
+
+### 重新连接
+
+当连接断开时，SDK 会在重新连接时自动重新订阅每个频道，并为每个频道发出带有新在线状态快照的 `presence:sync`。在您断开连接期间加入或离开的成员不会产生单独的 `presence:join`/`presence:leave` 增量，因此请替换（而非合并）您在 SDK 之外保留的任何状态：
+
+```typescript
+import type { PresenceSyncEvent } from '@insforge/sdk';
+
+insforge.realtime.on<PresenceSyncEvent>('presence:sync', ({ channel, presence }) => {
+  replaceMembers(channel, presence.members);
+});
+```
+
+如果您直接从 `getPresenceState()` 渲染，`presence:sync` 只是您的重新渲染信号。如果重新订阅被拒绝（例如用户的访问权限在断开连接时被撤销），SDK 会丢弃该频道并改为发出 `error`。
+
+### 令牌刷新
+
+当已登录用户的访问令牌刷新时，SDK 会让已建立的套接字保持连接 — 没有带内重新身份验证、重新连接或在线状态波动。稍后的初始连接或网络重新连接会在其握手之前获取最新的访问令牌。登录、登出或切换用户会以新身份重新连接套接字。
+
+访问权限*降低*会在实时连接上惰性应用：发布会在每条消息上根据 RLS 重新检查，新订阅会在加入时重新检查，但对已加入频道的持续接收会一直持续，直到客户端取消订阅或重新连接。
+
+## 属性
+
+| 属性 | 类型 | 描述 |
+|----------|------|-------------|
+| `isConnected` | `boolean` | 套接字当前是否已连接。 |
+| `connectionState` | `'disconnected' \| 'connecting' \| 'connected'` | 当前 SDK 连接状态。 |
+| `socketId` | `string \| undefined` | 连接时的 Socket.IO ID。 |
+| `getSubscribedChannels()` | `() => string[]` | 已订阅频道的本地列表。 |
+| `getPresenceState(channel)` | `(channel: string) => PresenceMember[]` | 由 SDK 维护的已订阅频道的当前成员。 |
+
+## 错误处理
+
+```typescript
+insforge.realtime.on('connect_error', (error) => {
+  console.error('Connection failed:', error.message);
+});
+
+insforge.realtime.on('disconnect', (reason) => {
+  console.log('Disconnected:', reason);
+});
+
+insforge.realtime.on('error', (error) => {
+  console.error(error.channel, error.code, error.message);
+});
+```
+
+常见实时错误代码：
+
+| 代码 | 含义 |
+|------|---------|
+| `REALTIME_UNAUTHORIZED` | RLS 或频道匹配拒绝了订阅或发布。 |
+| `REALTIME_NOT_SUBSCRIBED` | 客户端尝试在订阅频道之前发布。 |
+| `INTERNAL_ERROR` | 后端无法完成实时操作。 |
+
+## 完整示例
+
+```typescript
+const channel = `order:${orderId}`;
+
+insforge.realtime.on('error', (error) => {
+  console.error(error.code, error.message);
+});
+
+await insforge.realtime.connect();
+
+const response = await insforge.realtime.subscribe(channel);
+
+if (!response.ok) {
+  throw new Error(response.error.message);
+}
+
+insforge.realtime.on('status_changed', (message) => {
+  renderOrderStatus(message.status);
+});
+
+await insforge.realtime.publish(channel, 'customer_viewed', {
+  orderId,
+  viewedAt: new Date().toISOString()
+});
+
+function cleanup() {
+  insforge.realtime.unsubscribe(channel);
+  insforge.realtime.disconnect();
+}
+```

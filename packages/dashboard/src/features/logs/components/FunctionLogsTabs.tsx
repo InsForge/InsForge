@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@insforge/ui';
 
 export type FunctionLogType = 'runtime' | 'build';
@@ -13,15 +14,21 @@ interface FunctionLogsTabsProps {
   className?: string;
 }
 
-const FUNCTION_LOG_TABS: FunctionLogTab[] = [
-  { id: 'runtime', label: 'Runtime Logs' },
-  { id: 'build', label: 'Build Logs' },
-];
+const FUNCTION_LOG_TAB_DEFS = [
+  { id: 'runtime', labelKey: 'runtimeLogs', defaultLabel: 'Runtime Logs' },
+  { id: 'build', labelKey: 'buildLogs', defaultLabel: 'Build Logs' },
+] as const;
 
 export function FunctionLogsTabs({ value, onChange, className }: FunctionLogsTabsProps) {
+  const { t } = useTranslation('chrome');
+  const tabs: FunctionLogTab[] = FUNCTION_LOG_TAB_DEFS.map((tab) => ({
+    id: tab.id,
+    label: t(`logs.${tab.labelKey}`, { defaultValue: tab.defaultLabel }),
+  }));
+
   return (
     <div className={cn('flex dark:bg-neutral-700 bg-neutral-200 rounded-lg p-1', className)}>
-      {FUNCTION_LOG_TABS.map((tab) => (
+      {tabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => onChange(tab.id)}

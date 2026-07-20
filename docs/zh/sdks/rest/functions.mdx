@@ -1,0 +1,382 @@
+---
+title: 函数API参考
+description: 通过REST API的无服务器边界函数
+---
+
+## 概览
+
+函数API提供用于调用和管理无服务器函数的端点。在云环境中，函数在Deno Subhosting上边界运行。在自托管（Docker）环境中，函数在本地Deno运行时中运行。
+
+## 标头
+
+```bash
+Content-Type: application/json
+```
+
+对于经过身份验证的函数调用：
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+```
+
+对于管理员端点：
+```bash
+Authorization: Bearer admin-jwt-token-or-api-key
+```
+
+---
+
+## 调用函数
+
+使用任何HTTP方法（GET、POST、PUT、PATCH、DELETE等）执行已部署的函数。服务器保留并将调用者的原始方法转发给函数运行时。
+
+```
+ANY /functions/{slug}
+```
+
+<Note>
+注意：函数调用使用`/functions/{slug}`（没有`/api`前缀），不是`/api/functions/{slug}`。
+</Note>
+
+### 路径参数
+
+| 参数 | 类型 | 说明 |
+|-----------|------|-------------|
+| `slug` | string | 函数slug标识符 |
+
+### 请求正文
+
+函数期望的任何JSON有效负载。
+
+### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/functions/hello-world" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John"
+  }'
+```
+
+### 响应
+
+响应取决于函数返回的内容：
+
+```json
+{
+  "message": "Hello, John!"
+}
+```
+
+---
+
+## 管理员端点
+
+这些端点需要管理员身份验证。
+
+### 列出所有函数
+
+```
+GET /api/functions
+```
+
+### 示例
+
+```bash
+curl "https://your-app.insforge.app/api/functions" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+```
+
+### 响应
+
+```json
+[
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "slug": "hello-world",
+    "name": "Hello World Function",
+    "description": "Returns a greeting message",
+    "status": "active",
+    "created_at": "2024-01-21T10:30:00Z",
+    "updated_at": "2024-01-21T10:35:00Z",
+    "deployed_at": "2024-01-21T10:35:00Z"
+  },
+  {
+    "id": "223e4567-e89b-12d3-a456-426614174001",
+    "slug": "process-webhook",
+    "name": "Webhook Processor",
+    "description": "Processes incoming webhooks",
+    "status": "draft",
+    "created_at": "2024-01-22T14:20:00Z",
+    "updated_at": "2024-01-22T14:20:00Z",
+    "deployed_at": null
+  }
+]
+```
+
+---
+
+### 获取函数详情
+
+```
+GET /api/functions/{slug}
+```
+
+### 示例
+
+```bash
+curl "https://your-app.insforge.app/api/functions/hello-world" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+```
+
+### 响应
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "slug": "hello-world",
+  "name": "Hello World Function",
+  "description": "Returns a greeting message",
+  "code": "export default async function(request) {\n  const { name = 'World' } = await request.json();\n  return new Response(\n    JSON.stringify({ message: `Hello, ${name}!` }),\n    { headers: { 'Content-Type': 'application/json' } }\n  );\n}",
+  "status": "active",
+  "created_at": "2024-01-21T10:30:00Z",
+  "updated_at": "2024-01-21T10:35:00Z",
+  "deployed_at": "2024-01-21T10:35:00Z"
+}
+```
+
+---
+
+### 创建函数
+
+<Note>
+目前，InsForge仅支持在Deno环境中运行的JavaScript/TypeScript函数。
+</Note>
+
+```
+POST /api/functions
+```
+
+### 请求正文
+
+| 字段 | 类型 | 必需 | 说明 |
+|-------|------|----------|-------------|
+| `name` | string | 是 | 函数的显示名称 |
+| `code` | string | 是 | JavaScript/TypeScript代码 |
+| `slug` | string | 否 | URL友好的标识符（如果未提供，则自动生成） |
+| `description` | string | 否 | 函数的说明 |
+| `status` | string | 否 | `draft`或`active`（默认值：`active`） |
+
+### 示例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/functions" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Hello World Function",
+    "slug": "hello-world",
+    "description": "Returns a personalized greeting",
+    "code": "export default async function(request) {\n  const { name = \"World\" } = await request.json();\n  return new Response(\n    JSON.stringify({ message: `Hello, ${name}!` }),\n    { headers: { \"Content-Type\": \"application/json\" } }\n  );\n}",
+    "status": "active"
+  }'
+```
+
+### 响应
+
+```json
+{
+  "success": true,
+  "function": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "slug": "hello-world",
+    "name": "Hello World Function",
+    "description": "Returns a personalized greeting",
+    "status": "active",
+    "created_at": "2024-01-21T10:30:00Z"
+  }
+}
+```
+
+---
+
+### 更新函数
+
+```
+PUT /api/functions/{slug}
+```
+
+### 请求正文
+
+| 字段 | 类型 | 必需 | 说明 |
+|-------|------|----------|-------------|
+| `name` | string | 否 | 更新的显示名称 |
+| `code` | string | 否 | 更新的函数代码 |
+| `description` | string | 否 | 更新的说明 |
+| `status` | string | 否 | `draft`、`active`或`error` |
+
+### 示例
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/functions/hello-world" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Hello World Function v2",
+    "code": "export default async function(request) {\n  const { name = \"World\" } = await request.json();\n  return new Response(\n    JSON.stringify({ message: `Hello, ${name}! Welcome to v2.`, version: 2 }),\n    { headers: { \"Content-Type\": \"application/json\" } }\n  );\n}"
+  }'
+```
+
+### 响应
+
+```json
+{
+  "success": true,
+  "function": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "slug": "hello-world",
+    "name": "Hello World Function v2",
+    "description": "Returns a personalized greeting",
+    "status": "active",
+    "updated_at": "2024-01-21T11:00:00Z"
+  }
+}
+```
+
+---
+
+### 删除函数
+
+```
+DELETE /api/functions/{slug}
+```
+
+### 示例
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/functions/old-function" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+```
+
+### 响应
+
+```json
+{
+  "success": true,
+  "message": "Function old-function deleted successfully"
+}
+```
+
+---
+
+## 函数代码结构
+
+函数必须导出一个接收`Request`对象并返回`Response`的默认异步函数：
+
+```javascript
+export default async function(request) {
+  // Parse request body
+  const body = await request.json();
+
+  // Process request
+  const result = { message: `Hello, ${body.name}!` };
+
+  // Return response
+  return new Response(
+    JSON.stringify(result),
+    {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200
+    }
+  );
+}
+```
+
+### 访问请求数据
+
+```javascript
+export default async function(request) {
+  // Get JSON body
+  const body = await request.json();
+
+  // Get headers
+  const authHeader = request.headers.get('Authorization');
+
+  // Get query parameters
+  const url = new URL(request.url);
+  const param = url.searchParams.get('param');
+
+  // Get request method
+  const method = request.method;
+
+  return new Response(JSON.stringify({ body, authHeader, param, method }));
+}
+```
+
+---
+
+## 函数状态
+
+| 状态 | 说明 |
+|--------|-------------|
+| `draft` | 函数已保存但未部署 |
+| `active` | 函数已部署并可以调用 |
+| `error` | 函数有部署错误 |
+
+---
+
+## 错误响应
+
+### 找不到函数（404）
+
+```json
+{
+  "error": "Function not found"
+}
+```
+
+### 函数不活跃（404）
+
+```json
+{
+  "error": "Function not found or not active"
+}
+```
+
+### 执行错误（502）
+
+当函数运行时无法到达时（自托管：本地Deno运行时宕机；云端：子托管代理失败）：
+
+```json
+{
+  "error": "Failed to proxy function"
+}
+```
+
+### 函数运行时错误（500）
+
+当函数代码抛出错误时：
+
+```json
+{
+  "error": "Function execution failed",
+  "message": "TypeError: Cannot read property 'name' of undefined"
+}
+```
+
+### Slug已存在（409）
+
+```json
+{
+  "error": "Function with this slug already exists",
+  "details": "duplicate key value violates unique constraint"
+}
+```
+
+### 检测到危险代码（400）
+
+```json
+{
+  "error": "Code contains potentially dangerous patterns",
+  "pattern": "/Deno\\.run/i"
+}
+```

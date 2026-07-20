@@ -1,4 +1,5 @@
 import { Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@insforge/ui';
 import { DatabaseTemplate } from '#features/database/templates';
 import { TemplateCard } from './TemplateCard';
@@ -14,16 +15,21 @@ export function TablesEmptyState({
   onCreateTable,
   onTemplateClick,
 }: TablesEmptyStateProps) {
+  const { t } = useTranslation('chrome');
   return (
     <div className="flex h-full w-full justify-center overflow-y-auto bg-[rgb(var(--semantic-1))]">
       <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-6 px-4 pb-10 pt-8 sm:px-6 sm:pt-10 lg:px-10">
-        <h2 className="text-2xl font-medium leading-8 text-foreground">Create Your First Table</h2>
+        <h2 className="text-2xl font-medium leading-8 text-foreground">
+          {t('database.createFirstTable')}
+        </h2>
         <Button className="h-8 w-fit gap-0 rounded px-1.5" onClick={onCreateTable}>
           <Plus className="h-5 w-5" />
-          <span className="px-1 text-sm font-medium leading-5">Create Table</span>
+          <span className="px-1 text-sm font-medium leading-5">{t('database.createTable')}</span>
         </Button>
         <div className="flex flex-col gap-3">
-          <p className="text-sm leading-6 text-muted-foreground">or choose a template to start</p>
+          <p className="text-sm leading-6 text-muted-foreground">
+            {t('database.orChooseTemplate')}
+          </p>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {templates.map((template) => (
               <TemplateCard

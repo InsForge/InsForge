@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, MoreVertical, Pencil, Trash2, Loader2 } from 'lucide-react';
 import {
   Button,
@@ -25,6 +26,7 @@ interface EnvVarRowProps {
 }
 
 export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProps) {
+  const { t } = useTranslation('chrome');
   const [isValueVisible, setIsValueVisible] = useState(false);
   const [fetchedValue, setFetchedValue] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -58,7 +60,7 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
       setFetchedValue(data.value);
       setIsValueVisible(true);
     } catch {
-      setError('Failed to fetch value');
+      setError(t('deployments.fetchValueFailed', { defaultValue: 'Failed to fetch value' }));
     } finally {
       setIsLoading(false);
     }
@@ -110,7 +112,11 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
             onClick={() => void handleToggleValue()}
             disabled={isLoading}
             className="h-6 w-6 p-1 text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-600 shrink-0"
-            title={isValueVisible ? 'Hide value' : 'Show value'}
+            title={
+              isValueVisible
+                ? t('deployments.hideValue', { defaultValue: 'Hide value' })
+                : t('deployments.showValue', { defaultValue: 'Show value' })
+            }
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -132,7 +138,11 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <p>{copied ? 'Copied!' : 'Click to Copy'}</p>
+                  <p>
+                    {copied
+                      ? t('deployments.copiedTooltip', { defaultValue: 'Copied!' })
+                      : t('deployments.clickToCopy', { defaultValue: 'Click to Copy' })}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -142,7 +152,11 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
                 'text-[13px] truncate',
                 error ? 'text-red-500 dark:text-red-400' : 'text-neutral-400 dark:text-neutral-500'
               )}
-              title={error ? error : 'Click eye icon to reveal'}
+              title={
+                error
+                  ? error
+                  : t('deployments.clickEyeToReveal', { defaultValue: 'Click eye icon to reveal' })
+              }
             >
               {error || maskedValue}
             </span>
@@ -171,11 +185,11 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleEditClick}>
                 <Pencil className="h-4 w-4 mr-2" />
-                Edit
+                {t('deployments.edit', { defaultValue: 'Edit' })}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleDeleteClick} className="text-destructive">
                 <Trash2 className="h-4 w-4 mr-2" />
-                Delete
+                {t('deployments.delete', { defaultValue: 'Delete' })}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

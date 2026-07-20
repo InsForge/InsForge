@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, CirclePlus } from 'lucide-react';
 import { useSchedules } from '#features/functions/hooks/useSchedules';
 import {
@@ -24,6 +25,7 @@ import RefreshIcon from '#assets/icons/refresh.svg?react';
 const PAGE_SIZE = 50;
 
 export default function SchedulesPage() {
+  const { t } = useTranslation('chrome');
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
@@ -100,10 +102,14 @@ export default function SchedulesPage() {
       const schedule = schedules.find((s) => s.id === scheduleId);
       try {
         const confirmed = await confirm({
-          title: 'Delete Schedule',
-          description: `Are you sure you want to delete the schedule "${schedule?.name}"? This action cannot be undone.`,
-          confirmText: 'Delete',
-          cancelText: 'Cancel',
+          title: t('functions.deleteScheduleTitle', { defaultValue: 'Delete Schedule' }),
+          description: t('functions.deleteScheduleConfirm', {
+            name: schedule?.name,
+            defaultValue:
+              'Are you sure you want to delete the schedule "{{name}}"? This action cannot be undone.',
+          }),
+          confirmText: t('functions.delete', { defaultValue: 'Delete' }),
+          cancelText: t('functions.cancel', { defaultValue: 'Cancel' }),
           destructive: true,
         });
 
@@ -116,7 +122,7 @@ export default function SchedulesPage() {
         console.error('delete schedule error', err);
       }
     },
-    [schedules, confirm, deleteScheduleFn]
+    [schedules, confirm, deleteScheduleFn, t]
   );
 
   const handleEditSchedule = useCallback((scheduleId: string) => {
@@ -203,7 +209,9 @@ export default function SchedulesPage() {
       <TableHeader
         leftContent={
           <div className="flex flex-1 items-center overflow-clip">
-            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Schedules</h1>
+            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
+              {t('functions.schedules', { defaultValue: 'Schedules' })}
+            </h1>
             <div className="flex h-5 w-5 shrink-0 items-center justify-center">
               <div className="h-5 w-px bg-[var(--alpha-8)]" />
             </div>
@@ -221,7 +229,11 @@ export default function SchedulesPage() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">
-                  <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                  <p>
+                    {isRefreshing
+                      ? t('functions.refreshing', { defaultValue: 'Refreshing...' })
+                      : t('functions.refresh', { defaultValue: 'Refresh' })}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -234,21 +246,27 @@ export default function SchedulesPage() {
               className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
             >
               <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
-              <span className="px-1 text-sm font-medium leading-5">Add Schedule</span>
+              <span className="px-1 text-sm font-medium leading-5">
+                {t('functions.addSchedule', { defaultValue: 'Add Schedule' })}
+              </span>
             </Button>
           </div>
         }
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}
         searchDebounceTime={300}
-        searchPlaceholder="Search schedules"
+        searchPlaceholder={t('functions.searchSchedules', { defaultValue: 'Search schedules' })}
       />
 
       {/* Error Alert */}
       {schedulesError && (
         <div className="px-3 pt-3">
           <Alert variant="destructive">
-            <AlertDescription>Failed to load schedules. Please try again.</AlertDescription>
+            <AlertDescription>
+              {t('functions.failedToLoadSchedules', {
+                defaultValue: 'Failed to load schedules. Please try again.',
+              })}
+            </AlertDescription>
           </Alert>
         </div>
       )}
@@ -267,12 +285,24 @@ export default function SchedulesPage() {
           className={`sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3 ${isScrolled ? 'border-b border-[var(--alpha-8)]' : ''}`}
         >
           <div className="flex items-center h-8 pl-2 text-sm text-muted-foreground">
-            <div className="flex-1 py-1.5 px-2.5">Name</div>
-            <div className="flex-[2] py-1.5 px-2.5">Function URL</div>
-            <div className="flex-1 py-1.5 px-2.5">Next Run</div>
-            <div className="flex-1 py-1.5 px-2.5">Last Run</div>
-            <div className="flex-1 py-1.5 px-2.5">Created</div>
-            <div className="w-[60px] py-1.5 px-2.5">Active</div>
+            <div className="flex-1 py-1.5 px-2.5">
+              {t('functions.name', { defaultValue: 'Name' })}
+            </div>
+            <div className="flex-[2] py-1.5 px-2.5">
+              {t('functions.functionUrl', { defaultValue: 'Function URL' })}
+            </div>
+            <div className="flex-1 py-1.5 px-2.5">
+              {t('functions.nextRun', { defaultValue: 'Next Run' })}
+            </div>
+            <div className="flex-1 py-1.5 px-2.5">
+              {t('functions.lastRun', { defaultValue: 'Last Run' })}
+            </div>
+            <div className="flex-1 py-1.5 px-2.5">
+              {t('functions.created', { defaultValue: 'Created' })}
+            </div>
+            <div className="w-[60px] py-1.5 px-2.5">
+              {t('functions.active', { defaultValue: 'Active' })}
+            </div>
             <div className="w-12" />
           </div>
         </div>
@@ -314,10 +344,14 @@ export default function SchedulesPage() {
                 disabled={currentPage === 1}
                 className="text-muted-foreground hover:text-foreground"
               >
-                Prev
+                {t('functions.prev', { defaultValue: 'Prev' })}
               </Button>
               <div className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages}
+                {t('functions.pageOf', {
+                  current: currentPage,
+                  total: totalPages,
+                  defaultValue: 'Page {{current}} of {{total}}',
+                })}
               </div>
               <Button
                 variant="ghost"
@@ -325,7 +359,7 @@ export default function SchedulesPage() {
                 disabled={currentPage === totalPages}
                 className="text-muted-foreground hover:text-foreground"
               >
-                Next
+                {t('functions.next', { defaultValue: 'Next' })}
               </Button>
             </div>
           )}
@@ -336,7 +370,9 @@ export default function SchedulesPage() {
           <div className="absolute inset-0 bg-[rgb(var(--semantic-1))] flex items-center justify-center z-50">
             <div className="flex items-center gap-1">
               <div className="w-5 h-5 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-muted-foreground">Loading</span>
+              <span className="text-sm text-muted-foreground">
+                {t('functions.loading', { defaultValue: 'Loading' })}
+              </span>
             </div>
           </div>
         )}

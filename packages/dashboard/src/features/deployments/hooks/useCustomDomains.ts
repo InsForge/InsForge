@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { deploymentsService } from '#features/deployments/services/deployments.service';
 import { useToast } from '@insforge/ui';
 import { isInsForgeCloudProject } from '#lib/utils/utils';
@@ -11,6 +12,7 @@ const QUERY_KEY = ['deployments', 'custom-domains'];
  * each backed by React Query mutations with toast feedback.
  */
 export function useCustomDomains() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const isCloudProject = isInsForgeCloudProject();
@@ -32,13 +34,19 @@ export function useCustomDomains() {
     mutationFn: (domain: string) => deploymentsService.addCustomDomain(domain),
     onSuccess: (domain) => {
       showToast(
-        `Domain ${domain.domain} added. Add the required DNS records to activate it.`,
+        t('deployments.domainAdded', {
+          defaultValue: 'Domain {{domain}} added. Add the required DNS records to activate it.',
+          domain: domain.domain,
+        }),
         'success'
       );
       void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to add domain', 'error');
+      showToast(
+        error.message || t('deployments.addDomainFailed', { defaultValue: 'Failed to add domain' }),
+        'error'
+      );
     },
   });
 
@@ -46,30 +54,55 @@ export function useCustomDomains() {
     mutationFn: (domain: string) => deploymentsService.verifyCustomDomain(domain),
     onSuccess: (result) => {
       if (result.verified && !result.misconfigured) {
-        showToast('Domain verified successfully!', 'success');
+        showToast(
+          t('deployments.domainVerified', { defaultValue: 'Domain verified successfully!' }),
+          'success'
+        );
       } else if (result.misconfigured) {
-        showToast('Domain ownership is verified, but DNS is not pointing to Vercel yet.', 'error');
+        showToast(
+          t('deployments.domainDnsNotPointing', {
+            defaultValue: 'Domain ownership is verified, but DNS is not pointing to Vercel yet.',
+          }),
+          'error'
+        );
       } else {
         showToast(
-          'Verification is still pending. Check the required DNS records and try again.',
+          t('deployments.verificationPending', {
+            defaultValue:
+              'Verification is still pending. Check the required DNS records and try again.',
+          }),
           'error'
         );
       }
       void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to verify domain', 'error');
+      showToast(
+        error.message ||
+          t('deployments.verifyDomainFailed', { defaultValue: 'Failed to verify domain' }),
+        'error'
+      );
     },
   });
 
   const removeMutation = useMutation({
     mutationFn: (domain: string) => deploymentsService.removeCustomDomain(domain),
     onSuccess: (_data, domain) => {
-      showToast(`Domain ${domain} removed`, 'success');
+      showToast(
+        t('deployments.domainRemoved', {
+          defaultValue: 'Domain {{domain}} removed',
+          domain,
+        }),
+        'success'
+      );
       void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to remove domain', 'error');
+      showToast(
+        error.message ||
+          t('deployments.removeDomainFailed', { defaultValue: 'Failed to remove domain' }),
+        'error'
+      );
     },
   });
 

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CopyButton, cn } from '@insforge/ui';
 import { useProjectId } from '#lib/hooks/useMetadata';
 
@@ -7,6 +8,7 @@ interface DTestInstallCliSectionProps {
 }
 
 export function DTestInstallCliSection({ className }: DTestInstallCliSectionProps) {
+  const { t } = useTranslation('chrome');
   const { projectId } = useProjectId();
 
   const command = useMemo(
@@ -22,12 +24,14 @@ export function DTestInstallCliSection({ className }: DTestInstallCliSectionProp
         className
       )}
     >
-      <h2 className="text-base font-medium leading-7 text-foreground">Use InsForge with CLI</h2>
+      <h2 className="text-base font-medium leading-7 text-foreground">
+        {t('overview.useInsForgeWithCli', { defaultValue: 'Use InsForge with CLI' })}
+      </h2>
 
       <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-1 p-3">
         <div className="flex items-center justify-between">
           <span className="rounded bg-[var(--alpha-8)] px-2 py-0.5 text-xs font-medium leading-4 text-muted-foreground">
-            Command
+            {t('overview.commandLabel', { defaultValue: 'Command' })}
           </span>
           <CopyButton text={command} showText={false} disabled={!canCopy} className="shrink-0" />
         </div>

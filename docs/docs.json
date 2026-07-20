@@ -25,278 +25,1205 @@
   },
   "favicon": "/favicon.png",
   "navigation": {
-    "tabs": [
+    "languages": [
       {
-        "tab": "Docs",
-        "groups": [
+        "language": "en",
+        "default": true,
+        "tabs": [
           {
-            "group": "Getting Started",
-            "pages": [
-              "introduction",
-              "products",
+            "tab": "Docs",
+            "groups": [
               {
-                "group": "Quickstart",
+                "group": "Getting Started",
+                "pages": [
+                  "introduction",
+                  "products",
+                  {
+                    "group": "Quickstart",
+                    "expanded": true,
+                    "pages": [
+                      "quickstart",
+                      "mcp-setup"
+                    ]
+                  }
+                ]
+              },
+              {
+                "group": "Products",
                 "expanded": true,
-                "pages": ["quickstart", "mcp-setup"]
+                "pages": [
+                  {
+                    "group": "Database",
+                    "pages": [
+                      "core-concepts/database/overview",
+                      "core-concepts/database/migrations",
+                      "core-concepts/database/backups",
+                      "core-concepts/database/pgvector"
+                    ]
+                  },
+                  {
+                    "group": "Authentication",
+                    "pages": [
+                      "core-concepts/authentication/overview"
+                    ]
+                  },
+                  {
+                    "group": "Storage",
+                    "pages": [
+                      "core-concepts/storage/overview",
+                      "core-concepts/storage/s3-compatibility"
+                    ]
+                  },
+                  {
+                    "group": "Realtime",
+                    "pages": [
+                      "core-concepts/realtime/overview"
+                    ]
+                  },
+                  {
+                    "group": "Edge Functions",
+                    "pages": [
+                      "core-concepts/functions/overview",
+                      "core-concepts/functions/schedules"
+                    ]
+                  },
+                  {
+                    "group": "Model Gateway",
+                    "pages": [
+                      "core-concepts/ai/overview"
+                    ]
+                  },
+                  {
+                    "group": "Sites",
+                    "pages": [
+                      "core-concepts/sites/overview"
+                    ]
+                  },
+                  {
+                    "group": "Messaging",
+                    "pages": [
+                      "core-concepts/messaging/overview",
+                      "core-concepts/messaging/custom-smtp"
+                    ]
+                  },
+                  {
+                    "group": "Payments",
+                    "pages": [
+                      "core-concepts/payments/overview",
+                      "core-concepts/payments/stripe",
+                      "core-concepts/payments/razorpay"
+                    ]
+                  },
+                  {
+                    "group": "Custom Compute",
+                    "pages": [
+                      "core-concepts/compute/overview"
+                    ]
+                  },
+                  {
+                    "group": "Analytics",
+                    "pages": [
+                      "core-concepts/analytics/overview"
+                    ]
+                  },
+                  {
+                    "group": "Web Scraper",
+                    "pages": [
+                      "core-concepts/webscraper/overview"
+                    ]
+                  }
+                ]
+              },
+              {
+                "group": "Integrations",
+                "pages": [
+                  "integrations/overview",
+                  "integrations/clerk",
+                  "integrations/auth0",
+                  "integrations/workos",
+                  "integrations/kinde",
+                  "integrations/stytch",
+                  "integrations/better-auth"
+                ]
+              },
+              {
+                "group": "Agent-Native Initiatives",
+                "pages": [
+                  "agent-native/overview",
+                  "agent-native/vscode-extension",
+                  "agent-native/cli-harness",
+                  "agent-native/diagnostics",
+                  "agent-native/config-as-code",
+                  "agent-native/branching"
+                ]
+              },
+              {
+                "group": "Referral Program",
+                "root": "referral-program",
+                "pages": []
+              },
+              {
+                "group": "Partnership",
+                "pages": [
+                  "partnership",
+                  "oauth-server"
+                ]
+              },
+              {
+                "group": "Self-Hosting",
+                "pages": [
+                  "deployment/deployment-security-guide",
+                  "deployment/deploy-to-aws-ec2",
+                  "deployment/deploy-to-azure-virtual-machines",
+                  "deployment/deploy-to-containarium",
+                  "deployment/deploy-to-google-cloud-compute-engine"
+                ]
+              },
+              {
+                "group": "Resources",
+                "pages": [
+                  "alternatives",
+                  "pricing",
+                  "showcase"
+                ]
+              },
+              {
+                "group": "FAQ",
+                "pages": [
+                  "faq"
+                ]
               }
             ]
           },
           {
-            "group": "Products",
-            "expanded": true,
-            "pages": [
+            "tab": "SDK & Examples",
+            "groups": [
               {
-                "group": "Database",
+                "group": "TypeScript",
+                "icon": "js",
                 "pages": [
-                  "core-concepts/database/overview",
-                  "core-concepts/database/migrations",
-                  "core-concepts/database/pgvector"
+                  "sdks/typescript/overview",
+                  "sdks/typescript/database",
+                  "sdks/typescript/auth",
+                  "sdks/typescript/storage",
+                  "sdks/typescript/functions",
+                  "sdks/typescript/ai",
+                  "sdks/typescript/realtime",
+                  "sdks/typescript/email",
+                  {
+                    "group": "Payments",
+                    "pages": [
+                      "sdks/typescript/payments",
+                      "sdks/typescript/payments-stripe",
+                      "sdks/typescript/payments-razorpay"
+                    ]
+                  },
+                  {
+                    "group": "Framework Guides",
+                    "pages": [
+                      "examples/framework-guides/nextjs",
+                      "examples/framework-guides/react",
+                      "examples/framework-guides/vue",
+                      "examples/framework-guides/nuxt",
+                      "examples/framework-guides/svelte"
+                    ]
+                  }
                 ]
+              },
+              {
+                "group": "Swift",
+                "icon": "swift",
+                "pages": [
+                  "sdks/swift/overview",
+                  "sdks/swift/database",
+                  "sdks/swift/auth",
+                  "sdks/swift/storage",
+                  "sdks/swift/functions",
+                  "sdks/swift/ai",
+                  "sdks/swift/realtime"
+                ]
+              },
+              {
+                "group": "Kotlin",
+                "icon": "android",
+                "pages": [
+                  "sdks/kotlin/overview",
+                  "sdks/kotlin/database",
+                  "sdks/kotlin/auth",
+                  "sdks/kotlin/storage",
+                  "sdks/kotlin/functions",
+                  "sdks/kotlin/ai",
+                  "sdks/kotlin/realtime"
+                ]
+              },
+              {
+                "group": "REST API",
+                "icon": "code",
+                "pages": [
+                  "sdks/rest/overview",
+                  "sdks/rest/database",
+                  "sdks/rest/auth",
+                  "sdks/rest/storage",
+                  "sdks/rest/functions",
+                  "sdks/rest/ai",
+                  "sdks/rest/realtime"
+                ]
+              },
+              {
+                "group": "Examples",
+                "pages": [
+                  "examples/overview"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "API Reference",
+            "groups": [
+              {
+                "group": "Tables",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
               },
               {
                 "group": "Authentication",
-                "pages": [
-                  "core-concepts/authentication/overview"
-                ]
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/auth.yaml"
+              },
+              {
+                "group": "Records",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/records.yaml"
               },
               {
                 "group": "Storage",
-                "pages": [
-                  "core-concepts/storage/overview",
-                  "core-concepts/storage/s3-compatibility"
-                ]
-              },
-              {
-                "group": "Realtime",
-                "pages": [
-                  "core-concepts/realtime/overview"
-                ]
-              },
-              {
-                "group": "Edge Functions",
-                "pages": [
-                  "core-concepts/functions/overview",
-                  "core-concepts/functions/schedules"
-                ]
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/storage.yaml"
               },
               {
                 "group": "Model Gateway",
-                "pages": [
-                  "core-concepts/ai/overview"
-                ]
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/ai.yaml"
               },
               {
-                "group": "Sites",
-                "pages": [
-                  "core-concepts/sites/overview"
-                ]
+                "group": "Functions",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/functions.yaml"
+              },
+              {
+                "group": "Realtime",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/realtime.yaml"
               },
               {
                 "group": "Messaging",
-                "pages": [
-                  "core-concepts/messaging/overview",
-                  "core-concepts/messaging/custom-smtp"
-                ]
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/email.yaml"
               },
               {
                 "group": "Payments",
-                "pages": [
-                  "core-concepts/payments/overview",
-                  "core-concepts/payments/stripe",
-                  "core-concepts/payments/razorpay"
-                ]
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/payments.yaml"
               },
               {
-                "group": "Custom Compute",
-                "pages": [
-                  "core-concepts/compute/overview"
-                ]
+                "group": "Secrets",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/secrets.yaml"
               },
               {
-                "group": "Analytics",
-                "pages": [
-                  "core-concepts/analytics/overview"
-                ]
+                "group": "Logs",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
+              },
+              {
+                "group": "Metadata",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/metadata.yaml"
+              },
+              {
+                "group": "Health",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
               }
-            ]
-          },
-          {
-            "group": "Agent-Native Initiatives",
-            "pages": [
-              "agent-native/overview",
-              "agent-native/vscode-extension",
-              "agent-native/cli-harness",
-              "agent-native/diagnostics",
-              "agent-native/config-as-code",
-              "agent-native/branching"
-            ]
-          },
-          {
-            "group": "Referral Program",
-            "root": "referral-program",
-            "pages": []
-          },
-          {
-            "group": "Partnership",
-            "pages": [
-              "partnership",
-              "oauth-server"
-            ]
-          },
-          {
-            "group": "Self-Hosting",
-            "pages": [
-              "deployment/deployment-security-guide",
-              "deployment/deploy-to-aws-ec2",
-              "deployment/deploy-to-azure-virtual-machines",
-              "deployment/deploy-to-containarium",
-              "deployment/deploy-to-google-cloud-compute-engine"
-            ]
-          },
-          {
-            "group": "Resources",
-            "pages": [
-              "alternatives",
-              "pricing",
-              "showcase"
             ]
           }
         ]
       },
       {
-        "tab": "SDK & Examples",
-        "groups": [
+        "language": "zh",
+        "tabs": [
           {
-            "group": "TypeScript",
-            "icon": "js",
-            "pages": [
-              "sdks/typescript/overview",
-              "sdks/typescript/database",
-              "sdks/typescript/auth",
-              "sdks/typescript/storage",
-              "sdks/typescript/functions",
-              "sdks/typescript/ai",
-              "sdks/typescript/realtime",
-              "sdks/typescript/email",
+            "tab": "文档",
+            "groups": [
               {
-                "group": "Payments",
+                "group": "快速开始",
                 "pages": [
-                  "sdks/typescript/payments",
-                  "sdks/typescript/payments-stripe",
-                  "sdks/typescript/payments-razorpay"
+                  "zh/introduction",
+                  "zh/products",
+                  {
+                    "group": "快速上手",
+                    "expanded": true,
+                    "pages": [
+                      "zh/quickstart",
+                      "zh/mcp-setup"
+                    ]
+                  }
                 ]
               },
               {
-                "group": "Framework Guides",
+                "group": "Products",
+                "expanded": true,
                 "pages": [
-                  "examples/framework-guides/nextjs",
-                  "examples/framework-guides/react",
-                  "examples/framework-guides/vue",
-                  "examples/framework-guides/nuxt",
-                  "examples/framework-guides/svelte"
+                  {
+                    "group": "数据库",
+                    "pages": [
+                      "zh/core-concepts/database/overview",
+                      "zh/core-concepts/database/migrations",
+                      "zh/core-concepts/database/backups",
+                      "zh/core-concepts/database/pgvector"
+                    ]
+                  },
+                  {
+                    "group": "身份认证",
+                    "pages": [
+                      "zh/core-concepts/authentication/overview"
+                    ]
+                  },
+                  {
+                    "group": "存储",
+                    "pages": [
+                      "zh/core-concepts/storage/overview",
+                      "zh/core-concepts/storage/s3-compatibility"
+                    ]
+                  },
+                  {
+                    "group": "实时",
+                    "pages": [
+                      "zh/core-concepts/realtime/overview"
+                    ]
+                  },
+                  {
+                    "group": "边缘函数",
+                    "pages": [
+                      "zh/core-concepts/functions/overview",
+                      "zh/core-concepts/functions/schedules"
+                    ]
+                  },
+                  {
+                    "group": "模型网关",
+                    "pages": [
+                      "zh/core-concepts/ai/overview"
+                    ]
+                  },
+                  {
+                    "group": "站点",
+                    "pages": [
+                      "zh/core-concepts/sites/overview"
+                    ]
+                  },
+                  {
+                    "group": "消息",
+                    "pages": [
+                      "zh/core-concepts/messaging/overview",
+                      "zh/core-concepts/messaging/custom-smtp"
+                    ]
+                  },
+                  {
+                    "group": "支付",
+                    "pages": [
+                      "zh/core-concepts/payments/overview",
+                      "zh/core-concepts/payments/stripe",
+                      "zh/core-concepts/payments/razorpay"
+                    ]
+                  },
+                  {
+                    "group": "Custom Compute",
+                    "pages": [
+                      "zh/core-concepts/compute/overview"
+                    ]
+                  },
+                  {
+                    "group": "分析",
+                    "pages": [
+                      "zh/core-concepts/analytics/overview"
+                    ]
+                  },
+                  {
+                    "group": "网页抓取",
+                    "pages": [
+                      "zh/core-concepts/webscraper/overview"
+                    ]
+                  }
+                ]
+              },
+              {
+                "group": "Agent-Native Initiatives",
+                "pages": [
+                  "zh/agent-native/overview",
+                  "zh/agent-native/vscode-extension",
+                  "zh/agent-native/cli-harness",
+                  "zh/agent-native/diagnostics",
+                  "zh/agent-native/config-as-code",
+                  "zh/agent-native/branching"
+                ]
+              },
+              {
+                "group": "Referral Program",
+                "root": "referral-program",
+                "pages": []
+              },
+              {
+                "group": "Partnership",
+                "pages": [
+                  "zh/partnership",
+                  "zh/oauth-server"
+                ]
+              },
+              {
+                "group": "Self-Hosting",
+                "pages": [
+                  "zh/deployment/deployment-security-guide",
+                  "zh/deployment/deploy-to-aws-ec2",
+                  "zh/deployment/deploy-to-azure-virtual-machines",
+                  "zh/deployment/deploy-to-containarium",
+                  "zh/deployment/deploy-to-google-cloud-compute-engine"
+                ]
+              },
+              {
+                "group": "Resources",
+                "pages": [
+                  "zh/alternatives",
+                  "zh/pricing",
+                  "zh/showcase"
+                ]
+              },
+              {
+                "group": "常见问题",
+                "pages": [
+                  "zh/faq"
                 ]
               }
             ]
           },
           {
-            "group": "Swift",
-            "icon": "swift",
-            "pages": [
-              "sdks/swift/overview",
-              "sdks/swift/database",
-              "sdks/swift/auth",
-              "sdks/swift/storage",
-              "sdks/swift/functions",
-              "sdks/swift/ai",
-              "sdks/swift/realtime"
+            "tab": "SDK 与示例",
+            "groups": [
+              {
+                "group": "TypeScript",
+                "icon": "js",
+                "pages": [
+                  "zh/sdks/typescript/overview",
+                  "zh/sdks/typescript/database",
+                  "zh/sdks/typescript/auth",
+                  "zh/sdks/typescript/storage",
+                  "zh/sdks/typescript/functions",
+                  "zh/sdks/typescript/ai",
+                  "zh/sdks/typescript/realtime",
+                  "zh/sdks/typescript/email",
+                  {
+                    "group": "支付",
+                    "pages": [
+                      "zh/sdks/typescript/payments",
+                      "zh/sdks/typescript/payments-stripe",
+                      "zh/sdks/typescript/payments-razorpay"
+                    ]
+                  },
+                  {
+                    "group": "框架指南",
+                    "pages": [
+                      "zh/examples/framework-guides/nextjs",
+                      "zh/examples/framework-guides/react",
+                      "zh/examples/framework-guides/vue",
+                      "zh/examples/framework-guides/nuxt",
+                      "zh/examples/framework-guides/svelte"
+                    ]
+                  }
+                ]
+              },
+              {
+                "group": "Swift",
+                "icon": "swift",
+                "pages": [
+                  "zh/sdks/swift/overview",
+                  "zh/sdks/swift/database",
+                  "zh/sdks/swift/auth",
+                  "zh/sdks/swift/storage",
+                  "zh/sdks/swift/functions",
+                  "zh/sdks/swift/ai",
+                  "zh/sdks/swift/realtime"
+                ]
+              },
+              {
+                "group": "Kotlin",
+                "icon": "android",
+                "pages": [
+                  "zh/sdks/kotlin/overview",
+                  "zh/sdks/kotlin/database",
+                  "zh/sdks/kotlin/auth",
+                  "zh/sdks/kotlin/storage",
+                  "zh/sdks/kotlin/functions",
+                  "zh/sdks/kotlin/ai",
+                  "zh/sdks/kotlin/realtime"
+                ]
+              },
+              {
+                "group": "REST API",
+                "icon": "code",
+                "pages": [
+                  "zh/sdks/rest/overview",
+                  "zh/sdks/rest/database",
+                  "zh/sdks/rest/auth",
+                  "zh/sdks/rest/storage",
+                  "zh/sdks/rest/functions",
+                  "zh/sdks/rest/ai",
+                  "zh/sdks/rest/realtime"
+                ]
+              },
+              {
+                "group": "示例",
+                "pages": [
+                  "zh/examples/overview"
+                ]
+              }
             ]
           },
           {
-            "group": "Kotlin",
-            "icon": "android",
-            "pages": [
-              "sdks/kotlin/overview",
-              "sdks/kotlin/database",
-              "sdks/kotlin/auth",
-              "sdks/kotlin/storage",
-              "sdks/kotlin/functions",
-              "sdks/kotlin/ai",
-              "sdks/kotlin/realtime"
+            "tab": "API 参考",
+            "groups": [
+              {
+                "group": "Tables",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
+              },
+              {
+                "group": "身份认证",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/auth.yaml"
+              },
+              {
+                "group": "Records",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/records.yaml"
+              },
+              {
+                "group": "存储",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/storage.yaml"
+              },
+              {
+                "group": "模型网关",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/ai.yaml"
+              },
+              {
+                "group": "Functions",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/functions.yaml"
+              },
+              {
+                "group": "实时",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/realtime.yaml"
+              },
+              {
+                "group": "消息",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/email.yaml"
+              },
+              {
+                "group": "支付",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/payments.yaml"
+              },
+              {
+                "group": "Secrets",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/secrets.yaml"
+              },
+              {
+                "group": "Logs",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
+              },
+              {
+                "group": "Metadata",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/metadata.yaml"
+              },
+              {
+                "group": "Health",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+              }
             ]
-          },
-          {
-            "group": "REST API",
-            "icon": "code",
-            "pages": [
-              "sdks/rest/overview",
-              "sdks/rest/database",
-              "sdks/rest/auth",
-              "sdks/rest/storage",
-              "sdks/rest/functions",
-              "sdks/rest/ai",
-              "sdks/rest/realtime"
-            ]
-          },
-          {
-            "group": "Examples",
-            "pages": ["examples/overview"]
           }
         ]
       },
       {
-        "tab": "API Reference",
-        "groups": [
+        "language": "zh-Hant",
+        "tabs": [
           {
-            "group": "Tables",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
+            "tab": "文件",
+            "groups": [
+              {
+                "group": "快速開始",
+                "pages": [
+                  "zh-Hant/introduction",
+                  "zh-Hant/products",
+                  {
+                    "group": "快速上手",
+                    "expanded": true,
+                    "pages": [
+                      "zh-Hant/quickstart",
+                      "zh-Hant/mcp-setup"
+                    ]
+                  }
+                ]
+              },
+              {
+                "group": "Products",
+                "expanded": true,
+                "pages": [
+                  {
+                    "group": "資料庫",
+                    "pages": [
+                      "zh-Hant/core-concepts/database/overview",
+                      "zh-Hant/core-concepts/database/migrations",
+                      "zh-Hant/core-concepts/database/backups",
+                      "zh-Hant/core-concepts/database/pgvector"
+                    ]
+                  },
+                  {
+                    "group": "身分驗證",
+                    "pages": [
+                      "zh-Hant/core-concepts/authentication/overview"
+                    ]
+                  },
+                  {
+                    "group": "儲存",
+                    "pages": [
+                      "zh-Hant/core-concepts/storage/overview",
+                      "zh-Hant/core-concepts/storage/s3-compatibility"
+                    ]
+                  },
+                  {
+                    "group": "即時",
+                    "pages": [
+                      "zh-Hant/core-concepts/realtime/overview"
+                    ]
+                  },
+                  {
+                    "group": "邊緣函式",
+                    "pages": [
+                      "zh-Hant/core-concepts/functions/overview",
+                      "zh-Hant/core-concepts/functions/schedules"
+                    ]
+                  },
+                  {
+                    "group": "模型閘道",
+                    "pages": [
+                      "zh-Hant/core-concepts/ai/overview"
+                    ]
+                  },
+                  {
+                    "group": "網站",
+                    "pages": [
+                      "zh-Hant/core-concepts/sites/overview"
+                    ]
+                  },
+                  {
+                    "group": "訊息",
+                    "pages": [
+                      "zh-Hant/core-concepts/messaging/overview",
+                      "zh-Hant/core-concepts/messaging/custom-smtp"
+                    ]
+                  },
+                  {
+                    "group": "金流",
+                    "pages": [
+                      "zh-Hant/core-concepts/payments/overview",
+                      "zh-Hant/core-concepts/payments/stripe",
+                      "zh-Hant/core-concepts/payments/razorpay"
+                    ]
+                  },
+                  {
+                    "group": "Custom Compute",
+                    "pages": [
+                      "zh-Hant/core-concepts/compute/overview"
+                    ]
+                  },
+                  {
+                    "group": "分析",
+                    "pages": [
+                      "zh-Hant/core-concepts/analytics/overview"
+                    ]
+                  },
+                  {
+                    "group": "網頁擷取",
+                    "pages": [
+                      "zh-Hant/core-concepts/webscraper/overview"
+                    ]
+                  }
+                ]
+              },
+              {
+                "group": "Agent-Native Initiatives",
+                "pages": [
+                  "zh-Hant/agent-native/overview",
+                  "zh-Hant/agent-native/vscode-extension",
+                  "zh-Hant/agent-native/cli-harness",
+                  "zh-Hant/agent-native/diagnostics",
+                  "zh-Hant/agent-native/config-as-code",
+                  "zh-Hant/agent-native/branching"
+                ]
+              },
+              {
+                "group": "Referral Program",
+                "root": "referral-program",
+                "pages": []
+              },
+              {
+                "group": "Partnership",
+                "pages": [
+                  "zh-Hant/partnership",
+                  "zh-Hant/oauth-server"
+                ]
+              },
+              {
+                "group": "Self-Hosting",
+                "pages": [
+                  "zh-Hant/deployment/deployment-security-guide",
+                  "zh-Hant/deployment/deploy-to-aws-ec2",
+                  "zh-Hant/deployment/deploy-to-azure-virtual-machines",
+                  "zh-Hant/deployment/deploy-to-containarium",
+                  "zh-Hant/deployment/deploy-to-google-cloud-compute-engine"
+                ]
+              },
+              {
+                "group": "Resources",
+                "pages": [
+                  "zh-Hant/alternatives",
+                  "zh-Hant/pricing",
+                  "zh-Hant/showcase"
+                ]
+              },
+              {
+                "group": "常見問題",
+                "pages": [
+                  "zh-Hant/faq"
+                ]
+              }
+            ]
           },
           {
-            "group": "Authentication",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/auth.yaml"
+            "tab": "SDK 與範例",
+            "groups": [
+              {
+                "group": "TypeScript",
+                "icon": "js",
+                "pages": [
+                  "zh-Hant/sdks/typescript/overview",
+                  "zh-Hant/sdks/typescript/database",
+                  "zh-Hant/sdks/typescript/auth",
+                  "zh-Hant/sdks/typescript/storage",
+                  "zh-Hant/sdks/typescript/functions",
+                  "zh-Hant/sdks/typescript/ai",
+                  "zh-Hant/sdks/typescript/realtime",
+                  "zh-Hant/sdks/typescript/email",
+                  {
+                    "group": "金流",
+                    "pages": [
+                      "zh-Hant/sdks/typescript/payments",
+                      "zh-Hant/sdks/typescript/payments-stripe",
+                      "zh-Hant/sdks/typescript/payments-razorpay"
+                    ]
+                  },
+                  {
+                    "group": "框架指南",
+                    "pages": [
+                      "zh-Hant/examples/framework-guides/nextjs",
+                      "zh-Hant/examples/framework-guides/react",
+                      "zh-Hant/examples/framework-guides/vue",
+                      "zh-Hant/examples/framework-guides/nuxt",
+                      "zh-Hant/examples/framework-guides/svelte"
+                    ]
+                  }
+                ]
+              },
+              {
+                "group": "Swift",
+                "icon": "swift",
+                "pages": [
+                  "zh-Hant/sdks/swift/overview",
+                  "zh-Hant/sdks/swift/database",
+                  "zh-Hant/sdks/swift/auth",
+                  "zh-Hant/sdks/swift/storage",
+                  "zh-Hant/sdks/swift/functions",
+                  "zh-Hant/sdks/swift/ai",
+                  "zh-Hant/sdks/swift/realtime"
+                ]
+              },
+              {
+                "group": "Kotlin",
+                "icon": "android",
+                "pages": [
+                  "zh-Hant/sdks/kotlin/overview",
+                  "zh-Hant/sdks/kotlin/database",
+                  "zh-Hant/sdks/kotlin/auth",
+                  "zh-Hant/sdks/kotlin/storage",
+                  "zh-Hant/sdks/kotlin/functions",
+                  "zh-Hant/sdks/kotlin/ai",
+                  "zh-Hant/sdks/kotlin/realtime"
+                ]
+              },
+              {
+                "group": "REST API",
+                "icon": "code",
+                "pages": [
+                  "zh-Hant/sdks/rest/overview",
+                  "zh-Hant/sdks/rest/database",
+                  "zh-Hant/sdks/rest/auth",
+                  "zh-Hant/sdks/rest/storage",
+                  "zh-Hant/sdks/rest/functions",
+                  "zh-Hant/sdks/rest/ai",
+                  "zh-Hant/sdks/rest/realtime"
+                ]
+              },
+              {
+                "group": "範例",
+                "pages": [
+                  "zh-Hant/examples/overview"
+                ]
+              }
+            ]
           },
           {
-            "group": "Records",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/records.yaml"
+            "tab": "API 參考",
+            "groups": [
+              {
+                "group": "Tables",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
+              },
+              {
+                "group": "身分驗證",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/auth.yaml"
+              },
+              {
+                "group": "Records",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/records.yaml"
+              },
+              {
+                "group": "儲存",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/storage.yaml"
+              },
+              {
+                "group": "模型閘道",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/ai.yaml"
+              },
+              {
+                "group": "Functions",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/functions.yaml"
+              },
+              {
+                "group": "即時",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/realtime.yaml"
+              },
+              {
+                "group": "訊息",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/email.yaml"
+              },
+              {
+                "group": "金流",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/payments.yaml"
+              },
+              {
+                "group": "Secrets",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/secrets.yaml"
+              },
+              {
+                "group": "Logs",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
+              },
+              {
+                "group": "Metadata",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/metadata.yaml"
+              },
+              {
+                "group": "Health",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "language": "es",
+        "tabs": [
+          {
+            "tab": "Documentación",
+            "groups": [
+              {
+                "group": "Primeros pasos",
+                "pages": [
+                  "es/introduction",
+                  "es/products",
+                  {
+                    "group": "Inicio rápido",
+                    "expanded": true,
+                    "pages": [
+                      "es/quickstart",
+                      "es/mcp-setup"
+                    ]
+                  }
+                ]
+              },
+              {
+                "group": "Products",
+                "expanded": true,
+                "pages": [
+                  {
+                    "group": "Base de datos",
+                    "pages": [
+                      "es/core-concepts/database/overview",
+                      "es/core-concepts/database/migrations",
+                      "es/core-concepts/database/backups",
+                      "es/core-concepts/database/pgvector"
+                    ]
+                  },
+                  {
+                    "group": "Autenticación",
+                    "pages": [
+                      "es/core-concepts/authentication/overview"
+                    ]
+                  },
+                  {
+                    "group": "Almacenamiento",
+                    "pages": [
+                      "es/core-concepts/storage/overview",
+                      "es/core-concepts/storage/s3-compatibility"
+                    ]
+                  },
+                  {
+                    "group": "Tiempo real",
+                    "pages": [
+                      "es/core-concepts/realtime/overview"
+                    ]
+                  },
+                  {
+                    "group": "Funciones edge",
+                    "pages": [
+                      "es/core-concepts/functions/overview",
+                      "es/core-concepts/functions/schedules"
+                    ]
+                  },
+                  {
+                    "group": "Model Gateway",
+                    "pages": [
+                      "es/core-concepts/ai/overview"
+                    ]
+                  },
+                  {
+                    "group": "Sitios",
+                    "pages": [
+                      "es/core-concepts/sites/overview"
+                    ]
+                  },
+                  {
+                    "group": "Mensajería",
+                    "pages": [
+                      "es/core-concepts/messaging/overview",
+                      "es/core-concepts/messaging/custom-smtp"
+                    ]
+                  },
+                  {
+                    "group": "Pagos",
+                    "pages": [
+                      "es/core-concepts/payments/overview",
+                      "es/core-concepts/payments/stripe",
+                      "es/core-concepts/payments/razorpay"
+                    ]
+                  },
+                  {
+                    "group": "Custom Compute",
+                    "pages": [
+                      "es/core-concepts/compute/overview"
+                    ]
+                  },
+                  {
+                    "group": "Analítica",
+                    "pages": [
+                      "es/core-concepts/analytics/overview"
+                    ]
+                  },
+                  {
+                    "group": "Web Scraper",
+                    "pages": [
+                      "es/core-concepts/webscraper/overview"
+                    ]
+                  }
+                ]
+              },
+              {
+                "group": "Agent-Native Initiatives",
+                "pages": [
+                  "es/agent-native/overview",
+                  "es/agent-native/vscode-extension",
+                  "es/agent-native/cli-harness",
+                  "es/agent-native/diagnostics",
+                  "es/agent-native/config-as-code",
+                  "es/agent-native/branching"
+                ]
+              },
+              {
+                "group": "Referral Program",
+                "root": "referral-program",
+                "pages": []
+              },
+              {
+                "group": "Partnership",
+                "pages": [
+                  "es/partnership",
+                  "es/oauth-server"
+                ]
+              },
+              {
+                "group": "Self-Hosting",
+                "pages": [
+                  "es/deployment/deployment-security-guide",
+                  "es/deployment/deploy-to-aws-ec2",
+                  "es/deployment/deploy-to-azure-virtual-machines",
+                  "es/deployment/deploy-to-containarium",
+                  "es/deployment/deploy-to-google-cloud-compute-engine"
+                ]
+              },
+              {
+                "group": "Resources",
+                "pages": [
+                  "es/alternatives",
+                  "es/pricing",
+                  "es/showcase"
+                ]
+              },
+              {
+                "group": "Preguntas frecuentes",
+                "pages": [
+                  "es/faq"
+                ]
+              }
+            ]
           },
           {
-            "group": "Storage",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/storage.yaml"
+            "tab": "SDK y ejemplos",
+            "groups": [
+              {
+                "group": "TypeScript",
+                "icon": "js",
+                "pages": [
+                  "es/sdks/typescript/overview",
+                  "es/sdks/typescript/database",
+                  "es/sdks/typescript/auth",
+                  "es/sdks/typescript/storage",
+                  "es/sdks/typescript/functions",
+                  "es/sdks/typescript/ai",
+                  "es/sdks/typescript/realtime",
+                  "es/sdks/typescript/email",
+                  {
+                    "group": "Pagos",
+                    "pages": [
+                      "es/sdks/typescript/payments",
+                      "es/sdks/typescript/payments-stripe",
+                      "es/sdks/typescript/payments-razorpay"
+                    ]
+                  },
+                  {
+                    "group": "Guías de frameworks",
+                    "pages": [
+                      "es/examples/framework-guides/nextjs",
+                      "es/examples/framework-guides/react",
+                      "es/examples/framework-guides/vue",
+                      "es/examples/framework-guides/nuxt",
+                      "es/examples/framework-guides/svelte"
+                    ]
+                  }
+                ]
+              },
+              {
+                "group": "Swift",
+                "icon": "swift",
+                "pages": [
+                  "es/sdks/swift/overview",
+                  "es/sdks/swift/database",
+                  "es/sdks/swift/auth",
+                  "es/sdks/swift/storage",
+                  "es/sdks/swift/functions",
+                  "es/sdks/swift/ai",
+                  "es/sdks/swift/realtime"
+                ]
+              },
+              {
+                "group": "Kotlin",
+                "icon": "android",
+                "pages": [
+                  "es/sdks/kotlin/overview",
+                  "es/sdks/kotlin/database",
+                  "es/sdks/kotlin/auth",
+                  "es/sdks/kotlin/storage",
+                  "es/sdks/kotlin/functions",
+                  "es/sdks/kotlin/ai",
+                  "es/sdks/kotlin/realtime"
+                ]
+              },
+              {
+                "group": "REST API",
+                "icon": "code",
+                "pages": [
+                  "es/sdks/rest/overview",
+                  "es/sdks/rest/database",
+                  "es/sdks/rest/auth",
+                  "es/sdks/rest/storage",
+                  "es/sdks/rest/functions",
+                  "es/sdks/rest/ai",
+                  "es/sdks/rest/realtime"
+                ]
+              },
+              {
+                "group": "Ejemplos",
+                "pages": [
+                  "es/examples/overview"
+                ]
+              }
+            ]
           },
           {
-            "group": "Model Gateway",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/ai.yaml"
-          },
-          {
-            "group": "Functions",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/functions.yaml"
-          },
-          {
-            "group": "Realtime",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/realtime.yaml"
-          },
-          {
-            "group": "Messaging",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/email.yaml"
-          },
-          {
-            "group": "Payments",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/payments.yaml"
-          },
-          {
-            "group": "Secrets",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/secrets.yaml"
-          },
-          {
-            "group": "Logs",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
-          },
-          {
-            "group": "Metadata",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/metadata.yaml"
-          },
-          {
-            "group": "Health",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+            "tab": "Referencia de API",
+            "groups": [
+              {
+                "group": "Tables",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
+              },
+              {
+                "group": "Autenticación",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/auth.yaml"
+              },
+              {
+                "group": "Records",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/records.yaml"
+              },
+              {
+                "group": "Almacenamiento",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/storage.yaml"
+              },
+              {
+                "group": "Model Gateway",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/ai.yaml"
+              },
+              {
+                "group": "Functions",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/functions.yaml"
+              },
+              {
+                "group": "Tiempo real",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/realtime.yaml"
+              },
+              {
+                "group": "Mensajería",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/email.yaml"
+              },
+              {
+                "group": "Pagos",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/payments.yaml"
+              },
+              {
+                "group": "Secrets",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/secrets.yaml"
+              },
+              {
+                "group": "Logs",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
+              },
+              {
+                "group": "Metadata",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/metadata.yaml"
+              },
+              {
+                "group": "Health",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+              }
+            ]
           }
         ]
       }
@@ -327,10 +1254,22 @@
     }
   },
   "redirects": [
-    { "source": "/core-concepts/database/branching", "destination": "/agent-native/branching" },
-    { "source": "/configuration/config-as-code", "destination": "/agent-native/config-as-code" },
-    { "source": "/core-concepts/deployments/overview", "destination": "/core-concepts/sites/overview" },
-    { "source": "/deployment/deploy-to-render", "destination": "/deployment/deploy-to-aws-ec2" }
+    {
+      "source": "/core-concepts/database/branching",
+      "destination": "/agent-native/branching"
+    },
+    {
+      "source": "/configuration/config-as-code",
+      "destination": "/agent-native/config-as-code"
+    },
+    {
+      "source": "/core-concepts/deployments/overview",
+      "destination": "/core-concepts/sites/overview"
+    },
+    {
+      "source": "/deployment/deploy-to-render",
+      "destination": "/deployment/deploy-to-aws-ec2"
+    }
   ],
   "logo": {
     "light": "/logo/light.svg",

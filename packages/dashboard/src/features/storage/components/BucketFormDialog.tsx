@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useBuckets } from '#features/storage/hooks/useBuckets';
 import {
   Button,
@@ -50,6 +51,7 @@ export function BucketFormDialog({
   initialBucketName = '',
   initialIsPublic = false,
 }: BucketFormDialogProps) {
+  const { t } = useTranslation('chrome');
   const [bucketName, setBucketName] = useState(initialBucketName);
   const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [error, setError] = useState('');
@@ -74,7 +76,7 @@ export function BucketFormDialog({
 
     if (mode === 'create') {
       if (!bucketName.trim()) {
-        setError('Bucket name is required');
+        setError(t('storage.bucketNameRequired', { defaultValue: 'Bucket name is required' }));
         return;
       }
       try {
@@ -82,7 +84,11 @@ export function BucketFormDialog({
         onSuccess(bucketName.trim());
         handleClose();
       } catch (error) {
-        setError(error instanceof Error ? error.message : 'Failed to create bucket');
+        setError(
+          error instanceof Error
+            ? error.message
+            : t('storage.failedToCreateBucket', { defaultValue: 'Failed to create bucket' })
+        );
       }
     } else {
       try {
@@ -90,7 +96,11 @@ export function BucketFormDialog({
         onSuccess();
         handleClose();
       } catch (error) {
-        setError(error instanceof Error ? error.message : 'Failed to update bucket');
+        setError(
+          error instanceof Error
+            ? error.message
+            : t('storage.failedToUpdateBucket', { defaultValue: 'Failed to update bucket' })
+        );
       }
     }
   };
@@ -103,20 +113,29 @@ export function BucketFormDialog({
   const submitButtonText =
     mode === 'create'
       ? isLoading
-        ? 'Creating...'
-        : 'Create Bucket'
+        ? t('storage.creating', { defaultValue: 'Creating...' })
+        : t('storage.createBucket', { defaultValue: 'Create Bucket' })
       : isLoading
-        ? 'Saving...'
-        : 'Save Changes';
-  const title = mode === 'create' ? 'Create New Bucket' : 'Edit Bucket';
+        ? t('storage.saving', { defaultValue: 'Saving...' })
+        : t('storage.saveChanges', { defaultValue: 'Save Changes' });
+  const title =
+    mode === 'create'
+      ? t('storage.createNewBucket', { defaultValue: 'Create New Bucket' })
+      : t('storage.editBucket', { defaultValue: 'Edit Bucket' });
   const description =
     mode === 'create'
-      ? 'Create a new storage bucket to organize your files.'
-      : "Update this storage bucket's settings.";
+      ? t('storage.createBucketDescription', {
+          defaultValue: 'Create a new storage bucket to organize your files.',
+        })
+      : t('storage.editBucketDescription', {
+          defaultValue: "Update this storage bucket's settings.",
+        });
   const bucketNameHelpText =
     mode === 'create'
-      ? 'Use lowercase letters, numbers, hyphens, and underscores only.'
-      : 'Bucket name cannot be changed.';
+      ? t('storage.bucketNameHelpCreate', {
+          defaultValue: 'Use lowercase letters, numbers, hyphens, and underscores only.',
+        })
+      : t('storage.bucketNameHelpEdit', { defaultValue: 'Bucket name cannot be changed.' });
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -132,7 +151,10 @@ export function BucketFormDialog({
             </div>
           </DialogHeader>
           <DialogBody className="gap-2 p-4">
-            <BucketFormRow label="Bucket Name" description={bucketNameHelpText}>
+            <BucketFormRow
+              label={t('storage.bucketName', { defaultValue: 'Bucket Name' })}
+              description={bucketNameHelpText}
+            >
               <div className="flex w-full flex-col gap-1">
                 <Input
                   id="bucket-name"
@@ -143,7 +165,11 @@ export function BucketFormDialog({
                       setError('');
                     }
                   }}
-                  placeholder={mode === 'create' ? 'Enter a name' : ''}
+                  placeholder={
+                    mode === 'create'
+                      ? t('storage.enterAName', { defaultValue: 'Enter a name' })
+                      : ''
+                  }
                   disabled={mode === 'edit'}
                   className={`h-8 rounded px-1.5 py-1.5 text-sm leading-5 ${mode === 'edit' ? 'cursor-not-allowed' : ''}`}
                   autoFocus={mode === 'create'}
@@ -155,8 +181,11 @@ export function BucketFormDialog({
             <DialogDivider />
 
             <BucketFormRow
-              label="Public Bucket"
-              description="If enabled, files in this bucket can be accessed without authentication."
+              label={t('storage.publicBucket', { defaultValue: 'Public Bucket' })}
+              description={t('storage.publicBucketDescription', {
+                defaultValue:
+                  'If enabled, files in this bucket can be accessed without authentication.',
+              })}
             >
               <div className="flex h-8 w-full items-center justify-end">
                 <Switch id="bucket-public" checked={isPublic} onCheckedChange={setIsPublic} />
@@ -165,7 +194,7 @@ export function BucketFormDialog({
           </DialogBody>
           <DialogFooter className="gap-3 p-4">
             <Button type="button" variant="secondary" onClick={handleClose} className="h-8 px-2">
-              Cancel
+              {t('storage.cancel', { defaultValue: 'Cancel' })}
             </Button>
             <Button
               type="submit"

@@ -1,0 +1,60 @@
+---
+title: 自訂 SMTP
+description: 透過您自己的 SMTP 伺服器路由每個傳出電子郵件
+---
+
+啟用後，每個電子郵件（驗證流和 `emails.send()` 呼叫）都透過您的 SMTP 伺服器路由。關閉以還原；認證被保留。
+
+<Note>
+  **自託管實例必須設定此項才能發出任何電子郵件。** 零設定的託管寄件服務透過 InsForge Cloud 路由，僅對已連接雲端的專案可用。未設定 SMTP 的自託管實例無法投遞驗證郵件，因此電子郵件驗證、魔法連結和密碼重設在您完成下方設定之前都無法送達。
+</Note>
+
+## 概念
+
+提供商在每次傳送時被解析，所以儲存在下次請求時生效。InsForge 在儲存前執行 `transporter.verify()`，所以持久化的設定總是有效的。密碼在靜止時使用 AES-256-GCM 加密，API 永遠不會傳回。
+
+## 用法
+
+在 **Authentication → Email** 下配置 SMTP。
+
+<Steps>
+  <Step title="啟用自訂 SMTP">
+    在 **SMTP Provider** 卡上打開開關。
+  </Step>
+  <Step title="輸入認證">
+    主機、埠 (`25`、`465`、`587`、`2525`)、使用者名稱、密碼、寄件人電子郵件、寄件人名稱。私有 IP 和自簽署憑證被拒絕。
+  </Step>
+  <Step title="儲存">
+    InsForge 在持久化前執行 SMTP 握手。錯誤的認證會快速失敗。
+  </Step>
+  <Step title="編輯範本（可選）">
+    **Email Templates** 卡解鎖四個驗證範本。
+  </Step>
+</Steps>
+
+`From:` 標頭始終是您設定的寄件人。SDK 呼叫者無法偽造它。
+
+## 電子郵件範本
+
+範本從 `email.templates` 在本機呈現。變數使用 `{{ variable }}`，並進行 HTML 轉義。
+
+| 範本 | 何時傳送 |
+|----------|---------------|
+| `email-verification-code` | 帶有 6 位數代碼的新使用者驗證 |
+| `email-verification-link` | 帶有可點擊連結的新使用者驗證 |
+| `reset-password-code` | 帶有 6 位數代碼的密碼重設 |
+| `reset-password-link` | 帶有可點擊連結的密碼重設 |
+
+變數：`{{ token }}` (代碼範本)、`{{ link }}` (連結範本，必須以 `http://` 或 `https://` 開頭)、`{{ name }}` 和 `{{ email }}` (所有範本)。
+
+## 考慮
+
+- **速率限制。** **最小間隔（秒）** 限制每收件人頻率。冷卻時間內的傳送傳回 HTTP `429`。預設為 `60`；`0` 停用。
+- **SSRF 保護。** 私有、環回、連結本地和營運商 NAT 範圍被拒絕。
+- **稽核日誌。** 設定儲存日誌 `UPDATE_SMTP_CONFIG`；範本編輯日誌 `UPDATE_EMAIL_TEMPLATE`。
+
+## 更多資源
+
+- [Messaging overview](/core-concepts/messaging/overview) 用於路由模型。
+- [nodemailer SMTP transport](https://nodemailer.com/smtp/) 用於連接選項。
+- [Authentication overview](/core-concepts/authentication/overview) 用於傳送這些電子郵件的流。

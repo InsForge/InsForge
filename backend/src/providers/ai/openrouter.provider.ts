@@ -256,7 +256,7 @@ export class OpenRouterProvider {
       if (response.status === 401 || response.status === 403) {
         throw new AppError(
           'Invalid OpenRouter API Key',
-          401,
+          400,
           ERROR_CODES.AI_INVALID_API_KEY,
           'Check your OpenRouter key and try again.'
         );

@@ -1,4 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type {
   StripeEnvironment,
   SyncStripePaymentsEnvironmentResult,
@@ -14,20 +16,24 @@ interface StripeSyncToast {
   message: string;
 }
 
-const ENVIRONMENT_LABEL: Record<StripeEnvironment, string> = {
-  test: 'Test',
-  live: 'Live',
-};
-
-function formatEnvironments(environments: StripeEnvironment[]) {
-  return environments.map((environment) => ENVIRONMENT_LABEL[environment]).join(', ');
+function formatEnvironments(environments: StripeEnvironment[], t: TFunction<'chrome'>) {
+  return environments
+    .map((environment) =>
+      environment === 'test'
+        ? t('payments.modeTest', { defaultValue: 'Test' })
+        : t('payments.modeLive', { defaultValue: 'Live' })
+    )
+    .join(', ');
 }
 
 function isFailedSyncResult(result: SyncStripePaymentsEnvironmentResult) {
   return result.connection.status === 'error' || result.connection.lastSyncStatus === 'failed';
 }
 
-function getStripeSyncToast(result: SyncStripePaymentsResponse): StripeSyncToast {
+function getStripeSyncToast(
+  result: SyncStripePaymentsResponse,
+  t: TFunction<'chrome'>
+): StripeSyncToast {
   const attemptedResults = result.results.filter(
     (item) => item.connection.status !== 'unconfigured'
   );
@@ -37,24 +43,32 @@ function getStripeSyncToast(result: SyncStripePaymentsResponse): StripeSyncToast
   if (attemptedResults.length === 0) {
     return {
       type: 'info',
-      message: 'No configured Stripe environments to sync.',
+      message: t('payments.noStripeEnvironmentsToSync', {
+        defaultValue: 'No configured Stripe environments to sync.',
+      }),
     };
   }
 
   if (failedResults.length > 0) {
     return {
       type: 'error',
-      message: `Stripe sync failed for ${formatEnvironments(failedEnvironments)}.`,
+      message: t('payments.stripeSyncFailedFor', {
+        defaultValue: 'Stripe sync failed for {{environments}}.',
+        environments: formatEnvironments(failedEnvironments, t),
+      }),
     };
   }
 
   return {
     type: 'success',
-    message: 'Stripe payments synced successfully.',
+    message: t('payments.stripePaymentsSynced', {
+      defaultValue: 'Stripe payments synced successfully.',
+    }),
   };
 }
 
 export function useStripeSync() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -69,11 +83,15 @@ export function useStripeSync() {
         queryClient.invalidateQueries({ queryKey: stripeQueryKeys.transactions }),
       ]);
 
-      const toast = getStripeSyncToast(result);
+      const toast = getStripeSyncToast(result, t);
       showToast(toast.message, toast.type);
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to sync Stripe payments', 'error');
+      showToast(
+        error.message ||
+          t('payments.syncStripeFailed', { defaultValue: 'Failed to sync Stripe payments' }),
+        'error'
+      );
     },
   });
 

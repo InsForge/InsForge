@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { getFeatureFlag } from '#lib/analytics/posthog';
@@ -29,6 +30,7 @@ function writeConnectTipDismissed(key: string): void {
 // onboarding completes in d_test. Rendered at AppLayout level (not inside
 // AppHeader) because cloud-hosting hides our AppHeader via showNavbar=false.
 export function DTestConnectTip() {
+  const { t } = useTranslation('chrome');
   const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
   const { pathname } = useLocation();
   const isOnInstallPage = pathname === '/dashboard/install';
@@ -86,19 +88,21 @@ export function DTestConnectTip() {
       <div className="pointer-events-auto relative flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-[rgb(var(--foreground))] p-3 shadow-lg">
         <div className="flex items-center justify-between gap-2">
           <span className="rounded bg-[rgb(var(--inverse))]/10 px-2 py-0.5 text-xs font-medium leading-4 text-[rgb(var(--inverse))]">
-            Tip
+            {t('overview.tip', { defaultValue: 'Tip' })}
           </span>
           <button
             type="button"
             onClick={handleDismiss}
-            aria-label="Dismiss tip"
+            aria-label={t('overview.dismissTip', { defaultValue: 'Dismiss tip' })}
             className="shrink-0 text-[rgb(var(--inverse))]/60 hover:text-[rgb(var(--inverse))]"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
         <p className="text-xs leading-4 text-[rgb(var(--inverse))]">
-          You can always click here to re-connect.
+          {t('overview.reconnectTip', {
+            defaultValue: 'You can always click here to re-connect.',
+          })}
         </p>
       </div>
     </div>

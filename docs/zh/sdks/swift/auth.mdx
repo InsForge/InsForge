@@ -1,0 +1,438 @@
+---
+title: Swift 身份验证 SDK 参考
+description: 使用 InsForge Swift SDK 为 iOS、macOS、tvOS 和 watchOS 注册、登录、验证电子邮件、管理会话和配置 OAuth URL 方案。
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+## 安装
+
+<SwiftSdkInstallation />
+
+## signUp()
+
+使用电子邮件和密码创建新用户帐户。
+
+### 参数
+
+- `email` (String) - 用户的电子邮件地址
+- `password` (String) - 用户的密码
+- `name` (String, optional) - 用户的显示名称
+
+### 返回值
+
+```swift
+SignUpResponse
+```
+
+### SignUpResponse
+
+```swift
+public struct SignUpResponse: Codable, Sendable {
+    /// User object (nil when email verification is required)
+    public let user: User?
+    /// Access token (nil when email verification is required)
+    public let accessToken: String?
+    /// Refresh token (nil when email verification is required)
+    public let refreshToken: String?
+    /// Indicates if email verification is required before sign-in
+    public let requireEmailVerification: Bool?
+
+    /// Check if email verification is required
+    public var needsEmailVerification: Bool
+    /// Check if sign up completed with session (no verification required)
+    public var hasSession: Bool
+}
+```
+
+### 示例（包含验证的完整流程）
+
+```swift
+func handleSignUp(email: String, password: String, name: String?) async {
+    do {
+        let result = try await insforge.auth.signUp(
+            email: email,
+            password: password,
+            name: name
+        )
+
+        if result.needsEmailVerification {
+            // Show verification code input screen
+            // User will receive a 6-digit code via email
+            showEmailVerificationScreen(email: email)
+        } else if result.hasSession {
+            // Registration complete, user is signed in
+            navigateToDashboard()
+        }
+    } catch {
+        showError(error.localizedDescription)
+    }
+}
+
+// Called when user enters the verification code
+func handleVerifyEmail(email: String, code: String) async {
+    do {
+        try await insforge.auth.verifyEmail(email: email, code: code)
+        // Verification successful, user can now sign in
+        navigateToSignIn()
+    } catch {
+        showError("Invalid verification code")
+    }
+}
+
+// Called when user requests a new verification email
+func handleResendCode(email: String) async {
+    do {
+        try await insforge.auth.resendVerificationEmail(email: email)
+        showMessage("Verification email sent to \\(email)")
+    } catch {
+        showError("Failed to resend verification email")
+    }
+}
+```
+
+### 电子邮件验证
+
+对于使用电子邮件注册的用户，InsForge 后端提供三种选择：
+
+1. **不需要电子邮件验证** - 用户可在注册后立即登录。`SignUpResponse` 将具有 `hasSession = true`。
+2. **基于链接的验证** - 用户必须打开其电子邮件并单击验证链接才能登录。
+3. **基于代码的验证** - InsForge 后端向用户的电子邮件发送 6 位数验证码。客户端应用需要显示验证屏幕，用户可以输入代码，然后调用 `verifyEmail(email:code:)` 完成验证。只有这样用户才能使用电子邮件和密码登录。
+
+当 `requireEmailVerification` 为 `true` 时，响应将具有：
+- `accessToken = nil`
+- `user = nil`
+- `needsEmailVerification = true`
+
+这表明在用户登录之前需要通过选项 2 或 3 进行验证。
+
+### 相关方法
+
+| 方法 | 描述 |
+|--------|-------------|
+| `verifyEmail(email:code:)` | 使用 6 位数代码验证电子邮件 |
+| `resendVerificationEmail(email:)` | 重新发送验证电子邮件 |
+
+---
+
+## signIn()
+
+使用电子邮件和密码登录现有用户。
+
+### 参数
+
+- `email` (String) - 用户的电子邮件地址
+- `password` (String) - 用户的密码
+
+### 示例
+
+```swift
+do {
+    let result = try await insforge.auth.signIn(
+        email: "user@example.com",
+        password: "secure_password123"
+    )
+
+    if let user = result.user {
+        print("Welcome back, \\(user.profile?.name ?? user.email)")
+    }
+} catch {
+    print("Sign in failed: \\(error)")
+}
+```
+
+### 电子邮件验证
+
+如果登录响应是：
+```json
+{"error":"FORBIDDEN","message":"Email verification required","statusCode":403,"nextActions":"Please verify your email address before logging in"}
+```
+这表明在用户登录之前需要通过选项 2 或 3（链接或代码，请参阅 [signUp()](#电子邮件验证)）进行验证。
+
+---
+
+## signOut()
+
+登出当前用户。
+
+### 示例
+
+```swift
+do {
+    try await insforge.auth.signOut()
+    print("User signed out")
+} catch {
+    print("Sign out failed: \\(error)")
+}
+```
+
+---
+
+## getCurrentUser()
+
+获取带有配置文件数据的已认证用户。
+
+### 示例
+
+```swift
+do {
+    if let user = try await insforge.auth.getCurrentUser() {
+        print("Email: \\(user.email)")
+        print("Name: \\(user.profile?.name ?? "N/A")")
+    } else {
+        print("No user signed in")
+    }
+} catch {
+    print("Error: \\(error)")
+}
+```
+
+---
+
+## setProfile()
+
+更新当前用户的配置文件。
+
+### 示例
+
+```swift
+do {
+    let result = try await insforge.auth.setProfile([
+        "name": "JohnDev",
+        "bio": "iOS Developer",
+        "avatar_url": "https://example.com/avatar.jpg"
+    ])
+    print("Profile updated")
+} catch {
+    print("Update failed: \\(error)")
+}
+```
+
+---
+
+## 密码重置
+
+InsForge 支持两种密码重置方法，在后端中配置：
+
+- **代码方法**：用户通过电子邮件接收 6 位数代码，验证它以获取重置令牌，然后重置密码
+- **链接方法**：用户通过电子邮件接收包含重置令牌的魔法链接，然后直接重置密码
+
+### sendPasswordReset()
+
+向用户发送密码重置电子邮件。电子邮件将包含 6 位数代码或魔法链接，具体取决于后端配置。
+
+#### 参数
+
+- `email` (String) - 用户的电子邮件地址
+
+#### 示例
+
+```swift
+do {
+    try await insforge.auth.sendPasswordReset(email: "user@example.com")
+    // Show message to check email
+    showMessage("If your email is registered, you will receive a password reset email.")
+} catch {
+    print("Failed to send reset email: \\(error)")
+}
+```
+
+---
+
+### exchangeResetPasswordToken()
+
+将 6 位数重置代码交换为重置令牌。**此方法仅用于基于代码的重置流程。**
+
+#### 参数
+
+- `email` (String) - 用户的电子邮件地址
+- `code` (String) - 通过电子邮件接收的 6 位数代码
+
+#### 返回值
+
+```swift
+ResetPasswordTokenResponse
+```
+
+#### ResetPasswordTokenResponse
+
+```swift
+public struct ResetPasswordTokenResponse: Codable, Sendable {
+    /// Reset token to use with resetPassword()
+    public let token: String
+    /// Token expiration timestamp
+    public let expiresAt: Date?
+}
+```
+
+#### 示例
+
+```swift
+do {
+    let response = try await insforge.auth.exchangeResetPasswordToken(
+        email: "user@example.com",
+        code: "123456"
+    )
+    // Store the token and proceed to password reset screen
+    let resetToken = response.token
+    showPasswordResetScreen(token: resetToken)
+} catch {
+    print("Invalid or expired code: \\(error)")
+}
+```
+
+---
+
+### resetPassword()
+
+使用重置令牌重置用户的密码。
+
+#### 参数
+
+- `otp` (String) - 重置令牌（从 `exchangeResetPasswordToken()` 获取的代码流，或从魔法链接 URL 获取的链接流）
+- `newPassword` (String) - 满足配置要求的新密码
+
+#### 示例
+
+```swift
+do {
+    try await insforge.auth.resetPassword(
+        otp: resetToken,
+        newPassword: "newSecurePassword123"
+    )
+    // Password reset successful
+    showMessage("Password reset successfully. You can now sign in.")
+    navigateToSignIn()
+} catch {
+    print("Password reset failed: \\(error)")
+}
+```
+
+---
+
+## signInWithOAuthView()
+
+直接使用特定的 OAuth 提供商登录。此方法打开 OAuth 提供商的身份验证页面。
+
+在 iOS 12+ 和 macOS 10.15+ 上，SDK 使用 `ASWebAuthenticationSession` 显示应用内身份验证浏览器，具有自动回调处理。
+
+### 支持的提供商
+
+```swift
+public enum OAuthProvider: String, Sendable {
+    case google
+    case github
+    case discord
+    case linkedin
+    case facebook
+    case instagram
+    case tiktok
+    case apple
+    case x
+    case spotify
+    case microsoft
+}
+```
+
+### 参数
+
+- `provider` (`OAuthProvider`) - 要认证的 OAuth 提供商
+- `redirectTo` (`String`) - InsForge 身份验证后将重定向到的回调 URL
+
+### 返回值
+
+```swift
+AuthResponse
+```
+
+返回包含已认证用户和会话令牌的 `AuthResponse`。
+
+### 身份验证流程
+
+```
+1. App calls signInWithOAuthView(provider:redirectTo:)
+2. SDK fetches the OAuth authorization URL from InsForge
+3. SDK opens in-app authentication browser (ASWebAuthenticationSession)
+4. User authenticates with the provider (Google, GitHub, etc.)
+5. SDK automatically handles callback and creates session
+6. Method returns AuthResponse with user data
+```
+
+### 示例
+
+```swift
+import SwiftUI
+import InsForge
+
+struct LoginView: View {
+    let client: InsForgeClient
+    @State private var currentUser: User?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Sign in with")
+                .font(.headline)
+
+            // Google Sign In
+            Button {
+                Task {
+                    do {
+                        let response = try await client.auth.signInWithOAuthView(
+                            provider: .google,
+                            redirectTo: "yourapp://auth/callback"
+                        )
+                        currentUser = response.user
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "g.circle.fill")
+                    Text("Continue with Google")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+
+            if let error = errorMessage {
+                Text(error)
+                    .foregroundColor(.red)
+                    .font(.caption)
+            }
+        }
+        .padding()
+    }
+}
+```
+
+### URL 方案配置
+
+为您的应用注册回调 URL，将该确切值传递给 `redirectTo`，并将相同值添加到认证设置中的 `allowedRedirectUrls`。例如，您可以使用深层链接如 `yourapp://auth/callback` 或已声明的 HTTPS 回调如 `https://app.example.com/auth/callback`。如果 `redirectTo` 不在允许列表中，请求将以 HTTP 400 失败。
+
+---
+
+## 错误处理
+
+```swift
+do {
+    let result = try await insforge.auth.signIn(
+        email: email,
+        password: password
+    )
+} catch let error as InsForgeAuthError {
+    switch error {
+    case .invalidCredentials:
+        print("Invalid email or password")
+    case .userNotFound:
+        print("User not found")
+    case .emailNotVerified:
+        print("Please verify your email")
+    case .networkError(let underlying):
+        print("Network error: \\(underlying)")
+    default:
+        print("Auth error: \\(error.localizedDescription)")
+    }
+}
+```

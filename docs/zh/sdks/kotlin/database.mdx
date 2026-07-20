@@ -1,0 +1,356 @@
+---
+title: Kotlin 数据库 SDK 参考
+description: 使用 Kotlin SDK 通过 Kotlinx 序列化数据类对 InsForge 表进行类型安全的插入、更新、删除、选择和 rpcRaw 操作。
+---
+
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
+
+## 安装
+
+<KotlinSdkInstallation />
+
+## insert()
+
+将新记录插入表中。
+
+### 示例
+
+```kotlin
+// Define your data class
+@Serializable
+data class Post(
+    val id: String? = null,
+    val title: String,
+    val content: String,
+    @SerialName("created_at")
+    val createdAt: String? = null
+)
+
+// Single insert (must wrap in list)
+val post = Post(title = "Hello World", content = "My first post!")
+val result = insforge.database
+    .from("posts")
+    .insertTyped(listOf(post))
+    .returning()
+    .execute<Post>()  // Returns List<Post>
+
+// Bulk insert
+val posts = listOf(
+    Post(title = "First Post", content = "Hello everyone!"),
+    Post(title = "Second Post", content = "Another update.")
+)
+val result = insforge.database
+    .from("posts")
+    .insertTyped(posts)
+    .returning()
+    .execute<Post>()  // Returns List<Post>
+```
+
+---
+
+## update()
+
+更新表中的现有记录。
+
+### 示例
+
+```kotlin
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+// Update by ID (using JsonPrimitive)
+val result = insforge.database
+    .from("posts")
+    .update(mapOf("title" to JsonPrimitive("Updated Title")))
+    .eq("id", postId)
+    .returning()
+    .execute<Post>()  // Returns List<Post>
+
+// Update by ID (using buildJsonObject)
+val result = insforge.database
+    .from("posts")
+    .update(buildJsonObject { put("title", "Updated Title") })
+    .eq("id", postId)
+    .returning()
+    .execute<Post>()  // Returns List<Post>
+
+// Update multiple
+val result = insforge.database
+    .from("tasks")
+    .update(buildJsonObject { put("status", "completed") })
+    .`in`("id", listOf("task-1", "task-2"))
+    .returning()
+    .execute<Task>()  // Returns List<Task>
+```
+
+---
+
+## delete()
+
+从表中删除记录。
+
+### 示例
+
+```kotlin
+// Delete by ID
+insforge.database
+    .from("posts")
+    .delete()
+    .eq("id", postId)
+    .execute()
+
+// Delete with filter
+insforge.database
+    .from("sessions")
+    .delete()
+    .lt("expires_at", Date())
+    .execute()
+```
+
+---
+
+## select()
+
+从表中查询记录。
+
+### 示例
+
+```kotlin
+// Get all posts
+val posts = insforge.database
+    .from("posts")
+    .select()
+    .execute<Post>()  // Returns List<Post>
+
+// Specific columns
+val posts = insforge.database
+    .from("posts")
+    .select("id, title, content")
+    .execute<Post>()  // Returns List<Post>
+
+// With relationships (typed)
+@Serializable
+data class PostWithComments(
+    val id: String,
+    val title: String,
+    val content: String,
+    val comments: List<Comment>
+)
+
+val posts = insforge.database
+    .from("posts")
+    .select("*, comments(id, content)")
+    .execute<PostWithComments>()  // Returns List<PostWithComments>
+```
+
+---
+
+## executeRaw()
+
+执行 SELECT 查询并返回原始 JSON 数组。当您需要处理动态/无类型数据（例如返回嵌套对象的连接查询）时，请使用此方法。
+
+### 示例
+
+```kotlin
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+// Query with relationships - raw JSON access
+val result = insforge.database
+    .from("tweets")
+    .select("id, content, profiles!tweets_user_id_fkey(username)")
+    .executeRaw()  // Returns JsonArray
+
+result.forEach { element ->
+    val obj = element.jsonObject
+    val id = obj["id"]?.jsonPrimitive?.content
+    val content = obj["content"]?.jsonPrimitive?.content
+    val profile = obj["profiles"]?.jsonObject
+    val username = profile?.get("username")?.jsonPrimitive?.content
+
+    println("Tweet by $username: $content")
+}
+
+// Dynamic queries where structure is unknown
+val rawData = insforge.database
+    .from("dynamic_table")
+    .select()
+    .executeRaw()
+
+// Process raw JSON as needed
+rawData.forEach { element ->
+    val obj = element.jsonObject
+    obj.keys.forEach { key ->
+        println("$key: ${obj[key]}")
+    }
+}
+```
+
+---
+
+## rpc()
+
+调用 PostgreSQL 存储函数（RPC - 远程过程调用）。此方法允许您直接调用数据库中定义的 SQL 函数。
+
+### 签名
+
+```kotlin
+// Typed RPC call - deserializes response to specified type
+suspend inline fun <reified T> rpc(
+    functionName: String,
+    args: Map<String, Any?>? = null
+): T
+
+// Raw RPC call - returns JsonElement for dynamic processing
+suspend fun rpcRaw(
+    functionName: String,
+    args: Map<String, Any?>? = null
+): JsonElement
+```
+
+### 参数
+
+- `functionName` (String) - 要调用的 PostgreSQL 函数的名称
+- `args` (`Map\<String, Any?\>?`, optional) - 传递给函数的参数
+
+### 实现细节
+
+- **无参数**：使用 GET 请求到 `/api/database/rpc/{functionName}`
+- **有参数**：使用 POST 请求（JSON 正文）到 `/api/database/rpc/{functionName}`
+
+### 示例
+
+```kotlin
+// Define response data classes
+@Serializable
+data class UserStats(
+    val totalPosts: Int,
+    val totalLikes: Int,
+    val joinedAt: String
+)
+
+@Serializable
+data class User(
+    val id: String,
+    val name: String,
+    val email: String
+)
+
+// Call function with parameters
+val stats = insforge.database.rpc<UserStats>(
+    "get_user_stats",
+    mapOf("user_id" to 123)
+)
+println("Total posts: ${stats.totalPosts}")
+
+// Call function without parameters
+val users = insforge.database.rpc<List<User>>("get_all_active_users")
+users.forEach { user ->
+    println("User: ${user.name}")
+}
+
+// Call function returning a single value
+val count = insforge.database.rpc<Int>("count_active_posts")
+println("Active posts: $count")
+
+// Call function with multiple parameters
+val result = insforge.database.rpc<List<Post>>(
+    "search_posts",
+    mapOf(
+        "search_term" to "kotlin",
+        "limit" to 10,
+        "offset" to 0
+    )
+)
+```
+
+### rpcRaw() 示例
+
+当返回类型在编译时动态或未知时，使用 `rpcRaw()`。
+
+```kotlin
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+// Get raw JSON response
+val result = insforge.database.rpcRaw(
+    "some_dynamic_function",
+    mapOf("param" to "value")
+)
+
+// Process based on actual response structure
+when (result) {
+    is JsonArray -> {
+        result.forEach { element ->
+            val obj = element.jsonObject
+            println("Item: ${obj["name"]?.jsonPrimitive?.content}")
+        }
+    }
+    is JsonObject -> {
+        println("Single result: ${result["data"]}")
+    }
+    is JsonPrimitive -> {
+        println("Value: ${result.content}")
+    }
+}
+
+// Handle complex nested structures
+val complexResult = insforge.database.rpcRaw("get_dashboard_data")
+val dashboard = complexResult.jsonObject
+val userCount = dashboard["user_count"]?.jsonPrimitive?.int
+val recentPosts = dashboard["recent_posts"]?.jsonArray
+```
+
+---
+
+## 筛选器
+
+| 筛选器 | 说明 | 示例 |
+|--------|------|------|
+| `.eq(column, value)` | 等于 | `.eq("status", "active")` |
+| `.neq(column, value)` | 不等于 | `.neq("status", "banned")` |
+| `.gt(column, value)` | 大于 | `.gt("age", 18)` |
+| `.gte(column, value)` | 大于或等于 | `.gte("price", 100)` |
+| `.lt(column, value)` | 小于 | `.lt("stock", 10)` |
+| `.lte(column, value)` | 小于或等于 | `.lte("priority", 3)` |
+| `.like(column, pattern)` | 区分大小写的模式 | `.like("name", "%Widget%")` |
+| `.ilike(column, pattern)` | 不区分大小写的模式 | `.ilike("email", "%@gmail.com")` |
+| `.in(column, list)` | 值在列表中 | `.in("status", listOf("pending", "active"))` |
+| `.isNull(column)` | 是否为空 | `.isNull("deleted_at")` |
+
+```kotlin
+// Chain multiple filters
+val products = insforge.database
+    .from("products")
+    .select()
+    .eq("category", "electronics")
+    .gte("price", 50)
+    .lte("price", 500)
+    .execute<Product>()  // Returns List<Product>
+```
+
+---
+
+## 修饰符
+
+| 修饰符 | 说明 | 示例 |
+|--------|------|------|
+| `.order(column, ascending)` | 排序结果 | `.order("created_at", ascending = false)` |
+| `.limit(count)` | 限制行数 | `.limit(10)` |
+| `.range(from, to)` | 分页 | `.range(0, 9)` |
+
+```kotlin
+// Pagination with sorting
+val posts = insforge.database
+    .from("posts")
+    .select()
+    .order("created_at", ascending = false)
+    .range(0, 9)
+    .limit(10)
+    .execute<Post>()  // Returns List<Post>
+```
+

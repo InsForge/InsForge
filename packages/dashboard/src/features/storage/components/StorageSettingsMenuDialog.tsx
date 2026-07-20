@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Cloud, Settings } from 'lucide-react';
@@ -77,6 +78,7 @@ function SettingRow({ label, description, children }: SettingRowProps) {
 
 /** Admin dialog for viewing and editing the storage configuration. */
 export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSettingsMenuDialogProps) {
+  const { t } = useTranslation('chrome');
   const { config, isLoading, error, isUpdating, updateConfig } = useStorageConfig();
   // S3 gateway is a cloud-only feature — self-hosted deployments don't have
   // VITE_API_BASE_URL / APP_KEY set, so the tab is hidden entirely there.
@@ -119,14 +121,19 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
 
   const saveDisabled = !form.formState.isDirty || isUpdating;
 
-  const title = activeTab === 's3' && isCloud ? 'S3 Compatible API' : 'General';
+  const title =
+    activeTab === 's3' && isCloud
+      ? t('storage.s3CompatibleApi', { defaultValue: 'S3 Compatible API' })
+      : t('storage.general', { defaultValue: 'General' });
 
   return (
     <MenuDialog open={open} onOpenChange={handleOpenChange}>
       <MenuDialogContent>
         <MenuDialogSideNav>
           <MenuDialogSideNavHeader>
-            <MenuDialogSideNavTitle>Storage Settings</MenuDialogSideNavTitle>
+            <MenuDialogSideNavTitle>
+              {t('storage.storageSettings', { defaultValue: 'Storage Settings' })}
+            </MenuDialogSideNavTitle>
           </MenuDialogSideNavHeader>
           <MenuDialogNav>
             <MenuDialogNavList>
@@ -135,7 +142,7 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
                 active={activeTab === 'general'}
                 onClick={() => setActiveTab('general')}
               >
-                General
+                {t('storage.general', { defaultValue: 'General' })}
               </MenuDialogNavItem>
               {isCloud && (
                 <MenuDialogNavItem
@@ -143,7 +150,7 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
                   active={activeTab === 's3'}
                   onClick={() => setActiveTab('s3')}
                 >
-                  S3 Configuration
+                  {t('storage.s3Configuration', { defaultValue: 'S3 Configuration' })}
                 </MenuDialogNavItem>
               )}
             </MenuDialogNavList>
@@ -163,13 +170,15 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
           ) : isLoading ? (
             <MenuDialogBody>
               <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-muted-foreground">
-                Loading configuration...
+                {t('storage.loadingConfiguration', { defaultValue: 'Loading configuration...' })}
               </div>
             </MenuDialogBody>
           ) : error ? (
             <MenuDialogBody>
               <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-destructive">
-                Failed to load storage configuration. Close and reopen to retry.
+                {t('storage.failedToLoadConfiguration', {
+                  defaultValue: 'Failed to load storage configuration. Close and reopen to retry.',
+                })}
               </div>
             </MenuDialogBody>
           ) : (
@@ -179,8 +188,10 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
             >
               <MenuDialogBody>
                 <SettingRow
-                  label="Maximum Upload Size"
-                  description="Files exceeding this limit will be rejected."
+                  label={t('storage.maximumUploadSize', { defaultValue: 'Maximum Upload Size' })}
+                  description={t('storage.maximumUploadSizeDescription', {
+                    defaultValue: 'Files exceeding this limit will be rejected.',
+                  })}
                 >
                   <Controller
                     name="maxFileSizeMb"
@@ -206,7 +217,9 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
                         {form.formState.errors.maxFileSizeMb && (
                           <p className="pt-1 text-xs text-destructive">
                             {form.formState.errors.maxFileSizeMb.message ||
-                              'Must be between 1 and 200 MB'}
+                              t('storage.maxFileSizeError', {
+                                defaultValue: 'Must be between 1 and 200 MB',
+                              })}
                           </p>
                         )}
                       </>
@@ -224,10 +237,12 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
                       onClick={resetForm}
                       disabled={isUpdating}
                     >
-                      Cancel
+                      {t('storage.cancel', { defaultValue: 'Cancel' })}
                     </Button>
                     <Button type="button" onClick={handleSubmit} disabled={saveDisabled}>
-                      {isUpdating ? 'Saving...' : 'Save Changes'}
+                      {isUpdating
+                        ? t('storage.saving', { defaultValue: 'Saving...' })
+                        : t('storage.saveChanges', { defaultValue: 'Save Changes' })}
                     </Button>
                   </>
                 )}

@@ -1,4 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Button, ConfirmDialog, cn, useToast } from '@insforge/ui';
 import {
   DataGrid,
@@ -68,7 +70,8 @@ const FileSizeRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>) 
 };
 
 const MimeTypeRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>) => {
-  const mimeType = String(row[column.key] || 'Unknown');
+  const { t } = useTranslation('chrome');
+  const mimeType = String(row[column.key] || t('storage.unknownType', { defaultValue: 'Unknown' }));
   const category = mimeType.split('/')[0];
 
   // Get appropriate icon based on MIME type category
@@ -124,6 +127,7 @@ const UploadedAtRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>
 
 // Convert storage files data to DataGrid columns
 export function createStorageColumns(
+  t: TFunction,
   onPreview?: (file: StorageFileSchema) => void,
   onDownload?: (file: StorageFileSchema) => void,
   onDelete?: (file: StorageFileSchema) => void,
@@ -132,7 +136,7 @@ export function createStorageColumns(
   const columns: DataGridColumn<StorageDataGridRow>[] = [
     {
       key: 'key',
-      name: 'Name',
+      name: t('storage.columnName', { defaultValue: 'Name' }),
       width: '1.35fr',
       minWidth: 220,
       resizable: true,
@@ -141,7 +145,7 @@ export function createStorageColumns(
     },
     {
       key: 'size',
-      name: 'Size',
+      name: t('storage.columnSize', { defaultValue: 'Size' }),
       width: '0.8fr',
       minWidth: 120,
       resizable: true,
@@ -150,7 +154,7 @@ export function createStorageColumns(
     },
     {
       key: 'mimeType',
-      name: 'Type',
+      name: t('storage.columnType', { defaultValue: 'Type' }),
       width: '1.2fr',
       minWidth: 200,
       resizable: true,
@@ -159,7 +163,7 @@ export function createStorageColumns(
     },
     {
       key: 'uploadedAt',
-      name: 'Uploaded At',
+      name: t('storage.columnUploadedAt', { defaultValue: 'Uploaded At' }),
       width: '1.1fr',
       minWidth: 180,
       resizable: true,
@@ -193,7 +197,7 @@ export function createStorageColumns(
                   e.stopPropagation();
                   onPreview(row as StorageFileSchema);
                 }}
-                title="Preview file"
+                title={t('storage.previewFile', { defaultValue: 'Preview file' })}
               >
                 <Eye className="h-5 w-5 stroke-[1.5]" />
               </Button>
@@ -208,7 +212,7 @@ export function createStorageColumns(
                   onDownload(row as StorageFileSchema);
                 }}
                 disabled={isFileDownloading}
-                title="Download file"
+                title={t('storage.downloadFile', { defaultValue: 'Download file' })}
               >
                 <Download className="h-5 w-5 stroke-[1.5]" />
               </Button>
@@ -222,7 +226,7 @@ export function createStorageColumns(
                   e.stopPropagation();
                   onDelete(row as StorageFileSchema);
                 }}
-                title="Delete file"
+                title={t('storage.deleteFile', { defaultValue: 'Delete file' })}
               >
                 <Trash2 className="h-5 w-5 stroke-[1.5]" />
               </Button>
@@ -250,9 +254,10 @@ function StorageFilesGrid({
   isDownloading,
   ...props
 }: StorageFilesGridProps) {
+  const { t } = useTranslation('chrome');
   const columns = useMemo(
-    () => createStorageColumns(onPreview, onDownload, onDelete, isDownloading),
-    [onPreview, onDownload, onDelete, isDownloading]
+    () => createStorageColumns(t, onPreview, onDownload, onDelete, isDownloading),
+    [t, onPreview, onDownload, onDelete, isDownloading]
   );
 
   // Ensure each row has an id for selection
@@ -271,7 +276,7 @@ function StorageFilesGrid({
       showSelection={true}
       showPagination={true}
       showTypeBadge={false}
-      paginationRecordLabel="files"
+      paginationRecordLabel={t('storage.filesRecordLabel', { defaultValue: 'files' })}
       rowKeyGetter={(row) => row.key}
     />
   );
@@ -294,6 +299,7 @@ export function StorageDataGrid({
   onSelectedFilesChange,
   isRefreshing = false,
 }: StorageDataGridProps) {
+  const { t } = useTranslation('chrome');
   const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set());
   const [previewFile, setPreviewFile] = useState<StorageFileSchema | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
@@ -371,7 +377,7 @@ export function StorageDataGrid({
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
       } catch (error) {
-        showToast('Download failed', 'error');
+        showToast(t('storage.downloadFailed', { defaultValue: 'Download failed' }), 'error');
         console.error(error);
       } finally {
         setDownloadingFiles((prev) => {
@@ -381,7 +387,7 @@ export function StorageDataGrid({
         });
       }
     },
-    [bucketName, downloadObject, showToast]
+    [bucketName, downloadObject, showToast, t]
   );
 
   const handlePreview = useCallback((file: StorageFileSchema) => {
@@ -414,9 +420,11 @@ export function StorageDataGrid({
   const handleDelete = useCallback(
     async (file: StorageFileSchema) => {
       const confirmOptions = {
-        title: 'Delete File',
-        description: 'Are you sure you want to delete this file? This action cannot be undone.',
-        confirmText: 'Delete',
+        title: t('storage.deleteFileTitle', { defaultValue: 'Delete File' }),
+        description: t('storage.deleteFileDescription', {
+          defaultValue: 'Are you sure you want to delete this file? This action cannot be undone.',
+        }),
+        confirmText: t('storage.delete', { defaultValue: 'Delete' }),
         destructive: true,
       };
 
@@ -426,7 +434,7 @@ export function StorageDataGrid({
         deleteObjects({ bucket: bucketName, keys: [file.key] });
       }
     },
-    [bucketName, confirm, deleteObjects]
+    [bucketName, confirm, deleteObjects, t]
   );
 
   const isDownloading = useCallback(
@@ -441,8 +449,10 @@ export function StorageDataGrid({
       <div className="flex flex-1 items-center justify-center">
         <EmptyState
           icon={Folder}
-          title="No Bucket Selected"
-          description="Select a bucket from the sidebar to view its files"
+          title={t('storage.noBucketSelectedTitle', { defaultValue: 'No Bucket Selected' })}
+          description={t('storage.noBucketSelectedDescription', {
+            defaultValue: 'Select a bucket from the sidebar to view its files',
+          })}
         />
       </div>
     );
@@ -491,7 +501,13 @@ export function StorageDataGrid({
           isDownloading={isDownloading}
           emptyState={
             <DataGridEmptyState
-              message={searchQuery ? 'No files match your search criteria' : 'No files found'}
+              message={
+                searchQuery
+                  ? t('storage.noFilesMatchSearch', {
+                      defaultValue: 'No files match your search criteria',
+                    })
+                  : t('storage.noFilesFound', { defaultValue: 'No files found' })
+              }
             />
           }
         />

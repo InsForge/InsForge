@@ -1,5 +1,6 @@
 import { Button } from '@insforge/ui';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface SelectionClearButtonProps {
   selectedCount: number;
@@ -7,13 +8,19 @@ interface SelectionClearButtonProps {
   onClear: () => void;
 }
 
+const KNOWN_ITEM_TYPES = ['user', 'record', 'file'] as const;
+
 export function SelectionClearButton({
   selectedCount,
   itemType,
   onClear,
 }: SelectionClearButtonProps) {
+  const { t } = useTranslation('chrome');
   const isPlural = selectedCount > 1;
-  const displayText = `${selectedCount} ${isPlural ? `${itemType}s` : itemType} selected`;
+  const englishFallback = `${selectedCount} ${isPlural ? `${itemType}s` : itemType} selected`;
+  const displayText = (KNOWN_ITEM_TYPES as readonly string[]).includes(itemType)
+    ? t(`common.selectedItems.${itemType}`, { count: selectedCount, defaultValue: englishFallback })
+    : englishFallback;
 
   return (
     <Button

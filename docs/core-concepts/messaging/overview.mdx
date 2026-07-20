@@ -10,6 +10,10 @@ InsForge Messaging sends transactional notifications from your project: receipts
   **Just sending auth emails?** Magic links, verification codes, and password resets are wired into [Authentication](/core-concepts/authentication/overview) out of the box. You only need this product for transactional messages beyond auth.
 </Note>
 
+<Warning>
+  **Self-hosting?** The managed InsForge Cloud sender is only available to cloud-linked projects. On a self-hosted instance you must configure [Custom SMTP](/core-concepts/messaging/custom-smtp) before any email can send, auth emails included. Without it, turning on email verification leaves new sign-ups stuck in an unverified state with no email ever delivered, because the send failure is logged and swallowed rather than surfaced. Configure SMTP first, or leave email verification off (the default).
+</Warning>
+
 ```mermaid
 graph TB
     Client[Client Application] --> SDK[InsForge SDK]

@@ -90,6 +90,7 @@ services:
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-}
       - MAX_JSON_BODY_SIZE=${MAX_JSON_BODY_SIZE:-}
       - MAX_URLENCODED_BODY_SIZE=${MAX_URLENCODED_BODY_SIZE:-}
+      - KEEP_ALIVE_TIMEOUT_MS=${KEEP_ALIVE_TIMEOUT_MS:-}
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}
       # S3-compatible storage (MinIO, Tencent COS, Aliyun OSS, R2 ...)

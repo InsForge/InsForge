@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn } from '@insforge/ui';
 import type { PaymentProvider } from '@insforge/shared-schemas';
 import PaystackIcon from '#assets/logos/paystack-icon.svg';
@@ -65,14 +66,17 @@ export function PaymentProviderSelect({
   onValueChange,
   triggerClassName = 'h-9 w-[132px]',
   contentClassName = 'w-[132px]',
-  ariaLabel = 'Payment provider',
+  ariaLabel,
 }: PaymentProviderSelectProps) {
+  const { t } = useTranslation('chrome');
+  const resolvedAriaLabel =
+    ariaLabel ?? t('payments.providerAriaLabel', { defaultValue: 'Payment provider' });
   return (
     <Select
       value={value}
       onValueChange={(nextValue) => onValueChange(nextValue as PaymentProvider)}
     >
-      <SelectTrigger className={triggerClassName} aria-label={ariaLabel}>
+      <SelectTrigger className={triggerClassName} aria-label={resolvedAriaLabel}>
         <span className="!flex min-w-0 items-center gap-2.5">
           <PaymentProviderSelectIcon provider={value} />
           <SelectValue />

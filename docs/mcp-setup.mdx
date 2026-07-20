@@ -10,6 +10,22 @@ The InsForge MCP server gives your AI coding assistant direct access to your bac
 
 Follow the instructions below for your AI client. Don't see your tool? Browse the [agent directory](https://insforge.dev/agents) for the full list of tested integrations.
 
+## What the MCP server can do
+
+Once connected, the InsForge MCP server exposes these tools to your AI assistant. All run against your own project; write and admin actions require your admin API key.
+
+| Area | Tools | What it does |
+|---|---|---|
+| Database | `get-table-schema`, `run-raw-sql`, `bulk-upsert` | Read schema, run raw SQL (strict mode, admin only), bulk insert/upsert |
+| Storage | `create-bucket`, `list-buckets`, `delete-bucket` | Manage storage buckets |
+| Functions | `create-function`, `get-function`, `update-function`, `delete-function` | Manage Deno edge functions |
+| Deployment | `create-deployment`, `start-deployment`, `get-container-logs` | Deploy your app and read container logs |
+| Setup & docs | `fetch-docs`, `get-anon-key`, `get-backend-metadata` | Pull docs, generate an anon key, index backend metadata |
+
+<Note>
+  Raw SQL runs through the same [strict-mode endpoint](/sdks/rest/database) as the REST API: admin key required, system tables and `auth.users` blocked.
+</Note>
+
 ## Prerequisites
 
 - An **AI coding assistant** (Cursor, Claude Code, GitHub Copilot, etc.)
@@ -335,7 +351,7 @@ If you prefer to configure MCP locally, select your AI coding assistant below:
 
     ![Trae Marketplace](/images/mcp-setup/trae-3.png)
 
-    4. For required credentials API_KEY and API_BASE_URL, you can find them in your InsForge **Settings**, under the **Connect** tab
+    4. For required credentials API_KEY and API_BASE_URL, you can find them in your InsForge **Settings**, under the **Connect** tab.
 
     ![Trae Credentials](/images/mcp-setup/trae-4.png)
 
@@ -458,7 +474,7 @@ If you prefer to configure MCP locally, select your AI coding assistant below:
 
 ## Remote MCP
 
-The fastest way to get started is with Remote MCP. A single command attempts installation and will try to handle authentication and project binding, but it may still prompt you for manual authentication or project binding steps if the automatic flow cannot complete.
+The fastest way to get started is with Remote MCP. A single command attempts installation and tries to handle authentication and project binding. The command may still prompt you for manual steps if the automatic flow cannot complete.
 
 Run the following command in your terminal:
 
@@ -475,7 +491,7 @@ After running the command, the system will automatically generate a configuratio
 
 ### Connect and bind project
 
-Some MCP clients will automatically prompt you to log in during setup, while others may require manual authentication or project binding steps if the automatic flow cannot complete. Either way, authentication will open a browser window where you can log in to your InsForge account and grant organization/project access to the MCP client.
+Some MCP clients automatically prompt you to log in during setup. Others may require manual authentication or project binding steps if the automatic flow cannot complete. Either way, authentication opens a browser window where you can log in to your InsForge account and grant organization/project access to the MCP client.
 
 <AccordionGroup>
   <Accordion title="Cursor">
@@ -492,7 +508,7 @@ Some MCP clients will automatically prompt you to log in during setup, while oth
     ```
 
     In menu **Preferences → Cursor Settings → Tools & MCP**, you should see InsForge MCP server is added successfully.
-    InsForge MCP server is on the status of "Needs authentication", you can click the `connect` button to authenticate.
+    If the InsForge MCP server shows the status "Needs authentication", click the `connect` button to authenticate.
   </Accordion>
 
   <Accordion title="Claude Code">
@@ -540,7 +556,7 @@ Some MCP clients will automatically prompt you to log in during setup, while oth
       }
     }
     ```
-    Then restart Antigravity, it will auto authenticate.
+    Then restart Antigravity. It will auto-authenticate.
   </Accordion>
 
   <Accordion title="Gemini">

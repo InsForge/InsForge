@@ -40,6 +40,7 @@ interface DashboardHostContextValue {
   ) => Promise<{ success: boolean; instanceType?: string; error?: string }>;
   onUpdateVersion?: () => Promise<void>;
   onRequestUserInfo?: () => Promise<DashboardUserInfo>;
+  onUpdatePreferredLocale?: (locale: string) => void;
   onRequestUserApiKey?: () => Promise<string>;
   onRequestModelCredits?: () => Promise<DashboardModelCreditUsage>;
   onRequestProjectMetrics?: (range: DashboardMetricsRange) => Promise<DashboardMetricsResponse>;

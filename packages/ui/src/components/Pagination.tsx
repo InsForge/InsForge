@@ -19,6 +19,13 @@ export interface PaginationProps extends React.HTMLAttributes<HTMLDivElement> {
   pageSize?: number;
   pageSizeOptions?: number[];
   recordLabel?: string;
+  /**
+   * Localized replacements for the two English sentences this component would
+   * otherwise build itself. The UI package has no i18n runtime, so consumers
+   * (e.g. the dashboard's PaginationControls) render the copy and pass it in.
+   */
+  summaryText?: string;
+  pageSizeLabel?: string;
   visiblePageCount?: number;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
@@ -67,6 +74,8 @@ export function Pagination({
   pageSize = 50,
   pageSizeOptions,
   recordLabel = 'users',
+  summaryText,
+  pageSizeLabel,
   visiblePageCount = FIXED_CENTER_SLOT_COUNT,
   onPageChange,
   onPageSizeChange,
@@ -105,14 +114,16 @@ export function Pagination({
     >
       <div className="min-w-0 flex-1 flex items-center gap-3">
         <p className="truncate text-[13px] leading-[18px] text-muted-foreground">
-          Showing {startRecord} to {endRecord} of {totalRecords} {recordLabel}
+          {summaryText ??
+            `Showing ${startRecord} to ${endRecord} of ${totalRecords} ${recordLabel}`}
         </p>
         {pageSizeOptions && pageSizeOptions.length > 0 && onPageSizeChange && (
           <>
             <div className="h-4 w-px bg-[var(--alpha-8)]" />
             <div className="flex items-center gap-1.5">
               <span className="text-[13px] leading-[18px] text-muted-foreground">
-                {recordLabel.charAt(0).toUpperCase() + recordLabel.slice(1)} per page:
+                {pageSizeLabel ??
+                  `${recordLabel.charAt(0).toUpperCase() + recordLabel.slice(1)} per page:`}
               </span>
               <Select
                 value={String(pageSize)}

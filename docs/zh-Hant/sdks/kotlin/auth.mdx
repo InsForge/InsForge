@@ -1,0 +1,533 @@
+---
+title: 身份驗證 SDK 參考
+description: 使用 InsForge Kotlin SDK 進行使用者身份驗證和設定檔管理
+---
+
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
+
+## 安裝
+
+<KotlinSdkInstallation />
+
+## signUp()
+
+使用電子郵件和密碼建立新使用者帳戶。
+
+### 參數
+
+- `email` (String) - 使用者的電子郵件地址
+- `password` (String) - 使用者的密碼
+- `name` (String?, optional) - 使用者的顯示名稱
+
+### 傳回值
+
+```kotlin
+SignUpResponse
+```
+
+### SignUpResponse
+
+```kotlin
+data class SignUpResponse(
+    /** User object (null when email verification is required) */
+    val user: User? = null,
+    /** Access token (null when email verification is required) */
+    val accessToken: String? = null,
+    /** Indicates if email verification is required before sign-in */
+    val requireEmailVerification: Boolean = false,
+    /** Redirect URL (if applicable) */
+    val redirectTo: String? = null,
+    /** CSRF token (if applicable) */
+    val csrfToken: String? = null,
+    /** Refresh token (null when email verification is required) */
+    val refreshToken: String? = null
+)
+```
+
+### 範例（包含驗證的完整流程）
+
+```kotlin
+class AuthViewModel : ViewModel() {
+
+    // Sign up and handle verification requirement
+    suspend fun signUp(email: String, password: String, name: String?) {
+        try {
+            val result = client.auth.signUp(
+                email = email,
+                password = password,
+                name = name
+            )
+
+            if (result.requireEmailVerification) {
+                // Show verification code input screen
+                // User will receive a 6-digit code via email
+                _uiState.value = AuthUiState.RequiresVerification(email)
+            } else if (result.accessToken != null) {
+                // Registration complete, user is signed in
+                _uiState.value = AuthUiState.Authenticated
+            }
+        } catch (e: InsforgeHttpException) {
+            _uiState.value = AuthUiState.Error(e.message ?: "Sign up failed")
+        }
+    }
+
+    // Verify email with 6-digit code
+    suspend fun verifyEmail(email: String, code: String) {
+        try {
+            client.auth.verifyEmail(email = email, code = code)
+            // Verification successful, user can now sign in
+            _uiState.value = AuthUiState.VerificationSuccess
+        } catch (e: InsforgeHttpException) {
+            _uiState.value = AuthUiState.Error("Invalid verification code")
+        }
+    }
+
+    // Resend verification email
+    suspend fun resendVerificationEmail(email: String) {
+        try {
+            client.auth.resendVerificationEmail(email = email)
+            // Show success message
+        } catch (e: InsforgeHttpException) {
+            _uiState.value = AuthUiState.Error("Failed to resend verification email")
+        }
+    }
+}
+
+sealed class AuthUiState {
+    object Initial : AuthUiState()
+    object Authenticated : AuthUiState()
+    object VerificationSuccess : AuthUiState()
+    data class RequiresVerification(val email: String) : AuthUiState()
+    data class Error(val message: String) : AuthUiState()
+}
+```
+
+### 電子郵件驗證
+
+對於使用電子郵件註冊的使用者，InsForge 後端提供三種選項：
+
+1. **無電子郵件驗證** - 使用者可在註冊後立即登入。`SignUpResponse` 將具有 `accessToken != null`。
+2. **基於連結的驗證** - 使用者必須開啟電子郵件並按一下驗證連結，然後才能登入。
+3. **基於代碼的驗證** - InsForge 後端向使用者的電子郵件傳送 6 位驗證代碼。用戶端應用程式需要顯示驗證畫面，使用者可以在其中輸入代碼，然後呼叫 `verifyEmail(email, code)` 以完成驗證。只有之後使用者才能使用電子郵件 + 密碼登入。
+
+當 `requireEmailVerification` 為 `true` 時，回應將具有：
+- `accessToken = null`
+- `user = null`
+- `requireEmailVerification = true`
+
+這表示使用者需要透過選項 2 或 3 進行驗證，然後才能登入。
+
+### 相關方法
+
+| 方法 | 說明 |
+|------|------|
+| `verifyEmail(email, code)` | 使用 6 位代碼驗證電子郵件 |
+| `resendVerificationEmail(email)` | 重新傳送驗證電子郵件 |
+
+---
+
+## signIn()
+
+使用電子郵件和密碼登入現有使用者。
+
+### 範例
+
+```kotlin
+try {
+    val result = client.auth.signIn(
+        email = "user@example.com",
+        password = "secure_password123"
+    )
+
+    result.user?.let { user ->
+        Log.d("Auth", "Welcome back, ${user.profile?.name ?: user.email}")
+    }
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Sign in failed: ${e.message}")
+}
+```
+
+### 電子郵件驗證
+
+如果登入回應是：
+```json
+{"error":"FORBIDDEN","message":"Email verification required","statusCode":403,"nextActions":"Please verify your email address before logging in"}
+```
+這表示使用者需要透過選項 2 或 3（連結或代碼，請參閱 [signUp()](#電子郵件驗證)）進行驗證，然後才能登入。
+
+---
+
+## signOut()
+
+登出目前使用者。
+
+### 範例
+
+```kotlin
+try {
+    client.auth.signOut()
+    Log.d("Auth", "User signed out")
+} catch (e: InsforgeException) {
+    Log.e("Auth", "Sign out failed: ${e.message}")
+}
+```
+
+---
+
+## signInWithOAuthPage()
+
+直接使用特定 OAuth 提供者登入。此方法在系統瀏覽器中直接開啟 OAuth 提供者的身份驗證頁面。
+
+### 支援的提供者
+
+```kotlin
+enum class OAuthProvider(val value: String) {
+    GOOGLE("google"),
+    GITHUB("github"),
+    DISCORD("discord"),
+    LINKEDIN("linkedin"),
+    FACEBOOK("facebook"),
+    INSTAGRAM("instagram"),
+    TIKTOK("tiktok"),
+    APPLE("apple"),
+    X("x"),
+    SPOTIFY("spotify"),
+    MICROSOFT("microsoft")
+}
+```
+
+### 參數
+
+- `provider` (`OAuthProvider`) - 用於身份驗證的 OAuth 提供者
+- `redirectUri` (`String`) - 回呼 URL，InsForge 將在身份驗證後重新導向到此 URL
+
+### 傳回值
+
+```kotlin
+String  // The OAuth authorization URL (also opens in browser automatically)
+```
+
+### 範例
+
+1. 設定 BrowserLauncher
+
+建立 InsForge 用戶端時，設定 `browserLauncher` 以處理開啟 URL：
+
+```kotlin
+val client = createInsforgeClient(baseURL, anonKey) {
+    install(Auth) {
+        browserLauncher = BrowserLauncher { url ->
+            val customTabsIntent = CustomTabsIntent.Builder()
+                .setShowTitle(true)
+                .build()
+            // Handle non-Activity context safely
+            if (context is Activity) {
+                customTabsIntent.launchUrl(context, Uri.parse(url))
+            } else {
+                customTabsIntent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                customTabsIntent.launchUrl(context, Uri.parse(url))
+            }
+        }
+        persistSession = true
+        sessionStorage = mySessionStorage
+    }
+}
+```
+
+2. 設定應用程式連結/深層連結回呼
+
+在 AndroidManifest.xml 中設定您的回呼 Activity：
+
+- 選項 A：自訂 URL 配置（用於開發）
+
+```xml
+<activity
+    android:name=".AuthCallbackActivity"
+    android:launchMode="singleTask"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="yourapp" android:host="auth" android:path="/callback" />
+    </intent-filter>
+</activity>
+```
+
+- 選項 B：應用程式連結（用於生產）
+
+```xml
+<activity
+    android:name=".AuthCallbackActivity"
+    android:launchMode="singleTask"
+    android:exported="true">
+    <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" android:host="yourdomain.com" android:path="/auth/callback" />
+    </intent-filter>
+</activity>
+```
+
+3. 使用特定提供者啟動 OAuth 登入
+
+```kotlin
+// Start OAuth flow with Google
+fun startGoogleLogin() {
+    lifecycleScope.launch {
+        val authUrl = client.auth.signInWithOAuthPage(
+            OAuthProvider.GOOGLE,
+            "yourapp://auth/callback"
+        )
+        // Browser opens automatically via browserLauncher
+    }
+}
+```
+
+4. 處理 OAuth 回呼
+
+```kotlin
+class AuthCallbackActivity : AppCompatActivity() {
+    // Example: read the shared InsForge client from your Application class.
+    private val client by lazy { (application as MyApp).insforgeClient }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        intent?.let { handleIntent(it) }
+    }
+
+    private fun handleIntent(intent: Intent) {
+        intent.data?.let { uri ->
+            lifecycleScope.launch {
+                try {
+                    val result = client.auth.handleAuthCallback(uri.toString())
+
+                    Toast.makeText(
+                        this@AuthCallbackActivity,
+                        "Success: ${result.email}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    startActivity(Intent(this@AuthCallbackActivity, MainActivity::class.java))
+                    finish()
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        this@AuthCallbackActivity,
+                        "Failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    finish()
+                }
+            }
+        }
+    }
+}
+```
+
+`client` 應來自您在應用程式中其他地方使用的同一共用 InsForge 用戶端執行個體，例如 `Application` 單一形式或您的 DI 容器。
+
+---
+
+## getCurrentUser()
+
+從伺服器擷取目前已驗證的使用者。這是一個進行網路請求的暫停函式。
+
+### 傳回值
+
+```kotlin
+CurrentUserResponse  // Contains user data from server
+```
+
+### 範例
+
+```kotlin
+try {
+    val response = client.auth.getCurrentUser()
+    Log.d("Auth", "Email: ${response.email}")
+    Log.d("Auth", "Name: ${response.profile?.name ?: "N/A"}")
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Failed to get user: ${e.message}")
+}
+```
+
+<Note>
+此方法進行網路請求以擷取使用者資料。若要存取本機快取的使用者狀態，請改用 `currentUser` StateFlow。
+</Note>
+
+---
+
+## updateProfile()
+
+更新目前使用者的設定檔。
+
+### 參數
+
+- `profile` (`Map\<String, Any\>`) - 要更新的設定檔欄位
+
+### 傳回值
+
+```kotlin
+ProfileResponse  // Updated profile data
+```
+
+### 範例
+
+```kotlin
+try {
+    val result = client.auth.updateProfile(
+        mapOf(
+            "name" to "JohnDev",
+            "bio" to "Android Developer",
+            "avatar_url" to "https://example.com/avatar.jpg"
+        )
+    )
+    Log.d("Auth", "Profile updated: ${result.name}")
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Update failed: ${e.message}")
+}
+```
+
+---
+
+## 密碼重設
+
+InsForge 支援兩種密碼重設方法，在後端中設定：
+
+- **代碼方法**：使用者透過電子郵件接收 6 位代碼，驗證該代碼以取得重設權杖，然後重設密碼
+- **連結方法**：使用者透過電子郵件接收包含重設權杖的魔法連結，然後直接重設密碼
+
+### sendPasswordReset()
+
+向使用者傳送密碼重設電子郵件。該電子郵件將包含 6 位代碼或魔法連結，具體取決於後端設定。
+
+#### 參數
+
+- `email` (String) - 使用者的電子郵件地址
+
+#### 範例
+
+```kotlin
+try {
+    client.auth.sendPasswordReset(email = "user@example.com")
+    // Show message to check email
+    showMessage("If your email is registered, you will receive a password reset email.")
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Failed to send reset email: ${e.message}")
+}
+```
+
+---
+
+### exchangeResetPasswordToken()
+
+將 6 位重設代碼交換為重設權杖。**此方法僅用於基於代碼的重設流程。**
+
+#### 參數
+
+- `email` (String) - 使用者的電子郵件地址
+- `code` (String) - 透過電子郵件接收的 6 位數字代碼
+
+#### 傳回值
+
+```kotlin
+ResetTokenResponse
+```
+
+#### ResetTokenResponse
+
+```kotlin
+data class ResetTokenResponse(
+    /** Reset token to use with resetPassword() */
+    val token: String,
+    /** Token expiration timestamp */
+    val expiresAt: String?
+)
+```
+
+#### 範例
+
+```kotlin
+try {
+    val response = client.auth.exchangeResetPasswordToken(
+        email = "user@example.com",
+        code = "123456"
+    )
+    // Store the token and proceed to password reset screen
+    val resetToken = response.token
+    showPasswordResetScreen(token = resetToken)
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Invalid or expired code: ${e.message}")
+}
+```
+
+---
+
+### resetPassword()
+
+使用重設權杖重設使用者的密碼。
+
+#### 參數
+
+- `newPassword` (String) - 符合設定要求的新密碼
+- `otp` (String) - 重設權杖（來自代碼流的 `exchangeResetPasswordToken()`，或來自連結流的魔法連結 URL）
+
+#### 範例
+
+```kotlin
+try {
+    client.auth.resetPassword(
+        newPassword = "newSecurePassword123",
+        otp = resetToken
+    )
+    // Password reset successful
+    showMessage("Password reset successfully. You can now sign in.")
+    navigateToSignIn()
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Password reset failed: ${e.message}")
+}
+```
+
+---
+
+## 錯誤處理
+
+```kotlin
+import dev.insforge.exceptions.InsforgeHttpException
+import dev.insforge.exceptions.InsforgeException
+
+try {
+    val result = client.auth.signIn(email, password)
+} catch (e: InsforgeHttpException) {
+    // HTTP errors from API with error codes
+    when (e.error) {
+        "INVALID_CREDENTIALS" -> showError("Invalid email or password")
+        "USER_NOT_FOUND" -> showError("User not found")
+        "EMAIL_NOT_VERIFIED" -> showError("Please verify your email")
+        "INVALID_EMAIL" -> showError("Invalid email format")
+        "WEAK_PASSWORD" -> showError("Password is too weak")
+        else -> showError("Error: ${e.message}")
+    }
+} catch (e: InsforgeException) {
+    // Other SDK errors (network, parsing, etc.)
+    showError("Error: ${e.message}")
+}
+```
+
+### 常見錯誤代碼
+
+| 錯誤代碼 | 說明 |
+|---------|------|
+| `INVALID_CREDENTIALS` | 電子郵件或密碼不正確 |
+| `USER_NOT_FOUND` | 不存在此電子郵件的使用者 |
+| `EMAIL_NOT_VERIFIED` | 需要電子郵件驗證 |
+| `INVALID_EMAIL` | 電子郵件格式無效 |
+| `WEAK_PASSWORD` | 密碼不符合要求 |
+| `USER_ALREADY_EXISTS` | 電子郵件已註冊 |
+| `SESSION_EXPIRED` | 工作階段已過期，需要重新登入 |

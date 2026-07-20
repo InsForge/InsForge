@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   realtimeService,
@@ -8,6 +9,7 @@ import { useToast } from '@insforge/ui';
 import type { CreateChannelRequest, UpdateChannelRequest } from '@insforge/shared-schemas';
 
 export function useRealtimeChannels() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [selectedChannel, setSelectedChannel] = useState<RealtimeChannel | null>(null);
@@ -27,10 +29,19 @@ export function useRealtimeChannels() {
     mutationFn: (data: CreateChannelRequest) => realtimeService.createChannel(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['realtime', 'channels'] });
-      showToast('Channel created successfully', 'success');
+      showToast(
+        t('realtime.channelCreatedSuccessfully', {
+          defaultValue: 'Channel created successfully',
+        }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to create channel', 'error');
+      showToast(
+        error.message ||
+          t('realtime.failedToCreateChannel', { defaultValue: 'Failed to create channel' }),
+        'error'
+      );
     },
   });
 
@@ -39,10 +50,19 @@ export function useRealtimeChannels() {
       realtimeService.updateChannel(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['realtime', 'channels'] });
-      showToast('Channel updated successfully', 'success');
+      showToast(
+        t('realtime.channelUpdatedSuccessfully', {
+          defaultValue: 'Channel updated successfully',
+        }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to update channel', 'error');
+      showToast(
+        error.message ||
+          t('realtime.failedToUpdateChannel', { defaultValue: 'Failed to update channel' }),
+        'error'
+      );
     },
   });
 
@@ -50,13 +70,22 @@ export function useRealtimeChannels() {
     mutationFn: (id: string) => realtimeService.deleteChannel(id),
     onSuccess: (_, id) => {
       void queryClient.invalidateQueries({ queryKey: ['realtime', 'channels'] });
-      showToast('Channel deleted successfully', 'success');
+      showToast(
+        t('realtime.channelDeletedSuccessfully', {
+          defaultValue: 'Channel deleted successfully',
+        }),
+        'success'
+      );
       if (selectedChannel?.id === id) {
         setSelectedChannel(null);
       }
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to delete channel', 'error');
+      showToast(
+        error.message ||
+          t('realtime.failedToDeleteChannel', { defaultValue: 'Failed to delete channel' }),
+        'error'
+      );
     },
   });
 

@@ -1,0 +1,55 @@
+---
+title: 电子邮件 SDK 参考
+description: 使用 InsForge SDK 发送自定义事务电子邮件
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## emails.send()
+
+向一个或多个收件人发送自定义 HTML 电子邮件。
+
+### 参数
+
+- `to` (string | string[], required) - 收件人电子邮件，最多 50 个收件人
+- `subject` (string, required) - 电子邮件主题行，最多 500 个字符
+- `html` (string, required) - 电子邮件的 HTML 内容
+- `cc` (string | string[], optional) - 抄送收件人，最多 50 个收件人
+- `bcc` (string | string[], optional) - 密送收件人，最多 50 个收件人
+- `from` (string, optional) - 显示在发件地址旁的显示名，最多 100 个字符（启用自定义 SMTP 时会被忽略）
+- `replyTo` (string, optional) - 回复电子邮件地址，必须是有效的电子邮件地址
+
+<Note>
+默认情况下，邮件从 `noreply@<你的项目>.send.insforge.dev` 发出，这是 InsForge Cloud 为你的每个项目预置并验证的专属子域，因此无需任何域名配置。`from` 字段只设置显示在该地址旁的显示名；使用默认发件服务时，你无法更改发件地址或域名。若要从自己的域名发信，请配置[自定义 SMTP](/core-concepts/messaging/custom-smtp)。启用自定义 SMTP 后，`from` 字段会被完全忽略，发件人名称和电子邮件均取自你的 SMTP 配置，以防止通过你的服务器进行欺骗。
+</Note>
+
+### 返回
+
+```typescript
+{
+  data: {} | null,  // Empty object on success
+  error: Error | null
+}
+```
+
+### 示例
+
+```javascript
+const { data, error } = await insforge.emails.send({
+  to: ['user1@example.com', 'user2@example.com'],
+  cc: 'manager@example.com',
+  from: 'Acme Support Team',
+  subject: 'Team Update',
+  html: '<h1>Weekly Update</h1><p>Here are this week\'s highlights...</p>',
+  replyTo: 'support@example.com'
+});
+
+if (error) {
+  console.error('Failed to send email:', error.message);
+  return;
+}
+
+console.log('Email sent successfully');
+```

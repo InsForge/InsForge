@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { ExternalLink } from 'lucide-react';
 import {
   DataGrid,
@@ -18,15 +20,16 @@ type ActorRow = ApifyActor & {
   [key: string]: string | number | boolean | null;
 };
 
-const columns: DataGridColumn<ActorRow>[] = [
+const getColumns = (t: TFunction<'chrome'>): DataGridColumn<ActorRow>[] => [
   {
     key: 'actor',
-    name: 'Actor',
+    name: t('webscraper.actor', { defaultValue: 'Actor' }),
     width: '1.6fr',
     minWidth: 200,
     sortable: false,
     renderCell: ({ row }: RenderCellProps<ActorRow>) => {
-      const label = row.name ?? row.title ?? 'Unknown actor';
+      const label =
+        row.name ?? row.title ?? t('webscraper.unknownActor', { defaultValue: 'Unknown actor' });
       return (
         <span className="truncate text-[13px] leading-[18px] text-foreground" title={label}>
           {label}
@@ -36,7 +39,7 @@ const columns: DataGridColumn<ActorRow>[] = [
   },
   {
     key: 'lastRunStartedAt',
-    name: 'Last run',
+    name: t('webscraper.lastRun', { defaultValue: 'Last run' }),
     width: '1.2fr',
     minWidth: 160,
     sortable: false,
@@ -48,7 +51,7 @@ const columns: DataGridColumn<ActorRow>[] = [
   },
   {
     key: 'totalRuns',
-    name: 'Runs',
+    name: t('webscraper.runs', { defaultValue: 'Runs' }),
     width: '0.6fr',
     minWidth: 80,
     sortable: false,
@@ -72,8 +75,8 @@ const columns: DataGridColumn<ActorRow>[] = [
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
         className="text-muted-foreground hover:text-foreground"
-        aria-label="Open in Apify"
-        title="Open in Apify"
+        aria-label={t('webscraper.openInApify', { defaultValue: 'Open in Apify' })}
+        title={t('webscraper.openInApify', { defaultValue: 'Open in Apify' })}
       >
         <ExternalLink className="size-4" aria-hidden />
       </a>
@@ -82,10 +85,12 @@ const columns: DataGridColumn<ActorRow>[] = [
 ];
 
 export function WebscraperActorsPage() {
+  const { t } = useTranslation('chrome');
   const { connection } = useWebscraperContext();
   const isActive = connection.status === 'active';
   const actors = useApifyActors(isActive);
   const [search, setSearch] = useState('');
+  const columns = useMemo(() => getColumns(t), [t]);
 
   const rows = useMemo<ActorRow[]>(() => {
     const all = (actors.data ?? []) as ActorRow[];
@@ -102,23 +107,34 @@ export function WebscraperActorsPage() {
   const errorMessage =
     actors.error instanceof Error && actors.error.message
       ? actors.error.message
-      : 'Could not load actors from Apify. Try refreshing.';
+      : t('webscraper.loadActorsError', {
+          defaultValue: 'Could not load actors from Apify. Try refreshing.',
+        });
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <TableHeader
-        title="Actors"
+        title={t('webscraper.actors', { defaultValue: 'Actors' })}
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search actors"
+        searchPlaceholder={t('webscraper.searchActors', { defaultValue: 'Search actors' })}
       />
       <div className="relative min-h-0 flex-1">
         {!isActive ? (
-          <EmptyMessage message="Reconnect to load actors." />
+          <EmptyMessage
+            message={t('webscraper.reconnectToLoadActors', {
+              defaultValue: 'Reconnect to load actors.',
+            })}
+          />
         ) : actors.isError ? (
           <div className="flex h-full items-center justify-center px-6">
             <div className="w-full max-w-[420px]">
-              <ErrorState title="Failed to load actors" error={errorMessage} />
+              <ErrorState
+                title={t('webscraper.loadActorsFailed', {
+                  defaultValue: 'Failed to load actors',
+                })}
+                error={errorMessage}
+              />
             </div>
           </div>
         ) : (
@@ -128,9 +144,13 @@ export function WebscraperActorsPage() {
             loading={actors.isLoading}
             showSelection={false}
             showPagination={true}
-            paginationRecordLabel="actors"
+            paginationRecordLabel={t('webscraper.recordActors', { defaultValue: 'actors' })}
             showTypeBadge={false}
-            emptyState={<EmptyMessage message="No actors yet." />}
+            emptyState={
+              <EmptyMessage
+                message={t('webscraper.noActorsYet', { defaultValue: 'No actors yet.' })}
+              />
+            }
             {...gridProps}
           />
         )}

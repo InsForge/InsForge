@@ -1,0 +1,170 @@
+---
+title: React
+description: 瞭解如何建立 InsForge 專案並使用 AI 建構 React 應用程式
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+瞭解如何建立 InsForge 專案並使用 AI 工具（如 Cursor）建構 React 應用程式。
+
+## 1. 建立 InsForge 專案
+
+在 [insforge.dev](https://insforge.dev) 建立新的 InsForge 專案。
+
+## 2. 連接 InsForge
+
+兩個部分：
+
+- **CLI 連結** — 查看[快速開始](/quickstart)以執行 `npx @insforge/cli link --project-id <your-project-id>` 以便代理可以讀取您的專案 ID 和金鑰。
+- **MCP 設置** — 查看 [MCP 設置](/mcp-setup) 以瞭解每個編輯器的設定（Cursor、Claude Code、Windsurf、Codex、VS Code）。
+
+配置好兩者後，代理可以讀取綱要、執行查詢和從您的編輯器部署程式碼。
+
+## 3. 透過一個提示構建您的應用
+
+在 Cursor 或您的 AI 助手中，使用此提示：
+
+```
+Create a new React app with TypeScript and Vite.
+Add Tailwind CSS 3.4 for styling.
+Install the InsForge SDK and set up the client configuration.
+
+In my InsForge database, create a sports table with id and name columns.
+Add sample data: basketball, soccer, and tennis. Make it publicly readable.
+
+Create a component that fetches and displays all sports from the database.
+```
+
+您的 AI 將生成完整的應用程式，包括資料庫設置和 UI。無需手動編寫程式碼 - AI 為您建立所有內容。
+
+## 4. AI 生成的內容
+
+您的 AI 助手將自動建立這樣的檔案。您無需手動觸摸它們。
+
+**InsForge 用戶端** 在 `src/lib/insforge.ts`:
+
+```typescript src/lib/insforge.ts
+import { createClient } from '@insforge/sdk';
+
+export const insforge = createClient({
+  baseUrl: 'https://your-project.us-east.insforge.app',
+  anonKey: 'your-anon-key',
+});
+```
+
+**運動元件** 在 `src/components/Sports.tsx`:
+
+```typescript src/components/Sports.tsx
+import { useEffect, useState } from 'react';
+import { insforge } from '../lib/insforge';
+
+interface Sport {
+  id: string;
+  name: string;
+}
+
+export function Sports() {
+  const [sports, setSports] = useState<Sport[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchSports() {
+      const { data, error } = await insforge.database
+        .from('sports')
+        .select();
+
+      if (error) {
+        setError(error.message);
+      } else {
+        setSports(data || []);
+      }
+      setLoading(false);
+    }
+
+    fetchSports();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-red-600">
+          <h1 className="text-2xl font-bold mb-2">Error</h1>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-4xl font-bold mb-8">Sports</h1>
+
+        {sports.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {sports.map((sport) => (
+              <div
+                key={sport.id}
+                className="p-6 bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow"
+              >
+                <h2 className="text-xl font-semibold text-gray-800 capitalize">
+                  {sport.name}
+                </h2>
+                <p className="text-sm text-gray-500 mt-2">ID: {sport.id}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-600">No sports found.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+## 5. 啟動應用程式
+
+執行開發伺服器，在瀏覽器中訪問 [http://localhost:5173](http://localhost:5173)，您應該看到運動清單。
+
+```bash
+npm run dev
+```
+
+## 接下來：使用更多提示擴展您的應用程式
+
+嘗試這些提示為您的應用程式添加更多功能：
+
+```
+Add a form to create new sports and save them to the database.
+Include validation and error handling.
+```
+
+```
+Add user authentication with sign up and login pages.
+Only allow authenticated users to add new sports.
+```
+
+```
+Add a favorites feature where users can mark their favorite sports.
+Store favorites in a user_favorites table with user_id and sport_id.
+```
+
+```
+Add images to each sport using InsForge Storage.
+Allow users to upload sport images and display them in the grid.
+```
+
+```
+Add an AI chat feature that can answer questions about sports.
+Use InsForge AI with streaming responses.
+```

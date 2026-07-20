@@ -1,5 +1,6 @@
 import { Eye, EyeOff } from 'lucide-react';
 import { cn } from '@insforge/ui';
+import { useTranslation } from 'react-i18next';
 
 interface ShowPasswordButtonProps {
   show: boolean;
@@ -8,6 +9,7 @@ interface ShowPasswordButtonProps {
 }
 
 export function ShowPasswordButton({ show, onToggle, className }: ShowPasswordButtonProps) {
+  const { t } = useTranslation('chrome');
   return (
     <button
       type="button"
@@ -17,10 +19,18 @@ export function ShowPasswordButton({ show, onToggle, className }: ShowPasswordBu
         className
       )}
       aria-pressed={show}
-      aria-label={`${show ? 'Hide' : 'Show'} password`}
+      aria-label={
+        show
+          ? t('overview.hidePassword', { defaultValue: 'Hide Password' })
+          : t('overview.showPassword', { defaultValue: 'Show Password' })
+      }
     >
       {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-      <span>{show ? 'Hide' : 'Show'} Password</span>
+      <span>
+        {show
+          ? t('overview.hidePassword', { defaultValue: 'Hide Password' })
+          : t('overview.showPassword', { defaultValue: 'Show Password' })}
+      </span>
     </button>
   );
 }

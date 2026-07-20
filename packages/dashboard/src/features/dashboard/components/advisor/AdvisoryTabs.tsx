@@ -1,4 +1,5 @@
 import { Badge } from '@insforge/ui';
+import { useTranslation } from 'react-i18next';
 import type { DashboardAdvisorCategory } from '#types';
 
 export type AdvisoryTabValue = 'all' | DashboardAdvisorCategory;
@@ -18,6 +19,7 @@ const TABS: Array<{ value: AdvisoryTabValue; label: string }> = [
 ];
 
 export function AdvisoryTabs({ value, onChange, totalCount, categoryCounts }: AdvisoryTabsProps) {
+  const { t } = useTranslation('chrome');
   return (
     <div role="tablist" className="flex items-center gap-1">
       {TABS.map((tab) => {
@@ -35,7 +37,7 @@ export function AdvisoryTabs({ value, onChange, totalCount, categoryCounts }: Ad
               isActive ? 'bg-toast text-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            {tab.label}
+            {t(`advisor.tabs.${tab.value}`, { defaultValue: tab.label })}
             {typeof count === 'number' && (
               <Badge variant="default" className="h-5 rounded px-1.5 text-xs">
                 {count}

@@ -1,0 +1,46 @@
+---
+title: "後端分支"
+sidebarTitle: "Branching"
+description: "轉動後端的隔離複本以測試結構描述和設定變更"
+---
+
+分支是一個子專案，具有自己的 Postgres、身份驗證設定、儲存體、邊界函數、電子郵件範本、即時通道和排程。在準備好時合併回去或重設並重試。可在 InsForge OSS 2.1.0+ 上使用。
+
+## 概念
+
+每個分支在自己的 EC2 實例上執行，從建立時的父項還原。`merge` 針對父項的建立時狀態執行三向差異。分支共享父項的 `JWT_SECRET` 但取得自己的 `API_KEY`。計算服務和前端部署不分支。
+
+## 用法
+
+使用 `full`（結構描述 + 資料）或 `schema-only`（更快，使用者表為空）建立分支。
+
+```bash
+npx @insforge/cli branch create feat-billing --mode full
+npx @insforge/cli branch list
+```
+
+在套用前預覽合併 SQL。
+
+```bash
+npx @insforge/cli branch merge feat-billing --dry-run --save-sql ./preview.sql
+npx @insforge/cli branch merge feat-billing
+```
+
+回復到建立時快照或刪除分支。
+
+```bash
+npx @insforge/cli branch reset feat-billing
+npx @insforge/cli branch delete feat-billing
+```
+
+## 特定用途案例
+
+對危險的結構描述移轉、RLS 重寫、OAuth 提供者交換和邊界函數重構使用分支。跳過瑣碎的變更和資料回填（使用者資料列不會自動合併）。
+
+合併在衝突時阻止。在分支上解決或重設並重試。配額：每個組織 3 個父專案、每個父項最多 2 個使用中分支、無巢狀。成功合併不會自動刪除分支。
+
+## 更多資源
+
+- [資料庫移轉](/core-concepts/database/migrations)用於純前向 SQL 檔案。
+- [資料庫概覽](/core-concepts/database/overview)了解每個分支下執行什麼。
+- [CLI 參考](https://github.com/InsForge/InsForge)用於完整的 `branch` 旗標集。
