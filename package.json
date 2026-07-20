@@ -72,7 +72,7 @@
     "dompurify": "3.4.12",
     "follow-redirects": "^1.16.0",
     "uuid": "^14.0.0",
-    "axios": "^1.16.1",
+    "axios": "1.18.1",
     "ws": "^8.21.0",
     "qs": "^6.15.2",
     "minimatch@10": {
