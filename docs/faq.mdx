@@ -199,4 +199,19 @@ description: "Answers to common InsForge questions on database calls, edge funct
 
     The string connects as the privileged `postgres` role, so it isn't limited by row-level security and it embeds that role's password. Treat it like a secret: keep it server-side and never ship it to the browser.
   </Accordion>
+
+  <Accordion title="How do I take down or remove a deployed site?">
+    A [Site](/core-concepts/sites/overview) belongs to its project — there is no separate "delete this deployment" command. To take a site down for good, delete the project it lives in, which removes the deployment along with the database, storage, and everything else:
+
+    ```bash
+    npx @insforge/cli projects delete --project <id>
+    ```
+
+    This is irreversible. From the dashboard, project deletion lives under **Settings → General**. See [the CLI harness](/agent-native/cli-harness) for the full `projects delete` behavior and safeguards.
+
+    Two related actions that are *not* the same as removing a live site:
+
+    - **Cancel a build that's still running:** `npx @insforge/cli deployments cancel <id>` stops an in-progress deployment; it does not take down a site that is already live.
+    - **Replace what's live:** redeploy over the same site with `npx @insforge/cli deployments deploy ./frontend` — the newest ready deployment serves the URL.
+  </Accordion>
 </AccordionGroup>

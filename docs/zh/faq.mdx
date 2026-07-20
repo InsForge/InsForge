@@ -199,4 +199,19 @@ description: "解答 InsForge 常见问题：数据库调用、Edge Function 与
 
     这个串以拥有完整权限的 `postgres` 角色连接，因此不受行级安全（RLS）限制，而且串里嵌了该角色的密码。请把它当成机密：只在服务端使用，绝不要发到浏览器。
   </Accordion>
+
+  <Accordion title="怎么下线或删除已部署的站点（site）？">
+    [Site](/core-concepts/sites/overview) 属于它所在的项目——没有单独的"删除这个部署"命令。想彻底下线一个站点，就删除它所在的项目，这会连同数据库、Storage 以及其他所有资源一起把部署删掉：
+
+    ```bash
+    npx @insforge/cli projects delete --project <id>
+    ```
+
+    此操作不可逆。在 dashboard 里，删除项目位于 **Settings → General**。完整的 `projects delete` 行为和防护措施见 [CLI harness](/agent-native/cli-harness)。
+
+    有两个相关操作，和"下线一个已上线站点"并不是一回事：
+
+    - **取消还在跑的构建：** `npx @insforge/cli deployments cancel <id>` 会终止一个进行中的部署；它不会下线一个已经上线的站点。
+    - **替换当前上线的内容：** 用 `npx @insforge/cli deployments deploy ./frontend` 在同一个站点上重新部署——最新一次 ready 的部署会接管这个 URL。
+  </Accordion>
 </AccordionGroup>

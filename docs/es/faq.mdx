@@ -199,4 +199,19 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
 
     La cadena se conecta con el rol privilegiado `postgres`, por lo que no está limitada por row-level security e incluye la contraseña de ese rol. Trátala como un secreto: mantenla en el servidor y nunca la envíes al navegador.
   </Accordion>
+
+  <Accordion title="¿Cómo doy de baja o elimino un sitio desplegado?">
+    Un [Site](/core-concepts/sites/overview) pertenece a su proyecto: no hay un comando aparte para "eliminar este despliegue". Para dar de baja un sitio de forma definitiva, elimina el proyecto en el que vive, lo que quita el despliegue junto con la base de datos, el Storage y todo lo demás:
+
+    ```bash
+    npx @insforge/cli projects delete --project <id>
+    ```
+
+    Es irreversible. Desde el dashboard, la eliminación del proyecto está en **Settings → General**. Consulta [el CLI harness](/agent-native/cli-harness) para conocer el comportamiento completo de `projects delete` y sus salvaguardas.
+
+    Dos acciones relacionadas que *no* son lo mismo que eliminar un sitio en vivo:
+
+    - **Cancelar una compilación en curso:** `npx @insforge/cli deployments cancel <id>` detiene un despliegue en progreso; no da de baja un sitio que ya está en vivo.
+    - **Reemplazar lo que está en vivo:** vuelve a desplegar sobre el mismo sitio con `npx @insforge/cli deployments deploy ./frontend` — el despliegue ready más reciente sirve la URL.
+  </Accordion>
 </AccordionGroup>
