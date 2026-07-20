@@ -117,7 +117,28 @@ describe('AI config routes', () => {
         actor: 'admin-1',
         action: 'UPDATE_MODEL_GATEWAY_CONFIG',
         module: 'AI',
-        details: { updatedFields: ['apiKey', 'managementKey'] },
+        details: { updatedFields: ['apiKey', 'managementKey'], outcome: 'succeeded' },
+      })
+    );
+    expect(JSON.stringify(auditMock.log.mock.calls)).not.toContain('new-api-key');
+    expect(JSON.stringify(auditMock.log.mock.calls)).not.toContain('new-management-key');
+  });
+
+  it('audits field names when an independent credential update fails', async () => {
+    configServiceMock.updateConfig.mockRejectedValueOnce(new Error('management update failed'));
+
+    const response = await request(await createApp())
+      .put('/api/ai/config')
+      .send({
+        apiKey: 'new-api-key',
+        managementKey: 'new-management-key',
+      });
+
+    expect(response.status).toBe(500);
+    expect(auditMock.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'UPDATE_MODEL_GATEWAY_CONFIG',
+        details: { updatedFields: ['apiKey', 'managementKey'], outcome: 'failed' },
       })
     );
     expect(JSON.stringify(auditMock.log.mock.calls)).not.toContain('new-api-key');

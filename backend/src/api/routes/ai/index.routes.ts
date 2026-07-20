@@ -53,12 +53,31 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
         ERROR_CODES.INVALID_INPUT
       );
     }
-    const config = await modelGatewayConfigService.updateConfig(validation.data);
+    const updatedFields = Object.keys(validation.data);
+    let config: Awaited<ReturnType<typeof modelGatewayConfigService.updateConfig>>;
+    try {
+      config = await modelGatewayConfigService.updateConfig(validation.data);
+    } catch (error) {
+      try {
+        await auditService.log({
+          actor: req.hasApiKey ? 'api-key' : req.user?.id,
+          action: 'UPDATE_MODEL_GATEWAY_CONFIG',
+          module: 'AI',
+          details: { updatedFields, outcome: 'failed' },
+          ip_address: req.ip,
+        });
+      } catch (auditError) {
+        logger.error('Failed to audit a failed Model Gateway configuration update', {
+          error: auditError instanceof Error ? auditError.message : String(auditError),
+        });
+      }
+      throw error;
+    }
     await auditService.log({
       actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'UPDATE_MODEL_GATEWAY_CONFIG',
       module: 'AI',
-      details: { updatedFields: Object.keys(validation.data) },
+      details: { updatedFields, outcome: 'succeeded' },
       ip_address: req.ip,
     });
     successResponse(res, config);
