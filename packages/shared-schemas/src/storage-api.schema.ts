@@ -38,12 +38,12 @@ export const deleteObjectsResponseSchema = z.object({
 
 // Upload strategy schemas
 export const uploadStrategyRequestSchema = z.object({
+  // The object key to upload to. Uploading to an existing key replaces it
+  // (standard PUT semantics). Callers that want a server-generated unique
+  // key use POST /objects instead.
   filename: z.string().min(1, 'Filename cannot be empty'),
   contentType: z.string().optional(),
   size: z.number().optional(),
-  // Ask the server to mint a unique key from the filename instead of using
-  // it verbatim (same semantics as the auto-key POST upload route).
-  autoKey: z.boolean().optional(),
 });
 
 export const uploadStrategyResponseSchema = z.object({

@@ -51,12 +51,11 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|----------|-------------|
-| `filename` | string | Sí | Clave de objeto usada literalmente, salvo que se active `autoKey` |
+| `filename` | string | Sí | Clave de objeto a la que subir (usada literalmente) |
 | `contentType` | string | No | Tipo MIME del archivo |
 | `size` | integer | No | Tamaño de archivo en bytes |
-| `autoKey` | boolean | No | Genera una clave única a partir de `filename`. Por defecto es `false` |
 
-Cargar en una clave de objeto existente reemplaza el objeto actual. Usa `autoKey` cuando necesites que el servidor genere una clave nueva.
+Cargar en una clave de objeto existente reemplaza el objeto actual. Para subir con una clave única generada por el servidor, usa `POST /api/storage/buckets/{bucketName}/objects`.
 
 #### Ejemplo
 

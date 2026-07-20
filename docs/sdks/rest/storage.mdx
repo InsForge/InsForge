@@ -51,12 +51,11 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `filename` | string | Yes | Object key to use verbatim unless `autoKey` is enabled |
+| `filename` | string | Yes | Object key to upload to (used verbatim) |
 | `contentType` | string | No | MIME type of the file |
 | `size` | integer | No | File size in bytes |
-| `autoKey` | boolean | No | Generate a unique key from `filename`. Defaults to `false` |
 
-Uploading to an existing object key replaces the current object. Set `autoKey` when you need the server to generate a new key instead.
+Uploading to an existing object key replaces the current object. To upload with a server-generated unique key instead, use `POST /api/storage/buckets/{bucketName}/objects`.
 
 #### Example
 

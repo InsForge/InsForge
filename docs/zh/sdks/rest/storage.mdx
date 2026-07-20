@@ -51,12 +51,11 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 
 | 字段 | 类型 | 必需 | 说明 |
 |-------|------|----------|-------------|
-| `filename` | string | 是 | 对象键；除非启用 `autoKey`，否则按原样使用 |
+| `filename` | string | 是 | 要上传到的对象键（按原样使用） |
 | `contentType` | string | 否 | 文件的MIME类型 |
 | `size` | integer | 否 | 文件大小（字节） |
-| `autoKey` | boolean | 否 | 根据 `filename` 生成唯一键。默认为 `false` |
 
-上传到已有对象键会替换当前对象。如需服务器生成新键，请启用 `autoKey`。
+上传到已有对象键会替换当前对象。如需使用服务器生成的唯一键，请改用 `POST /api/storage/buckets/{bucketName}/objects`。
 
 #### 示例
 

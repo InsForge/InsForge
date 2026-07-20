@@ -556,8 +556,7 @@ export class StorageService {
       size?: number;
     },
     hasApiKey: boolean = false,
-    contentType: string = 'application/octet-stream',
-    options: { autoKey?: boolean } = {}
+    contentType: string = 'application/octet-stream'
   ) {
     this.validateBucketName(bucket);
 
@@ -565,12 +564,10 @@ export class StorageService {
       throw new Error(`Bucket "${bucket}" does not exist`);
     }
 
-    // autoKey callers ask the server to mint a unique key from the filename
-    // (timestamp + random suffix), matching the auto-key POST upload route.
-    // Otherwise the filename is the exact object key and a later upload to
-    // that key replaces the current object, matching S3 PUT semantics.
-    const key =
-      options.autoKey === true ? this.generateObjectKey(metadata.filename) : metadata.filename;
+    // The filename is the exact object key; a later upload to that key
+    // replaces the current object, matching S3 PUT semantics. Callers that
+    // want a server-generated unique key use the POST /objects route.
+    const key = metadata.filename;
     this.validateKey(key);
 
     const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();

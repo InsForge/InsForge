@@ -51,12 +51,11 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 
 | 欄位 | 類型 | 必需 | 說明 |
 |-------|------|----------|-------------|
-| `filename` | string | 是 | 物件金鑰；除非啟用 `autoKey`，否則依原樣使用 |
+| `filename` | string | 是 | 要上傳到的物件金鑰（依原樣使用） |
 | `contentType` | string | 否 | 檔案的MIME類型 |
 | `size` | integer | 否 | 檔案大小（位元組） |
-| `autoKey` | boolean | 否 | 根據 `filename` 產生唯一金鑰。預設為 `false` |
 
-上傳至現有物件金鑰會取代目前的物件。如需伺服器產生新金鑰，請啟用 `autoKey`。
+上傳至現有物件金鑰會取代目前的物件。如需使用伺服器產生的唯一金鑰，請改用 `POST /api/storage/buckets/{bucketName}/objects`。
 
 #### 範例
 

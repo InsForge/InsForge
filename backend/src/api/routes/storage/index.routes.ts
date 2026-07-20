@@ -719,7 +719,7 @@ router.post(
           ERROR_CODES.STORAGE_INVALID_PARAMETER
         );
       }
-      const { filename, contentType, size, autoKey } = validation.data;
+      const { filename, contentType, size } = validation.data;
 
       const requestedType =
         typeof contentType === 'string' && contentType.trim()
@@ -734,8 +734,7 @@ router.post(
         bucketName,
         { filename, contentType: safeContentType, size },
         !!req.hasApiKey,
-        safeContentType,
-        { autoKey: autoKey === true }
+        safeContentType
       );
 
       successResponse(res, strategy);
@@ -798,7 +797,11 @@ router.post(
         // Best-effort notification; do not fail completed storage mutation
       }
 
-      successResponse(res, fileInfo, 201);
+      // 200, matching the direct PUT route: confirm-upload finalizes a
+      // create-or-replace, and without a read-back we can't distinguish the
+      // two cases (deriving it would need RETURNING, which re-applies SELECT
+      // RLS to the write — deliberately avoided here).
+      successResponse(res, fileInfo, 200);
     } catch (error) {
       if (error instanceof AppError) {
         next(error);
