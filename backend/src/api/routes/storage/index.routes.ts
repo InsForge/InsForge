@@ -804,7 +804,9 @@ router.post(
 
       successResponse(res, fileInfo, 201);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('not found')) {
+      if (error instanceof AppError) {
+        next(error);
+      } else if (error instanceof Error && error.message.includes('not found')) {
         next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
       } else if (error instanceof Error && error.message.includes('already confirmed')) {
         next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));

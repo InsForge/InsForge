@@ -907,7 +907,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "ALREADY_CONFIRMED"
+                error: "STORAGE_ALREADY_EXISTS"
                 message: "File 'profile-photo.jpg' already confirmed in bucket 'avatars'"
                 statusCode: 409
 
