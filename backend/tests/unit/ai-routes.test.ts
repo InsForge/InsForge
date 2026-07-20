@@ -143,6 +143,19 @@ describe('AI config routes', () => {
     expect(JSON.stringify(auditMock.log.mock.calls)).not.toContain('new-management-key');
   });
 
+  it('returns the successful credential update when success audit logging fails', async () => {
+    auditMock.log.mockRejectedValueOnce(new Error('audit insert failed'));
+
+    const response = await request(await createApp())
+      .put('/api/ai/config')
+      .send({ apiKey: 'new-api-key' });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(config);
+    expect(configServiceMock.updateConfig).toHaveBeenCalledWith({ apiKey: 'new-api-key' });
+    expect(auditMock.log).toHaveBeenCalledOnce();
+  });
+
   it('audits exact field outcomes when an independent credential update partially succeeds', async () => {
     configServiceMock.updateConfig.mockRejectedValueOnce(
       new configUpdateErrorMock.ModelGatewayConfigUpdateError(

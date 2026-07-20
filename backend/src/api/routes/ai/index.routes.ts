@@ -84,13 +84,19 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
       }
       throw error;
     }
-    await auditService.log({
-      actor: req.hasApiKey ? 'api-key' : req.user?.id,
-      action: 'UPDATE_MODEL_GATEWAY_CONFIG',
-      module: 'AI',
-      details: { updatedFields, failedFields: [], outcome: 'succeeded' },
-      ip_address: req.ip,
-    });
+    try {
+      await auditService.log({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'UPDATE_MODEL_GATEWAY_CONFIG',
+        module: 'AI',
+        details: { updatedFields, failedFields: [], outcome: 'succeeded' },
+        ip_address: req.ip,
+      });
+    } catch (auditError) {
+      logger.error('Failed to audit a successful Model Gateway configuration update', {
+        error: auditError instanceof Error ? auditError.message : String(auditError),
+      });
+    }
     successResponse(res, config);
   } catch (error) {
     next(error);
