@@ -18,7 +18,7 @@ import { LocalStorageProvider } from '@/providers/storage/local.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import { StorageConfigService } from '@/services/storage/storage-config.service.js';
 import logger from '@/utils/logger.js';
-import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
+import { escapeSqlLikePattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
 import { appConfig } from '@/infra/config/app.config.js';
 
@@ -148,66 +148,17 @@ export class StorageService {
   }
 
   /**
-   * Generate the next available key for a file, using (1), (2), (3) pattern if duplicates exist
-   * @param bucket - The bucket name
-   * @param originalKey - The original filename
-   * @returns The next available key
+   * Raw-pool existence check for a (bucket, key) pair. Runs on the admin
+   * pool deliberately: the keyspace is globally unique while RLS may hide
+   * the colliding row from the caller, and the conflict answer must be
+   * accurate regardless of row visibility.
    */
-  private async generateNextAvailableKey(
-    bucket: string,
-    originalKey: string,
-    db: PoolClient | Pool
-  ): Promise<string> {
-    // Parse filename and extension for potential auto-renaming
-    const lastDotIndex = originalKey.lastIndexOf('.');
-    const baseName = lastDotIndex > 0 ? originalKey.substring(0, lastDotIndex) : originalKey;
-    const extension = lastDotIndex > 0 ? originalKey.substring(lastDotIndex) : '';
-
-    // Dedup runs on the admin pool so it sees ALL rows, not just those
-    // RLS lets the caller view. Otherwise an RLS-hidden collision would
-    // pass the check and silently overwrite another user's blob — the
-    // (bucket, key) keyspace is globally unique. Two users uploading
-    // `note.txt` get `note.txt` and `note (1).txt` respectively.
-    const result = await db.query(
-      `
-        SELECT key FROM storage.objects
-        WHERE bucket = $1
-        AND (key = $2 OR key LIKE $3)
-      `,
-      [
-        bucket,
-        originalKey,
-        `${escapeSqlLikePattern(baseName)} (%)${escapeSqlLikePattern(extension)}`,
-      ]
+  private async objectKeyExists(bucket: string, key: string): Promise<boolean> {
+    const result = await this.getPool().query(
+      'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+      [bucket, key]
     );
-
-    const existingFiles = result.rows;
-    let finalKey = originalKey;
-
-    if (existingFiles.length) {
-      // Extract counter numbers from existing files
-      let incrementNumber = 0;
-      // This regex is used to match the counter number in the filename, extract the increment number
-      const counterRegex = new RegExp(
-        `^${escapeRegexPattern(baseName)} \\((\\d+)\\)${escapeRegexPattern(extension)}$`
-      );
-
-      for (const file of existingFiles as { key: string }[]) {
-        if (file.key === originalKey) {
-          incrementNumber = Math.max(incrementNumber, 0); // Original file exists, so we need at least (1)
-        } else {
-          const match = file.key.match(counterRegex);
-          if (match) {
-            incrementNumber = Math.max(incrementNumber, parseInt(match[1], 10));
-          }
-        }
-      }
-
-      // Generate the next available filename
-      finalKey = `${baseName} (${incrementNumber + 1})${extension}`;
-    }
-
-    return finalKey;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async putObject(
@@ -215,13 +166,22 @@ export class StorageService {
     bucket: string,
     originalKey: string,
     file: Express.Multer.File,
-    hasApiKey: boolean = false
-  ): Promise<StorageFileSchema> {
+    hasApiKey: boolean = false,
+    options: { upsert?: boolean } = {}
+  ): Promise<{ object: StorageFileSchema; replaced: boolean }> {
     this.validateBucketName(bucket);
     this.validateKey(originalKey);
+    const upsert = options.upsert === true;
 
-    // Raw-pool dedup sees all rows and avoids silent cross-user blob overwrite.
-    const finalKey = await this.generateNextAvailableKey(bucket, originalKey, this.getPool());
+    const finalKey = originalKey;
+    const exists = await this.objectKeyExists(bucket, finalKey);
+    if (exists && !upsert) {
+      throw new AppError(
+        `Object "${finalKey}" already exists in bucket "${bucket}". Pass upsert=true to replace it.`,
+        409,
+        ERROR_CODES.STORAGE_ALREADY_EXISTS
+      );
+    }
 
     const userId = ctx?.role === 'authenticated' ? ctx.id : null;
     // Set uploaded_at app-side instead of reading back the DB default via
@@ -232,29 +192,56 @@ export class StorageService {
     // gated only by the INSERT policy's WITH CHECK.
     const uploadedAt = new Date();
     const insertObject = async (db: PoolClient) => {
-      // INSERT before provider write so UNIQUE (bucket, key) catches any
-      // race-window collision before any blob is touched. Provider write
-      // stays inside the transaction — a provider failure throws, the tx
-      // rolls back, and no orphan row remains.
-      await db.query(
-        `
-        INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via, uploaded_at)
-        VALUES ($1, $2, $3, $4, $5, 'rest', $6)
-      `,
-        [bucket, finalKey, file.size, file.mimetype || null, userId, uploadedAt]
-      );
+      if (upsert) {
+        // ON CONFLICT DO UPDATE deliberately leaves uploaded_by untouched:
+        // replacing an object's content must not reassign ownership (an
+        // admin/API-key replace of a user's object would otherwise strip it
+        // to NULL — same rationale as upsertS3Object). Under an end-user RLS
+        // context Postgres applies the table's UPDATE policies (USING against
+        // the existing row, WITH CHECK against the result) to the conflict
+        // arm, so replacing an object the caller cannot update raises an RLS
+        // violation instead of silently overwriting another user's blob.
+        await db.query(
+          `
+          INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via, uploaded_at)
+          VALUES ($1, $2, $3, $4, $5, 'rest', $6)
+          ON CONFLICT (bucket, key) DO UPDATE SET
+            size         = EXCLUDED.size,
+            mime_type    = EXCLUDED.mime_type,
+            uploaded_via = EXCLUDED.uploaded_via,
+            uploaded_at  = EXCLUDED.uploaded_at
+        `,
+          [bucket, finalKey, file.size, file.mimetype || null, userId, uploadedAt]
+        );
+      } else {
+        // INSERT before provider write so UNIQUE (bucket, key) catches any
+        // race-window collision before any blob is touched. Provider write
+        // stays inside the transaction — a provider failure throws, the tx
+        // rolls back, and no orphan row remains.
+        await db.query(
+          `
+          INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via, uploaded_at)
+          VALUES ($1, $2, $3, $4, $5, 'rest', $6)
+        `,
+          [bucket, finalKey, file.size, file.mimetype || null, userId, uploadedAt]
+        );
+      }
 
       const { etag: providerEtag } = await this.provider.putObject(bucket, finalKey, file);
       return { etag: providerEtag, uploadedAt };
     };
     let uploadedObject: Awaited<ReturnType<typeof insertObject>>;
-    if (hasApiKey || ctx?.role === 'project_admin') {
-      uploadedObject = await runWithRootAccess(this.getPool(), insertObject);
-    } else {
-      if (!ctx) {
-        throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
+    try {
+      if (hasApiKey || ctx?.role === 'project_admin') {
+        uploadedObject = await runWithRootAccess(this.getPool(), insertObject);
+      } else {
+        if (!ctx) {
+          throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
+        }
+        uploadedObject = await withUserContext(this.getPool(), ctx, insertObject);
       }
-      uploadedObject = await withUserContext(this.getPool(), ctx, insertObject);
+    } catch (error) {
+      throw this.mapObjectWriteError(error, bucket, finalKey);
     }
     const { etag } = uploadedObject;
 
@@ -283,13 +270,41 @@ export class StorageService {
     }
 
     return {
-      bucket,
-      key: finalKey,
-      size: file.size,
-      mimeType: file.mimetype,
-      uploadedAt: uploadedAt.toISOString(),
-      url: this.buildObjectUrl(bucket, finalKey, etag || uploadedAt),
+      object: {
+        bucket,
+        key: finalKey,
+        size: file.size,
+        mimeType: file.mimetype,
+        uploadedAt: uploadedAt.toISOString(),
+        url: this.buildObjectUrl(bucket, finalKey, etag || uploadedAt),
+      },
+      replaced: exists,
     };
+  }
+
+  /**
+   * Map low-level object-write failures to friendly AppErrors:
+   * - 23505 (unique_violation): another upload won the (bucket, key) race.
+   * - 42501 (insufficient_privilege): RLS rejected the write — for upsert,
+   *   the caller tried to replace an object their UPDATE policy doesn't cover.
+   */
+  private mapObjectWriteError(error: unknown, bucket: string, key: string): unknown {
+    const code = (error as { code?: string })?.code;
+    if (code === '23505') {
+      return new AppError(
+        `Object "${key}" already exists in bucket "${bucket}". Pass upsert=true to replace it.`,
+        409,
+        ERROR_CODES.STORAGE_ALREADY_EXISTS
+      );
+    }
+    if (code === '42501') {
+      return new AppError(
+        `You do not have permission to write "${key}" in bucket "${bucket}"`,
+        403,
+        ERROR_CODES.STORAGE_PERMISSION_DENIED
+      );
+    }
+    return error;
   }
 
   async getObject(
@@ -589,15 +604,32 @@ export class StorageService {
       size?: number;
     },
     hasApiKey: boolean = false,
-    contentType: string = 'application/octet-stream'
+    contentType: string = 'application/octet-stream',
+    options: { upsert?: boolean; autoKey?: boolean } = {}
   ) {
     this.validateBucketName(bucket);
+    const upsert = options.upsert === true;
 
     if (!(await this.bucketExists(bucket))) {
       throw new Error(`Bucket "${bucket}" does not exist`);
     }
 
-    const key = await this.generateNextAvailableKey(bucket, metadata.filename, this.getPool());
+    // autoKey callers ask the server to mint a unique key from the filename
+    // (timestamp + random suffix) — same semantics as the auto-key POST
+    // upload route. Explicit-key callers get standard PUT semantics: 409 on
+    // conflict unless upsert is set.
+    const key =
+      options.autoKey === true ? this.generateObjectKey(metadata.filename) : metadata.filename;
+    this.validateKey(key);
+    const exists = options.autoKey === true ? false : await this.objectKeyExists(bucket, key);
+    if (exists && !upsert) {
+      throw new AppError(
+        `Object "${key}" already exists in bucket "${bucket}". Pass upsert=true to replace it.`,
+        409,
+        ERROR_CODES.STORAGE_ALREADY_EXISTS
+      );
+    }
+
     const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
     if (hasApiKey || ctx?.role === 'project_admin') {
       return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes, contentType);
@@ -606,14 +638,34 @@ export class StorageService {
       throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
     }
     const userId = ctx?.role === 'authenticated' ? ctx.id : null;
+    // A presigned URL bypasses RLS at redeem time, so write permission must
+    // be proven BEFORE issuing one. Probe the exact statement the confirm
+    // step will run — INSERT for a new key, RLS-gated UPDATE for a replace —
+    // inside a savepoint that is always rolled back.
     await withUserContext(this.getPool(), ctx, async (client) => {
       await client.query('SAVEPOINT upload_strategy_rls_probe');
       try {
-        await client.query(
-          `INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
-           VALUES ($1, $2, 0, $3, $4, 'rest')`,
-          [bucket, key, metadata.contentType || null, userId]
-        );
+        if (exists) {
+          const probe = await client.query(
+            `UPDATE storage.objects SET uploaded_at = uploaded_at WHERE bucket = $1 AND key = $2`,
+            [bucket, key]
+          );
+          if ((probe.rowCount ?? 0) === 0) {
+            // RLS hides the row from this caller's UPDATE policy — they may
+            // not replace someone else's object.
+            throw new AppError(
+              `You do not have permission to replace "${key}" in bucket "${bucket}"`,
+              403,
+              ERROR_CODES.STORAGE_PERMISSION_DENIED
+            );
+          }
+        } else {
+          await client.query(
+            `INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
+             VALUES ($1, $2, 0, $3, $4, 'rest')`,
+            [bucket, key, metadata.contentType || null, userId]
+          );
+        }
       } finally {
         await client.query('ROLLBACK TO SAVEPOINT upload_strategy_rls_probe');
         await client.query('RELEASE SAVEPOINT upload_strategy_rls_probe');
@@ -714,10 +766,12 @@ export class StorageService {
       contentType?: string;
       etag?: string;
     },
-    hasApiKey: boolean = false
+    hasApiKey: boolean = false,
+    options: { upsert?: boolean } = {}
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(key);
+    const upsert = options.upsert === true;
 
     // Verify the file exists in storage and get its actual size + etag.
     // The server-side etag overrides whatever the client passed: browsers
@@ -743,24 +797,21 @@ export class StorageService {
       throw new Error(`File size exceeds the configured maximum upload size of ${limitMb} MB`);
     }
 
-    // Already-confirmed check runs on the admin pool deliberately — the
-    // friendly "already confirmed" error must fire even when the existing
-    // row was uploaded by a different user (RLS would hide it). Falling
-    // through to the INSERT in that case would either raise a unique
-    // constraint violation (worse UX) or silently shadow the original
-    // row depending on the schema.
-    const existingResult = await this.getPool().query(
-      'SELECT key FROM storage.objects WHERE bucket = $1 AND key = $2',
-      [bucket, key]
-    );
-
-    if (existingResult.rows[0]) {
+    // Existence check runs on the admin pool deliberately — the friendly
+    // "already confirmed" error (and correct insert-vs-update choice for
+    // upsert) must fire even when the existing row was uploaded by a
+    // different user (RLS would hide it). Falling through to the INSERT in
+    // that case would either raise a unique constraint violation (worse UX)
+    // or silently shadow the original row depending on the schema.
+    const rowExists = await this.objectKeyExists(bucket, key);
+    if (rowExists && !upsert) {
       throw new Error(`File "${key}" already confirmed in bucket "${bucket}"`);
     }
 
-    // INSERT runs through withUserContext for end-user callers, so the RLS
-    // WITH CHECK on storage_objects_owner_insert verifies uploaded_by =
-    // jwt.sub. Admin/API-key callers use the backend pool.
+    // Writes run through withUserContext for end-user callers, so the RLS
+    // policies on storage.objects gate them (INSERT WITH CHECK for new keys,
+    // UPDATE USING/WITH CHECK for replaces). Admin/API-key callers use the
+    // backend pool.
     const userId = ctx?.role === 'authenticated' ? ctx.id : null;
     // Set uploaded_at app-side instead of reading it back via RETURNING. Under
     // RLS, INSERT ... RETURNING also enforces the table's SELECT policies on
@@ -768,19 +819,43 @@ export class StorageService {
     // an INSERT policy but no covering SELECT policy. A plain INSERT is gated
     // solely by the INSERT policy's WITH CHECK, which is the intended check.
     const uploadedAt = new Date();
-    const insertObjectRow = (db: PoolClient) =>
-      db.query(
-        `INSERT INTO storage.objects (bucket, key, size, mime_type, etag, uploaded_by, uploaded_via, uploaded_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 'rest', $7)`,
-        [bucket, key, fileSize, metadata.contentType || null, finalEtag, userId, uploadedAt]
-      );
-    if (hasApiKey || ctx?.role === 'project_admin') {
-      await runWithRootAccess(this.getPool(), insertObjectRow);
-    } else {
-      if (!ctx) {
-        throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
+    const writeObjectRow = async (db: PoolClient) => {
+      if (rowExists) {
+        // Replace: refresh content metadata but leave uploaded_by untouched
+        // so replacing an object never reassigns its ownership. rowCount 0
+        // means RLS hid the row from this caller's UPDATE policy.
+        const updated = await db.query(
+          `UPDATE storage.objects
+           SET size = $3, mime_type = $4, etag = $5, uploaded_via = 'rest', uploaded_at = $6
+           WHERE bucket = $1 AND key = $2`,
+          [bucket, key, fileSize, metadata.contentType || null, finalEtag, uploadedAt]
+        );
+        if ((updated.rowCount ?? 0) === 0) {
+          throw new AppError(
+            `You do not have permission to replace "${key}" in bucket "${bucket}"`,
+            403,
+            ERROR_CODES.STORAGE_PERMISSION_DENIED
+          );
+        }
+      } else {
+        await db.query(
+          `INSERT INTO storage.objects (bucket, key, size, mime_type, etag, uploaded_by, uploaded_via, uploaded_at)
+           VALUES ($1, $2, $3, $4, $5, $6, 'rest', $7)`,
+          [bucket, key, fileSize, metadata.contentType || null, finalEtag, userId, uploadedAt]
+        );
       }
-      await withUserContext(this.getPool(), ctx, insertObjectRow);
+    };
+    try {
+      if (hasApiKey || ctx?.role === 'project_admin') {
+        await runWithRootAccess(this.getPool(), writeObjectRow);
+      } else {
+        if (!ctx) {
+          throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
+        }
+        await withUserContext(this.getPool(), ctx, writeObjectRow);
+      }
+    } catch (error) {
+      throw this.mapObjectWriteError(error, bucket, key);
     }
 
     return {

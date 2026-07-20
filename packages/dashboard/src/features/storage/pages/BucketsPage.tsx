@@ -6,6 +6,8 @@ import PencilIcon from '#assets/icons/pencil.svg?react';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { useBuckets } from '#features/storage/hooks/useBuckets';
 import { useStorageObjects } from '#features/storage/hooks/useStorageObjects';
+import { storageService } from '#features/storage/services/storage.service';
+import { nextAvailableObjectKey } from '#features/storage/helpers';
 import { StorageSidebar } from '#features/storage/components/StorageSidebar';
 import { StorageDataGrid } from '#features/storage/components/StorageDataGrid';
 import { BucketFormDialog } from '#features/storage/components/BucketFormDialog';
@@ -171,6 +173,44 @@ export default function BucketsPage() {
       return;
     }
 
+    // The storage API has standard PUT semantics: an existing key is rejected
+    // with 409. The dashboard keeps the friendly auto-rename UX by picking the
+    // next free "name (N).ext" client-side and retrying — replaces never
+    // happen implicitly from here.
+    const uploadObjectWithAutoRename = async (bucket: string, file: File) => {
+      const isConflict = (error: unknown) => (error as { status?: number })?.status === 409;
+      try {
+        return await uploadObject({ bucket, objectKey: file.name, file });
+      } catch (error) {
+        if (!isConflict(error)) {
+          throw error;
+        }
+      }
+
+      const lastDotIndex = file.name.lastIndexOf('.');
+      const baseName = lastDotIndex > 0 ? file.name.slice(0, lastDotIndex) : file.name;
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { objects } = await storageService.listObjects(bucket, { limit: 1000 }, baseName);
+        // Force the conflicting name into the list: the server said it exists,
+        // even if the (paginated) search listing missed it.
+        const candidateKey = nextAvailableObjectKey(
+          [...objects.map((object) => object.key), file.name],
+          file.name
+        );
+        try {
+          return await uploadObject({ bucket, objectKey: candidateKey, file });
+        } catch (error) {
+          if (!isConflict(error)) {
+            throw error;
+          }
+          // Another upload took the candidate between listing and PUT; re-list.
+          lastError = error;
+        }
+      }
+      throw lastError;
+    };
+
     setIsUploading(true);
 
     // Create abort controller for cancellation
@@ -200,11 +240,7 @@ export default function BucketsPage() {
       updateUploadProgress(toastId, progress);
 
       try {
-        await uploadObject({
-          bucket: selectedBucket,
-          objectKey: files[i].name,
-          file: files[i],
-        });
+        await uploadObjectWithAutoRename(selectedBucket, files[i]);
         successCount++;
       } catch (error) {
         // Handle individual file upload error

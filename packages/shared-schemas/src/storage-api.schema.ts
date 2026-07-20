@@ -41,6 +41,12 @@ export const uploadStrategyRequestSchema = z.object({
   filename: z.string().min(1, 'Filename cannot be empty'),
   contentType: z.string().optional(),
   size: z.number().optional(),
+  // Replace the object at this key if it already exists. Defaults to false,
+  // in which case a conflicting key is rejected with 409.
+  upsert: z.boolean().optional(),
+  // Ask the server to mint a unique key from the filename instead of using
+  // it verbatim (same semantics as the auto-key POST upload route).
+  autoKey: z.boolean().optional(),
 });
 
 export const uploadStrategyResponseSchema = z.object({
@@ -68,6 +74,9 @@ export const confirmUploadRequestSchema = z.object({
   size: z.number(),
   contentType: z.string().optional(),
   etag: z.string().optional(),
+  // Must match the upsert flag the upload strategy was requested with, so
+  // confirming a replacement updates the existing metadata row.
+  upsert: z.boolean().optional(),
 });
 
 export const updateStorageConfigRequestSchema = z.object({

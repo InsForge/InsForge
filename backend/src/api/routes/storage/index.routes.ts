@@ -289,7 +289,7 @@ router.get(
             total: result.total,
           },
           nextActions:
-            'You can use PUT /api/storage/buckets/:bucketName/objects/:objectKey to upload with a specific key, or POST /api/storage/buckets/:bucketName/objects to upload with auto-generated key, and GET /api/storage/buckets/:bucketName/objects/:objectKey to download an object.',
+            'You can use PUT /api/storage/buckets/:bucketName/objects/:objectKey to upload with a specific key (409 if the key exists; add ?upsert=true to replace it), or POST /api/storage/buckets/:bucketName/objects to upload with auto-generated key, and GET /api/storage/buckets/:bucketName/objects/:objectKey to download an object.',
         },
         200
       );
@@ -299,7 +299,10 @@ router.get(
   }
 );
 
-// PUT /api/storage/buckets/:bucketName/objects/:objectKey - Upload object to bucket (requires auth)
+// PUT /api/storage/buckets/:bucketName/objects/:objectKey - Upload object to bucket (requires auth).
+// Standard PUT semantics: a conflicting key is rejected with 409 unless
+// ?upsert=true is passed, in which case the object is replaced in place
+// (RLS UPDATE policies gate end-user replaces).
 router.put(
   '/buckets/:bucketName/objects/*',
   verifyUser,
@@ -309,6 +312,7 @@ router.put(
     try {
       const { bucketName } = req.params;
       const objectKey = req.params[0]; // Everything after objects
+      const upsert = req.query.upsert === 'true';
 
       if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
@@ -320,12 +324,13 @@ router.put(
 
       await enforceSafeMimeType(req.file);
 
-      const storedFile = await StorageService.getInstance().putObject(
+      const { object: storedFile, replaced } = await StorageService.getInstance().putObject(
         req.user,
         bucketName,
         objectKey,
         req.file,
-        !!req.hasApiKey
+        !!req.hasApiKey,
+        { upsert }
       );
 
       try {
@@ -340,9 +345,11 @@ router.put(
         // Best-effort notification; do not fail completed storage mutation
       }
 
-      successResponse(res, storedFile, 201);
+      successResponse(res, storedFile, replaced ? 200 : 201);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('already exists')) {
+      if (error instanceof AppError) {
+        next(error);
+      } else if (error instanceof Error && error.message.includes('already exists')) {
         next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
       } else if (error instanceof Error && error.message.includes('Invalid')) {
         next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
@@ -374,7 +381,7 @@ router.post(
       // Generate a unique key for the object using service
       const objectKey = storageService.generateObjectKey(req.file.originalname);
 
-      const storedFile = await storageService.putObject(
+      const { object: storedFile } = await storageService.putObject(
         req.user,
         bucketName,
         objectKey,
@@ -705,7 +712,7 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
-      const { filename, contentType, size } = req.body;
+      const { filename, contentType, size, upsert, autoKey } = req.body;
 
       if (!filename) {
         throw new AppError('Filename is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
@@ -724,12 +731,15 @@ router.post(
         bucketName,
         { filename, contentType: safeContentType, size },
         !!req.hasApiKey,
-        safeContentType
+        safeContentType,
+        { upsert: upsert === true, autoKey: autoKey === true }
       );
 
       successResponse(res, strategy);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('does not exist')) {
+      if (error instanceof AppError) {
+        next(error);
+      } else if (error instanceof Error && error.message.includes('does not exist')) {
         next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
       } else {
         next(error);
@@ -745,7 +755,7 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
-      const { size, etag } = req.body;
+      const { size, etag, upsert } = req.body;
       let { contentType } = req.body;
       if (contentType !== undefined && contentType !== null) {
         const typeStr =
@@ -769,7 +779,8 @@ router.post(
           contentType,
           etag,
         },
-        !!req.hasApiKey
+        !!req.hasApiKey,
+        { upsert: upsert === true }
       );
 
       try {

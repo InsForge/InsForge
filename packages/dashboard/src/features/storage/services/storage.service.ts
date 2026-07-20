@@ -59,18 +59,21 @@ export const storageService = {
     };
   },
 
-  // Upload an object to bucket
+  // Upload an object to bucket. The API rejects an existing key with 409
+  // unless upsert is set, in which case the object is replaced in place.
+  // Thrown errors carry the HTTP status so callers can branch on conflicts.
   async uploadObject(
     bucketName: string,
     objectKey: string,
-    object: File
+    object: File,
+    options?: { upsert?: boolean }
   ): Promise<StorageFileSchema> {
     const formData = new FormData();
     formData.append('file', object);
 
     // Use fetch directly for object uploads to avoid Content-Type header issues
     const response = await fetch(
-      `/api/storage/buckets/${encodeURIComponent(bucketName)}/objects/${encodeURIComponent(objectKey)}`,
+      `/api/storage/buckets/${encodeURIComponent(bucketName)}/objects/${encodeURIComponent(objectKey)}${options?.upsert ? '?upsert=true' : ''}`,
       {
         method: 'PUT',
         headers: {
@@ -83,7 +86,11 @@ export const storageService = {
     if (!response.ok) {
       const error = await response.json();
       // Traditional REST error format
-      throw new Error(error.message || error.error || 'Upload failed');
+      const uploadError = new Error(error.message || error.error || 'Upload failed') as Error & {
+        status?: number;
+      };
+      uploadError.status = response.status;
+      throw uploadError;
     }
 
     const result = await response.json();

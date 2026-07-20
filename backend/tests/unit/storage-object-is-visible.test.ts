@@ -289,7 +289,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     queryResults = [
       { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
-      { rows: [], rowCount: 0 }, // root object dedup query
+      { rows: [], rowCount: 0 }, // root key-existence check
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
       { rows: [], rowCount: 0 }, // BEGIN
       { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
@@ -313,7 +313,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
       sql: 'SELECT 1 FROM storage.buckets WHERE name = $1 LIMIT 1',
       params: ['photos'],
     });
-    expect(calls[1].sql).toContain('SELECT key FROM storage.objects');
+    expect(calls[1].sql).toContain('SELECT 1 FROM storage.objects');
     expect(calls[3].sql).toBe('BEGIN');
     expect(calls[4].sql).toBe('SET LOCAL ROLE authenticated');
     expect(calls.map((c) => c.sql).slice(1)).not.toContain(
@@ -339,7 +339,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     queryResults = [
       { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
-      { rows: [], rowCount: 0 }, // root object dedup query
+      { rows: [], rowCount: 0 }, // root key-existence check
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
     ];
 
@@ -365,7 +365,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     // uploaded_at is supplied app-side, so the INSERT no longer uses RETURNING.
     queryResults = [
-      { rows: [], rowCount: 0 }, // root object dedup query
+      { rows: [], rowCount: 0 }, // root key-existence check
       { rows: [], rowCount: 1 }, // root insert (no RETURNING)
       { rows: [], rowCount: 1 }, // root etag update
     ];
@@ -377,20 +377,222 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
       { size: 8, mimetype: 'text/plain' } as Express.Multer.File
     );
 
-    expect(result).toMatchObject({
+    expect(result.replaced).toBe(false);
+    expect(result.object).toMatchObject({
       bucket: 'photos',
       key: 'note.txt',
       size: 8,
       mimeType: 'text/plain',
     });
     // uploaded_at is an ISO string supplied app-side; assert it round-trips.
-    expect(new Date(result.uploadedAt).toISOString()).toBe(result.uploadedAt);
+    expect(new Date(result.object.uploadedAt).toISOString()).toBe(result.object.uploadedAt);
     expect(provider.putObject).toHaveBeenCalledOnce();
     expect(calls.map((c) => c.sql)).not.toContain('BEGIN');
     expect(calls.map((c) => c.sql)).not.toContain('SET LOCAL ROLE project_admin');
     expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(true);
     // The insert must not use RETURNING — that re-couples writes to SELECT RLS.
     expect(calls.some((c) => /RETURNING/i.test(c.sql))).toBe(false);
+  });
+
+  it('rejects a PUT to an existing key with 409 when upsert is not set', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      putObject: vi.fn(async () => ({ etag: 'never' })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
+    ];
+
+    await expect(
+      svc.putObject({ id: 'local:admin', role: 'project_admin' }, 'photos', 'note.txt', {
+        size: 8,
+        mimetype: 'text/plain',
+      } as Express.Multer.File)
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'STORAGE_ALREADY_EXISTS',
+    });
+    // Rejected before any row or blob write.
+    expect(provider.putObject).not.toHaveBeenCalled();
+    expect(calls.some((c) => c.sql.includes('INSERT'))).toBe(false);
+  });
+
+  it('replaces an existing key in place with upsert, preserving ownership', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      putObject: vi.fn(async () => ({ etag: 'etag-replaced' })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
+      { rows: [], rowCount: 1 }, // upsert write
+      { rows: [], rowCount: 1 }, // etag update
+    ];
+
+    const result = await svc.putObject(
+      { id: 'local:admin', role: 'project_admin' },
+      'photos',
+      'note.txt',
+      { size: 8, mimetype: 'text/plain' } as Express.Multer.File,
+      false,
+      { upsert: true }
+    );
+
+    expect(result.replaced).toBe(true);
+    expect(result.object).toMatchObject({ bucket: 'photos', key: 'note.txt' });
+    expect(provider.putObject).toHaveBeenCalledOnce();
+    const upsertCall = calls.find((c) => c.sql.includes('ON CONFLICT'));
+    expect(upsertCall?.sql).toContain('ON CONFLICT (bucket, key) DO UPDATE');
+    // Replacing content must never reassign ownership.
+    expect(upsertCall?.sql).not.toContain('uploaded_by = EXCLUDED');
+  });
+
+  it('rejects an upload strategy for an existing key with 409 when upsert is not set', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      getUploadStrategy: vi.fn(),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
+      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
+    ];
+
+    await expect(
+      svc.getUploadStrategy({ id: 'local:admin', role: 'project_admin' }, 'photos', {
+        filename: 'note.txt',
+        contentType: 'text/plain',
+        size: 8,
+      })
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'STORAGE_ALREADY_EXISTS',
+    });
+    expect(provider.getUploadStrategy).not.toHaveBeenCalled();
+  });
+
+  it('probes UPDATE permission under RLS before issuing an upsert upload strategy', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      getUploadStrategy: vi.fn(async () => ({
+        method: 'direct' as const,
+        uploadUrl: '/upload',
+        key: 'note.txt',
+        confirmRequired: false,
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
+      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [], rowCount: 0 }, // BEGIN
+      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
+      { rows: [], rowCount: 0 }, // set_config(claims)
+      { rows: [], rowCount: 0 }, // SAVEPOINT
+      { rows: [], rowCount: 1 }, // RLS UPDATE probe → caller may replace
+      { rows: [], rowCount: 0 }, // ROLLBACK TO SAVEPOINT
+      { rows: [], rowCount: 0 }, // RELEASE SAVEPOINT
+      { rows: [], rowCount: 0 }, // COMMIT
+      { rows: [], rowCount: 0 }, // RESET ROLE
+    ];
+
+    const strategy = await svc.getUploadStrategy(
+      { id: 'alice-sub', email: 'alice@example.com', role: 'authenticated' },
+      'photos',
+      { filename: 'note.txt', contentType: 'text/plain', size: 8 },
+      false,
+      'text/plain',
+      { upsert: true }
+    );
+
+    expect(strategy).toMatchObject({ method: 'direct', key: 'note.txt' });
+    const probe = calls.find((c) => c.sql.includes('SET uploaded_at = uploaded_at'));
+    expect(probe?.sql).toContain('UPDATE storage.objects');
+    expect(calls.map((c) => c.sql)).toContain('ROLLBACK TO SAVEPOINT upload_strategy_rls_probe');
+  });
+
+  it('rejects an upsert upload strategy with 403 when the RLS UPDATE probe matches no row', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      getUploadStrategy: vi.fn(),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
+      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [], rowCount: 0 }, // BEGIN
+      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
+      { rows: [], rowCount: 0 }, // set_config(claims)
+      { rows: [], rowCount: 0 }, // SAVEPOINT
+      { rows: [], rowCount: 0 }, // RLS UPDATE probe → hidden row, no permission
+      { rows: [], rowCount: 0 }, // ROLLBACK TO SAVEPOINT
+      { rows: [], rowCount: 0 }, // RELEASE SAVEPOINT
+      { rows: [], rowCount: 0 }, // ROLLBACK (withUserContext error path)
+      { rows: [], rowCount: 0 }, // RESET ROLE
+    ];
+
+    await expect(
+      svc.getUploadStrategy(
+        { id: 'bob-sub', email: 'bob@example.com', role: 'authenticated' },
+        'photos',
+        { filename: 'note.txt', contentType: 'text/plain', size: 8 },
+        false,
+        'text/plain',
+        { upsert: true }
+      )
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'STORAGE_PERMISSION_DENIED',
+    });
+    expect(provider.getUploadStrategy).not.toHaveBeenCalled();
+  });
+
+  it('updates the existing row on confirm-upload with upsert instead of inserting', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      verifyObjectExists: vi.fn(async () => ({
+        exists: true,
+        size: 16,
+        etag: 'etag-replaced',
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
+      { rows: [], rowCount: 1 }, // root UPDATE of the existing row
+    ];
+
+    const result = await svc.confirmUpload(
+      { id: 'local:admin', role: 'project_admin' },
+      'photos',
+      'note.txt',
+      { size: 16, contentType: 'text/plain' },
+      false,
+      { upsert: true }
+    );
+
+    expect(result).toMatchObject({ bucket: 'photos', key: 'note.txt', size: 16 });
+    const update = calls.find((c) => c.sql.includes('UPDATE storage.objects'));
+    expect(update?.sql).toContain('SET size = $3');
+    // Ownership column is never touched on replace.
+    expect(update?.sql).not.toContain('uploaded_by');
+    expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(false);
   });
 
   it('confirms presigned uploads for project_admin JWT callers through root access', async () => {
