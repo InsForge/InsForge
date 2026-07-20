@@ -3,6 +3,8 @@ import {
   ModelGatewayConfigService,
   ModelGatewayConfigUpdateError,
 } from '../../src/services/ai/model-gateway-config.service.js';
+import { AppError } from '../../src/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 type ConfigServiceSecretStore = ConstructorParameters<typeof ModelGatewayConfigService>[0];
 
@@ -246,6 +248,56 @@ describe('ModelGatewayConfigService', () => {
       name: 'ModelGatewayConfigUpdateError',
       succeededFields: [],
       failedFields: ['apiKey', 'managementKey'],
+    } satisfies Partial<ModelGatewayConfigUpdateError>);
+  });
+
+  it('preserves successful write outcomes when config read-back fails', async () => {
+    const readbackError = new Error('credential read-back failed');
+    const secretStore = createSecretStore();
+    secretStore.listSecrets.mockResolvedValue([
+      { id: 'api-id', key: 'OPENROUTER_API_KEY' },
+      { id: 'management-id', key: 'OPENROUTER_MANAGEMENT_API_KEY' },
+    ]);
+    secretStore.updateSecret.mockResolvedValue(true);
+    secretStore.getSecretByKey.mockRejectedValue(readbackError);
+    const service = new ModelGatewayConfigService(
+      secretStore as unknown as ConfigServiceSecretStore
+    );
+
+    await expect(
+      service.updateConfig({ apiKey: 'new-api-key', managementKey: 'new-management-key' })
+    ).rejects.toMatchObject({
+      name: 'ModelGatewayConfigUpdateError',
+      message: 'credential read-back failed',
+      succeededFields: ['apiKey', 'managementKey'],
+      failedFields: [],
+      cause: readbackError,
+    } satisfies Partial<ModelGatewayConfigUpdateError>);
+  });
+
+  it('preserves an AppError as the cause of a structured partial write failure', async () => {
+    const conflict = new AppError(
+      'Secret already exists: OPENROUTER_API_KEY',
+      409,
+      ERROR_CODES.SECRET_ALREADY_EXISTS
+    );
+    const secretStore = createSecretStore();
+    secretStore.listSecrets.mockResolvedValue([
+      { id: 'management-id', key: 'OPENROUTER_MANAGEMENT_API_KEY' },
+    ]);
+    secretStore.createSecret.mockRejectedValue(conflict);
+    secretStore.updateSecret.mockResolvedValue(true);
+    const service = new ModelGatewayConfigService(
+      secretStore as unknown as ConfigServiceSecretStore
+    );
+
+    await expect(
+      service.updateConfig({ apiKey: 'new-api-key', managementKey: 'new-management-key' })
+    ).rejects.toMatchObject({
+      name: 'ModelGatewayConfigUpdateError',
+      succeededFields: ['managementKey'],
+      failedFields: ['apiKey'],
+      cause: conflict,
     } satisfies Partial<ModelGatewayConfigUpdateError>);
   });
 });

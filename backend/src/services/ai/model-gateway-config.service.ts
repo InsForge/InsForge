@@ -106,6 +106,8 @@ export class ModelGatewayConfigService {
   }
 
   async updateConfig(input: UpdateModelGatewayConfig): Promise<ModelGatewayConfig> {
+    const succeededFields: ModelGatewayConfigField[] = [];
+
     try {
       const secrets = await this.secretService.listSecrets();
       const existingByKey = new Map(secrets.map((secret) => [secret.key, secret]));
@@ -134,7 +136,6 @@ export class ModelGatewayConfigService {
       }
 
       const results = await Promise.allSettled(updates.map((update) => update.operation));
-      const succeededFields: ModelGatewayConfigField[] = [];
       const failedFields: ModelGatewayConfigField[] = [];
       let firstFailure: unknown;
 
@@ -164,7 +165,12 @@ export class ModelGatewayConfigService {
       this.storedCredentialCache.clear();
     }
 
-    return this.getConfig();
+    try {
+      return await this.getConfig();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ModelGatewayConfigUpdateError(message, succeededFields, [], error);
+    }
   }
 
   private async getStoredCredential(key: ModelGatewayCredentialKey): Promise<string | null> {

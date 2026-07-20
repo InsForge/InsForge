@@ -65,6 +65,8 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
         error instanceof ModelGatewayConfigUpdateError ? error.succeededFields : [];
       const failedFields =
         error instanceof ModelGatewayConfigUpdateError ? error.failedFields : updatedFields;
+      const errorToPropagate =
+        error instanceof ModelGatewayConfigUpdateError ? (error.cause ?? error) : error;
       try {
         await auditService.log({
           actor: req.hasApiKey ? 'api-key' : req.user?.id,
@@ -73,16 +75,21 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
           details: {
             updatedFields: succeededFields,
             failedFields,
-            outcome: succeededFields.length > 0 ? 'partially_succeeded' : 'failed',
+            outcome:
+              failedFields.length === 0
+                ? 'succeeded'
+                : succeededFields.length > 0
+                  ? 'partially_succeeded'
+                  : 'failed',
           },
           ip_address: req.ip,
         });
       } catch (auditError) {
-        logger.error('Failed to audit a failed Model Gateway configuration update', {
+        logger.error('Failed to audit a Model Gateway configuration update', {
           error: auditError instanceof Error ? auditError.message : String(auditError),
         });
       }
-      throw error;
+      throw errorToPropagate;
     }
     try {
       await auditService.log({

@@ -1,6 +1,8 @@
 import express, { type ErrorRequestHandler } from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ERROR_CODES } from '@insforge/shared-schemas';
+import { AppError } from '../../src/utils/errors.js';
 
 const environmentMock = vi.hoisted(() => ({ isCloud: false }));
 const configServiceMock = vi.hoisted(() => ({
@@ -12,9 +14,10 @@ const configUpdateErrorMock = vi.hoisted(() => {
     constructor(
       message: string,
       readonly succeededFields: Array<'apiKey' | 'managementKey'>,
-      readonly failedFields: Array<'apiKey' | 'managementKey'>
+      readonly failedFields: Array<'apiKey' | 'managementKey'>,
+      cause: unknown = new Error(message)
     ) {
-      super(message);
+      super(message, { cause });
       this.name = 'ModelGatewayConfigUpdateError';
     }
   }
@@ -79,7 +82,14 @@ const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     error instanceof Error && 'statusCode' in error && typeof error.statusCode === 'number'
       ? error.statusCode
       : 500;
-  res.status(statusCode).json({ message: error instanceof Error ? error.message : 'Error' });
+  const code =
+    error instanceof Error && 'code' in error && typeof error.code === 'string'
+      ? error.code
+      : undefined;
+  res.status(statusCode).json({
+    message: error instanceof Error ? error.message : 'Error',
+    ...(code ? { code } : {}),
+  });
 };
 
 async function createApp() {
@@ -185,6 +195,68 @@ describe('AI config routes', () => {
     );
     expect(JSON.stringify(auditMock.log.mock.calls)).not.toContain('new-api-key');
     expect(JSON.stringify(auditMock.log.mock.calls)).not.toContain('new-management-key');
+  });
+
+  it('audits completed writes accurately when config read-back fails', async () => {
+    const readbackError = new Error('credential read-back failed');
+    configServiceMock.updateConfig.mockRejectedValueOnce(
+      new configUpdateErrorMock.ModelGatewayConfigUpdateError(
+        readbackError.message,
+        ['apiKey', 'managementKey'],
+        [],
+        readbackError
+      )
+    );
+
+    const response = await request(await createApp())
+      .put('/api/ai/config')
+      .send({ apiKey: 'new-api-key', managementKey: 'new-management-key' });
+
+    expect(response.status).toBe(500);
+    expect(response.body.message).toBe('credential read-back failed');
+    expect(auditMock.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: {
+          updatedFields: ['apiKey', 'managementKey'],
+          failedFields: [],
+          outcome: 'succeeded',
+        },
+      })
+    );
+  });
+
+  it('preserves the underlying AppError after partial success when audit logging also fails', async () => {
+    const conflict = new AppError(
+      'Secret already exists: OPENROUTER_API_KEY',
+      409,
+      ERROR_CODES.SECRET_ALREADY_EXISTS
+    );
+    configServiceMock.updateConfig.mockRejectedValueOnce(
+      new configUpdateErrorMock.ModelGatewayConfigUpdateError(
+        conflict.message,
+        ['managementKey'],
+        ['apiKey'],
+        conflict
+      )
+    );
+    auditMock.log.mockRejectedValueOnce(new Error('audit insert failed'));
+
+    const response = await request(await createApp())
+      .put('/api/ai/config')
+      .send({ apiKey: 'new-api-key', managementKey: 'new-management-key' });
+
+    expect(response.status).toBe(409);
+    expect(response.body.message).toBe('Secret already exists: OPENROUTER_API_KEY');
+    expect(response.body.code).toBe(ERROR_CODES.SECRET_ALREADY_EXISTS);
+    expect(auditMock.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: {
+          updatedFields: ['managementKey'],
+          failedFields: ['apiKey'],
+          outcome: 'partially_succeeded',
+        },
+      })
+    );
   });
 
   it('audits all requested fields as failed when no credential update outcome is available', async () => {
