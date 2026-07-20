@@ -20,6 +20,25 @@ type ModelGatewayCredentialKey =
   | typeof OPENROUTER_API_KEY_SECRET
   | typeof OPENROUTER_MANAGEMENT_KEY_SECRET;
 
+export type ModelGatewayConfigField = keyof UpdateModelGatewayConfig;
+
+interface ModelGatewayCredentialUpdate {
+  field: ModelGatewayConfigField;
+  operation: Promise<void>;
+}
+
+export class ModelGatewayConfigUpdateError extends Error {
+  constructor(
+    message: string,
+    readonly succeededFields: ModelGatewayConfigField[],
+    readonly failedFields: ModelGatewayConfigField[],
+    cause: unknown
+  ) {
+    super(message, { cause });
+    this.name = 'ModelGatewayConfigUpdateError';
+  }
+}
+
 export class ModelGatewayConfigService {
   private static instance: ModelGatewayConfigService;
   private storedCredentialCache = new Map<ModelGatewayCredentialKey, StoredCredentialCache>();
@@ -90,34 +109,54 @@ export class ModelGatewayConfigService {
     try {
       const secrets = await this.secretService.listSecrets();
       const existingByKey = new Map(secrets.map((secret) => [secret.key, secret]));
-      const updates: Promise<void>[] = [];
+      const updates: ModelGatewayCredentialUpdate[] = [];
 
       if (input.apiKey !== undefined) {
-        updates.push(
-          this.upsertCredential(
+        updates.push({
+          field: 'apiKey',
+          operation: this.upsertCredential(
             OPENROUTER_API_KEY_SECRET,
             input.apiKey,
             existingByKey.get(OPENROUTER_API_KEY_SECRET)
-          )
-        );
+          ),
+        });
       }
 
       if (input.managementKey !== undefined) {
-        updates.push(
-          this.upsertCredential(
+        updates.push({
+          field: 'managementKey',
+          operation: this.upsertCredential(
             OPENROUTER_MANAGEMENT_KEY_SECRET,
             input.managementKey,
             existingByKey.get(OPENROUTER_MANAGEMENT_KEY_SECRET)
-          )
-        );
+          ),
+        });
       }
 
-      const results = await Promise.allSettled(updates);
-      const failure = results.find(
-        (result): result is PromiseRejectedResult => result.status === 'rejected'
-      );
-      if (failure) {
-        throw failure.reason;
+      const results = await Promise.allSettled(updates.map((update) => update.operation));
+      const succeededFields: ModelGatewayConfigField[] = [];
+      const failedFields: ModelGatewayConfigField[] = [];
+      let firstFailure: unknown;
+
+      results.forEach((result, index) => {
+        const field = updates[index].field;
+        if (result.status === 'fulfilled') {
+          succeededFields.push(field);
+          return;
+        }
+
+        failedFields.push(field);
+        firstFailure ??= result.reason;
+      });
+
+      if (failedFields.length > 0) {
+        const message = firstFailure instanceof Error ? firstFailure.message : String(firstFailure);
+        throw new ModelGatewayConfigUpdateError(
+          message,
+          succeededFields,
+          failedFields,
+          firstFailure
+        );
       }
     } finally {
       // The credentials are independent and may update independently. Always invalidate both

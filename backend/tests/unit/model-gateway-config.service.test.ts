@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ModelGatewayConfigService } from '../../src/services/ai/model-gateway-config.service.js';
+import {
+  ModelGatewayConfigService,
+  ModelGatewayConfigUpdateError,
+} from '../../src/services/ai/model-gateway-config.service.js';
 
 type ConfigServiceSecretStore = ConstructorParameters<typeof ModelGatewayConfigService>[0];
 
@@ -188,7 +191,12 @@ describe('ModelGatewayConfigService', () => {
     await expect(service.getApiKey()).resolves.toBe('old-api-key');
     await expect(
       service.updateConfig({ apiKey: 'new-api-key', managementKey: 'new-management-key' })
-    ).rejects.toThrow('Failed to update OPENROUTER_MANAGEMENT_API_KEY');
+    ).rejects.toMatchObject({
+      name: 'ModelGatewayConfigUpdateError',
+      message: 'Failed to update OPENROUTER_MANAGEMENT_API_KEY',
+      succeededFields: ['apiKey'],
+      failedFields: ['managementKey'],
+    } satisfies Partial<ModelGatewayConfigUpdateError>);
     await expect(service.getApiKey()).resolves.toBe('new-api-key');
     expect(secretStore.getSecretByKey).toHaveBeenCalledTimes(2);
   });
@@ -206,7 +214,12 @@ describe('ModelGatewayConfigService', () => {
 
     await expect(
       service.updateConfig({ apiKey: 'new-api-key', managementKey: 'new-management-key' })
-    ).rejects.toThrow('Failed to update OPENROUTER_API_KEY');
+    ).rejects.toMatchObject({
+      name: 'ModelGatewayConfigUpdateError',
+      message: 'Failed to update OPENROUTER_API_KEY',
+      succeededFields: ['managementKey'],
+      failedFields: ['apiKey'],
+    } satisfies Partial<ModelGatewayConfigUpdateError>);
 
     expect(secretStore.updateSecret).toHaveBeenCalledTimes(2);
     expect(secretStore.updateSecret).toHaveBeenNthCalledWith(2, 'management-id', {
@@ -214,5 +227,25 @@ describe('ModelGatewayConfigService', () => {
       isActive: true,
       isReserved: true,
     });
+  });
+
+  it('reports both credential fields when both independent updates fail', async () => {
+    const secretStore = createSecretStore();
+    secretStore.listSecrets.mockResolvedValue([
+      { id: 'api-id', key: 'OPENROUTER_API_KEY' },
+      { id: 'management-id', key: 'OPENROUTER_MANAGEMENT_API_KEY' },
+    ]);
+    secretStore.updateSecret.mockResolvedValue(false);
+    const service = new ModelGatewayConfigService(
+      secretStore as unknown as ConfigServiceSecretStore
+    );
+
+    await expect(
+      service.updateConfig({ apiKey: 'new-api-key', managementKey: 'new-management-key' })
+    ).rejects.toMatchObject({
+      name: 'ModelGatewayConfigUpdateError',
+      succeededFields: [],
+      failedFields: ['apiKey', 'managementKey'],
+    } satisfies Partial<ModelGatewayConfigUpdateError>);
   });
 });

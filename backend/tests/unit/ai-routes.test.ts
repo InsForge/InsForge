@@ -7,6 +7,20 @@ const configServiceMock = vi.hoisted(() => ({
   getConfig: vi.fn(),
   updateConfig: vi.fn(),
 }));
+const configUpdateErrorMock = vi.hoisted(() => {
+  class ModelGatewayConfigUpdateError extends Error {
+    constructor(
+      message: string,
+      readonly succeededFields: Array<'apiKey' | 'managementKey'>,
+      readonly failedFields: Array<'apiKey' | 'managementKey'>
+    ) {
+      super(message);
+      this.name = 'ModelGatewayConfigUpdateError';
+    }
+  }
+
+  return { ModelGatewayConfigUpdateError };
+});
 const auditMock = vi.hoisted(() => ({ log: vi.fn() }));
 
 vi.hoisted(() => {
@@ -34,6 +48,7 @@ vi.mock('../../src/services/ai/model-gateway-config.service.js', () => ({
   ModelGatewayConfigService: {
     getInstance: () => configServiceMock,
   },
+  ModelGatewayConfigUpdateError: configUpdateErrorMock.ModelGatewayConfigUpdateError,
 }));
 
 vi.mock('../../src/services/logs/audit.service.js', () => ({
@@ -117,15 +132,25 @@ describe('AI config routes', () => {
         actor: 'admin-1',
         action: 'UPDATE_MODEL_GATEWAY_CONFIG',
         module: 'AI',
-        details: { updatedFields: ['apiKey', 'managementKey'], outcome: 'succeeded' },
+        details: {
+          updatedFields: ['apiKey', 'managementKey'],
+          failedFields: [],
+          outcome: 'succeeded',
+        },
       })
     );
     expect(JSON.stringify(auditMock.log.mock.calls)).not.toContain('new-api-key');
     expect(JSON.stringify(auditMock.log.mock.calls)).not.toContain('new-management-key');
   });
 
-  it('audits field names when an independent credential update fails', async () => {
-    configServiceMock.updateConfig.mockRejectedValueOnce(new Error('management update failed'));
+  it('audits exact field outcomes when an independent credential update partially succeeds', async () => {
+    configServiceMock.updateConfig.mockRejectedValueOnce(
+      new configUpdateErrorMock.ModelGatewayConfigUpdateError(
+        'management update failed',
+        ['apiKey'],
+        ['managementKey']
+      )
+    );
 
     const response = await request(await createApp())
       .put('/api/ai/config')
@@ -138,11 +163,38 @@ describe('AI config routes', () => {
     expect(auditMock.log).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'UPDATE_MODEL_GATEWAY_CONFIG',
-        details: { updatedFields: ['apiKey', 'managementKey'], outcome: 'failed' },
+        details: {
+          updatedFields: ['apiKey'],
+          failedFields: ['managementKey'],
+          outcome: 'partially_succeeded',
+        },
       })
     );
     expect(JSON.stringify(auditMock.log.mock.calls)).not.toContain('new-api-key');
     expect(JSON.stringify(auditMock.log.mock.calls)).not.toContain('new-management-key');
+  });
+
+  it('audits all requested fields as failed when no credential update outcome is available', async () => {
+    configServiceMock.updateConfig.mockRejectedValueOnce(new Error('secret listing failed'));
+
+    const response = await request(await createApp())
+      .put('/api/ai/config')
+      .send({
+        apiKey: 'new-api-key',
+        managementKey: 'new-management-key',
+      });
+
+    expect(response.status).toBe(500);
+    expect(auditMock.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'UPDATE_MODEL_GATEWAY_CONFIG',
+        details: {
+          updatedFields: [],
+          failedFields: ['apiKey', 'managementKey'],
+          outcome: 'failed',
+        },
+      })
+    );
   });
 
   it('rejects an empty update payload', async () => {

@@ -8,7 +8,10 @@ import { AppError } from '@/utils/errors.js';
 import { errorResponse, successResponse } from '@/utils/response.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import logger from '@/utils/logger.js';
-import { ModelGatewayConfigService } from '@/services/ai/model-gateway-config.service.js';
+import {
+  ModelGatewayConfigService,
+  ModelGatewayConfigUpdateError,
+} from '@/services/ai/model-gateway-config.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import {
@@ -58,12 +61,20 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
     try {
       config = await modelGatewayConfigService.updateConfig(validation.data);
     } catch (error) {
+      const succeededFields =
+        error instanceof ModelGatewayConfigUpdateError ? error.succeededFields : [];
+      const failedFields =
+        error instanceof ModelGatewayConfigUpdateError ? error.failedFields : updatedFields;
       try {
         await auditService.log({
           actor: req.hasApiKey ? 'api-key' : req.user?.id,
           action: 'UPDATE_MODEL_GATEWAY_CONFIG',
           module: 'AI',
-          details: { updatedFields, outcome: 'failed' },
+          details: {
+            updatedFields: succeededFields,
+            failedFields,
+            outcome: succeededFields.length > 0 ? 'partially_succeeded' : 'failed',
+          },
           ip_address: req.ip,
         });
       } catch (auditError) {
@@ -77,7 +88,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
       actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'UPDATE_MODEL_GATEWAY_CONFIG',
       module: 'AI',
-      details: { updatedFields, outcome: 'succeeded' },
+      details: { updatedFields, failedFields: [], outcome: 'succeeded' },
       ip_address: req.ip,
     });
     successResponse(res, config);
