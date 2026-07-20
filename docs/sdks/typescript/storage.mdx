@@ -39,7 +39,6 @@ Upload a file with a specific path/key.
 
 - `path` (string, required) - The object key/path for the file
 - `file` (File | Blob, required) - File or Blob to upload
-- `options.upsert` (boolean, optional) - Replace an existing object. Defaults to `false`
 
 ### Returns
 
@@ -57,9 +56,9 @@ Upload a file with a specific path/key.
 }
 ```
 
-<Warning>
-If a file with the same key exists, `upload()` returns a conflict by default. Pass `{ upsert: true }` to replace it, or use `uploadAuto()` when you want the server to generate a unique key.
-</Warning>
+<Note>
+Uploading to an existing key replaces the current object. Use `uploadAuto()` when you want the server to generate a unique key.
+</Note>
 
 ### Example
 

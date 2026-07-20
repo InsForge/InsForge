@@ -191,8 +191,8 @@ CREATE POLICY storage_objects_owner_delete ON storage.objects
   USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
 SQL
 
-assert_count "Alice upload"  "201" "$(upload "$ALICE_JWT" "$BUCKET" "a.txt" alice)"
-assert_count "Bob upload"    "201" "$(upload "$BOB_JWT"   "$BUCKET" "b.txt" bob)"
+assert_count "Alice upload"  "200" "$(upload "$ALICE_JWT" "$BUCKET" "a.txt" alice)"
+assert_count "Bob upload"    "200" "$(upload "$BOB_JWT"   "$BUCKET" "b.txt" bob)"
 
 assert_count "Alice list"  "1" "$(list_count "$ALICE_JWT" "$BUCKET")"
 assert_count "Bob list"    "1" "$(list_count "$BOB_JWT"   "$BUCKET")"
@@ -213,29 +213,21 @@ anon_private=$(curl -sS -o /dev/null -w "%{http_code}" \
   "$API/storage/buckets/$BUCKET/objects/a.txt")
 assert_count "Anon GET private bucket → 401" "401" "$anon_private"
 
-# Hidden-key collision regression. Both users upload "shared.txt". The
+# Hidden-key replacement regression. Both users PUT "shared.txt". The
 # (bucket, key) keyspace is globally unique while RLS hides Alice's row
-# from Bob, so Bob's PUT must be rejected with 409 — never a silent
-# overwrite (friendly auto-rename moved to the dashboard client).
+# from Bob, so Bob's replacement must be rejected before the blob is touched.
 upload "$ALICE_JWT" "$BUCKET" "shared.txt" "ALICE-shared-content" >/dev/null
 bob_shared_code=$(upload "$BOB_JWT" "$BUCKET" "shared.txt" "BOB-shared-content")
-assert_count "Bob PUT alice's key (hidden collision → 409)" "409" "$bob_shared_code"
-
-# upsert=true replaces in place, gated by the UPDATE policy: Bob still
-# cannot replace Alice's object, and her blob must stay untouched.
-bob_upsert_code=$(curl -sS -o /dev/null -w "%{http_code}" -X PUT \
-  "$API/storage/buckets/$BUCKET/objects/shared.txt?upsert=true" \
-  -H "Authorization: Bearer $BOB_JWT" -F "file=@/dev/stdin;filename=shared.txt" <<< "BOB-shared-content")
-assert_count "Bob PUT upsert on alice's key (RLS blocks → 403)" "403" "$bob_upsert_code"
+assert_count "Bob PUT alice's key (RLS blocks → 403)" "403" "$bob_shared_code"
 alice_shared_dl=$(curl -sSL "$API/storage/buckets/$BUCKET/objects/shared.txt" \
   -H "Authorization: Bearer $ALICE_JWT")
 assert_count "Alice's shared.txt blob untouched" "ALICE-shared-content" "$alice_shared_dl"
 
-# The owner CAN replace their own object with upsert=true (200, not 201).
-alice_upsert_code=$(curl -sS -o /dev/null -w "%{http_code}" -X PUT \
-  "$API/storage/buckets/$BUCKET/objects/shared.txt?upsert=true" \
+# The owner can replace their own object with a normal PUT.
+alice_replace_code=$(curl -sS -o /dev/null -w "%{http_code}" -X PUT \
+  "$API/storage/buckets/$BUCKET/objects/shared.txt" \
   -H "Authorization: Bearer $ALICE_JWT" -F "file=@/dev/stdin;filename=shared.txt" <<< "ALICE-shared-v2")
-assert_count "Alice PUT upsert on own key (replace → 200)" "200" "$alice_upsert_code"
+assert_count "Alice PUT own key (replace → 200)" "200" "$alice_replace_code"
 alice_shared_dl2=$(curl -sSL "$API/storage/buckets/$BUCKET/objects/shared.txt" \
   -H "Authorization: Bearer $ALICE_JWT")
 assert_count "Alice's shared.txt replaced in place" "ALICE-shared-v2" "$alice_shared_dl2"
@@ -291,9 +283,9 @@ curl -sS -X POST "$API/storage/buckets" \
 
 # Each user uploads at <user_id>/note.txt — column-based RLS still applies, so
 # this works.
-assert_count "Alice upload alice/note" "201" \
+assert_count "Alice upload alice/note" "200" \
   "$(upload "$ALICE_JWT" "$PATH_BUCKET" "${ALICE_ID}/note.txt" alice)"
-assert_count "Bob upload bob/note"     "201" \
+assert_count "Bob upload bob/note"     "200" \
   "$(upload "$BOB_JWT"   "$PATH_BUCKET" "${BOB_ID}/note.txt" bob)"
 
 # Scoped to $PATH_BUCKET so concurrent runs on other buckets aren't affected.
@@ -352,7 +344,7 @@ if [ -n "$JWT_SECRET_FOR_TEST" ] && command -v node >/dev/null 2>&1; then
   ' 2>/dev/null || true)
 
   if [ -n "$BA_JWT" ]; then
-    assert_count "BA-shaped upload" "201" \
+    assert_count "BA-shaped upload" "200" \
       "$(upload "$BA_JWT" "$BUCKET" "ba-note-$TS.txt" "ba content")"
     # BA user only sees their own file (column-based RLS still works for text sub)
     ba_count=$(list_count "$BA_JWT" "$BUCKET")

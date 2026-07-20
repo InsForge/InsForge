@@ -291,7 +291,7 @@ router.get(
             total: result.total,
           },
           nextActions:
-            'You can use PUT /api/storage/buckets/:bucketName/objects/:objectKey to upload with a specific key (409 if the key exists; add ?upsert=true to replace it), or POST /api/storage/buckets/:bucketName/objects to upload with auto-generated key, and GET /api/storage/buckets/:bucketName/objects/:objectKey to download an object.',
+            'You can use PUT /api/storage/buckets/:bucketName/objects/:objectKey to create or replace a specific key, POST /api/storage/buckets/:bucketName/objects to upload with an auto-generated key, and GET /api/storage/buckets/:bucketName/objects/:objectKey to download an object.',
         },
         200
       );
@@ -301,10 +301,9 @@ router.get(
   }
 );
 
-// PUT /api/storage/buckets/:bucketName/objects/:objectKey - Upload object to bucket (requires auth).
-// Standard PUT semantics: a conflicting key is rejected with 409 unless
-// ?upsert=true is passed, in which case the object is replaced in place
-// (RLS UPDATE policies gate end-user replaces).
+// PUT /api/storage/buckets/:bucketName/objects/:objectKey - Create or replace
+// an object at the exact key (requires auth). RLS policies gate end-user
+// creates and replacements.
 router.put(
   '/buckets/:bucketName/objects/*',
   verifyUser,
@@ -314,7 +313,6 @@ router.put(
     try {
       const { bucketName } = req.params;
       const objectKey = req.params[0]; // Everything after objects
-      const upsert = req.query.upsert === 'true';
 
       if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
@@ -326,13 +324,12 @@ router.put(
 
       await enforceSafeMimeType(req.file);
 
-      const { object: storedFile, replaced } = await StorageService.getInstance().putObject(
+      const storedFile = await StorageService.getInstance().putObject(
         req.user,
         bucketName,
         objectKey,
         req.file,
-        !!req.hasApiKey,
-        { upsert }
+        !!req.hasApiKey
       );
 
       try {
@@ -347,7 +344,7 @@ router.put(
         // Best-effort notification; do not fail completed storage mutation
       }
 
-      successResponse(res, storedFile, replaced ? 200 : 201);
+      successResponse(res, storedFile, 200);
     } catch (error) {
       if (error instanceof AppError) {
         next(error);
@@ -383,7 +380,7 @@ router.post(
       // Generate a unique key for the object using service
       const objectKey = storageService.generateObjectKey(req.file.originalname);
 
-      const { object: storedFile } = await storageService.putObject(
+      const storedFile = await storageService.putObject(
         req.user,
         bucketName,
         objectKey,
@@ -722,7 +719,7 @@ router.post(
           ERROR_CODES.STORAGE_INVALID_PARAMETER
         );
       }
-      const { filename, contentType, size, upsert, autoKey } = validation.data;
+      const { filename, contentType, size, autoKey } = validation.data;
 
       const requestedType =
         typeof contentType === 'string' && contentType.trim()
@@ -738,7 +735,7 @@ router.post(
         { filename, contentType: safeContentType, size },
         !!req.hasApiKey,
         safeContentType,
-        { upsert: upsert === true, autoKey: autoKey === true }
+        { autoKey: autoKey === true }
       );
 
       successResponse(res, strategy);
@@ -769,7 +766,7 @@ router.post(
           ERROR_CODES.STORAGE_INVALID_PARAMETER
         );
       }
-      const { size, etag, upsert } = validation.data;
+      const { size, etag } = validation.data;
       let { contentType } = validation.data;
       if (contentType !== undefined && contentType !== null) {
         const typeStr = contentType.trim() ? contentType : 'application/octet-stream';
@@ -786,8 +783,7 @@ router.post(
           contentType,
           etag,
         },
-        !!req.hasApiKey,
-        { upsert: upsert === true }
+        !!req.hasApiKey
       );
 
       try {
@@ -808,8 +804,6 @@ router.post(
         next(error);
       } else if (error instanceof Error && error.message.includes('not found')) {
         next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
-      } else if (error instanceof Error && error.message.includes('already confirmed')) {
-        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
       } else if (
         error instanceof Error &&
         error.message.includes('exceeds the configured maximum')

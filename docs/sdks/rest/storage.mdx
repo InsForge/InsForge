@@ -54,8 +54,9 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 | `filename` | string | Yes | Object key to use verbatim unless `autoKey` is enabled |
 | `contentType` | string | No | MIME type of the file |
 | `size` | integer | No | File size in bytes |
-| `upsert` | boolean | No | Replace an existing object at this key. Defaults to `false` |
 | `autoKey` | boolean | No | Generate a unique key from `filename`. Defaults to `false` |
+
+Uploading to an existing object key replaces the current object. Set `autoKey` when you need the server to generate a new key instead.
 
 #### Example
 
@@ -125,7 +126,6 @@ POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
 | `size` | integer | Yes | File size in bytes |
 | `contentType` | string | No | MIME type of the file |
 | `etag` | string | No | S3 ETag of the uploaded object |
-| `upsert` | boolean | No | Must match the `upsert` value used to request the strategy |
 
 #### Example
 

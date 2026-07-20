@@ -39,7 +39,6 @@ const bucket = insforge.storage.from('images')
 
 - `path` (string, required) - 檔案的物件金鑰/路徑
 - `file` (File | Blob, required) - 要上傳的檔案或 Blob
-- `options.upsert` (boolean, 選填) - 取代現有物件。預設為 `false`
 
 ### 傳回
 
@@ -57,9 +56,9 @@ const bucket = insforge.storage.from('images')
 }
 ```
 
-<Warning>
-如果已存在相同金鑰的檔案，`upload()` 預設會傳回衝突。傳入 `{ upsert: true }` 可取代該檔案；若要由伺服器產生唯一金鑰，請使用 `uploadAuto()`。
-</Warning>
+<Note>
+上傳至現有物件金鑰會取代目前的物件。如需伺服器產生唯一金鑰，請使用 `uploadAuto()`。
+</Note>
 
 ### 範例
 

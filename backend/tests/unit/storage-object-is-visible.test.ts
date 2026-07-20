@@ -296,13 +296,12 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     queryResults = [
       { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
-      { rows: [], rowCount: 0 }, // root key-existence check
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
       { rows: [], rowCount: 0 }, // BEGIN
       { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
       { rows: [], rowCount: 0 }, // set_config(claims)
       { rows: [], rowCount: 0 }, // SAVEPOINT
-      { rows: [], rowCount: 1 }, // RLS INSERT probe
+      { rows: [], rowCount: 1 }, // RLS create-or-replace probe
       { rows: [], rowCount: 0 }, // ROLLBACK TO SAVEPOINT
       { rows: [], rowCount: 0 }, // RELEASE SAVEPOINT
       { rows: [], rowCount: 0 }, // COMMIT
@@ -320,18 +319,18 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
       sql: 'SELECT 1 FROM storage.buckets WHERE name = $1 LIMIT 1',
       params: ['photos'],
     });
-    expect(calls[1].sql).toContain('SELECT 1 FROM storage.objects');
-    expect(calls[3].sql).toBe('BEGIN');
-    expect(calls[4].sql).toBe('SET LOCAL ROLE authenticated');
+    expect(calls[2].sql).toBe('BEGIN');
+    expect(calls[3].sql).toBe('SET LOCAL ROLE authenticated');
     expect(calls.map((c) => c.sql).slice(1)).not.toContain(
       'SELECT 1 FROM storage.buckets WHERE name = $1 LIMIT 1'
     );
     expect(calls.map((c) => c.sql)).toContain('SAVEPOINT upload_strategy_rls_probe');
     expect(calls.map((c) => c.sql)).toContain('ROLLBACK TO SAVEPOINT upload_strategy_rls_probe');
-    expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(true);
+    const probe = calls.find((c) => c.sql.includes('INSERT INTO storage.objects'));
+    expect(probe?.sql).toContain('ON CONFLICT (bucket, key) DO UPDATE');
   });
 
-  it('skips the upload-strategy RLS insert probe for project_admin JWT callers', async () => {
+  it('skips the upload-strategy RLS probe for project_admin JWT callers', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
     const provider = {
@@ -346,7 +345,6 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     queryResults = [
       { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
-      { rows: [], rowCount: 0 }, // root key-existence check
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
     ];
 
@@ -372,8 +370,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     // uploaded_at is supplied app-side, so the INSERT no longer uses RETURNING.
     queryResults = [
-      { rows: [], rowCount: 0 }, // root key-existence check
-      { rows: [], rowCount: 1 }, // root insert (no RETURNING)
+      { rows: [], rowCount: 1 }, // root create-or-replace write (no RETURNING)
       { rows: [], rowCount: 1 }, // root etag update
     ];
 
@@ -384,15 +381,14 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
       { size: 8, mimetype: 'text/plain' } as Express.Multer.File
     );
 
-    expect(result.replaced).toBe(false);
-    expect(result.object).toMatchObject({
+    expect(result).toMatchObject({
       bucket: 'photos',
       key: 'note.txt',
       size: 8,
       mimeType: 'text/plain',
     });
     // uploaded_at is an ISO string supplied app-side; assert it round-trips.
-    expect(new Date(result.object.uploadedAt).toISOString()).toBe(result.object.uploadedAt);
+    expect(new Date(result.uploadedAt).toISOString()).toBe(result.uploadedAt);
     expect(provider.putObject).toHaveBeenCalledOnce();
     expect(calls.map((c) => c.sql)).not.toContain('BEGIN');
     expect(calls.map((c) => c.sql)).not.toContain('SET LOCAL ROLE project_admin');
@@ -401,33 +397,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     expect(calls.some((c) => /RETURNING/i.test(c.sql))).toBe(false);
   });
 
-  it('rejects a PUT to an existing key with 409 when upsert is not set', async () => {
-    const { StorageService } = await import('@/services/storage/storage.service.js');
-    const svc = StorageService.getInstance();
-    const provider = {
-      putObject: vi.fn(async () => ({ etag: 'never' })),
-    };
-    (svc as unknown as { provider: typeof provider }).provider = provider;
-
-    queryResults = [
-      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
-    ];
-
-    await expect(
-      svc.putObject({ id: 'local:admin', role: 'project_admin' }, 'photos', 'note.txt', {
-        size: 8,
-        mimetype: 'text/plain',
-      } as Express.Multer.File)
-    ).rejects.toMatchObject({
-      statusCode: 409,
-      code: 'STORAGE_ALREADY_EXISTS',
-    });
-    // Rejected before any row or blob write.
-    expect(provider.putObject).not.toHaveBeenCalled();
-    expect(calls.some((c) => c.sql.includes('INSERT'))).toBe(false);
-  });
-
-  it('replaces an existing key in place with upsert, preserving ownership', async () => {
+  it('replaces an existing key in place by default, preserving ownership', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
     const provider = {
@@ -436,8 +406,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     (svc as unknown as { provider: typeof provider }).provider = provider;
 
     queryResults = [
-      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
-      { rows: [], rowCount: 1 }, // upsert write
+      { rows: [], rowCount: 1 }, // create-or-replace write
       { rows: [], rowCount: 1 }, // etag update
     ];
 
@@ -446,20 +415,18 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
       'photos',
       'note.txt',
       { size: 8, mimetype: 'text/plain' } as Express.Multer.File,
-      false,
-      { upsert: true }
+      false
     );
 
-    expect(result.replaced).toBe(true);
-    expect(result.object).toMatchObject({ bucket: 'photos', key: 'note.txt' });
+    expect(result).toMatchObject({ bucket: 'photos', key: 'note.txt' });
     expect(provider.putObject).toHaveBeenCalledOnce();
-    const upsertCall = calls.find((c) => c.sql.includes('ON CONFLICT'));
-    expect(upsertCall?.sql).toContain('ON CONFLICT (bucket, key) DO UPDATE');
+    const write = calls.find((c) => c.sql.includes('ON CONFLICT'));
+    expect(write?.sql).toContain('ON CONFLICT (bucket, key) DO UPDATE');
     // Replacing content must never reassign ownership.
-    expect(upsertCall?.sql).not.toContain('uploaded_by = EXCLUDED');
+    expect(write?.sql).not.toContain('uploaded_by = EXCLUDED');
   });
 
-  it('maps the RLS 42501 raised by the upsert conflict arm to 403 without touching the blob', async () => {
+  it('maps an RLS-denied replacement to 403 without touching the blob', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
     const provider = {
@@ -467,13 +434,12 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     };
     (svc as unknown as { provider: typeof provider }).provider = provider;
 
-    // Bob upserts a key whose row belongs to Alice. The ON CONFLICT arm has
+    // Bob puts a key whose row belongs to Alice. The ON CONFLICT arm has
     // no rowCount check by design: Postgres raises 42501 when the existing
     // row fails the UPDATE policy's USING expression. This test pins that
     // error path — if the write ever resolved without an error instead, the
     // provider blob write would run and silently overwrite Alice's object.
     queryResults = [
-      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
       { rows: [], rowCount: 0 }, // BEGIN
       { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
       { rows: [], rowCount: 0 }, // set_config(claims)
@@ -488,8 +454,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
         'photos',
         'alice-note.txt',
         { size: 8, mimetype: 'text/plain' } as Express.Multer.File,
-        false,
-        { upsert: true }
+        false
       )
     ).rejects.toMatchObject({
       statusCode: 403,
@@ -498,33 +463,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     expect(provider.putObject).not.toHaveBeenCalled();
   });
 
-  it('rejects an upload strategy for an existing key with 409 when upsert is not set', async () => {
-    const { StorageService } = await import('@/services/storage/storage.service.js');
-    const svc = StorageService.getInstance();
-    const provider = {
-      getUploadStrategy: vi.fn(),
-    };
-    (svc as unknown as { provider: typeof provider }).provider = provider;
-
-    queryResults = [
-      { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
-      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
-    ];
-
-    await expect(
-      svc.getUploadStrategy({ id: 'local:admin', role: 'project_admin' }, 'photos', {
-        filename: 'note.txt',
-        contentType: 'text/plain',
-        size: 8,
-      })
-    ).rejects.toMatchObject({
-      statusCode: 409,
-      code: 'STORAGE_ALREADY_EXISTS',
-    });
-    expect(provider.getUploadStrategy).not.toHaveBeenCalled();
-  });
-
-  it('probes UPDATE permission under RLS before issuing an upsert upload strategy', async () => {
+  it('probes create-or-replace permission before issuing an upload strategy', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
     const provider = {
@@ -539,13 +478,12 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     queryResults = [
       { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
-      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
       { rows: [], rowCount: 0 }, // BEGIN
       { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
       { rows: [], rowCount: 0 }, // set_config(claims)
       { rows: [], rowCount: 0 }, // SAVEPOINT
-      { rows: [], rowCount: 1 }, // RLS UPDATE probe → caller may replace
+      { rows: [], rowCount: 1 }, // RLS create-or-replace probe
       { rows: [], rowCount: 0 }, // ROLLBACK TO SAVEPOINT
       { rows: [], rowCount: 0 }, // RELEASE SAVEPOINT
       { rows: [], rowCount: 0 }, // COMMIT
@@ -557,20 +495,17 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
       'photos',
       { filename: 'note.txt', contentType: 'text/plain', size: 8 },
       false,
-      'text/plain',
-      { upsert: true }
+      'text/plain'
     );
 
     expect(strategy).toMatchObject({ method: 'direct', key: 'note.txt' });
-    // The direct uploadUrl must be self-contained: the PUT route it targets
-    // rejects an existing key with 409 unless the upsert flag rides along.
-    expect(strategy.uploadUrl).toBe('/upload?upsert=true');
-    const probe = calls.find((c) => c.sql.includes('SET uploaded_at = uploaded_at'));
-    expect(probe?.sql).toContain('UPDATE storage.objects');
+    expect(strategy.uploadUrl).toBe('/upload');
+    const probe = calls.find((c) => c.sql.includes('INSERT INTO storage.objects'));
+    expect(probe?.sql).toContain('ON CONFLICT (bucket, key) DO UPDATE');
     expect(calls.map((c) => c.sql)).toContain('ROLLBACK TO SAVEPOINT upload_strategy_rls_probe');
   });
 
-  it('rejects an upsert upload strategy with 403 when the RLS UPDATE probe matches no row', async () => {
+  it('rejects an upload strategy when RLS denies replacement', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
     const provider = {
@@ -580,13 +515,12 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     queryResults = [
       { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
-      { rows: [{ '?column?': 1 }], rowCount: 1 }, // root key-existence check → taken
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
       { rows: [], rowCount: 0 }, // BEGIN
       { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
       { rows: [], rowCount: 0 }, // set_config(claims)
       { rows: [], rowCount: 0 }, // SAVEPOINT
-      { rows: [], rowCount: 0 }, // RLS UPDATE probe → hidden row, no permission
+      { rows: [], rowCount: 0, throwCode: '42501' }, // RLS denies conflict update
       { rows: [], rowCount: 0 }, // ROLLBACK TO SAVEPOINT
       { rows: [], rowCount: 0 }, // RELEASE SAVEPOINT
       { rows: [], rowCount: 0 }, // ROLLBACK (withUserContext error path)
@@ -599,8 +533,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
         'photos',
         { filename: 'note.txt', contentType: 'text/plain', size: 8 },
         false,
-        'text/plain',
-        { upsert: true }
+        'text/plain'
       )
     ).rejects.toMatchObject({
       statusCode: 403,
@@ -609,43 +542,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     expect(provider.getUploadStrategy).not.toHaveBeenCalled();
   });
 
-  it('maps a concurrent upload-strategy INSERT collision to STORAGE_ALREADY_EXISTS', async () => {
-    const { StorageService } = await import('@/services/storage/storage.service.js');
-    const svc = StorageService.getInstance();
-    const provider = {
-      getUploadStrategy: vi.fn(),
-    };
-    (svc as unknown as { provider: typeof provider }).provider = provider;
-
-    queryResults = [
-      { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
-      { rows: [], rowCount: 0 }, // root key-existence check → free
-      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
-      { rows: [], rowCount: 0 }, // BEGIN
-      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
-      { rows: [], rowCount: 0 }, // set_config(claims)
-      { rows: [], rowCount: 0 }, // SAVEPOINT
-      { rows: [], rowCount: 0, throwCode: '23505' }, // concurrent creator won
-      { rows: [], rowCount: 0 }, // ROLLBACK TO SAVEPOINT
-      { rows: [], rowCount: 0 }, // RELEASE SAVEPOINT
-      { rows: [], rowCount: 0 }, // ROLLBACK (withUserContext error path)
-      { rows: [], rowCount: 0 }, // RESET ROLE
-    ];
-
-    await expect(
-      svc.getUploadStrategy(
-        { id: 'alice-sub', email: 'alice@example.com', role: 'authenticated' },
-        'photos',
-        { filename: 'note.txt', contentType: 'text/plain', size: 8 }
-      )
-    ).rejects.toMatchObject({
-      statusCode: 409,
-      code: 'STORAGE_ALREADY_EXISTS',
-    });
-    expect(provider.getUploadStrategy).not.toHaveBeenCalled();
-  });
-
-  it('updates the existing row on confirm-upload with upsert instead of inserting', async () => {
+  it('updates an existing row on confirm-upload by default', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
     const provider = {
@@ -659,7 +556,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
 
     queryResults = [
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
-      { rows: [], rowCount: 1 }, // root ON CONFLICT write (no pre-check for upsert)
+      { rows: [], rowCount: 1 }, // root create-or-replace write
     ];
 
     const result = await svc.confirmUpload(
@@ -667,19 +564,18 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
       'photos',
       'note.txt',
       { size: 16, contentType: 'text/plain' },
-      false,
-      { upsert: true }
+      false
     );
 
     expect(result).toMatchObject({ bucket: 'photos', key: 'note.txt', size: 16 });
-    // Upsert confirms are a single race-free INSERT ... ON CONFLICT write.
+    // Confirms are a single race-free INSERT ... ON CONFLICT write.
     const write = calls.find((c) => c.sql.includes('INSERT INTO storage.objects'));
     expect(write?.sql).toContain('ON CONFLICT (bucket, key) DO UPDATE');
     // Ownership column is never touched by the conflict arm.
     expect(write?.sql.split('DO UPDATE')[1]).not.toContain('uploaded_by');
   });
 
-  it('maps an end-user confirm-upload upsert RLS denial to 403', async () => {
+  it('maps an end-user confirm-upload replacement denial to 403', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
     const provider = {
@@ -707,8 +603,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
         'photos',
         'note.txt',
         { size: 16, contentType: 'text/plain' },
-        false,
-        { upsert: true }
+        false
       )
     ).rejects.toMatchObject({
       statusCode: 403,
@@ -731,8 +626,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     // uploaded_at is supplied app-side, so the INSERT no longer uses RETURNING.
     queryResults = [
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
-      { rows: [], rowCount: 0 }, // already-confirmed check
-      { rows: [], rowCount: 1 }, // root insert (no RETURNING)
+      { rows: [], rowCount: 1 }, // root create-or-replace write (no RETURNING)
     ];
 
     const result = await svc.confirmUpload(

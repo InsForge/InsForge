@@ -39,7 +39,6 @@ const bucket = insforge.storage.from('images')
 
 - `path` (string, required) - 文件的对象密钥/路径
 - `file` (File | Blob, required) - 要上传的文件或 Blob
-- `options.upsert` (boolean, 可选) - 替换现有对象。默认为 `false`
 
 ### 返回
 
@@ -57,9 +56,9 @@ const bucket = insforge.storage.from('images')
 }
 ```
 
-<Warning>
-如果已存在相同密钥的文件，`upload()` 默认返回冲突。传入 `{ upsert: true }` 可替换该文件；如需服务器生成唯一密钥，请使用 `uploadAuto()`。
-</Warning>
+<Note>
+上传到已有对象键会替换当前对象。如需服务器生成唯一键，请使用 `uploadAuto()`。
+</Note>
 
 ### 示例
 

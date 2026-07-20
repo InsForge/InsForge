@@ -54,8 +54,9 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 | `filename` | string | Sí | Clave de objeto usada literalmente, salvo que se active `autoKey` |
 | `contentType` | string | No | Tipo MIME del archivo |
 | `size` | integer | No | Tamaño de archivo en bytes |
-| `upsert` | boolean | No | Reemplaza un objeto existente con esta clave. Por defecto es `false` |
 | `autoKey` | boolean | No | Genera una clave única a partir de `filename`. Por defecto es `false` |
+
+Cargar en una clave de objeto existente reemplaza el objeto actual. Usa `autoKey` cuando necesites que el servidor genere una clave nueva.
 
 #### Ejemplo
 
@@ -125,7 +126,6 @@ POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
 | `size` | integer | Sí | Tamaño de archivo en bytes |
 | `contentType` | string | No | Tipo MIME del archivo |
 | `etag` | string | No | ETag S3 del objeto cargado |
-| `upsert` | boolean | No | Debe coincidir con el valor de `upsert` usado al solicitar la estrategia |
 
 #### Ejemplo
 

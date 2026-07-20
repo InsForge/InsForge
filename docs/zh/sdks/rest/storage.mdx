@@ -54,8 +54,9 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 | `filename` | string | 是 | 对象键；除非启用 `autoKey`，否则按原样使用 |
 | `contentType` | string | 否 | 文件的MIME类型 |
 | `size` | integer | 否 | 文件大小（字节） |
-| `upsert` | boolean | 否 | 替换该键的现有对象。默认为 `false` |
 | `autoKey` | boolean | 否 | 根据 `filename` 生成唯一键。默认为 `false` |
+
+上传到已有对象键会替换当前对象。如需服务器生成新键，请启用 `autoKey`。
 
 #### 示例
 
@@ -125,7 +126,6 @@ POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
 | `size` | integer | 是 | 文件大小（字节） |
 | `contentType` | string | 否 | 文件的MIME类型 |
 | `etag` | string | 否 | 上传对象的S3 ETag |
-| `upsert` | boolean | 否 | 必须与请求上传策略时使用的 `upsert` 值一致 |
 
 #### 示例
 

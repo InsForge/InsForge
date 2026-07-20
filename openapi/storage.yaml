@@ -518,7 +518,7 @@ paths:
       description: |
         Returns upload strategy based on storage backend (S3 returns presigned URLs, local returns direct upload endpoints).
 
-        The filename is used verbatim as the object key unless `autoKey` is set. If the key already exists the request fails with 409 unless `upsert` is true, in which case the issued strategy replaces the object in place (end-user replaces are gated by the `storage.objects` UPDATE row-level-security policies).
+        The filename is used verbatim as the object key unless `autoKey` is set. Uploading to an existing key replaces the current object in place. End-user creates and replacements are gated by the `storage.objects` row-level-security policies.
       tags:
         - Client
       security:
@@ -552,14 +552,10 @@ paths:
                   type: integer
                   description: File size in bytes
                   example: 102400
-                upsert:
-                  type: boolean
-                  default: false
-                  description: Replace the object at this key if it already exists. Without it, a conflicting key is rejected with 409. Pass the same value to confirm-upload.
                 autoKey:
                   type: boolean
                   default: false
-                  description: Ask the server to mint a unique key from the filename (timestamp + random suffix) instead of using it verbatim. Never conflicts; mutually exclusive with upsert in practice.
+                  description: Ask the server to mint a unique key from the filename (timestamp + random suffix) instead of using it verbatim.
       responses:
         '200':
           description: Upload strategy details
@@ -592,15 +588,8 @@ paths:
                     uploadUrl: /api/storage/buckets/avatars/objects/profile-photo.jpg
                     key: profile-photo.jpg
                     confirmRequired: false
-                localUpsert:
-                  summary: Local Storage Response (upsert requested — flag rides in the uploadUrl)
-                  value:
-                    method: direct
-                    uploadUrl: /api/storage/buckets/avatars/objects/profile-photo.jpg?upsert=true
-                    key: profile-photo.jpg
-                    confirmRequired: false
         '403':
-          description: upsert requested on an object the caller's UPDATE policy does not cover
+          description: The caller is not permitted to create or replace this object
           content:
             application/json:
               schema:
@@ -615,22 +604,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: Key already exists and upsert was not set
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "STORAGE_ALREADY_EXISTS"
-                message: "Object \"profile-photo.jpg\" already exists in bucket \"avatars\". Pass upsert=true to replace it."
-                statusCode: 409
-
   /api/storage/buckets/{bucketName}/objects/{objectKey}:
     put:
       summary: Upload Object
       description: |
-        Standard PUT semantics: uploading to an existing key fails with 409 unless `upsert=true` is passed, in which case the object is replaced in place (200 instead of 201). End-user replaces are gated by the `storage.objects` UPDATE row-level-security policies; replacing an object never reassigns its ownership.
+        Creates or replaces the object at the exact key, matching S3 PutObject semantics. End-user creates and replacements are gated by the `storage.objects` row-level-security policies; replacing an object never reassigns its ownership.
       tags:
         - Client
       security:
@@ -650,13 +628,6 @@ paths:
             type: string
           example: user123.jpg
           description: Object key (can include forward slashes for pseudo-folders)
-        - name: upsert
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: false
-          description: Replace the object at this key if it already exists (exact string "true"). Without it, a conflicting key is rejected with 409.
       requestBody:
         required: true
         content:
@@ -671,8 +642,8 @@ paths:
               required:
                 - file
       responses:
-        '201':
-          description: Object created
+        '200':
+          description: Object created or replaced
           content:
             application/json:
               schema:
@@ -684,14 +655,8 @@ paths:
                 mimeType: "image/jpeg"
                 uploadedAt: "2024-01-21T10:30:00Z"
                 url: "/api/storage/buckets/avatars/objects/user123.jpg"
-        '200':
-          description: Existing object replaced in place (upsert=true)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StoredFile'
         '403':
-          description: upsert=true on an object the caller's UPDATE policy does not cover
+          description: The caller is not permitted to create or replace this object
           content:
             application/json:
               schema:
@@ -700,16 +665,6 @@ paths:
                 error: "STORAGE_PERMISSION_DENIED"
                 message: "You do not have permission to write \"user123.jpg\" in bucket \"avatars\""
                 statusCode: 403
-        '409':
-          description: Key already exists and upsert was not set
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "STORAGE_ALREADY_EXISTS"
-                message: "Object \"user123.jpg\" already exists in bucket \"avatars\". Pass upsert=true to replace it."
-                statusCode: 409
         '400':
           description: Invalid bucket name, key, or file
           content:
@@ -869,10 +824,6 @@ paths:
                   type: string
                   description: S3 ETag of the uploaded object (optional)
                   example: "9bb58f26192e4ba00f01e2e7b136bbd8"
-                upsert:
-                  type: boolean
-                  default: false
-                  description: Must match the upsert flag the upload strategy was requested with, so confirming a replacement updates the existing metadata row instead of failing with 409.
       responses:
         '201':
           description: Upload confirmed successfully
@@ -900,17 +851,6 @@ paths:
                 error: "UPLOAD_NOT_FOUND"
                 message: "Upload not found for key 'profile-photo.jpg' in bucket 'avatars'"
                 statusCode: 404
-        '409':
-          description: Already confirmed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "STORAGE_ALREADY_EXISTS"
-                message: "File 'profile-photo.jpg' already confirmed in bucket 'avatars'"
-                statusCode: 409
-
   /api/storage/buckets/{bucketName}/download-strategy/objects/{objectKey}:
     get:
       summary: Get Download Strategy (Direct or Presigned URL)

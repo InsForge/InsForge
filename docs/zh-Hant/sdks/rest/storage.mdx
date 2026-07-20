@@ -54,8 +54,9 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 | `filename` | string | 是 | 物件金鑰；除非啟用 `autoKey`，否則依原樣使用 |
 | `contentType` | string | 否 | 檔案的MIME類型 |
 | `size` | integer | 否 | 檔案大小（位元組） |
-| `upsert` | boolean | 否 | 取代此金鑰的現有物件。預設為 `false` |
 | `autoKey` | boolean | 否 | 根據 `filename` 產生唯一金鑰。預設為 `false` |
+
+上傳至現有物件金鑰會取代目前的物件。如需伺服器產生新金鑰，請啟用 `autoKey`。
 
 #### 範例
 
@@ -125,7 +126,6 @@ POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
 | `size` | integer | 是 | 檔案大小（位元組） |
 | `contentType` | string | 否 | 檔案的MIME類型 |
 | `etag` | string | 否 | 上傳物件的S3 ETag |
-| `upsert` | boolean | 否 | 必須與請求上傳策略時使用的 `upsert` 值一致 |
 
 #### 範例
 
