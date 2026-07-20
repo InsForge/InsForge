@@ -9,6 +9,7 @@ import { errorResponse, successResponse } from '@/utils/response.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import logger from '@/utils/logger.js';
 import { ModelGatewayConfigService } from '@/services/ai/model-gateway-config.service.js';
+import { AuditService } from '@/services/logs/audit.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import {
   ERROR_CODES,
@@ -21,6 +22,7 @@ import {
 const router = Router();
 const chatService = ChatCompletionService.getInstance();
 const modelGatewayConfigService = ModelGatewayConfigService.getInstance();
+const auditService = AuditService.getInstance();
 type AIProvider = 'openrouter';
 
 /**
@@ -51,7 +53,15 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
         ERROR_CODES.INVALID_INPUT
       );
     }
-    successResponse(res, await modelGatewayConfigService.updateConfig(validation.data));
+    const config = await modelGatewayConfigService.updateConfig(validation.data);
+    await auditService.log({
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
+      action: 'UPDATE_MODEL_GATEWAY_CONFIG',
+      module: 'AI',
+      details: { updatedFields: Object.keys(validation.data) },
+      ip_address: req.ip,
+    });
+    successResponse(res, config);
   } catch (error) {
     next(error);
   }

@@ -22,7 +22,7 @@ function formatCompact(value: number): string {
 }
 
 function formatChartCurrency(value: number): string {
-  return `$${value.toFixed(value >= 10 ? 0 : 2)}`;
+  return formatCurrency(value);
 }
 
 function metricTotal(points: AIOverviewMetricPoint[]): number {
@@ -41,13 +41,27 @@ function UsageMetric({ label, value }: { label: string; value: number }) {
 }
 
 function KeyUsagePanel({ usage }: { usage: AIOverview['key'] }) {
-  const { t } = useTranslation('chrome');
+  const { t, i18n } = useTranslation('chrome');
   const hasLimit = usage.limit !== null && usage.limitRemaining !== null;
   const limit = usage.limit ?? 0;
   const limitRemaining = usage.limitRemaining ?? 0;
   const amountUsed = hasLimit ? Math.max(0, limit - limitRemaining) : 0;
   const usedPercentage =
     hasLimit && limit > 0 ? Math.min(100, Math.max(0, (amountUsed / limit) * 100)) : 0;
+  const resetValue = usage.limitReset
+    ? (() => {
+        const resetDate = new Date(usage.limitReset);
+        if (!Number.isNaN(resetDate.getTime()) && /\d{4}-\d{2}-\d{2}/.test(usage.limitReset)) {
+          return new Intl.DateTimeFormat(i18n.language, {
+            dateStyle: 'medium',
+            timeZone: 'UTC',
+          }).format(resetDate);
+        }
+        return t(`ai.usage.resetCadence.${usage.limitReset}`, {
+          defaultValue: usage.limitReset,
+        });
+      })()
+    : null;
 
   return (
     <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-[var(--alpha-8)]">
@@ -108,11 +122,11 @@ function KeyUsagePanel({ usage }: { usage: AIOverview['key'] }) {
               <span className="text-muted-foreground">
                 {t('ai.usage.limitReset', { defaultValue: 'Limit reset' })}
               </span>
-              <span className="font-medium capitalize text-foreground">
-                {usage.limitReset
+              <span className="font-medium text-foreground">
+                {resetValue
                   ? t('ai.usage.resetsValue', {
                       defaultValue: 'Resets {{value}}',
-                      value: usage.limitReset,
+                      value: resetValue,
                     })
                   : t('ai.usage.neverResets', { defaultValue: 'Never resets' })}
               </span>
@@ -185,7 +199,13 @@ function ModelUsageTable({ modelUsage }: { modelUsage: NonNullable<AIOverview['m
                   </td>
                   <td
                     className="px-4 py-3 text-right text-[13px] tabular-nums text-foreground"
-                    title={`${formatCompact(item.promptTokens)} prompt · ${formatCompact(item.completionTokens)} completion · ${formatCompact(item.reasoningTokens)} reasoning`}
+                    title={t('ai.usage.tokenBreakdown', {
+                      defaultValue:
+                        '{{prompt}} prompt · {{completion}} completion · {{reasoning}} reasoning',
+                      prompt: formatCompact(item.promptTokens),
+                      completion: formatCompact(item.completionTokens),
+                      reasoning: formatCompact(item.reasoningTokens),
+                    })}
                   >
                     {formatCompact(item.totalTokens)}
                   </td>

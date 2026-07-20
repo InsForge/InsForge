@@ -37,8 +37,8 @@ describe('AIService', () => {
 
   it('loads and updates Model Gateway configuration through authenticated requests', async () => {
     const config = {
-      apiKey: { configured: true, source: 'environment', maskedKey: 'sk-or••••' },
-      managementKey: { configured: false, source: null, maskedKey: null },
+      apiKey: { configured: true, maskedKey: 'sk-or••••' },
+      managementKey: { configured: false, maskedKey: null },
     };
     apiClientMock.request.mockResolvedValue(config);
 

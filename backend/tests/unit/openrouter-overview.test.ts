@@ -67,18 +67,10 @@ describe('OpenRouterProvider.getOverview', () => {
     modelGatewayConfigMock.apiKey = null;
     modelGatewayConfigMock.managementKey = null;
     modelGatewayConfigMock.getApiKey.mockImplementation(() =>
-      Promise.resolve(
-        modelGatewayConfigMock.apiKey
-          ? { value: modelGatewayConfigMock.apiKey, source: 'dashboard' as const }
-          : null
-      )
+      Promise.resolve(modelGatewayConfigMock.apiKey)
     );
     modelGatewayConfigMock.getManagementKey.mockImplementation(() =>
-      Promise.resolve(
-        modelGatewayConfigMock.managementKey
-          ? { value: modelGatewayConfigMock.managementKey, source: 'dashboard' as const }
-          : null
-      )
+      Promise.resolve(modelGatewayConfigMock.managementKey)
     );
     provider = OpenRouterProvider.getInstance();
     resetProviderState(provider);
@@ -310,6 +302,7 @@ describe('OpenRouterProvider.getOverview', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(overview.key.observabilityAvailable).toBe(false);
+    expect(overview.key.observabilityError).toContain('API key');
     expect(overview.charts.spend).toEqual([]);
   });
 
@@ -338,6 +331,76 @@ describe('OpenRouterProvider.getOverview', () => {
     expect(overview.key.observabilityAvailable).toBe(false);
     expect(overview.key.observabilityError).toContain('management key');
     expect(overview.modelUsage).toEqual([]);
+  });
+
+  it('loads model-level activity through the cloud backend', async () => {
+    environmentMock.isCloud = true;
+    vi.stubEnv('PROJECT_ID', 'project_123');
+    vi.stubEnv('JWT_SECRET', 'test-secret-long-enough-for-signing-32chars');
+    vi.stubEnv('CLOUD_API_HOST', 'https://cloud.example');
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            openrouter: { api_key: 'sk-or-cloud', limit_remaining: 10 },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              hash: 'hash',
+              label: 'Cloud key',
+              usage: 0.42,
+              limit: null,
+              is_free_tier: false,
+            },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [
+              {
+                date: '2026-05-10',
+                model: 'openai/gpt-5.4',
+                provider_name: 'OpenAI',
+                usage: 0.42,
+                requests: 3,
+                prompt_tokens: 100,
+                completion_tokens: 20,
+                reasoning_tokens: 5,
+              },
+            ],
+          }),
+      });
+
+    const overview = await provider.getOverview();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        href: expect.stringContaining('https://cloud.example/ai/v1/activity/project_123?sign='),
+      }),
+      { method: 'GET' }
+    );
+    expect(overview.key.observabilityAvailable).toBe(true);
+    expect(overview.modelUsage).toEqual([
+      {
+        model: 'openai/gpt-5.4',
+        providers: ['OpenAI'],
+        requests: 3,
+        promptTokens: 100,
+        completionTokens: 20,
+        reasoningTokens: 5,
+        totalTokens: 125,
+        spend: 0.42,
+        byokSpend: 0,
+      },
+    ]);
   });
 
   it.each([

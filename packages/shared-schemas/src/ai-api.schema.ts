@@ -344,11 +344,8 @@ export const openRouterKeySchema = z.object({
   maskedKey: z.string(),
 });
 
-export const modelGatewayCredentialSourceSchema = z.enum(['environment', 'dashboard']);
-
 export const modelGatewayCredentialStatusSchema = z.object({
   configured: z.boolean(),
-  source: modelGatewayCredentialSourceSchema.nullable(),
   maskedKey: z.string().nullable(),
 });
 
@@ -394,7 +391,6 @@ export type AIOverviewMetricPoint = z.infer<typeof aiOverviewMetricPointSchema>;
 export type AIModelUsage = z.infer<typeof aiModelUsageSchema>;
 export type AIOverview = z.infer<typeof aiOverviewSchema>;
 export type OpenRouterKey = z.infer<typeof openRouterKeySchema>;
-export type ModelGatewayCredentialSource = z.infer<typeof modelGatewayCredentialSourceSchema>;
 export type ModelGatewayCredentialStatus = z.infer<typeof modelGatewayCredentialStatusSchema>;
 export type ModelGatewayConfig = z.infer<typeof modelGatewayConfigSchema>;
 export type UpdateModelGatewayConfig = z.infer<typeof updateModelGatewayConfigSchema>;

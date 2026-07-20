@@ -41,5 +41,10 @@ export function useUpdateModelGatewayConfig() {
         'error'
       );
     },
+    onSettled: () => {
+      // A multi-key save may partially succeed because the two credentials are independent.
+      // Reconcile the masked status even when one write fails.
+      void queryClient.invalidateQueries({ queryKey: MODEL_GATEWAY_CONFIG_QUERY_KEY });
+    },
   });
 }

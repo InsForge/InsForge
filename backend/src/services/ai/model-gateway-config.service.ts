@@ -1,8 +1,4 @@
-import type {
-  ModelGatewayConfig,
-  ModelGatewayCredentialSource,
-  UpdateModelGatewayConfig,
-} from '@insforge/shared-schemas';
+import type { ModelGatewayConfig, UpdateModelGatewayConfig } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
 
@@ -15,20 +11,17 @@ type SecretStore = Pick<
   'createSecret' | 'getSecretByKey' | 'listSecrets' | 'updateSecret'
 >;
 
-export interface ResolvedModelGatewayCredential {
-  value: string;
-  source: ModelGatewayCredentialSource;
-}
-
 interface StoredCredentialCache {
-  apiKey: string | null;
-  managementKey: string | null;
+  value: string | null;
   expiresAt: number;
 }
 
+type ModelGatewayCredentialKey =
+  typeof OPENROUTER_API_KEY_SECRET | typeof OPENROUTER_MANAGEMENT_KEY_SECRET;
+
 export class ModelGatewayConfigService {
   private static instance: ModelGatewayConfigService;
-  private storedCredentialCache: StoredCredentialCache | null = null;
+  private storedCredentialCache = new Map<ModelGatewayCredentialKey, StoredCredentialCache>();
 
   constructor(private readonly secretService: SecretStore = SecretService.getInstance()) {}
 
@@ -39,12 +32,13 @@ export class ModelGatewayConfigService {
     return ModelGatewayConfigService.instance;
   }
 
-  async getApiKey(): Promise<ResolvedModelGatewayCredential | null> {
-    return this.resolveStoredCredential((await this.getStoredCredentials()).apiKey);
+  async getApiKey(): Promise<string | null> {
+    const storedApiKey = await this.getStoredCredential(OPENROUTER_API_KEY_SECRET);
+    return storedApiKey ?? this.normalizeCredential(process.env.OPENROUTER_API_KEY);
   }
 
-  async getManagementKey(): Promise<ResolvedModelGatewayCredential | null> {
-    return this.resolveStoredCredential((await this.getStoredCredentials()).managementKey);
+  async getManagementKey(): Promise<string | null> {
+    return this.getStoredCredential(OPENROUTER_MANAGEMENT_KEY_SECRET);
   }
 
   async seedApiKeyFromEnv(): Promise<void> {
@@ -77,13 +71,11 @@ export class ModelGatewayConfigService {
       });
     }
 
-    this.storedCredentialCache = null;
+    this.storedCredentialCache.delete(OPENROUTER_API_KEY_SECRET);
   }
 
   async getConfig(): Promise<ModelGatewayConfig> {
-    const storedCredentials = await this.getStoredCredentials();
-    const apiKey = this.resolveStoredCredential(storedCredentials.apiKey);
-    const managementKey = this.resolveStoredCredential(storedCredentials.managementKey);
+    const [apiKey, managementKey] = await Promise.all([this.getApiKey(), this.getManagementKey()]);
 
     return {
       apiKey: this.toCredentialStatus(apiKey),
@@ -92,65 +84,54 @@ export class ModelGatewayConfigService {
   }
 
   async updateConfig(input: UpdateModelGatewayConfig): Promise<ModelGatewayConfig> {
-    const secrets = await this.secretService.listSecrets();
-    const existingByKey = new Map(secrets.map((secret) => [secret.key, secret]));
+    try {
+      const secrets = await this.secretService.listSecrets();
+      const existingByKey = new Map(secrets.map((secret) => [secret.key, secret]));
 
-    if (input.apiKey !== undefined) {
-      await this.upsertCredential(
-        OPENROUTER_API_KEY_SECRET,
-        input.apiKey,
-        existingByKey.get(OPENROUTER_API_KEY_SECRET)
-      );
+      if (input.apiKey !== undefined) {
+        await this.upsertCredential(
+          OPENROUTER_API_KEY_SECRET,
+          input.apiKey,
+          existingByKey.get(OPENROUTER_API_KEY_SECRET)
+        );
+      }
+
+      if (input.managementKey !== undefined) {
+        await this.upsertCredential(
+          OPENROUTER_MANAGEMENT_KEY_SECRET,
+          input.managementKey,
+          existingByKey.get(OPENROUTER_MANAGEMENT_KEY_SECRET)
+        );
+      }
+    } finally {
+      // The credentials are independent and may update independently. Always invalidate both
+      // cache entries so a partial failure is reconciled on the next read.
+      this.storedCredentialCache.clear();
     }
 
-    if (input.managementKey !== undefined) {
-      await this.upsertCredential(
-        OPENROUTER_MANAGEMENT_KEY_SECRET,
-        input.managementKey,
-        existingByKey.get(OPENROUTER_MANAGEMENT_KEY_SECRET)
-      );
-    }
-
-    this.storedCredentialCache = null;
     return this.getConfig();
   }
 
-  private async getStoredCredentials(): Promise<{
-    apiKey: string | null;
-    managementKey: string | null;
-  }> {
-    if (this.storedCredentialCache && this.storedCredentialCache.expiresAt > Date.now()) {
-      return this.storedCredentialCache;
+  private async getStoredCredential(key: ModelGatewayCredentialKey): Promise<string | null> {
+    const cached = this.storedCredentialCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value;
     }
 
     try {
-      const [apiKey, managementKey] = await Promise.all([
-        this.secretService.getSecretByKey(OPENROUTER_API_KEY_SECRET),
-        this.secretService.getSecretByKey(OPENROUTER_MANAGEMENT_KEY_SECRET),
-      ]);
-      this.storedCredentialCache = {
-        apiKey: this.normalizeCredential(apiKey),
-        managementKey: this.normalizeCredential(managementKey),
+      const value = this.normalizeCredential(await this.secretService.getSecretByKey(key));
+      this.storedCredentialCache.set(key, {
+        value,
         expiresAt: Date.now() + STORED_CREDENTIAL_CACHE_TTL_MS,
-      };
+      });
+      return value;
     } catch (error) {
-      logger.warn('Unable to load dashboard-managed Model Gateway credentials', {
+      logger.warn('Unable to load a Model Gateway credential', {
+        key,
         error: error instanceof Error ? error.message : String(error),
       });
-      this.storedCredentialCache = {
-        apiKey: null,
-        managementKey: null,
-        expiresAt: Date.now() + STORED_CREDENTIAL_CACHE_TTL_MS,
-      };
+      throw error;
     }
-
-    return this.storedCredentialCache;
-  }
-
-  private resolveStoredCredential(
-    storedValue: string | null
-  ): ResolvedModelGatewayCredential | null {
-    return storedValue ? { value: storedValue, source: 'dashboard' } : null;
   }
 
   private normalizeCredential(value: string | null | undefined): string | null {
@@ -158,11 +139,10 @@ export class ModelGatewayConfigService {
     return normalized ? normalized : null;
   }
 
-  private toCredentialStatus(credential: ResolvedModelGatewayCredential | null) {
+  private toCredentialStatus(credential: string | null) {
     return {
       configured: credential !== null,
-      source: credential?.source ?? null,
-      maskedKey: credential ? this.maskCredential(credential.value) : null,
+      maskedKey: credential ? this.maskCredential(credential) : null,
     };
   }
 

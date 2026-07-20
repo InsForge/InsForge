@@ -13,8 +13,10 @@ const hookMock = vi.hoisted(() => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (_key: string, options?: { defaultValue?: string; value?: string }) =>
-      options?.defaultValue?.replace('{{value}}', options.value ?? '') ?? _key,
+    t: (_key: string, options?: Record<string, string>) =>
+      options?.defaultValue?.replace(/{{(\w+)}}/g, (_match, key: string) => options[key] ?? '') ??
+      _key,
+    i18n: { language: 'en' },
   }),
 }));
 
@@ -82,9 +84,34 @@ describe('AIUsagePage', () => {
     expect(screen.getAllByText('12K')).toHaveLength(3);
     expect(screen.getByText('openai/gpt-5.4')).toBeInTheDocument();
     expect(screen.getByText('OpenAI')).toBeInTheDocument();
+    expect(screen.getByTitle('9K prompt · 2.5K completion · 500 reasoning')).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole('img')
+        .some((point) => point.getAttribute('aria-label')?.includes('$1.25'))
+    ).toBe(true);
     expect(screen.getByText('$2.00')).toBeInTheDocument();
     expect(screen.getByText('$1.00')).toBeInTheDocument();
     expect(screen.getByText('$0.00')).toBeInTheDocument();
+  });
+
+  it('preserves cents for chart spend values above ten dollars', () => {
+    hookMock.result = {
+      data: {
+        ...overview,
+        charts: {
+          ...overview.charts,
+          spend: [{ label: '2026-07-15', value: 16.53 }],
+        },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    };
+
+    render(<AIUsagePage />);
+
+    expect(screen.getAllByText('$16.53')).toHaveLength(2);
   });
 
   it('shows a single management-key explanation when activity is unavailable', () => {

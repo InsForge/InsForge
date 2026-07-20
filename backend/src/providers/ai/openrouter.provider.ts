@@ -71,7 +71,7 @@ interface ModelUsageAccumulator {
   byokSpend: number;
 }
 
-export type ApiKeySource = 'cloud' | 'env' | 'settings';
+export type ApiKeySource = 'cloud' | 'self-hosted';
 interface ResolvedApiKey {
   apiKey: string;
   source: ApiKeySource;
@@ -87,6 +87,7 @@ const EMPTY_AI_OVERVIEW: AIOverview = {
     usageWeekly: 0,
     usageMonthly: 0,
     observabilityAvailable: false,
+    observabilityError: 'Configure an OpenRouter API key to load Model Gateway usage.',
   },
   charts: {
     spend: [],
@@ -135,8 +136,8 @@ export class OpenRouterProvider {
 
   /**
    * Resolve the API key and its source in one call.
-   * Cloud projects use InsForge Cloud-managed credentials; self-hosting uses the encrypted
-   * Model Gateway secret store, optionally bootstrapped from OPENROUTER_API_KEY at startup.
+   * Cloud projects use InsForge Cloud-managed credentials; self-hosting prefers the encrypted
+   * Model Gateway secret store and falls back to OPENROUTER_API_KEY for upgrade resilience.
    * Use this instead of getApiKey() when downstream logic depends on the source.
    */
   async getApiKeyWithSource(): Promise<ResolvedApiKey> {
@@ -148,18 +149,15 @@ export class OpenRouterProvider {
     }
 
     // Self-hosted: dashboard-managed encrypted secret.
-    const credential = await this.modelGatewayConfigService.getApiKey();
-    if (!credential) {
+    const apiKey = await this.modelGatewayConfigService.getApiKey();
+    if (!apiKey) {
       throw new AppError(
-        'OpenRouter API key not configured. Set OPENROUTER_API_KEY or configure Model Gateway settings.',
+        'OpenRouter API key not configured. Configure Model Gateway settings or set OPENROUTER_API_KEY.',
         500,
         ERROR_CODES.AI_INVALID_API_KEY
       );
     }
-    return {
-      apiKey: credential.value,
-      source: credential.source === 'environment' ? 'env' : 'settings',
-    };
+    return { apiKey, source: 'self-hosted' };
   }
 
   /**
@@ -321,7 +319,7 @@ export class OpenRouterProvider {
     try {
       response = await fetch(url, {
         method: 'GET',
-        headers: { Authorization: `Bearer ${managementCredential.value}` },
+        headers: { Authorization: `Bearer ${managementCredential}` },
       });
 
       if (response.status === 401 || response.status === 403 || response.status === 404) {

@@ -12,12 +12,10 @@ vi.mock('#features/ai/hooks/useModelGatewayConfig', () => ({
     data: {
       apiKey: {
         configured: true,
-        source: 'dashboard',
         maskedKey: 'sk-or-en••••••••1234',
       },
       managementKey: {
         configured: false,
-        source: null,
         maskedKey: null,
       },
     },

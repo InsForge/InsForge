@@ -5,6 +5,54 @@ info:
   description: Model Gateway helper APIs for OpenRouter key provisioning, model discovery, and deprecated compatibility proxy routes
 
 paths:
+  /api/ai/config:
+    get:
+      summary: Get Model Gateway credential configuration
+      description: Returns masked OpenRouter API and management key status for self-hosted deployments. Cloud-hosted credentials are managed by InsForge Cloud.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Masked Model Gateway credential status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelGatewayConfig'
+        '400':
+          description: Configuration is managed by InsForge Cloud
+        '401':
+          description: Unauthorized
+        '500':
+          description: Failed to load encrypted credentials
+    put:
+      summary: Update Model Gateway credentials
+      description: Stores one or both OpenRouter credentials as encrypted reserved secrets in a self-hosted deployment. Credentials are independent and may be updated separately.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateModelGatewayConfig'
+      responses:
+        '200':
+          description: Updated masked Model Gateway credential status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelGatewayConfig'
+        '400':
+          description: Invalid payload or configuration is managed by InsForge Cloud
+        '401':
+          description: Unauthorized
+        '500':
+          description: Failed to update encrypted credentials
+
   /api/ai/models:
     get:
       summary: Get all available AI models
@@ -586,12 +634,89 @@ components:
           type: string
           description: Masked OpenRouter API key for display
 
+    ModelGatewayCredentialStatus:
+      type: object
+      required:
+        - configured
+        - maskedKey
+      properties:
+        configured:
+          type: boolean
+          description: Whether the credential resolves from encrypted settings or the supported API-key environment fallback.
+        maskedKey:
+          type: string
+          nullable: true
+          description: Masked credential for display, or null when it is not configured.
+
+    ModelGatewayConfig:
+      type: object
+      required:
+        - apiKey
+        - managementKey
+      properties:
+        apiKey:
+          $ref: '#/components/schemas/ModelGatewayCredentialStatus'
+        managementKey:
+          $ref: '#/components/schemas/ModelGatewayCredentialStatus'
+
+    UpdateModelGatewayConfig:
+      type: object
+      minProperties: 1
+      properties:
+        apiKey:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: OpenRouter API key used for model requests.
+        managementKey:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: OpenRouter management API key used only for activity analytics.
+
     AIOverviewMetricPoint:
       type: object
+      required:
+        - label
+        - value
       properties:
         label:
           type: string
         value:
+          type: number
+
+    AIModelUsage:
+      type: object
+      required:
+        - model
+        - providers
+        - requests
+        - promptTokens
+        - completionTokens
+        - reasoningTokens
+        - totalTokens
+        - spend
+        - byokSpend
+      properties:
+        model:
+          type: string
+        providers:
+          type: array
+          items:
+            type: string
+        requests:
+          type: number
+        promptTokens:
+          type: number
+        completionTokens:
+          type: number
+        reasoningTokens:
+          type: number
+        totalTokens:
+          type: number
+        spend:
+          type: number
+        byokSpend:
           type: number
 
     AIOverview:
@@ -640,6 +765,11 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/AIOverviewMetricPoint'
+        modelUsage:
+          type: array
+          description: Activity aggregated by model for the completed 30-day UTC window.
+          items:
+            $ref: '#/components/schemas/AIModelUsage'
     EmbeddingsRequest:
       type: object
       required:

@@ -573,8 +573,8 @@ export default function AIOverviewPage() {
               heightClass="h-[280px]"
               message={
                 overviewError?.message ||
-                t('ai.overview.activityLoadError', {
-                  defaultValue: 'Failed to load activity overview.',
+                t('ai.overview.usageLoadError', {
+                  defaultValue: 'Failed to load usage overview.',
                 })
               }
             />

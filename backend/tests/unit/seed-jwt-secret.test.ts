@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetSecretByKey = vi.fn();
 const mockCreateSecret = vi.fn();
+const mockListSecrets = vi.fn();
 const mockInitializeApiKey = vi.fn().mockResolvedValue('api-key');
 const mockInitializeAnonKey = vi.fn().mockResolvedValue('anon_test');
 const mockInitializeJwtKeyPair = vi
@@ -23,6 +24,7 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
     getInstance: () => ({
       getSecretByKey: mockGetSecretByKey,
       createSecret: mockCreateSecret,
+      listSecrets: mockListSecrets,
       initializeApiKey: mockInitializeApiKey,
       initializeAnonKey: mockInitializeAnonKey,
       initializeJwtKeyPair: mockInitializeJwtKeyPair,
@@ -86,9 +88,15 @@ describe('seedBackend secret initialization', () => {
     vi.clearAllMocks();
     mockClientQuery.mockResolvedValue({ rows: [] });
     mockGetUserTables.mockResolvedValue([]);
+    mockListSecrets.mockResolvedValue([]);
+    mockCreateSecret.mockResolvedValue(undefined);
     process.env.ROOT_ADMIN_USERNAME = 'admin';
     process.env.ROOT_ADMIN_PASSWORD = 'change-this-password';
     process.env.JWT_SECRET = 'jwt-secret';
+  });
+
+  afterEach(() => {
+    delete process.env.OPENROUTER_API_KEY;
   });
 
   it('seeds INSFORGE_INTERNAL_URL in OSS environments', async () => {
@@ -126,6 +134,23 @@ describe('seedBackend secret initialization', () => {
       key: 'JWT_SECRET',
       isReserved: true,
       value: 'jwt-secret',
+    });
+  });
+
+  it('bootstraps a missing self-hosted OpenRouter API key from the environment', async () => {
+    mockIsCloudEnvironment.mockReturnValue(false);
+    mockGetSecretByKey.mockResolvedValue(null);
+    mockListSecrets.mockResolvedValue([]);
+    process.env.OPENROUTER_API_KEY = 'sk-or-env-bootstrap';
+
+    const { seedBackend } = await import('../../src/utils/seed.js');
+
+    await seedBackend();
+
+    expect(mockCreateSecret).toHaveBeenCalledWith({
+      key: 'OPENROUTER_API_KEY',
+      value: 'sk-or-env-bootstrap',
+      isReserved: true,
     });
   });
 });

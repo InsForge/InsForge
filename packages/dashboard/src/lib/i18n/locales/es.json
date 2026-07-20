@@ -525,12 +525,17 @@
       "remaining": "Restante",
       "limitReset": "Restablecimiento del límite",
       "resetsValue": "Se restablece {{value}}",
+      "resetCadence": {
+        "daily": "diariamente",
+        "weekly": "semanalmente",
+        "monthly": "mensualmente"
+      },
       "neverResets": "Nunca se restablece",
-      "noDataYet": "Aún no hay datos",
       "activityUnavailable": "Actividad no disponible",
       "model": "Modelo",
       "requests": "Solicitudes",
       "tokens": "Tokens",
+      "tokenBreakdown": "{{prompt}} de entrada · {{completion}} de salida · {{reasoning}} de razonamiento",
       "spend": "Gasto",
       "share": "Porcentaje",
       "showingTopModels": "Mostrando los 10 modelos con mayor gasto",

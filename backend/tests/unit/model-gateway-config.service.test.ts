@@ -39,12 +39,10 @@ describe('ModelGatewayConfigService', () => {
 
     expect(config.apiKey).toEqual({
       configured: true,
-      source: 'dashboard',
       maskedKey: 'sk-or-da••••••••7890',
     });
     expect(config.managementKey).toEqual({
       configured: true,
-      source: 'dashboard',
       maskedKey: 'sk-or-da••••••••7890',
     });
     expect(secretStore.getSecretByKey).toHaveBeenCalledTimes(2);
@@ -85,8 +83,6 @@ describe('ModelGatewayConfigService', () => {
 
     const config = await service.getConfig();
 
-    expect(config.apiKey.source).toBe('dashboard');
-    expect(config.managementKey.source).toBe('dashboard');
     expect(config.apiKey.maskedKey).toBe('sk-or-da••••••••7890');
     expect(config.managementKey.maskedKey).toBe('sk-or-da••••••••7890');
   });
@@ -129,7 +125,71 @@ describe('ModelGatewayConfigService', () => {
       value: 'new-management-key',
       isReserved: true,
     });
-    expect(config.apiKey.source).toBe('dashboard');
-    expect(config.managementKey.source).toBe('dashboard');
+    expect(config.apiKey.configured).toBe(true);
+    expect(config.managementKey.configured).toBe(true);
+  });
+
+  it('falls back to OPENROUTER_API_KEY when no stored API key exists', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-env-api-1234567890');
+    const secretStore = createSecretStore();
+    secretStore.getSecretByKey.mockResolvedValue(null);
+    const service = new ModelGatewayConfigService(
+      secretStore as unknown as ConfigServiceSecretStore
+    );
+
+    await expect(service.getApiKey()).resolves.toBe('sk-or-env-api-1234567890');
+    await expect(service.getManagementKey()).resolves.toBeNull();
+  });
+
+  it('loads API and management credentials independently', async () => {
+    const secretStore = createSecretStore();
+    secretStore.getSecretByKey.mockImplementation((key: string) => {
+      if (key === 'OPENROUTER_API_KEY') {
+        return Promise.resolve('sk-or-api');
+      }
+      return Promise.reject(new Error('management decrypt failed'));
+    });
+    const service = new ModelGatewayConfigService(
+      secretStore as unknown as ConfigServiceSecretStore
+    );
+
+    await expect(service.getApiKey()).resolves.toBe('sk-or-api');
+    await expect(service.getManagementKey()).rejects.toThrow('management decrypt failed');
+  });
+
+  it('does not cache transient secret-store failures as missing credentials', async () => {
+    const secretStore = createSecretStore();
+    secretStore.getSecretByKey
+      .mockRejectedValueOnce(new Error('temporary decrypt failure'))
+      .mockResolvedValueOnce('sk-or-recovered');
+    const service = new ModelGatewayConfigService(
+      secretStore as unknown as ConfigServiceSecretStore
+    );
+
+    await expect(service.getApiKey()).rejects.toThrow('temporary decrypt failure');
+    await expect(service.getApiKey()).resolves.toBe('sk-or-recovered');
+    expect(secretStore.getSecretByKey).toHaveBeenCalledTimes(2);
+  });
+
+  it('invalidates cached credentials after an allowed partial update', async () => {
+    const secretStore = createSecretStore();
+    secretStore.getSecretByKey
+      .mockResolvedValueOnce('old-api-key')
+      .mockResolvedValueOnce('new-api-key');
+    secretStore.listSecrets.mockResolvedValue([
+      { id: 'api-id', key: 'OPENROUTER_API_KEY' },
+      { id: 'management-id', key: 'OPENROUTER_MANAGEMENT_API_KEY' },
+    ]);
+    secretStore.updateSecret.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const service = new ModelGatewayConfigService(
+      secretStore as unknown as ConfigServiceSecretStore
+    );
+
+    await expect(service.getApiKey()).resolves.toBe('old-api-key');
+    await expect(
+      service.updateConfig({ apiKey: 'new-api-key', managementKey: 'new-management-key' })
+    ).rejects.toThrow('Failed to update OPENROUTER_MANAGEMENT_API_KEY');
+    await expect(service.getApiKey()).resolves.toBe('new-api-key');
+    expect(secretStore.getSecretByKey).toHaveBeenCalledTimes(2);
   });
 });

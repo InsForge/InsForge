@@ -521,12 +521,17 @@
       "remaining": "Remaining",
       "limitReset": "Limit reset",
       "resetsValue": "Resets {{value}}",
+      "resetCadence": {
+        "daily": "daily",
+        "weekly": "weekly",
+        "monthly": "monthly"
+      },
       "neverResets": "Never resets",
-      "noDataYet": "No data yet",
       "activityUnavailable": "Activity unavailable",
       "model": "Model",
       "requests": "Requests",
       "tokens": "Tokens",
+      "tokenBreakdown": "{{prompt}} prompt · {{completion}} completion · {{reasoning}} reasoning",
       "spend": "Spend",
       "share": "Share",
       "showingTopModels": "Showing top 10 models by spend",

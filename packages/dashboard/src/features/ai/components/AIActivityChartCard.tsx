@@ -36,8 +36,12 @@ function formatBucketLabel(label: string) {
 
   if (/^\d{4}-\d{2}$/.test(label)) {
     return {
-      axis: new Intl.DateTimeFormat(undefined, { month: 'short' }).format(date),
-      title: new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' }).format(date),
+      axis: new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: 'UTC' }).format(date),
+      title: new Intl.DateTimeFormat(undefined, {
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'UTC',
+      }).format(date),
     };
   }
 
@@ -45,22 +49,30 @@ function formatBucketLabel(label: string) {
     const hourLabel = new Intl.DateTimeFormat(undefined, {
       hour: 'numeric',
       minute: '2-digit',
+      timeZone: 'UTC',
     }).format(date);
 
     return {
       axis: hourLabel,
-      title: `${new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(
-        date
-      )}, ${hourLabel}`,
+      title: `${new Intl.DateTimeFormat(undefined, {
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC',
+      }).format(date)}, ${hourLabel}`,
     };
   }
 
   return {
-    axis: new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date),
+    axis: new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(date),
     title: new Intl.DateTimeFormat(undefined, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
+      timeZone: 'UTC',
     }).format(date),
   };
 }
@@ -149,21 +161,24 @@ export function AIActivityChartCard({
           ))}
 
           {points.length === 0 ? (
-            <div className="absolute inset-x-14 bottom-6 top-3 flex items-center justify-center text-[12px] leading-4 text-muted-foreground">
+            <div className="absolute left-14 right-0 top-2 flex h-44 items-center justify-center text-[12px] leading-4 text-muted-foreground">
               {t('ai.overview.noDataYet', { defaultValue: 'No data yet' })}
             </div>
           ) : (
             <>
-              <div className="absolute inset-x-0 bottom-5 top-3 flex items-end gap-1 pl-14">
+              <div className="absolute left-14 right-0 top-2 flex h-44 items-end gap-1">
                 {points.map((point, index) => {
                   const label = formatBucketLabel(point.label);
 
                   return (
                     <div
                       key={`${point.label}-${index}`}
-                      className="group relative flex min-w-0 flex-1 flex-col items-center gap-1"
+                      role="img"
+                      tabIndex={0}
+                      aria-label={`${label.title}: ${valueFormatter(point.value)}`}
+                      className="group relative flex min-w-0 flex-1 flex-col items-center gap-1 focus-visible:outline-none"
                     >
-                      <div className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-10 hidden w-[128px] -translate-x-1/2 rounded border border-[var(--alpha-8)] bg-[rgb(var(--semantic-1))] px-2 py-1.5 text-[11px] leading-4 text-foreground shadow-lg group-hover:block">
+                      <div className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-10 hidden w-[128px] -translate-x-1/2 rounded border border-[var(--alpha-8)] bg-[rgb(var(--semantic-1))] px-2 py-1.5 text-[11px] leading-4 text-foreground shadow-lg group-hover:block group-focus:block">
                         <div className="truncate font-medium">{label.title}</div>
                         <div className="truncate text-muted-foreground">
                           {valueFormatter(point.value)}
@@ -179,7 +194,7 @@ export function AIActivityChartCard({
                   );
                 })}
               </div>
-              <div className="absolute bottom-0 left-14 right-0 h-4">
+              <div className="absolute left-14 right-0 top-[196px] h-4">
                 {xAxisLabels.map((label) => (
                   <span
                     key={`${label.label}-${label.position}`}
