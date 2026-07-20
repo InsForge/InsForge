@@ -7,6 +7,7 @@ import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
+import { ModelGatewayConfigService } from '@/services/ai/model-gateway-config.service.js';
 
 /**
  * Seeds default auth configuration for cloud environments
@@ -181,6 +182,12 @@ export async function seedBackend(): Promise<void> {
 
     // Initialize API key (from env or generate)
     const apiKey = await secretService.initializeApiKey();
+
+    // Self-hosted OpenRouter env values are bootstrap inputs. Seed them once so
+    // runtime reads and dashboard edits share the encrypted secret store.
+    if (!isCloudEnvironment()) {
+      await ModelGatewayConfigService.getInstance().seedApiKeyFromEnv();
+    }
 
     // Seed Stripe secret keys into the secret store so payment code has one lookup path.
     await StripeSyncService.getInstance().seedStripeKeysFromEnv();

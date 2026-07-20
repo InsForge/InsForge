@@ -4,12 +4,25 @@ const environmentMock = vi.hoisted(() => ({
   isCloud: false,
 }));
 
+const modelGatewayConfigMock = vi.hoisted(() => ({
+  apiKey: null as string | null,
+  managementKey: null as string | null,
+  getApiKey: vi.fn(),
+  getManagementKey: vi.fn(),
+}));
+
 vi.mock('../../src/utils/environment.js', () => ({
   isCloudEnvironment: () => environmentMock.isCloud,
 }));
 
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock('../../src/services/ai/model-gateway-config.service.js', () => ({
+  ModelGatewayConfigService: {
+    getInstance: () => modelGatewayConfigMock,
+  },
 }));
 
 import { OpenRouterProvider } from '../../src/providers/ai/openrouter.provider.js';
@@ -51,6 +64,22 @@ describe('OpenRouterProvider.getOverview', () => {
     vi.setSystemTime(fixedNow);
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
+    modelGatewayConfigMock.apiKey = null;
+    modelGatewayConfigMock.managementKey = null;
+    modelGatewayConfigMock.getApiKey.mockImplementation(() =>
+      Promise.resolve(
+        modelGatewayConfigMock.apiKey
+          ? { value: modelGatewayConfigMock.apiKey, source: 'dashboard' as const }
+          : null
+      )
+    );
+    modelGatewayConfigMock.getManagementKey.mockImplementation(() =>
+      Promise.resolve(
+        modelGatewayConfigMock.managementKey
+          ? { value: modelGatewayConfigMock.managementKey, source: 'dashboard' as const }
+          : null
+      )
+    );
     provider = OpenRouterProvider.getInstance();
     resetProviderState(provider);
   });
@@ -61,7 +90,8 @@ describe('OpenRouterProvider.getOverview', () => {
   });
 
   it('returns the last 30 completed UTC day buckets when there is no activity', async () => {
-    vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
+    modelGatewayConfigMock.apiKey = 'sk-or-test';
+    modelGatewayConfigMock.managementKey = 'sk-or-management-test';
     fetchMock
       .mockResolvedValueOnce({
         ok: true,
@@ -87,16 +117,25 @@ describe('OpenRouterProvider.getOverview', () => {
     const overview = await provider.getOverview();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.any(URL),
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer sk-or-management-test' },
+      })
+    );
     expect(overview.key.label).toBe('Test key');
     expect(overview.charts.spend).toHaveLength(30);
     expect(overview.charts.spend.map((point) => point.label)).toEqual(completedDayLabels());
     expect(overview.charts.spend.map((point) => point.value)).toEqual(Array(30).fill(0));
     expect(overview.charts.requests.map((point) => point.value)).toEqual(Array(30).fill(0));
     expect(overview.charts.tokens.map((point) => point.value)).toEqual(Array(30).fill(0));
+    expect(overview.modelUsage).toEqual([]);
   });
 
   it('returns full completed-day buckets and ignores today and older activity', async () => {
-    vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
+    modelGatewayConfigMock.apiKey = 'sk-or-test';
+    modelGatewayConfigMock.managementKey = 'sk-or-management-test';
     fetchMock
       .mockResolvedValueOnce({
         ok: true,
@@ -138,8 +177,10 @@ describe('OpenRouterProvider.getOverview', () => {
                 completion_tokens: 100,
               },
               {
+                byok_usage_inference: 0.03,
                 date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
                 model: 'google/gemini-2.5-pro',
+                model_permaslug: 'google/gemini-2.5-pro-2026-01-01',
                 provider_name: 'Google',
                 usage: 0.42,
                 requests: 12,
@@ -147,6 +188,7 @@ describe('OpenRouterProvider.getOverview', () => {
                 completion_tokens: 320,
               },
               {
+                byok_usage_inference: 0.02,
                 date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
                 model: 'openai/gpt-5.4',
                 provider_name: 'OpenAI',
@@ -179,10 +221,35 @@ describe('OpenRouterProvider.getOverview', () => {
     expect(requestsByLabel.get('2026-05-11')).toBe(2);
     expect(tokensByLabel.get('2026-05-11')).toBe(30);
     expect(spendByLabel.has('2026-05-12')).toBe(false);
+    expect(overview.modelUsage).toEqual([
+      {
+        model: 'google/gemini-2.5-pro',
+        providers: ['Google'],
+        requests: 12,
+        promptTokens: 1200,
+        completionTokens: 320,
+        reasoningTokens: 0,
+        totalTokens: 1520,
+        spend: 0.42,
+        byokSpend: 0.03,
+      },
+      {
+        model: 'openai/gpt-5.4',
+        providers: ['OpenAI'],
+        requests: 2,
+        promptTokens: 20,
+        completionTokens: 10,
+        reasoningTokens: 0,
+        totalTokens: 30,
+        spend: 0.2,
+        byokSpend: 0.02,
+      },
+    ]);
   });
 
   it('sorts daily buckets in chronological order', async () => {
-    vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
+    modelGatewayConfigMock.apiKey = 'sk-or-test';
+    modelGatewayConfigMock.managementKey = 'sk-or-management-test';
     fetchMock
       .mockResolvedValueOnce({
         ok: true,
@@ -246,6 +313,33 @@ describe('OpenRouterProvider.getOverview', () => {
     expect(overview.charts.spend).toEqual([]);
   });
 
+  it('returns key usage without activity when the management key is not configured', async () => {
+    modelGatewayConfigMock.apiKey = 'sk-or-test';
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            hash: 'hash',
+            label: 'Test key',
+            usage: 1,
+            usage_daily: 0.1,
+            usage_weekly: 0.5,
+            usage_monthly: 1,
+            limit: null,
+            is_free_tier: false,
+          },
+        }),
+    });
+
+    const overview = await provider.getOverview();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(overview.key.observabilityAvailable).toBe(false);
+    expect(overview.key.observabilityError).toContain('management key');
+    expect(overview.modelUsage).toEqual([]);
+  });
+
   it.each([
     { mode: 'self-hosting', isCloud: false, upstreamStatus: 401 },
     { mode: 'cloud-hosting', isCloud: true, upstreamStatus: 403 },
@@ -266,7 +360,7 @@ describe('OpenRouterProvider.getOverview', () => {
             }),
         });
       } else {
-        vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-self-hosted-invalid');
+        modelGatewayConfigMock.apiKey = 'sk-or-self-hosted-invalid';
       }
 
       fetchMock.mockResolvedValueOnce({

@@ -8,16 +8,54 @@ import { AppError } from '@/utils/errors.js';
 import { errorResponse, successResponse } from '@/utils/response.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import logger from '@/utils/logger.js';
+import { ModelGatewayConfigService } from '@/services/ai/model-gateway-config.service.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import {
   ERROR_CODES,
   chatCompletionRequestSchema,
   embeddingsRequestSchema,
   imageGenerationRequestSchema,
+  updateModelGatewayConfigSchema,
 } from '@insforge/shared-schemas';
 
 const router = Router();
 const chatService = ChatCompletionService.getInstance();
+const modelGatewayConfigService = ModelGatewayConfigService.getInstance();
 type AIProvider = 'openrouter';
+
+/**
+ * GET /api/ai/config
+ * Get masked self-hosted Model Gateway credential status.
+ */
+router.get('/config', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    assertSelfHostedModelGatewayConfig();
+    successResponse(res, await modelGatewayConfigService.getConfig());
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/ai/config
+ * Store self-hosted Model Gateway credentials encrypted in system.secrets.
+ */
+router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    assertSelfHostedModelGatewayConfig();
+    const validation = updateModelGatewayConfigSchema.safeParse(req.body);
+    if (!validation.success) {
+      throw new AppError(
+        `Validation error: ${validation.error.errors.map((error) => error.message).join(', ')}`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+    successResponse(res, await modelGatewayConfigService.updateConfig(validation.data));
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * GET /api/ai/models
@@ -70,7 +108,7 @@ router.get(
           ERROR_CODES.AI_INVALID_API_KEY,
           'OpenRouter API key is not configured.',
           400,
-          'Set OPENROUTER_API_KEY in the backend environment.'
+          'Set OPENROUTER_API_KEY or configure it in Model Gateway settings.'
         );
         return;
       }
@@ -108,6 +146,16 @@ function parseAIProvider(value: string | undefined): AIProvider {
     400,
     ERROR_CODES.INVALID_INPUT
   );
+}
+
+function assertSelfHostedModelGatewayConfig(): void {
+  if (isCloudEnvironment()) {
+    throw new AppError(
+      'Model Gateway credentials are managed by InsForge Cloud.',
+      400,
+      ERROR_CODES.INVALID_INPUT
+    );
+  }
 }
 
 function getProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterProvider) {

@@ -304,6 +304,18 @@ export const aiOverviewMetricPointSchema = z.object({
   value: z.number(),
 });
 
+export const aiModelUsageSchema = z.object({
+  model: z.string(),
+  providers: z.array(z.string()),
+  requests: z.number(),
+  promptTokens: z.number(),
+  completionTokens: z.number(),
+  reasoningTokens: z.number(),
+  totalTokens: z.number(),
+  spend: z.number(),
+  byokSpend: z.number(),
+});
+
 export const aiOverviewSchema = z.object({
   key: z.object({
     label: z.string().optional(),
@@ -323,12 +335,36 @@ export const aiOverviewSchema = z.object({
     requests: z.array(aiOverviewMetricPointSchema),
     tokens: z.array(aiOverviewMetricPointSchema),
   }),
+  // Optional for compatibility while cloud backends and dashboards roll out independently.
+  modelUsage: z.array(aiModelUsageSchema).optional(),
 });
 
 export const openRouterKeySchema = z.object({
   apiKey: z.string(),
   maskedKey: z.string(),
 });
+
+export const modelGatewayCredentialSourceSchema = z.enum(['environment', 'dashboard']);
+
+export const modelGatewayCredentialStatusSchema = z.object({
+  configured: z.boolean(),
+  source: modelGatewayCredentialSourceSchema.nullable(),
+  maskedKey: z.string().nullable(),
+});
+
+export const modelGatewayConfigSchema = z.object({
+  apiKey: modelGatewayCredentialStatusSchema,
+  managementKey: modelGatewayCredentialStatusSchema,
+});
+
+export const updateModelGatewayConfigSchema = z
+  .object({
+    apiKey: z.string().trim().min(1).max(512).optional(),
+    managementKey: z.string().trim().min(1).max(512).optional(),
+  })
+  .refine((value) => value.apiKey !== undefined || value.managementKey !== undefined, {
+    message: 'At least one credential is required',
+  });
 
 // Export types
 export type ToolFunction = z.infer<typeof toolFunctionSchema>;
@@ -355,5 +391,10 @@ export type EmbeddingObject = z.infer<typeof embeddingObjectSchema>;
 export type EmbeddingsResponse = z.infer<typeof embeddingsResponseSchema>;
 export type AIModelSchema = z.infer<typeof aiModelSchema>;
 export type AIOverviewMetricPoint = z.infer<typeof aiOverviewMetricPointSchema>;
+export type AIModelUsage = z.infer<typeof aiModelUsageSchema>;
 export type AIOverview = z.infer<typeof aiOverviewSchema>;
 export type OpenRouterKey = z.infer<typeof openRouterKeySchema>;
+export type ModelGatewayCredentialSource = z.infer<typeof modelGatewayCredentialSourceSchema>;
+export type ModelGatewayCredentialStatus = z.infer<typeof modelGatewayCredentialStatusSchema>;
+export type ModelGatewayConfig = z.infer<typeof modelGatewayConfigSchema>;
+export type UpdateModelGatewayConfig = z.infer<typeof updateModelGatewayConfigSchema>;
