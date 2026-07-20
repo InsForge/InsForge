@@ -17,7 +17,8 @@ interface StoredCredentialCache {
 }
 
 type ModelGatewayCredentialKey =
-  typeof OPENROUTER_API_KEY_SECRET | typeof OPENROUTER_MANAGEMENT_KEY_SECRET;
+  | typeof OPENROUTER_API_KEY_SECRET
+  | typeof OPENROUTER_MANAGEMENT_KEY_SECRET;
 
 export class ModelGatewayConfigService {
   private static instance: ModelGatewayConfigService;
