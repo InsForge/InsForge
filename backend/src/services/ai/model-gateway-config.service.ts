@@ -88,21 +88,34 @@ export class ModelGatewayConfigService {
     try {
       const secrets = await this.secretService.listSecrets();
       const existingByKey = new Map(secrets.map((secret) => [secret.key, secret]));
+      const updates: Promise<void>[] = [];
 
       if (input.apiKey !== undefined) {
-        await this.upsertCredential(
-          OPENROUTER_API_KEY_SECRET,
-          input.apiKey,
-          existingByKey.get(OPENROUTER_API_KEY_SECRET)
+        updates.push(
+          this.upsertCredential(
+            OPENROUTER_API_KEY_SECRET,
+            input.apiKey,
+            existingByKey.get(OPENROUTER_API_KEY_SECRET)
+          )
         );
       }
 
       if (input.managementKey !== undefined) {
-        await this.upsertCredential(
-          OPENROUTER_MANAGEMENT_KEY_SECRET,
-          input.managementKey,
-          existingByKey.get(OPENROUTER_MANAGEMENT_KEY_SECRET)
+        updates.push(
+          this.upsertCredential(
+            OPENROUTER_MANAGEMENT_KEY_SECRET,
+            input.managementKey,
+            existingByKey.get(OPENROUTER_MANAGEMENT_KEY_SECRET)
+          )
         );
+      }
+
+      const results = await Promise.allSettled(updates);
+      const failure = results.find(
+        (result): result is PromiseRejectedResult => result.status === 'rejected'
+      );
+      if (failure) {
+        throw failure.reason;
       }
     } finally {
       // The credentials are independent and may update independently. Always invalidate both

@@ -192,4 +192,27 @@ describe('ModelGatewayConfigService', () => {
     await expect(service.getApiKey()).resolves.toBe('new-api-key');
     expect(secretStore.getSecretByKey).toHaveBeenCalledTimes(2);
   });
+
+  it('attempts the management-key update when the API-key update fails', async () => {
+    const secretStore = createSecretStore();
+    secretStore.listSecrets.mockResolvedValue([
+      { id: 'api-id', key: 'OPENROUTER_API_KEY' },
+      { id: 'management-id', key: 'OPENROUTER_MANAGEMENT_API_KEY' },
+    ]);
+    secretStore.updateSecret.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    const service = new ModelGatewayConfigService(
+      secretStore as unknown as ConfigServiceSecretStore
+    );
+
+    await expect(
+      service.updateConfig({ apiKey: 'new-api-key', managementKey: 'new-management-key' })
+    ).rejects.toThrow('Failed to update OPENROUTER_API_KEY');
+
+    expect(secretStore.updateSecret).toHaveBeenCalledTimes(2);
+    expect(secretStore.updateSecret).toHaveBeenNthCalledWith(2, 'management-id', {
+      value: 'new-management-key',
+      isActive: true,
+      isReserved: true,
+    });
+  });
 });
