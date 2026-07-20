@@ -17,6 +17,7 @@
       "outputs": ["dist/**"]
     },
     "@insforge/dashboard#build": {
+      "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
     "@insforge/shared-schemas#build": {
