@@ -155,6 +155,7 @@ paths:
                     description: Entry count per module
                   recentActivity:
                     type: array
+                    maxItems: 10
                     items:
                       $ref: '#/components/schemas/AuditLog'
                     description: Ten most recent audit entries in the window
