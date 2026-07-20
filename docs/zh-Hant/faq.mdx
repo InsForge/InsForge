@@ -143,6 +143,20 @@ description: "解答 InsForge 常見問題：資料庫呼叫、Edge Function 與
     還是卡住？到我們的 [Discord](https://discord.com/invite/DvBtaEc9Jz) 提問，回應最快。
   </Accordion>
 
+  <Accordion title="怎麼刪除一個專案？">
+    刪除專案是永久性的。它會銷毀專案的資料庫、Storage bucket、Edge Function、已部署的站點，以及其他所有後端資源，任何指向它的應用或整合都會立刻失效。沒有復原操作，所以如果你之後可能還要用這些資料，請先下載[備份](/core-concepts/database/backups)。
+
+    **Dashboard。** 打開專案，進入 **Project Settings**，使用刪除選項。系統會要求你確認。
+
+    **CLI。** 明確傳入專案 id——`projects delete` 絕不會回退到你已 link 的專案，因此不會誤刪其他專案：
+
+    ```bash
+    npx @insforge/cli projects delete --project <project-id>
+    ```
+
+    在互動模式下它會要求確認；`--yes` 和 `--json` 會跳過確認直接刪除，所以除非你已核對過 id，否則不要加這兩個參數。完整命令參考見 [CLI harness](/agent-native/cli-harness)。
+  </Accordion>
+
   <Accordion title="不打開瀏覽器，怎麼幫 CLI 登入驗證？">
     `npx @insforge/cli login` 會打開瀏覽器登入。在無介面機器、遠端伺服器或 CI 上，改用 user API key，不需要瀏覽器。
 

@@ -143,6 +143,20 @@ description: "Answers to common InsForge questions on database calls, edge funct
     Still stuck? Ask in our [Discord](https://discord.com/invite/DvBtaEc9Jz) for the fastest response.
   </Accordion>
 
+  <Accordion title="How do I delete a project?">
+    Deleting a project is permanent. It destroys the project's database, storage buckets, edge functions, deployed site, and every other backend resource, and any app or integration pointing at it breaks immediately. There's no undo, so if you might need the data later, download a [backup](/core-concepts/database/backups) first.
+
+    **Dashboard.** Open the project, go to **Project Settings**, and use the delete option. You'll be asked to confirm.
+
+    **CLI.** Pass the project id explicitly — `projects delete` never falls back to your linked project, so it can't target the wrong one by accident:
+
+    ```bash
+    npx @insforge/cli projects delete --project <project-id>
+    ```
+
+    It prompts for confirmation in interactive mode; `--yes` and `--json` skip the prompt and delete immediately, so don't pass them unless you've double-checked the id. See the [CLI harness](/agent-native/cli-harness) for the full command reference.
+  </Accordion>
+
   <Accordion title="How do I authenticate the CLI without a browser?">
     `npx @insforge/cli login` opens a browser to sign in. On a headless machine, a remote server, or CI, use a user API key instead. No browser needed.
 

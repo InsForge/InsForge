@@ -143,6 +143,20 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     ¿Sigues atascado? Pregunta en nuestro [Discord](https://discord.com/invite/DvBtaEc9Jz) para la respuesta más rápida.
   </Accordion>
 
+  <Accordion title="¿Cómo elimino un proyecto?">
+    Eliminar un proyecto es permanente. Destruye la base de datos del proyecto, los buckets de almacenamiento, las edge functions, el sitio desplegado y todos los demás recursos del backend, y cualquier app o integración que apunte a él deja de funcionar de inmediato. No hay deshacer, así que si podrías necesitar los datos más adelante, descarga primero una [copia de seguridad](/core-concepts/database/backups).
+
+    **Dashboard.** Abre el proyecto, ve a **Project Settings** y usa la opción de eliminar. Se te pedirá confirmación.
+
+    **CLI.** Pasa el id del proyecto de forma explícita — `projects delete` nunca recurre a tu proyecto vinculado, así que no puede apuntar al equivocado por accidente:
+
+    ```bash
+    npx @insforge/cli projects delete --project <project-id>
+    ```
+
+    Pide confirmación en modo interactivo; `--yes` y `--json` omiten el aviso y eliminan de inmediato, así que no los pases a menos que hayas verificado el id. Consulta el [CLI harness](/agent-native/cli-harness) para la referencia completa de comandos.
+  </Accordion>
+
   <Accordion title="¿Cómo autentico la CLI sin navegador?">
     `npx @insforge/cli login` abre un navegador para iniciar sesión. En una máquina sin interfaz, un servidor remoto o CI, usa una user API key en su lugar. No hace falta navegador.
 
