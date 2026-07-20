@@ -181,4 +181,22 @@ description: "解答 InsForge 常見問題：資料庫呼叫、Edge Function 與
   <Accordion title="這個助手能幫我解決我自己專案裡的具體問題嗎？">
     基本上不行。這個助手是根據 InsForge 的公開文件來回答的，看不到你的專案：既沒辦法除錯，也讀不到你的資料，更查不了你的設定。凡是跟你自己專案相關的，交給你的編碼 agent 來處理。你的 agent 透過 CLI 或 MCP 連著 InsForge，能讀到你的即時後端、結構、資料和日誌，直接幫你除錯，用白話描述問題就行。想自己拿一份後端健康和報錯報告，跑 `npx @insforge/cli diagnose`。參見 [Diagnostics & advisor](/agent-native/diagnostics)。
   </Accordion>
+
+  <Accordion title="怎麼拿到資料庫的 Postgres 連線字串（connection string）？">
+    每個 cloud 專案都有一個直連的 Postgres connection string，方便用 `psql`、資料庫 GUI、ORM（Prisma、Drizzle），或者像 [Better Auth](/integrations/better-auth) 這類需要自帶 Postgres 的外部服務。用 CLI 印出來：
+
+    ```bash
+    npx @insforge/cli db connection-string
+    ```
+
+    它回傳的 URL 形如：
+
+    ```text
+    postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require
+    ```
+
+    加上 `--json` 會得到 `{ "connectionURL": "..." }`，方便腳本使用。這個命令**只對 cloud 專案有效**——自行託管的實例其 Postgres 由你的 `docker-compose` 直接暴露，所以請改用本地 Postgres 憑證（`.env` 裡的 `DATABASE_URL` / `POSTGRES_*`）。
+
+    這個字串以擁有完整權限的 `postgres` 角色連線，因此不受行級安全（RLS）限制，而且字串裡嵌了該角色的密碼。請把它當成機密：只在伺服端使用，絕不要發到瀏覽器。
+  </Accordion>
 </AccordionGroup>
