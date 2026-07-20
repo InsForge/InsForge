@@ -34,6 +34,8 @@ export class ModelGatewayConfigService {
   }
 
   async getApiKey(): Promise<string | null> {
+    // Fall back to the bootstrap env key only when no stored key exists. Secret-store failures
+    // propagate deliberately so a database or decryption outage cannot silently revive a stale key.
     const storedApiKey = await this.getStoredCredential(OPENROUTER_API_KEY_SECRET);
     return storedApiKey ?? this.normalizeCredential(process.env.OPENROUTER_API_KEY);
   }
