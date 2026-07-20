@@ -17,7 +17,6 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl as getCloudFrontSignedUrl } from '@aws-sdk/cloudfront-signer';
 import { Readable } from 'stream';
-import { randomUUID } from 'crypto';
 import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
 import {
   StorageProvider,
@@ -109,10 +108,6 @@ export class S3StorageProvider implements StorageProvider {
 
   private getS3Key(bucket: string, key: string): string {
     return `${this.appKey}/${bucket}/${key}`;
-  }
-
-  private getStagedUploadKey(uploadId: string): string {
-    return `${this.appKey}/_uploads/${uploadId}`;
   }
 
   /**
@@ -349,12 +344,7 @@ export class S3StorageProvider implements StorageProvider {
       throw new Error('S3 client not initialized');
     }
 
-    // Presigned clients upload to a provider-private staging key. The service
-    // promotes those bytes to the final key only after its metadata write wins
-    // the unique-key race and passes RLS. Signing the final key directly would
-    // let an older URL overwrite an object created after strategy issuance.
-    const uploadId = randomUUID();
-    const s3Key = this.getStagedUploadKey(uploadId);
+    const s3Key = this.getS3Key(bucket, key);
     const expiresIn = ONE_HOUR_IN_SECONDS; // 1 hour
 
     try {
@@ -382,7 +372,7 @@ export class S3StorageProvider implements StorageProvider {
         fields,
         key,
         confirmRequired: true,
-        confirmUrl: `/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}/confirm-upload?uploadId=${encodeURIComponent(uploadId)}`,
+        confirmUrl: `/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}/confirm-upload`,
         expiresAt: new Date(Date.now() + expiresIn * 1000),
       };
     } catch (error) {
@@ -539,16 +529,13 @@ export class S3StorageProvider implements StorageProvider {
 
   async verifyObjectExists(
     bucket: string,
-    key: string,
-    options?: { stagedUploadId?: string }
+    key: string
   ): Promise<{ exists: boolean; size?: number; etag?: string }> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
     }
 
-    const s3Key = options?.stagedUploadId
-      ? this.getStagedUploadKey(options.stagedUploadId)
-      : this.getS3Key(bucket, key);
+    const s3Key = this.getS3Key(bucket, key);
 
     try {
       const command = new HeadObjectCommand({
@@ -564,41 +551,6 @@ export class S3StorageProvider implements StorageProvider {
     } catch {
       return { exists: false };
     }
-  }
-
-  async finalizePresignedUpload(
-    bucket: string,
-    key: string,
-    stagedUploadId: string
-  ): Promise<{ etag?: string }> {
-    if (!this.s3Client) {
-      throw new Error('S3 client not initialized');
-    }
-
-    const stagedKey = this.getStagedUploadKey(stagedUploadId);
-    const finalKey = this.getS3Key(bucket, key);
-    const copied = await this.tryCopyObject(stagedKey, finalKey);
-
-    // Promotion succeeded, so cleanup is best-effort. Failing confirmation
-    // after the final object has been written would invite a retry that copies
-    // the same bytes again and leaves metadata unnecessarily stale.
-    try {
-      await this.s3Client.send(
-        new DeleteObjectCommand({
-          Bucket: this.s3Bucket,
-          Key: stagedKey,
-        })
-      );
-    } catch (error) {
-      logger.warn('Failed to clean up staged S3 upload after promotion', {
-        bucket,
-        key,
-        stagedUploadId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-
-    return { etag: copied.etag || undefined };
   }
 
   // ==========================================================================

@@ -770,8 +770,6 @@ router.post(
         );
       }
       const { size, etag, upsert } = validation.data;
-      const stagedUploadId =
-        typeof req.query.uploadId === 'string' ? req.query.uploadId : undefined;
       let { contentType } = validation.data;
       if (contentType !== undefined && contentType !== null) {
         const typeStr = contentType.trim() ? contentType : 'application/octet-stream';
@@ -789,7 +787,7 @@ router.post(
           etag,
         },
         !!req.hasApiKey,
-        { upsert: upsert === true, stagedUploadId }
+        { upsert: upsert === true }
       );
 
       try {

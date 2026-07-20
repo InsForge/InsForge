@@ -78,7 +78,7 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
   "uploadUrl": "https://s3-bucket.amazonaws.com/",
   "fields": {
     "bucket": "my-s3-bucket",
-    "key": "app-key/_uploads/11111111-2222-4333-8444-555555555555",
+    "key": "app-key/avatars/profile-photo.jpg",
     "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
     "X-Amz-Credential": "...",
     "Policy": "...",
@@ -86,7 +86,7 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
   },
   "key": "profile-photo.jpg",
   "confirmRequired": true,
-  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload?uploadId=11111111-2222-4333-8444-555555555555",
+  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload",
   "expiresAt": "2025-09-05T01:00:00Z"
 }
 ```
@@ -112,7 +112,7 @@ Upload the file to the specified URL using the provided method.
 
 ### Step 3: Confirm Presigned Upload (S3 Only)
 
-Confirm that a file was successfully uploaded to S3 using a presigned URL. Call the exact `confirmUrl` returned by the upload strategy; for S3 it contains the server-owned staging identifier.
+Confirm that a file was successfully uploaded to S3 using a presigned URL.
 
 ```
 POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
@@ -130,7 +130,7 @@ POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
 #### Example
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload?uploadId=11111111-2222-4333-8444-555555555555" \
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{

@@ -518,7 +518,7 @@ paths:
       description: |
         Returns upload strategy based on storage backend (S3 returns presigned URLs, local returns direct upload endpoints).
 
-        The filename is used verbatim as the object key unless `autoKey` is set. If the key already exists the request fails with 409 unless `upsert` is true, in which case the issued strategy replaces the object in place (end-user replaces are gated by the `storage.objects` UPDATE row-level-security policies). S3 presigned uploads write to an isolated staging key and are promoted to the final object only after confirmation succeeds.
+        The filename is used verbatim as the object key unless `autoKey` is set. If the key already exists the request fails with 409 unless `upsert` is true, in which case the issued strategy replaces the object in place (end-user replaces are gated by the `storage.objects` UPDATE row-level-security policies).
       tags:
         - Client
       security:
@@ -575,7 +575,7 @@ paths:
                     uploadUrl: https://s3-bucket.amazonaws.com/
                     fields:
                       bucket: my-s3-bucket
-                      key: app-key/_uploads/11111111-2222-4333-8444-555555555555
+                      key: app-key/avatars/profile-photo.jpg
                       X-Amz-Algorithm: AWS4-HMAC-SHA256
                       X-Amz-Credential: AKIA.../20250905/us-east-2/s3/aws4_request
                       X-Amz-Date: 20250905T000000Z
@@ -583,7 +583,7 @@ paths:
                       X-Amz-Signature: abc123...
                     key: profile-photo.jpg
                     confirmRequired: true
-                    confirmUrl: /api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload?uploadId=11111111-2222-4333-8444-555555555555
+                    confirmUrl: /api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload
                     expiresAt: "2025-09-05T01:00:00Z"
                 local:
                   summary: Local Storage Response
@@ -777,9 +777,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "STORAGE_ALREADY_EXISTS"
-                message: "Object \"profile-photo.jpg\" already exists in bucket \"avatars\". Pass upsert=true to replace it."
-                statusCode: 409
+                error: "OBJECT_NOT_FOUND"
+                message: "Object 'user123.jpg' not found in bucket 'avatars'"
+                statusCode: 404
+                nextActions: "Check the bucket and key combination"
 
     delete:
       summary: Delete Object
@@ -828,7 +829,7 @@ paths:
   /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload:
     post:
       summary: Confirm Presigned Upload
-      description: Confirms a presigned S3 upload and promotes its staged bytes to the final object. Clients should call the exact confirmUrl returned by upload-strategy.
+      description: Confirms that a file was successfully uploaded to S3 using presigned URL
       tags:
         - Client
       security:
@@ -847,14 +848,6 @@ paths:
           schema:
             type: string
           example: profile-photo.jpg
-        - name: uploadId
-          in: query
-          required: false
-          description: Server-owned staging identifier included in the confirmUrl returned for S3 uploads. Do not construct it manually.
-          schema:
-            type: string
-            format: uuid
-          example: 11111111-2222-4333-8444-555555555555
       requestBody:
         required: true
         content:
@@ -908,14 +901,14 @@ paths:
                 message: "Upload not found for key 'profile-photo.jpg' in bucket 'avatars'"
                 statusCode: 404
         '409':
-          description: Object already exists and upsert was not set
+          description: Already confirmed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "STORAGE_ALREADY_EXISTS"
-                message: "Object \"profile-photo.jpg\" already exists in bucket \"avatars\". Pass upsert=true to replace it."
+                error: "ALREADY_CONFIRMED"
+                message: "File 'profile-photo.jpg' already confirmed in bucket 'avatars'"
                 statusCode: 409
 
   /api/storage/buckets/{bucketName}/download-strategy/objects/{objectKey}:
@@ -1405,8 +1398,8 @@ components:
           example: true
         confirmUrl:
           type: string
-          description: Exact URL to call after a presigned upload. It may contain a server-owned staging identifier and must not be reconstructed by clients.
-          example: /api/storage/buckets/avatars/objects/profile.jpg/confirm-upload?uploadId=11111111-2222-4333-8444-555555555555
+          description: URL to confirm the upload (if confirmRequired is true)
+          example: /api/storage/buckets/avatars/objects/profile.jpg/confirm-upload
         expiresAt:
           type: string
           format: date-time

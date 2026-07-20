@@ -799,29 +799,11 @@ export class StorageService {
       etag?: string;
     },
     hasApiKey: boolean = false,
-    options: { upsert?: boolean; stagedUploadId?: string } = {}
+    options: { upsert?: boolean } = {}
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(key);
     const upsert = options.upsert === true;
-    const stagedUploadId = options.stagedUploadId;
-    if (
-      stagedUploadId &&
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(stagedUploadId)
-    ) {
-      throw new AppError(
-        'Invalid staged upload identifier',
-        400,
-        ERROR_CODES.STORAGE_INVALID_PARAMETER
-      );
-    }
-    if (stagedUploadId && !this.provider.finalizePresignedUpload) {
-      throw new AppError(
-        'Staged uploads are not supported by the active storage provider',
-        400,
-        ERROR_CODES.STORAGE_INVALID_PARAMETER
-      );
-    }
 
     // Verify the file exists in storage and get its actual size + etag.
     // The server-side etag overrides whatever the client passed: browsers
@@ -833,11 +815,11 @@ export class StorageService {
       exists,
       size: actualSize,
       etag: serverEtag,
-    } = await this.provider.verifyObjectExists(bucket, key, { stagedUploadId });
+    } = await this.provider.verifyObjectExists(bucket, key);
     if (!exists) {
       throw new Error(`Upload not found for key "${key}" in bucket "${bucket}"`);
     }
-    let finalEtag = serverEtag || metadata.etag || null;
+    const finalEtag = serverEtag || metadata.etag || null;
 
     // Defense-in-depth: reject if the actual size exceeds the configured limit
     const fileSize = actualSize ?? metadata.size;
@@ -898,30 +880,10 @@ export class StorageService {
           [bucket, key, fileSize, metadata.contentType || null, finalEtag, userId, uploadedAt]
         );
       }
-
-      // The final object key is written only after the metadata mutation has
-      // won the unique constraint and passed RLS. This closes the gap where a
-      // presigned URL issued for an absent key could later overwrite another
-      // user's object before confirm-upload rejected it.
-      if (stagedUploadId && this.provider.finalizePresignedUpload) {
-        const finalized = await this.provider.finalizePresignedUpload(bucket, key, stagedUploadId);
-        if (finalized.etag && finalized.etag !== finalEtag) {
-          finalEtag = finalized.etag;
-          await db.query('UPDATE storage.objects SET etag = $1 WHERE bucket = $2 AND key = $3', [
-            finalEtag,
-            bucket,
-            key,
-          ]);
-        }
-      }
     };
     try {
       if (hasApiKey || ctx?.role === 'project_admin') {
-        if (stagedUploadId) {
-          await runWithRootTransaction(this.getPool(), writeObjectRow);
-        } else {
-          await runWithRootAccess(this.getPool(), writeObjectRow);
-        }
+        await runWithRootAccess(this.getPool(), writeObjectRow);
       } else {
         if (!ctx) {
           throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
@@ -1271,24 +1233,6 @@ async function runWithRootAccess<T>(
   const client = await pool.connect();
   try {
     return await fn(client);
-  } finally {
-    client.release();
-  }
-}
-
-async function runWithRootTransaction<T>(
-  pool: Pool,
-  fn: (client: PoolClient) => Promise<T>
-): Promise<T> {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const result = await fn(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw error;
   } finally {
     client.release();
   }

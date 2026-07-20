@@ -78,7 +78,7 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
   "uploadUrl": "https://s3-bucket.amazonaws.com/",
   "fields": {
     "bucket": "my-s3-bucket",
-    "key": "app-key/_uploads/11111111-2222-4333-8444-555555555555",
+    "key": "app-key/avatars/profile-photo.jpg",
     "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
     "X-Amz-Credential": "...",
     "Policy": "...",
@@ -86,7 +86,7 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
   },
   "key": "profile-photo.jpg",
   "confirmRequired": true,
-  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload?uploadId=11111111-2222-4333-8444-555555555555",
+  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload",
   "expiresAt": "2025-09-05T01:00:00Z"
 }
 ```
@@ -112,7 +112,7 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
 
 ### 第3步：确认预签名上传（仅限S3）
 
-确认文件已成功使用预签名 URL 上传到 S3。请使用上传策略返回的完整 `confirmUrl`；对于 S3，该 URL 包含由服务器管理的暂存标识符。
+确认文件已成功使用预签名 URL 上传到 S3。
 
 ```
 POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
@@ -130,7 +130,7 @@ POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
 #### 示例
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload?uploadId=11111111-2222-4333-8444-555555555555" \
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{
