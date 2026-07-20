@@ -518,7 +518,7 @@ paths:
       description: |
         Returns upload strategy based on storage backend (S3 returns presigned URLs, local returns direct upload endpoints).
 
-        The filename is used verbatim as the object key unless `autoKey` is set. If the key already exists the request fails with 409 unless `upsert` is true, in which case the issued strategy replaces the object in place (end-user replaces are gated by the `storage.objects` UPDATE row-level-security policies).
+        The filename is used verbatim as the object key unless `autoKey` is set. If the key already exists the request fails with 409 unless `upsert` is true, in which case the issued strategy replaces the object in place (end-user replaces are gated by the `storage.objects` UPDATE row-level-security policies). S3 presigned uploads write to an isolated staging key and are promoted to the final object only after confirmation succeeds.
       tags:
         - Client
       security:
@@ -575,22 +575,22 @@ paths:
                     uploadUrl: https://s3-bucket.amazonaws.com/
                     fields:
                       bucket: my-s3-bucket
-                      key: app-key/avatars/profile-photo-1234567890-abc123.jpg
+                      key: app-key/_uploads/11111111-2222-4333-8444-555555555555
                       X-Amz-Algorithm: AWS4-HMAC-SHA256
                       X-Amz-Credential: AKIA.../20250905/us-east-2/s3/aws4_request
                       X-Amz-Date: 20250905T000000Z
                       Policy: eyJ...
                       X-Amz-Signature: abc123...
-                    key: profile-photo-1234567890-abc123.jpg
+                    key: profile-photo.jpg
                     confirmRequired: true
-                    confirmUrl: /api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg/confirm-upload
+                    confirmUrl: /api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload?uploadId=11111111-2222-4333-8444-555555555555
                     expiresAt: "2025-09-05T01:00:00Z"
                 local:
                   summary: Local Storage Response
                   value:
                     method: direct
-                    uploadUrl: /api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg
-                    key: profile-photo-1234567890-abc123.jpg
+                    uploadUrl: /api/storage/buckets/avatars/objects/profile-photo.jpg
+                    key: profile-photo.jpg
                     confirmRequired: false
                 localUpsert:
                   summary: Local Storage Response (upsert requested — flag rides in the uploadUrl)
@@ -777,10 +777,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "OBJECT_NOT_FOUND"
-                message: "Object 'user123.jpg' not found in bucket 'avatars'"
-                statusCode: 404
-                nextActions: "Check the bucket and key combination"
+                error: "STORAGE_ALREADY_EXISTS"
+                message: "Object \"profile-photo.jpg\" already exists in bucket \"avatars\". Pass upsert=true to replace it."
+                statusCode: 409
 
     delete:
       summary: Delete Object
@@ -829,7 +828,7 @@ paths:
   /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload:
     post:
       summary: Confirm Presigned Upload
-      description: Confirms that a file was successfully uploaded to S3 using presigned URL
+      description: Confirms a presigned S3 upload and promotes its staged bytes to the final object. Clients should call the exact confirmUrl returned by upload-strategy.
       tags:
         - Client
       security:
@@ -847,7 +846,15 @@ paths:
           required: true
           schema:
             type: string
-          example: profile-photo-1234567890-abc123.jpg
+          example: profile-photo.jpg
+        - name: uploadId
+          in: query
+          required: false
+          description: Server-owned staging identifier included in the confirmUrl returned for S3 uploads. Do not construct it manually.
+          schema:
+            type: string
+            format: uuid
+          example: 11111111-2222-4333-8444-555555555555
       requestBody:
         required: true
         content:
@@ -880,6 +887,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StoredFile'
+        '403':
+          description: The caller is not permitted to insert or replace this object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "STORAGE_PERMISSION_DENIED"
+                message: "You do not have permission to write \"profile-photo.jpg\" in bucket \"avatars\""
+                statusCode: 403
         '404':
           description: Upload not found
           content:
@@ -891,14 +908,14 @@ paths:
                 message: "Upload not found for key 'profile-photo.jpg' in bucket 'avatars'"
                 statusCode: 404
         '409':
-          description: Already confirmed
+          description: Object already exists and upsert was not set
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "ALREADY_CONFIRMED"
-                message: "File 'profile-photo.jpg' already confirmed in bucket 'avatars'"
+                error: "STORAGE_ALREADY_EXISTS"
+                message: "Object \"profile-photo.jpg\" already exists in bucket \"avatars\". Pass upsert=true to replace it."
                 statusCode: 409
 
   /api/storage/buckets/{bucketName}/download-strategy/objects/{objectKey}:
@@ -1380,16 +1397,16 @@ components:
             X-Amz-Algorithm: AWS4-HMAC-SHA256
         key:
           type: string
-          description: Generated unique key for the file
-          example: profile-photo-1234567890-abc123.jpg
+          description: Final logical object key. It is generated only when autoKey is requested; otherwise the filename is used verbatim.
+          example: profile-photo.jpg
         confirmRequired:
           type: boolean
           description: Whether upload confirmation is required
           example: true
         confirmUrl:
           type: string
-          description: URL to confirm the upload (if confirmRequired is true)
-          example: /api/storage/buckets/avatars/objects/profile.jpg/confirm-upload
+          description: Exact URL to call after a presigned upload. It may contain a server-owned staging identifier and must not be reconstructed by clients.
+          example: /api/storage/buckets/avatars/objects/profile.jpg/confirm-upload?uploadId=11111111-2222-4333-8444-555555555555
         expiresAt:
           type: string
           format: date-time

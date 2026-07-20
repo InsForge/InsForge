@@ -609,6 +609,42 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     expect(provider.getUploadStrategy).not.toHaveBeenCalled();
   });
 
+  it('maps a concurrent upload-strategy INSERT collision to STORAGE_ALREADY_EXISTS', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      getUploadStrategy: vi.fn(),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
+      { rows: [], rowCount: 0 }, // root key-existence check → free
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [], rowCount: 0 }, // BEGIN
+      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
+      { rows: [], rowCount: 0 }, // set_config(claims)
+      { rows: [], rowCount: 0 }, // SAVEPOINT
+      { rows: [], rowCount: 0, throwCode: '23505' }, // concurrent creator won
+      { rows: [], rowCount: 0 }, // ROLLBACK TO SAVEPOINT
+      { rows: [], rowCount: 0 }, // RELEASE SAVEPOINT
+      { rows: [], rowCount: 0 }, // ROLLBACK (withUserContext error path)
+      { rows: [], rowCount: 0 }, // RESET ROLE
+    ];
+
+    await expect(
+      svc.getUploadStrategy(
+        { id: 'alice-sub', email: 'alice@example.com', role: 'authenticated' },
+        'photos',
+        { filename: 'note.txt', contentType: 'text/plain', size: 8 }
+      )
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'STORAGE_ALREADY_EXISTS',
+    });
+    expect(provider.getUploadStrategy).not.toHaveBeenCalled();
+  });
+
   it('updates the existing row on confirm-upload with upsert instead of inserting', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
@@ -641,6 +677,132 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
     expect(write?.sql).toContain('ON CONFLICT (bucket, key) DO UPDATE');
     // Ownership column is never touched by the conflict arm.
     expect(write?.sql.split('DO UPDATE')[1]).not.toContain('uploaded_by');
+  });
+
+  it('maps an end-user confirm-upload upsert RLS denial to 403 before promotion', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      verifyObjectExists: vi.fn(async () => ({
+        exists: true,
+        size: 16,
+        etag: 'staged-etag',
+      })),
+      finalizePresignedUpload: vi.fn(),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [], rowCount: 0 }, // BEGIN
+      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
+      { rows: [], rowCount: 0 }, // set_config(claims)
+      { rows: [], rowCount: 0, throwCode: '42501' }, // RLS rejects conflict arm
+      { rows: [], rowCount: 0 }, // ROLLBACK
+      { rows: [], rowCount: 0 }, // RESET ROLE
+    ];
+
+    await expect(
+      svc.confirmUpload(
+        { id: 'bob-sub', email: 'bob@example.com', role: 'authenticated' },
+        'photos',
+        'note.txt',
+        { size: 16, contentType: 'text/plain' },
+        false,
+        { upsert: true, stagedUploadId: '11111111-2222-4333-8444-555555555555' }
+      )
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'STORAGE_PERMISSION_DENIED',
+    });
+    expect(provider.finalizePresignedUpload).not.toHaveBeenCalled();
+  });
+
+  it('does not promote a staged upload when a concurrent metadata insert wins', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      verifyObjectExists: vi.fn(async () => ({
+        exists: true,
+        size: 16,
+        etag: 'staged-etag',
+      })),
+      finalizePresignedUpload: vi.fn(async () => ({ etag: 'final-etag' })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [], rowCount: 0 }, // pre-check says free
+      { rows: [], rowCount: 0 }, // BEGIN root transaction
+      { rows: [], rowCount: 0, throwCode: '23505' }, // concurrent creator won
+      { rows: [], rowCount: 0 }, // ROLLBACK
+    ];
+
+    await expect(
+      svc.confirmUpload(
+        { id: 'local:admin', role: 'project_admin' },
+        'photos',
+        'note.txt',
+        { size: 16, contentType: 'text/plain' },
+        false,
+        { stagedUploadId: '11111111-2222-4333-8444-555555555555' }
+      )
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'STORAGE_ALREADY_EXISTS',
+    });
+    expect(provider.finalizePresignedUpload).not.toHaveBeenCalled();
+  });
+
+  it('promotes a staged upload only after its metadata write succeeds', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      verifyObjectExists: vi.fn(async () => ({
+        exists: true,
+        size: 16,
+        etag: 'staged-etag',
+      })),
+      finalizePresignedUpload: vi.fn(async () => ({ etag: 'final-etag' })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [], rowCount: 0 }, // pre-check says free
+      { rows: [], rowCount: 0 }, // BEGIN root transaction
+      { rows: [], rowCount: 1 }, // metadata insert
+      { rows: [], rowCount: 1 }, // replace staged etag with final copy etag
+      { rows: [], rowCount: 0 }, // COMMIT
+    ];
+
+    const result = await svc.confirmUpload(
+      { id: 'local:admin', role: 'project_admin' },
+      'photos',
+      'note.txt',
+      { size: 16, contentType: 'text/plain' },
+      false,
+      { stagedUploadId: '11111111-2222-4333-8444-555555555555' }
+    );
+
+    expect(provider.verifyObjectExists).toHaveBeenCalledWith('photos', 'note.txt', {
+      stagedUploadId: '11111111-2222-4333-8444-555555555555',
+    });
+    expect(provider.finalizePresignedUpload).toHaveBeenCalledWith(
+      'photos',
+      'note.txt',
+      '11111111-2222-4333-8444-555555555555'
+    );
+    expect(result.url).toContain('v=final-etag');
+    expect(calls[0].sql).toContain('FROM storage.config');
+    expect(calls.map((call) => call.sql).slice(1)).toEqual([
+      'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+      'BEGIN',
+      expect.stringContaining('INSERT INTO storage.objects'),
+      'UPDATE storage.objects SET etag = $1 WHERE bucket = $2 AND key = $3',
+      'COMMIT',
+    ]);
   });
 
   it('confirms presigned uploads for project_admin JWT callers through root access', async () => {

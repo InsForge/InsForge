@@ -39,6 +39,7 @@ Carga un archivo con una ruta/clave específica.
 
 - `path` (string, required) - La clave/ruta del objeto para el archivo
 - `file` (File | Blob, required) - Archivo o Blob a cargar
+- `options.upsert` (boolean, opcional) - Reemplaza un objeto existente. Por defecto es `false`
 
 ### Devoluciones
 
@@ -57,7 +58,7 @@ Carga un archivo con una ruta/clave específica.
 ```
 
 <Warning>
-Si existe un archivo con la misma clave, el backend lo renombra automáticamente. Siempre usa la `key` y `url` devueltas.
+Si ya existe un archivo con la misma clave, `upload()` devuelve un conflicto por defecto. Usa `{ upsert: true }` para reemplazarlo o `uploadAuto()` para que el servidor genere una clave única.
 </Warning>
 
 ### Ejemplo

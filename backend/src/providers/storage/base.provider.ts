@@ -73,8 +73,19 @@ export interface StorageProvider {
    */
   verifyObjectExists(
     bucket: string,
-    key: string
+    key: string,
+    options?: { stagedUploadId?: string }
   ): Promise<{ exists: boolean; size?: number; etag?: string }>;
+  /**
+   * Promote a provider-private staged upload to its final object key. Only
+   * presigned providers implement this: direct providers write through the
+   * authenticated API and therefore do not need a staging step.
+   */
+  finalizePresignedUpload?(
+    bucket: string,
+    key: string,
+    stagedUploadId: string
+  ): Promise<{ etag?: string }>;
 
   // ==========================================================================
   // S3 Protocol extensions — required by the /storage/v1/s3 gateway.

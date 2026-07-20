@@ -51,9 +51,11 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|----------|-------------|
-| `filename` | string | Sí | Nombre de archivo original |
+| `filename` | string | Sí | Clave de objeto usada literalmente, salvo que se active `autoKey` |
 | `contentType` | string | No | Tipo MIME del archivo |
 | `size` | integer | No | Tamaño de archivo en bytes |
+| `upsert` | boolean | No | Reemplaza un objeto existente con esta clave. Por defecto es `false` |
+| `autoKey` | boolean | No | Genera una clave única a partir de `filename`. Por defecto es `false` |
 
 #### Ejemplo
 
@@ -76,15 +78,15 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
   "uploadUrl": "https://s3-bucket.amazonaws.com/",
   "fields": {
     "bucket": "my-s3-bucket",
-    "key": "app-key/avatars/profile-photo-1234567890-abc123.jpg",
+    "key": "app-key/_uploads/11111111-2222-4333-8444-555555555555",
     "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
     "X-Amz-Credential": "...",
     "Policy": "...",
     "X-Amz-Signature": "..."
   },
-  "key": "profile-photo-1234567890-abc123.jpg",
+  "key": "profile-photo.jpg",
   "confirmRequired": true,
-  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg/confirm-upload",
+  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload?uploadId=11111111-2222-4333-8444-555555555555",
   "expiresAt": "2025-09-05T01:00:00Z"
 }
 ```
@@ -94,8 +96,8 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
 ```json
 {
   "method": "direct",
-  "uploadUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg",
-  "key": "profile-photo-1234567890-abc123.jpg",
+  "uploadUrl": "/api/storage/buckets/avatars/objects/profile-photo.jpg",
+  "key": "profile-photo.jpg",
   "confirmRequired": false
 }
 ```
@@ -110,7 +112,7 @@ Carga el archivo a la URL especificada usando el método proporcionado.
 
 ### Paso 3: Confirmar carga presignada (solo S3)
 
-Confirma que un archivo se ha cargado correctamente a S3 usando URL presignada.
+Confirma que un archivo se ha cargado correctamente a S3 usando una URL presignada. Usa exactamente la `confirmUrl` devuelta por la estrategia; para S3 contiene el identificador de preparación administrado por el servidor.
 
 ```
 POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
@@ -123,11 +125,12 @@ POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
 | `size` | integer | Sí | Tamaño de archivo en bytes |
 | `contentType` | string | No | Tipo MIME del archivo |
 | `etag` | string | No | ETag S3 del objeto cargado |
+| `upsert` | boolean | No | Debe coincidir con el valor de `upsert` usado al solicitar la estrategia |
 
 #### Ejemplo
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo-123.jpg/confirm-upload" \
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload?uploadId=11111111-2222-4333-8444-555555555555" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -141,11 +144,11 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/
 ```json
 {
   "bucket": "avatars",
-  "key": "profile-photo-123.jpg",
+  "key": "profile-photo.jpg",
   "size": 102400,
   "mimeType": "image/jpeg",
   "uploadedAt": "2024-01-21T10:30:00Z",
-  "url": "/api/storage/buckets/avatars/objects/profile-photo-123.jpg"
+  "url": "/api/storage/buckets/avatars/objects/profile-photo.jpg"
 }
 ```
 

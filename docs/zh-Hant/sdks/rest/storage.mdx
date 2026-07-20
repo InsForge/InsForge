@@ -51,9 +51,11 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 
 | 欄位 | 類型 | 必需 | 說明 |
 |-------|------|----------|-------------|
-| `filename` | string | 是 | 原始檔案名稱 |
+| `filename` | string | 是 | 物件金鑰；除非啟用 `autoKey`，否則依原樣使用 |
 | `contentType` | string | 否 | 檔案的MIME類型 |
 | `size` | integer | 否 | 檔案大小（位元組） |
+| `upsert` | boolean | 否 | 取代此金鑰的現有物件。預設為 `false` |
+| `autoKey` | boolean | 否 | 根據 `filename` 產生唯一金鑰。預設為 `false` |
 
 #### 範例
 
@@ -76,15 +78,15 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
   "uploadUrl": "https://s3-bucket.amazonaws.com/",
   "fields": {
     "bucket": "my-s3-bucket",
-    "key": "app-key/avatars/profile-photo-1234567890-abc123.jpg",
+    "key": "app-key/_uploads/11111111-2222-4333-8444-555555555555",
     "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
     "X-Amz-Credential": "...",
     "Policy": "...",
     "X-Amz-Signature": "..."
   },
-  "key": "profile-photo-1234567890-abc123.jpg",
+  "key": "profile-photo.jpg",
   "confirmRequired": true,
-  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg/confirm-upload",
+  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload?uploadId=11111111-2222-4333-8444-555555555555",
   "expiresAt": "2025-09-05T01:00:00Z"
 }
 ```
@@ -94,8 +96,8 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
 ```json
 {
   "method": "direct",
-  "uploadUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg",
-  "key": "profile-photo-1234567890-abc123.jpg",
+  "uploadUrl": "/api/storage/buckets/avatars/objects/profile-photo.jpg",
+  "key": "profile-photo.jpg",
   "confirmRequired": false
 }
 ```
@@ -110,7 +112,7 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
 
 ### 步驟3：確認預簽名上傳（僅限S3）
 
-確認檔案已成功使用預簽名URL上傳到S3。
+確認檔案已成功使用預簽名 URL 上傳到 S3。請使用上傳策略傳回的完整 `confirmUrl`；對於 S3，該 URL 包含由伺服器管理的暫存識別碼。
 
 ```
 POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
@@ -123,11 +125,12 @@ POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
 | `size` | integer | 是 | 檔案大小（位元組） |
 | `contentType` | string | 否 | 檔案的MIME類型 |
 | `etag` | string | 否 | 上傳物件的S3 ETag |
+| `upsert` | boolean | 否 | 必須與請求上傳策略時使用的 `upsert` 值一致 |
 
 #### 範例
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo-123.jpg/confirm-upload" \
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload?uploadId=11111111-2222-4333-8444-555555555555" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -141,11 +144,11 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/
 ```json
 {
   "bucket": "avatars",
-  "key": "profile-photo-123.jpg",
+  "key": "profile-photo.jpg",
   "size": 102400,
   "mimeType": "image/jpeg",
   "uploadedAt": "2024-01-21T10:30:00Z",
-  "url": "/api/storage/buckets/avatars/objects/profile-photo-123.jpg"
+  "url": "/api/storage/buckets/avatars/objects/profile-photo.jpg"
 }
 ```
 
