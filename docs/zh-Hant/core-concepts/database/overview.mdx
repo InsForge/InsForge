@@ -60,6 +60,10 @@ graph TB
 
 Postgres RLS 原則在列級別強制執行存取。原則讀取驗證 JWT，因此相同的規則適用於 REST 查詢、SDK 呼叫、即時訂閱和儲存請求。
 
+### 連線字串
+
+用標準的 `postgresql://` 連線字串，讓外部 Postgres 工具（`psql`、BI 儀表板、ORM，或執行在虛擬機上的 worker）直接連到你專案的資料庫。在 [dashboard](https://insforge.dev) 打開專案，點 **Connect**（同樣的內容也在 **Project Settings** 裡），查看 **Connection String**。你會拿到完整的 URL，以及各個參數——host、database、user、port 和 password——密碼旁有顯示/隱藏開關，複製前可以先顯示出來。這是直連，最適合虛擬機、長時間執行的容器這類持久、長連線的用戶端。你的應用程式碼通常用不到它，因為每張資料表本身就是 REST 和 SDK 端點，但當某個工具需要原生 Postgres 存取時，它隨時可用。
+
 ## 概念
 
 <CardGroup cols={2}>

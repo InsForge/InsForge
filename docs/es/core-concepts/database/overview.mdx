@@ -60,6 +60,10 @@ Búsqueda de vectores nativos para incrustaciones, con índices HNSW e IVFFlat. 
 
 Las políticas RLS de Postgres aplican acceso a nivel de fila. Las políticas leen el JWT de autenticación, por lo que la misma regla se aplica a consultas REST, llamadas SDK, suscripciones en tiempo real y solicitudes de almacenamiento.
 
+### Cadena de conexión
+
+Apunta herramientas de Postgres externas — `psql`, un panel de BI, un ORM o un worker corriendo en una VM — directamente a la base de datos de tu proyecto con una cadena de conexión `postgresql://` estándar. Abre tu proyecto en el [dashboard](https://insforge.dev), haz clic en **Connect** (la misma sección también está en **Project Settings**) y consulta **Connection String**. Obtienes la URL completa más los parámetros individuales — host, database, user, port y password — con un botón para mostrar/ocultar la contraseña antes de copiarla. Es una conexión directa, ideal para clientes persistentes y de larga duración como máquinas virtuales y contenedores de larga ejecución. El código de tu app rara vez la necesita, ya que cada tabla ya es un endpoint REST y SDK, pero está ahí siempre que una herramienta necesite acceso Postgres en crudo.
+
 ## Conceptos
 
 <CardGroup cols={2}>

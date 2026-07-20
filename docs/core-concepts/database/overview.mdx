@@ -60,6 +60,10 @@ Native vector search for embeddings, with HNSW and IVFFlat indexes. See [pgvecto
 
 Postgres RLS policies enforce access at the row level. Policies read the auth JWT, so the same rule applies to REST queries, SDK calls, realtime subscriptions, and storage requests.
 
+### Connection string
+
+Point external Postgres tools — `psql`, a BI dashboard, an ORM, or a worker running on a VM — straight at your project's database with a standard `postgresql://` connection string. Open your project in the [dashboard](https://insforge.dev), click **Connect** (the same section also lives under **Project Settings**), and read **Connection String**. You get the full URL plus the individual parameters — host, database, user, port, and password — with a show/hide toggle to reveal the password before you copy it. This is a direct connection, best for persistent, long-lived clients such as virtual machines and long-running containers. Your app code rarely needs it, since every table is already a REST and SDK endpoint, but it's there whenever a tool needs raw Postgres access.
+
 ## Concepts
 
 <CardGroup cols={2}>

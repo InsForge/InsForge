@@ -60,6 +60,10 @@ graph TB
 
 Postgres RLS 策略在行级别强制执行访问。策略读取身份验证 JWT，因此相同的规则适用于 REST 查询、SDK 调用、实时订阅和存储请求。
 
+### 连接字符串
+
+用标准的 `postgresql://` 连接字符串，让外部 Postgres 工具（`psql`、BI 面板、ORM，或运行在虚拟机上的 worker）直接连到你项目的数据库。在 [dashboard](https://insforge.dev) 打开项目，点 **Connect**（同样的内容也在 **Project Settings** 里），查看 **Connection String**。你会得到完整的 URL，以及各个参数——host、database、user、port 和 password——密码旁有显示/隐藏开关，复制前可以先显示出来。这是直连，最适合虚拟机、长时间运行的容器这类持久、长连接的客户端。你的应用代码通常用不到它，因为每张表本身就是 REST 和 SDK 端点，但当某个工具需要原生 Postgres 访问时，它随时可用。
+
 ## 概念
 
 <CardGroup cols={2}>
