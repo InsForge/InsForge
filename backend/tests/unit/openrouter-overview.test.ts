@@ -333,6 +333,36 @@ describe('OpenRouterProvider.getOverview', () => {
     expect(overview.modelUsage).toEqual([]);
   });
 
+  it('returns key usage without activity when the management credential cannot be loaded', async () => {
+    modelGatewayConfigMock.apiKey = 'sk-or-test';
+    modelGatewayConfigMock.getManagementKey.mockRejectedValueOnce(
+      new Error('temporary secret-store failure')
+    );
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            hash: 'hash',
+            label: 'Test key',
+            usage: 0.42,
+            usage_daily: 0.1,
+            usage_weekly: 0.42,
+            usage_monthly: 0.42,
+            limit: null,
+            is_free_tier: false,
+          },
+        }),
+    });
+
+    const overview = await provider.getOverview();
+
+    expect(overview.key.label).toBe('Test key');
+    expect(overview.key.observabilityAvailable).toBe(false);
+    expect(overview.key.observabilityError).toBe('OpenRouter activity is temporarily unavailable.');
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it('loads model-level activity through the cloud backend', async () => {
     environmentMock.isCloud = true;
     vi.stubEnv('PROJECT_ID', 'project_123');

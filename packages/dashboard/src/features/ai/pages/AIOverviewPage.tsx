@@ -14,9 +14,9 @@ import {
   TooltipTrigger,
   useToast,
 } from '@insforge/ui';
-import type { AIOverviewMetricPoint } from '@insforge/shared-schemas';
 import { CodeEditor } from '#components';
 import { AIActivityChartCard } from '#features/ai/components/AIActivityChartCard';
+import { formatUsd, sumMetricPoints } from '#features/ai/helpers';
 import { useAIModelCredits } from '#features/ai/hooks/useAIModelCredits';
 import { useAIOverview } from '#features/ai/hooks/useAIOverview';
 import { useOpenRouterKey, useRotateOpenRouterKey } from '#features/ai/hooks/useOpenRouterKey';
@@ -36,14 +36,6 @@ function formatModelCredit(value: number, compact = false): string {
   }
 
   return `$${value.toFixed(2)}`;
-}
-
-function formatChartCurrency(value: number): string {
-  return `$${value.toFixed(value >= 10 ? 0 : 2)}`;
-}
-
-function metricTotal(points: AIOverviewMetricPoint[]): number {
-  return points.reduce((sum, point) => sum + point.value, 0);
 }
 
 function UnavailableChartCard({ title, message }: { title: string; message: string }) {
@@ -357,7 +349,7 @@ export default function AIOverviewPage() {
   const canRotateOpenRouterKey = host.mode === 'cloud-hosting';
   const codeSnippets = useMemo(() => getOverviewCodeSnippets(selectedModelId), [selectedModelId]);
   const chartTotals = useMemo(
-    () => formatChartCurrency(metricTotal(overviewData?.charts.spend ?? [])),
+    () => formatUsd(sumMetricPoints(overviewData?.charts.spend ?? [])),
     [overviewData]
   );
 
@@ -593,7 +585,7 @@ export default function AIOverviewPage() {
               title={t('ai.overview.spend', { defaultValue: 'Spend' })}
               points={overviewData.charts.spend}
               value={chartTotals}
-              valueFormatter={formatChartCurrency}
+              valueFormatter={formatUsd}
             />
           )}
         </section>

@@ -1,11 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { AIOverviewMetricPoint } from '@insforge/shared-schemas';
-
-function formatCompact(value: number): string {
-  return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(
-    value
-  );
-}
+import { formatCompactNumber } from '#features/ai/helpers';
 
 function parseBucketLabel(label: string): Date | null {
   if (/^\d{4}-\d{2}$/.test(label)) {
@@ -125,7 +120,7 @@ export function AIActivityChartCard({
   title,
   points,
   value,
-  valueFormatter = formatCompact,
+  valueFormatter = formatCompactNumber,
 }: {
   title: string;
   points: AIOverviewMetricPoint[];

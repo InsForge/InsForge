@@ -301,7 +301,20 @@ export class OpenRouterProvider {
       return this.fetchCloudActivity();
     }
 
-    const managementCredential = await this.modelGatewayConfigService.getManagementKey();
+    let managementCredential: string | null;
+    try {
+      managementCredential = await this.modelGatewayConfigService.getManagementKey();
+    } catch (error) {
+      logger.warn('Unable to load the OpenRouter management credential', {
+        error: getCaughtErrorMessage(error),
+      });
+      return {
+        available: false,
+        data: [],
+        error: 'OpenRouter activity is temporarily unavailable.',
+      };
+    }
+
     if (!managementCredential) {
       return {
         available: false,

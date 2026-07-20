@@ -27,8 +27,6 @@ export function useUpdateModelGatewayConfig() {
     mutationFn: (input) => aiService.updateConfig(input),
     onSuccess: (config) => {
       queryClient.setQueryData(MODEL_GATEWAY_CONFIG_QUERY_KEY, config);
-      void queryClient.invalidateQueries({ queryKey: OPENROUTER_KEY_QUERY_KEY });
-      void queryClient.invalidateQueries({ queryKey: AI_OVERVIEW_QUERY_KEY });
       showToast(
         t('ai.settings.saved', { defaultValue: 'Model Gateway settings saved' }),
         'success'
@@ -43,8 +41,10 @@ export function useUpdateModelGatewayConfig() {
     },
     onSettled: () => {
       // A multi-key save may partially succeed because the two credentials are independent.
-      // Reconcile the masked status even when one write fails.
+      // Reconcile all credential-dependent views even when one write fails.
       void queryClient.invalidateQueries({ queryKey: MODEL_GATEWAY_CONFIG_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: OPENROUTER_KEY_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: AI_OVERVIEW_QUERY_KEY });
     },
   });
 }

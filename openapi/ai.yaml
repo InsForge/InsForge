@@ -667,11 +667,13 @@ components:
           type: string
           minLength: 1
           maxLength: 512
+          pattern: '.*\S.*'
           description: OpenRouter API key used for model requests.
         managementKey:
           type: string
           minLength: 1
           maxLength: 512
+          pattern: '.*\S.*'
           description: OpenRouter management API key used only for activity analytics.
 
     AIOverviewMetricPoint:

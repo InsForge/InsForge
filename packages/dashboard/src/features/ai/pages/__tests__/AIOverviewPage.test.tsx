@@ -202,7 +202,7 @@ describe('AIOverviewPage OpenRouter key rotation', () => {
         observabilityError: undefined,
       },
       charts: {
-        spend: [{ label: '2026-07-15', value: 1.25 }],
+        spend: [{ label: '2026-07-15', value: 12.34 }],
         requests: [{ label: '2026-07-15', value: 42 }],
         tokens: [{ label: '2026-07-15', value: 12000 }],
       },
@@ -215,7 +215,7 @@ describe('AIOverviewPage OpenRouter key rotation', () => {
           completionTokens: 2500,
           reasoningTokens: 500,
           totalTokens: 12000,
-          spend: 1.25,
+          spend: 12.34,
           byokSpend: 0,
         },
       ],
@@ -227,7 +227,7 @@ describe('AIOverviewPage OpenRouter key rotation', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getAllByText('$1.25')).toHaveLength(2);
+    expect(screen.getAllByText('$12.34')).toHaveLength(2);
     expect(screen.queryByText('Requests')).not.toBeInTheDocument();
     expect(screen.queryByText('Tokens')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Models' })).not.toBeInTheDocument();

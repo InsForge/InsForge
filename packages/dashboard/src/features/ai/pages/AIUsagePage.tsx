@@ -1,40 +1,17 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
-import type { AIOverview, AIOverviewMetricPoint } from '@insforge/shared-schemas';
+import type { AIOverview } from '@insforge/shared-schemas';
 import { AIActivityChartCard } from '#features/ai/components/AIActivityChartCard';
+import { formatCompactNumber, formatUsd, sumMetricPoints } from '#features/ai/helpers';
 import { useAIOverview } from '#features/ai/hooks/useAIOverview';
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: value > 0 && value < 0.01 ? 4 : 2,
-  }).format(value);
-}
-
-function formatCompact(value: number): string {
-  return new Intl.NumberFormat('en', {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(value);
-}
-
-function formatChartCurrency(value: number): string {
-  return formatCurrency(value);
-}
-
-function metricTotal(points: AIOverviewMetricPoint[]): number {
-  return points.reduce((sum, point) => sum + point.value, 0);
-}
 
 function UsageMetric({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex min-w-0 flex-col gap-2 bg-card p-4">
       <span className="text-[12px] leading-4 text-muted-foreground">{label}</span>
       <span className="text-xl font-medium leading-7 tracking-[-0.02em] text-foreground">
-        {formatCurrency(value)}
+        {formatUsd(value)}
       </span>
     </div>
   );
@@ -91,8 +68,8 @@ function KeyUsagePanel({ usage }: { usage: AIOverview['key'] }) {
                 {t('ai.usage.spendingLimit', { defaultValue: 'Key spending limit' })}
               </span>
               <span className="font-medium text-foreground">
-                {formatCurrency(amountUsed)} {t('ai.usage.of', { defaultValue: 'of' })}{' '}
-                {formatCurrency(limit)}
+                {formatUsd(amountUsed)} {t('ai.usage.of', { defaultValue: 'of' })}{' '}
+                {formatUsd(limit)}
               </span>
             </div>
             <div
@@ -116,7 +93,7 @@ function KeyUsagePanel({ usage }: { usage: AIOverview['key'] }) {
               <span className="text-muted-foreground">
                 {t('ai.usage.remaining', { defaultValue: 'Remaining' })}
               </span>
-              <span className="font-medium text-foreground">{formatCurrency(limitRemaining)}</span>
+              <span className="font-medium text-foreground">{formatUsd(limitRemaining)}</span>
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-muted-foreground">
@@ -195,22 +172,22 @@ function ModelUsageTable({ modelUsage }: { modelUsage: NonNullable<AIOverview['m
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right text-[13px] tabular-nums text-foreground">
-                    {formatCompact(item.requests)}
+                    {formatCompactNumber(item.requests)}
                   </td>
                   <td
                     className="px-4 py-3 text-right text-[13px] tabular-nums text-foreground"
                     title={t('ai.usage.tokenBreakdown', {
                       defaultValue:
                         '{{prompt}} prompt · {{completion}} completion · {{reasoning}} reasoning',
-                      prompt: formatCompact(item.promptTokens),
-                      completion: formatCompact(item.completionTokens),
-                      reasoning: formatCompact(item.reasoningTokens),
+                      prompt: formatCompactNumber(item.promptTokens),
+                      completion: formatCompactNumber(item.completionTokens),
+                      reasoning: formatCompactNumber(item.reasoningTokens),
                     })}
                   >
-                    {formatCompact(item.totalTokens)}
+                    {formatCompactNumber(item.totalTokens)}
                   </td>
                   <td className="px-4 py-3 text-right text-[13px] tabular-nums text-foreground">
-                    {formatCurrency(item.spend)}
+                    {formatUsd(item.spend)}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -245,9 +222,9 @@ export default function AIUsagePage() {
   const { data, isLoading, isError, error } = useAIOverview();
   const totals = useMemo(
     () => ({
-      spend: metricTotal(data?.charts.spend ?? []),
-      requests: metricTotal(data?.charts.requests ?? []),
-      tokens: metricTotal(data?.charts.tokens ?? []),
+      spend: sumMetricPoints(data?.charts.spend ?? []),
+      requests: sumMetricPoints(data?.charts.requests ?? []),
+      tokens: sumMetricPoints(data?.charts.tokens ?? []),
     }),
     [data]
   );
@@ -322,18 +299,18 @@ export default function AIUsagePage() {
                   <AIActivityChartCard
                     title={t('ai.usage.spend', { defaultValue: 'Spend' })}
                     points={data.charts.spend}
-                    value={formatChartCurrency(totals.spend)}
-                    valueFormatter={formatChartCurrency}
+                    value={formatUsd(totals.spend)}
+                    valueFormatter={formatUsd}
                   />
                   <AIActivityChartCard
                     title={t('ai.usage.requests', { defaultValue: 'Requests' })}
                     points={data.charts.requests}
-                    value={formatCompact(totals.requests)}
+                    value={formatCompactNumber(totals.requests)}
                   />
                   <AIActivityChartCard
                     title={t('ai.usage.tokens', { defaultValue: 'Tokens' })}
                     points={data.charts.tokens}
-                    value={formatCompact(totals.tokens)}
+                    value={formatCompactNumber(totals.tokens)}
                   />
                 </div>
               )}
