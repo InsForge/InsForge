@@ -290,11 +290,36 @@ router.post(
           // Send completion signal
           res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         } catch (streamError) {
-          // If error occurs during streaming, send it in SSE format
           logger.error('Stream error during chat completion', {
             error: streamError instanceof Error ? streamError.message : String(streamError),
             stack: streamError instanceof Error ? streamError.stack : undefined,
           });
+
+          // The upstream call is made on the first pull of the generator, so a
+          // failure can happen before a single byte is streamed. In that case the
+          // status line is still open: surface the mapped upstream status (402 out
+          // of credits, 429 rate limited, 401 auth) exactly like the non-streaming
+          // path does. Writing an SSE frame here instead would flush the response
+          // as 200, and a client checking `response.ok` would read a billing or
+          // rate-limit failure as success.
+          if (!res.headersSent) {
+            res.removeHeader('Content-Type');
+            res.removeHeader('Cache-Control');
+            res.removeHeader('Connection');
+            next(
+              streamError instanceof AppError
+                ? streamError
+                : new AppError(
+                    streamError instanceof Error ? streamError.message : String(streamError),
+                    500,
+                    ERROR_CODES.INTERNAL_ERROR
+                  )
+            );
+            return;
+          }
+
+          // Mid-stream the headers are already flushed, so the status can no longer
+          // change — report the failure in-band and close the stream.
           res.write(
             `data: ${JSON.stringify({ error: true, message: streamError instanceof Error ? streamError.message : String(streamError) })}\n\n`
           );
