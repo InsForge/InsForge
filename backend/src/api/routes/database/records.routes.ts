@@ -118,7 +118,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     }
 
     // Broadcast socket events for mutations
-    if (['POST', 'DELETE'].includes(method)) {
+    if (['POST', 'DELETE', 'PATCH', 'PUT'].includes(method)) {
       const socket = SocketManager.getInstance();
       socket.broadcastToRoom(
         'role:project_admin',

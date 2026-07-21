@@ -56,9 +56,9 @@ Upload a file with a specific path/key.
 }
 ```
 
-<Warning>
-If a file with the same key exists, backend auto-renames it. Always use the returned `key` and `url`.
-</Warning>
+<Note>
+Uploading to an existing key replaces the current object. Use `uploadAuto()` when you want a unique key generated automatically.
+</Note>
 
 ### Example
 

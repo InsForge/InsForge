@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { RequireAuth } from './RequireAuth';
 import AILayout from '#features/ai/components/AILayout';
 import AIOverviewPage from '#features/ai/pages/AIOverviewPage';
+import AIUsagePage from '#features/ai/pages/AIUsagePage';
 import AIQuickStartPage from '#features/ai/pages/AIQuickStartPage';
 import AIModelsPage from '#features/ai/pages/AIModelsPage';
 import AnalyticsLayout from '#features/analytics/components/AnalyticsLayout';
@@ -128,6 +129,7 @@ function AuthenticatedRoutes() {
         <Route path="/dashboard/ai" element={<AILayout />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<AIOverviewPage />} />
+          <Route path="usage" element={<AIUsagePage />} />
           <Route path="quick-start" element={<AIQuickStartPage />} />
           <Route path="models" element={<AIModelsPage />} />
         </Route>

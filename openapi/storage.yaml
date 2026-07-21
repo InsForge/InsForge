@@ -515,7 +515,10 @@ paths:
   /api/storage/buckets/{bucketName}/upload-strategy:
     post:
       summary: Get Upload Strategy (Direct or Presigned URL)
-      description: Returns upload strategy based on storage backend (S3 returns presigned URLs, local returns direct upload endpoints)
+      description: |
+        Returns upload strategy based on storage backend (S3 returns presigned URLs, local returns direct upload endpoints).
+
+        The filename is used verbatim as the object key. Uploading to an existing key replaces the current object in place. To upload with a server-generated unique key instead, use `POST /api/storage/buckets/{bucketName}/objects`. End-user creates and replacements are gated by the `storage.objects` row-level-security policies.
       tags:
         - Client
       security:
@@ -539,7 +542,7 @@ paths:
               properties:
                 filename:
                   type: string
-                  description: Original filename for generating unique key
+                  description: Object key to upload to (used verbatim)
                   example: profile-photo.jpg
                 contentType:
                   type: string
@@ -564,33 +567,44 @@ paths:
                     uploadUrl: https://s3-bucket.amazonaws.com/
                     fields:
                       bucket: my-s3-bucket
-                      key: app-key/avatars/profile-photo-1234567890-abc123.jpg
+                      key: app-key/avatars/profile-photo.jpg
                       X-Amz-Algorithm: AWS4-HMAC-SHA256
                       X-Amz-Credential: AKIA.../20250905/us-east-2/s3/aws4_request
                       X-Amz-Date: 20250905T000000Z
                       Policy: eyJ...
                       X-Amz-Signature: abc123...
-                    key: profile-photo-1234567890-abc123.jpg
+                    key: profile-photo.jpg
                     confirmRequired: true
-                    confirmUrl: /api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg/confirm-upload
+                    confirmUrl: /api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload
                     expiresAt: "2025-09-05T01:00:00Z"
                 local:
                   summary: Local Storage Response
                   value:
                     method: direct
-                    uploadUrl: /api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg
-                    key: profile-photo-1234567890-abc123.jpg
+                    uploadUrl: /api/storage/buckets/avatars/objects/profile-photo.jpg
+                    key: profile-photo.jpg
                     confirmRequired: false
+        '403':
+          description: The caller is not permitted to create or replace this object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "STORAGE_PERMISSION_DENIED"
+                message: "You do not have permission to replace \"profile-photo.jpg\" in bucket \"avatars\""
+                statusCode: 403
         '404':
           description: Bucket not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
   /api/storage/buckets/{bucketName}/objects/{objectKey}:
     put:
       summary: Upload Object
+      description: |
+        Creates or replaces the object at the exact key, matching S3 PutObject semantics. End-user creates and replacements are gated by the `storage.objects` row-level-security policies; replacing an object never reassigns its ownership.
       tags:
         - Client
       security:
@@ -624,8 +638,8 @@ paths:
               required:
                 - file
       responses:
-        '201':
-          description: Object uploaded successfully
+        '200':
+          description: Object created or replaced
           content:
             application/json:
               schema:
@@ -637,6 +651,16 @@ paths:
                 mimeType: "image/jpeg"
                 uploadedAt: "2024-01-21T10:30:00Z"
                 url: "/api/storage/buckets/avatars/objects/user123.jpg"
+        '403':
+          description: The caller is not permitted to create or replace this object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "STORAGE_PERMISSION_DENIED"
+                message: "You do not have permission to write \"user123.jpg\" in bucket \"avatars\""
+                statusCode: 403
         '400':
           description: Invalid bucket name, key, or file
           content:
@@ -774,7 +798,7 @@ paths:
           required: true
           schema:
             type: string
-          example: profile-photo-1234567890-abc123.jpg
+          example: profile-photo.jpg
       requestBody:
         required: true
         content:
@@ -797,12 +821,22 @@ paths:
                   description: S3 ETag of the uploaded object (optional)
                   example: "9bb58f26192e4ba00f01e2e7b136bbd8"
       responses:
-        '201':
-          description: Upload confirmed successfully
+        '200':
+          description: Upload confirmed (object created or replaced)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/StoredFile'
+        '403':
+          description: The caller is not permitted to insert or replace this object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "STORAGE_PERMISSION_DENIED"
+                message: "You do not have permission to write \"profile-photo.jpg\" in bucket \"avatars\""
+                statusCode: 403
         '404':
           description: Upload not found
           content:
@@ -813,17 +847,6 @@ paths:
                 error: "UPLOAD_NOT_FOUND"
                 message: "Upload not found for key 'profile-photo.jpg' in bucket 'avatars'"
                 statusCode: 404
-        '409':
-          description: Already confirmed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "ALREADY_CONFIRMED"
-                message: "File 'profile-photo.jpg' already confirmed in bucket 'avatars'"
-                statusCode: 409
-
   /api/storage/buckets/{bucketName}/download-strategy/objects/{objectKey}:
     get:
       summary: Get Download Strategy (Direct or Presigned URL)
@@ -1303,8 +1326,8 @@ components:
             X-Amz-Algorithm: AWS4-HMAC-SHA256
         key:
           type: string
-          description: Generated unique key for the file
-          example: profile-photo-1234567890-abc123.jpg
+          description: Final logical object key (the filename, used verbatim).
+          example: profile-photo.jpg
         confirmRequired:
           type: boolean
           description: Whether upload confirmation is required

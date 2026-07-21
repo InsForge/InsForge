@@ -5,6 +5,7 @@ import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError, UpstreamError } from '@/utils/errors.js';
 import { ERROR_CODES, type AIOverview } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
+import { ModelGatewayConfigService } from '@/services/ai/model-gateway-config.service.js';
 
 interface CloudCredentialsResponse {
   openrouter?: {
@@ -38,7 +39,12 @@ interface OpenRouterKeyInfo {
 }
 
 interface OpenRouterActivityItem {
+  byok_usage_inference: number;
   date: string;
+  endpoint_id: string;
+  model: string;
+  model_permaslug: string;
+  provider_name: string;
   usage: number;
   requests: number;
   prompt_tokens: number;
@@ -53,7 +59,19 @@ interface OverviewBucket {
   tokens: number;
 }
 
-export type ApiKeySource = 'cloud' | 'env';
+interface ModelUsageAccumulator {
+  model: string;
+  providers: Set<string>;
+  requests: number;
+  promptTokens: number;
+  completionTokens: number;
+  reasoningTokens: number;
+  totalTokens: number;
+  spend: number;
+  byokSpend: number;
+}
+
+export type ApiKeySource = 'cloud' | 'self-hosted';
 interface ResolvedApiKey {
   apiKey: string;
   source: ApiKeySource;
@@ -69,12 +87,14 @@ const EMPTY_AI_OVERVIEW: AIOverview = {
     usageWeekly: 0,
     usageMonthly: 0,
     observabilityAvailable: false,
+    observabilityError: 'Configure an OpenRouter API key to load Model Gateway usage.',
   },
   charts: {
     spend: [],
     requests: [],
     tokens: [],
   },
+  modelUsage: [],
 };
 
 function getCaughtErrorMessage(error: unknown): string {
@@ -88,6 +108,7 @@ export class OpenRouterProvider {
   private currentApiKey: string | undefined;
   private fetchPromise: Promise<string> | null = null;
   private rotationPromise: Promise<string> | null = null;
+  private modelGatewayConfigService = ModelGatewayConfigService.getInstance();
 
   private constructor() {}
 
@@ -115,7 +136,8 @@ export class OpenRouterProvider {
 
   /**
    * Resolve the API key and its source in one call.
-   * Cloud projects use InsForge Cloud-managed credentials; self-hosting uses OPENROUTER_API_KEY.
+   * Cloud projects use InsForge Cloud-managed credentials; self-hosting prefers the encrypted
+   * Model Gateway secret store and falls back to OPENROUTER_API_KEY for upgrade resilience.
    * Use this instead of getApiKey() when downstream logic depends on the source.
    */
   async getApiKeyWithSource(): Promise<ResolvedApiKey> {
@@ -126,22 +148,22 @@ export class OpenRouterProvider {
       return { apiKey, source: 'cloud' };
     }
 
-    // 3. Self-hosted: env variable fallback
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    // Self-hosted: dashboard-managed encrypted secret.
+    const apiKey = await this.modelGatewayConfigService.getApiKey();
     if (!apiKey) {
       throw new AppError(
-        'OpenRouter API key not configured. Set OPENROUTER_API_KEY in the backend environment.',
+        'OpenRouter API key not configured. Configure Model Gateway settings or set OPENROUTER_API_KEY.',
         500,
         ERROR_CODES.AI_INVALID_API_KEY
       );
     }
-    return { apiKey, source: 'env' };
+    return { apiKey, source: 'self-hosted' };
   }
 
   /**
    * Get OpenRouter API key with priority order:
    * 1. InsForge Cloud-managed key (cloud environment only)
-   * 2. OPENROUTER_API_KEY environment variable (self-hosted)
+   * 2. Model Gateway secret store (self-hosted)
    */
   async getApiKey(): Promise<string> {
     return (await this.getApiKeyWithSource()).apiKey;
@@ -165,7 +187,7 @@ export class OpenRouterProvider {
       this.openRouterClient = this.createClient(apiKey);
       return this.openRouterClient;
     }
-    if (isCloudEnvironment() && this.currentApiKey !== apiKey) {
+    if (this.currentApiKey !== apiKey) {
       this.openRouterClient = this.createClient(apiKey);
     }
     return this.openRouterClient;
@@ -178,20 +200,13 @@ export class OpenRouterProvider {
     return `${apiKey.slice(0, 8)}••••••••${apiKey.slice(-4)}`;
   }
 
-  isConfigured(): boolean {
-    if (isCloudEnvironment()) {
-      return true;
-    }
-    return !!process.env.OPENROUTER_API_KEY;
-  }
-
   async rotateManagedApiKey(): Promise<{ apiKey: string; maskedKey: string }> {
     if (!isCloudEnvironment()) {
       throw new AppError(
         'OpenRouter API key rotation is only available for InsForge Cloud-managed keys.',
         400,
         ERROR_CODES.INVALID_INPUT,
-        'For self-hosted projects, update OPENROUTER_API_KEY in the backend environment.'
+        'For self-hosted projects, update the key in Model Gateway settings.'
       );
     }
 
@@ -225,6 +240,7 @@ export class OpenRouterProvider {
     );
     const activity = activityResult.data;
     const charts = this.buildOverviewCharts(activity);
+    const modelUsage = this.buildModelUsage(activity);
 
     return {
       key: {
@@ -243,6 +259,7 @@ export class OpenRouterProvider {
         observabilityError: activityResult.error,
       },
       charts,
+      modelUsage,
     };
   }
 
@@ -284,6 +301,29 @@ export class OpenRouterProvider {
       return this.fetchCloudActivity();
     }
 
+    let managementCredential: string | null;
+    try {
+      managementCredential = await this.modelGatewayConfigService.getManagementKey();
+    } catch (error) {
+      logger.warn('Unable to load the OpenRouter management credential', {
+        error: getCaughtErrorMessage(error),
+      });
+      return {
+        available: false,
+        data: [],
+        error: 'OpenRouter activity is temporarily unavailable.',
+      };
+    }
+
+    if (!managementCredential) {
+      return {
+        available: false,
+        data: [],
+        error:
+          'Configure an OpenRouter management key to load request, token, model, and historical activity.',
+      };
+    }
+
     const apiKeyHash = this.resolveActivityApiKeyHash(apiKey, apiKeyHashFromOpenRouter);
     const url = new URL('https://openrouter.ai/api/v1/activity');
     url.searchParams.set('api_key_hash', apiKeyHash);
@@ -292,14 +332,14 @@ export class OpenRouterProvider {
     try {
       response = await fetch(url, {
         method: 'GET',
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers: { Authorization: `Bearer ${managementCredential}` },
       });
 
       if (response.status === 401 || response.status === 403 || response.status === 404) {
         return {
           available: false,
           data: [],
-          error: 'Activity requires an OpenRouter management key with access to this API key hash.',
+          error: 'The configured OpenRouter management key cannot access this API key.',
         };
       }
 
@@ -401,13 +441,65 @@ export class OpenRouterProvider {
 
   private normalizeActivity(items: Partial<OpenRouterActivityItem>[]): OpenRouterActivityItem[] {
     return items.map((item) => ({
+      byok_usage_inference: Number(item.byok_usage_inference ?? 0),
       date: String(item.date || ''),
+      endpoint_id: String(item.endpoint_id || ''),
+      model: String(item.model || ''),
+      model_permaslug: String(item.model_permaslug || ''),
+      provider_name: String(item.provider_name || ''),
       usage: Number(item.usage || 0),
       requests: Number(item.requests || 0),
       prompt_tokens: Number(item.prompt_tokens || 0),
       completion_tokens: Number(item.completion_tokens || 0),
       reasoning_tokens: Number(item.reasoning_tokens || 0),
     }));
+  }
+
+  private buildModelUsage(
+    activity: OpenRouterActivityItem[]
+  ): NonNullable<AIOverview['modelUsage']> {
+    const allowedDays = new Set(this.createOverviewBuckets().keys());
+    const models = new Map<string, ModelUsageAccumulator>();
+
+    for (const item of activity) {
+      if (!allowedDays.has(this.resolveActivityBucketKey(item.date))) {
+        continue;
+      }
+
+      const model = item.model || item.model_permaslug || 'Unknown model';
+      const current = models.get(model) ?? {
+        model,
+        providers: new Set<string>(),
+        requests: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        reasoningTokens: 0,
+        totalTokens: 0,
+        spend: 0,
+        byokSpend: 0,
+      };
+
+      if (item.provider_name) {
+        current.providers.add(item.provider_name);
+      }
+      current.requests += item.requests;
+      current.promptTokens += item.prompt_tokens;
+      current.completionTokens += item.completion_tokens;
+      current.reasoningTokens += item.reasoning_tokens;
+      current.totalTokens += item.prompt_tokens + item.completion_tokens + item.reasoning_tokens;
+      current.spend += item.usage;
+      current.byokSpend += item.byok_usage_inference;
+      models.set(model, current);
+    }
+
+    return Array.from(models.values())
+      .map(({ providers, ...item }) => ({
+        ...item,
+        providers: Array.from(providers).sort((a, b) => a.localeCompare(b)),
+      }))
+      .sort(
+        (a, b) => b.spend - a.spend || b.requests - a.requests || a.model.localeCompare(b.model)
+      );
   }
 
   private buildOverviewCharts(activity: OpenRouterActivityItem[]): AIOverview['charts'] {
@@ -703,7 +795,7 @@ export class OpenRouterProvider {
             ERROR_CODES.AI_INVALID_API_KEY,
             source === 'cloud'
               ? 'Check the cloud-managed OpenRouter credential.'
-              : 'Set a valid OPENROUTER_API_KEY in the backend environment.'
+              : 'Set a valid OPENROUTER_API_KEY or update Model Gateway settings.'
           );
         }
         if (error.status === 429) {
