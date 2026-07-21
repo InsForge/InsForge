@@ -172,7 +172,10 @@ export class AIUsageService {
         totalRequests: parseInt(row.totalRequests),
         totalTokens: parseInt(row.totalTokens),
         totalCostUsd: parseFloat(row.totalCostUsd),
-        lastRequestAt: row.lastRequestAt instanceof Date ? row.lastRequestAt.toISOString() : row.lastRequestAt,
+        lastRequestAt:
+          row.lastRequestAt instanceof Date
+            ? row.lastRequestAt.toISOString()
+            : row.lastRequestAt,
       })),
       total: parseInt(countResult.rows[0]?.total || '0'),
     };
