@@ -167,16 +167,16 @@ export class AIUsageService {
     );
 
     return {
-      data: dataResult.rows.map((row) => ({
-        userId: row.userId,
-        totalRequests: parseInt(row.totalRequests),
-        totalTokens: parseInt(row.totalTokens),
-        totalCostUsd: parseFloat(row.totalCostUsd),
-        lastRequestAt:
-          row.lastRequestAt instanceof Date
-            ? row.lastRequestAt.toISOString()
-            : row.lastRequestAt,
-      })),
+      data: dataResult.rows.map((row) => {
+        const requestAt = row.lastRequestAt;
+        return {
+          userId: row.userId,
+          totalRequests: parseInt(row.totalRequests),
+          totalTokens: parseInt(row.totalTokens),
+          totalCostUsd: parseFloat(row.totalCostUsd),
+          lastRequestAt: requestAt instanceof Date ? requestAt.toISOString() : requestAt,
+        };
+      }),
       total: parseInt(countResult.rows[0]?.total || '0'),
     };
   }
