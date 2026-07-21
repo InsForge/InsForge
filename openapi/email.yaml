@@ -8,7 +8,7 @@ paths:
   /api/email/send-raw:
     post:
       summary: Send raw HTML email
-      description: Send a custom HTML email to one or more recipients. Requires user authentication.
+      description: Send a custom HTML email to one or more recipients. Requires user authentication or a valid admin API key.
       tags:
         - Client
       security:
