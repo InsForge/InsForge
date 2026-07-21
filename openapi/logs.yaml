@@ -1,118 +1,92 @@
 openapi: 3.0.3
 info:
   title: Insforge Logs API
-  version: 1.0.0
+  version: 2.0.0
+  description: >-
+    Audit logs and system log sources. All endpoints require project admin
+    authentication. The audit list and search endpoints paginate
+    PostgREST-style: metadata is returned in `Content-Range` /
+    `Preference-Applied` headers and partial results use HTTP `206`. Other
+    list endpoints (`/sources`, `/stats`, `/{source}`) return plain `200`
+    JSON bodies.
 
 paths:
-  /api/logs:
+  /api/logs/audits:
     get:
-      summary: List activity logs
+      summary: List audit logs
+      description: >-
+        Returns audit log entries ordered by creation time descending.
+        Pagination metadata is returned in `Content-Range` headers; the
+        response is `206 Partial Content` when the page does not contain
+        every matching record.
       tags:
         - Admin
       security:
         - bearerAuth: []
+        - apiKey: []
       parameters:
-        - name: limit
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - name: actor
           in: query
           schema:
-            type: integer
-            default: 100
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            default: 0
+            type: string
+          description: Filter by the actor that performed the action
+          example: "project_admin"
         - name: action
           in: query
           schema:
             type: string
-            enum: [INSERT, UPDATE, DELETE, LOGIN]
-          description: Filter by action type
-        - name: table
+          description: Filter by action name
+          example: "CREATE_TABLE"
+        - name: module
           in: query
           schema:
             type: string
-      responses:
-        '200':
-          description: List of logs with pagination
-          headers:
-            X-Total-Count:
-              schema:
-                type: integer
-              description: Total number of logs
-            X-Page:
-              schema:
-                type: integer
-              description: Current page number
-            X-Page-Size:
-              schema:
-                type: integer
-              description: Number of items per page
-            X-Total-Pages:
-              schema:
-                type: integer
-              description: Total number of pages
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: string
-                    timestamp:
-                      type: string
-                      format: date-time
-                    action:
-                      type: string
-                      enum: [INSERT, UPDATE, DELETE, LOGIN]
-                    table:
-                      type: string
-                      nullable: true
-                    record_id:
-                      type: string
-                      nullable: true
-                    user_id:
-                      type: string
-                    details:
-                      type: object
-                      nullable: true
-              example:
-                - id: "log-123"
-                  timestamp: "2024-01-21T10:30:00Z"
-                  action: "INSERT"
-                  table: "posts"
-                  record_id: "post-456"
-                  user_id: "user-789"
-                  details:
-                    title: "New Post"
-                    author: "John Doe"
-                - id: "log-124"
-                  timestamp: "2024-01-21T10:31:00Z"
-                  action: "LOGIN"
-                  table: null
-                  record_id: null
-                  user_id: "user-789"
-                  details:
-                    ip: "192.168.1.1"
-                    user_agent: "Mozilla/5.0..."
-
-    delete:
-      summary: Clear logs
-      tags:
-        - Admin
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: before
+          description: Filter by module name
+          example: "database"
+        - name: start_date
           in: query
           schema:
             type: string
             format: date-time
+          description: Only include entries created at or after this time
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Only include entries created at or before this time
       responses:
         '200':
-          description: Logs cleared
+          $ref: '#/components/responses/AuditLogList'
+        '206':
+          $ref: '#/components/responses/AuditLogList'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '500':
+          $ref: '#/components/responses/Error'
+
+    delete:
+      summary: Clear old audit logs
+      description: Deletes audit log entries older than the retention window.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: days_to_keep
+          in: query
+          schema:
+            type: integer
+            default: 90
+          description: Entries older than this many days are deleted
+      responses:
+        '200':
+          description: Audit logs cleared
           content:
             application/json:
               schema:
@@ -120,87 +94,574 @@ paths:
                 properties:
                   message:
                     type: string
-                  deleted_count:
+                  deleted:
                     type: integer
+                    description: Number of entries deleted
               example:
-                message: "Logs cleared successfully"
-                deleted_count: 150
-        '400':
-          description: Bad request
+                message: "Audit logs cleared successfully"
+                deleted: 150
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/logs/audits/stats:
+    get:
+      summary: Get audit log statistics
+      description: >-
+        Returns aggregate audit activity for the trailing window, including
+        per-module action counts and the ten most recent entries.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 7
+          description: Size of the trailing window in days
+      responses:
+        '200':
+          description: Audit log statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - totalLogs
+                  - uniqueActors
+                  - uniqueModules
+                  - actionsByModule
+                  - recentActivity
+                properties:
+                  totalLogs:
+                    type: integer
+                    description: Total number of audit entries in the window
+                  uniqueActors:
+                    type: integer
+                    description: Number of distinct actors in the window
+                  uniqueModules:
+                    type: integer
+                    description: Number of distinct modules in the window
+                  actionsByModule:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                    description: Entry count per module
+                  recentActivity:
+                    type: array
+                    maxItems: 10
+                    items:
+                      $ref: '#/components/schemas/AuditLog'
+                    description: Ten most recent audit entries in the window
+              example:
+                totalLogs: 245
+                uniqueActors: 3
+                uniqueModules: 4
+                actionsByModule:
+                  database: 120
+                  storage: 65
+                  auth: 40
+                  functions: 20
+                recentActivity:
+                  - id: "123e4567-e89b-12d3-a456-426614174000"
+                    actor: "project_admin"
+                    action: "CREATE_TABLE"
+                    module: "database"
+                    details:
+                      tableName: "posts"
+                    ipAddress: "192.168.1.1"
+                    createdAt: "2024-01-21T10:30:00Z"
+                    updatedAt: "2024-01-21T10:30:00Z"
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/logs/sources:
+    get:
+      summary: List log sources
+      description: >-
+        Returns the system log sources that can be queried via
+        `GET /api/logs/{source}`.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: List of log sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogSource'
+              example:
+                - id: "1"
+                  name: "insforge.logs"
+                  token: "insforge-vector"
+                - id: "2"
+                  name: "postgres.logs"
+                  token: "postgres-vector"
+                - id: "3"
+                  name: "function.logs"
+                  token: "function-vector"
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/logs/stats:
+    get:
+      summary: Get log source statistics
+      description: >-
+        Returns per-source record counts and last-activity timestamps for
+        every system log source.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Statistics for each log source
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogSourceStats'
+              example:
+                - source: "insforge.logs"
+                  count: 1523
+                  lastActivity: "2024-01-21T10:30:00Z"
+                - source: "postgres.logs"
+                  count: 4210
+                  lastActivity: "2024-01-21T10:29:45Z"
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/logs/functions/build-logs:
+    get:
+      summary: Get function build logs
+      description: >-
+        Returns build logs for a function deployment from the functions
+        provider. Defaults to the latest deployment when `deployment_id` is
+        omitted.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: deployment_id
+          in: query
+          schema:
+            type: string
+          description: Deployment to fetch build logs for (defaults to the latest deployment)
+      responses:
+        '200':
+          description: Build logs for the deployment
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - deploymentId
+                  - status
+                  - logs
+                  - createdAt
+                properties:
+                  deploymentId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, success, failed]
+                  logs:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - level
+                        - message
+                      properties:
+                        level:
+                          type: string
+                        message:
+                          type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+              example:
+                deploymentId: "dpl-123abc"
+                status: "success"
+                logs:
+                  - level: "info"
+                    message: "Downloading source files..."
+                  - level: "info"
+                    message: "Build completed successfully"
+                createdAt: "2024-01-21T10:30:00Z"
+        '404':
+          description: Build logs not available
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "INVALID_DATE"
-                message: "Invalid date format for 'before' parameter"
-                statusCode: 400
-                nextAction: "Use ISO 8601 date format (YYYY-MM-DDTHH:mm:ssZ)"
+                error: "LOG_NOT_FOUND"
+                message: "Build logs not available. Deno Deploy may not be configured or no deployments found."
+                statusCode: 404
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '500':
+          $ref: '#/components/responses/Error'
 
-  /api/logs/stats:
+  /api/logs/search:
     get:
-      summary: Get logs statistics
+      summary: Search logs
+      description: >-
+        Searches log entries across all sources, or within a single source
+        when `source` is provided. Pagination metadata is returned in
+        `Content-Range` headers; the response is `206 Partial Content` when
+        the page does not contain every matching entry.
       tags:
         - Admin
       security:
         - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+          example: "error"
+        - name: source
+          in: query
+          schema:
+            type: string
+          description: Restrict the search to a single log source
+          example: "postgres.logs"
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
       responses:
         '200':
-          description: Logs statistics
+          $ref: '#/components/responses/SearchLogList'
+        '206':
+          $ref: '#/components/responses/SearchLogList'
+        '400':
+          description: Missing search query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "INVALID_INPUT"
+                message: "Search query parameter (q) is required"
+                statusCode: 400
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/logs/{source}:
+    get:
+      summary: Get logs from a source
+      description: >-
+        Returns recent log entries from a single system log source in
+        chronological order (oldest of the returned window first). Use
+        `before_timestamp` to page backwards through older entries.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: source
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Log source name as returned by `GET /api/logs/sources`
+          example: "postgres.logs"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+          description: Maximum number of log entries to return
+        - name: before_timestamp
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Only return entries older than this timestamp
+      responses:
+        '200':
+          description: Log entries from the source
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - logs
+                  - total
                 properties:
-                  actionStats:
+                  logs:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        action:
-                          type: string
-                        count:
-                          type: integer
-                  tableStats:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        table_name:
-                          type: string
-                        count:
-                          type: integer
-                  recentActivity:
+                      $ref: '#/components/schemas/Log'
+                  total:
                     type: integer
-                    description: Count of logs in last 24 hours
-                  totalLogs:
-                    type: integer
-                    description: Total number of logs
+                    description: >-
+                      Number of entries returned in this window (not a
+                      source-wide total; both storage providers report the
+                      fetched count).
               example:
-                actionStats:
-                  - action: "INSERT"
-                    count: 245
-                  - action: "UPDATE"
-                    count: 189
-                  - action: "DELETE"
-                    count: 34
-                  - action: "LOGIN"
-                    count: 567
-                tableStats:
-                  - table_name: "posts"
-                    count: 156
-                  - table_name: "comments"
-                    count: 223
-                recentActivity: 47
-                totalLogs: 1035
+                logs:
+                  - id: "log-123"
+                    eventMessage: "connection received: host=172.18.0.5"
+                    timestamp: "2024-01-21T10:30:00Z"
+                    body:
+                      metadata:
+                        level: "info"
+                total: 1
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '500':
+          $ref: '#/components/responses/Error'
 
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
-  
+      description: Project admin JWT or an API key passed as a Bearer token.
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 100
+      description: Maximum number of entries to return.
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        default: 0
+      description: >-
+        Number of entries to skip. Only honored by local log storage;
+        CloudWatch-backed deployments do not support offset pagination and
+        ignore this parameter, and their `Content-Range` total reflects the
+        fetched window rather than a source-wide count.
+
+  responses:
+    AuditLogList:
+      description: Audit log entries
+      headers:
+        Content-Range:
+          schema:
+            type: string
+          description: Range of entries returned, for example `0-99/1234`.
+        Preference-Applied:
+          schema:
+            type: string
+          description: Always the literal `count=exact`.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/AuditLog'
+          example:
+            - id: "123e4567-e89b-12d3-a456-426614174000"
+              actor: "project_admin"
+              action: "CREATE_TABLE"
+              module: "database"
+              details:
+                tableName: "posts"
+              ipAddress: "192.168.1.1"
+              createdAt: "2024-01-21T10:30:00Z"
+              updatedAt: "2024-01-21T10:30:00Z"
+            - id: "223e4567-e89b-12d3-a456-426614174001"
+              actor: "project_admin"
+              action: "UPLOAD_OBJECT"
+              module: "storage"
+              details: null
+              ipAddress: null
+              createdAt: "2024-01-21T10:29:00Z"
+              updatedAt: "2024-01-21T10:29:00Z"
+    SearchLogList:
+      description: Matching log entries
+      headers:
+        Content-Range:
+          schema:
+            type: string
+          description: Range of entries returned, for example `0-99/1234`.
+        Preference-Applied:
+          schema:
+            type: string
+          description: Always the literal `count=exact`.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              allOf:
+                - $ref: '#/components/schemas/Log'
+                - type: object
+                  required:
+                    - source
+                  properties:
+                    source:
+                      type: string
+                      description: Log source the entry came from
+          example:
+            - id: "log-123"
+              eventMessage: "ERROR: relation \"missing_table\" does not exist"
+              timestamp: "2024-01-21T10:30:00Z"
+              body:
+                metadata:
+                  level: "error"
+              source: "postgres.logs"
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
   schemas:
+    AuditLog:
+      type: object
+      required:
+        - id
+        - actor
+        - action
+        - module
+        - details
+        - ipAddress
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the audit entry
+        actor:
+          type: string
+          description: Who performed the action
+        action:
+          type: string
+          description: Action that was performed
+        module:
+          type: string
+          description: Module the action belongs to
+        details:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: Additional structured details about the action
+        ipAddress:
+          type: string
+          nullable: true
+          description: IP address the action originated from
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    LogSource:
+      type: object
+      required:
+        - id
+        - name
+        - token
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          description: Source name, used as the `{source}` path parameter
+          example: "postgres.logs"
+        token:
+          type: string
+          description: Provider-specific source token
+          example: "postgres-vector"
+
+    LogSourceStats:
+      type: object
+      required:
+        - source
+        - count
+        - lastActivity
+      properties:
+        source:
+          type: string
+          description: Log source name
+        count:
+          type: integer
+          description: >-
+            Number of entries in the source. CloudWatch-backed deployments
+            always report `0` here (the provider does not compute per-source
+            counts); local log storage counts up to the most recent 1000
+            entries, so sources with more entries report `1000`.
+        lastActivity:
+          type: string
+          format: date-time
+          description: Timestamp of the most recent entry
+
+    Log:
+      type: object
+      required:
+        - id
+        - eventMessage
+        - timestamp
+        - body
+      properties:
+        id:
+          type: string
+        eventMessage:
+          type: string
+          description: Human-readable log line
+        timestamp:
+          type: string
+          format: date-time
+        body:
+          type: object
+          additionalProperties: true
+          description: Structured log payload, including severity metadata
+
     ErrorResponse:
       type: object
       required:
@@ -211,12 +672,16 @@ components:
         error:
           type: string
           description: Error code for programmatic handling
+          example: "INVALID_INPUT"
         message:
           type: string
           description: Human-readable error message
+          example: "Invalid input data"
         statusCode:
           type: integer
           description: HTTP status code
-        nextAction:
+          example: 400
+        nextActions:
           type: string
           description: Suggested action to resolve the error
+          example: "Check the request body format"
