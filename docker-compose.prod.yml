@@ -2,7 +2,7 @@ services:
   postgres:
     image: ghcr.io/insforge/postgres:v15.13.4
 
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}'
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
