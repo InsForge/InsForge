@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS ai.quota_configs (
 );
 
 -- Trigger to auto-update updated_at
+DROP TRIGGER IF EXISTS update_ai_quota_configs_updated_at ON ai.quota_configs;
 CREATE TRIGGER update_ai_quota_configs_updated_at
   BEFORE UPDATE ON ai.quota_configs
   FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();

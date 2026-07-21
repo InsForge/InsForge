@@ -242,9 +242,9 @@ router.post(
             userRole,
             model: options.model,
             endpoint: 'chat/completion',
-            promptTokens: 0,
-            completionTokens: 0,
-            totalTokens: 0,
+            promptTokens: totalPromptTokens,
+            completionTokens: totalCompletionTokens,
+            totalTokens: totalTokensAccum,
             estimatedCostUsd: 0,
             status: 'error',
           });

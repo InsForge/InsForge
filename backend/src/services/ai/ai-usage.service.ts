@@ -90,7 +90,7 @@ export class AIUsageService {
     const startOfDay = new Date(now);
     startOfDay.setUTCHours(0, 0, 0, 0);
 
-    const startOfMonth = new Date(now.getUTCFullYear(), now.getUTCMonth(), 1);
+    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
     const result = await this.pool.query(
       `SELECT
@@ -172,7 +172,7 @@ export class AIUsageService {
         totalRequests: parseInt(row.totalRequests),
         totalTokens: parseInt(row.totalTokens),
         totalCostUsd: parseFloat(row.totalCostUsd),
-        lastRequestAt: row.lastRequestAt,
+        lastRequestAt: row.lastRequestAt instanceof Date ? row.lastRequestAt.toISOString() : row.lastRequestAt,
       })),
       total: parseInt(countResult.rows[0]?.total || '0'),
     };
