@@ -26,11 +26,6 @@ export function EmailTemplateCard({
   readOnly = false,
 }: EmailTemplateCardProps) {
   const { t } = useTranslation('chrome');
-  const templateTypes = useMemo(
-    () => templates.map((template) => template.templateType),
-    [templates]
-  );
-
   const templateInfo = useMemo<Record<string, { title: string; description: string }>>(
     () => ({
       'email-verification-code': {
@@ -50,15 +45,19 @@ export function EmailTemplateCard({
         }),
       },
       'reset-password-code': {
-        title: t('auth.resetPasswordCodeTitle', { defaultValue: 'Password Reset (Code)' }),
+        title: t('auth.resetPasswordCodeTitle', {
+          defaultValue: 'Reset Password (Code)',
+        }),
         description: t('auth.resetPasswordCodeDescription', {
-          defaultValue: 'Sent when a user requests a password reset with a 6-digit code.',
+          defaultValue: 'Sent when a user requests a password reset via code.',
         }),
       },
       'reset-password-link': {
-        title: t('auth.resetPasswordLinkTitle', { defaultValue: 'Password Reset (Link)' }),
+        title: t('auth.resetPasswordLinkTitle', {
+          defaultValue: 'Reset Password (Link)',
+        }),
         description: t('auth.resetPasswordLinkDescription', {
-          defaultValue: 'Sent when a user requests a password reset via a magic link.',
+          defaultValue: 'Sent when a user requests a password reset via magic link.',
         }),
       },
       'email-address-change-code': {
@@ -66,7 +65,7 @@ export function EmailTemplateCard({
           defaultValue: 'Email Address Change (Code)',
         }),
         description: t('auth.emailAddressChangeCodeDescription', {
-          defaultValue: 'Sent when a user changes their email address with a 6-digit code.',
+          defaultValue: 'Sent to the new email address to verify it via code.',
         }),
       },
       'email-address-change-link': {
@@ -74,11 +73,16 @@ export function EmailTemplateCard({
           defaultValue: 'Email Address Change (Link)',
         }),
         description: t('auth.emailAddressChangeLinkDescription', {
-          defaultValue: 'Sent when a user changes their email address via a magic link.',
+          defaultValue: 'Sent to the new email address to verify it via magic link.',
         }),
       },
     }),
     [t]
+  );
+
+  const templateTypes = useMemo(
+    () => Object.keys(templateInfo) as Array<keyof typeof templateInfo>,
+    [templateInfo]
   );
 
   const templateVariables = useMemo<
@@ -172,10 +176,25 @@ export function EmailTemplateCard({
   const [bodyHtml, setBodyHtml] = useState('');
   const [isDirty, setIsDirty] = useState(false);
 
-  const selectedTemplate = useMemo(
-    () => templates.find((template) => template.templateType === selectedType),
-    [templates, selectedType]
-  );
+  const selectedTemplate = useMemo(() => {
+    const dbTemplate = templates.find((template) => template.templateType === selectedType);
+    if (dbTemplate) {
+      return dbTemplate;
+    }
+
+    if (
+      selectedType &&
+      DEFAULT_EMAIL_TEMPLATES[selectedType as keyof typeof DEFAULT_EMAIL_TEMPLATES]
+    ) {
+      const def = DEFAULT_EMAIL_TEMPLATES[selectedType as keyof typeof DEFAULT_EMAIL_TEMPLATES];
+      return {
+        templateType: selectedType,
+        subject: def.subject,
+        bodyHtml: def.bodyHtml,
+      };
+    }
+    return null;
+  }, [templates, selectedType]);
 
   const resetToTemplate = useCallback(() => {
     if (selectedTemplate) {
