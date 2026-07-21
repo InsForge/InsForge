@@ -111,6 +111,8 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
 
     <Warning>
       **Desactivar** RLS elimina todo el filtrado a nivel de fila: cualquier rol con privilegios sobre la tabla (como `authenticated`, y `anon` donde se le haya concedido) puede leer y escribir todas las filas a través de la API de datos. Es preferible escribir políticas RLS antes que desactivar RLS. Las solicitudes de administrador hechas con la API Key (`ik_...`) omiten RLS de todos modos.
+
+      **Activar** RLS en una tabla que no tiene políticas aplica el rechazo por defecto de PostgreSQL: `anon` y `authenticated` pierden todo acceso a ella a través de la API de datos (se bloquea cada `SELECT`/`INSERT`/`UPDATE`/`DELETE`) hasta que agregues al menos una política. Crea las políticas que necesites antes de activar RLS, o justo después.
     </Warning>
   </Accordion>
 

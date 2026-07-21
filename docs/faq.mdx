@@ -111,6 +111,8 @@ description: "Answers to common InsForge questions on database calls, edge funct
 
     <Warning>
       Turning RLS **off** removes all row-level filtering: any role with table privileges (such as `authenticated`, and `anon` where granted) can read and write every row through the data API. Prefer writing RLS policies over disabling RLS. Admin requests made with the API Key (`ik_...`) bypass RLS either way.
+
+      Turning RLS **on** for a table that has no policies applies PostgreSQL's default-deny: `anon` and `authenticated` lose all access to it through the data API (every `SELECT`/`INSERT`/`UPDATE`/`DELETE` is blocked) until you add at least one policy. Add the policies you need before, or right after, enabling RLS.
     </Warning>
   </Accordion>
 

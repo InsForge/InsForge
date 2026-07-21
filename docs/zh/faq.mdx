@@ -111,6 +111,8 @@ description: "解答 InsForge 常见问题：数据库调用、Edge Function 与
 
     <Warning>
       **关闭** RLS 会移除所有行级过滤：任何拥有表权限的角色（比如 `authenticated`，以及被授权的 `anon`）都能通过数据 API 读写每一行。相比关闭 RLS，更推荐编写 RLS 策略。用 API Key（`ik_...`）发起的管理员请求本来就会绕过 RLS。
+
+      给一张没有任何策略的表**开启** RLS 会触发 PostgreSQL 的默认拒绝：在你至少加一条策略之前，`anon` 和 `authenticated` 通过数据 API 对它的所有访问都会被拒绝（每个 `SELECT`/`INSERT`/`UPDATE`/`DELETE` 都被拦下）。请在开启 RLS 之前，或紧接着，补上需要的策略。
     </Warning>
   </Accordion>
 
