@@ -159,7 +159,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SchedulesConfig'
+              $ref: '#/components/schemas/UpdateSchedulesConfigRequest'
       responses:
         '200':
           description: Configuration updated successfully
@@ -498,8 +498,10 @@ components:
           additionalProperties:
             type: string
         body:
-          type: object
           nullable: true
+          oneOf:
+            - type: string
+            - type: object
         cronJobId:
           type: string
           nullable: true
@@ -547,6 +549,17 @@ components:
       properties:
         retentionDays:
           type: integer
+          minimum: 1
+          nullable: true
+
+    UpdateSchedulesConfigRequest:
+      type: object
+      required:
+        - retentionDays
+      properties:
+        retentionDays:
+          type: integer
+          minimum: 1
           nullable: true
 
     CreateScheduleRequest:
