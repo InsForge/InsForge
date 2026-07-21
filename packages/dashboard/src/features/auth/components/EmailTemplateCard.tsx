@@ -14,6 +14,7 @@ interface EmailTemplateCardProps {
     options?: { onSuccess?: () => void }
   ) => void;
   senderEmail?: string;
+  readOnly?: boolean;
 }
 
 export function EmailTemplateCard({
@@ -22,6 +23,7 @@ export function EmailTemplateCard({
   isUpdating,
   onSave,
   senderEmail,
+  readOnly = false,
 }: EmailTemplateCardProps) {
   const { t } = useTranslation('chrome');
   const templateTypes = useMemo(
@@ -343,8 +345,10 @@ export function EmailTemplateCard({
           id="email-template-subject"
           type="text"
           value={subject}
-          onChange={(e) => handleSubjectChange(e.target.value)}
+          onChange={(e) => !readOnly && handleSubjectChange(e.target.value)}
           placeholder={t('auth.emailSubjectPlaceholder', { defaultValue: 'Email subject' })}
+          readOnly={readOnly}
+          className={readOnly ? 'bg-[var(--alpha-4)]' : ''}
         />
         {!subject.trim() && isDirty && (
           <p className="text-xs text-destructive">
@@ -368,11 +372,12 @@ export function EmailTemplateCard({
         {activeTab === 'source' ? (
           <textarea
             id="email-template-body"
-            className="min-h-[350px] w-full resize-y rounded bg-[var(--alpha-4)] border border-[var(--alpha-12)] px-3 py-2 font-mono text-xs leading-relaxed text-foreground transition-colors placeholder:text-muted-foreground hover:bg-[var(--alpha-8)] focus:outline-none focus:shadow-[0_0_0_1px_rgb(var(--inverse)),0_0_0_2px_rgb(var(--foreground))]"
+            className={`min-h-[350px] w-full resize-y rounded bg-[var(--alpha-4)] border border-[var(--alpha-12)] px-3 py-2 font-mono text-xs leading-relaxed text-foreground transition-colors placeholder:text-muted-foreground ${!readOnly ? 'hover:bg-[var(--alpha-8)] focus:outline-none focus:shadow-[0_0_0_1px_rgb(var(--inverse)),0_0_0_2px_rgb(var(--foreground))]' : ''}`}
             value={bodyHtml}
-            onChange={(e) => handleBodyChange(e.target.value)}
+            onChange={(e) => !readOnly && handleBodyChange(e.target.value)}
             placeholder={t('auth.enterHtmlTemplate', { defaultValue: 'Enter HTML template...' })}
             spellCheck={false}
+            readOnly={readOnly}
           />
         ) : (
           <div className="min-h-[350px] overflow-hidden rounded border border-[var(--alpha-12)] bg-white">
@@ -407,27 +412,34 @@ export function EmailTemplateCard({
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between border-t border-[var(--alpha-8)] pt-6 mt-6">
-        <Button type="button" variant="ghost" onClick={resetToDefaults} disabled={isUpdating}>
-          {t('auth.resetToDefaults', { defaultValue: 'Reset to defaults' })}
-        </Button>
-        <div className="flex items-center gap-2">
-          {isDirty && (
-            <Button type="button" variant="secondary" onClick={handleCancel} disabled={isUpdating}>
-              {t('auth.cancel', { defaultValue: 'Cancel' })}
-            </Button>
-          )}
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={isUpdating || !isDirty || !subject.trim() || !bodyHtml.trim()}
-          >
-            {isUpdating
-              ? t('auth.saving', { defaultValue: 'Saving...' })
-              : t('auth.saveChanges', { defaultValue: 'Save Changes' })}
+      {!readOnly && (
+        <div className="flex items-center justify-between border-t border-[var(--alpha-8)] pt-6 mt-6">
+          <Button type="button" variant="ghost" onClick={resetToDefaults} disabled={isUpdating}>
+            {t('auth.resetToDefaults', { defaultValue: 'Reset to defaults' })}
           </Button>
+          <div className="flex items-center gap-2">
+            {isDirty && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleCancel}
+                disabled={isUpdating}
+              >
+                {t('auth.cancel', { defaultValue: 'Cancel' })}
+              </Button>
+            )}
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={isUpdating || !isDirty || !subject.trim() || !bodyHtml.trim()}
+            >
+              {isUpdating
+                ? t('auth.saving', { defaultValue: 'Saving...' })
+                : t('auth.saveChanges', { defaultValue: 'Save Changes' })}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
