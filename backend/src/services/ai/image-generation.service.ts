@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 
+import { AtlasCloudProvider } from '@/providers/ai/atlascloud.provider.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import {
   ERROR_CODES,
@@ -11,6 +12,7 @@ import { OpenRouterImageMessage } from '@/types/ai.js';
 import { AppError } from '@/utils/errors.js';
 
 export class ImageGenerationService {
+  private static atlasCloudProvider = AtlasCloudProvider.getInstance();
   private static openRouterProvider = OpenRouterProvider.getInstance();
 
   /**
@@ -21,6 +23,10 @@ export class ImageGenerationService {
     const model = options.model;
 
     try {
+      if (AtlasCloudProvider.isAtlasCloudModel(model)) {
+        return await this.atlasCloudProvider.generateImage(options);
+      }
+
       // Build content for the message
       const userContent = options.images?.length
         ? [

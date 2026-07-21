@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { AtlasCloudProvider } from '@/providers/ai/atlascloud.provider.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import {
   ERROR_CODES,
@@ -61,6 +62,7 @@ interface MessageWithAnnotations {
 
 export class ChatCompletionService {
   private static instance: ChatCompletionService;
+  private atlasCloudProvider = AtlasCloudProvider.getInstance();
   private openRouterProvider = OpenRouterProvider.getInstance();
 
   private constructor() {}
@@ -215,6 +217,16 @@ export class ChatCompletionService {
     return plugins.length > 0 ? plugins : undefined;
   }
 
+  private ensureNoOpenRouterPluginsForAtlasCloud(options: ChatCompletionOptions): void {
+    if (options.webSearch?.enabled || options.fileParser?.enabled) {
+      throw new AppError(
+        'Web search and file parser plugins are only supported by OpenRouter models.',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+  }
+
   /**
    * Parse annotations from OpenRouter response to our format
    */
@@ -259,6 +271,58 @@ export class ChatCompletionService {
       const modelId = this.buildModelId(options.model, options.thinking);
 
       const formattedMessages = this.formatMessages(messages);
+
+      if (AtlasCloudProvider.isAtlasCloudModel(modelId)) {
+        this.ensureNoOpenRouterPluginsForAtlasCloud(options);
+        const request: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
+          model: AtlasCloudProvider.stripModelPrefix(modelId),
+          messages: formattedMessages,
+          temperature: options.temperature ?? 0.7,
+          max_tokens: options.maxTokens ?? 4096,
+          top_p: options.topP,
+          stream: false,
+          tools: options.tools,
+          tool_choice: options.toolChoice,
+          parallel_tool_calls: options.parallelToolCalls,
+        };
+        const { result: response } = await this.atlasCloudProvider.sendRequest((client) =>
+          client.chat.completions.create(request)
+        );
+
+        const tokenUsage = response.usage
+          ? {
+              promptTokens: response.usage.prompt_tokens,
+              completionTokens: response.usage.completion_tokens,
+              totalTokens: response.usage.total_tokens,
+            }
+          : undefined;
+        const rawToolCalls = response.choices[0]?.message?.tool_calls;
+        const toolCalls: ToolCall[] | undefined =
+          rawToolCalls && rawToolCalls.length > 0
+            ? rawToolCalls
+                .filter(
+                  (tc): tc is OpenAI.Chat.ChatCompletionMessageToolCall & { type: 'function' } =>
+                    tc.type === 'function'
+                )
+                .map((tc) => ({
+                  id: tc.id,
+                  type: 'function' as const,
+                  function: {
+                    name: tc.function.name,
+                    arguments: tc.function.arguments,
+                  },
+                }))
+            : undefined;
+
+        return {
+          text: response.choices[0]?.message?.content || '',
+          tool_calls: toolCalls,
+          metadata: {
+            model: modelId,
+            usage: tokenUsage,
+          },
+        };
+      }
 
       // Build request with optional plugins (web search, file parser)
       const request: OpenRouterChatCompletionRequest = {
@@ -356,9 +420,14 @@ export class ChatCompletionService {
 
       const formattedMessages = this.formatMessages(messages);
 
+      const isAtlasCloudModel = AtlasCloudProvider.isAtlasCloudModel(modelId);
+      if (isAtlasCloudModel) {
+        this.ensureNoOpenRouterPluginsForAtlasCloud(options);
+      }
+
       // Build request with optional plugins (web search, file parser)
       const request: OpenRouterChatCompletionStreamingRequest = {
-        model: modelId,
+        model: isAtlasCloudModel ? AtlasCloudProvider.stripModelPrefix(modelId) : modelId,
         messages: formattedMessages,
         temperature: options.temperature ?? 0.7,
         max_tokens: options.maxTokens ?? 4096,
@@ -370,14 +439,15 @@ export class ChatCompletionService {
         // provider then emits one final chunk with `choices: []` and the full token
         // usage. Without this, streaming requests report zero token usage.
         stream_options: { include_usage: true },
-        plugins: this.buildPlugins(options),
+        plugins: isAtlasCloudModel ? undefined : this.buildPlugins(options),
         tools: options.tools,
         tool_choice: options.toolChoice,
         parallel_tool_calls: options.parallelToolCalls,
       };
 
       // Send request with upstream error mapping
-      const { result: stream } = await this.openRouterProvider.sendRequest((client) =>
+      const provider = isAtlasCloudModel ? this.atlasCloudProvider : this.openRouterProvider;
+      const { result: stream } = await provider.sendRequest((client) =>
         client.chat.completions.create(request as OpenAI.Chat.ChatCompletionCreateParamsStreaming)
       );
 

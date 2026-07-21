@@ -15,51 +15,67 @@ describe('AIModelService', () => {
   });
 
   it('fetches the public OpenRouter catalog with all output modalities and caches it', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          data: [
-            {
-              id: 'openai/gpt-image',
-              created: 1767225600,
-              architecture: {
-                input_modalities: ['image', 'text'],
-                output_modalities: ['video', 'text', 'embeddings'],
-              },
-              pricing: {
-                prompt: '0.000001',
-                completion: '0.000002',
-                image: '0.02',
-              },
-            },
-            {
-              id: 'openai/whisper-large-v3',
-              created: 1777248000,
-              architecture: {
-                input_modalities: ['audio'],
-                output_modalities: ['transcription'],
-              },
-              pricing: {
-                prompt: '0.111',
-                completion: '0',
-              },
-            },
-            {
-              id: 'google/veo',
-              created: 1777334400,
-              architecture: {
-                input_modalities: ['text'],
-                output_modalities: ['video'],
-              },
-              pricing: {
-                prompt: '0.000001',
-                completion: '0',
-                request: '0.5',
-              },
-            },
-          ],
-        }),
+    mockFetch.mockImplementation((url: string) => {
+      if (url === 'https://openrouter.ai/api/v1/models?output_modalities=all') {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: [
+                {
+                  id: 'openai/gpt-image',
+                  created: 1767225600,
+                  architecture: {
+                    input_modalities: ['image', 'text'],
+                    output_modalities: ['video', 'text', 'embeddings'],
+                  },
+                  pricing: {
+                    prompt: '0.000001',
+                    completion: '0.000002',
+                    image: '0.02',
+                  },
+                },
+                {
+                  id: 'openai/whisper-large-v3',
+                  created: 1777248000,
+                  architecture: {
+                    input_modalities: ['audio'],
+                    output_modalities: ['transcription'],
+                  },
+                  pricing: {
+                    prompt: '0.111',
+                    completion: '0',
+                  },
+                },
+                {
+                  id: 'google/veo',
+                  created: 1777334400,
+                  architecture: {
+                    input_modalities: ['text'],
+                    output_modalities: ['video'],
+                  },
+                  pricing: {
+                    prompt: '0.000001',
+                    completion: '0',
+                    request: '0.5',
+                  },
+                },
+              ],
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [
+              { model: 'qwen/qwen3.5-flash', type: 'Text', created: 1780000000 },
+              { model: 'openai/gpt-image-2/text-to-image', type: 'Image' },
+              { model: 'openai/gpt-image-2/edit', type: 'Image' },
+              { model: 'openai/sora-2/text-to-video', type: 'Video' },
+            ],
+          }),
+      });
     });
 
     const [firstResult, secondResult] = await Promise.all([
@@ -67,7 +83,7 @@ describe('AIModelService', () => {
       AIModelService.getModels(),
     ]);
 
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(mockFetch).toHaveBeenCalledWith(
       'https://openrouter.ai/api/v1/models?output_modalities=all'
     );
@@ -109,6 +125,30 @@ describe('AIModelService', () => {
         inputPriceLabel: '$1.0 / M tokens',
         outputPriceLabel: undefined,
       },
+      {
+        id: 'atlascloud/openai/gpt-image-2/edit',
+        created: undefined,
+        modelId: 'atlascloud/openai/gpt-image-2/edit',
+        provider: 'atlascloud',
+        inputModality: ['text', 'image'],
+        outputModality: ['image'],
+      },
+      {
+        id: 'atlascloud/openai/gpt-image-2/text-to-image',
+        created: undefined,
+        modelId: 'atlascloud/openai/gpt-image-2/text-to-image',
+        provider: 'atlascloud',
+        inputModality: ['text'],
+        outputModality: ['image'],
+      },
+      {
+        id: 'atlascloud/qwen/qwen3.5-flash',
+        created: 1780000000,
+        modelId: 'atlascloud/qwen/qwen3.5-flash',
+        provider: 'atlascloud',
+        inputModality: ['text'],
+        outputModality: ['text'],
+      },
     ]);
   });
 
@@ -139,8 +179,9 @@ describe('AIModelService', () => {
       // 3. The next call should trigger a fresh fetch
       await AIModelService.getModels();
 
-      // 4. Since the first two shared a fetch, and the third triggered a new one, the total should be 2.
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      // 4. Since the first two shared a fetch, and the third triggered a fresh OpenRouter
+      // fetch plus an Atlas Cloud catalog fetch, the total should be 3.
+      expect(mockFetch).toHaveBeenCalledTimes(3);
     } finally {
       dateSpy.mockRestore();
     }
@@ -170,7 +211,7 @@ describe('AIModelService', () => {
     });
 
     const initialResult = await AIModelService.getModels();
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
 
     // 2. Advance time by 2 hours so cache becomes stale (TTL is 1 hour)
     const baseTime = Date.now();
@@ -186,7 +227,7 @@ describe('AIModelService', () => {
       // 4. Retrieve models again - should return stale cache instead of throwing
       const staleResult = await AIModelService.getModels();
       expect(staleResult).toEqual(initialResult);
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(3);
     } finally {
       // Restore Date.now mock
       dateSpy.mockRestore();
@@ -217,7 +258,7 @@ describe('AIModelService', () => {
     });
 
     const initialResult = await AIModelService.getModels();
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
 
     // 2. Advance time by 2 hours so cache becomes stale (TTL is 1 hour)
     const baseTime = Date.now();
@@ -230,7 +271,7 @@ describe('AIModelService', () => {
       // 4. Retrieve models again - should return stale cache instead of throwing
       const staleResult = await AIModelService.getModels();
       expect(staleResult).toEqual(initialResult);
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(3);
     } finally {
       // Restore Date.now mock
       dateSpy.mockRestore();

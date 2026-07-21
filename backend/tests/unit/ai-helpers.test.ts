@@ -211,6 +211,7 @@ describe('getProviderOrder', () => {
     expect(getProviderOrder('anthropic/claude-sonnet-4.6')).toBe(2);
     expect(getProviderOrder('google/gemini-2.5-pro')).toBe(3);
     expect(getProviderOrder('amazon/nova-pro-v2')).toBe(4);
+    expect(getProviderOrder('atlascloud/qwen/qwen3.5-flash')).toBe(5);
   });
 
   it('returns 999 for unknown providers', () => {
