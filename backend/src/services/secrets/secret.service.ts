@@ -7,9 +7,14 @@ import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { SecretSchema, CreateSecretRequest, ERROR_CODES } from '@insforge/shared-schemas';
 import { appConfig } from '@/infra/config/app.config.js';
 
-export interface CreateSecretInput extends CreateSecretRequest {
+export interface CreateSecretInput extends Omit<CreateSecretRequest, 'mode'> {
   isReserved?: boolean;
   expiresAt?: Date;
+}
+
+export interface StrictCreateSecretResult {
+  id: string;
+  disposition: 'created';
 }
 
 export interface UpdateSecretInput {
@@ -108,6 +113,53 @@ export class SecretService {
           `A secret named ${input.key} already exists in this project. Update or delete it in the Secrets tab, or use a different name.`
         );
       }
+      throw new Error('Failed to create secret');
+    }
+  }
+
+  /**
+   * Create a secret only when its key has never been used.
+   *
+   * Unlike createSecret(), this method intentionally does not revive an
+   * inactive row. The single INSERT relies on UNIQUE(key), so active rows,
+   * tombstoned rows, and concurrent creators all share the same atomic
+   * create-if-absent boundary.
+   */
+  async createSecretStrict(
+    input: CreateSecretInput,
+    client?: PoolClient
+  ): Promise<StrictCreateSecretResult> {
+    try {
+      const encryptedValue = EncryptionManager.encrypt(input.value);
+      const executor = client ?? this.getPool();
+      const result = await executor.query(
+        `INSERT INTO system.secrets (key, value_ciphertext, is_reserved, expires_at)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (key) DO NOTHING
+         RETURNING id`,
+        [input.key, encryptedValue, input.isReserved || false, input.expiresAt || null]
+      );
+
+      if (!result.rows.length) {
+        throw new AppError(
+          `Secret already exists: ${input.key}`,
+          409,
+          ERROR_CODES.SECRET_ALREADY_EXISTS,
+          `A secret named ${input.key} already exists in this project. Strict create never reactivates or replaces an existing name.`
+        );
+      }
+
+      logger.info('Secret created in strict mode', {
+        id: result.rows[0].id,
+        key: input.key,
+        disposition: 'created',
+      });
+      return { id: result.rows[0].id, disposition: 'created' };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      logger.error('Failed to create secret in strict mode', { error, key: input.key });
       throw new Error('Failed to create secret');
     }
   }

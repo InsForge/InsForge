@@ -16,13 +16,28 @@ export const getSecretValueResponseSchema = z.object({
 export const createSecretRequestSchema = z.object({
   key: z.string().regex(/^[A-Z0-9_]+$/, 'Use uppercase letters, numbers, and underscores only'),
   value: z.string().min(1, 'Value is required'),
+  mode: z.literal('strict').optional(),
 });
 
-export const createSecretResponseSchema = z.object({
+export const legacyCreateSecretResponseSchema = z.object({
   success: z.literal(true),
   message: z.string(),
   id: z.string(),
 });
+
+export const strictCreateSecretResponseSchema = z.object({
+  success: z.literal(true),
+  message: z.string(),
+  id: z.string(),
+  disposition: z.literal('created'),
+  operationId: z.string().uuid(),
+  auditId: z.string(),
+});
+
+export const createSecretResponseSchema = z.union([
+  strictCreateSecretResponseSchema,
+  legacyCreateSecretResponseSchema,
+]);
 
 export const updateSecretResponseSchema = z.object({
   success: z.literal(true),
