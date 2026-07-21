@@ -1,6 +1,8 @@
 services:
   postgres:
     image: ghcr.io/insforge/postgres:v15.13.4
+    # Dev only: falls back to JWT_SECRET for local development convenience.
+    # Production deployments (docker-compose.prod.yml) require ENCRYPTION_KEY explicitly.
     command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET}}'
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
