@@ -128,4 +128,48 @@ describe('ChatCompletionService - formatMessages', () => {
       'Tool message is missing required tool_call_id'
     );
   });
+  it('normalizes a tool result sent as content parts into plain text', () => {
+    const messages: ChatMessageSchema[] = [
+      {
+        role: 'tool',
+        content: [{ type: 'text', text: '22°C and sunny' }],
+        tool_call_id: 'call_abc123',
+      },
+    ];
+
+    const result = service.formatMessages(messages);
+
+    // Previously JSON.stringify'd, so the model was told the tool returned the
+    // literal string [{"type":"text","text":"22°C and sunny"}].
+    expect(result[0].content).toBe('22°C and sunny');
+  });
+
+  it('joins multiple text parts of a tool result', () => {
+    const messages: ChatMessageSchema[] = [
+      {
+        role: 'tool',
+        content: [
+          { type: 'text', text: '22°C' },
+          { type: 'text', text: ' and sunny' },
+        ],
+        tool_call_id: 'call_abc123',
+      },
+    ];
+
+    const result = service.formatMessages(messages);
+
+    expect(result[0].content).toBe('22°C and sunny');
+  });
+
+  it('represents an absent tool result as an empty string, not the word "null"', () => {
+    const messages: ChatMessageSchema[] = [
+      { role: 'tool', content: null, tool_call_id: 'call_abc123' },
+    ];
+
+    const result = service.formatMessages(messages);
+
+    // JSON.stringify(null) produced the literal string "null", telling the model
+    // the tool returned the word null.
+    expect(result[0].content).toBe('');
+  });
 });

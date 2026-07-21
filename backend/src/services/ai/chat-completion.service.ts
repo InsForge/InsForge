@@ -99,7 +99,7 @@ export class ChatCompletionService {
         }
         formattedMessages.push({
           role: 'tool',
-          content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+          content: this.toToolContentText(msg.content),
           tool_call_id: msg.tool_call_id,
         } as OpenAI.Chat.ChatCompletionToolMessageParam);
         continue;
@@ -140,6 +140,23 @@ export class ChatCompletionService {
     }
 
     return formattedMessages;
+  }
+
+  /**
+   * Normalize a tool result into the plain string a tool message has to carry.
+   * The schema accepts `content` as a string, as OpenAI-style content parts, or as
+   * null, and JSON-stringifying the latter two handed the model a raw JSON blob —
+   * or the literal word "null" — in place of the tool's output. Only text parts
+   * have a representation in a tool message, so only they contribute.
+   */
+  private toToolContentText(content: ChatMessageSchema['content']): string {
+    if (typeof content === 'string') {
+      return content;
+    }
+    if (!Array.isArray(content)) {
+      return '';
+    }
+    return content.map((part) => (part.type === 'text' ? part.text : '')).join('');
   }
 
   /**
