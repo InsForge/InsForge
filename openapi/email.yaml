@@ -13,6 +13,7 @@ paths:
         - Client
       security:
         - bearerAuth: []
+        - apiKey: []
       requestBody:
         required: true
         content:
@@ -57,6 +58,10 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
 
   schemas:
     SendRawEmailRequest:
