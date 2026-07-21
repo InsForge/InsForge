@@ -1,8 +1,9 @@
-import express, { type ErrorRequestHandler } from 'express';
+import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { AppError } from '../../src/utils/errors.js';
+import { errorMiddleware } from '../../src/api/middlewares/error.js';
 
 const chatServiceMock = vi.hoisted(() => ({ streamChat: vi.fn(), chat: vi.fn() }));
 
@@ -47,28 +48,20 @@ vi.mock('../../src/services/logs/audit.service.js', () => ({
   AuditService: { getInstance: () => ({ log: vi.fn() }) },
 }));
 
-const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
-  void _next;
-  const statusCode =
-    error instanceof Error && 'statusCode' in error && typeof error.statusCode === 'number'
-      ? error.statusCode
-      : 500;
-  const code =
-    error instanceof Error && 'code' in error && typeof error.code === 'string'
-      ? error.code
-      : undefined;
-  res.status(statusCode).json({
-    message: error instanceof Error ? error.message : 'Error',
-    ...(code ? { code } : {}),
-  });
-};
+vi.mock('../../src/utils/logger.js', () => ({
+  default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+  logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+}));
 
+// Mount the real production error middleware rather than a stand-in, so these
+// tests assert the actual error-response contract clients receive
+// ({ error, message, statusCode }) and not a shape invented by the test.
 async function createApp() {
   const { aiRouter } = await import('../../src/api/routes/ai/index.routes.js');
   const app = express();
   app.use(express.json());
   app.use('/api/ai', aiRouter);
-  app.use(errorHandler);
+  app.use(errorMiddleware);
   return app;
 }
 
@@ -114,7 +107,9 @@ describe('POST /api/ai/chat/completion - streaming error status', () => {
     // Regression guard: this used to flush a 200 with an SSE error frame, so a
     // client checking `response.ok` read a billing failure as success.
     expect(response.status).toBe(402);
-    expect(response.body.code).toBe(ERROR_CODES.BILLING_INSUFFICIENT_BALANCE);
+    expect(response.body.error).toBe(ERROR_CODES.BILLING_INSUFFICIENT_BALANCE);
+    expect(response.body.statusCode).toBe(402);
+    expect(response.headers['content-type']).toContain('application/json');
     expect(response.text).not.toContain('data: ');
   });
 
@@ -130,7 +125,8 @@ describe('POST /api/ai/chat/completion - streaming error status', () => {
       .send(streamingRequest);
 
     expect(response.status).toBe(429);
-    expect(response.body.code).toBe(ERROR_CODES.RATE_LIMITED);
+    expect(response.body.error).toBe(ERROR_CODES.RATE_LIMITED);
+    expect(response.body.statusCode).toBe(429);
   });
 
   it('falls back to 500 for a non-AppError failure before streaming starts', async () => {
@@ -141,6 +137,7 @@ describe('POST /api/ai/chat/completion - streaming error status', () => {
       .send(streamingRequest);
 
     expect(response.status).toBe(500);
+    expect(response.body.error).toBe(ERROR_CODES.INTERNAL_ERROR);
     expect(response.body.message).toBe('socket hang up');
   });
 
