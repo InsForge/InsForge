@@ -189,7 +189,7 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     npx @insforge/cli db connection-string
     ```
 
-    También puedes obtenerla desde el dashboard, en **Install → Connection String** (solo para proyectos cloud).
+    También puedes obtenerla desde el dashboard, en **Project Settings → Connect → Connection String** (solo para proyectos cloud).
 
     Devuelve una URL con esta forma:
 
@@ -203,13 +203,9 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
   </Accordion>
 
   <Accordion title="¿Cómo doy de baja o elimino un sitio desplegado?">
-    Un [Site](/core-concepts/sites/overview) pertenece a su proyecto: no hay un comando aparte para "eliminar este despliegue". Para dar de baja un sitio de forma definitiva, elimina el proyecto en el que vive, lo que quita el despliegue junto con la base de datos, el Storage y todo lo demás:
+    Por ahora no hay una forma autoservicio de dar de baja un [Site](/core-concepts/sites/overview) desplegado: no existe un comando `deployments delete` ni una acción en el dashboard para ello. Los sitios desplegados se alojan de forma externa, así que incluso eliminar tu proyecto (`npx @insforge/cli projects delete --project <id>`) borra tus recursos de backend —base de datos, Storage y backend branches— pero *no* quita el sitio alojado.
 
-    ```bash
-    npx @insforge/cli projects delete --project <id>
-    ```
-
-    Es irreversible. Desde el dashboard, la eliminación del proyecto está en **Settings → General**. Consulta [el CLI harness](/agent-native/cli-harness) para conocer el comportamiento completo de `projects delete` y sus salvaguardas.
+    En la práctica esto rara vez importa. Si de verdad necesitas dar de baja un sitio desplegado, escríbele al equipo de InsForge en [Discord](https://discord.com/invite/DvBtaEc9Jz).
 
     Dos acciones relacionadas que *no* son lo mismo que eliminar un sitio en vivo:
 

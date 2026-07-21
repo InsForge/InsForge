@@ -189,7 +189,7 @@ description: "Answers to common InsForge questions on database calls, edge funct
     npx @insforge/cli db connection-string
     ```
 
-    You can also grab it from the dashboard under **Install → Connection String** (cloud projects only).
+    You can also grab it from the dashboard under **Project Settings → Connect → Connection String** (cloud projects only).
 
     It returns a URL shaped like:
 
@@ -203,13 +203,9 @@ description: "Answers to common InsForge questions on database calls, edge funct
   </Accordion>
 
   <Accordion title="How do I take down or remove a deployed site?">
-    A [Site](/core-concepts/sites/overview) belongs to its project — there is no separate "delete this deployment" command. To take a site down for good, delete the project it lives in, which removes the deployment along with the database, storage, and everything else:
+    There's currently no self-serve way to take down a deployed [Site](/core-concepts/sites/overview) — there's no `deployments delete` command and no dashboard action for it. Deployed sites are hosted externally, so even deleting your project (`npx @insforge/cli projects delete --project <id>`) tears down your backend resources — database, storage, and backend branches — but does *not* remove the hosted site.
 
-    ```bash
-    npx @insforge/cli projects delete --project <id>
-    ```
-
-    This is irreversible. From the dashboard, project deletion lives under **Settings → General**. See [the CLI harness](/agent-native/cli-harness) for the full `projects delete` behavior and safeguards.
+    In practice this rarely matters. If you do need a deployed site taken down, ask the InsForge team in [Discord](https://discord.com/invite/DvBtaEc9Jz).
 
     Two related actions that are *not* the same as removing a live site:
 

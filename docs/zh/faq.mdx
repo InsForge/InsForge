@@ -189,7 +189,7 @@ description: "解答 InsForge 常见问题：数据库调用、Edge Function 与
     npx @insforge/cli db connection-string
     ```
 
-    你也可以在 dashboard 里拿到：进入 **Install → Connection String**（仅限 cloud 项目）。
+    你也可以在 dashboard 里拿到：进入 **Project Settings → Connect → Connection String**（仅限 cloud 项目）。
 
     它返回的 URL 形如：
 
@@ -203,13 +203,9 @@ description: "解答 InsForge 常见问题：数据库调用、Edge Function 与
   </Accordion>
 
   <Accordion title="怎么下线或删除已部署的站点（site）？">
-    [Site](/core-concepts/sites/overview) 属于它所在的项目——没有单独的"删除这个部署"命令。想彻底下线一个站点，就删除它所在的项目，这会连同数据库、Storage 以及其他所有资源一起把部署删掉：
+    目前没有自助下线已部署 [Site](/core-concepts/sites/overview) 的方式——既没有 `deployments delete` 命令，dashboard 里也没有对应操作。已部署的站点托管在外部，所以即使删除项目（`npx @insforge/cli projects delete --project <id>`）也只会清掉后端资源——数据库、Storage 和后端分支——而*不会*移除已托管的站点。
 
-    ```bash
-    npx @insforge/cli projects delete --project <id>
-    ```
-
-    此操作不可逆。在 dashboard 里，删除项目位于 **Settings → General**。完整的 `projects delete` 行为和防护措施见 [CLI harness](/agent-native/cli-harness)。
+    实际上这基本不影响使用。如果你确实需要下线某个已部署的站点，请到 [Discord](https://discord.com/invite/DvBtaEc9Jz) 联系 InsForge 团队。
 
     有两个相关操作，和"下线一个已上线站点"并不是一回事：
 
