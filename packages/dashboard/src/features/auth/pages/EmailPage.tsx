@@ -35,12 +35,21 @@ export default function EmailPage() {
           <div className="rounded-lg border border-[var(--alpha-8)] bg-[rgb(var(--info-1)_/_0.5)] p-4 flex gap-3 text-info">
             <Info className="h-5 w-5 shrink-0" />
             <div className="text-sm leading-relaxed">
-              <p className="font-medium">Default templates are read-only</p>
+              <p className="font-medium">
+                {t('auth.defaultTemplatesReadOnlyTitle', {
+                  defaultValue: 'Default templates are read-only',
+                })}
+              </p>
               <p className="mt-0.5 opacity-90">
-                You are currently using the InsForge default email provider. To customize the
-                appearance and content of your authentication emails, you must configure a{' '}
-                <Link to="/auth/smtp" className="underline hover:text-info-hover">
-                  Custom SMTP provider
+                {t('auth.defaultTemplatesReadOnlyDescription', {
+                  defaultValue:
+                    'You are currently using the InsForge default email provider. To customize the appearance and content of your authentication emails, you must configure a',
+                })}{' '}
+                <Link
+                  to="/dashboard/authentication/custom-smtp"
+                  className="underline hover:text-info-hover"
+                >
+                  {t('auth.customSmtpProvider', { defaultValue: 'Custom SMTP provider' })}
                 </Link>
                 .
               </p>
