@@ -300,4 +300,35 @@ describe('ModelGatewayConfigService', () => {
       cause: conflict,
     } satisfies Partial<ModelGatewayConfigUpdateError>);
   });
+  it('ignores an in-flight credential read that resolves after an update invalidated the cache', async () => {
+    const secretStore = createSecretStore();
+    secretStore.listSecrets.mockResolvedValue([{ id: 'api-id', key: 'OPENROUTER_API_KEY' }]);
+    secretStore.updateSecret.mockResolvedValue(true);
+
+    // Hold the first read open so it settles only after updateConfig has cleared
+    // and refilled the cache — the interleaving a slow secret-store read produces
+    // under connection-pool contention.
+    let releaseStaleRead!: (value: string) => void;
+    const staleRead = new Promise<string>((resolve) => {
+      releaseStaleRead = resolve;
+    });
+    secretStore.getSecretByKey
+      .mockImplementationOnce(() => staleRead)
+      .mockImplementation(() => Promise.resolve('new-api-key'));
+
+    const service = new ModelGatewayConfigService(
+      secretStore as unknown as ConfigServiceSecretStore
+    );
+
+    const inFlightRead = service.getApiKey();
+    await service.updateConfig({ apiKey: 'new-api-key' });
+
+    releaseStaleRead('old-api-key');
+    // The read itself still returns what it fetched; that is not what regressed.
+    await expect(inFlightRead).resolves.toBe('old-api-key');
+
+    // It must not have written that pre-update value back over the fresh cache,
+    // which would serve the revoked key for a further TTL window.
+    await expect(service.getApiKey()).resolves.toBe('new-api-key');
+  });
 });
