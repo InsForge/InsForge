@@ -207,7 +207,7 @@ description: "解答 InsForge 常见问题：数据库调用、Edge Function 与
 
     实际上这基本不影响使用。如果你确实需要下线某个已部署的站点，请到 [Discord](https://discord.com/invite/DvBtaEc9Jz) 联系 InsForge 团队。
 
-    有两个相关操作，和"下线一个已上线站点"并不是一回事：
+    有两个相关操作，和「下线一个已上线站点」并不是一回事：
 
     - **取消还在跑的构建：** `npx @insforge/cli deployments cancel <id>` 会终止一个进行中的部署；它不会下线一个已经上线的站点。
     - **替换当前上线的内容：** 用 `npx @insforge/cli deployments deploy ./frontend` 在同一个站点上重新部署——最新一次 ready 的部署会接管这个 URL。
