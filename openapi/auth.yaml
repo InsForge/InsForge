@@ -363,12 +363,28 @@ paths:
                 statusCode: 403
         '409':
           description: User already exists
+        '429':
+          description: User created, but verification email delivery was rate limited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: AUTH_VERIFICATION_EMAIL_DELIVERY_FAILED
+                message: The user account was created, but the verification email could not be sent.
+                statusCode: 429
+                nextActions: The user account already exists. Retry delivery with POST /api/auth/email/send-verification instead of registering again.
         '500':
           description: User created, but the verification email could not be sent
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: AUTH_VERIFICATION_EMAIL_DELIVERY_FAILED
+                message: The user account was created, but the verification email could not be sent.
+                statusCode: 500
+                nextActions: The user account already exists. Retry delivery with POST /api/auth/email/send-verification instead of registering again.
 
     get:
       summary: List all users (admin only)

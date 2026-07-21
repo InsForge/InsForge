@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockPool, mockClient, mockAppConfig } = vi.hoisted(() => ({
+const { mockPool, mockClient, mockAppConfig, mockIsCloudEnvironment } = vi.hoisted(() => ({
   mockPool: {
     connect: vi.fn(),
   },
@@ -12,6 +12,7 @@ const { mockPool, mockClient, mockAppConfig } = vi.hoisted(() => ({
     app: { jwtSecret: 'test-secret' },
     cloud: { projectId: undefined as string | undefined },
   },
+  mockIsCloudEnvironment: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock('../../src/infra/database/database.manager', () => ({
@@ -24,6 +25,10 @@ vi.mock('../../src/infra/database/database.manager', () => ({
 
 vi.mock('../../src/infra/config/app.config', () => ({
   appConfig: mockAppConfig,
+}));
+
+vi.mock('../../src/utils/environment', () => ({
+  isCloudEnvironment: mockIsCloudEnvironment,
 }));
 
 vi.mock('../../src/utils/logger', () => ({
@@ -67,6 +72,7 @@ describe('SmtpConfigService email verification invariant', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAppConfig.cloud.projectId = undefined;
+    mockIsCloudEnvironment.mockReturnValue(false);
     mockPool.connect.mockResolvedValue(mockClient);
     Reflect.set(SmtpConfigService, 'instance', undefined);
     service = SmtpConfigService.getInstance();
@@ -107,6 +113,7 @@ describe('SmtpConfigService email verification invariant', () => {
 
   it('allows disabling SMTP when the managed cloud provider is available', async () => {
     mockAppConfig.cloud.projectId = 'cloud-project-id';
+    mockIsCloudEnvironment.mockReturnValue(true);
     mockClient.query.mockImplementation(async (query: string) => {
       if (query.includes('SELECT id, password_encrypted FROM email.config')) {
         return {
@@ -121,12 +128,48 @@ describe('SmtpConfigService email verification invariant', () => {
       if (query.includes('UPDATE email.config')) {
         return { rows: [disabledRow] };
       }
+      if (query.includes('require_email_verification')) {
+        throw new Error('Cloud provider path must not query auth email verification state');
+      }
       return { rows: [] };
     });
 
     const result = await service.upsertSmtpConfig(disabledInput);
 
     expect(result.enabled).toBe(false);
+    expect(
+      mockClient.query.mock.calls.some(
+        (call: unknown[]) =>
+          typeof call[0] === 'string' && call[0].includes('require_email_verification')
+      )
+    ).toBe(false);
+  });
+
+  it('does not treat PROJECT_ID as a managed provider in self-hosted mode', async () => {
+    mockAppConfig.cloud.projectId = 'self-hosted-integration-project';
+    mockClient.query.mockImplementation(async (query: string) => {
+      if (query.includes('SELECT id, password_encrypted FROM email.config')) {
+        return {
+          rows: [
+            {
+              id: 'b04553ba-5572-4012-a157-3d8dce0f7938',
+              password_encrypted: 'encrypted-password',
+            },
+          ],
+        };
+      }
+      if (query.includes('require_email_verification')) {
+        return { rows: [{ require_email_verification: true }] };
+      }
+      if (query.includes('UPDATE email.config')) {
+        return { rows: [disabledRow] };
+      }
+      return { rows: [] };
+    });
+
+    await expect(service.upsertSmtpConfig(disabledInput)).rejects.toMatchObject({
+      code: 'EMAIL_PROVIDER_NOT_CONFIGURED',
+    });
   });
 
   it('allows disabling SMTP when email verification is not required', async () => {

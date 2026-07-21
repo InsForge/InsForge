@@ -106,8 +106,11 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   const isCloudProject = isInsForgeCloudProject();
   const [activeSection, setActiveSection] = useState<AuthSettingsSection>('general');
   const { config, isLoading, isUpdating, updateConfig } = useAuthConfig();
-  const { config: smtpConfig } = useSmtpConfig();
-  const canConfigureEmailVerification = isCloudProject || smtpConfig?.enabled === true;
+  const { config: smtpConfig } = useSmtpConfig({ enabled: open && !isCloudProject });
+  const hasEmailProvider = isCloudProject || smtpConfig?.enabled === true;
+  const isEmailVerificationRecoveryRequired =
+    !hasEmailProvider && config?.requireEmailVerification === true;
+  const canAccessEmailVerification = hasEmailProvider || isEmailVerificationRecoveryRequired;
   const { showToast } = useToast();
 
   const form = useForm<UpdateAuthConfigRequest>({
@@ -220,7 +223,11 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
     return t('auth.general', { defaultValue: 'General' });
   }, [activeSection, t]);
 
-  const saveDisabled = !form.formState.isDirty || !form.formState.isValid || isUpdating;
+  const saveDisabled =
+    !form.formState.isDirty ||
+    !form.formState.isValid ||
+    isUpdating ||
+    (!hasEmailProvider && requireEmailVerification);
 
   return (
     <MenuDialog open={open} onOpenChange={handleOpenChange}>
@@ -240,7 +247,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
               >
                 {t('auth.general', { defaultValue: 'General' })}
               </MenuDialogNavItem>
-              {canConfigureEmailVerification && (
+              {canAccessEmailVerification && (
                 <MenuDialogNavItem
                   icon={<Mail className="h-5 w-5" />}
                   active={activeSection === 'email-verification'}
@@ -368,15 +375,23 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
 
                 {activeSection === 'email-verification' && (
                   <>
-                    {!canConfigureEmailVerification ? (
+                    {!canAccessEmailVerification ? (
                       <p className="text-sm text-muted-foreground">
-                        {t('auth.emailVerificationCloudOnly', {
+                        {t('auth.emailVerificationProviderRequired', {
                           defaultValue:
-                            'Email verification settings are available for InsForge Cloud projects only.',
+                            'Email verification settings require InsForge Cloud or enabled custom SMTP.',
                         })}
                       </p>
                     ) : (
                       <>
+                        {isEmailVerificationRecoveryRequired && (
+                          <p className="text-sm text-destructive">
+                            {t('auth.emailVerificationRecoveryRequired', {
+                              defaultValue:
+                                'No email provider is available. Turn off required email verification before saving, or enable custom SMTP.',
+                            })}
+                          </p>
+                        )}
                         <SettingRow
                           label={t('auth.requireEmailVerificationLabel', {
                             defaultValue: 'Require Email Verification',
@@ -392,6 +407,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                             render={({ field }) => (
                               <Switch
                                 checked={field.value}
+                                disabled={!hasEmailProvider && field.value === false}
                                 onCheckedChange={(value) => {
                                   field.onChange(value);
                                 }}

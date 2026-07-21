@@ -11,7 +11,7 @@ InsForge Messaging sends transactional notifications from your project: receipts
 </Note>
 
 <Warning>
-  **Self-hosting?** The managed InsForge Cloud sender is only available to cloud-linked projects. On a self-hosted instance you must configure [Custom SMTP](/core-concepts/messaging/custom-smtp) before any email can send, auth emails included. InsForge rejects enabling required email verification until a provider is available, and it prevents disabling the only SMTP provider while verification remains required. If a verification email fails at runtime, registration returns an error with instructions to retry through the verification-email endpoint.
+  **Self-hosting?** The managed InsForge Cloud sender is only available to cloud-linked projects. On a self-hosted instance you must configure [Custom SMTP](/core-concepts/messaging/custom-smtp) before any email can send, auth emails included. InsForge rejects enabling required email verification until a provider is available, and it prevents disabling the only SMTP provider while verification remains required. If a verification email fails at runtime, registration returns an error with instructions to retry with `POST /api/auth/email/send-verification`.
 </Warning>
 
 ```mermaid

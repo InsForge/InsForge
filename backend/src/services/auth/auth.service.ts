@@ -248,13 +248,12 @@ export class AuthService {
           await this.sendVerificationEmailWithCode(email);
         }
       } catch (error) {
-        const statusCode = error instanceof AppError ? error.statusCode : 500;
-        const code = error instanceof AppError ? error.code : ERROR_CODES.INTERNAL_ERROR;
+        const statusCode = error instanceof AppError && error.statusCode === 429 ? 429 : 500;
         logger.error('Verification email send failed during registration', { email, error });
         throw new AppError(
           'The user account was created, but the verification email could not be sent.',
           statusCode,
-          code,
+          ERROR_CODES.AUTH_VERIFICATION_EMAIL_DELIVERY_FAILED,
           NEXT_ACTIONS.RESEND_VERIFICATION_EMAIL
         );
       }

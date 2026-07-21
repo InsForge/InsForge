@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import '#lib/i18n';
@@ -22,6 +22,7 @@ const authSettingsMocks = vi.hoisted(() => ({
   },
   isCloudProject: false,
   smtpEnabled: false,
+  smtpQueryEnabled: undefined as boolean | undefined,
   showToast: vi.fn(),
   updateConfig: vi.fn(),
 }));
@@ -36,9 +37,12 @@ vi.mock('#features/auth/hooks/useAuthConfig', () => ({
 }));
 
 vi.mock('#features/auth/hooks/useSmtpConfig', () => ({
-  useSmtpConfig: () => ({
-    config: { enabled: authSettingsMocks.smtpEnabled },
-  }),
+  useSmtpConfig: ({ enabled }: { enabled?: boolean } = {}) => {
+    authSettingsMocks.smtpQueryEnabled = enabled;
+    return {
+      config: { enabled: authSettingsMocks.smtpEnabled },
+    };
+  },
 }));
 
 vi.mock('#lib/utils/utils', () => ({
@@ -60,6 +64,8 @@ describe('AuthSettingsMenuDialog', () => {
   afterEach(() => {
     authSettingsMocks.isCloudProject = false;
     authSettingsMocks.smtpEnabled = false;
+    authSettingsMocks.smtpQueryEnabled = undefined;
+    authSettingsMocks.authConfig.requireEmailVerification = false;
     authSettingsMocks.showToast.mockReset();
     authSettingsMocks.updateConfig.mockReset();
   });
@@ -69,6 +75,8 @@ describe('AuthSettingsMenuDialog', () => {
     authSettingsMocks.smtpEnabled = true;
 
     render(<AuthSettingsMenuDialog open onOpenChange={vi.fn()} />);
+
+    expect(authSettingsMocks.smtpQueryEnabled).toBe(true);
 
     await user.click(screen.getByRole('button', { name: 'Email Verification' }));
 
@@ -88,5 +96,41 @@ describe('AuthSettingsMenuDialog', () => {
     render(<AuthSettingsMenuDialog open onOpenChange={vi.fn()} />);
 
     expect(screen.getByRole('button', { name: 'Email Verification' })).toBeInTheDocument();
+    expect(authSettingsMocks.smtpQueryEnabled).toBe(false);
+  });
+
+  it('does not query SMTP while the settings dialog is closed', () => {
+    render(<AuthSettingsMenuDialog open={false} onOpenChange={vi.fn()} />);
+
+    expect(authSettingsMocks.smtpQueryEnabled).toBe(false);
+  });
+
+  it('allows recovering an existing required-verification state without a provider', async () => {
+    const user = userEvent.setup();
+    authSettingsMocks.authConfig.requireEmailVerification = true;
+
+    render(<AuthSettingsMenuDialog open onOpenChange={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Email Verification' }));
+
+    expect(
+      screen.getByText(
+        'No email provider is available. Turn off required email verification before saving, or enable custom SMTP.'
+      )
+    ).toBeInTheDocument();
+
+    const verificationSwitch = screen.getByRole('switch');
+    expect(verificationSwitch).toBeChecked();
+    await user.click(verificationSwitch);
+    expect(verificationSwitch).not.toBeChecked();
+    expect(verificationSwitch).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() =>
+      expect(authSettingsMocks.updateConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ requireEmailVerification: false })
+      )
+    );
   });
 });

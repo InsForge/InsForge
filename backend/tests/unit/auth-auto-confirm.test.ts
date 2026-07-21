@@ -141,6 +141,8 @@ vi.mock('../../src/infra/config/app.config', () => {
 });
 
 import { AuthService } from '../../src/services/auth/auth.service';
+import { AppError } from '../../src/utils/errors';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 describe('AuthService.register – autoConfirm', () => {
   let authService: AuthService;
@@ -252,6 +254,8 @@ describe('AuthService.register – autoConfirm', () => {
       authService.register('test@example.com', 'password123', 'Test')
     ).rejects.toMatchObject({
       message: 'The user account was created, but the verification email could not be sent.',
+      statusCode: 500,
+      code: 'AUTH_VERIFICATION_EMAIL_DELIVERY_FAILED',
       nextActions:
         'The user account already exists. Retry delivery with POST /api/auth/email/send-verification instead of registering again.',
     });
@@ -260,5 +264,20 @@ describe('AuthService.register – autoConfirm', () => {
       (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
     );
     expect(insertCall).toBeDefined();
+  });
+
+  it('preserves rate-limit status while using the registration delivery error code', async () => {
+    mockSendWithTemplate.mockRejectedValueOnce(
+      new AppError('Email rate limit exceeded', 429, ERROR_CODES.RATE_LIMITED)
+    );
+
+    await expect(
+      authService.register('test@example.com', 'password123', 'Test')
+    ).rejects.toMatchObject({
+      statusCode: 429,
+      code: 'AUTH_VERIFICATION_EMAIL_DELIVERY_FAILED',
+      nextActions:
+        'The user account already exists. Retry delivery with POST /api/auth/email/send-verification instead of registering again.',
+    });
   });
 });
