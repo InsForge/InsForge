@@ -57,7 +57,7 @@ services:
       API_BASE_URL: ${API_BASE_URL:-http://localhost:7130}
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:7130}
       JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-min-32-characters}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-encryption-key-32chars}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
       ROOT_ADMIN_USERNAME: ${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
       ROOT_ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-changeme123}}
       ADMIN_EMAIL: ${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
@@ -114,7 +114,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGREST_BASE_URL: http://postgrest:3000
       WORKER_TIMEOUT_MS: ${WORKER_TIMEOUT_MS:-60000}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-encryption-key-32chars}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
       JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-min-32-characters}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
