@@ -12,6 +12,8 @@ import {
   updateBucketRequestSchema,
   updateStorageConfigRequestSchema,
   createS3AccessKeyRequestSchema,
+  uploadStrategyRequestSchema,
+  confirmUploadRequestSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
@@ -289,7 +291,7 @@ router.get(
             total: result.total,
           },
           nextActions:
-            'You can use PUT /api/storage/buckets/:bucketName/objects/:objectKey to upload with a specific key, or POST /api/storage/buckets/:bucketName/objects to upload with auto-generated key, and GET /api/storage/buckets/:bucketName/objects/:objectKey to download an object.',
+            'You can use PUT /api/storage/buckets/:bucketName/objects/:objectKey to create or replace a specific key, POST /api/storage/buckets/:bucketName/objects to upload with an auto-generated key, and GET /api/storage/buckets/:bucketName/objects/:objectKey to download an object.',
         },
         200
       );
@@ -299,7 +301,9 @@ router.get(
   }
 );
 
-// PUT /api/storage/buckets/:bucketName/objects/:objectKey - Upload object to bucket (requires auth)
+// PUT /api/storage/buckets/:bucketName/objects/:objectKey - Create or replace
+// an object at the exact key (requires auth). RLS policies gate end-user
+// creates and replacements.
 router.put(
   '/buckets/:bucketName/objects/*',
   verifyUser,
@@ -340,9 +344,11 @@ router.put(
         // Best-effort notification; do not fail completed storage mutation
       }
 
-      successResponse(res, storedFile, 201);
+      successResponse(res, storedFile, 200);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('already exists')) {
+      if (error instanceof AppError) {
+        next(error);
+      } else if (error instanceof Error && error.message.includes('already exists')) {
         next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
       } else if (error instanceof Error && error.message.includes('Invalid')) {
         next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
@@ -705,11 +711,15 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
-      const { filename, contentType, size } = req.body;
-
-      if (!filename) {
-        throw new AppError('Filename is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+      const validation = uploadStrategyRequestSchema.safeParse(req.body ?? {});
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
       }
+      const { filename, contentType, size } = validation.data;
 
       const requestedType =
         typeof contentType === 'string' && contentType.trim()
@@ -729,7 +739,9 @@ router.post(
 
       successResponse(res, strategy);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('does not exist')) {
+      if (error instanceof AppError) {
+        next(error);
+      } else if (error instanceof Error && error.message.includes('does not exist')) {
         next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
       } else {
         next(error);
@@ -745,18 +757,19 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
-      const { size, etag } = req.body;
-      let { contentType } = req.body;
-      if (contentType !== undefined && contentType !== null) {
-        const typeStr =
-          typeof contentType === 'string' && contentType.trim()
-            ? contentType
-            : 'application/octet-stream';
-        contentType = isUnsafeMime(typeStr) ? 'application/octet-stream' : typeStr;
+      const validation = confirmUploadRequestSchema.safeParse(req.body ?? {});
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
       }
-
-      if (!size) {
-        throw new AppError('Size is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+      const { size, etag } = validation.data;
+      let { contentType } = validation.data;
+      if (contentType !== undefined && contentType !== null) {
+        const typeStr = contentType.trim() ? contentType : 'application/octet-stream';
+        contentType = isUnsafeMime(typeStr) ? 'application/octet-stream' : typeStr;
       }
 
       const storageService = StorageService.getInstance();
@@ -784,12 +797,16 @@ router.post(
         // Best-effort notification; do not fail completed storage mutation
       }
 
-      successResponse(res, fileInfo, 201);
+      // 200, matching the direct PUT route: confirm-upload finalizes a
+      // create-or-replace, and without a read-back we can't distinguish the
+      // two cases (deriving it would need RETURNING, which re-applies SELECT
+      // RLS to the write — deliberately avoided here).
+      successResponse(res, fileInfo, 200);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('not found')) {
+      if (error instanceof AppError) {
+        next(error);
+      } else if (error instanceof Error && error.message.includes('not found')) {
         next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
-      } else if (error instanceof Error && error.message.includes('already confirmed')) {
-        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
       } else if (
         error instanceof Error &&
         error.message.includes('exceeds the configured maximum')
