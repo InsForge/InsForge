@@ -55,7 +55,7 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 | `contentType` | string | 否 | 文件的MIME类型 |
 | `size` | integer | 否 | 文件大小（字节） |
 
-上传到已有对象键会替换当前对象。如需使用服务器生成的唯一键，请改用 `POST /api/storage/buckets/{bucketName}/objects`。
+上传到已有对象键会就地替换当前对象。
 
 #### 示例
 

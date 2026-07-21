@@ -113,6 +113,16 @@ $$;
 -- should drop these defaults and write a custom SELECT policy that
 -- handles `uploaded_by IS NULL` (e.g. `uploaded_by IS NULL OR
 -- uploaded_by = auth.jwt() ->> 'sub'`).
+--
+-- Caveat for object upload (PUT create-or-replace): the service writes via
+-- `INSERT ... ON CONFLICT (bucket, key) DO UPDATE`, so a create is gated by
+-- the INSERT policy's WITH CHECK and a replace by the UPDATE policy's
+-- USING/WITH CHECK (uploaded_by is preserved on replace). With the symmetric
+-- owner defaults below this is transparent. Projects that ship an ASYMMETRIC
+-- custom policy — a stricter INSERT than UPDATE — should note that an owner
+-- replacing their own object still has the proposed row checked against the
+-- INSERT WITH CHECK, so an INSERT clause narrower than UPDATE can block
+-- replacements too.
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 -- Postgres has no `CREATE POLICY IF NOT EXISTS` (any version through 17),

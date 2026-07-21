@@ -55,7 +55,7 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 | `contentType` | string | No | MIME type of the file |
 | `size` | integer | No | File size in bytes |
 
-Uploading to an existing object key replaces the current object. To upload with a server-generated unique key instead, use `POST /api/storage/buckets/{bucketName}/objects`.
+Uploading to an existing object key replaces the current object in place.
 
 #### Example
 

@@ -176,19 +176,29 @@ export default function BucketsPage() {
     // The storage API replaces on an existing key (standard PUT, no server-side
     // rename), so the dashboard's friendly auto-rename is done here: before each
     // upload we pick the next free "name (N).ext" so a duplicate filename never
-    // silently overwrites an existing object. `takenInBatch` also reserves keys
-    // chosen earlier in this multi-file upload, since the object listing won't
-    // reflect them yet. A concurrent upload from another client between the list
-    // and the PUT could still take the key (then PUT replaces it) — an accepted
-    // trade-off for this admin flow over a conditional-write round-trip.
+    // silently overwrites an existing object. `takenInBatch` reserves keys
+    // chosen earlier in this multi-file upload (the listing won't reflect them
+    // yet), and `listingCache` reuses one listing per base name across the
+    // batch instead of re-fetching per file.
+    //
+    // Two accepted trade-offs for this admin flow, over a conditional-write
+    // round-trip: a concurrent upload from another client between the list and
+    // the PUT could take the key (then PUT replaces it); and the listing is
+    // capped at 1000 matches, so in a bucket with >1000 keys sharing a base
+    // name a higher counter could fall outside the page and the chosen key
+    // could collide (again replacing rather than erroring). Both are extreme
+    // edges for a dashboard upload.
+    const listingCache = new Map<string, string[]>();
     const uploadWithAutoRename = async (bucket: string, file: File, takenInBatch: Set<string>) => {
       const lastDotIndex = file.name.lastIndexOf('.');
       const baseName = lastDotIndex > 0 ? file.name.slice(0, lastDotIndex) : file.name;
-      const { objects } = await storageService.listObjects(bucket, { limit: 1000 }, baseName);
-      const objectKey = nextAvailableObjectKey(
-        [...objects.map((object) => object.key), ...takenInBatch],
-        file.name
-      );
+      let existingKeys = listingCache.get(baseName);
+      if (!existingKeys) {
+        const { objects } = await storageService.listObjects(bucket, { limit: 1000 }, baseName);
+        existingKeys = objects.map((object) => object.key);
+        listingCache.set(baseName, existingKeys);
+      }
+      const objectKey = nextAvailableObjectKey([...existingKeys, ...takenInBatch], file.name);
       takenInBatch.add(objectKey);
       await uploadObject({ bucket, objectKey, file });
     };
