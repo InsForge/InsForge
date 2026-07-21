@@ -35,6 +35,7 @@ import {
   type UpdateAuthConfigRequest,
 } from '@insforge/shared-schemas';
 import { useAuthConfig } from '#features/auth/hooks/useAuthConfig';
+import { useSmtpConfig } from '#features/auth/hooks/useSmtpConfig';
 import { isInsForgeCloudProject } from '#lib/utils/utils';
 
 interface AuthSettingsMenuDialogProps {
@@ -105,6 +106,8 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   const isCloudProject = isInsForgeCloudProject();
   const [activeSection, setActiveSection] = useState<AuthSettingsSection>('general');
   const { config, isLoading, isUpdating, updateConfig } = useAuthConfig();
+  const { config: smtpConfig } = useSmtpConfig();
+  const canConfigureEmailVerification = isCloudProject || smtpConfig?.enabled === true;
   const { showToast } = useToast();
 
   const form = useForm<UpdateAuthConfigRequest>({
@@ -237,7 +240,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
               >
                 {t('auth.general', { defaultValue: 'General' })}
               </MenuDialogNavItem>
-              {isCloudProject && (
+              {canConfigureEmailVerification && (
                 <MenuDialogNavItem
                   icon={<Mail className="h-5 w-5" />}
                   active={activeSection === 'email-verification'}
@@ -365,7 +368,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
 
                 {activeSection === 'email-verification' && (
                   <>
-                    {!isCloudProject ? (
+                    {!canConfigureEmailVerification ? (
                       <p className="text-sm text-muted-foreground">
                         {t('auth.emailVerificationCloudOnly', {
                           defaultValue:
