@@ -6,7 +6,9 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
+      # ENCRYPTION_KEY is required for schedule header encryption.
+      # In production, set a unique value via .env — do not use the fallback.
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
