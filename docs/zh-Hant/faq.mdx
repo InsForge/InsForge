@@ -82,6 +82,40 @@ description: "InsForge 常見問題：資料庫呼叫、Edge Function、Custom C
     之後列級可見性照常由 RLS 控制。project_admin 擁有表，只是讓它能管理並直接查詢這些表（例如在 dashboard 的 SQL 編輯器裡），並不會給 API 角色存取權限。
   </Accordion>
 
+  <Accordion title="怎麼幫一張表開啟或關閉列級安全性（RLS）？">
+    新建的表預設**開啟** RLS。建立表時（在 dashboard、`POST /api/database/tables`，或用 SDK），除非你明確傳 `rlsEnabled: false`，否則都會啟用 RLS。
+
+    update-table-schema 端點（`PATCH /api/database/tables/{table}/schema`）沒有切換 RLS 的欄位——它只處理欄、外鍵和重新命名。要改**已存在**表的 RLS，執行一條 SQL 即可：
+
+    ```sql
+    -- 關閉 RLS
+    ALTER TABLE public.mytable DISABLE ROW LEVEL SECURITY;
+
+    -- 重新開啟 RLS
+    ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;
+    ```
+
+    用任何你執行管理員 SQL 的方式都可以執行它，這些方式都需要 project owner / admin 權限：
+
+    ```bash
+    # 一次性執行，透過 CLI
+    insforge db query "ALTER TABLE public.mytable DISABLE ROW LEVEL SECURITY"
+
+    # 或者作為 migration 追蹤
+    npx @insforge/cli db migrations new disable-rls-on-mytable
+    # 把 ALTER TABLE 語句寫進產生的 .sql 檔案裡，然後：
+    npx @insforge/cli db migrations up --all
+    ```
+
+    也可以在 dashboard 的 SQL 編輯器、MCP 的 `run-raw-sql` 工具，或原始 SQL 的 REST 端點（`POST /api/database/advance/rawsql/unrestricted`）裡執行。
+
+    <Warning>
+      **關閉** RLS 會移除所有列級過濾：任何擁有表權限的角色（例如 `authenticated`，以及被授權的 `anon`）都能透過資料 API 讀寫每一列。相比關閉 RLS，更推薦撰寫 RLS 原則。用 API Key（`ik_...`）發起的管理員請求本來就會繞過 RLS。
+
+      給一張沒有任何原則的表**開啟** RLS 會觸發 PostgreSQL 的預設拒絕：在你至少加一條原則之前，`anon` 和 `authenticated` 透過資料 API 對它的所有存取都會被拒絕（每個 `SELECT`/`INSERT`/`UPDATE`/`DELETE` 都被擋下）。請在開啟 RLS 之前，或緊接著，補上需要的原則。
+    </Warning>
+  </Accordion>
+
   <Accordion title="InsForge 有 `service_role` key / `INSFORGE_SERVICE_ROLE_KEY` 嗎？">
     沒有叫這個名字的。InsForge 裡的等價物是你專案的 **API Key**（以 `ik_` 開頭），也就是全權限的管理員 key。每個專案有兩個 key：
 

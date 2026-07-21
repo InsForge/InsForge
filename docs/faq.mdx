@@ -82,6 +82,40 @@ description: "Answers to common InsForge questions on database calls, edge funct
     Row visibility is then gated by RLS as usual. Project-admin ownership only lets the admin manage and directly query the tables (for example from the dashboard SQL editor); it does not give the API roles access.
   </Accordion>
 
+  <Accordion title="How do I turn row-level security (RLS) on or off for a table?">
+    New tables have RLS **on** by default. When you create a table (from the dashboard, `POST /api/database/tables`, or the SDK), RLS is enabled unless you explicitly pass `rlsEnabled: false`.
+
+    There is no field to toggle RLS on the update-table-schema endpoint (`PATCH /api/database/tables/{table}/schema`) — it only handles columns, foreign keys, and renames. To change RLS on an **existing** table, run one SQL statement:
+
+    ```sql
+    -- turn RLS off
+    ALTER TABLE public.mytable DISABLE ROW LEVEL SECURITY;
+
+    -- turn RLS back on
+    ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;
+    ```
+
+    Run that SQL any way you run admin SQL, all of which require project-owner / admin access:
+
+    ```bash
+    # one-off, via the CLI
+    insforge db query "ALTER TABLE public.mytable DISABLE ROW LEVEL SECURITY"
+
+    # or track it as a migration
+    npx @insforge/cli db migrations new disable-rls-on-mytable
+    # put the ALTER TABLE statement in the generated .sql file, then:
+    npx @insforge/cli db migrations up --all
+    ```
+
+    You can also run it from the dashboard SQL editor, the MCP `run-raw-sql` tool, or the raw SQL REST endpoint (`POST /api/database/advance/rawsql/unrestricted`).
+
+    <Warning>
+      Turning RLS **off** removes all row-level filtering: any role with table privileges (such as `authenticated`, and `anon` where granted) can read and write every row through the data API. Prefer writing RLS policies over disabling RLS. Admin requests made with the API Key (`ik_...`) bypass RLS either way.
+
+      Turning RLS **on** for a table that has no policies applies PostgreSQL's default-deny: `anon` and `authenticated` lose all access to it through the data API (every `SELECT`/`INSERT`/`UPDATE`/`DELETE` is blocked) until you add at least one policy. Add the policies you need before, or right after, enabling RLS.
+    </Warning>
+  </Accordion>
+
   <Accordion title="Does InsForge have a `service_role` key / `INSFORGE_SERVICE_ROLE_KEY`?">
     Not under that name. InsForge's equivalent is your project's **API Key** (it starts with `ik_`), the full-access admin key. Every project has two keys:
 
