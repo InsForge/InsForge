@@ -249,7 +249,7 @@ export class AuthService {
         }
       } catch (error) {
         const statusCode = error instanceof AppError && error.statusCode === 429 ? 429 : 500;
-        logger.error('Verification email send failed during registration', { email, error });
+        logger.error('Verification email send failed during registration', { userId, error });
         throw new AppError(
           'The user account was created, but the verification email could not be sent.',
           statusCode,

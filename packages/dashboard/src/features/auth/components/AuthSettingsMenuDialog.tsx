@@ -106,11 +106,20 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   const isCloudProject = isInsForgeCloudProject();
   const [activeSection, setActiveSection] = useState<AuthSettingsSection>('general');
   const { config, isLoading, isUpdating, updateConfig } = useAuthConfig();
-  const { config: smtpConfig } = useSmtpConfig({ enabled: open && !isCloudProject });
-  const hasEmailProvider = isCloudProject || smtpConfig?.enabled === true;
+  const {
+    config: smtpConfig,
+    isLoading: isSmtpConfigLoading,
+    error: smtpConfigError,
+    refetch: refetchSmtpConfig,
+  } = useSmtpConfig({ enabled: open && !isCloudProject });
+  const hasSuccessfulSmtpLookup =
+    isCloudProject || (!isSmtpConfigLoading && !smtpConfigError && smtpConfig !== undefined);
+  const hasEmailProvider =
+    isCloudProject || (hasSuccessfulSmtpLookup && smtpConfig?.enabled === true);
   const isEmailVerificationRecoveryRequired =
-    !hasEmailProvider && config?.requireEmailVerification === true;
-  const canAccessEmailVerification = hasEmailProvider || isEmailVerificationRecoveryRequired;
+    hasSuccessfulSmtpLookup && !hasEmailProvider && config?.requireEmailVerification === true;
+  const canAccessEmailVerification =
+    !hasSuccessfulSmtpLookup || hasEmailProvider || isEmailVerificationRecoveryRequired;
   const { showToast } = useToast();
 
   const form = useForm<UpdateAuthConfigRequest>({
@@ -375,7 +384,29 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
 
                 {activeSection === 'email-verification' && (
                   <>
-                    {!canAccessEmailVerification ? (
+                    {isSmtpConfigLoading ? (
+                      <p className="text-sm text-muted-foreground">
+                        {t('auth.emailProviderStatusLoading', {
+                          defaultValue: 'Loading email provider configuration...',
+                        })}
+                      </p>
+                    ) : smtpConfigError ? (
+                      <div className="flex flex-col items-start gap-3">
+                        <p className="text-sm text-destructive">
+                          {t('auth.emailProviderStatusLoadFailed', {
+                            defaultValue:
+                              'Could not check email provider availability. Try again to continue.',
+                          })}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => void refetchSmtpConfig()}
+                        >
+                          {t('auth.retry', { defaultValue: 'Retry' })}
+                        </Button>
+                      </div>
+                    ) : !canAccessEmailVerification ? (
                       <p className="text-sm text-muted-foreground">
                         {t('auth.emailVerificationProviderRequired', {
                           defaultValue:

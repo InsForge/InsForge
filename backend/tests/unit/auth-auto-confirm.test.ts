@@ -4,18 +4,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 process.env.ROOT_ADMIN_USERNAME = 'admin';
 process.env.ROOT_ADMIN_PASSWORD = 'admin-password';
 
-const { mockPool, mockClient, mockCreateEmailOTP, mockSendWithTemplate } = vi.hoisted(() => ({
-  mockPool: {
-    connect: vi.fn(),
-    query: vi.fn(),
-  },
-  mockClient: {
-    query: vi.fn(),
-    release: vi.fn(),
-  },
-  mockCreateEmailOTP: vi.fn().mockResolvedValue({ otp: '123456' }),
-  mockSendWithTemplate: vi.fn().mockResolvedValue(undefined),
-}));
+const { mockPool, mockClient, mockCreateEmailOTP, mockSendWithTemplate, mockLogger } = vi.hoisted(
+  () => ({
+    mockPool: {
+      connect: vi.fn(),
+      query: vi.fn(),
+    },
+    mockClient: {
+      query: vi.fn(),
+      release: vi.fn(),
+    },
+    mockCreateEmailOTP: vi.fn().mockResolvedValue({ otp: '123456' }),
+    mockSendWithTemplate: vi.fn().mockResolvedValue(undefined),
+    mockLogger: {
+      info: vi.fn(),
+      error: vi.fn(),
+      warn: vi.fn(),
+      debug: vi.fn(),
+    },
+  })
+);
 
 vi.mock('../../src/infra/database/database.manager', () => ({
   DatabaseManager: {
@@ -26,12 +34,7 @@ vi.mock('../../src/infra/database/database.manager', () => ({
 }));
 
 vi.mock('../../src/utils/logger', () => ({
-  default: {
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn(),
-  },
+  default: mockLogger,
 }));
 
 vi.mock('bcryptjs', () => ({
@@ -264,6 +267,14 @@ describe('AuthService.register – autoConfirm', () => {
       (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
     );
     expect(insertCall).toBeDefined();
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Verification email send failed during registration',
+      {
+        userId: insertCall![1][0],
+        error: expect.any(Error),
+      }
+    );
+    expect(mockLogger.error.mock.calls[0]?.[1]).not.toHaveProperty('email');
   });
 
   it('preserves rate-limit status while using the registration delivery error code', async () => {
