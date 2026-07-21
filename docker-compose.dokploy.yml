@@ -2,6 +2,7 @@ services:
   postgres:
     image: ghcr.io/insforge/postgres-all:latest
     restart: unless-stopped
+    command: postgres -c app.encryption_key='${ENCRYPTION_KEY:-change-this-encryption-key-32chars}'
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
