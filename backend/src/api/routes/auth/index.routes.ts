@@ -1145,6 +1145,15 @@ router.put(
       const provider = VALID_PROVIDERS.includes(rawProvider as (typeof VALID_PROVIDERS)[number])
         ? rawProvider
         : 'custom_smtp';
+
+      if (provider === 'default') {
+        throw new AppError(
+          'Default email templates are read-only. Please configure a custom SMTP provider to customize email templates.',
+          403,
+          ERROR_CODES.FORBIDDEN
+        );
+      }
+
       const template = await emailTemplateService.updateTemplate(
         templateType,
         validationResult.data,
