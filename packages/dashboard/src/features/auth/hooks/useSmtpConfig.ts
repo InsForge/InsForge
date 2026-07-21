@@ -18,6 +18,7 @@ export function useSmtpConfig() {
   } = useQuery<SmtpConfigSchema>({
     queryKey: ['smtp-config'],
     queryFn: () => smtpConfigService.getConfig(),
+    retry: false,
   });
 
   // Mutation to update SMTP configuration
