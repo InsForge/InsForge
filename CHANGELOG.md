@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.2.7](https://github.com/InsForge/insforge/compare/v2.2.6...v2.2.7) (2026-07-21)
+
+### Features
+
+- **advisor:** ignore/whitelist findings from the dashboard (Active/Ignored views, severity filters, suppression backend); realign rules with the cloud advisor
+- **storage:** safe batch object deletion (RLS-safe, rate-limited, per-key status)
+- **storage:** standard PUT/upsert semantics; auto-rename moved to the dashboard
+- **database:** EXPLAIN ANALYZE visual plan-tree tab in the SQL Editor
+- **ai:** model gateway usage analytics
+- **compute:** `scaleToZero` opt-out for always-on services
+- **dashboard:** language selector synced with the cloud account locale
+
+### Bug Fixes
+
+- **storage:** magic-byte MIME validation and pinned S3 Content-Type to prevent stored XSS
+- **auth:** require CSRF token on admin and user logout; constant-time admin login to close a timing attack; prevent an auth bypass via prefetched metadata
+- **ai:** report token usage for streaming chat completions; accept assistant tool-call messages that omit content
+- **database:** broadcast realtime events for PATCH and PUT
+- **build:** stop bundling `file-type` to fix the "Dynamic require of tty" crash
+- **backend:** raise HTTP keep-alive timeout above LB idle timeouts
+- **secrets:** revive soft-deleted secrets on create instead of failing with 23505
+- **deps:** upgrade axios and remediate dependency advisories
+
 ## [2.0.1](https://github.com/InsForge/insforge/compare/v2.0.0-fix-settings-2...v2.0.1) (2026-03-09)
 
 # [2.0.0](https://github.com/InsForge/insforge/compare/v1.5.9-ui-6...v2.0.0) (2026-03-06)
