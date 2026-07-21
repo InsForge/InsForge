@@ -11,7 +11,7 @@ InsForge Messaging envía notificaciones transaccionales desde su proyecto: reci
 </Note>
 
 <Warning>
-  **¿Autohospedado?** El remitente gestionado de InsForge Cloud solo está disponible para proyectos vinculados a la nube. En una instancia autohospedada debe configurar [Custom SMTP](/core-concepts/messaging/custom-smtp) antes de que se pueda enviar cualquier correo electrónico, incluidos los de autenticación. Sin él, activar la verificación de correo electrónico deja los nuevos registros atascados en un estado no verificado sin que se entregue ningún correo, porque el fallo de envío se registra y se descarta en lugar de mostrarse. Configure SMTP primero, o deje la verificación de correo electrónico desactivada (el valor por defecto).
+  **¿Autohospedado?** El remitente gestionado de InsForge Cloud solo está disponible para proyectos vinculados a la nube. En una instancia autohospedada debe configurar [Custom SMTP](/core-concepts/messaging/custom-smtp) antes de que se pueda enviar cualquier correo electrónico, incluidos los de autenticación. InsForge rechaza activar la verificación obligatoria hasta que haya un proveedor disponible e impide desactivar el único proveedor SMTP mientras la verificación siga siendo obligatoria. Si un correo de verificación falla durante el registro, la API devuelve un error con instrucciones para reintentar mediante el endpoint de correo de verificación.
 </Warning>
 
 ```mermaid

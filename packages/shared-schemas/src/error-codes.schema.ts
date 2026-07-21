@@ -79,6 +79,7 @@ const computeErrorCodes = [
 const billingErrorCodes = ['BILLING_INSUFFICIENT_BALANCE'] as const;
 
 const emailErrorCodes = [
+  'EMAIL_PROVIDER_NOT_CONFIGURED',
   'EMAIL_SMTP_CONNECTION_FAILED',
   'EMAIL_SMTP_SEND_FAILED',
   'EMAIL_TEMPLATE_NOT_FOUND',

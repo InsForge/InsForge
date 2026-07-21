@@ -30,6 +30,7 @@ import {
   OAuthUserData,
 } from '@/types/auth.js';
 import { AppError } from '@/utils/errors.js';
+import { NEXT_ACTIONS } from '@/utils/next-actions.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
@@ -247,8 +248,15 @@ export class AuthService {
           await this.sendVerificationEmailWithCode(email);
         }
       } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
-        logger.warn(`Verification email send failed during register: ${msg}`);
+        const statusCode = error instanceof AppError ? error.statusCode : 500;
+        const code = error instanceof AppError ? error.code : ERROR_CODES.INTERNAL_ERROR;
+        logger.error('Verification email send failed during registration', { email, error });
+        throw new AppError(
+          'The user account was created, but the verification email could not be sent.',
+          statusCode,
+          code,
+          NEXT_ACTIONS.RESEND_VERIFICATION_EMAIL
+        );
       }
       return {
         accessToken: null,

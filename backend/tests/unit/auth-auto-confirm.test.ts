@@ -4,14 +4,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 process.env.ROOT_ADMIN_USERNAME = 'admin';
 process.env.ROOT_ADMIN_PASSWORD = 'admin-password';
 
-const { mockPool, mockClient } = vi.hoisted(() => ({
+const { mockPool, mockClient, mockCreateEmailOTP, mockSendWithTemplate } = vi.hoisted(() => ({
   mockPool: {
     connect: vi.fn(),
+    query: vi.fn(),
   },
   mockClient: {
     query: vi.fn(),
     release: vi.fn(),
   },
+  mockCreateEmailOTP: vi.fn().mockResolvedValue({ otp: '123456' }),
+  mockSendWithTemplate: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../src/infra/database/database.manager', () => ({
@@ -65,11 +68,11 @@ vi.mock('../../src/services/auth/auth-config.service', () => ({
 vi.mock('../../src/services/auth/auth-otp.service', () => ({
   AuthOTPService: {
     getInstance: () => ({
-      generateOTP: vi.fn().mockResolvedValue('123456'),
+      createEmailOTP: mockCreateEmailOTP,
     }),
   },
   OTPPurpose: { VERIFY_EMAIL: 'VERIFY_EMAIL' },
-  OTPType: { CODE: 'CODE' },
+  OTPType: { NUMERIC_CODE: 'NUMERIC_CODE', HASH_TOKEN: 'HASH_TOKEN' },
 }));
 
 vi.mock('../../src/services/auth/oauth-config.service', () => ({
@@ -87,7 +90,7 @@ vi.mock('../../src/services/auth/custom-oauth-config.service', () => ({
 vi.mock('../../src/services/email/email.service', () => ({
   EmailService: {
     getInstance: () => ({
-      sendMail: vi.fn().mockResolvedValue(undefined),
+      sendWithTemplate: mockSendWithTemplate,
     }),
   },
 }));
@@ -145,6 +148,15 @@ describe('AuthService.register – autoConfirm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPool.connect.mockResolvedValue(mockClient);
+    mockPool.query.mockResolvedValue({
+      rows: [
+        {
+          id: 'test-user-id',
+          email: 'test@example.com',
+          profile: { name: 'Test' },
+        },
+      ],
+    });
     mockClient.query.mockResolvedValue({ rows: [] });
     // Reset singleton to get fresh instance
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -231,5 +243,22 @@ describe('AuthService.register – autoConfirm', () => {
     expect(insertCall![1][4]).toBe(false);
 
     expect(result.requireEmailVerification).toBe(true);
+  });
+
+  it('surfaces verification email failures during public registration', async () => {
+    mockSendWithTemplate.mockRejectedValueOnce(new Error('SMTP send failed'));
+
+    await expect(
+      authService.register('test@example.com', 'password123', 'Test')
+    ).rejects.toMatchObject({
+      message: 'The user account was created, but the verification email could not be sent.',
+      nextActions:
+        'The user account already exists. Retry delivery with POST /api/auth/email/send-verification instead of registering again.',
+    });
+
+    const insertCall = mockClient.query.mock.calls.find(
+      (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
+    );
+    expect(insertCall).toBeDefined();
   });
 });

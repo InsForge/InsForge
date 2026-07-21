@@ -11,6 +11,11 @@ import {
   type UpsertSmtpConfigRequest,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
+import {
+  emailProviderNotConfiguredError,
+  hasManagedEmailProvider,
+  lockEmailProviderConfiguration,
+} from '@/services/email/email-provider-availability.service.js';
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -222,7 +227,21 @@ export class SmtpConfigService {
     try {
       await client.query('BEGIN');
 
+      await lockEmailProviderConfiguration(client);
+
       const existingRow = await this.lockOrCreateSingletonRow(client);
+
+      if (!input.enabled && !hasManagedEmailProvider()) {
+        const authConfigResult = await client.query(
+          `SELECT require_email_verification
+           FROM auth.config
+           LIMIT 1
+           FOR UPDATE`
+        );
+        if (authConfigResult.rows[0]?.require_email_verification === true) {
+          throw emailProviderNotConfiguredError();
+        }
+      }
 
       let passwordEncrypted = existingRow.password_encrypted;
       if (input.password) {
