@@ -78,6 +78,26 @@ npx @insforge/cli deployments cancel deployment_123
 
 每个就绪的部署都获得一个默认 URL `https://<appkey>.insforge.site`。您也可以在 `https://<slug>.insforge.site` 设置一个 InsForge 管理的 slug。对于自定义域，在仪表板中添加域并配置它返回的 DNS 记录，通常是子域的 CNAME。
 
+## 故障排除
+
+### 客户端路由上的 404: NOT_FOUND
+
+在浏览器中处理路由的单页应用（React Router、Vue Router 等）在深层链接或刷新页面命中服务器上没有对应文件的路径时，可能会返回 `404: NOT_FOUND`。由于 InsForge 在 Vercel 上构建您的站点，请在项目根目录添加一个 `vercel.json`，将所有路径重写到 `index.html`，让浏览器端路由接管：
+
+```json
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+然后重新部署：
+
+```bash
+npx @insforge/cli deployments deploy ./frontend
+```
+
+如果 404 出现在首次加载时，而不仅仅是在子路由上，那么很可能是构建输出目录与您的框架不匹配。Vercel 会从 `package.json` 和 `vercel.json` 检测该目录，因此请确认您的构建生成了预期的输出文件夹。
+
 ## 使用它进行部署
 
 <CardGroup cols={2}>

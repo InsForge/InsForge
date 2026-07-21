@@ -78,6 +78,26 @@ npx @insforge/cli deployments cancel deployment_123
 
 Cada implementación lista obtiene una URL predeterminada en `https://<appkey>.insforge.site`. También puedes configurar un slug gestionado por InsForge en `https://<slug>.insforge.site`. Para un dominio personalizado, agrega el dominio en el panel y configura el registro DNS que este devuelve, normalmente un CNAME para subdominios.
 
+## Solución de problemas
+
+### 404: NOT_FOUND en rutas del lado del cliente
+
+Las aplicaciones de una sola página que gestionan el enrutamiento en el navegador (React Router, Vue Router y similares) pueden devolver `404: NOT_FOUND` cuando un enlace profundo o una recarga de página llega a una ruta que no tiene un archivo correspondiente en el servidor. Como InsForge construye tu sitio en Vercel, agrega un `vercel.json` en la raíz de tu proyecto que reescriba todas las rutas a `index.html`, para que el enrutador del navegador tome el control:
+
+```json
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+Luego vuelve a desplegar:
+
+```bash
+npx @insforge/cli deployments deploy ./frontend
+```
+
+Si el 404 aparece en la primera carga y no solo en una subruta, es probable que el directorio de salida de la compilación sea incorrecto para tu framework. Vercel lo detecta a partir de `package.json` y `vercel.json`, así que confirma que tu compilación produce la carpeta de salida esperada.
+
 ## Impleméntalo
 
 <CardGroup cols={2}>
