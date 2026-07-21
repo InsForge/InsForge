@@ -13,7 +13,7 @@ import {
   emailProviderNotConfiguredError,
   hasAvailableEmailProvider,
   lockEmailProviderConfiguration,
-} from '@/services/email/email-provider-availability.service.js';
+} from '@/services/email/helpers.js';
 
 export class AuthConfigService {
   private static instance: AuthConfigService;

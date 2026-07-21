@@ -15,7 +15,7 @@ import {
   emailProviderNotConfiguredError,
   hasManagedEmailProvider,
   lockEmailProviderConfiguration,
-} from '@/services/email/email-provider-availability.service.js';
+} from '@/services/email/helpers.js';
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
