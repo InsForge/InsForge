@@ -181,4 +181,35 @@ description: "Answers to common InsForge questions on database calls, edge funct
   <Accordion title="Can this assistant help with something specific to my own project?">
     Not really. This assistant answers from InsForge's public docs, so it can't see your project: it can't debug an error, read your data, or check your configuration. Take anything specific to your own project to your coding agent instead. Connected to InsForge through the CLI or MCP, your agent can read your live backend, schema, data, and logs and debug the problem directly. Just describe it in plain words. For a backend health and error report you can run yourself, use `npx @insforge/cli diagnose`. See [Diagnostics & advisor](/agent-native/diagnostics).
   </Accordion>
+
+  <Accordion title="How do I get my database's Postgres connection string?">
+    Every cloud project has a direct Postgres connection string, handy for `psql`, a database GUI, an ORM (Prisma, Drizzle), or an external service like [Better Auth](/integrations/better-auth) that needs its own Postgres. Print it with the CLI:
+
+    ```bash
+    npx @insforge/cli db connection-string
+    ```
+
+    You can also grab it from the dashboard under **Project Settings → Connect → Connection String** (cloud projects only).
+
+    It returns a URL shaped like:
+
+    ```text
+    postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require
+    ```
+
+    Add `--json` to get `{ "connectionURL": "..." }` for scripts. The command works for **cloud projects only** — on a self-hosted instance Postgres is exposed directly by your `docker-compose` setup, so use the local Postgres credentials (the `DATABASE_URL` / `POSTGRES_*` values from your `.env`) instead.
+
+    The string connects as the privileged `postgres` role, so it isn't limited by row-level security and it embeds that role's password. Treat it like a secret: keep it server-side and never ship it to the browser.
+  </Accordion>
+
+  <Accordion title="How do I take down or remove a deployed site?">
+    There's currently no self-serve way to take down a deployed [Site](/core-concepts/sites/overview) — there's no `deployments delete` command and no dashboard action for it. Deployed sites are hosted externally, so even deleting your project (`npx @insforge/cli projects delete --project <id>`) tears down your backend resources — database, storage, and backend branches — but does *not* remove the hosted site.
+
+    In practice this rarely matters. If you do need a deployed site taken down, ask the InsForge team in [Discord](https://discord.com/invite/DvBtaEc9Jz).
+
+    Two related actions that are *not* the same as removing a live site:
+
+    - **Cancel a build that's still running:** `npx @insforge/cli deployments cancel <id>` stops an in-progress deployment; it does not take down a site that is already live.
+    - **Replace what's live:** redeploy over the same site with `npx @insforge/cli deployments deploy ./frontend` — the newest ready deployment serves the URL.
+  </Accordion>
 </AccordionGroup>

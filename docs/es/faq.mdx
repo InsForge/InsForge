@@ -181,4 +181,35 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
   <Accordion title="¿Este asistente puede ayudarme con algo específico de mi propio proyecto?">
     En realidad no. Este asistente responde a partir de la documentación pública de InsForge, así que no puede ver tu proyecto: no puede depurar un error, leer tus datos ni revisar tu configuración. Lleva cualquier cosa específica de tu propio proyecto a tu agente de programación. Conectado a InsForge a través de la CLI o MCP, tu agente puede leer tu backend en vivo, el esquema, los datos y los logs, y depurar el problema directamente. Solo descríbelo con tus propias palabras. Para un informe de salud y errores que puedes ejecutar tú mismo, usa `npx @insforge/cli diagnose`. Consulta [Diagnostics & advisor](/agent-native/diagnostics).
   </Accordion>
+
+  <Accordion title="¿Cómo obtengo la cadena de conexión (connection string) de Postgres de mi base de datos?">
+    Cada proyecto cloud tiene una cadena de conexión de Postgres directa, útil para `psql`, un GUI de base de datos, un ORM (Prisma, Drizzle) o un servicio externo como [Better Auth](/integrations/better-auth) que necesita su propio Postgres. Imprímela con la CLI:
+
+    ```bash
+    npx @insforge/cli db connection-string
+    ```
+
+    También puedes obtenerla desde el dashboard, en **Project Settings → Connect → Connection String** (solo para proyectos cloud).
+
+    Devuelve una URL con esta forma:
+
+    ```text
+    postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require
+    ```
+
+    Añade `--json` para obtener `{ "connectionURL": "..." }` en scripts. El comando funciona **solo para proyectos cloud**: en una instancia autoalojada Postgres queda expuesto directamente por tu configuración de `docker-compose`, así que usa las credenciales de Postgres locales (los valores `DATABASE_URL` / `POSTGRES_*` de tu `.env`) en su lugar.
+
+    La cadena se conecta con el rol privilegiado `postgres`, por lo que no está limitada por row-level security e incluye la contraseña de ese rol. Trátala como un secreto: mantenla en el servidor y nunca la envíes al navegador.
+  </Accordion>
+
+  <Accordion title="¿Cómo doy de baja o elimino un sitio desplegado?">
+    Por ahora no hay una forma autoservicio de dar de baja un [Site](/core-concepts/sites/overview) desplegado: no existe un comando `deployments delete` ni una acción en el dashboard para ello. Los sitios desplegados se alojan de forma externa, así que incluso eliminar tu proyecto (`npx @insforge/cli projects delete --project <id>`) borra tus recursos de backend —base de datos, Storage y backend branches— pero *no* quita el sitio alojado.
+
+    En la práctica esto rara vez importa. Si de verdad necesitas dar de baja un sitio desplegado, escríbele al equipo de InsForge en [Discord](https://discord.com/invite/DvBtaEc9Jz).
+
+    Dos acciones relacionadas que *no* son lo mismo que eliminar un sitio en vivo:
+
+    - **Cancelar una compilación en curso:** `npx @insforge/cli deployments cancel <id>` detiene un despliegue en progreso; no da de baja un sitio que ya está en vivo.
+    - **Reemplazar lo que está en vivo:** vuelve a desplegar sobre el mismo sitio con `npx @insforge/cli deployments deploy ./frontend` — el despliegue ready más reciente sirve la URL.
+  </Accordion>
 </AccordionGroup>
