@@ -146,8 +146,11 @@ export class ChatCompletionService {
    * Normalize a tool result into the plain string a tool message has to carry.
    * The schema accepts `content` as a string, as OpenAI-style content parts, or as
    * null, and JSON-stringifying the latter two handed the model a raw JSON blob —
-   * or the literal word "null" — in place of the tool's output. Only text parts
-   * have a representation in a tool message, so only they contribute.
+   * or the literal word "null" — in place of the tool's output.
+   *
+   * A tool message has no representation for image/audio/file parts, so those are
+   * rejected rather than dropped: silently discarding them would hand the model an
+   * answerable prompt that is missing the data the caller attached.
    */
   private toToolContentText(content: ChatMessageSchema['content']): string {
     if (typeof content === 'string') {
@@ -156,7 +159,18 @@ export class ChatCompletionService {
     if (!Array.isArray(content)) {
       return '';
     }
-    return content.map((part) => (part.type === 'text' ? part.text : '')).join('');
+    return content
+      .map((part) => {
+        if (part.type !== 'text') {
+          throw new AppError(
+            `Tool message content part of type '${part.type}' is not supported; a tool result must be text`,
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
+        return part.text;
+      })
+      .join('');
   }
 
   /**

@@ -172,4 +172,21 @@ describe('ChatCompletionService - formatMessages', () => {
     // the tool returned the word null.
     expect(result[0].content).toBe('');
   });
+
+  it('rejects a tool result carrying a non-text content part instead of dropping it', () => {
+    const messages: ChatMessageSchema[] = [
+      {
+        role: 'tool',
+        content: [
+          { type: 'text', text: 'see attached' },
+          { type: 'image_url', image_url: { url: 'https://example.com/a.png' } },
+        ],
+        tool_call_id: 'call_abc123',
+      },
+    ];
+
+    // A tool message cannot carry an image, so silently discarding it would leave
+    // the model answering without data the caller supplied.
+    expect(() => service.formatMessages(messages)).toThrow(/is not supported/);
+  });
 });
