@@ -364,6 +364,12 @@ export class ChatCompletionService {
         max_tokens: options.maxTokens ?? 4096,
         top_p: options.topP,
         stream: true,
+        // Opt in to usage accounting for streamed responses. Unlike non-streaming
+        // completions (which always carry a `usage` object), a streamed response
+        // omits usage entirely unless `stream_options.include_usage` is set — the
+        // provider then emits one final chunk with `choices: []` and the full token
+        // usage. Without this, streaming requests report zero token usage.
+        stream_options: { include_usage: true },
         plugins: this.buildPlugins(options),
         tools: options.tools,
         tool_choice: options.toolChoice,
