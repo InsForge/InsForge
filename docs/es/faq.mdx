@@ -82,6 +82,38 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     La visibilidad de filas queda gobernada por RLS como siempre. Que el project-admin sea propietario solo le permite gestionar y consultar las tablas directamente (por ejemplo desde el editor SQL del dashboard); no da acceso a los roles de la API.
   </Accordion>
 
+  <Accordion title="¿Cómo activo o desactivo la seguridad a nivel de fila (RLS) en una tabla?">
+    Las tablas nuevas tienen RLS **activado** por defecto. Cuando creas una tabla (desde el dashboard, `POST /api/database/tables` o el SDK), RLS queda habilitado a menos que pases explícitamente `rlsEnabled: false`.
+
+    El endpoint update-table-schema (`PATCH /api/database/tables/{table}/schema`) no tiene ningún campo para alternar RLS: solo gestiona columnas, claves foráneas y renombrados. Para cambiar RLS en una tabla **existente**, ejecuta una sola sentencia SQL:
+
+    ```sql
+    -- desactivar RLS
+    ALTER TABLE public.mytable DISABLE ROW LEVEL SECURITY;
+
+    -- volver a activar RLS
+    ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;
+    ```
+
+    Ejecuta ese SQL de cualquier forma en que ejecutes SQL de administrador; todas requieren acceso de project owner / admin:
+
+    ```bash
+    # puntual, mediante la CLI
+    insforge db query "ALTER TABLE public.mytable DISABLE ROW LEVEL SECURITY"
+
+    # o registrarlo como una migración
+    npx @insforge/cli db migrations new disable-rls-on-mytable
+    # coloca la sentencia ALTER TABLE en el archivo .sql generado y luego:
+    npx @insforge/cli db migrations up --all
+    ```
+
+    También puedes ejecutarlo desde el editor SQL del dashboard, la herramienta `run-raw-sql` de MCP, o el endpoint REST de SQL directo (`POST /api/database/advance/rawsql/unrestricted`).
+
+    <Warning>
+      **Desactivar** RLS elimina todo el filtrado a nivel de fila: cualquier rol con privilegios sobre la tabla (como `authenticated`, y `anon` donde se le haya concedido) puede leer y escribir todas las filas a través de la API de datos. Es preferible escribir políticas RLS antes que desactivar RLS. Las solicitudes de administrador hechas con la API Key (`ik_...`) omiten RLS de todos modos.
+    </Warning>
+  </Accordion>
+
   <Accordion title="¿InsForge tiene una `service_role` key / `INSFORGE_SERVICE_ROLE_KEY`?">
     No con ese nombre. El equivalente en InsForge es la **API Key** de tu proyecto (empieza por `ik_`), la clave de administrador con acceso total. Cada proyecto tiene dos claves:
 
