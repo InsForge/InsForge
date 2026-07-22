@@ -284,6 +284,33 @@ describe('TelemetryService', () => {
     );
   });
 
+  it.each([
+    { env: 'RAILWAY_ENVIRONMENT_ID', expected: 'railway' },
+    { env: 'ZEABUR', expected: 'zeabur' },
+    { env: 'SEALOS_APP_NAME', expected: 'sealos' },
+    { env: 'RENDER', expected: 'render' },
+    { env: 'FLY_APP_NAME', expected: 'fly' },
+    { env: 'K_SERVICE', expected: 'cloud-run' },
+    { env: 'ECS_CONTAINER_METADATA_URI_V4', expected: 'ecs' },
+    { env: 'COOLIFY_RESOURCE_UUID', expected: 'coolify' },
+    { env: 'COOLIFY_FQDN', expected: 'coolify' },
+    { env: 'KUBERNETES_SERVICE_HOST', expected: 'kubernetes' },
+  ])('deployment method: $env identifies $expected', async ({ env, expected }) => {
+    clearDeploymentEnvironment();
+    process.env[env] = 'set-by-platform';
+    const config = makeConfig();
+    const fetchMock = makeFetchMock();
+
+    await new TelemetryService(config, fetchMock).sendEvent('instance_started');
+
+    const body = getPostedBody(fetchMock);
+    expect(body.properties).toEqual(
+      expect.objectContaining({
+        deployment_method: expected,
+      })
+    );
+  });
+
   it('starts once, schedules heartbeats, and stops the heartbeat timer', async () => {
     vi.useFakeTimers();
     try {
