@@ -1,9 +1,9 @@
 ---
 title: Custom SMTP
-description: Route every outgoing email through your own SMTP server
+description: Configure your own SMTP server to deliver auth and transactional emails from InsForge, including verification, magic links, and password resets.
 ---
 
-When enabled, every email (auth flows and `emails.send()` calls) routes through your SMTP server. Toggle off to revert; credentials are preserved.
+When enabled, every email (auth flows and `emails.send()` calls) routes through your SMTP server. Toggle off to revert; credentials are preserved. A self-hosted instance cannot turn SMTP off while required email verification depends on it.
 
 <Note>
   **Self-hosted instances need this to send any email at all.** The zero-setup managed sender routes through InsForge Cloud and is only available to cloud-linked projects. A self-hosted instance with no SMTP configured cannot deliver auth emails, so email verification, magic links, and password resets will not be delivered until you complete the setup below.

@@ -4,6 +4,10 @@ export const NEXT_ACTIONS = {
   CHECK_TOKEN: 'Check the token is valid or login to get a new token.',
   CHECK_ADMIN_TOKEN: 'Check the admin token is valid or login as admin to get a new token.',
   CHECK_API_KEY: 'Check the API key is valid or generate a new API key.',
+  CONFIGURE_EMAIL_PROVIDER:
+    'Configure and enable custom SMTP, then retry. Cloud-linked projects can use the managed email provider.',
+  RESEND_VERIFICATION_EMAIL:
+    'The user account already exists. Retry delivery with POST /api/auth/email/send-verification instead of registering again.',
 
   // Database next actions
   CHECK_UNIQUE_FIELD: (field: string) =>

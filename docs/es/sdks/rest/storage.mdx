@@ -51,9 +51,11 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|----------|-------------|
-| `filename` | string | Sí | Nombre de archivo original |
+| `filename` | string | Sí | Clave de objeto a la que subir (usada literalmente) |
 | `contentType` | string | No | Tipo MIME del archivo |
 | `size` | integer | No | Tamaño de archivo en bytes |
+
+Cargar en una clave de objeto existente reemplaza el objeto actual en su lugar.
 
 #### Ejemplo
 
@@ -76,15 +78,15 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
   "uploadUrl": "https://s3-bucket.amazonaws.com/",
   "fields": {
     "bucket": "my-s3-bucket",
-    "key": "app-key/avatars/profile-photo-1234567890-abc123.jpg",
+    "key": "app-key/avatars/profile-photo.jpg",
     "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
     "X-Amz-Credential": "...",
     "Policy": "...",
     "X-Amz-Signature": "..."
   },
-  "key": "profile-photo-1234567890-abc123.jpg",
+  "key": "profile-photo.jpg",
   "confirmRequired": true,
-  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg/confirm-upload",
+  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload",
   "expiresAt": "2025-09-05T01:00:00Z"
 }
 ```
@@ -94,8 +96,8 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
 ```json
 {
   "method": "direct",
-  "uploadUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg",
-  "key": "profile-photo-1234567890-abc123.jpg",
+  "uploadUrl": "/api/storage/buckets/avatars/objects/profile-photo.jpg",
+  "key": "profile-photo.jpg",
   "confirmRequired": false
 }
 ```
@@ -110,7 +112,7 @@ Carga el archivo a la URL especificada usando el método proporcionado.
 
 ### Paso 3: Confirmar carga presignada (solo S3)
 
-Confirma que un archivo se ha cargado correctamente a S3 usando URL presignada.
+Confirma que un archivo se ha cargado correctamente a S3 usando una URL presignada.
 
 ```
 POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
@@ -127,7 +129,7 @@ POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
 #### Ejemplo
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo-123.jpg/confirm-upload" \
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -141,11 +143,11 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/
 ```json
 {
   "bucket": "avatars",
-  "key": "profile-photo-123.jpg",
+  "key": "profile-photo.jpg",
   "size": 102400,
   "mimeType": "image/jpeg",
   "uploadedAt": "2024-01-21T10:30:00Z",
-  "url": "/api/storage/buckets/avatars/objects/profile-photo-123.jpg"
+  "url": "/api/storage/buckets/avatars/objects/profile-photo.jpg"
 }
 ```
 

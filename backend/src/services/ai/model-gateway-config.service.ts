@@ -42,6 +42,10 @@ export class ModelGatewayConfigUpdateError extends Error {
 export class ModelGatewayConfigService {
   private static instance: ModelGatewayConfigService;
   private storedCredentialCache = new Map<ModelGatewayCredentialKey, StoredCredentialCache>();
+  // Bumped on every invalidation. Clearing the map cannot cancel a read that is
+  // already awaiting the secret store, so `getStoredCredential` captures this
+  // before its await and declines to cache a value fetched under an older epoch.
+  private storedCredentialCacheEpoch = 0;
 
   constructor(private readonly secretService: SecretStore = SecretService.getInstance()) {}
 
@@ -93,7 +97,15 @@ export class ModelGatewayConfigService {
       });
     }
 
+    // Seeding wrote a credential, so drop the cached entry and retire any read
+    // already in flight along with it.
+    this.storedCredentialCacheEpoch += 1;
     this.storedCredentialCache.delete(OPENROUTER_API_KEY_SECRET);
+  }
+
+  private invalidateStoredCredentialCache(): void {
+    this.storedCredentialCacheEpoch += 1;
+    this.storedCredentialCache.clear();
   }
 
   async getConfig(): Promise<ModelGatewayConfig> {
@@ -162,7 +174,7 @@ export class ModelGatewayConfigService {
     } finally {
       // The credentials are independent and may update independently. Always invalidate both
       // cache entries so a partial failure is reconciled on the next read.
-      this.storedCredentialCache.clear();
+      this.invalidateStoredCredentialCache();
     }
 
     try {
@@ -179,12 +191,20 @@ export class ModelGatewayConfigService {
       return cached.value;
     }
 
+    const epoch = this.storedCredentialCacheEpoch;
+
     try {
       const value = this.normalizeCredential(await this.secretService.getSecretByKey(key));
-      this.storedCredentialCache.set(key, {
-        value,
-        expiresAt: Date.now() + STORED_CREDENTIAL_CACHE_TTL_MS,
-      });
+      // An update invalidated the cache while this read was in flight, so the value
+      // it just fetched is already stale. Hand it back to this caller, but leave the
+      // cache alone — writing it here would clobber the post-update value with the
+      // superseded credential for a further TTL window.
+      if (epoch === this.storedCredentialCacheEpoch) {
+        this.storedCredentialCache.set(key, {
+          value,
+          expiresAt: Date.now() + STORED_CREDENTIAL_CACHE_TTL_MS,
+        });
+      }
       return value;
     } catch (error) {
       logger.warn('Unable to load a Model Gateway credential', {

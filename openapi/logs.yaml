@@ -11,6 +11,7 @@ paths:
         - Admin
       security:
         - bearerAuth: []
+        - apiKey: []
       parameters:
         - name: limit
           in: query
@@ -104,6 +105,7 @@ paths:
         - Admin
       security:
         - bearerAuth: []
+        - apiKey: []
       parameters:
         - name: before
           in: query
@@ -144,6 +146,7 @@ paths:
         - Admin
       security:
         - bearerAuth: []
+        - apiKey: []
       responses:
         '200':
           description: Logs statistics
@@ -199,6 +202,10 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
   
   schemas:
     ErrorResponse:

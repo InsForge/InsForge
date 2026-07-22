@@ -13,6 +13,7 @@ paths:
         - Admin
       security:
         - bearerAuth: []
+        - apiKey: []
       responses:
         '200':
           description: List of functions
@@ -57,6 +58,7 @@ paths:
         - Admin
       security:
         - bearerAuth: []
+        - apiKey: []
       requestBody:
         required: true
         content:
@@ -162,6 +164,7 @@ paths:
         - Admin
       security:
         - bearerAuth: []
+        - apiKey: []
       parameters:
         - name: slug
           in: path
@@ -221,6 +224,7 @@ paths:
         - Admin
       security:
         - bearerAuth: []
+        - apiKey: []
       parameters:
         - name: slug
           in: path
@@ -299,6 +303,7 @@ paths:
         - Admin
       security:
         - bearerAuth: []
+        - apiKey: []
       parameters:
         - name: slug
           in: path
@@ -538,6 +543,10 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
 
   schemas:
     FunctionMetadata:

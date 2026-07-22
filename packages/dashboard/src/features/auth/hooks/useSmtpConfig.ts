@@ -4,7 +4,11 @@ import { SmtpConfigSchema, UpsertSmtpConfigRequest } from '@insforge/shared-sche
 import { smtpConfigService } from '#features/auth/services/smtp-config.service';
 import { useToast } from '@insforge/ui';
 
-export function useSmtpConfig() {
+interface UseSmtpConfigOptions {
+  enabled?: boolean;
+}
+
+export function useSmtpConfig({ enabled = true }: UseSmtpConfigOptions = {}) {
   const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
@@ -18,13 +22,14 @@ export function useSmtpConfig() {
   } = useQuery<SmtpConfigSchema>({
     queryKey: ['smtp-config'],
     queryFn: () => smtpConfigService.getConfig(),
+    enabled,
   });
 
   // Mutation to update SMTP configuration
   const updateConfigMutation = useMutation({
     mutationFn: (config: UpsertSmtpConfigRequest) => smtpConfigService.updateConfig(config),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['smtp-config'] });
+    onSuccess: (config) => {
+      queryClient.setQueryData(['smtp-config'], config);
       showToast(
         t('auth.smtpConfigUpdatedToast', {
           defaultValue: 'SMTP configuration updated successfully',
