@@ -254,4 +254,32 @@ describe('strict create API schemas', () => {
       }).success
     ).toBe(true);
   });
+
+  it('does not silently downcast a malformed strict receipt to the legacy shape', () => {
+    const strictLikeReceipt = {
+      success: true,
+      message: 'created',
+      id: 'strict-id',
+      disposition: 'created',
+      operationId: 'not-a-uuid',
+      auditId: 'audit-id',
+    };
+
+    expect(createSecretResponseSchema.safeParse(strictLikeReceipt).success).toBe(false);
+    expect(
+      createSecretResponseSchema.safeParse({
+        ...strictLikeReceipt,
+        operationId: '11111111-1111-4111-8111-111111111111',
+        auditId: 42,
+      }).success
+    ).toBe(false);
+    expect(
+      createSecretResponseSchema.safeParse({
+        success: true,
+        message: 'created',
+        id: 'strict-id',
+        disposition: 'created',
+      }).success
+    ).toBe(false);
+  });
 });

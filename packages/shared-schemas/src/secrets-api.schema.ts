@@ -19,11 +19,13 @@ export const createSecretRequestSchema = z.object({
   mode: z.literal('strict').optional(),
 });
 
-export const legacyCreateSecretResponseSchema = z.object({
-  success: z.literal(true),
-  message: z.string(),
-  id: z.string(),
-});
+export const legacyCreateSecretResponseSchema = z
+  .object({
+    success: z.literal(true),
+    message: z.string(),
+    id: z.string(),
+  })
+  .strict();
 
 export const strictCreateSecretResponseSchema = z.object({
   success: z.literal(true),
