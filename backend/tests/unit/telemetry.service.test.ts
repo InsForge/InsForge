@@ -53,6 +53,29 @@ function clearRuntimeEnvironment(): void {
   delete process.env.npm_lifecycle_event;
 }
 
+const deploymentEnvKeys = [
+  'RAILWAY_ENVIRONMENT_ID',
+  'ZEABUR',
+  'SEALOS_APP_NAME',
+  'DOKPLOY_PROJECT_NAME',
+  'RENDER',
+  'FLY_APP_NAME',
+  'K_SERVICE',
+  'ECS_CONTAINER_METADATA_URI_V4',
+  'ECS_CONTAINER_METADATA_URI',
+  'COOLIFY_RESOURCE_UUID',
+  'COOLIFY_FQDN',
+  'KUBERNETES_SERVICE_HOST',
+  'INSFORGE_DEPLOYMENT_METHOD',
+  'POSTGRES_HOST',
+];
+
+function clearDeploymentEnvironment(): void {
+  for (const key of deploymentEnvKeys) {
+    delete process.env[key];
+  }
+}
+
 function getPostedBody(fetchMock: FetchFunction, callIndex = 0): Record<string, unknown> {
   const call = vi.mocked(fetchMock).mock.calls[callIndex];
   expect(call).toBeDefined();
@@ -217,6 +240,60 @@ describe('TelemetryService', () => {
       );
     }
   );
+
+  it.each([
+    {
+      name: 'platform-injected variables win over the artifact stamp',
+      setup: () => {
+        process.env.RAILWAY_ENVIRONMENT_ID = 'env-123';
+        process.env.INSFORGE_DEPLOYMENT_METHOD = 'docker';
+      },
+      expectedDeploymentMethod: 'railway',
+    },
+    {
+      name: 'the artifact stamp is normalized and wins over the compose heuristic',
+      setup: () => {
+        process.env.INSFORGE_DEPLOYMENT_METHOD = ' Dokploy ';
+        process.env.POSTGRES_HOST = 'postgres';
+      },
+      expectedDeploymentMethod: 'dokploy',
+    },
+    {
+      name: 'pre-stamp compose files match the postgres host heuristic',
+      setup: () => {
+        process.env.POSTGRES_HOST = 'postgres';
+      },
+      expectedDeploymentMethod: 'docker-compose',
+    },
+    {
+      name: 'unstamped containers report docker',
+      setup: () => {
+        vi.spyOn(fs, 'existsSync').mockImplementation((target) => target === '/.dockerenv');
+      },
+      expectedDeploymentMethod: 'docker',
+    },
+    {
+      name: 'anything else reports source',
+      setup: () => {
+        vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+      },
+      expectedDeploymentMethod: 'source',
+    },
+  ])('deployment method: $name', async ({ setup, expectedDeploymentMethod }) => {
+    clearDeploymentEnvironment();
+    setup();
+    const config = makeConfig();
+    const fetchMock = makeFetchMock();
+
+    await new TelemetryService(config, fetchMock).sendEvent('instance_started');
+
+    const body = getPostedBody(fetchMock);
+    expect(body.properties).toEqual(
+      expect.objectContaining({
+        deployment_method: expectedDeploymentMethod,
+      })
+    );
+  });
 
   it('starts once, schedules heartbeats, and stops the heartbeat timer', async () => {
     vi.useFakeTimers();

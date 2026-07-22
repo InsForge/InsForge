@@ -135,6 +135,7 @@ services:
       - LOGS_DIR=/insforge-logs
       # Anonymous telemetry (set INSFORGE_TELEMETRY_DISABLED=1 to opt out)
       - INSFORGE_TELEMETRY_DISABLED=${INSFORGE_TELEMETRY_DISABLED:-}
+      - INSFORGE_DEPLOYMENT_METHOD=docker-compose
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
     volumes:
