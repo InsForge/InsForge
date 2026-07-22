@@ -57,17 +57,14 @@ const deploymentEnvKeys = [
   'RAILWAY_ENVIRONMENT_ID',
   'ZEABUR',
   'SEALOS_APP_NAME',
-  'DOKPLOY_PROJECT_NAME',
   'RENDER',
   'FLY_APP_NAME',
   'K_SERVICE',
   'ECS_CONTAINER_METADATA_URI_V4',
-  'ECS_CONTAINER_METADATA_URI',
   'COOLIFY_RESOURCE_UUID',
   'COOLIFY_FQDN',
   'KUBERNETES_SERVICE_HOST',
   'INSFORGE_DEPLOYMENT_METHOD',
-  'POSTGRES_HOST',
 ];
 
 function clearDeploymentEnvironment(): void {
@@ -251,19 +248,11 @@ describe('TelemetryService', () => {
       expectedDeploymentMethod: 'railway',
     },
     {
-      name: 'the artifact stamp is normalized and wins over the compose heuristic',
+      name: 'the artifact stamp is normalized',
       setup: () => {
         process.env.INSFORGE_DEPLOYMENT_METHOD = ' Dokploy ';
-        process.env.POSTGRES_HOST = 'postgres';
       },
       expectedDeploymentMethod: 'dokploy',
-    },
-    {
-      name: 'pre-stamp compose files match the postgres host heuristic',
-      setup: () => {
-        process.env.POSTGRES_HOST = 'postgres';
-      },
-      expectedDeploymentMethod: 'docker-compose',
     },
     {
       name: 'unstamped containers report docker',

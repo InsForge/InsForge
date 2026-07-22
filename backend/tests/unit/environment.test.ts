@@ -1,9 +1,4 @@
-import {
-  isCloudEnvironment,
-  isOAuthSharedKeysAvailable,
-  isDevelopment,
-  isProduction,
-} from '../../src/utils/environment';
+import { isCloudEnvironment, isOAuthSharedKeysAvailable } from '../../src/utils/environment';
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 
 describe('Environment utils', () => {
@@ -33,30 +28,5 @@ describe('Environment utils', () => {
 
     delete process.env.AWS_INSTANCE_PROFILE_NAME;
     expect(isOAuthSharedKeysAvailable()).toBe(false);
-  });
-
-  it('isDevelopment works correctly', () => {
-    process.env.NODE_ENV = 'development';
-    expect(isDevelopment()).toBe(true);
-
-    process.env.NODE_ENV = 'production';
-    expect(isDevelopment()).toBe(false);
-
-    process.env.NODE_ENV = 'test';
-    expect(isDevelopment()).toBe(false);
-
-    delete process.env.NODE_ENV;
-    expect(isDevelopment()).toBe(false);
-  });
-
-  it('isProduction works correctly', () => {
-    process.env.NODE_ENV = 'production';
-    expect(isProduction()).toBe(true);
-
-    process.env.NODE_ENV = 'development';
-    expect(isProduction()).toBe(false);
-
-    delete process.env.NODE_ENV;
-    expect(isProduction()).toBe(false);
   });
 });

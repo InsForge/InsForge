@@ -291,10 +291,6 @@ function detectDeploymentMethod(): string {
     return 'sealos';
   }
 
-  if (process.env.DOKPLOY_PROJECT_NAME) {
-    return 'dokploy';
-  }
-
   if (process.env.RENDER) {
     return 'render';
   }
@@ -307,7 +303,7 @@ function detectDeploymentMethod(): string {
     return 'cloud-run';
   }
 
-  if (process.env.ECS_CONTAINER_METADATA_URI_V4 || process.env.ECS_CONTAINER_METADATA_URI) {
+  if (process.env.ECS_CONTAINER_METADATA_URI_V4) {
     return 'ecs';
   }
 
@@ -320,16 +316,12 @@ function detectDeploymentMethod(): string {
   }
 
   // Artifact stamp: each distribution artifact we ship (compose files,
-  // Dockerfile, PaaS templates) declares its channel. Length-capped to keep
-  // property cardinality bounded when users edit the value.
+  // Dockerfile, PaaS templates) declares its channel. Dokploy is identified
+  // this way — it does not inject variables into containers. Length-capped
+  // to keep property cardinality bounded when users edit the value.
   const stamped = process.env.INSFORGE_DEPLOYMENT_METHOD?.trim().toLowerCase();
   if (stamped) {
     return stamped.slice(0, 32);
-  }
-
-  // Compose files published before the stamp existed
-  if (process.env.POSTGRES_HOST === 'postgres') {
-    return 'docker-compose';
   }
 
   // Container images built before the stamp existed
