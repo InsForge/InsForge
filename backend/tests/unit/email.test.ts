@@ -373,4 +373,235 @@ describe('EmailService', () => {
       });
     });
   });
+
+  describe('sendRaw', () => {
+    it('returns suppressed: false if the backend does not report suppression', async () => {
+      vi.mocked(axios.post).mockResolvedValue({
+        data: { success: true },
+      });
+
+      const response = await emailService.sendRaw({
+        to: 'user@example.com',
+        subject: 'Hello',
+        html: '<p>Hello</p>',
+      });
+
+      expect(response).toEqual({ suppressed: false });
+    });
+
+    it('returns suppressed: true if the backend reports suppression', async () => {
+      vi.mocked(axios.post).mockResolvedValue({
+        data: { success: true, suppressed: true },
+      });
+
+      const response = await emailService.sendRaw({
+        to: 'user@example.com',
+        subject: 'Hello',
+        html: '<p>Hello</p>',
+      });
+
+      expect(response).toEqual({ suppressed: true });
+    });
+
+    it('throws error if PROJECT_ID is not configured', async () => {
+      const { appConfig } = await import('../../src/infra/config/app.config');
+      appConfig.cloud.projectId = 'local';
+
+      try {
+        await expect(
+          emailService.sendRaw({
+            to: 'user@example.com',
+            subject: 'Hello',
+            html: '<p>Hello</p>',
+          })
+        ).rejects.toThrow('PROJECT_ID is not configured');
+      } finally {
+        appConfig.cloud.projectId = 'test-project-123';
+      }
+    });
+
+    it('throws error if JWT_SECRET is not configured', async () => {
+      const { appConfig } = await import('../../src/infra/config/app.config');
+      appConfig.app.jwtSecret = '';
+
+      try {
+        await expect(
+          emailService.sendRaw({
+            to: 'user@example.com',
+            subject: 'Hello',
+            html: '<p>Hello</p>',
+          })
+        ).rejects.toThrow('JWT_SECRET is not configured');
+      } finally {
+        appConfig.app.jwtSecret = 'test-jwt-secret';
+      }
+    });
+
+    it('throws error if cloud service returns unsuccessful response', async () => {
+      vi.mocked(axios.post).mockResolvedValue({
+        data: { success: false },
+      });
+
+      await expect(
+        emailService.sendRaw({
+          to: 'user@example.com',
+          subject: 'Hello',
+          html: '<p>Hello</p>',
+        })
+      ).rejects.toThrow('Email service returned unsuccessful response');
+    });
+
+    it('handles 401 authentication error', async () => {
+      const error = Object.assign(new Error('Request failed'), {
+        isAxiosError: true,
+        response: {
+          status: 401,
+          data: { message: 'Unauthorized' },
+        },
+      });
+
+      vi.mocked(axios.post).mockRejectedValue(error);
+      vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+      await expect(
+        emailService.sendRaw({
+          to: 'user@example.com',
+          subject: 'Hello',
+          html: '<p>Hello</p>',
+        })
+      ).rejects.toThrow('Authentication failed with cloud email service');
+    });
+
+    it('handles 403 forbidden error', async () => {
+      const error = Object.assign(new Error('Request failed'), {
+        isAxiosError: true,
+        response: {
+          status: 403,
+          data: { message: 'Forbidden' },
+        },
+      });
+
+      vi.mocked(axios.post).mockRejectedValue(error);
+      vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+      await expect(
+        emailService.sendRaw({
+          to: 'user@example.com',
+          subject: 'Hello',
+          html: '<p>Hello</p>',
+        })
+      ).rejects.toThrow('Custom email service is not available for free plan');
+    });
+
+    it('handles 429 rate limit error', async () => {
+      const error = Object.assign(new Error('Request failed'), {
+        isAxiosError: true,
+        response: {
+          status: 429,
+          data: { message: 'Too many requests' },
+        },
+      });
+
+      vi.mocked(axios.post).mockRejectedValue(error);
+      vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+      await expect(
+        emailService.sendRaw({
+          to: 'user@example.com',
+          subject: 'Hello',
+          html: '<p>Hello</p>',
+        })
+      ).rejects.toThrow('Email rate limit exceeded');
+    });
+
+    it('handles 400 bad request error', async () => {
+      const error = Object.assign(new Error('Request failed'), {
+        isAxiosError: true,
+        response: {
+          status: 400,
+          data: { message: 'Invalid format' },
+        },
+      });
+
+      vi.mocked(axios.post).mockRejectedValue(error);
+      vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+      await expect(
+        emailService.sendRaw({
+          to: 'user@example.com',
+          subject: 'Hello',
+          html: '<p>Hello</p>',
+        })
+      ).rejects.toThrow('Invalid email request: Invalid format');
+    });
+
+    it('handles generic axios error', async () => {
+      const error = Object.assign(new Error('Request failed'), {
+        isAxiosError: true,
+        response: {
+          status: 500,
+          data: { message: 'Internal error' },
+        },
+      });
+
+      vi.mocked(axios.post).mockRejectedValue(error);
+      vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+      await expect(
+        emailService.sendRaw({
+          to: 'user@example.com',
+          subject: 'Hello',
+          html: '<p>Hello</p>',
+        })
+      ).rejects.toThrow('Failed to send email: Internal error');
+    });
+
+    it('handles network error without response', async () => {
+      const error = Object.assign(new Error('Network error'), {
+        isAxiosError: true,
+      });
+
+      vi.mocked(axios.post).mockRejectedValue(error);
+      vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+      await expect(
+        emailService.sendRaw({
+          to: 'user@example.com',
+          subject: 'Hello',
+          html: '<p>Hello</p>',
+        })
+      ).rejects.toThrow('Failed to send email: Network error');
+    });
+
+    it('handles non-axios error', async () => {
+      vi.mocked(axios.post).mockRejectedValue(new Error('Unexpected error'));
+
+      await expect(
+        emailService.sendRaw({
+          to: 'user@example.com',
+          subject: 'Hello',
+          html: '<p>Hello</p>',
+        })
+      ).rejects.toThrow('Failed to send email: Unexpected error');
+    });
+
+    it('throws error if the provider does not support sendRaw', async () => {
+      const service = emailService as unknown as { cloudProvider: unknown };
+      const originalProvider = service.cloudProvider;
+      service.cloudProvider = {
+        supportsTemplates: () => true,
+      };
+      try {
+        await expect(
+          emailService.sendRaw({
+            to: 'user@example.com',
+            subject: 'Hello',
+            html: '<p>Hello</p>',
+          })
+        ).rejects.toThrow('Current email provider does not support raw email sending');
+      } finally {
+        service.cloudProvider = originalProvider;
+      }
+    });
+  });
 });

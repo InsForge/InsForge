@@ -195,10 +195,14 @@ export class SmtpConfigService {
         return null;
       }
 
-      const password = this.getDecryptedPassword(row.password_encrypted);
-      if (password === null) {
-        logger.error('SMTP config has undecryptable credentials — treating as unconfigured');
-        return null;
+      let password = '';
+      if (row.username) {
+        const decrypted = this.getDecryptedPassword(row.password_encrypted);
+        if (decrypted === null) {
+          logger.error('SMTP config has undecryptable credentials — treating as unconfigured');
+          return null;
+        }
+        password = decrypted;
       }
 
       return {
@@ -385,11 +389,12 @@ export class SmtpConfigService {
     input: UpsertSmtpConfigRequest,
     existingPasswordEncrypted: string
   ): Promise<void> {
+    const hasAuth = !!input.username;
     const password = input.password ?? this.getDecryptedPassword(existingPasswordEncrypted) ?? '';
 
-    if (!password) {
+    if (hasAuth && !password && !existingPasswordEncrypted) {
       throw new AppError(
-        'SMTP password is required when enabling SMTP',
+        'SMTP password is required when enabling SMTP with authentication',
         400,
         ERROR_CODES.INVALID_INPUT
       );
@@ -400,7 +405,7 @@ export class SmtpConfigService {
         host: input.host,
         port: input.port,
         secure: input.port === 465,
-        auth: { user: input.username, pass: password },
+        ...(hasAuth ? { auth: { user: input.username, pass: password } } : {}),
         connectionTimeout: 10000,
       });
       await transporter.verify();

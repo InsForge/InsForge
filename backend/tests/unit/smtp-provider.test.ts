@@ -185,4 +185,42 @@ describe('SmtpEmailProvider', () => {
       ).rejects.toThrow(AppError);
     });
   });
+
+  describe('createTransporter options', () => {
+    it('sets auth credentials when username is present', async () => {
+      const nodemailer = await import('nodemailer');
+      getRawSmtpConfigMock.mockResolvedValueOnce({
+        ...mockSmtpConfig,
+        username: 'user@example.com',
+        password: 'password',
+      });
+      await provider.sendRaw({
+        to: 'recipient@example.com',
+        subject: 'Test',
+        html: '<p>Hello</p>',
+      });
+      expect(nodemailer.default.createTransport).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          auth: { user: 'user@example.com', pass: 'password' },
+        })
+      );
+    });
+
+    it('omits auth completely when username is absent', async () => {
+      const nodemailer = await import('nodemailer');
+      getRawSmtpConfigMock.mockResolvedValueOnce({
+        ...mockSmtpConfig,
+        username: '',
+        password: '',
+      });
+      await provider.sendRaw({
+        to: 'recipient@example.com',
+        subject: 'Test',
+        html: '<p>Hello</p>',
+      });
+      const lastCall = vi.mocked(nodemailer.default.createTransport).mock.lastCall?.[0];
+      expect(lastCall).toBeDefined();
+      expect(lastCall).not.toHaveProperty('auth');
+    });
+  });
 });

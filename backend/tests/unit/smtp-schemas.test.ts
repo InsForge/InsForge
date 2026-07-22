@@ -98,7 +98,7 @@ describe('SMTP Config Request Schema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects empty username', () => {
+  it('accepts empty username (no-auth SMTP)', () => {
     const result = upsertSmtpConfigRequestSchema.safeParse({
       enabled: true,
       host: 'smtp.test.com',
@@ -107,7 +107,7 @@ describe('SMTP Config Request Schema', () => {
       senderEmail: 'test@test.com',
       senderName: 'Test',
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('rejects empty sender name', () => {

@@ -4,7 +4,7 @@ import { AppError } from '@/utils/errors.js';
 import { EmailTemplate } from '@/types/email.js';
 import { SmtpConfigService, RawSmtpConfig } from '@/services/email/smtp-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';
-import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
+import { ERROR_CODES, SendRawEmailRequest, SendEmailResponse } from '@insforge/shared-schemas';
 import { EmailProvider } from './base.provider.js';
 import logger from '@/utils/logger.js';
 
@@ -32,11 +32,15 @@ export class SmtpEmailProvider implements EmailProvider {
   }
 
   private createTransporter(config: RawSmtpConfig) {
+    // Skip auth entirely only when no username is configured (e.g. Mailhog, local
+    // dev SMTP). If a username is present, always send credentials — a blank
+    // password can be intentional and must not suppress the auth header.
+    const hasAuth = !!config.username;
     return nodemailer.createTransport({
       host: config.host,
       port: config.port,
       secure: config.port === 465,
-      auth: { user: config.username, pass: config.password },
+      ...(hasAuth ? { auth: { user: config.username, pass: config.password } } : {}),
       connectionTimeout: 10000,
     });
   }
@@ -123,7 +127,7 @@ export class SmtpEmailProvider implements EmailProvider {
     );
   }
 
-  async sendRaw(options: SendRawEmailRequest): Promise<void> {
+  async sendRaw(options: SendRawEmailRequest): Promise<SendEmailResponse> {
     const config = await this.getRequiredConfig();
 
     await this.send(
@@ -138,5 +142,9 @@ export class SmtpEmailProvider implements EmailProvider {
       },
       { to: options.to }
     );
+
+    return {
+      suppressed: false,
+    };
   }
 }

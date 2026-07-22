@@ -131,7 +131,12 @@ components:
 
     SendEmailResponse:
       type: object
-      description: Empty object on success - extend with optional fields later if needed
+      description: Response object for sent emails
+      properties:
+        suppressed:
+          type: boolean
+          description: Whether the recipient address is suppressed (e.g. unsubscribed)
+          example: false
 
     ErrorResponse:
       type: object
