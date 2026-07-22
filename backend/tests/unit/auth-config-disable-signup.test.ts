@@ -28,6 +28,23 @@ vi.mock('../../src/utils/logger', () => ({
   },
 }));
 
+vi.mock('../../src/infra/config/app.config', () => ({
+  appConfig: {
+    app: { jwtSecret: 'test-secret' },
+    cloud: { projectId: undefined },
+  },
+}));
+
+vi.mock('../../src/infra/security/encryption.manager', () => ({
+  EncryptionManager: {
+    decrypt: vi.fn().mockReturnValue('smtp-password'),
+  },
+}));
+
+vi.mock('../../src/utils/environment', () => ({
+  isCloudEnvironment: () => false,
+}));
+
 import { AuthConfigService } from '../../src/services/auth/auth-config.service';
 
 describe('AuthConfigService – disableSignup', () => {
@@ -188,7 +205,7 @@ describe('AuthConfigService – disableSignup', () => {
         })
         .mockResolvedValueOnce(undefined);
 
-      await service.updateAuthConfig({ requireEmailVerification: true });
+      await service.updateAuthConfig({ passwordMinLength: 8 });
 
       const updateCall = mockClient.query.mock.calls.find(
         (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('UPDATE auth.config')
@@ -197,6 +214,53 @@ describe('AuthConfigService – disableSignup', () => {
       // RETURNING clause always lists all columns; only check the SET portion
       const setClause = updateCall![0].split('RETURNING')[0];
       expect(setClause).not.toContain('disable_signup');
+    });
+
+    it('rejects enabling email verification when no email provider is configured', async () => {
+      mockClient.query.mockImplementation(async (query: string) => {
+        if (query.includes('SELECT id FROM auth.config')) {
+          return { rows: [{ id: 'b04553ba-5572-4012-a157-3d8dce0f7938' }] };
+        }
+        if (query.includes('FROM email.config')) {
+          return { rows: [] };
+        }
+        if (query.includes('UPDATE auth.config')) {
+          return { rows: [{ ...baseReturnRow, requireEmailVerification: true }] };
+        }
+        return { rows: [] };
+      });
+
+      await expect(
+        service.updateAuthConfig({ requireEmailVerification: true })
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        code: 'EMAIL_PROVIDER_NOT_CONFIGURED',
+      });
+
+      expect(
+        mockClient.query.mock.calls.some(
+          (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('UPDATE auth.config')
+        )
+      ).toBe(false);
+    });
+
+    it('allows enabling email verification when SMTP is configured', async () => {
+      mockClient.query.mockImplementation(async (query: string) => {
+        if (query.includes('SELECT id FROM auth.config')) {
+          return { rows: [{ id: 'b04553ba-5572-4012-a157-3d8dce0f7938' }] };
+        }
+        if (query.includes('FROM email.config')) {
+          return { rows: [{ enabled: true, password_encrypted: 'encrypted-password' }] };
+        }
+        if (query.includes('UPDATE auth.config')) {
+          return { rows: [{ ...baseReturnRow, requireEmailVerification: true }] };
+        }
+        return { rows: [] };
+      });
+
+      const result = await service.updateAuthConfig({ requireEmailVerification: true });
+
+      expect(result.requireEmailVerification).toBe(true);
     });
   });
 });
