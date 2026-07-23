@@ -72,13 +72,11 @@ services:
       LOGS_DIR: /insforge-logs
       STORAGE_DIR: /insforge-storage
       # S3-compatible storage (AWS S3, MinIO, RustFS, Wasabi, R2, Tencent COS ...).
-      # Leave AWS_S3_BUCKET empty to keep local filesystem storage. Set
+      # Leave S3_BUCKET empty to keep local filesystem storage. Set
       # S3_PRESIGNED_URLS=false to proxy object bytes through the backend
       # (required when the S3 endpoint is not reachable by browsers).
-      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
-      AWS_REGION: ${AWS_REGION:-}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
       S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
@@ -86,9 +84,6 @@ services:
       S3_MAX_OBJECT_SIZE_BYTES: ${S3_MAX_OBJECT_SIZE_BYTES:-}
       S3_PRESIGNED_URLS: ${S3_PRESIGNED_URLS:-}
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-}
-      AWS_CLOUDFRONT_URL: ${AWS_CLOUDFRONT_URL:-}
-      AWS_CLOUDFRONT_KEY_PAIR_ID: ${AWS_CLOUDFRONT_KEY_PAIR_ID:-}
-      AWS_CLOUDFRONT_PRIVATE_KEY: ${AWS_CLOUDFRONT_PRIVATE_KEY:-}
       INSFORGE_TELEMETRY_DISABLED: ${INSFORGE_TELEMETRY_DISABLED:-}
       INSFORGE_DEPLOYMENT_METHOD: dokploy
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}

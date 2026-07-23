@@ -91,9 +91,13 @@ services:
       - MAX_JSON_BODY_SIZE=${MAX_JSON_BODY_SIZE:-}
       - MAX_URLENCODED_BODY_SIZE=${MAX_URLENCODED_BODY_SIZE:-}
       - KEEP_ALIVE_TIMEOUT_MS=${KEEP_ALIVE_TIMEOUT_MS:-}
+      # S3-compatible storage (MinIO, RustFS, Wasabi, Tencent COS, Aliyun OSS,
+      # R2 ...). S3_BUCKET/S3_REGION preferred; AWS_* are the legacy names
+      # kept for cloud provisioning and existing .env files.
+      - S3_BUCKET=${S3_BUCKET:-}
+      - S3_REGION=${S3_REGION:-}
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}
-      # S3-compatible storage (MinIO, Tencent COS, Aliyun OSS, R2 ...)
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}

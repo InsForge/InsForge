@@ -52,7 +52,7 @@ export class StorageService {
       this.provider = new S3StorageProvider(
         s3Bucket,
         appKey,
-        appConfig.storage.awsRegion,
+        appConfig.storage.s3Region,
         parentAppKey
       );
       if (parentAppKey) {

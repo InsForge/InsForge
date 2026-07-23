@@ -22,6 +22,7 @@ import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js'
 import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { isUnsafeMime, resolveSafeMimeType } from '@/utils/mime-guard.js';
 import logger from '@/utils/logger.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
@@ -906,7 +907,9 @@ router.get('/s3/config', verifyAdmin, (_req: AuthRequest, res: Response, next: N
   try {
     const base = (process.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
     const endpoint = base ? `${base}/storage/v1/s3` : '/storage/v1/s3';
-    const region = process.env.AWS_REGION || 'us-east-2';
+    // Same source as the SigV4 middleware's SIGNING_REGION, so the dashboard
+    // always shows the region the gateway will actually accept.
+    const region = appConfig.storage.s3Region;
     // The gateway only works with an S3-backed provider; local-storage
     // deployments get available:false so the dashboard hides the S3 tab.
     const available = StorageService.getInstance().isS3Provider();

@@ -284,14 +284,14 @@ DENO_PORT=7133
 
 These variables are only needed if you plan to use InsForge's **deployment features** (deploying projects via the dashboard). If you don't need deployments, skip this section.
 
-> ⚠️ **Note**: `PROJECT_ID` comes from the root `.env.example` setup. It is **not** present in `deploy/docker-compose/.env.example`, and the `deploy/docker-compose/docker-compose.yml` does **not** pass it through to the `insforge` container, so setting it in your `.env` has no effect on that production compose. To use it, add it to the `insforge` service's `environment` block in your `docker-compose.yml`. The storage variables (`AWS_S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_*`, `MAX_FILE_SIZE`) **are** passed through — set them in your `.env` and restart.
+> ⚠️ **Note**: `PROJECT_ID` comes from the root `.env.example` setup. It is **not** present in `deploy/docker-compose/.env.example`, and the `deploy/docker-compose/docker-compose.yml` does **not** pass it through to the `insforge` container, so setting it in your `.env` has no effect on that production compose. To use it, add it to the `insforge` service's `environment` block in your `docker-compose.yml`. The storage variables (`S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `S3_PRESIGNED_URLS`, `S3_MAX_OBJECT_SIZE_BYTES`, `MAX_FILE_SIZE`) **are** passed through — set them in your `.env` and restart.
 
 ```env
 # ── Deployments ──────────────────────────────────────────────
 # S3 bucket for legacy zip deployment uploads.
 # Direct uploads use the backend proxy, but POST /api/deployments still requires S3.
-AWS_S3_BUCKET=your-deployment-bucket
-AWS_REGION=us-east-2
+S3_BUCKET=your-deployment-bucket
+S3_REGION=us-east-2
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
 
@@ -326,14 +326,13 @@ OPENROUTER_API_KEY=
 # filesystem storage is used automatically. See the "Self-hosted storage"
 # guide for bring-your-own S3, bundled MinIO/RustFS overlays, and the
 # S3-compatible gateway.
-AWS_S3_BUCKET=
-AWS_REGION=
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-# Custom S3-compatible endpoint (MinIO, RustFS, Wasabi, R2, COS, OSS ...)
-S3_ENDPOINT_URL=
+S3_BUCKET=
+S3_REGION=
 S3_ACCESS_KEY_ID=
 S3_SECRET_ACCESS_KEY=
+# Custom S3-compatible endpoint (MinIO, RustFS, Wasabi, R2, COS, OSS ...);
+# leave empty for AWS S3
+S3_ENDPOINT_URL=
 S3_FORCE_PATH_STYLE=true
 # Set to false to proxy object bytes through the backend (required when the
 # endpoint is not reachable by browsers, e.g. a bundled store on the Docker

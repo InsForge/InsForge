@@ -75,7 +75,7 @@ export interface AppConfig {
     s3Bucket: string | undefined;
     appKey: string;
     parentAppKey: string | undefined;
-    awsRegion: string;
+    s3Region: string;
     storageDir: string;
     s3AccessKeyId: string | undefined;
     s3SecretAccessKey: string | undefined;
@@ -201,10 +201,14 @@ export function loadConfig(): AppConfig {
       accessAnonKey: process.env.ACCESS_ANON_KEY || undefined,
     },
     storage: {
-      s3Bucket: process.env.AWS_S3_BUCKET || undefined,
+      // S3_BUCKET / S3_REGION are the provider-neutral names for self-hosting
+      // (the store can be MinIO, RustFS, Wasabi, R2, ... — not just AWS).
+      // AWS_S3_BUCKET / AWS_REGION remain as fallbacks: cloud provisioning
+      // sets them, and existing self-host .env files keep working.
+      s3Bucket: process.env.S3_BUCKET || process.env.AWS_S3_BUCKET || undefined,
       appKey: process.env.APP_KEY || 'local',
       parentAppKey: process.env.PARENT_APP_KEY?.trim() || undefined,
-      awsRegion: process.env.AWS_REGION || 'us-east-2',
+      s3Region: process.env.S3_REGION || process.env.AWS_REGION || 'us-east-2',
       storageDir: process.env.STORAGE_DIR || path.resolve(process.cwd(), 'insforge-storage'),
       s3AccessKeyId: process.env.S3_ACCESS_KEY_ID || undefined,
       s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY || undefined,

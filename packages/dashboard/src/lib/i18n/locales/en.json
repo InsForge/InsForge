@@ -1967,7 +1967,7 @@
     "refreshFiles": "Refresh files",
     "refreshing": "Refreshing...",
     "region": "Region",
-    "regionDescription": "SigV4 signing region expected by the gateway. Clients must sign with this exact value (configurable server-side via AWS_REGION).",
+    "regionDescription": "SigV4 signing region expected by the gateway. Clients must sign with this exact value (configurable server-side via S3_REGION).",
     "revoke": "Revoke",
     "revokeAccessKey": "Revoke access key",
     "revokeS3AccessKeyDescription": "The access key {{accessKeyId}} will stop working immediately. Any client still using it will start getting InvalidAccessKeyId errors.",

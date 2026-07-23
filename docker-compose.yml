@@ -96,7 +96,10 @@ services:
       # Deno Deploy Configuration
       - DENO_DEPLOY_TOKEN=${DENO_DEPLOY_TOKEN:-}
       - DENO_DEPLOY_ORG_ID=${DENO_DEPLOY_ORG_ID:-}
-      # Storage Configuration
+      # Storage Configuration (S3_BUCKET/S3_REGION preferred; AWS_* are the
+      # legacy names kept for cloud provisioning and existing .env files)
+      - S3_BUCKET=${S3_BUCKET:-}
+      - S3_REGION=${S3_REGION:-}
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}

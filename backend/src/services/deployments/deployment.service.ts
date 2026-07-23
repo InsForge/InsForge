@@ -73,7 +73,7 @@ export class DeploymentService {
     const appKey = appConfig.storage.appKey;
 
     if (s3Bucket) {
-      this.s3Provider = new S3StorageProvider(s3Bucket, appKey, appConfig.storage.awsRegion);
+      this.s3Provider = new S3StorageProvider(s3Bucket, appKey, appConfig.storage.s3Region);
       this.s3Provider.initialize();
     }
   }
@@ -206,7 +206,7 @@ export class DeploymentService {
 
     if (!this.s3Provider) {
       throw new AppError(
-        'S3 storage is required for legacy deployments. Please configure AWS_S3_BUCKET.',
+        'S3 storage is required for legacy deployments. Please configure S3_BUCKET.',
         503,
         ERROR_CODES.INTERNAL_ERROR
       );
@@ -549,7 +549,7 @@ export class DeploymentService {
   ): Promise<DeploymentRecord> {
     if (!this.s3Provider) {
       throw new AppError(
-        'S3 storage is required for legacy deployments. Please configure AWS_S3_BUCKET.',
+        'S3 storage is required for legacy deployments. Please configure S3_BUCKET.',
         503,
         ERROR_CODES.INTERNAL_ERROR
       );

@@ -78,7 +78,7 @@ export class DatabaseBackupService {
       this.s3Provider = new S3StorageProvider(
         appConfig.storage.s3Bucket,
         appConfig.storage.appKey,
-        appConfig.storage.awsRegion
+        appConfig.storage.s3Region
       );
       void this.s3Provider.initialize();
     }

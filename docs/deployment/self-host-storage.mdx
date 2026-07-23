@@ -18,21 +18,19 @@ You have three options:
 Set these in your `.env` (all production compose files pass them through to the backend) and restart:
 
 ```env
-# Required — any S3-compatible store, not just AWS
-AWS_S3_BUCKET=my-insforge-bucket
-AWS_REGION=us-east-1
-
-# For AWS S3: use AWS credentials
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-
-# For any other S3-compatible provider: add the endpoint (S3_* credentials
-# take precedence over AWS_* when set)
-S3_ENDPOINT_URL=https://s3.my-provider.example
+# Required — any S3-compatible store
+S3_BUCKET=my-insforge-bucket
+S3_REGION=us-east-1
 S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
+
+# For non-AWS providers: add the endpoint. Leave empty for AWS S3
+# (SDK default endpoints; credentials may also come from an IAM role).
+S3_ENDPOINT_URL=https://s3.my-provider.example
 S3_FORCE_PATH_STYLE=true
 ```
+
+The legacy `AWS_S3_BUCKET` / `AWS_REGION` names still work as fallbacks, but the `S3_*` names are preferred — the store doesn't have to be AWS.
 
 Storage auto-wires to the bucket on startup — no other configuration. The S3 gateway turns on automatically.
 
@@ -90,7 +88,7 @@ Switching an existing deployment from local storage to an S3 backend does not mi
 
 Dokploy takes a single compose file, so overlays don't apply. Two options:
 
-1. **External store** — set `AWS_S3_BUCKET`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE=true` (and `S3_PRESIGNED_URLS=false` for private endpoints) in Dokploy's environment UI. `docker-compose.dokploy.yml` passes them through.
+1. **External store** — set `S3_BUCKET`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE=true` (and `S3_PRESIGNED_URLS=false` for private endpoints) in Dokploy's environment UI. `docker-compose.dokploy.yml` passes them through.
 2. **MinIO/RustFS on the same Dokploy host** — deploy the store as its own Dokploy service, then point the env vars above at its internal address.
 
 ## Using the S3-compatible gateway
@@ -108,7 +106,7 @@ aws_secret_access_key = ...
 
 # ~/.aws/config
 [profile insforge]
-region = us-east-1            # must match the backend's AWS_REGION
+region = us-east-1            # must match the backend's S3_REGION
 endpoint_url = https://your-domain.example/storage/v1/s3
 s3 =
   addressing_style = path
@@ -126,11 +124,13 @@ Uploads made through the gateway appear immediately in the REST API and Dashboar
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `AWS_S3_BUCKET` | _(empty = local storage)_ | Backing bucket; setting it selects the S3 provider |
-| `AWS_REGION` | `us-east-2` | Signing region (also the gateway's expected SigV4 region) |
+| `S3_BUCKET` | _(empty = local storage)_ | Backing bucket; setting it selects the S3 provider |
+| `S3_REGION` | `us-east-2` | Signing region (also the gateway's expected SigV4 region) |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | _(empty)_ | Store credentials |
 | `S3_ENDPOINT_URL` | _(empty = AWS)_ | Custom S3-compatible endpoint |
-| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | _(empty)_ | Store credentials; take precedence over `AWS_*` |
 | `S3_FORCE_PATH_STYLE` | `true` | Path-style addressing (`false` for COS/OSS) |
 | `S3_PRESIGNED_URLS` | `true` | `false` = proxy mode: bytes stream through the backend |
 | `S3_MAX_OBJECT_SIZE_BYTES` | 5 GB | Max single S3-gateway upload / part size |
 | `MAX_FILE_SIZE` | 50 MB | REST API upload cap (also configurable in the Dashboard) |
+
+The `AWS_*` variables (`AWS_S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_CLOUDFRONT_*`) are cloud-project and legacy names: the first two work as fallbacks for `S3_BUCKET`/`S3_REGION`, the credentials double as CloudWatch/CloudFront credentials, and CloudFront only applies to AWS S3 without a custom endpoint. Self-hosted deployments should stick to `S3_*`.

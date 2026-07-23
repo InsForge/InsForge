@@ -53,8 +53,8 @@ services:
       rustfs-init:
         condition: service_completed_successfully
     environment:
-      AWS_S3_BUCKET: insforge-storage
-      AWS_REGION: us-east-1
+      S3_BUCKET: insforge-storage
+      S3_REGION: us-east-1
       S3_ENDPOINT_URL: http://rustfs:9000
       S3_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:-insforge}
       S3_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:-insforge-rustfs-secret}
