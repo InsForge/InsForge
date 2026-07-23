@@ -1,0 +1,136 @@
+---
+title: "Self-hosted storage backends"
+description: "Configure InsForge Storage for self-hosting: bring your own S3-compatible store, run a bundled MinIO or RustFS, and enable the S3-compatible gateway."
+---
+
+Self-hosted InsForge stores files on the **local filesystem** by default (`STORAGE_DIR`, a Docker volume). That works out of the box, but an S3 backend adds presigned or proxied transfers, multipart uploads, and — most importantly — enables the [S3-compatible gateway](/core-concepts/storage/s3-compatibility) at `/storage/v1/s3`, so `aws` CLI, rclone, boto3, and Terraform can talk to your InsForge Storage directly.
+
+You have three options:
+
+| Option | Setup | Best for |
+| --- | --- | --- |
+| Local filesystem | nothing (default) | Trying things out; the S3 gateway stays disabled |
+| Bring your own S3-compatible store | env vars only | Production with existing AWS S3, Wasabi, R2, Tencent COS, Aliyun OSS, a remote MinIO/RustFS/Garage/Ceph ... |
+| Bundled MinIO or RustFS | one compose overlay file | Production on a single host with no external dependencies |
+
+## Bring your own S3-compatible store
+
+Set these in your `.env` (all production compose files pass them through to the backend) and restart:
+
+```env
+# Required — any S3-compatible store, not just AWS
+AWS_S3_BUCKET=my-insforge-bucket
+AWS_REGION=us-east-1
+
+# For AWS S3: use AWS credentials
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+
+# For any other S3-compatible provider: add the endpoint (S3_* credentials
+# take precedence over AWS_* when set)
+S3_ENDPOINT_URL=https://s3.my-provider.example
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+S3_FORCE_PATH_STYLE=true
+```
+
+Storage auto-wires to the bucket on startup — no other configuration. The S3 gateway turns on automatically.
+
+Provider notes:
+
+- **AWS S3, Wasabi, MinIO (public endpoint)** — works with the defaults. Clients upload/download via presigned URLs directly against the store.
+- **Cloudflare R2** — set `S3_PRESIGNED_URLS=false`. R2 does not support S3 POST policies, which presigned browser uploads require; proxy mode routes all bytes through the backend instead.
+- **Tencent COS, Aliyun OSS** — set `S3_FORCE_PATH_STYLE=false` (they require virtual-hosted-style addressing).
+- **Store on a private network** (a MinIO/RustFS/Ceph the browser can't reach) — set `S3_PRESIGNED_URLS=false`.
+
+### Presigned vs. proxy mode
+
+`S3_PRESIGNED_URLS` (default `true`) decides how object bytes reach clients:
+
+- **Presigned (default)**: the backend hands clients short-lived URLs signed against `S3_ENDPOINT_URL`; browsers transfer directly with the store. Requires the endpoint to be reachable by browsers and to support POST policies.
+- **Proxy (`false`)**: strategies point at the backend's own routes and every byte streams through it — the store can stay completely private. Ranged downloads (`Range` headers, media seeking) are supported. Uploads through the REST API/SDK are capped by the storage max-file-size setting (Dashboard → Storage → Settings, default 50 MB); larger objects go through the S3 gateway, which streams and supports multipart up to `S3_MAX_OBJECT_SIZE_BYTES` (default 5 GB per part/put).
+
+## Bundled MinIO
+
+Run MinIO next to InsForge with a single overlay — no `.env` editing:
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.minio.yml up -d
+```
+
+The overlay starts `minio`, creates the backing bucket, and points the backend at it in proxy mode. MinIO stays on the internal Docker network — it exposes no host ports and never needs TLS or a domain of its own.
+
+Change the default credentials before production use:
+
+```env
+MINIO_ROOT_USER=your-user
+MINIO_ROOT_PASSWORD=a-long-random-secret
+```
+
+## Bundled RustFS
+
+Same shape with [RustFS](https://rustfs.com) (Apache-2.0 licensed, written in Rust):
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.rustfs.yml up -d
+```
+
+```env
+RUSTFS_ACCESS_KEY=your-user
+RUSTFS_SECRET_KEY=a-long-random-secret
+```
+
+Both overlays also work with the dev compose (`docker-compose.yml`) and the `deploy/docker-compose/docker-compose.yml` self-host file (place the overlay next to it).
+
+<Warning>
+Switching an existing deployment from local storage to an S3 backend does not migrate previously uploaded files. Migrate the contents of the `storage-data` volume (e.g. with `mc mirror` or `aws s3 sync`) before switching, or start fresh.
+</Warning>
+
+### Dokploy
+
+Dokploy takes a single compose file, so overlays don't apply. Two options:
+
+1. **External store** — set `AWS_S3_BUCKET`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE=true` (and `S3_PRESIGNED_URLS=false` for private endpoints) in Dokploy's environment UI. `docker-compose.dokploy.yml` passes them through.
+2. **MinIO/RustFS on the same Dokploy host** — deploy the store as its own Dokploy service, then point the env vars above at its internal address.
+
+## Using the S3-compatible gateway
+
+With any S3 backend configured, the gateway is live at `<your-backend-url>/storage/v1/s3`:
+
+1. Open **Dashboard → Storage → Settings → S3 Configuration** and create an access key. The secret is shown once.
+2. Point any SigV4 client at the gateway with path-style addressing:
+
+```ini
+# ~/.aws/credentials
+[insforge]
+aws_access_key_id = INSF...
+aws_secret_access_key = ...
+
+# ~/.aws/config
+[profile insforge]
+region = us-east-1            # must match the backend's AWS_REGION
+endpoint_url = https://your-domain.example/storage/v1/s3
+s3 =
+  addressing_style = path
+```
+
+```bash
+aws --profile insforge s3 mb s3://my-bucket
+aws --profile insforge s3 cp ./photo.jpg s3://my-bucket/photo.jpg
+aws --profile insforge s3 sync ./dist s3://my-bucket/dist
+```
+
+Uploads made through the gateway appear immediately in the REST API and Dashboard. See [S3-compatible gateway](/core-concepts/storage/s3-compatibility) for supported operations and limits.
+
+## Reference
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `AWS_S3_BUCKET` | _(empty = local storage)_ | Backing bucket; setting it selects the S3 provider |
+| `AWS_REGION` | `us-east-2` | Signing region (also the gateway's expected SigV4 region) |
+| `S3_ENDPOINT_URL` | _(empty = AWS)_ | Custom S3-compatible endpoint |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | _(empty)_ | Store credentials; take precedence over `AWS_*` |
+| `S3_FORCE_PATH_STYLE` | `true` | Path-style addressing (`false` for COS/OSS) |
+| `S3_PRESIGNED_URLS` | `true` | `false` = proxy mode: bytes stream through the backend |
+| `S3_MAX_OBJECT_SIZE_BYTES` | 5 GB | Max single S3-gateway upload / part size |
+| `MAX_FILE_SIZE` | 50 MB | REST API upload cap (also configurable in the Dashboard) |

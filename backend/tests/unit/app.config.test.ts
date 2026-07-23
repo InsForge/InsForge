@@ -504,6 +504,22 @@ describe('config.storage', () => {
     expect(c.storage.s3SecretAccessKey).toBe('s3-secret');
   });
 
+  it('s3PresignedUrls defaults to true; only the literal "false" enables proxy mode', () => {
+    unsetEnvKeys('S3_PRESIGNED_URLS');
+    expect(loadConfig().storage.s3PresignedUrls).toBe(true);
+
+    process.env.S3_PRESIGNED_URLS = 'false';
+    expect(loadConfig().storage.s3PresignedUrls).toBe(false);
+
+    process.env.S3_PRESIGNED_URLS = 'true';
+    expect(loadConfig().storage.s3PresignedUrls).toBe(true);
+
+    // Garbage values keep the safe default (presigned), matching the
+    // S3_FORCE_PATH_STYLE parsing convention.
+    process.env.S3_PRESIGNED_URLS = '0';
+    expect(loadConfig().storage.s3PresignedUrls).toBe(true);
+  });
+
   it('reads AWS credentials when set', () => {
     process.env.AWS_ACCESS_KEY_ID = 'test-aws-access-key-id';
     process.env.AWS_SECRET_ACCESS_KEY = 'test-aws-secret-access-key';

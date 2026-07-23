@@ -10,6 +10,12 @@ export interface ObjectMetadata {
 
 export interface GetObjectResult extends ObjectMetadata {
   body: Readable;
+  /**
+   * Present on ranged GETs: the upstream `Content-Range` header (e.g.
+   * `bytes 0-99/1234`). `size` is then the part length, not the full object
+   * size — exactly what a proxying route must send as `Content-Length`.
+   */
+  contentRange?: string;
 }
 
 export interface DeleteObjectsResult {

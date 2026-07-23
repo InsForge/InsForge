@@ -10,6 +10,9 @@ const storageMocks = vi.hoisted(() => ({
   getObject: vi.fn(),
   objectIsVisible: vi.fn(),
   deleteObjects: vi.fn(),
+  // Default undefined return keeps existing tests on the buffered local path.
+  isS3Provider: vi.fn(),
+  getProvider: vi.fn(),
 }));
 
 const authMocks = vi.hoisted(() => ({
@@ -443,6 +446,126 @@ describe('Storage routes', () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers['x-content-type-options']).toBe('nosniff');
     expect(response.headers['content-disposition']).toBe('attachment');
+  });
+
+  const rawGet = (
+    port: number,
+    path: string,
+    headers?: Record<string, string>
+  ): Promise<{ response: http.IncomingMessage; body: Buffer }> =>
+    new Promise((resolve, reject) => {
+      const request = http.request({ hostname: '127.0.0.1', port, path, method: 'GET', headers });
+      request.on('response', (response) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk) => chunks.push(chunk as Buffer));
+        response.on('end', () => resolve({ response, body: Buffer.concat(chunks) }));
+      });
+      request.on('error', reject);
+      request.end();
+    });
+
+  const startProxyModeServer = async () => {
+    vi.resetModules();
+    storageMocks.getObjectMetadataVisible.mockResolvedValue({
+      mime_type: 'image/png',
+      bucket: 'photos',
+      key: 'pic.png',
+      size: 10,
+    });
+    storageMocks.getDownloadStrategy.mockResolvedValue({
+      method: 'direct',
+      url: 'http://localhost:7130/api/storage/buckets/photos/objects/pic.png',
+    });
+    storageMocks.isS3Provider.mockReturnValue(true);
+
+    const { storageRouter } = await import('../../src/api/routes/storage/index.routes.js');
+    const app = express();
+    app.use('/api/storage', storageRouter);
+    app.use(routeErrorHandler);
+
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, resolve);
+    });
+    const address = server?.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Test server did not bind to a TCP port');
+    }
+    return address.port;
+  };
+
+  test('proxy-mode download streams the full object with 200 and length headers', async () => {
+    const { Readable } = await import('stream');
+    const getObjectStream = vi.fn().mockResolvedValue({
+      body: Readable.from([Buffer.from('0123456789')]),
+      size: 10,
+      etag: 'abc',
+      contentType: 'image/png',
+      lastModified: new Date(),
+    });
+    storageMocks.getProvider.mockReturnValue({ getObjectStream });
+
+    const port = await startProxyModeServer();
+    const { response, body } = await rawGet(port, '/api/storage/buckets/photos/objects/pic.png');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-length']).toBe('10');
+    expect(response.headers['accept-ranges']).toBe('bytes');
+    expect(response.headers['etag']).toBe('"abc"');
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(body.toString()).toBe('0123456789');
+    expect(getObjectStream).toHaveBeenCalledWith('photos', 'pic.png', { range: undefined });
+    expect(storageMocks.getObject).not.toHaveBeenCalled();
+  });
+
+  test('proxy-mode download honors Range with 206 and Content-Range passthrough', async () => {
+    const { Readable } = await import('stream');
+    const getObjectStream = vi.fn().mockResolvedValue({
+      body: Readable.from([Buffer.from('0123')]),
+      size: 4,
+      etag: 'abc',
+      contentType: 'image/png',
+      lastModified: new Date(),
+      contentRange: 'bytes 0-3/10',
+    });
+    storageMocks.getProvider.mockReturnValue({ getObjectStream });
+
+    const port = await startProxyModeServer();
+    const { response, body } = await rawGet(port, '/api/storage/buckets/photos/objects/pic.png', {
+      Range: 'bytes=0-3',
+    });
+
+    expect(response.statusCode).toBe(206);
+    expect(response.headers['content-range']).toBe('bytes 0-3/10');
+    expect(response.headers['content-length']).toBe('4');
+    expect(body.toString()).toBe('0123');
+    expect(getObjectStream).toHaveBeenCalledWith('photos', 'pic.png', { range: 'bytes=0-3' });
+  });
+
+  test('proxy-mode download maps InvalidRange to 416 with the full size', async () => {
+    const getObjectStream = vi
+      .fn()
+      .mockRejectedValue(
+        Object.assign(new Error('range'), { name: 'InvalidRange', $metadata: { httpStatusCode: 416 } })
+      );
+    storageMocks.getProvider.mockReturnValue({ getObjectStream });
+
+    const port = await startProxyModeServer();
+    const { response } = await rawGet(port, '/api/storage/buckets/photos/objects/pic.png', {
+      Range: 'bytes=100-200',
+    });
+
+    expect(response.statusCode).toBe(416);
+    expect(response.headers['content-range']).toBe('bytes */10');
+  });
+
+  test('proxy-mode download returns 404 when the blob is missing behind the metadata row', async () => {
+    const getObjectStream = vi.fn().mockRejectedValue(new Error('GetObject returned empty body'));
+    storageMocks.getProvider.mockReturnValue({ getObjectStream });
+
+    const port = await startProxyModeServer();
+    const { response } = await rawGet(port, '/api/storage/buckets/photos/objects/pic.png');
+
+    expect(response.statusCode).toBe(404);
   });
 
   test('download strategy route returns 404 for missing or invisible objects', async () => {

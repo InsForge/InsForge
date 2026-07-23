@@ -83,6 +83,7 @@ export interface AppConfig {
     awsSecretAccessKey: string | undefined;
     s3EndpointUrl: string | undefined;
     s3ForcePathStyle: boolean;
+    s3PresignedUrls: boolean;
     awsConfigBucket: string;
     awsConfigRegion: string;
     maxS3UploadSize: number;
@@ -213,6 +214,12 @@ export function loadConfig(): AppConfig {
       // Default true (MinIO etc.). Set S3_FORCE_PATH_STYLE=false for providers
       // that require virtual-hosted-style addressing (Tencent COS, Aliyun OSS).
       s3ForcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
+      // Default true (presigned upload/download URLs handed to clients). Set
+      // S3_PRESIGNED_URLS=false to proxy all object bytes through the backend
+      // instead — required when the S3 endpoint is not reachable by browsers
+      // (bundled MinIO/RustFS on the Docker network) or lacks POST-policy
+      // support (Cloudflare R2).
+      s3PresignedUrls: process.env.S3_PRESIGNED_URLS !== 'false',
       awsConfigBucket: process.env.AWS_CONFIG_BUCKET || 'insforge-config',
       awsConfigRegion: process.env.AWS_CONFIG_REGION || 'us-east-2',
       maxS3UploadSize: parseEnvBytes(process.env.S3_MAX_OBJECT_SIZE_BYTES, 5 * 1024 * 1024 * 1024),

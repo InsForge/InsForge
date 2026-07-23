@@ -21,6 +21,7 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js';
 import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { isUnsafeMime, resolveSafeMimeType } from '@/utils/mime-guard.js';
+import logger from '@/utils/logger.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
@@ -519,6 +520,72 @@ router.post(
   downloadStrategyHandler
 );
 
+// Proxy-mode download: stream object bytes from the S3 backend through this
+// route instead of buffering — gateway-uploaded objects can be multi-GB.
+// Handles Range requests (206/416) so media seeking works. Only used when the
+// provider is S3; the local provider keeps the buffered path in the route.
+const streamS3ObjectDownload = async (
+  req: Request,
+  res: Response,
+  bucketName: string,
+  objectKey: string,
+  metadataRow: { size: number; mime_type?: string | null }
+): Promise<void> => {
+  const provider = StorageService.getInstance().getProvider();
+  const rangeHeader = typeof req.headers.range === 'string' ? req.headers.range : undefined;
+
+  let result;
+  try {
+    result = await provider.getObjectStream(bucketName, objectKey, { range: rangeHeader });
+  } catch (error) {
+    const err = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+    if (err?.name === 'InvalidRange' || err?.$metadata?.httpStatusCode === 416) {
+      res.status(416);
+      res.setHeader('Content-Range', `bytes */${metadataRow.size}`);
+      res.end();
+      return;
+    }
+    // Metadata row exists but the blob is gone (getObjectStream throws on a
+    // true 404 after branch fallback) — surface as not found.
+    if (error instanceof Error && error.message.includes('empty body')) {
+      throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
+    }
+    throw error;
+  }
+
+  const serveMime = metadataRow.mime_type || result.contentType || 'application/octet-stream';
+  res.setHeader('Content-Type', serveMime);
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (result.etag) {
+    res.setHeader('ETag', `"${result.etag}"`);
+  }
+  if (isUnsafeMime(serveMime)) {
+    res.setHeader('Content-Disposition', 'attachment');
+  }
+  // For ranged responses size is the part length (provider passes S3's
+  // ContentLength through), which is exactly what Content-Length must be.
+  res.setHeader('Content-Length', String(result.size));
+  if (result.contentRange) {
+    res.status(206);
+    res.setHeader('Content-Range', result.contentRange);
+  }
+
+  // Client gone → release the upstream S3 socket. Upstream error after
+  // headers are sent → the status can't change anymore; kill our socket so
+  // the client sees a truncated transfer instead of a silent success.
+  res.on('close', () => result.body.destroy());
+  result.body.on('error', (error: Error) => {
+    logger.error('Proxy-mode object stream failed mid-transfer', {
+      bucket: bucketName,
+      key: objectKey,
+      error: error.message,
+    });
+    res.destroy();
+  });
+  result.body.pipe(res);
+};
+
 // GET /api/storage/buckets/:bucketName/objects/:objectKey - Download object from bucket (conditional auth)
 router.get(
   '/buckets/:bucketName/objects/*',
@@ -553,6 +620,11 @@ router.get(
       });
       if (strategy.method === 'presigned') {
         return res.redirect(strategy.url);
+      }
+
+      // Direct strategy + S3 provider = proxy mode: stream instead of buffer.
+      if (storageService.isS3Provider()) {
+        return await streamS3ObjectDownload(req, res, bucketName, objectKey, metadataRow);
       }
 
       const result = await storageService.getObject(
@@ -835,7 +907,10 @@ router.get('/s3/config', verifyAdmin, (_req: AuthRequest, res: Response, next: N
     const base = (process.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
     const endpoint = base ? `${base}/storage/v1/s3` : '/storage/v1/s3';
     const region = process.env.AWS_REGION || 'us-east-2';
-    successResponse(res, { endpoint, region });
+    // The gateway only works with an S3-backed provider; local-storage
+    // deployments get available:false so the dashboard hides the S3 tab.
+    const available = StorageService.getInstance().isS3Provider();
+    successResponse(res, { endpoint, region, available });
   } catch (error) {
     next(error);
   }
