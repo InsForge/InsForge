@@ -15,7 +15,8 @@
  *   - Ambiguous network errors (ECONNRESET, EPIPE, missing code) are retried
  *     only for idempotent methods (GET/HEAD/OPTIONS) — for writes the request
  *     may already have committed.
- *   - Non-axios errors are NOT retried.
+ *   - Response-less non-network axios errors (cancellation, bad config) and
+ *     non-axios errors are NOT retried.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -80,6 +81,14 @@ describe('PostgrestProxyService.isRetryableError', () => {
     expect(PostgrestProxyService.isRetryableError(makeAxiosError(undefined, 504), 'GET')).toBe(
       false
     );
+  });
+
+  it('does not retry response-less non-network axios errors for any method', () => {
+    for (const code of ['ERR_CANCELED', 'ERR_BAD_OPTION_VALUE', 'ERR_FR_TOO_MANY_REDIRECTS']) {
+      for (const method of ALL_METHODS) {
+        expect(PostgrestProxyService.isRetryableError(makeAxiosError(code), method)).toBe(false);
+      }
+    }
   });
 
   it('does not retry non-axios errors', () => {

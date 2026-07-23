@@ -87,11 +87,17 @@ const CONNECTION_NOT_ESTABLISHED_CODES = new Set([
 ]);
 
 /**
+ * Network errors where the request may or may not have reached PostgREST: an
+ * ECONNRESET is usually a keep-alive socket closed while idle, but it can
+ * also arrive mid-response after a write already committed, and the two are
+ * indistinguishable here. A missing code is treated the same way.
+ */
+const AMBIGUOUS_NETWORK_CODES = new Set(['ECONNRESET', 'EPIPE']);
+
+/**
  * Methods safe to replay even when the request may have reached PostgREST.
  * Everything else (POST/PATCH/PUT/DELETE) only retries errors from
- * CONNECTION_NOT_ESTABLISHED_CODES: an ECONNRESET is usually a keep-alive
- * socket closed while idle, but it can also arrive mid-response after the
- * write already committed, and the two are indistinguishable here.
+ * CONNECTION_NOT_ESTABLISHED_CODES.
  */
 const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -116,10 +122,11 @@ export class PostgrestProxyService {
   /**
    * A request may be retried only when replaying it cannot duplicate work in
    * PostgREST. Any HTTP response — including 5xx — and any timeout is
-   * surfaced to the caller instead of retried. Among the remaining network
-   * errors, connection-never-established failures are retryable for every
-   * method, while ambiguous ones (ECONNRESET, EPIPE, missing code) are
-   * retryable only for idempotent methods.
+   * surfaced to the caller instead of retried. Among the remaining errors,
+   * connection-never-established failures are retryable for every method,
+   * ambiguous network errors (ECONNRESET, EPIPE, missing code) only for
+   * idempotent methods, and anything else (cancellation, bad config) never —
+   * those fail identically on replay.
    */
   static isRetryableError(error: unknown, method: string): boolean {
     if (!axios.isAxiosError(error) || error.response) {
@@ -132,7 +139,10 @@ export class PostgrestProxyService {
     if (CONNECTION_NOT_ESTABLISHED_CODES.has(code)) {
       return true;
     }
-    return IDEMPOTENT_METHODS.has(method.toUpperCase());
+    if (code === '' || AMBIGUOUS_NETWORK_CODES.has(code)) {
+      return IDEMPOTENT_METHODS.has(method.toUpperCase());
+    }
+    return false;
   }
 
   /**
