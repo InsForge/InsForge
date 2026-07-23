@@ -12,6 +12,7 @@ import { metadataRouter } from '@/api/routes/metadata/index.routes.js';
 import { logsRouter } from '@/api/routes/logs/index.routes.js';
 import { docsRouter } from '@/api/routes/docs/index.routes.js';
 import functionsRouter from '@/api/routes/functions/index.routes.js';
+import marketplaceRouter from '@/api/routes/marketplace/index.routes.js';
 import secretsRouter from '@/api/routes/secrets/index.routes.js';
 import { usageRouter } from '@/api/routes/usage/index.routes.js';
 import { aiRouter } from '@/api/routes/ai/index.routes.js';
@@ -218,6 +219,7 @@ export async function createApp() {
   apiRouter.use('/deployments', deploymentsRouter);
   apiRouter.use('/schedules', schedulesRouter);
   apiRouter.use('/payments', paymentsRouter);
+  apiRouter.use('/marketplace', marketplaceRouter);
   apiRouter.use('/compute/services', servicesRouter);
   apiRouter.use('/analytics', analyticsRouter);
   apiRouter.use('/webscraper', webscraperRouter);
