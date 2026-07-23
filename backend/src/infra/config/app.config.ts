@@ -64,6 +64,8 @@ export interface AppConfig {
     password: string;
     dir: string;
     postgrestBaseUrl: string;
+    postgrestMaxSockets: number;
+    postgrestMaxFreeSockets: number;
   };
   auth: {
     rootAdminUsername: string;
@@ -192,6 +194,11 @@ export function loadConfig(): AppConfig {
       password: process.env.POSTGRES_PASSWORD || 'postgres',
       dir: process.env.DATABASE_DIR || path.join(__dirname, '../../data'),
       postgrestBaseUrl: process.env.POSTGREST_BASE_URL || 'http://localhost:5430',
+      // HTTP agent pool for the PostgREST proxy. Keep max sockets aligned with
+      // PostgREST's own db pool (PGRST_DB_POOL): sockets beyond it only move
+      // the queue from PostgREST back into this process.
+      postgrestMaxSockets: parseEnvInt(process.env.POSTGREST_MAX_SOCKETS, 50),
+      postgrestMaxFreeSockets: parseEnvInt(process.env.POSTGREST_MAX_FREE_SOCKETS, 10),
     },
     auth: {
       rootAdminUsername: process.env.ROOT_ADMIN_USERNAME || process.env.ADMIN_EMAIL || '',

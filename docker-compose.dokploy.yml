@@ -26,6 +26,8 @@ services:
       PGRST_OPENAPI_SERVER_PROXY_URI: ${POSTGREST_OPENAPI_SERVER_PROXY_URI:-http://localhost:3000}
       PGRST_DB_SCHEMA: public
       PGRST_DB_ANON_ROLE: anon
+      # Keep in sync with the backend's POSTGREST_MAX_SOCKETS (default 50)
+      PGRST_DB_POOL: ${PGRST_DB_POOL:-50}
       PGRST_JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-min-32-characters}
       PGRST_DB_CHANNEL_ENABLED: "true"
       PGRST_DB_CHANNEL: pgrst
@@ -68,6 +70,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       POSTGREST_BASE_URL: http://postgrest:3000
+      POSTGREST_MAX_SOCKETS: ${POSTGREST_MAX_SOCKETS:-}
+      POSTGREST_MAX_FREE_SOCKETS: ${POSTGREST_MAX_FREE_SOCKETS:-}
       DENO_RUNTIME_URL: http://deno:7133
       LOGS_DIR: /insforge-logs
       STORAGE_DIR: /insforge-storage
