@@ -16,7 +16,7 @@ Content-Type: application/json
 
 ---
 
-## Query Records
+## Query records
 
 Retrieve records from a table with filtering, sorting, and pagination.
 
@@ -24,7 +24,7 @@ Retrieve records from a table with filtering, sorting, and pagination.
 GET /api/database/records/{tableName}
 ```
 
-### Query Parameters
+### Query parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -34,7 +34,7 @@ GET /api/database/records/{tableName}
 | `select` | string | Comma-separated columns to return |
 | `{field}` | string | PostgREST filter (e.g., `status=eq.active`) |
 
-### Filter Operators
+### Filter operators
 
 | Operator | Description | Example |
 |----------|-------------|---------|
@@ -79,7 +79,7 @@ curl "https://your-app.insforge.app/api/database/records/posts?select=id,title,a
 ]
 ```
 
-### Response Headers
+### Response headers
 
 | Header | Description |
 |--------|-------------|
@@ -88,7 +88,7 @@ curl "https://your-app.insforge.app/api/database/records/posts?select=id,title,a
 
 ---
 
-## Create Records
+## Create records
 
 Create one or more records in a table.
 
@@ -154,7 +154,7 @@ With `Prefer: return=representation`:
 
 ---
 
-## Update Records
+## Update records
 
 Update records matching query filters.
 
@@ -162,7 +162,7 @@ Update records matching query filters.
 PATCH /api/database/records/{tableName}
 ```
 
-### Query Parameters
+### Query parameters
 
 Use filter operators to specify which records to update.
 
@@ -208,7 +208,7 @@ curl -X PATCH "https://your-app.insforge.app/api/database/records/posts?status=e
 
 ---
 
-## Delete Records
+## Delete records
 
 Delete records matching query filters.
 
@@ -216,7 +216,7 @@ Delete records matching query filters.
 DELETE /api/database/records/{tableName}
 ```
 
-### Query Parameters
+### Query parameters
 
 Use filter operators to specify which records to delete.
 
@@ -256,9 +256,9 @@ With `Prefer: return=representation`:
 
 ---
 
-## Error Responses
+## Error responses
 
-### Table Not Found (404)
+### Table not found (404)
 
 ```json
 {
@@ -269,7 +269,7 @@ With `Prefer: return=representation`:
 }
 ```
 
-### Invalid Query (400)
+### Invalid query (400)
 
 ```json
 {
@@ -280,7 +280,7 @@ With `Prefer: return=representation`:
 }
 ```
 
-### Validation Error (400)
+### Validation error (400)
 
 ```json
 {
@@ -305,7 +305,7 @@ curl "https://your-app.insforge.app/api/database/records/posts?limit=20&offset=0
 curl "https://your-app.insforge.app/api/database/records/posts?limit=20&offset=20"
 ```
 
-### Complex Filters
+### Complex filters
 
 ```bash
 # Multiple conditions
@@ -321,7 +321,7 @@ curl "https://your-app.insforge.app/api/database/records/orders?status=in.(pendi
 curl "https://your-app.insforge.app/api/database/records/tasks?completed_at=is.null"
 ```
 
-### Upsert (Insert or Update)
+### Upsert (insert or update)
 
 Insert a record or update it if a conflict occurs on a unique constraint.
 
@@ -372,7 +372,7 @@ Upsert requires a unique constraint (e.g., primary key or unique index) on the t
 
 ---
 
-## Call RPC Function
+## Call RPC function
 
 Execute a database function via PostgREST RPC. Supports all HTTP methods (GET, POST, PUT, PATCH, DELETE).
 
@@ -406,11 +406,11 @@ curl -X POST "https://your-app.insforge.app/api/database/rpc/get_total_count" \
 
 ---
 
-## Admin Endpoints
+## Admin endpoints
 
 The following endpoints require admin authentication.
 
-### Headers for Admin Endpoints
+### Headers for admin endpoints
 
 ```bash
 Authorization: Bearer admin-jwt-token-Or-API-Key
@@ -419,7 +419,7 @@ Content-Type: application/json
 
 ---
 
-## List Database Functions
+## List database functions
 
 Get all database functions in the public schema. **Requires admin authentication.**
 
@@ -451,7 +451,7 @@ curl "https://your-app.insforge.app/api/database/functions" \
 
 ---
 
-## List Database Indexes
+## List database indexes
 
 Get all database indexes. **Requires admin authentication.**
 
@@ -483,7 +483,7 @@ curl "https://your-app.insforge.app/api/database/indexes" \
 
 ---
 
-## List RLS Policies
+## List RLS policies
 
 Get all Row Level Security policies. **Requires admin authentication.**
 
@@ -515,7 +515,7 @@ curl "https://your-app.insforge.app/api/database/policies" \
 
 ---
 
-## List Database Triggers
+## List database triggers
 
 Get all database triggers. **Requires admin authentication.**
 
@@ -547,7 +547,7 @@ curl "https://your-app.insforge.app/api/database/triggers" \
 
 ---
 
-## List Database Migrations
+## List database migrations
 
 Get the history of successful custom migrations. InsForge stores these in `system.custom_migrations`, but the endpoint returns only the migration metadata and executed statements. **Requires admin authentication.**
 
@@ -581,7 +581,7 @@ curl "https://your-app.insforge.app/api/database/migrations" \
 
 ---
 
-## Create Database Migration
+## Create database migration
 
 Create and immediately execute a custom migration against the database. The migration is recorded only if every statement succeeds. **Requires admin authentication.**
 
@@ -589,7 +589,7 @@ Create and immediately execute a custom migration against the database. The migr
 POST /api/database/migrations
 ```
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -630,7 +630,7 @@ Do not include `BEGIN`, `COMMIT`, or `ROLLBACK` inside a custom migration. InsFo
 
 ---
 
-## Execute Raw SQL (Strict Mode)
+## Execute raw SQL (strict mode)
 
 Execute raw SQL query with strict sanitization. Blocks access to system tables and auth.users. **Requires admin authentication.**
 
@@ -638,7 +638,7 @@ Execute raw SQL query with strict sanitization. Blocks access to system tables a
 POST /api/database/advance/rawsql
 ```
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -675,7 +675,7 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql" \
 
 ---
 
-## Execute Raw SQL (Relaxed Mode)
+## Execute raw SQL (relaxed mode)
 
 Execute raw SQL query with relaxed sanitization. Allows SELECT and INSERT into system tables. **Use with caution. Requires admin authentication.**
 
@@ -683,7 +683,7 @@ Execute raw SQL query with relaxed sanitization. Allows SELECT and INSERT into s
 POST /api/database/advance/rawsql/unrestricted
 ```
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -717,7 +717,7 @@ This endpoint has relaxed restrictions and can access system tables. Use only wh
 
 ---
 
-## Export Database
+## Export database
 
 Export database schema and/or data in SQL or JSON format. **Requires admin authentication.**
 
@@ -725,7 +725,7 @@ Export database schema and/or data in SQL or JSON format. **Requires admin authe
 POST /api/database/advance/export
 ```
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
@@ -763,7 +763,7 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/export" \
 
 ---
 
-## Import Database
+## Import database
 
 Import database from SQL file. **Requires admin authentication.**
 
@@ -800,7 +800,7 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/import" \
 
 ---
 
-## Bulk Upsert
+## Bulk upsert
 
 Bulk insert or update data from CSV or JSON file. **Requires admin authentication.**
 

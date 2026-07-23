@@ -23,7 +23,7 @@ Content-Type: application/json
 
 ---
 
-## Register User
+## Register user
 
 Create a new user account.
 
@@ -31,13 +31,13 @@ Create a new user account.
 POST /api/auth/users
 ```
 
-### Query Parameters
+### Query parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -46,7 +46,7 @@ POST /api/auth/users
 | `name` | string | No | User display name |
 | `redirectTo` | string | No | Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL with the verification result. Required when `verifyEmailMethod` is `link`. This URL must be included in `allowedRedirectUrls`. Recommended: use your app's sign-in page. |
 
-### Example (Web Client)
+### Example (web client)
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/users" \
@@ -59,7 +59,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/users" \
   }'
 ```
 
-### Example (Non-Web Client)
+### Example (non-web client)
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/users?client_type=mobile" \
@@ -72,7 +72,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/users?client_type=mobile" \
   }'
 ```
 
-### Response (Web Client)
+### Response (web client)
 
 ```json
 {
@@ -90,7 +90,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/users?client_type=mobile" \
 }
 ```
 
-### Response (Non-Web Client)
+### Response (non-web client)
 
 ```json
 {
@@ -117,7 +117,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/users?client_type=mobile" \
 
 ---
 
-## Sign In
+## Sign in
 
 Authenticate user and get access token.
 
@@ -125,20 +125,20 @@ Authenticate user and get access token.
 POST /api/auth/sessions
 ```
 
-### Query Parameters
+### Query parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `email` | string | Yes | User email address |
 | `password` | string | Yes | User password |
 
-### Example (Web Client)
+### Example (web client)
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
@@ -149,7 +149,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
   }'
 ```
 
-### Example (Non-Web Client)
+### Example (non-web client)
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile" \
@@ -160,7 +160,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile
   }'
 ```
 
-### Response (Web Client)
+### Response (web client)
 
 ```json
 {
@@ -177,7 +177,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile
 }
 ```
 
-### Response (Non-Web Client)
+### Response (non-web client)
 
 ```json
 {
@@ -201,7 +201,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile
 
 ---
 
-## Refresh Token
+## Refresh token
 
 Refresh access token using refresh token.
 
@@ -209,25 +209,25 @@ Refresh access token using refresh token.
 POST /api/auth/refresh
 ```
 
-### Query Parameters
+### Query parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
 
-### Headers (Web Client)
+### Headers (web client)
 
 | Header | Type | Required | Description |
 |--------|------|----------|-------------|
 | `X-CSRF-Token` | string | Yes | CSRF token received from login/register response |
 
-### Request Body (Non-Web Client)
+### Request body (non-web client)
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `refreshToken` | string | Yes | Refresh token received from login/register response |
 
-### Example (Web Client)
+### Example (web client)
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/refresh" \
@@ -235,7 +235,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/refresh" \
   --cookie "refresh_token=..."
 ```
 
-### Example (Non-Web Client)
+### Example (non-web client)
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/refresh?client_type=mobile" \
@@ -245,7 +245,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/refresh?client_type=mobile"
   }'
 ```
 
-### Response (Web Client)
+### Response (web client)
 
 ```json
 {
@@ -262,7 +262,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/refresh?client_type=mobile"
 }
 ```
 
-### Response (Non-Web Client)
+### Response (non-web client)
 
 ```json
 {
@@ -312,7 +312,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/logout"
 
 ---
 
-## Get Current User
+## Get current user
 
 Get the currently authenticated user's info from JWT token.
 
@@ -347,7 +347,7 @@ curl "https://your-app.insforge.app/api/auth/sessions/current" \
 
 ---
 
-## Update Profile
+## Update profile
 
 Update the current user's profile.
 
@@ -355,7 +355,7 @@ Update the current user's profile.
 PATCH /api/auth/profiles/current
 ```
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -389,7 +389,7 @@ curl -X PATCH "https://your-app.insforge.app/api/auth/profiles/current" \
 
 ---
 
-## Get User Profile
+## Get user profile
 
 Get public profile information for a user by ID.
 
@@ -417,15 +417,15 @@ curl "https://your-app.insforge.app/api/auth/profiles/123e4567-e89b-12d3-a456-42
 
 ---
 
-## Email Verification
+## Email verification
 
-### Send Verification Email
+### Send verification email
 
 ```
 POST /api/auth/email/send-verification
 ```
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -452,19 +452,19 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/send-verification" \
 }
 ```
 
-### Verify Email
+### Verify email
 
 ```
 POST /api/auth/email/verify
 ```
 
-### Query Parameters
+### Query parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -489,7 +489,7 @@ Handle the browser redirect like this:
 - Recommended handling: use your sign-in page as `redirectTo`. When `insforge_status=success`, show a confirmation message and ask the user to sign in with their email and password.
 - If `redirectTo` is not allowlisted, InsForge returns a `400` error whose message includes the rejected URL and whose `nextActions` tells you to add it to `allowedRedirectUrls`.
 
-### Example (Web Client)
+### Example (web client)
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/email/verify" \
@@ -500,7 +500,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/verify" \
   }'
 ```
 
-### Example (Non-Web Client)
+### Example (non-web client)
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/email/verify?client_type=mobile" \
@@ -511,7 +511,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/verify?client_type=mo
   }'
 ```
 
-### Response (Web Client)
+### Response (web client)
 
 ```json
 {
@@ -525,7 +525,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/verify?client_type=mo
 }
 ```
 
-### Response (Non-Web Client)
+### Response (non-web client)
 
 ```json
 {
@@ -541,15 +541,15 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/verify?client_type=mo
 
 ---
 
-## Password Reset
+## Password reset
 
-### Send Reset Email
+### Send reset email
 
 ```
 POST /api/auth/email/send-reset-password
 ```
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -567,13 +567,13 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/send-reset-password" 
   }'
 ```
 
-### Exchange Code for Token (Code Method Only)
+### Exchange code for token (code method only)
 
 ```
 POST /api/auth/email/exchange-reset-password-token
 ```
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -600,7 +600,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/exchange-reset-passwo
 }
 ```
 
-### Reset Password
+### Reset password
 
 ```
 POST /api/auth/email/reset-password
@@ -624,7 +624,7 @@ Handle the browser redirect like this:
 - `insforge_error`: Present only when `insforge_status=error`. Human-readable error message for display or logging.
 - Your app should only render the reset-password form when `insforge_status=ready` and `token` is present.
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -652,11 +652,11 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/reset-password" \
 
 ---
 
-## OAuth Authentication
+## OAuth authentication
 
 OAuth authentication now uses the PKCE (Proof Key for Code Exchange) flow for enhanced security. Instead of returning tokens directly in the redirect URL, an authorization code is returned which must be exchanged for tokens.
 
-### Initiate OAuth Flow
+### Initiate OAuth flow
 
 ```
 GET /api/auth/oauth/{provider}
@@ -668,7 +668,7 @@ For custom providers configured in the dashboard, use:
 GET /api/auth/oauth/custom/{key}
 ```
 
-### Query Parameters
+### Query parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -683,7 +683,7 @@ GET /api/auth/oauth/custom/{key}
   values are ignored.
 </Note>
 
-### Supported Providers
+### Supported providers
 
 - `google`
 - `github`
@@ -721,7 +721,7 @@ curl "https://your-app.insforge.app/api/auth/oauth/custom/acme?redirect_uri=http
 }
 ```
 
-### OAuth Callback
+### OAuth callback
 
 After the user authenticates with the provider, they will be redirected to your `redirect_uri` with an authorization code:
 
@@ -735,7 +735,7 @@ The `insforge_code` is a temporary authorization code that must be exchanged for
 
 ---
 
-### Exchange Code for Tokens
+### Exchange code for tokens
 
 Exchange the authorization code for access and refresh tokens.
 
@@ -743,13 +743,13 @@ Exchange the authorization code for access and refresh tokens.
 POST /api/auth/oauth/exchange
 ```
 
-### Query Parameters
+### Query parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
 
-### Request Body
+### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -791,7 +791,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/oauth/exchange?client_type=
 
 ---
 
-### Complete OAuth Flow Example (Non-Web)
+### Complete OAuth flow example (non-web)
 
 ```swift
 // 1. Generate PKCE code verifier and challenge
@@ -822,7 +822,7 @@ refreshToken = response.refreshToken  // Persist securely
 
 ---
 
-## Public Configuration
+## Public configuration
 
 Get public authentication settings (no auth required).
 
@@ -855,23 +855,23 @@ curl "https://your-app.insforge.app/api/auth/public-config"
 
 ---
 
-## Admin Endpoints
+## Admin endpoints
 
 These endpoints require `project_admin` role.
 
-### List All Users
+### List all users
 
 ```
 GET /api/auth/users?offset=0&limit=10&search=john
 ```
 
-### Get User by ID
+### Get user by ID
 
 ```
 GET /api/auth/users/{userId}
 ```
 
-### Delete Users
+### Delete users
 
 ```bash
 curl -X DELETE "https://your-app.insforge.app/api/auth/users" \
@@ -880,13 +880,13 @@ curl -X DELETE "https://your-app.insforge.app/api/auth/users" \
   -d '{"userIds": ["user-id-1", "user-id-2"]}'
 ```
 
-### Generate Anonymous Token
+### Generate anonymous token
 
 ```
 POST /api/auth/tokens/anon
 ```
 
-### Get Auth Configuration
+### Get auth configuration
 
 Get current authentication settings (admin only).
 
@@ -927,7 +927,7 @@ curl "https://your-app.insforge.app/api/auth/config" \
 - Deep links are allowed when explicitly listed, such as `com.example.app:/oauth2redirect` or `myapp://auth/callback`.
 - If `allowedRedirectUrls` is empty, InsForge allows all redirects for developer convenience. This is insecure for production and should be avoided outside local development.
 
-### Update Auth Configuration
+### Update auth configuration
 
 Update authentication settings (admin only).
 
@@ -935,7 +935,7 @@ Update authentication settings (admin only).
 PUT /api/auth/config
 ```
 
-#### Request Body
+#### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -962,7 +962,7 @@ curl -X PUT "https://your-app.insforge.app/api/auth/config" \
   }'
 ```
 
-### Exchange Admin Session
+### Exchange admin session
 
 Exchange a cloud provider authorization code for an admin session.
 
@@ -970,7 +970,7 @@ Exchange a cloud provider authorization code for an admin session.
 POST /api/auth/admin/sessions/exchange
 ```
 
-#### Request Body
+#### Request body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -996,7 +996,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/admin/sessions/exchange" \
 }
 ```
 
-### Get Current Admin Session
+### Get current admin session
 
 Get the current dashboard admin session from a project admin access token.
 
@@ -1014,7 +1014,7 @@ GET /api/auth/admin/sessions/current
 }
 ```
 
-### Refresh Admin Session
+### Refresh admin session
 
 Refresh a dashboard admin access token. This endpoint uses the dashboard-only
 `insforge_admin_refresh_token` httpOnly cookie and does not share the app/user
@@ -1030,7 +1030,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/admin/refresh" \
   --cookie "insforge_admin_refresh_token=..."
 ```
 
-### Logout Admin Session
+### Logout admin session
 
 ```
 POST /api/auth/admin/logout
@@ -1038,9 +1038,9 @@ POST /api/auth/admin/logout
 
 ---
 
-## Error Responses
+## Error responses
 
-### Invalid Credentials (401)
+### Invalid credentials (401)
 
 ```json
 {
@@ -1051,7 +1051,7 @@ POST /api/auth/admin/logout
 }
 ```
 
-### User Already Exists (409)
+### User already exists (409)
 
 ```json
 {
@@ -1062,7 +1062,7 @@ POST /api/auth/admin/logout
 }
 ```
 
-### Email Not Verified (403)
+### Email not verified (403)
 
 ```json
 {

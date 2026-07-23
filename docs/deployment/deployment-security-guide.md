@@ -15,7 +15,7 @@ This comprehensive guide covers deploying InsForge on a generic VPS (Virtual Pri
 
 ---
 
-## 📋 Table of Contents
+## 📋 Table of contents
 
 - [Prerequisites](#prerequisites)
 - [Part 1 — Deployment](#part-1--deployment)
@@ -57,7 +57,7 @@ Before starting, ensure you have:
 
 ## Part 1 — Deployment
 
-### 1. Server Requirements
+### 1. Server requirements
 
 | Resource      | Minimum        | Recommended     |
 |---------------|----------------|-----------------|
@@ -80,21 +80,21 @@ InsForge consists of **4 services** that run together:
 
 ---
 
-### 2. Initial Server Setup
+### 2. Initial server setup
 
-#### 2.1 Connect to Your VPS
+#### 2.1 Connect to your VPS
 
 ```bash
 ssh root@your-server-ip
 ```
 
-#### 2.2 Update System Packages
+#### 2.2 Update system packages
 
 ```bash
 apt update && apt upgrade -y
 ```
 
-#### 2.3 Create a Deploy User (Non-Root)
+#### 2.3 Create a deploy user (non-root)
 
 Never run production services as root. Create a dedicated user:
 
@@ -107,13 +107,13 @@ usermod -aG sudo deploy
 su - deploy
 ```
 
-#### 2.4 Set the Timezone
+#### 2.4 Set the timezone
 
 ```bash
 sudo timedatectl set-timezone UTC
 ```
 
-#### 2.5 Enable Automatic Security Updates
+#### 2.5 Enable automatic security updates
 
 ```bash
 sudo apt install unattended-upgrades -y
@@ -124,7 +124,7 @@ sudo dpkg-reconfigure -plow unattended-upgrades
 
 ### 3. Install Docker & Docker Compose
 
-#### 3.1 Install Docker Engine
+#### 3.1 Install Docker engine
 
 ```bash
 # Add Docker's official GPG key
@@ -144,14 +144,14 @@ sudo apt update
 sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
 ```
 
-#### 3.2 Add Deploy User to the Docker Group
+#### 3.2 Add deploy user to the Docker group
 
 ```bash
 sudo usermod -aG docker deploy
 newgrp docker
 ```
 
-#### 3.3 Verify Docker Installation
+#### 3.3 Verify Docker installation
 
 ```bash
 docker --version
@@ -165,7 +165,7 @@ docker run hello-world
 
 ### 4. Deploy InsForge with Docker Compose
 
-#### 4.1 Download the Production Docker Compose File
+#### 4.1 Download the production Docker Compose file
 
 ```bash
 mkdir -p ~/insforge && cd ~/insforge
@@ -184,7 +184,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-#### 4.3 Verify All Services Are Running
+#### 4.3 Verify all services are running
 
 ```bash
 docker compose ps
@@ -200,7 +200,7 @@ postgrest       postgrest   healthy
 deno            deno        running
 ```
 
-#### 4.4 Test the Health Endpoint
+#### 4.4 Test the health endpoint
 
 ```bash
 curl http://localhost:7130/api/health
@@ -219,7 +219,7 @@ Expected response:
 
 ---
 
-### 5. Environment Variable Configuration
+### 5. Environment variable configuration
 
 Edit your `.env` file to configure InsForge for production:
 
@@ -227,7 +227,7 @@ Edit your `.env` file to configure InsForge for production:
 nano ~/insforge/.env
 ```
 
-#### 5.1 Required Variables
+#### 5.1 Required variables
 
 These **must** be changed from defaults before going to production:
 
@@ -258,7 +258,7 @@ openssl rand -base64 18
 
 > ⚠️ **Important**: `JWT_SECRET` and `ENCRYPTION_KEY` should be **different** values. If `ENCRYPTION_KEY` is not set, InsForge falls back to `JWT_SECRET` — but rotating `JWT_SECRET` later will permanently corrupt all stored secrets (API keys, OAuth tokens, etc.).
 
-#### 5.2 Database Variables
+#### 5.2 Database variables
 
 ```env
 POSTGRES_USER=postgres
@@ -266,7 +266,7 @@ POSTGRES_PASSWORD=<strong-unique-password>
 POSTGRES_DB=insforge
 ```
 
-#### 5.3 Port Variables
+#### 5.3 Port variables
 
 Default ports used by InsForge:
 
@@ -280,7 +280,7 @@ DENO_PORT=7133
 
 > 💡 You can change these if they conflict with other services on your VPS.
 
-#### 5.4 Required for Deployments
+#### 5.4 Required for deployments
 
 These variables are only needed if you plan to use InsForge's **deployment features** (deploying projects via the dashboard). If you don't need deployments, skip this section.
 
@@ -299,7 +299,7 @@ AWS_SECRET_ACCESS_KEY=
 PROJECT_ID=your-project-id
 ```
 
-#### 5.5 Optional Variables
+#### 5.5 Optional variables
 
 ```env
 # ── OAuth Providers ───────────────────────────────────────────
@@ -343,11 +343,11 @@ docker compose up -d
 
 ---
 
-### 6. Reverse Proxy Setup
+### 6. Reverse proxy setup
 
 A reverse proxy sits in front of InsForge, providing TLS termination, HTTP/2, and a clean URL without port numbers.
 
-#### Option A: Nginx (Recommended)
+#### Option A: Nginx (recommended)
 
 ##### 6.1 Install Nginx
 
@@ -355,7 +355,7 @@ A reverse proxy sits in front of InsForge, providing TLS termination, HTTP/2, an
 sudo apt install nginx -y
 ```
 
-##### 6.2 Create the Site Configuration
+##### 6.2 Create the site configuration
 
 ```bash
 sudo nano /etc/nginx/sites-available/insforge
@@ -400,7 +400,7 @@ server {
 }
 ```
 
-##### 6.3 Enable the Site
+##### 6.3 Enable the site
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/insforge /etc/nginx/sites-enabled/
@@ -413,7 +413,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-#### Option B: Caddy (Automatic HTTPS)
+#### Option B: Caddy (automatic HTTPS)
 
 Caddy is a simpler alternative that handles TLS certificates automatically.
 
@@ -458,7 +458,7 @@ Caddy will automatically obtain and renew Let's Encrypt certificates — no extr
 
 ---
 
-### 7. HTTPS / TLS Setup
+### 7. HTTPS / TLS setup
 
 > If you chose **Caddy** in Step 6, TLS is already handled automatically. Skip to [Part 2](#part-2--security).
 
@@ -468,7 +468,7 @@ Caddy will automatically obtain and renew Let's Encrypt certificates — no extr
 sudo apt install certbot python3-certbot-nginx -y
 ```
 
-#### 7.2 Obtain SSL Certificates
+#### 7.2 Obtain SSL certificates
 
 ```bash
 sudo certbot --nginx -d insforge.yourdomain.com
@@ -480,7 +480,7 @@ Follow the interactive prompts. Certbot will:
 3. Automatically update your Nginx configuration to serve HTTPS
 4. Set up HTTP → HTTPS redirect
 
-#### 7.3 Verify Auto-Renewal
+#### 7.3 Verify auto-renewal
 
 Let's Encrypt certificates expire every 90 days. Certbot installs a systemd timer for automatic renewal:
 
@@ -492,7 +492,7 @@ sudo certbot renew --dry-run
 sudo systemctl status certbot.timer
 ```
 
-#### 7.4 Update InsForge Environment for HTTPS
+#### 7.4 Update InsForge environment for HTTPS
 
 After obtaining your certificate, update your `.env` to use HTTPS URLs:
 
@@ -517,9 +517,9 @@ docker compose up -d
 
 ## Part 2 — Security
 
-### 8. Port Management
+### 8. Port management
 
-#### Ports That Should Be Open (via Reverse Proxy)
+#### Ports that should be open (via reverse proxy)
 
 | Port | Protocol | Purpose                     |
 |------|----------|-----------------------------|
@@ -527,7 +527,7 @@ docker compose up -d
 | 80   | TCP      | HTTP → HTTPS redirect       |
 | 443  | TCP      | HTTPS (reverse proxy)       |
 
-#### Ports That Should Be Closed to the Public
+#### Ports that should be closed to the public
 
 These ports are used **only** for internal Docker service-to-service communication. They should **never** be exposed to the internet:
 
@@ -554,11 +554,11 @@ These ports are used **only** for internal Docker service-to-service communicati
 
 ---
 
-### 9. Firewall Setup (UFW)
+### 9. Firewall setup (UFW)
 
 UFW (Uncomplicated Firewall) is the simplest way to manage iptables on Ubuntu.
 
-#### 9.1 Install and Configure UFW
+#### 9.1 Install and configure UFW
 
 ```bash
 # Install UFW (usually pre-installed on Ubuntu)
@@ -596,7 +596,7 @@ OpenSSH                    ALLOW       Anywhere
 
 > ⚠️ **Critical**: Always allow SSH **before** enabling UFW, or you will lock yourself out of the server.
 
-#### 9.2 Docker and UFW Caveat
+#### 9.2 Docker and UFW caveat
 
 Docker manipulates iptables directly, which can **bypass UFW rules**. To prevent this:
 
@@ -628,7 +628,7 @@ sudo systemctl restart docker
 
 > ⚠️ Disabling Docker iptables requires manual network configuration. **Option 1 is preferred** for most setups.
 
-#### 9.3 Restrict SSH to Your IP (Optional)
+#### 9.3 Restrict SSH to your IP (optional)
 
 For maximum security, restrict SSH access to a known IP address:
 
@@ -645,7 +645,7 @@ sudo ufw status
 
 ---
 
-### 10. Run Services as a Non-Root User
+### 10. Run services as a non-root user
 
 InsForge's Docker image already follows non-root best practices:
 
@@ -671,9 +671,9 @@ security_opt:
 
 ---
 
-### 11. SSH Hardening
+### 11. SSH hardening
 
-#### 11.1 Use SSH Key Authentication
+#### 11.1 Use SSH key authentication
 
 ```bash
 # On your LOCAL machine — generate a key pair if you don't have one
@@ -683,7 +683,7 @@ ssh-keygen -t ed25519 -C "deploy@insforge"
 ssh-copy-id -i ~/.ssh/id_ed25519.pub deploy@your-server-ip
 ```
 
-#### 11.2 Disable Password Authentication
+#### 11.2 Disable password authentication
 
 Once key-based auth is confirmed working:
 
@@ -740,16 +740,16 @@ sudo fail2ban-client status sshd
 
 ---
 
-### 12. Docker Security
+### 12. Docker security
 
-#### 12.1 Keep Docker Updated
+#### 12.1 Keep Docker updated
 
 ```bash
 sudo apt update
 sudo apt upgrade docker-ce docker-ce-cli containerd.io -y
 ```
 
-#### 12.2 Limit Container Resources (Optional)
+#### 12.2 Limit container resources (optional)
 
 Prevent a single container from consuming all resources:
 
@@ -764,7 +764,7 @@ deploy:
       memory: 512M
 ```
 
-#### 12.3 Read-Only Root Filesystem (Advanced)
+#### 12.3 Read-only root filesystem (advanced)
 
 For extra hardening, mount the container filesystem as read-only where possible:
 
@@ -776,13 +776,13 @@ tmpfs:
 
 > ⚠️ This requires testing — some services need writable directories for caches or temporary files.
 
-#### 12.4 Restrict CORS Origins
+#### 12.4 Restrict CORS origins
 
 By default the backend allows all origins. It reflects the request's `Origin` header back in the response and, for function proxy responses, sets `Access-Control-Allow-Origin: *`. This is convenient for local development but too permissive for production. For a production deployment, restrict the allowed origins to the domains you actually serve (for example your dashboard and app domains), so other sites cannot make credentialed cross-origin requests to your API.
 
 ---
 
-### 13. Secrets Management
+### 13. Secrets management
 
 #### Do ✅
 
@@ -800,13 +800,13 @@ By default the backend allows all origins. It reflects the request's `Origin` he
 
 ---
 
-## Part 3 — Updating & Maintenance
+## Part 3 — Updating & maintenance
 
-### 14. Pre-Update Backup
+### 14. Pre-update backup
 
 **Always back up before updating.** This gives you a recovery path if anything goes wrong.
 
-#### 14.1 Back Up the Database
+#### 14.1 Back up the database
 
 ```bash
 cd ~/insforge
@@ -821,7 +821,7 @@ docker compose exec -T postgres pg_dump \
 ls -lh backup_*.sql
 ```
 
-#### 14.2 Back Up Environment and Volumes
+#### 14.2 Back up environment and volumes
 
 ```bash
 # Back up .env file
@@ -834,7 +834,7 @@ docker run --rm \
   alpine tar czf /backup/volumes_postgres_$(date +%Y%m%d_%H%M%S).tar.gz /data
 ```
 
-#### 14.3 Record Current Version
+#### 14.3 Record current version
 
 ```bash
 # Note the current image versions before updating
@@ -845,7 +845,7 @@ docker compose images
 
 ### 15. Updating InsForge
 
-#### 15.1 Pull the Latest Images
+#### 15.1 Pull the latest images
 
 ```bash
 cd ~/insforge
@@ -854,7 +854,7 @@ cd ~/insforge
 docker compose pull
 ```
 
-#### 15.2 Apply the Update
+#### 15.2 Apply the update
 
 ```bash
 # Stop current services, start with new images
@@ -867,7 +867,7 @@ docker compose logs -f --tail=50
 
 Press `Ctrl+C` to stop following logs.
 
-#### 15.3 Verify the Update
+#### 15.3 Verify the update
 
 ```bash
 # Check all services are healthy
@@ -879,7 +879,7 @@ curl http://localhost:7130/api/health
 # Check the version in the response
 ```
 
-#### 15.4 Update the Docker Compose File (If Needed)
+#### 15.4 Update the Docker Compose file (if needed)
 
 Occasionally, new releases may include changes to `docker-compose.yml`. To pick up these changes:
 
@@ -904,25 +904,25 @@ docker compose up -d
 
 ---
 
-### 16. Rollback Procedure
+### 16. Rollback procedure
 
 If an update causes issues, follow these steps to revert:
 
-#### 16.1 Stop the Broken Services
+#### 16.1 Stop the broken services
 
 ```bash
 cd ~/insforge
 docker compose down
 ```
 
-#### 16.2 Restore the Previous Docker Compose File
+#### 16.2 Restore the previous Docker Compose file
 
 ```bash
 # If you saved the old file
 mv docker-compose.yml.old docker-compose.yml
 ```
 
-#### 16.3 Pin to a Specific Image Version
+#### 16.3 Pin to a specific image version
 
 Edit `docker-compose.yml` and replace `latest` tags with the previous version:
 
@@ -933,7 +933,7 @@ image: ghcr.io/insforge/insforge-oss:v1.5.0
 
 > Note: the current `deploy/docker-compose` pins `v1.5.0`, and the project is now on the 2.x line. Pin to whatever version you were running before the update.
 
-#### 16.4 Restore the Database (If Needed)
+#### 16.4 Restore the database (if needed)
 
 Only restore the database if the update included a database migration that caused issues:
 
@@ -956,7 +956,7 @@ cat backup_YYYYMMDD_HHMMSS.sql | \
 docker compose up -d
 ```
 
-#### 16.5 Restore Environment File (If Changed)
+#### 16.5 Restore environment file (if changed)
 
 ```bash
 cp .env.backup_YYYYMMDD .env
@@ -966,11 +966,11 @@ docker compose up -d
 
 ---
 
-### 17. Automated Backups
+### 17. Automated backups
 
 Set up a cron job for daily automated backups:
 
-#### 17.1 Create a Backup Script
+#### 17.1 Create a backup script
 
 ```bash
 nano ~/insforge/backup.sh
@@ -1025,7 +1025,7 @@ Add this line for daily backups at 3:00 AM:
 0 3 * * * /home/deploy/insforge/backup.sh >> /home/deploy/insforge/backups/cron.log 2>&1
 ```
 
-#### 17.3 Off-Site Backups (Recommended)
+#### 17.3 Off-site backups (recommended)
 
 For disaster recovery, copy backups to an external location:
 
@@ -1039,9 +1039,9 @@ rsync -avz ~/insforge/backups/ user@backup-server:/backups/insforge/
 
 ---
 
-### 18. Monitoring & Health Checks
+### 18. Monitoring & health checks
 
-#### 18.1 Check Service Status
+#### 18.1 Check service status
 
 ```bash
 # Container status
@@ -1057,7 +1057,7 @@ df -h
 free -h
 ```
 
-#### 18.2 View Logs
+#### 18.2 View logs
 
 ```bash
 # All services
@@ -1069,7 +1069,7 @@ docker compose logs -f postgres
 docker compose logs -f deno
 ```
 
-#### 18.3 Health Check Endpoint
+#### 18.3 Health check endpoint
 
 Monitor the health endpoint externally. A simple cron-based check:
 
@@ -1082,9 +1082,9 @@ Or use a free uptime monitoring service like [UptimeRobot](https://uptimerobot.c
 
 ---
 
-## Quick Reference
+## Quick reference
 
-### Essential Commands
+### Essential commands
 
 ```bash
 # ── Lifecycle ─────────────────────────────────
@@ -1109,7 +1109,7 @@ docker compose pull               # Pull new images
 docker compose down && docker compose up -d   # Apply update
 ```
 
-### Security Checklist
+### Security checklist
 
 - [ ] Deploy user created (non-root)
 - [ ] SSH key authentication enabled
@@ -1131,7 +1131,7 @@ docker compose down && docker compose up -d   # Apply update
 
 ## Troubleshooting
 
-### Cannot Connect After Enabling UFW
+### Cannot connect after enabling UFW
 
 If you're locked out, use your VPS provider's **web console** (out-of-band access) to:
 
@@ -1140,11 +1140,11 @@ sudo ufw allow OpenSSH
 sudo ufw enable
 ```
 
-### Docker Bypasses UFW
+### Docker bypasses UFW
 
 Docker directly manipulates iptables. Bind ports to `127.0.0.1` in `docker-compose.yml` as described in [Section 9.2](#92-docker-and-ufw-caveat).
 
-### Services Fail to Start
+### Services fail to start
 
 ```bash
 # Check logs for the failing service
@@ -1162,7 +1162,7 @@ sudo systemctl restart docker
 docker compose up -d
 ```
 
-### SSL Certificate Won't Renew
+### SSL certificate won't renew
 
 ```bash
 # Check Certbot timer
@@ -1175,7 +1175,7 @@ sudo certbot renew
 sudo certbot renew --dry-run
 ```
 
-### Port Conflicts
+### Port conflicts
 
 ```bash
 # Find what's using a port
@@ -1185,7 +1185,7 @@ sudo ss -tlnp | grep :7130
 APP_PORT=7140
 ```
 
-### Database Connection Issues
+### Database connection issues
 
 ```bash
 # Check PostgreSQL is healthy
@@ -1200,7 +1200,7 @@ docker compose exec postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES
 
 ---
 
-## 🆘 Need Help?
+## 🆘 Need help?
 
 - **Documentation**: [https://docs.insforge.dev](https://docs.insforge.dev)
 - **Discord Community**: [https://discord.com/invite/MPxwj5xVvW](https://discord.com/invite/MPxwj5xVvW)

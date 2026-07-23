@@ -26,7 +26,7 @@ description: "Add Stytch passwordless authentication to your InsForge app. JWT v
 4. Navigate to **Frontend SDK** > **Configuration** and add `http://localhost:3000` as an authorized domain
 5. Go to **Project overview** > **Project ID & API keys** and note down the **Project ID**, **Public Token**, and **Secret**
 
-## Step 2: Set Up Your InsForge Project
+## Step 2: Set up your InsForge project
 
 Create a new project or link an existing one:
 
@@ -47,7 +47,7 @@ npx @insforge/cli secrets get JWT_SECRET
 
 Note down the **URL** and **Anon Key** from the InsForge dashboard. You'll use the JWT Secret from the CLI output to sign tokens for InsForge.
 
-## Step 3: Set Up Your Application
+## Step 3: Set up your application
 
 Install the required dependencies:
 
@@ -70,7 +70,7 @@ NEXT_PUBLIC_INSFORGE_ANON_KEY='YOUR_INSFORGE_ANON_KEY'
 INSFORGE_JWT_SECRET='YOUR_INSFORGE_JWT_SECRET'
 ```
 
-## Step 4: Set Up InsForge Integration
+## Step 4: Set up InsForge integration
 
 Ask your agent to complete the following steps:
 
@@ -106,7 +106,7 @@ Build a todo list page with full CRUD — create, read, update, and delete todos
 
 This creates a page that uses the InsForge client to manage todos. RLS ensures users only see their own data.
 
-## Step 5: Run Your Application
+## Step 5: Run your application
 
 ```bash
 # Install dependencies if you haven't already

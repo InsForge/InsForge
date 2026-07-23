@@ -18,7 +18,7 @@ Authorization: Bearer $OPENROUTER_API_KEY
 Content-Type: application/json
 ```
 
-### Chat Completion
+### Chat completion
 
 ```bash
 curl -X POST https://openrouter.ai/api/v1/chat/completions \
@@ -69,13 +69,13 @@ curl "https://openrouter.ai/api/v1/models?output_modalities=all"
 OpenRouter owns the current request and response shape for AI model calls. Check OpenRouter's API docs for model-specific parameters, supported modalities, plugins, and video generation endpoints.
 </Note>
 
-## InsForge Admin Helper Endpoints
+## InsForge admin helper endpoints
 
 These endpoints help the dashboard display the active Model Gateway key, model catalog, and usage overview. They require admin authentication.
 
 Use either an admin JWT bearer token or an InsForge API key bearer token in the `Authorization` header.
 
-### Get Available Models
+### Get available models
 
 ```
 GET /api/ai/models
@@ -113,7 +113,7 @@ Returns the normalized OpenRouter model catalog as an array:
 ]
 ```
 
-### Get Active OpenRouter Key
+### Get active OpenRouter key
 
 ```
 GET /api/ai/openrouter/api-key
@@ -140,7 +140,7 @@ curl "https://your-app.insforge.app/api/ai/openrouter/api-key" \
 `apiKey` is a raw secret. Do not log it, commit it, store it in browser storage, or return it from public endpoints. Only `maskedKey` is safe to display in client UI.
 </Warning>
 
-### Get Usage Overview
+### Get usage overview
 
 ```
 GET /api/ai/overview
@@ -158,7 +158,7 @@ curl "https://your-app.insforge.app/api/ai/overview" \
 
 Returns key-level OpenRouter usage and activity time series when the active key has activity access.
 
-## Deprecated InsForge Proxy Routes
+## Deprecated InsForge proxy routes
 
 The following routes still exist for existing applications, but new code should use OpenRouter directly.
 
@@ -168,7 +168,7 @@ The following routes still exist for existing applications, but new code should 
 | POST | `/api/ai/image/generation` | OpenRouter chat completions with image output or OpenRouter image-capable model docs |
 | POST | `/api/ai/embeddings` | `POST https://openrouter.ai/api/v1/embeddings` |
 
-### Legacy Chat Proxy
+### Legacy chat proxy
 
 ```
 POST /api/ai/chat/completion
@@ -176,7 +176,7 @@ POST /api/ai/chat/completion
 
 This route validates an InsForge-shaped request, forwards it to OpenRouter, and returns an InsForge-shaped response. It does not expose the complete OpenRouter API surface.
 
-### Legacy Image Proxy
+### Legacy image proxy
 
 ```
 POST /api/ai/image/generation
@@ -184,7 +184,7 @@ POST /api/ai/image/generation
 
 This route forwards an InsForge-shaped image request to OpenRouter chat completions with image output. It is retained for compatibility only.
 
-### Legacy Embeddings Proxy
+### Legacy embeddings proxy
 
 ```
 POST /api/ai/embeddings
