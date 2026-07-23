@@ -1,15 +1,19 @@
 services:
   postgres:
     image: ghcr.io/insforge/postgres:v15.13.4
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
+    # Dev: ENCRYPTION_KEY falls back to JWT_SECRET for local convenience.
+    # The encryption.sql init script persists it via ALTER DATABASE.
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./deploy/docker-init/db/db-init.sql:/docker-entrypoint-initdb.d/01-init.sql
       - ./deploy/docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
+      - ./deploy/docker-init/db/encryption.sql:/docker-entrypoint-initdb.d/03-encryption.sql
       - ./deploy/docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -70,7 +74,7 @@ services:
       - API_BASE_URL=${API_BASE_URL:-}
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
       - ROOT_ADMIN_USERNAME=${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
       - ROOT_ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}
       - ADMIN_EMAIL=${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
@@ -201,7 +205,7 @@ services:
       # Worker timeout (60 seconds default)
       - WORKER_TIMEOUT_MS=${WORKER_TIMEOUT_MS:-60000}
       # Encryption keys for decrypting function secrets
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
     volumes:
       - ./functions:/app/functions
