@@ -70,11 +70,30 @@ const EXCLUDED_HEADERS = new Set([
  * Timeout-class errors are never retried: by the time the 10s budget is spent
  * the request may already be executing in PostgREST (retrying a write risks a
  * duplicate), and re-running it amplifies load exactly when the database is
- * saturated. Connection-class errors (ECONNREFUSED, ECONNRESET from a
- * keep-alive socket closed while idle, DNS failures) mean the request was
- * never processed, so those remain retryable.
+ * saturated.
  */
 const TIMEOUT_ERROR_CODES = new Set(['ECONNABORTED', 'ETIMEDOUT']);
+
+/**
+ * Errors that prove the connection was never established, so the request
+ * cannot have reached PostgREST and is safe to retry for any method.
+ */
+const CONNECTION_NOT_ESTABLISHED_CODES = new Set([
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+]);
+
+/**
+ * Methods safe to replay even when the request may have reached PostgREST.
+ * Everything else (POST/PATCH/PUT/DELETE) only retries errors from
+ * CONNECTION_NOT_ESTABLISHED_CODES: an ECONNRESET is usually a keep-alive
+ * socket closed while idle, but it can also arrive mid-response after the
+ * write already committed, and the two are indistinguishable here.
+ */
+const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 export class PostgrestProxyService {
   private static instance: PostgrestProxyService;
@@ -95,16 +114,25 @@ export class PostgrestProxyService {
   }
 
   /**
-   * A request may be retried only when PostgREST never received it: a
-   * network-level failure (no HTTP response) that is not a timeout. Any
-   * response — including 5xx — and any timeout is surfaced to the caller
-   * instead of retried.
+   * A request may be retried only when replaying it cannot duplicate work in
+   * PostgREST. Any HTTP response — including 5xx — and any timeout is
+   * surfaced to the caller instead of retried. Among the remaining network
+   * errors, connection-never-established failures are retryable for every
+   * method, while ambiguous ones (ECONNRESET, EPIPE, missing code) are
+   * retryable only for idempotent methods.
    */
-  static isRetryableError(error: unknown): boolean {
+  static isRetryableError(error: unknown, method: string): boolean {
     if (!axios.isAxiosError(error) || error.response) {
       return false;
     }
-    return !TIMEOUT_ERROR_CODES.has(error.code ?? '');
+    const code = error.code ?? '';
+    if (TIMEOUT_ERROR_CODES.has(code)) {
+      return false;
+    }
+    if (CONNECTION_NOT_ESTABLISHED_CODES.has(code)) {
+      return true;
+    }
+    return IDEMPOTENT_METHODS.has(method.toUpperCase());
   }
 
   /**
@@ -224,7 +252,8 @@ export class PostgrestProxyService {
         break;
       } catch (error) {
         lastError = error;
-        const shouldRetry = attempt < maxRetries && PostgrestProxyService.isRetryableError(error);
+        const shouldRetry =
+          attempt < maxRetries && PostgrestProxyService.isRetryableError(error, request.method);
 
         if (shouldRetry) {
           logger.warn(`PostgREST request failed, retrying (attempt ${attempt}/${maxRetries})`, {

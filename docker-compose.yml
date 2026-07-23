@@ -34,6 +34,8 @@ services:
       PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
       PGRST_DB_SCHEMA: public
       PGRST_DB_ANON_ROLE: anon
+      # Keep in sync with the backend's POSTGREST_MAX_SOCKETS (default 50)
+      PGRST_DB_POOL: ${PGRST_DB_POOL:-50}
       PGRST_JWT_SECRET: ${JWT_SECRET:-dev-secret-please-change-in-production}
       # Enable schema reloading via NOTIFY
       PGRST_DB_CHANNEL_ENABLED: true
