@@ -2,6 +2,7 @@ ack
 ACLs
 additionalParams
 agentic
+Aliyun
 allowlisted
 allowlists
 Apify
@@ -145,6 +146,7 @@ Subhosting
 sudo
 Supabase
 systemd
+Tencent
 tmpfs
 todo
 todos

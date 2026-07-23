@@ -542,11 +542,12 @@ describe('Storage routes', () => {
   });
 
   test('proxy-mode download maps InvalidRange to 416 with the full size', async () => {
-    const getObjectStream = vi
-      .fn()
-      .mockRejectedValue(
-        Object.assign(new Error('range'), { name: 'InvalidRange', $metadata: { httpStatusCode: 416 } })
-      );
+    const getObjectStream = vi.fn().mockRejectedValue(
+      Object.assign(new Error('range'), {
+        name: 'InvalidRange',
+        $metadata: { httpStatusCode: 416 },
+      })
+    );
     storageMocks.getProvider.mockReturnValue({ getObjectStream });
 
     const port = await startProxyModeServer();

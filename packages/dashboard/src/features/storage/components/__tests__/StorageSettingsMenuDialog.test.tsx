@@ -6,9 +6,7 @@ import type { S3GatewayConfigSchema } from '@insforge/shared-schemas';
 
 const storageSettingsMocks = vi.hoisted(() => ({
   isCloudProject: false,
-  gatewayConfig: undefined as
-    | { endpoint: string; region: string; available: boolean }
-    | undefined,
+  gatewayConfig: undefined as { endpoint: string; region: string; available: boolean } | undefined,
   // Stable reference — a fresh object per render would change resetForm's
   // identity every render and loop the dialog's reset effect.
   storageConfig: { maxFileSizeMb: 50 },
