@@ -9,20 +9,25 @@ import { ERROR_CODES } from '@insforge/shared-schemas';
 
 const postgrestUrl = appConfig.database.postgrestBaseUrl;
 
-// Connection pooling for PostgREST
+// Connection pooling for PostgREST. maxSockets caps concurrency toward
+// PostgREST; requests beyond it queue inside the agent, and queue time counts
+// against the axios timeout below.
+const maxSockets = appConfig.database.postgrestMaxSockets;
+const maxFreeSockets = Math.min(appConfig.database.postgrestMaxFreeSockets, maxSockets);
+
 const httpAgent = new http.Agent({
   keepAlive: true,
   keepAliveMsecs: 5000,
-  maxSockets: 20,
-  maxFreeSockets: 5,
+  maxSockets,
+  maxFreeSockets,
   timeout: 10000,
 });
 
 const httpsAgent = new https.Agent({
   keepAlive: true,
   keepAliveMsecs: 5000,
-  maxSockets: 20,
-  maxFreeSockets: 5,
+  maxSockets,
+  maxFreeSockets,
   timeout: 10000,
 });
 
@@ -61,6 +66,16 @@ const EXCLUDED_HEADERS = new Set([
   'content-encoding',
 ]);
 
+/**
+ * Timeout-class errors are never retried: by the time the 10s budget is spent
+ * the request may already be executing in PostgREST (retrying a write risks a
+ * duplicate), and re-running it amplifies load exactly when the database is
+ * saturated. Connection-class errors (ECONNREFUSED, ECONNRESET from a
+ * keep-alive socket closed while idle, DNS failures) mean the request was
+ * never processed, so those remain retryable.
+ */
+const TIMEOUT_ERROR_CODES = new Set(['ECONNABORTED', 'ETIMEDOUT']);
+
 export class PostgrestProxyService {
   private static instance: PostgrestProxyService;
   private tokenManager = TokenManager.getInstance();
@@ -77,6 +92,19 @@ export class PostgrestProxyService {
       PostgrestProxyService.instance = new PostgrestProxyService();
     }
     return PostgrestProxyService.instance;
+  }
+
+  /**
+   * A request may be retried only when PostgREST never received it: a
+   * network-level failure (no HTTP response) that is not a timeout. Any
+   * response — including 5xx — and any timeout is surfaced to the caller
+   * instead of retried.
+   */
+  static isRetryableError(error: unknown): boolean {
+    if (!axios.isAxiosError(error) || error.response) {
+      return false;
+    }
+    return !TIMEOUT_ERROR_CODES.has(error.code ?? '');
   }
 
   /**
@@ -196,11 +224,12 @@ export class PostgrestProxyService {
         break;
       } catch (error) {
         lastError = error;
-        const shouldRetry = axios.isAxiosError(error) && !error.response && attempt < maxRetries;
+        const shouldRetry = attempt < maxRetries && PostgrestProxyService.isRetryableError(error);
 
         if (shouldRetry) {
           logger.warn(`PostgREST request failed, retrying (attempt ${attempt}/${maxRetries})`, {
             url: targetUrl,
+            method: request.method,
             errorCode: (error as NodeJS.ErrnoException).code,
             message: (error as Error).message,
           });

@@ -351,7 +351,9 @@ describe('config.database', () => {
       'POSTGRES_USER',
       'POSTGRES_PASSWORD',
       'DATABASE_DIR',
-      'POSTGREST_BASE_URL'
+      'POSTGREST_BASE_URL',
+      'POSTGREST_MAX_SOCKETS',
+      'POSTGREST_MAX_FREE_SOCKETS'
     );
     const c = loadConfig();
 
@@ -361,6 +363,8 @@ describe('config.database', () => {
     expect(c.database.user).toBe('postgres');
     expect(c.database.password).toBe('postgres');
     expect(c.database.postgrestBaseUrl).toBe('http://localhost:5430');
+    expect(c.database.postgrestMaxSockets).toBe(50);
+    expect(c.database.postgrestMaxFreeSockets).toBe(10);
     expect(typeof c.database.dir).toBe('string');
   });
 
@@ -371,6 +375,8 @@ describe('config.database', () => {
     process.env.POSTGRES_USER = 'dbuser';
     process.env.POSTGRES_PASSWORD = 'securepass';
     process.env.POSTGREST_BASE_URL = 'http://postgrest:3000';
+    process.env.POSTGREST_MAX_SOCKETS = '100';
+    process.env.POSTGREST_MAX_FREE_SOCKETS = '25';
     const c = loadConfig();
 
     expect(c.database.host).toBe('db.internal');
@@ -379,6 +385,17 @@ describe('config.database', () => {
     expect(c.database.user).toBe('dbuser');
     expect(c.database.password).toBe('securepass');
     expect(c.database.postgrestBaseUrl).toBe('http://postgrest:3000');
+    expect(c.database.postgrestMaxSockets).toBe(100);
+    expect(c.database.postgrestMaxFreeSockets).toBe(25);
+  });
+
+  it('falls back to defaults for invalid PostgREST pool sizes', () => {
+    process.env.POSTGREST_MAX_SOCKETS = 'not-a-number';
+    process.env.POSTGREST_MAX_FREE_SOCKETS = '-3';
+    const c = loadConfig();
+
+    expect(c.database.postgrestMaxSockets).toBe(50);
+    expect(c.database.postgrestMaxFreeSockets).toBe(10);
   });
 
   it('parses POSTGRES_PORT as integer', () => {

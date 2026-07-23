@@ -82,6 +82,8 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       - POSTGREST_BASE_URL=http://postgrest:3000
+      - POSTGREST_MAX_SOCKETS=${POSTGREST_MAX_SOCKETS:-}
+      - POSTGREST_MAX_FREE_SOCKETS=${POSTGREST_MAX_FREE_SOCKETS:-}
       # Deno Runtime URL for serverless functions
       - DENO_RUNTIME_URL=http://deno:7133
       - DENO_DEPLOY_TOKEN=${DENO_DEPLOY_TOKEN:-}
