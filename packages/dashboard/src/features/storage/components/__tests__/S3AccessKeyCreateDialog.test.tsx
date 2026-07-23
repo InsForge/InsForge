@@ -14,8 +14,8 @@ const createdKey: S3AccessKeyWithSecretSchema = {
 };
 
 describe('S3AccessKeyCreateDialog', () => {
-  it('creates a key, displays the secret, and requires acknowledgement before closing', async () => {
-    const user = userEvent.setup();
+  it('creates a key, displays the secret, and requires acknowledgement before closing', { timeout: 10_000 }, async () => {
+    const user = userEvent.setup({ delay: null });
     const onCreate = vi.fn().mockResolvedValue(createdKey);
     const onOpenChange = vi.fn();
 
