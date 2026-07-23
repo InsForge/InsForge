@@ -1971,7 +1971,7 @@
     "refreshFiles": "Actualizar archivos",
     "refreshing": "Actualizando...",
     "region": "Región",
-    "regionDescription": "Región de firma SigV4 esperada por el gateway. Los clientes deben firmar con este valor exacto (configurable en el servidor mediante AWS_REGION).",
+    "regionDescription": "Región de firma SigV4 esperada por el gateway. Los clientes deben firmar con este valor exacto (configurable en el servidor mediante S3_REGION).",
     "revoke": "Revocar",
     "revokeAccessKey": "Revocar clave de acceso",
     "revokeS3AccessKeyDescription": "La clave de acceso {{accessKeyId}} dejará de funcionar de inmediato. Cualquier cliente que aún la use empezará a recibir errores InvalidAccessKeyId.",

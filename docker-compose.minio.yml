@@ -1,0 +1,73 @@
+# Optional bundled MinIO object storage for self-hosted InsForge.
+#
+# Overlay this on top of any base compose file:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.minio.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.minio.yml up -d
+#
+# MinIO stays on the internal Docker network (no host ports). The backend runs
+# in proxy mode (S3_PRESIGNED_URLS=false): all object bytes stream through the
+# backend, so MinIO never needs to be exposed to browsers. The S3-compatible
+# gateway at /storage/v1/s3 is enabled automatically.
+#
+# ⚠️ CHANGE THE DEFAULT CREDENTIALS IN PRODUCTION: set MINIO_ROOT_USER and
+# MINIO_ROOT_PASSWORD in your .env before first launch.
+
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-insforge}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-insforge-minio-secret}
+    volumes:
+      - minio-data:/data
+    networks:
+      - insforge-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # Optional: publish the MinIO console for admin access.
+    # ports:
+    #   - "${MINIO_CONSOLE_PORT:-9001}:9001"
+
+  # One-shot: creates the backing bucket, then exits. `mc mb -p` is idempotent
+  # so re-running `up` is safe.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-insforge}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-insforge-minio-secret}
+    networks:
+      - insforge-network
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do sleep 1; done
+        mc mb -p local/insforge-storage
+    restart: "no"
+
+  insforge:
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      S3_BUCKET: insforge-storage
+      S3_REGION: us-east-1
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-insforge}
+      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-insforge-minio-secret}
+      S3_FORCE_PATH_STYLE: "true"
+      S3_PRESIGNED_URLS: "false"
+
+volumes:
+  minio-data:
+    driver: local

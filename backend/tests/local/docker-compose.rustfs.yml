@@ -1,0 +1,36 @@
+# Ephemeral RustFS for S3-gateway / proxy-mode integration tests (manual-only,
+# not wired into CI — RustFS compatibility is verified by hand for now).
+# Exposes the S3 API at :9102, shifted off 9000/9100 so it doesn't clash with
+# other local services or the MinIO test rig.
+#
+# Point the backend at it with:
+#   AWS_S3_BUCKET=insforge-storage
+#   S3_ENDPOINT_URL=http://localhost:9102
+#   S3_ACCESS_KEY_ID=rustfs S3_SECRET_ACCESS_KEY=rustfssecret
+#   S3_FORCE_PATH_STYLE=true S3_PRESIGNED_URLS=false
+
+services:
+  rustfs:
+    image: rustfs/rustfs:latest
+    ports:
+      - "9102:9000"
+    environment:
+      RUSTFS_ACCESS_KEY: rustfs
+      RUSTFS_SECRET_KEY: rustfssecret
+    volumes:
+      - rustfs-data:/data
+
+  rustfs-setup:
+    image: minio/mc:latest
+    depends_on:
+      - rustfs
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until (/usr/bin/mc alias set local http://rustfs:9000 rustfs rustfssecret) do sleep 1; done
+        /usr/bin/mc mb -p local/insforge-storage
+        exit 0
+
+volumes:
+  rustfs-data:

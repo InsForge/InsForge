@@ -8,12 +8,12 @@ import { appConfig } from '@/infra/config/app.config.js';
 
 /**
  * Region used to validate the `Credential=<ak>/<date>/<region>/s3/aws4_request`
- * scope in incoming Authorization headers. Shares `AWS_REGION` with
- * S3StorageProvider so clients sign with the same region the backing bucket
- * lives in (and so `GET /api/storage/s3/config` surfaces exactly what the
- * middleware will accept). Defaults to `us-east-2`.
+ * scope in incoming Authorization headers. Shares `S3_REGION` (fallback
+ * `AWS_REGION`) with S3StorageProvider so clients sign with the same region
+ * the backing bucket lives in (and so `GET /api/storage/s3/config` surfaces
+ * exactly what the middleware will accept). Defaults to `us-east-2`.
  */
-const SIGNING_REGION = appConfig.storage.awsRegion;
+const SIGNING_REGION = appConfig.storage.s3Region;
 const MAX_CLOCK_SKEW_MS = 15 * 60 * 1000;
 
 /**

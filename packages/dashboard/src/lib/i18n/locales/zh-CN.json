@@ -1926,7 +1926,7 @@
     "refreshFiles": "刷新文件",
     "refreshing": "刷新中...",
     "region": "区域",
-    "regionDescription": "网关所需的 SigV4 签名区域。客户端必须使用此确切值进行签名（可通过服务器端 AWS_REGION 配置）。",
+    "regionDescription": "网关所需的 SigV4 签名区域。客户端必须使用此确切值进行签名（可通过服务器端 S3_REGION 配置）。",
     "revoke": "吊销",
     "revokeAccessKey": "吊销访问密钥",
     "revokeS3AccessKeyDescription": "访问密钥 {{accessKeyId}} 将立即失效。仍在使用它的客户端将开始收到 InvalidAccessKeyId 错误。",

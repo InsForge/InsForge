@@ -40,7 +40,7 @@ vi.mock('../../src/infra/config/app.config', () => ({
     storage: {
       s3Bucket: undefined,
       appKey: 'local',
-      awsRegion: 'us-east-2',
+      s3Region: 'us-east-2',
       storageDir: '/tmp/insforge-backup-service-tests',
     },
     database: {

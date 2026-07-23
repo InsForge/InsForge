@@ -27,6 +27,7 @@ import {
   type UpdateStorageConfigRequest,
 } from '@insforge/shared-schemas';
 import { useStorageConfig } from '#features/storage/hooks/useStorageConfig';
+import { useS3GatewayConfig } from '#features/storage/hooks/useS3AccessKeys';
 import { S3SettingsPanel } from './S3SettingsPanel';
 import { isInsForgeCloudProject } from '#lib/utils/utils';
 
@@ -80,10 +81,13 @@ function SettingRow({ label, description, children }: SettingRowProps) {
 export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSettingsMenuDialogProps) {
   const { t } = useTranslation('chrome');
   const { config, isLoading, error, isUpdating, updateConfig } = useStorageConfig();
-  // S3 gateway is a cloud-only feature — self-hosted deployments don't have
-  // VITE_API_BASE_URL / APP_KEY set, so the tab is hidden entirely there.
-  // Same detection as AppSidebar and BucketFormDialog.
+  // The S3 gateway needs an S3-backed storage provider. Cloud projects always
+  // have one; self-hosted deployments advertise it via /storage/s3/config
+  // `available` (false on local-filesystem storage). The query is admin-only
+  // and fails closed: on error or older backends the tab stays hidden.
   const isCloud = isInsForgeCloudProject();
+  const { data: gatewayConfig } = useS3GatewayConfig();
+  const showS3Tab = isCloud || gatewayConfig?.available === true;
   const [activeTab, setActiveTab] = useState<StorageSettingsTab>('general');
 
   const form = useForm<UpdateStorageConfigRequest>({
@@ -122,7 +126,7 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
   const saveDisabled = !form.formState.isDirty || isUpdating;
 
   const title =
-    activeTab === 's3' && isCloud
+    activeTab === 's3' && showS3Tab
       ? t('storage.s3CompatibleApi', { defaultValue: 'S3 Compatible API' })
       : t('storage.general', { defaultValue: 'General' });
 
@@ -144,7 +148,7 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
               >
                 {t('storage.general', { defaultValue: 'General' })}
               </MenuDialogNavItem>
-              {isCloud && (
+              {showS3Tab && (
                 <MenuDialogNavItem
                   icon={<Cloud className="h-5 w-5" />}
                   active={activeTab === 's3'}
@@ -163,7 +167,7 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
             <MenuDialogCloseButton className="ml-auto" />
           </MenuDialogHeader>
 
-          {activeTab === 's3' && isCloud ? (
+          {activeTab === 's3' && showS3Tab ? (
             <MenuDialogBody>
               <S3SettingsPanel />
             </MenuDialogBody>

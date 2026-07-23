@@ -1926,7 +1926,7 @@
     "refreshFiles": "重新整理檔案",
     "refreshing": "重新整理中...",
     "region": "區域",
-    "regionDescription": "閘道所要求的 SigV4 簽章區域。用戶端必須使用此確切值進行簽章（可透過伺服器端 AWS_REGION 設定）。",
+    "regionDescription": "閘道所要求的 SigV4 簽章區域。用戶端必須使用此確切值進行簽章（可透過伺服器端 S3_REGION 設定）。",
     "revoke": "撤銷",
     "revokeAccessKey": "撤銷存取金鑰",
     "revokeS3AccessKeyDescription": "存取金鑰 {{accessKeyId}} 將立即失效。仍在使用它的用戶端將開始收到 InvalidAccessKeyId 錯誤。",

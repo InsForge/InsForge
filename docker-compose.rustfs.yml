@@ -1,0 +1,66 @@
+# Optional bundled RustFS object storage for self-hosted InsForge.
+# RustFS is an Apache-2.0 licensed, S3-compatible object store written in Rust.
+#
+# Overlay this on top of any base compose file:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.rustfs.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.rustfs.yml up -d
+#
+# RustFS stays on the internal Docker network (no host ports). The backend runs
+# in proxy mode (S3_PRESIGNED_URLS=false): all object bytes stream through the
+# backend, so RustFS never needs to be exposed to browsers. The S3-compatible
+# gateway at /storage/v1/s3 is enabled automatically.
+#
+# ⚠️ CHANGE THE DEFAULT CREDENTIALS IN PRODUCTION: set RUSTFS_ACCESS_KEY and
+# RUSTFS_SECRET_KEY in your .env before first launch.
+
+services:
+  rustfs:
+    image: rustfs/rustfs:latest
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-insforge}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-insforge-rustfs-secret}
+    volumes:
+      - rustfs-data:/data
+    networks:
+      - insforge-network
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  # One-shot: creates the backing bucket, then exits. The retry loop doubles as
+  # the readiness gate (the RustFS image ships no healthcheck tooling we rely
+  # on). `mc mb -p` is idempotent so re-running `up` is safe.
+  rustfs-init:
+    image: minio/mc:latest
+    depends_on:
+      rustfs:
+        condition: service_started
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-insforge}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-insforge-rustfs-secret}
+    networks:
+      - insforge-network
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://rustfs:9000 "$$RUSTFS_ACCESS_KEY" "$$RUSTFS_SECRET_KEY"; do sleep 1; done
+        mc mb -p local/insforge-storage
+    restart: "no"
+
+  insforge:
+    depends_on:
+      rustfs-init:
+        condition: service_completed_successfully
+    environment:
+      S3_BUCKET: insforge-storage
+      S3_REGION: us-east-1
+      S3_ENDPOINT_URL: http://rustfs:9000
+      S3_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:-insforge}
+      S3_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:-insforge-rustfs-secret}
+      S3_FORCE_PATH_STYLE: "true"
+      S3_PRESIGNED_URLS: "false"
+
+volumes:
+  rustfs-data:
+    driver: local

@@ -462,9 +462,11 @@ describe('config.auth', () => {
 describe('config.storage', () => {
   it('uses defaults when no env vars are set', () => {
     unsetEnvKeys(
+      'S3_BUCKET',
       'AWS_S3_BUCKET',
       'APP_KEY',
       'PARENT_APP_KEY',
+      'S3_REGION',
       'AWS_REGION',
       'STORAGE_DIR',
       'S3_ACCESS_KEY_ID',
@@ -480,7 +482,7 @@ describe('config.storage', () => {
     expect(c.storage.s3Bucket).toBeUndefined();
     expect(c.storage.appKey).toBe('local');
     expect(c.storage.parentAppKey).toBeUndefined();
-    expect(c.storage.awsRegion).toBe('us-east-2');
+    expect(c.storage.s3Region).toBe('us-east-2');
     expect(c.storage.s3AccessKeyId).toBeUndefined();
     expect(c.storage.s3SecretAccessKey).toBeUndefined();
     expect(c.storage.awsAccessKeyId).toBeUndefined();
@@ -498,17 +500,29 @@ describe('config.storage', () => {
     expect(loadConfig().storage.appKey).not.toBe('default-app-key');
   });
 
-  it('overrides S3 bucket and region', () => {
+  it('overrides S3 bucket and region via legacy AWS_* names (cloud provisioning)', () => {
+    unsetEnvKeys('S3_BUCKET', 'S3_REGION');
     process.env.AWS_S3_BUCKET = 'my-production-bucket';
     process.env.AWS_REGION = 'eu-west-1';
     const c = loadConfig();
 
     expect(c.storage.s3Bucket).toBe('my-production-bucket');
-    expect(c.storage.awsRegion).toBe('eu-west-1');
+    expect(c.storage.s3Region).toBe('eu-west-1');
   });
 
-  it('sets s3Bucket to undefined when AWS_S3_BUCKET is not set', () => {
-    unsetEnvKeys('AWS_S3_BUCKET');
+  it('prefers provider-neutral S3_BUCKET / S3_REGION over the AWS_* fallbacks', () => {
+    process.env.S3_BUCKET = 'neutral-bucket';
+    process.env.AWS_S3_BUCKET = 'legacy-bucket';
+    process.env.S3_REGION = 'eu-central-1';
+    process.env.AWS_REGION = 'eu-west-1';
+    const c = loadConfig();
+
+    expect(c.storage.s3Bucket).toBe('neutral-bucket');
+    expect(c.storage.s3Region).toBe('eu-central-1');
+  });
+
+  it('sets s3Bucket to undefined when neither S3_BUCKET nor AWS_S3_BUCKET is set', () => {
+    unsetEnvKeys('S3_BUCKET', 'AWS_S3_BUCKET');
     expect(loadConfig().storage.s3Bucket).toBeUndefined();
   });
 
@@ -519,6 +533,22 @@ describe('config.storage', () => {
 
     expect(c.storage.s3AccessKeyId).toBe('s3-key-id');
     expect(c.storage.s3SecretAccessKey).toBe('s3-secret');
+  });
+
+  it('s3PresignedUrls defaults to true; only the literal "false" enables proxy mode', () => {
+    unsetEnvKeys('S3_PRESIGNED_URLS');
+    expect(loadConfig().storage.s3PresignedUrls).toBe(true);
+
+    process.env.S3_PRESIGNED_URLS = 'false';
+    expect(loadConfig().storage.s3PresignedUrls).toBe(false);
+
+    process.env.S3_PRESIGNED_URLS = 'true';
+    expect(loadConfig().storage.s3PresignedUrls).toBe(true);
+
+    // Garbage values keep the safe default (presigned), matching the
+    // S3_FORCE_PATH_STYLE parsing convention.
+    process.env.S3_PRESIGNED_URLS = '0';
+    expect(loadConfig().storage.s3PresignedUrls).toBe(true);
   });
 
   it('reads AWS credentials when set', () => {

@@ -173,6 +173,7 @@
                 "group": "Self-Hosting",
                 "pages": [
                   "deployment/deployment-security-guide",
+                  "deployment/self-host-storage",
                   "deployment/deploy-to-aws-ec2",
                   "deployment/deploy-to-azure-virtual-machines",
                   "deployment/deploy-to-containarium",
