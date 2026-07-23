@@ -115,6 +115,16 @@ ENV LOGS_DIR=/insforge-logs
 ENV MAX_JSON_BODY_SIZE=100mb
 ENV MAX_URLENCODED_BODY_SIZE=10mb
 
+# Express production mode + telemetry runtime_environment classification.
+# Only safe in this stage: node_modules are copied in prebuilt, so no npm
+# install runs under it. Do NOT set this in the dev stage — its containers
+# run `npm install` at startup, which would skip devDependencies.
+ENV NODE_ENV=production
+
+# Telemetry deployment-channel default for bare `docker run`. Compose files
+# and PaaS templates override it; platform-injected vars win over both.
+ENV INSFORGE_DEPLOYMENT_METHOD=docker
+
 RUN mkdir -p /data /insforge-storage /insforge-logs && \
     chown node:node /data /insforge-storage /insforge-logs
 

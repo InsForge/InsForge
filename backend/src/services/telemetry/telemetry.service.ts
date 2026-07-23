@@ -276,6 +276,9 @@ function detectStorageBackend(): 'local' | 's3' | 's3-compatible' {
 }
 
 function detectDeploymentMethod(): string {
+  // Platform-injected variables win over the artifact stamp below: PaaS
+  // channels run the published image, whose baked-in stamp only knows it
+  // is "docker".
   if (process.env.RAILWAY_ENVIRONMENT_ID) {
     return 'railway';
   }
@@ -288,17 +291,43 @@ function detectDeploymentMethod(): string {
     return 'sealos';
   }
 
-  if (process.env.DOKPLOY_PROJECT_NAME) {
-    return 'dokploy';
+  if (process.env.RENDER) {
+    return 'render';
+  }
+
+  if (process.env.FLY_APP_NAME) {
+    return 'fly';
+  }
+
+  if (process.env.K_SERVICE) {
+    return 'cloud-run';
+  }
+
+  if (process.env.ECS_CONTAINER_METADATA_URI_V4) {
+    return 'ecs';
+  }
+
+  if (process.env.COOLIFY_RESOURCE_UUID || process.env.COOLIFY_FQDN) {
+    return 'coolify';
   }
 
   if (process.env.KUBERNETES_SERVICE_HOST) {
     return 'kubernetes';
   }
 
-  if (process.env.POSTGRES_HOST === 'postgres') {
-    return 'docker-compose';
+  // Artifact stamp: each distribution artifact we ship (compose files,
+  // Dockerfile, PaaS templates) declares its channel. Dokploy is identified
+  // this way — it does not inject variables into containers. Length-capped
+  // to keep property cardinality bounded when users edit the value.
+  const stamped = process.env.INSFORGE_DEPLOYMENT_METHOD?.trim().toLowerCase();
+  if (stamped) {
+    return stamped.slice(0, 32);
   }
 
-  return 'unknown';
+  // Container images built before the stamp existed
+  if (fs.existsSync('/.dockerenv')) {
+    return 'docker';
+  }
+
+  return 'source';
 }
