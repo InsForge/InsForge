@@ -106,6 +106,14 @@ export interface AppConfig {
   telemetry: {
     disabled: boolean;
   };
+  messaging: {
+    leaseDurationSeconds: number;
+    maxRetryAttempts: number;
+    backoffBaseSeconds: number;
+    jitterPercent: number;
+    reconciliationIntervalSeconds: number;
+    listenTimeoutSeconds: number;
+  };
 }
 
 function parseEnvInt(val: string | undefined, fallback: number): number {
@@ -243,6 +251,17 @@ export function loadConfig(): AppConfig {
     },
     telemetry: {
       disabled: parseEnvBool(process.env.INSFORGE_TELEMETRY_DISABLED),
+    },
+    messaging: {
+      leaseDurationSeconds: parseEnvInt(process.env.MESSAGING_LEASE_DURATION_SECONDS, 60),
+      maxRetryAttempts: parseEnvInt(process.env.MESSAGING_MAX_RETRY_ATTEMPTS, 5),
+      backoffBaseSeconds: parseEnvInt(process.env.MESSAGING_BACKOFF_BASE_SECONDS, 5),
+      jitterPercent: (() => {
+        const val = parseFloat(process.env.MESSAGING_JITTER_PERCENT || '0.2');
+        return isNaN(val) || val < 0 || val > 1 ? 0.2 : val;
+      })(),
+      reconciliationIntervalSeconds: parseEnvInt(process.env.MESSAGING_RECONCILIATION_INTERVAL_SECONDS, 60),
+      listenTimeoutSeconds: parseEnvInt(process.env.MESSAGING_LISTEN_TIMEOUT_SECONDS, 30),
     },
   };
 }
