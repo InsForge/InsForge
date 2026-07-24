@@ -7,7 +7,7 @@
 #   AWS_S3_BUCKET=insforge-storage
 #   S3_ENDPOINT_URL=http://localhost:9102
 #   S3_ACCESS_KEY_ID=rustfs S3_SECRET_ACCESS_KEY=rustfssecret
-#   S3_FORCE_PATH_STYLE=true S3_PRESIGNED_URLS=false
+#   S3_FORCE_PATH_STYLE=true S3_USE_PRESIGNED_URLS=false
 
 services:
   rustfs:

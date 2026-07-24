@@ -6,7 +6,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.rustfs.yml up -d
 #
 # RustFS stays on the internal Docker network (no host ports). The backend runs
-# in proxy mode (S3_PRESIGNED_URLS=false): all object bytes stream through the
+# in proxy mode (S3_USE_PRESIGNED_URLS=false): all object bytes stream through the
 # backend, so RustFS never needs to be exposed to browsers. The S3-compatible
 # gateway at /storage/v1/s3 is enabled automatically.
 #
@@ -59,7 +59,7 @@ services:
       S3_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:-insforge}
       S3_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:-insforge-rustfs-secret}
       S3_FORCE_PATH_STYLE: "true"
-      S3_PRESIGNED_URLS: "false"
+      S3_USE_PRESIGNED_URLS: "false"
 
 volumes:
   rustfs-data:

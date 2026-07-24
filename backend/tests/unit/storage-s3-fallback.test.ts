@@ -26,8 +26,8 @@ vi.mock('@/infra/config/app.config.js', () => {
       get s3EndpointUrl() {
         return process.env.S3_ENDPOINT_URL;
       },
-      get s3PresignedUrls() {
-        return process.env.S3_PRESIGNED_URLS !== 'false';
+      get s3UsePresignedUrls() {
+        return process.env.S3_USE_PRESIGNED_URLS !== 'false';
       },
     },
     server: {

@@ -73,7 +73,7 @@ services:
       STORAGE_DIR: /insforge-storage
       # S3-compatible storage (AWS S3, MinIO, RustFS, Wasabi, R2, Tencent COS ...).
       # Leave S3_BUCKET empty to keep local filesystem storage. Set
-      # S3_PRESIGNED_URLS=false to proxy object bytes through the backend
+      # S3_USE_PRESIGNED_URLS=false to proxy object bytes through the backend
       # (required when the S3 endpoint is not reachable by browsers).
       S3_BUCKET: ${S3_BUCKET:-}
       S3_REGION: ${S3_REGION:-}
@@ -82,7 +82,7 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-}
       S3_MAX_OBJECT_SIZE_BYTES: ${S3_MAX_OBJECT_SIZE_BYTES:-}
-      S3_PRESIGNED_URLS: ${S3_PRESIGNED_URLS:-}
+      S3_USE_PRESIGNED_URLS: ${S3_USE_PRESIGNED_URLS:-}
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-}
       INSFORGE_TELEMETRY_DISABLED: ${INSFORGE_TELEMETRY_DISABLED:-}
       INSFORGE_DEPLOYMENT_METHOD: dokploy

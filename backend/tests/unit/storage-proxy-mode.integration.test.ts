@@ -3,7 +3,7 @@
  *
  * Opt-in: set RUN_STORAGE_PROXY_INTEGRATION=1 to run. Requires:
  *   - backend running at INSFORGE_API_BASE (default http://localhost:7130)
- *     with an S3 backend AND S3_PRESIGNED_URLS=false — e.g. the MinIO overlay:
+ *     with an S3 backend AND S3_USE_PRESIGNED_URLS=false — e.g. the MinIO overlay:
  *       docker compose -f docker-compose.yml -f docker-compose.minio.yml up -d
  *   - INSFORGE_API_KEY: an admin API key (ik_...) for the REST API
  *

@@ -117,9 +117,9 @@ services:
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
       - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-}
       - S3_MAX_OBJECT_SIZE_BYTES=${S3_MAX_OBJECT_SIZE_BYTES:-}
-      # Set S3_PRESIGNED_URLS=false to proxy object bytes through the backend
+      # Set S3_USE_PRESIGNED_URLS=false to proxy object bytes through the backend
       # (required when the S3 endpoint is not reachable by browsers).
-      - S3_PRESIGNED_URLS=${S3_PRESIGNED_URLS:-}
+      - S3_USE_PRESIGNED_URLS=${S3_USE_PRESIGNED_URLS:-}
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-}
     restart: unless-stopped
     volumes:

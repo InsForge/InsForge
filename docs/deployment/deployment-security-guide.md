@@ -284,7 +284,7 @@ DENO_PORT=7133
 
 These variables are only needed if you plan to use InsForge's **deployment features** (deploying projects via the dashboard). If you don't need deployments, skip this section.
 
-> ⚠️ **Note**: `PROJECT_ID` comes from the root `.env.example` setup. It is **not** present in `deploy/docker-compose/.env.example`, and the `deploy/docker-compose/docker-compose.yml` does **not** pass it through to the `insforge` container, so setting it in your `.env` has no effect on that production compose. To use it, add it to the `insforge` service's `environment` block in your `docker-compose.yml`. The storage variables (`S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `S3_PRESIGNED_URLS`, `S3_MAX_OBJECT_SIZE_BYTES`, `MAX_FILE_SIZE`) **are** passed through — set them in your `.env` and restart.
+> ⚠️ **Note**: `PROJECT_ID` comes from the root `.env.example` setup. It is **not** present in `deploy/docker-compose/.env.example`, and the `deploy/docker-compose/docker-compose.yml` does **not** pass it through to the `insforge` container, so setting it in your `.env` has no effect on that production compose. To use it, add it to the `insforge` service's `environment` block in your `docker-compose.yml`. The storage variables (`S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `S3_USE_PRESIGNED_URLS`, `S3_MAX_OBJECT_SIZE_BYTES`, `MAX_FILE_SIZE`) **are** passed through — set them in your `.env` and restart.
 
 ```env
 # ── Deployments ──────────────────────────────────────────────
@@ -339,7 +339,7 @@ S3_FORCE_PATH_STYLE=true
 # network). If you run the MinIO/RustFS overlay, CHANGE its default
 # credentials (MINIO_ROOT_USER/MINIO_ROOT_PASSWORD or
 # RUSTFS_ACCESS_KEY/RUSTFS_SECRET_KEY) before production use.
-S3_PRESIGNED_URLS=
+S3_USE_PRESIGNED_URLS=
 
 # ── Deno Functions ────────────────────────────────────────────
 WORKER_TIMEOUT_MS=60000

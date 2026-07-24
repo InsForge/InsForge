@@ -106,9 +106,9 @@ export class S3StorageProvider implements StorageProvider {
 
     this.s3Client = new S3Client(s3Config);
 
-    if (!appConfig.storage.s3PresignedUrls && appConfig.cloud.cloudFrontUrl) {
+    if (!appConfig.storage.s3UsePresignedUrls && appConfig.cloud.cloudFrontUrl) {
       logger.warn(
-        'S3_PRESIGNED_URLS=false: CloudFront settings are ignored in proxy mode; all object bytes are served through the backend'
+        'S3_USE_PRESIGNED_URLS=false: CloudFront settings are ignored in proxy mode; all object bytes are served through the backend'
       );
     }
   }
@@ -336,10 +336,10 @@ export class S3StorageProvider implements StorageProvider {
   }
 
   // Presigned URLs are handed to clients only when the endpoint is reachable
-  // by them. S3_PRESIGNED_URLS=false switches to proxy mode: strategies point
+  // by them. S3_USE_PRESIGNED_URLS=false switches to proxy mode: strategies point
   // at the backend routes instead, mirroring LocalStorageProvider.
   supportsPresignedUrls(): boolean {
-    return appConfig.storage.s3PresignedUrls;
+    return appConfig.storage.s3UsePresignedUrls;
   }
 
   async getUploadStrategy(
@@ -356,7 +356,7 @@ export class S3StorageProvider implements StorageProvider {
     // Proxy mode: the endpoint is not client-reachable (or lacks POST-policy
     // support), so hand back the backend PUT route — same contract as
     // LocalStorageProvider. The route writes through provider.putObject.
-    if (!appConfig.storage.s3PresignedUrls) {
+    if (!appConfig.storage.s3UsePresignedUrls) {
       const baseUrl = getApiBaseUrl();
       return {
         method: 'direct',
@@ -426,7 +426,7 @@ export class S3StorageProvider implements StorageProvider {
     // via getObjectStream. asAttachment is ignored for the same reason the
     // local provider ignores it: the route re-derives Content-Disposition
     // from the stored MIME type.
-    if (!appConfig.storage.s3PresignedUrls) {
+    if (!appConfig.storage.s3UsePresignedUrls) {
       const baseUrl = getApiBaseUrl();
       const base = `${baseUrl}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`;
       return {

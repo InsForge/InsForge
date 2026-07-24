@@ -19,8 +19,8 @@ vi.mock('@/infra/config/app.config.js', () => {
       get s3EndpointUrl() {
         return process.env.S3_ENDPOINT_URL;
       },
-      get s3PresignedUrls() {
-        return process.env.S3_PRESIGNED_URLS !== 'false';
+      get s3UsePresignedUrls() {
+        return process.env.S3_USE_PRESIGNED_URLS !== 'false';
       },
     },
     server: {
@@ -38,11 +38,11 @@ vi.mock('@/utils/environment.js', async (importOriginal) => ({
   getApiBaseUrl: () => 'http://api.example.test',
 }));
 
-describe('S3StorageProvider — proxy mode (S3_PRESIGNED_URLS=false)', () => {
+describe('S3StorageProvider — proxy mode (S3_USE_PRESIGNED_URLS=false)', () => {
   let sendMock: ReturnType<typeof vi.fn>;
   const savedEnv: Record<string, string | undefined> = {};
   const ENV_KEYS = [
-    'S3_PRESIGNED_URLS',
+    'S3_USE_PRESIGNED_URLS',
     'S3_ENDPOINT_URL',
     'AWS_CLOUDFRONT_URL',
     'AWS_CLOUDFRONT_KEY_PAIR_ID',
@@ -100,7 +100,7 @@ describe('S3StorageProvider — proxy mode (S3_PRESIGNED_URLS=false)', () => {
 
   describe('flag off (proxy mode)', () => {
     beforeEach(() => {
-      process.env.S3_PRESIGNED_URLS = 'false';
+      process.env.S3_USE_PRESIGNED_URLS = 'false';
     });
 
     it('supportsPresignedUrls() is false', () => {
