@@ -201,6 +201,70 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile
 
 ---
 
+## Email OTP Sign In
+
+Use this passwordless flow when a user should sign in with a 6-digit code sent to their email address.
+
+### Send a Sign-In Code
+
+```
+POST /api/auth/email/send-sign-in-otp
+```
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | Email address that receives the sign-in code |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-sign-in-otp" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "user@example.com" }'
+```
+
+The endpoint returns `202 Accepted` with a generic message. It does not reveal whether the email already belongs to a user.
+
+### Create a Session with the Code
+
+```
+POST /api/auth/sessions/otp
+```
+
+#### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | Email address that received the code |
+| `otp` | string | Yes | 6-digit sign-in code |
+| `name` | string | No | Profile name used only if verification creates a new user |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions/otp?client_type=server" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "otp": "123456",
+    "name": "Ada Lovelace"
+  }'
+```
+
+The response uses the same session shape and `client_type` behavior as password sign-in.
+
+<Note>
+- Codes expire after 5 minutes, can be used once, and are consumed after three failed attempts.
+- InsForge does not create a user when the code is sent. If the email is new, a verified passwordless user is created only after successful verification.
+- If public signups are disabled, an existing user can still sign in. A valid code for an unknown email is consumed and returns HTTP 403.
+</Note>
+
+---
+
 ## Refresh Token
 
 Refresh access token using refresh token.

@@ -563,6 +563,81 @@ paths:
         '403':
           description: Email verification required
 
+  /api/auth/sessions/otp:
+    post:
+      summary: Sign in with an email OTP
+      description: |
+        Verifies a 6-digit sign-in code and creates a user session.
+
+        If the email does not belong to a user and public signups are enabled,
+        InsForge creates a verified passwordless user after the code is verified.
+        If public signups are disabled, the valid code is consumed and the
+        request returns 403.
+      tags:
+        - Client
+      parameters:
+        - name: client_type
+          in: query
+          schema:
+            type: string
+            enum: [web, mobile, desktop, server]
+            default: web
+          description: |
+            Client type determines how refresh tokens are returned:
+            - web: Refresh token stored in httpOnly cookie, csrfToken returned in response
+            - mobile/desktop/server: refreshToken returned directly in response body
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - otp
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                otp:
+                  type: string
+                  pattern: '^\d{6}$'
+                  description: 6-digit sign-in code
+                  example: "123456"
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                  description: Profile name used only when a new user is created
+                  example: Ada Lovelace
+      responses:
+        '200':
+          description: Sign-in successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
+                  accessToken:
+                    type: string
+                  csrfToken:
+                    type: string
+                    nullable: true
+                    description: CSRF token for use with refresh endpoint (web clients only)
+                  refreshToken:
+                    type: string
+                    nullable: true
+                    description: Refresh token for mobile/desktop/server clients (null for web clients)
+        '400':
+          description: Invalid, expired, consumed, or attempt-limited sign-in code
+        '403':
+          description: Public signups are disabled and the verified email has no user
+        '429':
+          description: Too many verification attempts
+
   /api/auth/refresh:
     post:
       summary: Refresh access token
@@ -889,6 +964,47 @@ paths:
           description: Forbidden - admin access required
         '404':
           description: Anon key not initialized
+
+  /api/auth/email/send-sign-in-otp:
+    post:
+      summary: Send an email sign-in OTP
+      description: |
+        Sends a 6-digit code that can be exchanged at POST /api/auth/sessions/otp.
+        The response is intentionally generic and does not reveal whether a user
+        already exists. The code expires after 5 minutes.
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '202':
+          description: The sign-in code was accepted for delivery
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: If sign-in is available for this email, we have sent a verification code.
+        '400':
+          description: Invalid request
+        '429':
+          description: Too many sign-in code requests
 
   /api/auth/email/send-verification:
     post:

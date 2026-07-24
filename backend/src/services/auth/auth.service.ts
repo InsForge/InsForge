@@ -391,6 +391,8 @@ export class AuthService {
         );
         const disableSignup = authConfig.rows[0]?.disable_signup ?? false;
         if (disableSignup) {
+          await client.query('COMMIT');
+          transactionActive = false;
           throw new AppError(
             'User signups are disabled for this project.',
             403,

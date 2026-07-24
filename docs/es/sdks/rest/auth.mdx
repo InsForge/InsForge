@@ -201,6 +201,70 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile
 
 ---
 
+## Inicio de Sesión con OTP por Correo Electrónico
+
+Usa este flujo sin contraseña cuando un usuario deba iniciar sesión con un código de 6 dígitos enviado a su correo electrónico.
+
+### Enviar un Código de Inicio de Sesión
+
+```
+POST /api/auth/email/send-sign-in-otp
+```
+
+#### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|-----------|-------------|
+| `email` | string | Sí | Dirección de correo electrónico que recibe el código |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-sign-in-otp" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "user@example.com" }'
+```
+
+El endpoint devuelve `202 Accepted` con un mensaje genérico. No revela si el correo electrónico ya pertenece a un usuario.
+
+### Crear una Sesión con el Código
+
+```
+POST /api/auth/sessions/otp
+```
+
+#### Parámetros de Consulta
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|-----------|-------------|
+| `client_type` | string | No | Tipo de cliente: `web` (predeterminado), `mobile`, `desktop` o `server` |
+
+#### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|-----------|-------------|
+| `email` | string | Sí | Dirección de correo electrónico que recibió el código |
+| `otp` | string | Sí | Código de inicio de sesión de 6 dígitos |
+| `name` | string | No | Nombre de perfil usado solo si la verificación crea un usuario |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions/otp?client_type=server" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "otp": "123456",
+    "name": "Ada Lovelace"
+  }'
+```
+
+La respuesta usa la misma estructura de sesión y el mismo comportamiento de `client_type` que el inicio de sesión con contraseña.
+
+<Note>
+- Los códigos caducan después de 5 minutos, solo pueden usarse una vez y se consumen después de tres intentos fallidos.
+- InsForge no crea un usuario al enviar el código. Si el correo es nuevo, crea un usuario verificado sin contraseña solo después de verificarlo correctamente.
+- Si el registro público está deshabilitado, un usuario existente todavía puede iniciar sesión. Un código válido para un correo desconocido se consume y devuelve HTTP 403.
+</Note>
+
+---
+
 ## Actualizar Token
 
 Actualizar token de acceso usando token de actualización.

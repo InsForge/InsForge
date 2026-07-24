@@ -260,7 +260,22 @@ describe('AuthService email OTP sign-in', () => {
     expect(updateCall?.[1]).toEqual([USER_RECORD.id]);
   });
 
-  it('does not create a user when public signups are disabled', async () => {
+  it('consumes a correct OTP before rejecting first-time signup when signups are disabled', async () => {
+    const replayError = new AppError(
+      'Invalid or expired verification code',
+      400,
+      ERROR_CODES.INVALID_INPUT
+    );
+    mocks.attemptEmailOTPWithCode
+      .mockResolvedValueOnce({
+        success: true,
+        value: {
+          success: true,
+          email: 'new@example.com',
+          purpose: 'SIGN_IN',
+        },
+      })
+      .mockResolvedValueOnce({ success: false, error: replayError });
     mocks.client.query
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
@@ -270,6 +285,7 @@ describe('AuthService email OTP sign-in', () => {
       statusCode: 403,
       code: ERROR_CODES.AUTH_SIGNUP_DISABLED,
     });
+    await expect(authService.signInWithOTP('new@example.com', '123456')).rejects.toBe(replayError);
 
     expect(
       mocks.client.query.mock.calls.some(
@@ -281,6 +297,8 @@ describe('AuthService email OTP sign-in', () => {
         ([sql]) => typeof sql === 'string' && sql.includes('FOR SHARE')
       )
     ).toBe(true);
+    expect(mocks.client.query.mock.calls.filter(([sql]) => sql === 'COMMIT')).toHaveLength(2);
+    expect(mocks.client.query.mock.calls.some(([sql]) => sql === 'ROLLBACK')).toBe(false);
   });
 
   it('recovers when another signup creates the user concurrently', async () => {

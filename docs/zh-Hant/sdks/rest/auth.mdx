@@ -201,6 +201,70 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile
 
 ---
 
+## 電子郵件 OTP 登入
+
+當使用者需要透過傳送至電子郵件的 6 位數驗證碼進行免密碼登入時，請使用此流程。
+
+### 傳送登入驗證碼
+
+```
+POST /api/auth/email/send-sign-in-otp
+```
+
+#### 請求本文
+
+| 欄位 | 類型 | 必需 | 描述 |
+|------|------|------|------|
+| `email` | string | 是 | 接收登入驗證碼的電子郵件地址 |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-sign-in-otp" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "user@example.com" }'
+```
+
+此端點會傳回包含通用訊息的 `202 Accepted`，不會透露該電子郵件是否已屬於某個使用者。
+
+### 使用驗證碼建立工作階段
+
+```
+POST /api/auth/sessions/otp
+```
+
+#### 查詢參數
+
+| 參數 | 類型 | 必需 | 描述 |
+|------|------|------|------|
+| `client_type` | string | 否 | 用戶端類型：`web`（預設）、`mobile`、`desktop` 或 `server` |
+
+#### 請求本文
+
+| 欄位 | 類型 | 必需 | 描述 |
+|------|------|------|------|
+| `email` | string | 是 | 接收驗證碼的電子郵件地址 |
+| `otp` | string | 是 | 6 位數登入驗證碼 |
+| `name` | string | 否 | 僅在驗證後建立新使用者時使用的個人資料名稱 |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions/otp?client_type=server" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "otp": "123456",
+    "name": "Ada Lovelace"
+  }'
+```
+
+回應使用與密碼登入相同的工作階段結構和 `client_type` 行為。
+
+<Note>
+- 驗證碼有效期為 5 分鐘，只能使用一次，並會在三次失敗嘗試後失效。
+- InsForge 不會在傳送驗證碼時建立使用者。如果電子郵件尚未註冊，只會在驗證成功後建立已驗證的免密碼使用者。
+- 如果已停用公開註冊，現有使用者仍可登入。未知電子郵件的有效驗證碼會被消耗，並傳回 HTTP 403。
+</Note>
+
+---
+
 ## 刷新令牌
 
 使用刷新令牌刷新存取令牌。
