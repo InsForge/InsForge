@@ -45,6 +45,10 @@ import { webscraperRouter } from '@/api/routes/webscraper/index.routes.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import { TelemetryService } from '@/services/telemetry/telemetry.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
+import messagingRouter from '@/api/routes/messaging/index.routes.js';
+import { MessagingQueueService } from '@/services/messaging/queue.service.js';
+import { EmailService } from '@/services/email/email.service.js';
+import { MessagingWorker } from '@/services/messaging/worker.service.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -215,6 +219,7 @@ export async function createApp() {
   apiRouter.use('/memory', memoryRouter);
   apiRouter.use('/realtime', realtimeRouter);
   apiRouter.use('/email', emailRouter);
+  apiRouter.use('/messaging', messagingRouter);
   apiRouter.use('/deployments', deploymentsRouter);
   apiRouter.use('/schedules', schedulesRouter);
   apiRouter.use('/payments', paymentsRouter);
@@ -324,6 +329,8 @@ export async function createApp() {
 // Use PORT from config (already parsed from env, falls back to 7130)
 const PORT = appConfig.app.port;
 
+let messagingWorker: MessagingWorker | null = null;
+
 async function initializeServer() {
   try {
     const app = await createApp();
@@ -353,6 +360,12 @@ async function initializeServer() {
     });
 
     TelemetryService.getInstance().start();
+
+    // Start MessagingWorker
+    const messagingQueueService = MessagingQueueService.getInstance();
+    const emailService = EmailService.getInstance();
+    messagingWorker = new MessagingWorker(messagingQueueService, emailService);
+    await messagingWorker.start();
   } catch (error) {
     logger.error('Failed to initialize server', {
       error: error instanceof Error ? error.message : String(error),
@@ -366,6 +379,16 @@ void initializeServer();
 
 async function cleanup() {
   logger.info('Shutting down gracefully...');
+
+  if (messagingWorker) {
+    try {
+      await messagingWorker.stop();
+    } catch (error) {
+      logger.error('Error stopping MessagingWorker', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   try {
     const realtimeManager = RealtimeManager.getInstance();
