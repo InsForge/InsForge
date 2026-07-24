@@ -260,7 +260,10 @@ export function loadConfig(): AppConfig {
         const val = parseFloat(process.env.MESSAGING_JITTER_PERCENT || '0.2');
         return isNaN(val) || val < 0 || val > 1 ? 0.2 : val;
       })(),
-      reconciliationIntervalSeconds: parseEnvInt(process.env.MESSAGING_RECONCILIATION_INTERVAL_SECONDS, 60),
+      reconciliationIntervalSeconds: parseEnvInt(
+        process.env.MESSAGING_RECONCILIATION_INTERVAL_SECONDS,
+        60
+      ),
       listenTimeoutSeconds: parseEnvInt(process.env.MESSAGING_LISTEN_TIMEOUT_SECONDS, 30),
     },
   };
