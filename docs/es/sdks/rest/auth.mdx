@@ -135,8 +135,9 @@ POST /api/auth/sessions
 
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|----------|-------------|
+| `method` | string | No | Método de autenticación. El valor predeterminado es `password`; usa `otp` para iniciar sesión con OTP |
 | `email` | string | Sí | Dirección de correo electrónico del usuario |
-| `password` | string | Sí | Contraseña del usuario |
+| `password` | string | Para contraseña | Contraseña del usuario |
 
 ### Ejemplo (Cliente Web)
 
@@ -144,6 +145,7 @@ POST /api/auth/sessions
 curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "password",
     "email": "user@example.com",
     "password": "securepassword123"
   }'
@@ -155,6 +157,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
 curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "password",
     "email": "user@example.com",
     "password": "securepassword123"
   }'
@@ -208,7 +211,7 @@ Usa este flujo sin contraseña cuando un usuario deba iniciar sesión con un có
 ### Enviar un Código de Inicio de Sesión
 
 ```
-POST /api/auth/email/send-sign-in-otp
+POST /api/auth/email/send-otp
 ```
 
 #### Cuerpo de Solicitud
@@ -218,7 +221,7 @@ POST /api/auth/email/send-sign-in-otp
 | `email` | string | Sí | Dirección de correo electrónico que recibe el código |
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/auth/email/send-sign-in-otp" \
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-otp" \
   -H "Content-Type: application/json" \
   -d '{ "email": "user@example.com" }'
 ```
@@ -228,7 +231,7 @@ El endpoint devuelve `202 Accepted` con un mensaje genérico. No revela si el co
 ### Crear una Sesión con el Código
 
 ```
-POST /api/auth/sessions/otp
+POST /api/auth/sessions
 ```
 
 #### Parámetros de Consulta
@@ -241,14 +244,16 @@ POST /api/auth/sessions/otp
 
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|-----------|-------------|
+| `method` | string | Sí | Debe ser `otp` |
 | `email` | string | Sí | Dirección de correo electrónico que recibió el código |
 | `otp` | string | Sí | Código de inicio de sesión de 6 dígitos |
 | `name` | string | No | Nombre de perfil usado solo si la verificación crea un usuario |
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/auth/sessions/otp?client_type=server" \
+curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=server" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "otp",
     "email": "user@example.com",
     "otp": "123456",
     "name": "Ada Lovelace"

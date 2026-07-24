@@ -10,6 +10,8 @@ interface RouteError {
 const mocks = vi.hoisted(() => ({
   sendSignInOTP: vi.fn(),
   signInWithOTP: vi.fn(),
+  login: vi.fn(),
+  verifyOTPRequest: vi.fn(),
   generateRefreshToken: vi.fn(),
   generateRefreshTokenWithCsrf: vi.fn(),
 }));
@@ -19,6 +21,7 @@ vi.mock('@/services/auth/auth.service.js', () => ({
     getInstance: () => ({
       sendSignInOTP: mocks.sendSignInOTP,
       signInWithOTP: mocks.signInWithOTP,
+      login: mocks.login,
     }),
   },
 }));
@@ -26,6 +29,10 @@ vi.mock('@/services/auth/auth.service.js', () => ({
 vi.mock('@/api/middlewares/rate-limiters.js', () => ({
   sendEmailOTPLimiter: [(_req: Request, _res: Response, next: NextFunction) => next()],
   verifyOTPLimiter: [(_req: Request, _res: Response, next: NextFunction) => next()],
+  verifyOTPRateLimiter: (req: Request, _res: Response, next: NextFunction) => {
+    mocks.verifyOTPRequest(req.body);
+    next();
+  },
 }));
 
 vi.mock('@/infra/security/token.manager.js', () => ({
@@ -117,6 +124,7 @@ describe('email OTP auth routes', () => {
     vi.clearAllMocks();
     mocks.sendSignInOTP.mockResolvedValue(undefined);
     mocks.signInWithOTP.mockResolvedValue({ ...SESSION });
+    mocks.login.mockResolvedValue({ ...SESSION });
     mocks.generateRefreshToken.mockReturnValue('refresh-token');
     mocks.generateRefreshTokenWithCsrf.mockReturnValue({
       refreshToken: 'refresh-token',
@@ -125,7 +133,7 @@ describe('email OTP auth routes', () => {
   });
 
   it('accepts an email OTP request without requiring an existing user', async () => {
-    const response = await callRoute(router, '/email/send-sign-in-otp', {
+    const response = await callRoute(router, '/email/send-otp', {
       email: 'USER@Example.com',
     });
 
@@ -134,8 +142,9 @@ describe('email OTP auth routes', () => {
     expect(mocks.sendSignInOTP).toHaveBeenCalledWith('user@example.com');
   });
 
-  it('creates a web session through the existing cookie and CSRF convention', async () => {
-    const response = await callRoute(router, '/sessions/otp', {
+  it('creates a web session with the OTP method through the existing cookie convention', async () => {
+    const response = await callRoute(router, '/sessions', {
+      method: 'otp',
       email: 'user@example.com',
       otp: '123456',
       name: 'Ada',
@@ -147,18 +156,43 @@ describe('email OTP auth routes', () => {
       csrfToken: 'csrf-token',
     });
     expect(mocks.signInWithOTP).toHaveBeenCalledWith('user@example.com', '123456', 'Ada');
+    expect(mocks.verifyOTPRequest).toHaveBeenCalledOnce();
     expect(mocks.generateRefreshTokenWithCsrf).toHaveBeenCalledWith(SESSION.user.id, 'user');
   });
 
-  it('returns a refresh token in the body for native clients', async () => {
+  it('returns a refresh token in the body for native OTP clients', async () => {
     const response = await callRoute(
       router,
-      '/sessions/otp',
-      { email: 'user@example.com', otp: '123456' },
+      '/sessions',
+      { method: 'otp', email: 'user@example.com', otp: '123456' },
       { client_type: 'mobile' }
     );
 
     expect(response.body).toMatchObject({ refreshToken: 'refresh-token' });
     expect(mocks.generateRefreshToken).toHaveBeenCalledWith(SESSION.user.id, 'user');
+  });
+
+  it('keeps password sessions backward compatible without method or OTP rate limiting', async () => {
+    const response = await callRoute(router, '/sessions', {
+      email: 'user@example.com',
+      password: 'securepassword123',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(mocks.login).toHaveBeenCalledWith('user@example.com', 'securepassword123');
+    expect(mocks.signInWithOTP).not.toHaveBeenCalled();
+    expect(mocks.verifyOTPRequest).not.toHaveBeenCalled();
+  });
+
+  it('dispatches an explicit password method without OTP rate limiting', async () => {
+    const response = await callRoute(router, '/sessions', {
+      method: 'password',
+      email: 'user@example.com',
+      password: 'securepassword123',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(mocks.login).toHaveBeenCalledWith('user@example.com', 'securepassword123');
+    expect(mocks.verifyOTPRequest).not.toHaveBeenCalled();
   });
 });

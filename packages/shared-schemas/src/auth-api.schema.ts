@@ -42,28 +42,28 @@ export const createUserRequestSchema = z.object({
 });
 
 /**
- * POST /api/auth/sessions - Create session
+ * POST /api/auth/sessions - Create a session with a password or email OTP.
+ * Existing password clients may omit method; it defaults to password.
  */
-export const createSessionRequestSchema = z.object({
-  email: emailSchema,
-  password: passwordSchema,
-});
+export const createSessionRequestSchema = z.union([
+  z.object({
+    method: z.literal('password').optional(),
+    email: emailSchema,
+    password: passwordSchema,
+  }),
+  z.object({
+    method: z.literal('otp'),
+    email: emailSchema,
+    otp: z.string().regex(/^\d{6}$/, 'OTP code must be a 6-digit numeric code'),
+    name: nameSchema.optional(),
+  }),
+]);
 
 /**
- * POST /api/auth/email/send-sign-in-otp - Send a sign-in OTP
+ * POST /api/auth/email/send-otp - Send a sign-in OTP
  */
-export const sendSignInOTPRequestSchema = z.object({
+export const sendOTPRequestSchema = z.object({
   email: emailSchema,
-});
-
-/**
- * POST /api/auth/sessions/otp - Create a session with an email OTP
- * name is only used when the verified email creates a new user.
- */
-export const signInWithOTPRequestSchema = z.object({
-  email: emailSchema,
-  otp: z.string().regex(/^\d{6}$/, 'OTP code must be a 6-digit numeric code'),
-  name: nameSchema.optional(),
 });
 
 /**
@@ -525,8 +525,7 @@ export const authErrorResponseSchema = z.object({
 // Request types for type-safe request handling
 export type CreateUserRequest = z.infer<typeof createUserRequestSchema>;
 export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
-export type SendSignInOTPRequest = z.infer<typeof sendSignInOTPRequestSchema>;
-export type SignInWithOTPRequest = z.infer<typeof signInWithOTPRequestSchema>;
+export type SendOTPRequest = z.infer<typeof sendOTPRequestSchema>;
 export type CreateAdminSessionRequest = z.infer<typeof createAdminSessionRequestSchema>;
 export type RefreshSessionRequest = z.infer<typeof refreshSessionRequestSchema>;
 export type ListUsersRequest = z.infer<typeof listUsersRequestSchema>;

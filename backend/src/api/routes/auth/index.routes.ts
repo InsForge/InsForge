@@ -12,7 +12,11 @@ import { AuthRequest, verifyAdmin, verifyUser, verifyToken } from '@/api/middlew
 import adminRouter from './admin.routes.js';
 import oauthRouter from './oauth.routes.js';
 import customOAuthRouter from './custom-oauth.routes.js';
-import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
+import {
+  sendEmailOTPLimiter,
+  verifyOTPLimiter,
+  verifyOTPRateLimiter,
+} from '@/api/middlewares/rate-limiters.js';
 import {
   REFRESH_TOKEN_COOKIE_NAME,
   setRefreshTokenCookie,
@@ -25,8 +29,7 @@ import {
   userIdSchema,
   createUserRequestSchema,
   createSessionRequestSchema,
-  sendSignInOTPRequestSchema,
-  signInWithOTPRequestSchema,
+  sendOTPRequestSchema,
   refreshSessionRequestSchema,
   deleteUsersRequestSchema,
   listUsersRequestSchema,
@@ -60,6 +63,15 @@ import logger from '@/utils/logger.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
+
+const verifySessionOTPLimiter = (req: Request, res: Response, next: NextFunction): void => {
+  if (req.body?.method !== 'otp') {
+    next();
+    return;
+  }
+
+  void verifyOTPRateLimiter(req, res, next);
+};
 const authConfigService = AuthConfigService.getInstance();
 const authOTPService = AuthOTPService.getInstance();
 const auditService = AuditService.getInstance();
@@ -411,56 +423,15 @@ router.post('/users', verifyUser, async (req: AuthRequest, res: Response, next: 
   }
 });
 
-// POST /api/auth/sessions - Create a new session (login)
-// Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
-router.post('/sessions', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const clientType = parseClientType(req.query.client_type);
-
-    const validationResult = createSessionRequestSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      throw new AppError(
-        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    const { email, password } = validationResult.data;
-    const result: CreateSessionResponse = await authService.login(email, password);
-
-    // Set refresh token based on client type
-    const tokenManager = TokenManager.getInstance();
-    if (clientType === 'web') {
-      // Web clients: use httpOnly cookie + CSRF token
-      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-        result.user.id,
-        'user'
-      );
-      setRefreshTokenCookie(res, refreshToken);
-      result.csrfToken = csrfToken;
-    } else {
-      const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
-      // Non-web clients (mobile, desktop, server): return refresh token in response body.
-      // Server clients cannot rely on browser cookies, so they follow the native-app flow.
-      result.refreshToken = refreshToken;
-    }
-
-    successResponse(res, result);
-  } catch (error) {
-    next(error);
-  }
-});
-
-// POST /api/auth/sessions/otp - Create a session with a 6-digit email OTP
+// POST /api/auth/sessions - Create a new session with a password or email OTP
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 router.post(
-  '/sessions/otp',
-  verifyOTPLimiter,
+  '/sessions',
+  verifySessionOTPLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const clientType = parseClientType(req.query.client_type);
-      const validationResult = signInWithOTPRequestSchema.safeParse(req.body);
+      const validationResult = createSessionRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
@@ -469,9 +440,13 @@ router.post(
         );
       }
 
-      const { email, otp, name } = validationResult.data;
-      const result: CreateSessionResponse = await authService.signInWithOTP(email, otp, name);
+      const credentials = validationResult.data;
+      const result: CreateSessionResponse =
+        credentials.method === 'otp'
+          ? await authService.signInWithOTP(credentials.email, credentials.otp, credentials.name)
+          : await authService.login(credentials.email, credentials.password);
 
+      // Set refresh token based on client type
       const tokenManager = TokenManager.getInstance();
       if (clientType === 'web') {
         const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
@@ -481,7 +456,10 @@ router.post(
         setRefreshTokenCookie(res, refreshToken);
         result.csrfToken = csrfToken;
       } else {
-        result.refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
+        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
+        // Non-web clients (mobile, desktop, server): return refresh token in response body.
+        // Server clients cannot rely on browser cookies, so they follow the native-app flow.
+        result.refreshToken = refreshToken;
       }
 
       successResponse(res, result);
@@ -832,13 +810,13 @@ router.post(
   }
 );
 
-// POST /api/auth/email/send-sign-in-otp - Send a 6-digit email OTP for session creation
+// POST /api/auth/email/send-otp - Send a 6-digit email OTP for session creation
 router.post(
-  '/email/send-sign-in-otp',
+  '/email/send-otp',
   sendEmailOTPLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const validationResult = sendSignInOTPRequestSchema.safeParse(req.body);
+      const validationResult = sendOTPRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),

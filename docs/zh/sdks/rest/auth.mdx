@@ -135,8 +135,9 @@ POST /api/auth/sessions
 
 | 字段 | 类型 | 必需 | 描述 |
 |-------|------|----------|-------------|
+| `method` | string | 否 | 认证方式，默认为 `password`；邮箱 OTP 登录时使用 `otp` |
 | `email` | string | 是 | 用户电子邮件地址 |
-| `password` | string | 是 | 用户密码 |
+| `password` | string | 密码登录时 | 用户密码 |
 
 ### 示例（Web 客户端）
 
@@ -144,6 +145,7 @@ POST /api/auth/sessions
 curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "password",
     "email": "user@example.com",
     "password": "securepassword123"
   }'
@@ -155,6 +157,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
 curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "password",
     "email": "user@example.com",
     "password": "securepassword123"
   }'
@@ -208,7 +211,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile
 ### 发送登录验证码
 
 ```
-POST /api/auth/email/send-sign-in-otp
+POST /api/auth/email/send-otp
 ```
 
 #### 请求体
@@ -218,7 +221,7 @@ POST /api/auth/email/send-sign-in-otp
 | `email` | string | 是 | 接收登录验证码的邮箱地址 |
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/auth/email/send-sign-in-otp" \
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-otp" \
   -H "Content-Type: application/json" \
   -d '{ "email": "user@example.com" }'
 ```
@@ -228,7 +231,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/send-sign-in-otp" \
 ### 使用验证码创建会话
 
 ```
-POST /api/auth/sessions/otp
+POST /api/auth/sessions
 ```
 
 #### 查询参数
@@ -241,14 +244,16 @@ POST /api/auth/sessions/otp
 
 | 字段 | 类型 | 必需 | 描述 |
 |------|------|------|------|
+| `method` | string | 是 | 必须为 `otp` |
 | `email` | string | 是 | 接收验证码的邮箱地址 |
 | `otp` | string | 是 | 6 位登录验证码 |
 | `name` | string | 否 | 仅在验证后创建新用户时使用的资料名称 |
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/auth/sessions/otp?client_type=server" \
+curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=server" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "otp",
     "email": "user@example.com",
     "otp": "123456",
     "name": "Ada Lovelace"

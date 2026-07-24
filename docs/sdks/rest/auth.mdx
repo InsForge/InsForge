@@ -135,8 +135,9 @@ POST /api/auth/sessions
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `method` | string | No | Authentication method. Defaults to `password`; use `otp` for email OTP sign-in |
 | `email` | string | Yes | User email address |
-| `password` | string | Yes | User password |
+| `password` | string | For password | User password |
 
 ### Example (Web Client)
 
@@ -144,6 +145,7 @@ POST /api/auth/sessions
 curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "password",
     "email": "user@example.com",
     "password": "securepassword123"
   }'
@@ -155,6 +157,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
 curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "password",
     "email": "user@example.com",
     "password": "securepassword123"
   }'
@@ -208,7 +211,7 @@ Use this passwordless flow when a user should sign in with a 6-digit code sent t
 ### Send a Sign-In Code
 
 ```
-POST /api/auth/email/send-sign-in-otp
+POST /api/auth/email/send-otp
 ```
 
 #### Request Body
@@ -218,7 +221,7 @@ POST /api/auth/email/send-sign-in-otp
 | `email` | string | Yes | Email address that receives the sign-in code |
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/auth/email/send-sign-in-otp" \
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-otp" \
   -H "Content-Type: application/json" \
   -d '{ "email": "user@example.com" }'
 ```
@@ -228,7 +231,7 @@ The endpoint returns `202 Accepted` with a generic message. It does not reveal w
 ### Create a Session with the Code
 
 ```
-POST /api/auth/sessions/otp
+POST /api/auth/sessions
 ```
 
 #### Query Parameters
@@ -241,14 +244,16 @@ POST /api/auth/sessions/otp
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `method` | string | Yes | Must be `otp` |
 | `email` | string | Yes | Email address that received the code |
 | `otp` | string | Yes | 6-digit sign-in code |
 | `name` | string | No | Profile name used only if verification creates a new user |
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/auth/sessions/otp?client_type=server" \
+curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=server" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "otp",
     "email": "user@example.com",
     "otp": "123456",
     "name": "Ada Lovelace"
