@@ -82,6 +82,7 @@ export class CloudEmailProvider implements EmailProvider {
       const validTemplates: EmailTemplate[] = [
         'email-verification-code',
         'email-verification-link',
+        'request-otp',
         'reset-password-code',
         'reset-password-link',
       ];

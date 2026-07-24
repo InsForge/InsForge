@@ -25,6 +25,8 @@ import {
   userIdSchema,
   createUserRequestSchema,
   createSessionRequestSchema,
+  sendSignInOTPRequestSchema,
+  signInWithOTPRequestSchema,
   refreshSessionRequestSchema,
   deleteUsersRequestSchema,
   listUsersRequestSchema,
@@ -450,6 +452,45 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
   }
 });
 
+// POST /api/auth/sessions/otp - Create a session with a 6-digit email OTP
+// Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
+router.post(
+  '/sessions/otp',
+  verifyOTPLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const clientType = parseClientType(req.query.client_type);
+      const validationResult = signInWithOTPRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const { email, otp, name } = validationResult.data;
+      const result: CreateSessionResponse = await authService.signInWithOTP(email, otp, name);
+
+      const tokenManager = TokenManager.getInstance();
+      if (clientType === 'web') {
+        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+          result.user.id,
+          'user'
+        );
+        setRefreshTokenCookie(res, refreshToken);
+        result.csrfToken = csrfToken;
+      } else {
+        result.refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
+      }
+
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // POST /api/auth/id-token - Sign in with ID token from native SDK (Google One Tap, etc.)
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 router.post('/id-token', async (req: Request, res: Response, next: NextFunction) => {
@@ -785,6 +826,37 @@ router.post(
         message:
           'Anon key retrieved successfully (deprecated route, use GET /api/metadata/anon-key)',
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /api/auth/email/send-sign-in-otp - Send a 6-digit email OTP for session creation
+router.post(
+  '/email/send-sign-in-otp',
+  sendEmailOTPLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = sendSignInOTPRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      await authService.sendSignInOTP(validationResult.data.email);
+
+      successResponse(
+        res,
+        {
+          success: true,
+          message: 'If sign-in is available for this email, we have sent a verification code.',
+        },
+        202
+      );
     } catch (error) {
       next(error);
     }

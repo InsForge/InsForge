@@ -50,6 +50,23 @@ export const createSessionRequestSchema = z.object({
 });
 
 /**
+ * POST /api/auth/email/send-sign-in-otp - Send a sign-in OTP
+ */
+export const sendSignInOTPRequestSchema = z.object({
+  email: emailSchema,
+});
+
+/**
+ * POST /api/auth/sessions/otp - Create a session with an email OTP
+ * name is only used when the verified email creates a new user.
+ */
+export const signInWithOTPRequestSchema = z.object({
+  email: emailSchema,
+  otp: z.string().regex(/^\d{6}$/, 'OTP code must be a 6-digit numeric code'),
+  name: nameSchema.optional(),
+});
+
+/**
  * POST /api/auth/admin/sessions - Create admin session
  */
 export const createAdminSessionRequestSchema = z.object({
@@ -508,6 +525,8 @@ export const authErrorResponseSchema = z.object({
 // Request types for type-safe request handling
 export type CreateUserRequest = z.infer<typeof createUserRequestSchema>;
 export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
+export type SendSignInOTPRequest = z.infer<typeof sendSignInOTPRequestSchema>;
+export type SignInWithOTPRequest = z.infer<typeof signInWithOTPRequestSchema>;
 export type CreateAdminSessionRequest = z.infer<typeof createAdminSessionRequestSchema>;
 export type RefreshSessionRequest = z.infer<typeof refreshSessionRequestSchema>;
 export type ListUsersRequest = z.infer<typeof listUsersRequestSchema>;
