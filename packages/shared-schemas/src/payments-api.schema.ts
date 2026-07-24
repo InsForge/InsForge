@@ -19,6 +19,9 @@ import {
   stripeWebhookEventSchema,
   razorpayConnectionSchema,
   razorpayEnvironmentSchema,
+  paystackConnectionSchema,
+  paystackEnvironmentSchema,
+  paystackTransactionSchema,
 } from './payments.schema.js';
 
 export const syncStripePaymentsRequestSchema = z.object({
@@ -824,6 +827,113 @@ export const razorpayWebhookResponseSchema = z.object({
   handled: z.boolean(),
 });
 
+export const paystackEnvironmentParamsSchema = z
+  .object({
+    environment: paystackEnvironmentSchema,
+  })
+  .strict();
+
+export const paystackWebhookParamsSchema = paystackEnvironmentParamsSchema;
+
+const initializePaystackTransactionFields = {
+  amount: z.number().int().positive(),
+  currency: currencySchema,
+  email: z.string().trim().email('Customer email must be a valid email address'),
+  reference: z.string().trim().min(1).max(100).nullable().optional(),
+  callbackUrl: z.string().trim().url('Callback URL must be a valid URL').nullable().optional(),
+  subject: billingSubjectSchema.optional(),
+  metadata: z.record(z.string()).optional(),
+};
+
+export const initializePaystackTransactionBodySchema = z
+  .object(initializePaystackTransactionFields)
+  .strict()
+  .refine((value) => hasNoReservedInsForgeMetadata(value.metadata), {
+    path: ['metadata'],
+    message: 'Metadata keys starting with insforge_ are reserved',
+  });
+
+export const initializePaystackTransactionRequestSchema = z
+  .object({
+    environment: paystackEnvironmentSchema,
+    ...initializePaystackTransactionFields,
+  })
+  .strict()
+  .refine((value) => hasNoReservedInsForgeMetadata(value.metadata), {
+    path: ['metadata'],
+    message: 'Metadata keys starting with insforge_ are reserved',
+  });
+
+export const initializePaystackTransactionResponseSchema = z.object({
+  transaction: paystackTransactionSchema,
+  authorizationUrl: z.string(),
+  accessCode: z.string(),
+  reference: z.string(),
+  publicKey: z.string().nullable(),
+});
+
+const verifyPaystackTransactionFields = {
+  reference: z.string().trim().min(1, 'Paystack transaction reference is required'),
+  // Local transaction id returned by initialize. Required to verify sessions
+  // created without an authenticated identity, since the Paystack reference
+  // alone leaks through callback URLs.
+  transactionId: z.string().trim().uuid().optional(),
+};
+
+export const verifyPaystackTransactionBodySchema = z
+  .object(verifyPaystackTransactionFields)
+  .strict();
+
+export const verifyPaystackTransactionRequestSchema = z
+  .object({
+    environment: paystackEnvironmentSchema,
+    ...verifyPaystackTransactionFields,
+  })
+  .strict();
+
+export const verifyPaystackTransactionResponseSchema = z.object({
+  verified: z.boolean(),
+  transaction: paystackTransactionSchema,
+});
+
+export const paystackKeyConfigSchema = z.object({
+  environment: paystackEnvironmentSchema,
+  keyType: z.enum(['secret_key', 'public_key']),
+  value: z.string().nullable(),
+});
+
+export const getPaystackStatusResponseSchema = z.object({
+  paystackConnections: z.array(paystackConnectionSchema),
+});
+
+export const getPaystackConfigResponseSchema = z.object({
+  keys: z.array(paystackKeyConfigSchema),
+});
+
+export const upsertPaystackConfigBodySchema = z
+  .object({
+    secretKey: z.string().trim().min(1, 'Paystack secret key is required'),
+    publicKey: z.string().trim().min(1).nullable().optional(),
+  })
+  .strict();
+
+export const upsertPaystackConfigRequestSchema = z
+  .object({
+    environment: paystackEnvironmentSchema,
+    ...upsertPaystackConfigBodySchema.shape,
+  })
+  .strict();
+
+export const getPaystackWebhookSetupResponseSchema = z.object({
+  connection: paystackConnectionSchema,
+  webhookUrl: z.string().trim().min(1),
+});
+
+export const paystackWebhookResponseSchema = z.object({
+  received: z.boolean(),
+  handled: z.boolean(),
+});
+
 export type SyncStripePaymentsRequest = z.infer<typeof syncStripePaymentsRequestSchema>;
 export type SyncRazorpayPaymentsRequest = z.infer<typeof syncRazorpayPaymentsRequestSchema>;
 export type ListStripeCatalogRequest = z.infer<typeof listStripeCatalogRequestSchema>;
@@ -966,3 +1076,28 @@ export type RotateRazorpayWebhookSecretResponse = z.infer<
   typeof rotateRazorpayWebhookSecretResponseSchema
 >;
 export type RazorpayWebhookResponse = z.infer<typeof razorpayWebhookResponseSchema>;
+export type PaystackEnvironmentParams = z.infer<typeof paystackEnvironmentParamsSchema>;
+export type PaystackWebhookParams = z.infer<typeof paystackWebhookParamsSchema>;
+export type InitializePaystackTransactionBody = z.infer<
+  typeof initializePaystackTransactionBodySchema
+>;
+export type InitializePaystackTransactionRequest = z.infer<
+  typeof initializePaystackTransactionRequestSchema
+>;
+export type InitializePaystackTransactionResponse = z.infer<
+  typeof initializePaystackTransactionResponseSchema
+>;
+export type VerifyPaystackTransactionBody = z.infer<typeof verifyPaystackTransactionBodySchema>;
+export type VerifyPaystackTransactionRequest = z.infer<
+  typeof verifyPaystackTransactionRequestSchema
+>;
+export type VerifyPaystackTransactionResponse = z.infer<
+  typeof verifyPaystackTransactionResponseSchema
+>;
+export type PaystackKeyConfig = z.infer<typeof paystackKeyConfigSchema>;
+export type GetPaystackStatusResponse = z.infer<typeof getPaystackStatusResponseSchema>;
+export type GetPaystackConfigResponse = z.infer<typeof getPaystackConfigResponseSchema>;
+export type UpsertPaystackConfigBody = z.infer<typeof upsertPaystackConfigBodySchema>;
+export type UpsertPaystackConfigRequest = z.infer<typeof upsertPaystackConfigRequestSchema>;
+export type GetPaystackWebhookSetupResponse = z.infer<typeof getPaystackWebhookSetupResponseSchema>;
+export type PaystackWebhookResponse = z.infer<typeof paystackWebhookResponseSchema>;
