@@ -24,6 +24,19 @@ export interface DeleteObjectsResult {
 }
 
 /**
+ * Thrown by read-path provider methods when the blob does not exist in the
+ * backing store (after branch fallback). Callers map it to their protocol's
+ * not-found response (REST 404, S3 gateway NoSuchKey) by type instead of
+ * matching error message text.
+ */
+export class ObjectNotFoundError extends Error {
+  constructor(message = 'Object not found in storage backend') {
+    super(message);
+    this.name = 'ObjectNotFoundError';
+  }
+}
+
+/**
  * Storage provider interface
  * Defines the contract that all storage providers must implement
  */

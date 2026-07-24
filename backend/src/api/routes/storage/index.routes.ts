@@ -23,6 +23,7 @@ import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiter
 import { isUnsafeMime, resolveSafeMimeType } from '@/utils/mime-guard.js';
 import logger from '@/utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
+import { ObjectNotFoundError } from '@/providers/storage/base.provider.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
@@ -548,7 +549,7 @@ const streamS3ObjectDownload = async (
     }
     // Metadata row exists but the blob is gone (getObjectStream throws on a
     // true 404 after branch fallback) — surface as not found.
-    if (error instanceof Error && error.message.includes('empty body')) {
+    if (error instanceof ObjectNotFoundError) {
       throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
     }
     throw error;
@@ -558,6 +559,12 @@ const streamS3ObjectDownload = async (
   res.setHeader('Content-Type', serveMime);
   res.setHeader('Accept-Ranges', 'bytes');
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  // Proxy mode serves the actual private-bucket bytes through this route;
+  // intermediaries (shared proxies, CDNs in front of the backend) must never
+  // cache them. Public buckets keep default caching semantics.
+  if (!(await StorageService.getInstance().isBucketPublic(bucketName))) {
+    res.setHeader('Cache-Control', 'private, no-store');
+  }
   if (result.etag) {
     res.setHeader('ETag', `"${result.etag}"`);
   }

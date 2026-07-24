@@ -340,6 +340,8 @@ S3_FORCE_PATH_STYLE=true
 # credentials (MINIO_ROOT_USER/MINIO_ROOT_PASSWORD or
 # RUSTFS_ACCESS_KEY/RUSTFS_SECRET_KEY) before production use.
 S3_USE_PRESIGNED_URLS=
+# Max single S3-gateway upload in bytes (default 5368709120 = 5GB)
+S3_MAX_OBJECT_SIZE_BYTES=
 
 # ── Deno Functions ────────────────────────────────────────────
 WORKER_TIMEOUT_MS=60000

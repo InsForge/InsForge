@@ -15,7 +15,7 @@
 
 services:
   rustfs:
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:1.0.0-beta.11
     environment:
       RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-insforge}
       RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-insforge-rustfs-secret}
@@ -31,7 +31,7 @@ services:
   # the readiness gate (the RustFS image ships no healthcheck tooling we rely
   # on). `mc mb -p` is idempotent so re-running `up` is safe.
   rustfs-init:
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     depends_on:
       rustfs:
         condition: service_started

@@ -4,14 +4,14 @@
 # other local services or the MinIO test rig.
 #
 # Point the backend at it with:
-#   AWS_S3_BUCKET=insforge-storage
+#   S3_BUCKET=insforge-storage
 #   S3_ENDPOINT_URL=http://localhost:9102
 #   S3_ACCESS_KEY_ID=rustfs S3_SECRET_ACCESS_KEY=rustfssecret
 #   S3_FORCE_PATH_STYLE=true S3_USE_PRESIGNED_URLS=false
 
 services:
   rustfs:
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:1.0.0-beta.11
     ports:
       - "9102:9000"
     environment:
@@ -21,7 +21,7 @@ services:
       - rustfs-data:/data
 
   rustfs-setup:
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     depends_on:
       - rustfs
     entrypoint:

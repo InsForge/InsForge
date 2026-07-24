@@ -88,7 +88,8 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
   // a "not configured" state instead of the panel, failing closed on query
   // errors or older backends without the field.
   const isCloud = isInsForgeCloudProject();
-  const gatewayConfigQuery = useS3GatewayConfig();
+  // Deferred until the dialog is open — no gateway-config request on mount.
+  const gatewayConfigQuery = useS3GatewayConfig({ enabled: open });
   const s3Available = isCloud || gatewayConfigQuery.data?.available === true;
   const [activeTab, setActiveTab] = useState<StorageSettingsTab>('general');
 

@@ -957,10 +957,12 @@ paths:
     get:
       summary: Get S3 Gateway Config
       description: |
-        Return the externally-reachable endpoint URL and the SigV4 signing
-        region for the S3 protocol gateway. The endpoint is assembled from
-        the server's `VITE_API_BASE_URL` env var plus `/storage/v1/s3`, and
-        the region is `AWS_REGION` (default `us-east-2`).
+        Return the externally-reachable endpoint URL, the SigV4 signing
+        region, and the availability of the S3 protocol gateway. The endpoint
+        is assembled from the server's `VITE_API_BASE_URL` env var plus
+        `/storage/v1/s3`; the region is `S3_REGION` (fallback `AWS_REGION`,
+        default `us-east-2`); `available` reflects whether an S3-backed
+        storage provider is configured (`false` on local-filesystem storage).
 
         Intended for Dashboard display so the UI doesn't make any
         backend-topology assumptions client-side.
@@ -982,6 +984,7 @@ paths:
                 data:
                   endpoint: https://proj.insforge.app/storage/v1/s3
                   region: us-east-2
+                  available: true
         '401':
           description: Missing or invalid API key / admin token
           content:
@@ -1423,6 +1426,7 @@ components:
       required:
         - endpoint
         - region
+        - available
       properties:
         endpoint:
           type: string
@@ -1432,6 +1436,14 @@ components:
           type: string
           description: SigV4 signing region the gateway validates incoming requests against.
           example: us-east-2
+        available:
+          type: boolean
+          description: |
+            Whether the gateway is usable on this deployment. `true` when an
+            S3-backed storage provider is configured; `false` on
+            local-filesystem storage, where all gateway requests return
+            `NotImplemented`.
+          example: true
 
     S3AccessKey:
       type: object

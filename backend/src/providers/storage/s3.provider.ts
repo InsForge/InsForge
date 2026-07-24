@@ -23,6 +23,7 @@ import {
   ObjectMetadata,
   GetObjectResult,
   DeleteObjectsResult,
+  ObjectNotFoundError,
 } from './base.provider.js';
 import logger from '@/utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
@@ -632,9 +633,9 @@ export class S3StorageProvider implements StorageProvider {
       this.tryGetObjectStream(s3Key, range)
     );
     if (!result) {
-      // Preserve previous behaviour: missing object surfaces as a thrown
-      // error here (callers expect a stream, not null).
-      throw new Error('GetObject returned empty body');
+      // Missing object surfaces as a typed error (callers expect a stream,
+      // not null) so routes can map it to a 404/NoSuchKey by instanceof.
+      throw new ObjectNotFoundError();
     }
     return result;
   }

@@ -503,6 +503,7 @@ describe('Storage routes', () => {
       lastModified: new Date(),
     });
     storageMocks.getProvider.mockReturnValue({ getObjectStream });
+    storageMocks.isBucketPublic.mockResolvedValue(false);
 
     const port = await startProxyModeServer();
     const { response, body } = await rawGet(port, '/api/storage/buckets/photos/objects/pic.png');
@@ -512,6 +513,8 @@ describe('Storage routes', () => {
     expect(response.headers['accept-ranges']).toBe('bytes');
     expect(response.headers['etag']).toBe('"abc"');
     expect(response.headers['x-content-type-options']).toBe('nosniff');
+    // Private-bucket bytes must never be cached by intermediaries.
+    expect(response.headers['cache-control']).toBe('private, no-store');
     expect(body.toString()).toBe('0123456789');
     expect(getObjectStream).toHaveBeenCalledWith('photos', 'pic.png', { range: undefined });
     expect(storageMocks.getObject).not.toHaveBeenCalled();
@@ -528,6 +531,7 @@ describe('Storage routes', () => {
       contentRange: 'bytes 0-3/10',
     });
     storageMocks.getProvider.mockReturnValue({ getObjectStream });
+    storageMocks.isBucketPublic.mockResolvedValue(true);
 
     const port = await startProxyModeServer();
     const { response, body } = await rawGet(port, '/api/storage/buckets/photos/objects/pic.png', {
@@ -537,6 +541,8 @@ describe('Storage routes', () => {
     expect(response.statusCode).toBe(206);
     expect(response.headers['content-range']).toBe('bytes 0-3/10');
     expect(response.headers['content-length']).toBe('4');
+    // Public buckets keep default caching semantics.
+    expect(response.headers['cache-control']).toBeUndefined();
     expect(body.toString()).toBe('0123');
     expect(getObjectStream).toHaveBeenCalledWith('photos', 'pic.png', { range: 'bytes=0-3' });
   });
@@ -560,10 +566,13 @@ describe('Storage routes', () => {
   });
 
   test('proxy-mode download returns 404 when the blob is missing behind the metadata row', async () => {
-    const getObjectStream = vi.fn().mockRejectedValue(new Error('GetObject returned empty body'));
-    storageMocks.getProvider.mockReturnValue({ getObjectStream });
-
     const port = await startProxyModeServer();
+    // Import AFTER startProxyModeServer's vi.resetModules() so the error
+    // class comes from the same module registry the route checks instanceof
+    // against.
+    const { ObjectNotFoundError } = await import('../../src/providers/storage/base.provider.js');
+    const getObjectStream = vi.fn().mockRejectedValue(new ObjectNotFoundError());
+    storageMocks.getProvider.mockReturnValue({ getObjectStream });
     const { response } = await rawGet(port, '/api/storage/buckets/photos/objects/pic.png');
 
     expect(response.statusCode).toBe(404);
