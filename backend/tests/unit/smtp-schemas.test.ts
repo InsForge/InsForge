@@ -148,7 +148,7 @@ describe('Email Template Request Schema', () => {
   it('accepts valid template update', () => {
     const result = updateEmailTemplateRequestSchema.safeParse({
       subject: 'Verify your email',
-      bodyHtml: '<p>Your code: {{ token }}</p>',
+      bodyHtml: '<p>Your code: %TOKEN%</p>',
     });
     expect(result.success).toBe(true);
   });
@@ -209,7 +209,7 @@ describe('Email Template Schema', () => {
       id: '11111111-1111-4111-8111-111111111111',
       templateType: 'email-verification-code',
       subject: 'Verify your email',
-      bodyHtml: '<p>Code: {{ token }}</p>',
+      bodyHtml: '<p>Code: %TOKEN%</p>',
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     });

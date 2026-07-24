@@ -1103,7 +1103,12 @@ router.get(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const templates = await emailTemplateService.getTemplates();
+      const VALID_PROVIDERS = ['custom_smtp', 'default'] as const;
+      const rawProvider = req.query.provider as string;
+      const provider = VALID_PROVIDERS.includes(rawProvider as (typeof VALID_PROVIDERS)[number])
+        ? rawProvider
+        : 'custom_smtp';
+      const templates = await emailTemplateService.getTemplates(provider);
       successResponse(res, { data: templates });
     } catch (error) {
       next(error);
@@ -1135,9 +1140,24 @@ router.put(
       }
 
       const templateType = req.params.type as EmailTemplate;
+      const VALID_PROVIDERS = ['custom_smtp', 'default'] as const;
+      const rawProvider = req.query.provider as string;
+      const provider = VALID_PROVIDERS.includes(rawProvider as (typeof VALID_PROVIDERS)[number])
+        ? rawProvider
+        : 'custom_smtp';
+
+      if (provider === 'default') {
+        throw new AppError(
+          'Default email templates are read-only. Please configure a custom SMTP provider to customize email templates.',
+          403,
+          ERROR_CODES.FORBIDDEN
+        );
+      }
+
       const template = await emailTemplateService.updateTemplate(
         templateType,
-        validationResult.data
+        validationResult.data,
+        provider
       );
 
       await auditService.log({
@@ -1146,6 +1166,7 @@ router.put(
         module: 'EMAIL',
         details: {
           templateType,
+          provider,
         },
         ip_address: req.ip,
       });

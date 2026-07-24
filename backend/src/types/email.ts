@@ -6,6 +6,8 @@ export const EMAIL_TEMPLATE_TYPES = [
   'email-verification-link',
   'reset-password-code',
   'reset-password-link',
+  'email-address-change-code',
+  'email-address-change-link',
 ] as const;
 
 export type EmailTemplate = (typeof EMAIL_TEMPLATE_TYPES)[number];
