@@ -117,6 +117,39 @@ function parseEnvInt(val: string | undefined, fallback: number): number {
   return parsed;
 }
 
+/**
+ * Strict positive-integer parser for pure byte-count knobs (MAX_FILE_SIZE,
+ * MAX_DEPLOYMENT_*_BYTES). parseInt() silently truncates trailing garbage
+ * ("100mb" → 100), which is a trap here because the sibling body-size knobs
+ * (MAX_JSON_BODY_SIZE) legitimately accept unit suffixes. parseEnvBytes
+ * builds on this parser, and it warns on rejection so operators
+ * can see why their value was ignored. Uses console.warn because the shared
+ * logger (utils/logger.ts) imports appConfig, so it cannot be used at
+ * config-load time.
+ */
+function parseStrictEnvInt<T extends number | undefined>(
+  name: string,
+  val: string | undefined,
+  fallback: T
+): number | T {
+  if (!val) return fallback;
+  const trimmed = val.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    console.warn(
+      `Invalid ${name} value "${val}": expected a plain positive integer (bytes, no unit suffix); falling back to default.`
+    );
+    return fallback;
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    console.warn(
+      `Invalid ${name} value "${val}": must be a positive integer; falling back to default.`
+    );
+    return fallback;
+  }
+  return parsed;
+}
+
 function parseEnvBool(val: string | undefined): boolean {
   if (!val) return false;
   return ['1', 'true', 'yes', 'on'].includes(val.trim().toLowerCase());
@@ -124,14 +157,10 @@ function parseEnvBool(val: string | undefined): boolean {
 
 const AWS_MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024;
 
-function parseEnvBytes(val: string | undefined, fallback: number): number {
-  if (!val) return fallback;
-  if (!/^\d+$/.test(val)) return fallback;
-  const parsed = Number(val);
-  if (!Number.isFinite(parsed) || !Number.isSafeInteger(parsed) || parsed <= 0) {
-    return fallback;
-  }
-  return Math.min(parsed, AWS_MAX_SINGLE_PUT_BYTES);
+// Same strict parsing (trim, warn, safe-integer) as every other byte knob,
+// plus the AWS single-PUT ceiling.
+function parseEnvBytes(name: string, val: string | undefined, fallback: number): number {
+  return Math.min(parseStrictEnvInt(name, val, fallback), AWS_MAX_SINGLE_PUT_BYTES);
 }
 
 export function loadConfig(): AppConfig {
@@ -175,10 +204,7 @@ export function loadConfig(): AppConfig {
     server: {
       maxJsonBodySize: process.env.MAX_JSON_BODY_SIZE || '100mb',
       maxUrlencodedBodySize: process.env.MAX_URLENCODED_BODY_SIZE || '10mb',
-      maxFileSize: (() => {
-        const parsed = parseInt(process.env.MAX_FILE_SIZE || '', 10);
-        return isNaN(parsed) || parsed <= 0 ? undefined : parsed;
-      })(),
+      maxFileSize: parseStrictEnvInt('MAX_FILE_SIZE', process.env.MAX_FILE_SIZE, undefined),
       maxFilesPerField: parseEnvInt(process.env.MAX_FILES_PER_FIELD, 10),
       logsDir,
       trustProxy: parseTrustProxySetting(process.env.TRUST_PROXY),
@@ -217,12 +243,19 @@ export function loadConfig(): AppConfig {
       awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID || undefined,
       awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || undefined,
       s3EndpointUrl: process.env.S3_ENDPOINT_URL || undefined,
-      // Default true (MinIO etc.). Set S3_FORCE_PATH_STYLE=false for providers
-      // that require virtual-hosted-style addressing (Tencent COS, Aliyun OSS).
-      s3ForcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
+      // Default true (MinIO etc.). Set S3_FORCE_PATH_STYLE=false/0/no/off for
+      // providers that require virtual-hosted-style addressing (Tencent COS,
+      // Aliyun OSS). Falsy list mirrors parseEnvBool's truthy list.
+      s3ForcePathStyle: !['false', '0', 'no', 'off'].includes(
+        (process.env.S3_FORCE_PATH_STYLE ?? '').trim().toLowerCase()
+      ),
       awsConfigBucket: process.env.AWS_CONFIG_BUCKET || 'insforge-config',
       awsConfigRegion: process.env.AWS_CONFIG_REGION || 'us-east-2',
-      maxS3UploadSize: parseEnvBytes(process.env.S3_MAX_OBJECT_SIZE_BYTES, 5 * 1024 * 1024 * 1024),
+      maxS3UploadSize: parseEnvBytes(
+        'S3_MAX_OBJECT_SIZE_BYTES',
+        process.env.S3_MAX_OBJECT_SIZE_BYTES,
+        5 * 1024 * 1024 * 1024
+      ),
     },
     functions: {
       denoRuntimeUrl: process.env.DENO_RUNTIME_URL || 'http://localhost:7133',
@@ -232,11 +265,16 @@ export function loadConfig(): AppConfig {
       vercelTeamId: process.env.VERCEL_TEAM_ID || undefined,
       vercelProjectId: process.env.VERCEL_PROJECT_ID || undefined,
       maxDeploymentFiles: parseEnvInt(process.env.MAX_DEPLOYMENT_FILES, 5000),
-      maxDeploymentTotalBytes: parseEnvInt(
+      maxDeploymentTotalBytes: parseStrictEnvInt(
+        'MAX_DEPLOYMENT_TOTAL_BYTES',
         process.env.MAX_DEPLOYMENT_TOTAL_BYTES,
         100 * 1024 * 1024
       ),
-      maxDeploymentFileBytes: parseEnvInt(process.env.MAX_DEPLOYMENT_FILE_BYTES, 100 * 1024 * 1024),
+      maxDeploymentFileBytes: parseStrictEnvInt(
+        'MAX_DEPLOYMENT_FILE_BYTES',
+        process.env.MAX_DEPLOYMENT_FILE_BYTES,
+        100 * 1024 * 1024
+      ),
     },
     ai: {
       openrouterApiKey: process.env.OPENROUTER_API_KEY || undefined,

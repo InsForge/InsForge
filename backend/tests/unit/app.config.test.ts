@@ -19,9 +19,11 @@
  *   ✅ PARENT_APP_KEY whitespace trimming
  *   ✅ MAX_FILE_SIZE absent → undefined (not 0 or NaN)
  *   ✅ Deployment byte limits default to 100 MiB
+ *   ✅ Size knobs reject unit suffixes ("100mb"/"100abc") with a warning
+ *   ✅ S3_FORCE_PATH_STYLE case/whitespace variants of 'false'
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loadConfig } from '../../src/infra/config/app.config';
 
 // ---------------------------------------------------------------------------
@@ -35,7 +37,20 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env = savedEnv;
+  vi.restoreAllMocks();
 });
+
+// ---------------------------------------------------------------------------
+// Utility — silence console.warn (strict size parsing warns on rejection)
+// and capture its messages for assertions
+// ---------------------------------------------------------------------------
+function spyOnWarn() {
+  return vi.spyOn(console, 'warn').mockImplementation(() => {});
+}
+
+function warnMessages(spy: ReturnType<typeof spyOnWarn>): string[] {
+  return spy.mock.calls.map((call) => String(call[0]));
+}
 
 // ---------------------------------------------------------------------------
 // Utility to wipe a set of keys so defaults kick in cleanly
@@ -269,6 +284,52 @@ describe('config.server', () => {
     expect(typeof c.server.maxFileSize).toBe('number');
   });
 
+  it('rejects MAX_FILE_SIZE with a unit suffix ("100mb") and warns, instead of truncating to 100 bytes', () => {
+    const warnSpy = spyOnWarn();
+    process.env.MAX_FILE_SIZE = '100mb';
+    const c = loadConfig();
+
+    expect(c.server.maxFileSize).toBeUndefined();
+    expect(
+      warnMessages(warnSpy).some((m) => m.includes('MAX_FILE_SIZE') && m.includes('100mb'))
+    ).toBe(true);
+  });
+
+  it('rejects MAX_FILE_SIZE with trailing garbage ("100abc") and warns', () => {
+    const warnSpy = spyOnWarn();
+    process.env.MAX_FILE_SIZE = '100abc';
+    const c = loadConfig();
+
+    expect(c.server.maxFileSize).toBeUndefined();
+    expect(
+      warnMessages(warnSpy).some((m) => m.includes('MAX_FILE_SIZE') && m.includes('100abc'))
+    ).toBe(true);
+  });
+
+  it('accepts MAX_FILE_SIZE with surrounding whitespace (" 100 ")', () => {
+    process.env.MAX_FILE_SIZE = ' 100 ';
+    expect(loadConfig().server.maxFileSize).toBe(100);
+  });
+
+  it('rejects non-positive MAX_FILE_SIZE ("0") without the misleading unit-suffix hint', () => {
+    const warnSpy = spyOnWarn();
+    process.env.MAX_FILE_SIZE = '0';
+    const c = loadConfig();
+
+    expect(c.server.maxFileSize).toBeUndefined();
+    const message = warnMessages(warnSpy).find((m) => m.includes('MAX_FILE_SIZE'));
+    expect(message).toContain('must be a positive integer');
+    expect(message).not.toContain('unit suffix');
+  });
+
+  it('REGRESSION: plain numeric MAX_FILE_SIZE still parses without warning', () => {
+    const warnSpy = spyOnWarn();
+    process.env.MAX_FILE_SIZE = '10485760';
+
+    expect(loadConfig().server.maxFileSize).toBe(10485760);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it('MAX_FILE_SIZE is undefined when not set (not 0 or NaN)', () => {
     unsetEnvKeys('MAX_FILE_SIZE');
     const c = loadConfig();
@@ -330,6 +391,7 @@ describe('config.server', () => {
   });
 
   it('robustly falls back to defaults for 0 or negative limits', () => {
+    spyOnWarn();
     process.env.MAX_FILES_PER_FIELD = '0';
     process.env.MAX_FILE_SIZE = '0';
     const c = loadConfig();
@@ -568,6 +630,74 @@ describe('config.storage', () => {
     expect(c.storage.awsConfigBucket).toBe('my-config-bucket');
     expect(c.storage.awsConfigRegion).toBe('ap-southeast-1');
   });
+
+  // ── S3_FORCE_PATH_STYLE normalization ─────────────────────────────────────
+  it('s3ForcePathStyle defaults to true when S3_FORCE_PATH_STYLE is unset', () => {
+    unsetEnvKeys('S3_FORCE_PATH_STYLE');
+    expect(loadConfig().storage.s3ForcePathStyle).toBe(true);
+  });
+
+  it('s3ForcePathStyle stays true for empty string and explicit true', () => {
+    process.env.S3_FORCE_PATH_STYLE = '';
+    expect(loadConfig().storage.s3ForcePathStyle).toBe(true);
+
+    process.env.S3_FORCE_PATH_STYLE = 'true';
+    expect(loadConfig().storage.s3ForcePathStyle).toBe(true);
+  });
+
+  it('disables path style for case and whitespace variants of false', () => {
+    for (const value of ['false', 'False', 'FALSE', ' false ']) {
+      process.env.S3_FORCE_PATH_STYLE = value;
+      expect(
+        loadConfig().storage.s3ForcePathStyle,
+        `S3_FORCE_PATH_STYLE=${JSON.stringify(value)}`
+      ).toBe(false);
+    }
+  });
+
+  it('disables path style for 0, including whitespace variants', () => {
+    for (const value of ['0', ' 0 ']) {
+      process.env.S3_FORCE_PATH_STYLE = value;
+      expect(
+        loadConfig().storage.s3ForcePathStyle,
+        `S3_FORCE_PATH_STYLE=${JSON.stringify(value)}`
+      ).toBe(false);
+    }
+  });
+
+  it('disables path style for no/off, mirroring parseEnvBool falsy symmetry', () => {
+    for (const value of ['no', 'NO', 'off', ' Off ']) {
+      process.env.S3_FORCE_PATH_STYLE = value;
+      expect(
+        loadConfig().storage.s3ForcePathStyle,
+        `S3_FORCE_PATH_STYLE=${JSON.stringify(value)}`
+      ).toBe(false);
+    }
+  });
+
+  // ── S3_MAX_OBJECT_SIZE_BYTES strict parsing (parseEnvBytes on parseStrictEnvInt)
+  it('rejects S3_MAX_OBJECT_SIZE_BYTES with a unit suffix and warns instead of silently falling back', () => {
+    const warnSpy = spyOnWarn();
+    process.env.S3_MAX_OBJECT_SIZE_BYTES = '100mb';
+    const c = loadConfig();
+
+    expect(c.storage.maxS3UploadSize).toBe(5 * 1024 * 1024 * 1024);
+    expect(
+      warnMessages(warnSpy).some(
+        (m) => m.includes('S3_MAX_OBJECT_SIZE_BYTES') && m.includes('100mb')
+      )
+    ).toBe(true);
+  });
+
+  it('accepts whitespace-padded S3_MAX_OBJECT_SIZE_BYTES like the other byte knobs', () => {
+    process.env.S3_MAX_OBJECT_SIZE_BYTES = ' 1048576 ';
+    expect(loadConfig().storage.maxS3UploadSize).toBe(1048576);
+  });
+
+  it('still clamps S3_MAX_OBJECT_SIZE_BYTES to the AWS single-PUT ceiling', () => {
+    process.env.S3_MAX_OBJECT_SIZE_BYTES = String(6 * 1024 * 1024 * 1024);
+    expect(loadConfig().storage.maxS3UploadSize).toBe(5 * 1024 * 1024 * 1024);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -634,6 +764,73 @@ describe('config.deployments', () => {
     expect(typeof c.deployments.maxDeploymentFiles).toBe('number');
     expect(typeof c.deployments.maxDeploymentTotalBytes).toBe('number');
     expect(typeof c.deployments.maxDeploymentFileBytes).toBe('number');
+  });
+
+  // ── Strict byte parsing (no unit suffixes) ────────────────────────────────
+  it('rejects deployment byte limits with unit suffixes ("100mb" is not 100 bytes) and warns', () => {
+    const warnSpy = spyOnWarn();
+    process.env.MAX_DEPLOYMENT_TOTAL_BYTES = '100mb';
+    process.env.MAX_DEPLOYMENT_FILE_BYTES = '100mb';
+    const c = loadConfig();
+
+    expect(c.deployments.maxDeploymentTotalBytes).toBe(ONE_HUNDRED_MIB);
+    expect(c.deployments.maxDeploymentFileBytes).toBe(ONE_HUNDRED_MIB);
+
+    const messages = warnMessages(warnSpy);
+    expect(
+      messages.some((m) => m.includes('MAX_DEPLOYMENT_TOTAL_BYTES') && m.includes('100mb'))
+    ).toBe(true);
+    expect(
+      messages.some((m) => m.includes('MAX_DEPLOYMENT_FILE_BYTES') && m.includes('100mb'))
+    ).toBe(true);
+  });
+
+  it('rejects deployment byte limits with trailing garbage ("100abc") and warns', () => {
+    const warnSpy = spyOnWarn();
+    process.env.MAX_DEPLOYMENT_TOTAL_BYTES = '100abc';
+    process.env.MAX_DEPLOYMENT_FILE_BYTES = '100abc';
+    const c = loadConfig();
+
+    expect(c.deployments.maxDeploymentTotalBytes).toBe(ONE_HUNDRED_MIB);
+    expect(c.deployments.maxDeploymentFileBytes).toBe(ONE_HUNDRED_MIB);
+
+    const messages = warnMessages(warnSpy);
+    expect(
+      messages.some((m) => m.includes('MAX_DEPLOYMENT_TOTAL_BYTES') && m.includes('100abc'))
+    ).toBe(true);
+    expect(
+      messages.some((m) => m.includes('MAX_DEPLOYMENT_FILE_BYTES') && m.includes('100abc'))
+    ).toBe(true);
+  });
+
+  it('accepts deployment byte limits with surrounding whitespace (" 100 ")', () => {
+    process.env.MAX_DEPLOYMENT_TOTAL_BYTES = ' 100 ';
+    process.env.MAX_DEPLOYMENT_FILE_BYTES = ' 100 ';
+    const c = loadConfig();
+
+    expect(c.deployments.maxDeploymentTotalBytes).toBe(100);
+    expect(c.deployments.maxDeploymentFileBytes).toBe(100);
+  });
+
+  it('REGRESSION: plain numeric deployment byte limits still parse without warning', () => {
+    const warnSpy = spyOnWarn();
+    process.env.MAX_DEPLOYMENT_TOTAL_BYTES = '52428800';
+    process.env.MAX_DEPLOYMENT_FILE_BYTES = '10485760';
+    const c = loadConfig();
+
+    expect(c.deployments.maxDeploymentTotalBytes).toBe(52428800);
+    expect(c.deployments.maxDeploymentFileBytes).toBe(10485760);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('REGRESSION: deployment byte limit defaults are unchanged (100 MiB) and emit no warning', () => {
+    const warnSpy = spyOnWarn();
+    unsetEnvKeys('MAX_DEPLOYMENT_TOTAL_BYTES', 'MAX_DEPLOYMENT_FILE_BYTES');
+    const c = loadConfig();
+
+    expect(c.deployments.maxDeploymentTotalBytes).toBe(ONE_HUNDRED_MIB);
+    expect(c.deployments.maxDeploymentFileBytes).toBe(ONE_HUNDRED_MIB);
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
 
