@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import '#lib/i18n';
 import { StorageSettingsMenuDialog } from '#features/storage/components/StorageSettingsMenuDialog';
@@ -7,6 +8,7 @@ import type { S3GatewayConfigSchema } from '@insforge/shared-schemas';
 const storageSettingsMocks = vi.hoisted(() => ({
   isCloudProject: false,
   gatewayConfig: undefined as { endpoint: string; region: string; available: boolean } | undefined,
+  gatewayConfigLoading: false,
   // Stable reference — a fresh object per render would change resetForm's
   // identity every render and loop the dialog's reset effect.
   storageConfig: { maxFileSizeMb: 50 },
@@ -26,7 +28,7 @@ vi.mock('#features/storage/hooks/useStorageConfig', () => ({
 vi.mock('#features/storage/hooks/useS3AccessKeys', () => ({
   useS3GatewayConfig: () => ({
     data: storageSettingsMocks.gatewayConfig as S3GatewayConfigSchema | undefined,
-    isLoading: false,
+    isLoading: storageSettingsMocks.gatewayConfigLoading,
     error: null,
   }),
   useS3AccessKeys: () => ({
@@ -45,52 +47,80 @@ vi.mock('#lib/utils/utils', () => ({
   isInsForgeCloudProject: () => storageSettingsMocks.isCloudProject,
 }));
 
-// The panel pulls in its own hooks/services; the dialog's tab gating is what
+// The panel pulls in its own hooks/services; the dialog's tab behavior is what
 // this suite covers, so stub the panel body.
 vi.mock('#features/storage/components/S3SettingsPanel', () => ({
   S3SettingsPanel: () => <div data-testid="s3-settings-panel" />,
 }));
 
-describe('StorageSettingsMenuDialog — S3 tab gating', () => {
+describe('StorageSettingsMenuDialog — S3 tab', () => {
   afterEach(() => {
     storageSettingsMocks.isCloudProject = false;
     storageSettingsMocks.gatewayConfig = undefined;
+    storageSettingsMocks.gatewayConfigLoading = false;
     storageSettingsMocks.updateConfig.mockReset();
   });
 
   const renderDialog = () =>
     render(<StorageSettingsMenuDialog open={true} onOpenChange={() => {}} />);
 
-  it('shows the S3 tab on self-hosted when the backend reports the gateway available', () => {
+  const openS3Tab = async () => {
+    await userEvent.click(screen.getByText('S3 Configuration'));
+  };
+
+  it('always shows the S3 tab, even on self-hosted local storage', () => {
+    renderDialog();
+    expect(screen.getByText('S3 Configuration')).toBeInTheDocument();
+  });
+
+  it('renders the panel when the backend reports the gateway available', async () => {
     storageSettingsMocks.gatewayConfig = {
       endpoint: 'http://localhost:7130/storage/v1/s3',
       region: 'us-east-1',
       available: true,
     };
     renderDialog();
-    expect(screen.getByText('S3 Configuration')).toBeInTheDocument();
+    await openS3Tab();
+    expect(screen.getByTestId('s3-settings-panel')).toBeInTheDocument();
   });
 
-  it('hides the S3 tab on self-hosted when the gateway is unavailable (local storage)', () => {
+  it('renders the not-configured state when the gateway is unavailable (local storage)', async () => {
     storageSettingsMocks.gatewayConfig = {
       endpoint: 'http://localhost:7130/storage/v1/s3',
       region: 'us-east-2',
       available: false,
     };
     renderDialog();
-    expect(screen.queryByText('S3 Configuration')).not.toBeInTheDocument();
+    await openS3Tab();
+    expect(screen.getByText('Storage backend not configured')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /self-hosted storage guide/i })).toHaveAttribute(
+      'href',
+      'https://docs.insforge.dev/deployment/self-host-storage'
+    );
+    expect(screen.queryByTestId('s3-settings-panel')).not.toBeInTheDocument();
   });
 
-  it('hides the S3 tab on self-hosted when the config query has no data (fails closed)', () => {
+  it('fails closed to the not-configured state when the config query has no data', async () => {
     storageSettingsMocks.gatewayConfig = undefined;
     renderDialog();
-    expect(screen.queryByText('S3 Configuration')).not.toBeInTheDocument();
+    await openS3Tab();
+    expect(screen.getByText('Storage backend not configured')).toBeInTheDocument();
+    expect(screen.queryByTestId('s3-settings-panel')).not.toBeInTheDocument();
   });
 
-  it('keeps the S3 tab visible on cloud regardless of the config query', () => {
+  it('shows a loading state while the config query is in flight', async () => {
+    storageSettingsMocks.gatewayConfigLoading = true;
+    renderDialog();
+    await openS3Tab();
+    expect(screen.getByText('Loading configuration...')).toBeInTheDocument();
+    expect(screen.queryByText('Storage backend not configured')).not.toBeInTheDocument();
+  });
+
+  it('renders the panel on cloud regardless of the config query', async () => {
     storageSettingsMocks.isCloudProject = true;
     storageSettingsMocks.gatewayConfig = undefined;
     renderDialog();
-    expect(screen.getByText('S3 Configuration')).toBeInTheDocument();
+    await openS3Tab();
+    expect(screen.getByTestId('s3-settings-panel')).toBeInTheDocument();
   });
 });
