@@ -134,3 +134,7 @@ Uploads made through the gateway appear immediately in the REST API and Dashboar
 | `MAX_FILE_SIZE` | 50 MB | REST API upload cap (also configurable in the Dashboard) |
 
 The `AWS_*` variables (`AWS_S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_CLOUDFRONT_*`) are cloud-project and legacy names: the first two work as fallbacks for `S3_BUCKET`/`S3_REGION`, the credentials double as CloudWatch/CloudFront credentials, and CloudFront only applies to AWS S3 without a custom endpoint. Self-hosted deployments should stick to `S3_*`.
+
+### Upgrading from an `AWS_*` configuration
+
+Older versions of `deploy/docker-compose/docker-compose.yml` did not pass storage variables at all, and the deployment guide recommended hand-adding `AWS_S3_BUCKET` (and friends) to the `insforge` service. If you did that: the current compose file passes only the `S3_*` names. Before adopting it, rename the variables in your `.env` to `S3_BUCKET` / `S3_REGION` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` — or keep your hand-edited `environment` block. The backend itself still honors `AWS_*` as fallbacks, so any value that reaches the container keeps working; the risk is only a compose file that no longer forwards them, which would silently fall back to local storage.
