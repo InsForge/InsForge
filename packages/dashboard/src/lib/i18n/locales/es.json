@@ -1048,6 +1048,11 @@
     "smtpConfigUpdateFailed": "Error al actualizar la configuración SMTP",
     "autoConfirmDescription": "Marca el correo como verificado automáticamente, para que el usuario pueda iniciar sesión sin confirmarlo."
   },
+  "routeError": {
+    "title": "No se pudo cargar esta página",
+    "staleAssets": "El panel no pudo cargar los recursos más recientes de la página. Vuelve a cargar la aplicación para intentarlo de nuevo.",
+    "generic": "Se produjo un error inesperado al cargar esta página. Vuelve a cargar la aplicación para intentarlo de nuevo."
+  },
   "common": {
     "anErrorOccurred": "Se produjo un error",
     "cancel": "Cancelar",
