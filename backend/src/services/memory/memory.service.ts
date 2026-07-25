@@ -278,13 +278,18 @@ Return JSON {"action":"ADD"|"UPDATE"|"NOOP","target_id"?:string,"title"?:string,
         ? [{ kind: params.kind ?? 'fact', title: params.title, content: params.content }]
         : [];
 
-    // Isolate failures per candidate: one bad row (e.g. an embedding hiccup
-    // mid-batch) must not discard the memories already stored before it.
+    // Isolate failures per candidate in transcript mode: one bad row (e.g. an
+    // embedding hiccup mid-batch) must not discard the memories already stored
+    // before it. A single explicit memory has no batch to protect — rethrow so
+    // the caller sees the failure instead of a misleading NOOP.
     const results: RememberResult[] = [];
     for (const c of candidates) {
       try {
         results.push(await this.rememberOne(params.scope, c, params.source));
       } catch (err) {
+        if (!params.transcript) {
+          throw err;
+        }
         logger.warn('memory.remember candidate failed', {
           scope: params.scope,
           title: c.title,

@@ -127,6 +127,13 @@ describe('MemoryService.remember — extraction sanitization & failure isolation
     expect(res[0].action).toBe('ADD');
     expect(res[1]).toEqual({ action: 'NOOP', title: 'bad' });
   });
+
+  it('rethrows a failure for a single explicit memory instead of reporting NOOP', async () => {
+    embedMock.mockRejectedValueOnce(new Error('embed boom'));
+    await expect(
+      service.remember({ scope: 's', kind: 'fact', title: 't', content: 'c' })
+    ).rejects.toThrow('embed boom');
+  });
 });
 
 describe('MemoryService.recall / index', () => {
