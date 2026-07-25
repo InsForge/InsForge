@@ -45,19 +45,34 @@ export const createUserRequestSchema = z.object({
  * POST /api/auth/sessions - Create a session with a password or email OTP.
  * Existing password clients may omit method; it defaults to password.
  */
-export const createSessionRequestSchema = z.union([
-  z.object({
-    method: z.literal('password').optional(),
-    email: emailSchema,
-    password: passwordSchema,
-  }),
-  z.object({
-    method: z.literal('otp'),
-    email: emailSchema,
-    otp: z.string().regex(/^\d{6}$/, 'OTP code must be a 6-digit numeric code'),
-    name: nameSchema.optional(),
-  }),
-]);
+const passwordSessionRequestSchema = z.object({
+  method: z.literal('password'),
+  email: emailSchema,
+  password: passwordSchema,
+});
+
+const otpSessionRequestSchema = z.object({
+  method: z.literal('otp'),
+  email: emailSchema,
+  otp: z.string().regex(/^\d{6}$/, 'OTP code must be a 6-digit numeric code'),
+  name: nameSchema.optional(),
+});
+
+export const createSessionRequestSchema = z.preprocess(
+  (value) => {
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      Array.isArray(value) ||
+      Object.prototype.hasOwnProperty.call(value, 'method')
+    ) {
+      return value;
+    }
+
+    return { ...value, method: 'password' };
+  },
+  z.discriminatedUnion('method', [passwordSessionRequestSchema, otpSessionRequestSchema])
+);
 
 /**
  * POST /api/auth/email/send-otp - Send a sign-in OTP
@@ -524,7 +539,11 @@ export const authErrorResponseSchema = z.object({
 
 // Request types for type-safe request handling
 export type CreateUserRequest = z.infer<typeof createUserRequestSchema>;
-export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
+type PasswordSessionRequest = z.infer<typeof passwordSessionRequestSchema>;
+type OTPSessionRequest = z.infer<typeof otpSessionRequestSchema>;
+export type CreateSessionRequest =
+  | (Omit<PasswordSessionRequest, 'method'> & { method?: 'password' })
+  | OTPSessionRequest;
 export type SendOTPRequest = z.infer<typeof sendOTPRequestSchema>;
 export type CreateAdminSessionRequest = z.infer<typeof createAdminSessionRequestSchema>;
 export type RefreshSessionRequest = z.infer<typeof refreshSessionRequestSchema>;

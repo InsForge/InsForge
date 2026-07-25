@@ -50,6 +50,7 @@ describe('email OTP sign-in schemas', () => {
     });
 
     expect(result).toEqual({
+      method: 'password',
       email: 'user@example.com',
       password: 'securepassword123',
     });
@@ -63,5 +64,43 @@ describe('email OTP sign-in schemas', () => {
     });
 
     expect(result.method).toBe('password');
+  });
+
+  it('preserves field-level errors for legacy password requests', () => {
+    const result = createSessionRequestSchema.safeParse({});
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual([
+        expect.objectContaining({ path: ['email'], message: 'Required' }),
+        expect.objectContaining({ path: ['password'], message: 'Required' }),
+      ]);
+    }
+  });
+
+  it('returns OTP field errors for an incomplete OTP request', () => {
+    const result = createSessionRequestSchema.safeParse({ method: 'otp' });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual([
+        expect.objectContaining({ path: ['email'], message: 'Required' }),
+        expect.objectContaining({ path: ['otp'], message: 'Required' }),
+      ]);
+    }
+  });
+
+  it('rejects unknown session methods at the discriminator', () => {
+    const result = createSessionRequestSchema.safeParse({ method: 'magic' });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual([
+        expect.objectContaining({
+          path: ['method'],
+          message: "Invalid discriminator value. Expected 'password' | 'otp'",
+        }),
+      ]);
+    }
   });
 });

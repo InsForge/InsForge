@@ -195,4 +195,25 @@ describe('email OTP auth routes', () => {
     expect(mocks.login).toHaveBeenCalledWith('user@example.com', 'securepassword123');
     expect(mocks.verifyOTPRequest).not.toHaveBeenCalled();
   });
+
+  it('preserves legacy field-level errors for an empty session request', async () => {
+    const response = await callRoute(router, '/sessions', {});
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'INVALID_INPUT',
+      message: 'email: Required, password: Required',
+    });
+  });
+
+  it('returns OTP field-level errors for an incomplete OTP session request', async () => {
+    const response = await callRoute(router, '/sessions', { method: 'otp' });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'INVALID_INPUT',
+      message: 'email: Required, otp: Required',
+    });
+    expect(mocks.verifyOTPRequest).toHaveBeenCalledOnce();
+  });
 });
