@@ -94,7 +94,7 @@ export function S3SettingsPanel() {
         title={t('storage.region', { defaultValue: 'Region' })}
         description={t('storage.regionDescription', {
           defaultValue:
-            'SigV4 signing region expected by the gateway. Clients must sign with this exact value (configurable server-side via AWS_REGION).',
+            'SigV4 signing region expected by the gateway. Clients must sign with this exact value (configurable server-side via S3_REGION).',
         })}
       >
         <div className="flex items-center gap-2">

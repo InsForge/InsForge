@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Cloud, Settings } from 'lucide-react';
+import { Cloud, ExternalLink, Settings } from 'lucide-react';
 import {
   Button,
   Input,
@@ -27,6 +27,7 @@ import {
   type UpdateStorageConfigRequest,
 } from '@insforge/shared-schemas';
 import { useStorageConfig } from '#features/storage/hooks/useStorageConfig';
+import { useS3GatewayConfig } from '#features/storage/hooks/useS3AccessKeys';
 import { S3SettingsPanel } from './S3SettingsPanel';
 import { isInsForgeCloudProject } from '#lib/utils/utils';
 
@@ -80,10 +81,16 @@ function SettingRow({ label, description, children }: SettingRowProps) {
 export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSettingsMenuDialogProps) {
   const { t } = useTranslation('chrome');
   const { config, isLoading, error, isUpdating, updateConfig } = useStorageConfig();
-  // S3 gateway is a cloud-only feature — self-hosted deployments don't have
-  // VITE_API_BASE_URL / APP_KEY set, so the tab is hidden entirely there.
-  // Same detection as AppSidebar and BucketFormDialog.
+  // The S3 gateway needs an S3-backed storage provider. Cloud projects always
+  // have one; self-hosted deployments advertise it via /storage/s3/config
+  // `available` (false on local-filesystem storage). The tab itself is always
+  // visible for discoverability — when the gateway is unavailable it renders
+  // a "not configured" state instead of the panel, failing closed on query
+  // errors or older backends without the field.
   const isCloud = isInsForgeCloudProject();
+  // Deferred until the dialog is open — no gateway-config request on mount.
+  const gatewayConfigQuery = useS3GatewayConfig({ enabled: open });
+  const s3Available = isCloud || gatewayConfigQuery.data?.available === true;
   const [activeTab, setActiveTab] = useState<StorageSettingsTab>('general');
 
   const form = useForm<UpdateStorageConfigRequest>({
@@ -122,7 +129,7 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
   const saveDisabled = !form.formState.isDirty || isUpdating;
 
   const title =
-    activeTab === 's3' && isCloud
+    activeTab === 's3'
       ? t('storage.s3CompatibleApi', { defaultValue: 'S3 Compatible API' })
       : t('storage.general', { defaultValue: 'General' });
 
@@ -144,15 +151,13 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
               >
                 {t('storage.general', { defaultValue: 'General' })}
               </MenuDialogNavItem>
-              {isCloud && (
-                <MenuDialogNavItem
-                  icon={<Cloud className="h-5 w-5" />}
-                  active={activeTab === 's3'}
-                  onClick={() => setActiveTab('s3')}
-                >
-                  {t('storage.s3Configuration', { defaultValue: 'S3 Configuration' })}
-                </MenuDialogNavItem>
-              )}
+              <MenuDialogNavItem
+                icon={<Cloud className="h-5 w-5" />}
+                active={activeTab === 's3'}
+                onClick={() => setActiveTab('s3')}
+              >
+                {t('storage.s3Configuration', { defaultValue: 'S3 Configuration' })}
+              </MenuDialogNavItem>
             </MenuDialogNavList>
           </MenuDialogNav>
         </MenuDialogSideNav>
@@ -163,9 +168,41 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
             <MenuDialogCloseButton className="ml-auto" />
           </MenuDialogHeader>
 
-          {activeTab === 's3' && isCloud ? (
+          {activeTab === 's3' ? (
             <MenuDialogBody>
-              <S3SettingsPanel />
+              {s3Available ? (
+                <S3SettingsPanel />
+              ) : gatewayConfigQuery.isLoading ? (
+                <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-muted-foreground">
+                  {t('storage.loadingConfiguration', { defaultValue: 'Loading configuration...' })}
+                </div>
+              ) : (
+                <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-2 p-6 text-center">
+                  <Cloud className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm font-medium text-foreground">
+                    {t('storage.s3BackendNotConfigured', {
+                      defaultValue: 'Storage backend not configured',
+                    })}
+                  </p>
+                  <p className="max-w-md text-[13px] leading-[18px] text-muted-foreground">
+                    {t('storage.s3BackendNotConfiguredDescription', {
+                      defaultValue:
+                        'The S3-compatible gateway needs an S3-backed storage provider. Point InsForge at any S3-compatible store — or run the bundled MinIO/RustFS overlay — via environment variables, then restart the backend.',
+                    })}
+                  </p>
+                  <a
+                    href="https://docs.insforge.dev/deployment/self-host-storage"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[13px] font-medium text-primary hover:underline"
+                  >
+                    {t('storage.s3BackendSetupGuide', {
+                      defaultValue: 'View the self-hosted storage guide',
+                    })}
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              )}
             </MenuDialogBody>
           ) : isLoading ? (
             <MenuDialogBody>
