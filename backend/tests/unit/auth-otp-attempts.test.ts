@@ -48,38 +48,72 @@ describe('AuthOTPService numeric attempt limits', () => {
     service = AuthOTPService.getInstance();
   });
 
-  it('persists a failed attempt and invalidates the third failure', async () => {
-    mocks.client.query
-      .mockResolvedValueOnce({
+  it.each([OTPPurpose.SIGN_IN, OTPPurpose.VERIFY_EMAIL, OTPPurpose.RESET_PASSWORD])(
+    'persists a failed %s attempt and invalidates the third failure',
+    async (purpose) => {
+      mocks.client.query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'otp-id',
+              email: 'user@example.com',
+              purpose,
+              otp_hash: 'hash',
+              expires_at: new Date(Date.now() + 60_000),
+              consumed_at: null,
+              redirect_to: null,
+              attempts_count: 2,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rowCount: 1 });
+      mocks.compare.mockResolvedValue(false);
+
+      const result = await service.attemptEmailOTPWithCode(
+        mocks.client as unknown as PoolClient,
+        'user@example.com',
+        purpose,
+        '000000'
+      );
+
+      expect(result.success).toBe(false);
+      expect(mocks.client.query.mock.calls[1][0]).toContain(
+        'WHEN attempts_count + 1 >= $2 THEN NOW()'
+      );
+      expect(mocks.client.query.mock.calls[1][1]).toEqual(['otp-id', 3]);
+    }
+  );
+
+  it.each([OTPPurpose.VERIFY_EMAIL, OTPPurpose.RESET_PASSWORD])(
+    'rejects an exhausted %s challenge without comparing the code again',
+    async (purpose) => {
+      mocks.client.query.mockResolvedValueOnce({
         rows: [
           {
             id: 'otp-id',
             email: 'user@example.com',
-            purpose: OTPPurpose.SIGN_IN,
+            purpose,
             otp_hash: 'hash',
             expires_at: new Date(Date.now() + 60_000),
             consumed_at: null,
             redirect_to: null,
-            attempts_count: 2,
+            attempts_count: 3,
           },
         ],
-      })
-      .mockResolvedValueOnce({ rowCount: 1 });
-    mocks.compare.mockResolvedValue(false);
+      });
 
-    const result = await service.attemptEmailOTPWithCode(
-      mocks.client as unknown as PoolClient,
-      'user@example.com',
-      OTPPurpose.SIGN_IN,
-      '000000'
-    );
+      const result = await service.attemptEmailOTPWithCode(
+        mocks.client as unknown as PoolClient,
+        'user@example.com',
+        purpose,
+        '000000'
+      );
 
-    expect(result.success).toBe(false);
-    expect(mocks.client.query.mock.calls[1][0]).toContain(
-      'WHEN attempts_count + 1 >= $2 THEN NOW()'
-    );
-    expect(mocks.client.query.mock.calls[1][1]).toEqual(['otp-id', 3]);
-  });
+      expect(result.success).toBe(false);
+      expect(mocks.compare).not.toHaveBeenCalled();
+      expect(mocks.client.query).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('consumes a valid code while holding the challenge row lock', async () => {
     mocks.client.query
@@ -93,7 +127,7 @@ describe('AuthOTPService numeric attempt limits', () => {
             expires_at: new Date(Date.now() + 60_000),
             consumed_at: null,
             redirect_to: null,
-            attempts_count: 0,
+            attempts_count: 2,
           },
         ],
       })
@@ -117,35 +151,6 @@ describe('AuthOTPService numeric attempt limits', () => {
     });
   });
 
-  it('does not apply the sign-in attempt limit to existing OTP purposes', async () => {
-    mocks.client.query.mockResolvedValueOnce({
-      rows: [
-        {
-          id: 'otp-id',
-          email: 'user@example.com',
-          purpose: OTPPurpose.RESET_PASSWORD,
-          otp_hash: 'hash',
-          expires_at: new Date(Date.now() + 60_000),
-          consumed_at: null,
-          redirect_to: null,
-          attempts_count: 3,
-        },
-      ],
-    });
-    mocks.compare.mockResolvedValue(false);
-
-    const result = await service.attemptEmailOTPWithCode(
-      mocks.client as unknown as PoolClient,
-      'user@example.com',
-      OTPPurpose.RESET_PASSWORD,
-      '000000'
-    );
-
-    expect(result.success).toBe(false);
-    expect(mocks.compare).toHaveBeenCalledWith('000000', 'hash');
-    expect(mocks.client.query).toHaveBeenCalledTimes(1);
-  });
-
   it('resets attempts and uses a five-minute expiry for sign-in challenges', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
@@ -163,4 +168,16 @@ describe('AuthOTPService numeric attempt limits', () => {
     expect(mocks.pool.query.mock.calls[0][0]).toContain('attempts_count = 0');
     vi.useRealTimers();
   });
+
+  it.each([OTPPurpose.VERIFY_EMAIL, OTPPurpose.RESET_PASSWORD])(
+    'resets attempts when issuing a fresh %s numeric challenge',
+    async (purpose) => {
+      mocks.hash.mockResolvedValue('hash');
+      mocks.pool.query.mockResolvedValue({ rows: [] });
+
+      await service.createEmailOTP('user@example.com', purpose, OTPType.NUMERIC_CODE);
+
+      expect(mocks.pool.query.mock.calls[0][0]).toContain('attempts_count = 0');
+    }
+  );
 });

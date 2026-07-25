@@ -207,19 +207,17 @@ export class AuthOTPService {
 
     const otpRecord = result.rows[0];
 
-    const shouldLimitAttempts = purpose === OTPPurpose.SIGN_IN;
-
     if (
       new Date() > new Date(otpRecord.expires_at) ||
       otpRecord.consumed_at !== null ||
-      (shouldLimitAttempts && otpRecord.attempts_count >= this.MAX_NUMERIC_CODE_ATTEMPTS)
+      otpRecord.attempts_count >= this.MAX_NUMERIC_CODE_ATTEMPTS
     ) {
       return { success: false, error: this.invalidCodeError() };
     }
 
     const isValid = await bcrypt.compare(code, otpRecord.otp_hash);
 
-    if (!isValid && shouldLimitAttempts) {
+    if (!isValid) {
       await client.query(
         `UPDATE auth.email_otps
          SET
