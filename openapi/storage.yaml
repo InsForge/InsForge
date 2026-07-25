@@ -1141,7 +1141,8 @@ paths:
       from any SigV4 client (AWS SDKs, `aws` CLI, `rclone`, Terraform, etc.)
       against this endpoint. Only path-style URLs are supported; SDKs must
       be configured with `forcePathStyle: true` and the signing region
-      `us-east-2` (or the value of `AWS_REGION` on this backend).
+      `us-east-2` (or the value of `S3_REGION`, fallback `AWS_REGION`, on
+      this backend — see `GET /api/storage/s3/config`).
 
       Supported operations: ListBuckets, CreateBucket, DeleteBucket,
       HeadBucket, ListObjectsV2, PutObject (streaming + UNSIGNED +
@@ -1247,7 +1248,8 @@ components:
       description: |
         AWS SigV4 authentication using S3 access keys minted by
         `POST /api/storage/s3/access-keys`. Region must match the server's
-        `AWS_REGION` (default `us-east-2`); service scope must be `s3`.
+        `S3_REGION` (fallback `AWS_REGION`, default `us-east-2`); service
+        scope must be `s3`.
 
   schemas:
     StoredFile:

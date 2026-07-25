@@ -533,8 +533,14 @@ const streamS3ObjectDownload = async (
   objectKey: string,
   metadataRow: { size: number; mime_type?: string | null }
 ): Promise<void> => {
-  const provider = StorageService.getInstance().getProvider();
+  const storageService = StorageService.getInstance();
+  const provider = storageService.getProvider();
   const rangeHeader = typeof req.headers.range === 'string' ? req.headers.range : undefined;
+
+  // Resolve bucket visibility BEFORE opening the upstream stream: this is a
+  // DB query, and a failure here after getObjectStream would leak the open
+  // S3 socket (no close handler is attached until after the headers below).
+  const isPublic = await storageService.isBucketPublic(bucketName);
 
   let result;
   try {
@@ -562,7 +568,7 @@ const streamS3ObjectDownload = async (
   // Proxy mode serves the actual private-bucket bytes through this route;
   // intermediaries (shared proxies, CDNs in front of the backend) must never
   // cache them. Public buckets keep default caching semantics.
-  if (!(await StorageService.getInstance().isBucketPublic(bucketName))) {
+  if (!isPublic) {
     res.setHeader('Cache-Control', 'private, no-store');
   }
   if (result.etag) {
