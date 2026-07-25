@@ -1,10 +1,8 @@
 import { Component, lazy, Suspense, type ErrorInfo, type ReactNode } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { LoadingState } from '@insforge/ui';
-// Direct import (not the `#components` barrel): AppRoutes is eagerly loaded, so
-// pulling from the barrel would drag the whole barrel (CodeEditor, datagrid,
-// radix, ...) into the initial entry chunk and defeat the route splitting.
-// This is chunk-graph correctness, not a bundle-size micro-optimization.
+// Direct import (not the `#components` barrel) to keep this eager router's deps explicit.
 import { ErrorState } from '#components/ErrorState';
 import { RequireAuth } from './RequireAuth';
 import AppLayout from '#layout/AppLayout';
@@ -12,9 +10,8 @@ import { getFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 
-// Route layouts and pages are lazy-loaded so heavy feature-only libraries
-// (CodeMirror, Recharts, XYFlow, react-data-grid, ...) are split into
-// on-demand chunks instead of the initial dashboard bundle.
+// Lazy-loaded so heavy feature libs (CodeMirror, Recharts, XYFlow, data-grid)
+// split into on-demand chunks instead of the initial bundle.
 const AILayout = lazy(() => import('#features/ai/components/AILayout'));
 const AIOverviewPage = lazy(() => import('#features/ai/pages/AIOverviewPage'));
 const AIUsagePage = lazy(() => import('#features/ai/pages/AIUsagePage'));
@@ -116,15 +113,35 @@ interface ChunkErrorBoundaryState {
   error: Error | null;
 }
 
-/**
- * Catches failures from lazy `import()` calls (most commonly a stale chunk after
- * a new deployment: the content-hashed filename no longer exists and the fetch
- * 404s). Without this, a rejected dynamic import propagates up and unmounts the
- * whole app into a blank screen. On a caught error we render a recoverable
- * message with a reload action, and we clear the error when the route changes so
- * the still-mounted navigation (rendered outside this boundary) can recover the
- * content area without a full reload.
- */
+// Matches failed dynamic-import signatures (a stale/missing hashed chunk after a
+// deploy) so the "reload for latest assets" copy shows only for those, not plain
+// render bugs.
+function isChunkLoadError(error: Error): boolean {
+  return /dynamically imported module|failed to fetch|loading chunk|importing a module script failed/i.test(
+    error.message
+  );
+}
+
+// A function component (not inline in the class boundary) so it can use hooks.
+function RouteErrorFallback({ error }: { error: Error }) {
+  const { t } = useTranslation('chrome');
+  const isChunkError = isChunkLoadError(error);
+
+  return (
+    <div className="p-6">
+      <ErrorState
+        title={isChunkError ? t('routeError.title') : undefined}
+        error={isChunkError ? t('routeError.staleAssets') : t('routeError.generic')}
+        onRetry={() => window.location.reload()}
+      />
+    </div>
+  );
+}
+
+// Without this, a rejected lazy import (usually a stale hashed chunk after a
+// deploy) unmounts the whole app into a blank screen. Clears the error on
+// navigation so the still-mounted nav (outside this boundary) recovers the
+// content area without a full reload.
 class ChunkErrorBoundary extends Component<ChunkErrorBoundaryProps, ChunkErrorBoundaryState> {
   state: ChunkErrorBoundaryState = { error: null };
 
@@ -133,7 +150,7 @@ class ChunkErrorBoundary extends Component<ChunkErrorBoundaryProps, ChunkErrorBo
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Dashboard route chunk failed to load', error, errorInfo);
+    console.error('Dashboard route failed to render', error, errorInfo);
   }
 
   componentDidUpdate(prevProps: ChunkErrorBoundaryProps) {
@@ -144,15 +161,7 @@ class ChunkErrorBoundary extends Component<ChunkErrorBoundaryProps, ChunkErrorBo
 
   render() {
     if (this.state.error) {
-      return (
-        <div className="p-6">
-          <ErrorState
-            title="Unable to load this page"
-            error="The dashboard could not load the latest page assets. Reload the app to try again."
-            onRetry={() => window.location.reload()}
-          />
-        </div>
-      );
+      return <RouteErrorFallback error={this.state.error} />;
     }
 
     return this.props.children;
