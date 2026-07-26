@@ -57,9 +57,15 @@ describe('StorageService URL versioning', () => {
     );
   });
 
-  it('url-encodes the object key', () => {
+  it('url-encodes the object key per segment, keeping `/` separators literal', () => {
     expect(buildObjectUrl('b', 'folder/sub key.png', 'v1')).toBe(
-      'https://example.test/api/storage/buckets/b/objects/folder%2Fsub%20key.png?v=v1'
+      'https://example.test/api/storage/buckets/b/objects/folder/sub%20key.png?v=v1'
+    );
+  });
+
+  it('keeps nested content-addressed keys directly fetchable', () => {
+    expect(buildObjectUrl('audio', 'c7/01/c701abc.mp3', 'etag1')).toBe(
+      'https://example.test/api/storage/buckets/audio/objects/c7/01/c701abc.mp3?v=etag1'
     );
   });
 });

@@ -116,7 +116,11 @@ export class StorageService {
    * this to take effect (CloudFront default is to ignore query strings).
    */
   private buildObjectUrl(bucket: string, key: string, version?: string | Date | null): string {
-    const base = `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`;
+    // Encode per path segment so `/` separators in nested keys stay literal —
+    // a whole-key encode turns them into `%2F`, which the storage route does
+    // not serve (it 401s instead of redirecting to the signed CDN URL).
+    const encodedKey = key.split('/').map(encodeURIComponent).join('/');
+    const base = `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodedKey}`;
     const stamp = this.toVersionStamp(version);
     return stamp ? `${base}?v=${encodeURIComponent(stamp)}` : base;
   }
