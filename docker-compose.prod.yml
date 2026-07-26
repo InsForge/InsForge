@@ -13,11 +13,11 @@ services:
       - ./deploy/docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
       - ./deploy/docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     networks:
       - insforge-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -42,7 +42,7 @@ services:
       PGRST_DB_POOL: ${PGRST_DB_POOL:-50}
       PGRST_JWT_SECRET: ${JWT_SECRET:-dev-secret-please-change-in-production}
     ports:
-      - "${POSTGREST_PORT:-5430}:3000"
+      - "127.0.0.1:${POSTGREST_PORT:-5430}:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -168,7 +168,7 @@ services:
       - postgres
       - postgrest
     ports:
-      - "${DENO_PORT:-7133}:7133"
+      - "127.0.0.1:${DENO_PORT:-7133}:7133"
     environment:
       - PORT=7133
       - DENO_ENV=${DENO_ENV:-production}
