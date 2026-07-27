@@ -48,6 +48,7 @@ vi.mock('@/utils/logger.js', () => ({
   default: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+import logger from '../../src/utils/logger';
 import { PostgrestProxyService } from '../../src/services/database/postgrest-proxy.service';
 
 function connectionReset(reusedSocket: boolean): AxiosError {
@@ -60,6 +61,7 @@ const okResponse = { data: { ok: true }, status: 200, headers: {} };
 describe('PostgREST proxy stale keep-alive socket retry', () => {
   beforeEach(() => {
     requestMock.mockReset();
+    vi.mocked(logger.warn).mockClear();
     vi.useFakeTimers();
   });
 
@@ -78,6 +80,31 @@ describe('PostgREST proxy stale keep-alive socket retry', () => {
     expect(requestMock).toHaveBeenCalledTimes(2);
     expect(result.status).toBe(200);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('logs a distinct, alertable message when a non-idempotent request is replayed', async () => {
+    requestMock.mockRejectedValueOnce(connectionReset(true)).mockResolvedValueOnce(okResponse);
+
+    await PostgrestProxyService.getInstance().forward({
+      method: 'POST',
+      path: '/rpc/claim_job',
+    });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('stale-socket replay of non-idempotent request'),
+      expect.objectContaining({ method: 'POST', staleSocketRetry: true })
+    );
+  });
+
+  it('keeps the generic retry message for idempotent stale replays', async () => {
+    requestMock.mockRejectedValueOnce(connectionReset(true)).mockResolvedValueOnce(okResponse);
+
+    await PostgrestProxyService.getInstance().forward({ method: 'GET', path: '/items' });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('PostgREST request failed, retrying'),
+      expect.objectContaining({ method: 'GET', staleSocketRetry: true })
+    );
   });
 
   it('does not replay a POST a second time on consecutive reused-socket resets', async () => {

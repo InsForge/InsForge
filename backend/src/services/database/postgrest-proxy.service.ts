@@ -18,6 +18,10 @@ const postgrestUrl = appConfig.database.postgrestBaseUrl;
 // always closes an idle connection before the server can, so requests are
 // never written to a socket the server has already torn down (the stale
 // keep-alive reuse race behind "socket hang up" ECONNRESETs).
+//
+// keepAliveMsecs (TCP-level SO_KEEPALIVE probe delay, formerly 5000) is
+// deliberately left at agentkeepalive's 1000ms default — it is orthogonal to
+// the app-level freeSocketTimeout that governs socket reaping.
 const maxSockets = appConfig.database.postgrestMaxSockets;
 const maxFreeSockets = Math.min(appConfig.database.postgrestMaxFreeSockets, maxSockets);
 const freeSocketTimeout = appConfig.database.postgrestFreeSocketTimeoutMs;
@@ -152,12 +156,20 @@ export class PostgrestProxyService {
   }
 
   /**
-   * An ECONNRESET on a reused keep-alive socket means the server closed the
-   * connection while it sat idle in the pool and the request died before it
-   * was processed, so a replay cannot duplicate work — safe for any method,
-   * including writes. Node exposes `request.reusedSocket` for exactly this
-   * case and endorses one immediate retry
-   * (https://nodejs.org/api/http.html#requestreusedsocket).
+   * An ECONNRESET on a reused keep-alive socket almost always means the
+   * server closed the connection while it sat idle in the pool and the
+   * request died before it was processed — Node exposes
+   * `request.reusedSocket` for exactly this case and endorses one immediate
+   * retry (https://nodejs.org/api/http.html#requestreusedsocket), which is
+   * why the replay applies to any method, including writes.
+   *
+   * This is a strong heuristic, not a proof: a reused socket can also reset
+   * after the server committed a write but before the response arrived, and
+   * a replay would then duplicate it. That window is kept small by the
+   * agents' freeSocketTimeout (idle sockets are reaped client-side before
+   * the server closes them) and by capping the replay at one attempt, and
+   * non-idempotent replays are logged with a distinct message so duplicates
+   * can be traced and alerted on.
    */
   static isStaleSocketReset(error: unknown): boolean {
     if (!axios.isAxiosError(error) || error.response) {
@@ -300,13 +312,23 @@ export class PostgrestProxyService {
           throw error;
         }
 
-        logger.warn(`PostgREST request failed, retrying (attempt ${attempt}/${maxRetries})`, {
-          url: targetUrl,
-          method: request.method,
-          errorCode: (error as NodeJS.ErrnoException).code,
-          message: (error as Error).message,
-          staleSocketRetry,
-        });
+        // Non-idempotent stale-socket replays get a distinct message so a
+        // CloudWatch metric filter can alert on them if duplicate writes are
+        // ever suspected (see isStaleSocketReset on why they are replayed).
+        const nonIdempotentReplay =
+          staleSocketRetry && !IDEMPOTENT_METHODS.has(request.method.toUpperCase());
+        logger.warn(
+          nonIdempotentReplay
+            ? `PostgREST stale-socket replay of non-idempotent request (attempt ${attempt}/${maxRetries})`
+            : `PostgREST request failed, retrying (attempt ${attempt}/${maxRetries})`,
+          {
+            url: targetUrl,
+            method: request.method,
+            errorCode: (error as NodeJS.ErrnoException).code,
+            message: (error as Error).message,
+            staleSocketRetry,
+          }
+        );
 
         if (!staleSocketRetry) {
           const backoffDelay = Math.min(200 * Math.pow(2.5, attempt - 1), 1000);
