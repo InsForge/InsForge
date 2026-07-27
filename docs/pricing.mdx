@@ -60,18 +60,18 @@ below). Free projects are paused after 1 week of inactivity.
     ```bash
     npx @insforge/cli usage
     # a specific organization:
-    npx @insforge/cli usage --org-id <org-id>
+    npx @insforge/cli usage --org-id your-org-id
     # machine-readable:
     npx @insforge/cli usage --json
     ```
 
     It reports your plan and the totals that count against the limits above
-    (database, file storage, bandwidth/egress, AI credits, edge function calls,
-    and email requests), followed by a per-project breakdown of database,
+    (AI credits, monthly active users, database, bandwidth/egress, file storage,
+    and edge function calls), followed by a per-project breakdown of database,
     storage, and egress.
 
-    Consumption counters (bandwidth/egress, AI credits, edge function calls, and
-    emails) are measured per billing period and start again from zero at the
+    Consumption counters (AI credits, monthly active users, bandwidth/egress,
+    and edge function calls) are measured per billing period and start again from zero at the
     start of each new period. On Pro the period follows your subscription's
     monthly cycle; on Free the allowances are monthly. Size metrics like
     database and file storage aren't per-period counters — they reflect what

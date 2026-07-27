@@ -54,18 +54,18 @@ En Pro, el uso más allá de los montos incluidos es de pago según sea necesari
     ```bash
     npx @insforge/cli usage
     # una organización específica:
-    npx @insforge/cli usage --org-id <org-id>
+    npx @insforge/cli usage --org-id your-org-id
     # formato legible por máquina:
     npx @insforge/cli usage --json
     ```
 
     Informa de su plan y de los totales que cuentan para los límites anteriores
-    (base de datos, almacenamiento de archivos, ancho de banda/salida, créditos
-    de IA, llamadas de función de borde y solicitudes de correo), seguido de un
-    desglose por proyecto de base de datos, almacenamiento y salida.
+    (créditos de IA, usuarios activos mensuales, base de datos, ancho de
+    banda/salida, almacenamiento de archivos y llamadas de función de borde),
+    seguido de un desglose por proyecto de base de datos, almacenamiento y salida.
 
-    Los contadores de consumo (ancho de banda/salida, créditos de IA, llamadas
-    de función de borde y correos) se miden por período de facturación y vuelven
+    Los contadores de consumo (créditos de IA, usuarios activos mensuales, ancho
+    de banda/salida y llamadas de función de borde) se miden por período de facturación y vuelven
     a empezar desde cero al inicio de cada nuevo período. En Pro, el período
     sigue el ciclo mensual de su suscripción; en Gratis, las asignaciones son
     mensuales. Las métricas de tamaño como la base de datos y el almacenamiento
