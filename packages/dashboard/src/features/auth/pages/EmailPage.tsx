@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { useEmailTemplates } from '#features/auth/hooks/useEmailTemplates';
 import { EmailTemplateCard } from '#features/auth/components/EmailTemplateCard';
 import { Info } from 'lucide-react';
 import { Link } from 'react-router-dom';
