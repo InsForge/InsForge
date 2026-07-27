@@ -49,6 +49,15 @@ Wire a function to fire on `INSERT`, `UPDATE`, or `DELETE` against a table. The 
 
 Set env vars and secrets per function. The dashboard, CLI, and MCP all read and write the same store; secrets never round-trip through your repo.
 
+The difference is how each value is stored and protected. **Secrets** are encrypted at rest: `secrets list` shows only metadata with the values hidden, and `secrets get` returns the decrypted value on demand. A secret can also carry an expiry date (`--expires <ISO-8601>`) and be marked protected from deletion (`--reserved`). **Environment variables** are plain configuration values with no encryption or expiry. Put credentials like API keys and passwords in secrets, and non-sensitive config in environment variables. Either one is available to your function code the same way.
+
+```bash
+# a protected secret with an expiry
+npx @insforge/cli secrets add STRIPE_SECRET_KEY sk_live_xxx --reserved --expires 2027-01-01T00:00:00Z
+# read the decrypted value back
+npx @insforge/cli secrets get STRIPE_SECRET_KEY
+```
+
 ### Logs
 
 Structured logs are captured per invocation, queryable by status, duration, and function name. The InsForge MCP `get-function-logs` tool lets your agent diagnose failures without leaving the editor.
