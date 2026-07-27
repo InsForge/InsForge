@@ -47,6 +47,22 @@ InsForge 对原型和副项目有免费套餐，对生产有付费计划。此�
   <Accordion title="用完 $10 计算积分后会发生什么？">
     不会停止任何操作 — 每月 $10 的 InsForge 计算积分（在专业版上）涵盖前 $10 的计算，超过该金额计算继续按使用量付费。
   </Accordion>
+
+  <Accordion title="如何查看当前用量？限额何时重置？">
+    通过 CLI 打印您的组织在当前计费周期内的用量：
+
+    ```bash
+    npx @insforge/cli usage
+    # 指定某个组织：
+    npx @insforge/cli usage --org-id <org-id>
+    # 机器可读格式：
+    npx @insforge/cli usage --json
+    ```
+
+    它会显示您的套餐，以及计入上述限额的各项总量（数据库、文件存储、带宽/出网流量、AI 积分、边缘函数调用、邮件请求），随后按项目细分数据库、存储和出网流量。
+
+    消耗类计数（带宽/出网流量、AI 积分、边缘函数调用、邮件）按计费周期统计，并在每个新周期开始时从零重新计算。在专业版上，该周期遵循您订阅的每月计费周期；在免费版上，限额按月计算。数据库和文件存储等容量类指标不是按周期计数的 — 它们反映您当前存储的内容，删除数据后会随之下降。
+  </Accordion>
 </AccordionGroup>
 
 <Card title="查看完整定价" icon="tag" href="https://insforge.dev/pricing">

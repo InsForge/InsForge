@@ -47,6 +47,31 @@ En Pro, el uso más allá de los montos incluidos es de pago según sea necesari
   <Accordion title="¿Qué sucede después de agotar el crédito de computación de $10?">
     Nada se detiene — el crédito mensual de $10 de InsForge Compute (en Pro) cubre los primeros $10 de computación, y más allá de eso, la computación continúa sobre una base de pago por uso.
   </Accordion>
+
+  <Accordion title="¿Cómo compruebo mi uso actual y cuándo se restablecen los límites?">
+    Imprima el uso de su organización para el período de facturación actual desde la CLI:
+
+    ```bash
+    npx @insforge/cli usage
+    # una organización específica:
+    npx @insforge/cli usage --org-id <org-id>
+    # formato legible por máquina:
+    npx @insforge/cli usage --json
+    ```
+
+    Informa de su plan y de los totales que cuentan para los límites anteriores
+    (base de datos, almacenamiento de archivos, ancho de banda/salida, créditos
+    de IA, llamadas de función de borde y solicitudes de correo), seguido de un
+    desglose por proyecto de base de datos, almacenamiento y salida.
+
+    Los contadores de consumo (ancho de banda/salida, créditos de IA, llamadas
+    de función de borde y correos) se miden por período de facturación y vuelven
+    a empezar desde cero al inicio de cada nuevo período. En Pro, el período
+    sigue el ciclo mensual de su suscripción; en Gratis, las asignaciones son
+    mensuales. Las métricas de tamaño como la base de datos y el almacenamiento
+    de archivos no son contadores por período — reflejan lo que está almacenando
+    actualmente, por lo que bajan cuando elimina datos.
+  </Accordion>
 </AccordionGroup>
 
 <Card title="Ver precios completos" icon="tag" href="https://insforge.dev/pricing">
