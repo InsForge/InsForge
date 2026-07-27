@@ -1,6 +1,5 @@
 import axios, { AxiosResponse } from 'axios';
-import http from 'http';
-import https from 'https';
+import { HttpAgent, HttpsAgent } from 'agentkeepalive';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
@@ -12,23 +11,31 @@ const postgrestUrl = appConfig.database.postgrestBaseUrl;
 // Connection pooling for PostgREST. maxSockets caps concurrency toward
 // PostgREST; requests beyond it queue inside the agent, and queue time counts
 // against the axios timeout below.
+//
+// agentkeepalive (rather than the built-in http.Agent) because of
+// freeSocketTimeout: idle sockets are proactively closed after it elapses.
+// Keeping it below PostgREST's server-side idle timeout means this process
+// always closes an idle connection before the server can, so requests are
+// never written to a socket the server has already torn down (the stale
+// keep-alive reuse race behind "socket hang up" ECONNRESETs).
 const maxSockets = appConfig.database.postgrestMaxSockets;
 const maxFreeSockets = Math.min(appConfig.database.postgrestMaxFreeSockets, maxSockets);
+const freeSocketTimeout = appConfig.database.postgrestFreeSocketTimeoutMs;
 
-const httpAgent = new http.Agent({
+const httpAgent = new HttpAgent({
   keepAlive: true,
-  keepAliveMsecs: 5000,
   maxSockets,
   maxFreeSockets,
   timeout: 10000,
+  freeSocketTimeout,
 });
 
-const httpsAgent = new https.Agent({
+const httpsAgent = new HttpsAgent({
   keepAlive: true,
-  keepAliveMsecs: 5000,
   maxSockets,
   maxFreeSockets,
   timeout: 10000,
+  freeSocketTimeout,
 });
 
 const postgrestAxios = axios.create({
@@ -36,10 +43,6 @@ const postgrestAxios = axios.create({
   httpsAgent,
   timeout: 10000,
   maxRedirects: 0,
-  headers: {
-    Connection: 'keep-alive',
-    'Keep-Alive': 'timeout=5, max=10',
-  },
 });
 
 export interface ProxyRequest {
@@ -90,7 +93,9 @@ const CONNECTION_NOT_ESTABLISHED_CODES = new Set([
  * Network errors where the request may or may not have reached PostgREST: an
  * ECONNRESET is usually a keep-alive socket closed while idle, but it can
  * also arrive mid-response after a write already committed, and the two are
- * indistinguishable here. A missing code is treated the same way.
+ * generally indistinguishable here — except when Node flags the socket as
+ * reused, which `isStaleSocketReset` handles separately. A missing code is
+ * treated the same way.
  */
 const AMBIGUOUS_NETWORK_CODES = new Set(['ECONNRESET', 'EPIPE']);
 
@@ -126,7 +131,8 @@ export class PostgrestProxyService {
    * connection-never-established failures are retryable for every method,
    * ambiguous network errors (ECONNRESET, EPIPE, missing code) only for
    * idempotent methods, and anything else (cancellation, bad config) never —
-   * those fail identically on replay.
+   * those fail identically on replay. Resets on reused keep-alive sockets
+   * are additionally retryable for any method via `isStaleSocketReset`.
    */
   static isRetryableError(error: unknown, method: string): boolean {
     if (!axios.isAxiosError(error) || error.response) {
@@ -143,6 +149,22 @@ export class PostgrestProxyService {
       return IDEMPOTENT_METHODS.has(method.toUpperCase());
     }
     return false;
+  }
+
+  /**
+   * An ECONNRESET on a reused keep-alive socket means the server closed the
+   * connection while it sat idle in the pool and the request died before it
+   * was processed, so a replay cannot duplicate work — safe for any method,
+   * including writes. Node exposes `request.reusedSocket` for exactly this
+   * case and endorses one immediate retry
+   * (https://nodejs.org/api/http.html#requestreusedsocket).
+   */
+  static isStaleSocketReset(error: unknown): boolean {
+    if (!axios.isAxiosError(error) || error.response) {
+      return false;
+    }
+    const request = error.request as { reusedSocket?: boolean } | undefined;
+    return error.code === 'ECONNRESET' && request?.reusedSocket === true;
   }
 
   /**
@@ -255,6 +277,10 @@ export class PostgrestProxyService {
     let response: AxiosResponse | undefined;
     let lastError: unknown;
     const maxRetries = 3;
+    // A reset on a reused keep-alive socket gets exactly one immediate
+    // replay regardless of method; a second reset falls through to the
+    // method-based policy so writes cannot ping-pong on repeated resets.
+    let staleSocketRetryUsed = false;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -262,20 +288,29 @@ export class PostgrestProxyService {
         break;
       } catch (error) {
         lastError = error;
-        const shouldRetry =
-          attempt < maxRetries && PostgrestProxyService.isRetryableError(error, request.method);
+        if (attempt >= maxRetries) {
+          throw error;
+        }
 
-        if (shouldRetry) {
-          logger.warn(`PostgREST request failed, retrying (attempt ${attempt}/${maxRetries})`, {
-            url: targetUrl,
-            method: request.method,
-            errorCode: (error as NodeJS.ErrnoException).code,
-            message: (error as Error).message,
-          });
+        const staleSocketRetry =
+          !staleSocketRetryUsed && PostgrestProxyService.isStaleSocketReset(error);
+        if (staleSocketRetry) {
+          staleSocketRetryUsed = true;
+        } else if (!PostgrestProxyService.isRetryableError(error, request.method)) {
+          throw error;
+        }
+
+        logger.warn(`PostgREST request failed, retrying (attempt ${attempt}/${maxRetries})`, {
+          url: targetUrl,
+          method: request.method,
+          errorCode: (error as NodeJS.ErrnoException).code,
+          message: (error as Error).message,
+          staleSocketRetry,
+        });
+
+        if (!staleSocketRetry) {
           const backoffDelay = Math.min(200 * Math.pow(2.5, attempt - 1), 1000);
           await new Promise((resolve) => setTimeout(resolve, backoffDelay));
-        } else {
-          throw error;
         }
       }
     }

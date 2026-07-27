@@ -66,6 +66,7 @@ export interface AppConfig {
     postgrestBaseUrl: string;
     postgrestMaxSockets: number;
     postgrestMaxFreeSockets: number;
+    postgrestFreeSocketTimeoutMs: number;
   };
   auth: {
     rootAdminUsername: string;
@@ -199,6 +200,12 @@ export function loadConfig(): AppConfig {
       // the queue from PostgREST back into this process.
       postgrestMaxSockets: parseEnvInt(process.env.POSTGREST_MAX_SOCKETS, 50),
       postgrestMaxFreeSockets: parseEnvInt(process.env.POSTGREST_MAX_FREE_SOCKETS, 10),
+      // Must stay below PostgREST's own idle connection timeout so free
+      // sockets are dropped before the server can close them first.
+      postgrestFreeSocketTimeoutMs: parseEnvInt(
+        process.env.POSTGREST_FREE_SOCKET_TIMEOUT_MS,
+        4000
+      ),
     },
     auth: {
       rootAdminUsername: process.env.ROOT_ADMIN_USERNAME || process.env.ADMIN_EMAIL || '',
