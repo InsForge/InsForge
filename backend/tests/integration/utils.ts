@@ -52,6 +52,7 @@ export const getConnections = (
       await ctx.pg.query(`
         CREATE EXTENSION IF NOT EXISTS pgcrypto;
         CREATE EXTENSION IF NOT EXISTS http;
+        CREATE EXTENSION IF NOT EXISTS vector;
 
         CREATE SCHEMA IF NOT EXISTS cron;
         CREATE TABLE IF NOT EXISTS cron.job (
@@ -75,14 +76,20 @@ export const getConnections = (
           RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
       `);
     }),
-    // 3. Run the full migration chain (000–048), stripping CREATE EXTENSION
+    // 3. Run the full migration chain (000–048+), stripping CREATE EXTENSION
     //    statements since extensions are already installed or stubbed above.
     seed.fn(async (ctx) => {
       for (const file of migrationFiles) {
         const sql = fs
           .readFileSync(file, 'utf8')
           .replace(/^CREATE EXTENSION IF NOT EXISTS \S+;$/gm, '');
-        await ctx.pg.query(sql);
+        try {
+          await ctx.pg.query(sql);
+        } catch (err) {
+          throw new Error(
+            `Failed to apply migration ${path.basename(file)}: ${(err as Error).message}`
+          );
+        }
       }
     }),
   ]);

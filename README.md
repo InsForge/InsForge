@@ -180,6 +180,24 @@ docker compose -f docker-compose.prod.yml --env-file .env.project1 -p project1 l
 docker compose -f docker-compose.prod.yml --env-file .env.project1 -p project1 down     # stop
 ```
 
+#### 5. Storage Backends (Optional)
+
+InsForge stores files on the local filesystem by default. Backing storage with an S3-compatible store also enables the S3-compatible gateway at `/storage/v1/s3` (use `aws` CLI, rclone, or any AWS SDK against your InsForge Storage):
+
+```bash
+# Bundled MinIO — one command, store stays internal to the Docker network
+docker compose -f docker-compose.prod.yml -f docker-compose.minio.yml up -d
+
+# Bundled RustFS (Apache-2.0 licensed alternative)
+docker compose -f docker-compose.prod.yml -f docker-compose.rustfs.yml up -d
+```
+
+The overlays ship with default store credentials — set `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` (or `RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY`) in `.env` before production use.
+
+Or bring your own S3-compatible store (AWS S3, MinIO, RustFS, Wasabi, R2, Tencent COS, Aliyun OSS ...) by setting `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` — plus `S3_ENDPOINT_URL` for non-AWS providers — in `.env`. If the endpoint is not reachable by browsers (private network), also set `S3_USE_PRESIGNED_URLS=false` to enable proxy mode.
+
+See the [self-hosted storage guide](https://docs.insforge.dev/deployment/self-host-storage) for provider notes, presigned vs. proxy mode, and upgrade tips.
+
 ### One-click Deployment
 
 In addition to running InsForge locally, you can also launch InsForge using a pre-configured setup. This allows you to get up and running quickly with InsForge without installing Docker on your local machine.

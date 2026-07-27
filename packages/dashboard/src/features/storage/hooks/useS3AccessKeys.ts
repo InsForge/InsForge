@@ -9,13 +9,18 @@ import { useTranslation } from 'react-i18next';
 import { s3AccessKeyService } from '#features/storage/services/s3-access-key.service';
 import { useToast } from '@insforge/ui';
 
-/** React Query hook for the read-only S3 gateway config (endpoint + region). */
-export function useS3GatewayConfig() {
+/**
+ * React Query hook for the read-only S3 gateway config (endpoint + region +
+ * availability). Pass `enabled: false` to defer the fetch until the caller
+ * actually needs it (e.g. a dialog that isn't open yet).
+ */
+export function useS3GatewayConfig(options?: { enabled?: boolean }) {
   return useQuery<S3GatewayConfigSchema>({
     queryKey: ['storage', 's3-gateway-config'],
     queryFn: () => s3AccessKeyService.getGatewayConfig(),
     // Endpoint/region come from server env; they don't change at runtime.
     staleTime: Infinity,
+    enabled: options?.enabled ?? true,
   });
 }
 

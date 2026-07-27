@@ -9,20 +9,25 @@ import { ERROR_CODES } from '@insforge/shared-schemas';
 
 const postgrestUrl = appConfig.database.postgrestBaseUrl;
 
-// Connection pooling for PostgREST
+// Connection pooling for PostgREST. maxSockets caps concurrency toward
+// PostgREST; requests beyond it queue inside the agent, and queue time counts
+// against the axios timeout below.
+const maxSockets = appConfig.database.postgrestMaxSockets;
+const maxFreeSockets = Math.min(appConfig.database.postgrestMaxFreeSockets, maxSockets);
+
 const httpAgent = new http.Agent({
   keepAlive: true,
   keepAliveMsecs: 5000,
-  maxSockets: 20,
-  maxFreeSockets: 5,
+  maxSockets,
+  maxFreeSockets,
   timeout: 10000,
 });
 
 const httpsAgent = new https.Agent({
   keepAlive: true,
   keepAliveMsecs: 5000,
-  maxSockets: 20,
-  maxFreeSockets: 5,
+  maxSockets,
+  maxFreeSockets,
   timeout: 10000,
 });
 
@@ -61,6 +66,41 @@ const EXCLUDED_HEADERS = new Set([
   'content-encoding',
 ]);
 
+/**
+ * Timeout-class errors are never retried: by the time the 10s budget is spent
+ * the request may already be executing in PostgREST (retrying a write risks a
+ * duplicate), and re-running it amplifies load exactly when the database is
+ * saturated.
+ */
+const TIMEOUT_ERROR_CODES = new Set(['ECONNABORTED', 'ETIMEDOUT']);
+
+/**
+ * Errors that prove the connection was never established, so the request
+ * cannot have reached PostgREST and is safe to retry for any method.
+ */
+const CONNECTION_NOT_ESTABLISHED_CODES = new Set([
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+]);
+
+/**
+ * Network errors where the request may or may not have reached PostgREST: an
+ * ECONNRESET is usually a keep-alive socket closed while idle, but it can
+ * also arrive mid-response after a write already committed, and the two are
+ * indistinguishable here. A missing code is treated the same way.
+ */
+const AMBIGUOUS_NETWORK_CODES = new Set(['ECONNRESET', 'EPIPE']);
+
+/**
+ * Methods safe to replay even when the request may have reached PostgREST.
+ * Everything else (POST/PATCH/PUT/DELETE) only retries errors from
+ * CONNECTION_NOT_ESTABLISHED_CODES.
+ */
+const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
 export class PostgrestProxyService {
   private static instance: PostgrestProxyService;
   private tokenManager = TokenManager.getInstance();
@@ -77,6 +117,32 @@ export class PostgrestProxyService {
       PostgrestProxyService.instance = new PostgrestProxyService();
     }
     return PostgrestProxyService.instance;
+  }
+
+  /**
+   * A request may be retried only when replaying it cannot duplicate work in
+   * PostgREST. Any HTTP response — including 5xx — and any timeout is
+   * surfaced to the caller instead of retried. Among the remaining errors,
+   * connection-never-established failures are retryable for every method,
+   * ambiguous network errors (ECONNRESET, EPIPE, missing code) only for
+   * idempotent methods, and anything else (cancellation, bad config) never —
+   * those fail identically on replay.
+   */
+  static isRetryableError(error: unknown, method: string): boolean {
+    if (!axios.isAxiosError(error) || error.response) {
+      return false;
+    }
+    const code = error.code ?? '';
+    if (TIMEOUT_ERROR_CODES.has(code)) {
+      return false;
+    }
+    if (CONNECTION_NOT_ESTABLISHED_CODES.has(code)) {
+      return true;
+    }
+    if (code === '' || AMBIGUOUS_NETWORK_CODES.has(code)) {
+      return IDEMPOTENT_METHODS.has(method.toUpperCase());
+    }
+    return false;
   }
 
   /**
@@ -196,11 +262,13 @@ export class PostgrestProxyService {
         break;
       } catch (error) {
         lastError = error;
-        const shouldRetry = axios.isAxiosError(error) && !error.response && attempt < maxRetries;
+        const shouldRetry =
+          attempt < maxRetries && PostgrestProxyService.isRetryableError(error, request.method);
 
         if (shouldRetry) {
           logger.warn(`PostgREST request failed, retrying (attempt ${attempt}/${maxRetries})`, {
             url: targetUrl,
+            method: request.method,
             errorCode: (error as NodeJS.ErrnoException).code,
             message: (error as Error).message,
           });
