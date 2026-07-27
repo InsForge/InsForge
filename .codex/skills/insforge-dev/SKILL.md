@@ -49,10 +49,6 @@ Use the cross-repo release workflow skill when preparing an OSS PR:
    - This repo contains the platform, the publishable dashboard package, and a local shell for self-hosting mode.
    - Keep guidance focused on maintaining InsForge itself.
 
-5. Do not create Linear issues unless the user explicitly asks for one.
-   - Do not automatically turn review feedback, follow-up ideas, or deferred work into Linear issues.
-   - Keep in-scope fixes in the current PR; otherwise report the remaining work to the user without creating external tracking items.
-
 ## Finish Rules
 
 - Run the smallest validation that gives confidence for the change.
