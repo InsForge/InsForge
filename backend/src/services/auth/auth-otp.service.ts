@@ -13,6 +13,7 @@ import { generateNumericCode, generateSecureToken } from '@/utils/utils.js';
 export enum OTPPurpose {
   VERIFY_EMAIL = 'VERIFY_EMAIL',
   RESET_PASSWORD = 'RESET_PASSWORD',
+  SIGN_IN = 'SIGN_IN',
 }
 
 /**
@@ -42,13 +43,23 @@ export interface VerifyOTPResult {
   redirectTo?: string | null;
 }
 
+export type VerifyOTPAttemptResult =
+  | {
+      success: true;
+      value: VerifyOTPResult;
+    }
+  | {
+      success: false;
+      error: AppError;
+    };
+
 /**
  * Service for managing email-based one-time passwords (OTPs)
  *
  * Supports two delivery methods:
  * 1. Short numeric codes (6 digits) - displayed in email for manual entry
  *    - Stored as bcrypt hash (defense against brute force if DB compromised)
- *    - Brute force protection handled by API-level rate limiting
+ *    - Brute force protection uses persisted attempt counts plus API rate limiting
  * 2. Long cryptographic tokens (64 chars) - embedded in clickable links for one-click verification
  *    - Stored as SHA-256 hash (high entropy makes bcrypt unnecessary, allows direct lookup)
  *
@@ -66,6 +77,7 @@ export class AuthOTPService {
   private readonly HASH_TOKEN_BYTES = 32; // 32 bytes = 64 hex characters = 256 bits entropy
   private readonly HASH_TOKEN_EXPIRY_HOURS = 24; // 24 hours expiry for hash tokens
   private readonly BCRYPT_SALT_ROUNDS = 10; // Salt rounds for numeric codes (2^10 iterations)
+  private readonly MAX_NUMERIC_CODE_ATTEMPTS = 3;
 
   private constructor() {
     logger.info('AuthOTPService initialized');
@@ -105,6 +117,7 @@ export class AuthOTPService {
     otpType: OTPType = OTPType.NUMERIC_CODE,
     options?: {
       redirectTo?: string | null;
+      expiresInMinutes?: number;
     }
   ): Promise<CreateOTPResult> {
     try {
@@ -116,7 +129,8 @@ export class AuthOTPService {
       if (otpType === OTPType.NUMERIC_CODE) {
         // Generate 6-digit numeric code for manual entry
         otp = generateNumericCode(this.NUMERIC_CODE_LENGTH);
-        expiresAt = new Date(Date.now() + this.NUMERIC_CODE_EXPIRY_MINUTES * 60 * 1000);
+        const expiresInMinutes = options?.expiresInMinutes ?? this.NUMERIC_CODE_EXPIRY_MINUTES;
+        expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
         // Use bcrypt for low-entropy codes (defense against brute force)
         otpHash = await bcrypt.hash(otp, this.BCRYPT_SALT_ROUNDS);
       } else {
@@ -130,16 +144,20 @@ export class AuthOTPService {
       // Upsert token record - insert or update if email+purpose combination already exists
       // This ensures only one active token per email/purpose (replaces any existing token)
       await this.getPool().query(
-        `INSERT INTO auth.email_otps (email, purpose, otp_hash, expires_at, consumed_at, redirect_to)
-         VALUES ($1, $2, $3, $4, NULL, $5)
+        `INSERT INTO auth.email_otps (
+           email, purpose, otp_hash, otp_type, expires_at, consumed_at, redirect_to, attempts_count
+         )
+         VALUES ($1, $2, $3, $4, $5, NULL, $6, 0)
          ON CONFLICT (email, purpose)
          DO UPDATE SET
            otp_hash = EXCLUDED.otp_hash,
+           otp_type = EXCLUDED.otp_type,
            expires_at = EXCLUDED.expires_at,
            redirect_to = EXCLUDED.redirect_to,
            consumed_at = NULL,
+           attempts_count = 0,
            updated_at = NOW()`,
-        [email, purpose, otpHash, expiresAt, options?.redirectTo ?? null]
+        [email, purpose, otpHash, otpType, expiresAt, options?.redirectTo ?? null]
       );
 
       logger.info('Email verification token created successfully', {
@@ -159,87 +177,134 @@ export class AuthOTPService {
     }
   }
 
+  private invalidCodeError(): AppError {
+    return new AppError('Invalid or expired verification code', 400, ERROR_CODES.INVALID_INPUT);
+  }
+
   /**
-   * Verify a numeric OTP code (6 digits)
-   * Looks up by email and verifies the bcrypt-hashed code
+   * Low-level primitive: attempt a numeric OTP verification on a caller-owned
+   * transaction. Expected failures are returned (not thrown) so the persisted
+   * attempt counter can be committed before the error surfaces.
    *
-   * Brute force protection is handled by API-level rate limiting.
+   * Prefer {@link consumeNumericOTP}, which owns the transaction and guarantees
+   * the counter is committed even on failure. Call this directly only from
+   * inside a transaction you commit on both the success and failure paths;
+   * throwing-and-rolling-back here would silently discard the attempt counter.
    *
-   * @param email - The email address associated with the OTP
-   * @param purpose - The purpose of the OTP
-   * @param code - The 6-digit numeric code to verify
-   * @param externalClient - Optional external database client for transaction support
-   * @returns Promise with verification result
-   * @throws AppError if verification fails (with generic error message)
+   * Scoped to NUMERIC_CODE rows so a wrong code can never touch a HASH_TOKEN row
+   * (magic-link) sharing the same (email, purpose).
    */
-  async verifyEmailOTPWithCode(
+  async attemptEmailOTPWithCode(
+    client: PoolClient,
     email: string,
     purpose: OTPPurpose,
-    code: string,
-    externalClient?: PoolClient
-  ): Promise<VerifyOTPResult> {
-    const client = externalClient || (await this.getPool().connect());
-    const shouldManageTransaction = !externalClient;
+    code: string
+  ): Promise<VerifyOTPAttemptResult> {
+    const result = await client.query(
+      `SELECT
+         id, email, purpose, otp_hash, expires_at, consumed_at, redirect_to, attempts_count
+       FROM auth.email_otps
+       WHERE email = $1 AND purpose = $2 AND otp_type = 'NUMERIC_CODE'
+       FOR UPDATE`,
+      [email, purpose]
+    );
 
-    try {
-      if (shouldManageTransaction) {
-        await client.query('BEGIN');
-      }
+    if (result.rows.length === 0) {
+      return { success: false, error: this.invalidCodeError() };
+    }
 
-      // Lookup by email and lock the row
-      const result = await client.query(
-        `SELECT id, email, purpose, otp_hash, expires_at, consumed_at, redirect_to
-         FROM auth.email_otps
-         WHERE email = $1 AND purpose = $2
-         FOR UPDATE`,
-        [email, purpose]
-      );
+    const otpRecord = result.rows[0];
 
-      // Check if OTP record exists
-      if (result.rows.length === 0) {
-        throw new AppError('Invalid or expired verification code', 400, ERROR_CODES.INVALID_INPUT);
-      }
+    if (
+      new Date() > new Date(otpRecord.expires_at) ||
+      otpRecord.consumed_at !== null ||
+      otpRecord.attempts_count >= this.MAX_NUMERIC_CODE_ATTEMPTS
+    ) {
+      return { success: false, error: this.invalidCodeError() };
+    }
 
-      const otpRecord = result.rows[0];
+    const isValid = await bcrypt.compare(code, otpRecord.otp_hash);
 
-      // Validate OTP record is still usable
-      if (new Date() > new Date(otpRecord.expires_at) || otpRecord.consumed_at !== null) {
-        throw new AppError('Invalid or expired verification code', 400, ERROR_CODES.INVALID_INPUT);
-      }
-
-      // Verify bcrypt hash
-      const isValid = await bcrypt.compare(code, otpRecord.otp_hash);
-
-      if (!isValid) {
-        throw new AppError('Invalid or expired verification code', 400, ERROR_CODES.INVALID_INPUT);
-      }
-
-      // Mark OTP as consumed atomically
-      const consume = await client.query(
+    if (!isValid) {
+      await client.query(
         `UPDATE auth.email_otps
-         SET consumed_at = NOW(), updated_at = NOW()
-         WHERE id = $1 AND consumed_at IS NULL`,
-        [otpRecord.id]
+         SET
+           attempts_count = attempts_count + 1,
+           consumed_at = CASE
+             WHEN attempts_count + 1 >= $2 THEN NOW()
+             ELSE consumed_at
+           END,
+           updated_at = NOW()
+         WHERE id = $1`,
+        [otpRecord.id, this.MAX_NUMERIC_CODE_ATTEMPTS]
       );
+      return { success: false, error: this.invalidCodeError() };
+    }
 
-      if (consume.rowCount !== 1) {
-        throw new AppError('Invalid or expired verification code', 400, ERROR_CODES.INVALID_INPUT);
-      }
+    const consume = await client.query(
+      `UPDATE auth.email_otps
+       SET consumed_at = NOW(), updated_at = NOW()
+       WHERE id = $1 AND consumed_at IS NULL`,
+      [otpRecord.id]
+    );
 
-      if (shouldManageTransaction) {
-        await client.query('COMMIT');
-      }
+    if (consume.rowCount !== 1) {
+      return { success: false, error: this.invalidCodeError() };
+    }
 
-      logger.info('Numeric OTP code verified successfully', { purpose });
+    logger.info('Numeric OTP code verified successfully', { purpose });
 
-      return {
+    return {
+      success: true,
+      value: {
         success: true,
         email: otpRecord.email,
         purpose: otpRecord.purpose,
         redirectTo: otpRecord.redirect_to,
-      };
+      },
+    };
+  }
+
+  /**
+   * Verify a numeric OTP code and run caller work in one transaction.
+   *
+   * Owns the transaction boundary so callers cannot break the brute-force
+   * invariant: a failed attempt is committed (persisting the attempt counter)
+   * before its error is thrown, a successful attempt plus the caller's
+   * `onVerified` work commit together, and any error thrown by `onVerified`
+   * rolls the whole transaction back (un-consuming the code).
+   *
+   * `onVerified` receives the same open client and the verification result, so
+   * it can read/write additional rows atomically with the OTP consumption.
+   */
+  async consumeNumericOTP<T>(
+    email: string,
+    purpose: OTPPurpose,
+    code: string,
+    onVerified: (client: PoolClient, verified: VerifyOTPResult) => Promise<T>
+  ): Promise<T> {
+    const client = await this.getPool().connect();
+    let transactionActive = false;
+
+    try {
+      await client.query('BEGIN');
+      transactionActive = true;
+
+      const attempt = await this.attemptEmailOTPWithCode(client, email, purpose, code);
+      if (!attempt.success) {
+        // Commit the persisted attempt counter before surfacing the failure.
+        await client.query('COMMIT');
+        transactionActive = false;
+        throw attempt.error;
+      }
+
+      const result = await onVerified(client, attempt.value);
+
+      await client.query('COMMIT');
+      transactionActive = false;
+      return result;
     } catch (error) {
-      if (shouldManageTransaction) {
+      if (transactionActive) {
         await client.query('ROLLBACK');
       }
 
@@ -250,9 +315,7 @@ export class AuthOTPService {
       logger.error('Failed to verify numeric OTP code', { error, purpose });
       throw new AppError('Failed to verify code', 500, ERROR_CODES.INTERNAL_ERROR);
     } finally {
-      if (shouldManageTransaction) {
-        client.release();
-      }
+      client.release();
     }
   }
 
@@ -287,6 +350,7 @@ export class AuthOTPService {
         `SELECT id, email, purpose, otp_hash, expires_at, consumed_at, redirect_to
          FROM auth.email_otps
          WHERE purpose = $1
+           AND otp_type = 'HASH_TOKEN'
            AND otp_hash = $2
            AND expires_at > NOW()
            AND consumed_at IS NULL
@@ -361,73 +425,45 @@ export class AuthOTPService {
    * @param email - The email address associated with the code
    * @param purpose - The purpose of the OTP (e.g., RESET_PASSWORD)
    * @param numericCode - The 6-digit numeric code to verify
-   * @param externalClient - Optional external database client for broader transaction support
    * @returns Promise with the long-lived token and its expiration
    * @throws AppError if verification fails or token creation fails
    */
   async exchangeCodeForToken(
     email: string,
     purpose: OTPPurpose,
-    numericCode: string,
-    externalClient?: PoolClient
+    numericCode: string
   ): Promise<{ token: string; expiresAt: Date }> {
-    const client = externalClient || (await this.getPool().connect());
-    const shouldManageTransaction = !externalClient;
-    let transactionActive = false;
-
-    try {
-      if (shouldManageTransaction) {
-        await client.query('BEGIN');
-        transactionActive = true;
-      }
-
-      // Step 1: Verify the numeric code (consumes it atomically)
-      await this.verifyEmailOTPWithCode(email, purpose, numericCode, client);
-
-      // Step 2: Generate a long-lived hash token
+    // Verify + consume the numeric code and issue the token in one transaction:
+    // the code is consumed only if token issuance succeeds.
+    return this.consumeNumericOTP(email, purpose, numericCode, async (client) => {
+      // Generate a long-lived hash token
       const token = generateSecureToken(this.HASH_TOKEN_BYTES);
       const expiresAt = new Date(Date.now() + this.HASH_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-      // Step 3: Insert the new token (replaces the consumed numeric code)
-      // Uses upsert to overwrite the consumed code record with the new token
+      // Insert the new token, replacing the consumed numeric code for this
+      // (email, purpose) and flipping the row's type to HASH_TOKEN.
       await client.query(
-        `INSERT INTO auth.email_otps (email, purpose, otp_hash, expires_at, consumed_at, redirect_to)
-         VALUES ($1, $2, $3, $4, NULL, NULL)
+        `INSERT INTO auth.email_otps (
+           email, purpose, otp_hash, otp_type, expires_at, consumed_at, redirect_to, attempts_count
+         )
+         VALUES ($1, $2, $3, 'HASH_TOKEN', $4, NULL, NULL, 0)
          ON CONFLICT (email, purpose)
          DO UPDATE SET
            otp_hash = EXCLUDED.otp_hash,
+           otp_type = EXCLUDED.otp_type,
            expires_at = EXCLUDED.expires_at,
            redirect_to = EXCLUDED.redirect_to,
            consumed_at = NULL,
+           attempts_count = 0,
            updated_at = NOW()`,
         [email, purpose, tokenHash, expiresAt]
       );
 
-      if (shouldManageTransaction) {
-        await client.query('COMMIT');
-        transactionActive = false;
-      }
-
       logger.info('Successfully exchanged numeric code for hash token', { email, purpose });
 
       return { token, expiresAt };
-    } catch (error) {
-      if (shouldManageTransaction && transactionActive) {
-        await client.query('ROLLBACK');
-      }
-
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      logger.error('Failed to exchange code for token', { error, email, purpose });
-      throw new AppError('Failed to exchange verification code', 500, ERROR_CODES.INTERNAL_ERROR);
-    } finally {
-      if (shouldManageTransaction) {
-        client.release();
-      }
-    }
+    });
   }
 
   /**
