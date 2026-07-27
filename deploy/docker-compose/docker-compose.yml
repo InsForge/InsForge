@@ -11,11 +11,11 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     networks:
       - insforge-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -34,12 +34,12 @@ services:
       PGRST_DB_CHANNEL_ENABLED: true
       PGRST_DB_CHANNEL: pgrst
     ports:
-      - "${POSTGREST_PORT:-5430}:3000"
+      - "127.0.0.1:${POSTGREST_PORT:-5430}:3000"
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/3000'"]
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/3000'" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -58,7 +58,7 @@ services:
         condition: service_healthy
     ports:
       - "${APP_PORT:-7130}:7130"
-      - "${AUTH_PORT:-7131}:7131"
+      - "127.0.0.1:${AUTH_PORT:-7131}:7131"
     environment:
       - PORT=7130
       - PROJECT_ROOT=/app
@@ -137,7 +137,7 @@ services:
       - postgres
       - postgrest
     ports:
-      - "${DENO_PORT:-7133}:7133"
+      - "127.0.0.1:${DENO_PORT:-7133}:7133"
     environment:
       - PORT=7133
       - DENO_ENV=development
@@ -157,7 +157,7 @@ services:
     volumes:
       - deno_cache:/deno-dir
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:7133/health"]
+      test: [ "CMD", "wget", "-q", "--spider", "http://127.0.0.1:7133/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
