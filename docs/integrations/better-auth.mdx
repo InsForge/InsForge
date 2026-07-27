@@ -15,7 +15,7 @@ Better Auth's tables live in a dedicated `better_auth` schema. PostgREST exposes
 - An InsForge project (self-hosted or cloud)
 - A Postgres database for Better Auth's tables — self-hosted InsForge shares the same Postgres for free; cloud needs a connection string to a Postgres you control
 
-## Step 1: Scaffold the Project
+## Step 1: Scaffold the project
 
 ```bash
 npx @insforge/cli link --project-id <your-project-id> --auth better-auth
@@ -37,7 +37,7 @@ After dropping the scaffold files in place, the CLI automatically ran `npm insta
 **Setup failed?** If the CLI logged `npm run setup failed`, the most common cause is `DATABASE_URL` pointing at an unreachable Postgres. Fix `.env.local` and re-run `npm run setup` — it's idempotent.
 </Note>
 
-## Step 3: Run Your Application
+## Step 3: Run your application
 
 ```bash
 npm run dev
@@ -51,7 +51,7 @@ Open `http://localhost:3000/sign-up`, create a user, and you'll be redirected to
 **Why is InsForge's Auth > Users empty?** Authentication is handled entirely by Better Auth, so user records live in `better_auth.user` — not in InsForge's native `auth.users` table. InsForge only sees the JWT claim (`sub`) that RLS uses to scope data to the correct user.
 </Note>
 
-## Adding Your Own RLS-Protected Tables
+## Adding your own RLS-protected tables
 
 Ask your agent to complete the following:
 
@@ -71,7 +71,7 @@ Build a posts page with full CRUD using the useInsforgeClient hook from src/lib/
 
 Sign up as a second user in an incognito window — they see an empty list, never the first user's rows. That's RLS working through the bridged JWT.
 
-## Further Reading
+## Further reading
 
 - [Scaffold source](https://github.com/InsForge/insforge-templates/tree/main/auth-providers/better-auth) — the template files the CLI drops into your project
 - [Better Auth + InsForge skill reference](https://github.com/InsForge/insforge-skills/blob/main/skills/insforge-integrations/references/better-auth.md) — Vite / React-only setups, plugins (organization, twoFactor, magicLink), email transport via `client.emails.send`, realtime, cross-origin gotchas, and a Common Mistakes table

@@ -53,7 +53,7 @@ const { data, error } = await insforge.database
 ```
 </CodeGroup>
 
-### Output Example
+### Output example
 
 ```json
 {
@@ -109,7 +109,7 @@ const { data, error } = await insforge.database
 ```
 </CodeGroup>
 
-### Output Example
+### Output example
 
 ```json
 {
@@ -162,7 +162,7 @@ const { error } = await insforge.database
 ```
 </CodeGroup>
 
-### Output Example
+### Output example
 
 ```json
 {
@@ -215,7 +215,7 @@ const { data, error } = await insforge.database
 ```
 </CodeGroup>
 
-### Output Example
+### Output example
 
 ```json
 {
@@ -316,9 +316,9 @@ const { data } = await insforge.database
 
 ---
 
-## Common Patterns
+## Common patterns
 
-### Pagination with Count
+### Pagination with count
 
 ```javascript
 const page = 1;
@@ -347,7 +347,7 @@ console.log(`Page ${page}: ${data.length} of ${count} total`)
 }
 ```
 
-### Filtered Search
+### Filtered search
 
 ```javascript
 const { data } = await insforge.database
@@ -371,7 +371,7 @@ const { data } = await insforge.database
 }
 ```
 
-### Using with Authentication Hooks
+### Using with authentication hooks
 
 Combine database queries with `useUser()` or `useAuth()` hooks to fetch user-specific data:
 

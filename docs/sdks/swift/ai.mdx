@@ -9,7 +9,7 @@ InsForge provisions an OpenRouter API key for Model Gateway projects. New Swift 
 
 The previous InsForge Swift AI SDK methods are deprecated compatibility wrappers. Use the InsForge SDK for database, auth, storage, functions, and realtime; use OpenRouter for model calls.
 
-## Recommended Architecture
+## Recommended architecture
 
 ```mermaid
 sequenceDiagram
@@ -23,7 +23,7 @@ sequenceDiagram
     API-->>App: App-specific response
 ```
 
-## Server-Side OpenRouter Call
+## Server-side OpenRouter call
 
 Use the OpenAI SDK or REST from your backend. For TypeScript backends:
 
@@ -41,7 +41,7 @@ const completion = await openai.chat.completions.create({
 });
 ```
 
-## Calling Your Backend from Swift
+## Calling your backend from Swift
 
 ```swift
 struct ChatRequest: Encodable {
@@ -72,7 +72,7 @@ func sendPrompt(_ prompt: String, sessionToken: String) async throws -> ChatResp
 
 Use an app session token or another user-scoped credential for your backend route. Never send the OpenRouter key from a Swift client.
 
-## Legacy InsForge AI Methods
+## Legacy InsForge AI methods
 
 These Swift SDK methods are deprecated for new AI integrations:
 

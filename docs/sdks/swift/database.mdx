@@ -9,7 +9,7 @@ import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
 
 <SwiftSdkInstallation />
 
-## Define Models
+## Define models
 
 Define your data models using Swift's `Codable` protocol:
 
@@ -217,7 +217,7 @@ let count: Int = try await insforge.database
     .executeSingle()
 ```
 
-### Implementation Details
+### Implementation details
 
 - **No arguments**: Uses GET request to `/api/database/rpc/{functionName}`
 - **With arguments**: Uses POST request with JSON body to `/api/database/rpc/{functionName}`

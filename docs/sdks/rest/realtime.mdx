@@ -49,7 +49,7 @@ const socket = io('https://your-app.insforge.app', {
 });
 ```
 
-## Socket.IO Pub/Sub
+## Socket.IO pub/Sub
 
 Install the Socket.IO client when you are not using the InsForge SDK:
 
@@ -57,7 +57,7 @@ Install the Socket.IO client when you are not using the InsForge SDK:
 npm install socket.io-client
 ```
 
-### Connect And Subscribe
+### Connect and subscribe
 
 ```javascript
 import { io } from 'socket.io-client';
@@ -78,7 +78,7 @@ socket.emit('realtime:subscribe', { channel: 'order:123' }, (response) => {
 });
 ```
 
-### Listen For Events
+### Listen for events
 
 ```javascript
 socket.on('status_changed', (message) => {
@@ -123,7 +123,7 @@ socket.emit('realtime:unsubscribe', { channel: 'order:123' });
 socket.disconnect();
 ```
 
-### Socket Events
+### Socket events
 
 | Event | Direction | Description |
 |-------|-----------|-------------|
@@ -135,7 +135,7 @@ socket.disconnect();
 | `presence:leave` | Server to client | A logical member is no longer present in the channel. |
 | `realtime:error` | Server to client | Subscribe or publish failed. |
 
-## Channel Patterns
+## Channel patterns
 
 Create channel definitions before clients subscribe.
 
@@ -149,7 +149,7 @@ Pattern matching uses SQL `LIKE`, so `%` is the wildcard. `_` is not accepted in
 
 ## Channels
 
-### List Channels
+### List channels
 
 ```http
 GET /api/realtime/channels
@@ -176,7 +176,7 @@ Response:
 ]
 ```
 
-### Create Channel
+### Create channel
 
 ```http
 POST /api/realtime/channels
@@ -203,13 +203,13 @@ curl -X POST "https://your-app.insforge.app/api/realtime/channels" \
   }'
 ```
 
-### Get Channel
+### Get channel
 
 ```http
 GET /api/realtime/channels/{id}
 ```
 
-### Update Channel
+### Update channel
 
 ```http
 PUT /api/realtime/channels/{id}
@@ -225,7 +225,7 @@ curl -X PUT "https://your-app.insforge.app/api/realtime/channels/550e8400-e29b-4
   }'
 ```
 
-### Delete Channel
+### Delete channel
 
 ```http
 DELETE /api/realtime/channels/{id}
@@ -241,7 +241,7 @@ Message history is preserved. Deleted channels set existing message `channelId` 
 
 ## Messages
 
-### List Messages
+### List messages
 
 ```http
 GET /api/realtime/messages
@@ -284,7 +284,7 @@ Response:
 ]
 ```
 
-### Message Stats
+### Message stats
 
 ```http
 GET /api/realtime/messages/stats
@@ -346,7 +346,7 @@ Returns user-defined RLS policies for:
 
 ## Configuration
 
-### Get Realtime Config
+### Get realtime config
 
 ```http
 GET /api/realtime/config
@@ -358,7 +358,7 @@ GET /api/realtime/config
 }
 ```
 
-### Update Realtime Config
+### Update realtime config
 
 ```http
 PATCH /api/realtime/config

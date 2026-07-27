@@ -48,7 +48,7 @@ val response = client.functions.invoke<HelloResponse>(
 println(response.message)  // "Hello, World!"
 ```
 
-### Example with Typed Request
+### Example with typed request
 
 ```kotlin
 @Serializable
@@ -90,7 +90,7 @@ val contentType = response.contentType()
 
 ---
 
-## Admin Functions
+## Admin functions
 
 The following methods require admin/service role authentication.
 
@@ -195,7 +195,7 @@ client.functions.deleteFunction("old-function")
 
 ---
 
-## Error Handling
+## Error handling
 
 ```kotlin
 import dev.insforge.exceptions.InsforgeHttpException
@@ -216,7 +216,7 @@ try {
 
 ---
 
-## Models Reference
+## Models reference
 
 ### FunctionMetadata
 

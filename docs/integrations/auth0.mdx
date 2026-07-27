@@ -17,7 +17,7 @@ description: "Add Auth0 enterprise authentication and SSO to your InsForge backe
 - An [Auth0](https://auth0.com) account and tenant
 - A Next.js application (or any framework — adjust the client code accordingly)
 
-## Step 1: Create an Auth0 Application
+## Step 1: Create an Auth0 application
 
 1. Log in to your [Auth0 Dashboard](https://manage.auth0.com)
 2. Go to **Applications** > **Applications** > **Create Application**
@@ -27,7 +27,7 @@ description: "Add Auth0 enterprise authentication and SSO to your InsForge backe
    - **Allowed Logout URLs**: `http://localhost:3000`
 5. Note down the **Domain**, **Client ID**, and **Client Secret**
 
-## Step 2: Set Up Your InsForge Project
+## Step 2: Set up your InsForge project
 
 Create a new project or link an existing one:
 
@@ -48,7 +48,7 @@ npx @insforge/cli secrets get JWT_SECRET
 
 Note down the **URL** and **Anon Key** from the InsForge dashboard. You'll use the JWT Secret from the CLI output in a later step to sign tokens for InsForge.
 
-## Step 3: Set Up Your Application
+## Step 3: Set up your application
 
 Install the required dependencies:
 
@@ -73,7 +73,7 @@ NEXT_PUBLIC_INSFORGE_ANON_KEY='YOUR_INSFORGE_ANON_KEY'
 INSFORGE_JWT_SECRET='YOUR_INSFORGE_JWT_SECRET'
 ```
 
-## Step 4: Set Up InsForge Integration
+## Step 4: Set up InsForge integration
 
 Ask your agent to complete the following steps:
 
@@ -109,7 +109,7 @@ Build a todo list page with full CRUD — create, read, update, and delete todos
 
 This creates a page that uses the InsForge client to manage todos. RLS ensures users only see their own data.
 
-## Step 5: Run Your Application
+## Step 5: Run your application
 
 ```bash
 # Install dependencies if you haven't already

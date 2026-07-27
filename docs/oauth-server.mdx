@@ -7,7 +7,7 @@ description: Use InsForge as an OAuth 2.0 identity provider to authenticate user
 
 InsForge can function as an OAuth 2.0 identity provider, allowing third-party applications to authenticate users with "Sign in with InsForge". This enables developers building on your platform to leverage InsForge's authentication system without managing their own user credentials.
 
-## Use Cases
+## Use cases
 
 <CardGroup cols={2}>
   <Card title="Developer Platforms" icon="code">
@@ -27,7 +27,7 @@ InsForge can function as an OAuth 2.0 identity provider, allowing third-party ap
   </Card>
 </CardGroup>
 
-## OAuth 2.0 Flow
+## OAuth 2.0 flow
 
 InsForge implements the **Authorization Code flow with PKCE** (Proof Key for Code Exchange), the most secure OAuth flow for both web and native applications.
 
@@ -51,7 +51,7 @@ sequenceDiagram
     API->>App: Protected resources
 ```
 
-## Getting Started
+## Getting started
 
 <Steps>
   <Step title="Register Your Application">
@@ -79,7 +79,7 @@ sequenceDiagram
 
 ## Endpoints
 
-### Authorization Endpoint
+### Authorization endpoint
 
 Redirect users to this endpoint to initiate the OAuth flow.
 
@@ -112,7 +112,7 @@ https://api.insforge.dev/api/oauth/v1/authorize?
   code_challenge_method=S256
 ```
 
-### Token Endpoint
+### Token endpoint
 
 Exchange the authorization code for access and refresh tokens.
 
@@ -144,7 +144,7 @@ POST https://api.insforge.dev/api/oauth/v1/token
 }
 ```
 
-### Refresh Token
+### Refresh token
 
 Exchange a refresh token for a new access token.
 
@@ -163,7 +163,7 @@ POST https://api.insforge.dev/api/oauth/v1/token
 }
 ```
 
-### User Profile Endpoint
+### User profile endpoint
 
 Retrieve the authenticated user's profile information.
 
@@ -189,9 +189,9 @@ Authorization: Bearer {access_token}
 }
 ```
 
-## Implementation Guide
+## Implementation guide
 
-### Generate PKCE Parameters
+### Generate PKCE parameters
 
 PKCE adds an extra layer of security by ensuring the application that started the flow is the same one completing it.
 
@@ -265,7 +265,7 @@ function base64UrlEncode(buffer) {
   </Tab>
 </Tabs>
 
-### Complete Server-Side Example
+### Complete server-side example
 
 Here's a complete Express.js implementation. First, create a `.env` file with your credentials:
 
@@ -421,7 +421,7 @@ app.get('/api/organizations', async (req, res) => {
 app.listen(3000, () => console.log('Server running on http://localhost:3000'));
 ```
 
-### Popup Mode for SPAs
+### Popup mode for SPAs
 
 For single-page applications, you can open the OAuth flow in a popup window:
 
@@ -465,7 +465,7 @@ if (req.query.mode === 'popup') {
 }
 ```
 
-## Security Considerations
+## Security considerations
 
 <CardGroup cols={2}>
   <Card title="Always Use PKCE" icon="shield-check">
@@ -493,7 +493,7 @@ if (req.query.mode === 'popup') {
   </Card>
 </CardGroup>
 
-## Token Claims
+## Token claims
 
 Access tokens are JWTs containing the following claims:
 
@@ -509,9 +509,9 @@ Access tokens are JWTs containing the following claims:
 | `iss` | Issuer (`insforge`) |
 | `aud` | Audience (`insforge-api`) |
 
-## Error Handling
+## Error handling
 
-### Authorization Errors
+### Authorization errors
 
 If authorization fails, users are redirected to your `redirect_uri` with error parameters:
 
@@ -528,7 +528,7 @@ Common error codes:
 | `access_denied` | User denied the authorization request |
 | `invalid_scope` | Requested scope is invalid or unknown |
 
-### Token Errors
+### Token errors
 
 Token endpoint errors return JSON:
 
@@ -545,7 +545,7 @@ Token endpoint errors return JSON:
 | `invalid_client` | Client authentication failed |
 | `invalid_request` | Missing required parameters |
 
-## Rate Limits
+## Rate limits
 
 OAuth endpoints are rate-limited to prevent abuse:
 

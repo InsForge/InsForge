@@ -23,7 +23,7 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
 
 ---
 
-## Step 1: 🖥️ Create an Azure Virtual Machine
+## Step 1: 🖥️ Create an Azure virtual machine
 
 1.  **Log in to the [Azure Portal](https://portal.azure.com/)** and navigate to **Virtual machines**.
 2.  Click **+ Create** > **Azure virtual machine**.
@@ -48,7 +48,7 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
 
 ---
 
-## Step 2: ⚙️ Connect and Set Up the Server
+## Step 2: ⚙️ Connect and set up the server
 
 1.  **Connect via SSH:**
     Open your terminal, give your key the correct permissions, and connect to the VM.
@@ -149,7 +149,7 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
 
 ---
 
-## Step 4: 🔑 Access Your InsForge Instance
+## Step 4: 🔑 Access your InsForge instance
 
 1.  **Test Backend API:**
     Use `curl` to check the health endpoint.
@@ -164,7 +164,7 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
 
 ---
 
-## Step 5: 🌐 Configure Domain (Optional but Recommended)
+## Step 5: 🌐 Configure domain (optional but recommended)
 
 1.  **Update DNS Records:**
     In your domain provider's DNS settings, add two **A records** pointing to your VM's Public IP address:
@@ -237,7 +237,7 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
 
 ---
 
-## 🔧 Management & Maintenance
+## 🔧 Management & maintenance
 
 * **View Logs:** `docker compose logs -f` (all services) or `docker compose logs -f insforge` (specific service).
 * **Stop Services:** `docker compose down`
@@ -259,21 +259,21 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
 * **Port Already in Use:** Check which process is using the port with `sudo netstat -tulpn | grep :7130`.
 * **Out of Memory:** Consider upgrading your Azure VM to a size with more RAM.
 
-## 📊 Cost Estimation
+## 📊 Cost estimation
 
 > **Disclaimer:** Prices are estimates based on Pay-As-You-Go rates in a common region (e.g., East US) and can vary. Always check the official [Azure Pricing Calculator](https://azure.microsoft.com/en-us/pricing/calculator/) for the most accurate information. On Azure, you pay for the VM's resources (CPU, RAM, Storage), which are shared by all the Docker services you run on it.
 
-### Free Tier (for Testing)
+### Free tier (for testing)
 * **Cost:** **~$0/month** for the first 12 months.
 * **Resources:** Azure provides a free tier that includes 750 hours/month of a `B1s` burstable VM.
 * **Limitations:** This VM has very limited resources (1 vCPU, 1 GiB RAM) and may run slowly. It's suitable only for basic testing and familiarization, not for active development or production.
 
-### Starter Setup (for Development & Small Projects)
+### Starter setup (for development & small projects)
 * **Cost:** **~$30 - $40/month**
 * **Resources:** This estimate is for a `Standard_B2s` VM (2 vCPU, 4 GiB RAM) running all the InsForge Docker containers.
 * **Breakdown:** The cost primarily consists of the VM compute hours. It also includes the OS disk storage and a static public IP address. This single VM runs your database, backend, Deno, and all other services.
 
-### Production Setup (for Scalability & Reliability)
+### Production setup (for scalability & reliability)
 For production, you can choose between an all-in-one, larger VM or a more robust setup using managed services.
 
 * **Option A: All-in-One Larger VM**
@@ -290,7 +290,7 @@ For production, you can choose between an all-in-one, larger VM or a more robust
     * **Pros:** Highly reliable and scalable. Database performance is isolated and guaranteed. Managed backups and security.
     * **Cons:** More complex setup, costs are distributed across multiple services.
 
-## 🔒 Security Best Practices
+## 🔒 Security best practices
 
 * **Change Default Passwords:** Always update admin and database passwords.
 * **Enable Firewall:** Use Azure **Network Security Groups (NSGs)** to restrict access to necessary ports and IP addresses.

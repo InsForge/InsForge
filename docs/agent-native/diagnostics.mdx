@@ -21,7 +21,7 @@ npx @insforge/cli diagnose --json
 
 The report bundles the advisor scan, database health, instance metrics, and recent error logs into one output. In `--json` mode the agent gets it all as structured data.
 
-## Backend Advisor
+## Backend advisor
 
 The advisor scans for security, performance, and health issues and writes a remediation for each one. The dashboard shows the findings with a "Copy Remediation" button, but the agent does not need the dashboard: it fetches the same scan directly with `--json` and applies the fix itself, so a security issue gets closed without waiting for a human to notice it.
 

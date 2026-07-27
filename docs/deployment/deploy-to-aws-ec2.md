@@ -21,11 +21,11 @@ This guide will walk you through self-hosting the InsForge platform on an AWS EC
 - Basic knowledge of SSH and command-line operations
 - Domain name (optional, for custom domain setup)
 
-## 🚀 Deployment Steps
+## 🚀 Deployment steps
 
-### 1. Create and Configure EC2 Instance
+### 1. Create and configure EC2 instance
 
-#### 1.1 Launch EC2 Instance
+#### 1.1 Launch EC2 instance
 
 1. **Log into AWS Console** and navigate to EC2 Dashboard
 2. **Click "Launch Instance"**
@@ -38,7 +38,7 @@ This guide will walk you through self-hosting the InsForge platform on an AWS EC
    - **Key Pair**: Create new or select existing key pair (download and save the `.pem` file)
    - **Storage**: 30 GB gp3 (minimum 20 GB recommended)
 
-#### 1.2 Configure Security Group
+#### 1.2 Configure security group
 
 Create or configure security group with the following inbound rules:
 
@@ -52,7 +52,7 @@ Create or configure security group with the following inbound rules:
 
 > ⚠️ **Security Note**: For production, restrict PostgreSQL (5432) to specific IP addresses or remove external access entirely. Consider using a reverse proxy (nginx) and exposing only ports 80/443.
 
-#### 1.3 Allocate Elastic IP (Recommended)
+#### 1.3 Allocate Elastic IP (recommended)
 
 1. Navigate to **Elastic IPs** in EC2 Dashboard
 2. Click **Allocate Elastic IP address**
@@ -60,7 +60,7 @@ Create or configure security group with the following inbound rules:
 
 This ensures your instance keeps the same IP address even after restarts.
 
-### 2. Connect to Your EC2 Instance
+### 2. Connect to your EC2 instance
 
 ```bash
 # Set correct permissions for your key file
@@ -70,9 +70,9 @@ chmod 400 your-key-pair.pem
 ssh -i your-key-pair.pem ubuntu@your-ec2-public-ip
 ```
 
-### 3. Install Dependencies
+### 3. Install dependencies
 
-#### 3.1 Update System Packages
+#### 3.1 Update system packages
 
 ```bash
 sudo apt update && sudo apt upgrade -y
@@ -85,7 +85,7 @@ Follow the instructions of the link below to install and verify docker on your n
 https://docs.docker.com/engine/install/ubuntu/
 ```
 
-#### 3.3 Add Your User to Docker Group
+#### 3.3 Add your user to Docker group
 
 After installing Docker, you need to add your user to the `docker` group to run Docker commands without `sudo`:
 
@@ -116,7 +116,7 @@ sudo apt install git -y
 
 ### 4. Deploy InsForge
 
-#### 4.1 Clone Repository
+#### 4.1 Clone repository
 
 ```bash
 cd ~
@@ -124,7 +124,7 @@ git clone https://github.com/insforge/insforge.git
 cd insforge/deploy/docker-compose
 ```
 
-#### 4.2 Create Environment Configuration
+#### 4.2 Create environment configuration
 
 Copy the example template to create your `.env` file:
 
@@ -174,7 +174,7 @@ openssl rand -base64 24
 
 > 💡 **Important**: Save these secrets securely. You'll need them if you ever migrate or restore your instance.
 
-#### 4.3 Start InsForge Services
+#### 4.3 Start InsForge services
 
 ```bash
 # Pull Docker images and start services
@@ -186,7 +186,7 @@ docker compose logs -f
 
 Press `Ctrl+C` to exit log view.
 
-#### 4.4 Verify Services
+#### 4.4 Verify services
 
 ```bash
 # Check running containers
@@ -199,9 +199,9 @@ docker compose ps
 # - deno
 ```
 
-### 5. Access Your InsForge Instance
+### 5. Access your InsForge instance
 
-#### 5.1 Test Backend API
+#### 5.1 Test backend API
 
 ```bash
 curl http://your-ec2-ip:7130/api/health
@@ -217,7 +217,7 @@ Expected response:
 }
 ```
 
-#### 5.2 Access Dashboard
+#### 5.2 Access dashboard
 
 Open your browser and navigate to:
 ```text
@@ -226,9 +226,9 @@ http://your-ec2-ip:7130
 
 Log in with the `ROOT_ADMIN_USERNAME` and `ROOT_ADMIN_PASSWORD` you set in `.env`.
 
-### 6. Configure Domain (Optional but Recommended)
+### 6. Configure domain (optional but recommended)
 
-#### 6.1 Update DNS Records
+#### 6.1 Update DNS records
 
 Add DNS A records pointing to your EC2 Elastic IP:
 ```text
@@ -236,7 +236,7 @@ api.yourdomain.com    → your-ec2-ip
 app.yourdomain.com    → your-ec2-ip
 ```
 
-#### 6.2 Install Nginx Reverse Proxy
+#### 6.2 Install Nginx reverse proxy
 
 ```bash
 sudo apt install nginx -y
@@ -296,7 +296,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-#### 6.3 Install SSL Certificate (Recommended)
+#### 6.3 Install SSL certificate (recommended)
 
 ```bash
 # Install Certbot
@@ -328,9 +328,9 @@ docker compose down
 docker compose up -d
 ```
 
-## 🔧 Management & Maintenance
+## 🔧 Management & maintenance
 
-### View Logs
+### View logs
 
 ```bash
 # All services
@@ -342,13 +342,13 @@ docker compose logs -f postgres
 docker compose logs -f deno
 ```
 
-### Stop Services
+### Stop services
 
 ```bash
 docker compose down
 ```
 
-### Restart Services
+### Restart services
 
 ```bash
 docker compose restart
@@ -364,7 +364,7 @@ git pull origin main
 docker compose pull && docker compose up -d
 ```
 
-### Backup Database
+### Backup database
 
 Run these from `~/insforge/deploy/docker-compose`:
 
@@ -376,7 +376,7 @@ docker compose exec postgres pg_dump -U postgres insforge > backup_$(date +%Y%m%
 cat backup_file.sql | docker compose exec -T postgres psql -U postgres -d insforge
 ```
 
-### Monitor Resources
+### Monitor resources
 
 ```bash
 # Check disk usage
@@ -391,7 +391,7 @@ docker stats
 
 ## 🐛 Troubleshooting
 
-### Services Won't Start
+### Services won't start
 
 ```bash
 # Check logs for errors
@@ -408,7 +408,7 @@ sudo systemctl restart docker
 docker compose up -d
 ```
 
-### Cannot Connect to Database
+### Cannot connect to database
 
 ```bash
 # Check if PostgreSQL is running
@@ -421,7 +421,7 @@ docker compose logs postgres
 cat .env | grep POSTGRES
 ```
 
-### Port Already in Use
+### Port already in use
 
 ```bash
 # Check what's using the port
@@ -430,7 +430,7 @@ sudo netstat -tulpn | grep :7130
 # Kill the process or change port in docker-compose.yml
 ```
 
-### Out of Memory
+### Out of memory
 
 Consider upgrading to a larger instance type:
 ```text
@@ -438,7 +438,7 @@ Consider upgrading to a larger instance type:
 - Upgrade to: t3.large (8 GB RAM)
 ```
 
-### SSL Certificate Issues
+### SSL certificate issues
 
 ```bash
 # Renew certificates
@@ -448,9 +448,9 @@ sudo certbot renew
 sudo certbot renew --dry-run
 ```
 
-## 📊 Performance Optimization
+## 📊 Performance optimization
 
-### For Production Workloads
+### For production workloads
 
 1. **Upgrade Instance Type**: Use `t3.large` or `t3.xlarge`
 2. **Enable Auto-scaling**: Set up Application Load Balancer with auto-scaling groups
@@ -459,7 +459,7 @@ sudo certbot renew --dry-run
 5. **Configure Backups**: Set up automated daily backups
 6. **Use S3 for Storage**: Configure S3 bucket for file uploads instead of local storage
 
-### Database Optimization
+### Database optimization
 
 ```conf
 # Increase PostgreSQL shared_buffers (edit postgresql.conf in deploy/docker-init/db/)
@@ -468,7 +468,7 @@ shared_buffers = 1GB
 effective_cache_size = 3GB
 ```
 
-## 🔒 Security Best Practices
+## 🔒 Security best practices
 
 1. **Change Default Passwords**: Update admin and database passwords
 2. **Enable Firewall**: Use AWS Security Groups effectively
@@ -479,13 +479,13 @@ effective_cache_size = 3GB
 7. **Limit SSH Access**: Restrict SSH to specific IP addresses
 8. **Use IAM Roles**: Instead of AWS access keys where possible
 
-## 🆘 Support & Resources
+## 🆘 Support & resources
 
 - **Documentation**: [https://docs.insforge.dev](https://docs.insforge.dev)
 - **GitHub Issues**: [https://github.com/insforge/insforge/issues](https://github.com/insforge/insforge/issues)
 - **Discord Community**: [https://discord.com/invite/MPxwj5xVvW](https://discord.com/invite/MPxwj5xVvW)
 
-## 📝 Cost Estimation
+## 📝 Cost estimation
 
 **Monthly AWS Costs (approximate):**
 

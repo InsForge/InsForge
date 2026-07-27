@@ -2,21 +2,21 @@
 
 To keep the InsForge repository fast to clone, easy to maintain, and efficient for contributors, all documentation media assets should be reviewed and optimized before being committed.
 
-## Asset Size Expectations
+## Asset size expectations
 
 * Prefer optimized assets whenever possible.
 * Files larger than **5 MB** should be reviewed carefully before being committed.
 * Large media files increase repository clone size, slow documentation loading, and create unnecessary Git history churn.
 * Consider whether an asset can be compressed or hosted externally before committing it to the repository.
 
-## Video Assets
+## Video assets
 
 * Use MP4 for documentation videos whenever possible.
 * Compress screen recordings before committing them.
 * Verify that text, cursor movements, and UI interactions remain clearly visible after compression.
 * Avoid committing duplicate versions of the same video.
 
-### Compress MP4 Videos
+### Compress MP4 videos
 
 Example command used for documentation video compression:
 
@@ -29,9 +29,9 @@ ffmpeg -i input.mp4 \
 output.mp4
 ```
 
-## Image Assets
+## Image assets
 
-### PNG Images
+### PNG images
 
 Compress PNG files before committing:
 
@@ -39,7 +39,7 @@ Compress PNG files before committing:
 pngquant --force --ext .png image.png
 ```
 
-### JPEG Images
+### JPEG images
 
 Optimize JPEG files before committing:
 
@@ -47,13 +47,13 @@ Optimize JPEG files before committing:
 jpegoptim image.jpg
 ```
 
-### SVG Files
+### SVG files
 
 * Ensure SVG files contain vector data whenever possible.
 * Avoid embedding large raster images as base64 content inside SVG files.
 * Remove unnecessary metadata and optimize SVG exports before committing.
 
-## External Hosting
+## External hosting
 
 Consider external hosting when:
 
@@ -61,7 +61,7 @@ Consider external hosting when:
 * The asset is primarily demonstrative and does not need version control.
 * The same content can be referenced through a stable URL.
 
-## Pull Request Checklist
+## Pull request checklist
 
 Before submitting a pull request that includes documentation assets:
 
@@ -72,7 +72,7 @@ Before submitting a pull request that includes documentation assets:
 * [ ] No duplicate media assets have been committed.
 * [ ] Large assets have a documented justification if optimization is not possible.
 
-## Recommended Tools
+## Recommended tools
 
 * FFmpeg
 * pngquant

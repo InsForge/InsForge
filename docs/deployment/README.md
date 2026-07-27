@@ -4,9 +4,9 @@ This directory contains deployment guides for self-hosting the InsForge platform
 
 > Looking to deploy the app you built on InsForge (take it live)? That is [Sites](../core-concepts/sites/overview), not self-hosting. The guides below are for running the InsForge backend on infrastructure you control.
 
-## 📚 Available Guides
+## 📚 Available guides
 
-### General (Any VPS)
+### General (any VPS)
 
 - **[Deployment & Security Guide](./deployment-security-guide.md)** - Comprehensive guide for any Linux VPS
   - Full deployment walkthrough with Docker Compose
@@ -14,7 +14,7 @@ This directory contains deployment guides for self-hosting the InsForge platform
   - Firewall, SSH hardening, and security best practices
   - Update, rollback, and automated backup procedures
 
-### Cloud Platforms
+### Cloud platforms
 
 > Note: the cloud-provider walkthroughs (AWS, Azure, GCP) are community-maintained and can lag the current release.
 
@@ -43,7 +43,7 @@ This directory contains deployment guides for self-hosting the InsForge platform
   - Multi-tenant: many isolated InsForge projects per host
   - Optional agent-driven deploy via MCP
 
-### Coming Soon
+### Coming soon
 
 - **Digital Ocean** - Droplet deployment guide
 - **Hetzner** - VPS deployment guide
@@ -51,25 +51,25 @@ This directory contains deployment guides for self-hosting the InsForge platform
 - **Railway** - One-click Railway deployment
 - **Fly.io** - Global edge deployment
 
-## 🎯 Choosing a Platform
+## 🎯 Choosing a platform
 
-### For Beginners
+### For beginners
 - **AWS EC2** - Well-documented, widely used
 - **Railway** (Coming Soon) - One-click deployment
 
-### For Production
+### For production
 - **AWS EC2** - Reliable, scalable, extensive features
 - **Kubernetes** (Coming Soon) - High availability, auto-scaling
 
-### For Cost-Conscious
+### For cost-conscious
 - **Hetzner** (Coming Soon) - Best price-to-performance ratio
 - **Digital Ocean** (Coming Soon) - Simple pricing, good performance
 
-### For Global Distribution
+### For global distribution
 - **AWS with CloudFront** - Global CDN integration
 - **Fly.io** (Coming Soon) - Edge deployment in multiple regions
 
-## 📋 General Requirements
+## 📋 General requirements
 
 All deployment methods require:
 
@@ -79,7 +79,7 @@ All deployment methods require:
 - PostgreSQL 15+ compatible
 - Internet connectivity for external services
 
-## 🔧 Architecture Overview
+## 🔧 Architecture overview
 
 InsForge consists of 4 main services:
 
@@ -98,7 +98,7 @@ Have experience deploying InsForge on a platform not listed here? We'd love your
 
 See [CONTRIBUTING.md](../../CONTRIBUTING.md) for more details.
 
-## 🆘 Need Help?
+## 🆘 Need help?
 
 - **Documentation**: [https://docs.insforge.dev](https://docs.insforge.dev)
 - **Discord Community**: [https://discord.com/invite/MPxwj5xVvW](https://discord.com/invite/MPxwj5xVvW)
