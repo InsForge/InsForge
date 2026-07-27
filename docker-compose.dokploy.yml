@@ -31,11 +31,12 @@ services:
       PGRST_JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-min-32-characters}
       PGRST_DB_CHANNEL_ENABLED: "true"
       PGRST_DB_CHANNEL: pgrst
+      PGRST_ADMIN_SERVER_PORT: 3001
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ > /dev/null 2>&1 || exit 1"]
+      test: ["CMD", "postgrest", "--ready"]
       interval: 10s
       timeout: 5s
       retries: 10
