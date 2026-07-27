@@ -19,6 +19,11 @@ UPDATE auth.email_otps
   SET otp_type = 'HASH_TOKEN'
   WHERE otp_hash NOT LIKE '$2%';
 
+-- OTP sign-in looks up users case-insensitively (auth.users.email may be stored
+-- mixed-case for OAuth accounts), so serve the WHERE lower(email) = $1 FOR UPDATE
+-- lookup with a matching functional index instead of a sequential scan.
+CREATE INDEX IF NOT EXISTS idx_users_lower_email ON auth.users (lower(email));
+
 INSERT INTO email.templates (template_type, subject, body_html)
 VALUES (
   'request-otp',

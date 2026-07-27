@@ -23,6 +23,12 @@ describe('060_add-email-otp-sign-in migration', () => {
     expect(sql).toMatch(/SET otp_type = 'HASH_TOKEN'\s+WHERE otp_hash NOT LIKE '\$2%'/i);
   });
 
+  it('adds a functional index for case-insensitive user lookup idempotently', () => {
+    expect(sql).toMatch(
+      /CREATE INDEX IF NOT EXISTS idx_users_lower_email ON auth\.users \(lower\(email\)\)/i
+    );
+  });
+
   it('seeds the SMTP request-otp template idempotently', () => {
     expect(sql).toMatch(/INSERT INTO email\.templates/i);
     expect(sql).toContain("'request-otp'");
