@@ -32,28 +32,6 @@ npx @insforge/cli diagnose advisor --json
 
 Un hallazgo típico es una política RLS permisiva que expone una tabla a usuarios anónimos. El asesor nombra la tabla, la gravedad y el SQL para arreglarlo. El agente lee el hallazgo, aplica la remediación como una [migración](/core-concepts/database/migrations) y vuelve a escanear para confirmar que se borró.
 
-### Hallazgo de salud: proporción alta de tuplas muertas
-
-El hallazgo `health/dead-tuples` marca una tabla con demasiadas tuplas muertas. Refleja el comportamiento estándar de PostgreSQL, no un tráfico intenso, por lo que puede aparecer en un proyecto pequeño o poco usado:
-
-- Cada `UPDATE` o `DELETE` deja atrás la versión anterior de la fila como una *tupla muerta*. Así es como el MVCC de Postgres mantiene consistentes las lecturas concurrentes, y ocurre en toda tabla que cambia.
-- El autovacuum recupera ese espacio, pero de forma predeterminada solo se ejecuta cuando las filas muertas alcanzan el 20% de la tabla. En una tabla pequeña o de poca rotación, la proporción puede permanecer por encima del umbral del asesor un buen rato antes de que el autovacuum la alcance.
-
-La remediación recupera las tuplas muertas actuales y hace que el autovacuum se active antes en esa tabla:
-
-```sql
--- recupera las tuplas muertas ahora
-VACUUM ANALYZE files;
-
--- haz que el autovacuum se ejecute antes en esta tabla de alta rotación
-ALTER TABLE files SET (
-  autovacuum_vacuum_scale_factor = 0.05,  -- limpia al 5% de tuplas muertas (predeterminado 20%)
-  autovacuum_analyze_scale_factor = 0.02  -- analiza al 2% de cambios (predeterminado 10%)
-);
-```
-
-Aplica la parte `ALTER TABLE` como una [migración](/core-concepts/database/migrations) para que el ajuste quede versionado, luego vuelve a escanear con `diagnose advisor` para confirmar que el hallazgo se borró.
-
 ## Controles específicos
 
 Cada parte del informe también está disponible por sí sola:
