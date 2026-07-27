@@ -17,7 +17,7 @@ export default function CustomSmtpPage() {
     isLoading: isTemplatesLoading,
     isUpdating: isTemplatesUpdating,
     updateTemplate,
-  } = useEmailTemplates('custom_smtp');
+  } = useEmailTemplates();
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">

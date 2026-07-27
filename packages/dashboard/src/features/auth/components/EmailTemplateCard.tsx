@@ -60,22 +60,6 @@ export function EmailTemplateCard({
           defaultValue: 'Sent when a user requests a password reset via magic link.',
         }),
       },
-      'email-address-change-code': {
-        title: t('auth.emailAddressChangeCodeTitle', {
-          defaultValue: 'Email Address Change (Code)',
-        }),
-        description: t('auth.emailAddressChangeCodeDescription', {
-          defaultValue: 'Sent to the new email address to verify it via code.',
-        }),
-      },
-      'email-address-change-link': {
-        title: t('auth.emailAddressChangeLinkTitle', {
-          defaultValue: 'Email Address Change (Link)',
-        }),
-        description: t('auth.emailAddressChangeLinkDescription', {
-          defaultValue: 'Sent to the new email address to verify it via magic link.',
-        }),
-      },
     }),
     [t]
   );
@@ -88,84 +72,36 @@ export function EmailTemplateCard({
   const templateVariables = useMemo<
     Record<string, { name: string; description: string; sample: string }[]>
   >(() => {
-    const emailVariable = {
-      name: '%EMAIL%',
-      description: t('auth.varUserEmail', { defaultValue: "User's email address" }),
-      sample: 'user@example.com',
-    };
-    const nameVariable = {
-      name: '%DISPLAY_NAME%',
-      description: t('auth.varUserName', { defaultValue: "User's display name" }),
-      sample: 'John Doe',
-    };
-    const appNameVariable = {
-      name: '%APP_NAME%',
-      description: t('auth.varAppName', { defaultValue: 'Application Name' }),
-      sample: 'Your Awesome App',
-    };
-
     return {
       'email-verification-code': [
         {
-          name: '%TOKEN%',
+          name: '{{ token }}',
           description: t('auth.varVerificationCode', {
             defaultValue: '6-digit verification code',
           }),
           sample: '847295',
         },
-        emailVariable,
-        nameVariable,
-        appNameVariable,
       ],
       'email-verification-link': [
         {
-          name: '%LINK%',
+          name: '{{ link }}',
           description: t('auth.varVerificationUrl', { defaultValue: 'Email verification URL' }),
           sample: 'https://yourapp.com/verify?token=abc123',
         },
-        emailVariable,
-        nameVariable,
-        appNameVariable,
       ],
       'reset-password-code': [
         {
-          name: '%TOKEN%',
+          name: '{{ token }}',
           description: t('auth.varResetCode', { defaultValue: '6-digit reset code' }),
           sample: '382916',
         },
-        emailVariable,
-        nameVariable,
-        appNameVariable,
       ],
       'reset-password-link': [
         {
-          name: '%LINK%',
+          name: '{{ link }}',
           description: t('auth.varResetUrl', { defaultValue: 'Password reset URL' }),
           sample: 'https://yourapp.com/reset?token=xyz789',
         },
-        emailVariable,
-        nameVariable,
-        appNameVariable,
-      ],
-      'email-address-change-code': [
-        {
-          name: '%TOKEN%',
-          description: t('auth.varEmailChangeCode', { defaultValue: '6-digit email change code' }),
-          sample: '918273',
-        },
-        emailVariable,
-        nameVariable,
-        appNameVariable,
-      ],
-      'email-address-change-link': [
-        {
-          name: '%LINK%',
-          description: t('auth.varEmailChangeUrl', { defaultValue: 'Email address change URL' }),
-          sample: 'https://yourapp.com/change-email?token=xyz789',
-        },
-        emailVariable,
-        nameVariable,
-        appNameVariable,
       ],
     };
   }, [t]);

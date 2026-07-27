@@ -6,12 +6,9 @@ import { Link } from 'react-router-dom';
 
 export default function EmailPage() {
   const { t } = useTranslation('chrome');
-  const {
-    templates,
-    isLoading: isTemplatesLoading,
-    isUpdating: isTemplatesUpdating,
-    updateTemplate,
-  } = useEmailTemplates('default');
+  const isTemplatesLoading = false;
+  const isTemplatesUpdating = false;
+  const updateTemplate = () => {};
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
@@ -69,7 +66,7 @@ export default function EmailPage() {
             </div>
             <div className="px-6 py-6">
               <EmailTemplateCard
-                templates={templates}
+                templates={[]}
                 isLoading={isTemplatesLoading}
                 isUpdating={isTemplatesUpdating}
                 onSave={updateTemplate}

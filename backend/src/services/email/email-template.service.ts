@@ -57,7 +57,7 @@ export class EmailTemplateService {
   /**
    * Get all email templates ordered by template_type
    */
-  async getTemplates(providerType: string = 'custom_smtp'): Promise<EmailTemplateSchema[]> {
+  async getTemplates(): Promise<EmailTemplateSchema[]> {
     try {
       const result = await this.getPool().query(
         `SELECT
@@ -68,9 +68,7 @@ export class EmailTemplateService {
           created_at as "createdAt",
           updated_at as "updatedAt"
          FROM email.templates
-         WHERE provider_type = $1
-         ORDER BY template_type`,
-        [providerType]
+         ORDER BY template_type`
       );
 
       return result.rows.map(normalizeTemplateRow);
@@ -84,10 +82,7 @@ export class EmailTemplateService {
    * Get a single email template by type
    * Throws 404 if not found
    */
-  async getTemplate(
-    templateType: string,
-    providerType: string = 'custom_smtp'
-  ): Promise<EmailTemplateSchema> {
+  async getTemplate(templateType: string): Promise<EmailTemplateSchema> {
     try {
       const result = await this.getPool().query(
         `SELECT
@@ -98,8 +93,8 @@ export class EmailTemplateService {
           created_at as "createdAt",
           updated_at as "updatedAt"
          FROM email.templates
-         WHERE template_type = $1 AND provider_type = $2`,
-        [templateType, providerType]
+         WHERE template_type = $1`,
+        [templateType]
       );
 
       if (!result.rows.length) {
@@ -125,8 +120,7 @@ export class EmailTemplateService {
    */
   async updateTemplate(
     templateType: string,
-    input: UpdateEmailTemplateRequest,
-    providerType: string = 'custom_smtp'
+    input: UpdateEmailTemplateRequest
   ): Promise<EmailTemplateSchema> {
     try {
       const result = await this.getPool().query(
@@ -135,7 +129,7 @@ export class EmailTemplateService {
            subject = $1,
            body_html = $2,
            updated_at = NOW()
-         WHERE template_type = $3 AND provider_type = $4
+         WHERE template_type = $3
          RETURNING
            id,
            template_type as "templateType",
@@ -143,7 +137,7 @@ export class EmailTemplateService {
            body_html as "bodyHtml",
            created_at as "createdAt",
            updated_at as "updatedAt"`,
-        [input.subject, input.bodyHtml, templateType, providerType]
+        [input.subject, input.bodyHtml, templateType]
       );
 
       if (!result.rows.length) {

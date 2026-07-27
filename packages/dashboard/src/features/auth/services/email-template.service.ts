@@ -6,16 +6,15 @@ import type {
 } from '@insforge/shared-schemas';
 
 export class EmailTemplateService {
-  async getTemplates(providerType: string = 'custom_smtp'): Promise<ListEmailTemplatesResponse> {
-    return apiClient.request(`/auth/email-templates?provider=${providerType}`);
+  async getTemplates(): Promise<ListEmailTemplatesResponse> {
+    return apiClient.request('/auth/email-templates');
   }
 
   async updateTemplate(
     type: string,
-    data: UpdateEmailTemplateRequest,
-    providerType: string = 'custom_smtp'
+    data: UpdateEmailTemplateRequest
   ): Promise<EmailTemplateSchema> {
-    return apiClient.request(`/auth/email-templates/${type}?provider=${providerType}`, {
+    return apiClient.request(`/auth/email-templates/${type}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
