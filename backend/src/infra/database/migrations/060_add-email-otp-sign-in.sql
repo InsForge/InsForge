@@ -7,6 +7,18 @@
 ALTER TABLE auth.email_otps
   ADD COLUMN IF NOT EXISTS attempts_count INTEGER NOT NULL DEFAULT 0;
 
+-- Numeric codes (bcrypt) and hash-link tokens (SHA-256) share auth.email_otps
+-- under the same (email, purpose) key. Persisting the delivery type lets the
+-- numeric-code verify path filter to NUMERIC_CODE rows only, so a wrong 6-digit
+-- guess can never consume a live link token for the same (email, purpose).
+ALTER TABLE auth.email_otps
+  ADD COLUMN IF NOT EXISTS otp_type TEXT NOT NULL DEFAULT 'NUMERIC_CODE';
+
+-- Backfill existing rows: bcrypt hashes begin with '$2'; SHA-256 hex tokens do not.
+UPDATE auth.email_otps
+  SET otp_type = 'HASH_TOKEN'
+  WHERE otp_hash NOT LIKE '$2%';
+
 INSERT INTO email.templates (template_type, subject, body_html)
 VALUES (
   'request-otp',

@@ -2224,7 +2224,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [email-verification-code, email-verification-link, reset-password-code, reset-password-link]
+            enum: [email-verification-code, email-verification-link, request-otp, reset-password-code, reset-password-link]
           description: Template type to update
       requestBody:
         required: true
@@ -2500,7 +2500,7 @@ components:
           format: uuid
         templateType:
           type: string
-          enum: [email-verification-code, email-verification-link, reset-password-code, reset-password-link]
+          enum: [email-verification-code, email-verification-link, request-otp, reset-password-code, reset-password-link]
         subject:
           type: string
         bodyHtml:

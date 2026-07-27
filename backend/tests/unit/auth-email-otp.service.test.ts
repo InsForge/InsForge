@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
     release: vi.fn(),
   },
   createEmailOTP: vi.fn(),
-  attemptEmailOTPWithCode: vi.fn(),
+  consumeNumericOTP: vi.fn(),
   sendWithTemplate: vi.fn(),
   getAuthConfig: vi.fn(),
   generateAccessToken: vi.fn(),
@@ -50,7 +50,7 @@ vi.mock('../../src/services/auth/auth-otp.service.js', () => ({
   AuthOTPService: {
     getInstance: () => ({
       createEmailOTP: mocks.createEmailOTP,
-      attemptEmailOTPWithCode: mocks.attemptEmailOTPWithCode,
+      consumeNumericOTP: mocks.consumeNumericOTP,
     }),
   },
   OTPPurpose: {
@@ -158,14 +158,11 @@ describe('AuthService email OTP sign-in', () => {
       otp: '123456',
       expiresAt: new Date('2026-01-01T00:05:00.000Z'),
     });
-    mocks.attemptEmailOTPWithCode.mockResolvedValue({
-      success: true,
-      value: {
-        success: true,
-        email: 'user@example.com',
-        purpose: 'SIGN_IN',
-      },
-    });
+    // By default the helper verifies successfully and runs the caller's work on
+    // the mock client, mirroring a committed transaction.
+    mocks.consumeNumericOTP.mockImplementation((email, purpose, _code, onVerified) =>
+      onVerified(mocks.client, { success: true, email, purpose, redirectTo: null })
+    );
     mocks.sendWithTemplate.mockResolvedValue(undefined);
     mocks.generateAccessToken.mockReturnValue('access-token');
     authService = AuthService.getInstance();
@@ -209,13 +206,18 @@ describe('AuthService email OTP sign-in', () => {
 
   it('creates a verified passwordless user only after a valid OTP', async () => {
     mocks.client.query
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ disable_signup: false }] })
-      .mockResolvedValueOnce({ rows: [{ id: USER_RECORD.id }] })
-      .mockResolvedValueOnce({ rows: [] });
+      .mockResolvedValueOnce({ rows: [] }) // SELECT auth.users (no existing user)
+      .mockResolvedValueOnce({ rows: [{ id: USER_RECORD.id }] }) // INSERT auth.users
+      .mockResolvedValueOnce({ rows: [] }); // INSERT auth.user_providers
 
     const result = await authService.signInWithOTP('user@example.com', '123456', 'Ada Lovelace');
+
+    expect(mocks.consumeNumericOTP).toHaveBeenCalledWith(
+      'user@example.com',
+      'SIGN_IN',
+      '123456',
+      expect.any(Function)
+    );
 
     const insertCall = mocks.client.query.mock.calls.find(
       ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO auth.users')
@@ -244,12 +246,11 @@ describe('AuthService email OTP sign-in', () => {
 
   it('removes the password when OTP verifies a pre-existing unverified user', async () => {
     mocks.client.query
-      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [{ id: USER_RECORD.id, email_verified: false }],
-      })
-      .mockResolvedValueOnce({ rows: [{ id: USER_RECORD.id }] })
-      .mockResolvedValueOnce({ rows: [] });
+      }) // SELECT auth.users (found, unverified)
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE password = NULL
+      .mockResolvedValueOnce({ rows: [] }); // INSERT auth.user_providers
 
     await authService.signInWithOTP('user@example.com', '123456');
 
@@ -260,58 +261,79 @@ describe('AuthService email OTP sign-in', () => {
     expect(updateCall?.[1]).toEqual([USER_RECORD.id]);
   });
 
-  it('consumes a correct OTP before rejecting first-time signup when signups are disabled', async () => {
-    const replayError = new AppError(
-      'Invalid or expired verification code',
-      400,
-      ERROR_CODES.INVALID_INPUT
-    );
-    mocks.attemptEmailOTPWithCode
-      .mockResolvedValueOnce({
-        success: true,
-        value: {
-          success: true,
-          email: 'new@example.com',
-          purpose: 'SIGN_IN',
-        },
-      })
-      .mockResolvedValueOnce({ success: false, error: replayError });
-    mocks.client.query
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ disable_signup: true }] });
-
-    await expect(authService.signInWithOTP('new@example.com', '123456')).rejects.toMatchObject({
-      statusCode: 403,
-      code: ERROR_CODES.AUTH_SIGNUP_DISABLED,
+  it('preserves the password and single email provider for an existing verified user', async () => {
+    vi.spyOn(authService, 'getUserById').mockResolvedValue({
+      ...USER_RECORD,
+      email_verified: true,
+      password: 'hashed-password',
+      providers: 'email',
     });
-    await expect(authService.signInWithOTP('new@example.com', '123456')).rejects.toBe(replayError);
+    mocks.client.query
+      .mockResolvedValueOnce({ rows: [{ id: USER_RECORD.id, email_verified: true }] }) // SELECT auth.users (verified)
+      .mockResolvedValueOnce({ rows: [] }); // INSERT auth.user_providers
 
+    const result = await authService.signInWithOTP('user@example.com', '123456');
+
+    expect(
+      mocks.client.query.mock.calls.some(
+        ([sql]) => typeof sql === 'string' && sql.includes('SET password = NULL')
+      )
+    ).toBe(false);
     expect(
       mocks.client.query.mock.calls.some(
         ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO auth.users')
       )
     ).toBe(false);
+    expect(result.user.providers).toEqual(['email']);
+  });
+
+  it('rejects a first-time signup with 403 when signups are disabled, without creating a user', async () => {
+    mocks.getAuthConfig.mockResolvedValue({ ...AUTH_CONFIG, disableSignup: true });
+    mocks.client.query.mockResolvedValueOnce({ rows: [] }); // SELECT auth.users (no existing user)
+
+    await expect(authService.signInWithOTP('new@example.com', '123456')).rejects.toMatchObject({
+      statusCode: 403,
+      code: ERROR_CODES.AUTH_SIGNUP_DISABLED,
+    });
+
+    // The helper already consumed/committed the code; signInWithOTP only blocks
+    // the account creation and never writes to auth.users.
+    expect(mocks.consumeNumericOTP).toHaveBeenCalledWith(
+      'new@example.com',
+      'SIGN_IN',
+      '123456',
+      expect.any(Function)
+    );
     expect(
       mocks.client.query.mock.calls.some(
-        ([sql]) => typeof sql === 'string' && sql.includes('FOR SHARE')
+        ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO auth.users')
       )
-    ).toBe(true);
-    expect(mocks.client.query.mock.calls.filter(([sql]) => sql === 'COMMIT')).toHaveLength(2);
-    expect(mocks.client.query.mock.calls.some(([sql]) => sql === 'ROLLBACK')).toBe(false);
+    ).toBe(false);
+  });
+
+  it('surfaces the verification error when the OTP is invalid', async () => {
+    const invalidCode = new AppError(
+      'Invalid or expired verification code',
+      400,
+      ERROR_CODES.INVALID_INPUT
+    );
+    mocks.consumeNumericOTP.mockRejectedValue(invalidCode);
+
+    await expect(authService.signInWithOTP('user@example.com', '000000')).rejects.toBe(invalidCode);
+
+    // A failed attempt never runs the user-creation callback.
+    expect(mocks.client.query).not.toHaveBeenCalled();
   });
 
   it('recovers when another signup creates the user concurrently', async () => {
     mocks.client.query
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ disable_signup: false }] })
-      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] }) // SELECT auth.users (no existing user)
+      .mockResolvedValueOnce({ rows: [] }) // INSERT auth.users (concurrent conflict → no row)
       .mockResolvedValueOnce({
         rows: [{ id: USER_RECORD.id, email_verified: false }],
-      })
-      .mockResolvedValueOnce({ rows: [{ id: USER_RECORD.id }] })
-      .mockResolvedValueOnce({ rows: [] });
+      }) // re-SELECT auth.users (found)
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE password = NULL
+      .mockResolvedValueOnce({ rows: [] }); // INSERT auth.user_providers
 
     await authService.signInWithOTP('user@example.com', '123456');
 
@@ -329,27 +351,5 @@ describe('AuthService email OTP sign-in', () => {
         ([sql]) => typeof sql === 'string' && sql.includes('SET password = NULL')
       )
     ).toBe(true);
-  });
-
-  it('commits a failed OTP attempt without looking up or creating a user', async () => {
-    const invalidCode = new AppError(
-      'Invalid or expired verification code',
-      400,
-      ERROR_CODES.INVALID_INPUT
-    );
-    mocks.attemptEmailOTPWithCode.mockResolvedValue({
-      success: false,
-      error: invalidCode,
-    });
-    mocks.client.query.mockResolvedValue({ rows: [] });
-
-    await expect(authService.signInWithOTP('user@example.com', '000000')).rejects.toBe(invalidCode);
-
-    expect(mocks.client.query).toHaveBeenCalledWith('COMMIT');
-    expect(
-      mocks.client.query.mock.calls.some(
-        ([sql]) => typeof sql === 'string' && sql.includes('FROM auth.users')
-      )
-    ).toBe(false);
   });
 });

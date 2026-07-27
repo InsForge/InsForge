@@ -265,6 +265,7 @@ The response uses the same session shape and `client_type` behavior as password 
 <Note>
 - Codes expire after 5 minutes, can be used once, and are consumed after three failed attempts.
 - InsForge does not create a user when the code is sent. If the email is new, a verified passwordless user is created only after successful verification.
+- Verifying a code for an existing unverified account clears its stored password, leaving the account passwordless.
 - If public signups are disabled, an existing user can still sign in. A valid code for an unknown email is consumed and returns HTTP 403.
 </Note>
 

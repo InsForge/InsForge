@@ -56,6 +56,18 @@ describe('email OTP sign-in schemas', () => {
     });
   });
 
+  it('treats a null or undefined method as the legacy password flow', () => {
+    for (const method of [null, undefined]) {
+      const result = createSessionRequestSchema.parse({
+        method,
+        email: 'user@example.com',
+        password: 'securepassword123',
+      });
+
+      expect(result).toMatchObject({ method: 'password', email: 'user@example.com' });
+    }
+  });
+
   it('accepts an explicit password method', () => {
     const result = createSessionRequestSchema.parse({
       method: 'password',

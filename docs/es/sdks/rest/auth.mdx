@@ -265,6 +265,7 @@ La respuesta usa la misma estructura de sesión y el mismo comportamiento de `cl
 <Note>
 - Los códigos caducan después de 5 minutos, solo pueden usarse una vez y se consumen después de tres intentos fallidos.
 - InsForge no crea un usuario al enviar el código. Si el correo es nuevo, crea un usuario verificado sin contraseña solo después de verificarlo correctamente.
+- Verificar un código para una cuenta existente no verificada elimina su contraseña almacenada, dejando la cuenta sin contraseña.
 - Si el registro público está deshabilitado, un usuario existente todavía puede iniciar sesión. Un código válido para un correo desconocido se consume y devuelve HTTP 403.
 </Note>
 

@@ -352,136 +352,116 @@ export class AuthService {
     verificationCode: string,
     name?: string
   ): Promise<CreateSessionResponse> {
-    const pool = this.getPool();
-    const client = await pool.connect();
-    let transactionActive = false;
+    const { disableSignup } = await AuthConfigService.getInstance().getAuthConfig();
 
-    try {
-      await client.query('BEGIN');
-      transactionActive = true;
-
-      const attempt = await AuthOTPService.getInstance().attemptEmailOTPWithCode(
-        client,
-        email,
-        OTPPurpose.SIGN_IN,
-        verificationCode
-      );
-
-      if (!attempt.success) {
-        await client.query('COMMIT');
-        transactionActive = false;
-        throw attempt.error;
-      }
-
-      let existingUser = await client.query(
-        `SELECT id, email_verified
-         FROM auth.users
-         WHERE email = $1
-         FOR UPDATE`,
-        [email]
-      );
-
-      let userId: string | undefined;
-      if (!existingUser.rows.length) {
-        const authConfig = await client.query(
-          `SELECT disable_signup
-           FROM auth.config
-           LIMIT 1
-           FOR SHARE`
-        );
-        const disableSignup = authConfig.rows[0]?.disable_signup ?? false;
-        if (disableSignup) {
-          await client.query('COMMIT');
-          transactionActive = false;
-          throw new AppError(
-            'User signups are disabled for this project.',
-            403,
-            ERROR_CODES.AUTH_SIGNUP_DISABLED
-          );
-        }
-
-        const proposedUserId = crypto.randomUUID();
-        const profile = JSON.stringify(name ? { name } : {});
-        const createdUser = await client.query(
-          `INSERT INTO auth.users (
-             id, email, password, profile, email_verified, created_at, updated_at
-           )
-           VALUES ($1, $2, NULL, $3::jsonb, true, NOW(), NOW())
-           ON CONFLICT (email) DO NOTHING
-           RETURNING id`,
-          [proposedUserId, email, profile]
+    // AuthOTPService owns the transaction: the code is consumed atomically with
+    // the user creation/lookup below, and the persisted attempt counter is
+    // committed even when verification fails.
+    const outcome = await AuthOTPService.getInstance().consumeNumericOTP(
+      email,
+      OTPPurpose.SIGN_IN,
+      verificationCode,
+      async (client): Promise<{ blocked: true } | { userId: string }> => {
+        let existingUser = await client.query(
+          `SELECT id, email_verified
+           FROM auth.users
+           WHERE lower(email) = $1
+           FOR UPDATE`,
+          [email]
         );
 
-        if (createdUser.rows.length) {
-          userId = createdUser.rows[0].id;
-        } else {
-          existingUser = await client.query(
-            `SELECT id, email_verified
-             FROM auth.users
-             WHERE email = $1
-             FOR UPDATE`,
-            [email]
-          );
-        }
-      }
+        let userId: string | undefined;
+        if (!existingUser.rows.length) {
+          // The code is already consumed. Signal a blocked signup so the caller
+          // rejects after the transaction commits — keeping the send path
+          // uniform and avoiding an account-enumeration timing leak.
+          if (disableSignup) {
+            return { blocked: true };
+          }
 
-      if (!userId && existingUser.rows.length) {
-        const dbUser = existingUser.rows[0];
-        userId = dbUser.id;
-
-        if (!dbUser.email_verified) {
-          const updatedUser = await client.query(
-            `UPDATE auth.users
-             SET password = NULL, email_verified = true, updated_at = NOW()
-             WHERE id = $1
+          const proposedUserId = crypto.randomUUID();
+          const profile = JSON.stringify(name ? { name } : {});
+          const createdUser = await client.query(
+            `INSERT INTO auth.users (
+               id, email, password, profile, email_verified, created_at, updated_at
+             )
+             VALUES ($1, $2, NULL, $3::jsonb, true, NOW(), NOW())
+             ON CONFLICT (email) DO NOTHING
              RETURNING id`,
-            [userId]
+            [proposedUserId, email, profile]
           );
-          userId = updatedUser.rows[0].id;
+
+          if (createdUser.rows.length) {
+            userId = createdUser.rows[0].id;
+          } else {
+            existingUser = await client.query(
+              `SELECT id, email_verified
+               FROM auth.users
+               WHERE lower(email) = $1
+               FOR UPDATE`,
+              [email]
+            );
+          }
         }
-      }
 
-      if (!userId) {
-        throw new Error('User not found after concurrent OTP sign-in');
-      }
+        if (!userId && existingUser.rows.length) {
+          const dbUser = existingUser.rows[0];
+          userId = dbUser.id;
 
-      await client.query(
-        `INSERT INTO auth.user_providers (
-           user_id, provider, provider_account_id, provider_data, created_at, updated_at
-         )
-         VALUES ($1, 'email', $2, '{"method":"otp"}'::jsonb, NOW(), NOW())
-         ON CONFLICT (provider, provider_account_id)
-         DO UPDATE SET
-           user_id = EXCLUDED.user_id,
-           provider_data = EXCLUDED.provider_data,
-           updated_at = NOW()`,
-        [userId, email]
+          // A verified OTP proves email ownership: clear any password on a
+          // pre-existing unverified account and mark it verified.
+          if (!dbUser.email_verified) {
+            await client.query(
+              `UPDATE auth.users
+               SET password = NULL, email_verified = true, updated_at = NOW()
+               WHERE id = $1`,
+              [userId]
+            );
+          }
+        }
+
+        if (!userId) {
+          throw new Error('User not found after concurrent OTP sign-in');
+        }
+
+        await client.query(
+          `INSERT INTO auth.user_providers (
+             user_id, provider, provider_account_id, provider_data, created_at, updated_at
+           )
+           VALUES ($1, 'email', $2, '{"method":"otp"}'::jsonb, NOW(), NOW())
+           ON CONFLICT (provider, provider_account_id)
+           DO UPDATE SET
+             provider_data = EXCLUDED.provider_data,
+             updated_at = NOW()
+           WHERE auth.user_providers.user_id = EXCLUDED.user_id`,
+          [userId, email]
+        );
+
+        return { userId };
+      }
+    );
+
+    if ('blocked' in outcome) {
+      throw new AppError(
+        'User signups are disabled for this project.',
+        403,
+        ERROR_CODES.AUTH_SIGNUP_DISABLED
       );
-
-      await client.query('COMMIT');
-      transactionActive = false;
-
-      const dbUser = await this.getUserById(userId);
-      if (!dbUser) {
-        throw new Error('User not found after OTP sign-in');
-      }
-
-      const user = this.transformUserRecordToSchema(dbUser);
-      const accessToken = this.tokenManager.generateAccessToken({
-        sub: dbUser.id,
-        email: dbUser.email,
-        role: 'authenticated',
-      });
-
-      return { user, accessToken };
-    } catch (error) {
-      if (transactionActive) {
-        await client.query('ROLLBACK');
-      }
-      throw error;
-    } finally {
-      client.release();
     }
+
+    const dbUser = await this.getUserById(outcome.userId);
+    if (!dbUser) {
+      throw new AppError('Failed to complete sign-in', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+
+    const user = this.transformUserRecordToSchema(dbUser);
+    const accessToken = this.tokenManager.generateAccessToken({
+      sub: dbUser.id,
+      email: dbUser.email,
+      role: 'authenticated',
+    });
+
+    return { user, accessToken };
   }
 
   /**
@@ -556,70 +536,46 @@ export class AuthService {
    * Verifies the email OTP code and updates the account in a single transaction
    */
   async verifyEmailWithCode(email: string, verificationCode: string): Promise<VerifyEmailResponse> {
-    const dbManager = DatabaseManager.getInstance();
-    const pool = dbManager.getPool();
-    const client = await pool.connect();
-    let transactionActive = false;
+    // AuthOTPService owns the transaction: the code is consumed atomically with
+    // the email-verification update, and the attempt counter is committed even
+    // when verification fails.
+    const userId = await AuthOTPService.getInstance().consumeNumericOTP(
+      email,
+      OTPPurpose.VERIFY_EMAIL,
+      verificationCode,
+      async (client): Promise<string> => {
+        const result = await client.query(
+          `UPDATE auth.users
+           SET email_verified = true, updated_at = NOW()
+           WHERE email = $1
+           RETURNING id`,
+          [email]
+        );
 
-    try {
-      await client.query('BEGIN');
-      transactionActive = true;
+        if (result.rows.length === 0) {
+          throw new Error('User not found');
+        }
 
-      // Verify OTP using the OTP service (within the same transaction)
-      const otpService = AuthOTPService.getInstance();
-      const attempt = await otpService.attemptEmailOTPWithCode(
-        client,
-        email,
-        OTPPurpose.VERIFY_EMAIL,
-        verificationCode
-      );
-      if (!attempt.success) {
-        await client.query('COMMIT');
-        transactionActive = false;
-        throw attempt.error;
+        return result.rows[0].id;
       }
+    );
 
-      // Update account email verification status
-      const result = await client.query(
-        `UPDATE auth.users
-         SET email_verified = true, updated_at = NOW()
-         WHERE email = $1
-         RETURNING id`,
-        [email]
-      );
-
-      if (result.rows.length === 0) {
-        throw new Error('User not found');
-      }
-
-      await client.query('COMMIT');
-      transactionActive = false;
-
-      // Fetch full user record with provider data
-      const userId = result.rows[0].id;
-      const dbUser = await this.getUserById(userId);
-      if (!dbUser) {
-        throw new Error('User not found after verification');
-      }
-      const user = this.transformUserRecordToSchema(dbUser);
-      const accessToken = this.tokenManager.generateAccessToken({
-        sub: dbUser.id,
-        email: dbUser.email,
-        role: 'authenticated',
-      });
-
-      return {
-        user,
-        accessToken,
-      };
-    } catch (error) {
-      if (transactionActive) {
-        await client.query('ROLLBACK');
-      }
-      throw error;
-    } finally {
-      client.release();
+    // Fetch full user record with provider data
+    const dbUser = await this.getUserById(userId);
+    if (!dbUser) {
+      throw new AppError('Failed to complete verification', 500, ERROR_CODES.INTERNAL_ERROR);
     }
+    const user = this.transformUserRecordToSchema(dbUser);
+    const accessToken = this.tokenManager.generateAccessToken({
+      sub: dbUser.id,
+      email: dbUser.email,
+      role: 'authenticated',
+    });
+
+    return {
+      user,
+      accessToken,
+    };
   }
 
   /**
@@ -1379,7 +1335,7 @@ export class AuthService {
         u.created_at,
         u.updated_at,
         u.password,
-        STRING_AGG(a.provider, ',') as providers
+        STRING_AGG(DISTINCT a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
       WHERE u.email = $1
@@ -1408,7 +1364,7 @@ export class AuthService {
         u.created_at,
         u.updated_at,
         u.password,
-        STRING_AGG(a.provider, ',') as providers
+        STRING_AGG(DISTINCT a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
       WHERE u.id = $1
@@ -1474,7 +1430,7 @@ export class AuthService {
         u.created_at,
         u.updated_at,
         u.password,
-        STRING_AGG(a.provider, ',') as providers
+        STRING_AGG(DISTINCT a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
       WHERE u.is_anonymous = false

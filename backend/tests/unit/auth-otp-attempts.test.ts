@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   },
   client: {
     query: vi.fn(),
+    release: vi.fn(),
   },
   compare: vi.fn(),
   hash: vi.fn(),
@@ -38,6 +39,8 @@ vi.mock('bcryptjs', () => ({
 }));
 
 import { AuthOTPService, OTPPurpose, OTPType } from '../../src/services/auth/auth-otp.service.js';
+import { AppError } from '../../src/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 describe('AuthOTPService numeric attempt limits', () => {
   let service: AuthOTPService;
@@ -45,6 +48,7 @@ describe('AuthOTPService numeric attempt limits', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Reflect.set(AuthOTPService, 'instance', undefined);
+    mocks.pool.connect.mockResolvedValue(mocks.client);
     service = AuthOTPService.getInstance();
   });
 
@@ -153,20 +157,23 @@ describe('AuthOTPService numeric attempt limits', () => {
 
   it('resets attempts and uses a five-minute expiry for sign-in challenges', async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
-    mocks.hash.mockResolvedValue('hash');
-    mocks.pool.query.mockResolvedValue({ rows: [] });
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+      mocks.hash.mockResolvedValue('hash');
+      mocks.pool.query.mockResolvedValue({ rows: [] });
 
-    const result = await service.createEmailOTP(
-      'user@example.com',
-      OTPPurpose.SIGN_IN,
-      OTPType.NUMERIC_CODE,
-      { expiresInMinutes: 5 }
-    );
+      const result = await service.createEmailOTP(
+        'user@example.com',
+        OTPPurpose.SIGN_IN,
+        OTPType.NUMERIC_CODE,
+        { expiresInMinutes: 5 }
+      );
 
-    expect(result.expiresAt.toISOString()).toBe('2026-01-01T00:05:00.000Z');
-    expect(mocks.pool.query.mock.calls[0][0]).toContain('attempts_count = 0');
-    vi.useRealTimers();
+      expect(result.expiresAt.toISOString()).toBe('2026-01-01T00:05:00.000Z');
+      expect(mocks.pool.query.mock.calls[0][0]).toContain('attempts_count = 0');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each([OTPPurpose.VERIFY_EMAIL, OTPPurpose.RESET_PASSWORD])(
@@ -180,4 +187,94 @@ describe('AuthOTPService numeric attempt limits', () => {
       expect(mocks.pool.query.mock.calls[0][0]).toContain('attempts_count = 0');
     }
   );
+});
+
+describe('AuthOTPService.consumeNumericOTP transaction ownership', () => {
+  let service: AuthOTPService;
+
+  const validRow = {
+    id: 'otp-id',
+    email: 'user@example.com',
+    purpose: OTPPurpose.SIGN_IN,
+    otp_hash: 'hash',
+    expires_at: new Date(Date.now() + 60_000),
+    consumed_at: null,
+    redirect_to: null,
+    attempts_count: 0,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Reflect.set(AuthOTPService, 'instance', undefined);
+    mocks.pool.connect.mockResolvedValue(mocks.client);
+    service = AuthOTPService.getInstance();
+  });
+
+  it('commits the caller work with the consumed code and returns its result', async () => {
+    mocks.client.query
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [validRow] }) // SELECT ... FOR UPDATE
+      .mockResolvedValueOnce({ rowCount: 1 }) // consume
+      .mockResolvedValueOnce(undefined); // COMMIT
+    mocks.compare.mockResolvedValue(true);
+    const onVerified = vi.fn().mockResolvedValue('session');
+
+    const result = await service.consumeNumericOTP(
+      'user@example.com',
+      OTPPurpose.SIGN_IN,
+      '123456',
+      onVerified
+    );
+
+    expect(result).toBe('session');
+    expect(onVerified).toHaveBeenCalledWith(
+      mocks.client,
+      expect.objectContaining({ success: true })
+    );
+    const sql = mocks.client.query.mock.calls.map(([q]) => q);
+    expect(sql).toContain('BEGIN');
+    expect(sql).toContain('COMMIT');
+    expect(sql).not.toContain('ROLLBACK');
+    expect(mocks.client.release).toHaveBeenCalledOnce();
+  });
+
+  it('commits the persisted attempt counter before throwing on a failed code', async () => {
+    mocks.client.query
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [validRow] }) // SELECT ... FOR UPDATE
+      .mockResolvedValueOnce({}) // attempt increment
+      .mockResolvedValueOnce(undefined); // COMMIT
+    mocks.compare.mockResolvedValue(false);
+    const onVerified = vi.fn();
+
+    await expect(
+      service.consumeNumericOTP('user@example.com', OTPPurpose.SIGN_IN, '000000', onVerified)
+    ).rejects.toBeInstanceOf(AppError);
+
+    expect(onVerified).not.toHaveBeenCalled();
+    const sql = mocks.client.query.mock.calls.map(([q]) => q);
+    expect(sql).toContain('COMMIT');
+    expect(sql).not.toContain('ROLLBACK');
+  });
+
+  it('rolls back when the caller work throws, un-consuming the code', async () => {
+    mocks.client.query
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [validRow] }) // SELECT ... FOR UPDATE
+      .mockResolvedValueOnce({ rowCount: 1 }) // consume
+      .mockResolvedValueOnce(undefined); // ROLLBACK
+    mocks.compare.mockResolvedValue(true);
+    const boom = new AppError('boom', 400, ERROR_CODES.INVALID_INPUT);
+
+    await expect(
+      service.consumeNumericOTP('user@example.com', OTPPurpose.SIGN_IN, '123456', async () => {
+        throw boom;
+      })
+    ).rejects.toBe(boom);
+
+    const sql = mocks.client.query.mock.calls.map(([q]) => q);
+    expect(sql).toContain('ROLLBACK');
+    expect(sql).not.toContain('COMMIT');
+    expect(mocks.client.release).toHaveBeenCalledOnce();
+  });
 });

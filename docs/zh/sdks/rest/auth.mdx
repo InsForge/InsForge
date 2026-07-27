@@ -265,6 +265,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=server
 <Note>
 - 验证码有效期为 5 分钟，只能使用一次，并会在三次失败尝试后失效。
 - InsForge 不会在发送验证码时创建用户。如果邮箱尚未注册，只会在验证成功后创建已验证的免密码用户。
+- 为现有的未验证账户验证验证码会清除其已存储的密码，使该账户变为免密码。
 - 如果已禁用公开注册，现有用户仍可登录。未知邮箱的有效验证码会被消费，并返回 HTTP 403。
 </Note>
 

@@ -145,18 +145,19 @@ export class AuthOTPService {
       // This ensures only one active token per email/purpose (replaces any existing token)
       await this.getPool().query(
         `INSERT INTO auth.email_otps (
-           email, purpose, otp_hash, expires_at, consumed_at, redirect_to, attempts_count
+           email, purpose, otp_hash, otp_type, expires_at, consumed_at, redirect_to, attempts_count
          )
-         VALUES ($1, $2, $3, $4, NULL, $5, 0)
+         VALUES ($1, $2, $3, $4, $5, NULL, $6, 0)
          ON CONFLICT (email, purpose)
          DO UPDATE SET
            otp_hash = EXCLUDED.otp_hash,
+           otp_type = EXCLUDED.otp_type,
            expires_at = EXCLUDED.expires_at,
            redirect_to = EXCLUDED.redirect_to,
            consumed_at = NULL,
            attempts_count = 0,
            updated_at = NOW()`,
-        [email, purpose, otpHash, expiresAt, options?.redirectTo ?? null]
+        [email, purpose, otpHash, otpType, expiresAt, options?.redirectTo ?? null]
       );
 
       logger.info('Email verification token created successfully', {
@@ -181,10 +182,17 @@ export class AuthOTPService {
   }
 
   /**
-   * Attempt a numeric OTP verification inside a caller-owned transaction.
+   * Low-level primitive: attempt a numeric OTP verification on a caller-owned
+   * transaction. Expected failures are returned (not thrown) so the persisted
+   * attempt counter can be committed before the error surfaces.
    *
-   * Expected verification failures are returned instead of thrown so the caller
-   * can commit the persisted attempt counter before surfacing the error.
+   * Prefer {@link consumeNumericOTP}, which owns the transaction and guarantees
+   * the counter is committed even on failure. Call this directly only from
+   * inside a transaction you commit on both the success and failure paths;
+   * throwing-and-rolling-back here would silently discard the attempt counter.
+   *
+   * Scoped to NUMERIC_CODE rows so a wrong code can never touch a HASH_TOKEN row
+   * (magic-link) sharing the same (email, purpose).
    */
   async attemptEmailOTPWithCode(
     client: PoolClient,
@@ -196,7 +204,7 @@ export class AuthOTPService {
       `SELECT
          id, email, purpose, otp_hash, expires_at, consumed_at, redirect_to, attempts_count
        FROM auth.email_otps
-       WHERE email = $1 AND purpose = $2
+       WHERE email = $1 AND purpose = $2 AND otp_type = 'NUMERIC_CODE'
        FOR UPDATE`,
       [email, purpose]
     );
@@ -230,9 +238,6 @@ export class AuthOTPService {
          WHERE id = $1`,
         [otpRecord.id, this.MAX_NUMERIC_CODE_ATTEMPTS]
       );
-    }
-
-    if (!isValid) {
       return { success: false, error: this.invalidCodeError() };
     }
 
@@ -261,13 +266,23 @@ export class AuthOTPService {
   }
 
   /**
-   * Verify a numeric OTP code in a self-contained transaction.
+   * Verify a numeric OTP code and run caller work in one transaction.
+   *
+   * Owns the transaction boundary so callers cannot break the brute-force
+   * invariant: a failed attempt is committed (persisting the attempt counter)
+   * before its error is thrown, a successful attempt plus the caller's
+   * `onVerified` work commit together, and any error thrown by `onVerified`
+   * rolls the whole transaction back (un-consuming the code).
+   *
+   * `onVerified` receives the same open client and the verification result, so
+   * it can read/write additional rows atomically with the OTP consumption.
    */
-  async verifyEmailOTPWithCode(
+  async consumeNumericOTP<T>(
     email: string,
     purpose: OTPPurpose,
-    code: string
-  ): Promise<VerifyOTPResult> {
+    code: string,
+    onVerified: (client: PoolClient, verified: VerifyOTPResult) => Promise<T>
+  ): Promise<T> {
     const client = await this.getPool().connect();
     let transactionActive = false;
 
@@ -276,13 +291,18 @@ export class AuthOTPService {
       transactionActive = true;
 
       const attempt = await this.attemptEmailOTPWithCode(client, email, purpose, code);
-      await client.query('COMMIT');
-      transactionActive = false;
-
       if (!attempt.success) {
+        // Commit the persisted attempt counter before surfacing the failure.
+        await client.query('COMMIT');
+        transactionActive = false;
         throw attempt.error;
       }
-      return attempt.value;
+
+      const result = await onVerified(client, attempt.value);
+
+      await client.query('COMMIT');
+      transactionActive = false;
+      return result;
     } catch (error) {
       if (transactionActive) {
         await client.query('ROLLBACK');
@@ -330,6 +350,7 @@ export class AuthOTPService {
         `SELECT id, email, purpose, otp_hash, expires_at, consumed_at, redirect_to
          FROM auth.email_otps
          WHERE purpose = $1
+           AND otp_type = 'HASH_TOKEN'
            AND otp_hash = $2
            AND expires_at > NOW()
            AND consumed_at IS NULL
@@ -412,36 +433,25 @@ export class AuthOTPService {
     purpose: OTPPurpose,
     numericCode: string
   ): Promise<{ token: string; expiresAt: Date }> {
-    const client = await this.getPool().connect();
-    let transactionActive = false;
-
-    try {
-      await client.query('BEGIN');
-      transactionActive = true;
-
-      // Step 1: Verify the numeric code (consumes it atomically)
-      const attempt = await this.attemptEmailOTPWithCode(client, email, purpose, numericCode);
-      if (!attempt.success) {
-        await client.query('COMMIT');
-        transactionActive = false;
-        throw attempt.error;
-      }
-
-      // Step 2: Generate a long-lived hash token
+    // Verify + consume the numeric code and issue the token in one transaction:
+    // the code is consumed only if token issuance succeeds.
+    return this.consumeNumericOTP(email, purpose, numericCode, async (client) => {
+      // Generate a long-lived hash token
       const token = generateSecureToken(this.HASH_TOKEN_BYTES);
       const expiresAt = new Date(Date.now() + this.HASH_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-      // Step 3: Insert the new token (replaces the consumed numeric code)
-      // Uses upsert to overwrite the consumed code record with the new token
+      // Insert the new token, replacing the consumed numeric code for this
+      // (email, purpose) and flipping the row's type to HASH_TOKEN.
       await client.query(
         `INSERT INTO auth.email_otps (
-           email, purpose, otp_hash, expires_at, consumed_at, redirect_to, attempts_count
+           email, purpose, otp_hash, otp_type, expires_at, consumed_at, redirect_to, attempts_count
          )
-         VALUES ($1, $2, $3, $4, NULL, NULL, 0)
+         VALUES ($1, $2, $3, 'HASH_TOKEN', $4, NULL, NULL, 0)
          ON CONFLICT (email, purpose)
          DO UPDATE SET
            otp_hash = EXCLUDED.otp_hash,
+           otp_type = EXCLUDED.otp_type,
            expires_at = EXCLUDED.expires_at,
            redirect_to = EXCLUDED.redirect_to,
            consumed_at = NULL,
@@ -450,26 +460,10 @@ export class AuthOTPService {
         [email, purpose, tokenHash, expiresAt]
       );
 
-      await client.query('COMMIT');
-      transactionActive = false;
-
       logger.info('Successfully exchanged numeric code for hash token', { email, purpose });
 
       return { token, expiresAt };
-    } catch (error) {
-      if (transactionActive) {
-        await client.query('ROLLBACK');
-      }
-
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      logger.error('Failed to exchange code for token', { error, email, purpose });
-      throw new AppError('Failed to exchange verification code', 500, ERROR_CODES.INTERNAL_ERROR);
-    } finally {
-      client.release();
-    }
+    });
   }
 
   /**

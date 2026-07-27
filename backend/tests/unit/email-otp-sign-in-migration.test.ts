@@ -3,9 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const migrationPath = path.resolve(
-  currentDir,
+  currentDirectory,
   '../../src/infra/database/migrations/060_add-email-otp-sign-in.sql'
 );
 
@@ -16,6 +16,11 @@ describe('060_add-email-otp-sign-in migration', () => {
     expect(sql).toMatch(
       /ALTER TABLE auth\.email_otps\s+ADD COLUMN IF NOT EXISTS attempts_count INTEGER NOT NULL DEFAULT 0/i
     );
+  });
+
+  it('adds a delivery-type discriminator and backfills existing rows', () => {
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS otp_type TEXT NOT NULL DEFAULT 'NUMERIC_CODE'/i);
+    expect(sql).toMatch(/SET otp_type = 'HASH_TOKEN'\s+WHERE otp_hash NOT LIKE '\$2%'/i);
   });
 
   it('seeds the SMTP request-otp template idempotently', () => {

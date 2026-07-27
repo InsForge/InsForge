@@ -215,5 +215,6 @@ describe('email OTP auth routes', () => {
       message: 'email: Required, otp: Required',
     });
     expect(mocks.verifyOTPRequest).toHaveBeenCalledOnce();
+    expect(mocks.signInWithOTP).not.toHaveBeenCalled();
   });
 });

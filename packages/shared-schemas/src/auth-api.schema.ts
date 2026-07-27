@@ -30,6 +30,13 @@ export const paginationSchema = z.object({
 });
 
 /**
+ * A 6-digit numeric one-time code (email OTP, verification, reset).
+ * `label` customizes the validation message for the field it guards.
+ */
+const sixDigitCodeSchema = (label: string) =>
+  z.string().regex(/^\d{6}$/, `${label} must be a 6-digit numeric code`);
+
+/**
  * POST /api/auth/users - Create user
  * redirectTo is used only for link-based email verification and must be allowlisted.
  */
@@ -54,22 +61,24 @@ const passwordSessionRequestSchema = z.object({
 const otpSessionRequestSchema = z.object({
   method: z.literal('otp'),
   email: emailSchema,
-  otp: z.string().regex(/^\d{6}$/, 'OTP code must be a 6-digit numeric code'),
+  otp: sixDigitCodeSchema('OTP code'),
   name: nameSchema.optional(),
 });
 
 export const createSessionRequestSchema = z.preprocess(
   (value) => {
-    if (
-      !value ||
-      typeof value !== 'object' ||
-      Array.isArray(value) ||
-      Object.prototype.hasOwnProperty.call(value, 'method')
-    ) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return value;
     }
 
-    return { ...value, method: 'password' };
+    // Treat an absent, null, or undefined method as the legacy password flow.
+    // A present-but-invalid method still fails the discriminated union below.
+    const record = value as Record<string, unknown>;
+    if (record.method === undefined || record.method === null) {
+      return { ...record, method: 'password' };
+    }
+
+    return value;
   },
   z.discriminatedUnion('method', [passwordSessionRequestSchema, otpSessionRequestSchema])
 );
@@ -141,7 +150,7 @@ export const sendVerificationEmailRequestSchema = z.object({
  */
 export const verifyEmailRequestSchema = z.object({
   email: emailSchema,
-  otp: z.string().regex(/^\d{6}$/, 'OTP code must be a 6-digit numeric code'),
+  otp: sixDigitCodeSchema('OTP code'),
 });
 
 /**
@@ -159,7 +168,7 @@ export const sendResetPasswordEmailRequestSchema = z.object({
  */
 export const exchangeResetPasswordTokenRequestSchema = z.object({
   email: emailSchema,
-  code: z.string().regex(/^\d{6}$/, 'Reset password code must be a 6-digit numeric code'),
+  code: sixDigitCodeSchema('Reset password code'),
 });
 
 /**
