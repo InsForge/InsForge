@@ -49,6 +49,15 @@ graph TB
 
 為每個函式設定環境變數和祕密。儀表板、CLI 和 MCP 都讀寫相同的儲存區；祕密永遠不會透過您的存放庫往返。
 
+兩者的差別在於儲存與保護方式。**祕密**在靜態儲存時加密：`secrets list` 只顯示中繼資料而隱藏值，`secrets get` 按需回傳解密後的值。祕密還可以設定到期日期（`--expires <ISO-8601>`）並標記為禁止刪除（`--reserved`）。**環境變數**是普通設定值，不加密也不會到期。請把 API 金鑰、密碼等憑證放入祕密，把非敏感設定放入環境變數。兩者在函式程式碼中的使用方式相同。
+
+```bash
+# 帶到期時間的受保護祕密
+npx @insforge/cli secrets add STRIPE_SECRET_KEY sk_live_xxx --reserved --expires 2027-01-01T00:00:00Z
+# 讀回解密後的值
+npx @insforge/cli secrets get STRIPE_SECRET_KEY
+```
+
 ### 日誌
 
 每次呼叫都會擷取結構化日誌，可按狀態、持續時間和函式名稱查詢。InsForge MCP `get-function-logs` 工具允許您的代理在不離開編輯器的情況下診斷失敗。
