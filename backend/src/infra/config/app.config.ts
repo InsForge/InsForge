@@ -202,10 +202,7 @@ export function loadConfig(): AppConfig {
       postgrestMaxFreeSockets: parseEnvInt(process.env.POSTGREST_MAX_FREE_SOCKETS, 10),
       // Must stay below PostgREST's own idle connection timeout so free
       // sockets are dropped before the server can close them first.
-      postgrestFreeSocketTimeoutMs: parseEnvInt(
-        process.env.POSTGREST_FREE_SOCKET_TIMEOUT_MS,
-        4000
-      ),
+      postgrestFreeSocketTimeoutMs: parseEnvInt(process.env.POSTGREST_FREE_SOCKET_TIMEOUT_MS, 4000),
     },
     auth: {
       rootAdminUsername: process.env.ROOT_ADMIN_USERNAME || process.env.ADMIN_EMAIL || '',
