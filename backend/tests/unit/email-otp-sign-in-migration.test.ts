@@ -18,9 +18,11 @@ describe('060_add-email-otp-sign-in migration', () => {
     );
   });
 
-  it('adds a delivery-type discriminator and backfills existing rows', () => {
+  it('adds a delivery-type discriminator and backfills existing rows idempotently', () => {
     expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS otp_type TEXT NOT NULL DEFAULT 'NUMERIC_CODE'/i);
-    expect(sql).toMatch(/SET otp_type = 'HASH_TOKEN'\s+WHERE otp_hash NOT LIKE '\$2%'/i);
+    expect(sql).toMatch(
+      /SET otp_type = 'HASH_TOKEN'\s+WHERE otp_hash NOT LIKE '\$2%'\s+AND otp_type IS DISTINCT FROM 'HASH_TOKEN'/i
+    );
   });
 
   it('adds a functional index for case-insensitive user lookup idempotently', () => {

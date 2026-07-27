@@ -15,9 +15,12 @@ ALTER TABLE auth.email_otps
   ADD COLUMN IF NOT EXISTS otp_type TEXT NOT NULL DEFAULT 'NUMERIC_CODE';
 
 -- Backfill existing rows: bcrypt hashes begin with '$2'; SHA-256 hex tokens do not.
+-- The otp_type guard keeps re-runs a true no-op (0 rows) so the migration is
+-- strictly idempotent and never re-writes already-labeled rows.
 UPDATE auth.email_otps
   SET otp_type = 'HASH_TOKEN'
-  WHERE otp_hash NOT LIKE '$2%';
+  WHERE otp_hash NOT LIKE '$2%'
+    AND otp_type IS DISTINCT FROM 'HASH_TOKEN';
 
 -- OTP sign-in looks up users case-insensitively (auth.users.email may be stored
 -- mixed-case for OAuth accounts), so serve the WHERE lower(email) = $1 FOR UPDATE
