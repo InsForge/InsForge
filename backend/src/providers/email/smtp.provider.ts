@@ -108,8 +108,7 @@ export class SmtpEmailProvider implements EmailProvider {
   ): Promise<void> {
     const config = await this.getRequiredConfig();
     const emailTemplate = await EmailTemplateService.getInstance().getTemplate(
-      template,
-      'custom_smtp'
+      template
     );
 
     // Map system variables to Firebase-style percent variables
