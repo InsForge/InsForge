@@ -362,10 +362,15 @@ export class AuthService {
       OTPPurpose.SIGN_IN,
       verificationCode,
       async (client): Promise<{ blocked: true } | { userId: string }> => {
+        // auth.users.email is case-sensitive UNIQUE and OAuth stores emails
+        // provider-cased, so case-variant duplicates of one mailbox can exist.
+        // Pick deterministically (oldest) instead of an arbitrary matching row.
         let existingUser = await client.query(
           `SELECT id, email_verified
            FROM auth.users
            WHERE lower(email) = $1
+           ORDER BY created_at ASC
+           LIMIT 1
            FOR UPDATE`,
           [email]
         );
@@ -398,6 +403,8 @@ export class AuthService {
               `SELECT id, email_verified
                FROM auth.users
                WHERE lower(email) = $1
+               ORDER BY created_at ASC
+               LIMIT 1
                FOR UPDATE`,
               [email]
             );
