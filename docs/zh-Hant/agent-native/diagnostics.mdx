@@ -32,6 +32,28 @@ npx @insforge/cli diagnose advisor --json
 
 典型發現是一個寬鬆的 RLS 原則，向匿名使用者公開表。顧問命名表、嚴重性和 SQL 以修復它。代理讀取發現、套用補救為[移轉](/core-concepts/database/migrations)並重新掃描以確認它清除。
 
+### 健康發現：死元組比例過高
+
+`health/dead-tuples` 發現會標記某個表中死元組過多的情況。它反映的是標準的 PostgreSQL 行為，而不是流量過大，因此即使在小型或使用很少的專案上也可能觸發：
+
+- 每次 `UPDATE` 或 `DELETE` 都會把舊的行版本留下，成為*死元組*。這是 Postgres MVCC 保持並發讀取一致性的方式，任何發生變更的表都會產生死元組。
+- 自動清理（autovacuum）會回收這些空間，但預設只有當死行達到表的 20% 時才會執行。在小型或低變更的表上，該比例可能在自動清理跟上之前，長時間超過顧問的閾值。
+
+補救措施會回收目前的死元組，並讓自動清理在該表上更早觸發：
+
+```sql
+-- 立即回收死元組
+VACUUM ANALYZE files;
+
+-- 讓自動清理在這個高變更的表上更早執行
+ALTER TABLE files SET (
+  autovacuum_vacuum_scale_factor = 0.05,  -- 死元組達 5% 時清理（預設 20%）
+  autovacuum_analyze_scale_factor = 0.02  -- 變更達 2% 時分析（預設 10%）
+);
+```
+
+將 `ALTER TABLE` 部分作為[移轉](/core-concepts/database/migrations)套用，使該調校可被版本化，然後用 `diagnose advisor` 重新掃描以確認該發現已清除。
+
 ## 目標檢查
 
 報告的每一部分也可在其自己上可用：

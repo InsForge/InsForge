@@ -32,6 +32,28 @@ npx @insforge/cli diagnose advisor --json
 
 A typical finding is a permissive RLS policy that exposes a table to anonymous users. The advisor names the table, the severity, and the SQL to fix it. The agent reads the finding, applies the remediation as a [migration](/core-concepts/database/migrations), and re-scans to confirm it cleared.
 
+### Health finding: high dead tuple ratio
+
+The `health/dead-tuples` finding flags a table where too many rows are dead tuples. It reflects standard PostgreSQL behavior, not heavy traffic, so it can fire on a small or lightly used project:
+
+- Every `UPDATE` or `DELETE` leaves the previous row version behind as a *dead tuple*. That is how Postgres MVCC keeps concurrent reads consistent, and it happens on every table that changes.
+- Autovacuum reclaims that space, but by default it only runs once dead rows reach 20% of a table. On a small or low-churn table, the ratio can sit above the advisor's threshold for a while before autovacuum catches up.
+
+The remediation reclaims the current dead tuples and makes autovacuum trigger sooner on that table:
+
+```sql
+-- reclaim the dead tuples now
+VACUUM ANALYZE files;
+
+-- make autovacuum run sooner on this high-churn table
+ALTER TABLE files SET (
+  autovacuum_vacuum_scale_factor = 0.05,  -- vacuum at 5% dead tuples (default 20%)
+  autovacuum_analyze_scale_factor = 0.02  -- analyze at 2% changes (default 10%)
+);
+```
+
+Apply the `ALTER TABLE` part as a [migration](/core-concepts/database/migrations) so the tuning is versioned, then re-scan with `diagnose advisor` to confirm the finding cleared.
+
 ## Targeted checks
 
 Each part of the report is also available on its own:
