@@ -49,6 +49,7 @@ import AuditsPage from '#features/logs/pages/AuditsPage';
 import FunctionLogsPage from '#features/logs/pages/FunctionLogsPage';
 import LogsPage from '#features/logs/pages/LogsPage';
 import MCPLogsPage from '#features/logs/pages/MCPLogsPage';
+import MarketplacePage from '#features/marketplace/pages/MarketplacePage';
 import PaymentsLayout from '#features/payments/components/PaymentsLayout';
 import CatalogPage from '#features/payments/pages/CatalogPage';
 import CustomersPage from '#features/payments/pages/CustomersPage';
@@ -138,6 +139,7 @@ function AuthenticatedRoutes() {
           <Route path="subscriptions" element={<SubscriptionsPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
         </Route>
+        <Route path="/dashboard/marketplace" element={<MarketplacePage />} />
         <Route path="/dashboard/realtime" element={<RealtimeLayout />}>
           <Route index element={<Navigate to="channels" replace />} />
           <Route path="channels" element={<RealtimeChannelsPage />} />

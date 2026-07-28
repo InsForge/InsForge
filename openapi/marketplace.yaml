@@ -1,0 +1,193 @@
+openapi: 3.0.3
+info:
+  title: Insforge Marketplace API
+  version: 1.0.0
+  description: Plugin marketplace - browse the catalog and install plugins by storing a validated provider API key as an encrypted project secret
+
+paths:
+  /api/marketplace/plugins:
+    get:
+      summary: List marketplace plugins
+      description: Returns the plugin catalog (hosted marketplace.json with a bundled fallback) with each plugin's installed status, derived from whether an active secret with the plugin's secretName exists
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Plugin catalog with installed status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plugins:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MarketplacePlugin'
+        '401':
+          description: Missing or invalid admin credentials
+
+  /api/marketplace/plugins/{slug}/install:
+    post:
+      summary: Install a plugin
+      description: Validates the provider API key against the plugin's validation endpoint (when the catalog entry declares one), then stores it as an encrypted project secret injected into edge-function environments. Rate limited per IP.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9][a-z0-9-]*$'
+          example: resend
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - apiKey
+              properties:
+                apiKey:
+                  type: string
+                  description: Provider API key to validate and store
+                  example: re_123abc...
+      responses:
+        '201':
+          description: Plugin installed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketplaceActionResponse'
+        '400':
+          description: Invalid request body, invalid provider API key, or disallowed validation endpoint
+        '401':
+          description: Missing or invalid admin credentials
+        '403':
+          description: The plugin's secret name is reserved and managed by the platform
+        '404':
+          description: Unknown plugin slug
+        '429':
+          description: Rate limit exceeded
+        '502':
+          description: The provider could not be reached to verify the key
+
+  /api/marketplace/plugins/{slug}:
+    delete:
+      summary: Uninstall a plugin
+      description: Deactivates the plugin's secret (soft delete). Functions lose access to the env var after the next redeployment. Rate limited per IP.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9][a-z0-9-]*$'
+          example: resend
+      responses:
+        '200':
+          description: Plugin uninstalled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketplaceActionResponse'
+        '401':
+          description: Missing or invalid admin credentials
+        '403':
+          description: The plugin's secret name is reserved and managed by the platform
+        '404':
+          description: Unknown plugin slug, or the plugin is not installed
+        '429':
+          description: Rate limit exceeded
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    MarketplacePlugin:
+      type: object
+      description: Catalog entry (see marketplacePluginSchema in @insforge/shared-schemas) plus installed status
+      properties:
+        slug:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9-]*$'
+          example: resend
+        name:
+          type: string
+          example: Resend
+        publisher:
+          type: string
+          example: Resend
+        category:
+          type: string
+          example: Messaging
+        description:
+          type: string
+          example: Send transactional email from functions with domains and templates.
+        actions:
+          type: array
+          items:
+            type: string
+          description: What installing the plugin does, shown in the install dialog
+        iconUrl:
+          type: string
+          format: uri
+          nullable: true
+        install:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [secret]
+            secretName:
+              type: string
+              pattern: '^[A-Z0-9_]+$'
+              example: RESEND_API_KEY
+            placeholder:
+              type: string
+              example: re_...
+            validation:
+              type: object
+              nullable: true
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: HTTPS endpoint called with Authorization Bearer <apiKey> to validate the key
+                method:
+                  type: string
+                  enum: [GET, POST]
+        docsUrl:
+          type: string
+          format: uri
+          nullable: true
+        skillUrl:
+          type: string
+          format: uri
+          nullable: true
+        installed:
+          type: boolean
+          description: Whether an active secret with the plugin's secretName exists
+
+    MarketplaceActionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Resend has been installed successfully

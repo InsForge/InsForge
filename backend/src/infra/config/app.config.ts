@@ -105,6 +105,10 @@ export interface AppConfig {
   ai: {
     openrouterApiKey: string | undefined;
   };
+  marketplace: {
+    // URL of the hosted marketplace.json catalog; empty = bundled catalog only
+    catalogUrl: string;
+  };
   telemetry: {
     disabled: boolean;
   };
@@ -255,6 +259,12 @@ export function loadConfig(): AppConfig {
     },
     ai: {
       openrouterApiKey: process.env.OPENROUTER_API_KEY || undefined,
+    },
+    marketplace: {
+      // ?? preserves an explicitly empty MARKETPLACE_CATALOG_URL as the
+      // documented "bundled catalog only" opt-out for offline self-hosts
+      catalogUrl:
+        process.env.MARKETPLACE_CATALOG_URL ?? 'https://api.insforge.dev/marketplace/v1/catalog',
     },
     telemetry: {
       disabled: parseEnvBool(process.env.INSFORGE_TELEMETRY_DISABLED),
