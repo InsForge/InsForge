@@ -45,13 +45,13 @@ export class SmtpEmailProvider implements EmailProvider {
     let rendered = template;
     for (const [key, value] of Object.entries(variables)) {
       let safeValue: string;
-      if (key === 'LINK' && !/^https?:\/\//i.test(value)) {
+      if (key === 'link' && !/^https?:\/\//i.test(value)) {
         logger.error('Rejected non-HTTP link value in email template', { key });
         safeValue = '#';
       } else {
         safeValue = escapeHtml(value);
       }
-      const pattern = new RegExp(`%${escapeRegex(key)}%`, 'g');
+      const pattern = new RegExp(`{{\\s*${escapeRegex(key)}\\s*}}`, 'g');
       rendered = rendered.replace(pattern, safeValue);
     }
     return rendered;
@@ -109,13 +109,13 @@ export class SmtpEmailProvider implements EmailProvider {
     const config = await this.getRequiredConfig();
     const emailTemplate = await EmailTemplateService.getInstance().getTemplate(template);
 
-    // Map system variables to Firebase-style percent variables
+    // Map system variables to template variables
     const allVariables: Record<string, string> = {
-      TOKEN: variables?.token || '',
-      LINK: variables?.link || '',
-      EMAIL: email,
-      DISPLAY_NAME: name,
-      APP_NAME: process.env.APP_NAME || 'InsForge',
+      token: variables?.token || '',
+      link: variables?.link || '',
+      email: email,
+      display_name: name,
+      app_name: process.env.APP_NAME || 'InsForge',
     };
 
     await this.send(

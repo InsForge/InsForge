@@ -21,7 +21,7 @@ vi.mock('../../src/services/email/email-template.service', () => ({
         id: '11111111-1111-4111-8111-111111111111',
         templateType: 'email-verification-code',
         subject: 'Verify your email',
-        bodyHtml: '<p>Your code is: %TOKEN%</p>',
+        bodyHtml: '<p>Your code is: {{ token }}</p>',
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
       }),
