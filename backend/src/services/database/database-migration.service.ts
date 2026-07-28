@@ -4,6 +4,10 @@ import {
   type CreateMigrationResponse,
   type DatabaseMigrationsResponse,
   type Migration,
+  type DryRunMigrationRequest,
+  type DryRunMigrationResponse,
+  type MigrationRiskFactor,
+  type MigrationRiskLevel,
 } from '@insforge/shared-schemas';
 import { AppError, isPgErrorLike } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
@@ -146,4 +150,113 @@ export class DatabaseMigrationService {
       client.release();
     }
   }
+
+  async dryRunMigration(input: DryRunMigrationRequest): Promise<DryRunMigrationResponse> {
+    const statements = parseSQLStatements(input.sql);
+    if (statements.length === 0) {
+      return {
+        valid: false,
+        statementCount: 0,
+        statements: [],
+        riskLevel: 'DANGER',
+        riskFactors: [
+          {
+            code: 'EMPTY_SQL',
+            description: 'Migration SQL must contain at least one statement.',
+            level: 'DANGER',
+          },
+        ],
+        error: 'Migration SQL must contain at least one statement.',
+      };
+    }
+
+    await initSqlParser();
+
+    const guardError = checkSqlExecutionGuards(input.sql);
+    if (guardError) {
+      return {
+        valid: false,
+        statementCount: statements.length,
+        statements,
+        riskLevel: 'DANGER',
+        riskFactors: [
+          {
+            code: 'GUARD_VIOLATION',
+            description: guardError,
+            level: 'DANGER',
+          },
+        ],
+        error: guardError,
+      };
+    }
+
+    const riskFactors: MigrationRiskFactor[] = [];
+    let riskLevel: MigrationRiskLevel = 'SAFE';
+
+    for (const statement of statements) {
+      const upperStmt = statement.toUpperCase();
+      if (
+        upperStmt.includes('DROP TABLE') ||
+        upperStmt.includes('DROP DATABASE') ||
+        upperStmt.includes('TRUNCATE')
+      ) {
+        riskFactors.push({
+          code: 'DESTRUCTIVE_DATA_LOSS',
+          description: 'Statement drops tables or truncates data permanently.',
+          level: 'DANGER',
+          statement,
+        });
+        riskLevel = 'DANGER';
+      } else if (
+        upperStmt.includes('DROP COLUMN') ||
+        upperStmt.includes('DROP CONSTRAINT') ||
+        (upperStmt.includes('ALTER TABLE') && upperStmt.includes('DROP'))
+      ) {
+        riskFactors.push({
+          code: 'SCHEMA_BREAKING_CHANGE',
+          description: 'Statement drops columns or constraints which may break existing functionality.',
+          level: 'WARNING',
+          statement,
+        });
+        if (riskLevel !== 'DANGER') {
+          riskLevel = 'WARNING';
+        }
+      }
+    }
+
+    const client = await this.dbManager.getPool().connect();
+    let valid = true;
+    let executionError: string | undefined = undefined;
+
+    try {
+      await client.query('BEGIN');
+      await client.query('SET LOCAL search_path TO public');
+      await withAdminContext(client, () => client.query(input.sql), true);
+    } catch (error) {
+      valid = false;
+      executionError = error instanceof Error ? error.message : String(error);
+    } finally {
+      await Promise.resolve(client.query('ROLLBACK')).catch(() => {});
+      client.release();
+    }
+
+    if (!valid) {
+      riskLevel = 'DANGER';
+      riskFactors.push({
+        code: 'SYNTAX_OR_EXECUTION_ERROR',
+        description: executionError || 'Failed to execute SQL dry-run.',
+        level: 'DANGER',
+      });
+    }
+
+    return {
+      valid,
+      statementCount: statements.length,
+      statements,
+      riskLevel,
+      riskFactors,
+      error: executionError,
+    };
+  }
 }
+

@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import {
   ERROR_CODES,
   createMigrationRequestSchema,
+  dryRunMigrationRequestSchema,
   type CreateMigrationResponse,
   type DatabaseMigrationsResponse,
 } from '@insforge/shared-schemas';
@@ -82,4 +83,30 @@ router.post(
   }
 );
 
+router.post(
+  '/dry-run',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = dryRunMigrationRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        const issues = validation.error.issues;
+        throw new AppError(
+          issues.length === 1
+            ? issues[0]?.message || 'Invalid dry-run request.'
+            : issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const result = await migrationService.dryRunMigration(validation.data);
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export { router as databaseMigrationsRouter };
+

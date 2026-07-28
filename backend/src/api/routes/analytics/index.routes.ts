@@ -4,10 +4,13 @@ import {
   posthogTimeframeSchema,
   posthogBreakdownSchema,
   posthogMetricSchema,
+  recordAgentToolCallSchema,
 } from '@insforge/shared-schemas';
 import { verifyUser, verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import { AnalyticsService } from '@/services/analytics/analytics.service.js';
+import { AgentTelemetryService } from '@/services/telemetry/agent-telemetry.service.js';
+import { successResponse } from '@/utils/response.js';
 
 export const analyticsRouter = Router();
 const service = AnalyticsService.getInstance();
@@ -205,3 +208,54 @@ analyticsRouter.post(
     }
   }
 );
+
+analyticsRouter.post(
+  '/agent-telemetry/events',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = recordAgentToolCallSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError('Invalid agent telemetry event payload', 400, ERROR_CODES.INVALID_INPUT);
+      }
+      const telemetryService = AgentTelemetryService.getInstance();
+      const record = telemetryService.recordToolCall(validation.data);
+      successResponse(res, record, 201);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+analyticsRouter.get(
+  '/agent-telemetry/stats',
+  verifyUser,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const telemetryService = AgentTelemetryService.getInstance();
+      const stats = telemetryService.getSystemAgentStats();
+      successResponse(res, stats);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+analyticsRouter.get(
+  '/agent-telemetry/session/:id',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = String(req.params.id || '');
+      const telemetryService = AgentTelemetryService.getInstance();
+      const metrics = telemetryService.getSessionMetrics(sessionId);
+      if (!metrics) {
+        throw new AppError('Agent session not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+      successResponse(res, metrics);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
