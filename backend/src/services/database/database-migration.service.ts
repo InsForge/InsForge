@@ -18,6 +18,7 @@ import {
   parseSQLStatements,
   type DatabaseResourceUpdate,
 } from '@/utils/sql-parser.js';
+import { parseSync } from 'libpg-query';
 import { withAdminContext } from './user-context.service.js';
 
 interface CreateMigrationResult {
@@ -152,7 +153,27 @@ export class DatabaseMigrationService {
   }
 
   async dryRunMigration(input: DryRunMigrationRequest): Promise<DryRunMigrationResponse> {
-    const statements = parseSQLStatements(input.sql);
+    let statements: string[];
+    try {
+      statements = parseSQLStatements(input.sql);
+    } catch (parseError) {
+      const errMsg = parseError instanceof Error ? parseError.message : String(parseError);
+      return {
+        valid: false,
+        statementCount: 0,
+        statements: [],
+        riskLevel: 'DANGER',
+        riskFactors: [
+          {
+            code: 'SYNTAX_OR_EXECUTION_ERROR',
+            description: errMsg,
+            level: 'DANGER',
+          },
+        ],
+        error: errMsg,
+      };
+    }
+
     if (statements.length === 0) {
       return {
         valid: false,
@@ -193,34 +214,85 @@ export class DatabaseMigrationService {
     const riskFactors: MigrationRiskFactor[] = [];
     let riskLevel: MigrationRiskLevel = 'SAFE';
 
-    for (const statement of statements) {
-      const upperStmt = statement.toUpperCase();
-      if (
-        upperStmt.includes('DROP TABLE') ||
-        upperStmt.includes('DROP DATABASE') ||
-        upperStmt.includes('TRUNCATE')
-      ) {
-        riskFactors.push({
-          code: 'DESTRUCTIVE_DATA_LOSS',
-          description: 'Statement drops tables or truncates data permanently.',
-          level: 'DANGER',
-          statement,
-        });
-        riskLevel = 'DANGER';
-      } else if (
-        upperStmt.includes('DROP COLUMN') ||
-        upperStmt.includes('DROP CONSTRAINT') ||
-        (upperStmt.includes('ALTER TABLE') && upperStmt.includes('DROP'))
-      ) {
-        riskFactors.push({
-          code: 'SCHEMA_BREAKING_CHANGE',
-          description:
-            'Statement drops columns or constraints which may break existing functionality.',
-          level: 'WARNING',
-          statement,
-        });
-        if (riskLevel !== 'DANGER') {
-          riskLevel = 'WARNING';
+    try {
+      const { stmts } = parseSync(input.sql);
+      for (let i = 0; i < stmts.length; i++) {
+        const stmtWrapper = stmts[i];
+        const statementText = statements[i] || input.sql;
+        const stmt = stmtWrapper.stmt as Record<string, unknown>;
+        const [stmtType, data] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
+
+        if (stmtType === 'DropStmt') {
+          const removeType = String(data.removeType || '');
+          if (
+            removeType === 'OBJECT_TABLE' ||
+            removeType === 'OBJECT_DATABASE' ||
+            removeType === 'OBJECT_SCHEMA'
+          ) {
+            riskFactors.push({
+              code: 'DESTRUCTIVE_DATA_LOSS',
+              description: `Statement drops database object (${removeType}) permanently resulting in potential data loss.`,
+              level: 'DANGER',
+              statement: statementText,
+            });
+            riskLevel = 'DANGER';
+          } else if (removeType === 'OBJECT_COLUMN' || removeType === 'OBJECT_CONSTRAINT') {
+            riskFactors.push({
+              code: 'SCHEMA_BREAKING_CHANGE',
+              description: `Statement drops column/constraint (${removeType}) which may break dependent application logic.`,
+              level: 'WARNING',
+              statement: statementText,
+            });
+            if (riskLevel !== 'DANGER') {
+              riskLevel = 'WARNING';
+            }
+          }
+        } else if (stmtType === 'TruncateStmt') {
+          riskFactors.push({
+            code: 'DESTRUCTIVE_DATA_LOSS',
+            description: 'TRUNCATE statement clears all records from targeted table(s).',
+            level: 'DANGER',
+            statement: statementText,
+          });
+          riskLevel = 'DANGER';
+        } else if (stmtType === 'AlterTableStmt') {
+          const cmds = (data.cmds as Array<Record<string, unknown>>) || [];
+          for (const cmdWrapper of cmds) {
+            const cmd = (cmdWrapper.AlterTableCmd as Record<string, unknown>) || {};
+            const subtype = String(cmd.subtype || '');
+            if (
+              subtype === 'AT_DropColumn' ||
+              subtype === 'AT_DropConstraint' ||
+              subtype === 'AT_AlterColumnType'
+            ) {
+              riskFactors.push({
+                code: 'SCHEMA_BREAKING_CHANGE',
+                description: `ALTER TABLE statement contains destructive command: ${subtype}.`,
+                level: 'WARNING',
+                statement: statementText,
+              });
+              if (riskLevel !== 'DANGER') {
+                riskLevel = 'WARNING';
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      for (const statement of statements) {
+        const upperStmt = statement.toUpperCase();
+        if (
+          upperStmt.includes('DROP TABLE') ||
+          upperStmt.includes('DROP DATABASE') ||
+          upperStmt.includes('TRUNCATE')
+        ) {
+          riskFactors.push({
+            code: 'DESTRUCTIVE_DATA_LOSS',
+            description: 'Statement drops tables or truncates data permanently.',
+            level: 'DANGER',
+            statement,
+          });
+          riskLevel = 'DANGER';
         }
       }
     }

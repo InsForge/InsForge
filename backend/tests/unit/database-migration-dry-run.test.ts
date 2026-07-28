@@ -74,11 +74,12 @@ describe('DatabaseMigrationService Dry-Run', () => {
   });
 
   it('handles execution errors and flags them as DANGER', async () => {
-    const queryMock = vi
-      .fn()
-      .mockResolvedValueOnce({})
-      .mockResolvedValueOnce({})
-      .mockRejectedValueOnce(new Error('syntax error at or near INVALID'));
+    const queryMock = vi.fn().mockImplementation((queryText: string) => {
+      if (typeof queryText === 'string' && queryText.includes('INVALID SQL STATEMENT')) {
+        return Promise.reject(new Error('syntax error at or near INVALID'));
+      }
+      return Promise.resolve({});
+    });
 
     connectMock.mockResolvedValue({
       query: queryMock,
@@ -93,5 +94,6 @@ describe('DatabaseMigrationService Dry-Run', () => {
     expect(result.valid).toBe(false);
     expect(result.riskLevel).toBe('DANGER');
     expect(result.error).toContain('syntax error');
+    expect(queryMock).toHaveBeenCalledWith('INVALID SQL STATEMENT');
   });
 });

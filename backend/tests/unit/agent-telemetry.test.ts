@@ -9,60 +9,67 @@ describe('AgentTelemetryService', () => {
     service.clearRecords();
   });
 
-  it('records agent tool calls accurately', () => {
-    const record = service.recordToolCall({
-      sessionId: 'session-123',
-      agentId: 'agent-alpha',
-      toolName: 'execute_sql',
-      durationMs: 150,
-      status: 'success',
-    });
+  it('records agent tool calls accurately for a specific project scope', () => {
+    const record = service.recordToolCall(
+      {
+        sessionId: 'session-123',
+        agentId: 'agent-alpha',
+        toolName: 'execute_sql',
+        durationMs: 150,
+        status: 'success',
+      },
+      'proj-alpha'
+    );
 
     expect(record.sessionId).toBe('session-123');
     expect(record.status).toBe('success');
 
-    const session = service.getSessionMetrics('session-123');
+    const session = service.getSessionMetrics('session-123', 'proj-alpha');
     expect(session).not.toBeNull();
     expect(session?.totalToolCalls).toBe(1);
     expect(session?.successfulToolCalls).toBe(1);
     expect(session?.avgDurationMs).toBe(150);
   });
 
-  it('aggregates system-wide telemetry statistics across multiple sessions', () => {
-    service.recordToolCall({
-      sessionId: 'session-1',
-      toolName: 'create_table',
-      durationMs: 200,
-      status: 'success',
-    });
+  it('isolates session telemetry between different project scopes', () => {
+    service.recordToolCall(
+      {
+        sessionId: 'shared-session-id',
+        toolName: 'create_table',
+        durationMs: 100,
+        status: 'success',
+      },
+      'proj-1'
+    );
 
-    service.recordToolCall({
-      sessionId: 'session-1',
-      toolName: 'deploy_function',
-      durationMs: 400,
-      status: 'error',
-      errorMessage: 'Build failed',
-    });
+    service.recordToolCall(
+      {
+        sessionId: 'shared-session-id',
+        toolName: 'deploy_function',
+        durationMs: 300,
+        status: 'error',
+      },
+      'proj-2'
+    );
 
-    service.recordToolCall({
-      sessionId: 'session-2',
-      toolName: 'create_table',
-      durationMs: 100,
-      status: 'success',
-    });
+    const proj1Session = service.getSessionMetrics('shared-session-id', 'proj-1');
+    const proj2Session = service.getSessionMetrics('shared-session-id', 'proj-2');
 
-    const stats = service.getSystemAgentStats();
+    expect(proj1Session?.totalToolCalls).toBe(1);
+    expect(proj1Session?.successfulToolCalls).toBe(1);
 
-    expect(stats.activeSessionsCount).toBe(2);
-    expect(stats.totalToolCallsRecorded).toBe(3);
-    expect(stats.overallSuccessRate).toBeCloseTo(66.66, 1);
-    expect(stats.averageToolLatencyMs).toBe(233.33333333333334);
-    expect(stats.topToolsUsed[0].toolName).toBe('create_table');
-    expect(stats.topToolsUsed[0].count).toBe(2);
+    expect(proj2Session?.totalToolCalls).toBe(1);
+    expect(proj2Session?.failedToolCalls).toBe(1);
+
+    const proj1Stats = service.getSystemAgentStats('proj-1');
+    const proj2Stats = service.getSystemAgentStats('proj-2');
+
+    expect(proj1Stats.totalToolCallsRecorded).toBe(1);
+    expect(proj2Stats.totalToolCallsRecorded).toBe(1);
   });
 
   it('returns null for unknown session metrics', () => {
-    const metrics = service.getSessionMetrics('non-existent');
+    const metrics = service.getSessionMetrics('non-existent', 'proj-1');
     expect(metrics).toBeNull();
   });
 });

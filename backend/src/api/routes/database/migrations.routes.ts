@@ -7,6 +7,7 @@ import {
   type DatabaseMigrationsResponse,
 } from '@insforge/shared-schemas';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { migrationsDryRunLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AppError } from '@/utils/errors.js';
 import { DatabaseMigrationService } from '@/services/database/database-migration.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
@@ -86,6 +87,7 @@ router.post(
 router.post(
   '/dry-run',
   verifyAdmin,
+  migrationsDryRunLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validation = dryRunMigrationRequestSchema.safeParse(req.body);

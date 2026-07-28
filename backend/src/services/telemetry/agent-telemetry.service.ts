@@ -13,6 +13,7 @@ interface ToolCallRecord {
   errorMessage?: string;
   metadata?: Record<string, unknown>;
   timestamp: string;
+  projectId: string;
 }
 
 export class AgentTelemetryService {
@@ -29,9 +30,10 @@ export class AgentTelemetryService {
     return AgentTelemetryService.instance;
   }
 
-  recordToolCall(input: RecordAgentToolCallRequest): ToolCallRecord {
+  recordToolCall(input: RecordAgentToolCallRequest, projectId = 'default'): ToolCallRecord {
     const record: ToolCallRecord = {
       ...input,
+      projectId,
       timestamp: new Date().toISOString(),
     };
 
@@ -44,8 +46,10 @@ export class AgentTelemetryService {
     return record;
   }
 
-  getSessionMetrics(sessionId: string): AgentSessionMetrics | null {
-    const sessionRecords = this.records.filter((r) => r.sessionId === sessionId);
+  getSessionMetrics(sessionId: string, projectId = 'default'): AgentSessionMetrics | null {
+    const sessionRecords = this.records.filter(
+      (r) => r.sessionId === sessionId && r.projectId === projectId
+    );
 
     if (sessionRecords.length === 0) {
       return null;
@@ -71,14 +75,15 @@ export class AgentTelemetryService {
     };
   }
 
-  getSystemAgentStats(): AgentTelemetryStatsResponse {
+  getSystemAgentStats(projectId = 'default'): AgentTelemetryStatsResponse {
+    const projectRecords = this.records.filter((r) => r.projectId === projectId);
     const sessionsMap = new Map<string, ToolCallRecord[]>();
     const toolCounts = new Map<string, number>();
 
     let totalDurationMs = 0;
     let totalSuccessCount = 0;
 
-    for (const record of this.records) {
+    for (const record of projectRecords) {
       totalDurationMs += record.durationMs;
       if (record.status === 'success') {
         totalSuccessCount++;
@@ -117,7 +122,7 @@ export class AgentTelemetryService {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    const totalRecords = this.records.length;
+    const totalRecords = projectRecords.length;
 
     return {
       activeSessionsCount: sessionsMap.size,
