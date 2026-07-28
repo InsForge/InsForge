@@ -53,6 +53,30 @@ below). Free projects are paused after 1 week of inactivity.
     Nothing stops — the $10 monthly InsForge Compute credit (on Pro) covers the
     first $10 of compute, and beyond that compute continues on pay-as-you-go.
   </Accordion>
+
+  <Accordion title="How do I check my current usage, and when do the limits reset?">
+    Print your organization's usage for the current billing period from the CLI:
+
+    ```bash
+    npx @insforge/cli usage
+    # a specific organization:
+    npx @insforge/cli usage --org-id your-org-id
+    # machine-readable:
+    npx @insforge/cli usage --json
+    ```
+
+    It reports your plan and the totals that count against the limits above
+    (AI credits, monthly active users, database, bandwidth/egress, file storage,
+    and edge function calls), followed by a per-project breakdown of database,
+    storage, and egress.
+
+    Consumption counters (AI credits, monthly active users, bandwidth/egress,
+    and edge function calls) are measured per billing period and start again from zero at the
+    start of each new period. On Pro the period follows your subscription's
+    monthly cycle; on Free the allowances are monthly. Size metrics like
+    database and file storage aren't per-period counters — they reflect what
+    you're currently storing, so they go down when you delete data.
+  </Accordion>
 </AccordionGroup>
 
 <Card title="See full pricing" icon="tag" href="https://insforge.dev/pricing">

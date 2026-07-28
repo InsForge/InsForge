@@ -49,6 +49,15 @@ graph TB
 
 为每个函数设置环境变量和秘密。仪表盘、CLI 和 MCP 都读写相同的存储；秘密永远不会通过您的存储库往返。
 
+两者的区别在于存储和保护方式。**秘密**在静态存储时加密：`secrets list` 只显示元数据而隐藏值，`secrets get` 按需返回解密后的值。秘密还可以设置过期日期（`--expires <ISO-8601>`）并标记为禁止删除（`--reserved`）。**环境变量**是普通配置值，不加密也不过期。请把 API 密钥、密码等凭据放入秘密，把非敏感配置放入环境变量。两者在函数代码中的使用方式相同。
+
+```bash
+# 带过期时间的受保护秘密
+npx @insforge/cli secrets add STRIPE_SECRET_KEY sk_live_xxx --reserved --expires 2027-01-01T00:00:00Z
+# 读回解密后的值
+npx @insforge/cli secrets get STRIPE_SECRET_KEY
+```
+
 ### 日志
 
 每次调用都会捕获结构化日志，可按状态、持续时间和函数名称查询。InsForge MCP `get-function-logs` 工具允许您的代理在不离开编辑器的情况下诊断失败。

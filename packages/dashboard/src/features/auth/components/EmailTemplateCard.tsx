@@ -44,6 +44,12 @@ export function EmailTemplateCard({
           defaultValue: 'Sent when a user needs to verify their email via a magic link.',
         }),
       },
+      'request-otp': {
+        title: t('auth.emailOtpSignInTitle', { defaultValue: 'Email OTP Sign-In' }),
+        description: t('auth.emailOtpSignInDescription', {
+          defaultValue: 'Sent when a user requests a 6-digit code to sign in.',
+        }),
+      },
       'reset-password-code': {
         title: t('auth.resetPasswordCodeTitle', {
           defaultValue: 'Reset Password (Code)',
@@ -88,6 +94,17 @@ export function EmailTemplateCard({
           description: t('auth.varVerificationUrl', { defaultValue: 'Email verification URL' }),
           sample: 'https://yourapp.com/verify?token=abc123',
         },
+      ],
+      'request-otp': [
+        {
+          name: '{{ token }}',
+          description: t('auth.varSignInCode', {
+            defaultValue: '6-digit sign-in code',
+          }),
+          sample: '583104',
+        },
+        emailVariable,
+        nameVariable,
       ],
       'reset-password-code': [
         {
