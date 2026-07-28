@@ -153,7 +153,7 @@ describe('Email Template Request Schema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('should strip script tags from bodyHtml', () => {
+  it('accepts bodyHtml containing script tags', () => {
     const input = {
       templateType: 'email-verification-code',
       subject: 'Verify',
@@ -226,7 +226,7 @@ describe('Email Template Schema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('should strip script tags from bodyHtml', () => {
+  it('accepts bodyHtml containing script tags', () => {
     const input = {
       templateType: 'email-verification-code',
       subject: 'Update',

@@ -115,6 +115,7 @@ export class SmtpEmailProvider implements EmailProvider {
       link: variables?.link || '',
       email: email,
       display_name: name,
+      name: name, // Backwards compatibility for existing templates
       app_name: process.env.APP_NAME || 'InsForge',
     };
 
