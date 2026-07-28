@@ -78,6 +78,17 @@ export function EmailTemplateCard({
   const templateVariables = useMemo<
     Record<string, { name: string; description: string; sample: string }[]>
   >(() => {
+    const emailVariable = {
+      name: '{{ email }}',
+      description: t('auth.varUserEmail', { defaultValue: "User's email address" }),
+      sample: 'user@example.com',
+    };
+    const nameVariable = {
+      name: '{{ name }}',
+      description: t('auth.varUserName', { defaultValue: "User's display name" }),
+      sample: 'John',
+    };
+
     return {
       'email-verification-code': [
         {
@@ -87,6 +98,8 @@ export function EmailTemplateCard({
           }),
           sample: '847295',
         },
+        emailVariable,
+        nameVariable,
       ],
       'email-verification-link': [
         {
@@ -94,6 +107,8 @@ export function EmailTemplateCard({
           description: t('auth.varVerificationUrl', { defaultValue: 'Email verification URL' }),
           sample: 'https://yourapp.com/verify?token=abc123',
         },
+        emailVariable,
+        nameVariable,
       ],
       'request-otp': [
         {
@@ -112,6 +127,8 @@ export function EmailTemplateCard({
           description: t('auth.varResetCode', { defaultValue: '6-digit reset code' }),
           sample: '382916',
         },
+        emailVariable,
+        nameVariable,
       ],
       'reset-password-link': [
         {
@@ -119,6 +136,8 @@ export function EmailTemplateCard({
           description: t('auth.varResetUrl', { defaultValue: 'Password reset URL' }),
           sample: 'https://yourapp.com/reset?token=xyz789',
         },
+        emailVariable,
+        nameVariable,
       ],
     };
   }, [t]);
