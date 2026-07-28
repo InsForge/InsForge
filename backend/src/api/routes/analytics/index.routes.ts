@@ -212,7 +212,7 @@ analyticsRouter.post(
 analyticsRouter.post(
   '/agent-telemetry/events',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validation = recordAgentToolCallSchema.safeParse(req.body);
       if (!validation.success) {
@@ -230,7 +230,7 @@ analyticsRouter.post(
 analyticsRouter.get(
   '/agent-telemetry/stats',
   verifyUser,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  (_req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const telemetryService = AgentTelemetryService.getInstance();
       const stats = telemetryService.getSystemAgentStats();
@@ -244,7 +244,7 @@ analyticsRouter.get(
 analyticsRouter.get(
   '/agent-telemetry/session/:id',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const sessionId = String(req.params.id || '');
       const telemetryService = AgentTelemetryService.getInstance();
@@ -258,4 +258,3 @@ analyticsRouter.get(
     }
   }
 );
-

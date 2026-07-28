@@ -1,20 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const {
-  connectMock,
-  parseSQLStatementsMock,
-  initSqlParserMock,
-  checkSqlExecutionGuardsMock,
-} = vi.hoisted(() => ({
-  connectMock: vi.fn(),
-  parseSQLStatementsMock: vi.fn((sql: string) => [sql]),
-  initSqlParserMock: vi.fn(async () => {}),
-  checkSqlExecutionGuardsMock: vi.fn((query: string) =>
-    query.includes('RESET ROLE')
-      ? 'Changing SQL execution role or session authorization is not allowed.'
-      : null
-  ),
-}));
+const { connectMock, parseSQLStatementsMock, initSqlParserMock, checkSqlExecutionGuardsMock } =
+  vi.hoisted(() => ({
+    connectMock: vi.fn(),
+    parseSQLStatementsMock: vi.fn((sql: string) => [sql]),
+    initSqlParserMock: vi.fn(async () => {}),
+    checkSqlExecutionGuardsMock: vi.fn((query: string) =>
+      query.includes('RESET ROLE')
+        ? 'Changing SQL execution role or session authorization is not allowed.'
+        : null
+    ),
+  }));
 
 vi.mock('../../src/infra/database/database.manager', () => ({
   DatabaseManager: {

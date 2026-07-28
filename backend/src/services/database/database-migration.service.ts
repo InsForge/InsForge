@@ -214,7 +214,8 @@ export class DatabaseMigrationService {
       ) {
         riskFactors.push({
           code: 'SCHEMA_BREAKING_CHANGE',
-          description: 'Statement drops columns or constraints which may break existing functionality.',
+          description:
+            'Statement drops columns or constraints which may break existing functionality.',
           level: 'WARNING',
           statement,
         });
@@ -259,4 +260,3 @@ export class DatabaseMigrationService {
     };
   }
 }
-

@@ -109,4 +109,3 @@ router.post(
 );
 
 export { router as databaseMigrationsRouter };
-
