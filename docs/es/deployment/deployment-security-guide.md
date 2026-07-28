@@ -924,10 +924,10 @@ Edita `docker-compose.yml` y sustituye las etiquetas `latest` por la versión an
 
 ```yaml
 # Example: pin to a known-good version (replace with your previous tag)
-image: ghcr.io/insforge/insforge-oss:v1.5.0
+image: ghcr.io/insforge/insforge-oss:v2.2.8
 ```
 
-> Nota: el `deploy/docker-compose` actual fija la versión `v1.5.0`, y el proyecto ya está en la línea 2.x. Fija la versión que estuvieras ejecutando antes de la actualización.
+> Nota: `deploy/docker-compose` sigue la etiqueta `latest`, por lo que `docker compose pull` te lleva a la versión más reciente. Fija la versión que estuvieras ejecutando antes de la actualización.
 
 #### 16.4 Restaura la base de datos (si es necesario)
 

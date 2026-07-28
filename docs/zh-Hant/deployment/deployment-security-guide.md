@@ -924,10 +924,10 @@ mv docker-compose.yml.old docker-compose.yml
 
 ```yaml
 # Example: pin to a known-good version (replace with your previous tag)
-image: ghcr.io/insforge/insforge-oss:v1.5.0
+image: ghcr.io/insforge/insforge-oss:v2.2.8
 ```
 
-> 注意：目前 `deploy/docker-compose` 固定使用 `v1.5.0`，而專案現已進展到 2.x 系列。請固定至你更新前所執行的版本。
+> 注意：`deploy/docker-compose` 跟隨 `latest` 標籤，因此 `docker compose pull` 會將你升級至最新發布版本。請固定至你更新前所執行的版本。
 
 #### 16.4 還原資料庫（如有需要）
 
