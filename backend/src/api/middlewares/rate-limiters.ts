@@ -459,7 +459,7 @@ export const migrationsDryRunLimiter = rateLimit({
       new AppError(
         'Too many migration dry-run requests. Please try again later.',
         429,
-        ERROR_CODES.RATE_LIMIT_EXCEEDED
+        ERROR_CODES.TOO_MANY_REQUESTS
       )
     );
   },
