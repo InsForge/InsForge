@@ -9,18 +9,14 @@ import {
   type CreateDatabaseBackupRequest,
   type DatabaseBackup,
   type DatabaseBackupsResponse,
-  type GetDatabaseBackupConfigResponse,
-  type UpdateDatabaseBackupConfigRequest,
+  type DatabaseBackupConfigResponse,
+  type UpdateDatabaseBackupConfig,
 } from '@insforge/shared-schemas';
 import { AppError, isPgErrorLike } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
-import {
-  assertValidBackupCron,
-  computeNextBackupAt,
-  isScheduledBackupDue,
-} from './backup-schedule.helpers.js';
+import { assertValidBackupCron, computeNextBackupAt, isScheduledBackupDue } from './helpers.js';
 import logger from '@/utils/logger.js';
 
 // Internal artifact bucket, mirroring the `_deployments` convention. With S3
@@ -359,7 +355,7 @@ export class DatabaseBackupService {
     }
   }
 
-  async getBackupConfig(): Promise<GetDatabaseBackupConfigResponse> {
+  async getBackupConfig(): Promise<DatabaseBackupConfigResponse> {
     const row = await this.getBackupConfigRow();
     if (!row) {
       // The migration seeds the singleton row; a missing row means migrations
@@ -374,8 +370,8 @@ export class DatabaseBackupService {
   }
 
   async updateBackupConfig(
-    patch: UpdateDatabaseBackupConfigRequest
-  ): Promise<GetDatabaseBackupConfigResponse> {
+    patch: UpdateDatabaseBackupConfig
+  ): Promise<DatabaseBackupConfigResponse> {
     if (patch.cronSchedule !== undefined) {
       assertValidBackupCron(patch.cronSchedule);
     }
@@ -530,7 +526,7 @@ export class DatabaseBackupService {
     return (result.rows[0] as BackupConfigRow | undefined) ?? null;
   }
 
-  private serializeBackupConfig(row: BackupConfigRow): GetDatabaseBackupConfigResponse {
+  private serializeBackupConfig(row: BackupConfigRow): DatabaseBackupConfigResponse {
     return {
       enabled: row.enabled,
       cronSchedule: row.cronSchedule,

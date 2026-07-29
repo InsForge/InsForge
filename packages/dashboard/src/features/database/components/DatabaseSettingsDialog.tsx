@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DatabaseBackup } from 'lucide-react';
-import type { UpdateDatabaseBackupConfigRequest } from '@insforge/shared-schemas';
+import type { UpdateDatabaseBackupConfig } from '@insforge/shared-schemas';
 import {
   Button,
   cn,
@@ -178,7 +178,7 @@ export function DatabaseSettingsDialog({ open, onOpenChange }: DatabaseSettingsD
       return;
     }
 
-    const patch: UpdateDatabaseBackupConfigRequest = {
+    const patch: UpdateDatabaseBackupConfig = {
       enabled: draft.enabled,
       retentionDays: draft.retention === 'never' ? null : Number(draft.retention),
     };

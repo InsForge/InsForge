@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { UpdateDatabaseBackupConfigRequest } from '@insforge/shared-schemas';
+import type { UpdateDatabaseBackupConfig } from '@insforge/shared-schemas';
 import { useToast } from '@insforge/ui';
 import { backupService } from '#features/database/services/backup.service';
 import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
@@ -30,7 +30,7 @@ export function useBackupConfig() {
   });
 
   const updateBackupConfigMutation = useMutation({
-    mutationFn: (patch: UpdateDatabaseBackupConfigRequest) =>
+    mutationFn: (patch: UpdateDatabaseBackupConfig) =>
       backupService.updateBackupConfig(patch),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: BACKUP_CONFIG_QUERY_KEY });

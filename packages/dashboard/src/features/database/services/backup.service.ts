@@ -2,13 +2,15 @@ import { apiClient } from '#lib/api/client';
 import type {
   CreateDatabaseBackupRequest,
   CreateDatabaseBackupResponse,
+  DatabaseBackupConfigResponse,
   DatabaseBackupsResponse,
   DeleteDatabaseBackupResponse,
-  GetDatabaseBackupConfigResponse,
+  GetDatabaseConfigResponse,
   RenameDatabaseBackupRequest,
   RestoreDatabaseBackupResponse,
-  UpdateDatabaseBackupConfigRequest,
-  UpdateDatabaseBackupConfigResponse,
+  UpdateDatabaseBackupConfig,
+  UpdateDatabaseConfigRequest,
+  UpdateDatabaseConfigResponse,
   UpdateDatabaseBackupResponse,
 } from '@insforge/shared-schemas';
 
@@ -58,23 +60,28 @@ export class BackupService {
     });
   }
 
-  async getBackupConfig(): Promise<GetDatabaseBackupConfigResponse> {
-    return apiClient.request('/database/backups/config', {
+  // Backup scheduling lives in the database-module config endpoint; these
+  // helpers unwrap its `backup` section so callers stay flat.
+  async getBackupConfig(): Promise<DatabaseBackupConfigResponse> {
+    const response: GetDatabaseConfigResponse = await apiClient.request('/database/config', {
       method: 'GET',
       headers: apiClient.withAccessToken({}),
     });
+    return response.backup;
   }
 
   async updateBackupConfig(
-    patch: UpdateDatabaseBackupConfigRequest
-  ): Promise<UpdateDatabaseBackupConfigResponse> {
-    return apiClient.request('/database/backups/config', {
+    patch: UpdateDatabaseBackupConfig
+  ): Promise<DatabaseBackupConfigResponse> {
+    const body: UpdateDatabaseConfigRequest = { backup: patch };
+    const response: UpdateDatabaseConfigResponse = await apiClient.request('/database/config', {
       method: 'PATCH',
       headers: apiClient.withAccessToken({
         'Content-Type': 'application/json',
       }),
-      body: JSON.stringify(patch),
+      body: JSON.stringify(body),
     });
+    return response.backup;
   }
 }
 

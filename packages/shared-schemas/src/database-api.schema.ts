@@ -470,11 +470,11 @@ export const restoreDatabaseBackupResponseSchema = z.object({
 
 // `nextBackupAt` is computed by the backend from the cron schedule (UTC);
 // null when scheduled backups are disabled.
-export const getDatabaseBackupConfigResponseSchema = databaseBackupConfigSchema.extend({
+export const databaseBackupConfigResponseSchema = databaseBackupConfigSchema.extend({
   nextBackupAt: z.string().nullable(),
 });
 
-export const updateDatabaseBackupConfigRequestSchema = z
+export const updateDatabaseBackupConfigSchema = z
   .object({
     enabled: z.boolean().optional(),
     cronSchedule: z
@@ -495,7 +495,17 @@ export const updateDatabaseBackupConfigRequestSchema = z
     message: 'At least one field must be provided',
   });
 
-export const updateDatabaseBackupConfigResponseSchema = getDatabaseBackupConfigResponseSchema;
+// Database-module configuration (GET/PATCH /api/database/config). Backups are
+// the first section; future database-level settings nest alongside `backup`.
+export const getDatabaseConfigResponseSchema = z.object({
+  backup: databaseBackupConfigResponseSchema,
+});
+
+export const updateDatabaseConfigRequestSchema = z.object({
+  backup: updateDatabaseBackupConfigSchema,
+});
+
+export const updateDatabaseConfigResponseSchema = getDatabaseConfigResponseSchema;
 
 // Database Metadata Response Types
 export type DatabaseFunctionsResponse = z.infer<typeof databaseFunctionsResponseSchema>;
@@ -513,10 +523,8 @@ export type CreateDatabaseBackupResponse = z.infer<typeof createDatabaseBackupRe
 export type UpdateDatabaseBackupResponse = z.infer<typeof updateDatabaseBackupResponseSchema>;
 export type DeleteDatabaseBackupResponse = z.infer<typeof deleteDatabaseBackupResponseSchema>;
 export type RestoreDatabaseBackupResponse = z.infer<typeof restoreDatabaseBackupResponseSchema>;
-export type GetDatabaseBackupConfigResponse = z.infer<typeof getDatabaseBackupConfigResponseSchema>;
-export type UpdateDatabaseBackupConfigRequest = z.infer<
-  typeof updateDatabaseBackupConfigRequestSchema
->;
-export type UpdateDatabaseBackupConfigResponse = z.infer<
-  typeof updateDatabaseBackupConfigResponseSchema
->;
+export type DatabaseBackupConfigResponse = z.infer<typeof databaseBackupConfigResponseSchema>;
+export type UpdateDatabaseBackupConfig = z.infer<typeof updateDatabaseBackupConfigSchema>;
+export type GetDatabaseConfigResponse = z.infer<typeof getDatabaseConfigResponseSchema>;
+export type UpdateDatabaseConfigRequest = z.infer<typeof updateDatabaseConfigRequestSchema>;
+export type UpdateDatabaseConfigResponse = z.infer<typeof updateDatabaseConfigResponseSchema>;

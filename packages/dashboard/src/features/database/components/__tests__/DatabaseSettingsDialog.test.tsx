@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GetDatabaseBackupConfigResponse } from '@insforge/shared-schemas';
+import type { DatabaseBackupConfigResponse } from '@insforge/shared-schemas';
 
 const hookMocks = vi.hoisted(() => ({
-  config: null as GetDatabaseBackupConfigResponse | null,
+  config: null as DatabaseBackupConfigResponse | null,
   isLoading: false,
   isUpdating: false,
   error: null as Error | null,
