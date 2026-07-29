@@ -15,7 +15,7 @@ services:
     networks:
       - insforge-network
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -33,14 +33,13 @@ services:
       # Enable schema reloading via NOTIFY
       PGRST_DB_CHANNEL_ENABLED: true
       PGRST_DB_CHANNEL: pgrst
-      PGRST_ADMIN_SERVER_PORT: 3001
     ports:
       - "127.0.0.1:${POSTGREST_PORT:-5430}:3000"
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: [ "CMD", "postgrest", "--ready" ]
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/3000'"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -158,7 +157,7 @@ services:
     volumes:
       - deno_cache:/deno-dir
     healthcheck:
-      test: [ "CMD", "wget", "-q", "--spider", "http://127.0.0.1:7133/health" ]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:7133/health"]
       interval: 10s
       timeout: 5s
       retries: 5
