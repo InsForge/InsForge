@@ -4,8 +4,11 @@ import type {
   CreateDatabaseBackupResponse,
   DatabaseBackupsResponse,
   DeleteDatabaseBackupResponse,
+  GetDatabaseBackupConfigResponse,
   RenameDatabaseBackupRequest,
   RestoreDatabaseBackupResponse,
+  UpdateDatabaseBackupConfigRequest,
+  UpdateDatabaseBackupConfigResponse,
   UpdateDatabaseBackupResponse,
 } from '@insforge/shared-schemas';
 
@@ -52,6 +55,25 @@ export class BackupService {
     return apiClient.request(`/database/backups/${backupId}/restore`, {
       method: 'POST',
       headers: apiClient.withAccessToken({}),
+    });
+  }
+
+  async getBackupConfig(): Promise<GetDatabaseBackupConfigResponse> {
+    return apiClient.request('/database/backups/config', {
+      method: 'GET',
+      headers: apiClient.withAccessToken({}),
+    });
+  }
+
+  async updateBackupConfig(
+    patch: UpdateDatabaseBackupConfigRequest
+  ): Promise<UpdateDatabaseBackupConfigResponse> {
+    return apiClient.request('/database/backups/config', {
+      method: 'PATCH',
+      headers: apiClient.withAccessToken({
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify(patch),
     });
   }
 }

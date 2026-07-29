@@ -10,6 +10,7 @@ import {
   databaseTriggerSchema,
   migrationSchema,
   databaseBackupSchema,
+  databaseBackupConfigSchema,
 } from './database.schema.js';
 
 export const createTableRequestSchema = tableSchema
@@ -467,6 +468,29 @@ export const restoreDatabaseBackupResponseSchema = z.object({
   message: z.string(),
 });
 
+// `nextBackupAt` is computed by the backend from the cron schedule (UTC);
+// null when scheduled backups are disabled.
+export const getDatabaseBackupConfigResponseSchema = databaseBackupConfigSchema.extend({
+  nextBackupAt: z.string().nullable(),
+});
+
+export const updateDatabaseBackupConfigRequestSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    cronSchedule: z
+      .string()
+      .trim()
+      .min(1, 'Cron schedule cannot be empty')
+      .max(64, 'Cron schedule must be less than 64 characters')
+      .optional(),
+    retentionDays: z.number().int().positive().nullable().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field must be provided',
+  });
+
+export const updateDatabaseBackupConfigResponseSchema = getDatabaseBackupConfigResponseSchema;
+
 // Database Metadata Response Types
 export type DatabaseFunctionsResponse = z.infer<typeof databaseFunctionsResponseSchema>;
 export type DatabaseSchemasResponse = z.infer<typeof databaseSchemasResponseSchema>;
@@ -483,3 +507,10 @@ export type CreateDatabaseBackupResponse = z.infer<typeof createDatabaseBackupRe
 export type UpdateDatabaseBackupResponse = z.infer<typeof updateDatabaseBackupResponseSchema>;
 export type DeleteDatabaseBackupResponse = z.infer<typeof deleteDatabaseBackupResponseSchema>;
 export type RestoreDatabaseBackupResponse = z.infer<typeof restoreDatabaseBackupResponseSchema>;
+export type GetDatabaseBackupConfigResponse = z.infer<typeof getDatabaseBackupConfigResponseSchema>;
+export type UpdateDatabaseBackupConfigRequest = z.infer<
+  typeof updateDatabaseBackupConfigRequestSchema
+>;
+export type UpdateDatabaseBackupConfigResponse = z.infer<
+  typeof updateDatabaseBackupConfigResponseSchema
+>;

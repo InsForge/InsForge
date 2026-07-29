@@ -4,10 +4,13 @@ import {
   ERROR_CODES,
   createDatabaseBackupRequestSchema,
   renameDatabaseBackupRequestSchema,
+  updateDatabaseBackupConfigRequestSchema,
   type CreateDatabaseBackupResponse,
   type DatabaseBackupsResponse,
   type DeleteDatabaseBackupResponse,
+  type GetDatabaseBackupConfigResponse,
   type RestoreDatabaseBackupResponse,
+  type UpdateDatabaseBackupConfigResponse,
   type UpdateDatabaseBackupResponse,
 } from '@insforge/shared-schemas';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
@@ -73,6 +76,55 @@ router.post(
       });
 
       successResponse(res, backup, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Registered before the '/:id' routes so 'config' is never parsed as a backup id.
+router.get(
+  '/config',
+  verifyAdmin,
+  async (_req: AuthRequest, res: Response<GetDatabaseBackupConfigResponse>, next: NextFunction) => {
+    try {
+      const config = await backupService.getBackupConfig();
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.patch(
+  '/config',
+  verifyAdmin,
+  async (
+    req: AuthRequest,
+    res: Response<UpdateDatabaseBackupConfigResponse>,
+    next: NextFunction
+  ) => {
+    try {
+      const validation = updateDatabaseBackupConfigRequestSchema.safeParse(req.body ?? {});
+      if (!validation.success) {
+        throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const config = await backupService.updateBackupConfig(validation.data);
+
+      await auditService.log({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'UPDATE_DATABASE_BACKUP_CONFIG',
+        module: 'DATABASE',
+        details: {
+          enabled: config.enabled,
+          cronSchedule: config.cronSchedule,
+          retentionDays: config.retentionDays,
+        },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, config);
     } catch (error) {
       next(error);
     }

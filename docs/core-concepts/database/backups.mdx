@@ -25,7 +25,9 @@ Click **Restore** next to any completed backup — scheduled or manual. Restorin
 
 ## Self-hosting
 
-Self-hosted deployments have the same **Backup & Restore** page for manual backups and restores. Backups are stored alongside your project's storage (local disk, or your S3 bucket when configured) and kept until you delete them. The official Docker image needs no extra setup.
+Self-hosted deployments have the same **Backup & Restore** page for manual backups and restores. Backups are stored alongside your project's storage (local disk, or your S3 bucket when configured). The official Docker image needs no extra setup.
+
+Scheduled backups are available too, but run in your own backend rather than on InsForge Cloud. Turn them on from the **Database Settings** dialog (the gear icon in the Database sidebar, or **Configure** on the Backup & Restore page): pick a frequency — presets from every 6 hours to weekly, or any 5-field cron expression, evaluated in UTC and limited to at most one backup per hour — and a retention period. Expired scheduled backups are deleted automatically after each successful run; manual backups are always kept until you delete them. A backup missed while the server was down runs shortly after it starts again.
 
 ## More resources
 

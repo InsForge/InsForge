@@ -578,4 +578,245 @@ describe('DatabaseBackupService', () => {
       );
     });
   });
+
+  describe('scheduled backups', () => {
+    function configRow(overrides: Record<string, unknown> = {}) {
+      return {
+        enabled: true,
+        cronSchedule: '0 0 * * *',
+        retentionDays: 7,
+        updatedAt: new Date('2026-06-01T00:00:00Z'),
+        ...overrides,
+      };
+    }
+
+    it('runs a due backup with trigger_source scheduled on the startup catch-up pass', async () => {
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('FROM system.database_config')) {
+          return Promise.resolve({ rows: [configRow({ retentionDays: null })] });
+        }
+        if (sql.includes('MAX(created_at)')) {
+          return Promise.resolve({ rows: [{ lastAttemptAt: null }] });
+        }
+        if (sql.includes('INSERT INTO system.database_backups')) {
+          return Promise.resolve({
+            rows: [backupRow({ triggerSource: 'scheduled', createdBy: null })],
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+      spawnMock.mockImplementation(() => makeFakeChild().child);
+
+      const service = DatabaseBackupService.getInstance();
+      try {
+        service.startScheduler();
+        await vi.waitFor(() => {
+          const insert = queryMock.mock.calls.find(([sql]) =>
+            (sql as string).includes('INSERT INTO system.database_backups')
+          );
+          expect(insert).toBeDefined();
+        });
+        const insert = queryMock.mock.calls.find(([sql]) =>
+          (sql as string).includes('INSERT INTO system.database_backups')
+        ) as [string, unknown[]];
+        expect(insert[1][2]).toBe('scheduled');
+        expect(insert[1][0]).toBeNull(); // no name
+        expect(insert[1][1]).toBeNull(); // no actor
+      } finally {
+        service.stopScheduler();
+      }
+      await waitForIdle(service);
+    });
+
+    it('does nothing when scheduled backups are disabled', async () => {
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('FROM system.database_config')) {
+          return Promise.resolve({ rows: [configRow({ enabled: false })] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const service = DatabaseBackupService.getInstance();
+      try {
+        service.startScheduler();
+        await vi.waitFor(() => {
+          expect(
+            queryMock.mock.calls.some(([sql]) =>
+              (sql as string).includes('FROM system.database_config')
+            )
+          ).toBe(true);
+        });
+      } finally {
+        service.stopScheduler();
+      }
+
+      expect(
+        queryMock.mock.calls.some(([sql]) => (sql as string).includes('MAX(created_at)'))
+      ).toBe(false);
+      expect(
+        queryMock.mock.calls.some(([sql]) =>
+          (sql as string).includes('INSERT INTO system.database_backups')
+        )
+      ).toBe(false);
+    });
+
+    it('does not fire for a cron slot that predates enabling the schedule', async () => {
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('FROM system.database_config')) {
+          // Config touched "now": the most recent midnight fire is older.
+          return Promise.resolve({ rows: [configRow({ updatedAt: new Date() })] });
+        }
+        if (sql.includes('MAX(created_at)')) {
+          return Promise.resolve({ rows: [{ lastAttemptAt: null }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const service = DatabaseBackupService.getInstance();
+      try {
+        service.startScheduler();
+        await vi.waitFor(() => {
+          expect(
+            queryMock.mock.calls.some(([sql]) => (sql as string).includes('MAX(created_at)'))
+          ).toBe(true);
+        });
+      } finally {
+        service.stopScheduler();
+      }
+
+      expect(
+        queryMock.mock.calls.some(([sql]) =>
+          (sql as string).includes('INSERT INTO system.database_backups')
+        )
+      ).toBe(false);
+    });
+
+    it('prunes expired scheduled backups after a scheduled run completes', async () => {
+      const expiredId = '00000000-0000-4000-8000-00000000dead';
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('FROM system.database_config')) {
+          return Promise.resolve({ rows: [configRow()] });
+        }
+        if (sql.includes('MAX(created_at)')) {
+          return Promise.resolve({ rows: [{ lastAttemptAt: null }] });
+        }
+        if (sql.includes('INSERT INTO system.database_backups')) {
+          return Promise.resolve({ rows: [backupRow({ triggerSource: 'scheduled' })] });
+        }
+        if (sql.includes('make_interval')) {
+          return Promise.resolve({ rows: [{ id: expiredId }] });
+        }
+        if (sql.includes('storage_key AS "storageKey"')) {
+          return Promise.resolve({
+            rows: [backupRow({ id: expiredId, status: 'completed', storageKey: 'old.dump' })],
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+      spawnMock.mockImplementation(() => makeFakeChild().child);
+
+      const service = DatabaseBackupService.getInstance();
+      try {
+        service.startScheduler();
+        await vi.waitFor(() => {
+          const del = queryMock.mock.calls.find(([sql]) =>
+            (sql as string).includes('DELETE FROM system.database_backups')
+          );
+          expect(del).toBeDefined();
+          expect((del as [string, unknown[]])[1]).toEqual([expiredId]);
+        });
+      } finally {
+        service.stopScheduler();
+      }
+      await waitForIdle(service);
+    });
+
+    it('never prunes after a manual backup', async () => {
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO system.database_backups')) {
+          return Promise.resolve({ rows: [backupRow()] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+      spawnMock.mockImplementation(() => makeFakeChild().child);
+
+      const service = DatabaseBackupService.getInstance();
+      await service.createBackup({}, 'admin');
+
+      await vi.waitFor(() => {
+        expect(
+          queryMock.mock.calls.some(([sql]) => (sql as string).includes("SET status = 'completed'"))
+        ).toBe(true);
+      });
+      await waitForIdle(service);
+
+      expect(
+        queryMock.mock.calls.some(([sql]) => (sql as string).includes('make_interval'))
+      ).toBe(false);
+    });
+  });
+
+  describe('backup config', () => {
+    function configRow(overrides: Record<string, unknown> = {}) {
+      return {
+        enabled: true,
+        cronSchedule: '0 0 * * *',
+        retentionDays: 7,
+        updatedAt: new Date('2026-06-01T00:00:00Z'),
+        ...overrides,
+      };
+    }
+
+    it('getBackupConfig computes nextBackupAt when enabled', async () => {
+      queryMock.mockResolvedValue({ rows: [configRow()] });
+
+      const config = await DatabaseBackupService.getInstance().getBackupConfig();
+
+      expect(config).toMatchObject({
+        enabled: true,
+        cronSchedule: '0 0 * * *',
+        retentionDays: 7,
+      });
+      expect(config.nextBackupAt).toMatch(/T00:00:00\.000Z$/);
+    });
+
+    it('getBackupConfig returns a null nextBackupAt when disabled', async () => {
+      queryMock.mockResolvedValue({ rows: [configRow({ enabled: false })] });
+
+      const config = await DatabaseBackupService.getInstance().getBackupConfig();
+
+      expect(config.nextBackupAt).toBeNull();
+    });
+
+    it('getBackupConfig fails when the singleton row is missing', async () => {
+      queryMock.mockResolvedValue({ rows: [] });
+
+      await expect(DatabaseBackupService.getInstance().getBackupConfig()).rejects.toMatchObject({
+        statusCode: 500,
+      });
+    });
+
+    it('updateBackupConfig rejects an invalid cron without touching the database', async () => {
+      const service = DatabaseBackupService.getInstance();
+
+      await expect(service.updateBackupConfig({ cronSchedule: 'nope' })).rejects.toMatchObject({
+        statusCode: 400,
+        code: ERROR_CODES.INVALID_INPUT,
+      });
+      expect(queryMock).not.toHaveBeenCalled();
+    });
+
+    it('updateBackupConfig only rewrites retention when the field is present', async () => {
+      const service = DatabaseBackupService.getInstance();
+
+      queryMock.mockResolvedValue({ rows: [configRow({ enabled: false })] });
+      await service.updateBackupConfig({ enabled: false });
+      expect(queryMock.mock.calls[0][1]).toEqual([false, null, false, null]);
+
+      queryMock.mockClear();
+      queryMock.mockResolvedValue({ rows: [configRow({ retentionDays: null })] });
+      await service.updateBackupConfig({ retentionDays: null });
+      expect(queryMock.mock.calls[0][1]).toEqual([null, null, true, null]);
+    });
+  });
 });
