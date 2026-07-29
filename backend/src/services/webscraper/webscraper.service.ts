@@ -1,12 +1,12 @@
-import { ApifyProvider } from '@/providers/webscraper/apify.provider.js';
+import { CloudWebscraperProvider } from '@/providers/webscraper/cloud.provider.js';
 
 // Wraps the data-source providers (Apify first; others slot in later). Mirrors
 // AnalyticsService's thin delegation over PostHogProvider.
 export class WebscraperService {
   private static instance: WebscraperService;
-  private apify: ApifyProvider;
+  private apify: CloudWebscraperProvider;
 
-  constructor(apify: ApifyProvider = ApifyProvider.getInstance()) {
+  constructor(apify: CloudWebscraperProvider = CloudWebscraperProvider.getInstance()) {
     this.apify = apify;
   }
 
