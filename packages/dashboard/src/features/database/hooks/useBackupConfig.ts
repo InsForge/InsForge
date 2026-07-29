@@ -9,9 +9,11 @@ const BACKUP_CONFIG_QUERY_KEY = ['database-backup', 'config'] as const;
 
 /**
  * Scheduled backup configuration. Self-hosting only: the cloud control plane
- * owns backups there and the OSS config endpoint is not mounted.
+ * owns backups there and the OSS config endpoint is not mounted. Pass
+ * `enabled: false` to keep the query idle while a consumer (e.g. a closed
+ * settings dialog) is mounted but inactive.
  */
-export function useBackupConfig() {
+export function useBackupConfig(options?: { enabled?: boolean }) {
   const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
@@ -25,7 +27,7 @@ export function useBackupConfig() {
   } = useQuery({
     queryKey: BACKUP_CONFIG_QUERY_KEY,
     queryFn: () => backupService.getBackupConfig(),
-    enabled: !isCloudHostingMode,
+    enabled: !isCloudHostingMode && (options?.enabled ?? true),
     staleTime: 2 * 60 * 1000,
   });
 

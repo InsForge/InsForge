@@ -186,9 +186,16 @@ describe('scheduled backup retention', () => {
     });
     await expect(fs.stat(staleArtifact)).rejects.toMatchObject({ code: 'ENOENT' });
 
-    // The fresh scheduled backup itself is retained.
+    // The fresh scheduled backup itself is retained, and the list surfaces
+    // when retention will delete it; manual backups never expire.
     const fresh = await readBackupRow(backup.id);
     expect(fresh.status).toBe('completed');
+    const listed = (await svc.listBackups()).backups;
+    const scheduledRow = listed.find((b) => b.id === backup.id);
+    expect(scheduledRow?.expiresAt).toBeTruthy();
+    expect(
+      listed.filter((b) => b.triggerSource === 'manual').every((b) => b.expiresAt === null)
+    ).toBe(true);
 
     await svc.deleteBackup(backup.id);
     await svc.updateBackupConfig({ enabled: false });

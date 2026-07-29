@@ -687,9 +687,9 @@ export default function BackupsPage() {
         }}
       />
       <ConfirmDialog {...confirmDialogProps} />
-      {/* Mounted only while open so the config query does not fire for
-          visitors who never touch the settings. */}
-      {!isCloudHostingMode && databaseSettingsOpen && (
+      {/* Stays mounted (Radix close animation); its config query only runs
+          while open. */}
+      {!isCloudHostingMode && (
         <DatabaseSettingsDialog
           open={databaseSettingsOpen}
           onOpenChange={setDatabaseSettingsOpen}

@@ -154,6 +154,9 @@ export const databaseBackupSchema = z.object({
   createdAt: z.string(),
   completedAt: z.string().nullable(),
   createdBy: z.string().nullable(),
+  // When retention will delete this backup; only set for scheduled backups
+  // while a retention period is configured.
+  expiresAt: z.string().nullable(),
 });
 
 // Self-hosting scheduled backup configuration. Retention applies to scheduled

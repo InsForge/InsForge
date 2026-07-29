@@ -415,10 +415,45 @@ describe('DatabaseBackupService', () => {
       await expect(service.deleteBackup('some-id')).rejects.toMatchObject(conflict);
       await expect(service.renameBackup('some-id', 'x')).rejects.toMatchObject(conflict);
       await expect(service.createBackup({}, 'admin')).rejects.toMatchObject(conflict);
+      // A config update mid-restore would be clobbered by the write-back.
+      await expect(service.updateBackupConfig({ enabled: false })).rejects.toMatchObject(conflict);
 
       await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
       pending.finish();
       await restore;
+    });
+
+    it('blocks a restore while a config update is in flight', async () => {
+      let releaseUpdate!: (value: { rows: unknown[] }) => void;
+      const gatedUpdate = new Promise<{ rows: unknown[] }>((resolve) => {
+        releaseUpdate = resolve;
+      });
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('UPDATE system.database_config')) {
+          return gatedUpdate;
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const service = DatabaseBackupService.getInstance();
+      const update = service.updateBackupConfig({ retentionDays: 14 });
+
+      await expect(service.restoreBackup('some-id')).rejects.toMatchObject({
+        statusCode: 409,
+        code: ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION,
+      });
+
+      releaseUpdate({
+        rows: [
+          {
+            enabled: false,
+            cronSchedule: '0 0 * * *',
+            retentionDays: 14,
+            scheduleAnchorAt: new Date('2026-06-01T00:00:00Z'),
+          },
+        ],
+      });
+      await update;
     });
 
     it('restores the archive and reinstates the backup metadata snapshot', async () => {
@@ -802,6 +837,28 @@ describe('DatabaseBackupService', () => {
         code: ERROR_CODES.INVALID_INPUT,
       });
       expect(queryMock).not.toHaveBeenCalled();
+    });
+
+    it('updateBackupConfig refuses to enable over a stored invalid cron', async () => {
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('FROM system.database_config')) {
+          return Promise.resolve({
+            rows: [configRow({ enabled: false, cronSchedule: 'garbage' })],
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const service = DatabaseBackupService.getInstance();
+      await expect(service.updateBackupConfig({ enabled: true })).rejects.toMatchObject({
+        statusCode: 400,
+        code: ERROR_CODES.INVALID_INPUT,
+      });
+      expect(
+        queryMock.mock.calls.some(([sql]) =>
+          (sql as string).includes('UPDATE system.database_config')
+        )
+      ).toBe(false);
     });
 
     it('updateBackupConfig only rewrites retention when the field is present', async () => {

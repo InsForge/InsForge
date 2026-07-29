@@ -327,9 +327,9 @@ export function DatabaseSidebar({
         </div>
       </div>
 
-      {/* Mounted only while open so the config query does not fire on every
-          tables-page visit. */}
-      {!isCloudHostingMode && settingsOpen && (
+      {/* Stays mounted (Radix close animation); its config query only runs
+          while open. */}
+      {!isCloudHostingMode && (
         <DatabaseSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       )}
     </div>

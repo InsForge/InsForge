@@ -62,6 +62,12 @@ describe('061_add-database-config migration', () => {
     expect(sql).toMatch(/backup_schedule_anchor TIMESTAMPTZ NOT NULL DEFAULT NOW\(\)/i);
   });
 
+  it('backfills the anchor column on tables created by an earlier revision', () => {
+    expect(sql).toMatch(
+      /ALTER TABLE system\.database_config\s+ADD COLUMN IF NOT EXISTS backup_schedule_anchor/i
+    );
+  });
+
   it('allows NULL retention (keep forever) but rejects non-positive values', () => {
     expect(sql).toMatch(/CHECK \(backup_retention_days IS NULL OR backup_retention_days > 0\)/i);
   });

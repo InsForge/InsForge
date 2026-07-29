@@ -114,7 +114,11 @@ export function DatabaseSettingsDialog({ open, onOpenChange }: DatabaseSettingsD
   const { t } = useTranslation('chrome');
   const [draft, setDraft] = useState<BackupDraft | null>(null);
   const [initialDraft, setInitialDraft] = useState<BackupDraft | null>(null);
-  const { config, isLoading, isUpdating, error, updateConfig } = useBackupConfig();
+  // Query only while open, so an always-mounted (animatable) dialog does not
+  // fetch config on pages where it is never used.
+  const { config, isLoading, isUpdating, error, updateConfig } = useBackupConfig({
+    enabled: open,
+  });
 
   useEffect(() => {
     if (!open) {

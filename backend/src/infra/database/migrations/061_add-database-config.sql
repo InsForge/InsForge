@@ -27,6 +27,12 @@ CREATE TABLE IF NOT EXISTS system.database_config (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Idempotent upgrade for databases that ran an earlier revision of this
+-- migration before backup_schedule_anchor existed (CREATE TABLE IF NOT EXISTS
+-- is a no-op for them).
+ALTER TABLE system.database_config
+  ADD COLUMN IF NOT EXISTS backup_schedule_anchor TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
 -- Ensure only one row exists (singleton pattern)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_database_config_singleton
   ON system.database_config ((1));

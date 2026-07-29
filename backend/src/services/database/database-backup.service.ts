@@ -88,6 +88,7 @@ function serializeBackup(row: BackupRow): DatabaseBackup {
     createdAt: toIsoString(row.createdAt) ?? row.createdAt,
     completedAt: toIsoString(row.completedAt),
     createdBy: row.createdBy,
+    expiresAt: toIsoString(row.expiresAt),
   };
 }
 
@@ -124,8 +125,16 @@ export class DatabaseBackupService {
   async listBackups(): Promise<DatabaseBackupsResponse> {
     await this.failInterruptedBackups();
 
+    // expiresAt mirrors the retention prune criteria: scheduled non-running
+    // rows age out created_at + retention; NULL retention means never.
     const result = await this.dbManager.getPool().query(`
-      SELECT ${BACKUP_COLUMNS}
+      SELECT ${BACKUP_COLUMNS},
+        CASE
+          WHEN trigger_source = 'scheduled' AND status <> 'running' THEN
+            created_at + make_interval(days =>
+              (SELECT backup_retention_days FROM system.database_config LIMIT 1))
+          ELSE NULL
+        END AS "expiresAt"
       FROM system.database_backups
       ORDER BY created_at DESC
     `);
@@ -376,6 +385,30 @@ export class DatabaseBackupService {
       assertValidBackupCron(patch.cronSchedule);
     }
 
+    // A restore's config write-back would clobber a concurrent update (and
+    // the update would corrupt the restore snapshot), so serialize exactly
+    // like the rename/delete metadata mutations.
+    this.assertNoRestoreInProgress();
+    this.metadataMutationsInFlight += 1;
+    try {
+      // Enabling must never leave an unparseable stored cron active. Only
+      // reachable through out-of-band writes, but cheap to keep invariant.
+      if (patch.enabled === true && patch.cronSchedule === undefined) {
+        const current = await this.getBackupConfigRow();
+        if (current) {
+          assertValidBackupCron(current.cronSchedule);
+        }
+      }
+
+      return await this.applyBackupConfigPatch(patch);
+    } finally {
+      this.metadataMutationsInFlight -= 1;
+    }
+  }
+
+  private async applyBackupConfigPatch(
+    patch: UpdateDatabaseBackupConfig
+  ): Promise<DatabaseBackupConfigResponse> {
     const result = await this.dbManager.getPool().query(
       `
         UPDATE system.database_config
