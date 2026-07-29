@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import { useLogs } from '#features/logs/hooks/useLogs';
@@ -15,6 +16,7 @@ import { LogSchema } from '@insforge/shared-schemas';
 import { usePageSize } from '#lib/hooks/usePageSize';
 
 export default function LogsPage() {
+  const { t } = useTranslation('chrome');
   const { source = 'insforge.logs' } = useParams<{ source?: string }>();
   const [selectedLog, setSelectedLog] = useState<LogSchema | null>(null);
   const { pageSize, pageSizeOptions, onPageSizeChange: handlePageSizeChange } = usePageSize('logs');
@@ -59,7 +61,7 @@ export default function LogsPage() {
     () => [
       {
         key: 'timestamp',
-        name: 'Time',
+        name: t('logs.time', { defaultValue: 'Time' }),
         width: '240px',
         renderCell: ({ row }) => (
           <p className="truncate text-[13px] font-normal leading-[18px] text-[rgb(var(--foreground))]">
@@ -69,13 +71,13 @@ export default function LogsPage() {
       },
       {
         key: 'severity',
-        name: 'Type',
+        name: t('logs.type', { defaultValue: 'Type' }),
         width: '160px',
         renderCell: ({ row }) => <SeverityBadge severity={getSeverity(row)} />,
       },
       {
         key: 'event_message',
-        name: 'Definition',
+        name: t('logs.definition', { defaultValue: 'Definition' }),
         width: selectedLog ? '1fr' : 'minmax(400px, 1fr)',
         minWidth: 300,
         renderCell: ({ row }) => {
@@ -93,7 +95,7 @@ export default function LogsPage() {
         },
       },
     ],
-    [getSeverity, selectedLog]
+    [getSeverity, selectedLog, t]
   );
 
   return (
@@ -102,7 +104,7 @@ export default function LogsPage() {
         title={source}
         searchValue={logsSearchQuery}
         onSearchChange={setLogsSearchQuery}
-        searchPlaceholder="Search logs"
+        searchPlaceholder={t('logs.searchLogs', { defaultValue: 'Search logs' })}
         rightActions={
           <SeverityFilterDropdown value={severityFilter} onChange={handleSeverityChange} />
         }
@@ -112,11 +114,13 @@ export default function LogsPage() {
         {logsError ? (
           <div className="flex h-full items-center justify-center">
             <EmptyState
-              title="Error loading logs"
+              title={t('logs.errorLoadingLogs', { defaultValue: 'Error loading logs' })}
               description={
                 logsError instanceof Error
                   ? logsError.message
-                  : 'Failed to load logs. Please refresh or contact support.'
+                  : t('logs.failedToLoadLogs', {
+                      defaultValue: 'Failed to load logs. Please refresh or contact support.',
+                    })
               }
             />
           </div>
@@ -135,7 +139,7 @@ export default function LogsPage() {
               handlePageSizeChange(newSize);
               setCurrentPage(1);
             }}
-            paginationRecordLabel="logs"
+            paginationRecordLabel={t('logs.recordLabel', { defaultValue: 'logs' })}
             selectedRowId={selectedLog?.id ?? null}
             onRowClick={handleRowClick}
             gridContainerClassName="border-t border-[var(--alpha-8)]"
@@ -146,7 +150,13 @@ export default function LogsPage() {
                 </div>
               )
             }
-            emptyState={<DataGridEmptyState message="No logs match your filters" />}
+            emptyState={
+              <DataGridEmptyState
+                message={t('logs.noLogsMatchFilters', {
+                  defaultValue: 'No logs match your filters',
+                })}
+              />
+            }
           />
         )}
       </div>

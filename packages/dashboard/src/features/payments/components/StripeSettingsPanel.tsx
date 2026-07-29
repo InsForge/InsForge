@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle2, Eye, EyeOff, Loader2, Webhook } from 'lucide-react';
 import { Button } from '@insforge/ui';
 import type {
@@ -40,6 +41,7 @@ function getStripeKeyValues(keys: StripeKeyConfig[]): Record<PaymentEnvironment,
  * `reset()` on close.
  */
 export function useStripeSettings(open: boolean) {
+  const { t } = useTranslation('chrome');
   const { keys, isLoading, error, saveKey, removeKey } = useStripeConfig();
   const { syncPayments } = useStripeSync();
   const {
@@ -94,14 +96,23 @@ export function useStripeSettings(open: boolean) {
     const expectedPrefix = KEY_PREFIX_BY_ENVIRONMENT[environment];
 
     if (!secretKeyValue) {
-      setErrors((current) => ({ ...current, [environment]: 'Please enter a Stripe secret key.' }));
+      setErrors((current) => ({
+        ...current,
+        [environment]: t('payments.enterStripeSecretKey', {
+          defaultValue: 'Please enter a Stripe secret key.',
+        }),
+      }));
       return;
     }
 
     if (!secretKeyValue.startsWith(expectedPrefix)) {
       setErrors((current) => ({
         ...current,
-        [environment]: `The ${environment} key must start with ${expectedPrefix}.`,
+        [environment]: t('payments.stripeKeyPrefixError', {
+          defaultValue: 'The {{environment}} key must start with {{prefix}}.',
+          environment,
+          prefix: expectedPrefix,
+        }),
       }));
       return;
     }
@@ -113,7 +124,10 @@ export function useStripeSettings(open: boolean) {
     } catch (err) {
       setErrors((current) => ({
         ...current,
-        [environment]: err instanceof Error ? err.message : 'Failed to save Stripe key.',
+        [environment]:
+          err instanceof Error
+            ? err.message
+            : t('payments.saveStripeKeyFailed', { defaultValue: 'Failed to save Stripe key' }),
       }));
     }
   };
@@ -127,7 +141,10 @@ export function useStripeSettings(open: boolean) {
     } catch (err) {
       setErrors((current) => ({
         ...current,
-        [environment]: err instanceof Error ? err.message : 'Failed to remove Stripe key.',
+        [environment]:
+          err instanceof Error
+            ? err.message
+            : t('payments.removeStripeKeyFailed', { defaultValue: 'Failed to remove Stripe key' }),
       }));
     }
   };
@@ -251,8 +268,12 @@ function EnvironmentKeySection({
   onSave,
   onRemove,
 }: EnvironmentKeySectionProps) {
+  const { t } = useTranslation('chrome');
   const expectedPrefix = KEY_PREFIX_BY_ENVIRONMENT[environment];
-  const environmentLabel = environment === 'test' ? 'Test Mode' : 'Live Mode';
+  const environmentLabel =
+    environment === 'test'
+      ? t('payments.testMode', { defaultValue: 'Test Mode' })
+      : t('payments.liveMode', { defaultValue: 'Live Mode' });
   const hasSavedValue = Boolean(config?.value);
   const hasPendingInput = inputValue.trim() !== savedValue.trim();
 
@@ -261,7 +282,9 @@ function EnvironmentKeySection({
       label={environmentLabel}
       description={
         <>
-          Use a Stripe secret key that starts with{' '}
+          {t('payments.stripeKeyHintBefore', {
+            defaultValue: 'Use a Stripe secret key that starts with',
+          })}{' '}
           <span className="font-mono text-foreground">{expectedPrefix}</span>
         </>
       }
@@ -281,7 +304,11 @@ function EnvironmentKeySection({
               type="button"
               onClick={onToggleShowKey}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={showKey ? 'Hide key' : 'Show key'}
+              aria-label={
+                showKey
+                  ? t('payments.hideKey', { defaultValue: 'Hide key' })
+                  : t('payments.showKey', { defaultValue: 'Show key' })
+              }
               disabled={isBusy}
             >
               {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -303,7 +330,7 @@ function EnvironmentKeySection({
                   disabled={isBusy}
                   className="h-7 px-2"
                 >
-                  Remove
+                  {t('payments.remove', { defaultValue: 'Remove' })}
                 </Button>
               )}
 
@@ -317,7 +344,7 @@ function EnvironmentKeySection({
                   className="h-7 px-2"
                 >
                   {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                  Save
+                  {t('payments.save', { defaultValue: 'Save' })}
                 </Button>
               )}
             </div>
@@ -353,11 +380,15 @@ function StripeKeysTabContent({
   onSave: (environment: PaymentEnvironment) => void;
   onRemove: (environment: PaymentEnvironment) => void;
 }) {
+  const { t } = useTranslation('chrome');
   if (isLoading && !error) {
     return (
       <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Loading Stripe key configuration...
+        {t('payments.loadingKeyConfiguration', {
+          defaultValue: 'Loading {{provider}} key configuration...',
+          provider: 'Stripe',
+        })}
       </div>
     );
   }
@@ -365,7 +396,11 @@ function StripeKeysTabContent({
   if (error) {
     return (
       <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-        Failed to load Stripe key configuration. Close the dialog and try again.
+        {t('payments.loadKeyConfigurationFailed', {
+          defaultValue:
+            'Failed to load {{provider}} key configuration. Close the dialog and try again.',
+          provider: 'Stripe',
+        })}
       </div>
     );
   }
@@ -374,7 +409,9 @@ function StripeKeysTabContent({
     <div className="flex flex-col gap-6">
       <div>
         <p className="text-sm leading-6 text-muted-foreground">
-          Configure the Stripe secret keys to use Payments.
+          {t('payments.stripeKeysIntro', {
+            defaultValue: 'Configure the Stripe secret keys to use Payments.',
+          })}
         </p>
       </div>
 
@@ -403,10 +440,11 @@ function StripeKeysTabContent({
 }
 
 function WebhookStatusBadge({ configured }: { configured: boolean }) {
+  const { t } = useTranslation('chrome');
   if (!configured) {
     return (
       <span className="inline-flex items-center rounded-full border border-[var(--alpha-8)] bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-        Not configured
+        {t('payments.notConfigured', { defaultValue: 'Not configured' })}
       </span>
     );
   }
@@ -414,7 +452,7 @@ function WebhookStatusBadge({ configured }: { configured: boolean }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">
       <CheckCircle2 className="h-3 w-3" />
-      Configured
+      {t('payments.configured', { defaultValue: 'Configured' })}
     </span>
   );
 }
@@ -458,11 +496,15 @@ function StripeWebhooksTabContent({
   isBusy: boolean;
   onConfigure: (environment: PaymentEnvironment) => void;
 }) {
+  const { t } = useTranslation('chrome');
   if ((isLoading || isLoadingWebhooks) && !error && !webhooksError) {
     return (
       <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Loading Stripe webhook configuration...
+        {t('payments.loadingWebhookConfiguration', {
+          defaultValue: 'Loading {{provider}} webhook configuration...',
+          provider: 'Stripe',
+        })}
       </div>
     );
   }
@@ -470,7 +512,11 @@ function StripeWebhooksTabContent({
   if (error || webhooksError) {
     return (
       <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-        Failed to load Stripe webhook configuration. Close the dialog and try again.
+        {t('payments.loadWebhookConfigurationFailed', {
+          defaultValue:
+            'Failed to load {{provider}} webhook configuration. Close the dialog and try again.',
+          provider: 'Stripe',
+        })}
       </div>
     );
   }
@@ -479,7 +525,10 @@ function StripeWebhooksTabContent({
     <div className="flex flex-col gap-6">
       <div>
         <p className="text-sm leading-6 text-muted-foreground">
-          Configure Stripe webhook endpoints for customer, transaction, and subscription updates.
+          {t('payments.stripeWebhooksIntro', {
+            defaultValue:
+              'Configure Stripe webhook endpoints for customer, transaction, and subscription updates.',
+          })}
         </p>
       </div>
 
@@ -499,7 +548,9 @@ function StripeWebhooksTabContent({
         <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
           {configureWebhookError instanceof Error
             ? configureWebhookError.message
-            : 'Failed to configure Stripe webhook.'}
+            : t('payments.configureStripeWebhookFailed', {
+                defaultValue: 'Failed to configure Stripe webhook',
+              })}
         </div>
       )}
     </div>
@@ -523,7 +574,11 @@ function StripeWebhookEnvironmentSection({
   isBusy,
   onConfigure,
 }: StripeWebhookEnvironmentSectionProps) {
-  const environmentLabel = environment === 'test' ? 'Test mode' : 'Live mode';
+  const { t } = useTranslation('chrome');
+  const environmentLabel =
+    environment === 'test'
+      ? t('payments.testMode', { defaultValue: 'Test Mode' })
+      : t('payments.liveMode', { defaultValue: 'Live Mode' });
   const keyName = environment === 'test' ? 'STRIPE_TEST_SECRET_KEY' : 'STRIPE_LIVE_SECRET_KEY';
 
   const isKeyConfigured = !!config?.value;
@@ -537,8 +592,14 @@ function StripeWebhookEnvironmentSection({
       label={environmentLabel}
       description={
         isKeyConfigured
-          ? 'InsForge creates and stores a Stripe webhook signing secret for this environment.'
-          : `Configure ${keyName} before creating the webhook.`
+          ? t('payments.stripeWebhookManagedDescription', {
+              defaultValue:
+                'InsForge creates and stores a Stripe webhook signing secret for this environment.',
+            })
+          : t('payments.configureKeyBeforeWebhook', {
+              defaultValue: 'Configure {{keyName}} before creating the webhook.',
+              keyName,
+            })
       }
     >
       <div className="flex flex-col gap-3">
@@ -555,27 +616,43 @@ function StripeWebhookEnvironmentSection({
           {isWebhookConfigured ? (
             <div className="grid gap-2 text-xs">
               <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3">
-                <span className="text-muted-foreground">Endpoint</span>
+                <span className="text-muted-foreground">
+                  {t('payments.endpoint', { defaultValue: 'Endpoint' })}
+                </span>
                 <span className="min-w-0 truncate font-mono text-foreground">
                   {webhookEndpointUrl}
                 </span>
               </div>
               <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3">
-                <span className="text-muted-foreground">Stripe ID</span>
+                <span className="text-muted-foreground">
+                  {t('payments.stripeId', { defaultValue: 'Stripe ID' })}
+                </span>
                 <span className="min-w-0 truncate font-mono text-foreground">
                   {webhookEndpointId}
                 </span>
               </div>
               <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3">
-                <span className="text-muted-foreground">Secret</span>
-                <span className="text-foreground">Stored in InsForge secret store</span>
+                <span className="text-muted-foreground">
+                  {t('payments.secret', { defaultValue: 'Secret' })}
+                </span>
+                <span className="text-foreground">
+                  {t('payments.storedInSecretStore', {
+                    defaultValue: 'Stored in InsForge secret store',
+                  })}
+                </span>
               </div>
             </div>
           ) : (
             <p className="text-xs leading-5 text-muted-foreground">
               {isKeyConfigured
-                ? 'No managed Stripe webhook is configured yet. Create one when your backend has a public API URL.'
-                : 'Webhook setup uses the saved Stripe API key, so the key must be configured first.'}
+                ? t('payments.noManagedWebhook', {
+                    defaultValue:
+                      'No managed Stripe webhook is configured yet. Create one when your backend has a public API URL.',
+                  })
+                : t('payments.webhookNeedsKey', {
+                    defaultValue:
+                      'Webhook setup uses the saved Stripe API key, so the key must be configured first.',
+                  })}
             </p>
           )}
         </div>
@@ -593,7 +670,9 @@ function StripeWebhookEnvironmentSection({
             ) : (
               <Webhook className="h-4 w-4" />
             )}
-            {isWebhookConfigured ? 'Reconfigure webhook' : 'Configure webhook'}
+            {isWebhookConfigured
+              ? t('payments.reconfigureWebhook', { defaultValue: 'Reconfigure webhook' })
+              : t('payments.configureWebhook', { defaultValue: 'Configure webhook' })}
           </Button>
         </div>
       </div>

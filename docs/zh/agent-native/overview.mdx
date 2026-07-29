@@ -1,0 +1,50 @@
+---
+title: "代理原生倡议"
+sidebarTitle: "Overview"
+description: "允许编码代理操作后端的基元，不仅仅是人类点击仪表板。"
+---
+
+大多数后端假设仪表板中有人类。InsForge 假设终端处的编码代理。产品（数据库、身份验证、存储等）是构建块；本页上的基元是代理如何操作它们：作为它可以编辑的文件、可以测试的分支以及可以诊断和自己修复的后端。
+
+<Note>
+  新来这里？从[通过 CLI 连接](/quickstart)开始链接您的项目。本部分关于代理在连接后*如何*处理后端。
+</Note>
+
+## 基元
+
+<CardGroup cols={2}>
+  <Card title="CLI 工具" icon="terminal" href="/agent-native/cli-harness">
+    代理的双手。用于登录、架构、部署、配置和诊断的一个终端接口。
+  </Card>
+  <Card title="诊断和顾问" icon="stethoscope" href="/agent-native/diagnostics">
+    拉取顾问发现、DB 健康、指标和错误日志，代理可以读取和修复。
+  </Card>
+  <Card title="代码配置" icon="file-code" href="/agent-native/config-as-code">
+    身份验证、SMTP、存储、保留和部署设置存在于 `insforge.toml` 中。计划和应用如基础设施。
+  </Card>
+  <Card title="分支" icon="code-branch" href="/agent-native/branching">
+    将整个后端克隆到隔离分支以测试危险更改，然后合并或重置。
+  </Card>
+</CardGroup>
+
+## 为什么这很重要
+
+人和代理想要来自后端的不同东西。一个人想要一个 UI 点击。一个代理想要一个稳定的文本接口，可以驱动、读取和推理。这在 InsForge 各处显示。
+
+架构更改是您的存储库中的[迁移](/core-concepts/database/migrations)，项目配置是一个 [`insforge.toml`](/agent-native/config-as-code) 文件，所以代理编辑文本、提交它并在 PR 中评论它，而不是点击表单。当它想尝试危险的事情时，它旋转一个[后端分支](/agent-native/branching)、运行对副本的更改并在出错时扔掉分支。当某些事情看起来不对时，它直接用 `npx @insforge/cli diagnose` 获取[诊断和顾问发现](/agent-native/diagnostics)，没有仪表板在循环中，这就是让它关闭像许可 RLS 策略这样的安全漏洞本身而不是等待人类记得检查。它还用 `npx @insforge/cli metadata` 直接从后端读取当前架构、日志和元数据，所以它从真实状态工作，而不是猜测。
+
+## 循环
+
+这些串联在一起。会话通常是这样的：
+
+1. 用 `npx @insforge/cli metadata` 读取当前状态。
+2. 分支后端、写一个[迁移](/core-concepts/database/migrations)并检查什么是待处理的 `npx @insforge/cli db migrations list`，或编辑 `insforge.toml` 并用 `npx @insforge/cli config plan` 预览配置差异。
+3. 用 `npx @insforge/cli db migrations up --all` 或 `config apply` 应用它，针对分支先，然后父项。
+4. 运行 `npx @insforge/cli diagnose` 以检查顾问发现和错误日志，并问 `diagnose --ai` 以解释它们。
+5. 应用补救、重新运行诊断并合并分支。
+
+## 后续步骤
+
+- 读[CLI 工具](/agent-native/cli-harness)看看代理驱动的完整命令表面。
+- 建立[代码配置](/agent-native/config-as-code)使项目设置存在于版本控制中。
+- 使用[诊断](/agent-native/diagnostics)让代理找到和修复后端问题。

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Settings } from 'lucide-react';
 import {
   Button,
@@ -63,6 +64,7 @@ export function RealtimeSettingsMenuDialog({
   open,
   onOpenChange,
 }: RealtimeSettingsMenuDialogProps) {
+  const { t } = useTranslation('chrome');
   const [retentionDays, setRetentionDays] = useState<RetentionOption | null>(null);
   const [initialRetentionDays, setInitialRetentionDays] = useState<RetentionOption | null>(null);
   const { config, isLoading, isUpdating, error, updateConfig } = useRealtimeConfig();
@@ -115,12 +117,14 @@ export function RealtimeSettingsMenuDialog({
       <MenuDialogContent>
         <MenuDialogSideNav>
           <MenuDialogSideNavHeader>
-            <MenuDialogSideNavTitle>Realtime Settings</MenuDialogSideNavTitle>
+            <MenuDialogSideNavTitle>
+              {t('realtime.realtimeSettings', { defaultValue: 'Realtime Settings' })}
+            </MenuDialogSideNavTitle>
           </MenuDialogSideNavHeader>
           <MenuDialogNav>
             <MenuDialogNavList>
               <MenuDialogNavItem icon={<Settings className="h-5 w-5" />} active={true}>
-                General
+                {t('realtime.general', { defaultValue: 'General' })}
               </MenuDialogNavItem>
             </MenuDialogNavList>
           </MenuDialogNav>
@@ -128,22 +132,28 @@ export function RealtimeSettingsMenuDialog({
 
         <MenuDialogMain>
           <MenuDialogHeader>
-            <MenuDialogTitle>General</MenuDialogTitle>
+            <MenuDialogTitle>{t('realtime.general', { defaultValue: 'General' })}</MenuDialogTitle>
             <MenuDialogCloseButton className="ml-auto" />
           </MenuDialogHeader>
 
           {!isLoaded ? (
             <MenuDialogBody>
               <div className="flex min-h-[92px] items-center justify-center text-sm text-muted-foreground">
-                {isLoading && !error ? 'Loading configuration...' : 'Unable to load configuration.'}
+                {isLoading && !error
+                  ? t('realtime.loadingConfiguration', { defaultValue: 'Loading configuration...' })
+                  : t('realtime.unableToLoadConfiguration', {
+                      defaultValue: 'Unable to load configuration.',
+                    })}
               </div>
             </MenuDialogBody>
           ) : (
             <>
               <MenuDialogBody>
                 <SettingRow
-                  label="Message Retention"
-                  description="How long messages are kept before pruning."
+                  label={t('realtime.messageRetention', { defaultValue: 'Message Retention' })}
+                  description={t('realtime.messageRetentionDescription', {
+                    defaultValue: 'How long messages are kept before pruning.',
+                  })}
                 >
                   <div className="flex justify-end">
                     <Select
@@ -155,10 +165,30 @@ export function RealtimeSettingsMenuDialog({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="30">30 days</SelectItem>
-                        <SelectItem value="90">90 days</SelectItem>
-                        <SelectItem value="180">180 days</SelectItem>
-                        <SelectItem value="never">Never</SelectItem>
+                        <SelectItem value="30">
+                          {t('realtime.retentionDays', {
+                            count: 30,
+                            defaultValue_one: '{{count}} day',
+                            defaultValue_other: '{{count}} days',
+                          })}
+                        </SelectItem>
+                        <SelectItem value="90">
+                          {t('realtime.retentionDays', {
+                            count: 90,
+                            defaultValue_one: '{{count}} day',
+                            defaultValue_other: '{{count}} days',
+                          })}
+                        </SelectItem>
+                        <SelectItem value="180">
+                          {t('realtime.retentionDays', {
+                            count: 180,
+                            defaultValue_one: '{{count}} day',
+                            defaultValue_other: '{{count}} days',
+                          })}
+                        </SelectItem>
+                        <SelectItem value="never">
+                          {t('realtime.retentionNever', { defaultValue: 'Never' })}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -173,14 +203,16 @@ export function RealtimeSettingsMenuDialog({
                       variant="secondary"
                       onClick={() => handleOpenChange(false)}
                     >
-                      Cancel
+                      {t('realtime.cancel', { defaultValue: 'Cancel' })}
                     </Button>
                     <Button
                       type="button"
                       onClick={() => void handleSave()}
                       disabled={!isLoaded || isUpdating || !hasChanges}
                     >
-                      {isUpdating ? 'Saving...' : 'Save Changes'}
+                      {isUpdating
+                        ? t('realtime.saving', { defaultValue: 'Saving...' })
+                        : t('realtime.saveChanges', { defaultValue: 'Save Changes' })}
                     </Button>
                   </>
                 )}

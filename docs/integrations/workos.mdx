@@ -1,0 +1,122 @@
+---
+title: "WorkOS SSO and Directory Sync"
+sidebarTitle: "WorkOS"
+description: "Add WorkOS enterprise SSO, SCIM provisioning, and directory sync to your InsForge backend. Step-by-step JWT and RLS setup."
+---
+
+## Overview
+
+[WorkOS](https://workos.com) is an enterprise authentication platform that provides AuthKit (hosted login UI), Single Sign-On (SSO), SCIM directory sync, and user management. This guide shows how to integrate WorkOS with InsForge in a Next.js application. WorkOS handles authentication and enterprise identity, while InsForge manages data authorization through Row Level Security (RLS) policies.
+
+- [Live Demo](https://workosauth.insforge.site) — A sample app using WorkOS authentication with InsForge
+- [Source Code](https://github.com/InsForge/insforge-integration/tree/main/auth/workos) — GitHub repository for the sample app
+
+## Prerequisites
+
+- An InsForge project (self-hosted or cloud)
+- A [WorkOS](https://workos.com) account
+
+## Step 1: Create a WorkOS Application
+
+1. Log in to your [WorkOS Dashboard](https://dashboard.workos.com)
+2. Go to **API Keys** and note down the **API Key** and **Client ID**
+3. Navigate to **Redirects** and add `http://localhost:3000/callback`
+4. Enable your desired authentication methods (email/password, social login, SSO, etc.)
+
+## Step 2: Set Up Your InsForge Project
+
+Create a new project or link an existing one:
+
+```bash
+# Create a new project
+npx @insforge/cli create
+
+# Or link an existing project
+npx @insforge/cli link --project-id <your-project-id>
+```
+
+Then get your project credentials:
+
+```bash
+# Get the JWT Secret
+npx @insforge/cli secrets get JWT_SECRET
+```
+
+Note down the **URL** and **Anon Key** from the InsForge dashboard.
+
+## Step 3: Set Up Your Application
+
+Install the required dependencies:
+
+```bash
+npm install @workos-inc/authkit-nextjs @insforge/sdk jsonwebtoken
+npm install --save-dev @types/jsonwebtoken
+```
+
+Add environment variables to `.env.local`:
+
+```env
+# WorkOS
+WORKOS_API_KEY='sk_example_...'
+WORKOS_CLIENT_ID='client_...'
+WORKOS_COOKIE_PASSWORD='use [openssl rand -hex 32] to generate a 32 bytes value'
+NEXT_PUBLIC_WORKOS_REDIRECT_URI='http://localhost:3000/callback'
+
+# InsForge
+NEXT_PUBLIC_INSFORGE_URL='YOUR_INSFORGE_URL'
+NEXT_PUBLIC_INSFORGE_ANON_KEY='YOUR_INSFORGE_ANON_KEY'
+INSFORGE_JWT_SECRET='YOUR_INSFORGE_JWT_SECRET'
+```
+
+## Step 4: Set Up InsForge Integration
+
+Ask your agent to complete the following steps:
+
+### 1. Set up WorkOS AuthKit and InsForge integration
+
+```text
+Set up WorkOS AuthKit and InsForge integration for my Next.js app — callback route, provider, middleware, and login route.
+```
+
+This creates the callback route (`app/callback/route.ts`), AuthKitProvider wrapper (`app/layout.tsx`), middleware (`middleware.ts`), and login route (`app/login/route.ts`).
+
+### 2. Create the InsForge client utility
+
+```text
+Create the InsForge client utility that uses the WorkOS session to sign a JWT for InsForge.
+```
+
+This creates a server-side utility (`lib/insforge.ts`) that gets the WorkOS user via `withAuth()`, signs a JWT with the InsForge secret, and passes it as `edgeFunctionToken`.
+
+### 3. Create the database schema
+
+```text
+Create a todos table with RLS. Columns: id, user_id, title, is_complete, created_at. Users should only be able to access their own todos.
+```
+
+This creates the `requesting_user_id()` helper function (since WorkOS user IDs are strings, not UUIDs) and a `todos` table with Row Level Security policies.
+
+### 4. Build the todo list page
+
+```text
+Build a todo list page with full CRUD — create, read, update, and delete todos.
+```
+
+This creates a page that uses the InsForge client to manage todos. RLS ensures users only see their own data.
+
+## Step 5: Run Your Application
+
+```bash
+# Install dependencies if you haven't already
+npm install
+
+npm run dev
+```
+
+Open `http://localhost:3000` and sign up with a new user through WorkOS.
+
+<Note>
+Since authentication is handled entirely by WorkOS, you will **not** see any users in the InsForge dashboard under **Auth > Users**. User records are managed in the [WorkOS Dashboard](https://dashboard.workos.com) — check **Users** there to confirm the sign-up was successful.
+</Note>
+
+![InsForge Auth Users — empty because WorkOS manages users](/images/integrations/insforge-no-users.webp)

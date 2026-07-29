@@ -1,0 +1,390 @@
+---
+title: 实时 API 参考
+description: 管理实时频道、检查消息历史记录，并使用 Socket.IO 原始发布/订阅。
+---
+
+## 概述
+
+实时有两个表面：
+
+- **REST API** 用于频道管理、消息历史、交付统计、权限和保留设置。
+- **Socket.IO** 用于实时订阅、发布、在线状态和已交付事件。
+
+<Note>
+  REST API 不流式传输消息。使用 Socket.IO 连接或 [TypeScript SDK](/sdks/typescript/realtime) 来获取实时事件。
+</Note>
+
+## 身份验证
+
+管理员 REST 端点需要项目管理员令牌或 API 密钥。
+
+```bash
+Authorization: Bearer <project-admin-jwt-or-ik_api_key>
+Content-Type: application/json
+```
+
+您也可以使用以下方式传递 API 密钥：
+
+```bash
+X-API-Key: <ik_api_key>
+```
+
+Socket.IO 连接通过 Socket.IO `auth` 对象进行身份验证：
+
+```javascript
+const socket = io('https://your-app.insforge.app', {
+  auth: {
+    token: '<user-jwt-or-anon-token>'
+  }
+});
+```
+
+服务器/管理员客户端可以传递 API 密钥：
+
+```javascript
+const socket = io('https://your-app.insforge.app', {
+  auth: {
+    apiKey: '<ik_api_key>'
+  }
+});
+```
+
+## Socket.IO 发布/订阅
+
+当您没有使用 InsForge SDK 时，请安装 Socket.IO 客户端：
+
+```bash
+npm install socket.io-client
+```
+
+### 连接并订阅
+
+```javascript
+import { io } from 'socket.io-client';
+
+const socket = io('https://your-app.insforge.app', {
+  auth: {
+    token: '<user-jwt-or-anon-token>'
+  }
+});
+
+socket.emit('realtime:subscribe', { channel: 'order:123' }, (response) => {
+  if (response.ok) {
+    console.log('Subscribed:', response.channel);
+    console.log('Presence:', response.presence.members);
+  } else {
+    console.error(response.error.code, response.error.message);
+  }
+});
+```
+
+### 监听事件
+
+```javascript
+socket.on('status_changed', (message) => {
+  console.log(message.status);
+  console.log(message.meta.messageId);
+  console.log(message.meta.senderType);
+});
+
+socket.on('presence:join', (message) => {
+  console.log('Joined:', message.member);
+});
+
+socket.on('presence:leave', (message) => {
+  console.log('Left:', message.member);
+});
+
+socket.on('realtime:error', (error) => {
+  console.error(error.channel, error.code, error.message);
+});
+```
+
+### 发布
+
+```javascript
+socket.emit('realtime:publish', {
+  channel: 'order:123',
+  event: 'customer_viewed',
+  payload: {
+    viewedAt: new Date().toISOString()
+  }
+});
+```
+
+<Warning>
+  套接字必须成功订阅通道才能发布到该通道。
+</Warning>
+
+### 取消订阅
+
+```javascript
+socket.emit('realtime:unsubscribe', { channel: 'order:123' });
+socket.disconnect();
+```
+
+### 套接字事件
+
+| 事件 | 方向 | 说明 |
+|-------|-----------|-------------|
+| `realtime:subscribe` | 客户端到服务器 | 订阅通道。确认返回成功/错误和存在快照。 |
+| `realtime:unsubscribe` | 客户端到服务器 | 离开通道。 |
+| `realtime:publish` | 客户端到服务器 | 将用户消息插入实时管道。 |
+| Custom event name | 服务器到客户端 | 交付的消息，在消息`eventName`下发出。 |
+| `presence:join` | 服务器到客户端 | 一个逻辑成员在通道中变得存在。 |
+| `presence:leave` | 服务器到客户端 | 一个逻辑成员不再在通道中。 |
+| `realtime:error` | 服务器到客户端 | 订阅或发布失败。 |
+
+## 通道模式
+
+在客户端订阅之前创建通道定义。
+
+| 模式 | 匹配 |
+|---------|---------|
+| `orders` | `orders` |
+| `order:%` | `order:123`, `order:456` |
+| `chat:%:messages` | `chat:room-1:messages` |
+
+模式匹配使用SQL`LIKE`，因此`%`是通配符。`_`在通道模式中不被接受，因为它也是SQL通配符。
+
+## 通道
+
+### 列出通道
+
+```http
+GET /api/realtime/channels
+```
+
+```bash
+curl "https://your-app.insforge.app/api/realtime/channels" \
+  -H "Authorization: Bearer <project-admin-jwt-or-ik_api_key>"
+```
+
+响应：
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "pattern": "order:%",
+    "description": "Order updates",
+    "webhookUrls": ["https://example.com/webhook"],
+    "enabled": true,
+    "createdAt": "2026-04-25T17:00:00.000Z",
+    "updatedAt": "2026-04-25T17:00:00.000Z"
+  }
+]
+```
+
+### 创建通道
+
+```http
+POST /api/realtime/channels
+```
+
+请求正文：
+
+| 字段 | 类型 | 必需 | 说明 |
+|-------|------|----------|-------------|
+| `pattern` | `string` | 是 | 通道模式。 |
+| `description` | `string` | 否 | 人类可读的说明。 |
+| `webhookUrls` | `string[]` | 否 | 每条交付的消息的Webhook URL。 |
+| `enabled` | `boolean` | 否 | 默认为`true`。禁用的通道无法加入或交付到。 |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/realtime/channels" \
+  -H "Authorization: Bearer <project-admin-jwt-or-ik_api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pattern": "chat:%",
+    "description": "Chat rooms",
+    "webhookUrls": ["https://example.com/realtime-webhook"],
+    "enabled": true
+  }'
+```
+
+### 获取通道
+
+```http
+GET /api/realtime/channels/{id}
+```
+
+### 更新通道
+
+```http
+PUT /api/realtime/channels/{id}
+```
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/realtime/channels/550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer <project-admin-jwt-or-ik_api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Active order updates",
+    "enabled": true
+  }'
+```
+
+### 删除通道
+
+```http
+DELETE /api/realtime/channels/{id}
+```
+
+```json
+{
+  "message": "Channel deleted"
+}
+```
+
+消息历史被保留。删除的通道将现有消息`channelId`值设置为`null`。
+
+## 消息
+
+### 列出消息
+
+```http
+GET /api/realtime/messages
+```
+
+查询参数：
+
+| 参数 | 类型 | 说明 |
+|-----------|------|-------------|
+| `channelId` | `uuid` | 按通道ID过滤。 |
+| `eventName` | `string` | 按事件名称过滤。 |
+| `limit` | `integer` | 1到1000。默认为100。 |
+| `offset` | `integer` | 默认为0。 |
+
+```bash
+curl "https://your-app.insforge.app/api/realtime/messages?eventName=status_changed&limit=50" \
+  -H "Authorization: Bearer <project-admin-jwt-or-ik_api_key>"
+```
+
+响应：
+
+```json
+[
+  {
+    "id": "660e8400-e29b-41d4-a716-446655440000",
+    "eventName": "status_changed",
+    "channelId": "550e8400-e29b-41d4-a716-446655440000",
+    "channelName": "order:123",
+    "payload": {
+      "id": "123",
+      "status": "shipped"
+    },
+    "senderType": "system",
+    "senderId": null,
+    "wsAudienceCount": 5,
+    "whAudienceCount": 1,
+    "whDeliveredCount": 1,
+    "createdAt": "2026-04-25T17:00:00.000Z"
+  }
+]
+```
+
+### 消息统计
+
+```http
+GET /api/realtime/messages/stats
+```
+
+查询参数：
+
+| 参数 | 类型 | 说明 |
+|-----------|------|-------------|
+| `channelId` | `uuid` | 按通道ID过滤统计。 |
+| `since` | `date-time` | 仅包含在此时间戳之后创建的消息。 |
+
+```json
+{
+  "totalMessages": 1250,
+  "whDeliveryRate": 0.98,
+  "topEvents": [
+    {
+      "eventName": "status_changed",
+      "count": 450
+    }
+  ],
+  "retentionDays": null
+}
+```
+
+`retentionDays: null`意味着消息无限期保留。
+
+## 权限
+
+```http
+GET /api/realtime/permissions
+```
+
+返回用户定义的RLS策略，用于：
+
+- `realtime.channels`上的订阅检查。
+- `realtime.messages`上的发布检查。
+
+```json
+{
+  "subscribe": {
+    "policies": [
+      {
+        "policyName": "users_subscribe_own_orders",
+        "tableName": "channels",
+        "command": "SELECT",
+        "roles": ["authenticated"],
+        "using": "pattern = 'order:%'",
+        "withCheck": null
+      }
+    ]
+  },
+  "publish": {
+    "policies": []
+  }
+}
+```
+
+## 配置
+
+### 获取实时配置
+
+```http
+GET /api/realtime/config
+```
+
+```json
+{
+  "retentionDays": null
+}
+```
+
+### 更新实时配置
+
+```http
+PATCH /api/realtime/config
+```
+
+```bash
+curl -X PATCH "https://your-app.insforge.app/api/realtime/config" \
+  -H "Authorization: Bearer <project-admin-jwt-or-ik_api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "retentionDays": 90
+  }'
+```
+
+使用`null`以无限期保留消息。正整数保留消息指定天数。
+
+## Webhooks
+
+当通道有`webhookUrls`时，通过该通道交付的每条消息都会被发布到每个URL。
+
+请求正文是原始消息有效负载。标头标识交付：
+
+| 标头 | 值 |
+|--------|-------|
+| `X-InsForge-Event` | 事件名称 |
+| `X-InsForge-Channel` | 已解决的通道名称 |
+| `X-InsForge-Message-Id` | 消息UUID |
+
+交付尝试反映在消息历史中的`whAudienceCount`和`whDeliveredCount`中。

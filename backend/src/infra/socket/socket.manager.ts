@@ -12,6 +12,7 @@ import {
   type SubscribeResponse,
   type UnsubscribeChannelPayload,
   type PresenceMember,
+  type PresenceMemberEvent,
 } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { AppError } from '@/utils/errors.js';
@@ -627,7 +628,7 @@ export class SocketManager {
       return;
     }
 
-    const message = this.buildSocketMessage(
+    const message: PresenceMemberEvent = this.buildSocketMessage(
       { member },
       {
         channel,

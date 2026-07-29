@@ -1,0 +1,93 @@
+---
+title: "pgvector"
+description: "Almacenar incrustaciones y ejecutar búsqueda de similitud dentro de Postgres"
+---
+
+[pgvector](https://github.com/pgvector/pgvector) se envía en cada proyecto de InsForge. Úselo para búsqueda semántica, recomendaciones y [RAG](https://www.pinecone.io/learn/retrieval-augmented-generation/).
+
+## Indicar su agente
+
+> Agregue pgvector a mi proyecto. Cree una tabla `documents` con `content` y una columna `embedding` de 1536 dimensiones, más un índice coseno HNSW. Cuando inserte contenido, incrústalo con `text-embedding-3-small` de OpenRouter desde una ruta del lado del servidor. Exponga un RPC `match_documents(query, count, threshold)` que devuelva las mejores coincidencias de similitud.
+
+## Conceptos
+
+Un vector es una lista de números que representan un elemento. Dos vectores son similares si se encuentran cerca en el espacio vectorial. Almacene el vector junto a su fila, incruste la consulta del usuario de la misma manera, y pgvector clasifica por distancia.
+
+## Uso
+
+Habilite la extensión y cree una columna de vector. Haga que la dimensión coincida con su modelo (`text-embedding-3-small` es 1536).
+
+```sql
+create extension if not exists vector;
+
+create table documents (
+  id bigserial primary key,
+  content text,
+  embedding vector(1536)
+);
+```
+
+Genere una incrustación del lado del servidor e insértela.
+
+```typescript
+import OpenAI from 'openai';
+import { createClient } from '@insforge/sdk';
+
+const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+const insforge = createClient({ projectId: process.env.INSFORGE_PROJECT_ID });
+
+const { data } = await openai.embeddings.create({
+  model: 'openai/text-embedding-3-small',
+  input: 'hello world',
+});
+
+await insforge.database.from('documents').insert({
+  content: 'hello world',
+  embedding: data[0].embedding,
+});
+```
+
+Consulte por distancia coseno (`<=>`). L2 (`<->`) e producto interno (`<#>`) también están disponibles.
+
+```sql
+select id, content
+from documents
+order by embedding <=> $1
+limit 5;
+```
+
+## Casos de uso específicos
+
+Envuelva la búsqueda en una función de Postgres y llámela a través de `rpc()` para mantener las matemáticas del lado del servidor:
+
+```sql
+create or replace function match_documents(
+  query_embedding vector(1536),
+  match_count int default 5,
+  match_threshold float default 0
+)
+returns table (id bigint, content text, similarity float)
+language sql stable
+as $$
+  select id, content, 1 - (embedding <=> query_embedding) as similarity
+  from documents
+  where 1 - (embedding <=> query_embedding) > match_threshold
+  order by embedding <=> query_embedding
+  limit match_count;
+$$;
+```
+
+Pasados aproximadamente 10k filas, agregue un índice HNSW:
+
+```sql
+create index on documents using hnsw (embedding vector_cosine_ops);
+```
+
+## Más recursos
+
+- [pgvector on GitHub](https://github.com/pgvector/pgvector) para operadores e índices.
+- [OpenRouter embeddings](https://openrouter.ai/docs/features/multimodal/embeddings) para el catálogo de modelos.
+- [Model Gateway overview](/core-concepts/ai/overview) para el lado de InsForge de OpenRouter.

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { ExternalLink } from 'lucide-react';
 import {
   DataGrid,
@@ -19,10 +21,10 @@ type DatasetRow = ApifyDataset & {
   [key: string]: string | number | boolean | null;
 };
 
-const columns: DataGridColumn<DatasetRow>[] = [
+const getColumns = (t: TFunction<'chrome'>): DataGridColumn<DatasetRow>[] => [
   {
     key: 'dataset',
-    name: 'Dataset',
+    name: t('webscraper.dataset', { defaultValue: 'Dataset' }),
     width: '1.6fr',
     minWidth: 200,
     sortable: false,
@@ -37,7 +39,7 @@ const columns: DataGridColumn<DatasetRow>[] = [
   },
   {
     key: 'itemCount',
-    name: 'Items',
+    name: t('webscraper.items', { defaultValue: 'Items' }),
     width: '0.6fr',
     minWidth: 80,
     sortable: false,
@@ -49,7 +51,7 @@ const columns: DataGridColumn<DatasetRow>[] = [
   },
   {
     key: 'createdAt',
-    name: 'Created',
+    name: t('webscraper.created', { defaultValue: 'Created' }),
     width: '1.2fr',
     minWidth: 160,
     sortable: false,
@@ -61,7 +63,7 @@ const columns: DataGridColumn<DatasetRow>[] = [
   },
   {
     key: 'actor',
-    name: 'Actor',
+    name: t('webscraper.actor', { defaultValue: 'Actor' }),
     width: '1.2fr',
     minWidth: 160,
     sortable: false,
@@ -85,8 +87,8 @@ const columns: DataGridColumn<DatasetRow>[] = [
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
         className="text-muted-foreground hover:text-foreground"
-        aria-label="Open in Apify"
-        title="Open in Apify"
+        aria-label={t('webscraper.openInApify', { defaultValue: 'Open in Apify' })}
+        title={t('webscraper.openInApify', { defaultValue: 'Open in Apify' })}
       >
         <ExternalLink className="size-4" aria-hidden />
       </a>
@@ -95,12 +97,14 @@ const columns: DataGridColumn<DatasetRow>[] = [
 ];
 
 export function WebscraperDatasetPage() {
+  const { t } = useTranslation('chrome');
   const { connection } = useWebscraperContext();
   const isActive = connection.status === 'active';
   const datasets = useApifyDatasets(isActive);
   // Join dataset.actId against the actor list for the originating actor's name.
   const actors = useApifyActors(isActive);
   const [search, setSearch] = useState('');
+  const columns = useMemo(() => getColumns(t), [t]);
 
   const rows = useMemo<DatasetRow[]>(() => {
     const actorNameById = new Map(
@@ -108,14 +112,16 @@ export function WebscraperDatasetPage() {
     );
     const all = (datasets.data ?? []).map((d) => ({
       ...d,
-      actorName: d.actId ? (actorNameById.get(d.actId) ?? d.actId) : 'Unknown actor',
+      actorName: d.actId
+        ? (actorNameById.get(d.actId) ?? d.actId)
+        : t('webscraper.unknownActor', { defaultValue: 'Unknown actor' }),
     })) as DatasetRow[];
     const q = search.trim().toLowerCase();
     if (!q) {
       return all;
     }
     return all.filter((d) => `${d.name ?? ''} ${d.id} ${d.actorName}`.toLowerCase().includes(q));
-  }, [datasets.data, actors.data, search]);
+  }, [datasets.data, actors.data, search, t]);
 
   const { pageRows, setCurrentPage, gridProps } = useClientPagination(rows, 'webscraper-datasets');
   useEffect(() => setCurrentPage(1), [search, setCurrentPage]);
@@ -123,23 +129,34 @@ export function WebscraperDatasetPage() {
   const errorMessage =
     datasets.error instanceof Error && datasets.error.message
       ? datasets.error.message
-      : 'Could not load datasets from Apify. Try refreshing.';
+      : t('webscraper.loadDatasetsError', {
+          defaultValue: 'Could not load datasets from Apify. Try refreshing.',
+        });
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <TableHeader
-        title="Dataset"
+        title={t('webscraper.dataset', { defaultValue: 'Dataset' })}
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search datasets"
+        searchPlaceholder={t('webscraper.searchDatasets', { defaultValue: 'Search datasets' })}
       />
       <div className="relative min-h-0 flex-1">
         {!isActive ? (
-          <EmptyMessage message="Reconnect to load datasets." />
+          <EmptyMessage
+            message={t('webscraper.reconnectToLoadDatasets', {
+              defaultValue: 'Reconnect to load datasets.',
+            })}
+          />
         ) : datasets.isError ? (
           <div className="flex h-full items-center justify-center px-6">
             <div className="w-full max-w-[420px]">
-              <ErrorState title="Failed to load datasets" error={errorMessage} />
+              <ErrorState
+                title={t('webscraper.loadDatasetsFailed', {
+                  defaultValue: 'Failed to load datasets',
+                })}
+                error={errorMessage}
+              />
             </div>
           </div>
         ) : (
@@ -149,9 +166,13 @@ export function WebscraperDatasetPage() {
             loading={datasets.isLoading}
             showSelection={false}
             showPagination={true}
-            paginationRecordLabel="datasets"
+            paginationRecordLabel={t('webscraper.recordDatasets', { defaultValue: 'datasets' })}
             showTypeBadge={false}
-            emptyState={<EmptyMessage message="No datasets yet." />}
+            emptyState={
+              <EmptyMessage
+                message={t('webscraper.noDatasetsYet', { defaultValue: 'No datasets yet.' })}
+              />
+            }
             {...gridProps}
           />
         )}

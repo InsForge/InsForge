@@ -1,0 +1,334 @@
+---
+title: 存储 SDK 参考
+description: 使用 InsForge Kotlin SDK 进行文件上传、下载和管理
+---
+
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
+## 安装
+
+<KotlinSdkInstallation />
+
+## from()
+
+获取用于文件操作的桶实例。
+
+### 示例
+
+```kotlin
+val bucket = insforge.storage.from("images")
+```
+
+---
+
+## upload()
+
+上传具有特定路径/密钥的文件。
+
+### 参数
+
+- `path` (String) - 桶中的文件路径/密钥
+- `data` (ByteArray) - 文件内容（以字节形式）
+- `options` (DSL block, optional) - 上传选项
+
+### UploadOptions
+
+| 选项 | 类型 | 说明 |
+|------|------|------|
+| `contentType` | String? | MIME 类型（例如 "image/jpeg"） |
+| `upsert` | Boolean | 如果文件存在，覆盖（默认：false） |
+| `metadata` | `Map\<String, String\>?` | 自定义元数据 |
+
+### 示例
+
+```kotlin
+// Basic upload
+val imageData = bitmap.toByteArray()
+val result = insforge.storage
+    .from("images")
+    .upload("posts/post-123/cover.jpg", imageData)
+
+Log.d("Storage", "Uploaded: ${result.url}")
+
+// Upload with options
+val result = insforge.storage
+    .from("images")
+    .upload("posts/post-123/cover.jpg", imageData) {
+        contentType = "image/jpeg"
+        upsert = true  // Overwrite if exists
+        metadata = mapOf("userId" to "123")
+    }
+
+// Using bracket syntax
+val result = insforge.storage["images"]
+    .upload("avatars/user-123.jpg", imageData) {
+        contentType = "image/jpeg"
+    }
+```
+
+### 从 Android Uri 上传
+
+开发者可以使用以下函数从 Android Uri 上传文件：
+
+```kotlin
+// Android Uri Upload sample:
+suspend fun uploadFromUri(
+    bucket: BucketApi,
+    uri: Uri,
+    context: Context,
+    path: String
+): FileUploadResponse {
+    val data = context.contentResolver.openInputStream(uri)?.use {
+        it.readBytes()
+    } ?: throw IllegalArgumentException("Cannot read Uri")
+
+    val contentType = context.contentResolver.getType(uri)
+
+    return bucket.upload(path, data) {
+        this.contentType = contentType
+    }
+}
+```
+
+---
+
+## uploadWithAutoKey()
+
+上传具有自动生成的唯一密钥的文件。
+
+### 参数
+
+- `filename` (String) - 原始文件名（用于扩展名检测）
+- `data` (ByteArray) - 文件内容（以字节形式）
+- `options` (DSL block, optional) - 上传选项
+
+### 示例
+
+```kotlin
+val imageData = bitmap.toByteArray()
+val result = insforge.storage
+    .from("uploads")
+    .uploadWithAutoKey("photo.jpg", imageData) {
+        contentType = "image/jpeg"
+    }
+
+Log.d("Storage", "Auto-generated key: ${result.key}")
+Log.d("Storage", "URL: ${result.url}")
+
+// Save to database
+insforge.database
+    .from("posts")
+    .insertTyped(listOf(
+        Post(
+            imageUrl = result.url,
+            imageKey = result.key,
+            userId = userId
+        )
+    ))
+    .returning()
+    .execute<Post>()
+```
+
+---
+
+## download()
+
+将文件下载为 ByteArray。
+
+### 示例
+
+```kotlin
+// Download file
+val data = insforge.storage
+    .from("images")
+    .download(path = "posts/post-123/cover.jpg")
+
+// Convert to Bitmap
+val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
+imageView.setImageBitmap(bitmap)
+```
+
+---
+
+## delete()
+
+从存储中删除文件。
+
+### 示例
+
+```kotlin
+// Get the file key from database
+val posts = insforge.database
+    .from("posts")
+    .select("image_key")
+    .eq("id", "post-123")
+    .execute<Post>()  // Returns List<Post>
+
+val post = posts.firstOrNull() ?: return
+
+// Delete from storage
+insforge.storage
+    .from("images")
+    .delete(post.imageKey)
+
+// Clear database reference
+insforge.database
+    .from("posts")
+    .update(buildJsonObject {
+        put("image_url", JsonNull)
+        put("image_key", JsonNull)
+    })
+    .eq("id", "post-123")
+    .execute<Post>()
+```
+
+---
+
+## createSignedUrl()
+
+为文件临时访问创建签名 URL。
+
+### 参数
+
+- `path` (String) - 桶中的文件路径
+- `expiresIn` (Int) - 过期时间（以秒为单位）
+
+### 示例
+
+```kotlin
+// Create a signed URL (expires in 1 hour)
+val url = insforge.storage
+    .from("images")
+    .createSignedUrl("posts/post-123/cover.jpg", expiresIn = 3600)
+
+Log.d("Storage", "Signed URL: $url")
+```
+
+---
+
+## getDownloadUrl()
+
+获取文件的下载 URL。
+
+### 示例
+
+```kotlin
+val strategy = insforge.storage
+    .from("images")
+    .getDownloadUrl("posts/post-123/cover.jpg")
+
+Log.d("Storage", "Download URL: ${strategy.url}")
+```
+
+---
+
+## list()
+
+列出桶中具有可选筛选的文件。
+
+### BucketListFilter 选项
+
+| 选项 | 类型 | 说明 |
+|------|------|------|
+| `prefix` | String? | 按路径前缀筛选 |
+| `limit` | Int | 最大结果数（默认：100） |
+| `offset` | Int | 分页偏移（默认：0） |
+| `sortBy` | String? | 排序字段 |
+| `sortOrder` | SortOrder | ASC 或 DESC（默认：ASC） |
+
+### 示例
+
+```kotlin
+// List all files in bucket
+val files = insforge.storage
+    .from("images")
+    .list()
+
+files.forEach { file ->
+    Log.d("Storage", "File: ${file.name}, Size: ${file.metadata?.size}")
+}
+
+// List with filters
+val files = insforge.storage
+    .from("images")
+    .list {
+        prefix = "posts/"
+        limit = 50
+        offset = 0
+        sortBy = "created_at"
+        sortOrder = SortOrder.DESC
+    }
+```
+
+---
+
+## 桶管理
+
+### listBuckets()
+
+列出所有存储桶。
+
+```kotlin
+val buckets = insforge.storage.listBuckets()
+
+buckets.forEach { bucket ->
+    Log.d("Storage", "Bucket: ${bucket.id}, Public: ${bucket.isPublic}")
+}
+```
+
+### createBucket()
+
+创建新存储桶。
+
+```kotlin
+val bucket = insforge.storage.createBucket("my-bucket") {
+    isPublic = true
+}
+
+Log.d("Storage", "Created bucket: ${bucket.id}")
+```
+
+### updateBucket()
+
+更新桶设置。
+
+```kotlin
+insforge.storage.updateBucket("my-bucket") {
+    isPublic = false
+}
+```
+
+### deleteBucket()
+
+删除存储桶。
+
+```kotlin
+insforge.storage.deleteBucket("my-bucket")
+```
+
+---
+
+## 高级上传
+
+### getUploadStrategy()
+
+获取用于大文件或可恢复上传的上传策略。
+
+```kotlin
+val strategy = insforge.storage
+    .from("videos")
+    .getUploadStrategy("videos/large-file.mp4", fileSize = 100_000_000)
+
+// Use strategy.url for upload
+Log.d("Storage", "Upload URL: ${strategy.url}")
+```
+
+### confirmUpload()
+
+确认已完成的上传。
+
+```kotlin
+insforge.storage
+    .from("videos")
+    .confirmUpload("videos/large-file.mp4")
+```

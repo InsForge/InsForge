@@ -1,0 +1,52 @@
+---
+title: 展示
+description: 使用 InsForge 构建的生产应用程序
+---
+
+import { ServiceIcons } from '/snippets/service-icons.mdx';
+
+查看开发者使用 InsForge 构建的内容 - 从 AI 驱动的 SaaS 到社交平台等。
+
+## 社区项目
+
+<CardGroup cols={2}>
+  <Card title="国旗排行榜" icon="flag" href="https://national-flags-phi.vercel.app/">
+    <div style={{maxHeight: '192px', height: '192px', overflow: 'hidden', borderRadius: '0.5rem', pointerEvents: 'none'}}>
+      <img src="/showcase/national-flags.png" style={{width: '100%', height: '192px', objectFit: 'cover', pointerEvents: 'none'}} alt="国旗排行榜展示" />
+    </div>
+
+    通过交互式数据库学习国旗，并参与真实排行榜排名的挑战。
+
+    <ServiceIcons services={['database', 'auth', 'storage', 'ai', 'functions']} />
+  </Card>
+
+  <Card title="Pokemon Vibe" icon="wand-magic-sparkles" href="https://pokemon-vibe.vercel.app/">
+    <div style={{maxHeight: '192px', height: '192px', overflow: 'hidden', borderRadius: '0.5rem', pointerEvents: 'none'}}>
+      <img src="/showcase/pokemon-vibe.png" style={{width: '100%', height: '192px', objectFit: 'cover', pointerEvents: 'none'}} alt="Pokemon Vibe 展示" />
+    </div>
+
+    组建自己的 Pokemon 团队并与其他玩家竞争。AI 驱动的战斗让两个团队在 AI 生成的图纸上对战。
+
+    <ServiceIcons services={['database', 'auth', 'storage', 'ai', 'functions']} />
+  </Card>
+
+  <Card title="2048 Arena" icon="gamepad" href="https://insforge-2048-arena.netlify.app/">
+    <div style={{maxHeight: '192px', height: '192px', overflow: 'hidden', borderRadius: '0.5rem', pointerEvents: 'none'}}>
+      <img src="/showcase/2048-arena.png" style={{width: '100%', height: '192px', objectFit: 'cover', pointerEvents: 'none'}} alt="2048 Arena 展示" />
+    </div>
+
+    经典 2048 益智游戏，配有多人竞技场和竞争排行榜。
+
+    <ServiceIcons services={['database', 'auth']} />
+  </Card>
+
+  <Card title="Line Connect Race" icon="route" href="https://line-connect-race.vercel.app/">
+    <div style={{maxHeight: '192px', height: '192px', overflow: 'hidden', borderRadius: '0.5rem', pointerEvents: 'none'}}>
+      <img src="/showcase/line-connect-race.png" style={{width: '100%', height: '192px', objectFit: 'cover', pointerEvents: 'none'}} alt="Line Connect Race 展示" />
+    </div>
+
+    具有实时多人游戏和竞争游戏玩法的交互式划线赛车游戏。
+
+    <ServiceIcons services={['database', 'auth', 'functions']} />
+  </Card>
+</CardGroup>

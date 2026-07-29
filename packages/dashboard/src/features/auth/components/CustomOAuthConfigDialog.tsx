@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import {
   Button,
@@ -59,6 +60,7 @@ export function CustomOAuthConfigDialog({
   selectedConfig,
   onSuccess,
 }: CustomOAuthConfigDialogProps) {
+  const { t } = useTranslation('chrome');
   const {
     configs,
     createConfig,
@@ -144,13 +146,19 @@ export function CustomOAuthConfigDialog({
     const normalizedKey = data.key.trim().toLowerCase();
     if (!keyRegex.test(normalizedKey)) {
       form.setError('key', {
-        message: 'Use lowercase letters, numbers, hyphens, and underscores',
+        message: t('auth.keyFormatError', {
+          defaultValue: 'Use lowercase letters, numbers, hyphens, and underscores',
+        }),
       });
       return;
     }
 
     if (reservedBuiltInProviderSlugs.has(normalizedKey)) {
-      form.setError('key', { message: 'This key is reserved by a built-in provider' });
+      form.setError('key', {
+        message: t('auth.keyReservedError', {
+          defaultValue: 'This key is reserved by a built-in provider',
+        }),
+      });
       return;
     }
 
@@ -158,12 +166,20 @@ export function CustomOAuthConfigDialog({
       (item) => item.key.toLowerCase() === normalizedKey && item.key !== selectedConfig?.key
     );
     if (duplicateKey) {
-      form.setError('key', { message: 'A custom provider with this key already exists' });
+      form.setError('key', {
+        message: t('auth.keyDuplicateError', {
+          defaultValue: 'A custom provider with this key already exists',
+        }),
+      });
       return;
     }
 
     if (!isValidUrl(data.discoveryEndpoint.trim())) {
-      form.setError('discoveryEndpoint', { message: 'Discovery endpoint must be a valid URL' });
+      form.setError('discoveryEndpoint', {
+        message: t('auth.discoveryEndpointInvalid', {
+          defaultValue: 'Discovery endpoint must be a valid URL',
+        }),
+      });
       return;
     }
 
@@ -197,7 +213,9 @@ export function CustomOAuthConfigDialog({
       };
 
       if (!createPayload.clientSecret) {
-        form.setError('clientSecret', { message: 'Client secret is required' });
+        form.setError('clientSecret', {
+          message: t('auth.clientSecretRequired', { defaultValue: 'Client secret is required' }),
+        });
         return;
       }
       createConfig(createPayload, {
@@ -214,17 +232,23 @@ export function CustomOAuthConfigDialog({
       <DialogContent className="w-[min(96vw,820px)] overflow-hidden p-0">
         <DialogHeader className="border-b border-[var(--alpha-8)] px-6 py-5">
           <DialogTitle>
-            {isEditing ? 'Edit Custom OAuth Provider' : 'Add Custom OAuth Provider'}
+            {isEditing
+              ? t('auth.editCustomOAuthProvider', { defaultValue: 'Edit Custom OAuth Provider' })
+              : t('auth.addCustomOAuthProvider', { defaultValue: 'Add Custom OAuth Provider' })}
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Configure a custom OIDC provider using its discovery endpoint.
+            {t('auth.customOAuthDescription', {
+              defaultValue: 'Configure a custom OIDC provider using its discovery endpoint.',
+            })}
           </p>
         </DialogHeader>
 
         {isEditing && isLoadingSelectedConfig ? (
           <div className="flex items-center justify-center p-6">
             <div className="text-sm text-muted-foreground">
-              Loading custom OAuth configuration...
+              {t('auth.loadingCustomOAuthConfig', {
+                defaultValue: 'Loading custom OAuth configuration...',
+              })}
             </div>
           </div>
         ) : (
@@ -238,20 +262,25 @@ export function CustomOAuthConfigDialog({
             >
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  Provider Name
+                  {t('auth.providerName', { defaultValue: 'Provider Name' })}
                 </label>
-                <Input placeholder="e.g. Acme" {...form.register('name')} />
+                <Input
+                  placeholder={t('auth.providerNamePlaceholder', { defaultValue: 'e.g. Acme' })}
+                  {...form.register('name')}
+                />
               </div>
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  Provider Key
+                  {t('auth.providerKey', { defaultValue: 'Provider Key' })}
                 </label>
                 <Input placeholder="acme_provider" disabled={isEditing} {...form.register('key')} />
                 <div className="mt-1 space-y-1 text-xs text-muted-foreground">
                   <p>
-                    Use lowercase letters, numbers, hyphens, and underscores. Add this callback URL
-                    to your provider:
+                    {t('auth.providerKeyHelp', {
+                      defaultValue:
+                        'Use lowercase letters, numbers, hyphens, and underscores. Add this callback URL to your provider:',
+                    })}
                   </p>
                   <div className="flex items-center gap-2">
                     <code className="min-w-0 rounded bg-[var(--alpha-8)] px-1.5 py-0.5 font-mono text-[12px] text-foreground break-all">
@@ -275,7 +304,7 @@ export function CustomOAuthConfigDialog({
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  Discovery endpoint
+                  {t('auth.discoveryEndpoint', { defaultValue: 'Discovery endpoint' })}
                 </label>
                 <Input
                   placeholder="https://example.com/.well-known/openid-configuration"
@@ -290,21 +319,23 @@ export function CustomOAuthConfigDialog({
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  Client ID
+                  {t('auth.clientId', { defaultValue: 'Client ID' })}
                 </label>
                 <Input {...form.register('clientId')} />
               </div>
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  Client secret
+                  {t('auth.clientSecret', { defaultValue: 'Client Secret' })}
                 </label>
                 <SecretInput
                   {...form.register('clientSecret')}
                   value={values.clientSecret}
                   isVisible={isClientSecretVisible}
                   onToggleVisibility={() => setIsClientSecretVisible((visible) => !visible)}
-                  placeholder="Enter client secret"
+                  placeholder={t('auth.enterClientSecret', {
+                    defaultValue: 'Enter client secret',
+                  })}
                 />
                 {form.formState.errors.clientSecret?.message && (
                   <p className="mt-1 text-xs text-destructive">
@@ -316,14 +347,16 @@ export function CustomOAuthConfigDialog({
 
             <DialogFooter>
               <Button type="button" variant="secondary" onClick={onClose}>
-                Cancel
+                {t('auth.cancel', { defaultValue: 'Cancel' })}
               </Button>
               <Button
                 type="button"
                 onClick={() => void form.handleSubmit(onSubmit)()}
                 disabled={isSaveDisabled || isPending}
               >
-                {isEditing ? 'Save changes' : 'Create provider'}
+                {isEditing
+                  ? t('auth.saveChanges', { defaultValue: 'Save Changes' })
+                  : t('auth.createProvider', { defaultValue: 'Create provider' })}
               </Button>
             </DialogFooter>
           </>

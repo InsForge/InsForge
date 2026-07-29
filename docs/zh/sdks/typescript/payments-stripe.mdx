@@ -1,0 +1,226 @@
+---
+title: Stripe 支付 SDK
+description: 使用 InsForge TypeScript SDK 创建 Stripe Checkout 和账单门户会话
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## 概述
+
+TypeScript SDK 为生成的应用前端公开 Stripe 运行时助手：
+
+- `insforge.payments.stripe.createCheckoutSession(...)`
+- `insforge.payments.stripe.createCustomerPortalSession(...)`
+
+Stripe 密钥、目录管理、webhook 设置和付款监控是管理操作。在使用 SDK 之前，从仪表板或 CLI 配置它们。
+
+```bash
+npx @insforge/cli payments stripe status
+npx @insforge/cli payments stripe catalog --environment test
+```
+
+<Note>
+  有关设置、数据库表、webhook 投影和履行模式，请参见 [Stripe 支付](/core-concepts/payments/stripe)。
+</Note>
+
+SDK 方法需要当前 InsForge 用户令牌。匿名 InsForge 令牌可用于来宾一次性结账，但 InsForge API 密钥不能替代，因为后端需要用户上下文来处理本地会话行。
+
+## createCheckoutSession()
+
+通过 InsForge 后端创建 Stripe Checkout 会话。
+
+### 参数
+
+| 参数 | 类型 | 必需 | 描述 |
+|-----------|------|----------|-------------|
+| 第一个参数 | `'test' \| 'live'` | 是 | 要定位的 Stripe 环境 |
+| `mode` | `'payment' \| 'subscription'` | 是 | Checkout 模式 |
+| `lineItems` | `{ priceId: string; quantity?: number }[]` | 是 | Stripe 价格 ID 和数量。数量默认为 `1` |
+| `successUrl` | `string` | 是 | Checkout 完成后 Stripe 重定向到的 URL |
+| `cancelUrl` | `string` | 是 | 如果客户取消，Stripe 重定向到的 URL |
+| `subject` | `{ type: string; id: string }` | 订阅必需 | 应用定义的计费所有者 |
+| `customerEmail` | `string \| null` | 否 | Checkout 客户创建的电子邮件提示 |
+| `metadata` | `Record<string, string>` | 否 | 复制到 Stripe Checkout 的应用元数据 |
+| `idempotencyKey` | `string` | 否 | 用于重试安全的 Checkout 创建的稳定密钥 |
+
+<Warning>
+  以 `insforge_` 开头的元数据键是保留的。
+</Warning>
+
+### 返回
+
+```typescript
+{
+  data: {
+    checkoutSession: {
+      id: string
+      environment: 'test' | 'live'
+      mode: 'payment' | 'subscription'
+      status: 'initialized' | 'open' | 'completed' | 'expired' | 'failed'
+      paymentStatus: 'paid' | 'unpaid' | 'no_payment_required' | null
+      subjectType: string | null
+      subjectId: string | null
+      customerEmail: string | null
+      checkoutSessionId: string | null
+      customerId: string | null
+      paymentIntentId: string | null
+      subscriptionId: string | null
+      url: string | null
+      lastError: string | null
+      createdAt: string
+      updatedAt: string
+    }
+  } | null,
+  error: Error | null
+}
+```
+
+### 一次性结账
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCheckoutSession('test', {
+  mode: 'payment',
+  lineItems: [{ priceId: 'price_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/checkout/success`,
+  cancelUrl: `${window.location.origin}/pricing`,
+  customerEmail: user?.email ?? null,
+  metadata: { order_id: orderId },
+  idempotencyKey: `order:${orderId}`
+});
+
+if (error) {
+  console.error('Checkout failed:', error.message);
+  return;
+}
+
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+对于匿名一次性购买，省略 `subject` 并在可用时传递 `customerEmail`。
+
+如果一次性结账包含 `subject` 且还没有现有的 Stripe 客户映射，InsForge 让 Stripe 在 Checkout 期间创建客户，并从完成 webhook 回填主体映射。
+
+### 订阅结账
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCheckoutSession('test', {
+  mode: 'subscription',
+  subject: { type: 'team', id: teamId },
+  lineItems: [{ priceId: 'price_monthly_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/billing/success`,
+  cancelUrl: `${window.location.origin}/billing`,
+  customerEmail: user.email,
+  idempotencyKey: `team:${teamId}:pro-monthly`
+});
+
+if (error) throw error;
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+订阅结账需要 `subject`，因为定期访问属于应用定义的计费所有者，如用户、团队、组织、工作区、租户或群组。
+
+<Warning>
+  不要将成功 URL 视为付款证明。使用已验证的 webhook 事件来履行订单和授予订阅访问权限。
+</Warning>
+
+## createCustomerPortalSession()
+
+为映射的计费主体创建 Stripe 计费门户会话。
+
+### 参数
+
+| 参数 | 类型 | 必需 | 描述 |
+|-----------|------|----------|-------------|
+| 第一个参数 | `'test' \| 'live'` | 是 | 要定位的 Stripe 环境 |
+| `subject` | `{ type: string; id: string }` | 是 | 应用定义的计费所有者 |
+| `returnUrl` | `string` | 否 | 客户离开门户时 Stripe 重定向到的 URL |
+| `configuration` | `string` | 否 | Stripe 计费门户配置 ID |
+
+### 返回
+
+```typescript
+{
+  data: {
+    customerPortalSession: {
+      id: string
+      environment: 'test' | 'live'
+      status: 'initialized' | 'created' | 'failed'
+      subjectType: string
+      subjectId: string
+      customerId: string | null
+      returnUrl: string | null
+      configuration: string | null
+      url: string | null
+      lastError: string | null
+      createdAt: string
+      updatedAt: string
+    }
+  } | null,
+  error: Error | null
+}
+```
+
+### 示例
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCustomerPortalSession('test', {
+  subject: { type: 'team', id: teamId },
+  returnUrl: `${window.location.origin}/billing`
+});
+
+if (error) {
+  if ('statusCode' in error && error.statusCode === 404) {
+    return;
+  }
+
+  throw error;
+}
+
+if (data?.customerPortalSession.url) {
+  window.location.assign(data.customerPortalSession.url);
+}
+```
+
+客户门户会话需要经过身份验证的用户和主体的现有客户映射。该映射通常在 Checkout 会话完成且 Stripe 返回客户后创建。
+
+## 授权和 RLS
+
+SDK 方法使用当前 InsForge 令牌调用运行时路由。后端使用调用者上下文插入本地会话行：
+
+- `payments.stripe_checkout_sessions` 用于 Checkout 尝试
+- `payments.stripe_customer_portal_sessions` 用于计费门户尝试
+
+如果用户可以传递共享主体（如团队或组织），请在公开结账、订阅或客户门户 UI 之前添加授权边界。例如，在 Stripe 运行时表上启用带有检查团队成员资格策略的 RLS，或通过您自己的服务器端点调用支付，先检查成员资格。
+
+PostgreSQL 将 `SELECT` 策略应用于 `INSERT ... RETURNING` 返回的行和幂等重试查找。如果即使存在 `INSERT` 策略也出现 RLS 错误，请为同一计费主体和幂等密钥添加匹配的 `SELECT` 策略。
+
+<Warning>
+  除非您的应用检查用户可以管理该计费主体，否则不要让用户提交任意的 `subject.type` 和 `subject.id` 值。
+</Warning>
+
+## 读取付款状态
+
+支付 SDK 不为 `payments.customers`、`payments.stripe_subscriptions` 或 `payments.transactions` 公开通用的终端用户读取。这些表是用于仪表板可见性和报告的操作记录。
+
+对于面向用户的计费状态，创建带有 RLS 的应用拥有的表，并从提供商 webhook 事件触发器填充它们：
+
+- `public.orders`
+- `public.credit_ledger`
+- `public.user_entitlements`
+- `public.team_billing_status`
+
+有关履行示例，请参见 [Stripe 支付](/core-concepts/payments/stripe)。
+
+## 生产/测试环境
+
+在开发时将 `'test'` 作为第一个 SDK 参数传递。仅在开发者明确批准生产 Stripe 更改并配置了生产价格后才切换到 `'live'`。
+
+<Warning>
+  永远不要将 Stripe 密钥放在前端代码或公共部署环境变量中。通过 InsForge 仪表板或 CLI 配置 Stripe 密钥。
+</Warning>

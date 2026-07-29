@@ -17,19 +17,17 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl as getCloudFrontSignedUrl } from '@aws-sdk/cloudfront-signer';
 import { Readable } from 'stream';
-import {
-  UploadStrategyResponse,
-  DownloadStrategyResponse,
-  DELETE_OBJECT_FAILURE_MESSAGE,
-} from '@insforge/shared-schemas';
+import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
 import {
   StorageProvider,
   ObjectMetadata,
   GetObjectResult,
   DeleteObjectsResult,
+  ObjectNotFoundError,
 } from './base.provider.js';
 import logger from '@/utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
+import { getApiBaseUrl } from '@/utils/environment.js';
 
 function stripEtagQuotes(etag: string | undefined): string {
   return (etag ?? '').replace(/^"(.*)"$/, '$1');
@@ -108,6 +106,12 @@ export class S3StorageProvider implements StorageProvider {
     }
 
     this.s3Client = new S3Client(s3Config);
+
+    if (!appConfig.storage.s3UsePresignedUrls && appConfig.cloud.cloudFrontUrl) {
+      logger.warn(
+        'S3_USE_PRESIGNED_URLS=false: CloudFront settings are ignored in proxy mode; all object bytes are served through the backend'
+      );
+    }
   }
 
   private getS3Key(bucket: string, key: string): string {
@@ -282,7 +286,7 @@ export class S3StorageProvider implements StorageProvider {
         const originalKey = s3KeyToOriginalKey.get(error.Key) ?? error.Key;
         return {
           key: originalKey,
-          message: DELETE_OBJECT_FAILURE_MESSAGE,
+          message: 'Failed to delete object',
         };
       });
 
@@ -332,9 +336,11 @@ export class S3StorageProvider implements StorageProvider {
     } while (continuationToken);
   }
 
-  // S3 supports presigned URLs
+  // Presigned URLs are handed to clients only when the endpoint is reachable
+  // by them. S3_USE_PRESIGNED_URLS=false switches to proxy mode: strategies point
+  // at the backend routes instead, mirroring LocalStorageProvider.
   supportsPresignedUrls(): boolean {
-    return true;
+    return appConfig.storage.s3UsePresignedUrls;
   }
 
   async getUploadStrategy(
@@ -346,6 +352,19 @@ export class S3StorageProvider implements StorageProvider {
   ): Promise<UploadStrategyResponse> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
+    }
+
+    // Proxy mode: the endpoint is not client-reachable (or lacks POST-policy
+    // support), so hand back the backend PUT route — same contract as
+    // LocalStorageProvider. The route writes through provider.putObject.
+    if (!appConfig.storage.s3UsePresignedUrls) {
+      const baseUrl = getApiBaseUrl();
+      return {
+        method: 'direct',
+        uploadUrl: `${baseUrl}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
+        key,
+        confirmRequired: false,
+      };
     }
 
     const s3Key = this.getS3Key(bucket, key);
@@ -399,6 +418,22 @@ export class S3StorageProvider implements StorageProvider {
   ): Promise<DownloadStrategyResponse> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
+    }
+
+    // Proxy mode: direct URL onto the backend GET route, mirroring
+    // LocalStorageProvider. Safe to append the `?v=` cache stamp (no
+    // signature covers the query string). The branch-mode HEAD probe is
+    // deliberately skipped — the GET route resolves parent fallback itself
+    // via getObjectStream. asAttachment is ignored for the same reason the
+    // local provider ignores it: the route re-derives Content-Disposition
+    // from the stored MIME type.
+    if (!appConfig.storage.s3UsePresignedUrls) {
+      const baseUrl = getApiBaseUrl();
+      const base = `${baseUrl}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`;
+      return {
+        method: 'direct',
+        url: version ? `${base}?v=${encodeURIComponent(version)}` : base,
+      };
     }
 
     // In branch mode, HEAD the branch path first; if missing and a parent
@@ -598,9 +633,9 @@ export class S3StorageProvider implements StorageProvider {
       this.tryGetObjectStream(s3Key, range)
     );
     if (!result) {
-      // Preserve previous behaviour: missing object surfaces as a thrown
-      // error here (callers expect a stream, not null).
-      throw new Error('GetObject returned empty body');
+      // Missing object surfaces as a typed error (callers expect a stream,
+      // not null) so routes can map it to a 404/NoSuchKey by instanceof.
+      throw new ObjectNotFoundError();
     }
     return result;
   }
@@ -625,6 +660,7 @@ export class S3StorageProvider implements StorageProvider {
         etag: stripEtagQuotes(resp.ETag),
         contentType: resp.ContentType,
         lastModified: resp.LastModified ?? new Date(),
+        contentRange: resp.ContentRange,
       };
     } catch (err) {
       if (isS3NotFound(err)) {

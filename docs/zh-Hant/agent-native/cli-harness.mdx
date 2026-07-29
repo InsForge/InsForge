@@ -1,0 +1,62 @@
+---
+title: "CLI 工具"
+sidebarTitle: "CLI harness"
+description: "InsForge CLI 是代理的雙手：用於結構描述、設定、部署和診斷的一個終端機介面。"
+---
+
+`@insforge/cli` 是編碼代理用來操作後端的介面。當人類到達儀表板時，代理到達終端機：它執行命令、讀取輸出並決定下一步做什麼。每個命令都會說 `--json`，所以代理從結構化資料而不是解析畫面。
+
+<Note>
+  使用 `npx @insforge/cli` 執行 CLI。不要全域安裝，所以代理始終使用專案固定的版本。
+</Note>
+
+## 為什麼是代理的 CLI
+
+儀表板為人類指標構建；CLI 為任何可以寫入文字的東西構建。傳遞 `--json` 到任何命令，代理取得可以解析的結構化結果；傳遞 `--yes` 它執行無需停止確認提示。結構描述、身份驗證設定、儲存體、函數、部署、分支和診斷都是同一工具的子命令，所以有一個要學習的表面而不是要導覽的儀表板。它在任何終端機、任何編輯器或 CI 中執行，無需設定整合。在變更後，代理可以執行 [`npx @insforge/cli diagnose`](/agent-native/diagnostics) 並讀取正確中斷的內容。
+
+## 命令表面
+
+| 區域 | 命令 |
+|------|----------|
+| 身份驗證和上下文 | `login`, `logout`, `whoami`, `current`, `list` |
+| 專案 | `create`, `link` |
+| 結構描述 | `db migrations new`, `db migrations up`, `db migrations list` |
+| 代碼設定 | `config plan`, `config apply`, `config export` |
+| 分支 | `branch create`, `branch merge`, `branch reset`, `branch delete` |
+| 組建 | `functions`, `storage`, `deployments`, `secrets`, `schedules`, `ai` |
+| 診斷 | `diagnose`, `diagnose advisor`, `diagnose db`, `diagnose logs`, `metadata` |
+
+執行 `npx @insforge/cli help <command>` 以取得任何這些命令的旗標。
+
+## 典型代理執行
+
+```bash
+# connect
+npx @insforge/cli login
+npx @insforge/cli link
+
+# read current state
+npx @insforge/cli --json metadata
+
+# change schema, safely
+npx @insforge/cli db migrations new add-orders-table
+npx @insforge/cli db migrations up --all
+
+# check the result
+npx @insforge/cli diagnose --json
+```
+
+## 讓代理解釋輸出
+
+診斷配有 AI 旗標，所以代理可以將自己的後端資料傳遞給模型並取回解釋：
+
+```bash
+npx @insforge/cli diagnose --ai "why are auth requests failing after the last migration?"
+```
+
+這將原始信號（顧問發現、DB 健康、錯誤日誌）與純文字閱讀配對，這是將"這是堆棧追蹤"變成"這是修復"的原因。請參閱[診斷和顧問](/agent-native/diagnostics)。
+
+## 後續步驟
+
+- 使用[代碼設定](/agent-native/config-as-code)將身份驗證、SMTP、儲存體、保留和部署設定放在版本控制中。
+- 在[後端分支](/agent-native/branching)上測試危險變更，然後觸及生產環境。

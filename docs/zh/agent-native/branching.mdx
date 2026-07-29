@@ -1,0 +1,46 @@
+---
+title: "后端分支"
+sidebarTitle: "Branching"
+description: "旋转后端的隔离副本以测试架构和配置更改"
+---
+
+分支是一个子项目，具有自己的 Postgres、身份验证配置、存储、边缘函数、电子邮件模板、实时通道和计划。在准备好时合并回去或重置并重试。可在 InsForge OSS 2.1.0+ 上使用。
+
+## 概念
+
+每个分支在自己的 EC2 实例上运行，从创建时的父项恢复。`merge` 针对父项的创建时状态运行三路差异。分支共享父项的 `JWT_SECRET` 但获得自己的 `API_KEY`。计算服务和前端部署不分支。
+
+## 用法
+
+使用 `full`（架构 + 数据）或 `schema-only`（更快，用户表为空）创建分支。
+
+```bash
+npx @insforge/cli branch create feat-billing --mode full
+npx @insforge/cli branch list
+```
+
+在应用前预览合并 SQL。
+
+```bash
+npx @insforge/cli branch merge feat-billing --dry-run --save-sql ./preview.sql
+npx @insforge/cli branch merge feat-billing
+```
+
+回滚到创建时快照或删除分支。
+
+```bash
+npx @insforge/cli branch reset feat-billing
+npx @insforge/cli branch delete feat-billing
+```
+
+## 特定用途案例
+
+对危险的架构迁移、RLS 重写、OAuth 提供商交换和边缘函数重构使用分支。跳过琐碎的更改和数据回填（用户数据行不会自动合并）。
+
+合并在冲突时阻止。在分支上解决或重置并重试。配额：每个组织 3 个父项目、每个父项最多 2 个活动分支、无嵌套。成功合并不会自动删除分支。
+
+## 更多资源
+
+- [数据库迁移](/core-concepts/database/migrations)用于仅前向 SQL 文件。
+- [数据库概览](/core-concepts/database/overview)了解每个分支下运行什么。
+- [CLI 参考](https://github.com/InsForge/InsForge)用于完整的 `branch` 标志集。

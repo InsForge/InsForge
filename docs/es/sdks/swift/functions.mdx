@@ -1,0 +1,121 @@
+---
+title: Referencia del SDK de funciones
+description: Invoca funciones sin servidor con el SDK de Swift de InsForge
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+## Instalación
+
+<SwiftSdkInstallation />
+
+<Note>
+Actualmente, InsForge solo admite funciones JavaScript/TypeScript ejecutándose en un entorno Deno.
+</Note>
+
+---
+
+## invoke()
+
+Invoca una función sin servidor por slug.
+
+### Parámetros
+
+- `slug` (String) - Slug/nombre de función
+- `body` ([String: Any], optional) - Cuerpo de solicitud como diccionario
+
+### Sobrecargas
+
+El método `invoke` tiene tres sobrecargas:
+
+1. **Con cuerpo de diccionario, devolviendo respuesta tipada**
+   ```swift
+   func invoke<T: Decodable>(_ slug: String, body: [String: Any]?) async throws -> T
+   ```
+
+2. **Con cuerpo Encodable, devolviendo respuesta tipada**
+   ```swift
+   func invoke<I: Encodable, O: Decodable>(_ slug: String, body: I) async throws -> O
+   ```
+
+3. **Sin esperar cuerpo de respuesta**
+   ```swift
+   func invoke(_ slug: String, body: [String: Any]?) async throws
+   ```
+
+<Note>
+SDK incluye automáticamente el token de autenticación del usuario conectado.
+</Note>
+
+---
+
+## Ejemplos
+
+### Ejemplo: Invocación básica con respuesta tipada
+
+```swift
+// Define response model
+struct HelloResponse: Codable {
+    let message: String
+    let timestamp: String
+}
+
+// Invoke function with dictionary body
+let response: HelloResponse = try await insforge.functions.invoke(
+    "hello-world",
+    body: ["name": "World", "greeting": "Hello"]
+)
+
+print(response.message)  // "Hello, World!"
+```
+
+### Ejemplo: Con cuerpo de solicitud Encodable
+
+```swift
+// Define request and response models
+struct GreetingRequest: Codable {
+    let name: String
+    let greeting: String
+}
+
+struct GreetingResponse: Codable {
+    let message: String
+    let timestamp: String
+}
+
+// Invoke with typed request
+let request = GreetingRequest(name: "World", greeting: "Hello")
+let response: GreetingResponse = try await insforge.functions.invoke(
+    "hello-world",
+    body: request
+)
+
+print(response.message)
+```
+
+---
+
+## Manejo de errores
+
+```swift
+do {
+    let response: MyResponse = try await insforge.functions.invoke(
+        "my-function",
+        body: ["key": "value"]
+    )
+    print("Success: \\(response)")
+} catch let error as InsForgeError {
+    switch error {
+    case .httpError(let statusCode, let message):
+        print("HTTP Error \\(statusCode): \\(message)")
+    case .decodingError(let error):
+        print("Failed to decode response: \\(error)")
+    case .networkError(let error):
+        print("Network error: \\(error)")
+    default:
+        print("Error: \\(error)")
+    }
+} catch {
+    print("Unexpected error: \\(error)")
+}
+```

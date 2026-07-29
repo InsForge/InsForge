@@ -1,0 +1,417 @@
+---
+title: 数据库 SDK 参考
+description: 使用 InsForge TypeScript SDK 进行类型安全的数据库操作
+---
+
+## 安装
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## insert()
+
+将新记录插入表中。
+
+### 参数
+
+- `values` (object | Array, required) - 要插入的数据。单个对象或数组用于批量插入
+- `options.count` ('exact' | 'planned' | 'estimated', optional) - 包含插入行数
+
+### 返回
+
+```typescript
+{
+  data: Array<object> | null,
+  error: Error | null,
+  count?: number
+}
+```
+
+<Note>
+在 `.insert()` 后链接 `.select()` 以返回插入的数据
+</Note>
+
+### 示例
+
+<CodeGroup>
+```javascript Single insert
+const { data, error } = await insforge.database
+  .from('posts')
+  .insert({ title: 'Hello World', content: 'My first post!' })
+  .select()
+```
+
+```javascript Bulk insert
+const { data, error } = await insforge.database
+  .from('posts')
+  .insert([
+    { title: 'First Post', content: 'Hello everyone!' },
+    { title: 'Second Post', content: 'Another update.' }
+  ])
+  .select()
+```
+</CodeGroup>
+
+### 输出示例
+
+```json
+{
+  "data": [
+    { "id": "789", "title": "Hello World", "content": "My first post!", "created_at": "2024-01-15T10:30:00Z" }
+  ],
+  "error": null
+}
+```
+
+---
+
+## update()
+
+更新表中的现有记录。必须使用筛选器来定位特定行。
+
+### 参数
+
+- `values` (object, required) - 要更新的字段
+- `options.count` ('exact' | 'planned' | 'estimated', optional) - 包含更新行数
+
+### 返回
+
+```typescript
+{
+  data: Array<object> | null,
+  error: Error | null,
+  count?: number
+}
+```
+
+<Warning>
+始终使用筛选器（如 `.eq()` 或 `.in()`）来指定要更新的行
+</Warning>
+
+### 示例
+
+<CodeGroup>
+```javascript Update by ID
+const { data, error } = await insforge.database
+  .from('posts')
+  .update({ title: 'Updated Title' })
+  .eq('id', postId)
+  .select()
+```
+
+```javascript Update multiple
+const { data, error } = await insforge.database
+  .from('tasks')
+  .update({ status: 'completed' })
+  .in('id', ['task-1', 'task-2'])
+  .select()
+```
+</CodeGroup>
+
+### 输出示例
+
+```json
+{
+  "data": [
+    { "id": "123", "title": "Updated Title", "content": "My first post!", "updated_at": "2024-01-15T11:00:00Z" }
+  ],
+  "error": null
+}
+```
+
+---
+
+## delete()
+
+从表中删除记录。必须使用筛选器来定位特定行。
+
+### 参数
+
+- `options.count` ('exact' | 'planned' | 'estimated', optional) - 包含删除行数
+
+### 返回
+
+```typescript
+{
+  data: Array<object> | null,
+  error: Error | null,
+  count?: number
+}
+```
+
+<Warning>
+始终使用筛选器来指定要删除的行
+</Warning>
+
+### 示例
+
+<CodeGroup>
+```javascript Delete by ID
+const { error } = await insforge.database
+  .from('posts')
+  .delete()
+  .eq('id', postId)
+```
+
+```javascript Delete with filter
+const { error } = await insforge.database
+  .from('sessions')
+  .delete()
+  .lt('expires_at', new Date())
+```
+</CodeGroup>
+
+### 输出示例
+
+```json
+{
+  "data": null,
+  "error": null
+}
+```
+
+---
+
+## select()
+
+从表或视图查询记录。
+
+### 参数
+
+- `columns` (string, optional) - 逗号分隔的列名。使用 `*` 表示所有列
+- `options.count` ('exact' | 'planned' | 'estimated', optional) - 包含总行数
+- `options.head` (boolean, optional) - 仅返回计数，不返回数据
+
+### 返回
+
+```typescript
+{
+  data: Array<object> | null,
+  error: Error | null,
+  count?: number
+}
+```
+
+### 示例
+
+<CodeGroup>
+```javascript Get all
+const { data, error } = await insforge.database
+  .from('posts')
+  .select()
+```
+
+```javascript Specific columns
+const { data, error } = await insforge.database
+  .from('posts')
+  .select('id, title, content')
+```
+
+```javascript With relationships
+const { data, error } = await insforge.database
+  .from('posts')
+  .select('*, comments(id, content)')
+```
+</CodeGroup>
+
+### 输出示例
+
+```json
+{
+  "data": [
+    { "id": "123", "title": "Hello World", "content": "My first post!" },
+    { "id": "456", "title": "Second Post", "content": "Another update." }
+  ],
+  "error": null
+}
+```
+
+---
+
+## rpc()
+
+调用 PostgreSQL 存储函数（RPC - 远程过程调用）。
+
+### 参数
+
+- `functionName` (string, required) - 要调用的 PostgreSQL 函数的名称
+- `args` (object, optional) - 传递给函数的参数
+
+### 返回
+
+```typescript
+{
+  data: T | T[] | null,
+  error: Error | null
+}
+```
+
+### 示例
+
+<CodeGroup>
+```javascript With parameters
+const { data, error } = await insforge.database
+  .rpc('get_user_stats', { user_id: '123' })
+```
+
+```javascript Without parameters
+const { data, error } = await insforge.database
+  .rpc('get_all_active_users')
+```
+</CodeGroup>
+
+---
+
+## 筛选器
+
+链接筛选器以缩小查询结果范围。所有筛选器采用 `(column, value)` 作为参数。
+
+| 筛选器 | 描述 | 示例 |
+|--------|-------------|---------|
+| `.eq(column, value)` | 等于 | `.eq('status', 'active')` |
+| `.neq(column, value)` | 不等于 | `.neq('status', 'banned')` |
+| `.gt(column, value)` | 大于 | `.gt('age', 18)` |
+| `.gte(column, value)` | 大于或等于 | `.gte('price', 100)` |
+| `.lt(column, value)` | 小于 | `.lt('stock', 10)` |
+| `.lte(column, value)` | 小于或等于 | `.lte('priority', 3)` |
+| `.like(column, pattern)` | 区分大小写的模式（使用 `%` 通配符） | `.like('name', '%Widget%')` |
+| `.ilike(column, pattern)` | 不区分大小写的模式（使用 `%` 通配符） | `.ilike('email', '%@gmail.com')` |
+| `.in(column, array)` | 值在数组中 | `.in('status', ['pending', 'active'])` |
+| `.is(column, value)` | 完全等于（用于 null 检查） | `.is('deleted_at', null)` |
+
+```javascript
+// Example: Chain multiple filters
+const { data } = await insforge.database
+  .from('products')
+  .select()
+  .eq('category', 'electronics')
+  .gte('price', 50)
+  .lte('price', 500)
+  .is('in_stock', true)
+```
+
+---
+
+## 修饰符
+
+控制查询结果的返回方式。
+
+| 修饰符 | 描述 | 示例 |
+|----------|-------------|---------|
+| `.order(column, options)` | 排序结果。选项：`{ ascending: true/false, nullsFirst: true/false }` | `.order('created_at', { ascending: false })` |
+| `.limit(count)` | 限制行数 | `.limit(10)` |
+| `.range(from, to)` | 获取索引之间的行（分页） | `.range(0, 9)` |
+| `.single()` | 返回对象而不是数组（如果有多个则抛出） | `.single()` |
+| `.maybeSingle()` | 返回对象或 null（无错误） | `.maybeSingle()` |
+
+```javascript
+// Example: Pagination with sorting
+const { data } = await insforge.database
+  .from('posts')
+  .select()
+  .order('created_at', { ascending: false })
+  .range(0, 9)
+```
+
+---
+
+## 常见模式
+
+### 带计数的分页
+
+```javascript
+const page = 1;
+const pageSize = 10;
+const from = (page - 1) * pageSize;
+const to = from + pageSize - 1;
+
+const { data, count } = await insforge.database
+  .from('posts')
+  .select('*', { count: 'exact' })
+  .range(from, to)
+  .order('created_at', { ascending: false })
+
+console.log(`Page ${page}: ${data.length} of ${count} total`)
+```
+
+**输出：**
+```json
+{
+  "data": [
+    { "id": "1", "title": "Post 1", "created_at": "2024-01-15T10:00:00Z" },
+    { "id": "2", "title": "Post 2", "created_at": "2024-01-14T10:00:00Z" }
+  ],
+  "count": 50,
+  "error": null
+}
+```
+
+### 筛选搜索
+
+```javascript
+const { data } = await insforge.database
+  .from('products')
+  .select('id, name, price, category')
+  .eq('category', 'electronics')
+  .gte('price', 50)
+  .lte('price', 500)
+  .order('price', { ascending: true })
+  .limit(20)
+```
+
+**输出：**
+```json
+{
+  "data": [
+    { "id": "101", "name": "USB Cable", "price": 59.99, "category": "electronics" },
+    { "id": "102", "name": "Keyboard", "price": 89.99, "category": "electronics" }
+  ],
+  "error": null
+}
+```
+
+### 与身份验证钩子结合使用
+
+结合数据库查询与 `useUser()` 或 `useAuth()` 钩子来获取用户特定的数据：
+
+```tsx
+import { useUser } from '@insforge/react'; // or '@insforge/react-router'
+import { insforge } from './lib/insforge';
+import { useEffect, useState } from 'react';
+
+function MyProfile() {
+  const { user, isLoaded } = useUser();
+  const [posts, setPosts] = useState([]);
+
+  useEffect(() => {
+    if (user) {
+      // Fetch user's posts from database
+      insforge.database
+        .from('posts')
+        .select('*')
+        .eq('user_id', user.id)
+        .then(({ data }) => setPosts(data));
+    }
+  }, [user]);
+
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+
+  return (
+    <div>
+      <h1>{user.profile?.name}</h1>
+      <p>{user.email}</p>
+      <h2>My Posts: {posts.length}</h2>
+      {posts.map(post => (
+        <div key={post.id}>{post.title}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+**关键要点：**
+- 使用 `user.id` 为已认证用户筛选数据
+- 在访问 `user` 之前检查 `isLoaded` 以避免竞争条件
+- 检查 `!user` 以处理未认证状态

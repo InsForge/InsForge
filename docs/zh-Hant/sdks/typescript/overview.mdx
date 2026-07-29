@@ -1,0 +1,59 @@
+---
+title: InsForge TypeScript 和 JavaScript SDK
+description: 在 Node、瀏覽器和邊緣運行時中安裝和初始化官方 InsForge TypeScript SDK，以使用身分驗證、資料庫、儲存和即時功能。
+---
+
+InsForge TypeScript SDK 為 JavaScript 和 TypeScript 應用程式提供了一個類型安全的用戶端，用於與 InsForge 服務互動。
+
+## 安裝
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## 快速開始
+
+```typescript
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-app.insforge.app',
+  anonKey: 'your-anon-key'  // Optional: for public/unauthenticated requests
+});
+```
+
+## 功能
+
+- **Database** - 使用 PostgREST 進行類型安全的 CRUD 操作
+- **Authentication** - 電子郵件/密碼和 OAuth 身分驗證
+- **Storage** - 檔案上傳、下載和管理
+- **Functions** - 叫用無伺服器邊緣函數
+- **AI** - 聊天完成和圖像生成
+- **Realtime** - 基於 WebSocket 的 pub/sub 訊息傳遞
+- **Payments** - 提供商特定的 Stripe 和 Razorpay 支付助手
+
+## SDK 參考
+
+<CardGroup cols={2}>
+  <Card title="資料庫" icon="database" href="/sdks/typescript/database">
+    CRUD 操作、篩選和查詢
+  </Card>
+  <Card title="身分驗證" icon="lock" href="/sdks/typescript/auth">
+    註冊、登入、OAuth 和使用者管理
+  </Card>
+  <Card title="儲存" icon="cloud-arrow-up" href="/sdks/typescript/storage">
+    檔案上傳、下載和管理
+  </Card>
+  <Card title="函數" icon="bolt" href="/sdks/typescript/functions">
+    叫用無伺服器邊緣函數
+  </Card>
+  <Card title="AI" icon="brain" href="/sdks/typescript/ai">
+    聊天完成和圖像生成
+  </Card>
+  <Card title="即時" icon="signal-stream" href="/sdks/typescript/realtime">
+    WebSocket pub/sub 訊息傳遞
+  </Card>
+  <Card title="支付" icon="credit-card" href="/sdks/typescript/payments">
+    提供商特定的 Stripe 和 Razorpay 支付助手
+  </Card>
+</CardGroup>

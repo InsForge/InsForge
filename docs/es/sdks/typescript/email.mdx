@@ -1,0 +1,55 @@
+---
+title: Referencia de SDK de Correo Electrónico
+description: Envía correos electrónicos transaccionales personalizados con el SDK de InsForge
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## emails.send()
+
+Envía correos electrónicos HTML personalizados a uno o más destinatarios.
+
+### Parámetros
+
+- `to` (string | string[], required) - Correos electrónicos de destinatarios, máximo 50 destinatarios
+- `subject` (string, required) - Línea de asunto del correo electrónico, máximo 500 caracteres
+- `html` (string, required) - Contenido HTML del correo electrónico
+- `cc` (string | string[], optional) - Destinatarios CC, máximo 50 destinatarios
+- `bcc` (string | string[], optional) - Destinatarios BCC, máximo 50 destinatarios
+- `from` (string, optional) - Nombre visible mostrado junto a la dirección del remitente, máximo 100 caracteres (se ignora cuando SMTP Personalizado está habilitado)
+- `replyTo` (string, optional) - Dirección de correo electrónico de respuesta, debe ser una dirección de correo válida
+
+<Note>
+De forma predeterminada, los correos se envían desde `noreply@<tu-proyecto>.send.insforge.dev`, un subdominio por proyecto que InsForge Cloud aprovisiona y verifica por ti, por lo que no se requiere ninguna configuración de dominio. El campo `from` solo establece el nombre visible que aparece junto a esa dirección; con el proveedor predeterminado no puedes cambiar la dirección ni el dominio. Para enviar desde tu propio dominio, configura [SMTP Personalizado](/core-concepts/messaging/custom-smtp). Cuando SMTP Personalizado está habilitado, el campo `from` se ignora por completo y el nombre del remitente y el correo electrónico se toman de tu configuración SMTP para evitar spoofing a través de tu servidor.
+</Note>
+
+### Devoluciones
+
+```typescript
+{
+  data: {} | null,  // Empty object on success
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.emails.send({
+  to: ['user1@example.com', 'user2@example.com'],
+  cc: 'manager@example.com',
+  from: 'Acme Support Team',
+  subject: 'Team Update',
+  html: '<h1>Weekly Update</h1><p>Here are this week\'s highlights...</p>',
+  replyTo: 'support@example.com'
+});
+
+if (error) {
+  console.error('Failed to send email:', error.message);
+  return;
+}
+
+console.log('Email sent successfully');
+```

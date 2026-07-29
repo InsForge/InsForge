@@ -1,0 +1,87 @@
+---
+title: "付款"
+sidebarTitle: "Overview"
+description: "为 Stripe 或 Razorpay 选择特定于提供商的付款集成。"
+---
+
+InsForge Payments 让您的应用使用您自己的 Stripe 或 Razorpay 账户收取费用。两个提供商使用不同的支付模型，所以文档按提供商拆分，而不是描述一个通用支付流。
+
+<Frame caption="支付仪表盘：提供商连接、目录、订阅和交易。">
+  <img src="/images/dashboard-payments.png" alt="InsForge 付款仪表板" />
+</Frame>
+
+<Note>
+  Stripe 或 Razorpay 仍然是费用、发票、退款、争议、税款和账户级财务操作的真实来源。InsForge 不是支付处理器或商户，不替代提供商仪表板。
+</Note>
+
+## 选择提供商
+
+<CardGroup cols={2}>
+  <Card title="Stripe Payments" icon="stripe" href="/core-concepts/payments/stripe">
+    使用 Stripe Checkout、Products、Prices、Subscriptions 和 Billing Portal。
+  </Card>
+
+  <Card title="Razorpay Payments" icon="credit-card" href="/core-concepts/payments/razorpay">
+    使用 Razorpay Orders、Items、Plans、Subscriptions 和 Razorpay Checkout。
+  </Card>
+</CardGroup>
+
+## 架构
+
+提供商原生表保持提供商概念完整：
+
+| 提供商 | 运行时表 | 目录表 | 订阅表 |
+|----------|----------------|----------------|---------------------|
+| Stripe | `payments.stripe_checkout_sessions`、`payments.stripe_customer_portal_sessions` | `payments.stripe_products`、`payments.stripe_prices` | `payments.stripe_subscriptions`、`payments.stripe_subscription_items` |
+| Razorpay | `payments.razorpay_orders` | `payments.razorpay_items`、`payments.razorpay_plans` | `payments.razorpay_subscriptions` |
+
+共享表仅用于持久形状在提供商中有用的地方：
+
+| 表 | 目的 |
+|-------|---------|
+| `payments.provider_connections` | 按 `provider` 和 `environment` 的提供商密钥、账户、同步和 webhook 设置状态。 |
+| `payments.customer_mappings` | 应用计费主体到提供商客户 ID 映射。 |
+| `payments.customers` | 仪表板可见性的管理员/客户镜像。 |
+| `payments.webhook_events` | 已验证的提供商 webhook 事件账本。用于持久履行触发器。 |
+| `payments.transactions` | InsForge 仪表板/报告投影，用于成功、失败和退款的支付活动。 |
+
+`payments.transactions` 不是履行契约。它是从提供商事件和同步构建的投影。对于业务逻辑，创建应用拥有的表，如 `public.orders`、`public.credit_ledger` 或 `public.team_entitlements`，然后从 `payments.webhook_events` 中的已验证行填充它们。
+
+## 履行
+
+不要仅从 Stripe 成功 URL 或 Razorpay Checkout 回调履行。这些是用户体验信号。持久履行应从已验证的提供商 webhook 事件运行。
+
+```sql
+CREATE TRIGGER fulfill_from_payment_webhook
+  AFTER INSERT OR UPDATE ON payments.webhook_events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fulfill_payment_event();
+```
+
+如果您的应用接受多个提供商，请保持触发器幂等，并在 `NEW.provider` 和 `NEW.event_type` 上分支。使用您自己的 RLS 策略保护应用拥有的履行表。
+
+Webhook 事件独立处理，提供商不提供事件间排序保证。派生自事件的行在该事件标记为 `processed` 之前提交，但由其他事件拥有的行（如 `payments.customer_mappings`（结账完成创建））在触发器触发时可能不存在。首先从事件有效负载解析计费主体，将其他表的查找视为备用。有关订阅履行示例，请参阅提供商指南。
+
+<Warning>
+  较旧的仅限 Stripe 的 `payments.payment_history` 行迁移到 `payments.transactions` 用于仪表板和报告。`payment_history` 上的触发器不会自动重写。将履行逻辑移至 `payments.webhook_events`。
+</Warning>
+
+## 使用它进行构建
+
+<CardGroup cols={2}>
+  <Card title="TypeScript payments guide" icon="js" href="/sdks/typescript/payments">
+    为应用代码选择 Stripe 或 Razorpay 提供商模块。
+  </Card>
+
+  <Card title="REST patterns" icon="code" href="/sdks/rest/overview">
+    查看特定于提供商的 Payments API 路由和 webhook 路由。
+  </Card>
+</CardGroup>
+
+## 下一步
+
+- 如果您使用 Stripe Checkout 或 Billing Portal，请阅读 [Stripe Payments](/core-concepts/payments/stripe)。
+- 如果您使用 Razorpay Orders 或 Subscriptions，请阅读 [Razorpay Payments](/core-concepts/payments/razorpay)。
+- 在 Dashboard -> Payments -> Settings 中配置提供商密钥。
+- 为计费主体添加特定于应用的 RLS 或服务器端成员资格检查。
+- 从 `payments.webhook_events` 添加触发器支持的履行。

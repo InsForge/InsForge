@@ -1,4 +1,5 @@
 import { Table2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { DatabaseTemplate } from '#features/database/templates';
 
 interface TemplateCardProps {
@@ -8,6 +9,7 @@ interface TemplateCardProps {
 }
 
 export function TemplateCard({ template, onClick, showTableCount = false }: TemplateCardProps) {
+  const { t } = useTranslation('chrome');
   return (
     <button
       type="button"
@@ -16,16 +18,20 @@ export function TemplateCard({ template, onClick, showTableCount = false }: Temp
     >
       <div className="flex w-full flex-col gap-3 rounded px-4 pb-6 pt-4 transition-colors group-hover:bg-[var(--alpha-4)] group-active:bg-[var(--alpha-8)]">
         <div className="flex flex-col gap-2">
-          <h3 className="text-base font-medium leading-7 text-foreground">{template.title}</h3>
+          <h3 className="text-base font-medium leading-7 text-foreground">
+            {t(`database.templates_data.${template.id}.title`, { defaultValue: template.title })}
+          </h3>
           <p className="min-h-[72px] line-clamp-3 text-sm leading-6 text-muted-foreground">
-            {template.description}
+            {t(`database.templates_data.${template.id}.description`, {
+              defaultValue: template.description,
+            })}
           </p>
         </div>
         {showTableCount && (
           <div className="inline-flex w-fit items-center rounded bg-[var(--alpha-8)] px-1 py-0.5">
             <Table2 className="h-4 w-4 text-muted-foreground" />
             <p className="px-1 text-xs font-medium leading-4 text-muted-foreground">
-              {template.tableCount} {template.tableCount === 1 ? 'Table' : 'Tables'}
+              {t('database.tablesCount', { count: template.tableCount })}
             </p>
           </div>
         )}

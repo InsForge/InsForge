@@ -1,11 +1,15 @@
 ---
-title: "Deploy InsForge to AWS EC2"
-description: "Step-by-step guide to deploy InsForge on an AWS EC2 instance using Docker Compose, including SSH setup, domain config, and TLS termination."
+title: "Self-Host InsForge on AWS EC2"
+description: "Step-by-step guide to self-host the InsForge platform on an AWS EC2 instance using Docker Compose, including SSH setup, domain config, and TLS termination."
 ---
 
-# Deploy InsForge to AWS EC2
+# Self-Host InsForge on AWS EC2
 
-This guide will walk you through deploying InsForge on an AWS EC2 instance using Docker Compose.
+This guide will walk you through self-hosting the InsForge platform on an AWS EC2 instance using Docker Compose.
+
+<Note>
+  **This deploys InsForge itself, not the app you built.** If you just want to take your app live, use [Sites](/core-concepts/sites/overview) instead. This guide is for running the InsForge backend on your own infrastructure.
+</Note>
 
 <Note>
   This cloud walkthrough is community-maintained and can lag the latest InsForge release. The canonical, always-current setup is the `deploy/docker-compose/` directory in the [InsForge repo](https://github.com/InsForge/InsForge).

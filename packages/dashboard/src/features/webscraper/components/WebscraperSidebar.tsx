@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Settings } from 'lucide-react';
 import {
   FeatureSidebar,
@@ -16,25 +17,26 @@ interface WebscraperSidebarProps {
 }
 
 export function WebscraperSidebar({ connection, projectId }: WebscraperSidebarProps) {
+  const { t } = useTranslation('chrome');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const connected = !!connection;
 
   const items: FeatureSidebarListItem[] = [
     {
       id: 'actors',
-      label: 'Actors',
+      label: t('webscraper.actors', { defaultValue: 'Actors' }),
       href: '/dashboard/webscraper/actors',
       disabled: !connected,
     },
     {
       id: 'runs',
-      label: 'Runs',
+      label: t('webscraper.runs', { defaultValue: 'Runs' }),
       href: '/dashboard/webscraper/runs',
       disabled: !connected,
     },
     {
       id: 'dataset',
-      label: 'Dataset',
+      label: t('webscraper.dataset', { defaultValue: 'Dataset' }),
       href: '/dashboard/webscraper/dataset',
       disabled: !connected,
     },
@@ -43,7 +45,7 @@ export function WebscraperSidebar({ connection, projectId }: WebscraperSidebarPr
   const headerButtons: FeatureSidebarHeaderButton[] = [
     {
       id: 'webscraper-settings',
-      label: 'Web Scraper Config',
+      label: t('webscraper.configTitle', { defaultValue: 'Web Scraper Config' }),
       icon: Settings,
       onClick: () => setSettingsOpen(true),
       // Clickable even when not connected (mirrors Analytics); the dialog itself
@@ -54,7 +56,11 @@ export function WebscraperSidebar({ connection, projectId }: WebscraperSidebarPr
 
   return (
     <>
-      <FeatureSidebar title="Web Scraper" items={items} headerButtons={headerButtons} />
+      <FeatureSidebar
+        title={t('webscraper.title', { defaultValue: 'Web Scraper' })}
+        items={items}
+        headerButtons={headerButtons}
+      />
       <WebScraperSettingsDialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}

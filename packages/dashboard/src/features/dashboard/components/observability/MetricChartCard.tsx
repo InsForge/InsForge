@@ -1,4 +1,5 @@
 import { type MouseEventHandler, type ReactNode, useId, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Info } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '#components';
 import type { DashboardMetricDataPoint } from '#types';
@@ -113,6 +114,7 @@ export function MetricChartCard({
   formatAxisLabel,
   description,
 }: MetricChartCardProps) {
+  const { t } = useTranslation('chrome');
   const effectiveDomain =
     fixedDomain ?? (threshold !== undefined ? FIXED_PERCENT_DOMAIN : undefined);
   const aggregates = useMemo(() => aggregateMetricSeries(data), [data]);
@@ -171,7 +173,10 @@ export function MetricChartCard({
     formatAxisLabel ? formatAxisLabel(value) : `${value}%`;
   const thresholdNote =
     threshold !== undefined
-      ? `Green while healthy; the line turns red above ${renderAxisLabel(threshold)}.`
+      ? t('overview.thresholdNote', {
+          threshold: renderAxisLabel(threshold),
+          defaultValue: 'Green while healthy; the line turns red above {{threshold}}.',
+        })
       : null;
   const gradientTransitionHalfWidth = 8;
   const gradientTransitionStart = Math.max(
@@ -195,7 +200,7 @@ export function MetricChartCard({
                 <button
                   type="button"
                   className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-                  aria-label={`About ${title}`}
+                  aria-label={t('overview.aboutMetric', { title, defaultValue: 'About {{title}}' })}
                 >
                   <Info className="h-3.5 w-3.5" />
                 </button>
@@ -345,7 +350,9 @@ export function MetricChartCard({
               </>
             ) : (
               <div className="flex h-full w-full items-center justify-center text-[13px] text-muted-foreground">
-                {isLoading ? 'Loading…' : 'No data'}
+                {isLoading
+                  ? t('overview.loadingShort', { defaultValue: 'Loading…' })
+                  : t('overview.noData', { defaultValue: 'No data' })}
               </div>
             )}
           </div>
@@ -360,6 +367,12 @@ export function MetricChartCard({
       </div>
       <div className="grid grid-cols-3 border-t border-[var(--alpha-8)]">
         {(['AVG', 'MAX', 'LATEST'] as const).map((label, i) => {
+          const statLabel =
+            i === 0
+              ? t('overview.statAvg', { defaultValue: 'AVG' })
+              : i === 1
+                ? t('overview.statMax', { defaultValue: 'MAX' })
+                : t('overview.statLatest', { defaultValue: 'LATEST' });
           const value = i === 0 ? aggregates.avg : i === 1 ? aggregates.max : aggregates.latest;
           return (
             <div
@@ -368,7 +381,7 @@ export function MetricChartCard({
                 i < 2 ? 'border-r border-[var(--alpha-8)]' : ''
               }`}
             >
-              <span className="text-xs leading-4 text-muted-foreground">{label}</span>
+              <span className="text-xs leading-4 text-muted-foreground">{statLabel}</span>
               <span className="text-sm leading-5 text-foreground">
                 {isLoading ? '—' : renderValue(value)}
               </span>

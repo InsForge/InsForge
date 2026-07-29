@@ -1,0 +1,59 @@
+---
+title: SDK de TypeScript y JavaScript para InsForge
+description: Instala e inicializa el SDK oficial de TypeScript para InsForge en Node, navegadores y tiempos de ejecución edge para usar autenticación, base de datos, almacenamiento y tiempo real.
+---
+
+El SDK de TypeScript para InsForge proporciona un cliente seguro en tipos para interactuar con los servicios de InsForge desde aplicaciones JavaScript y TypeScript.
+
+## Instalación
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## Inicio rápido
+
+```typescript
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-app.insforge.app',
+  anonKey: 'your-anon-key'  // Optional: for public/unauthenticated requests
+});
+```
+
+## Funcionalidades
+
+- **Database** - Operaciones CRUD seguras en tipos con PostgREST
+- **Authentication** - Autenticación por correo electrónico/contraseña y OAuth
+- **Storage** - Carga, descarga y gestión de archivos
+- **Functions** - Invoca funciones serverless de edge
+- **AI** - Completamiento de chat y generación de imágenes
+- **Realtime** - Mensajería pub/sub basada en WebSocket
+- **Payments** - Asistentes de pagos Stripe y Razorpay específicos del proveedor
+
+## Referencia de SDK
+
+<CardGroup cols={2}>
+  <Card title="Base de datos" icon="database" href="/sdks/typescript/database">
+    Operaciones CRUD, filtros y consultas
+  </Card>
+  <Card title="Autenticación" icon="lock" href="/sdks/typescript/auth">
+    Registro, inicio de sesión, OAuth y gestión de usuarios
+  </Card>
+  <Card title="Almacenamiento" icon="cloud-arrow-up" href="/sdks/typescript/storage">
+    Carga, descarga y gestión de archivos
+  </Card>
+  <Card title="Funciones" icon="bolt" href="/sdks/typescript/functions">
+    Invoca funciones serverless de edge
+  </Card>
+  <Card title="AI" icon="brain" href="/sdks/typescript/ai">
+    Completamiento de chat y generación de imágenes
+  </Card>
+  <Card title="Tiempo real" icon="signal-stream" href="/sdks/typescript/realtime">
+    Mensajería pub/sub de WebSocket
+  </Card>
+  <Card title="Pagos" icon="credit-card" href="/sdks/typescript/payments">
+    Asistentes de pagos Stripe y Razorpay específicos del proveedor
+  </Card>
+</CardGroup>

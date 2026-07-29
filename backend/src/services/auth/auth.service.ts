@@ -30,6 +30,7 @@ import {
   OAuthUserData,
 } from '@/types/auth.js';
 import { AppError } from '@/utils/errors.js';
+import { NEXT_ACTIONS } from '@/utils/next-actions.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
@@ -54,8 +55,8 @@ import {
  */
 export class AuthService {
   private static instance: AuthService;
-  private adminUsername: string;
-  private adminPassword: string;
+  private adminUsernameHash: Buffer;
+  private adminPasswordHash: Buffer;
   private pool: Pool | null = null;
   private tokenManager: TokenManager;
 
@@ -70,14 +71,23 @@ export class AuthService {
   private appleOAuthProvider: AppleOAuthProvider;
 
   private constructor() {
-    this.adminUsername = appConfig.auth.rootAdminUsername;
-    this.adminPassword = appConfig.auth.rootAdminPassword;
+    const adminUsername = appConfig.auth.rootAdminUsername;
+    const adminPassword = appConfig.auth.rootAdminPassword;
 
-    if (!this.adminUsername || !this.adminPassword) {
+    if (!adminUsername || !adminPassword) {
       throw new Error(
         'ROOT_ADMIN_USERNAME and ROOT_ADMIN_PASSWORD environment variables are required'
       );
     }
+
+    if (adminUsername.length > 4096 || adminPassword.length > 4096) {
+      throw new Error(
+        'ROOT_ADMIN_USERNAME and ROOT_ADMIN_PASSWORD must not exceed 4096 characters to prevent DoS vulnerabilities.'
+      );
+    }
+
+    this.adminUsernameHash = crypto.createHash('sha256').update(adminUsername).digest();
+    this.adminPasswordHash = crypto.createHash('sha256').update(adminPassword).digest();
 
     // Initialize token manager
     this.tokenManager = TokenManager.getInstance();
@@ -238,8 +248,14 @@ export class AuthService {
           await this.sendVerificationEmailWithCode(email);
         }
       } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
-        logger.warn(`Verification email send failed during register: ${msg}`);
+        const statusCode = error instanceof AppError && error.statusCode === 429 ? 429 : 500;
+        logger.error('Verification email send failed during registration', { userId, error });
+        throw new AppError(
+          'The user account was created, but the verification email could not be sent.',
+          statusCode,
+          ERROR_CODES.AUTH_VERIFICATION_EMAIL_DELIVERY_FAILED,
+          NEXT_ACTIONS.RESEND_VERIFICATION_EMAIL
+        );
       }
       return {
         accessToken: null,
@@ -302,6 +318,157 @@ export class AuthService {
     };
 
     return response;
+  }
+
+  /**
+   * Send an OTP that can be exchanged for a user session.
+   *
+   * This deliberately does not require or create a user record. Sending the
+   * same challenge flow for existing and unknown emails avoids account
+   * enumeration; signup policy is enforced only after the OTP is verified.
+   */
+  async sendSignInOTP(email: string): Promise<void> {
+    const { otp } = await AuthOTPService.getInstance().createEmailOTP(
+      email,
+      OTPPurpose.SIGN_IN,
+      OTPType.NUMERIC_CODE,
+      { expiresInMinutes: 5 }
+    );
+
+    await EmailService.getInstance().sendWithTemplate(email, 'User', 'request-otp', {
+      token: otp,
+    });
+  }
+
+  /**
+   * Verify an email OTP and create a session.
+   *
+   * OTP consumption and first-time user creation happen in one transaction.
+   * A verified OTP proves email ownership, so pre-existing unverified password
+   * accounts have their password cleared before sign-in.
+   */
+  async signInWithOTP(
+    email: string,
+    verificationCode: string,
+    name?: string
+  ): Promise<CreateSessionResponse> {
+    const { disableSignup } = await AuthConfigService.getInstance().getAuthConfig();
+
+    // AuthOTPService owns the transaction: the code is consumed atomically with
+    // the user creation/lookup below, and the persisted attempt counter is
+    // committed even when verification fails.
+    const outcome = await AuthOTPService.getInstance().consumeNumericOTP(
+      email,
+      OTPPurpose.SIGN_IN,
+      verificationCode,
+      async (client): Promise<{ blocked: true } | { userId: string }> => {
+        // auth.users.email is case-sensitive UNIQUE and OAuth stores emails
+        // provider-cased, so case-variant duplicates of one mailbox can exist.
+        // Pick deterministically (oldest) instead of an arbitrary matching row.
+        let existingUser = await client.query(
+          `SELECT id, email_verified
+           FROM auth.users
+           WHERE lower(email) = $1
+           ORDER BY created_at ASC
+           LIMIT 1
+           FOR UPDATE`,
+          [email]
+        );
+
+        let userId: string | undefined;
+        if (!existingUser.rows.length) {
+          // The code is already consumed. Signal a blocked signup so the caller
+          // rejects after the transaction commits — keeping the send path
+          // uniform and avoiding an account-enumeration timing leak.
+          if (disableSignup) {
+            return { blocked: true };
+          }
+
+          const proposedUserId = crypto.randomUUID();
+          const profile = JSON.stringify(name ? { name } : {});
+          const createdUser = await client.query(
+            `INSERT INTO auth.users (
+               id, email, password, profile, email_verified, created_at, updated_at
+             )
+             VALUES ($1, $2, NULL, $3::jsonb, true, NOW(), NOW())
+             ON CONFLICT (email) DO NOTHING
+             RETURNING id`,
+            [proposedUserId, email, profile]
+          );
+
+          if (createdUser.rows.length) {
+            userId = createdUser.rows[0].id;
+          } else {
+            existingUser = await client.query(
+              `SELECT id, email_verified
+               FROM auth.users
+               WHERE lower(email) = $1
+               ORDER BY created_at ASC
+               LIMIT 1
+               FOR UPDATE`,
+              [email]
+            );
+          }
+        }
+
+        if (!userId && existingUser.rows.length) {
+          const dbUser = existingUser.rows[0];
+          userId = dbUser.id;
+
+          // A verified OTP proves email ownership: clear any password on a
+          // pre-existing unverified account and mark it verified.
+          if (!dbUser.email_verified) {
+            await client.query(
+              `UPDATE auth.users
+               SET password = NULL, email_verified = true, updated_at = NOW()
+               WHERE id = $1`,
+              [userId]
+            );
+          }
+        }
+
+        if (!userId) {
+          throw new Error('User not found after concurrent OTP sign-in');
+        }
+
+        await client.query(
+          `INSERT INTO auth.user_providers (
+             user_id, provider, provider_account_id, provider_data, created_at, updated_at
+           )
+           VALUES ($1, 'email', $2, '{"method":"otp"}'::jsonb, NOW(), NOW())
+           ON CONFLICT (provider, provider_account_id)
+           DO UPDATE SET
+             provider_data = EXCLUDED.provider_data,
+             updated_at = NOW()
+           WHERE auth.user_providers.user_id = EXCLUDED.user_id`,
+          [userId, email]
+        );
+
+        return { userId };
+      }
+    );
+
+    if ('blocked' in outcome) {
+      throw new AppError(
+        'User signups are disabled for this project.',
+        403,
+        ERROR_CODES.AUTH_SIGNUP_DISABLED
+      );
+    }
+
+    const dbUser = await this.getUserById(outcome.userId);
+    if (!dbUser) {
+      throw new AppError('Failed to complete sign-in', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+
+    const user = this.transformUserRecordToSchema(dbUser);
+    const accessToken = this.tokenManager.generateAccessToken({
+      sub: dbUser.id,
+      email: dbUser.email,
+      role: 'authenticated',
+    });
+
+    return { user, accessToken };
   }
 
   /**
@@ -376,60 +543,46 @@ export class AuthService {
    * Verifies the email OTP code and updates the account in a single transaction
    */
   async verifyEmailWithCode(email: string, verificationCode: string): Promise<VerifyEmailResponse> {
-    const dbManager = DatabaseManager.getInstance();
-    const pool = dbManager.getPool();
-    const client = await pool.connect();
+    // AuthOTPService owns the transaction: the code is consumed atomically with
+    // the email-verification update, and the attempt counter is committed even
+    // when verification fails.
+    const userId = await AuthOTPService.getInstance().consumeNumericOTP(
+      email,
+      OTPPurpose.VERIFY_EMAIL,
+      verificationCode,
+      async (client): Promise<string> => {
+        const result = await client.query(
+          `UPDATE auth.users
+           SET email_verified = true, updated_at = NOW()
+           WHERE email = $1
+           RETURNING id`,
+          [email]
+        );
 
-    try {
-      await client.query('BEGIN');
+        if (result.rows.length === 0) {
+          throw new Error('User not found');
+        }
 
-      // Verify OTP using the OTP service (within the same transaction)
-      const otpService = AuthOTPService.getInstance();
-      await otpService.verifyEmailOTPWithCode(
-        email,
-        OTPPurpose.VERIFY_EMAIL,
-        verificationCode,
-        client
-      );
-
-      // Update account email verification status
-      const result = await client.query(
-        `UPDATE auth.users
-         SET email_verified = true, updated_at = NOW()
-         WHERE email = $1
-         RETURNING id`,
-        [email]
-      );
-
-      if (result.rows.length === 0) {
-        throw new Error('User not found');
+        return result.rows[0].id;
       }
+    );
 
-      await client.query('COMMIT');
-
-      // Fetch full user record with provider data
-      const userId = result.rows[0].id;
-      const dbUser = await this.getUserById(userId);
-      if (!dbUser) {
-        throw new Error('User not found after verification');
-      }
-      const user = this.transformUserRecordToSchema(dbUser);
-      const accessToken = this.tokenManager.generateAccessToken({
-        sub: dbUser.id,
-        email: dbUser.email,
-        role: 'authenticated',
-      });
-
-      return {
-        user,
-        accessToken,
-      };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+    // Fetch full user record with provider data
+    const dbUser = await this.getUserById(userId);
+    if (!dbUser) {
+      throw new AppError('Failed to complete verification', 500, ERROR_CODES.INTERNAL_ERROR);
     }
+    const user = this.transformUserRecordToSchema(dbUser);
+    const accessToken = this.tokenManager.generateAccessToken({
+      sub: dbUser.id,
+      email: dbUser.email,
+      role: 'authenticated',
+    });
+
+    return {
+      user,
+      accessToken,
+    };
   }
 
   /**
@@ -657,8 +810,18 @@ export class AuthService {
    * Admin login (validates against env variables only)
    */
   adminLogin(username: string, password: string): CreateAdminSessionResponse {
-    // Simply validate against environment variables
-    if (username !== this.adminUsername || password !== this.adminPassword) {
+    // input-sanity guard (defense-in-depth against route validation bypasses)
+    if (username.length > 4096 || password.length > 4096) {
+      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    const hashedUserProvided = crypto.createHash('sha256').update(username).digest();
+    const hashedPassProvided = crypto.createHash('sha256').update(password).digest();
+
+    const usernameMatch = crypto.timingSafeEqual(hashedUserProvided, this.adminUsernameHash);
+    const passwordMatch = crypto.timingSafeEqual(hashedPassProvided, this.adminPasswordHash);
+
+    if (!usernameMatch || !passwordMatch) {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
@@ -1179,7 +1342,7 @@ export class AuthService {
         u.created_at,
         u.updated_at,
         u.password,
-        STRING_AGG(a.provider, ',') as providers
+        STRING_AGG(DISTINCT a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
       WHERE u.email = $1
@@ -1208,7 +1371,7 @@ export class AuthService {
         u.created_at,
         u.updated_at,
         u.password,
-        STRING_AGG(a.provider, ',') as providers
+        STRING_AGG(DISTINCT a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
       WHERE u.id = $1
@@ -1238,7 +1401,7 @@ export class AuthService {
     }
 
     // Add email provider if password exists
-    if (dbUser.password) {
+    if (dbUser.password && !providers.includes('email')) {
       providers.push('email');
     }
 
@@ -1274,7 +1437,7 @@ export class AuthService {
         u.created_at,
         u.updated_at,
         u.password,
-        STRING_AGG(a.provider, ',') as providers
+        STRING_AGG(DISTINCT a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
       WHERE u.is_anonymous = false

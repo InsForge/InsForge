@@ -1,0 +1,438 @@
+---
+title: Referencia del SDK de autenticación de Swift
+description: Cree cuentas, inicie sesión, verifique el correo electrónico, gestione sesiones y configure esquemas de URL de OAuth para iOS, macOS, tvOS y watchOS con el SDK de Swift de InsForge.
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+## Instalación
+
+<SwiftSdkInstallation />
+
+## signUp()
+
+Cree una nueva cuenta de usuario con correo electrónico y contraseña.
+
+### Parámetros
+
+- `email` (String) - Dirección de correo electrónico del usuario
+- `password` (String) - Contraseña del usuario
+- `name` (String, optional) - Nombre para mostrar del usuario
+
+### Devoluciones
+
+```swift
+SignUpResponse
+```
+
+### SignUpResponse
+
+```swift
+public struct SignUpResponse: Codable, Sendable {
+    /// User object (nil when email verification is required)
+    public let user: User?
+    /// Access token (nil when email verification is required)
+    public let accessToken: String?
+    /// Refresh token (nil when email verification is required)
+    public let refreshToken: String?
+    /// Indicates if email verification is required before sign-in
+    public let requireEmailVerification: Bool?
+
+    /// Check if email verification is required
+    public var needsEmailVerification: Bool
+    /// Check if sign up completed with session (no verification required)
+    public var hasSession: Bool
+}
+```
+
+### Ejemplo (flujo completo con verificación)
+
+```swift
+func handleSignUp(email: String, password: String, name: String?) async {
+    do {
+        let result = try await insforge.auth.signUp(
+            email: email,
+            password: password,
+            name: name
+        )
+
+        if result.needsEmailVerification {
+            // Show verification code input screen
+            // User will receive a 6-digit code via email
+            showEmailVerificationScreen(email: email)
+        } else if result.hasSession {
+            // Registration complete, user is signed in
+            navigateToDashboard()
+        }
+    } catch {
+        showError(error.localizedDescription)
+    }
+}
+
+// Called when user enters the verification code
+func handleVerifyEmail(email: String, code: String) async {
+    do {
+        try await insforge.auth.verifyEmail(email: email, code: code)
+        // Verification successful, user can now sign in
+        navigateToSignIn()
+    } catch {
+        showError("Invalid verification code")
+    }
+}
+
+// Called when user requests a new verification email
+func handleResendCode(email: String) async {
+    do {
+        try await insforge.auth.resendVerificationEmail(email: email)
+        showMessage("Verification email sent to \\(email)")
+    } catch {
+        showError("Failed to resend verification email")
+    }
+}
+```
+
+### Verificación de correo electrónico
+
+Para usuarios que se registran con correo electrónico, el backend de InsForge ofrece tres opciones:
+
+1. **Sin verificación de correo electrónico** - Los usuarios pueden iniciar sesión inmediatamente después del registro. `SignUpResponse` tendrá `hasSession = true`.
+2. **Verificación basada en enlace** - Los usuarios deben abrir su correo electrónico y hacer clic en el enlace de verificación antes de poder iniciar sesión.
+3. **Verificación basada en código** - El backend de InsForge envía un código de verificación de 6 dígitos al correo electrónico del usuario. La aplicación cliente necesita mostrar una pantalla de verificación donde los usuarios puedan ingresar el código y luego llamar a `verifyEmail(email:code:)` para completar la verificación. Solo después de esto los usuarios pueden iniciar sesión con correo electrónico y contraseña.
+
+Cuando `requireEmailVerification` es `true`, la respuesta tendrá:
+- `accessToken = nil`
+- `user = nil`
+- `needsEmailVerification = true`
+
+Esto indica que la verificación a través de la opción 2 o 3 es necesaria antes de que el usuario pueda iniciar sesión.
+
+### Métodos relacionados
+
+| Método | Descripción |
+|--------|-------------|
+| `verifyEmail(email:code:)` | Verificar correo electrónico con código de 6 dígitos |
+| `resendVerificationEmail(email:)` | Reenviar correo de verificación |
+
+---
+
+## signIn()
+
+Inicie sesión con un usuario existente con correo electrónico y contraseña.
+
+### Parámetros
+
+- `email` (String) - Dirección de correo electrónico del usuario
+- `password` (String) - Contraseña del usuario
+
+### Ejemplo
+
+```swift
+do {
+    let result = try await insforge.auth.signIn(
+        email: "user@example.com",
+        password: "secure_password123"
+    )
+
+    if let user = result.user {
+        print("Welcome back, \\(user.profile?.name ?? user.email)")
+    }
+} catch {
+    print("Sign in failed: \\(error)")
+}
+```
+
+### Verificación de correo electrónico
+
+Si la respuesta de inicio de sesión es:
+```json
+{"error":"FORBIDDEN","message":"Email verification required","statusCode":403,"nextActions":"Please verify your email address before logging in"}
+```
+Esto indica que la verificación a través de la opción 2 o 3 (enlace o código, consulte [signUp()](#verificación-de-correo-electrónico)) es necesaria antes de que el usuario pueda iniciar sesión.
+
+---
+
+## signOut()
+
+Cierre la sesión del usuario actual.
+
+### Ejemplo
+
+```swift
+do {
+    try await insforge.auth.signOut()
+    print("User signed out")
+} catch {
+    print("Sign out failed: \\(error)")
+}
+```
+
+---
+
+## getCurrentUser()
+
+Obtener usuario autenticado con datos de perfil.
+
+### Ejemplo
+
+```swift
+do {
+    if let user = try await insforge.auth.getCurrentUser() {
+        print("Email: \\(user.email)")
+        print("Name: \\(user.profile?.name ?? "N/A")")
+    } else {
+        print("No user signed in")
+    }
+} catch {
+    print("Error: \\(error)")
+}
+```
+
+---
+
+## setProfile()
+
+Actualizar el perfil del usuario actual.
+
+### Ejemplo
+
+```swift
+do {
+    let result = try await insforge.auth.setProfile([
+        "name": "JohnDev",
+        "bio": "iOS Developer",
+        "avatar_url": "https://example.com/avatar.jpg"
+    ])
+    print("Profile updated")
+} catch {
+    print("Update failed: \\(error)")
+}
+```
+
+---
+
+## Restablecimiento de contraseña
+
+InsForge admite dos métodos de restablecimiento de contraseña, configurados en el backend:
+
+- **Método de código**: El usuario recibe un código de 6 dígitos por correo electrónico, lo verifica para obtener un token de restablecimiento y luego restablece la contraseña
+- **Método de enlace**: El usuario recibe un enlace mágico por correo electrónico que contiene el token de restablecimiento y luego restablece la contraseña directamente
+
+### sendPasswordReset()
+
+Envíe un correo electrónico de restablecimiento de contraseña al usuario. El correo electrónico contendrá un código de 6 dígitos o un enlace mágico según la configuración del backend.
+
+#### Parámetros
+
+- `email` (String) - Dirección de correo electrónico del usuario
+
+#### Ejemplo
+
+```swift
+do {
+    try await insforge.auth.sendPasswordReset(email: "user@example.com")
+    // Show message to check email
+    showMessage("If your email is registered, you will receive a password reset email.")
+} catch {
+    print("Failed to send reset email: \\(error)")
+}
+```
+
+---
+
+### exchangeResetPasswordToken()
+
+Intercambie un código de restablecimiento de 6 dígitos por un token de restablecimiento. **Este método solo se usa con el flujo de restablecimiento basado en código.**
+
+#### Parámetros
+
+- `email` (String) - Dirección de correo electrónico del usuario
+- `code` (String) - Código numérico de 6 dígitos recibido por correo electrónico
+
+#### Devoluciones
+
+```swift
+ResetPasswordTokenResponse
+```
+
+#### ResetPasswordTokenResponse
+
+```swift
+public struct ResetPasswordTokenResponse: Codable, Sendable {
+    /// Reset token to use with resetPassword()
+    public let token: String
+    /// Token expiration timestamp
+    public let expiresAt: Date?
+}
+```
+
+#### Ejemplo
+
+```swift
+do {
+    let response = try await insforge.auth.exchangeResetPasswordToken(
+        email: "user@example.com",
+        code: "123456"
+    )
+    // Store the token and proceed to password reset screen
+    let resetToken = response.token
+    showPasswordResetScreen(token: resetToken)
+} catch {
+    print("Invalid or expired code: \\(error)")
+}
+```
+
+---
+
+### resetPassword()
+
+Restablezca la contraseña del usuario usando un token de restablecimiento.
+
+#### Parámetros
+
+- `otp` (String) - Token de restablecimiento (de `exchangeResetPasswordToken()` para el flujo de código, o de la URL del enlace mágico para el flujo de enlace)
+- `newPassword` (String) - Nueva contraseña que cumple con los requisitos configurados
+
+#### Ejemplo
+
+```swift
+do {
+    try await insforge.auth.resetPassword(
+        otp: resetToken,
+        newPassword: "newSecurePassword123"
+    )
+    // Password reset successful
+    showMessage("Password reset successfully. You can now sign in.")
+    navigateToSignIn()
+} catch {
+    print("Password reset failed: \\(error)")
+}
+```
+
+---
+
+## signInWithOAuthView()
+
+Inicie sesión directamente con un proveedor OAuth específico. Este método abre la página de autenticación del proveedor OAuth.
+
+En iOS 12+ y macOS 10.15+, el SDK usa `ASWebAuthenticationSession` para presentar un navegador de autenticación en la aplicación con manejo de devolución de llamada automática.
+
+### Proveedores admitidos
+
+```swift
+public enum OAuthProvider: String, Sendable {
+    case google
+    case github
+    case discord
+    case linkedin
+    case facebook
+    case instagram
+    case tiktok
+    case apple
+    case x
+    case spotify
+    case microsoft
+}
+```
+
+### Parámetros
+
+- `provider` (`OAuthProvider`) - El proveedor OAuth con el que autenticarse
+- `redirectTo` (`String`) - URL de devolución de llamada donde InsForge redirigirá después de la autenticación
+
+### Devoluciones
+
+```swift
+AuthResponse
+```
+
+Devuelve `AuthResponse` que contiene el usuario autenticado y los tokens de sesión.
+
+### Flujo de autenticación
+
+```
+1. App calls signInWithOAuthView(provider:redirectTo:)
+2. SDK fetches the OAuth authorization URL from InsForge
+3. SDK opens in-app authentication browser (ASWebAuthenticationSession)
+4. User authenticates with the provider (Google, GitHub, etc.)
+5. SDK automatically handles callback and creates session
+6. Method returns AuthResponse with user data
+```
+
+### Ejemplo
+
+```swift
+import SwiftUI
+import InsForge
+
+struct LoginView: View {
+    let client: InsForgeClient
+    @State private var currentUser: User?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Sign in with")
+                .font(.headline)
+
+            // Google Sign In
+            Button {
+                Task {
+                    do {
+                        let response = try await client.auth.signInWithOAuthView(
+                            provider: .google,
+                            redirectTo: "yourapp://auth/callback"
+                        )
+                        currentUser = response.user
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "g.circle.fill")
+                    Text("Continue with Google")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+
+            if let error = errorMessage {
+                Text(error)
+                    .foregroundColor(.red)
+                    .font(.caption)
+            }
+        }
+        .padding()
+    }
+}
+```
+
+### Configuración del esquema de URL
+
+Registre una URL de devolución de llamada para su aplicación, pase ese valor exacto a `redirectTo` y agregue el mismo valor a `allowedRedirectUrls` en Configuración de autenticación. Por ejemplo, puede usar un enlace profundo como `yourapp://auth/callback` o una devolución de llamada HTTPS reclamada como `https://app.example.com/auth/callback`. Las solicitudes fallarán con HTTP 400 si `redirectTo` no está en la lista permitida.
+
+---
+
+## Manejo de errores
+
+```swift
+do {
+    let result = try await insforge.auth.signIn(
+        email: email,
+        password: password
+    )
+} catch let error as InsForgeAuthError {
+    switch error {
+    case .invalidCredentials:
+        print("Invalid email or password")
+    case .userNotFound:
+        print("User not found")
+    case .emailNotVerified:
+        print("Please verify your email")
+    case .networkError(let underlying):
+        print("Network error: \\(underlying)")
+    default:
+        print("Auth error: \\(error.localizedDescription)")
+    }
+}
+```

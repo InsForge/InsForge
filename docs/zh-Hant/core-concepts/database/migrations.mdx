@@ -1,0 +1,52 @@
+---
+title: "資料庫遷移"
+description: "在 git 中追蹤架構變更，並使用 InsForge CLI 應用它們"
+---
+
+遷移是 `migrations/` 中應用於 `@insforge/cli` 的版本化 SQL 檔案。每次成功執行都記錄在 `system.custom_migrations` 中。工作流程是僅向前的。
+
+## 概念
+
+遷移是一個帶有 14 位數 UTC 時間戳前綴的 SQL 檔案：`<YYYYMMDDHHmmss>_<name>.sql`。CLI 在交易內按順序應用待處理檔案，將 `search_path` 設定為 `public`，並僅在成功時記錄歷史。PostgREST 自動重新載入架構中繼資料。檔案內的 `BEGIN`/`COMMIT`/`ROLLBACK` 被拒絕。
+
+## 用法
+
+連結後端，然後建立檔案。
+
+```bash
+npx @insforge/cli login
+npx @insforge/cli link
+npx @insforge/cli db migrations new create-employees-table
+```
+
+編寫 SQL。
+
+```sql
+create table if not exists public.employees (
+  id bigint primary key generated always as identity,
+  name text not null,
+  email text,
+  created_at timestamptz default now()
+);
+```
+
+應用待處理的遷移並檢查歷史。
+
+```bash
+npx @insforge/cli db migrations up --all
+npx @insforge/cli db migrations list
+```
+
+使用 `up <version>` 針對單個檔案，或使用 `up --to <version>` 應用到目標為止的所有待處理項。
+
+## 特定用法案例
+
+在現有專案上採用遷移：首先執行 `db migrations fetch` 來將遠端歷史具體化為本機檔案。一旦應用於遠端，永遠不要就地編輯遷移。改為編寫前向遷移。
+
+選擇加入後，透過檔案路由所有架構變更。臨時儀表板編輯會在 git 和 `system.custom_migrations` 之間造成漂移。
+
+## 更多資源
+
+- [Database branching](/agent-native/branching) 在副本上排練遷移。
+- [Database overview](/core-concepts/database/overview) 瞭解 PostgREST 如何拾取架構變更。
+- [PostgreSQL DDL docs](https://www.postgresql.org/docs/15/ddl.html) 用於您編寫的 SQL。

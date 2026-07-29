@@ -1,0 +1,253 @@
+---
+title: 函数 SDK 参考
+description: 使用 InsForge Kotlin SDK 调用无服务器函数
+---
+
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
+## 安装
+
+<KotlinSdkInstallation />
+
+---
+
+## invoke()
+
+通过 slug 调用无服务器函数。
+
+### 参数
+
+- `slug` (String) - 函数 slug 标识符
+- `body` (Any?, optional) - 请求体（将被 JSON 序列化）
+
+### 返回值
+
+```kotlin
+T // Typed response (reified generic)
+```
+
+### 示例
+
+```kotlin
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
+
+// Define response data class
+@Serializable
+data class HelloResponse(
+    val message: String,
+    val timestamp: String
+)
+
+// Invoke function with typed response
+val response = client.functions.invoke<HelloResponse>(
+    slug = "hello-world",
+    body = mapOf("name" to "World")
+)
+
+println(response.message)  // "Hello, World!"
+```
+
+### 带有类型化请求的示例
+
+```kotlin
+@Serializable
+data class GreetingRequest(
+    val name: String,
+    val greeting: String
+)
+
+@Serializable
+data class GreetingResponse(
+    val message: String,
+    val timestamp: String
+)
+
+val response = client.functions.invoke<GreetingResponse>(
+    slug = "hello-world",
+    body = GreetingRequest(name = "Kotlin", greeting = "Hello")
+)
+```
+
+---
+
+## invokeRaw()
+
+调用函数并获取原始 HTTP 响应。
+
+### 示例
+
+```kotlin
+val response = client.functions.invokeRaw(
+    slug = "generate-pdf",
+    body = mapOf("documentId" to "doc-123")
+)
+
+// Access raw response
+val bytes = response.readBytes()
+val contentType = response.contentType()
+```
+
+---
+
+## 管理员函数
+
+以下方法需要管理员/服务角色身份验证。
+
+<Warning>
+这些方法要求客户端使用**服务角色密钥**而不是 anon 密钥初始化。服务角色密钥具有提升的权限，应仅在安全的服务器端环境中使用，决不能在客户端代码中使用。
+
+```kotlin
+// Initialize client with service role key for admin operations
+val adminClient = createInsforgeClient(
+    baseUrl = "https://your-app.insforge.app",
+    anonKey = "your-service-role-key"  // Use service role key or api key, not anon key
+) {
+    install(Functions)
+}
+```
+</Warning>
+
+### listFunctions()
+
+列出所有函数。
+
+```kotlin
+val functions = client.functions.listFunctions()
+
+functions.forEach { fn ->
+    println("${fn.name} (${fn.slug}) - ${fn.status}")
+}
+```
+
+### getFunction()
+
+获取特定函数的详细信息。
+
+```kotlin
+val details = client.functions.getFunction("hello-world")
+
+println("Name: ${details.name}")
+println("Slug: ${details.slug}")
+println("Status: ${details.status}")
+println("Code: ${details.code}")
+```
+
+### createFunction()
+
+<Note>
+目前，InsForge 仅支持在 Deno 环境中运行的 JavaScript/TypeScript 函数。
+</Note>
+
+创建新函数。
+
+```kotlin
+val result = client.functions.createFunction(
+    name = "Hello World",
+    code = """
+        export default async function(req) {
+            const body = await req.json()
+            return new Response(JSON.stringify({
+                message: `Hello, ${'$'}{body.name}!`,
+                timestamp: new Date().toISOString()
+            }), {
+                headers: { "Content-Type": "application/json" }
+            })
+        }
+    """.trimIndent(),
+    slug = "hello-world",  // Optional, auto-generated from name if not provided
+    description = "A simple greeting function",
+    status = "active"  // "draft" or "active"
+)
+
+println("Created function: ${result.slug}")
+```
+
+### updateFunction()
+
+更新现有函数。
+
+```kotlin
+val result = client.functions.updateFunction(
+    slug = "hello-world",
+    name = "Hello World v2",
+    code = """
+        export default async function(req) {
+            const body = await req.json()
+            return new Response(JSON.stringify({
+                message: `Hello, ${'$'}{body.name}! Welcome to v2.`,
+                version: 2
+            }), {
+                headers: { "Content-Type": "application/json" }
+            })
+        }
+    """.trimIndent(),
+    status = "active"
+)
+```
+
+### deleteFunction()
+
+删除函数。
+
+```kotlin
+client.functions.deleteFunction("old-function")
+```
+
+---
+
+## 错误处理
+
+```kotlin
+import dev.insforge.exceptions.InsforgeHttpException
+
+try {
+    val response = client.functions.invoke<MyResponse>("my-function")
+    println("Success: $response")
+} catch (e: InsforgeHttpException) {
+    println("HTTP Error ${e.statusCode}: ${e.message}")
+    println("Error code: ${e.error}")
+    e.nextActions?.let { actions ->
+        println("Suggested actions: $actions")
+    }
+} catch (e: Exception) {
+    println("Unexpected error: ${e.message}")
+}
+```
+
+---
+
+## 模型参考
+
+### FunctionMetadata
+
+```kotlin
+@Serializable
+data class FunctionMetadata(
+    val id: String,
+    val slug: String,
+    val name: String,
+    val description: String? = null,
+    val status: String,  // "draft", "active", "error"
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("deployed_at") val deployedAt: String? = null
+)
+```
+
+### FunctionDetails
+
+```kotlin
+@Serializable
+data class FunctionDetails(
+    val id: String,
+    val slug: String,
+    val name: String,
+    val description: String? = null,
+    val code: String,
+    val status: String,  // "draft", "active", "error"
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("deployed_at") val deployedAt: String? = null
+)
+```

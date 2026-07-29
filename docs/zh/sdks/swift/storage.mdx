@@ -1,0 +1,360 @@
+---
+title: 存储 SDK 参考
+description: 使用 InsForge Swift SDK 进行文件上传、下载和管理
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+## 安装
+
+<SwiftSdkInstallation />
+
+## from()
+
+获取存储桶的文件 API 引用。
+
+### 示例
+
+```swift
+let bucket = insforge.storage.from("images")
+```
+
+---
+
+## 存储桶操作
+
+### createBucket()
+
+创建新的存储桶。
+
+```swift
+// Create a public bucket
+try await insforge.storage.createBucket("avatars")
+
+// Create a private bucket
+try await insforge.storage.createBucket(
+    "documents",
+    options: BucketOptions(isPublic: false)
+)
+```
+
+### listBuckets()
+
+列出所有存储桶名称。
+
+```swift
+let buckets = try await insforge.storage.listBuckets()
+// ["avatars", "documents", "uploads"]
+```
+
+### updateBucket()
+
+更新存储桶的可见性。
+
+```swift
+try await insforge.storage.updateBucket(
+    "documents",
+    options: BucketOptions(isPublic: true)
+)
+```
+
+### deleteBucket()
+
+删除存储桶。
+
+```swift
+try await insforge.storage.deleteBucket("old-bucket")
+```
+
+---
+
+## upload()
+
+上传文件到存储桶。
+
+### 参数
+
+- `path` (String) - 文件的对象键/路径
+- `data` (Data) - 要上传的文件数据
+- `options` (FileOptions, optional) - 上传选项，包括 contentType
+
+### 示例
+
+```swift
+// Upload with specific path
+let imageData = UIImage(named: "photo")?.jpegData(compressionQuality: 0.8)
+let file = try await insforge.storage
+    .from("images")
+    .upload(
+        path: "posts/post-123/cover.jpg",
+        data: imageData!,
+        options: FileOptions(contentType: "image/jpeg")
+    )
+
+print("Uploaded: \\(file.url)")
+print("Key: \\(file.key)")
+
+// Upload from file URL
+let fileURL = URL(fileURLWithPath: "/path/to/document.pdf")
+let file = try await insforge.storage
+    .from("documents")
+    .upload(
+        path: "reports/annual-2024.pdf",
+        fileURL: fileURL
+    )
+
+// Upload with auto-generated key
+let file = try await insforge.storage
+    .from("uploads")
+    .upload(
+        data: imageData!,
+        fileName: "profile.jpg",
+        options: FileOptions(contentType: "image/jpeg")
+    )
+```
+
+---
+
+## download()
+
+下载文件为数据。
+
+### 示例
+
+```swift
+// Download file
+let data = try await insforge.storage
+    .from("images")
+    .download(path: "posts/post-123/cover.jpg")
+
+// Convert to UIImage
+if let image = UIImage(data: data) {
+    imageView.image = image
+}
+```
+
+---
+
+## list()
+
+列出存储桶中的文件。
+
+### 参数
+
+- `options` (ListOptions, optional) - 选项，包括前缀、限制、偏移
+
+### 示例
+
+```swift
+// List all files
+let files = try await insforge.storage
+    .from("images")
+    .list()
+
+// List with prefix filter
+let userFiles = try await insforge.storage
+    .from("images")
+    .list(options: ListOptions(prefix: "users/", limit: 50))
+
+// Shorthand with prefix
+let files = try await insforge.storage
+    .from("images")
+    .list(prefix: "posts/", limit: 20, offset: 0)
+
+// Iterate results
+for file in files {
+    print("Key: \\(file.key), Size: \\(file.size)")
+}
+```
+
+---
+
+## delete()
+
+从存储删除文件。
+
+### 示例
+
+```swift
+// Delete a file
+try await insforge.storage
+    .from("images")
+    .delete(path: "posts/post-123/cover.jpg")
+
+// Delete with database cleanup
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select("id, image_key")
+    .eq("id", value: "post-123")
+    .execute()
+
+if let post = posts.first, let imageKey = post.imageKey {
+    // Delete from storage
+    try await insforge.storage
+        .from("images")
+        .delete(path: imageKey)
+
+    // Clear database reference
+    struct PostUpdate: Codable {
+        let imageUrl: String?
+        let imageKey: String?
+    }
+
+    let _: [Post] = try await insforge.database
+        .from("posts")
+        .eq("id", value: "post-123")
+        .update(PostUpdate(imageUrl: nil, imageKey: nil))
+}
+```
+
+---
+
+## getPublicURL()
+
+获取公共存储桶中文件的公共 URL。
+
+### 示例
+
+```swift
+let url = insforge.storage
+    .from("images")
+    .getPublicURL(path: "posts/post-123/cover.jpg")
+
+print("Public URL: \\(url)")
+```
+
+---
+
+## 上传策略
+
+获取大文件的上传策略（直接或预签名 URL）。
+
+### getUploadStrategy()
+
+```swift
+let strategy = try await insforge.storage
+    .from("videos")
+    .getUploadStrategy(
+        filename: "large-video.mp4",
+        contentType: "video/mp4",
+        size: 104857600  // 100MB
+    )
+
+if strategy.method == "presigned" {
+    // Upload directly to S3 using presigned URL
+    print("Upload URL: \\(strategy.uploadUrl)")
+    print("Key: \\(strategy.key)")
+
+    // After uploading to presigned URL, confirm the upload
+    if strategy.confirmRequired {
+        let file = try await insforge.storage
+            .from("videos")
+            .confirmUpload(
+                path: strategy.key,
+                size: 104857600,
+                contentType: "video/mp4"
+            )
+    }
+}
+```
+
+### confirmUpload()
+
+在上传到 S3 后确认预签名上传。
+
+```swift
+let file = try await insforge.storage
+    .from("videos")
+    .confirmUpload(
+        path: "videos/large-video.mp4",
+        size: 104857600,
+        contentType: "video/mp4",
+        etag: "\"abc123\""  // Optional S3 ETag
+    )
+```
+
+---
+
+## 下载策略
+
+获取私有文件的下载策略（直接或预签名 URL）。
+
+### getDownloadStrategy()
+
+```swift
+let strategy = try await insforge.storage
+    .from("documents")
+    .getDownloadStrategy(
+        path: "private/confidential.pdf",
+        expiresIn: 3600  // URL expires in 1 hour
+    )
+
+if strategy.method == "presigned" {
+    // Use presigned URL to download
+    print("Download URL: \\(strategy.url)")
+    print("Expires: \\(strategy.expiresAt ?? "N/A")")
+}
+```
+
+---
+
+## 选项参考
+
+### FileOptions
+
+文件上传操作的选项。
+
+```swift
+public struct FileOptions {
+    /// The Content-Type header value (auto-inferred if not specified)
+    var contentType: String?
+
+    /// Optional extra headers for the request
+    var headers: [String: String]?
+}
+```
+
+### BucketOptions
+
+存储桶创建/更新的选项。
+
+```swift
+public struct BucketOptions {
+    /// Whether the bucket is publicly accessible (default: true)
+    var isPublic: Bool
+}
+```
+
+### ListOptions
+
+列出文件的选项。
+
+```swift
+public struct ListOptions {
+    /// Filter objects by key prefix
+    var prefix: String?
+
+    /// Maximum number of results (1-1000, default: 100)
+    var limit: Int
+
+    /// Offset for pagination (default: 0)
+    var offset: Int
+}
+```
+
+---
+
+## StoredFile 模型
+
+存储操作的响应模型。
+
+```swift
+public struct StoredFile {
+    let bucket: String      // Bucket name
+    let key: String         // Object key/path
+    let size: Int           // File size in bytes
+    let mimeType: String?   // MIME type
+    let uploadedAt: Date    // Upload timestamp
+    let url: String         // Public or signed URL
+}
+```

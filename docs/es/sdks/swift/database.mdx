@@ -1,0 +1,304 @@
+---
+title: Referencia del SDK de base de datos
+description: Operaciones de base de datos de tipo seguro con el SDK de Swift de InsForge
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+## Instalación
+
+<SwiftSdkInstallation />
+
+## Definir modelos
+
+Defina sus modelos de datos usando el protocolo `Codable` de Swift:
+
+```swift
+struct Post: Codable {
+    let id: String?
+    let title: String
+    let content: String
+    let userId: String
+    let createdAt: Date?
+}
+```
+
+---
+
+## insert()
+
+Inserte nuevos registros en una tabla.
+
+### Parámetros
+
+- `values` - Objeto Codable único o matriz de objetos para insertar
+
+### Ejemplos
+
+```swift
+// Single insert
+let post = Post(
+    id: nil,
+    title: "Hello World",
+    content: "My first post!",
+    userId: currentUserId,
+    createdAt: nil
+)
+let inserted = try await insforge.database
+    .from("posts")
+    .insert(post)
+
+// Bulk insert
+let posts = [
+    Post(id: nil, title: "First Post", content: "Hello everyone!", userId: currentUserId, createdAt: nil),
+    Post(id: nil, title: "Second Post", content: "Another update.", userId: currentUserId, createdAt: nil)
+]
+let inserted = try await insforge.database
+    .from("posts")
+    .insert(posts)
+```
+
+---
+
+## update()
+
+Actualizar registros existentes en una tabla.
+
+### Ejemplos
+
+```swift
+// Define update model
+struct PostUpdate: Codable {
+    let title: String
+}
+
+// Update by ID
+let updated: [Post] = try await insforge.database
+    .from("posts")
+    .eq("id", value: postId)
+    .update(PostUpdate(title: "Updated Title"))
+
+// Update multiple records
+struct TaskUpdate: Codable {
+    let status: String
+}
+
+let updated: [Task] = try await insforge.database
+    .from("tasks")
+    .in("id", values: ["task-1", "task-2"])
+    .update(TaskUpdate(status: "completed"))
+```
+
+---
+
+## delete()
+
+Eliminar registros de una tabla.
+
+### Ejemplos
+
+```swift
+// Delete by ID
+try await insforge.database
+    .from("posts")
+    .eq("id", value: postId)
+    .delete()
+
+// Delete with filter
+try await insforge.database
+    .from("sessions")
+    .lt("expires_at", value: Date())
+    .delete()
+```
+
+---
+
+## select()
+
+Consultar registros de una tabla.
+
+### Ejemplos
+
+```swift
+// Get all posts
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .execute()
+
+// Filter and sort
+let recentPosts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .eq("userId", value: currentUserId)
+    .order("createdAt", ascending: false)
+    .limit(20)
+    .execute()
+
+// Multiple filters
+let activePosts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .eq("userId", value: currentUserId)
+    .eq("status", value: "published")
+    .execute()
+
+// Specific columns
+let posts = try await insforge.database
+    .from("posts")
+    .select("id, title, content")
+    .execute()
+
+// With relationships
+let posts = try await insforge.database
+    .from("posts")
+    .select("*, comments(id, content)")
+    .execute()
+```
+
+---
+
+## rpc()
+
+Llamar a funciones PostgreSQL almacenadas (RPC - Remote Procedure Call). Este método le permite invocar directamente funciones SQL definidas en su base de datos.
+
+### Parámetros
+
+- `functionName` (String) - Nombre de la función PostgreSQL a llamar
+- `args` ([String: Any]?, optional) - Argumentos para pasar a la función
+
+### Ejemplos
+
+```swift
+// Define response models
+struct UserStats: Decodable {
+    let totalPosts: Int
+    let totalComments: Int
+}
+
+struct User: Decodable {
+    let id: String
+    let name: String
+    let email: String
+}
+
+// Call function with parameters, returning array
+let stats: [UserStats] = try await insforge.database
+    .rpc("get_user_stats", args: ["user_id": "123"])
+    .execute()
+
+// Call function with parameters, returning single result
+let stat: UserStats = try await insforge.database
+    .rpc("get_user_stats", args: ["user_id": "123"])
+    .executeSingle()
+
+// Call function without parameters
+let users: [User] = try await insforge.database
+    .rpc("get_all_active_users")
+    .execute()
+
+// Call function with multiple parameters
+let results: [Post] = try await insforge.database
+    .rpc("search_posts", args: [
+        "search_term": "swift",
+        "limit": 10,
+        "offset": 0
+    ])
+    .execute()
+
+// Call function with no return value (void function)
+try await insforge.database
+    .rpc("cleanup_old_records", args: ["days": 30])
+    .execute()
+
+// Call function returning a single primitive value
+let count: Int = try await insforge.database
+    .rpc("count_active_posts")
+    .executeSingle()
+```
+
+### Detalles de implementación
+
+- **Sin argumentos**: Utiliza la solicitud GET a `/api/database/rpc/{functionName}`
+- **Con argumentos**: Utiliza la solicitud POST con cuerpo JSON a `/api/database/rpc/{functionName}`
+- Use `execute()` para funciones que devuelven matrices o void
+- Use `executeSingle()` para funciones que devuelven un solo objeto o valor
+
+---
+
+## Filtros
+
+| Filtro | Descripción | Ejemplo |
+|--------|-------------|---------|
+| `.eq(column, value:)` | Igual | `.eq("status", value: "active")` |
+| `.neq(column, value:)` | No igual | `.neq("status", value: "banned")` |
+| `.gt(column, value:)` | Mayor que | `.gt("age", value: 18)` |
+| `.gte(column, value:)` | Mayor o igual | `.gte("price", value: 100)` |
+| `.lt(column, value:)` | Menor que | `.lt("stock", value: 10)` |
+| `.lte(column, value:)` | Menor o igual | `.lte("priority", value: 3)` |
+| `.like(column, pattern:)` | Patrón sensible a mayúsculas | `.like("name", pattern: "%Widget%")` |
+| `.ilike(column, pattern:)` | Patrón insensible a mayúsculas | `.ilike("email", pattern: "%@gmail.com")` |
+| `.in(column, values:)` | Valor en matriz | `.in("status", values: ["pending", "active"])` |
+| `.is(column, value:)` | Exactamente igual (para nil/bool) | `.is("deleted_at", value: nil)` |
+
+```swift
+// Chain multiple filters
+let products: [Product] = try await insforge.database
+    .from("products")
+    .select()
+    .eq("category", value: "electronics")
+    .gte("price", value: 50)
+    .lte("price", value: 500)
+    .execute()
+
+// Pattern matching
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .ilike("title", pattern: "%swift%")
+    .execute()
+
+// Filter by multiple values
+let tasks: [Task] = try await insforge.database
+    .from("tasks")
+    .select()
+    .in("status", values: ["pending", "in_progress"])
+    .execute()
+
+// Check for null or boolean
+let activePosts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .is("deleted_at", value: nil)
+    .is("published", value: true)
+    .execute()
+```
+
+---
+
+## Modificadores
+
+| Modificador | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `.order(column, ascending:)` | Resultados de ordenación | `.order("createdAt", ascending: false)` |
+| `.limit(count)` | Limitar filas | `.limit(10)` |
+| `.offset(count)` | Saltar filas | `.offset(20)` |
+| `.range(from:, to:)` | Paginación de rango | `.range(from: 0, to: 9)` |
+
+```swift
+// Pagination with sorting
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .order("createdAt", ascending: false)
+    .limit(10)
+    .offset(20)
+    .execute()
+
+// Range pagination (get items 10-19)
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .range(from: 10, to: 19)
+    .execute()
+```

@@ -1,0 +1,93 @@
+---
+title: "pgvector"
+description: "在 Postgres 內儲存嵌入並執行相似性搜尋"
+---
+
+[pgvector](https://github.com/pgvector/pgvector) 在每個 InsForge 專案上提供。將其用於語義搜尋、推薦和 [RAG](https://www.pinecone.io/learn/retrieval-augmented-generation/)。
+
+## 提示您的代理
+
+> 將 pgvector 新增到我的專案。建立一個帶有 `content` 和 1536 維 `embedding` 欄位的 `documents` 資料表，加上 HNSW 余弦索引。當我插入內容時，使用來自伺服器端路由的 OpenRouter 的 `text-embedding-3-small` 嵌入它。公開一個 `match_documents(query, count, threshold)` RPC，傳回頂部相似性符合。
+
+## 概念
+
+向量是表示項目的數字清單。兩個向量如果在向量空間中位置接近則相似。將向量儲存在其列旁，以相同方式嵌入使用者查詢，pgvector 按距離排列。
+
+## 用法
+
+啟用擴充功能並建立向量欄。將維度與您的模型相符（`text-embedding-3-small` 是 1536）。
+
+```sql
+create extension if not exists vector;
+
+create table documents (
+  id bigserial primary key,
+  content text,
+  embedding vector(1536)
+);
+```
+
+在伺服器端產生嵌入並插入。
+
+```typescript
+import OpenAI from 'openai';
+import { createClient } from '@insforge/sdk';
+
+const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+const insforge = createClient({ projectId: process.env.INSFORGE_PROJECT_ID });
+
+const { data } = await openai.embeddings.create({
+  model: 'openai/text-embedding-3-small',
+  input: 'hello world',
+});
+
+await insforge.database.from('documents').insert({
+  content: 'hello world',
+  embedding: data[0].embedding,
+});
+```
+
+按余弦距離查詢 (`<=>`). L2 (`<->`) 和內積 (`<#>`) 也可用。
+
+```sql
+select id, content
+from documents
+order by embedding <=> $1
+limit 5;
+```
+
+## 特定用法案例
+
+將搜尋包裝在 Postgres 函式中並透過 `rpc()` 呼叫以保持數學在伺服器端：
+
+```sql
+create or replace function match_documents(
+  query_embedding vector(1536),
+  match_count int default 5,
+  match_threshold float default 0
+)
+returns table (id bigint, content text, similarity float)
+language sql stable
+as $$
+  select id, content, 1 - (embedding <=> query_embedding) as similarity
+  from documents
+  where 1 - (embedding <=> query_embedding) > match_threshold
+  order by embedding <=> query_embedding
+  limit match_count;
+$$;
+```
+
+超過約 10k 列時，新增 HNSW 索引：
+
+```sql
+create index on documents using hnsw (embedding vector_cosine_ops);
+```
+
+## 更多資源
+
+- [pgvector on GitHub](https://github.com/pgvector/pgvector) 用於操作符和索引。
+- [OpenRouter embeddings](https://openrouter.ai/docs/features/multimodal/embeddings) 用於模型目錄。
+- [Model Gateway overview](/core-concepts/ai/overview) 用於 OpenRouter 的 InsForge 端。

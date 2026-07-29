@@ -1,0 +1,50 @@
+---
+title: "代理原生倡議"
+sidebarTitle: "Overview"
+description: "允許編碼代理操作後端的基元，不僅僅是人類按一下儀表板。"
+---
+
+大多數後端假設儀表板中有人類。InsForge 假設終端處的編碼代理。產品（資料庫、身份驗證、儲存體等）是構建塊；本頁上的基元是代理如何操作它們：作為它可以編輯的檔案、可以測試的分支以及可以診斷和自己修復的後端。
+
+<Note>
+  新來這裡？從[透過 CLI 連線](/quickstart)開始連結您的專案。本部分關於代理在連線後*如何*處理後端。
+</Note>
+
+## 基元
+
+<CardGroup cols={2}>
+  <Card title="CLI 工具" icon="terminal" href="/agent-native/cli-harness">
+    代理的雙手。用於登入、結構描述、部署、設定和診斷的一個終端機介面。
+  </Card>
+  <Card title="診斷和顧問" icon="stethoscope" href="/agent-native/diagnostics">
+    拉取顧問發現、DB 健康、指標和錯誤日誌，代理可以讀取和修復。
+  </Card>
+  <Card title="代碼設定" icon="file-code" href="/agent-native/config-as-code">
+    身份驗證、SMTP、儲存體、保留和部署設定存在於 `insforge.toml` 中。計畫和套用如基礎設施。
+  </Card>
+  <Card title="分支" icon="code-branch" href="/agent-native/branching">
+    將整個後端複製到隔離分支以測試危險變更，然後合併或重設。
+  </Card>
+</CardGroup>
+
+## 為什麼這很重要
+
+人和代理想要來自後端的不同東西。一個人想要一個 UI 按一下。一個代理想要一個穩定的文字介面，可以驅動、讀取和推理。這在 InsForge 各處顯示。
+
+結構描述變更是您的存放庫中的[移轉](/core-concepts/database/migrations)，專案設定是一個 [`insforge.toml`](/agent-native/config-as-code) 檔案，所以代理編輯文字、提交它並在 PR 中評論它，而不是按一下表單。當它想嘗試危險的事情時，它轉動一個[後端分支](/agent-native/branching)、執行對複本的變更並在出錯時扔掉分支。當某些事情看起來不對時，它直接用 `npx @insforge/cli diagnose` 取得[診斷和顧問發現](/agent-native/diagnostics)，沒有儀表板在迴圈中，這就是讓它關閉像許可 RLS 原則這樣的安全漏洞本身而不是等待人類記得檢查。它還用 `npx @insforge/cli metadata` 直接從後端讀取目前結構描述、日誌和中繼資料，所以它從真實狀態工作，而不是猜測。
+
+## 迴圈
+
+這些串聯在一起。工作階段通常是這樣的：
+
+1. 用 `npx @insforge/cli metadata` 讀取目前狀態。
+2. 分支後端、寫一個[移轉](/core-concepts/database/migrations)並檢查什麼是待處理的 `npx @insforge/cli db migrations list`，或編輯 `insforge.toml` 並用 `npx @insforge/cli config plan` 預覽設定差異。
+3. 用 `npx @insforge/cli db migrations up --all` 或 `config apply` 套用它，針對分支先，然後父項。
+4. 執行 `npx @insforge/cli diagnose` 以檢查顧問發現和錯誤日誌，並問 `diagnose --ai` 以解釋它們。
+5. 套用補救、重新執行診斷並合併分支。
+
+## 後續步驟
+
+- 讀[CLI 工具](/agent-native/cli-harness)看看代理驅動的完整命令表面。
+- 建立[代碼設定](/agent-native/config-as-code)使專案設定存在於版本控制中。
+- 使用[診斷](/agent-native/diagnostics)讓代理找到和修復後端問題。

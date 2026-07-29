@@ -1,0 +1,171 @@
+---
+title: Kotlin 即時 SDK 參考
+description: 透過 Socket.IO 連線，訂閱頻道，發佈事件，追蹤在線狀態，並使用 InsForge Kotlin 即時用戶端處理重新連線。
+---
+
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
+## 安裝
+
+<KotlinSdkInstallation />
+
+## 心智模型
+
+Kotlin SDK 透過 Socket.IO 連線到 InsForge 即時系統。訂閱頻道名稱（如 `order:123` 或 `chat:room-1`），然後監聽發佈到這些頻道的事件名稱。
+
+事件由資料庫觸發程式發佈，這些觸發程式呼叫 `realtime.publish(...)` 或由已加入頻道的用戶端發佈。有關頻道和 RLS 模型，請參閱[即時概述](/core-concepts/realtime/overview)。
+
+## 快速開始
+
+```kotlin
+import dev.insforge.realtime.models.SocketMessage
+
+client.realtime.connect()
+
+val response = client.realtime.subscribe("order:$orderId")
+
+if (!response.ok) {
+    println("Subscribe failed: ${response.error?.message}")
+    return
+}
+
+client.realtime.on<SocketMessage>("status_changed") { message ->
+    message?.let {
+        println("Status changed: ${it.payload}")
+    }
+}
+```
+
+## connect()
+
+建立即時連線。
+
+```kotlin
+client.realtime.connect()
+
+println("Connected: ${client.realtime.isConnected}")
+println("Socket ID: ${client.realtime.socketId}")
+```
+
+監視連線狀態：
+
+```kotlin
+client.realtime.connectionState.collect { state ->
+    when (state) {
+        is Realtime.ConnectionState.Connected -> println("Connected")
+        is Realtime.ConnectionState.Connecting -> println("Connecting")
+        is Realtime.ConnectionState.Disconnected -> println("Disconnected")
+        is Realtime.ConnectionState.Error -> println("Error: ${state.message}")
+    }
+}
+```
+
+## subscribe()
+
+訂閱頻道並接收目前在線狀態快照。
+
+```kotlin
+val response = client.realtime.subscribe("chat:room-1")
+
+if (response.ok) {
+    println("Subscribed to: ${response.channel}")
+    println("Members: ${response.presence?.members}")
+} else {
+    println("Error: ${response.error?.message}")
+}
+```
+
+## publish()
+
+將事件發佈到頻道。
+
+```kotlin
+client.realtime.publish(
+    channel = "chat:room-1",
+    event = "new_message",
+    payload = mapOf(
+        "text" to "Hello from Kotlin",
+        "sentAt" to System.currentTimeMillis()
+    )
+)
+```
+
+<Note>
+  用戶端必須訂閱頻道才能向該頻道發佈。
+</Note>
+
+如果在 `realtime.messages` 上啟用了 RLS，發佈也會根據 `INSERT` 原則進行檢查。
+
+## on()
+
+註冊事件接聽程式。
+
+```kotlin
+client.realtime.on<SocketMessage>("new_message") { message ->
+    message?.let {
+        println("Message: ${it.payload}")
+    }
+}
+```
+
+連線和系統事件：
+
+| 事件 | 說明 |
+|------|------|
+| `presence:join` | 邏輯成員在頻道中變為在線。 |
+| `presence:leave` | 邏輯成員不再在頻道中在線。 |
+| `realtime:error` | 訂閱或發佈失敗。 |
+
+## once()
+
+僅監聽一次事件。
+
+```kotlin
+client.realtime.once<SocketMessage>("checkout_completed") { message ->
+    println("Checkout completed: ${message?.payload}")
+}
+```
+
+## off()
+
+移除事件接聽程式。
+
+```kotlin
+val callback = Realtime.EventCallback<SocketMessage> { message ->
+    println("Event received: $message")
+}
+
+client.realtime.on("status_changed", callback)
+client.realtime.off("status_changed", callback)
+```
+
+## unsubscribe()
+
+離開頻道。
+
+```kotlin
+client.realtime.unsubscribe("chat:room-1")
+```
+
+## disconnect()
+
+關閉即時連線。
+
+```kotlin
+client.realtime.disconnect()
+```
+
+## getSubscribedChannels()
+
+傳回本機訂閱的頻道。
+
+```kotlin
+val channels = client.realtime.getSubscribedChannels()
+println(channels)
+```
+
+## 在線狀態
+
+成功的訂閱會傳回在線狀態快照。監聽 `presence:join` 和 `presence:leave` 以更新本機在線狀態。
+
+在線狀態是暫時的。它不是一個持久的房間成員身份表。

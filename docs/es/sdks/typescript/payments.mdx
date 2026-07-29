@@ -1,0 +1,45 @@
+---
+title: Pagos
+description: Elige los asistentes de pagos de Stripe o Razorpay para aplicaciones de TypeScript
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+Los Pagos de InsForge son específicos del proveedor. Stripe usa Checkout alojado y Portal de Facturación. Razorpay usa órdenes y suscripciones nativas del proveedor más Razorpay Checkout. El SDK de TypeScript expone módulos de proveedor separados para ambos.
+
+<CardGroup cols={2}>
+  <Card title="Pagos con Stripe" icon="stripe" href="/sdks/typescript/payments-stripe">
+    Crea sesiones de Checkout y Portal de Facturación con `insforge.payments.stripe`.
+  </Card>
+
+  <Card title="Pagos con Razorpay" icon="credit-card" href="/sdks/typescript/payments-razorpay">
+    Crea órdenes o suscripciones con `insforge.payments.razorpay`, luego abre Razorpay Checkout.
+  </Card>
+</CardGroup>
+
+## Configuración Compartida
+
+```typescript
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-project.insforge.app',
+  anonKey: 'your-anon-key'
+});
+```
+
+Las llamadas de tiempo de ejecución de pagos requieren un token de usuario de InsForge. El pago único anónimo puede usar un token anónimo de InsForge. Las claves secretas del proveedor deben mantenerse en el lado del servidor y configurarse a través de Panel -> Pagos -> Configuración, CLI o API de administración.
+
+## Cumplimiento
+
+Para ambos proveedores, crea tablas propiedad de la aplicación como `public.orders`, `public.credit_ledger` o `public.team_entitlements`, luego rellena desde eventos de webhook del proveedor verificados en `payments.webhook_events`.
+
+`payments.transactions` es una proyección de panel/informes. No la uses como flujo de trabajo empresarial principal.
+
+## Próximos Pasos
+
+- Usa [Pagos con Stripe](/sdks/typescript/payments-stripe) para `insforge.payments.stripe.createCheckoutSession(...)` y `insforge.payments.stripe.createCustomerPortalSession(...)`.
+- Usa [Pagos con Razorpay](/sdks/typescript/payments-razorpay) para `insforge.payments.razorpay.createOrder(...)`, `createSubscription(...)`, verificación y gestión de suscripciones.
+- Lee [Descripción general de pagos](/core-concepts/payments/overview) para la arquitectura de base de datos compartida y el modelo de cumplimiento.

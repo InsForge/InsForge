@@ -1,0 +1,46 @@
+---
+title: "Ramificación de backend"
+sidebarTitle: "Branching"
+description: "Girar una copia aislada de su proyecto para probar cambios de esquema y configuración"
+---
+
+Una rama es un subproyecto con su propio Postgres, configuración de autenticación, almacenamiento, funciones perimetrales, plantillas de correo electrónico, canales en tiempo real y programaciones. Fusione de nuevo cuando esté listo o restablezca e intente de nuevo. Disponible en InsForge OSS 2.1.0+.
+
+## Conceptos
+
+Cada rama se ejecuta en su propia instancia EC2, restaurada desde el padre en el momento de la creación. `merge` ejecuta un diff de tres vías contra el estado de creación del padre. La rama comparte el `JWT_SECRET` del padre pero obtiene su propio `API_KEY`. Los servicios de cómputo y las implementaciones de frontend no se ramifican.
+
+## Uso
+
+Cree una rama con `full` (esquema + datos) o `schema-only` (más rápido, tablas de usuario vacías).
+
+```bash
+npx @insforge/cli branch create feat-billing --mode full
+npx @insforge/cli branch list
+```
+
+Obtenga una vista previa del SQL de fusión antes de aplicar.
+
+```bash
+npx @insforge/cli branch merge feat-billing --dry-run --save-sql ./preview.sql
+npx @insforge/cli branch merge feat-billing
+```
+
+Revierta a la instantánea de creación o elimine la rama.
+
+```bash
+npx @insforge/cli branch reset feat-billing
+npx @insforge/cli branch delete feat-billing
+```
+
+## Casos de uso específicos
+
+Utilice una rama para migraciones de esquema arriesgadas, reescrituras de RLS, intercambios de proveedores OAuth y refactorizaciones de funciones perimetrales. Omítala para cambios triviales y rellenos de datos (las filas de datos de usuario no se fusionan automáticamente).
+
+Las fusiones se bloquean en conflictos. Resuelva en la rama o restablezca e intente de nuevo. Cuotas: 3 proyectos padre por organización, 2 ramas activas por padre, sin anidamiento. Una fusión exitosa no elimina automáticamente la rama.
+
+## Más recursos
+
+- [Migraciones de base de datos](/core-concepts/database/migrations) para archivos SQL de solo avance.
+- [Descripción general de la base de datos](/core-concepts/database/overview) para lo que se ejecuta bajo cada rama.
+- [Referencia de CLI](https://github.com/InsForge/InsForge) para el conjunto completo de banderas `branch`.

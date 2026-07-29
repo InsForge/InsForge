@@ -1,0 +1,386 @@
+---
+title: Referencia de SDK de tiempo real de TypeScript
+description: Suscríbete a canales, publica eventos, rastrea presencia y maneja reconexiones y actualizaciones de tokens a través de Socket.IO con el SDK de TypeScript para InsForge.
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+## Instalación
+
+<Installation />
+
+## Modelo mental
+
+El SDK de TypeScript abre una conexión Socket.IO a tu backend de InsForge. Te suscribes a canales con nombre, escuchas nombres de eventos y opcionalmente publicas eventos de vuelta a los canales a los que te has unido.
+
+Los eventos pueden provenir de dos lugares:
+
+- Disparadores de base de datos que llaman a `realtime.publish(channel, event, payload)`.
+- Clientes que llaman a `insforge.realtime.publish(channel, event, payload)`.
+
+Para el modelo de canal de backend y RLS, consulta [Descripción general de tiempo real](/core-concepts/realtime/overview).
+
+## Inicio rápido
+
+```typescript
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-app.insforge.app',
+  anonKey: 'your-anon-key'
+});
+
+insforge.realtime.on('connect', () => {
+  console.log('Connected:', insforge.realtime.socketId);
+});
+
+insforge.realtime.on('error', (error) => {
+  console.error(error.code, error.message);
+});
+
+await insforge.realtime.connect();
+
+const subscription = await insforge.realtime.subscribe('order:123');
+
+if (!subscription.ok) {
+  throw new Error(subscription.error.message);
+}
+
+insforge.realtime.on('status_changed', (message) => {
+  console.log(message.status);
+  console.log(message.meta.messageId);
+});
+```
+
+<Tip>
+  Registra los manejadores `connect`, `disconnect`, `connect_error` y `error` antes de llamar a `connect()` para que las fallas tempranas de conexión sean visibles.
+</Tip>
+
+## connect()
+
+Establece una conexión WebSocket.
+
+```typescript
+await insforge.realtime.connect();
+```
+
+Devuelve:
+
+```typescript
+Promise<void>
+```
+
+Notas:
+
+- El SDK incluye el token de autenticación actual cuando existe uno. Si no hay un usuario que ha iniciado sesión, puede usar la clave anónima configurada.
+- Múltiples llamadas a `connect()` mientras una conexión ya está en progreso reutilizan la misma promesa de conexión.
+- El intento de conexión expira después de 10 segundos.
+
+## subscribe()
+
+Suscríbete a un canal y recibe la instantánea de presencia actual.
+
+```typescript
+const response = await insforge.realtime.subscribe('chat:room-1');
+
+if (response.ok) {
+  console.log(response.channel);
+  console.log(response.presence.members);
+} else {
+  console.error(response.error.code, response.error.message);
+}
+```
+
+Parámetros:
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `channel` | `string` | Nombre de canal resuelto, como `orders`, `order:123` o `chat:room-1`. |
+
+Devuelve:
+
+```typescript
+type SubscribeResponse =
+  | {
+      ok: true;
+      channel: string;
+      presence: {
+        members: PresenceMember[];
+      };
+    }
+  | {
+      ok: false;
+      channel: string;
+      error: {
+        code: string;
+        message: string;
+      };
+    };
+```
+
+`subscribe()` se conecta automáticamente si es necesario. Aún se recomienda llamar a `connect()` explícitamente para que los manejadores de eventos de conexión ya estén adjuntos.
+
+`subscribe()` es idempotente: llamarlo de nuevo para un canal al que ya te uniste vuelve a solicitar la suscripción y resuelve la instantánea de presencia actual del servidor. El servidor rastrea la presencia por miembro lógico, por lo que las suscripciones repetidas nunca producen miembros duplicados ni eventos `presence:join` espurios.
+
+## publish()
+
+Publica un evento en un canal.
+
+```typescript
+await insforge.realtime.publish('chat:room-1', 'new_message', {
+  text: 'Hello',
+  sentAt: new Date().toISOString()
+});
+```
+
+Parámetros:
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `channel` | `string` | Canal en el que publicar. El cliente ya debe estar suscrito. |
+| `event` | `string` | Nombre del evento que escuchan los suscriptores. |
+| `payload` | `Record<string, unknown>` | Carga útil del mensaje serializable en JSON. |
+
+<Warning>
+  La publicación requiere una suscripción previa exitosa al mismo canal. Si RLS está habilitado en `realtime.messages`, la publicación también se verifica contra las políticas `INSERT`.
+</Warning>
+
+Las fallas de publicación se emiten a través del evento `error`.
+
+## on()
+
+Escucha eventos personalizados, eventos de conexión, eventos de presencia y errores de tiempo real.
+
+```typescript
+insforge.realtime.on('new_message', (message) => {
+  console.log(message.text);
+  console.log(message.meta.senderType);
+});
+```
+
+Eventos reservados:
+
+| Evento | Carga útil | Descripción |
+|-------|---------|-------------|
+| `connect` | Ninguna | El WebSocket se conectó. |
+| `connect_error` | `Error` | La conexión inicial o reconexión falló. |
+| `disconnect` | `string` | El WebSocket se desconectó. |
+| `error` | `RealtimeErrorPayload` | La suscripción o publicación falló. |
+| `presence:join` | `PresenceJoinMessage` | Un miembro lógico pasó a estar presente en un canal. |
+| `presence:leave` | `PresenceLeaveMessage` | Un miembro lógico ya no está presente en un canal. |
+| `presence:sync` | `PresenceSyncEvent` | Una instantánea de presencia nueva para un canal. Se dispara en cada suscripción exitosa, incluyendo resuscripciones automáticas después de una reconexión. |
+
+## once()
+
+Escucha un evento una vez, luego elimina el listener automáticamente.
+
+```typescript
+insforge.realtime.once('checkout_completed', (message) => {
+  console.log('Completed:', message.orderId);
+});
+```
+
+## off()
+
+Elimina un listener de eventos.
+
+```typescript
+function handleStatus(message: OrderStatusMessage) {
+  console.log(message.status);
+}
+
+insforge.realtime.on('status_changed', handleStatus);
+insforge.realtime.off('status_changed', handleStatus);
+```
+
+## unsubscribe()
+
+Abandona un canal.
+
+```typescript
+insforge.realtime.unsubscribe('chat:room-1');
+```
+
+`unsubscribe()` es de disparar y olvidar. Si este era el último socket de un miembro lógico, otros suscriptores reciben `presence:leave`.
+
+## disconnect()
+
+Cierra el WebSocket y limpia las suscripciones locales.
+
+```typescript
+insforge.realtime.disconnect();
+```
+
+## Forma del mensaje
+
+Los mensajes entregados incluyen los campos de tu carga útil más los metadatos del servidor.
+
+```typescript
+import type { SocketMessage } from '@insforge/sdk';
+
+interface OrderStatusMessage extends SocketMessage {
+  id: string;
+  status: string;
+}
+
+insforge.realtime.on<OrderStatusMessage>('status_changed', (message) => {
+  console.log(message.id);
+  console.log(message.status);
+  console.log(message.meta.messageId);
+  console.log(message.meta.senderType);
+  console.log(message.meta.senderId);
+  console.log(message.meta.timestamp);
+});
+```
+
+Metadatos:
+
+```typescript
+interface SocketMessageMeta {
+  channel?: string;
+  messageId: string;
+  senderType: 'system' | 'user';
+  senderId?: string;
+  timestamp: string;
+}
+```
+
+`senderType` es `system` para mensajes disparados por la base de datos y `user` para mensajes publicados por el cliente.
+
+## Presencia
+
+Una suscripción exitosa devuelve la instantánea de presencia actual.
+
+```typescript
+const response = await insforge.realtime.subscribe('chat:room-1');
+
+if (response.ok) {
+  for (const member of response.presence.members) {
+    console.log(member.type, member.presenceId, member.joinedAt);
+  }
+}
+```
+
+Miembro de presencia:
+
+```typescript
+type PresenceMember =
+  | {
+      type: 'user';
+      presenceId: string;
+      joinedAt: string;
+    }
+  | {
+      type: 'anonymous';
+      presenceId: string;
+      joinedAt: string;
+    };
+```
+
+Escucha los cambios:
+
+```typescript
+insforge.realtime.on('presence:join', (message) => {
+  console.log('Joined:', message.member.presenceId);
+});
+
+insforge.realtime.on('presence:leave', (message) => {
+  console.log('Left:', message.member.presenceId);
+});
+```
+
+### Lectura del estado de presencia
+
+El SDK mantiene la lista de miembros de cada canal suscrito — inicializada desde la instantánea de suscripción y mantenida actualizada a partir de los deltas `presence:join`/`presence:leave` y las resincronizaciones de reconexión. Léela en cualquier momento en lugar de fusionar los deltas tú mismo:
+
+```typescript
+const members = insforge.realtime.getPresenceState('chat:room-1');
+```
+
+Devuelve una matriz vacía para canales a los que no estás suscrito. Mientras el socket está brevemente desconectado, mantiene el último estado conocido, reemplazado por una instantánea nueva tan pronto como el canal se vuelve a suscribir.
+
+### Reconexiones
+
+Cuando la conexión se cae, el SDK vuelve a suscribirse automáticamente a cada canal en la reconexión y emite `presence:sync` con la instantánea de presencia nueva para cada uno. Los miembros que se unieron o abandonaron mientras estabas desconectado no producen deltas individuales `presence:join`/`presence:leave`, por lo que reemplaza — no fusiones — cualquier estado que mantengas fuera del SDK:
+
+```typescript
+import type { PresenceSyncEvent } from '@insforge/sdk';
+
+insforge.realtime.on<PresenceSyncEvent>('presence:sync', ({ channel, presence }) => {
+  replaceMembers(channel, presence.members);
+});
+```
+
+Si renderizas directamente desde `getPresenceState()`, `presence:sync` es simplemente tu señal de re-renderizado. Si una resuscripción es rechazada (por ejemplo, el acceso del usuario fue revocado mientras estaba desconectado), el SDK descarta el canal y emite `error` en su lugar.
+
+### Actualizaciones de tokens
+
+Cuando el token de acceso del usuario que ha iniciado sesión se actualiza, el SDK deja conectado un socket establecido — no hay reautenticación en banda, reconexión ni rotación de presencia. Una conexión inicial posterior o reconexión de red obtiene el token de acceso más reciente antes de su handshake. El inicio de sesión, el cierre de sesión o el cambio de usuario reconecta el socket bajo la nueva identidad.
+
+Las *reducciones* de acceso se aplican de forma diferida en una conexión activa: la publicación se vuelve a verificar contra RLS en cada mensaje y las nuevas suscripciones se vuelven a verificar en el momento de unirse, pero la recepción continua en canales ya unidos persiste hasta que el cliente cancela la suscripción o se reconecta.
+
+## Propiedades
+
+| Propiedad | Tipo | Descripción |
+|----------|------|-------------|
+| `isConnected` | `boolean` | Si el socket está actualmente conectado. |
+| `connectionState` | `'disconnected' \| 'connecting' \| 'connected'` | Estado de conexión actual del SDK. |
+| `socketId` | `string \| undefined` | ID de Socket.IO cuando está conectado. |
+| `getSubscribedChannels()` | `() => string[]` | Lista local de canales suscritos. |
+| `getPresenceState(channel)` | `(channel: string) => PresenceMember[]` | Miembros actuales de un canal suscrito, mantenidos por el SDK. |
+
+## Manejo de errores
+
+```typescript
+insforge.realtime.on('connect_error', (error) => {
+  console.error('Connection failed:', error.message);
+});
+
+insforge.realtime.on('disconnect', (reason) => {
+  console.log('Disconnected:', reason);
+});
+
+insforge.realtime.on('error', (error) => {
+  console.error(error.channel, error.code, error.message);
+});
+```
+
+Códigos de error de tiempo real comunes:
+
+| Código | Significado |
+|------|---------|
+| `REALTIME_UNAUTHORIZED` | RLS o la coincidencia de canal denegó la suscripción o publicación. |
+| `REALTIME_NOT_SUBSCRIBED` | El cliente intentó publicar antes de suscribirse al canal. |
+| `INTERNAL_ERROR` | El backend no pudo completar la operación de tiempo real. |
+
+## Ejemplo completo
+
+```typescript
+const channel = `order:${orderId}`;
+
+insforge.realtime.on('error', (error) => {
+  console.error(error.code, error.message);
+});
+
+await insforge.realtime.connect();
+
+const response = await insforge.realtime.subscribe(channel);
+
+if (!response.ok) {
+  throw new Error(response.error.message);
+}
+
+insforge.realtime.on('status_changed', (message) => {
+  renderOrderStatus(message.status);
+});
+
+await insforge.realtime.publish(channel, 'customer_viewed', {
+  orderId,
+  viewedAt: new Date().toISOString()
+});
+
+function cleanup() {
+  insforge.realtime.unsubscribe(channel);
+  insforge.realtime.disconnect();
+}
+```

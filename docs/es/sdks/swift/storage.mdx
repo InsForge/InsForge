@@ -1,0 +1,360 @@
+---
+title: Referencia del SDK de almacenamiento
+description: Carga, descarga y gestión de archivos con el SDK de Swift de InsForge
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+## Instalación
+
+<SwiftSdkInstallation />
+
+## from()
+
+Obtenga una referencia de API de archivo para un depósito.
+
+### Ejemplo
+
+```swift
+let bucket = insforge.storage.from("images")
+```
+
+---
+
+## Operaciones de depósito
+
+### createBucket()
+
+Crea un nuevo depósito de almacenamiento.
+
+```swift
+// Create a public bucket
+try await insforge.storage.createBucket("avatars")
+
+// Create a private bucket
+try await insforge.storage.createBucket(
+    "documents",
+    options: BucketOptions(isPublic: false)
+)
+```
+
+### listBuckets()
+
+Enumera todos los nombres de depósitos.
+
+```swift
+let buckets = try await insforge.storage.listBuckets()
+// ["avatars", "documents", "uploads"]
+```
+
+### updateBucket()
+
+Actualiza la visibilidad de un depósito.
+
+```swift
+try await insforge.storage.updateBucket(
+    "documents",
+    options: BucketOptions(isPublic: true)
+)
+```
+
+### deleteBucket()
+
+Elimina un depósito.
+
+```swift
+try await insforge.storage.deleteBucket("old-bucket")
+```
+
+---
+
+## upload()
+
+Carga un archivo en el depósito.
+
+### Parámetros
+
+- `path` (String) - La clave de objeto/ruta del archivo
+- `data` (Data) - Datos del archivo para cargar
+- `options` (FileOptions, optional) - Opciones de carga incluyendo contentType
+
+### Ejemplos
+
+```swift
+// Upload with specific path
+let imageData = UIImage(named: "photo")?.jpegData(compressionQuality: 0.8)
+let file = try await insforge.storage
+    .from("images")
+    .upload(
+        path: "posts/post-123/cover.jpg",
+        data: imageData!,
+        options: FileOptions(contentType: "image/jpeg")
+    )
+
+print("Uploaded: \\(file.url)")
+print("Key: \\(file.key)")
+
+// Upload from file URL
+let fileURL = URL(fileURLWithPath: "/path/to/document.pdf")
+let file = try await insforge.storage
+    .from("documents")
+    .upload(
+        path: "reports/annual-2024.pdf",
+        fileURL: fileURL
+    )
+
+// Upload with auto-generated key
+let file = try await insforge.storage
+    .from("uploads")
+    .upload(
+        data: imageData!,
+        fileName: "profile.jpg",
+        options: FileOptions(contentType: "image/jpeg")
+    )
+```
+
+---
+
+## download()
+
+Descarga un archivo como datos.
+
+### Ejemplo
+
+```swift
+// Download file
+let data = try await insforge.storage
+    .from("images")
+    .download(path: "posts/post-123/cover.jpg")
+
+// Convert to UIImage
+if let image = UIImage(data: data) {
+    imageView.image = image
+}
+```
+
+---
+
+## list()
+
+Enumera archivos en un depósito.
+
+### Parámetros
+
+- `options` (ListOptions, optional) - Opciones incluyendo prefijo, límite, desplazamiento
+
+### Ejemplos
+
+```swift
+// List all files
+let files = try await insforge.storage
+    .from("images")
+    .list()
+
+// List with prefix filter
+let userFiles = try await insforge.storage
+    .from("images")
+    .list(options: ListOptions(prefix: "users/", limit: 50))
+
+// Shorthand with prefix
+let files = try await insforge.storage
+    .from("images")
+    .list(prefix: "posts/", limit: 20, offset: 0)
+
+// Iterate results
+for file in files {
+    print("Key: \\(file.key), Size: \\(file.size)")
+}
+```
+
+---
+
+## delete()
+
+Elimina un archivo del almacenamiento.
+
+### Ejemplo
+
+```swift
+// Delete a file
+try await insforge.storage
+    .from("images")
+    .delete(path: "posts/post-123/cover.jpg")
+
+// Delete with database cleanup
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select("id, image_key")
+    .eq("id", value: "post-123")
+    .execute()
+
+if let post = posts.first, let imageKey = post.imageKey {
+    // Delete from storage
+    try await insforge.storage
+        .from("images")
+        .delete(path: imageKey)
+
+    // Clear database reference
+    struct PostUpdate: Codable {
+        let imageUrl: String?
+        let imageKey: String?
+    }
+
+    let _: [Post] = try await insforge.database
+        .from("posts")
+        .eq("id", value: "post-123")
+        .update(PostUpdate(imageUrl: nil, imageKey: nil))
+}
+```
+
+---
+
+## getPublicURL()
+
+Obtener una URL pública para un archivo en un depósito público.
+
+### Ejemplo
+
+```swift
+let url = insforge.storage
+    .from("images")
+    .getPublicURL(path: "posts/post-123/cover.jpg")
+
+print("Public URL: \\(url)")
+```
+
+---
+
+## Estrategia de carga
+
+Obtener estrategia de carga para archivos grandes (directo o URL prefirmada).
+
+### getUploadStrategy()
+
+```swift
+let strategy = try await insforge.storage
+    .from("videos")
+    .getUploadStrategy(
+        filename: "large-video.mp4",
+        contentType: "video/mp4",
+        size: 104857600  // 100MB
+    )
+
+if strategy.method == "presigned" {
+    // Upload directly to S3 using presigned URL
+    print("Upload URL: \\(strategy.uploadUrl)")
+    print("Key: \\(strategy.key)")
+
+    // After uploading to presigned URL, confirm the upload
+    if strategy.confirmRequired {
+        let file = try await insforge.storage
+            .from("videos")
+            .confirmUpload(
+                path: strategy.key,
+                size: 104857600,
+                contentType: "video/mp4"
+            )
+    }
+}
+```
+
+### confirmUpload()
+
+Confirma una carga prefirmada después de cargar directamente en S3.
+
+```swift
+let file = try await insforge.storage
+    .from("videos")
+    .confirmUpload(
+        path: "videos/large-video.mp4",
+        size: 104857600,
+        contentType: "video/mp4",
+        etag: "\"abc123\""  // Optional S3 ETag
+    )
+```
+
+---
+
+## Estrategia de descarga
+
+Obtener estrategia de descarga para archivos privados (directo o URL prefirmada).
+
+### getDownloadStrategy()
+
+```swift
+let strategy = try await insforge.storage
+    .from("documents")
+    .getDownloadStrategy(
+        path: "private/confidential.pdf",
+        expiresIn: 3600  // URL expires in 1 hour
+    )
+
+if strategy.method == "presigned" {
+    // Use presigned URL to download
+    print("Download URL: \\(strategy.url)")
+    print("Expires: \\(strategy.expiresAt ?? "N/A")")
+}
+```
+
+---
+
+## Referencia de opciones
+
+### FileOptions
+
+Opciones para operaciones de carga de archivos.
+
+```swift
+public struct FileOptions {
+    /// The Content-Type header value (auto-inferred if not specified)
+    var contentType: String?
+
+    /// Optional extra headers for the request
+    var headers: [String: String]?
+}
+```
+
+### BucketOptions
+
+Opciones para creación/actualización de depósitos.
+
+```swift
+public struct BucketOptions {
+    /// Whether the bucket is publicly accessible (default: true)
+    var isPublic: Bool
+}
+```
+
+### ListOptions
+
+Opciones para enumerar archivos.
+
+```swift
+public struct ListOptions {
+    /// Filter objects by key prefix
+    var prefix: String?
+
+    /// Maximum number of results (1-1000, default: 100)
+    var limit: Int
+
+    /// Offset for pagination (default: 0)
+    var offset: Int
+}
+```
+
+---
+
+## Modelo StoredFile
+
+El modelo de respuesta para operaciones de almacenamiento.
+
+```swift
+public struct StoredFile {
+    let bucket: String      // Bucket name
+    let key: String         // Object key/path
+    let size: Int           // File size in bytes
+    let mimeType: String?   // MIME type
+    let uploadedAt: Date    // Upload timestamp
+    let url: String         // Public or signed URL
+}
+```

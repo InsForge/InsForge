@@ -53,6 +53,26 @@ function clearRuntimeEnvironment(): void {
   delete process.env.npm_lifecycle_event;
 }
 
+const deploymentEnvKeys = [
+  'RAILWAY_ENVIRONMENT_ID',
+  'ZEABUR',
+  'SEALOS_APP_NAME',
+  'RENDER',
+  'FLY_APP_NAME',
+  'K_SERVICE',
+  'ECS_CONTAINER_METADATA_URI_V4',
+  'COOLIFY_RESOURCE_UUID',
+  'COOLIFY_FQDN',
+  'KUBERNETES_SERVICE_HOST',
+  'INSFORGE_DEPLOYMENT_METHOD',
+];
+
+function clearDeploymentEnvironment(): void {
+  for (const key of deploymentEnvKeys) {
+    delete process.env[key];
+  }
+}
+
 function getPostedBody(fetchMock: FetchFunction, callIndex = 0): Record<string, unknown> {
   const call = vi.mocked(fetchMock).mock.calls[callIndex];
   expect(call).toBeDefined();
@@ -217,6 +237,79 @@ describe('TelemetryService', () => {
       );
     }
   );
+
+  it.each([
+    {
+      name: 'platform-injected variables win over the artifact stamp',
+      setup: () => {
+        process.env.RAILWAY_ENVIRONMENT_ID = 'env-123';
+        process.env.INSFORGE_DEPLOYMENT_METHOD = 'docker';
+      },
+      expectedDeploymentMethod: 'railway',
+    },
+    {
+      name: 'the artifact stamp is normalized',
+      setup: () => {
+        process.env.INSFORGE_DEPLOYMENT_METHOD = ' Dokploy ';
+      },
+      expectedDeploymentMethod: 'dokploy',
+    },
+    {
+      name: 'unstamped containers report docker',
+      setup: () => {
+        vi.spyOn(fs, 'existsSync').mockImplementation((target) => target === '/.dockerenv');
+      },
+      expectedDeploymentMethod: 'docker',
+    },
+    {
+      name: 'anything else reports source',
+      setup: () => {
+        vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+      },
+      expectedDeploymentMethod: 'source',
+    },
+  ])('deployment method: $name', async ({ setup, expectedDeploymentMethod }) => {
+    clearDeploymentEnvironment();
+    setup();
+    const config = makeConfig();
+    const fetchMock = makeFetchMock();
+
+    await new TelemetryService(config, fetchMock).sendEvent('instance_started');
+
+    const body = getPostedBody(fetchMock);
+    expect(body.properties).toEqual(
+      expect.objectContaining({
+        deployment_method: expectedDeploymentMethod,
+      })
+    );
+  });
+
+  it.each([
+    { env: 'RAILWAY_ENVIRONMENT_ID', expected: 'railway' },
+    { env: 'ZEABUR', expected: 'zeabur' },
+    { env: 'SEALOS_APP_NAME', expected: 'sealos' },
+    { env: 'RENDER', expected: 'render' },
+    { env: 'FLY_APP_NAME', expected: 'fly' },
+    { env: 'K_SERVICE', expected: 'cloud-run' },
+    { env: 'ECS_CONTAINER_METADATA_URI_V4', expected: 'ecs' },
+    { env: 'COOLIFY_RESOURCE_UUID', expected: 'coolify' },
+    { env: 'COOLIFY_FQDN', expected: 'coolify' },
+    { env: 'KUBERNETES_SERVICE_HOST', expected: 'kubernetes' },
+  ])('deployment method: $env identifies $expected', async ({ env, expected }) => {
+    clearDeploymentEnvironment();
+    process.env[env] = 'set-by-platform';
+    const config = makeConfig();
+    const fetchMock = makeFetchMock();
+
+    await new TelemetryService(config, fetchMock).sendEvent('instance_started');
+
+    const body = getPostedBody(fetchMock);
+    expect(body.properties).toEqual(
+      expect.objectContaining({
+        deployment_method: expected,
+      })
+    );
+  });
 
   it('starts once, schedules heartbeats, and stops the heartbeat timer', async () => {
     vi.useFakeTimers();

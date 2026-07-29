@@ -17,9 +17,9 @@ export const passwordSchema = z.string();
 
 export const nameSchema = z
   .string()
+  .trim()
   .min(1, 'Name is required')
-  .max(100, 'Name must be less than 100 characters')
-  .trim();
+  .max(100, 'Name must be less than 100 characters');
 
 export const usernameSchema = z
   .string()

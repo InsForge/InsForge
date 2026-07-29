@@ -1,0 +1,164 @@
+---
+title: Vue
+description: Aprende a crear un proyecto de InsForge y desarrollar una aplicación Vue con IA
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+Aprende a crear un proyecto de InsForge y a desarrollar una aplicación Vue utilizando herramientas de IA como Cursor.
+
+## 1. Crear un proyecto de InsForge
+
+Crea un nuevo proyecto de InsForge en [insforge.dev](https://insforge.dev).
+
+## 2. Conectar InsForge
+
+Dos partes:
+
+- **Enlace de la CLI** — consulta la [Guía rápida](/quickstart) para ejecutar `npx @insforge/cli link --project-id <your-project-id>` y que el agente pueda leer el ID de tu proyecto y tus claves.
+- **Configuración de MCP** — consulta [Configuración de MCP](/mcp-setup) para conocer la configuración de cada editor (Cursor, Claude Code, Windsurf, Codex, VS Code).
+
+Con ambas cosas configuradas, el agente puede leer esquemas, ejecutar consultas y desplegar código desde tu editor.
+
+## 3. Crea tu aplicación con un solo prompt
+
+En Cursor o tu asistente de IA, usa este prompt:
+
+```
+Create a new Vue app with TypeScript and Vite.
+Add Tailwind CSS 3.4 for styling.
+Install the InsForge SDK and set up the client configuration.
+
+In my InsForge database, create a sports table with id and name columns.
+Add sample data: basketball, soccer, and tennis. Make it publicly readable.
+
+Create a component that fetches and displays all sports from the database.
+```
+
+Tu IA generará la aplicación completa, incluyendo la configuración de la base de datos y la interfaz de usuario. No necesitas escribir código manualmente: la IA lo crea todo por ti.
+
+## 4. Qué genera la IA
+
+Tu asistente de IA creará automáticamente archivos como estos. No necesitas modificarlos manualmente.
+
+**Cliente de InsForge** en `src/lib/insforge.ts`:
+
+```typescript src/lib/insforge.ts
+import { createClient } from '@insforge/sdk';
+
+export const insforge = createClient({
+  baseUrl: 'https://your-project.us-east.insforge.app',
+  anonKey: 'your-anon-key'
+});
+```
+
+**Componente de Sports** en `src/components/Sports.vue`:
+
+```vue src/components/Sports.vue
+<template>
+  <div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Sports</h1>
+
+    <div v-if="loading" class="text-center py-8">
+      <p class="text-gray-600">Loading sports...</p>
+    </div>
+
+    <div v-else-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+      <p>Error: {{ error }}</p>
+    </div>
+
+    <div v-else-if="sports && sports.length > 0" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div
+        v-for="sport in sports"
+        :key="sport.id"
+        class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+      >
+        <h2 class="text-xl font-semibold text-gray-800 capitalize">{{ sport.name }}</h2>
+        <p class="text-sm text-gray-500 mt-2">ID: {{ sport.id }}</p>
+      </div>
+    </div>
+
+    <div v-else class="text-center py-8">
+      <p class="text-gray-600">No sports found.</p>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { insforge } from '../lib/insforge';
+
+interface Sport {
+  id: string;
+  name: string;
+  created_at?: string;
+}
+
+const sports = ref<Sport[]>([]);
+const loading = ref(true);
+const error = ref<string | null>(null);
+
+const fetchSports = async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+
+    const { data, error: fetchError } = await insforge.database
+      .from('sports')
+      .select();
+
+    if (fetchError) {
+      error.value = fetchError.message || 'Failed to fetch sports';
+      return;
+    }
+
+    sports.value = data || [];
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'An unexpected error occurred';
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchSports();
+});
+</script>
+```
+
+## 5. Inicia la aplicación
+
+Ejecuta el servidor de desarrollo, ve a [http://localhost:5173](http://localhost:5173) en un navegador y deberías ver la lista de deportes.
+
+```bash
+npm run dev
+```
+
+## Siguiente paso: amplía tu aplicación con más prompts
+
+Prueba estos prompts para añadir más funciones a tu aplicación:
+
+```
+Add a form to create new sports and save them to the database.
+Include validation and error handling.
+```
+
+```
+Add user authentication with sign up and login pages.
+Only allow authenticated users to add new sports.
+```
+
+```
+Add a favorites feature where users can mark their favorite sports.
+Store favorites in a user_favorites table with user_id and sport_id.
+```
+
+```
+Add images to each sport using InsForge Storage.
+Allow users to upload sport images and display them in the grid.
+```
+
+```
+Add an AI chat feature that can answer questions about sports.
+Use InsForge AI with streaming responses.
+```

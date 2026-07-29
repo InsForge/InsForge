@@ -1,0 +1,73 @@
+---
+title: SDK de Swift para iOS, macOS, tvOS, watchOS
+description: Instale e inicialice el SDK oficial de Swift de InsForge a través de Swift Package Manager para usar autenticación, base de datos, almacenamiento y funcionalidad en tiempo real en plataformas de Apple.
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+El SDK de Swift de InsForge proporciona un cliente Swift nativo para interactuar con servicios de InsForge desde aplicaciones iOS, macOS, tvOS y watchOS.
+
+## Instalación
+
+### Swift Package Manager
+
+<SwiftSdkInstallation />
+
+O agréguelo a través de Xcode:
+1. File → Add Packages...
+2. Ingrese: `https://github.com/insforge/insforge-swift.git`
+
+### CocoaPods (próximamente)
+
+```ruby
+pod 'InsForge', '~> 1.0'
+```
+
+## Inicio rápido
+
+```swift
+import InsForge
+
+let insforge = InsForgeClient(
+    baseUrl: "https://your-app.insforge.app",
+    anonKey: "your-anon-key"
+)
+```
+
+## Características
+
+- **Base de datos** - Operaciones CRUD de tipo seguro con soporte de Codable
+- **Autenticación** - Autenticación con correo electrónico/contraseña y OAuth
+- **Almacenamiento** - Carga, descarga y gestión de archivos
+- **IA** - Completaciones de chat y generación de imágenes
+- **Tiempo real** - Mensajería pub/sub basada en WebSocket
+- **Integración de SwiftUI** - Envolturas de propiedades y valores de entorno
+
+## Compatibilidad de plataformas
+
+| Plataforma | Versión mínima |
+|----------|----------------|
+| iOS | 15.0+ |
+| macOS | 12.0+ |
+| tvOS | 15.0+ |
+| watchOS | 8.0+ |
+
+## Referencia del SDK
+
+<CardGroup cols={2}>
+  <Card title="Database" icon="database" href="/sdks/swift/database">
+    CRUD operations with Codable models
+  </Card>
+  <Card title="Authentication" icon="lock" href="/sdks/swift/auth">
+    Sign up, sign in, OAuth, and user management
+  </Card>
+  <Card title="Storage" icon="cloud-arrow-up" href="/sdks/swift/storage">
+    File upload, download, and management
+  </Card>
+  <Card title="AI" icon="brain" href="/sdks/swift/ai">
+    Chat completions and image generation
+  </Card>
+  <Card title="Realtime" icon="signal-stream" href="/sdks/swift/realtime">
+    WebSocket pub/sub messaging
+  </Card>
+</CardGroup>

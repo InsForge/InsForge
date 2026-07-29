@@ -1,0 +1,35 @@
+---
+title: "資料庫備份和復原"
+sidebarTitle: "Backups"
+description: "建立手動資料庫備份，從 InsForge 儀表板復原快照，並在 InsForge Cloud 上使用 7 天保留期的自動化日常備份。"
+---
+
+從儀表板中的 **Database → Backup & Restore** 備份和復原您的資料庫。InsForge Cloud 也會自動每天備份您的專案，所以您總是有一個最近的副本可以回滾到。
+
+備份僅覆蓋資料庫 — 上傳到 Storage 的檔案不包括在內。
+
+<Frame caption="這是它在 UI 中的位置：Database → Backup & Restore。">
+  <img src="/images/dashboard-backup-restore.png" alt="InsForge 儀表板備份和復原頁面顯示手動備份和排程備份，帶有復原按鈕" />
+</Frame>
+
+## 排程備份
+
+InsForge Cloud 每天為付費計畫上的每個作用中專案進行一次完整備份，保留 7 天。**Scheduled Backups** 清單顯示每個備份的過期時間，任何備份都可以隨時復原。手動備份不影響日常排程。
+
+## 手動備份
+
+在風險變更前點擊 **Create a Backup**，並可選擇給它一個名稱。備份在後臺執行；清單顯示其狀態、大小和建立時間，並允許您重新命名或刪除它。免費計畫包含 1 個手動備份插槽，付費計畫包含 5 個，手動備份保留到您刪除為止。
+
+## 復原
+
+點擊任何已完成的備份旁的 **Restore** — 排程備份或手動備份。復原會將目前資料庫替換為備份：專案在復原期間離線，備份後建立的資料會遺失，並且該操作無法撤銷，所以如果您不確定，請先進行手動備份。
+
+## 自託管
+
+自託管部署為手動備份和復原有相同的 **Backup & Restore** 頁面。備份儲存在您的專案儲存旁（本機磁碟，或配置為您的 S3 儲存貯體），並保留到您刪除為止。官方 Docker 映像不需要額外設定。
+
+## 更多資源
+
+- [Database overview](/core-concepts/database/overview) 瞭解資料庫如何暴露給您的應用程式。
+- [Database migrations](/core-concepts/database/migrations) 來版本化架構變更而不是復原來撤銷它們。
+- [Database branching](/agent-native/branching) 來排練危險變更的副本。

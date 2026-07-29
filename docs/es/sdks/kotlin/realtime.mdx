@@ -1,0 +1,171 @@
+---
+title: Referencia de SDK de Kotlin en tiempo real
+description: Conectar a través de Socket.IO, suscribirse a canales, publicar eventos, rastrear presencia y manejar reconexiones con el cliente en tiempo real de Kotlin de InsForge.
+---
+
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
+## Instalación
+
+<KotlinSdkInstallation />
+
+## Modelo mental
+
+El SDK de Kotlin se conecta a InsForge Realtime a través de Socket.IO. Suscríbete a nombres de canales como `order:123` o `chat:room-1`, luego escucha los nombres de eventos publicados en esos canales.
+
+Los eventos se publican mediante disparadores de base de datos que llaman a `realtime.publish(...)` o por clientes que publican en un canal al que ya se han unido. Consulta [descripción general de tiempo real](/core-concepts/realtime/overview) para el modelo de canal y RLS.
+
+## Inicio rápido
+
+```kotlin
+import dev.insforge.realtime.models.SocketMessage
+
+client.realtime.connect()
+
+val response = client.realtime.subscribe("order:$orderId")
+
+if (!response.ok) {
+    println("Subscribe failed: ${response.error?.message}")
+    return
+}
+
+client.realtime.on<SocketMessage>("status_changed") { message ->
+    message?.let {
+        println("Status changed: ${it.payload}")
+    }
+}
+```
+
+## connect()
+
+Establecer una conexión en tiempo real.
+
+```kotlin
+client.realtime.connect()
+
+println("Connected: ${client.realtime.isConnected}")
+println("Socket ID: ${client.realtime.socketId}")
+```
+
+Monitorear el estado de la conexión:
+
+```kotlin
+client.realtime.connectionState.collect { state ->
+    when (state) {
+        is Realtime.ConnectionState.Connected -> println("Connected")
+        is Realtime.ConnectionState.Connecting -> println("Connecting")
+        is Realtime.ConnectionState.Disconnected -> println("Disconnected")
+        is Realtime.ConnectionState.Error -> println("Error: ${state.message}")
+    }
+}
+```
+
+## subscribe()
+
+Suscribirse a un canal y recibir la instantánea de presencia actual.
+
+```kotlin
+val response = client.realtime.subscribe("chat:room-1")
+
+if (response.ok) {
+    println("Subscribed to: ${response.channel}")
+    println("Members: ${response.presence?.members}")
+} else {
+    println("Error: ${response.error?.message}")
+}
+```
+
+## publish()
+
+Publicar un evento en un canal.
+
+```kotlin
+client.realtime.publish(
+    channel = "chat:room-1",
+    event = "new_message",
+    payload = mapOf(
+        "text" to "Hello from Kotlin",
+        "sentAt" to System.currentTimeMillis()
+    )
+)
+```
+
+<Note>
+  El cliente debe suscribirse a un canal antes de publicar en ese mismo canal.
+</Note>
+
+Si RLS está habilitado en `realtime.messages`, la publicación también se verifica contra las políticas de `INSERT`.
+
+## on()
+
+Registrar un escucha de eventos.
+
+```kotlin
+client.realtime.on<SocketMessage>("new_message") { message ->
+    message?.let {
+        println("Message: ${it.payload}")
+    }
+}
+```
+
+Eventos de conexión y del sistema:
+
+| Evento | Descripción |
+|--------|-------------|
+| `presence:join` | Un miembro lógico se vuelve presente en el canal. |
+| `presence:leave` | Un miembro lógico ya no está presente en el canal. |
+| `realtime:error` | La suscripción o publicación falló. |
+
+## once()
+
+Escuchar un evento una sola vez.
+
+```kotlin
+client.realtime.once<SocketMessage>("checkout_completed") { message ->
+    println("Checkout completed: ${message?.payload}")
+}
+```
+
+## off()
+
+Eliminar un escucha de eventos.
+
+```kotlin
+val callback = Realtime.EventCallback<SocketMessage> { message ->
+    println("Event received: $message")
+}
+
+client.realtime.on("status_changed", callback)
+client.realtime.off("status_changed", callback)
+```
+
+## unsubscribe()
+
+Salir de un canal.
+
+```kotlin
+client.realtime.unsubscribe("chat:room-1")
+```
+
+## disconnect()
+
+Cerrar la conexión en tiempo real.
+
+```kotlin
+client.realtime.disconnect()
+```
+
+## getSubscribedChannels()
+
+Devolver canales suscritos localmente.
+
+```kotlin
+val channels = client.realtime.getSubscribedChannels()
+println(channels)
+```
+
+## Presencia
+
+Las suscripciones exitosas devuelven una instantánea de presencia. Escucha `presence:join` y `presence:leave` para actualizar el estado en línea local.
+
+La presencia es efímera. No es una tabla de pertenencia de sala duradera.

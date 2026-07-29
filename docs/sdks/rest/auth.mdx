@@ -135,8 +135,9 @@ POST /api/auth/sessions
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `method` | string | No | Authentication method. Defaults to `password`; use `otp` for email OTP sign-in |
 | `email` | string | Yes | User email address |
-| `password` | string | Yes | User password |
+| `password` | string | For password | User password |
 
 ### Example (Web Client)
 
@@ -144,6 +145,7 @@ POST /api/auth/sessions
 curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "password",
     "email": "user@example.com",
     "password": "securepassword123"
   }'
@@ -155,6 +157,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
 curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "password",
     "email": "user@example.com",
     "password": "securepassword123"
   }'
@@ -197,6 +200,73 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile
 <Note>
 - For **web clients**: A `csrfToken` is returned and the refresh token is stored in an httpOnly cookie. Include the `csrfToken` in the `X-CSRF-Token` header when calling `/api/auth/refresh`.
 - For **non-web clients** (`mobile`, `desktop`, `server`): A `refreshToken` is returned directly. Store it securely and include it in the request body when calling `/api/auth/refresh`.
+</Note>
+
+---
+
+## Email OTP Sign In
+
+Use this passwordless flow when a user should sign in with a 6-digit code sent to their email address.
+
+### Send a Sign-In Code
+
+```
+POST /api/auth/email/send-otp
+```
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | Email address that receives the sign-in code |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-otp" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "user@example.com" }'
+```
+
+The endpoint returns `202 Accepted` with a generic message. It does not reveal whether the email already belongs to a user.
+
+### Create a Session with the Code
+
+```
+POST /api/auth/sessions
+```
+
+#### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `method` | string | Yes | Must be `otp` |
+| `email` | string | Yes | Email address that received the code |
+| `otp` | string | Yes | 6-digit sign-in code |
+| `name` | string | No | Profile name used only if verification creates a new user |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=server" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "otp",
+    "email": "user@example.com",
+    "otp": "123456",
+    "name": "Ada Lovelace"
+  }'
+```
+
+The response uses the same session shape and `client_type` behavior as password sign-in.
+
+<Note>
+- Codes expire after 5 minutes, can be used once, and are consumed after three failed attempts.
+- InsForge does not create a user when the code is sent. If the email is new, a verified passwordless user is created only after successful verification.
+- Verifying a code for an existing unverified account clears its stored password, leaving the account passwordless.
+- If public signups are disabled, an existing user can still sign in. A valid code for an unknown email is consumed and returns HTTP 403.
 </Note>
 
 ---

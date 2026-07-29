@@ -4,7 +4,7 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { AuthOTPService, OTPPurpose } from '@/services/auth/auth-otp.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { TokenManager } from '@/infra/security/token.manager.js';
+import { TokenManager, type RefreshTokenPayload } from '@/infra/security/token.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
@@ -12,7 +12,11 @@ import { AuthRequest, verifyAdmin, verifyUser, verifyToken } from '@/api/middlew
 import adminRouter from './admin.routes.js';
 import oauthRouter from './oauth.routes.js';
 import customOAuthRouter from './custom-oauth.routes.js';
-import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
+import {
+  sendEmailOTPLimiter,
+  verifyOTPLimiter,
+  verifyOTPRateLimiter,
+} from '@/api/middlewares/rate-limiters.js';
 import {
   REFRESH_TOKEN_COOKIE_NAME,
   setRefreshTokenCookie,
@@ -25,6 +29,7 @@ import {
   userIdSchema,
   createUserRequestSchema,
   createSessionRequestSchema,
+  sendOTPRequestSchema,
   refreshSessionRequestSchema,
   deleteUsersRequestSchema,
   listUsersRequestSchema,
@@ -58,6 +63,15 @@ import logger from '@/utils/logger.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
+
+const verifySessionOTPLimiter = (req: Request, res: Response, next: NextFunction): void => {
+  if (req.body?.method !== 'otp') {
+    next();
+    return;
+  }
+
+  void verifyOTPRateLimiter(req, res, next);
+};
 const authConfigService = AuthConfigService.getInstance();
 const authOTPService = AuthOTPService.getInstance();
 const auditService = AuditService.getInstance();
@@ -409,46 +423,51 @@ router.post('/users', verifyUser, async (req: AuthRequest, res: Response, next: 
   }
 });
 
-// POST /api/auth/sessions - Create a new session (login)
+// POST /api/auth/sessions - Create a new session with a password or email OTP
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
-router.post('/sessions', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const clientType = parseClientType(req.query.client_type);
+router.post(
+  '/sessions',
+  verifySessionOTPLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const clientType = parseClientType(req.query.client_type);
+      const validationResult = createSessionRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
 
-    const validationResult = createSessionRequestSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      throw new AppError(
-        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
+      const credentials = validationResult.data;
+      const result: CreateSessionResponse =
+        credentials.method === 'otp'
+          ? await authService.signInWithOTP(credentials.email, credentials.otp, credentials.name)
+          : await authService.login(credentials.email, credentials.password);
+
+      // Set refresh token based on client type
+      const tokenManager = TokenManager.getInstance();
+      if (clientType === 'web') {
+        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+          result.user.id,
+          'user'
+        );
+        setRefreshTokenCookie(res, refreshToken);
+        result.csrfToken = csrfToken;
+      } else {
+        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
+        // Non-web clients (mobile, desktop, server): return refresh token in response body.
+        // Server clients cannot rely on browser cookies, so they follow the native-app flow.
+        result.refreshToken = refreshToken;
+      }
+
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
     }
-
-    const { email, password } = validationResult.data;
-    const result: CreateSessionResponse = await authService.login(email, password);
-
-    // Set refresh token based on client type
-    const tokenManager = TokenManager.getInstance();
-    if (clientType === 'web') {
-      // Web clients: use httpOnly cookie + CSRF token
-      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-        result.user.id,
-        'user'
-      );
-      setRefreshTokenCookie(res, refreshToken);
-      result.csrfToken = csrfToken;
-    } else {
-      const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
-      // Non-web clients (mobile, desktop, server): return refresh token in response body.
-      // Server clients cannot rely on browser cookies, so they follow the native-app flow.
-      result.refreshToken = refreshToken;
-    }
-
-    successResponse(res, result);
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /api/auth/id-token - Sign in with ID token from native SDK (Google One Tap, etc.)
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
@@ -545,11 +564,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     }
 
     if (clientType === 'web') {
-      const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
-      if (!tokenManager.verifyCsrfToken(csrfHeader, payload)) {
-        logger.warn('[Auth:Refresh] CSRF token validation failed');
-        throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
-      }
+      tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:Refresh');
     }
 
     // Fetch current user data from DB.
@@ -613,6 +628,21 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
     const clientType = parseClientType(req.query.client_type);
 
     if (clientType === 'web') {
+      const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
+
+      if (refreshToken) {
+        const tokenManager = TokenManager.getInstance();
+        let payload: RefreshTokenPayload | null = null;
+        try {
+          payload = tokenManager.verifyRefreshToken(refreshToken);
+        } catch {
+          // Stale or invalid cookie: fall through and clear it idempotently.
+        }
+        if (payload?.sessionType === 'user') {
+          tokenManager.verifyCsrfToken(req.headers['x-csrf-token'], payload, 'Auth:Logout');
+        }
+      }
+
       clearRefreshTokenCookie(res);
     }
     // For non-web clients: no server-side cleanup needed.
@@ -774,6 +804,37 @@ router.post(
         message:
           'Anon key retrieved successfully (deprecated route, use GET /api/metadata/anon-key)',
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /api/auth/email/send-otp - Send a 6-digit email OTP for session creation
+router.post(
+  '/email/send-otp',
+  sendEmailOTPLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = sendOTPRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      await authService.sendSignInOTP(validationResult.data.email);
+
+      successResponse(
+        res,
+        {
+          success: true,
+          message: 'If sign-in is available for this email, we have sent a verification code.',
+        },
+        202
+      );
     } catch (error) {
       next(error);
     }

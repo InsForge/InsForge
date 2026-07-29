@@ -1,0 +1,224 @@
+---
+title: 代碼設定
+description: 使用 CLI 的計畫、套用和導出工作流程從單一 insforge.toml 聲明管理 InsForge 驗證、SMTP、儲存體、保留和部署設定。
+---
+
+## 概覽
+
+`insforge.toml` 是專案設定子集的聲明性版本控制快照：驗證原則、允許的重新導向 URL、密碼規則、SMTP、儲存體上傳大小、即時和排程保留以及部署子網域。CLI 針對此檔案提供三個命令：
+
+- **`config plan`**：將 `insforge.toml` 與連結專案進行比較。顯示會發生什麼變化。
+- **`config apply`**：將差異推送到實時專案。按變更能力門控、環境解析的秘密、乾運行模式。
+- **`config export`**：拉取目前專案狀態並寫新的 `insforge.toml`。對從現有專案引導很有用。
+
+您在存放庫中保留**一個** `insforge.toml`。要將其套用到不同環境（暫存、生產、隊友的本機後端或自託管實例），請將 CLI 指向不同的專案（重新連結或使用 `--project-id`）。秘密透過 `env(...)` 參考從環境變數讀取，所以檔案本身保持免費的認證並可以安全提交。
+
+這在 InsForge Cloud 專案和自託管 OSS 部署上的工作方式相同。
+
+<Note>
+  所有範例使用 `npx @insforge/cli`。不要全域安裝 CLI。
+</Note>
+
+## 命令摘要
+
+| 命令 | 目的 |
+|---------|---------|
+| `config plan` | 顯示 `insforge.toml` 和實時專案狀態之間的差異 |
+| `config apply` | 將 `insforge.toml` 套用至實時專案 |
+| `config apply --dry-run` | 列印計畫而不套用 |
+| `config apply --auto-approve` | 跳過互動式確認提示（在 `--json` 模式下需要） |
+| `config export` | 拉取實時設定並寫 `insforge.toml` |
+| `config export --force` | 不確認覆寫現有 `insforge.toml` |
+
+`config plan` 和 `config apply` 讀取 `insforge.toml`；如果它存在於其他位置，透過 `--file <path>`。`config export` 寫入檔案；透過 `--out <path>` 將其寫入自訂位置。
+
+## 推薦工作流程
+
+<Steps>
+  <Step title="從現有專案引導">
+    如果您已透過儀表板設定專案，導出一次以取得工作檔案：
+
+    ```bash
+    npx @insforge/cli config export
+    ```
+
+    這寫 `insforge.toml` 反映目前後端狀態。
+  </Step>
+
+  <Step title="提交它">
+    檢查 `insforge.toml` 進入版本控制。秘密透過 `env(...)` 參考，所以檔案很安全。
+  </Step>
+
+  <Step title="編輯和計畫">
+    變更 TOML，然後在套用前預覽差異：
+
+    ```bash
+    npx @insforge/cli config plan
+    ```
+  </Step>
+
+  <Step title="套用">
+    ```bash
+    npx @insforge/cli config apply
+    ```
+
+    審查呈現的計畫並確認。在 CI 中，透過 `--auto-approve` 和 `--json`。
+  </Step>
+
+  <Step title="在其他地方套用相同的檔案">
+    要將相同的設定推送到暫存或自託管後端，請將 CLI 指向其他專案並重新執行套用：
+
+    ```bash
+    npx @insforge/cli --project-id <staging-project-id> config apply
+    ```
+
+    在本機 shell 中因環境解析的不同秘密（SMTP 密碼等），所以 TOML 不需要變更。
+  </Step>
+</Steps>
+
+## `insforge.toml` 涵蓋什麼
+
+該檔案鏡像專案設定的精選子集，對於以聲明方式管理有用的部分。任何不在此清單中的內容仍存在於儀表板和 API 上。
+
+| 部分 | 金鑰 |
+|---------|------|
+| `[auth]` | `allowed_redirect_urls`, `require_email_verification`, `verify_email_method`, `reset_password_method`, `disable_signup` |
+| `[auth.password]` | `min_length`, `require_number`, `require_lowercase`, `require_uppercase`, `require_special_char` |
+| `[auth.smtp]` | `enabled`, `host`, `port`, `username`, `password`, `sender_email`, `sender_name`, `min_interval_seconds` |
+| `[storage]` | `max_file_size_mb` |
+| `[realtime]` | `retention_days` |
+| `[schedules]` | `retention_days` |
+| `[deployments]` | `subdomain` |
+
+因為 TOML 沒有 `null` 文本，使用 `retention_days = 0` 停用即時訊息或排程執行日誌的保留清理；`config apply` 為該值向後端傳送 `null`。電子郵件範本、OAuth 提供者應用認證、儲存體、即時通道、函數、部署環境變數和秘密不透過此檔案管理。
+
+完整範例：
+
+```toml
+[auth]
+require_email_verification = true
+verify_email_method = "code"
+reset_password_method = "code"
+disable_signup = false
+allowed_redirect_urls = [
+  "https://app.example.com/auth/callback",
+  "http://localhost:3000/auth/callback",
+]
+
+[auth.password]
+min_length = 12
+require_number = true
+require_lowercase = true
+require_uppercase = true
+require_special_char = false
+
+[auth.smtp]
+enabled = true
+host = "smtp.sendgrid.net"
+port = 587
+username = "apikey"
+password = "env(SENDGRID_API_KEY)"
+sender_email = "noreply@example.com"
+sender_name = "Acme"
+
+[storage]
+max_file_size_mb = 100
+
+[realtime]
+retention_days = 7
+
+[schedules]
+retention_days = 0
+
+[deployments]
+subdomain = "acme-prod"
+```
+
+## `config plan`
+
+```bash
+npx @insforge/cli config plan
+npx @insforge/cli config plan --file ./config/insforge.toml
+npx @insforge/cli --json config plan
+```
+
+`plan` 讀取 `insforge.toml`，透過 `/api/metadata` 和儲存體、即時和排程的可選設定端點取得實時狀態，然後列印呈現的差異。它也標記任何部分實時後端尚未公開（較舊的自託管版本等）。套用將跳過而不是失敗整個執行。
+
+在互動式工作階段中的每個 `apply` 之前使用 `plan`，並作為 CI 門來擷取意外漂移。
+
+## `config apply`
+
+```bash
+npx @insforge/cli config apply
+npx @insforge/cli config apply --dry-run
+npx @insforge/cli config apply --auto-approve
+npx @insforge/cli --json config apply --auto-approve
+```
+
+`apply` 執行與 `plan` 相同的差異，然後遍歷變更集：
+
+1. **按變更能力門控。** 每個變更根據後端的中繼資料或部分的設定端點進行檢查。如果後端不支援部分（例如沒有 SMTP 公開的較舊自託管實例），該部分會跳過帶命名警告，其餘變更仍然適用。
+2. **秘密解析。** TOML 中的 `env(...)` 參考在套用時從本機環境解析。如果缺少參考變數，命令在傳送任何更新之前中止，所以後端不會被留下半設定。
+3. **按部分調派。** 每個變更被傳送到適當的後端端點（`/api/auth/config`, `/api/auth/smtp-config`, `/api/storage/config`, `/api/realtime/config`, `/api/schedules/config`, `/api/deployments/slug`, 等）。變更是獨立的，所以一個部分的失敗不會回滾之前成功的部分。
+
+旗標：
+
+- `--dry-run` 列印計畫並結束而不套用。
+- `--auto-approve` 跳過互動式確認。當設定 `--json` 時需要，因為沒有 TTY 用於提示。
+- `--file <path>` 覆寫預設 `./insforge.toml` 位置。
+
+## `config export`
+
+```bash
+npx @insforge/cli config export
+npx @insforge/cli config export --out ./config/insforge.toml
+npx @insforge/cli config export --force
+```
+
+`export` 拉取實時專案的可設定表面並將其寫入 TOML 檔案。使用它來：
+
+- 從您一直透過儀表板設定的專案引導 `insforge.toml`。
+- 透過導出到暫存檔案並比較來對手編輯進行比較。
+- 快照設定在危險變更之前，以便您在需要回復時重新套用快照。
+
+`export` 寫的檔案與 CLI 從 `apply` 期望的形狀相同，所以往返支援。
+
+沒有 `--force`，`export` 在互動式模式中拒絕覆寫現有檔案，並在 `--json` 模式中曲面 `OUTPUT_EXISTS` 錯誤。
+
+## 秘密參考
+
+`auth.smtp.password` 和任何其他敏感欄位可以表示為 `env(VAR_NAME)` 而不是文字值：
+
+```toml
+[auth.smtp]
+password = "env(SENDGRID_API_KEY)"
+```
+
+在套用時，CLI 從本機環境讀取 `SENDGRID_API_KEY`、驗證它的存在，並向後端傳送解析的值。TOML 本身從不包含秘密，所以它可以提交。
+
+這是讓一個 `insforge.toml` 清潔地套用到多個環境的原因：開發和生產後端僅在**哪個** `SENDGRID_API_KEY` 在您執行 `apply` 時範圍內有所不同。
+
+`env(...)` refs 在一個 TOML 中，是 `apply` 的目標在每次執行時重新傳送解析的密碼。這是 CLI 可以告訴後端"秘密可能已輪轉，請更新"的唯一方式。沒有 `env(...)` ref 的欄位被視為保留現有。
+
+## 何時使用這個
+
+- **專案設定的版本控制。** 重新導向 URL、註冊原則、密碼原則、電子郵件驗證模式、SMTP、儲存體上傳大小和保留視窗存在在您的團隊透過 PR 審查的檔案中。
+- **多環境奇偶校驗。** 一個 TOML，套用至開發、暫存和生產，保持支援的專案設定在各處對齐。環境特定值（子網域、SMTP 認證）透過 `--project-id` 覆寫和 `env(...)` refs 流。
+- **CI 驅動的設定變更。** 從您的部署管道執行 `config apply --auto-approve --json`。與 `config plan` 結合作為 PR 檢查，以便審查者看到合併在生產環境中會改變什麼。
+- **災難復原。** 提交的 `insforge.toml` 是已知好的設定快照。在復原專案後重新套用它以在幾秒鐘內使驗證、SMTP、儲存體、保留和部署設定回到預期形狀。
+- **自託管和本機 OSS 開發。** 執行 `npx @insforge/cli link --api-base-url http://localhost:7130 --api-key <local-key>` 針對 docker-compose 堆疊，然後將 CLI 的設定命令指向您的本機 OSS 實例，方式與您指向雲的方式相同。
+
+## 疑難排解
+
+**`Refusing to apply in --json mode without --auto-approve or --yes`。** CLI 從不在非互動式執行中靜默套用變更。明確透過 `--auto-approve`（或 `-y`）。
+
+**`your backend doesn't expose <section>`。** 連結後端在一個版本上，該版本還沒有相關的 API。其餘的變更仍然適用。升級後端（或等待下一個版本）以套用該部分。
+
+**`env(...)` reference resolves to nothing。** 當缺少參考環境變數時，CLI 在任何 API 呼叫之前中止。在您的 shell 或 CI 的秘密存放區中設定變數並重新執行。
+
+**`Slug is already taken`。** `deployments.subdomain` 與同一後端上另一個專案的子網域衝突。選擇不同的值。
+
+## 相關
+
+- [CLI 工具](/agent-native/cli-harness)：代理驅動的完整命令表面
+- [部署安全指南](/deployment/deployment-security-guide)：在部署後強化自託管後端

@@ -1,0 +1,48 @@
+---
+title: "匿名自托管遥测"
+description: "了解匿名使用数据 InsForge 自托管部署发送、永远不会收集的内容以及如何使用 INSFORGE_TELEMETRY_DISABLED 选择退出。"
+---
+
+InsForge 从自托管部署中收集匿名遥测数据，以了解活跃安装、版本采用、部署方法以及配置了哪些可选服务。这有助于维护人员优先考虑修复、安全通知和开源项目的部署工作。
+
+遥测是可选的。您可以随时禁用它。
+InsForge 不会从 InsForge Cloud 发送此遥测。
+自托管事件包括粗略的运行时标签，例如生产、开发、测试、ci 或未知，因此维护人员可以将本地和自动化运行与生产部署分开。
+
+## InsForge 发送什么
+
+InsForge 在后端启动时发送 `oss_instance_started` 事件，并在后端运行时大约每 24 小时发送一次 `oss_heartbeat` 事件。
+事件通过 InsForge 的 PostHog 代理在 `https://b.insforge.dev/capture/` 使用 PostHog 的捕获 API 格式发送。
+
+每个事件包含：
+
+- PostHog 事件名称：`oss_instance_started` 或 `oss_heartbeat`
+- 本地存储在 `LOGS_DIR/.insforge-installation-id` 中的匿名安装 ID，用作 PostHog `distinct_id`
+- InsForge 版本
+- 事件时间戳
+- 托管模式，如 `self-hosted` 或 `cloud`
+- 粗略的部署方法，例如 Docker Compose、Railway、Zeabur、Sealos、Dokploy、Kubernetes 或未知
+- 操作系统、CPU 架构、Node.js 版本、运行时环境以及该过程是否似乎在 CI 中运行
+- 存储后端类别：本地文件系统、S3 或 S3 兼容
+- 可选功能是否已配置的布尔标志：站点部署、函数、计算和 OpenRouter
+
+## InsForge 永远不会发送什么
+
+遥测不包括：
+
+- 环境变量值
+- API 密钥、JWT 密钥、密码、OAuth 密钥或支付密钥
+- 数据库内容、模式、表名或行数
+- 日志、错误堆栈跟踪、文件内容或文件路径
+- 项目名称、域、存储桶名称、电子邮件地址或用户数据
+
+## 禁用遥测
+
+在您的环境中设置 `INSFORGE_TELEMETRY_DISABLED=1` 并重新启动后端。
+对于 Docker Compose 部署，将相同的行添加到您的 `.env` 文件：
+
+```bash
+INSFORGE_TELEMETRY_DISABLED=1
+```
+
+网络故障已记录并忽略，因此遥测永远不会阻止启动或正常请求。

@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Dialog,
@@ -24,6 +25,7 @@ export function RenameBackupDialog({
   onOpenChange,
   onSave,
 }: RenameBackupDialogProps) {
+  const { t } = useTranslation('chrome');
   const backupNameId = useId();
   const [backupName, setBackupName] = useState(initialName);
   const [isSaving, setIsSaving] = useState(false);
@@ -55,8 +57,14 @@ export function RenameBackupDialog({
           <DialogHeader className="gap-0">
             <div className="flex w-full items-center gap-3">
               <div className="min-w-0 flex-1">
-                <DialogTitle>Rename Backup</DialogTitle>
-                <DialogDescription className="sr-only">Rename a database backup.</DialogDescription>
+                <DialogTitle>
+                  {t('database.renameBackup', { defaultValue: 'Rename Backup' })}
+                </DialogTitle>
+                <DialogDescription className="sr-only">
+                  {t('database.renameBackupDescription', {
+                    defaultValue: 'Rename a database backup.',
+                  })}
+                </DialogDescription>
               </div>
               <DialogCloseButton className="relative right-auto top-auto h-7 w-7 rounded p-1" />
             </div>
@@ -68,7 +76,7 @@ export function RenameBackupDialog({
                 htmlFor={backupNameId}
                 className="text-sm font-normal leading-5 text-foreground"
               >
-                Backup Name
+                {t('database.backupName', { defaultValue: 'Backup Name' })}
               </label>
               <Input
                 id={backupNameId}
@@ -88,7 +96,7 @@ export function RenameBackupDialog({
               disabled={isSaving}
               onClick={() => onOpenChange(false)}
             >
-              Close
+              {t('common.close', { defaultValue: 'Close' })}
             </Button>
             <Button
               type="button"
@@ -98,7 +106,9 @@ export function RenameBackupDialog({
                 void handleSave();
               }}
             >
-              {isSaving ? 'Saving...' : 'Save'}
+              {isSaving
+                ? t('common.saving', { defaultValue: 'Saving...' })
+                : t('common.save', { defaultValue: 'Save' })}
             </Button>
           </DialogFooter>
         </div>

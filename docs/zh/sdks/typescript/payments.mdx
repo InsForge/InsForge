@@ -1,0 +1,45 @@
+---
+title: 支付
+description: 为 TypeScript 应用选择 Stripe 或 Razorpay 支付助手
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+InsForge 支付是特定于提供商的。Stripe 使用托管的 Checkout 和计费门户。Razorpay 使用提供商原生的订单和订阅加上 Razorpay Checkout。TypeScript SDK 为两者都公开了独立的提供商模块。
+
+<CardGroup cols={2}>
+  <Card title="Stripe 支付" icon="stripe" href="/sdks/typescript/payments-stripe">
+    使用 `insforge.payments.stripe` 创建 Checkout 和计费门户会话。
+  </Card>
+
+  <Card title="Razorpay 支付" icon="credit-card" href="/sdks/typescript/payments-razorpay">
+    使用 `insforge.payments.razorpay` 创建订单或订阅，然后打开 Razorpay Checkout。
+  </Card>
+</CardGroup>
+
+## 共享设置
+
+```typescript
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-project.insforge.app',
+  anonKey: 'your-anon-key'
+});
+```
+
+支付运行时调用需要 InsForge 用户令牌。来宾一次性结账可以使用匿名 InsForge 令牌。提供商密钥必须保留在服务器端，应通过仪表板 -> 支付 -> 设置、CLI 或管理 API 配置。
+
+## 履行
+
+对于两个提供商，创建应用拥有的表，如 `public.orders`、`public.credit_ledger` 或 `public.team_entitlements`，然后从 `payments.webhook_events` 中验证的提供商 webhook 事件填充它们。
+
+`payments.transactions` 是仪表板/报告投影。不要将其用作主要业务工作流。
+
+## 后续步骤
+
+- 为 `insforge.payments.stripe.createCheckoutSession(...)` 和 `insforge.payments.stripe.createCustomerPortalSession(...)` 使用 [Stripe 支付](/sdks/typescript/payments-stripe)。
+- 为 `insforge.payments.razorpay.createOrder(...)`、`createSubscription(...)`、验证和订阅管理使用 [Razorpay 支付](/sdks/typescript/payments-razorpay)。
+- 阅读[支付概述](/core-concepts/payments/overview)以了解共享的数据库架构和履行模型。

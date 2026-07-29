@@ -1,0 +1,69 @@
+---
+title: "診斷和顧問"
+sidebarTitle: "Diagnostics & advisor"
+description: "代理讀取後端健康、顧問發現和錯誤日誌，然後套用修復。"
+---
+
+當出現問題時，代理不應該猜測。`npx @insforge/cli diagnose` 將後端自身的信號轉變為代理可以直接取得和處理的東西：顧問發現有補救方案、資料庫健康檢查、實例指標和聚合錯誤日誌。每個發現都帶有修復，所以"什麼是錯"和"做什麼"一起到達。代理自己拉取所有這個，沒有儀表板在迴圈中，這就是讓它關閉安全漏洞的原因，比如一個寬鬆的 RLS 原則，然後他們洩露資料。
+
+<Frame caption="一個後端顧問發現：問題、受影響的表和代理可以複製和套用的補救。">
+  <img src="/images/backend-advisor.png" alt="Backend Advisor finding: a permissive RLS policy on public.messages with a Copy Remediation button" />
+</Frame>
+
+## 完整健康報告
+
+不帶子命令執行 `diagnose` 以取得一切：
+
+```bash
+npx @insforge/cli diagnose
+npx @insforge/cli diagnose --json
+```
+
+報告將顧問掃描、資料庫健康、實例指標和最近的錯誤日誌綑綁到一個輸出中。在 `--json` 模式下，代理將其全部作為結構化資料取得。
+
+## 後端顧問
+
+顧問掃描安全、效能和健康問題，並為每個問題寫補救。儀表板用"複製補救"按鈕顯示發現，但代理不需要儀表板：它用 `--json` 直接取得相同的掃描，自己套用修復，所以安全問題被關閉，無需等待人類注意到它。
+
+```bash
+npx @insforge/cli diagnose advisor
+npx @insforge/cli diagnose advisor --json
+```
+
+典型發現是一個寬鬆的 RLS 原則，向匿名使用者公開表。顧問命名表、嚴重性和 SQL 以修復它。代理讀取發現、套用補救為[移轉](/core-concepts/database/migrations)並重新掃描以確認它清除。
+
+## 目標檢查
+
+報告的每一部分也可在其自己上可用：
+
+| 命令 | 它檢查什麼 |
+|---------|----------------|
+| `diagnose advisor` | 最新顧問掃描：安全、效能和健康問題 |
+| `diagnose db` | 資料庫健康：連線、表膨脹、索引使用 |
+| `diagnose metrics` | 實例指標：CPU、記憶體、磁碟和網路 |
+| `diagnose logs` | 從每個後端來源聚合的錯誤級日誌 |
+
+對於來自單一來源的原始日誌，使用頂級命令：
+
+```bash
+npx @insforge/cli logs function.logs
+npx @insforge/cli logs postgres.logs
+```
+
+來源包括 `insforge.logs`, `postgREST.logs`, `postgres.logs`, `function.logs` 和 `function-deploy.logs`。
+
+## 讓代理解釋它
+
+`diagnose --ai` 將收集的診斷資料遞交給模型並傳回純文字分析：
+
+```bash
+npx @insforge/cli diagnose --ai "why did write latency spike after the last deploy?"
+```
+
+這就是轉儲堆棧追蹤和解釋修復的區別。代理就實時後端提出問題並取得根據實際信號的答案。
+
+## 後續步驟
+
+- 作為[移轉](/core-concepts/database/migrations)套用顧問補救，所以修復被版本化。
+- 在[後端分支](/agent-native/branching)上排演危險修復，然後它觸及生產環境。
+- 讀[CLI 工具](/agent-native/cli-harness)了解命令表面的其餘部分。

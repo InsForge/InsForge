@@ -1,0 +1,844 @@
+---
+title: 資料庫 API 參考
+description: 透過 REST API 實現 PostgREST 風格的資料庫操作
+---
+
+## 概述
+
+資料庫 API 為你的資料庫資料表提供 PostgREST 風格的 CRUD 操作。所有請求都需要身分驗證標頭。
+
+## 標頭
+
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+Content-Type: application/json
+```
+
+---
+
+## 查詢記錄
+
+從資料表中擷取記錄，支援過濾、排序與分頁。
+
+```
+GET /api/database/records/{tableName}
+```
+
+### 查詢參數
+
+| 參數 | 類型 | 說明 |
+|-----------|------|-------------|
+| `limit` | integer | 回傳的最大記錄數（1-1000，預設值：100） |
+| `offset` | integer | 分頁時要跳過的記錄數（預設值：0） |
+| `order` | string | 排序方式（例如 `createdAt.desc`、`name.asc`） |
+| `select` | string | 要回傳的欄位，以逗號分隔 |
+| `{field}` | string | PostgREST 過濾條件（例如 `status=eq.active`） |
+
+### 過濾運算子
+
+| 運算子 | 說明 | 範例 |
+|----------|-------------|---------|
+| `eq` | 等於 | `status=eq.active` |
+| `neq` | 不等於 | `status=neq.deleted` |
+| `gt` | 大於 | `age=gt.18` |
+| `gte` | 大於或等於 | `price=gte.100` |
+| `lt` | 小於 | `quantity=lt.10` |
+| `lte` | 小於或等於 | `score=lte.50` |
+| `like` | 模式比對（區分大小寫） | `name=like.*john*` |
+| `ilike` | 模式比對（不區分大小寫） | `email=ilike.*@gmail.com` |
+| `in` | 在清單中 | `status=in.(active,pending)` |
+| `is` | 是否為 null/true/false | `deleted_at=is.null` |
+
+### 範例
+
+```bash
+# Get all posts
+curl "https://your-app.insforge.app/api/database/records/posts" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Get posts with filters
+curl "https://your-app.insforge.app/api/database/records/posts?status=eq.published&order=createdAt.desc&limit=10" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Select specific columns
+curl "https://your-app.insforge.app/api/database/records/posts?select=id,title,author" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### 回應
+
+```json
+[
+  {
+    "id": "248373e1-0aea-45ce-8844-5ef259203749",
+    "title": "Getting Started with InsForge",
+    "content": "This is a guide to help you get started...",
+    "createdAt": "2025-07-18T05:37:24.338Z",
+    "updatedAt": "2025-07-18T05:37:24.338Z"
+  }
+]
+```
+
+### 回應標頭
+
+| 標頭 | 說明 |
+|--------|-------------|
+| `X-Total-Count` | 符合查詢條件的總記錄數 |
+| `Content-Range` | 回傳的記錄範圍（例如 `0-99/1234`） |
+
+---
+
+## 建立記錄
+
+在資料表中建立一筆或多筆記錄。
+
+```
+POST /api/database/records/{tableName}
+```
+
+<Warning>
+**重要提示**：請求主體必須是陣列，即使只建立單筆記錄也是如此。
+</Warning>
+
+### 標頭
+
+| 標頭 | 值 | 說明 |
+|--------|-------|-------------|
+| `Prefer` | `return=representation` | 加入此項以回傳已建立的記錄 |
+
+### 範例
+
+```bash
+# Create a single record
+curl -X POST "https://your-app.insforge.app/api/database/records/posts" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '[{
+    "title": "My First Post",
+    "content": "Hello world!",
+    "published": true
+  }]'
+
+# Create multiple records
+curl -X POST "https://your-app.insforge.app/api/database/records/posts" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '[
+    {"title": "Post 1", "content": "Content 1"},
+    {"title": "Post 2", "content": "Content 2"}
+  ]'
+```
+
+### 回應
+
+不含 `Prefer` 標頭時：
+```json
+[]
+```
+
+含 `Prefer: return=representation` 時：
+```json
+[
+  {
+    "id": "248373e1-0aea-45ce-8844-5ef259203749",
+    "title": "My First Post",
+    "content": "Hello world!",
+    "published": true,
+    "createdAt": "2025-07-18T05:37:24.338Z",
+    "updatedAt": "2025-07-18T05:37:24.338Z"
+  }
+]
+```
+
+---
+
+## 更新記錄
+
+更新符合查詢過濾條件的記錄。
+
+```
+PATCH /api/database/records/{tableName}
+```
+
+### 查詢參數
+
+使用過濾運算子指定要更新的記錄。
+
+### 標頭
+
+| 標頭 | 值 | 說明 |
+|--------|-------|-------------|
+| `Prefer` | `return=representation` | 加入此項以回傳已更新的記錄 |
+
+### 範例
+
+```bash
+# Update a single record by ID
+curl -X PATCH "https://your-app.insforge.app/api/database/records/posts?id=eq.248373e1-0aea-45ce-8844-5ef259203749" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '{
+    "title": "Updated Post Title",
+    "content": "This content has been updated."
+  }'
+
+# Update multiple records
+curl -X PATCH "https://your-app.insforge.app/api/database/records/posts?status=eq.draft" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "archived"}'
+```
+
+### 回應
+
+```json
+[
+  {
+    "id": "248373e1-0aea-45ce-8844-5ef259203749",
+    "title": "Updated Post Title",
+    "content": "This content has been updated.",
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-21T11:00:00Z"
+  }
+]
+```
+
+---
+
+## 刪除記錄
+
+刪除符合查詢過濾條件的記錄。
+
+```
+DELETE /api/database/records/{tableName}
+```
+
+### 查詢參數
+
+使用過濾運算子指定要刪除的記錄。
+
+### 標頭
+
+| 標頭 | 值 | 說明 |
+|--------|-------|-------------|
+| `Prefer` | `return=representation` | 加入此項以回傳已刪除的記錄 |
+
+### 範例
+
+```bash
+# Delete by ID
+curl -X DELETE "https://your-app.insforge.app/api/database/records/posts?id=eq.248373e1-0aea-45ce-8844-5ef259203749" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Delete with Prefer header to see deleted records
+curl -X DELETE "https://your-app.insforge.app/api/database/records/posts?status=eq.archived" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Prefer: return=representation"
+```
+
+### 回應
+
+不含 `Prefer` 標頭時：`204 No Content`
+
+含 `Prefer: return=representation` 時：
+```json
+[
+  {
+    "id": "248373e1-0aea-45ce-8844-5ef259203749",
+    "title": "Deleted Post",
+    "createdAt": "2025-01-01T00:00:00Z"
+  }
+]
+```
+
+---
+
+## 錯誤回應
+
+### 找不到資料表 (404)
+
+```json
+{
+  "error": "TABLE_NOT_FOUND",
+  "message": "Table 'nonexistent' does not exist",
+  "statusCode": 404,
+  "nextActions": "Check table name and try again"
+}
+```
+
+### 無效查詢 (400)
+
+```json
+{
+  "error": "INVALID_QUERY",
+  "message": "Invalid filter syntax",
+  "statusCode": 400,
+  "nextActions": "Check PostgREST filter documentation"
+}
+```
+
+### 驗證錯誤 (400)
+
+```json
+{
+  "error": "VALIDATION_ERROR",
+  "message": "Invalid field type: expected boolean for 'published'",
+  "statusCode": 400,
+  "nextActions": "Ensure field types match the table schema"
+}
+```
+
+---
+
+## 範例
+
+### 分頁
+
+```bash
+# Page 1 (first 20 records)
+curl "https://your-app.insforge.app/api/database/records/posts?limit=20&offset=0"
+
+# Page 2 (next 20 records)
+curl "https://your-app.insforge.app/api/database/records/posts?limit=20&offset=20"
+```
+
+### 複雜過濾條件
+
+```bash
+# Multiple conditions
+curl "https://your-app.insforge.app/api/database/records/posts?status=eq.published&author_id=eq.123&order=createdAt.desc"
+
+# Search with pattern
+curl "https://your-app.insforge.app/api/database/records/users?email=ilike.*@company.com"
+
+# In list
+curl "https://your-app.insforge.app/api/database/records/orders?status=in.(pending,processing)"
+
+# Null check
+curl "https://your-app.insforge.app/api/database/records/tasks?completed_at=is.null"
+```
+
+### Upsert（插入或更新）
+
+插入一筆記錄，若與唯一約束發生衝突則更新該記錄。
+
+```
+POST /api/database/records/{tableName}
+```
+
+#### 標頭
+
+| 標頭 | 值 | 說明 |
+|--------|-------|-------------|
+| `Prefer` | `resolution=merge-duplicates` | 發生衝突時更新現有記錄 |
+| `Prefer` | `resolution=ignore-duplicates` | 記錄已存在時忽略插入 |
+
+#### 範例
+
+```bash
+# Upsert: insert or update on conflict
+curl -X POST "https://your-app.insforge.app/api/database/records/user_settings" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: resolution=merge-duplicates,return=representation" \
+  -d '[{
+    "user_id": "123e4567-e89b-12d3-a456-426614174000",
+    "theme": "dark",
+    "notifications": true
+  }]'
+```
+
+#### 回應
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "user_id": "123e4567-e89b-12d3-a456-426614174000",
+    "theme": "dark",
+    "notifications": true,
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-21T11:00:00Z"
+  }
+]
+```
+
+<Note>
+Upsert 需要資料表上存在唯一約束（例如主鍵或唯一索引）。衝突解決方式將依此約束而定。
+</Note>
+
+---
+
+## 呼叫 RPC 函式
+
+透過 PostgREST RPC 執行資料庫函式。支援所有 HTTP 方法（GET、POST、PUT、PATCH、DELETE）。
+
+```
+POST /api/database/rpc/{functionName}
+```
+
+### 範例
+
+```bash
+# Call a function with parameters
+curl -X POST "https://your-app.insforge.app/api/database/rpc/get_user_stats" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "123e4567-e89b-12d3-a456-426614174000"}'
+
+# Call a function without parameters
+curl -X POST "https://your-app.insforge.app/api/database/rpc/get_total_count" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### 回應
+
+```json
+{
+  "total_posts": 42,
+  "total_comments": 128,
+  "last_activity": "2025-01-15T10:30:00Z"
+}
+```
+
+---
+
+## 管理員端點
+
+以下端點需要管理員身分驗證。
+
+### 管理員端點的標頭
+
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
+Content-Type: application/json
+```
+
+---
+
+## 列出資料庫函式
+
+取得 public 結構描述下的所有資料庫函式。**需要管理員身分驗證。**
+
+```
+GET /api/database/functions
+```
+
+### 範例
+
+```bash
+curl "https://your-app.insforge.app/api/database/functions" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### 回應
+
+```json
+[
+  {
+    "name": "get_user_stats",
+    "schema": "public",
+    "language": "plpgsql",
+    "returnType": "json",
+    "arguments": "user_id uuid",
+    "definition": "BEGIN ... END;"
+  }
+]
+```
+
+---
+
+## 列出資料庫索引
+
+取得所有資料庫索引。**需要管理員身分驗證。**
+
+```
+GET /api/database/indexes
+```
+
+### 範例
+
+```bash
+curl "https://your-app.insforge.app/api/database/indexes" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### 回應
+
+```json
+[
+  {
+    "name": "posts_pkey",
+    "tableName": "posts",
+    "columns": ["id"],
+    "isUnique": true,
+    "isPrimary": true,
+    "definition": "CREATE UNIQUE INDEX posts_pkey ON public.posts USING btree (id)"
+  }
+]
+```
+
+---
+
+## 列出 RLS 政策
+
+取得所有資料列層級安全性（Row Level Security）政策。**需要管理員身分驗證。**
+
+```
+GET /api/database/policies
+```
+
+### 範例
+
+```bash
+curl "https://your-app.insforge.app/api/database/policies" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### 回應
+
+```json
+[
+  {
+    "name": "Users can view own posts",
+    "tableName": "posts",
+    "command": "SELECT",
+    "roles": ["authenticated"],
+    "using": "(auth.uid() = user_id)",
+    "withCheck": null
+  }
+]
+```
+
+---
+
+## 列出資料庫觸發器
+
+取得所有資料庫觸發器。**需要管理員身分驗證。**
+
+```
+GET /api/database/triggers
+```
+
+### 範例
+
+```bash
+curl "https://your-app.insforge.app/api/database/triggers" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### 回應
+
+```json
+[
+  {
+    "name": "update_timestamp",
+    "tableName": "posts",
+    "timing": "BEFORE",
+    "events": ["UPDATE"],
+    "functionName": "update_updated_at_column",
+    "enabled": true
+  }
+]
+```
+
+---
+
+## 列出資料庫遷移
+
+取得已成功執行的自訂遷移歷史記錄。InsForge 會將這些記錄儲存在 `system.custom_migrations` 中，但此端點僅回傳遷移的中繼資料與已執行的陳述式。**需要管理員身分驗證。**
+
+```
+GET /api/database/migrations
+```
+
+### 範例
+
+```bash
+curl "https://your-app.insforge.app/api/database/migrations" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### 回應
+
+```json
+{
+  "migrations": [
+    {
+      "version": "20260416170500",
+      "name": "create-posts-table",
+      "statements": [
+        "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+      ],
+      "createdAt": "2026-04-16T17:05:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+## 建立資料庫遷移
+
+建立並立即對資料庫執行一次自訂遷移。只有當每一條陳述式都執行成功時，此遷移才會被記錄。**需要管理員身分驗證。**
+
+```
+POST /api/database/migrations
+```
+
+### 請求主體
+
+| 欄位 | 類型 | 是否必填 | 說明 |
+|-------|------|----------|-------------|
+| `version` | string | 是 | 數字形式的遷移版本號（最多 64 位）。可以是 Drizzle 風格的循序前綴（例如 `0001`），也可以是 `YYYYMMDDHHmmss` 格式的時間戳記。版本號依數字大小比較。InsForge CLI 會為本機遷移檔名產生 14 位的 UTC 時間戳記。 |
+| `name` | string | 是 | 遷移名稱，僅能使用小寫字母、數字和連字號 |
+| `sql` | string | 是 | 要剖析並執行的 SQL 文字 |
+
+### 範例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/migrations" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "version": "20260416170500",
+    "name": "create-posts-table",
+    "sql": "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+  }'
+```
+
+### 回應
+
+```json
+{
+  "version": "20260416170500",
+  "name": "create-posts-table",
+  "statements": [
+    "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+  ],
+  "createdAt": "2026-04-16T17:05:00.000Z",
+  "message": "Migration executed successfully"
+}
+```
+
+<Warning>
+請勿在自訂遷移中包含 `BEGIN`、`COMMIT` 或 `ROLLBACK`。InsForge 會在自己的交易中執行此遷移。
+</Warning>
+
+---
+
+## 執行原始 SQL（嚴格模式）
+
+以嚴格清理規則執行原始 SQL 查詢。禁止存取系統資料表和 auth.users。**需要管理員身分驗證。**
+
+```
+POST /api/database/advance/rawsql
+```
+
+### 請求主體
+
+| 欄位 | 類型 | 是否必填 | 說明 |
+|-------|------|----------|-------------|
+| `query` | string | 是 | 要執行的 SQL 查詢 |
+| `params` | array | 否 | 用於參數化查詢的查詢參數 |
+
+### 範例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT * FROM posts WHERE published = $1",
+    "params": [true]
+  }'
+```
+
+### 回應
+
+```json
+{
+  "rows": [
+    {
+      "id": "248373e1-0aea-45ce-8844-5ef259203749",
+      "title": "My Post",
+      "published": true
+    }
+  ],
+  "rowCount": 1,
+  "command": "SELECT"
+}
+```
+
+---
+
+## 執行原始 SQL（寬鬆模式）
+
+以寬鬆清理規則執行原始 SQL 查詢。允許對系統資料表執行 SELECT 與 INSERT。**請謹慎使用。需要管理員身分驗證。**
+
+```
+POST /api/database/advance/rawsql/unrestricted
+```
+
+### 請求主體
+
+| 欄位 | 類型 | 是否必填 | 說明 |
+|-------|------|----------|-------------|
+| `query` | string | 是 | 要執行的 SQL 查詢 |
+| `params` | array | 否 | 用於參數化查詢的查詢參數 |
+
+### 範例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql/unrestricted" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT * FROM auth.users LIMIT 10"
+  }'
+```
+
+### 回應
+
+```json
+{
+  "rows": [...],
+  "rowCount": 10,
+  "command": "SELECT"
+}
+```
+
+<Warning>
+此端點的限制較為寬鬆，可以存取系統資料表。請僅在必要時使用，並確保具備適當的授權。
+</Warning>
+
+---
+
+## 匯出資料庫
+
+以 SQL 或 JSON 格式匯出資料庫結構描述和/或資料。**需要管理員身分驗證。**
+
+```
+POST /api/database/advance/export
+```
+
+### 請求主體
+
+| 欄位 | 類型 | 是否必填 | 預設值 | 說明 |
+|-------|------|----------|---------|-------------|
+| `tables` | array | 否 | all | 要匯出的資料表清單 |
+| `format` | string | 否 | sql | 匯出格式（`sql` 或 `json`） |
+| `includeData` | boolean | 否 | true | 包含資料表資料 |
+| `includeFunctions` | boolean | 否 | false | 包含資料庫函式 |
+| `includeSequences` | boolean | 否 | false | 包含序列 |
+| `includeViews` | boolean | 否 | false | 包含檢視表 |
+| `rowLimit` | integer | 否 | - | 每個資料表的最大列數 |
+
+### 範例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/export" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tables": ["posts", "comments"],
+    "format": "sql",
+    "includeData": true,
+    "rowLimit": 1000
+  }'
+```
+
+### 回應
+
+```json
+{
+  "format": "sql",
+  "content": "CREATE TABLE posts (...); INSERT INTO posts VALUES (...);",
+  "tables": ["posts", "comments"]
+}
+```
+
+---
+
+## 匯入資料庫
+
+從 SQL 檔案匯入資料庫。**需要管理員身分驗證。**
+
+```
+POST /api/database/advance/import
+```
+
+### 請求（multipart/form-data）
+
+| 欄位 | 類型 | 是否必填 | 預設值 | 說明 |
+|-------|------|----------|---------|-------------|
+| `file` | file | 是 | - | 要匯入的 SQL 檔案 |
+| `truncate` | boolean | 否 | false | 匯入前清空既有資料表 |
+
+### 範例
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/import" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -F "file=@backup.sql" \
+  -F "truncate=false"
+```
+
+### 回應
+
+```json
+{
+  "filename": "backup.sql",
+  "fileSize": 102400,
+  "tables": ["posts", "comments", "users"],
+  "rowsImported": 1500
+}
+```
+
+---
+
+## 批次插入或更新
+
+從 CSV 或 JSON 檔案批次插入或更新資料。**需要管理員身分驗證。**
+
+```
+POST /api/database/advance/bulk-upsert
+```
+
+### 請求（multipart/form-data）
+
+| 欄位 | 類型 | 是否必填 | 說明 |
+|-------|------|----------|-------------|
+| `file` | file | 是 | 包含資料的 CSV 或 JSON 檔案 |
+| `table` | string | 是 | 目標資料表名稱 |
+| `upsertKey` | string | 否 | 用於衝突解決的欄位名稱 |
+
+### 範例
+
+```bash
+# Import from CSV
+curl -X POST "https://your-app.insforge.app/api/database/advance/bulk-upsert" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -F "file=@data.csv" \
+  -F "table=posts" \
+  -F "upsertKey=id"
+
+# Import from JSON
+curl -X POST "https://your-app.insforge.app/api/database/advance/bulk-upsert" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -F "file=@data.json" \
+  -F "table=posts"
+```
+
+### 回應
+
+```json
+{
+  "rowsAffected": 150,
+  "totalRecords": 150,
+  "table": "posts"
+}
+```

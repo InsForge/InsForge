@@ -1,4 +1,5 @@
 import { useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createMCPServerConfig, type PlatformType } from './helpers';
 import QoderLogo from '#assets/logos/qoder.svg?react';
 import { getBackendUrl } from '#lib/utils/utils';
@@ -14,6 +15,7 @@ export function QoderDeeplinkGenerator({
   apiKey,
   os = 'macos-linux',
 }: QoderDeeplinkGeneratorProps) {
+  const { t } = useTranslation('chrome');
   const deeplink = useMemo(() => {
     const config = createMCPServerConfig(apiKey || '', os, getBackendUrl());
     const configString = JSON.stringify(config);
@@ -40,7 +42,7 @@ export function QoderDeeplinkGenerator({
       className="flex h-8 items-center justify-center gap-2.5 rounded border border-[var(--alpha-8)] bg-semantic-0 px-4 text-sm font-medium text-foreground transition-colors hover:bg-[var(--alpha-4)]"
     >
       <QoderLogo className="h-6 w-6" />
-      <span>Add to Qoder</span>
+      <span>{t('overview.addToAgent', { agent: 'Qoder', defaultValue: 'Add to {{agent}}' })}</span>
     </button>
   );
 }

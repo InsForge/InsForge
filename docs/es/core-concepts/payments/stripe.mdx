@@ -1,0 +1,210 @@
+---
+title: "Pagos de Stripe"
+sidebarTitle: "Stripe"
+description: "Integrar Stripe Checkout, Billing Portal, sincronización de catálogo y cumplimiento de webhook con InsForge."
+---
+
+Utilice la integración de Stripe cuando desee Stripe Checkout alojado, Stripe Products y Prices, Stripe Subscriptions y el Billing Portal alojado.
+
+InsForge almacena claves secretas de Stripe en el lado del servidor, crea sesiones de Checkout y Billing Portal desde su aplicación, administra automáticamente el punto final del webhook de Stripe cuando su backend es accesible, refleja el estado de Stripe en el esquema `payments` y registra eventos de webhook verificados.
+
+## Modelo de Stripe
+
+| Concepto de Stripe | Tabla o API de InsForge |
+|----------------|-----------------------|
+| Product | `payments.stripe_products` |
+| Price | `payments.stripe_prices` |
+| Checkout Session | `POST /api/payments/stripe/{environment}/checkout-sessions` y `payments.stripe_checkout_sessions` |
+| Billing Portal Session | `POST /api/payments/stripe/{environment}/customer-portal-sessions` y `payments.stripe_customer_portal_sessions` |
+| Subscription | `payments.stripe_subscriptions` y `payments.stripe_subscription_items` |
+| Customer mapping | `payments.customer_mappings` con `provider = 'stripe'` |
+| Webhook event | `payments.webhook_events` con `provider = 'stripe'` |
+| Dashboard transaction row | `payments.transactions` con `provider = 'stripe'` |
+
+## Configuración
+
+Configure las claves secretas de Stripe `test` y `live` en Dashboard -> Payments -> Settings, CLI o API de administrador.
+
+```bash
+npx @insforge/cli payments stripe status
+npx @insforge/cli payments stripe config set --environment test sk_test_xxx
+npx @insforge/cli payments stripe sync --environment test
+npx @insforge/cli payments stripe webhooks configure --environment test
+```
+
+Después de conectar una clave, InsForge valida la cuenta, almacena la clave en el almacén de secretos, intenta crear el punto final del webhook de Stripe administrado y ejecuta la sincronización para Productos, Precios, Clientes y Suscripciones.
+
+## Checkout
+
+Cree sesiones de checkout desde código frontend con el token de usuario actual de InsForge.
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCheckoutSession('test', {
+  mode: 'payment',
+  lineItems: [{ priceId: 'price_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/checkout/success`,
+  cancelUrl: `${window.location.origin}/pricing`,
+  customerEmail: user?.email ?? null,
+  metadata: { order_id: orderId },
+  idempotencyKey: `order:${orderId}`
+});
+
+if (error) throw error;
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+Para Checkout de suscripción, pase un sujeto de facturación. El sujeto es el propietario de facturación propio de su aplicación, como un usuario, equipo, espacio de trabajo, organización, inquilino o grupo.
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCheckoutSession('test', {
+  mode: 'subscription',
+  subject: { type: 'team', id: teamId },
+  lineItems: [{ priceId: 'price_monthly_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/billing/success`,
+  cancelUrl: `${window.location.origin}/billing`,
+  customerEmail: user.email,
+  idempotencyKey: `team:${teamId}:pro-monthly`
+});
+
+if (error) throw error;
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+Checkout inserta una fila en `payments.stripe_checkout_sessions` usando el token de InsForge del llamador. Agregue políticas de RLS para que los usuarios solo puedan crear sesiones para sujetos a los que se les permite facturar. PostgreSQL aplica políticas `SELECT` a las filas devueltas por `INSERT ... RETURNING` y búsquedas idempotentes, por lo que los reintentos también necesitan una política `SELECT` coincidente para el mismo sujeto e clave de idempotencia.
+
+## Portal de facturación
+
+Utilice el Billing Portal alojado para una asignación de cliente de Stripe existente.
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCustomerPortalSession('test', {
+  subject: { type: 'team', id: teamId },
+  returnUrl: `${window.location.origin}/billing`
+});
+
+if (error) {
+  if ('statusCode' in error && error.statusCode === 404) {
+    return;
+  }
+
+  throw error;
+}
+
+if (data?.customerPortalSession.url) {
+  window.location.assign(data.customerPortalSession.url);
+}
+```
+
+La creación del portal requiere un usuario autenticado y una fila `payments.customer_mappings` existente para el sujeto. Proteja la creación del portal con RLS o una verificación de pertenencia del lado del servidor para que los usuarios no puedan abrir la configuración de facturación para un equipo u organización que no administran.
+
+## Webhooks y cumplimiento
+
+Los webhooks de Stripe se administran automáticamente cuando el backend tiene una URL pública. InsForge escucha los eventos necesarios para mantener actualizados los intentos de checkout, clientes, suscripciones, reembolsos y proyecciones de transacciones.
+
+Stripe también recomienda cumplir con los pedidos de Checkout desde webhooks en lugar de desde la URL de éxito. En InsForge, adjunte activadores de cumplimiento a `payments.webhook_events`.
+
+```sql
+CREATE OR REPLACE FUNCTION public.fulfill_stripe_order()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.provider = 'stripe'
+     AND NEW.event_type = 'checkout.session.completed'
+     AND NEW.processing_status = 'processed'
+     AND (NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'order_id') IS NOT NULL THEN
+    UPDATE public.orders
+    SET status = 'paid',
+        paid_at = COALESCE(NEW.processed_at, NOW())
+    WHERE id::text = NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'order_id'
+      AND status = 'pending';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER fulfill_stripe_order_from_webhook
+  AFTER INSERT OR UPDATE ON payments.webhook_events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fulfill_stripe_order();
+```
+
+### Pedido de eventos
+
+Los eventos webhook se verifican y procesan de forma independiente. InsForge confirma cada fila derivada de un evento antes de marcar ese evento como `processed`, pero Stripe no da garantía de ordenamiento entre eventos: `invoice.paid` puede procesarse antes de `checkout.session.completed`, por lo que las filas creadas por otro evento (como `payments.customer_mappings`) pueden no existir cuando se dispare su activador.
+
+Para eventos de suscripción, primero resuelva el sujeto de facturación de la carga útil del evento — InsForge marca `insforge_subject_type` e `insforge_subject_id` en metadatos de suscripción en el checkout, y Stripe lo captura en facturas generadas por suscripción como `parent.subscription_details.metadata`. Verifique `invoice.metadata` a continuación, luego recurra a `payments.customer_mappings` (el mismo orden que InsForge usa internamente):
+
+```sql
+CREATE OR REPLACE FUNCTION public.grant_subscription_access()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_subject_type TEXT;
+  v_subject_id TEXT;
+BEGIN
+  IF NEW.provider = 'stripe'
+     AND NEW.event_type = 'invoice.paid'
+     AND NEW.processing_status = 'processed' THEN
+    v_subject_type := COALESCE(
+      NEW.payload -> 'data' -> 'object' -> 'parent'
+        -> 'subscription_details' -> 'metadata' ->> 'insforge_subject_type',
+      NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'insforge_subject_type'
+    );
+    v_subject_id := COALESCE(
+      NEW.payload -> 'data' -> 'object' -> 'parent'
+        -> 'subscription_details' -> 'metadata' ->> 'insforge_subject_id',
+      NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'insforge_subject_id'
+    );
+
+    IF v_subject_id IS NULL THEN
+      SELECT m.subject_type, m.subject_id
+      INTO v_subject_type, v_subject_id
+      FROM payments.customer_mappings m
+      WHERE m.provider = NEW.provider
+        AND m.environment = NEW.environment
+        AND m.provider_customer_id = NEW.payload -> 'data' -> 'object' ->> 'customer';
+    END IF;
+
+    IF v_subject_id IS NULL THEN
+      RAISE WARNING 'Stripe event % has no resolvable billing subject', NEW.provider_event_id;
+      RETURN NEW;
+    END IF;
+
+    -- Rama en el tipo de sujeto enviado en el checkout; team_id es un UUID aquí,
+    -- por lo que la verificación de tipo también protege la conversión.
+    IF v_subject_type = 'team' THEN
+      INSERT INTO public.team_entitlements (team_id, plan, active, updated_at)
+      VALUES (v_subject_id::uuid, 'pro', true, NOW())
+      ON CONFLICT (team_id) DO UPDATE SET
+        plan = EXCLUDED.plan,
+        active = true,
+        updated_at = NOW();
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER grant_subscription_access_from_stripe_webhook
+  AFTER INSERT OR UPDATE ON payments.webhook_events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.grant_subscription_access();
+```
+
+Nunca permita que el cumplimiento se salte silenciosamente — registre o envíe eventos que no pueda resolver para que puedan reproducirse.
+
+## Sincronizar y estado del panel
+
+La sincronización de Stripe refleja Productos, Precios, Clientes y Suscripciones. Los webhooks mantienen el estado de sesión, suscripción, cliente, reembolso y transacción a medida que Stripe emite eventos.
+
+`payments.transactions` es una proyección de informe para el panel. Le proporciona ID de referencia del proveedor como intención de pago, cargo, factura, sesión de checkout e ID de reembolso para que pueda buscar detalles en el Panel de Stripe. Mantenga el estado de orden, crédito o derecho visible para el usuario en sus propias tablas.
+
+## Referencias
+
+- [Stripe Checkout fulfillment](https://docs.stripe.com/checkout/fulfillment)
+- [Stripe Billing Portal Sessions API](https://docs.stripe.com/api/customer_portal/sessions/create)
+- [TypeScript Stripe payments guide](/sdks/typescript/payments-stripe)

@@ -1,0 +1,111 @@
+---
+title: InsForge REST API 概覽
+description: 透過 HTTP 使用任何語言，通過 API 密鑰、JWT 和標準 REST 慣例，直接呼叫 InsForge 驗證、資料庫、儲存空間和函式。
+---
+
+InsForge REST API 提供對所有 InsForge 服務的直接 HTTP 存取。當您需要與沒有官方 SDK 的語言或平台整合時，請使用這種方式。
+
+## 基底 URL
+
+```
+https://your-app.insforge.app
+```
+
+## 驗證
+
+所有 API 請求都需要透過 `Authorization` 標頭進行驗證：
+
+### Bearer Token
+
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+```
+
+## 快速開始
+
+```bash
+# Register a new user
+curl -X POST https://your-app.insforge.app/api/auth/users \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "securepassword123"}'
+
+# Sign in and get token
+curl -X POST https://your-app.insforge.app/api/auth/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "securepassword123"}'
+
+# Use the token for authenticated requests
+curl https://your-app.insforge.app/api/database/records/posts \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+## 回應格式
+
+### 成功回應
+
+資料直接在回應本文中傳回：
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "email": "user@example.com",
+  "createdAt": "2024-01-15T10:30:00Z"
+}
+```
+
+### 錯誤回應
+
+```json
+{
+  "error": "ERROR_CODE",
+  "message": "Human-readable error message",
+  "statusCode": 400,
+  "nextActions": "Suggested action to resolve the error"
+}
+```
+
+## 常見 HTTP 狀態碼
+
+| 狀態 | 描述 |
+|--------|-------------|
+| `200` | 成功 |
+| `201` | 已建立 |
+| `204` | 無內容（用於 DELETE） |
+| `400` | 錯誤的請求 - 輸入無效 |
+| `401` | 未授權 - 令牌無效或缺少 |
+| `403` | 禁止 - 權限不足 |
+| `404` | 找不到 |
+| `409` | 衝突 - 資源已存在 |
+| `500` | 內部伺服器錯誤 |
+
+## 特性
+
+- **資料庫** - PostgREST 風格的 CRUD 操作
+- **驗證** - 電子郵件/密碼和 OAuth 驗證
+- **儲存空間** - 檔案上傳、下載和管理
+- **函式** - 呼叫無伺服器邊緣函式
+- **AI** - 聊天完成和影像生成
+- **即時** - 頻道管理和訊息歷史（WebSocket 用於即時通訊）
+
+## API 參考
+
+<CardGroup cols={2}>
+  <Card title="資料庫" icon="database" href="/sdks/rest/database">
+    CRUD 操作、篩選器和查詢
+  </Card>
+  <Card title="驗證" icon="lock" href="/sdks/rest/auth">
+    註冊、登入、OAuth 和使用者管理
+  </Card>
+  <Card title="儲存空間" icon="cloud-arrow-up" href="/sdks/rest/storage">
+    檔案上傳、下載和管理
+  </Card>
+  <Card title="函式" icon="bolt" href="/sdks/rest/functions">
+    呼叫無伺服器邊緣函式
+  </Card>
+  <Card title="AI" icon="brain" href="/sdks/rest/ai">
+    聊天完成和影像生成
+  </Card>
+  <Card title="即時" icon="signal-stream" href="/sdks/rest/realtime">
+    頻道管理和訊息歷史
+  </Card>
+</CardGroup>

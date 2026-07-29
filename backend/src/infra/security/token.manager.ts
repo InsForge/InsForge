@@ -4,6 +4,7 @@ import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type TokenPayloadSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
+import logger from '../../utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
 
 const JWT_SECRET = appConfig.app.jwtSecret;
@@ -364,19 +365,29 @@ export class TokenManager {
   }
 
   /**
-   * Verify CSRF token by re-computing from refresh-session claims.
-   * Uses timing-safe comparison to prevent timing attacks
+   * Verify the X-CSRF-Token header by re-computing from refresh-session claims.
+   * Accepts the raw header value; multi-valued headers are invalid.
+   * Uses timing-safe comparison and throws 403 FORBIDDEN on mismatch.
    */
-  verifyCsrfToken(csrfHeader: string | undefined, payload: RefreshTokenPayload): boolean {
-    if (!csrfHeader) {
-      return false;
+  verifyCsrfToken(
+    csrfHeader: string | string[] | undefined,
+    payload: RefreshTokenPayload,
+    logTag: string
+  ): void {
+    const csrfToken = typeof csrfHeader === 'string' ? csrfHeader : undefined;
+    let valid = false;
+    if (csrfToken) {
+      try {
+        const expectedCsrf = this.generateCsrfToken(payload);
+        valid = crypto.timingSafeEqual(Buffer.from(csrfToken), Buffer.from(expectedCsrf));
+      } catch {
+        valid = false;
+      }
     }
 
-    try {
-      const expectedCsrf = this.generateCsrfToken(payload);
-      return crypto.timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(expectedCsrf));
-    } catch {
-      return false;
+    if (!valid) {
+      logger.warn(`[${logTag}] CSRF token validation failed`);
+      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.FORBIDDEN);
     }
   }
 

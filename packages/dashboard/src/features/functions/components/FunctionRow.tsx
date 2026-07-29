@@ -3,6 +3,7 @@ import { FunctionSchema } from '@insforge/shared-schemas';
 import { getBackendUrl } from '#lib/utils/utils';
 import { ListRow, ListRowCell } from '#components';
 import { format, formatDistance } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 interface FunctionRowProps {
   function: FunctionSchema;
   onClick: () => void;
@@ -16,6 +17,7 @@ export function FunctionRow({
   className,
   deploymentUrl,
 }: FunctionRowProps) {
+  const { t } = useTranslation('chrome');
   // Use deployment URL if available (cloud mode), otherwise fall back to proxy URL
   const functionUrl = deploymentUrl
     ? `${deploymentUrl}/${func.slug}`
@@ -59,7 +61,7 @@ export function FunctionRow({
         >
           {func.deployedAt
             ? formatDistance(new Date(func.deployedAt), new Date(), { addSuffix: true })
-            : 'Never'}
+            : t('functions.never', { defaultValue: 'Never' })}
         </span>
       </ListRowCell>
     </ListRow>

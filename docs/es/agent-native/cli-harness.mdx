@@ -1,0 +1,62 @@
+---
+title: "Arnés CLI"
+sidebarTitle: "CLI harness"
+description: "La CLI de InsForge es las manos del agente: una interfaz de terminal para esquema, configuración, implementaciones y diagnósticos."
+---
+
+`@insforge/cli` es la interfaz que un agente de codificación utiliza para operar su backend. Donde un humano se dirige al panel, el agente se dirige a la terminal: ejecuta un comando, lee el resultado y decide qué hacer a continuación. Cada comando habla `--json`, por lo que el agente funciona con datos estructurados en lugar de raspar una pantalla.
+
+<Note>
+  Ejecute la CLI con `npx @insforge/cli`. No lo instale globalmente, para que el agente siempre use la versión fijada al proyecto.
+</Note>
+
+## Por qué una CLI para agentes
+
+Un panel se construye para un puntero humano; una CLI se construye para cualquier cosa que pueda escribir texto. Pase `--json` a cualquier comando y el agente obtiene un resultado estructurado que puede analizar; pase `--yes` y se ejecuta sin detenerse en un indicador de confirmación. El esquema, la configuración de autenticación, el almacenamiento, las funciones, las implementaciones, las ramas y los diagnósticos son todos subcomandos de la misma herramienta, por lo que hay una superficie para aprender en lugar de un panel para navegar. Se ejecuta en cualquier terminal, cualquier editor o CI, sin necesidad de configurar una integración. Y después de un cambio, el agente puede ejecutar [`npx @insforge/cli diagnose`](/agent-native/diagnostics) y leer exactamente qué se rompió.
+
+## Superficie de comando
+
+| Área | Comandos |
+|------|----------|
+| Autenticación y contexto | `login`, `logout`, `whoami`, `current`, `list` |
+| Proyecto | `create`, `link` |
+| Esquema | `db migrations new`, `db migrations up`, `db migrations list` |
+| Configuración como código | `config plan`, `config apply`, `config export` |
+| Ramificación | `branch create`, `branch merge`, `branch reset`, `branch delete` |
+| Construir | `functions`, `storage`, `deployments`, `secrets`, `schedules`, `ai` |
+| Diagnosticar | `diagnose`, `diagnose advisor`, `diagnose db`, `diagnose logs`, `metadata` |
+
+Ejecute `npx @insforge/cli help <command>` para las banderas en cualquiera de estos.
+
+## Una ejecución de agente típica
+
+```bash
+# connect
+npx @insforge/cli login
+npx @insforge/cli link
+
+# read current state
+npx @insforge/cli --json metadata
+
+# change schema, safely
+npx @insforge/cli db migrations new add-orders-table
+npx @insforge/cli db migrations up --all
+
+# check the result
+npx @insforge/cli diagnose --json
+```
+
+## Deje que el agente interprete la salida
+
+Los diagnósticos incluyen una bandera de IA para que el agente pueda entregar sus propios datos de backend a un modelo y obtener una explicación:
+
+```bash
+npx @insforge/cli diagnose --ai "why are auth requests failing after the last migration?"
+```
+
+Esto empareja las señales sin procesar (hallazgos del asesor, salud de DB, registros de errores) con una lectura en lenguaje natural, que es lo que convierte "aquí hay un seguimiento de pila" en "aquí está la solución". Ver [Diagnósticos y asesor](/agent-native/diagnostics).
+
+## Próximos pasos
+
+- Coloque la configuración de autenticación, SMTP, almacenamiento, retención e implementación en control de versiones con [configuración como código](/agent-native/config-as-code).
+- Pruebe cambios arriesgados en una [rama de backend](/agent-native/branching) antes de tocar la producción.

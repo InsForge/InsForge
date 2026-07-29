@@ -123,6 +123,15 @@ export const posthogConnectionStatusEventSchema = z.object({
   timestamp: z.number(),
 });
 
+// Child -> parent: user changed their language inside the dashboard; the
+// cloud shell persists it on the account (users.preferred_locale).
+export const updatePreferredLocaleEventSchema = z.object({
+  type: z.literal('UPDATE_PREFERRED_LOCALE'),
+  // Free string (not an enum) so old/new locale lists interoperate; bounded
+  // to the BCP 47 max the backend column accepts.
+  locale: z.string().max(35),
+});
+
 export const posthogConnectRequestEventSchema = z.object({
   type: z.literal('POSTHOG_CONNECT_REQUEST'),
   projectId: z.string(),
@@ -151,6 +160,7 @@ export const cloudEventSchema = z.discriminatedUnion('type', [
   instanceTypeChangeResultEventSchema,
   posthogConnectionStatusEventSchema,
   posthogConnectRequestEventSchema,
+  updatePreferredLocaleEventSchema,
 ]);
 
 export type AppRouteChangeEvent = z.infer<typeof appRouteChangeEventSchema>;
@@ -173,3 +183,4 @@ export type RequestInstanceTypeChangeEvent = z.infer<typeof requestInstanceTypeC
 export type InstanceTypeChangeResultEvent = z.infer<typeof instanceTypeChangeResultEventSchema>;
 export type PosthogConnectionStatusEvent = z.infer<typeof posthogConnectionStatusEventSchema>;
 export type PosthogConnectRequestEvent = z.infer<typeof posthogConnectRequestEventSchema>;
+export type UpdatePreferredLocaleEvent = z.infer<typeof updatePreferredLocaleEventSchema>;

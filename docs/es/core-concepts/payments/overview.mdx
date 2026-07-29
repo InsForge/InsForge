@@ -1,0 +1,87 @@
+---
+title: "Pagos"
+sidebarTitle: "Overview"
+description: "Elija una integración de pagos específica del proveedor para Stripe o Razorpay."
+---
+
+InsForge Payments permite que su aplicación recaude dinero con su propia cuenta de Stripe o Razorpay. Los dos proveedores utilizan diferentes modelos de pago, por lo que los documentos se dividen por proveedor en lugar de describir un flujo de pago genérico.
+
+<Frame caption="Panel de pagos: conexión de proveedor, catálogo, suscripciones y transacciones.">
+  <img src="/images/dashboard-payments.png" alt="Panel de pagos de InsForge" />
+</Frame>
+
+<Note>
+  Stripe o Razorpay sigue siendo la fuente de verdad para cargos, facturas, reembolsos, disputas, impuestos y operaciones financieras a nivel de cuenta. InsForge no es un procesador de pagos ni comerciante registrado, y no reemplaza el panel del proveedor.
+</Note>
+
+## Elija un proveedor
+
+<CardGroup cols={2}>
+  <Card title="Pagos de Stripe" icon="stripe" href="/core-concepts/payments/stripe">
+    Use Stripe Checkout, Products, Prices, Subscriptions y Billing Portal.
+  </Card>
+
+  <Card title="Pagos de Razorpay" icon="credit-card" href="/core-concepts/payments/razorpay">
+    Use Razorpay Orders, Items, Plans, Subscriptions y Razorpay Checkout.
+  </Card>
+</CardGroup>
+
+## Arquitectura
+
+Las tablas nativas del proveedor mantienen intactos los conceptos del proveedor:
+
+| Proveedor | Tablas de tiempo de ejecución | Tablas de catálogo | Tablas de suscripción |
+|----------|----------------|----------------|---------------------|
+| Stripe | `payments.stripe_checkout_sessions`, `payments.stripe_customer_portal_sessions` | `payments.stripe_products`, `payments.stripe_prices` | `payments.stripe_subscriptions`, `payments.stripe_subscription_items` |
+| Razorpay | `payments.razorpay_orders` | `payments.razorpay_items`, `payments.razorpay_plans` | `payments.razorpay_subscriptions` |
+
+Las tablas compartidas solo se usan cuando la forma duradera es útil en los proveedores:
+
+| Tabla | Propósito |
+|-------|---------|
+| `payments.provider_connections` | Proveedor clave, cuenta, sincronización y estado de configuración de webhook por `provider` y `environment`. |
+| `payments.customer_mappings` | Asignación de sujeto de facturación de la aplicación a ID de cliente del proveedor. |
+| `payments.customers` | Espejo administrador/cliente para visibilidad del panel. |
+| `payments.webhook_events` | Libro mayor de eventos webhook del proveedor verificado. Úselo para activadores de cumplimiento duradero. |
+| `payments.transactions` | Proyección de panel/informe de InsForge para actividad de pago exitosa, fallida y reembolsada. |
+
+`payments.transactions` no es el contrato de cumplimiento. Es una proyección construida a partir de eventos y sincronización del proveedor. Para la lógica empresarial, cree tablas propiedad de la aplicación como `public.orders`, `public.credit_ledger` o `public.team_entitlements`, y luego rellénelas desde filas verificadas en `payments.webhook_events`.
+
+## Cumplimiento
+
+No cumpla solo desde una URL de éxito de Stripe o una devolución de llamada de Razorpay Checkout. Estas son señales de experiencia del usuario. El cumplimiento duradero debe ejecutarse desde eventos webhook del proveedor verificados.
+
+```sql
+CREATE TRIGGER fulfill_from_payment_webhook
+  AFTER INSERT OR UPDATE ON payments.webhook_events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fulfill_payment_event();
+```
+
+Si su aplicación acepta múltiples proveedores, mantenga el activador idempotente y rama en `NEW.provider` y `NEW.event_type`. Proteja sus tablas de cumplimiento propiedad de la aplicación con sus propias políticas de RLS.
+
+Los eventos webhook se procesan de forma independiente y los proveedores no dan garantía de pedido entre eventos. Las filas derivadas de un evento se confirman antes de que ese evento se marque como `processed`, pero es posible que las filas propiedad de otros eventos, como `payments.customer_mappings` (que se crea al completar la compra), no existan cuando se active su activador. Primero resuelva los sujetos de facturación de la carga útil del evento y trate las búsquedas en otras tablas como alternativas. Vea las guías del proveedor para ejemplos de cumplimiento de suscripción.
+
+<Warning>
+  Las filas `payments.payment_history` antiguas solo de Stripe se migran a `payments.transactions` para panel e informe. Los activadores en `payment_history` no se reescriben automáticamente. Mueva la lógica de cumplimiento a `payments.webhook_events`.
+</Warning>
+
+## Construir con él
+
+<CardGroup cols={2}>
+  <Card title="Guía de pagos de TypeScript" icon="js" href="/sdks/typescript/payments">
+    Seleccione el módulo del proveedor Stripe o Razorpay para el código de la aplicación.
+  </Card>
+
+  <Card title="Patrones REST" icon="code" href="/sdks/rest/overview">
+    Revise las rutas de la API de Pagos específicas del proveedor y las rutas de webhook.
+  </Card>
+</CardGroup>
+
+## Próximos pasos
+
+- Lea [Pagos de Stripe](/core-concepts/payments/stripe) si está utilizando Stripe Checkout o Billing Portal.
+- Lea [Pagos de Razorpay](/core-concepts/payments/razorpay) si está utilizando Razorpay Orders o Subscriptions.
+- Configure las claves del proveedor en Dashboard -> Payments -> Settings.
+- Agregue verificaciones de pertenencia RLS específicas de la aplicación o del lado del servidor para sujetos de facturación.
+- Agregue cumplimiento respaldado por activadores desde `payments.webhook_events`.

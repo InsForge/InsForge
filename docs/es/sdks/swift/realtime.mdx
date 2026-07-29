@@ -1,0 +1,143 @@
+---
+title: Referencia del SDK de tiempo real de Swift
+description: Conéctese a través de Socket.IO, suscríbase a canales, publique eventos, rastree la presencia y maneje reconexiones con el cliente de tiempo real de Swift de InsForge en Apple.
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+## Instalación
+
+<SwiftSdkInstallation />
+
+## Modelo mental
+
+El SDK de Swift se conecta a InsForge Realtime a través de Socket.IO. Suscríbase a nombres de canal como `order:123` o `chat:room-1`, luego escuche nombres de eventos publicados en esos canales.
+
+Los eventos se publican mediante disparadores de base de datos que llaman a `realtime.publish(...)` o mediante clientes que publican en un canal al que ya se han unido. Consulte [Descripción general de Realtime](/core-concepts/realtime/overview) para el modelo de canal y RLS.
+
+## Inicio rápido
+
+```swift
+try await insforge.realtime.connect()
+
+await insforge.realtime.subscribe(to: "order:\\(orderId)") { message in
+    if message.eventName == "status_changed" {
+        print("Payload: \\(String(describing: message.payload))")
+    }
+}
+```
+
+## connect()
+
+Establece una conexión en tiempo real.
+
+```swift
+do {
+    try await insforge.realtime.connect()
+    print("Connected to realtime")
+} catch {
+    print("Connection failed: \\(error)")
+}
+```
+
+## subscribe()
+
+Suscríbase a un canal y reciba mensajes publicados en él.
+
+```swift
+await insforge.realtime.subscribe(to: "chat:room-1") { message in
+    print("Event: \\(message.eventName ?? "")")
+    print("Channel: \\(message.channelName ?? "")")
+
+    if let payload = message.payload {
+        print("Payload: \\(payload)")
+    }
+}
+```
+
+Si RLS está habilitado en `realtime.channels`, la suscripción se verifica con las políticas `SELECT`.
+
+## publish()
+
+Publique un evento en un canal.
+
+```swift
+try await insforge.realtime.publish(
+    to: "chat:room-1",
+    event: "new_message",
+    payload: [
+        "text": "Hello from Swift",
+        "sentAt": ISO8601DateFormatter().string(from: Date())
+    ]
+)
+```
+
+<Note>
+  El cliente debe suscribirse a un canal antes de publicar en ese canal.
+</Note>
+
+Si RLS está habilitado en `realtime.messages`, la publicación también se verifica con las políticas `INSERT`.
+
+## unsubscribe()
+
+Abandone un canal.
+
+```swift
+await insforge.realtime.unsubscribe(from: "chat:room-1")
+```
+
+## disconnect()
+
+Cierre la conexión en tiempo real.
+
+```swift
+await insforge.realtime.disconnect()
+```
+
+## API de canal
+
+El API de canal agrupa operaciones para un nombre de canal.
+
+```swift
+let channel = await insforge.realtime.channel("chat:room-1")
+try await channel.subscribe()
+```
+
+### Mensajes de difusión
+
+Escucha un evento:
+
+```swift
+let channel = await insforge.realtime.channel("chat:room-1")
+try await channel.subscribe()
+
+for await message in await channel.broadcast(event: "new_message") {
+    print("Payload: \\(message.payload)")
+}
+```
+
+Publicar a través del canal:
+
+```swift
+struct ChatMessage: Codable {
+    let text: String
+    let author: String
+}
+
+try await channel.broadcast(
+    event: "new_message",
+    message: ChatMessage(text: "Hello", author: currentUser.name)
+)
+```
+
+Elimine un objeto de canal cuando ya no sea necesario:
+
+```swift
+await insforge.realtime.removeChannel("chat:room-1")
+```
+
+## Presencia
+
+Las suscripciones exitosas devuelven la instantánea de presencia actual cuando lo admite el API del SDK. Escuche las actualizaciones de presencia a través del canal o las API de eventos de nivel inferior expuestas por el SDK.
+
+La presencia es un estado en línea efímero. No se almacena en Postgres.

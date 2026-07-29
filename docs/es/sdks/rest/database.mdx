@@ -1,0 +1,844 @@
+---
+title: Referencia de API de base de datos
+description: Operaciones de base de datos estilo PostgREST a través de API REST
+---
+
+## Descripción general
+
+La API de base de datos ofrece operaciones CRUD estilo PostgREST para las tablas de tu base de datos. Todas las solicitudes requieren encabezados de autenticación.
+
+## Encabezados
+
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+Content-Type: application/json
+```
+
+---
+
+## Consultar registros
+
+Recupera registros de una tabla con filtrado, ordenamiento y paginación.
+
+```
+GET /api/database/records/{tableName}
+```
+
+### Parámetros de consulta
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `limit` | integer | Número máximo de registros a devolver (1-1000, valor predeterminado: 100) |
+| `offset` | integer | Registros a omitir para la paginación (valor predeterminado: 0) |
+| `order` | string | Orden de clasificación (por ejemplo, `createdAt.desc`, `name.asc`) |
+| `select` | string | Columnas a devolver, separadas por comas |
+| `{field}` | string | Filtro de PostgREST (por ejemplo, `status=eq.active`) |
+
+### Operadores de filtro
+
+| Operador | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `eq` | Igual a | `status=eq.active` |
+| `neq` | Distinto de | `status=neq.deleted` |
+| `gt` | Mayor que | `age=gt.18` |
+| `gte` | Mayor o igual que | `price=gte.100` |
+| `lt` | Menor que | `quantity=lt.10` |
+| `lte` | Menor o igual que | `score=lte.50` |
+| `like` | Coincidencia de patrón (sensible a mayúsculas y minúsculas) | `name=like.*john*` |
+| `ilike` | Coincidencia de patrón (no sensible a mayúsculas y minúsculas) | `email=ilike.*@gmail.com` |
+| `in` | Está en la lista | `status=in.(active,pending)` |
+| `is` | Es null/true/false | `deleted_at=is.null` |
+
+### Ejemplo
+
+```bash
+# Get all posts
+curl "https://your-app.insforge.app/api/database/records/posts" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Get posts with filters
+curl "https://your-app.insforge.app/api/database/records/posts?status=eq.published&order=createdAt.desc&limit=10" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Select specific columns
+curl "https://your-app.insforge.app/api/database/records/posts?select=id,title,author" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Respuesta
+
+```json
+[
+  {
+    "id": "248373e1-0aea-45ce-8844-5ef259203749",
+    "title": "Getting Started with InsForge",
+    "content": "This is a guide to help you get started...",
+    "createdAt": "2025-07-18T05:37:24.338Z",
+    "updatedAt": "2025-07-18T05:37:24.338Z"
+  }
+]
+```
+
+### Encabezados de respuesta
+
+| Encabezado | Descripción |
+|--------|-------------|
+| `X-Total-Count` | Total de registros que coinciden con la consulta |
+| `Content-Range` | Rango de registros devuelto (por ejemplo, `0-99/1234`) |
+
+---
+
+## Crear registros
+
+Crea uno o más registros en una tabla.
+
+```
+POST /api/database/records/{tableName}
+```
+
+<Warning>
+**Importante**: el cuerpo de la solicitud DEBE ser un arreglo, incluso para registros individuales.
+</Warning>
+
+### Encabezados
+
+| Encabezado | Valor | Descripción |
+|--------|-------|-------------|
+| `Prefer` | `return=representation` | Inclúyelo para devolver los registros creados |
+
+### Ejemplo
+
+```bash
+# Create a single record
+curl -X POST "https://your-app.insforge.app/api/database/records/posts" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '[{
+    "title": "My First Post",
+    "content": "Hello world!",
+    "published": true
+  }]'
+
+# Create multiple records
+curl -X POST "https://your-app.insforge.app/api/database/records/posts" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '[
+    {"title": "Post 1", "content": "Content 1"},
+    {"title": "Post 2", "content": "Content 2"}
+  ]'
+```
+
+### Respuesta
+
+Sin el encabezado `Prefer`:
+```json
+[]
+```
+
+Con `Prefer: return=representation`:
+```json
+[
+  {
+    "id": "248373e1-0aea-45ce-8844-5ef259203749",
+    "title": "My First Post",
+    "content": "Hello world!",
+    "published": true,
+    "createdAt": "2025-07-18T05:37:24.338Z",
+    "updatedAt": "2025-07-18T05:37:24.338Z"
+  }
+]
+```
+
+---
+
+## Actualizar registros
+
+Actualiza los registros que coincidan con los filtros de la consulta.
+
+```
+PATCH /api/database/records/{tableName}
+```
+
+### Parámetros de consulta
+
+Usa los operadores de filtro para especificar qué registros actualizar.
+
+### Encabezados
+
+| Encabezado | Valor | Descripción |
+|--------|-------|-------------|
+| `Prefer` | `return=representation` | Inclúyelo para devolver los registros actualizados |
+
+### Ejemplo
+
+```bash
+# Update a single record by ID
+curl -X PATCH "https://your-app.insforge.app/api/database/records/posts?id=eq.248373e1-0aea-45ce-8844-5ef259203749" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '{
+    "title": "Updated Post Title",
+    "content": "This content has been updated."
+  }'
+
+# Update multiple records
+curl -X PATCH "https://your-app.insforge.app/api/database/records/posts?status=eq.draft" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "archived"}'
+```
+
+### Respuesta
+
+```json
+[
+  {
+    "id": "248373e1-0aea-45ce-8844-5ef259203749",
+    "title": "Updated Post Title",
+    "content": "This content has been updated.",
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-21T11:00:00Z"
+  }
+]
+```
+
+---
+
+## Eliminar registros
+
+Elimina los registros que coincidan con los filtros de la consulta.
+
+```
+DELETE /api/database/records/{tableName}
+```
+
+### Parámetros de consulta
+
+Usa los operadores de filtro para especificar qué registros eliminar.
+
+### Encabezados
+
+| Encabezado | Valor | Descripción |
+|--------|-------|-------------|
+| `Prefer` | `return=representation` | Inclúyelo para devolver los registros eliminados |
+
+### Ejemplo
+
+```bash
+# Delete by ID
+curl -X DELETE "https://your-app.insforge.app/api/database/records/posts?id=eq.248373e1-0aea-45ce-8844-5ef259203749" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Delete with Prefer header to see deleted records
+curl -X DELETE "https://your-app.insforge.app/api/database/records/posts?status=eq.archived" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Prefer: return=representation"
+```
+
+### Respuesta
+
+Sin el encabezado `Prefer`: `204 No Content`
+
+Con `Prefer: return=representation`:
+```json
+[
+  {
+    "id": "248373e1-0aea-45ce-8844-5ef259203749",
+    "title": "Deleted Post",
+    "createdAt": "2025-01-01T00:00:00Z"
+  }
+]
+```
+
+---
+
+## Respuestas de error
+
+### Tabla no encontrada (404)
+
+```json
+{
+  "error": "TABLE_NOT_FOUND",
+  "message": "Table 'nonexistent' does not exist",
+  "statusCode": 404,
+  "nextActions": "Check table name and try again"
+}
+```
+
+### Consulta inválida (400)
+
+```json
+{
+  "error": "INVALID_QUERY",
+  "message": "Invalid filter syntax",
+  "statusCode": 400,
+  "nextActions": "Check PostgREST filter documentation"
+}
+```
+
+### Error de validación (400)
+
+```json
+{
+  "error": "VALIDATION_ERROR",
+  "message": "Invalid field type: expected boolean for 'published'",
+  "statusCode": 400,
+  "nextActions": "Ensure field types match the table schema"
+}
+```
+
+---
+
+## Ejemplos
+
+### Paginación
+
+```bash
+# Page 1 (first 20 records)
+curl "https://your-app.insforge.app/api/database/records/posts?limit=20&offset=0"
+
+# Page 2 (next 20 records)
+curl "https://your-app.insforge.app/api/database/records/posts?limit=20&offset=20"
+```
+
+### Filtros complejos
+
+```bash
+# Multiple conditions
+curl "https://your-app.insforge.app/api/database/records/posts?status=eq.published&author_id=eq.123&order=createdAt.desc"
+
+# Search with pattern
+curl "https://your-app.insforge.app/api/database/records/users?email=ilike.*@company.com"
+
+# In list
+curl "https://your-app.insforge.app/api/database/records/orders?status=in.(pending,processing)"
+
+# Null check
+curl "https://your-app.insforge.app/api/database/records/tasks?completed_at=is.null"
+```
+
+### Upsert (insertar o actualizar)
+
+Inserta un registro o lo actualiza si se produce un conflicto en una restricción única.
+
+```
+POST /api/database/records/{tableName}
+```
+
+#### Encabezados
+
+| Encabezado | Valor | Descripción |
+|--------|-------|-------------|
+| `Prefer` | `resolution=merge-duplicates` | Actualiza el registro existente en caso de conflicto |
+| `Prefer` | `resolution=ignore-duplicates` | Ignora la inserción si el registro ya existe |
+
+#### Ejemplo
+
+```bash
+# Upsert: insert or update on conflict
+curl -X POST "https://your-app.insforge.app/api/database/records/user_settings" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: resolution=merge-duplicates,return=representation" \
+  -d '[{
+    "user_id": "123e4567-e89b-12d3-a456-426614174000",
+    "theme": "dark",
+    "notifications": true
+  }]'
+```
+
+#### Respuesta
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "user_id": "123e4567-e89b-12d3-a456-426614174000",
+    "theme": "dark",
+    "notifications": true,
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-21T11:00:00Z"
+  }
+]
+```
+
+<Note>
+El upsert requiere una restricción única (por ejemplo, una clave primaria o un índice único) en la tabla. La resolución de conflictos se basa en esa restricción.
+</Note>
+
+---
+
+## Llamar a una función RPC
+
+Ejecuta una función de base de datos mediante PostgREST RPC. Admite todos los métodos HTTP (GET, POST, PUT, PATCH, DELETE).
+
+```
+POST /api/database/rpc/{functionName}
+```
+
+### Ejemplo
+
+```bash
+# Call a function with parameters
+curl -X POST "https://your-app.insforge.app/api/database/rpc/get_user_stats" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "123e4567-e89b-12d3-a456-426614174000"}'
+
+# Call a function without parameters
+curl -X POST "https://your-app.insforge.app/api/database/rpc/get_total_count" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Respuesta
+
+```json
+{
+  "total_posts": 42,
+  "total_comments": 128,
+  "last_activity": "2025-01-15T10:30:00Z"
+}
+```
+
+---
+
+## Endpoints de administrador
+
+Los siguientes endpoints requieren autenticación de administrador.
+
+### Encabezados para endpoints de administrador
+
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
+Content-Type: application/json
+```
+
+---
+
+## Listar funciones de base de datos
+
+Obtiene todas las funciones de base de datos en el esquema public. **Requiere autenticación de administrador.**
+
+```
+GET /api/database/functions
+```
+
+### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/database/functions" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Respuesta
+
+```json
+[
+  {
+    "name": "get_user_stats",
+    "schema": "public",
+    "language": "plpgsql",
+    "returnType": "json",
+    "arguments": "user_id uuid",
+    "definition": "BEGIN ... END;"
+  }
+]
+```
+
+---
+
+## Listar índices de base de datos
+
+Obtiene todos los índices de la base de datos. **Requiere autenticación de administrador.**
+
+```
+GET /api/database/indexes
+```
+
+### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/database/indexes" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Respuesta
+
+```json
+[
+  {
+    "name": "posts_pkey",
+    "tableName": "posts",
+    "columns": ["id"],
+    "isUnique": true,
+    "isPrimary": true,
+    "definition": "CREATE UNIQUE INDEX posts_pkey ON public.posts USING btree (id)"
+  }
+]
+```
+
+---
+
+## Listar políticas RLS
+
+Obtiene todas las políticas de seguridad a nivel de fila (Row Level Security). **Requiere autenticación de administrador.**
+
+```
+GET /api/database/policies
+```
+
+### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/database/policies" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Respuesta
+
+```json
+[
+  {
+    "name": "Users can view own posts",
+    "tableName": "posts",
+    "command": "SELECT",
+    "roles": ["authenticated"],
+    "using": "(auth.uid() = user_id)",
+    "withCheck": null
+  }
+]
+```
+
+---
+
+## Listar disparadores (triggers) de base de datos
+
+Obtiene todos los disparadores de la base de datos. **Requiere autenticación de administrador.**
+
+```
+GET /api/database/triggers
+```
+
+### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/database/triggers" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Respuesta
+
+```json
+[
+  {
+    "name": "update_timestamp",
+    "tableName": "posts",
+    "timing": "BEFORE",
+    "events": ["UPDATE"],
+    "functionName": "update_updated_at_column",
+    "enabled": true
+  }
+]
+```
+
+---
+
+## Listar migraciones de base de datos
+
+Obtiene el historial de migraciones personalizadas ejecutadas con éxito. InsForge las almacena en `system.custom_migrations`, pero el endpoint devuelve únicamente los metadatos de la migración y las sentencias ejecutadas. **Requiere autenticación de administrador.**
+
+```
+GET /api/database/migrations
+```
+
+### Ejemplo
+
+```bash
+curl "https://your-app.insforge.app/api/database/migrations" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Respuesta
+
+```json
+{
+  "migrations": [
+    {
+      "version": "20260416170500",
+      "name": "create-posts-table",
+      "statements": [
+        "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+      ],
+      "createdAt": "2026-04-16T17:05:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+## Crear una migración de base de datos
+
+Crea y ejecuta de inmediato una migración personalizada en la base de datos. La migración solo se registra si todas las sentencias se ejecutan correctamente. **Requiere autenticación de administrador.**
+
+```
+POST /api/database/migrations
+```
+
+### Cuerpo de la solicitud
+
+| Campo | Tipo | Obligatorio | Descripción |
+|-------|------|----------|-------------|
+| `version` | string | Sí | Versión numérica de la migración (hasta 64 dígitos). Admite prefijos secuenciales estilo Drizzle (por ejemplo, `0001`) o una marca de tiempo `YYYYMMDDHHmmss`. Las versiones se comparan numéricamente. La CLI de InsForge genera marcas de tiempo UTC de 14 dígitos para los nombres de archivo de migración locales. |
+| `name` | string | Sí | Nombre de la migración usando solo letras minúsculas, números y guiones |
+| `sql` | string | Sí | Texto SQL a analizar y ejecutar |
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/migrations" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "version": "20260416170500",
+    "name": "create-posts-table",
+    "sql": "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+  }'
+```
+
+### Respuesta
+
+```json
+{
+  "version": "20260416170500",
+  "name": "create-posts-table",
+  "statements": [
+    "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+  ],
+  "createdAt": "2026-04-16T17:05:00.000Z",
+  "message": "Migration executed successfully"
+}
+```
+
+<Warning>
+No incluyas `BEGIN`, `COMMIT` ni `ROLLBACK` dentro de una migración personalizada. InsForge ejecuta la migración dentro de su propia transacción.
+</Warning>
+
+---
+
+## Ejecutar SQL sin procesar (modo estricto)
+
+Ejecuta una consulta SQL sin procesar con saneamiento estricto. Bloquea el acceso a las tablas del sistema y a auth.users. **Requiere autenticación de administrador.**
+
+```
+POST /api/database/advance/rawsql
+```
+
+### Cuerpo de la solicitud
+
+| Campo | Tipo | Obligatorio | Descripción |
+|-------|------|----------|-------------|
+| `query` | string | Sí | Consulta SQL a ejecutar |
+| `params` | array | No | Parámetros de consulta para consultas parametrizadas |
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT * FROM posts WHERE published = $1",
+    "params": [true]
+  }'
+```
+
+### Respuesta
+
+```json
+{
+  "rows": [
+    {
+      "id": "248373e1-0aea-45ce-8844-5ef259203749",
+      "title": "My Post",
+      "published": true
+    }
+  ],
+  "rowCount": 1,
+  "command": "SELECT"
+}
+```
+
+---
+
+## Ejecutar SQL sin procesar (modo relajado)
+
+Ejecuta una consulta SQL sin procesar con saneamiento relajado. Permite SELECT e INSERT en tablas del sistema. **Úsalo con precaución. Requiere autenticación de administrador.**
+
+```
+POST /api/database/advance/rawsql/unrestricted
+```
+
+### Cuerpo de la solicitud
+
+| Campo | Tipo | Obligatorio | Descripción |
+|-------|------|----------|-------------|
+| `query` | string | Sí | Consulta SQL a ejecutar |
+| `params` | array | No | Parámetros de consulta para consultas parametrizadas |
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql/unrestricted" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT * FROM auth.users LIMIT 10"
+  }'
+```
+
+### Respuesta
+
+```json
+{
+  "rows": [...],
+  "rowCount": 10,
+  "command": "SELECT"
+}
+```
+
+<Warning>
+Este endpoint tiene restricciones relajadas y puede acceder a tablas del sistema. Úsalo solo cuando sea necesario y asegúrate de contar con la autorización adecuada.
+</Warning>
+
+---
+
+## Exportar base de datos
+
+Exporta el esquema y/o los datos de la base de datos en formato SQL o JSON. **Requiere autenticación de administrador.**
+
+```
+POST /api/database/advance/export
+```
+
+### Cuerpo de la solicitud
+
+| Campo | Tipo | Obligatorio | Predeterminado | Descripción |
+|-------|------|----------|---------|-------------|
+| `tables` | array | No | all | Lista de tablas a exportar |
+| `format` | string | No | sql | Formato de exportación (`sql` o `json`) |
+| `includeData` | boolean | No | true | Incluir los datos de las tablas |
+| `includeFunctions` | boolean | No | false | Incluir funciones de la base de datos |
+| `includeSequences` | boolean | No | false | Incluir secuencias |
+| `includeViews` | boolean | No | false | Incluir vistas |
+| `rowLimit` | integer | No | - | Número máximo de filas por tabla |
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/export" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tables": ["posts", "comments"],
+    "format": "sql",
+    "includeData": true,
+    "rowLimit": 1000
+  }'
+```
+
+### Respuesta
+
+```json
+{
+  "format": "sql",
+  "content": "CREATE TABLE posts (...); INSERT INTO posts VALUES (...);",
+  "tables": ["posts", "comments"]
+}
+```
+
+---
+
+## Importar base de datos
+
+Importa la base de datos desde un archivo SQL. **Requiere autenticación de administrador.**
+
+```
+POST /api/database/advance/import
+```
+
+### Solicitud (multipart/form-data)
+
+| Campo | Tipo | Obligatorio | Predeterminado | Descripción |
+|-------|------|----------|---------|-------------|
+| `file` | file | Sí | - | Archivo SQL a importar |
+| `truncate` | boolean | No | false | Truncar las tablas existentes antes de importar |
+
+### Ejemplo
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/import" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -F "file=@backup.sql" \
+  -F "truncate=false"
+```
+
+### Respuesta
+
+```json
+{
+  "filename": "backup.sql",
+  "fileSize": 102400,
+  "tables": ["posts", "comments", "users"],
+  "rowsImported": 1500
+}
+```
+
+---
+
+## Inserción o actualización masiva (Bulk Upsert)
+
+Inserta o actualiza datos de forma masiva a partir de un archivo CSV o JSON. **Requiere autenticación de administrador.**
+
+```
+POST /api/database/advance/bulk-upsert
+```
+
+### Solicitud (multipart/form-data)
+
+| Campo | Tipo | Obligatorio | Descripción |
+|-------|------|----------|-------------|
+| `file` | file | Sí | Archivo CSV o JSON que contiene los datos |
+| `table` | string | Sí | Nombre de la tabla de destino |
+| `upsertKey` | string | No | Nombre de la columna para la resolución de conflictos en el upsert |
+
+### Ejemplo
+
+```bash
+# Import from CSV
+curl -X POST "https://your-app.insforge.app/api/database/advance/bulk-upsert" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -F "file=@data.csv" \
+  -F "table=posts" \
+  -F "upsertKey=id"
+
+# Import from JSON
+curl -X POST "https://your-app.insforge.app/api/database/advance/bulk-upsert" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -F "file=@data.json" \
+  -F "table=posts"
+```
+
+### Respuesta
+
+```json
+{
+  "rowsAffected": 150,
+  "totalRecords": 150,
+  "table": "posts"
+}
+```

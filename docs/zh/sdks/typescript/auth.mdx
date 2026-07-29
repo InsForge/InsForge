@@ -1,0 +1,715 @@
+---
+title: 身份验证 SDK 参考
+description: 使用 InsForge TypeScript SDK 进行用户身份验证和配置文件管理
+---
+
+## 安装
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## signUp()
+
+使用电子邮件和密码创建新用户帐户。
+
+### 参数
+
+- `email` (string, required) - 用户的电子邮件地址
+- `password` (string, required) - 用户的密码
+- `name` (string, optional) - 用户的显示名称
+- `redirectTo` (string, optional) - 用于基于链接的电子邮件验证。电子邮件链接始终首先打开 InsForge 后端端点；在验证令牌后，InsForge 将浏览器重定向到此 URL 以获取验证结果。当 `verifyEmailMethod` 设置为 `link` 时需要。此 URL 必须包含在 `allowedRedirectUrls` 中。推荐：使用您的应用登录页面。
+
+### 返回
+
+```typescript
+{
+  data: {
+    user?: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
+    accessToken: string | null,
+    requireEmailVerification?: boolean,
+    csrfToken?: string | null
+  } | null,
+  error: Error | null
+}
+```
+
+<Note>
+  当 `requireEmailVerification` 为真时，`accessToken` 将为空直到用户验证其电子邮件。InsForge 发送一个验证电子邮件，其中包含一个链接或 6 位数字代码，具体取决于您的仪表板配置（`verifyEmailMethod`）。对于代码验证，实现一个提示用户输入代码的页面（见 [verifyEmail()](#verifyemail)）。对于链接验证，提供一个在 InsForge 验证令牌后应接收浏览器的 `redirectTo` URL。推荐：使用您的登录页面作为 `redirectTo`，然后显示成功消息并询问用户使用其电子邮件和密码登录。
+</Note>
+
+### 示例
+
+```javascript
+const { data, error } = await insforge.auth.signUp({
+  email: 'user@example.com',
+  password: 'secure_password123',
+  name: 'John Doe',
+  redirectTo: 'http://localhost:3000/sign-in',
+});
+
+if (data?.requireEmailVerification) {
+  // For code verification: redirect to page where user enters the 6-digit code
+  // For link verification: wait for the user to click the email link
+  console.log('Please verify your email');
+} else if (data?.accessToken) {
+  // User is signed in (email verification disabled)
+  console.log('Welcome!', data.user.email);
+}
+```
+
+### 输出
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "emailVerified": false,
+      "providers": ["email"],
+      "createdAt": "2024-01-15T10:00:00Z",
+      "updatedAt": "2024-01-15T10:00:00Z",
+      "profile": {
+        "name": "John Doe",
+        "avatar_url": null
+      },
+      "metadata": {}
+    },
+    "requireEmailVerification": true,
+    "accessToken": null,
+    "csrfToken": null
+  },
+  "error": null
+}
+```
+
+---
+
+## signInWithPassword()
+
+使用电子邮件和密码登录现有用户。
+
+### 参数
+
+- `email` (string, required) - 用户的电子邮件地址
+- `password` (string, required) - 用户的密码
+
+### 返回
+
+```typescript
+{
+  data: {
+    user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
+    accessToken: string,
+    csrfToken?: string | null
+  } | null,
+  error: Error | null
+}
+```
+
+### 示例
+
+```javascript
+const { data, error } = await insforge.auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'secure_password123',
+});
+
+if (data) {
+  console.log('Signed in as:', data.user.email);
+}
+```
+
+### 输出
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "emailVerified": true,
+      "providers": ["email"],
+      "createdAt": "2024-01-15T10:00:00Z",
+      "updatedAt": "2024-01-15T10:00:00Z",
+      "profile": {
+        "name": "John Doe",
+        "avatar_url": "https://example.com/avatar.jpg"
+      },
+      "metadata": {}
+    },
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "csrfToken": "5758d38259fb..."
+  },
+  "error": null
+}
+```
+
+---
+
+## signInWithOAuth()
+
+使用已配置的提供商（内置提供商如 Google/GitHub，以及从仪表板配置的任何自定义提供商密钥）启动 OAuth 身份验证流程。
+
+### 参数
+
+- `provider` (string, required) - OAuth 提供商密钥（如 `google`、`github` 或自定义提供商密钥如 `okta-company`）
+- `redirectTo` (string, required) - 身份验证后要重定向的 URL
+- `additionalParams` (`Record<string, string>`, optional) - 提供商特定的 OAuth 提示，如 Google 的 `prompt=select_account`
+- `skipBrowserRedirect` (boolean, optional) - 如果为 true，返回 OAuth URL 而不自动重定向（用于服务器渲染或移动流程）
+
+### 返回
+
+```typescript
+{
+  data: { url?: string, provider?: string, codeVerifier?: string },
+  error: Error | null
+}
+```
+
+<Note>
+  OAuth 重定向后，SDK 自动检测回调 `insforge_code`，将其交换为会话，并自动保存会话。
+</Note>
+
+### 示例
+
+```javascript
+// Default: auto-redirect
+await insforge.auth.signInWithOAuth('google', {
+  redirectTo: 'http://localhost:3000/dashboard',
+  additionalParams: { prompt: 'select_account' },
+});
+// Browser immediately redirects to Google
+
+// skipBrowserRedirect: get URL for manual handling
+const { data } = await insforge.auth.signInWithOAuth('google', {
+  redirectTo: 'http://localhost:3000/dashboard',
+  skipBrowserRedirect: true,
+});
+
+window.location.href = data.url; // Redirect when ready
+```
+
+<Note>
+  `additionalParams` 仅用于提供商特定的可选提示。不要传递服务器拥有的 OAuth 字段如 `client_id`、`redirect_uri`、`code_challenge`、`state`、`response_type` 或 `scope`；InsForge 在服务器上设置这些值并忽略冲突的客户端提供的密钥。
+</Note>
+
+<Note>
+  自定义提供商必须首先在 InsForge 仪表板的 `Auth Methods` 中使用客户端凭证和 OIDC 发现 URL 配置。
+</Note>
+
+### 输出
+
+```json
+{
+  "data": {
+    "url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...",
+    "provider": "google"
+  },
+  "error": null
+}
+```
+
+---
+
+## signOut()
+
+登出当前用户并清除会话。
+
+### 参数
+
+无
+
+### 返回
+
+```typescript
+{
+  error: Error | null;
+}
+```
+
+### 示例
+
+```javascript
+const { error } = await insforge.auth.signOut();
+```
+
+### 输出
+
+```json
+{
+  "error": null
+}
+```
+
+---
+
+## getCurrentUser()
+
+获取当前登录的用户。
+
+对于浏览器应用，在启动期间调用 `auth.getCurrentUser()`。如果存在有效的 httpOnly 刷新 cookie，SDK 将在返回用户之前自动刷新会话。
+
+对于服务器模式，当您需要刷新过期的访问令牌时，显式调用 `refreshSession({ refreshToken })`。
+
+### 参数
+
+无
+
+### 返回
+
+```typescript
+{
+  data: {
+    user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata } | null
+  },
+  error: Error | null
+}
+```
+
+### 示例
+
+```javascript
+const { data, error } = await insforge.auth.getCurrentUser();
+
+if (data.user) {
+  console.log('User:', data.user.email);
+}
+```
+
+### 输出
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "emailVerified": true,
+      "createdAt": "2024-01-15T10:00:00Z",
+      "updatedAt": "2024-01-15T10:00:00Z",
+      "providers": ["email"],
+      "profile": {
+        "name": "John Doe",
+        "avatar_url": "https://example.com/avatar.jpg"
+      },
+      "metadata": {}
+    }
+  },
+  "error": null
+}
+```
+
+---
+
+## getProfile()
+
+通过 ID 获取任何用户的公开个人资料。返回一个顶级包含所有字段的平面个人资料对象。
+
+### 参数
+
+- `userId` (string, required) - 要获取个人资料的用户 ID
+
+### 返回
+
+```typescript
+{
+  data: {
+    id: string,
+    name?: string,
+    avatar_url?: string,
+    createdAt?: string,
+    updatedAt?: string,
+    ...customFields
+  } | null,
+  error: Error | null
+}
+```
+
+### 示例
+
+```javascript
+const { data, error } = await insforge.auth.getProfile('usr_xyz789');
+
+if (data) {
+  console.log(data.name);
+  console.log(data.avatar_url);
+}
+```
+
+### 输出
+
+```json
+{
+  "data": {
+    "id": "usr_xyz789",
+    "name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "bio": "Full-stack developer",
+    "createdAt": "2024-01-15T10:00:00Z",
+    "updatedAt": "2024-01-15T10:00:00Z"
+  },
+  "error": null
+}
+```
+
+---
+
+## setProfile()
+
+更新当前用户在用户表中的个人资料。支持任何动态字段并返回更新的个人资料作为平面对象。
+
+### 参数
+
+- `profile` (object) - 要更新的个人资料字段的键值映射。接受任何字段。
+
+**常见字段：**
+
+- `name` (predefined, string) - 用户的显示名称
+- `avatar_url` (predefined, string) - 个人资料图片 URL
+
+### 返回
+
+```typescript
+{
+  data: {
+    id: string,
+    name?: string,
+    avatar_url?: string,
+    createdAt?: string,
+    updatedAt?: string,
+    ...customFields
+  } | null,
+  error: Error | null
+}
+```
+
+### 示例
+
+```javascript
+const { data, error } = await insforge.auth.setProfile({
+  name: 'JohnDev',
+  bio: 'Full-stack developer',
+  avatar_url: 'https://example.com/avatar.jpg',
+  custom_field: 'any value', // Any custom fields are supported
+});
+```
+
+### 输出
+
+```json
+{
+  "data": {
+    "id": "usr_abc123",
+    "name": "JohnDev",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "bio": "Full-stack developer",
+    "custom_field": "any value",
+    "createdAt": "2024-01-15T10:00:00Z",
+    "updatedAt": "2024-01-15T12:30:00Z"
+  },
+  "error": null
+}
+```
+
+---
+
+## resendVerificationEmail()
+
+当之前的 OTP 已过期或未收到时，重新发送电子邮件验证。使用身份验证设置中配置的方法（`verifyEmailMethod`）。当方法为 `code` 时，发送 6 位数字代码。当方法为 `link` 时，发送通过 InsForge 后端端点的浏览器验证链接。
+
+<Note>
+  此端点通过即使电子邮件不存在也返回成功来防止用户枚举。
+</Note>
+
+### 参数
+
+- `email` (string, required) - 用户的电子邮件地址
+- `redirectTo` (string, optional) - 用于基于链接的电子邮件验证。电子邮件链接始终首先打开 InsForge 后端端点；在验证令牌后，InsForge 将浏览器重定向到此 URL 以获取验证结果。当 `verifyEmailMethod` 设置为 `link` 时需要。此 URL 必须包含在 `allowedRedirectUrls` 中。推荐：使用您的应用登录页面。
+
+### 返回
+
+```typescript
+{
+  data: { success: boolean, message: string } | null,
+  error: Error | null
+}
+```
+
+### 示例
+
+```javascript
+const { data, error } = await insforge.auth.resendVerificationEmail({
+  email: 'user@example.com',
+  redirectTo: 'http://localhost:3000/sign-in',
+});
+
+if (data?.success) {
+  console.log('Verification email sent!');
+}
+```
+
+### 输出
+
+```json
+{
+  "data": {
+    "success": true,
+    "message": "Verification email sent"
+  },
+  "error": null
+}
+```
+
+---
+
+## verifyEmail()
+
+使用 6 位数字代码验证电子邮件地址。
+
+对于基于链接的验证，用户应点击电子邮件链接，在浏览器中打开 `GET /api/auth/email/verify-link`。
+
+成功验证的使用此代码端点的用户将收到会话令牌。
+
+对于基于链接的验证，您的前端应按如下方式处理浏览器重定向：
+
+- 成功：`?insforge_status=success&insforge_type=verify_email`
+- 错误：`?insforge_status=error&insforge_type=verify_email&insforge_error=...`
+- `insforge_status`：浏览器链接流的结果。对于验证，值为 `success` 或 `error`。
+- `insforge_type`：流标识符。对于验证链接，这始终是 `verify_email`。
+- `insforge_error`：仅当 `insforge_status=error` 时存在。人类可读的错误消息用于显示或日志。
+
+推荐处理：使用您的登录页面作为 `redirectTo`。当 `insforge_status=success` 时，显示确认消息并询问用户使用其电子邮件和密码登录。
+
+### 参数
+
+- `email` (string, required) - 用户的电子邮件地址
+- `otp` (string, required) - 6 位数字验证代码
+
+### 返回
+
+```typescript
+{
+  data: {
+    accessToken: string,
+    user: { id, email, emailVerified, ... }
+  } | null,
+  error: Error | null
+}
+```
+
+### 示例
+
+```javascript
+const { data, error } = await insforge.auth.verifyEmail({
+  email: 'user@example.com',
+  otp: '123456',
+});
+
+if (data) {
+  console.log('Email verified!', data.accessToken);
+}
+```
+
+### 输出
+
+```json
+{
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "emailVerified": true
+    }
+  },
+  "error": null
+}
+```
+
+---
+
+## sendResetPasswordEmail()
+
+使用身份验证设置中配置的方法（`resetPasswordMethod`）发送密码重置电子邮件。当方法为 `code` 时，发送 6 位数字代码用于两步流程。当方法为 `link` 时，发送通过 InsForge 后端端点的浏览器重置链接。
+
+<Note>
+  此端点通过即使电子邮件不存在也返回成功来防止用户枚举。
+</Note>
+
+### 参数
+
+- `email` (string, required) - 用户的电子邮件地址
+- `redirectTo` (string, optional) - 用于基于链接的密码重置。电子邮件链接始终首先打开 InsForge 后端端点；InsForge 然后将浏览器重定向到此 URL，在查询字符串中包含重置 `token`，以便您的应用可以呈现其自己的重置密码页面。当 `resetPasswordMethod` 设置为 `link` 时需要。此 URL 必须包含在 `allowedRedirectUrls` 中。推荐：使用您的应用的专用重置密码页面。
+
+### 返回
+
+```typescript
+{
+  data: { success: boolean, message: string } | null,
+  error: Error | null
+}
+```
+
+### 示例
+
+```javascript
+const { data, error } = await insforge.auth.sendResetPasswordEmail({
+  email: 'user@example.com',
+  redirectTo: 'http://localhost:3000/reset-password',
+});
+
+if (data?.success) {
+  console.log('Password reset email sent!');
+}
+```
+
+### 输出
+
+```json
+{
+  "data": {
+    "success": true,
+    "message": "Password reset email sent"
+  },
+  "error": null
+}
+```
+
+---
+
+## exchangeResetPasswordToken()
+
+将 6 位数字重置密码代码交换为重置令牌。这是两步密码重置流程的第 1 步（仅在 `resetPasswordMethod` 为 `code` 时使用）。
+
+<Note>
+  当 `resetPasswordMethod` 为 `link` 时不使用此端点，因为浏览器重置链接流直接使用电子邮件链接令牌。
+</Note>
+
+### 参数
+
+- `email` (string, required) - 用户的电子邮件地址
+- `code` (string, required) - 电子邮件中的 6 位数字代码
+
+### 返回
+
+```typescript
+{
+  data: { token: string, expiresAt: string } | null,
+  error: Error | null
+}
+```
+
+### 示例
+
+```javascript
+const { data, error } = await insforge.auth.exchangeResetPasswordToken({
+  email: 'user@example.com',
+  code: '123456',
+});
+
+if (data) {
+  // Use token to reset password
+  await insforge.auth.resetPassword({
+    newPassword: 'newSecurePassword123',
+    otp: data.token,
+  });
+}
+```
+
+### 输出
+
+```json
+{
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresAt": "2024-01-15T11:00:00Z"
+  },
+  "error": null
+}
+```
+
+---
+
+## resetPassword()
+
+使用令牌重置用户密码。令牌可以是：
+- **魔法链接令牌**：在 `sendResetPasswordEmail` 的重置页面 URL 中提供，当方法为 `link` 时
+- **重置令牌**：来自 `exchangeResetPasswordToken`，在代码验证后，当方法为 `code` 时
+
+### 参数
+
+- `newPassword` (string, required) - 用户的新密码
+- `otp` (string, required) - 重置令牌或魔法链接令牌
+
+对于基于链接的密码重置，您的前端应按如下方式处理浏览器重定向：
+
+- 准备重置：`?token=...&insforge_status=ready&insforge_type=reset_password`
+- 错误：`?insforge_status=error&insforge_type=reset_password&insforge_error=...`
+- `token`：仅当 `insforge_status=ready` 时存在。将此值传递给 `resetPassword({ otp })`。
+- `insforge_status`：浏览器链接流的结果。对于重置链接，值为 `ready` 或 `error`。
+- `insforge_type`：流标识符。对于重置链接，这始终是 `reset_password`。
+- `insforge_error`：仅当 `insforge_status=error` 时存在。人类可读的错误消息用于显示或日志。
+
+仅当 `insforge_status=ready` 且 `token` 存在时才呈现重置密码表单。
+
+### 返回
+
+```typescript
+{
+  data: { message: string } | null,
+  error: Error | null
+}
+```
+
+### 示例
+
+```javascript
+// Code method flow: after exchangeResetPasswordToken
+const { data, error } = await insforge.auth.resetPassword({
+  newPassword: 'newSecurePassword123',
+  otp: resetToken, // Token from exchangeResetPasswordToken
+});
+
+// Link method flow: token from the reset page URL
+const { data, error } = await insforge.auth.resetPassword({
+  newPassword: 'newSecurePassword123',
+  otp: 'a1b2c3d4e5f6...', // Token from the magic link URL
+});
+
+if (data) {
+  console.log('Password reset successful!');
+}
+```
+
+### 输出
+
+```json
+{
+  "data": {
+    "message": "Password reset successfully. Please login with your new password."
+  },
+  "error": null
+}
+```
+
+---
+
+## 错误处理
+
+所有身份验证方法返回结构化错误：
+
+```javascript
+const { data, error } = await insforge.auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'wrong_password',
+});
+
+if (error) {
+  console.error(error.statusCode); // 401
+  console.error(error.error); // 'INVALID_CREDENTIALS'
+  console.error(error.message); // 'Invalid login credentials'
+  console.error(error.nextActions); // 'Check email and password'
+}
+```

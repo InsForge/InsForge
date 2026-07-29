@@ -9,9 +9,10 @@ import {
   DropdownMenuTrigger,
   cn,
 } from '@insforge/ui';
-import { Avatar, AvatarFallback, Separator, ThemeSelect } from '#components';
+import { Avatar, AvatarFallback, LanguageSelect, Separator, ThemeSelect } from '#components';
 import { useTheme } from '#lib/contexts/ThemeContext';
 import { useAuth } from '#lib/contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 import { useOpenConnectDialog } from './ConnectDialogContext';
 import { getFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
@@ -23,6 +24,7 @@ import InsForgeLogoLight from '#assets/logos/insforge_light.svg';
 import InsForgeLogoDark from '#assets/logos/insforge_dark.svg';
 
 export default function AppHeader() {
+  const { t } = useTranslation('chrome');
   const { resolvedTheme } = useTheme();
   const { logout } = useAuth();
   const openConnectDialog = useOpenConnectDialog();
@@ -31,7 +33,7 @@ export default function AppHeader() {
   const navigate = useNavigate();
   const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;
   const isConnectDisabled = isDTest && pathname === '/dashboard/install';
-  const adminLabel = 'Administrator';
+  const adminLabel = t('header.administrator');
 
   const handleConnectClick = () => {
     if (isDTest) {
@@ -129,6 +131,7 @@ export default function AppHeader() {
             )}
           </a>
           <Separator className="h-5 mx-2" orientation="vertical" />
+          <LanguageSelect />
           <ThemeSelect />
           <Separator className="h-5 mx-2" orientation="vertical" />
           {/* MCP Connection Status */}
@@ -141,7 +144,7 @@ export default function AppHeader() {
             className="gap-1 rounded-[14px] border-[var(--alpha-8)] px-2 [&_svg]:size-4"
           >
             <Plug aria-hidden="true" />
-            <span>Connect</span>
+            <span>{t('header.connect')}</span>
           </Button>
 
           {/* User Profile*/}
@@ -158,7 +161,7 @@ export default function AppHeader() {
                 </Avatar>
                 <div className="text-left hidden md:block">
                   <p className="text-sm font-medium text-zinc-950 dark:text-zinc-100 leading-tight">
-                    Admin
+                    {t('header.admin')}
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">{adminLabel}</p>
                 </div>
@@ -171,7 +174,7 @@ export default function AppHeader() {
                 className="cursor-pointer text-red-600 dark:text-red-400"
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>Sign Out</span>
+                <span>{t('header.signOut')}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -1,0 +1,193 @@
+---
+title: AI REST 參考
+description: 直接 OpenRouter HTTP 整合和 InsForge 模型閘道協助端點
+---
+
+## 概覽
+
+新的 AI 整合應直接呼叫 OpenRouter，使用由 InsForge 提供的 OpenRouter 密鑰。InsForge AI 代理路由（用於聊天、影像生成和嵌入）是已棄用的相容性端點。
+
+使用儀表板將活躍 OpenRouter 密鑰複製到僅伺服器的 `OPENROUTER_API_KEY` 環境變數中。
+
+## 直接 OpenRouter REST
+
+### 標頭
+
+```bash
+Authorization: Bearer $OPENROUTER_API_KEY
+Content-Type: application/json
+```
+
+### 聊天完成
+
+```bash
+curl -X POST https://openrouter.ai/api/v1/chat/completions \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-4o",
+    "messages": [
+      { "role": "user", "content": "What is the capital of France?" }
+    ]
+  }'
+```
+
+### 串流傳輸
+
+```bash
+curl -X POST https://openrouter.ai/api/v1/chat/completions \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-3.5-haiku",
+    "stream": true,
+    "messages": [
+      { "role": "user", "content": "Write a short product update." }
+    ]
+  }'
+```
+
+### 嵌入
+
+```bash
+curl -X POST https://openrouter.ai/api/v1/embeddings \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/text-embedding-3-small",
+    "input": "Hello world"
+  }'
+```
+
+### 模型
+
+```bash
+curl "https://openrouter.ai/api/v1/models?output_modalities=all"
+```
+
+<Note>
+OpenRouter 擁有 AI 模型呼叫的目前請求和回應格式。查看 OpenRouter 的 API 文件以瞭解模型特定參數、支援的模式、外掛程式和影片生成端點。
+</Note>
+
+## InsForge 管理員協助端點
+
+這些端點可協助儀表板顯示活躍模型閘道密鑰、模型目錄和使用概覽。它們需要管理員身份驗證。
+
+在 `Authorization` 標頭中使用管理員 JWT 持有者令牌或 InsForge API 密鑰持有者令牌。
+
+### 取得可用模型
+
+```
+GET /api/ai/models
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/models" \
+  -H "Authorization: Bearer <ADMIN_JWT_TOKEN>"
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/models" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>"
+```
+
+<Warning>
+`GET /api/ai/models` 現在傳回模型物件的平面陣列。較舊的 AI 代理文件描述了一個分類物件，如 `{ "text": [...], "image": [...] }`；更新讀取類別屬性的現有呼叫者改為按 `inputModality` 或 `outputModality` 進行篩選。
+</Warning>
+
+傳回規範化的 OpenRouter 模型目錄作為陣列：
+
+```json
+[
+  {
+    "id": "openai/gpt-4o",
+    "modelId": "openai/gpt-4o",
+    "provider": "openrouter",
+    "inputModality": ["text", "image"],
+    "outputModality": ["text"],
+    "inputPrice": 2.5,
+    "outputPrice": 10,
+    "inputPriceLabel": "$2.50 / 1M tokens",
+    "outputPriceLabel": "$10.00 / 1M tokens"
+  }
+]
+```
+
+### 取得活躍 OpenRouter 密鑰
+
+```
+GET /api/ai/openrouter/api-key
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/openrouter/api-key" \
+  -H "Authorization: Bearer <ADMIN_JWT_TOKEN>"
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/openrouter/api-key" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>"
+```
+
+```json
+{
+  "apiKey": "sk-or-...",
+  "maskedKey": "sk-or-abcd••••••••1234"
+}
+```
+
+<Warning>
+`apiKey` 是原始密鑰。不要記錄、提交、將其儲存在瀏覽器儲存空間中或從公開端點傳回。僅 `maskedKey` 可以安全地顯示在用戶端 UI 中。
+</Warning>
+
+### 取得使用概覽
+
+```
+GET /api/ai/overview
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/overview" \
+  -H "Authorization: Bearer <ADMIN_JWT_TOKEN>"
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/overview" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>"
+```
+
+當活躍密鑰有活動存取權限時，傳回密鑰級 OpenRouter 使用和活動時間序列。
+
+## 已棄用的 InsForge 代理路由
+
+以下路由仍然存在用於現有應用，但新代碼應直接使用 OpenRouter。
+
+| 方法 | 端點 | 替換 |
+|--------|----------|-------------|
+| POST | `/api/ai/chat/completion` | `POST https://openrouter.ai/api/v1/chat/completions` |
+| POST | `/api/ai/image/generation` | OpenRouter 聊天完成（帶影像輸出）或 OpenRouter 影像能力模型文件 |
+| POST | `/api/ai/embeddings` | `POST https://openrouter.ai/api/v1/embeddings` |
+
+### 舊版聊天代理
+
+```
+POST /api/ai/chat/completion
+```
+
+此路由驗證 InsForge 格式的請求，將其轉送到 OpenRouter，並傳回 InsForge 格式的回應。它不公開完整的 OpenRouter API 表面。
+
+### 舊版影像代理
+
+```
+POST /api/ai/image/generation
+```
+
+此路由將 InsForge 格式的影像請求轉送到 OpenRouter 聊天完成（帶影像輸出）。僅為了相容性而保留。
+
+### 舊版嵌入代理
+
+```
+POST /api/ai/embeddings
+```
+
+此路由將 InsForge 格式的嵌入請求轉送到 OpenRouter。對於新代碼，更偏好直接 OpenRouter 嵌入端點。

@@ -1,0 +1,35 @@
+---
+title: "数据库备份和恢复"
+sidebarTitle: "Backups"
+description: "创建手动数据库备份，从 InsForge 仪表盘恢复快照，并在 InsForge Cloud 上使用 7 天保留期的自动化日常备份。"
+---
+
+从仪表盘中的 **Database → Backup & Restore** 备份和恢复您的数据库。InsForge Cloud 也会自动每天备份您的项目，所以您总是有一个最近的副本可以回滚到。
+
+备份仅覆盖数据库 — 上传到 Storage 的文件不包括在内。
+
+<Frame caption="这是它在 UI 中的位置：Database → Backup & Restore。">
+  <img src="/images/dashboard-backup-restore.png" alt="InsForge 仪表盘备份和恢复页面显示手动备份和计划备份，带有恢复按钮" />
+</Frame>
+
+## 计划备份
+
+InsForge Cloud 每天为付费计划上的每个活跃项目进行一次完整备份，保留 7 天。**Scheduled Backups** 列表显示每个备份的过期时间，任何备份都可以随时恢复。手动备份不影响日常计划。
+
+## 手动备份
+
+在风险变更前点击 **Create a Backup**，并可选择给它一个名称。备份在后台运行；列表显示其状态、大小和创建时间，并允许您重命名或删除它。免费计划包含 1 个手动备份槽，付费计划包含 5 个，手动备份保留到您删除为止。
+
+## 恢复
+
+点击任何已完成的备份旁的 **Restore** — 计划备份或手动备份。恢复会将当前数据库替换为备份：项目在恢复期间离线，备份后创建的数据会丢失，并且该操作无法撤销，所以如果您不确定，请先进行手动备份。
+
+## 自托管
+
+自托管部署为手动备份和恢复有相同的 **Backup & Restore** 页面。备份存储在您的项目存储旁（本地磁盘，或配置为您的 S3 桶），并保留到您删除为止。官方 Docker 映像不需要额外设置。
+
+## 更多资源
+
+- [Database overview](/core-concepts/database/overview) 了解数据库如何暴露给您的应用。
+- [Database migrations](/core-concepts/database/migrations) 来版本化架构变更而不是恢复来撤销它们。
+- [Database branching](/agent-native/branching) 来排练危险变更的副本。

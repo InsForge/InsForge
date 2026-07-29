@@ -1,0 +1,121 @@
+---
+title: 函数 SDK 参考
+description: 使用 InsForge Swift SDK 调用无服务器函数
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+## 安装
+
+<SwiftSdkInstallation />
+
+<Note>
+目前，InsForge 仅支持在 Deno 环境中运行的 JavaScript/TypeScript 函数。
+</Note>
+
+---
+
+## invoke()
+
+按 slug 调用无服务器函数。
+
+### 参数
+
+- `slug` (String) - 函数 slug/名称
+- `body` ([String: Any], optional) - 请求体作为字典
+
+### 重载
+
+`invoke` 方法有三个重载：
+
+1. **使用字典体，返回类型化响应**
+   ```swift
+   func invoke<T: Decodable>(_ slug: String, body: [String: Any]?) async throws -> T
+   ```
+
+2. **使用 Encodable 体，返回类型化响应**
+   ```swift
+   func invoke<I: Encodable, O: Decodable>(_ slug: String, body: I) async throws -> O
+   ```
+
+3. **不期望响应体**
+   ```swift
+   func invoke(_ slug: String, body: [String: Any]?) async throws
+   ```
+
+<Note>
+SDK 自动包含来自登录用户的身份验证令牌。
+</Note>
+
+---
+
+## 示例
+
+### 示例：基本调用与类型化响应
+
+```swift
+// Define response model
+struct HelloResponse: Codable {
+    let message: String
+    let timestamp: String
+}
+
+// Invoke function with dictionary body
+let response: HelloResponse = try await insforge.functions.invoke(
+    "hello-world",
+    body: ["name": "World", "greeting": "Hello"]
+)
+
+print(response.message)  // "Hello, World!"
+```
+
+### 示例：使用 Encodable 请求体
+
+```swift
+// Define request and response models
+struct GreetingRequest: Codable {
+    let name: String
+    let greeting: String
+}
+
+struct GreetingResponse: Codable {
+    let message: String
+    let timestamp: String
+}
+
+// Invoke with typed request
+let request = GreetingRequest(name: "World", greeting: "Hello")
+let response: GreetingResponse = try await insforge.functions.invoke(
+    "hello-world",
+    body: request
+)
+
+print(response.message)
+```
+
+---
+
+## 错误处理
+
+```swift
+do {
+    let response: MyResponse = try await insforge.functions.invoke(
+        "my-function",
+        body: ["key": "value"]
+    )
+    print("Success: \\(response)")
+} catch let error as InsForgeError {
+    switch error {
+    case .httpError(let statusCode, let message):
+        print("HTTP Error \\(statusCode): \\(message)")
+    case .decodingError(let error):
+        print("Failed to decode response: \\(error)")
+    case .networkError(let error):
+        print("Network error: \\(error)")
+    default:
+        print("Error: \\(error)")
+    }
+} catch {
+    print("Unexpected error: \\(error)")
+}
+```

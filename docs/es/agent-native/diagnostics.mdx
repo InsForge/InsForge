@@ -1,0 +1,69 @@
+---
+title: "Diagnósticos y asesor"
+sidebarTitle: "Diagnostics & advisor"
+description: "El agente lee la salud del backend, los hallazgos del asesor y los registros de errores, luego aplica la solución."
+---
+
+Cuando algo se rompe, un agente no debe adivinar. `npx @insforge/cli diagnose` convierte las propias señales del backend en algo que un agente puede recuperar y actuar directamente: hallazgos del asesor con remediaciones, controles de salud de la base de datos, métricas de instancia y registros de errores agregados. Cada hallazgo viene con una solución, por lo que "qué está mal" y "qué hacer al respecto" llegan juntos. El agente extrae todo esto por sí mismo, sin panel en el bucle, que es lo que le permite cerrar brechas de seguridad como una política RLS permisiva antes de que filtren datos.
+
+<Frame caption="Un hallazgo del asesor de backend: el problema, la tabla afectada y una remediación que el agente puede copiar y aplicar.">
+  <img src="/images/backend-advisor.png" alt="Backend Advisor finding: a permissive RLS policy on public.messages with a Copy Remediation button" />
+</Frame>
+
+## Informe de salud completo
+
+Ejecute `diagnose` sin subcomando para obtener todo a la vez:
+
+```bash
+npx @insforge/cli diagnose
+npx @insforge/cli diagnose --json
+```
+
+El informe agrupa el escaneo del asesor, la salud de la base de datos, las métricas de instancia y los registros de errores recientes en una salida. En modo `--json`, el agente lo obtiene todo como datos estructurados.
+
+## Asesor de backend
+
+El asesor escanea problemas de seguridad, rendimiento y salud y escribe una remediación para cada uno. El panel muestra los hallazgos con un botón "Copiar remediación", pero el agente no necesita el panel: obtiene el mismo escaneo directamente con `--json` y aplica la solución él mismo, para que un problema de seguridad se cierre sin esperar a que un humano lo note.
+
+```bash
+npx @insforge/cli diagnose advisor
+npx @insforge/cli diagnose advisor --json
+```
+
+Un hallazgo típico es una política RLS permisiva que expone una tabla a usuarios anónimos. El asesor nombra la tabla, la gravedad y el SQL para arreglarlo. El agente lee el hallazgo, aplica la remediación como una [migración](/core-concepts/database/migrations) y vuelve a escanear para confirmar que se borró.
+
+## Controles específicos
+
+Cada parte del informe también está disponible por sí sola:
+
+| Comando | Qué verifica |
+|---------|----------------|
+| `diagnose advisor` | Escaneo más reciente del asesor: problemas de seguridad, rendimiento y salud |
+| `diagnose db` | Salud de la base de datos: conexiones, hinchazón de tabla, uso de índice |
+| `diagnose metrics` | Métricas de instancia: CPU, memoria, disco y red |
+| `diagnose logs` | Registros de nivel de error agregados de todas las fuentes de backend |
+
+Para registros sin procesar de una sola fuente, use el comando de nivel superior:
+
+```bash
+npx @insforge/cli logs function.logs
+npx @insforge/cli logs postgres.logs
+```
+
+Las fuentes incluyen `insforge.logs`, `postgREST.logs`, `postgres.logs`, `function.logs`, y `function-deploy.logs`.
+
+## Deje que el agente lo interprete
+
+`diagnose --ai` entrega los datos de diagnóstico recopilados a un modelo y devuelve un análisis en lenguaje natural:
+
+```bash
+npx @insforge/cli diagnose --ai "why did write latency spike after the last deploy?"
+```
+
+Esa es la diferencia entre volcar un seguimiento de pila y explicar la solución. El agente hace una pregunta sobre el backend activo y obtiene una respuesta fundamentada en las señales reales.
+
+## Próximos pasos
+
+- Aplique remediaciones de asesor como [migraciones](/core-concepts/database/migrations) para que la solución sea versionada.
+- Ensaye una solución riesgosa en una [rama de backend](/agent-native/branching) antes de que toque la producción.
+- Lea el [arnés CLI](/agent-native/cli-harness) para el resto de la superficie de comando.

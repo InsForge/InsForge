@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Outlet, useOutletContext } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, useToast } from '@insforge/ui';
@@ -20,6 +21,7 @@ export function useWebscraperContext() {
 }
 
 export default function WebscraperLayout() {
+  const { t } = useTranslation('chrome');
   const conn = useApifyConnection();
   const { projectId, isLoading: projectIdLoading } = useProjectId();
   const qc = useQueryClient();
@@ -34,28 +36,41 @@ export default function WebscraperLayout() {
     return subscribeApifyConnectionStatus((e) => {
       if (e.status === 'connected') {
         void qc.invalidateQueries({ queryKey: webscraperQueryKeys.all });
-        showToast('Apify connected.', 'info');
+        showToast(t('webscraper.apifyConnected', { defaultValue: 'Apify connected.' }), 'info');
         return;
       }
       if (e.status === 'error') {
         showToast(
           e.reason
-            ? `Apify connection failed: ${e.reason}`
-            : 'Apify connection failed. Please try again.',
+            ? t('webscraper.apifyConnectionFailedReason', {
+                defaultValue: 'Apify connection failed: {{reason}}',
+                reason: e.reason,
+              })
+            : t('webscraper.apifyConnectionFailed', {
+                defaultValue: 'Apify connection failed. Please try again.',
+              }),
           'error'
         );
         return;
       }
       if (e.status === 'cancelled') {
-        showToast('Apify connection cancelled.', 'info');
+        showToast(
+          t('webscraper.apifyConnectionCancelled', {
+            defaultValue: 'Apify connection cancelled.',
+          }),
+          'info'
+        );
       }
     });
-  }, [qc, showToast, subscribeApifyConnectionStatus]);
+  }, [qc, showToast, subscribeApifyConnectionStatus, t]);
 
   if (conn.isLoading || projectIdLoading) {
     return (
       <div className="flex h-full min-h-0 items-center justify-center">
-        <LoadingState className="py-0" message="Loading Web Scraper…" />
+        <LoadingState
+          className="py-0"
+          message={t('webscraper.loadingWebScraper', { defaultValue: 'Loading Web Scraper…' })}
+        />
       </div>
     );
   }
@@ -64,8 +79,12 @@ export default function WebscraperLayout() {
       <div className="flex h-full min-h-0 items-center justify-center px-6">
         <div className="w-full max-w-[420px]">
           <ErrorState
-            title="Failed to load Apify connection"
-            error="Please refresh, or contact support if the problem persists."
+            title={t('webscraper.loadConnectionFailed', {
+              defaultValue: 'Failed to load Apify connection',
+            })}
+            error={t('webscraper.refreshOrContactSupport', {
+              defaultValue: 'Please refresh, or contact support if the problem persists.',
+            })}
           />
         </div>
       </div>
@@ -76,8 +95,12 @@ export default function WebscraperLayout() {
       <div className="flex h-full min-h-0 items-center justify-center px-6">
         <div className="w-full max-w-[420px]">
           <ErrorState
-            title="Project ID unavailable"
-            error="Please refresh, or contact support if the problem persists."
+            title={t('webscraper.projectIdUnavailable', {
+              defaultValue: 'Project ID unavailable',
+            })}
+            error={t('webscraper.refreshOrContactSupport', {
+              defaultValue: 'Please refresh, or contact support if the problem persists.',
+            })}
           />
         </div>
       </div>
@@ -98,9 +121,14 @@ export default function WebscraperLayout() {
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-6">
             <div className="flex w-full max-w-[760px] flex-col gap-4">
               <div className="flex flex-col gap-1">
-                <h1 className="text-lg font-semibold text-foreground">Web Scraper</h1>
+                <h1 className="text-lg font-semibold text-foreground">
+                  {t('webscraper.title', { defaultValue: 'Web Scraper' })}
+                </h1>
                 <p className="text-sm text-muted-foreground">
-                  Connect a web scraper so your coding agent can pull external data on demand.
+                  {t('webscraper.connectDescription', {
+                    defaultValue:
+                      'Connect a web scraper so your coding agent can pull external data on demand.',
+                  })}
                 </p>
               </div>
               <ApifyConnectPanel projectId={projectId} />
@@ -111,8 +139,11 @@ export default function WebscraperLayout() {
             {unhealthy && (
               <div className="flex items-center justify-between gap-3 border-b border-warning bg-warning/10 px-6 py-3">
                 <p className="text-sm text-warning">
-                  Apify connection is {connection.status}. Token refresh may have failed, reconnect
-                  to restore access.
+                  {t('webscraper.connectionUnhealthy', {
+                    defaultValue:
+                      'Apify connection is {{status}}. Token refresh may have failed, reconnect to restore access.',
+                    status: connection.status,
+                  })}
                 </p>
                 <Button
                   variant="secondary"
@@ -120,7 +151,7 @@ export default function WebscraperLayout() {
                   onClick={() => onConnectApify?.(projectId)}
                   className="shrink-0"
                 >
-                  Reconnect
+                  {t('webscraper.reconnect', { defaultValue: 'Reconnect' })}
                 </Button>
               </div>
             )}

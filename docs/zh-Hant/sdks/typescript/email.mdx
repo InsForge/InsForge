@@ -1,0 +1,55 @@
+---
+title: 電子郵件 SDK 參考
+description: 使用 InsForge SDK 傳送自訂交易電子郵件
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## emails.send()
+
+向一個或多個收件人傳送自訂 HTML 電子郵件。
+
+### 參數
+
+- `to` (string | string[], required) - 收件人電子郵件，最多 50 個收件人
+- `subject` (string, required) - 電子郵件主旨列，最多 500 個字元
+- `html` (string, required) - 電子郵件的 HTML 內容
+- `cc` (string | string[], optional) - 副本收件人，最多 50 個收件人
+- `bcc` (string | string[], optional) - 密件副本收件人，最多 50 個收件人
+- `from` (string, optional) - 顯示在寄件地址旁的顯示名稱，最多 100 個字元（啟用自訂 SMTP 時會被忽略）
+- `replyTo` (string, optional) - 回覆電子郵件地址，必須是有效的電子郵件地址
+
+<Note>
+預設情況下，郵件從 `noreply@<你的專案>.send.insforge.dev` 寄出，這是 InsForge Cloud 為您的每個專案佈建並驗證的專屬子網域，因此無需任何網域設定。`from` 欄位只設定顯示在該地址旁的顯示名稱；使用預設寄件服務時，您無法變更寄件地址或網域。若要從自己的網域寄信，請設定[自訂 SMTP](/core-concepts/messaging/custom-smtp)。啟用自訂 SMTP 後，`from` 欄位會被完全忽略，寄件者名稱和電子郵件皆取自您的 SMTP 組態，以防止透過您的伺服器進行詐騙。
+</Note>
+
+### 傳回
+
+```typescript
+{
+  data: {} | null,  // Empty object on success
+  error: Error | null
+}
+```
+
+### 範例
+
+```javascript
+const { data, error } = await insforge.emails.send({
+  to: ['user1@example.com', 'user2@example.com'],
+  cc: 'manager@example.com',
+  from: 'Acme Support Team',
+  subject: 'Team Update',
+  html: '<h1>Weekly Update</h1><p>Here are this week\'s highlights...</p>',
+  replyTo: 'support@example.com'
+});
+
+if (error) {
+  console.error('Failed to send email:', error.message);
+  return;
+}
+
+console.log('Email sent successfully');
+```
