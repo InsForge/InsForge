@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { StorageService } from '@/services/storage/storage.service.js';
+import { ObjectNotFoundError } from '@/providers/storage/base.provider.js';
 import { sendS3Error } from '../errors.js';
 import { S3GatewayRequest, getS3Bucket, getS3Key } from '../request.js';
 
@@ -39,7 +40,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
     result.body.pipe(res);
   } catch (err: unknown) {
     const name = (err as { name?: string; Code?: string }).name ?? (err as { Code?: string }).Code;
-    if (name === 'NoSuchKey' || name === 'NotFound') {
+    if (err instanceof ObjectNotFoundError || name === 'NoSuchKey' || name === 'NotFound') {
       sendS3Error(res, 'NoSuchKey', 'Object does not exist', {
         resource: req.path,
         requestId: req.s3Auth.requestId,

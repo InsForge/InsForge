@@ -1,7 +1,7 @@
 ---
-title: "InsForge 常見問題：資料庫、非 public schema、Edge Function 與 SDK"
+title: "InsForge 常見問題：資料庫、Edge Function 與 SDK"
 sidebarTitle: "常見問題"
-description: "解答 InsForge 常見問題：資料庫呼叫、Edge Function 與 Custom Compute 的差別，如何用 SDK 的 .schema() 查詢非 public schema，以及 RLS 權限設定。"
+description: "InsForge 常見問題：資料庫呼叫、Edge Function、Custom Compute 的差別，SDK 查詢非 public schema，以及 RLS 權限設定。"
 ---
 
 <AccordionGroup>
@@ -80,6 +80,40 @@ description: "解答 InsForge 常見問題：資料庫呼叫、Edge Function 與
     ```
 
     之後列級可見性照常由 RLS 控制。project_admin 擁有表，只是讓它能管理並直接查詢這些表（例如在 dashboard 的 SQL 編輯器裡），並不會給 API 角色存取權限。
+  </Accordion>
+
+  <Accordion title="怎麼幫一張表開啟或關閉列級安全性（RLS）？">
+    新建的表預設**開啟** RLS。建立表時（在 dashboard、`POST /api/database/tables`，或用 SDK），除非你明確傳 `rlsEnabled: false`，否則都會啟用 RLS。
+
+    update-table-schema 端點（`PATCH /api/database/tables/{table}/schema`）沒有切換 RLS 的欄位——它只處理欄、外鍵和重新命名。要改**已存在**表的 RLS，執行一條 SQL 即可：
+
+    ```sql
+    -- 關閉 RLS
+    ALTER TABLE public.mytable DISABLE ROW LEVEL SECURITY;
+
+    -- 重新開啟 RLS
+    ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;
+    ```
+
+    用任何你執行管理員 SQL 的方式都可以執行它，這些方式都需要 project owner / admin 權限：
+
+    ```bash
+    # 一次性執行，透過 CLI
+    insforge db query "ALTER TABLE public.mytable DISABLE ROW LEVEL SECURITY"
+
+    # 或者作為 migration 追蹤
+    npx @insforge/cli db migrations new disable-rls-on-mytable
+    # 把 ALTER TABLE 語句寫進產生的 .sql 檔案裡，然後：
+    npx @insforge/cli db migrations up --all
+    ```
+
+    也可以在 dashboard 的 SQL 編輯器、MCP 的 `run-raw-sql` 工具，或原始 SQL 的 REST 端點（`POST /api/database/advance/rawsql/unrestricted`）裡執行。
+
+    <Warning>
+      **關閉** RLS 會移除所有列級過濾：任何擁有表權限的角色（例如 `authenticated`，以及被授權的 `anon`）都能透過資料 API 讀寫每一列。相比關閉 RLS，更推薦撰寫 RLS 原則。用 API Key（`ik_...`）發起的管理員請求本來就會繞過 RLS。
+
+      給一張沒有任何原則的表**開啟** RLS 會觸發 PostgreSQL 的預設拒絕：在你至少加一條原則之前，`anon` 和 `authenticated` 透過資料 API 對它的所有存取都會被拒絕（每個 `SELECT`/`INSERT`/`UPDATE`/`DELETE` 都被擋下）。請在開啟 RLS 之前，或緊接著，補上需要的原則。
+    </Warning>
   </Accordion>
 
   <Accordion title="InsForge 有 `service_role` key / `INSFORGE_SERVICE_ROLE_KEY` 嗎？">
@@ -180,5 +214,36 @@ description: "解答 InsForge 常見問題：資料庫呼叫、Edge Function 與
 
   <Accordion title="這個助手能幫我解決我自己專案裡的具體問題嗎？">
     基本上不行。這個助手是根據 InsForge 的公開文件來回答的，看不到你的專案：既沒辦法除錯，也讀不到你的資料，更查不了你的設定。凡是跟你自己專案相關的，交給你的編碼 agent 來處理。你的 agent 透過 CLI 或 MCP 連著 InsForge，能讀到你的即時後端、結構、資料和日誌，直接幫你除錯，用白話描述問題就行。想自己拿一份後端健康和報錯報告，跑 `npx @insforge/cli diagnose`。參見 [Diagnostics & advisor](/agent-native/diagnostics)。
+  </Accordion>
+
+  <Accordion title="怎麼拿到資料庫的 Postgres 連線字串（connection string）？">
+    每個 cloud 專案都有一個直連的 Postgres connection string，方便用 `psql`、資料庫 GUI、ORM（Prisma、Drizzle），或者像 [Better Auth](/integrations/better-auth) 這類需要自帶 Postgres 的外部服務。用 CLI 印出來：
+
+    ```bash
+    npx @insforge/cli db connection-string
+    ```
+
+    你也可以在 dashboard 裡拿到：進入 **Project Settings → Connect → Connection String**（僅限 cloud 專案）。
+
+    它回傳的 URL 形如：
+
+    ```text
+    postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require
+    ```
+
+    加上 `--json` 會得到 `{ "connectionURL": "..." }`，方便腳本使用。這個命令**只對 cloud 專案有效**——自行託管的實例其 Postgres 由你的 `docker-compose` 直接暴露，所以請改用本地 Postgres 憑證（`.env` 裡的 `DATABASE_URL` / `POSTGRES_*`）。
+
+    這個字串以擁有完整權限的 `postgres` 角色連線，因此不受行級安全（RLS）限制，而且字串裡嵌了該角色的密碼。請把它當成機密：只在伺服端使用，絕不要發到瀏覽器。
+  </Accordion>
+
+  <Accordion title="怎麼下線或刪除已部署的站點（site）？">
+    目前沒有自助下線已部署 [Site](/core-concepts/sites/overview) 的方式——既沒有 `deployments delete` 命令，dashboard 裡也沒有對應操作。已部署的站點託管在外部，所以即使刪除專案（`npx @insforge/cli projects delete --project <id>`）也只會清掉後端資源——資料庫、Storage 和後端分支——而*不會*移除已託管的站點。
+
+    實際上這基本不影響使用。如果你確實需要下線某個已部署的站點，請到 [Discord](https://discord.com/invite/DvBtaEc9Jz) 聯繫 InsForge 團隊。
+
+    有兩個相關操作，和「下線一個已上線站點」並不是一回事：
+
+    - **取消還在跑的建置：** `npx @insforge/cli deployments cancel <id>` 會終止一個進行中的部署；它不會下線一個已經上線的站點。
+    - **替換目前上線的內容：** 用 `npx @insforge/cli deployments deploy ./frontend` 在同一個站點上重新部署——最新一次 ready 的部署會接管這個 URL。
   </Accordion>
 </AccordionGroup>

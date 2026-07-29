@@ -6,6 +6,8 @@ import PencilIcon from '#assets/icons/pencil.svg?react';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { useBuckets } from '#features/storage/hooks/useBuckets';
 import { useStorageObjects } from '#features/storage/hooks/useStorageObjects';
+import { storageService } from '#features/storage/services/storage.service';
+import { nextAvailableObjectKey } from '#features/storage/helpers';
 import { StorageSidebar } from '#features/storage/components/StorageSidebar';
 import { StorageDataGrid } from '#features/storage/components/StorageDataGrid';
 import { BucketFormDialog } from '#features/storage/components/BucketFormDialog';
@@ -171,6 +173,36 @@ export default function BucketsPage() {
       return;
     }
 
+    // The storage API replaces on an existing key (standard PUT, no server-side
+    // rename), so the dashboard's friendly auto-rename is done here: before each
+    // upload we pick the next free "name (N).ext" so a duplicate filename never
+    // silently overwrites an existing object. `takenInBatch` reserves keys
+    // chosen earlier in this multi-file upload (the listing won't reflect them
+    // yet), and `listingCache` reuses one listing per base name across the
+    // batch instead of re-fetching per file.
+    //
+    // Two accepted trade-offs for this admin flow, over a conditional-write
+    // round-trip: a concurrent upload from another client between the list and
+    // the PUT could take the key (then PUT replaces it); and the listing is
+    // capped at 1000 matches, so in a bucket with >1000 keys sharing a base
+    // name a higher counter could fall outside the page and the chosen key
+    // could collide (again replacing rather than erroring). Both are extreme
+    // edges for a dashboard upload.
+    const listingCache = new Map<string, string[]>();
+    const uploadWithAutoRename = async (bucket: string, file: File, takenInBatch: Set<string>) => {
+      const lastDotIndex = file.name.lastIndexOf('.');
+      const baseName = lastDotIndex > 0 ? file.name.slice(0, lastDotIndex) : file.name;
+      let existingKeys = listingCache.get(baseName);
+      if (!existingKeys) {
+        const { objects } = await storageService.listObjects(bucket, { limit: 1000 }, baseName);
+        existingKeys = objects.map((object) => object.key);
+        listingCache.set(baseName, existingKeys);
+      }
+      const objectKey = nextAvailableObjectKey([...existingKeys, ...takenInBatch], file.name);
+      takenInBatch.add(objectKey);
+      await uploadObject({ bucket, objectKey, file });
+    };
+
     setIsUploading(true);
 
     // Create abort controller for cancellation
@@ -188,6 +220,9 @@ export default function BucketsPage() {
     });
 
     let successCount = 0;
+    // Keys already assigned earlier in this batch, so two files with the same
+    // name don't collide before the listing catches up.
+    const takenInBatch = new Set<string>();
 
     // Upload files sequentially with individual error handling
     for (let i = 0; i < files.length; i++) {
@@ -200,11 +235,7 @@ export default function BucketsPage() {
       updateUploadProgress(toastId, progress);
 
       try {
-        await uploadObject({
-          bucket: selectedBucket,
-          objectKey: files[i].name,
-          file: files[i],
-        });
+        await uploadWithAutoRename(selectedBucket, files[i], takenInBatch);
         successCount++;
       } catch (error) {
         // Handle individual file upload error

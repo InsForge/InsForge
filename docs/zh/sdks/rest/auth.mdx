@@ -135,8 +135,9 @@ POST /api/auth/sessions
 
 | 字段 | 类型 | 必需 | 描述 |
 |-------|------|----------|-------------|
+| `method` | string | 否 | 认证方式，默认为 `password`；邮箱 OTP 登录时使用 `otp` |
 | `email` | string | 是 | 用户电子邮件地址 |
-| `password` | string | 是 | 用户密码 |
+| `password` | string | 密码登录时 | 用户密码 |
 
 ### 示例（Web 客户端）
 
@@ -144,6 +145,7 @@ POST /api/auth/sessions
 curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "password",
     "email": "user@example.com",
     "password": "securepassword123"
   }'
@@ -155,6 +157,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
 curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "password",
     "email": "user@example.com",
     "password": "securepassword123"
   }'
@@ -197,6 +200,73 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile
 <Note>
 - 对于 **Web 客户端**：返回 `csrfToken`，刷新令牌存储在 httpOnly Cookie 中。调用 `/api/auth/refresh` 时在 `X-CSRF-Token` 标头中包含 `csrfToken`。
 - 对于 **非 Web 客户端**（`mobile`、`desktop`、`server`）：直接返回 `refreshToken`。安全地存储它，并在调用 `/api/auth/refresh` 时在请求体中包含它。
+</Note>
+
+---
+
+## 邮箱 OTP 登录
+
+当用户需要通过发送到邮箱的 6 位验证码进行免密码登录时，使用此流程。
+
+### 发送登录验证码
+
+```
+POST /api/auth/email/send-otp
+```
+
+#### 请求体
+
+| 字段 | 类型 | 必需 | 描述 |
+|------|------|------|------|
+| `email` | string | 是 | 接收登录验证码的邮箱地址 |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-otp" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "user@example.com" }'
+```
+
+该端点返回带通用消息的 `202 Accepted`，不会透露此邮箱是否已经属于某个用户。
+
+### 使用验证码创建会话
+
+```
+POST /api/auth/sessions
+```
+
+#### 查询参数
+
+| 参数 | 类型 | 必需 | 描述 |
+|------|------|------|------|
+| `client_type` | string | 否 | 客户端类型：`web`（默认）、`mobile`、`desktop` 或 `server` |
+
+#### 请求体
+
+| 字段 | 类型 | 必需 | 描述 |
+|------|------|------|------|
+| `method` | string | 是 | 必须为 `otp` |
+| `email` | string | 是 | 接收验证码的邮箱地址 |
+| `otp` | string | 是 | 6 位登录验证码 |
+| `name` | string | 否 | 仅在验证后创建新用户时使用的资料名称 |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=server" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "otp",
+    "email": "user@example.com",
+    "otp": "123456",
+    "name": "Ada Lovelace"
+  }'
+```
+
+响应使用与密码登录相同的会话结构和 `client_type` 行为。
+
+<Note>
+- 验证码有效期为 5 分钟，只能使用一次，并会在三次失败尝试后失效。
+- InsForge 不会在发送验证码时创建用户。如果邮箱尚未注册，只会在验证成功后创建已验证的免密码用户。
+- 为现有的未验证账户验证验证码会清除其已存储的密码，使该账户变为免密码。
+- 如果已禁用公开注册，现有用户仍可登录。未知邮箱的有效验证码会被消费，并返回 HTTP 403。
 </Note>
 
 ---

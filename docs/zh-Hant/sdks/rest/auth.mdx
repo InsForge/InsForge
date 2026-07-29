@@ -135,8 +135,9 @@ POST /api/auth/sessions
 
 | 欄位 | 類型 | 必需 | 描述 |
 |-------|------|----------|-------------|
+| `method` | string | 否 | 驗證方式，預設為 `password`；電子郵件 OTP 登入時使用 `otp` |
 | `email` | string | 是 | 使用者電子郵件地址 |
-| `password` | string | 是 | 使用者密碼 |
+| `password` | string | 密碼登入時 | 使用者密碼 |
 
 ### 示例（Web 用戶端）
 
@@ -144,6 +145,7 @@ POST /api/auth/sessions
 curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "password",
     "email": "user@example.com",
     "password": "securepassword123"
   }'
@@ -155,6 +157,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
 curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile" \
   -H "Content-Type: application/json" \
   -d '{
+    "method": "password",
     "email": "user@example.com",
     "password": "securepassword123"
   }'
@@ -197,6 +200,73 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile
 <Note>
 - 對於 **Web 用戶端**：傳回 `csrfToken`，刷新令牌儲存在 httpOnly Cookie 中。呼叫 `/api/auth/refresh` 時在 `X-CSRF-Token` 標頭中包含 `csrfToken`。
 - 對於 **非 Web 用戶端**（`mobile`、`desktop`、`server`）：直接傳回 `refreshToken`。安全地儲存它，並在呼叫 `/api/auth/refresh` 時在請求體中包含它。
+</Note>
+
+---
+
+## 電子郵件 OTP 登入
+
+當使用者需要透過傳送至電子郵件的 6 位數驗證碼進行免密碼登入時，請使用此流程。
+
+### 傳送登入驗證碼
+
+```
+POST /api/auth/email/send-otp
+```
+
+#### 請求本文
+
+| 欄位 | 類型 | 必需 | 描述 |
+|------|------|------|------|
+| `email` | string | 是 | 接收登入驗證碼的電子郵件地址 |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-otp" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "user@example.com" }'
+```
+
+此端點會傳回包含通用訊息的 `202 Accepted`，不會透露該電子郵件是否已屬於某個使用者。
+
+### 使用驗證碼建立工作階段
+
+```
+POST /api/auth/sessions
+```
+
+#### 查詢參數
+
+| 參數 | 類型 | 必需 | 描述 |
+|------|------|------|------|
+| `client_type` | string | 否 | 用戶端類型：`web`（預設）、`mobile`、`desktop` 或 `server` |
+
+#### 請求本文
+
+| 欄位 | 類型 | 必需 | 描述 |
+|------|------|------|------|
+| `method` | string | 是 | 必須為 `otp` |
+| `email` | string | 是 | 接收驗證碼的電子郵件地址 |
+| `otp` | string | 是 | 6 位數登入驗證碼 |
+| `name` | string | 否 | 僅在驗證後建立新使用者時使用的個人資料名稱 |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=server" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "otp",
+    "email": "user@example.com",
+    "otp": "123456",
+    "name": "Ada Lovelace"
+  }'
+```
+
+回應使用與密碼登入相同的工作階段結構和 `client_type` 行為。
+
+<Note>
+- 驗證碼有效期為 5 分鐘，只能使用一次，並會在三次失敗嘗試後失效。
+- InsForge 不會在傳送驗證碼時建立使用者。如果電子郵件尚未註冊，只會在驗證成功後建立已驗證的免密碼使用者。
+- 為現有的未驗證帳戶驗證驗證碼會清除其已儲存的密碼，使該帳戶變為免密碼。
+- 如果已停用公開註冊，現有使用者仍可登入。未知電子郵件的有效驗證碼會被消耗，並傳回 HTTP 403。
 </Note>
 
 ---

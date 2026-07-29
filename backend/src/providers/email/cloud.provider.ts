@@ -3,7 +3,7 @@ import axios from 'axios';
 import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import { AppError } from '@/utils/errors.js';
-import { EmailTemplate } from '@/types/email.js';
+import { EMAIL_TEMPLATE_TYPES, EmailTemplate } from '@/types/email.js';
 import { EmailProvider } from './base.provider.js';
 import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
 
@@ -79,15 +79,9 @@ export class CloudEmailProvider implements EmailProvider {
         );
       }
 
-      const validTemplates: EmailTemplate[] = [
-        'email-verification-code',
-        'email-verification-link',
-        'reset-password-code',
-        'reset-password-link',
-      ];
-      if (!validTemplates.includes(template)) {
+      if (!EMAIL_TEMPLATE_TYPES.includes(template)) {
         throw new AppError(
-          `Invalid template type: ${template}. Must be one of: ${validTemplates.join(', ')}`,
+          `Invalid template type: ${template}. Must be one of: ${EMAIL_TEMPLATE_TYPES.join(', ')}`,
           400,
           ERROR_CODES.INVALID_INPUT
         );

@@ -50,7 +50,7 @@ describe('OpenRouterProvider authentication error handling', () => {
   });
 
   it('throws AppError with BILLING_INSUFFICIENT_BALANCE for env key 402', async () => {
-    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'env' });
+    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'self-hosted' });
 
     await expect(
       provider.sendRequest(() => {
@@ -64,7 +64,7 @@ describe('OpenRouterProvider authentication error handling', () => {
   });
 
   it('throws AppError with AI_INVALID_API_KEY for env key 401', async () => {
-    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'env' });
+    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'self-hosted' });
 
     await expect(
       provider.sendRequest(() => {
@@ -78,7 +78,7 @@ describe('OpenRouterProvider authentication error handling', () => {
   });
 
   it('throws AppError with AI_INVALID_API_KEY for env key 403', async () => {
-    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'env' });
+    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'self-hosted' });
 
     await expect(
       provider.sendRequest(() => {
@@ -92,7 +92,7 @@ describe('OpenRouterProvider authentication error handling', () => {
   });
 
   it('throws AppError with RATE_LIMITED for 429', async () => {
-    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'env' });
+    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'self-hosted' });
 
     await expect(
       provider.sendRequest(() => {
@@ -106,7 +106,7 @@ describe('OpenRouterProvider authentication error handling', () => {
   });
 
   it('maps non-API provider errors to AI_UPSTREAM_UNAVAILABLE', async () => {
-    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'env' });
+    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'self-hosted' });
 
     const networkError = new Error('ECONNREFUSED');
 
@@ -122,7 +122,7 @@ describe('OpenRouterProvider authentication error handling', () => {
   });
 
   it('maps 500 API errors to AI_UPSTREAM_UNAVAILABLE', async () => {
-    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'env' });
+    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'self-hosted' });
 
     await expect(
       provider.sendRequest(() => {

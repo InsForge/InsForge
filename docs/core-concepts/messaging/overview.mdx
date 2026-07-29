@@ -1,7 +1,7 @@
 ---
-title: "Messaging"
+title: "Messaging overview"
 sidebarTitle: "Overview"
-description: "Send transactional messages from your project. Email today, SMS and push on the roadmap."
+description: "Send transactional emails from your InsForge project with the managed sender or custom SMTP. SMS and push are on the roadmap for the same API."
 ---
 
 InsForge Messaging sends transactional notifications from your project: receipts, digests, password-reset codes, notification roll-ups, anything you would otherwise wire SendGrid, Postmark, or Twilio in for. Email is the first channel; SMS and push are on the roadmap and will share the same API surface.
@@ -11,7 +11,7 @@ InsForge Messaging sends transactional notifications from your project: receipts
 </Note>
 
 <Warning>
-  **Self-hosting?** The managed InsForge Cloud sender is only available to cloud-linked projects. On a self-hosted instance you must configure [Custom SMTP](/core-concepts/messaging/custom-smtp) before any email can send, auth emails included. Without it, turning on email verification leaves new sign-ups stuck in an unverified state with no email ever delivered, because the send failure is logged and swallowed rather than surfaced. Configure SMTP first, or leave email verification off (the default).
+  **Self-hosting?** The managed InsForge Cloud sender is only available to cloud-linked projects. On a self-hosted instance you must configure [Custom SMTP](/core-concepts/messaging/custom-smtp) before any email can send, auth emails included. InsForge rejects enabling required email verification until a provider is available, and it prevents disabling the only SMTP provider while verification remains required. If a verification email fails at runtime, registration returns an error with instructions to retry with `POST /api/auth/email/send-verification`.
 </Warning>
 
 ```mermaid

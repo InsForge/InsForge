@@ -27,7 +27,9 @@ export function useRotateOpenRouterKey() {
       queryClient.setQueryData(OPENROUTER_KEY_QUERY_KEY, key);
       void queryClient.invalidateQueries({ queryKey: AI_OVERVIEW_QUERY_KEY });
       showToast(
-        t('ai.overview.keyRotated', { defaultValue: 'OpenRouter API key rotated successfully' }),
+        t('ai.overview.keyRotated', {
+          defaultValue: 'OpenRouter API key rotated successfully',
+        }),
         'success'
       );
     },

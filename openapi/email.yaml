@@ -8,11 +8,12 @@ paths:
   /api/email/send-raw:
     post:
       summary: Send raw HTML email
-      description: Send a custom HTML email to one or more recipients. Requires user authentication.
+      description: Send a custom HTML email to one or more recipients. Requires user authentication or a valid admin API key.
       tags:
         - Client
       security:
         - bearerAuth: []
+        - apiKey: []
       requestBody:
         required: true
         content:
@@ -57,6 +58,10 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
 
   schemas:
     SendRawEmailRequest:

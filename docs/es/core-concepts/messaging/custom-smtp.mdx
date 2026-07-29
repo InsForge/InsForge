@@ -1,9 +1,9 @@
 ---
 title: SMTP personalizado
-description: Enrutar todos los correos electrónicos salientes a través de su propio servidor SMTP
+description: Configure su propio servidor SMTP para enviar correos de autenticación y transaccionales de InsForge, con verificación y enlaces mágicos.
 ---
 
-Cuando está habilitado, cada correo electrónico (flujos de autenticación y llamadas `emails.send()`) se enruta a través de su servidor SMTP. Apáguelo para revertir; las credenciales se conservan.
+Cuando está habilitado, cada correo electrónico (flujos de autenticación y llamadas `emails.send()`) se enruta a través de su servidor SMTP. Apáguelo para revertir; las credenciales se conservan. Una instancia autohospedada no puede desactivar SMTP mientras la verificación obligatoria de correo dependa de él.
 
 <Note>
   **Las instancias autohospedadas necesitan esto para poder enviar cualquier correo electrónico.** El remitente gestionado sin configuración se enruta a través de InsForge Cloud y solo está disponible para proyectos vinculados a la nube. Una instancia autohospedada sin SMTP configurado no puede entregar correos de autenticación, por lo que la verificación de correo electrónico, los enlaces mágicos y los restablecimientos de contraseña no se entregarán hasta que complete la configuración a continuación.
