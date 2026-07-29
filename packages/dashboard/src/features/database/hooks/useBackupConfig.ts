@@ -30,8 +30,7 @@ export function useBackupConfig() {
   });
 
   const updateBackupConfigMutation = useMutation({
-    mutationFn: (patch: UpdateDatabaseBackupConfig) =>
-      backupService.updateBackupConfig(patch),
+    mutationFn: (patch: UpdateDatabaseBackupConfig) => backupService.updateBackupConfig(patch),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: BACKUP_CONFIG_QUERY_KEY });
       showToast(
