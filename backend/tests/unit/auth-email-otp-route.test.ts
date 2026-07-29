@@ -33,6 +33,7 @@ vi.mock('@/api/middlewares/rate-limiters.js', () => ({
     mocks.verifyOTPRequest(req.body);
     next();
   },
+  registrationRateLimiter: (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
 vi.mock('@/infra/security/token.manager.js', () => ({
