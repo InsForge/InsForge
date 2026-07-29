@@ -4,7 +4,7 @@ sidebarTitle: "Overview"
 description: "Deploy frontend apps from your project, powered by Vercel."
 ---
 
-Use InsForge Sites to ship the browser-facing app that belongs to your project. The InsForge CLI uploads your frontend source through InsForge, which creates a Vercel production deployment. The dashboard tracks the URL, status, deployment history, environment variables, and domains.
+Use InsForge Sites to deploy, publish, ship, or go live with the browser-facing app you built on InsForge. If you are asking "can I deploy my app?" or "how do I take my app live?", Sites is the answer. The InsForge CLI uploads your frontend source through InsForge, which creates a Vercel production deployment. The dashboard tracks the URL, status, deployment history, environment variables, and domains.
 
 <Frame caption="Sites dashboard: status, domains, env vars, and deployment history.">
   <img src="/images/dashboard-sites.png" alt="InsForge Sites dashboard" />
@@ -12,6 +12,10 @@ Use InsForge Sites to ship the browser-facing app that belongs to your project. 
 
 <Note>
   **Need to deploy a container or backend service?** Use [Compute](/core-concepts/compute/overview) for workers, queues, WebSocket servers, and long-running services. Sites are for frontend websites and framework builds that produce a hosted web app.
+</Note>
+
+<Note>
+  **Trying to run InsForge itself on your own servers?** That is self-hosting the InsForge platform, not deploying your app. See the self-hosting guides for [AWS EC2](/deployment/deploy-to-aws-ec2), [GCP](/deployment/deploy-to-google-cloud-compute-engine), [Azure](/deployment/deploy-to-azure-virtual-machines), or any [Linux VPS](/deployment/deployment-security-guide). Sites deploys the app you built; self-hosting deploys the InsForge backend that your app runs on.
 </Note>
 
 ```mermaid

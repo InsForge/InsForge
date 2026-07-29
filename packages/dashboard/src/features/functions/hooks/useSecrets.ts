@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { secretService } from '#features/functions/services/secret.service';
 import type { SecretSchema, CreateSecretRequest } from '@insforge/shared-schemas';
@@ -6,6 +7,7 @@ import { useToast } from '@insforge/ui';
 import { useConfirm } from '#lib/hooks/useConfirm';
 
 export function useSecretValue(secret: Pick<SecretSchema, 'key' | 'updatedAt'>) {
+  const { t } = useTranslation('chrome');
   const { showToast } = useToast();
   const updatedAtKey = secret.updatedAt ?? 'never';
   const [isValueVisible, setIsValueVisible] = useState(false);
@@ -40,7 +42,11 @@ export function useSecretValue(secret: Pick<SecretSchema, 'key' | 'updatedAt'>) 
 
       if (error || !data) {
         const errorMessage =
-          error instanceof Error ? error.message : 'Failed to fetch secret value';
+          error instanceof Error
+            ? error.message
+            : t('functions.failedToFetchSecretValue', {
+                defaultValue: 'Failed to fetch secret value',
+              });
         setValueError(errorMessage);
         showToast(errorMessage, 'error');
         return;
@@ -48,7 +54,7 @@ export function useSecretValue(secret: Pick<SecretSchema, 'key' | 'updatedAt'>) 
     }
 
     setIsValueVisible(true);
-  }, [isValueVisible, revealedSecret, refetchSecretValue, showToast]);
+  }, [isValueVisible, revealedSecret, refetchSecretValue, showToast, t]);
 
   return {
     isValueVisible,
@@ -60,6 +66,7 @@ export function useSecretValue(secret: Pick<SecretSchema, 'key' | 'updatedAt'>) 
 }
 
 export function useSecrets() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { confirm, confirmDialogProps } = useConfirm();
@@ -85,11 +92,17 @@ export function useSecrets() {
     mutationFn: (input: CreateSecretRequest) => secretService.createSecret(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['secrets'] });
-      showToast('Secret created successfully', 'success');
+      showToast(
+        t('functions.secretCreated', { defaultValue: 'Secret created successfully' }),
+        'success'
+      );
     },
     onError: (error: Error) => {
       console.error('Failed to create secret:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create secret';
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : t('functions.failedToCreateSecret', { defaultValue: 'Failed to create secret' });
       showToast(errorMessage, 'error');
     },
   });
@@ -99,11 +112,17 @@ export function useSecrets() {
     mutationFn: (key: string) => secretService.deleteSecret(key),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['secrets'] });
-      showToast('Secret deleted successfully', 'success');
+      showToast(
+        t('functions.secretDeleted', { defaultValue: 'Secret deleted successfully' }),
+        'success'
+      );
     },
     onError: (error: Error) => {
       console.error('Failed to delete secret:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete secret';
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : t('functions.failedToDeleteSecret', { defaultValue: 'Failed to delete secret' });
       showToast(errorMessage, 'error');
     },
   });
@@ -112,7 +131,10 @@ export function useSecrets() {
   const createSecret = useCallback(
     async (key: string, value: string) => {
       if (!key.trim() || !value.trim()) {
-        showToast('Please fill in both key and value', 'error');
+        showToast(
+          t('functions.fillKeyAndValue', { defaultValue: 'Please fill in both key and value' }),
+          'error'
+        );
         return false;
       }
 
@@ -126,22 +148,28 @@ export function useSecrets() {
         return false;
       }
     },
-    [createSecretMutation, showToast]
+    [createSecretMutation, showToast, t]
   );
 
   // Delete secret with confirmation
   const deleteSecret = useCallback(
     async (secret: SecretSchema) => {
       if (secret.isReserved) {
-        showToast('Cannot delete reserved secrets', 'error');
+        showToast(
+          t('functions.cannotDeleteReserved', { defaultValue: 'Cannot delete reserved secrets' }),
+          'error'
+        );
         return false;
       }
 
       const shouldDelete = await confirm({
-        title: 'Delete Secret',
-        description: `You sure to delete "${secret.key}"?`,
-        confirmText: 'Delete',
-        cancelText: 'Cancel',
+        title: t('functions.deleteSecretTitle', { defaultValue: 'Delete Secret' }),
+        description: t('functions.deleteSecretConfirm', {
+          key: secret.key,
+          defaultValue: 'You sure to delete "{{key}}"?',
+        }),
+        confirmText: t('functions.delete', { defaultValue: 'Delete' }),
+        cancelText: t('functions.cancel', { defaultValue: 'Cancel' }),
         destructive: true,
       });
 
@@ -155,7 +183,7 @@ export function useSecrets() {
       }
       return false;
     },
-    [confirm, deleteSecretMutation, showToast]
+    [confirm, deleteSecretMutation, showToast, t]
   );
 
   // Filter secrets based on search query

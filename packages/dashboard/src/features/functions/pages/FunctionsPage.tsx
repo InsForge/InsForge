@@ -13,6 +13,7 @@ import {
   Skeleton,
 } from '@insforge/ui';
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { CodeEditor, TableHeader } from '#components';
 import { useConfirm } from '#lib/hooks/useConfirm';
@@ -21,6 +22,7 @@ const MAX_FUNCTION_FILE_SIZE_BYTES = 1024 * 1024;
 const ALLOWED_FUNCTION_FILE_EXTENSIONS = ['.ts', '.js', '.tsx', '.jsx'];
 
 export default function FunctionsPage() {
+  const { t } = useTranslation('chrome');
   const toastShownRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,9 +79,12 @@ export default function FunctionsPage() {
   useEffect(() => {
     if (!isRuntimeAvailable && !toastShownRef.current) {
       toastShownRef.current = true;
-      showToast('Function container is unhealthy.', 'error');
+      showToast(
+        t('functions.containerUnhealthy', { defaultValue: 'Function container is unhealthy.' }),
+        'error'
+      );
     }
-  }, [isRuntimeAvailable, showToast]);
+  }, [isRuntimeAvailable, showToast, t]);
 
   useEffect(() => {
     setIsEditingCode(false);
@@ -109,10 +114,14 @@ export default function FunctionsPage() {
 
       try {
         const confirmed = await confirm({
-          title: 'Delete Function',
-          description: `Are you sure you want to delete the function "${name}"? This action cannot be undone.`,
-          confirmText: 'Delete',
-          cancelText: 'Cancel',
+          title: t('functions.deleteFunctionTitle', { defaultValue: 'Delete Function' }),
+          description: t('functions.deleteFunctionConfirm', {
+            name,
+            defaultValue:
+              'Are you sure you want to delete the function "{{name}}"? This action cannot be undone.',
+          }),
+          confirmText: t('functions.delete', { defaultValue: 'Delete' }),
+          cancelText: t('functions.cancel', { defaultValue: 'Cancel' }),
           destructive: true,
         });
 
@@ -125,7 +134,7 @@ export default function FunctionsPage() {
         console.error('Failed to delete function', error);
       }
     },
-    [confirm, deleteFunction, isMutatingFunction]
+    [confirm, deleteFunction, isMutatingFunction, t]
   );
 
   const handleStartEditCode = useCallback(
@@ -190,13 +199,20 @@ export default function FunctionsPage() {
           );
 
           if (!matchedExtension) {
-            showToast('Invalid file type. Please upload a .ts, .js, .tsx, or .jsx file.', 'error');
+            showToast(
+              t('functions.invalidFileType', {
+                defaultValue: 'Invalid file type. Please upload a .ts, .js, .tsx, or .jsx file.',
+              }),
+              'error'
+            );
             return;
           }
 
           if (file.size > MAX_FUNCTION_FILE_SIZE_BYTES) {
             showToast(
-              'Function file is too large. Please upload a file smaller than 1 MB.',
+              t('functions.fileTooLarge', {
+                defaultValue: 'Function file is too large. Please upload a file smaller than 1 MB.',
+              }),
               'error'
             );
             return;
@@ -207,14 +223,17 @@ export default function FunctionsPage() {
           setIsEditingCode(true);
         } catch (error) {
           console.error('Failed to read function file', error);
-          showToast('Failed to read function file', 'error');
+          showToast(
+            t('functions.failedToReadFile', { defaultValue: 'Failed to read function file' }),
+            'error'
+          );
         } finally {
           // reset input so same file can be selected again
           event.target.value = '';
         }
       })();
     },
-    [isMutatingFunction, showToast]
+    [isMutatingFunction, showToast, t]
   );
 
   // Detail view for selected function
@@ -249,9 +268,13 @@ export default function FunctionsPage() {
                 handleDownloadCode(selectedFunction.code, selectedFunction.slug)
               }
               disabled={!selectedFunction.code}
-              aria-label="Download function code"
+              aria-label={t('functions.downloadFunctionCode', {
+                defaultValue: 'Download function code',
+              })}
               className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
-              title="Download function code"
+              title={t('functions.downloadFunctionCode', {
+                defaultValue: 'Download function code',
+              })}
             >
               <Download className="h-4 w-4" />
             </Button>
@@ -259,10 +282,12 @@ export default function FunctionsPage() {
               variant="ghost"
               size="icon"
               onClick={handleUploadFile}
-              aria-label="Upload function file"
+              aria-label={t('functions.uploadFunctionFile', {
+                defaultValue: 'Upload function file',
+              })}
               disabled={isMutatingFunction}
               className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
-              title="Upload function file"
+              title={t('functions.uploadFunctionFile', { defaultValue: 'Upload function file' })}
             >
               <Upload className="h-4 w-4" />
             </Button>
@@ -270,9 +295,9 @@ export default function FunctionsPage() {
               variant="ghost"
               size="icon"
               onClick={() => handleStartEditCode(selectedFunction.code)}
-              aria-label="Edit function code"
+              aria-label={t('functions.editFunctionCode', { defaultValue: 'Edit function code' })}
               className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
-              title="Edit function code"
+              title={t('functions.editFunctionCode', { defaultValue: 'Edit function code' })}
               disabled={isMutatingFunction}
             >
               <Edit3 className="h-4 w-4" />
@@ -283,9 +308,9 @@ export default function FunctionsPage() {
               onClick={() =>
                 void handleDeleteFunction(selectedFunction.slug, selectedFunction.name)
               }
-              aria-label="Delete function"
+              aria-label={t('functions.deleteFunction', { defaultValue: 'Delete function' })}
               className="h-8 w-8 rounded p-1.5 text-destructive hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
-              title="Delete function"
+              title={t('functions.deleteFunction', { defaultValue: 'Delete function' })}
               disabled={isMutatingFunction}
             >
               <Trash2 className="h-4 w-4" />
@@ -303,7 +328,7 @@ export default function FunctionsPage() {
                   disabled={isMutatingFunction}
                   className="h-8 px-2"
                 >
-                  Cancel
+                  {t('functions.cancel', { defaultValue: 'Cancel' })}
                 </Button>
                 <Button
                   size="sm"
@@ -311,7 +336,9 @@ export default function FunctionsPage() {
                   disabled={isMutatingFunction}
                   className="h-8 px-2"
                 >
-                  {isUpdating ? 'Saving…' : 'Save'}
+                  {isUpdating
+                    ? t('functions.saving', { defaultValue: 'Saving...' })
+                    : t('functions.save', { defaultValue: 'Save' })}
                 </Button>
               </div>
               <div className="flex-1 min-h-0">
@@ -339,7 +366,7 @@ export default function FunctionsPage() {
         leftContent={
           <div className="flex flex-1 items-center overflow-clip">
             <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
-              Edge Functions
+              {t('functions.edgeFunctions', { defaultValue: 'Edge Functions' })}
             </h1>
             <div className="flex h-5 w-5 shrink-0 items-center justify-center">
               <div className="h-5 w-px bg-[var(--alpha-8)]" />
@@ -358,7 +385,11 @@ export default function FunctionsPage() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">
-                  <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                  <p>
+                    {isRefreshing
+                      ? t('functions.refreshing', { defaultValue: 'Refreshing...' })
+                      : t('functions.refresh', { defaultValue: 'Refresh' })}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -367,7 +398,7 @@ export default function FunctionsPage() {
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}
         searchDebounceTime={300}
-        searchPlaceholder="Search functions"
+        searchPlaceholder={t('functions.searchFunctions', { defaultValue: 'Search functions' })}
       />
 
       {/* Scrollable Content */}
@@ -384,10 +415,18 @@ export default function FunctionsPage() {
           className={`sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3 ${isScrolled ? 'border-b border-[var(--alpha-8)]' : ''}`}
         >
           <div className="flex items-center h-8 pl-2 text-sm text-muted-foreground">
-            <div className="flex-[1.5] py-1.5 px-2.5">Name</div>
-            <div className="flex-[3] py-1.5 px-2.5">URL</div>
-            <div className="flex-[1.5] py-1.5 px-2.5">Created</div>
-            <div className="flex-1 py-1.5 px-2.5">Last Update</div>
+            <div className="flex-[1.5] py-1.5 px-2.5">
+              {t('functions.name', { defaultValue: 'Name' })}
+            </div>
+            <div className="flex-[3] py-1.5 px-2.5">
+              {t('functions.url', { defaultValue: 'URL' })}
+            </div>
+            <div className="flex-[1.5] py-1.5 px-2.5">
+              {t('functions.created', { defaultValue: 'Created' })}
+            </div>
+            <div className="flex-1 py-1.5 px-2.5">
+              {t('functions.lastUpdate', { defaultValue: 'Last Update' })}
+            </div>
           </div>
         </div>
 
@@ -422,7 +461,9 @@ export default function FunctionsPage() {
           <div className="absolute inset-0 bg-[rgb(var(--semantic-1))] flex items-center justify-center z-50">
             <div className="flex items-center gap-1">
               <div className="w-5 h-5 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-muted-foreground">Loading</span>
+              <span className="text-sm text-muted-foreground">
+                {t('functions.loading', { defaultValue: 'Loading' })}
+              </span>
             </div>
           </div>
         )}

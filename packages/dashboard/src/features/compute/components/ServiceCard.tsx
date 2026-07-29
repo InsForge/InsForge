@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, ExternalLink, MoreVertical, Play, Square, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -19,6 +20,7 @@ interface ServiceCardProps {
 }
 
 export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: ServiceCardProps) {
+  const { t } = useTranslation('chrome');
   const reachableUrl = getReachableUrl(service);
   // Only poll Fly events for services that could plausibly be crash-looping —
   // a stopped/failed/destroying machine has nothing to loop on, and these
@@ -44,15 +46,19 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
           {health?.isCrashLooping && (
             <span
               className="flex items-center gap-1 text-xs text-destructive"
-              title={`${health.recentExitCount} exits in the last 60s — container is restart-looping. Container stdout/stderr isn't surfaced yet; reproduce locally with the same image to see why it's exiting.`}
+              title={t('compute.crashLoopTooltip', {
+                defaultValue:
+                  "{{count}} exits in the last 60s — container is restart-looping. Container stdout/stderr isn't surfaced yet; reproduce locally with the same image to see why it's exiting.",
+                count: health.recentExitCount,
+              })}
             >
               <AlertTriangle className="h-3 w-3" />
-              crash-looping
+              {t('compute.crashLooping', { defaultValue: 'crash-looping' })}
             </span>
           )}
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className={`inline-block h-2 w-2 rounded-full ${statusColors[service.status]}`} />
-            {service.status}
+            {t(`compute.statuses.${service.status}`, { defaultValue: service.status })}
           </span>
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -65,13 +71,13 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
               {service.status === 'running' && (
                 <DropdownMenuItem onClick={() => onStop(service.id)}>
                   <Square className="h-3.5 w-3.5" />
-                  Stop
+                  {t('compute.stop', { defaultValue: 'Stop' })}
                 </DropdownMenuItem>
               )}
               {service.status === 'stopped' && (
                 <DropdownMenuItem onClick={() => onStart(service.id)}>
                   <Play className="h-3.5 w-3.5" />
-                  Start
+                  {t('compute.start', { defaultValue: 'Start' })}
                 </DropdownMenuItem>
               )}
               {(service.status === 'running' || service.status === 'stopped') && (
@@ -79,7 +85,7 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
               )}
               <DropdownMenuItem onClick={() => onDelete(service.id)} className="text-destructive">
                 <Trash2 className="h-3.5 w-3.5" />
-                Delete
+                {t('compute.delete', { defaultValue: 'Delete' })}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -87,7 +93,9 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
       </div>
 
       <p className="text-xs text-muted-foreground truncate mb-3" title={service.imageUrl}>
-        {service.imageUrl === 'dockerfile' ? 'Built from Dockerfile' : service.imageUrl}
+        {service.imageUrl === 'dockerfile'
+          ? t('compute.builtFromDockerfile', { defaultValue: 'Built from Dockerfile' })
+          : service.imageUrl}
       </p>
 
       {reachableUrl &&
@@ -106,15 +114,23 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
           <code
             onClick={(e) => e.stopPropagation()}
             className="inline-flex items-center text-xs text-foreground bg-[var(--alpha-8)] px-2 py-0.5 rounded mb-3 font-mono"
-            title="Raw TCP endpoint — connect with redis-cli, psql, or your protocol-native client"
+            title={t('compute.rawTcpEndpointTooltip', {
+              defaultValue:
+                'Raw TCP endpoint — connect with redis-cli, psql, or your protocol-native client',
+            })}
           >
             {reachableUrl.display}
           </code>
         ))}
 
       <div className="flex items-center gap-3 text-xs text-muted-foreground pt-2 border-t border-[var(--alpha-8)]">
-        <span>CPU: {service.cpu}</span>
-        <span>Memory: {service.memory} MB</span>
+        <span>{t('compute.cpuValue', { defaultValue: 'CPU: {{value}}', value: service.cpu })}</span>
+        <span>
+          {t('compute.memoryValue', {
+            defaultValue: 'Memory: {{value}} MB',
+            value: service.memory,
+          })}
+        </span>
         <span>{service.region}</span>
       </div>
     </div>

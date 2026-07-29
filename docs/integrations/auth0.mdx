@@ -1,0 +1,127 @@
+---
+title: "Auth0 Authentication"
+sidebarTitle: "Auth0"
+description: "Add Auth0 enterprise authentication and SSO to your InsForge backend. Step-by-step setup for JWT validation, RLS policies, and user sync."
+---
+
+## Overview
+
+[Auth0](https://auth0.com) is an authentication and authorization platform that supports social logins, enterprise federation, and passwordless authentication. This guide shows how to integrate Auth0 with InsForge in a Next.js application. Auth0 handles authentication, while InsForge manages data authorization through Row Level Security (RLS) policies. On each server request, the app signs a fresh InsForge JWT from the Auth0 session using your InsForge secret, so InsForge accepts it natively.
+
+- [Live Demo](https://auth0auth.insforge.site) — A sample app using Auth0 authentication with InsForge
+- [Source Code](https://github.com/InsForge/insforge-integration/tree/main/auth/auth0) — GitHub repository for the sample app
+
+## Prerequisites
+
+- An InsForge project (self-hosted or cloud)
+- An [Auth0](https://auth0.com) account and tenant
+- A Next.js application (or any framework — adjust the client code accordingly)
+
+## Step 1: Create an Auth0 Application
+
+1. Log in to your [Auth0 Dashboard](https://manage.auth0.com)
+2. Go to **Applications** > **Applications** > **Create Application**
+3. Choose **Regular Web Application** and give it a name (if prompted to select a technology, choose **Next.js** or skip — it only affects which quickstart guide Auth0 shows you)
+4. In the **Settings** tab, configure:
+   - **Allowed Callback URLs**: `http://localhost:3000/auth/callback`
+   - **Allowed Logout URLs**: `http://localhost:3000`
+5. Note down the **Domain**, **Client ID**, and **Client Secret**
+
+## Step 2: Set Up Your InsForge Project
+
+Create a new project or link an existing one:
+
+```bash
+# Create a new project
+npx @insforge/cli create
+
+# Or link an existing project
+npx @insforge/cli link --project-id <your-project-id>
+```
+
+Then get your project credentials:
+
+```bash
+# Get the JWT Secret
+npx @insforge/cli secrets get JWT_SECRET
+```
+
+Note down the **URL** and **Anon Key** from the InsForge dashboard. You'll use the JWT Secret from the CLI output in a later step to sign tokens for InsForge.
+
+## Step 3: Set Up Your Application
+
+Install the required dependencies:
+
+```bash
+npm install @auth0/nextjs-auth0 @insforge/sdk jsonwebtoken
+npm install --save-dev @types/jsonwebtoken
+```
+
+Add environment variables to `.env.local`:
+
+```env
+# Auth0
+AUTH0_SECRET='use [openssl rand -hex 32] to generate a 32 bytes value'
+APP_BASE_URL='http://localhost:3000'
+AUTH0_DOMAIN='YOUR_AUTH0_DOMAIN'
+AUTH0_CLIENT_ID='YOUR_CLIENT_ID'
+AUTH0_CLIENT_SECRET='YOUR_CLIENT_SECRET'
+
+# InsForge
+NEXT_PUBLIC_INSFORGE_URL='YOUR_INSFORGE_URL'
+NEXT_PUBLIC_INSFORGE_ANON_KEY='YOUR_INSFORGE_ANON_KEY'
+INSFORGE_JWT_SECRET='YOUR_INSFORGE_JWT_SECRET'
+```
+
+## Step 4: Set Up InsForge Integration
+
+Ask your agent to complete the following steps:
+
+### 1. Set up Auth0 authentication
+
+```text
+Set up Auth0 for my Next.js app — Auth0 client, middleware, and provider.
+```
+
+This creates the Auth0 client (`lib/auth0.ts`), middleware (`middleware.ts`), and Auth0Provider wrapper (`app/layout.tsx`).
+
+### 2. Create the InsForge client utility
+
+```text
+Create the InsForge client utility that uses the Auth0 session to sign a JWT for InsForge.
+```
+
+This creates a server-side utility (`lib/insforge.ts`) that gets the Auth0 user via `auth0.getSession()`, signs a JWT with the InsForge secret, and passes it as `edgeFunctionToken`.
+
+### 3. Create the database schema
+
+```text
+Create a todos table with RLS. Columns: id, user_id, title, is_complete, created_at. Users should only be able to access their own todos.
+```
+
+This creates the `requesting_user_id()` helper function (since Auth0 user IDs are strings, not UUIDs) and a `todos` table with Row Level Security policies.
+
+### 4. Build the todo list page
+
+```text
+Build a todo list page with full CRUD — create, read, update, and delete todos.
+```
+
+This creates a page that uses the InsForge client to manage todos. RLS ensures users only see their own data.
+
+## Step 5: Run Your Application
+
+```bash
+# Install dependencies if you haven't already
+npm install
+
+npm run dev
+```
+
+Open `http://localhost:3000` and sign up with a new user through Auth0.
+
+<Note>
+Since authentication is handled entirely by Auth0, you will **not** see any users in the InsForge dashboard under **Auth > Users**. User records are managed in the [Auth0 Dashboard](https://manage.auth0.com) — check **User Management > Users** there to confirm the sign-up was successful.
+</Note>
+
+![InsForge Auth Users — empty because Auth0 manages users](/images/integrations/insforge-no-users.webp)

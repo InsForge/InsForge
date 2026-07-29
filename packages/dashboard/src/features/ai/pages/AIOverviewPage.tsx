@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ArrowUpCircle, Loader2, RotateCcw, StopCircle } from 'lucide-react';
 import {
@@ -13,8 +14,9 @@ import {
   TooltipTrigger,
   useToast,
 } from '@insforge/ui';
-import type { AIOverviewMetricPoint } from '@insforge/shared-schemas';
 import { CodeEditor } from '#components';
+import { AIActivityChartCard } from '#features/ai/components/AIActivityChartCard';
+import { formatUsd, sumMetricPoints } from '#features/ai/helpers';
 import { useAIModelCredits } from '#features/ai/hooks/useAIModelCredits';
 import { useAIOverview } from '#features/ai/hooks/useAIOverview';
 import { useOpenRouterKey, useRotateOpenRouterKey } from '#features/ai/hooks/useOpenRouterKey';
@@ -28,10 +30,6 @@ import {
   type CodeTab,
 } from '#features/ai/constants';
 
-function formatCurrency(value: number): string {
-  return `$${value.toFixed(value >= 10 ? 0 : 2)}`;
-}
-
 function formatModelCredit(value: number, compact = false): string {
   if (compact && Number.isInteger(value)) {
     return `$${value.toFixed(0)}`;
@@ -40,75 +38,35 @@ function formatModelCredit(value: number, compact = false): string {
   return `$${value.toFixed(2)}`;
 }
 
-function formatCompact(value: number): string {
-  return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(
-    value
+function UnavailableChartCard({ title, message }: { title: string; message: string }) {
+  return (
+    <div className="flex h-[280px] flex-col rounded border border-[var(--alpha-8)] bg-card">
+      <div className="flex h-10 shrink-0 items-center justify-between px-2.5">
+        <div className="text-[13px] leading-[18px] text-foreground">{title}</div>
+        <div className="text-lg font-medium leading-6 text-muted-foreground">—</div>
+      </div>
+      <div className="relative min-h-0 flex-1 px-2.5 pb-4">
+        <div className="absolute inset-x-2.5 bottom-12 top-8 flex flex-col justify-between pl-14">
+          <span className="border-t border-dashed border-[var(--alpha-8)]" />
+          <span className="border-t border-dashed border-[var(--alpha-8)]" />
+          <span className="border-t border-dashed border-[var(--alpha-8)]" />
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center px-12 text-center text-[12px] leading-4 text-muted-foreground">
+          {message}
+        </div>
+      </div>
+    </div>
   );
 }
 
-function metricTotal(points: AIOverviewMetricPoint[]): number {
-  return points.reduce((sum, point) => sum + point.value, 0);
-}
-
-function parseBucketLabel(label: string): Date | null {
-  if (/^\d{4}-\d{2}$/.test(label)) {
-    const date = new Date(`${label}-01T00:00:00Z`);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
-    const date = new Date(`${label}T00:00:00Z`);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(label)) {
-    const date = new Date(`${label}:00Z`);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  const date = new Date(label);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function formatBucketLabel(label: string) {
-  const date = parseBucketLabel(label);
-
-  if (!date) {
-    return {
-      axis: label,
-      title: label,
-    };
-  }
-
-  if (/^\d{4}-\d{2}$/.test(label)) {
-    return {
-      axis: new Intl.DateTimeFormat(undefined, { month: 'short' }).format(date),
-      title: new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' }).format(date),
-    };
-  }
-
-  if (/T/.test(label)) {
-    const hourLabel = new Intl.DateTimeFormat(undefined, {
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(date);
-
-    return {
-      axis: hourLabel,
-      title: `${new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(
-        date
-      )}, ${hourLabel}`,
-    };
-  }
-
-  return {
-    axis: new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date),
-    title: new Intl.DateTimeFormat(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    }).format(date),
-  };
+function OverviewStatusPanel({ message, heightClass }: { message: string; heightClass: string }) {
+  return (
+    <div
+      className={`flex ${heightClass} items-center justify-center rounded border border-[var(--alpha-8)] bg-card px-4 text-center text-sm text-muted-foreground`}
+    >
+      {message}
+    </div>
+  );
 }
 
 function OpenRouterKeyBox({
@@ -122,7 +80,12 @@ function OpenRouterKeyBox({
   isLoading?: boolean;
   error?: Error | null;
 }) {
-  const displayValue = isLoading ? 'Loading…' : maskedKey || error?.message || 'Not configured';
+  const { t } = useTranslation('chrome');
+  const displayValue = isLoading
+    ? t('ai.overview.loadingEllipsis', { defaultValue: 'Loading…' })
+    : maskedKey ||
+      error?.message ||
+      t('ai.overview.notConfigured', { defaultValue: 'Not configured' });
   const copyValue = apiKey ?? '';
 
   return (
@@ -146,164 +109,6 @@ function OpenRouterKeyBox({
   );
 }
 
-function getNiceChartMax(value: number): number {
-  if (value <= 0) {
-    return 1;
-  }
-
-  const exponent = Math.floor(Math.log10(value));
-  const magnitude = 10 ** exponent;
-  const normalized = value / magnitude;
-  const niceNormalized = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
-  return niceNormalized * magnitude;
-}
-
-function getXAxisLabels(points: AIOverviewMetricPoint[]) {
-  if (points.length === 0) {
-    return [];
-  }
-
-  if (points.length === 1) {
-    return [{ label: formatBucketLabel(points[0].label).axis, position: 0, align: 'left' }];
-  }
-
-  if (points.length === 2) {
-    return [
-      { label: formatBucketLabel(points[0].label).axis, position: 0, align: 'left' },
-      { label: formatBucketLabel(points[1].label).axis, position: 100, align: 'right' },
-    ];
-  }
-
-  const middleIndex = Math.floor((points.length - 1) / 2);
-  return [
-    { label: formatBucketLabel(points[0].label).axis, position: 0, align: 'left' },
-    {
-      label: formatBucketLabel(points[middleIndex].label).axis,
-      position: (middleIndex / (points.length - 1)) * 100,
-      align: 'center',
-    },
-    {
-      label: formatBucketLabel(points[points.length - 1].label).axis,
-      position: 100,
-      align: 'right',
-    },
-  ];
-}
-
-function ChartCard({
-  title,
-  points,
-  value,
-  valueFormatter = formatCompact,
-}: {
-  title: string;
-  points: AIOverviewMetricPoint[];
-  value: string;
-  valueFormatter?: (value: number) => string;
-}) {
-  const chartPoints = points;
-  const chartHeight = 176;
-  const xAxisPadding = 12;
-  const max = getNiceChartMax(Math.max(...chartPoints.map((point) => point.value), 0));
-  const yTicks = [max, max / 2, 0];
-  const xAxisLabels = getXAxisLabels(chartPoints);
-
-  return (
-    <div className="flex h-[280px] flex-col rounded border border-[var(--alpha-8)] bg-card">
-      <div className="flex h-10 shrink-0 items-center justify-between px-2.5">
-        <div className="text-[13px] leading-[18px] text-foreground">{title}</div>
-        <div className="text-lg font-medium leading-6 text-foreground">{value}</div>
-      </div>
-      <div className="relative min-h-0 flex-1 px-2.5 pb-4">
-        <div className="relative h-full pl-14 pt-2">
-          {yTicks.map((tick) => (
-            <div
-              key={tick}
-              className="absolute inset-x-0 flex items-center"
-              style={{ top: `${8 + ((max - tick) / max) * chartHeight}px` }}
-            >
-              <span className="w-12 pr-2 text-right text-[10px] leading-4 text-muted-foreground">
-                {valueFormatter(tick)}
-              </span>
-              <span className="h-px flex-1 border-t border-dashed border-[var(--alpha-8)]" />
-            </div>
-          ))}
-
-          {chartPoints.length === 0 ? (
-            <div className="absolute inset-x-14 bottom-6 top-3 flex items-center justify-center text-[12px] leading-4 text-muted-foreground">
-              No data yet
-            </div>
-          ) : (
-            <>
-              <div className="absolute inset-x-0 bottom-5 top-3 flex items-end gap-1 pl-14">
-                {chartPoints.map((point, index) => {
-                  const label = formatBucketLabel(point.label);
-
-                  return (
-                    <div
-                      key={`${point.label}-${index}`}
-                      className="group relative flex min-w-0 flex-1 flex-col items-center gap-1"
-                    >
-                      <div className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-10 hidden w-[128px] -translate-x-1/2 rounded border border-[var(--alpha-8)] bg-[rgb(var(--semantic-1))] px-2 py-1.5 text-[11px] leading-4 text-foreground shadow-lg group-hover:block">
-                        <div className="truncate font-medium">{label.title}</div>
-                        <div className="truncate text-muted-foreground">
-                          {valueFormatter(point.value)}
-                        </div>
-                      </div>
-                      <div
-                        className="w-full rounded-t-sm bg-[rgb(var(--disabled))]"
-                        style={{
-                          height: point.value <= 0 ? 0 : `${(point.value / max) * chartHeight}px`,
-                        }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="absolute bottom-0 left-14 right-0 h-4">
-                {xAxisLabels.map((label) => (
-                  <span
-                    key={`${label.label}-${label.position}`}
-                    className={[
-                      'absolute top-0 whitespace-nowrap text-[10px] leading-3 text-muted-foreground',
-                      label.align === 'center'
-                        ? '-translate-x-1/2'
-                        : label.align === 'right'
-                          ? '-translate-x-full'
-                          : '',
-                    ].join(' ')}
-                    style={{
-                      left: `calc(${label.position}% + ${
-                        label.align === 'right'
-                          ? -xAxisPadding
-                          : label.align === 'left'
-                            ? xAxisPadding
-                            : 0
-                      }px)`,
-                    }}
-                  >
-                    {label.label}
-                  </span>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function OverviewErrorPanel({ message, heightClass }: { message: string; heightClass: string }) {
-  return (
-    <div
-      className={`flex ${heightClass} items-center justify-center rounded border border-[var(--alpha-8)] bg-card px-4 text-center text-sm text-muted-foreground`}
-    >
-      {message}
-    </div>
-  );
-}
-
 function ModelCreditPopover({
   credits,
   error,
@@ -313,6 +118,7 @@ function ModelCreditPopover({
   error?: Error | null;
   isLoading?: boolean;
 }) {
+  const { t } = useTranslation('chrome');
   const used = credits?.used ?? 0;
   const limit = Math.max(credits?.limit ?? 0, 0);
   const isFree = credits?.isFree ?? false;
@@ -337,13 +143,20 @@ function ModelCreditPopover({
       return;
     }
 
-    showToast('Subscription management is only available in cloud-hosting mode.', 'info');
+    showToast(
+      t('ai.overview.subscriptionCloudOnly', {
+        defaultValue: 'Subscription management is only available in cloud-hosting mode.',
+      }),
+      'info'
+    );
   };
 
   if (isLoading) {
     return (
       <div className="w-[358px] rounded-lg border border-[#404040] bg-[#262626] p-5 text-sm text-[#a3a3a3] shadow-[0_4px_4px_rgba(0,0,0,0.4)]">
-        Loading model credit usage...
+        {t('ai.overview.loadingModelCreditUsage', {
+          defaultValue: 'Loading model credit usage...',
+        })}
       </div>
     );
   }
@@ -351,7 +164,10 @@ function ModelCreditPopover({
   if (error || !credits) {
     return (
       <div className="w-[358px] rounded-lg border border-[#404040] bg-[#262626] p-5 text-sm text-[#a3a3a3] shadow-[0_4px_4px_rgba(0,0,0,0.4)]">
-        {error?.message || 'Model credit usage is unavailable.'}
+        {error?.message ||
+          t('ai.overview.creditUsageUnavailable', {
+            defaultValue: 'Model credit usage is unavailable.',
+          })}
       </div>
     );
   }
@@ -361,8 +177,14 @@ function ModelCreditPopover({
       <div className="flex flex-col gap-3 rounded px-3 py-2">
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between text-[#a3a3a3]">
-            <span>Used Credits</span>
-            <span>{hasOverage ? 'Overage Usage' : 'Remaining'}</span>
+            <span>{t('ai.overview.usedCredits', { defaultValue: 'Used Credits' })}</span>
+            <span>
+              {hasOverage
+                ? t('ai.overview.overageUsage', {
+                    defaultValue: 'Overage Usage',
+                  })
+                : t('ai.overview.remaining', { defaultValue: 'Remaining' })}
+            </span>
           </div>
           <div className="flex items-end justify-between text-white">
             <div>
@@ -386,10 +208,20 @@ function ModelCreditPopover({
         {(isFreeExhausted || isLowCredit || hasOverage) && (
           <p className="leading-[18px] text-white">
             {isFreeExhausted
-              ? 'AI features are paused.'
+              ? t('ai.overview.featuresPaused', {
+                  defaultValue: 'AI features are paused.',
+                })
               : isFree
-                ? 'AI features will pause when credits run out.'
-                : `Additional usage ${hasOverage ? 'is' : 'will be'} billed pay-as-you-go.`}
+                ? t('ai.overview.featuresWillPause', {
+                    defaultValue: 'AI features will pause when credits run out.',
+                  })
+                : hasOverage
+                  ? t('ai.overview.overageBilledNow', {
+                      defaultValue: 'Additional usage is billed pay-as-you-go.',
+                    })
+                  : t('ai.overview.overageBilledLater', {
+                      defaultValue: 'Additional usage will be billed pay-as-you-go.',
+                    })}
           </p>
         )}
       </div>
@@ -400,7 +232,11 @@ function ModelCreditPopover({
           className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm font-medium leading-5 text-[#6ee7b7] transition-colors hover:bg-[var(--alpha-4)]"
         >
           <ArrowUpCircle className="size-5 shrink-0" aria-hidden="true" />
-          <span>Upgrade plan for $10 credit</span>
+          <span>
+            {t('ai.overview.upgradePlan', {
+              defaultValue: 'Upgrade plan for $10 credit',
+            })}
+          </span>
         </button>
       )}
     </div>
@@ -416,6 +252,7 @@ function ModelCreditBadge({
   error?: Error | null;
   isLoading?: boolean;
 }) {
+  const { t } = useTranslation('chrome');
   const limit = Math.max(credits?.limit ?? 0, 0);
   const used = credits?.used ?? 0;
   const remaining = Math.max(0, limit - used);
@@ -425,14 +262,25 @@ function ModelCreditBadge({
   const isFreeExhausted = isFree && (limit <= 0 || remaining <= 0);
   const isLowFreeCredit = isFree && !isFreeExhausted && limit > 0 && remaining / limit <= 0.2;
   const label = isLoading
-    ? 'Loading'
+    ? t('ai.overview.loading', { defaultValue: 'Loading' })
     : error
-      ? 'Credit unavailable'
+      ? t('ai.overview.creditUnavailable', {
+          defaultValue: 'Credit unavailable',
+        })
       : isFree
-        ? `${formatModelCredit(remaining)} Credits`
+        ? t('ai.overview.creditsAmount', {
+            defaultValue: '{{amount}} Credits',
+            amount: formatModelCredit(remaining),
+          })
         : hasOverage
-          ? `${formatModelCredit(overage)} Overage`
-          : `${formatModelCredit(remaining, true)} Credits`;
+          ? t('ai.overview.overageAmount', {
+              defaultValue: '{{amount}} Overage',
+              amount: formatModelCredit(overage),
+            })
+          : t('ai.overview.creditsAmount', {
+              defaultValue: '{{amount}} Credits',
+              amount: formatModelCredit(remaining, true),
+            });
   const iconClass = isFreeExhausted
     ? 'size-5 text-[#ef4444]'
     : isLowFreeCredit
@@ -451,7 +299,9 @@ function ModelCreditBadge({
               'flex shrink-0 items-center gap-1 rounded border border-[var(--alpha-8)] bg-card p-2 text-sm font-medium leading-5 text-foreground transition-colors hover:bg-[var(--alpha-4)]',
               isLoading ? 'animate-pulse' : '',
             ].join(' ')}
-            aria-label="Model credit usage"
+            aria-label={t('ai.overview.modelCreditUsage', {
+              defaultValue: 'Model credit usage',
+            })}
           >
             <StopCircle className={iconClass} aria-hidden="true" />
             <span>{label}</span>
@@ -471,6 +321,7 @@ function ModelCreditBadge({
 }
 
 export default function AIOverviewPage() {
+  const { t } = useTranslation('chrome');
   const host = useDashboardHost();
   const [codeTab, setCodeTab] = useState<CodeTab>('sdk');
   const [selectedModelId, setSelectedModelId] = useState<
@@ -478,16 +329,16 @@ export default function AIOverviewPage() {
   >(OVERVIEW_QUICK_START_MODELS[0].id);
   const { confirm, confirmDialogProps } = useConfirm();
   const {
-    data: usageData,
-    isLoading: isUsageLoading,
-    isError: isUsageError,
-    error: usageError,
-  } = useAIOverview();
-  const {
     data: openRouterKey,
     isLoading: isOpenRouterKeyLoading,
     error: openRouterKeyError,
   } = useOpenRouterKey();
+  const {
+    data: overviewData,
+    isLoading: isOverviewLoading,
+    isError: isOverviewError,
+    error: overviewError,
+  } = useAIOverview();
   const rotateOpenRouterKey = useRotateOpenRouterKey();
   const {
     data: modelCredits,
@@ -497,14 +348,24 @@ export default function AIOverviewPage() {
   const shouldShowModelCredits = host.mode === 'cloud-hosting' && !!host.onRequestModelCredits;
   const canRotateOpenRouterKey = host.mode === 'cloud-hosting';
   const codeSnippets = useMemo(() => getOverviewCodeSnippets(selectedModelId), [selectedModelId]);
+  const chartTotals = useMemo(
+    () => formatUsd(sumMetricPoints(overviewData?.charts.spend ?? [])),
+    [overviewData]
+  );
 
   const handleRotateOpenRouterKey = async () => {
     const confirmed = await confirm({
-      title: 'Rotate OpenRouter key?',
-      description:
-        'The current API key will stop working immediately. Update any apps or services that use it as soon as the new key appears.',
-      confirmText: 'Rotate key',
-      cancelText: 'Cancel',
+      title: t('ai.overview.rotateKeyTitle', {
+        defaultValue: 'Rotate OpenRouter key?',
+      }),
+      description: t('ai.overview.rotateKeyDescription', {
+        defaultValue:
+          'The current API key will stop working immediately. Update any apps or services that use it as soon as the new key appears.',
+      }),
+      confirmText: t('ai.overview.rotateKeyConfirm', {
+        defaultValue: 'Rotate key',
+      }),
+      cancelText: t('ai.overview.cancel', { defaultValue: 'Cancel' }),
       destructive: true,
     });
 
@@ -519,23 +380,19 @@ export default function AIOverviewPage() {
     }
   };
 
-  const totals = useMemo(
-    () => ({
-      spend: formatCurrency(metricTotal(usageData?.charts.spend ?? [])),
-      requests: formatCompact(metricTotal(usageData?.charts.requests ?? [])),
-      tokens: formatCompact(metricTotal(usageData?.charts.tokens ?? [])),
-    }),
-    [usageData]
-  );
-
   return (
     <div className="h-full overflow-y-auto bg-[rgb(var(--semantic-1))]">
       <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-6 px-10 py-10">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-2">
-            <h1 className="text-2xl font-medium leading-8 text-foreground">Overview</h1>
+            <h1 className="text-2xl font-medium leading-8 text-foreground">
+              {t('ai.overview.title', { defaultValue: 'Overview' })}
+            </h1>
             <p className="text-sm leading-5 text-muted-foreground">
-              Your models are ready — build LLM-powered features or add more integrations.
+              {t('ai.overview.description', {
+                defaultValue:
+                  'Your models are ready — build LLM-powered features or add more integrations.',
+              })}
             </p>
           </div>
           {shouldShowModelCredits && (
@@ -552,16 +409,22 @@ export default function AIOverviewPage() {
             <div className="flex min-w-0 flex-col gap-5">
               <div className="flex flex-col gap-3">
                 <h2 className="text-base font-medium leading-6 text-foreground">
-                  Start using Model Gateway
+                  {t('ai.overview.startUsingGateway', {
+                    defaultValue: 'Start using Model Gateway',
+                  })}
                 </h2>
                 <p className="max-w-[280px] text-sm leading-5 text-muted-foreground">
-                  Powered by OpenRouter, Model Gateway lets you switch between hundreds of models
-                  without managing provider accounts.
+                  {t('ai.overview.gatewayDescription', {
+                    defaultValue:
+                      'Powered by OpenRouter, Model Gateway lets you switch between hundreds of models without managing provider accounts.',
+                  })}
                 </p>
               </div>
               <div className="flex flex-col gap-1.5">
                 <span className="text-[12px] leading-4 text-muted-foreground">
-                  Active OpenRouter key
+                  {t('ai.overview.activeOpenRouterKey', {
+                    defaultValue: 'Active OpenRouter key',
+                  })}
                 </span>
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="min-w-0 flex-1">
@@ -590,7 +453,7 @@ export default function AIOverviewPage() {
                       ) : (
                         <RotateCcw className="size-4" aria-hidden="true" />
                       )}
-                      <span>Rotate</span>
+                      <span>{t('ai.overview.rotate', { defaultValue: 'Rotate' })}</span>
                     </Button>
                   )}
                 </div>
@@ -602,7 +465,9 @@ export default function AIOverviewPage() {
                 size="sm"
                 className="h-8 bg-[#68e5a2] px-4 text-black hover:bg-[#68e5a2]/90"
               >
-                <Link to="/dashboard/ai/quick-start">Quick Start</Link>
+                <Link to="/dashboard/ai/quick-start">
+                  {t('ai.overview.quickStart', { defaultValue: 'Quick Start' })}
+                </Link>
               </Button>
             </div>
           </div>
@@ -661,12 +526,12 @@ export default function AIOverviewPage() {
                 );
               })}
               <span className="text-muted-foreground">
-                and{' '}
+                {t('ai.overview.and', { defaultValue: 'and' })}{' '}
                 <Link
                   to="/dashboard/ai/models"
                   className="underline underline-offset-4 hover:text-foreground"
                 >
-                  many more
+                  {t('ai.overview.manyMore', { defaultValue: 'many more' })}
                 </Link>
               </span>
             </div>
@@ -675,37 +540,53 @@ export default function AIOverviewPage() {
 
         <section className="flex flex-col gap-3">
           <div className="flex items-end justify-between gap-4">
-            <h2 className="text-lg font-medium leading-7 text-foreground">Usage</h2>
-            <span className="text-[12px] leading-4 text-muted-foreground">Past 30 UTC days</span>
-          </div>
-          {isUsageLoading ? (
-            <div className="flex h-[340px] items-center justify-center rounded border border-[var(--alpha-8)] bg-card">
-              <Loader2 className="size-8 animate-spin text-muted-foreground" />
+            <div>
+              <h2 className="text-lg font-medium leading-7 text-foreground">
+                {t('ai.overview.activity', { defaultValue: 'Spend' })}
+              </h2>
+              <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">
+                {t('ai.overview.activityDescription', {
+                  defaultValue: 'Historical spend for this key.',
+                })}
+              </p>
             </div>
-          ) : isUsageError ? (
-            <OverviewErrorPanel
-              heightClass="h-[340px]"
-              message={usageError?.message || 'Failed to load usage overview.'}
+            <Button asChild variant="secondary" size="sm" className="h-8 shrink-0">
+              <Link to="/dashboard/ai/usage">
+                {t('ai.overview.viewUsage', { defaultValue: 'View usage' })}
+              </Link>
+            </Button>
+          </div>
+          {isOverviewLoading ? (
+            <div className="flex h-[280px] items-center justify-center rounded border border-[var(--alpha-8)] bg-card">
+              <Loader2 className="size-7 animate-spin text-muted-foreground" />
+            </div>
+          ) : isOverviewError ? (
+            <OverviewStatusPanel
+              heightClass="h-[280px]"
+              message={
+                overviewError?.message ||
+                t('ai.overview.usageLoadError', {
+                  defaultValue: 'Failed to load usage overview.',
+                })
+              }
+            />
+          ) : !overviewData?.key.observabilityAvailable ? (
+            <UnavailableChartCard
+              title={t('ai.overview.spend', { defaultValue: 'Spend' })}
+              message={
+                overviewData?.key.observabilityError ||
+                t('ai.overview.activityRequiresManagementKey', {
+                  defaultValue: 'Configure an OpenRouter management key to load activity.',
+                })
+              }
             />
           ) : (
-            <div className="grid grid-cols-2 gap-4">
-              <ChartCard
-                title="Spend"
-                points={usageData?.charts.spend ?? []}
-                value={totals.spend}
-                valueFormatter={formatCurrency}
-              />
-              <ChartCard
-                title="Requests"
-                points={usageData?.charts.requests ?? []}
-                value={totals.requests}
-              />
-              <ChartCard
-                title="Tokens"
-                points={usageData?.charts.tokens ?? []}
-                value={totals.tokens}
-              />
-            </div>
+            <AIActivityChartCard
+              title={t('ai.overview.spend', { defaultValue: 'Spend' })}
+              points={overviewData.charts.spend}
+              value={chartTotals}
+              valueFormatter={formatUsd}
+            />
           )}
         </section>
       </div>

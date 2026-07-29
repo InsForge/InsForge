@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react';
 import { Button, ConfirmDialog, Skeleton } from '@insforge/ui';
 import { EnvVarRow } from '#features/deployments/components/EnvVarRow';
@@ -8,6 +9,7 @@ import { useDeploymentEnvVars } from '#features/deployments/hooks/useDeploymentE
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
 
 export default function DeploymentEnvVarsPage() {
+  const { t } = useTranslation('chrome');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingEnvVar, setEditingEnvVar] = useState<DeploymentEnvVar | null>(null);
 
@@ -29,22 +31,30 @@ export default function DeploymentEnvVarsPage() {
           {/* Header with Add Button */}
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-semibold text-zinc-950 dark:text-white tracking-[-0.1px]">
-              Environment Variables
+              {t('deployments.environmentVariables', {
+                defaultValue: 'Environment Variables',
+              })}
             </h1>
             <Button
               onClick={() => setIsAddDialogOpen(true)}
               className="h-8 px-2 py-0 gap-2 bg-black text-white dark:bg-neutral-600 dark:text-white hover:bg-gray-800 dark:hover:bg-neutral-500 text-sm font-medium rounded"
             >
               <Plus className="w-4 h-4" />
-              Add
+              {t('deployments.add', { defaultValue: 'Add' })}
             </Button>
           </div>
 
           {/* Table Header */}
           <div className="grid grid-cols-12 text-sm text-muted-foreground dark:text-neutral-400">
-            <div className="col-span-4 py-1 px-3">Key</div>
-            <div className="col-span-4 py-1 px-3">Value</div>
-            <div className="col-span-3 py-1 px-3">Updated at</div>
+            <div className="col-span-4 py-1 px-3">
+              {t('deployments.key', { defaultValue: 'Key' })}
+            </div>
+            <div className="col-span-4 py-1 px-3">
+              {t('deployments.value', { defaultValue: 'Value' })}
+            </div>
+            <div className="col-span-3 py-1 px-3">
+              {t('deployments.updatedAt', { defaultValue: 'Updated at' })}
+            </div>
             <div className="col-span-1 py-1 px-3" />
           </div>
         </div>

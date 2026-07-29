@@ -1,6 +1,15 @@
-# 📖 Deploying InsForge to Azure Virtual Machines (Extended Guide)
+---
+title: "Self-Host InsForge on Azure Virtual Machines"
+description: "Self-host the InsForge platform on an Azure Virtual Machine using Docker Compose, covering SSH access, custom domains, HTTPS, and production hardening."
+---
 
-This guide provides comprehensive, step-by-step instructions for deploying, managing, and securing InsForge on an Azure Virtual Machine (VM) using Docker Compose.
+# 📖 Self-Hosting InsForge on Azure Virtual Machines (Extended Guide)
+
+This guide provides comprehensive, step-by-step instructions for self-hosting, managing, and securing the InsForge platform on an Azure Virtual Machine (VM) using Docker Compose.
+
+<Note>
+  **This deploys InsForge itself, not the app you built.** If you just want to take your app live, use [Sites](/core-concepts/sites/overview) instead. This guide is for running the InsForge backend on your own infrastructure.
+</Note>
 
 <Note>
   This cloud walkthrough is community-maintained and can lag the latest InsForge release. The canonical, always-current setup is the `deploy/docker-compose/` directory in the [InsForge repo](https://github.com/InsForge/InsForge).

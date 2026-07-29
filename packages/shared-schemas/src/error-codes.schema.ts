@@ -18,6 +18,7 @@ const authErrorCodes = [
   'AUTH_UNAUTHORIZED',
   'AUTH_NEED_VERIFICATION',
   'AUTH_SIGNUP_DISABLED',
+  'AUTH_VERIFICATION_EMAIL_DELIVERY_FAILED',
 ] as const;
 
 const databaseErrorCodes = [
@@ -79,6 +80,7 @@ const computeErrorCodes = [
 const billingErrorCodes = ['BILLING_INSUFFICIENT_BALANCE'] as const;
 
 const emailErrorCodes = [
+  'EMAIL_PROVIDER_NOT_CONFIGURED',
   'EMAIL_SMTP_CONNECTION_FAILED',
   'EMAIL_SMTP_SEND_FAILED',
   'EMAIL_TEMPLATE_NOT_FOUND',

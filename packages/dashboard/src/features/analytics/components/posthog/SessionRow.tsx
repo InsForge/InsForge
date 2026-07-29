@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { formatDistance } from 'date-fns';
 import type { PosthogRecordingItem } from '@insforge/shared-schemas';
 import { formatDuration, truncateId } from '#features/analytics/lib/format';
@@ -8,6 +9,7 @@ interface SessionRowProps {
 }
 
 export function SessionRow({ recording, onOpen }: SessionRowProps) {
+  const { t } = useTranslation('chrome');
   return (
     <button
       type="button"
@@ -25,7 +27,7 @@ export function SessionRow({ recording, onOpen }: SessionRowProps) {
         {/* URL */}
         <div className="flex h-12 min-w-0 flex-[1.5] items-center px-2.5">
           <span className="truncate text-sm text-foreground" title={recording.startUrl ?? ''}>
-            {recording.startUrl ?? '(no url)'}
+            {recording.startUrl ?? t('analytics.noUrl', { defaultValue: '(no url)' })}
           </span>
         </div>
 

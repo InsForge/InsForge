@@ -1,7 +1,7 @@
 ---
-title: "訊息傳遞"
+title: "訊息傳遞概覽"
 sidebarTitle: "Overview"
-description: "從您的專案傳送交易性訊息。今天傳送電子郵件，SMS 和推送在路線圖上。"
+description: "透過託管寄件服務或自訂 SMTP，從您的 InsForge 專案傳送交易性電子郵件。SMS 與推送通知已在路線圖上，將共用相同的 API。"
 ---
 
 InsForge Messaging 從您的專案傳送交易性通知：收據、摘要、密碼重設代碼、通知匯總、任何您本來會為其接入 SendGrid、Postmark 或 Twilio 的東西。電子郵件是第一個通道；SMS 和推送在路線圖上，將共享相同的 API 表面。
@@ -9,6 +9,10 @@ InsForge Messaging 從您的專案傳送交易性通知：收據、摘要、密�
 <Note>
   **只是傳送驗證電子郵件？** 魔法連結、驗證代碼和密碼重設已內建在 [Authentication](/core-concepts/authentication/overview) 中。您只需要這個產品用於驗證之外的交易性訊息。
 </Note>
+
+<Warning>
+  **自託管？** 託管的 InsForge Cloud 寄件服務僅對已連接雲端的專案可用。在自託管實例上，必須先設定 [Custom SMTP](/core-concepts/messaging/custom-smtp)，任何電子郵件才能發出，包括驗證郵件。郵件提供方可用前，InsForge 會拒絕開啟強制電子郵件驗證；驗證仍為強制狀態時，也無法關閉唯一的 SMTP 提供方。如果註冊時驗證郵件傳送失敗，API 會傳回錯誤，並提示透過 `POST /api/auth/email/send-verification` 重試。
+</Warning>
 
 ```mermaid
 graph TB

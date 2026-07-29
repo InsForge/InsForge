@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RefreshCw, Trash2, ExternalLink } from 'lucide-react';
 import { LogsDataGrid, type LogsColumnDef } from '#features/logs/components';
 import { formatTime } from '#lib/utils/utils';
@@ -18,6 +19,7 @@ function ModuleBadge({ module }: { module?: string | null }) {
 }
 
 export default function AuditsPage() {
+  const { t } = useTranslation('chrome');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState<Partial<GetAuditLogsRequest>>({});
@@ -49,11 +51,13 @@ export default function AuditsPage() {
 
   const handleClearLogs = () => {
     void confirm({
-      title: 'Clear Audit Logs',
-      description:
-        'Are you sure you want to clear old audit logs? This will keep the last 90 days of logs.',
-      confirmText: 'Clear Logs',
-      cancelText: 'Cancel',
+      title: t('logs.clearAuditLogsTitle', { defaultValue: 'Clear Audit Logs' }),
+      description: t('logs.clearAuditLogsConfirm', {
+        defaultValue:
+          'Are you sure you want to clear old audit logs? This will keep the last 90 days of logs.',
+      }),
+      confirmText: t('logs.clearLogs', { defaultValue: 'Clear Logs' }),
+      cancelText: t('logs.cancel', { defaultValue: 'Cancel' }),
     }).then((confirmed) => {
       if (confirmed) {
         clearMutation.mutate(90);
@@ -77,23 +81,23 @@ export default function AuditsPage() {
     () => [
       {
         key: 'actor',
-        name: 'Actor',
+        name: t('logs.actor', { defaultValue: 'Actor' }),
         width: '240px',
       },
       {
         key: 'action',
-        name: 'Action',
+        name: t('logs.action', { defaultValue: 'Action' }),
         width: '240px',
       },
       {
         key: 'module',
-        name: 'Type',
+        name: t('logs.type', { defaultValue: 'Type' }),
         width: '160px',
         renderCell: ({ row }) => <ModuleBadge module={String(row.module ?? '')} />,
       },
       {
         key: 'details',
-        name: 'Definition',
+        name: t('logs.definition', { defaultValue: 'Definition' }),
         width: '1fr',
         minWidth: 360,
         renderCell: ({ row }) => {
@@ -111,7 +115,7 @@ export default function AuditsPage() {
         },
       },
     ],
-    []
+    [t]
   );
 
   return (
@@ -120,7 +124,7 @@ export default function AuditsPage() {
         title="audits.logs"
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Search audit logs"
+        searchPlaceholder={t('logs.searchAuditLogs', { defaultValue: 'Search audit logs' })}
         rightActions={
           <div className="flex items-center gap-1">
             <Button
@@ -160,19 +164,29 @@ export default function AuditsPage() {
             handlePageSizeChange(newSize);
             setCurrentPage(1);
           }}
-          paginationRecordLabel="logs"
+          paginationRecordLabel={t('logs.recordLabel', { defaultValue: 'logs' })}
           gridContainerClassName="border-t border-[var(--alpha-8)]"
           emptyState={
             error ? (
               <div className="text-[13px] text-muted-foreground">
-                {`Error loading audit logs: ${
-                  error instanceof Error ? error.message : 'An unexpected error occurred'
-                }`}
+                {t('logs.errorLoadingAuditLogs', {
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : t('logs.unexpectedError', {
+                          defaultValue: 'An unexpected error occurred',
+                        }),
+                  defaultValue: 'Error loading audit logs: {{error}}',
+                })}
               </div>
             ) : (
               <DataGridEmptyState
                 message={
-                  searchQuery ? 'No audit logs match your search criteria' : 'No audit logs found'
+                  searchQuery
+                    ? t('logs.noAuditLogsMatch', {
+                        defaultValue: 'No audit logs match your search criteria',
+                      })
+                    : t('logs.noAuditLogs', { defaultValue: 'No audit logs found' })
                 }
               />
             )

@@ -609,6 +609,8 @@ export function useCloudHosting() {
               userId,
               email,
               name: typeof message.name === 'string' ? message.name : undefined,
+              preferredLocale:
+                typeof message.preferredLocale === 'string' ? message.preferredLocale : null,
             });
             return;
           }
@@ -956,6 +958,15 @@ export function useCloudHosting() {
     return createPendingRequest('userInfo', 'User info request');
   }, [createPendingRequest, sendMessageToParent]);
 
+  // Fire-and-forget: the shell persists the preference on the account
+  // (users.preferred_locale); the dashboard keeps its local copy regardless.
+  const updatePreferredLocale = useCallback(
+    (locale: string) => {
+      void postMessageToParent({ type: 'UPDATE_PREFERRED_LOCALE', locale });
+    },
+    [postMessageToParent]
+  );
+
   const requestUserApiKey = useCallback(async (): Promise<string> => {
     await sendMessageToParent(
       { type: 'REQUEST_USER_API_KEY' },
@@ -1129,6 +1140,7 @@ export function useCloudHosting() {
     showUpgradeDialog,
     openWhatsNew,
     requestUserInfo,
+    updatePreferredLocale,
     requestUserApiKey,
     requestModelCredits,
     requestProjectMetrics,

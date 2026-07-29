@@ -1,11 +1,13 @@
 import { apiClient } from '#lib/api/client';
 import {
-  DELETE_OBJECTS_MAX_KEYS,
   StorageFileSchema,
   StorageBucketSchema,
   ListObjectsResponseSchema,
   type DeleteObjectsResponse,
 } from '@insforge/shared-schemas';
+
+/** Server cap on keys per batch-delete request (see deleteObjectsRequestSchema). */
+const DELETE_OBJECTS_MAX_KEYS = 1000;
 
 export interface ListObjectsParams {
   prefix?: string;

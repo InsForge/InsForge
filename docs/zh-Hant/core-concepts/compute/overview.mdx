@@ -52,6 +52,15 @@ graph TB
 
 為每個服務設定環境變數和祕密，與您的邊緣函式祕密分開。不需重新部署即可輪換。
 
+## 自行託管：啟用 compute
+
+Custom Compute 把您的容器跑在 [Fly.io](https://fly.io) 上。在 InsForge Cloud 上這部分完全代管，您無需設定。自行託管時，您使用自己的 Fly 帳號，透過 `.env` 中的兩個環境變數啟用 compute：
+
+- `FLY_API_TOKEN`：Fly.io API token，用 `fly tokens create org` 產生。InsForge 用它來建立和管理您的 compute 容器。
+- `FLY_ORG`：您的 Fly organization slug，用 `fly orgs list` 查看。容器會建立在此 org 之下。
+
+兩者都必填。只有 token 而沒有 org，就沒有可認證的對象；只有 org 而沒有 token，則無法呼叫。設定完成後重新啟動容器。兩者齊備之前，compute 端點都會回傳 `503 COMPUTE_NOT_CONFIGURED`。
+
 ## 下一步
 
 - 設定 [CLI](/quickstart) 以連結您的專案（建議的路徑）。

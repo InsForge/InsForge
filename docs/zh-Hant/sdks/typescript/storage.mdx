@@ -56,9 +56,9 @@ const bucket = insforge.storage.from('images')
 }
 ```
 
-<Warning>
-如果存在具有相同金鑰的檔案，後端會自動重新命名。一律使用傳回的 `key` 和 `url`。
-</Warning>
+<Note>
+上傳至現有物件金鑰會取代目前的物件。如需自動產生唯一金鑰，請使用 `uploadAuto()`。
+</Note>
 
 ### 範例
 

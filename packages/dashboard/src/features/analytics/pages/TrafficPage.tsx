@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { TableHeader } from '#components';
 import { RequireAnalyticsConnection } from '#features/analytics/components/RequireAnalyticsConnection';
 import { TimeRangeSelector } from '#features/analytics/components/posthog/TimeRangeSelector';
@@ -5,9 +6,14 @@ import { KpiSectionWithTrend } from '#features/analytics/components/posthog/KpiS
 import { BreakdownPanel } from '#features/analytics/components/posthog/BreakdownPanel';
 
 export function TrafficPage() {
+  const { t } = useTranslation('chrome');
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <TableHeader title="Traffic" showSearch={false} rightActions={<TimeRangeSelector />} />
+      <TableHeader
+        title={t('analytics.sidebar.traffic', { defaultValue: 'Traffic' })}
+        showSearch={false}
+        rightActions={<TimeRangeSelector />}
+      />
       <div className="min-h-0 flex-1">
         <RequireAnalyticsConnection>
           <div className="h-full overflow-y-auto">

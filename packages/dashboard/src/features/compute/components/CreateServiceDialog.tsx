@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Dialog,
@@ -31,6 +32,7 @@ export function CreateServiceDialog({
   onCreate,
   isCreating,
 }: CreateServiceDialogProps) {
+  const { t } = useTranslation('chrome');
   const [name, setName] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [port, setPort] = useState('8080');
@@ -70,20 +72,34 @@ export function CreateServiceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[520px]">
         <DialogHeader>
-          <DialogTitle>Create Service</DialogTitle>
-          <DialogDescription>Deploy a Docker container as a compute service.</DialogDescription>
+          <DialogTitle>
+            {t('compute.createService', { defaultValue: 'Create Service' })}
+          </DialogTitle>
+          <DialogDescription>
+            {t('compute.createServiceDescription', {
+              defaultValue: 'Deploy a Docker container as a compute service.',
+            })}
+          </DialogDescription>
         </DialogHeader>
 
         <DialogBody>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Name</label>
+              <label className="text-sm font-medium text-foreground">
+                {t('compute.fields.name', { defaultValue: 'Name' })}
+              </label>
               <Input placeholder="my-api" value={name} onChange={(e) => setName(e.target.value)} />
-              <p className="text-xs text-muted-foreground">DNS-safe: lowercase, numbers, dashes</p>
+              <p className="text-xs text-muted-foreground">
+                {t('compute.nameHint', {
+                  defaultValue: 'DNS-safe: lowercase, numbers, dashes',
+                })}
+              </p>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Image URL</label>
+              <label className="text-sm font-medium text-foreground">
+                {t('compute.fields.imageUrl', { defaultValue: 'Image URL' })}
+              </label>
               <Input
                 placeholder="nginx:alpine"
                 value={imageUrl}
@@ -93,12 +109,16 @@ export function CreateServiceDialog({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-foreground">Port</label>
+                <label className="text-sm font-medium text-foreground">
+                  {t('compute.fields.port', { defaultValue: 'Port' })}
+                </label>
                 <Input type="number" value={port} onChange={(e) => setPort(e.target.value)} />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-foreground">Region</label>
+                <label className="text-sm font-medium text-foreground">
+                  {t('compute.fields.region', { defaultValue: 'Region' })}
+                </label>
                 <Select value={region} onValueChange={setRegion}>
                   <SelectTrigger>
                     <SelectValue />
@@ -106,7 +126,7 @@ export function CreateServiceDialog({
                   <SelectContent>
                     {REGIONS.map((r) => (
                       <SelectItem key={r.value} value={r.value}>
-                        {r.label}
+                        {t(`compute.regions.${r.value}`, { defaultValue: r.label })}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -116,15 +136,17 @@ export function CreateServiceDialog({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-foreground">CPU</label>
+                <label className="text-sm font-medium text-foreground">
+                  {t('compute.fields.cpu', { defaultValue: 'CPU' })}
+                </label>
                 <Select value={cpu} onValueChange={setCpu}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CPU_TIERS.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>
-                        {t.label}
+                    {CPU_TIERS.map((tier) => (
+                      <SelectItem key={tier.value} value={tier.value}>
+                        {tier.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -132,7 +154,9 @@ export function CreateServiceDialog({
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-foreground">Memory</label>
+                <label className="text-sm font-medium text-foreground">
+                  {t('compute.fields.memory', { defaultValue: 'Memory' })}
+                </label>
                 <Select value={memory} onValueChange={setMemory}>
                   <SelectTrigger>
                     <SelectValue />
@@ -157,7 +181,7 @@ export function CreateServiceDialog({
             disabled={isCreating}
             onClick={() => onOpenChange(false)}
           >
-            Cancel
+            {t('compute.cancel', { defaultValue: 'Cancel' })}
           </Button>
           <Button
             variant="primary"
@@ -165,7 +189,9 @@ export function CreateServiceDialog({
             disabled={!isValid || isCreating}
             onClick={() => void handleSubmit()}
           >
-            {isCreating ? 'Creating...' : 'Create Service'}
+            {isCreating
+              ? t('compute.creating', { defaultValue: 'Creating...' })
+              : t('compute.createService', { defaultValue: 'Create Service' })}
           </Button>
         </DialogFooter>
       </DialogContent>

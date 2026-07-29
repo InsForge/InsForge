@@ -56,9 +56,9 @@ const bucket = insforge.storage.from('images')
 }
 ```
 
-<Warning>
-如果存在具有相同密钥的文件，后端会自动重命名。始终使用返回的 `key` 和 `url`。
-</Warning>
+<Note>
+上传到已有对象键会替换当前对象。如需自动生成唯一键，请使用 `uploadAuto()`。
+</Note>
 
 ### 示例
 

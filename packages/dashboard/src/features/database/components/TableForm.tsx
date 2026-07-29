@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -47,6 +48,7 @@ export function TableForm({
   editTable,
   setFormIsDirty,
 }: TableFormProps) {
+  const { t } = useTranslation('chrome');
   const [error, setError] = useState<string | null>(null);
   const [showForeignKeyDialog, setShowForeignKeyDialog] = useState(false);
   const [editingForeignKey, setEditingForeignKey] = useState<string>();
@@ -232,7 +234,10 @@ export function TableForm({
       void queryClient.invalidateQueries({ queryKey: ['database', 'tables'] });
       void queryClient.invalidateQueries({ queryKey: ['metadata'] });
 
-      showToast('Table created successfully!', 'success');
+      showToast(
+        t('database.tableCreatedSuccess', { defaultValue: 'Table created successfully!' }),
+        'success'
+      );
 
       form.reset();
       setError(null);
@@ -241,7 +246,9 @@ export function TableForm({
       onSuccess?.(data.tableName);
     },
     onError: (err) => {
-      const errorMessage = err.message || 'Failed to create table';
+      const errorMessage =
+        err.message ||
+        t('database.failedToCreateTable', { defaultValue: 'Failed to create table' });
       setError(errorMessage);
       showToast(errorMessage, 'error');
     },
@@ -369,7 +376,13 @@ export function TableForm({
       });
       void queryClient.invalidateQueries({ queryKey: ['records', schemaName, data.tableName] });
 
-      showToast(`Table "${data.tableName}" updated successfully!`, 'success');
+      showToast(
+        t('database.tableUpdatedSuccess', {
+          tableName: data.tableName,
+          defaultValue: 'Table "{{tableName}}" updated successfully!',
+        }),
+        'success'
+      );
 
       form.reset();
       setError(null);
@@ -378,7 +391,9 @@ export function TableForm({
       onSuccess?.(data.tableName);
     },
     onError: (err) => {
-      const errorMessage = err.message || 'Failed to update table';
+      const errorMessage =
+        err.message ||
+        t('database.failedToUpdateTable', { defaultValue: 'Failed to update table' });
       setError(errorMessage);
       showToast(errorMessage, 'error');
     },
@@ -389,8 +404,12 @@ export function TableForm({
     if (!userColumns.length) {
       const msg =
         mode === 'create'
-          ? 'Please add at least one user-defined column to create a table.'
-          : 'Please ensure the table has at least one user-defined column.';
+          ? t('database.addAtLeastOneColumnCreate', {
+              defaultValue: 'Please add at least one user-defined column to create a table.',
+            })
+          : t('database.addAtLeastOneColumnEdit', {
+              defaultValue: 'Please ensure the table has at least one user-defined column.',
+            });
       setError(msg);
       showToast(msg, 'error');
       return;
@@ -442,7 +461,9 @@ export function TableForm({
       <div className="px-4 pb-6 pt-10 sm:px-6 lg:px-10">
         <div className="mx-auto w-full max-w-[1024px]">
           <h1 className="text-2xl leading-8 font-medium">
-            {mode === 'edit' ? 'Edit Table' : 'Create New Table'}
+            {mode === 'edit'
+              ? t('database.editTable', { defaultValue: 'Edit Table' })
+              : t('database.createNewTable', { defaultValue: 'Create New Table' })}
           </h1>
         </div>
       </div>
@@ -453,10 +474,14 @@ export function TableForm({
           className="mx-auto flex w-full max-w-[1024px] flex-col gap-6"
         >
           <div className="flex w-full max-w-[400px] flex-col gap-1.5">
-            <label className="text-sm leading-5 text-foreground">Table Name</label>
+            <label className="text-sm leading-5 text-foreground">
+              {t('database.tableName', { defaultValue: 'Table Name' })}
+            </label>
             <Input
               {...form.register('tableName')}
-              placeholder="e.g., products, orders, customers"
+              placeholder={t('database.tableNamePlaceholder', {
+                defaultValue: 'e.g., products, orders, customers',
+              })}
               className="bg-[var(--alpha-4)] border-[var(--alpha-12)]"
             />
             {form.formState.errors.tableName && (
@@ -466,17 +491,29 @@ export function TableForm({
 
           <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
             <div className="px-4 py-3">
-              <h2 className="text-base leading-7 font-medium">Columns</h2>
+              <h2 className="text-base leading-7 font-medium">
+                {t('database.columns', { defaultValue: 'Columns' })}
+              </h2>
             </div>
 
             <div className="overflow-x-auto">
               <div className="min-w-[860px]">
                 <div className="flex h-8 items-center border-y border-[var(--alpha-8)] pl-1.5 pr-0 text-[13px] leading-[18px] text-muted-foreground">
-                  <div className="flex flex-1 items-center px-2.5">Name</div>
-                  <div className="flex flex-1 items-center px-2.5">Type</div>
-                  <div className="flex flex-1 items-center px-2.5">Default Value</div>
-                  <div className="flex w-[100px] items-center justify-center px-2.5">Nullable</div>
-                  <div className="flex w-[100px] items-center justify-center px-2.5">Unique</div>
+                  <div className="flex flex-1 items-center px-2.5">
+                    {t('common.nameColumn', { defaultValue: 'Name' })}
+                  </div>
+                  <div className="flex flex-1 items-center px-2.5">
+                    {t('common.typeColumn', { defaultValue: 'Type' })}
+                  </div>
+                  <div className="flex flex-1 items-center px-2.5">
+                    {t('database.defaultValueColumn', { defaultValue: 'Default Value' })}
+                  </div>
+                  <div className="flex w-[100px] items-center justify-center px-2.5">
+                    {t('database.nullableColumn', { defaultValue: 'Nullable' })}
+                  </div>
+                  <div className="flex w-[100px] items-center justify-center px-2.5">
+                    {t('database.uniqueColumnHeader', { defaultValue: 'Unique' })}
+                  </div>
                   <div className="w-[52px]" />
                 </div>
 
@@ -506,16 +543,20 @@ export function TableForm({
                 className="h-8 rounded border-[var(--alpha-8)] bg-card px-2.5 text-sm font-medium hover:before:bg-[var(--alpha-4)]"
               >
                 <Plus className="size-5" />
-                Add Column
+                {t('database.addColumn', { defaultValue: 'Add Column' })}
               </Button>
             </div>
           </div>
 
           <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
             <div className="flex flex-col gap-1 px-4 py-3">
-              <h2 className="text-base leading-7 font-medium">Foreign Keys</h2>
+              <h2 className="text-base leading-7 font-medium">
+                {t('database.foreignKeys', { defaultValue: 'Foreign Keys' })}
+              </h2>
               <p className="text-sm leading-6 text-muted-foreground">
-                Create a relationship between this table and another table
+                {t('database.addForeignKeyDescription', {
+                  defaultValue: 'Create a relationship between this table and another table',
+                })}
               </p>
             </div>
 
@@ -523,9 +564,15 @@ export function TableForm({
               <div className="overflow-x-auto">
                 <div className="min-w-[760px]">
                   <div className="grid h-8 grid-cols-[minmax(260px,1fr)_190px_190px_52px] items-center border-y border-[var(--alpha-8)] px-1.5 text-[13px] leading-[18px] text-muted-foreground">
-                    <div className="px-2.5">Relationship</div>
-                    <div className="px-2.5">On Update</div>
-                    <div className="px-2.5">On Delete</div>
+                    <div className="px-2.5">
+                      {t('database.relationshipColumn', { defaultValue: 'Relationship' })}
+                    </div>
+                    <div className="px-2.5">
+                      {t('database.onUpdate', { defaultValue: 'On Update' })}
+                    </div>
+                    <div className="px-2.5">
+                      {t('database.onDelete', { defaultValue: 'On Delete' })}
+                    </div>
                     <div />
                   </div>
 
@@ -558,7 +605,7 @@ export function TableForm({
                           type="button"
                           onClick={() => handleRemoveForeignKey(fk.uid)}
                           className="flex size-8 items-center justify-center rounded text-muted-foreground opacity-0 transition-[opacity,colors] group-hover:opacity-100 hover:bg-[var(--alpha-8)] hover:text-foreground focus-visible:opacity-100"
-                          aria-label="Remove"
+                          aria-label={t('common.remove', { defaultValue: 'Remove' })}
                         >
                           <X className="size-5" />
                         </button>
@@ -577,7 +624,7 @@ export function TableForm({
                 onClick={() => setShowForeignKeyDialog(true)}
               >
                 <Link className="size-5" />
-                Add Foreign Keys
+                {t('database.addForeignKeys', { defaultValue: 'Add Foreign Keys' })}
               </Button>
             </div>
 
@@ -619,7 +666,7 @@ export function TableForm({
             onClick={() => onOpenChange(false)}
             className="h-9 rounded border-[var(--alpha-8)] bg-card px-3 text-sm font-medium hover:before:bg-[var(--alpha-4)]"
           >
-            Cancel
+            {t('common.cancel', { defaultValue: 'Cancel' })}
           </Button>
           <Button
             onClick={() => void handleSubmit()}
@@ -631,7 +678,9 @@ export function TableForm({
             }
             className="h-9 rounded bg-primary px-3 text-sm font-medium text-[rgb(var(--inverse))] hover:before:bg-[var(--alpha-inverse-8)] disabled:opacity-40"
           >
-            {mode === 'edit' ? 'Update Table' : 'Create Table'}
+            {mode === 'edit'
+              ? t('database.updateTable', { defaultValue: 'Update Table' })
+              : t('database.createTable', { defaultValue: 'Create Table' })}
           </Button>
         </div>
       </div>

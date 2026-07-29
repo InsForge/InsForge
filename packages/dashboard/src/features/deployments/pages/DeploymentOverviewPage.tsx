@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ExternalLink, Copy, Check, RefreshCw } from 'lucide-react';
 import {
   Button,
@@ -29,6 +30,7 @@ const statusColors: Record<string, string> = {
 const DEPLOY_PROMPT = 'Deploy my app to InsForge';
 
 export default function DeploymentOverviewPage() {
+  const { t } = useTranslation('chrome');
   const { showToast } = useToast();
   const { copied, copy } = useCopyToClipboard();
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -91,7 +93,10 @@ export default function DeploymentOverviewPage() {
   const handleCopyPrompt = async () => {
     const ok = await copy(DEPLOY_PROMPT);
     if (!ok) {
-      showToast('Failed to copy to clipboard', 'error');
+      showToast(
+        t('deployments.copyFailed', { defaultValue: 'Failed to copy to clipboard' }),
+        'error'
+      );
     }
   };
 
@@ -105,19 +110,21 @@ export default function DeploymentOverviewPage() {
         <div className="bg-neutral-100 dark:bg-[#333] rounded-lg p-6">
           <div className="flex flex-col gap-6">
             <h2 className="text-xl font-semibold text-zinc-950 dark:text-white">
-              No deployments yet
+              {t('deployments.noDeploymentsYet', { defaultValue: 'No deployments yet' })}
             </h2>
 
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted-foreground dark:text-neutral-400">
-                Send the prompt below to your connected AI agent to deploy your site for the first
-                time.
+                {t('deployments.deployPromptHint', {
+                  defaultValue:
+                    'Send the prompt below to your connected AI agent to deploy your site for the first time.',
+                })}
               </p>
 
               <div className="bg-neutral-200 dark:bg-[#171717] rounded-lg p-3 flex flex-col gap-2">
                 <div className="flex items-start">
                   <span className="bg-neutral-300 dark:bg-neutral-700 text-zinc-950 dark:text-neutral-50 text-xs px-2 py-0.5 rounded">
-                    prompt
+                    {t('deployments.promptLabel', { defaultValue: 'prompt' })}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -133,13 +140,17 @@ export default function DeploymentOverviewPage() {
                     ) : (
                       <Copy className="w-4 h-4 mr-2" />
                     )}
-                    {copied ? 'Copied' : 'Copy'}
+                    {copied
+                      ? t('deployments.copied', { defaultValue: 'Copied' })
+                      : t('deployments.copy', { defaultValue: 'Copy' })}
                   </Button>
                 </div>
               </div>
 
               <p className="text-sm text-muted-foreground dark:text-neutral-400">
-                You can also deploy using your own workflow.
+                {t('deployments.deployOwnWorkflow', {
+                  defaultValue: 'You can also deploy using your own workflow.',
+                })}
               </p>
             </div>
           </div>
@@ -162,7 +173,7 @@ export default function DeploymentOverviewPage() {
                 <iframe
                   key={iframeKey}
                   src={deploymentUrl}
-                  title="Site Preview"
+                  title={t('deployments.sitePreview', { defaultValue: 'Site Preview' })}
                   className="absolute top-0 left-0 w-[1215px] h-[912px] origin-top-left scale-[0.333] border-0 pointer-events-none"
                   sandbox="allow-scripts allow-same-origin"
                   loading="lazy"
@@ -170,7 +181,7 @@ export default function DeploymentOverviewPage() {
               </a>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-                No preview available
+                {t('deployments.noPreview', { defaultValue: 'No preview available' })}
               </div>
             )}
           </div>
@@ -179,7 +190,7 @@ export default function DeploymentOverviewPage() {
           <div className="flex-1 flex flex-col gap-6 justify-center">
             <div className="flex flex-col">
               <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-6">
-                Deployment ID
+                {t('deployments.deploymentId', { defaultValue: 'Deployment ID' })}
               </p>
               <p className="text-sm text-zinc-950 dark:text-white font-mono">
                 {latestReadyDeployment.id}
@@ -189,14 +200,14 @@ export default function DeploymentOverviewPage() {
             <div className="grid grid-cols-2 gap-x-9">
               <div className="flex flex-col">
                 <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-6">
-                  Status
+                  {t('deployments.status', { defaultValue: 'Status' })}
                 </p>
                 <div>
                   <span
                     className={`inline-flex items-center justify-center h-5 px-2 rounded text-xs font-medium text-white ${statusColor}`}
                   >
                     {latestReadyDeployment.status === 'READY'
-                      ? 'Ready'
+                      ? t('deployments.deploymentStatus.READY', { defaultValue: 'Ready' })
                       : latestReadyDeployment.status}
                   </span>
                 </div>
@@ -204,7 +215,7 @@ export default function DeploymentOverviewPage() {
 
               <div className="flex flex-col">
                 <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-6">
-                  Provider
+                  {t('deployments.provider', { defaultValue: 'Provider' })}
                 </p>
                 <p className="text-sm text-zinc-950 dark:text-white capitalize">
                   {latestReadyDeployment.provider}
@@ -214,7 +225,7 @@ export default function DeploymentOverviewPage() {
 
             <div className="flex flex-col">
               <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-6">
-                Created at
+                {t('deployments.createdAt', { defaultValue: 'Created At' })}
               </p>
               <p className="text-sm text-zinc-950 dark:text-white">
                 {formatTime(latestReadyDeployment.createdAt)}
@@ -223,7 +234,7 @@ export default function DeploymentOverviewPage() {
 
             <div className="flex flex-col gap-1">
               <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-6">
-                Domains
+                {t('deployments.domains', { defaultValue: 'Domains' })}
               </p>
               <div className="flex flex-col gap-1">
                 {visibleDomains.length > 0
@@ -257,7 +268,9 @@ export default function DeploymentOverviewPage() {
         <div className="w-full max-w-[1080px] mx-auto flex flex-col gap-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-zinc-950 dark:text-white">Overview</h1>
+              <h1 className="text-xl font-semibold text-zinc-950 dark:text-white">
+                {t('deployments.overview', { defaultValue: 'Overview' })}
+              </h1>
               <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
               <TooltipProvider>
                 <Tooltip>
@@ -278,7 +291,11 @@ export default function DeploymentOverviewPage() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
-                    <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                    <p>
+                      {isRefreshing
+                        ? t('deployments.refreshing', { defaultValue: 'Refreshing...' })
+                        : t('deployments.refresh', { defaultValue: 'Refresh' })}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -289,7 +306,7 @@ export default function DeploymentOverviewPage() {
                 className="h-9 px-8 bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
               >
                 <a href={primaryVisitUrl} target="_blank" rel="noopener noreferrer">
-                  Visit
+                  {t('deployments.visit', { defaultValue: 'Visit' })}
                 </a>
               </Button>
             )}

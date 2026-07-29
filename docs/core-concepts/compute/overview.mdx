@@ -52,6 +52,15 @@ Structured logs per container, queryable by service and time range. Tail in the 
 
 Set environment variables and secrets per service, separately from your edge-function secrets. Rotate without redeploying.
 
+## Self-hosting: enable compute
+
+Custom Compute runs your containers on [Fly.io](https://fly.io). On InsForge Cloud this is fully managed and you configure nothing. When you self-host, you bring your own Fly account and turn compute on with two environment variables in your `.env`:
+
+- `FLY_API_TOKEN`: a Fly.io API token, created with `fly tokens create org`. InsForge uses it to create and manage your compute containers.
+- `FLY_ORG`: your Fly organization slug, from `fly orgs list`. This is the org the containers are created in.
+
+Both are required. A token with no org has nothing to authenticate against, and an org with no token can't be called. Set them, then restart the container. Until both are present, compute endpoints return `503 COMPUTE_NOT_CONFIGURED`.
+
 ## Next steps
 
 - Set up the [CLI](/quickstart) to link your project (the recommended path).

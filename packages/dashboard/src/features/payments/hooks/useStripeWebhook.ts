@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type { GetStripeStatusResponse, StripeEnvironment } from '@insforge/shared-schemas';
 import { stripeService } from '#features/payments/services/stripe.service';
 import { stripeQueryKeys } from '#features/payments/queryKeys';
 import { useToast } from '@insforge/ui';
 
 export function useStripeWebhook() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -18,10 +20,19 @@ export function useStripeWebhook() {
     mutationFn: (environment: StripeEnvironment) => stripeService.configureWebhook(environment),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: stripeQueryKeys.status });
-      showToast('Stripe webhook configured', 'success');
+      showToast(
+        t('payments.stripeWebhookConfigured', { defaultValue: 'Stripe webhook configured' }),
+        'success'
+      );
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Failed to configure Stripe webhook', 'error');
+      showToast(
+        err.message ||
+          t('payments.configureStripeWebhookFailed', {
+            defaultValue: 'Failed to configure Stripe webhook',
+          }),
+        'error'
+      );
     },
   });
 

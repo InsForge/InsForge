@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSchedules } from '#features/functions/hooks/useSchedules';
 import type { ScheduleFormSchema } from '#features/functions/types';
 import { useForm, Controller } from 'react-hook-form';
@@ -40,6 +41,7 @@ export function ScheduleFormDialog({
   initialValues,
   onSubmit,
 }: ScheduleFormDialogProps) {
+  const { t } = useTranslation('chrome');
   const [error, setError] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<'headers' | 'body' | null>(null);
   const [contentType, setContentType] = useState('application/json');
@@ -176,7 +178,7 @@ export function ScheduleFormDialog({
       }
     },
     (errs) => {
-      setError('Please review the form fields');
+      setError(t('functions.reviewFormFields', { defaultValue: 'Please review the form fields' }));
       console.error('validation', errs);
     }
   );
@@ -186,11 +188,19 @@ export function ScheduleFormDialog({
       <DialogContent>
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col">
           <DialogHeader>
-            <DialogTitle>{mode === 'create' ? 'Create Schedule' : 'Edit Schedule'}</DialogTitle>
+            <DialogTitle>
+              {mode === 'create'
+                ? t('functions.createSchedule', { defaultValue: 'Create Schedule' })
+                : t('functions.editSchedule', { defaultValue: 'Edit Schedule' })}
+            </DialogTitle>
             <DialogDescription className="sr-only">
               {mode === 'create'
-                ? 'Create a new scheduled function'
-                : 'Edit scheduled function settings'}
+                ? t('functions.createScheduleDescription', {
+                    defaultValue: 'Create a new scheduled function',
+                  })
+                : t('functions.editScheduleDescription', {
+                    defaultValue: 'Edit scheduled function settings',
+                  })}
             </DialogDescription>
           </DialogHeader>
 
@@ -199,13 +209,15 @@ export function ScheduleFormDialog({
               <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-center">
                 {/* Schedule Name */}
                 <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Schedule Name
+                  {t('functions.scheduleName', { defaultValue: 'Schedule Name' })}
                 </label>
                 <div>
                   <input
                     {...form.register('name')}
                     className="w-full px-3 py-2 rounded border bg-white dark:bg-neutral-800 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
-                    placeholder="Enter schedule name"
+                    placeholder={t('functions.scheduleNamePlaceholder', {
+                      defaultValue: 'Enter schedule name',
+                    })}
                   />
                   {form.formState.errors.name && (
                     <p className="text-xs text-rose-500 mt-1">
@@ -217,21 +229,30 @@ export function ScheduleFormDialog({
                 {/* Cron Schedule */}
                 <div className="flex flex-col self-start">
                   <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    Cron Schedule
+                    {t('functions.cronSchedule', { defaultValue: 'Cron Schedule' })}
                   </label>
                   <span className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                    Pick from examples
+                    {t('functions.pickFromExamples', { defaultValue: 'Pick from examples' })}
                   </span>
                 </div>
                 <div className="self-start">
                   <input
                     {...form.register('cronSchedule')}
                     className="w-full px-3 py-2 rounded border bg-white dark:bg-neutral-800 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
-                    placeholder='E.g. "*/5 * * * *" or "30 seconds"'
+                    placeholder={t('functions.cronSchedulePlaceholder', {
+                      defaultValue: 'E.g. "*/5 * * * *" or "30 seconds"',
+                    })}
                   />
                   <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    5-field cron (e.g. <code>*/5 * * * *</code>) or interval form for sub-minute
-                    cadence (1–59 seconds, e.g. <code>30 seconds</code>). For ≥ 1 minute, use cron.
+                    {t('functions.cronHelpBeforeCron', { defaultValue: '5-field cron (e.g.' })}{' '}
+                    <code>*/5 * * * *</code>
+                    {t('functions.cronHelpBeforeInterval', {
+                      defaultValue: ') or interval form for sub-minute cadence (1–59 seconds, e.g.',
+                    })}{' '}
+                    <code>30 seconds</code>
+                    {t('functions.cronHelpAfterInterval', {
+                      defaultValue: '). For ≥ 1 minute, use cron.',
+                    })}
                   </p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <button
@@ -244,7 +265,7 @@ export function ScheduleFormDialog({
                         });
                       }}
                     >
-                      Every 30 seconds
+                      {t('functions.cronExample30Seconds', { defaultValue: 'Every 30 seconds' })}
                     </button>
                     <button
                       type="button"
@@ -256,7 +277,7 @@ export function ScheduleFormDialog({
                         });
                       }}
                     >
-                      Every 5 minutes
+                      {t('functions.cronExample5Minutes', { defaultValue: 'Every 5 minutes' })}
                     </button>
                     <button
                       type="button"
@@ -268,7 +289,7 @@ export function ScheduleFormDialog({
                         });
                       }}
                     >
-                      Every hour
+                      {t('functions.cronExampleHourly', { defaultValue: 'Every hour' })}
                     </button>
                     <button
                       type="button"
@@ -280,7 +301,9 @@ export function ScheduleFormDialog({
                         });
                       }}
                     >
-                      Every first of the month, at 00:00
+                      {t('functions.cronExampleMonthly', {
+                        defaultValue: 'Every first of the month, at 00:00',
+                      })}
                     </button>
                     <button
                       type="button"
@@ -292,7 +315,7 @@ export function ScheduleFormDialog({
                         });
                       }}
                     >
-                      Every Monday at 2 AM
+                      {t('functions.cronExampleMonday', { defaultValue: 'Every Monday at 2 AM' })}
                     </button>
                   </div>
                   {form.formState.errors.cronSchedule && (
@@ -304,13 +327,15 @@ export function ScheduleFormDialog({
 
                 {/* Function URL */}
                 <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Function URL
+                  {t('functions.functionUrl', { defaultValue: 'Function URL' })}
                 </label>
                 <div>
                   <input
                     {...form.register('functionUrl')}
                     className="w-full px-3 py-2 rounded border bg-white dark:bg-neutral-800 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
-                    placeholder="Enter Function URL"
+                    placeholder={t('functions.functionUrlPlaceholder', {
+                      defaultValue: 'Enter Function URL',
+                    })}
                   />
                   {form.formState.errors.functionUrl && (
                     <p className="text-xs text-rose-500 mt-1">
@@ -321,7 +346,7 @@ export function ScheduleFormDialog({
 
                 {/* HTTP Method */}
                 <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  HTTP Method
+                  {t('functions.httpMethod', { defaultValue: 'HTTP Method' })}
                 </label>
                 <Controller
                   control={form.control}
@@ -344,7 +369,7 @@ export function ScheduleFormDialog({
 
                 {/* Content Type */}
                 <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Content Type
+                  {t('functions.contentType', { defaultValue: 'Content Type' })}
                 </label>
                 <Select value={contentType} onValueChange={handleContentTypeChange}>
                   <SelectTrigger className="w-full">
@@ -363,7 +388,7 @@ export function ScheduleFormDialog({
               <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-center">
                 {/* Headers (JSON) */}
                 <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 self-start mt-2">
-                  Headers (JSON)
+                  {t('functions.headersJson', { defaultValue: 'Headers (JSON)' })}
                 </label>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -378,7 +403,8 @@ export function ScheduleFormDialog({
                       onClick={() => setEditingField(editingField === 'headers' ? null : 'headers')}
                       className="shrink-0 dark:text-zinc-100"
                     >
-                      <Pencil className="h-3.5 w-3.5" /> Edit
+                      <Pencil className="h-3.5 w-3.5" />{' '}
+                      {t('functions.edit', { defaultValue: 'Edit' })}
                     </Button>
                   </div>
                   {editingField === 'headers' && (
@@ -416,7 +442,7 @@ export function ScheduleFormDialog({
 
                 {/* Body (JSON) */}
                 <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 self-start mt-2">
-                  Body (JSON)
+                  {t('functions.bodyJson', { defaultValue: 'Body (JSON)' })}
                 </label>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -431,7 +457,8 @@ export function ScheduleFormDialog({
                       onClick={() => setEditingField(editingField === 'body' ? null : 'body')}
                       className="shrink-0 dark:text-zinc-100"
                     >
-                      <Pencil className="h-3.5 w-3.5 dark:text-zinc-100" /> Edit
+                      <Pencil className="h-3.5 w-3.5 dark:text-zinc-100" />{' '}
+                      {t('functions.edit', { defaultValue: 'Edit' })}
                     </Button>
                   </div>
                   {editingField === 'body' && (
@@ -485,7 +512,7 @@ export function ScheduleFormDialog({
               onClick={() => onOpenChange(false)}
               className="h-10 px-5 dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
             >
-              Cancel
+              {t('functions.cancel', { defaultValue: 'Cancel' })}
             </Button>
             <Button
               type="submit"
@@ -496,7 +523,9 @@ export function ScheduleFormDialog({
                 (mode === 'edit' && !form.formState.isDirty)
               }
             >
-              {mode === 'create' ? 'Create' : 'Save'}
+              {mode === 'create'
+                ? t('functions.create', { defaultValue: 'Create' })
+                : t('functions.save', { defaultValue: 'Save' })}
             </Button>
           </DialogFooter>
         </form>

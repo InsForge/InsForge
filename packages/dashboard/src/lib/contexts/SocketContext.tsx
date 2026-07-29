@@ -9,7 +9,7 @@ import {
   useMemo,
 } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { apiClient } from '#lib/api/client';
 import { useAuth } from './AuthContext';
 import { getDashboardBackendUrl } from '#lib/config/runtime';
@@ -32,6 +32,13 @@ export enum ServerEvents {
   DATA_UPDATE = 'data:update',
   MCP_CONNECTED = 'mcp:connected',
 }
+
+/**
+ * Window over which realtime query invalidations are coalesced. A burst of
+ * writes to the same table within this window collapses into a single refetch,
+ * capping refetch rate while keeping the dashboard live (max staleness ~= this).
+ */
+const INVALIDATION_DEBOUNCE_MS = 300;
 
 // ============================================================================
 // Payload Types
@@ -108,12 +115,49 @@ export function SocketProvider({ children }: SocketProviderProps) {
   // Refs
   const socketRef = useRef<Socket | null>(null);
 
+  // Pending query invalidations from realtime events, deduped by serialized
+  // key. Flushed as a single batch by flushInvalidations (see scheduleInvalidate).
+  const pendingInvalidationsRef = useRef<Map<string, QueryKey>>(new Map());
+  const invalidationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   /**
    * Update state helper
    */
   const updateState = useCallback((updates: Partial<SocketState>) => {
     setState((prev) => ({ ...prev, ...updates }));
   }, []);
+
+  /**
+   * Flush all pending invalidations queued since the timer was armed. Each
+   * unique query key is invalidated once, regardless of how many events touched it.
+   */
+  const flushInvalidations = useCallback(() => {
+    invalidationTimerRef.current = null;
+    const pending = pendingInvalidationsRef.current;
+    if (pending.size === 0) {
+      return;
+    }
+    const queryKeys = Array.from(pending.values());
+    pending.clear();
+    for (const queryKey of queryKeys) {
+      void queryClient.invalidateQueries({ queryKey });
+    }
+  }, [queryClient]);
+
+  /**
+   * Queue a query key for invalidation, coalescing keys received within
+   * INVALIDATION_DEBOUNCE_MS into one flush. This throttles refetches under
+   * high write volume instead of firing one per DATA_UPDATE event.
+   */
+  const scheduleInvalidate = useCallback(
+    (queryKey: QueryKey) => {
+      pendingInvalidationsRef.current.set(JSON.stringify(queryKey), queryKey);
+      if (invalidationTimerRef.current === null) {
+        invalidationTimerRef.current = setTimeout(flushInvalidations, INVALIDATION_DEBOUNCE_MS);
+      }
+    },
+    [flushInvalidations]
+  );
 
   /**
    * Create and configure socket connection
@@ -228,6 +272,16 @@ export function SocketProvider({ children }: SocketProviderProps) {
     };
   }, [disconnect]);
 
+  // Clear any pending invalidation timer on unmount
+  useEffect(() => {
+    return () => {
+      if (invalidationTimerRef.current !== null) {
+        clearTimeout(invalidationTimerRef.current);
+        invalidationTimerRef.current = null;
+      }
+    };
+  }, []);
+
   // Send onboarding success only after 2+ MCP connections
   const onMcpConnectedSuccess = useCallback(
     (toolName: string) => {
@@ -249,7 +303,9 @@ export function SocketProvider({ children }: SocketProviderProps) {
       return;
     }
 
-    // Handle DATA_UPDATE events - invalidate relevant queries
+    // Handle DATA_UPDATE events - invalidate relevant queries. Invalidations are
+    // coalesced (see scheduleInvalidate) so a burst of writes to the same table
+    // collapses into a single refetch instead of one per event.
     const handleDataUpdate = (message: SocketMessage) => {
       const resource = message.resource as DataUpdateResourceType;
 
@@ -266,67 +322,63 @@ export function SocketProvider({ children }: SocketProviderProps) {
             switch (change.type) {
               case 'tables':
                 // CREATE TABLE / DROP TABLE - affects table list
-                void queryClient.invalidateQueries({ queryKey: ['database', 'tables'] });
-                void queryClient.invalidateQueries({ queryKey: ['metadata', 'full'] });
+                scheduleInvalidate(['database', 'tables']);
+                scheduleInvalidate(['metadata', 'full']);
                 break;
               case 'table':
                 // ALTER TABLE / RENAME - affects specific table and list
-                void queryClient.invalidateQueries({ queryKey: ['database', 'tables'] });
+                scheduleInvalidate(['database', 'tables']);
                 if (change.name) {
                   const { schemaName, tableName } = parseDatabaseTableReference(change.name);
-                  void queryClient.invalidateQueries({
-                    queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
-                  });
+                  scheduleInvalidate(databaseTableQueryKeys.tableSchema(schemaName, tableName));
                 }
                 break;
               case 'records':
                 // INSERT / UPDATE / DELETE - affects records for specific table
                 if (change.name) {
                   const { schemaName, tableName } = parseDatabaseTableReference(change.name);
-                  void queryClient.invalidateQueries({
-                    queryKey: ['records', schemaName, tableName],
-                  });
+                  scheduleInvalidate(['records', schemaName, tableName]);
                 }
                 // Record count changed — refresh metadata so dashboard steps update
-                void queryClient.invalidateQueries({ queryKey: ['metadata', 'full'] });
+                scheduleInvalidate(['metadata', 'full']);
                 break;
               case 'index':
-                void queryClient.invalidateQueries({ queryKey: ['database', 'indexes'] });
+                scheduleInvalidate(['database', 'indexes']);
                 break;
               case 'trigger':
-                void queryClient.invalidateQueries({ queryKey: ['database', 'triggers'] });
+                scheduleInvalidate(['database', 'triggers']);
                 break;
               case 'policy':
-                void queryClient.invalidateQueries({ queryKey: ['database', 'policies'] });
+                scheduleInvalidate(['database', 'policies']);
                 break;
               case 'function':
-                void queryClient.invalidateQueries({ queryKey: ['database', 'functions'] });
+                scheduleInvalidate(['database', 'functions']);
                 break;
               case 'extension':
                 // Extensions are not supported yet
                 break;
               case 'migration':
-                void queryClient.invalidateQueries({ queryKey: ['database', 'migrations'] });
+                scheduleInvalidate(['database', 'migrations']);
                 break;
             }
           }
           break;
         }
         case DataUpdateResourceType.BUCKETS:
-          void queryClient.invalidateQueries({ queryKey: ['storage', 'buckets'] });
-          void queryClient.invalidateQueries({ queryKey: ['metadata', 'full'] });
+          scheduleInvalidate(['storage', 'buckets']);
+          scheduleInvalidate(['metadata', 'full']);
           break;
         case DataUpdateResourceType.USERS:
-          void queryClient.invalidateQueries({ queryKey: ['users'] });
+          scheduleInvalidate(['users']);
           break;
         case DataUpdateResourceType.FUNCTIONS:
-          void queryClient.invalidateQueries({ queryKey: ['functions'] });
+          scheduleInvalidate(['functions']);
           break;
         case DataUpdateResourceType.DEPLOYMENTS:
-          void queryClient.invalidateQueries({ queryKey: ['deployment-metadata'] });
+          scheduleInvalidate(['deployment-metadata']);
           break;
         case DataUpdateResourceType.REALTIME:
-          void queryClient.invalidateQueries({ queryKey: ['realtime'] });
+          scheduleInvalidate(['realtime']);
           break;
       }
     };
@@ -347,7 +399,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
       socket.off(ServerEvents.MCP_CONNECTED, handleMcpConnected);
     };
-  }, [state.isConnected, queryClient, onMcpConnectedSuccess]);
+  }, [state.isConnected, queryClient, onMcpConnectedSuccess, scheduleInvalidate]);
 
   // Context value
   const contextValue = useMemo<SocketContextValue>(

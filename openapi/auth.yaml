@@ -195,6 +195,7 @@ paths:
               properties:
                 requireEmailVerification:
                   type: boolean
+                  description: Enabling this requires custom SMTP or a managed email provider.
                 passwordMinLength:
                   type: integer
                   minimum: 4
@@ -269,7 +270,7 @@ paths:
                     type: string
                     format: date-time
         '400':
-          description: Invalid request
+          description: Invalid request, or no email provider is configured when enabling email verification
         '401':
           description: Unauthorized
         '403':
@@ -278,7 +279,8 @@ paths:
   /api/auth/users:
     post:
       summary: Register new user
-      description: Creates a new user account
+      description: |
+        Creates a new user account. When email verification is required, a delivery failure is returned as an error after the account is created. Retry delivery with POST /api/auth/email/send-verification instead of registering the same email again.
       tags:
           - Client
       parameters:
@@ -361,6 +363,28 @@ paths:
                 statusCode: 403
         '409':
           description: User already exists
+        '429':
+          description: User created, but verification email delivery was rate limited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: AUTH_VERIFICATION_EMAIL_DELIVERY_FAILED
+                message: The user account was created, but the verification email could not be sent.
+                statusCode: 429
+                nextActions: The user account already exists. Retry delivery with POST /api/auth/email/send-verification instead of registering again.
+        '500':
+          description: User created, but the verification email could not be sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: AUTH_VERIFICATION_EMAIL_DELIVERY_FAILED
+                message: The user account was created, but the verification email could not be sent.
+                statusCode: 500
+                nextActions: The user account already exists. Retry delivery with POST /api/auth/email/send-verification instead of registering again.
 
     get:
       summary: List all users (admin only)
@@ -485,7 +509,17 @@ paths:
   /api/auth/sessions:
     post:
       summary: User login
-      description: Authenticates user and returns access token. For web clients, sets httpOnly refresh token cookie. For mobile/desktop/server clients, returns refreshToken in response body.
+      description: |
+        Authenticates with a password or email OTP and returns an access token.
+        Existing password clients may omit `method`; it defaults to `password`.
+
+        With `method: otp`, InsForge verifies and consumes the 6-digit sign-in
+        code. If the email is new and public signups are enabled, it then creates
+        a verified passwordless user. If public signups are disabled, a valid
+        code for an unknown email is consumed and the request returns 403.
+
+        For web clients, this endpoint sets an httpOnly refresh token cookie.
+        For mobile/desktop/server clients, it returns refreshToken in the body.
       tags:
         - Client
       parameters:
@@ -504,16 +538,48 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - email
-                - password
-              properties:
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
+              oneOf:
+                - title: Password login
+                  type: object
+                  required:
+                    - email
+                    - password
+                  properties:
+                    method:
+                      type: string
+                      enum: [password]
+                      default: password
+                      description: May be omitted for backward compatibility
+                    email:
+                      type: string
+                      format: email
+                    password:
+                      type: string
+                - title: Email OTP login
+                  type: object
+                  required:
+                    - method
+                    - email
+                    - otp
+                  properties:
+                    method:
+                      type: string
+                      enum: [otp]
+                    email:
+                      type: string
+                      format: email
+                      example: user@example.com
+                    otp:
+                      type: string
+                      pattern: '^\d{6}$'
+                      description: 6-digit sign-in code
+                      example: "123456"
+                    name:
+                      type: string
+                      minLength: 1
+                      maxLength: 100
+                      description: Profile name used only when a new user is created
+                      example: Ada Lovelace
       responses:
         '200':
           description: Login successful
@@ -534,10 +600,14 @@ paths:
                     type: string
                     nullable: true
                     description: Refresh token for mobile/desktop/server clients (null for web clients)
+        '400':
+          description: Invalid input or invalid, expired, consumed, or attempt-limited sign-in code
         '401':
-          description: Invalid credentials
+          description: Invalid password credentials
         '403':
-          description: Email verification required
+          description: Email verification required, or public signups are disabled for a verified unknown email
+        '429':
+          description: Too many OTP verification attempts
 
   /api/auth/refresh:
     post:
@@ -865,6 +935,48 @@ paths:
           description: Forbidden - admin access required
         '404':
           description: Anon key not initialized
+
+  /api/auth/email/send-otp:
+    post:
+      summary: Send an email sign-in OTP
+      description: |
+        Sends a 6-digit code that can be exchanged at POST /api/auth/sessions
+        with `method: otp`.
+        The response is intentionally generic and does not reveal whether a user
+        already exists. The code expires after 5 minutes.
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '202':
+          description: The sign-in code was accepted for delivery
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: If sign-in is available for this email, we have sent a verification code.
+        '400':
+          description: Invalid request
+        '429':
+          description: Too many sign-in code requests
 
   /api/auth/email/send-verification:
     post:
@@ -1899,6 +2011,251 @@ paths:
                 format: uri
                 description: Redirect URL with authentication parameters
 
+  /api/auth/id-token:
+    post:
+      summary: Sign in with ID token (Google One Tap, native SDKs)
+      description: |
+        Authenticate a user using an ID token obtained from a native SDK (e.g., Google One Tap).
+        Currently only the `google` provider is supported.
+      tags:
+        - Client
+      parameters:
+        - name: client_type
+          in: query
+          schema:
+            type: string
+            enum: [web, mobile, desktop, server]
+            default: web
+          description: |
+            Client type determines how refresh tokens are returned:
+            - web: Refresh token stored in httpOnly cookie, csrfToken returned in response
+            - mobile/desktop/server: refreshToken returned directly in response body
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - provider
+                - token
+              properties:
+                provider:
+                  type: string
+                  enum: [google]
+                  description: Identity provider that issued the token
+                token:
+                  type: string
+                  description: Raw ID token from the provider SDK
+      responses:
+        '200':
+          description: Sign-in successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
+                  accessToken:
+                    type: string
+                  csrfToken:
+                    type: string
+                    nullable: true
+                    description: CSRF token for use with refresh endpoint (web clients only)
+                  refreshToken:
+                    type: string
+                    nullable: true
+                    description: Refresh token for mobile/desktop/server clients (null for web clients)
+        '400':
+          description: Invalid request - unsupported provider or missing token
+        '401':
+          description: Invalid or expired ID token
+
+  /api/auth/admin/sessions/current:
+    get:
+      summary: Get current admin session
+      description: Returns the currently authenticated admin's basic info from the access token.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current admin session info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  admin:
+                    type: object
+                    properties:
+                      sub:
+                        type: string
+                        description: Admin subject identifier
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  /api/auth/smtp-config:
+    get:
+      summary: Get SMTP configuration
+      description: Get current SMTP email configuration (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      x-internal: true
+      responses:
+        '200':
+          description: SMTP configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmtpConfig'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+    put:
+      summary: Update SMTP configuration
+      description: |
+        Create or update SMTP email configuration (admin only).
+        When `enabled` is true, the fields `host`, `username`, `senderEmail`, and `senderName` are required by the backend validation.
+        When `enabled` is false, these fields may be empty.
+        SMTP cannot be disabled on a self-hosted instance while email verification is required, unless a managed email provider is available.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      x-internal: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enabled
+                - port
+              properties:
+                enabled:
+                  type: boolean
+                  description: When true, host/username/senderEmail/senderName become required
+                host:
+                  type: string
+                  description: Required when enabled is true
+                port:
+                  type: integer
+                  enum: [25, 465, 587, 2525]
+                username:
+                  type: string
+                  description: Required when enabled is true
+                password:
+                  type: string
+                  description: SMTP password (optional on update if unchanged)
+                senderEmail:
+                  type: string
+                  format: email
+                  description: Required when enabled is true
+                senderName:
+                  type: string
+                  description: Required when enabled is true
+                minIntervalSeconds:
+                  type: integer
+                  minimum: 0
+                  default: 60
+                  description: Minimum interval between emails in seconds
+      responses:
+        '200':
+          description: SMTP configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmtpConfig'
+        '400':
+          description: Invalid request, or SMTP is the required email verification provider
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+  /api/auth/email-templates:
+    get:
+      summary: Get all email templates
+      description: Returns all configurable email templates (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      x-internal: true
+      responses:
+        '200':
+          description: List of email templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EmailTemplate'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+  /api/auth/email-templates/{type}:
+    put:
+      summary: Update email template
+      description: Update a specific email template by type (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      x-internal: true
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [email-verification-code, email-verification-link, request-otp, reset-password-code, reset-password-link]
+          description: Template type to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subject
+                - bodyHtml
+              properties:
+                subject:
+                  type: string
+                  description: Email subject line
+                bodyHtml:
+                  type: string
+                  description: HTML body of the email template
+      responses:
+        '200':
+          description: Template updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailTemplate'
+        '400':
+          description: Invalid template type or request body
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2102,3 +2459,55 @@ components:
           type: string
           description: Suggested action to resolve the error
           example: "Please use a different email address"
+
+    SmtpConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        enabled:
+          type: boolean
+        host:
+          type: string
+        port:
+          type: integer
+        username:
+          type: string
+        hasPassword:
+          type: boolean
+          description: Whether a password is set (actual password is never exposed)
+        senderEmail:
+          type: string
+          format: email
+        senderName:
+          type: string
+        minIntervalSeconds:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    EmailTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        templateType:
+          type: string
+          enum: [email-verification-code, email-verification-link, request-otp, reset-password-code, reset-password-link]
+        subject:
+          type: string
+        bodyHtml:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

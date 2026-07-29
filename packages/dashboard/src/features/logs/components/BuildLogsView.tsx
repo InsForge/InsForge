@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
   logService,
@@ -30,11 +32,23 @@ function getLevelColor(level: string): string {
   }
 }
 
-function getStatusBadge(status: GetBuildLogsResponse['status']) {
+function getStatusBadge(t: TFunction<'chrome'>, status: GetBuildLogsResponse['status']) {
   const statusConfig = {
-    pending: { label: 'Building', bgColor: 'bg-yellow-500/20', textColor: 'text-yellow-500' },
-    success: { label: 'Success', bgColor: 'bg-green-500/20', textColor: 'text-green-500' },
-    failed: { label: 'Failed', bgColor: 'bg-red-500/20', textColor: 'text-red-500' },
+    pending: {
+      label: t('logs.statusBuilding', { defaultValue: 'Building' }),
+      bgColor: 'bg-yellow-500/20',
+      textColor: 'text-yellow-500',
+    },
+    success: {
+      label: t('logs.statusSuccess', { defaultValue: 'Success' }),
+      bgColor: 'bg-green-500/20',
+      textColor: 'text-green-500',
+    },
+    failed: {
+      label: t('logs.statusFailed', { defaultValue: 'Failed' }),
+      bgColor: 'bg-red-500/20',
+      textColor: 'text-red-500',
+    },
   };
 
   const config = statusConfig[status] || statusConfig.pending;
@@ -54,6 +68,7 @@ interface BuildLogRow extends BuildLogEntry {
 }
 
 export function BuildLogsView({ className }: BuildLogsViewProps) {
+  const { t } = useTranslation('chrome');
   const [currentPage, setCurrentPage] = useState(1);
   const {
     pageSize,
@@ -114,7 +129,7 @@ export function BuildLogsView({ className }: BuildLogsViewProps) {
     () => [
       {
         key: 'level',
-        name: 'Level',
+        name: t('logs.level', { defaultValue: 'Level' }),
         width: '100px',
         renderCell: ({ row }) => {
           const level = row.level;
@@ -123,7 +138,7 @@ export function BuildLogsView({ className }: BuildLogsViewProps) {
       },
       {
         key: 'message',
-        name: 'Message',
+        name: t('logs.message', { defaultValue: 'Message' }),
         width: '1fr',
         renderCell: ({ row }) => {
           const message = row.message;
@@ -135,7 +150,7 @@ export function BuildLogsView({ className }: BuildLogsViewProps) {
         },
       },
     ],
-    []
+    [t]
   );
 
   return (
@@ -144,14 +159,18 @@ export function BuildLogsView({ className }: BuildLogsViewProps) {
       {buildLogs && (
         <div className="px-4 py-3 border-b border-gray-200 dark:border-neutral-700 flex items-center gap-4 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Deployment:</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {t('logs.deploymentLabel', { defaultValue: 'Deployment:' })}
+            </span>
             <code className="text-sm font-mono text-gray-900 dark:text-white">
               {buildLogs.deploymentId}
             </code>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Status:</span>
-            {getStatusBadge(buildLogs.status)}
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {t('logs.statusLabel', { defaultValue: 'Status:' })}
+            </span>
+            {getStatusBadge(t, buildLogs.status)}
           </div>
         </div>
       )}
@@ -172,9 +191,13 @@ export function BuildLogsView({ className }: BuildLogsViewProps) {
             handlePageSizeChange(newSize);
             setCurrentPage(1);
           }}
-          paginationRecordLabel="logs"
+          paginationRecordLabel={t('logs.recordLabel', { defaultValue: 'logs' })}
           gridContainerClassName="border-t border-[var(--alpha-8)]"
-          emptyState={<DataGridEmptyState message="No build logs found" />}
+          emptyState={
+            <DataGridEmptyState
+              message={t('logs.noBuildLogs', { defaultValue: 'No build logs found' })}
+            />
+          }
         />
       </div>
     </div>

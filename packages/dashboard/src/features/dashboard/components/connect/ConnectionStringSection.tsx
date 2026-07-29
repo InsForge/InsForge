@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CopyButton, cn } from '@insforge/ui';
 import { ShowPasswordButton } from './ShowPasswordButton';
 import { useDatabaseConnectionString, useDatabasePassword } from '#lib/hooks/useMetadata';
@@ -20,6 +21,7 @@ function formatParameterValue(value: string | number | undefined) {
 }
 
 export function ConnectionStringSection({ className }: ConnectionStringSectionProps) {
+  const { t } = useTranslation('chrome');
   const [showConnectionPassword, setShowConnectionPassword] = useState(false);
   const [showParamsPassword, setShowParamsPassword] = useState(false);
 
@@ -76,7 +78,7 @@ export function ConnectionStringSection({ className }: ConnectionStringSectionPr
         <div className="flex items-center justify-between">
           <div className="flex h-5 items-center justify-center rounded bg-[var(--alpha-8)] px-2">
             <span className="text-xs font-medium leading-4 text-muted-foreground">
-              connection string
+              {t('overview.connectionStringLabel', { defaultValue: 'connection string' })}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -88,14 +90,16 @@ export function ConnectionStringSection({ className }: ConnectionStringSectionPr
           </div>
         </div>
         <p className="break-all font-mono text-sm leading-6 text-foreground">
-          {connectionStringDisplay || 'Loading...'}
+          {connectionStringDisplay || t('overview.loading', { defaultValue: 'Loading...' })}
         </p>
       </div>
 
       <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 p-3">
         <div className="flex items-center justify-between">
           <div className="flex h-5 items-center justify-center rounded bg-[var(--alpha-8)] px-2">
-            <span className="text-xs font-medium leading-4 text-muted-foreground">parameters</span>
+            <span className="text-xs font-medium leading-4 text-muted-foreground">
+              {t('overview.parametersLabel', { defaultValue: 'parameters' })}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <ShowPasswordButton

@@ -1,11 +1,15 @@
 ---
-title: "Deploy InsForge to Google Cloud Compute Engine"
-description: "Deploy InsForge on a Google Cloud Compute Engine VM with Docker Compose, covering firewall rules, SSH access, custom domains, and HTTPS setup."
+title: "Self-Host InsForge on Google Cloud Compute Engine"
+description: "Self-host the InsForge platform on a Google Cloud Compute Engine VM with Docker Compose, covering firewall rules, SSH access, custom domains, and HTTPS setup."
 ---
 
-# Deploy InsForge to Google Cloud Compute Engine
+# Self-Host InsForge on Google Cloud Compute Engine
 
-This guide will walk you through deploying InsForge on Google Cloud Compute Engine using Docker Compose.
+This guide will walk you through self-hosting the InsForge platform on Google Cloud Compute Engine using Docker Compose.
+
+<Note>
+  **This deploys InsForge itself, not the app you built.** If you just want to take your app live, use [Sites](/core-concepts/sites/overview) instead. This guide is for running the InsForge backend on your own infrastructure.
+</Note>
 
 <Note>
   This cloud walkthrough is community-maintained and can lag the latest InsForge release. The canonical, always-current setup is the `deploy/docker-compose/` directory in the [InsForge repo](https://github.com/InsForge/InsForge).

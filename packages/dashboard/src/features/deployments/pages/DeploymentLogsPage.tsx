@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RefreshCw, Search, MoreVertical, RefreshCcw, XCircle } from 'lucide-react';
 import {
   Button,
@@ -33,16 +34,6 @@ type DeploymentStatus =
   | 'ERROR'
   | 'CANCELED';
 
-const statusOptions: { value: DeploymentStatus; label: string }[] = [
-  { value: 'ALL', label: 'All Status' },
-  { value: 'READY', label: 'Ready' },
-  { value: 'UPLOADING', label: 'Uploading' },
-  { value: 'QUEUED', label: 'Queued' },
-  { value: 'BUILDING', label: 'Building' },
-  { value: 'ERROR', label: 'Error' },
-  { value: 'CANCELED', label: 'Canceled' },
-];
-
 const statusColors: Record<string, string> = {
   WAITING: 'bg-yellow-600',
   UPLOADING: 'bg-yellow-600',
@@ -53,21 +44,32 @@ const statusColors: Record<string, string> = {
   CANCELED: 'bg-neutral-600',
 };
 
-const statusLabels: Record<string, string> = {
-  WAITING: 'Waiting',
-  UPLOADING: 'Uploading',
-  QUEUED: 'Queued',
-  BUILDING: 'Building',
-  READY: 'Ready',
-  ERROR: 'Error',
-  CANCELED: 'Canceled',
-};
-
 export default function DeploymentLogsPage() {
+  const { t } = useTranslation('chrome');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<DeploymentStatus>('ALL');
   const [selectedDeployment, setSelectedDeployment] = useState<DeploymentSchema | null>(null);
+
+  const translatedStatusLabels: Record<string, string> = {
+    WAITING: t('deployments.deploymentStatus.WAITING', { defaultValue: 'Waiting' }),
+    UPLOADING: t('deployments.deploymentStatus.UPLOADING', { defaultValue: 'Uploading' }),
+    QUEUED: t('deployments.deploymentStatus.QUEUED', { defaultValue: 'Queued' }),
+    BUILDING: t('deployments.deploymentStatus.BUILDING', { defaultValue: 'Building' }),
+    READY: t('deployments.deploymentStatus.READY', { defaultValue: 'Ready' }),
+    ERROR: t('deployments.deploymentStatus.ERROR', { defaultValue: 'Error' }),
+    CANCELED: t('deployments.deploymentStatus.CANCELED', { defaultValue: 'Canceled' }),
+  };
+
+  const statusOptions: { value: DeploymentStatus; label: string }[] = [
+    { value: 'ALL', label: t('deployments.allStatus', { defaultValue: 'All Status' }) },
+    { value: 'READY', label: translatedStatusLabels.READY },
+    { value: 'UPLOADING', label: translatedStatusLabels.UPLOADING },
+    { value: 'QUEUED', label: translatedStatusLabels.QUEUED },
+    { value: 'BUILDING', label: translatedStatusLabels.BUILDING },
+    { value: 'ERROR', label: translatedStatusLabels.ERROR },
+    { value: 'CANCELED', label: translatedStatusLabels.CANCELED },
+  ];
 
   const {
     deployments,
@@ -133,7 +135,7 @@ export default function DeploymentLogsPage() {
       <div className="flex flex-col gap-6 p-4">
         {/* Title */}
         <h1 className="text-xl font-semibold text-zinc-950 dark:text-white tracking-[-0.1px]">
-          Deployment Logs
+          {t('deployments.deploymentLogs', { defaultValue: 'Deployment Logs' })}
         </h1>
 
         {/* Filters Row */}
@@ -142,7 +144,7 @@ export default function DeploymentLogsPage() {
           <div className="relative flex-1 max-w-80">
             <Input
               type="text"
-              placeholder="Search logs"
+              placeholder={t('deployments.searchLogs', { defaultValue: 'Search logs' })}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-9 pl-3 pr-9"
@@ -156,7 +158,7 @@ export default function DeploymentLogsPage() {
             onValueChange={(value) => setStatusFilter(value as DeploymentStatus)}
           >
             <SelectTrigger className="w-[180px] h-9">
-              <SelectValue placeholder="Status" />
+              <SelectValue placeholder={t('deployments.status', { defaultValue: 'Status' })} />
             </SelectTrigger>
             <SelectContent>
               {statusOptions.map((option) => (
@@ -176,15 +178,21 @@ export default function DeploymentLogsPage() {
             className="h-9 px-3 text-zinc-950 dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700"
           >
             <RefreshCw className={cn('h-4 w-4 mr-1.5', isRefreshing && 'animate-spin')} />
-            Refresh
+            {t('deployments.refresh', { defaultValue: 'Refresh' })}
           </Button>
         </div>
 
         {/* Table Header */}
         <div className="grid grid-cols-10 px-3 text-sm text-muted-foreground dark:text-neutral-400">
-          <div className="col-span-3 py-1 px-3">Deployment ID</div>
-          <div className="col-span-3 py-1 px-3">Status</div>
-          <div className="col-span-3 py-1 px-3">Created At</div>
+          <div className="col-span-3 py-1 px-3">
+            {t('deployments.deploymentId', { defaultValue: 'Deployment ID' })}
+          </div>
+          <div className="col-span-3 py-1 px-3">
+            {t('deployments.status', { defaultValue: 'Status' })}
+          </div>
+          <div className="col-span-3 py-1 px-3">
+            {t('deployments.createdAt', { defaultValue: 'Created At' })}
+          </div>
           <div className="col-span-1" />
         </div>
       </div>
@@ -203,7 +211,7 @@ export default function DeploymentLogsPage() {
               {filteredDeployments.map((deployment) => {
                 const isCurrent = deployment.id === latestReadyDeploymentId;
                 const statusColor = statusColors[deployment.status] || 'bg-neutral-500';
-                const statusLabel = statusLabels[deployment.status] || deployment.status;
+                const statusLabel = translatedStatusLabels[deployment.status] || deployment.status;
 
                 return (
                   <div
@@ -219,7 +227,11 @@ export default function DeploymentLogsPage() {
                       >
                         {deployment.id}
                       </span>
-                      {isCurrent && <Badge className="shrink-0">Current</Badge>}
+                      {isCurrent && (
+                        <Badge className="shrink-0">
+                          {t('deployments.current', { defaultValue: 'Current' })}
+                        </Badge>
+                      )}
                     </div>
 
                     {/* Status */}
@@ -257,11 +269,11 @@ export default function DeploymentLogsPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => handleSync(deployment.id)}>
                               <RefreshCcw className="h-4 w-4" />
-                              Sync
+                              {t('deployments.sync', { defaultValue: 'Sync' })}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleCancel(deployment.id)}>
                               <XCircle className="h-4 w-4" />
-                              Cancel
+                              {t('deployments.cancel', { defaultValue: 'Cancel' })}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -281,7 +293,9 @@ export default function DeploymentLogsPage() {
           <div className="absolute inset-0 bg-[rgb(var(--semantic-1))] flex items-center justify-center z-50">
             <div className="flex items-center gap-1">
               <div className="w-5 h-5 border-2 border-zinc-500 dark:border-neutral-700 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading</span>
+              <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                {t('deployments.loading', { defaultValue: 'Loading' })}
+              </span>
             </div>
           </div>
         )}
@@ -296,7 +310,7 @@ export default function DeploymentLogsPage() {
             onPageChange={handlePageChange}
             totalRecords={totalDeployments}
             pageSize={pageSize}
-            recordLabel="deployments"
+            recordLabel={t('deployments.recordDeployments', { defaultValue: 'deployments' })}
           />
         </div>
       )}

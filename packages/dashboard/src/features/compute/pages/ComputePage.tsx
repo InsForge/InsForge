@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Loader2,
   ArrowLeft,
@@ -20,6 +21,7 @@ import { statusColors, getReachableUrl } from '#features/compute/constants';
 import type { ServiceSchema } from '@insforge/shared-schemas';
 
 export default function ComputePage() {
+  const { t } = useTranslation('chrome');
   const {
     services,
     isLoading,
@@ -70,7 +72,9 @@ export default function ComputePage() {
           <div className="max-w-xl text-center space-y-3">
             <AlertTriangle className="w-8 h-8 text-muted-foreground mx-auto" />
             <h2 className="text-base font-medium text-foreground">
-              Compute services not configured
+              {t('compute.notConfigured', {
+                defaultValue: 'Compute services not configured',
+              })}
             </h2>
             {apiError.nextActions && (
               <p className="text-sm text-muted-foreground whitespace-pre-line">
@@ -85,7 +89,11 @@ export default function ComputePage() {
       <div className="flex items-center justify-center h-64">
         <div className="flex items-center gap-2 text-destructive">
           <XCircle className="w-5 h-5 shrink-0" />
-          <span className="text-sm">Failed to load services. Please refresh the page.</span>
+          <span className="text-sm">
+            {t('compute.loadServicesFailed', {
+              defaultValue: 'Failed to load services. Please refresh the page.',
+            })}
+          </span>
         </div>
       </div>
     );
@@ -104,7 +112,7 @@ export default function ComputePage() {
               className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors self-start"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to services
+              {t('compute.backToServices', { defaultValue: 'Back to services' })}
             </button>
 
             <div className="flex items-center justify-between">
@@ -116,7 +124,9 @@ export default function ComputePage() {
                   <span
                     className={`inline-block h-2 w-2 rounded-full ${statusColors[currentService.status]}`}
                   />
-                  {currentService.status}
+                  {t(`compute.statuses.${currentService.status}`, {
+                    defaultValue: currentService.status,
+                  })}
                 </span>
               </div>
 
@@ -129,7 +139,9 @@ export default function ComputePage() {
                     onClick={() => void stop(currentService.id)}
                   >
                     <Square className="h-3.5 w-3.5" />
-                    {isStopping ? 'Stopping...' : 'Stop'}
+                    {isStopping
+                      ? t('compute.stopping', { defaultValue: 'Stopping...' })
+                      : t('compute.stop', { defaultValue: 'Stop' })}
                   </Button>
                 )}
                 {currentService.status === 'stopped' && (
@@ -140,7 +152,9 @@ export default function ComputePage() {
                     onClick={() => void start(currentService.id)}
                   >
                     <Play className="h-3.5 w-3.5" />
-                    {isStarting ? 'Starting...' : 'Start'}
+                    {isStarting
+                      ? t('compute.starting', { defaultValue: 'Starting...' })
+                      : t('compute.start', { defaultValue: 'Start' })}
                   </Button>
                 )}
                 <Button
@@ -150,7 +164,9 @@ export default function ComputePage() {
                   onClick={() => setDeleteTarget(currentService.id)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  {isDeleting ? 'Deleting...' : 'Delete'}
+                  {isDeleting
+                    ? t('compute.deleting', { defaultValue: 'Deleting...' })
+                    : t('compute.delete', { defaultValue: 'Delete' })}
                 </Button>
               </div>
             </div>
@@ -158,38 +174,52 @@ export default function ComputePage() {
             {currentService.status === 'failed' && (
               <div className="flex items-center gap-2 px-4 py-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                This service failed to deploy. You can delete it and try again.
+                {t('compute.deployFailed', {
+                  defaultValue: 'This service failed to deploy. You can delete it and try again.',
+                })}
               </div>
             )}
 
             <div className="bg-card border border-[var(--alpha-8)] rounded-lg p-6">
               <dl className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <dt className="text-muted-foreground mb-1">Image</dt>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.image', { defaultValue: 'Image' })}
+                  </dt>
                   <dd className="text-foreground break-all">
                     {currentService.imageUrl === 'dockerfile'
-                      ? 'Built from Dockerfile'
+                      ? t('compute.builtFromDockerfile', { defaultValue: 'Built from Dockerfile' })
                       : currentService.imageUrl}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground mb-1">Port</dt>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.port', { defaultValue: 'Port' })}
+                  </dt>
                   <dd className="text-foreground">{currentService.port}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground mb-1">CPU</dt>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.cpu', { defaultValue: 'CPU' })}
+                  </dt>
                   <dd className="text-foreground">{currentService.cpu}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground mb-1">Memory</dt>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.memory', { defaultValue: 'Memory' })}
+                  </dt>
                   <dd className="text-foreground">{currentService.memory} MB</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground mb-1">Region</dt>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.region', { defaultValue: 'Region' })}
+                  </dt>
                   <dd className="text-foreground">{currentService.region}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground mb-1">Created</dt>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.created', { defaultValue: 'Created' })}
+                  </dt>
                   <dd className="text-foreground">
                     {new Date(currentService.createdAt).toLocaleDateString(undefined, {
                       year: 'numeric',
@@ -201,7 +231,9 @@ export default function ComputePage() {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground mb-1">Updated</dt>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.updated', { defaultValue: 'Updated' })}
+                  </dt>
                   <dd className="text-foreground">
                     {new Date(currentService.updatedAt).toLocaleDateString(undefined, {
                       year: 'numeric',
@@ -213,7 +245,9 @@ export default function ComputePage() {
                   </dd>
                 </div>
                 <div className="col-span-2">
-                  <dt className="text-muted-foreground mb-1">Endpoint</dt>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.endpoint', { defaultValue: 'Endpoint' })}
+                  </dt>
                   <dd className="text-foreground">
                     {reachableUrl ? (
                       reachableUrl.href ? (
@@ -231,11 +265,16 @@ export default function ComputePage() {
                         </code>
                       )
                     ) : (
-                      <span className="text-muted-foreground">Not available</span>
+                      <span className="text-muted-foreground">
+                        {t('compute.notAvailable', { defaultValue: 'Not available' })}
+                      </span>
                     )}
                     {reachableUrl && !reachableUrl.href && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        Raw TCP service. Connect with the protocol&apos;s native client (e.g.{' '}
+                        {t('compute.rawTcpHint', {
+                          defaultValue:
+                            "Raw TCP service. Connect with the protocol's native client (e.g.",
+                        })}{' '}
                         <code className="font-mono">redis-cli -h &lt;host&gt; -p &lt;port&gt;</code>
                         ).
                       </p>
@@ -277,42 +316,57 @@ export default function ComputePage() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-medium text-foreground leading-8">Services</h1>
+                <h1 className="text-2xl font-medium text-foreground leading-8">
+                  {t('compute.servicesTitle', { defaultValue: 'Services' })}
+                </h1>
                 <p className="text-sm leading-5 text-muted-foreground">
-                  Deploy and manage long-running containers on your infrastructure.
+                  {t('compute.servicesDescription', {
+                    defaultValue:
+                      'Deploy and manage long-running containers on your infrastructure.',
+                  })}
                 </p>
               </div>
               <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
                 <Plus className="h-4 w-4" />
-                Create Service
+                {t('compute.createService', { defaultValue: 'Create Service' })}
               </Button>
             </div>
 
             {services.length === 0 ? (
               <div className="bg-card border border-[var(--alpha-8)] rounded-lg p-8">
                 <p className="text-sm text-muted-foreground mb-4 text-center">
-                  No services deployed yet.
+                  {t('compute.noServices', { defaultValue: 'No services deployed yet.' })}
                 </p>
                 <div className="flex flex-col gap-3 max-w-xl mx-auto">
                   <div>
                     <p className="text-xs text-muted-foreground mb-1.5">
-                      Use the button above, the CLI:
+                      {t('compute.useButtonOrCli', {
+                        defaultValue: 'Use the button above, the CLI:',
+                      })}
                     </p>
                     <code className="block px-3 py-2 bg-muted text-foreground rounded text-xs font-mono break-all">
                       npx @insforge/cli compute deploy --name my-api --image nginx:alpine --port 80
                     </code>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1.5">Or ask your AI agent:</p>
+                    <p className="text-xs text-muted-foreground mb-1.5">
+                      {t('compute.orAskAgent', { defaultValue: 'Or ask your AI agent:' })}
+                    </p>
                     <ul className="flex flex-col gap-1 text-xs text-foreground">
                       <li className="px-3 py-2 bg-muted rounded">
-                        &ldquo;Deploy nginx:alpine on port 80 as a compute service&rdquo;
+                        {t('compute.agentExampleDeploy', {
+                          defaultValue: '“Deploy nginx:alpine on port 80 as a compute service”',
+                        })}
                       </li>
                       <li className="px-3 py-2 bg-muted rounded">
-                        &ldquo;Deploy this FastAPI app in the current directory&rdquo;
+                        {t('compute.agentExampleFastapi', {
+                          defaultValue: '“Deploy this FastAPI app in the current directory”',
+                        })}
                       </li>
                       <li className="px-3 py-2 bg-muted rounded">
-                        &ldquo;Create a Redis container for caching&rdquo;
+                        {t('compute.agentExampleRedis', {
+                          defaultValue: '“Create a Redis container for caching”',
+                        })}
                       </li>
                     </ul>
                   </div>
@@ -336,9 +390,13 @@ export default function ComputePage() {
 
           {/* Jobs Section Placeholder */}
           <div className="flex flex-col gap-2">
-            <h2 className="text-lg font-medium text-foreground">Jobs</h2>
+            <h2 className="text-lg font-medium text-foreground">
+              {t('compute.jobs', { defaultValue: 'Jobs' })}
+            </h2>
             <div className="bg-card border border-[var(--alpha-8)] rounded-lg p-6 text-center">
-              <p className="text-sm text-muted-foreground">Coming soon</p>
+              <p className="text-sm text-muted-foreground">
+                {t('compute.comingSoon', { defaultValue: 'Coming soon' })}
+              </p>
             </div>
           </div>
         </div>

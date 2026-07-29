@@ -272,19 +272,26 @@ Return JSON {"action":"ADD"|"UPDATE"|"NOOP","target_id"?:string,"title"?:string,
     title?: string;
     content?: string;
   }): Promise<RememberResult[]> {
+    const isTranscriptMode = Boolean(params.transcript);
     const candidates: Candidate[] = params.transcript
       ? await this.extract(params.transcript)
       : params.title && params.content
         ? [{ kind: params.kind ?? 'fact', title: params.title, content: params.content }]
         : [];
 
-    // Isolate failures per candidate: one bad row (e.g. an embedding hiccup
-    // mid-batch) must not discard the memories already stored before it.
+    // Transcript mode: isolate failures per candidate — one bad row (e.g. an
+    // embedding hiccup mid-batch) must not discard the memories already
+    // stored before it. Explicit single-candidate mode: rethrow, so the
+    // caller gets a real error instead of a misleading NOOP that looks like
+    // "already stored" when nothing was persisted.
     const results: RememberResult[] = [];
     for (const c of candidates) {
       try {
         results.push(await this.rememberOne(params.scope, c, params.source));
       } catch (err) {
+        if (!isTranscriptMode) {
+          throw err;
+        }
         logger.warn('memory.remember candidate failed', {
           scope: params.scope,
           title: c.title,

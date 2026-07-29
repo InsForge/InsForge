@@ -13,11 +13,11 @@ services:
       - ./deploy/docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
       - ./deploy/docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     networks:
       - insforge-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -38,9 +38,11 @@ services:
       PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
       PGRST_DB_SCHEMA: public
       PGRST_DB_ANON_ROLE: anon
+      # Keep in sync with the backend's POSTGREST_MAX_SOCKETS (default 50)
+      PGRST_DB_POOL: ${PGRST_DB_POOL:-50}
       PGRST_JWT_SECRET: ${JWT_SECRET:-dev-secret-please-change-in-production}
     ports:
-      - "${POSTGREST_PORT:-5430}:3000"
+      - "127.0.0.1:${POSTGREST_PORT:-5430}:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,6 +84,9 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       - POSTGREST_BASE_URL=http://postgrest:3000
+      - POSTGREST_MAX_SOCKETS=${POSTGREST_MAX_SOCKETS:-}
+      - POSTGREST_MAX_FREE_SOCKETS=${POSTGREST_MAX_FREE_SOCKETS:-}
+      - POSTGREST_FREE_SOCKET_TIMEOUT_MS=${POSTGREST_FREE_SOCKET_TIMEOUT_MS:-}
       # Deno Runtime URL for serverless functions
       - DENO_RUNTIME_URL=http://deno:7133
       - DENO_DEPLOY_TOKEN=${DENO_DEPLOY_TOKEN:-}
@@ -91,13 +96,19 @@ services:
       - MAX_JSON_BODY_SIZE=${MAX_JSON_BODY_SIZE:-}
       - MAX_URLENCODED_BODY_SIZE=${MAX_URLENCODED_BODY_SIZE:-}
       - KEEP_ALIVE_TIMEOUT_MS=${KEEP_ALIVE_TIMEOUT_MS:-}
+      # S3-compatible storage (MinIO, RustFS, Wasabi, Tencent COS, Aliyun OSS,
+      # R2 ...). S3_BUCKET/S3_REGION preferred; AWS_* are the legacy names
+      # kept for cloud provisioning and existing .env files.
+      - S3_BUCKET=${S3_BUCKET:-}
+      - S3_REGION=${S3_REGION:-}
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}
-      # S3-compatible storage (MinIO, Tencent COS, Aliyun OSS, R2 ...)
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
       - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-}
+      - S3_MAX_OBJECT_SIZE_BYTES=${S3_MAX_OBJECT_SIZE_BYTES:-}
+      - S3_USE_PRESIGNED_URLS=${S3_USE_PRESIGNED_URLS:-}
       - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL:-}
       - AWS_CLOUDFRONT_KEY_PAIR_ID=${AWS_CLOUDFRONT_KEY_PAIR_ID:-}
       - AWS_CLOUDFRONT_PRIVATE_KEY=${AWS_CLOUDFRONT_PRIVATE_KEY:-}
@@ -135,6 +146,7 @@ services:
       - LOGS_DIR=/insforge-logs
       # Anonymous telemetry (set INSFORGE_TELEMETRY_DISABLED=1 to opt out)
       - INSFORGE_TELEMETRY_DISABLED=${INSFORGE_TELEMETRY_DISABLED:-}
+      - INSFORGE_DEPLOYMENT_METHOD=docker-compose
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
     volumes:
@@ -157,7 +169,7 @@ services:
       - postgres
       - postgrest
     ports:
-      - "${DENO_PORT:-7133}:7133"
+      - "127.0.0.1:${DENO_PORT:-7133}:7133"
     environment:
       - PORT=7133
       - DENO_ENV=${DENO_ENV:-production}
