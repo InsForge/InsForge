@@ -53,14 +53,14 @@ interface BackupConfigRow {
   enabled: boolean;
   cronSchedule: string;
   retentionDays: number | null;
-  updatedAt: Date | string;
+  scheduleAnchorAt: Date | string;
 }
 
 const BACKUP_CONFIG_COLUMNS = `
   backup_enabled AS "enabled",
   backup_cron_schedule AS "cronSchedule",
   backup_retention_days AS "retentionDays",
-  updated_at AS "updatedAt"
+  backup_schedule_anchor AS "scheduleAnchorAt"
 `;
 
 function toDateOrNull(value: unknown): Date | null {
@@ -311,6 +311,10 @@ export class DatabaseBackupService {
                 error_message, created_by, completed_at, created_at, updated_at
          FROM system.database_backups`
       );
+      // The dump also contains system.database_config, so an old archive
+      // would silently revert the operator's current backup schedule —
+      // snapshot it for the same write-back treatment as the metadata above.
+      const configSnapshot = await this.getBackupConfigRow();
 
       // Do NOT pg_terminate_backend other sessions here: that kills the
       // backend's own long-lived clients (realtime LISTEN, pool) and crashes
@@ -338,7 +342,10 @@ export class DatabaseBackupService {
         watchdog.stop();
       }
 
-      await this.writeBackMetadataSnapshot(snapshot.rows as Record<string, unknown>[]);
+      await this.writeBackMetadataSnapshot(
+        snapshot.rows as Record<string, unknown>[],
+        configSnapshot
+      );
       await pool.query(`NOTIFY pgrst, 'reload schema';`).catch((error: unknown) => {
         logger.warn('Failed to notify PostgREST after restore', {
           error: error instanceof Error ? error.message : String(error),
@@ -379,6 +386,15 @@ export class DatabaseBackupService {
         SET backup_enabled = COALESCE($1::boolean, backup_enabled),
             backup_cron_schedule = COALESCE($2::text, backup_cron_schedule),
             backup_retention_days = CASE WHEN $3::boolean THEN $4::integer ELSE backup_retention_days END,
+            -- The due-ness anchor moves only when scheduling itself changes;
+            -- an unrelated edit (e.g. retention) must not swallow a cron fire
+            -- that has not been attempted yet.
+            backup_schedule_anchor = CASE
+              WHEN ($1::boolean IS NOT NULL AND $1::boolean IS DISTINCT FROM backup_enabled)
+                OR ($2::text IS NOT NULL AND $2::text IS DISTINCT FROM backup_cron_schedule)
+              THEN NOW()
+              ELSE backup_schedule_anchor
+            END,
             updated_at = NOW()
         RETURNING ${BACKUP_CONFIG_COLUMNS}
       `,
@@ -455,7 +471,7 @@ export class DatabaseBackupService {
         cronSchedule: config.cronSchedule,
         now: new Date(),
         lastAttemptAt: toDateOrNull(result.rows[0]?.lastAttemptAt),
-        configUpdatedAt: toDateOrNull(config.updatedAt),
+        scheduleAnchorAt: toDateOrNull(config.scheduleAnchorAt),
       });
       if (!due) {
         return;
@@ -477,19 +493,29 @@ export class DatabaseBackupService {
     }
 
     const result = await this.dbManager.getPool().query(
-      `SELECT id FROM system.database_backups
+      `SELECT id, storage_key AS "storageKey" FROM system.database_backups
        WHERE trigger_source = 'scheduled'
          AND status <> 'running'
          AND created_at < NOW() - make_interval(days => $1)`,
       [config.retentionDays]
     );
 
-    for (const row of result.rows as { id: string }[]) {
+    for (const row of result.rows as { id: string; storageKey: string | null }[]) {
       try {
-        await this.deleteBackup(row.id);
+        // Artifact first: if its deletion fails, the metadata row survives so
+        // the next scheduled run retries — the reverse order would orphan the
+        // artifact with nothing left to retry from. Artifact deletion is
+        // idempotent on both backends, so a row-delete failure after this is
+        // also retried safely.
+        if (row.storageKey) {
+          await this.deleteArtifact(row.storageKey);
+        }
+        await this.dbManager
+          .getPool()
+          .query(`DELETE FROM system.database_backups WHERE id = $1`, [row.id]);
         logger.info('Pruned expired scheduled backup', { backupId: row.id });
       } catch (error) {
-        logger.warn('Failed to prune expired scheduled backup', {
+        logger.warn('Failed to prune expired scheduled backup; will retry next run', {
           backupId: row.id,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -565,12 +591,16 @@ export class DatabaseBackupService {
   }
 
   /**
-   * Rewrites system.database_backups with the pre-restore snapshot. Retried
-   * because the table was just recreated by pg_restore; on final failure the
-   * restore is still reported as successful and the stale list is logged for
-   * the operator (it self-corrects on the next backup mutation).
+   * Rewrites system.database_backups (and the backup schedule columns of
+   * system.database_config) with the pre-restore snapshot. Retried because
+   * the tables were just recreated by pg_restore; on final failure the
+   * restore is still reported as successful and the stale state is logged
+   * for the operator (it self-corrects on the next mutation).
    */
-  private async writeBackMetadataSnapshot(rows: Record<string, unknown>[]): Promise<void> {
+  private async writeBackMetadataSnapshot(
+    rows: Record<string, unknown>[],
+    configSnapshot: BackupConfigRow | null
+  ): Promise<void> {
     const pool = this.dbManager.getPool();
     let lastError: unknown = null;
 
@@ -603,6 +633,24 @@ export class DatabaseBackupService {
               row.completed_at,
               row.created_at,
               row.updated_at,
+            ]
+          );
+        }
+        if (configSnapshot) {
+          // An archive that predates the config table leaves the current row
+          // untouched (pg_restore --clean only drops dumped objects), so this
+          // UPDATE is correct for both old and new archives.
+          await client.query(
+            `UPDATE system.database_config
+             SET backup_enabled = $1,
+                 backup_cron_schedule = $2,
+                 backup_retention_days = $3,
+                 backup_schedule_anchor = $4`,
+            [
+              configSnapshot.enabled,
+              configSnapshot.cronSchedule,
+              configSnapshot.retentionDays,
+              configSnapshot.scheduleAnchorAt,
             ]
           );
         }

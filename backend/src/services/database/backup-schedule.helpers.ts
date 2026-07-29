@@ -53,21 +53,21 @@ export function computeNextBackupAt(cronSchedule: string, now: Date = new Date()
 
 /**
  * A scheduled backup is due when the most recent cron fire time is newer than
- * both the last scheduled attempt and the last config change. Anchoring on the
- * config's updated_at makes the cadence start counting from the moment
- * scheduling is (re)configured — without it, enabling a daily-midnight
- * schedule at 3pm would fire immediately for the fire time that predates
- * enablement. Catch-up after downtime still works: a fire missed while the
- * server was off stays newer than the last attempt, so the next evaluation
- * runs it.
+ * both the last scheduled attempt and the schedule anchor. The anchor moves
+ * only when scheduling itself is (re)configured (enabled or cron changed), so
+ * the cadence starts counting from that moment — without it, enabling a
+ * daily-midnight schedule at 3pm would fire immediately for the fire time
+ * that predates enablement. Catch-up after downtime still works: a fire
+ * missed while the server was off stays newer than the last attempt, so the
+ * next evaluation runs it.
  */
 export function isScheduledBackupDue(args: {
   cronSchedule: string;
   now: Date;
   lastAttemptAt: Date | null;
-  configUpdatedAt: Date | null;
+  scheduleAnchorAt: Date | null;
 }): boolean {
-  const { cronSchedule, now, lastAttemptAt, configUpdatedAt } = args;
+  const { cronSchedule, now, lastAttemptAt, scheduleAnchorAt } = args;
 
   let lastFire: Date;
   try {
@@ -78,6 +78,6 @@ export function isScheduledBackupDue(args: {
     return false;
   }
 
-  const floorMs = Math.max(lastAttemptAt?.getTime() ?? 0, configUpdatedAt?.getTime() ?? 0);
+  const floorMs = Math.max(lastAttemptAt?.getTime() ?? 0, scheduleAnchorAt?.getTime() ?? 0);
   return lastFire.getTime() > floorMs;
 }

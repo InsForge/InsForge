@@ -327,7 +327,9 @@ export function DatabaseSidebar({
         </div>
       </div>
 
-      {!isCloudHostingMode && (
+      {/* Mounted only while open so the config query does not fire on every
+          tables-page visit. */}
+      {!isCloudHostingMode && settingsOpen && (
         <DatabaseSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       )}
     </div>

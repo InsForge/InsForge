@@ -473,6 +473,9 @@ describe('DatabaseBackupService', () => {
       expect(clientSql.some((sql) => sql.includes('INSERT INTO system.database_backups'))).toBe(
         true
       );
+      // The current backup schedule survives the restore too — the archive's
+      // system.database_config must not silently replace it.
+      expect(clientSql.some((sql) => sql.includes('UPDATE system.database_config'))).toBe(true);
       expect(clientSql).toContain('COMMIT');
       // The PostgREST reload runs outside the write-back transaction so a
       // write-back failure cannot leave PostgREST on a stale schema.
@@ -585,7 +588,7 @@ describe('DatabaseBackupService', () => {
         enabled: true,
         cronSchedule: '0 0 * * *',
         retentionDays: 7,
-        updatedAt: new Date('2026-06-01T00:00:00Z'),
+        scheduleAnchorAt: new Date('2026-06-01T00:00:00Z'),
         ...overrides,
       };
     }
@@ -663,8 +666,8 @@ describe('DatabaseBackupService', () => {
     it('does not fire for a cron slot that predates enabling the schedule', async () => {
       queryMock.mockImplementation((sql: string) => {
         if (sql.includes('FROM system.database_config')) {
-          // Config touched "now": the most recent midnight fire is older.
-          return Promise.resolve({ rows: [configRow({ updatedAt: new Date() })] });
+          // Schedule (re)configured "now": the most recent midnight fire is older.
+          return Promise.resolve({ rows: [configRow({ scheduleAnchorAt: new Date() })] });
         }
         if (sql.includes('MAX(created_at)')) {
           return Promise.resolve({ rows: [{ lastAttemptAt: null }] });
@@ -704,12 +707,7 @@ describe('DatabaseBackupService', () => {
           return Promise.resolve({ rows: [backupRow({ triggerSource: 'scheduled' })] });
         }
         if (sql.includes('make_interval')) {
-          return Promise.resolve({ rows: [{ id: expiredId }] });
-        }
-        if (sql.includes('storage_key AS "storageKey"')) {
-          return Promise.resolve({
-            rows: [backupRow({ id: expiredId, status: 'completed', storageKey: 'old.dump' })],
-          });
+          return Promise.resolve({ rows: [{ id: expiredId, storageKey: 'old.dump' }] });
         }
         return Promise.resolve({ rows: [] });
       });
@@ -750,9 +748,9 @@ describe('DatabaseBackupService', () => {
       });
       await waitForIdle(service);
 
-      expect(
-        queryMock.mock.calls.some(([sql]) => (sql as string).includes('make_interval'))
-      ).toBe(false);
+      expect(queryMock.mock.calls.some(([sql]) => (sql as string).includes('make_interval'))).toBe(
+        false
+      );
     });
   });
 
@@ -762,7 +760,7 @@ describe('DatabaseBackupService', () => {
         enabled: true,
         cronSchedule: '0 0 * * *',
         retentionDays: 7,
-        updatedAt: new Date('2026-06-01T00:00:00Z'),
+        scheduleAnchorAt: new Date('2026-06-01T00:00:00Z'),
         ...overrides,
       };
     }

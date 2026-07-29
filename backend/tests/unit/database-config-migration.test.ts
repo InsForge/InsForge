@@ -58,10 +58,12 @@ describe('061_add-database-config migration', () => {
     expect(sql).toMatch(/backup_enabled BOOLEAN NOT NULL DEFAULT FALSE/i);
   });
 
+  it('carries a schedule anchor separate from the trigger-managed updated_at', () => {
+    expect(sql).toMatch(/backup_schedule_anchor TIMESTAMPTZ NOT NULL DEFAULT NOW\(\)/i);
+  });
+
   it('allows NULL retention (keep forever) but rejects non-positive values', () => {
-    expect(sql).toMatch(
-      /CHECK \(backup_retention_days IS NULL OR backup_retention_days > 0\)/i
-    );
+    expect(sql).toMatch(/CHECK \(backup_retention_days IS NULL OR backup_retention_days > 0\)/i);
   });
 
   it('uses the shared system.update_updated_at trigger function', () => {

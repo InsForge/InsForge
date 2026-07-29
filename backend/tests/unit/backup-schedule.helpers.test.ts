@@ -68,7 +68,7 @@ describe('isScheduledBackupDue', () => {
         cronSchedule: daily,
         now,
         lastAttemptAt: new Date('2026-07-28T00:00:05Z'),
-        configUpdatedAt: new Date('2026-07-01T00:00:00Z'),
+        scheduleAnchorAt: new Date('2026-07-01T00:00:00Z'),
       })
     ).toBe(true);
   });
@@ -79,7 +79,7 @@ describe('isScheduledBackupDue', () => {
         cronSchedule: daily,
         now,
         lastAttemptAt: new Date('2026-07-29T00:00:05Z'),
-        configUpdatedAt: new Date('2026-07-01T00:00:00Z'),
+        scheduleAnchorAt: new Date('2026-07-01T00:00:00Z'),
       })
     ).toBe(false);
   });
@@ -92,7 +92,7 @@ describe('isScheduledBackupDue', () => {
         cronSchedule: daily,
         now,
         lastAttemptAt: null,
-        configUpdatedAt: new Date('2026-07-29T15:00:00Z'),
+        scheduleAnchorAt: new Date('2026-07-29T15:00:00Z'),
       })
     ).toBe(false);
   });
@@ -104,7 +104,7 @@ describe('isScheduledBackupDue', () => {
         cronSchedule: daily,
         now,
         lastAttemptAt: new Date('2026-07-27T00:00:05Z'),
-        configUpdatedAt: new Date('2026-07-01T00:00:00Z'),
+        scheduleAnchorAt: new Date('2026-07-01T00:00:00Z'),
       })
     ).toBe(true);
   });
@@ -115,7 +115,7 @@ describe('isScheduledBackupDue', () => {
         cronSchedule: daily,
         now,
         lastAttemptAt: null,
-        configUpdatedAt: new Date('2026-07-28T15:00:00Z'),
+        scheduleAnchorAt: new Date('2026-07-28T15:00:00Z'),
       })
     ).toBe(true);
   });
@@ -126,7 +126,7 @@ describe('isScheduledBackupDue', () => {
         cronSchedule: 'garbage',
         now,
         lastAttemptAt: null,
-        configUpdatedAt: null,
+        scheduleAnchorAt: null,
       })
     ).toBe(false);
   });

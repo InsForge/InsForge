@@ -18,6 +18,7 @@ import { DatabaseSettingsDialog } from '#features/database/components/DatabaseSe
 import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
 import { RenameBackupDialog } from '#features/database/components/RenameBackupDialog';
 import { useBackupConfig } from '#features/database/hooks/useBackupConfig';
+import { formatUtcTimestamp } from '#features/database/utils';
 import {
   useDatabaseBackupActions,
   useDatabaseBackupInfo,
@@ -54,7 +55,7 @@ export default function BackupsPage() {
   const { backupInfo, refetch } = useDatabaseBackupInfo();
   const { instanceInfo } = useDatabaseBackupInstanceInfo();
   const backupActions = useDatabaseBackupActions();
-  const { config: backupConfig } = useBackupConfig();
+  const { config: backupConfig, isLoading: isBackupConfigLoading } = useBackupConfig();
   const [createBackupDialogOpen, setCreateBackupDialogOpen] = useState(false);
   const [databaseSettingsOpen, setDatabaseSettingsOpen] = useState(false);
   const [renameBackupDialogState, setRenameBackupDialogState] = useState<{
@@ -433,21 +434,25 @@ export default function BackupsPage() {
                             defaultValue:
                               "Projects are auto backed up each day around midnight in the project's region and can be restored at any time.",
                           })
-                        : backupConfig?.enabled
-                          ? backupConfig.nextBackupAt
-                            ? t('database.scheduledBackupsSelfHostEnabled', {
-                                date: formatBackupTimestamp(backupConfig.nextBackupAt),
+                        : !backupConfig && isBackupConfigLoading
+                          ? t('database.loadingConfiguration', {
+                              defaultValue: 'Loading configuration...',
+                            })
+                          : backupConfig?.enabled
+                            ? backupConfig.nextBackupAt
+                              ? t('database.scheduledBackupsSelfHostEnabled', {
+                                  date: formatUtcTimestamp(backupConfig.nextBackupAt),
+                                  defaultValue:
+                                    'The database is backed up automatically on your configured schedule. Next backup: {{date}}',
+                                })
+                              : t('database.scheduledBackupsSelfHostEnabledNoDate', {
+                                  defaultValue:
+                                    'The database is backed up automatically on your configured schedule.',
+                                })
+                            : t('database.scheduledBackupsSelfHostDisabled', {
                                 defaultValue:
-                                  'The database is backed up automatically on your configured schedule. Next backup: {{date}}',
-                              })
-                            : t('database.scheduledBackupsSelfHostEnabledNoDate', {
-                                defaultValue:
-                                  'The database is backed up automatically on your configured schedule.',
-                              })
-                          : t('database.scheduledBackupsSelfHostDisabled', {
-                              defaultValue:
-                                'Scheduled backups are disabled. Enable them in Database Settings.',
-                            })}
+                                  'Scheduled backups are disabled. Enable them in Database Settings.',
+                              })}
                     </p>
                   </div>
                   {!isCloudHostingMode && (
@@ -682,7 +687,9 @@ export default function BackupsPage() {
         }}
       />
       <ConfirmDialog {...confirmDialogProps} />
-      {!isCloudHostingMode && (
+      {/* Mounted only while open so the config query does not fire for
+          visitors who never touch the settings. */}
+      {!isCloudHostingMode && databaseSettingsOpen && (
         <DatabaseSettingsDialog
           open={databaseSettingsOpen}
           onOpenChange={setDatabaseSettingsOpen}

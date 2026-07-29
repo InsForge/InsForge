@@ -132,6 +132,31 @@ describe('DatabaseSettingsDialog', () => {
     expect(hookMocks.updateConfig).not.toHaveBeenCalled();
   });
 
+  it('lets the user disable backups even with an invalid cron left in the field', async () => {
+    hookMocks.config = {
+      enabled: true,
+      cronSchedule: '0 0 * * *',
+      retentionDays: 7,
+      nextBackupAt: '2026-07-30T00:00:00.000Z',
+    };
+    const user = userEvent.setup();
+
+    render(<DatabaseSettingsDialog open={true} onOpenChange={vi.fn()} />);
+
+    await user.clear(cronInput());
+    await user.type(cronInput(), 'garbage');
+    expect(screen.getByText('Invalid cron expression.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('switch', { name: 'Scheduled Backups' }));
+
+    // Scheduling is off: the stale error hides and the save goes through with
+    // the invalid cron omitted, so the stored schedule stays intact.
+    expect(screen.queryByText('Invalid cron expression.')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    expect(hookMocks.updateConfig).toHaveBeenCalledWith({ enabled: false, retentionDays: 7 });
+  });
+
   it('flags a sub-hour schedule with the once-per-hour rule and blocks saving', async () => {
     hookMocks.config = {
       enabled: true,

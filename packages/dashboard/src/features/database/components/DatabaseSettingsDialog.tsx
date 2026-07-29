@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DatabaseBackup } from 'lucide-react';
-import { format } from 'date-fns';
+import type { UpdateDatabaseBackupConfigRequest } from '@insforge/shared-schemas';
 import {
   Button,
   cn,
@@ -28,6 +28,7 @@ import {
   Switch,
 } from '@insforge/ui';
 import { useBackupConfig } from '#features/database/hooks/useBackupConfig';
+import { formatUtcTimestamp } from '#features/database/utils';
 
 interface DatabaseSettingsDialogProps {
   open: boolean;
@@ -153,12 +154,16 @@ export function DatabaseSettingsDialog({ open, onOpenChange }: DatabaseSettingsD
 
   const cronError = draft ? validateCronShape(draft.cronSchedule) : null;
   const isCronValid = draft !== null && cronError === null;
+  // The cron only matters while scheduling is on — an invalid leftover in the
+  // (grayed-out) field must never block saving the disabled state.
+  const isSaveBlocked = draft !== null && draft.enabled && !isCronValid;
 
   // Feedback below the input follows the schedules convention: a concrete
   // next-run time (from the saved config) rather than a humanized sentence.
+  // Hidden while the draft has edits, since it describes the saved schedule.
   const nextBackupLabel =
-    config?.enabled && config.nextBackupAt
-      ? format(new Date(config.nextBackupAt), 'MMM dd, yyyy HH:mm')
+    !hasChanges && config?.enabled && config.nextBackupAt
+      ? formatUtcTimestamp(config.nextBackupAt)
       : null;
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -169,16 +174,21 @@ export function DatabaseSettingsDialog({ open, onOpenChange }: DatabaseSettingsD
   };
 
   const handleSave = async () => {
-    if (!isLoaded || !hasChanges || !isCronValid) {
+    if (!isLoaded || !hasChanges || isSaveBlocked) {
       return;
     }
 
+    const patch: UpdateDatabaseBackupConfigRequest = {
+      enabled: draft.enabled,
+      retentionDays: draft.retention === 'never' ? null : Number(draft.retention),
+    };
+    // Omit an invalid cron when disabling so the saved schedule stays intact.
+    if (isCronValid) {
+      patch.cronSchedule = draft.cronSchedule.trim();
+    }
+
     try {
-      await updateConfig({
-        enabled: draft.enabled,
-        cronSchedule: draft.cronSchedule.trim(),
-        retentionDays: draft.retention === 'never' ? null : Number(draft.retention),
-      });
+      await updateConfig(patch);
       onOpenChange(false);
     } catch {
       // The mutation hook already handles error toasts; swallow here to avoid an unhandled rejection.
@@ -297,7 +307,7 @@ export function DatabaseSettingsDialog({ open, onOpenChange }: DatabaseSettingsD
                         defaultValue: 'Cron expression',
                       })}
                     />
-                    {cronError ? (
+                    {draft.enabled && cronError ? (
                       <p className="w-[280px] max-w-full text-right text-xs leading-4 text-destructive">
                         {cronError === 'invalid'
                           ? t('database.invalidCronExpression', {
@@ -337,7 +347,11 @@ export function DatabaseSettingsDialog({ open, onOpenChange }: DatabaseSettingsD
                       }
                       disabled={isScheduleControlDisabled}
                     >
-                      <SelectTrigger id="backup-retention" className="h-9 w-[240px] max-w-full">
+                      <SelectTrigger
+                        id="backup-retention"
+                        aria-label={t('database.backupRetention', { defaultValue: 'Retention' })}
+                        className="h-9 w-[240px] max-w-full"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -380,7 +394,7 @@ export function DatabaseSettingsDialog({ open, onOpenChange }: DatabaseSettingsD
                     <Button
                       type="button"
                       onClick={() => void handleSave()}
-                      disabled={!isLoaded || isUpdating || !hasChanges || !isCronValid}
+                      disabled={!isLoaded || isUpdating || !hasChanges || isSaveBlocked}
                     >
                       {isUpdating
                         ? t('database.saving', { defaultValue: 'Saving...' })

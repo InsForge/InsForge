@@ -483,7 +483,13 @@ export const updateDatabaseBackupConfigRequestSchema = z
       .min(1, 'Cron schedule cannot be empty')
       .max(64, 'Cron schedule must be less than 64 characters')
       .optional(),
-    retentionDays: z.number().int().positive().nullable().optional(),
+    retentionDays: z
+      .number()
+      .int()
+      .positive()
+      .max(3650, 'Retention must be 3650 days (10 years) or less')
+      .nullable()
+      .optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one field must be provided',

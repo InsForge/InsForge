@@ -18,6 +18,11 @@ CREATE TABLE IF NOT EXISTS system.database_config (
   backup_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   backup_cron_schedule TEXT NOT NULL DEFAULT '0 0 * * *',
   backup_retention_days INTEGER DEFAULT 7 CHECK (backup_retention_days IS NULL OR backup_retention_days > 0),
+  -- Due-ness anchor: moves only when backup_enabled or backup_cron_schedule
+  -- change, so unrelated config edits (e.g. retention) can never swallow a
+  -- cron fire that has not been attempted yet. updated_at moves on every
+  -- write (trigger below), which would.
+  backup_schedule_anchor TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

@@ -71,12 +71,13 @@ beforeAll(async () => {
   process.env.POSTGRES_PASSWORD = String(cfg.password ?? 'postgres');
   // Exercise the local-disk artifact path; the S3 branch shares the same
   // provider contract and is covered by the storage provider suites.
+  // (AWS_S3_BUCKET is the legacy fallback for S3_BUCKET — clear both.)
   delete process.env.S3_BUCKET;
+  delete process.env.AWS_S3_BUCKET;
 
   const { DatabaseManager } = await import('../../src/infra/database/database.manager');
-  const { DatabaseBackupService } = await import(
-    '../../src/services/database/database-backup.service'
-  );
+  const { DatabaseBackupService } =
+    await import('../../src/services/database/database-backup.service');
   dbManager = DatabaseManager.getInstance();
   await dbManager.initialize();
   svc = DatabaseBackupService.getInstance();
@@ -126,78 +127,70 @@ describe('backup schedule config', () => {
 });
 
 describe('backup round-trip', () => {
-  it(
-    'creates a backup, restores it from the artifact, and deletes the artifact',
-    async () => {
-      const pool = dbManager.getPool();
-      await pool.query(`CREATE TABLE backup_probe (id INT PRIMARY KEY, v TEXT)`);
-      await pool.query(`INSERT INTO backup_probe VALUES (1, 'before')`);
+  it('creates a backup, restores it from the artifact, and deletes the artifact', async () => {
+    const pool = dbManager.getPool();
+    await pool.query(`CREATE TABLE backup_probe (id INT PRIMARY KEY, v TEXT)`);
+    await pool.query(`INSERT INTO backup_probe VALUES (1, 'before')`);
 
-      const backup = await svc.createBackup({ name: 'integration-roundtrip' }, 'integration-test');
-      const completed = await waitForBackupCompletion(backup.id);
-      expect(completed.errorMessage).toBeNull();
-      expect(completed.status).toBe('completed');
+    const backup = await svc.createBackup({ name: 'integration-roundtrip' }, 'integration-test');
+    const completed = await waitForBackupCompletion(backup.id);
+    expect(completed.errorMessage).toBeNull();
+    expect(completed.status).toBe('completed');
 
-      const artifactPath = path.join(
-        storageDir,
-        '_database_backups',
-        completed.storageKey as string
-      );
-      const artifact = await fs.stat(artifactPath);
-      expect(artifact.size).toBeGreaterThan(0);
+    const artifactPath = path.join(storageDir, '_database_backups', completed.storageKey as string);
+    const artifact = await fs.stat(artifactPath);
+    expect(artifact.size).toBeGreaterThan(0);
 
-      // The restore must revert data changed after the backup was taken.
-      await pool.query(`UPDATE backup_probe SET v = 'after' WHERE id = 1`);
-      await svc.restoreBackup(backup.id);
-      const probe = await pool.query(`SELECT v FROM backup_probe WHERE id = 1`);
-      expect(probe.rows[0].v).toBe('before');
+    // The restore must revert data changed after the backup was taken, but
+    // must NOT revert the backup schedule config changed after the backup —
+    // the config write-back preserves the operator's current settings.
+    await pool.query(`UPDATE backup_probe SET v = 'after' WHERE id = 1`);
+    await svc.updateBackupConfig({ retentionDays: 21 });
+    await svc.restoreBackup(backup.id);
+    const probe = await pool.query(`SELECT v FROM backup_probe WHERE id = 1`);
+    expect(probe.rows[0].v).toBe('before');
+    expect((await svc.getBackupConfig()).retentionDays).toBe(21);
 
-      await svc.deleteBackup(backup.id);
-      await expect(fs.stat(artifactPath)).rejects.toMatchObject({ code: 'ENOENT' });
-    },
-    180_000
-  );
+    await svc.deleteBackup(backup.id);
+    await expect(fs.stat(artifactPath)).rejects.toMatchObject({ code: 'ENOENT' });
+  }, 180_000);
 });
 
 describe('scheduled backup retention', () => {
-  it(
-    'prunes expired scheduled backups after a scheduled run completes',
-    async () => {
-      const pool = dbManager.getPool();
-      await svc.updateBackupConfig({ enabled: true, cronSchedule: '0 0 * * *', retentionDays: 7 });
+  it('prunes expired scheduled backups after a scheduled run completes', async () => {
+    const pool = dbManager.getPool();
+    await svc.updateBackupConfig({ enabled: true, cronSchedule: '0 0 * * *', retentionDays: 7 });
 
-      const staleKey = 'stale_expired.dump';
-      const staleArtifact = path.join(storageDir, '_database_backups', staleKey);
-      await fs.mkdir(path.dirname(staleArtifact), { recursive: true });
-      await fs.writeFile(staleArtifact, 'stale-bytes');
-      await pool.query(
-        `INSERT INTO system.database_backups
+    const staleKey = 'stale_expired.dump';
+    const staleArtifact = path.join(storageDir, '_database_backups', staleKey);
+    await fs.mkdir(path.dirname(staleArtifact), { recursive: true });
+    await fs.writeFile(staleArtifact, 'stale-bytes');
+    await pool.query(
+      `INSERT INTO system.database_backups
            (name, trigger_source, status, storage_key, size_bytes, completed_at, created_at)
          VALUES ('expired-scheduled', 'scheduled', 'completed', $1, 11,
                  NOW() - INTERVAL '10 days', NOW() - INTERVAL '10 days')`,
-        [staleKey]
+      [staleKey]
+    );
+
+    const backup = await svc.createBackup({}, null, 'scheduled');
+    const completed = await waitForBackupCompletion(backup.id);
+    expect(completed.status).toBe('completed');
+
+    // Pruning runs right after the scheduled run completes.
+    await waitFor(async () => {
+      const result = await pool.query(
+        `SELECT COUNT(*)::int AS count FROM system.database_backups WHERE name = 'expired-scheduled'`
       );
+      return (result.rows[0] as { count: number }).count === 0;
+    });
+    await expect(fs.stat(staleArtifact)).rejects.toMatchObject({ code: 'ENOENT' });
 
-      const backup = await svc.createBackup({}, null, 'scheduled');
-      const completed = await waitForBackupCompletion(backup.id);
-      expect(completed.status).toBe('completed');
+    // The fresh scheduled backup itself is retained.
+    const fresh = await readBackupRow(backup.id);
+    expect(fresh.status).toBe('completed');
 
-      // Pruning runs right after the scheduled run completes.
-      await waitFor(async () => {
-        const result = await pool.query(
-          `SELECT COUNT(*)::int AS count FROM system.database_backups WHERE name = 'expired-scheduled'`
-        );
-        return (result.rows[0] as { count: number }).count === 0;
-      });
-      await expect(fs.stat(staleArtifact)).rejects.toMatchObject({ code: 'ENOENT' });
-
-      // The fresh scheduled backup itself is retained.
-      const fresh = await readBackupRow(backup.id);
-      expect(fresh.status).toBe('completed');
-
-      await svc.deleteBackup(backup.id);
-      await svc.updateBackupConfig({ enabled: false });
-    },
-    180_000
-  );
+    await svc.deleteBackup(backup.id);
+    await svc.updateBackupConfig({ enabled: false });
+  }, 180_000);
 });
