@@ -45,6 +45,7 @@ import { webscraperRouter } from '@/api/routes/webscraper/index.routes.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import { TelemetryService } from '@/services/telemetry/telemetry.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
+import { DatabaseBackupService } from '@/services/database/database-backup.service.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -353,6 +354,12 @@ async function initializeServer() {
     });
 
     TelemetryService.getInstance().start();
+
+    // Scheduled backups are self-hosting only; the cloud control plane owns
+    // backups there (the backup routes are not even mounted in cloud env).
+    if (!isCloudEnvironment()) {
+      DatabaseBackupService.getInstance().startScheduler();
+    }
   } catch (error) {
     logger.error('Failed to initialize server', {
       error: error instanceof Error ? error.message : String(error),
@@ -366,6 +373,8 @@ void initializeServer();
 
 async function cleanup() {
   logger.info('Shutting down gracefully...');
+
+  DatabaseBackupService.getInstance().stopScheduler();
 
   try {
     const realtimeManager = RealtimeManager.getInstance();
