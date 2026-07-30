@@ -160,14 +160,17 @@ function AuthenticatedRoutes() {
             <Route path="session-replay" element={<SessionReplayPage />} />
           </Route>
         )}
-        {isCloudHosting && (
-          <Route path="/dashboard/webscraper" element={<WebscraperLayout />}>
-            <Route index element={<Navigate to="actors" replace />} />
-            <Route path="actors" element={<WebscraperActorsPage />} />
-            <Route path="runs" element={<WebscraperRunsPage />} />
-            <Route path="dataset" element={<WebscraperDatasetPage />} />
-          </Route>
-        )}
+        {/* Web Scraper ships in both host modes — self-hosting connects with the
+            admin's own Apify token — so this subtree is deliberately ungated,
+            matching AppSidebar, which pushes the nav entry unconditionally. A
+            cloud-only gate here would make the nav entry fall through to the
+            catch-all below and bounce self-hosted admins back to /dashboard. */}
+        <Route path="/dashboard/webscraper" element={<WebscraperLayout />}>
+          <Route index element={<Navigate to="actors" replace />} />
+          <Route path="actors" element={<WebscraperActorsPage />} />
+          <Route path="runs" element={<WebscraperRunsPage />} />
+          <Route path="dataset" element={<WebscraperDatasetPage />} />
+        </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>
