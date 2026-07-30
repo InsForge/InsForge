@@ -912,6 +912,14 @@ export class AuthService {
       return { user, accessToken };
     }
 
+    if (!email) {
+      throw new AppError(
+        'A verified email address is required to create or link an OAuth account.',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
     // If not found by provider_id, try to find by email in _user table
     const existingUserResult = await pool.query('SELECT * FROM auth.users WHERE email = $1', [
       email,
@@ -1260,10 +1268,13 @@ export class AuthService {
   }
 
   /**
-   * Sign in with ID token from native SDK (Google One Tap, etc.)
-   * Limited to Google for now to unblock customer ask, can extend to other providers later as needed.
+   * Sign in with ID token from a native provider SDK.
    */
-  async signInWithIdToken(provider: 'google', idToken: string): Promise<CreateSessionResponse> {
+  async signInWithIdToken(
+    provider: 'google' | 'apple',
+    idToken: string,
+    options?: { nonce?: string; name?: string }
+  ): Promise<CreateSessionResponse> {
     let userData: OAuthUserData;
 
     switch (provider) {
@@ -1305,9 +1316,50 @@ export class AuthService {
         break;
       }
 
+      case 'apple': {
+        const nonce = options?.nonce?.trim();
+        if (!nonce) {
+          throw new AppError(
+            'Nonce is required for Apple ID token sign-in',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
+
+        let appleUserInfo: AppleUserInfo;
+        try {
+          appleUserInfo = await this.appleOAuthProvider.verifyIdToken(idToken, {
+            nonce,
+            native: true,
+          });
+        } catch (error) {
+          logger.error('Failed to verify Apple ID token', {
+            error: error instanceof Error ? error.message : 'Unknown verification error',
+          });
+          throw new AppError('Failed to verify Apple ID token', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+        }
+
+        const email =
+          appleUserInfo.email_verified && appleUserInfo.email
+            ? appleUserInfo.email.trim().toLowerCase()
+            : '';
+        const suppliedName = options?.name?.trim();
+        const userName = suppliedName || (email ? email.split('@')[0] : 'Apple User');
+
+        userData = {
+          provider: 'apple',
+          providerId: appleUserInfo.sub,
+          email,
+          userName,
+          avatarUrl: '',
+          identityData: appleUserInfo,
+        };
+        break;
+      }
+
       default:
         throw new AppError(
-          `Provider ${provider} is not supported for ID token sign-in. Supported: google`,
+          `Provider ${provider} is not supported for ID token sign-in. Supported: google, apple`,
           400,
           ERROR_CODES.INVALID_INPUT
         );

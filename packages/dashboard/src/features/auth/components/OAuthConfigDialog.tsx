@@ -64,6 +64,7 @@ export function OAuthConfigDialog({
     defaultValues: {
       provider: provider?.id || 'google',
       clientId: '',
+      nativeClientIds: [],
       clientSecret: '',
       useSharedKey: false,
     },
@@ -108,6 +109,7 @@ export function OAuthConfigDialog({
       form.reset({
         provider: provider.id,
         clientId: '',
+        nativeClientIds: [],
         clientSecret: '',
         useSharedKey: isSharedKeysAvailable,
       });
@@ -118,6 +120,7 @@ export function OAuthConfigDialog({
       form.reset({
         provider: provider.id,
         clientId: providerConfig.clientId || '',
+        nativeClientIds: providerConfig.nativeClientIds || [],
         clientSecret: providerConfig.clientSecret || '',
         useSharedKey: providerConfig.useSharedKey || false,
       });
@@ -139,9 +142,10 @@ export function OAuthConfigDialog({
         updateConfig({
           provider: provider.id,
           config: data.useSharedKey
-            ? { useSharedKey: true }
+            ? { useSharedKey: true, nativeClientIds: data.nativeClientIds }
             : {
                 clientId: data.clientId,
+                nativeClientIds: data.nativeClientIds,
                 clientSecret: data.clientSecret,
                 useSharedKey: false,
               },
@@ -151,6 +155,7 @@ export function OAuthConfigDialog({
         createConfig({
           provider: provider.id,
           clientId: data.useSharedKey ? undefined : data.clientId,
+          nativeClientIds: data.nativeClientIds,
           clientSecret: data.useSharedKey ? undefined : clientSecret,
           useSharedKey: data.useSharedKey,
         });
@@ -331,6 +336,43 @@ export function OAuthConfigDialog({
                         defaultValue: 'Enter {{name}} OAuth App Secret',
                       })}
                       className="w-[340px]"
+                    />
+                  </div>
+                </div>
+              )}
+              {provider?.id === 'apple' && (
+                <div className="p-6 border-t border-zinc-200 dark:border-neutral-700">
+                  <div className="flex flex-row items-start justify-between gap-10">
+                    <div className="space-y-1">
+                      <label className="text-sm text-zinc-950 dark:text-white">
+                        {t('auth.nativeClientIds', { defaultValue: 'Native App IDs' })}
+                      </label>
+                      <p className="max-w-52 text-xs text-zinc-500 dark:text-neutral-400">
+                        {t('auth.nativeClientIdsDescription', {
+                          defaultValue:
+                            'Comma-separated bundle IDs trusted for native Apple ID tokens.',
+                        })}
+                      </p>
+                    </div>
+                    <Controller
+                      name="nativeClientIds"
+                      control={form.control}
+                      render={({ field }) => (
+                        <Input
+                          type="text"
+                          value={(field.value ?? []).join(', ')}
+                          onChange={(event) =>
+                            field.onChange(
+                              event.target.value
+                                .split(',')
+                                .map((value) => value.trim())
+                                .filter(Boolean)
+                            )
+                          }
+                          placeholder="com.example.ios-app"
+                          className="w-[340px]"
+                        />
+                      )}
                     />
                   </div>
                 </div>

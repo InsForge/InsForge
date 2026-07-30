@@ -53,6 +53,7 @@ import {
   updateAuthConfigRequestSchema,
   upsertSmtpConfigRequestSchema,
   updateEmailTemplateRequestSchema,
+  idTokenSignInRequestSchema,
 } from '@insforge/shared-schemas';
 import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';
@@ -469,33 +470,33 @@ router.post(
   }
 );
 
-// POST /api/auth/id-token - Sign in with ID token from native SDK (Google One Tap, etc.)
+// POST /api/auth/id-token - Sign in with an ID token from a native provider SDK
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 router.post('/id-token', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
 
-    const { provider, token } = req.body;
-
-    // Validate input
-    if (!provider || typeof provider !== 'string') {
-      throw new AppError('Provider is required', 400, ERROR_CODES.INVALID_INPUT);
-    }
-
-    if (provider !== 'google') {
+    const validationResult = idTokenSignInRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
       throw new AppError(
-        `Provider ${provider} is not supported for ID token sign-in. Supported: google`,
+        validationResult.error.issues
+          .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+          .join(', '),
         400,
         ERROR_CODES.INVALID_INPUT
       );
     }
 
-    if (!token || typeof token !== 'string') {
-      throw new AppError('Token is required', 400, ERROR_CODES.INVALID_INPUT);
-    }
+    const request = validationResult.data;
 
     // Sign in with ID token
-    const result: CreateSessionResponse = await authService.signInWithIdToken(provider, token);
+    const result: CreateSessionResponse =
+      request.provider === 'apple'
+        ? await authService.signInWithIdToken('apple', request.token, {
+            nonce: request.nonce,
+            name: request.name,
+          })
+        : await authService.signInWithIdToken('google', request.token);
 
     // Set refresh token based on client type
     const tokenManager = TokenManager.getInstance();

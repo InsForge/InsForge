@@ -1353,6 +1353,12 @@ paths:
                   enum: [google, github, discord, linkedin, facebook, instagram, tiktok, apple, x, spotify, microsoft]
                 clientId:
                   type: string
+                nativeClientIds:
+                  type: array
+                  maxItems: 20
+                  description: Server-trusted native app client IDs used as ID-token audiences
+                  items:
+                    type: string
                 clientSecret:
                   type: string
                 redirectUri:
@@ -1434,6 +1440,12 @@ paths:
               properties:
                 clientId:
                   type: string
+                nativeClientIds:
+                  type: array
+                  maxItems: 20
+                  description: Server-trusted native app client IDs used as ID-token audiences
+                  items:
+                    type: string
                 clientSecret:
                   type: string
                 redirectUri:
@@ -2013,10 +2025,13 @@ paths:
 
   /api/auth/id-token:
     post:
-      summary: Sign in with ID token (Google One Tap, native SDKs)
+      summary: Sign in with a native provider ID token
       description: |
-        Authenticate a user using an ID token obtained from a native SDK (e.g., Google One Tap).
-        Currently only the `google` provider is supported.
+        Authenticate a user using an ID token obtained from Google or Apple's native SDK.
+        Apple requests require the original raw nonce whose lowercase SHA-256 hex digest was
+        attached to the native authorization request. Apple token audiences are validated only
+        against the project's configured clientId and nativeClientIds; callers cannot select a
+        trusted audience.
       tags:
         - Client
       parameters:
@@ -2035,18 +2050,40 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - provider
-                - token
-              properties:
-                provider:
-                  type: string
-                  enum: [google]
-                  description: Identity provider that issued the token
-                token:
-                  type: string
-                  description: Raw ID token from the provider SDK
+              oneOf:
+                - type: object
+                  required: [provider, token]
+                  properties:
+                    provider:
+                      type: string
+                      enum: [google]
+                    token:
+                      type: string
+                      minLength: 1
+                      description: Raw Google ID token
+                - type: object
+                  additionalProperties: false
+                  required: [provider, token, nonce]
+                  properties:
+                    provider:
+                      type: string
+                      enum: [apple]
+                    token:
+                      type: string
+                      minLength: 1
+                      description: Raw identityToken from ASAuthorizationAppleIDCredential
+                    nonce:
+                      type: string
+                      minLength: 1
+                      maxLength: 255
+                      description: Original raw nonce whose lowercase SHA-256 hex digest was attached to ASAuthorizationAppleIDRequest
+                    name:
+                      type: string
+                      minLength: 1
+                      maxLength: 100
+                      description: Optional display name returned on first Apple authorization
+              discriminator:
+                propertyName: provider
       responses:
         '200':
           description: Sign-in successful
@@ -2350,6 +2387,12 @@ components:
         clientId:
           type: string
           nullable: true
+        nativeClientIds:
+          type: array
+          maxItems: 20
+          description: Server-trusted native app client IDs used as ID-token audiences
+          items:
+            type: string
         redirectUri:
           type: string
           nullable: true
