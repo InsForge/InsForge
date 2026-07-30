@@ -45,9 +45,7 @@ describe('ApifyConnectPanel', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: /connect apify/i }));
 
-    await waitFor(() =>
-      expect(updateApifyConfig).toHaveBeenCalledWith('apify_api_tok1234567890')
-    );
+    await waitFor(() => expect(updateApifyConfig).toHaveBeenCalledWith('apify_api_tok1234567890'));
   });
 
   it('keeps the token field disabled until something is typed', async () => {

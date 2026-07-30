@@ -170,7 +170,9 @@ describe('LocalWebscraperProvider', () => {
 
   it('reads the latest run dataset for the data preview', async () => {
     axiosGetMock
-      .mockResolvedValueOnce({ data: { data: { items: [{ id: 'run1', defaultDatasetId: 'ds1' }] } } })
+      .mockResolvedValueOnce({
+        data: { data: { items: [{ id: 'run1', defaultDatasetId: 'ds1' }] } },
+      })
       .mockResolvedValueOnce({ data: [{ title: 'hello' }] });
     const p = provider(makeConfig('apify_api_tok1234567890'));
 

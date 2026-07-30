@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
-const configMock = { cloud: { projectId: undefined as string | undefined, apiHost: 'https://x' }, app: { jwtSecret: 's'.repeat(32) } };
+const configMock = {
+  cloud: { projectId: undefined as string | undefined, apiHost: 'https://x' },
+  app: { jwtSecret: 's'.repeat(32) },
+};
 vi.mock('../../src/infra/config/app.config', () => ({ config: configMock, appConfig: configMock }));
 
 vi.mock('../../src/api/middlewares/auth', () => ({
@@ -45,7 +48,9 @@ describe('webscraper config routes', () => {
   });
 
   it('stores a submitted token', async () => {
-    setTokenMock.mockResolvedValue({ token: { configured: true, maskedKey: 'apify_ap••••••••mnop' } });
+    setTokenMock.mockResolvedValue({
+      token: { configured: true, maskedKey: 'apify_ap••••••••mnop' },
+    });
 
     const res = await request(app())
       .put('/webscraper/apify/config')
