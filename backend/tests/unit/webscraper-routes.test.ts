@@ -87,9 +87,11 @@ describe('webscraper config routes', () => {
 });
 
 describe('webscraper route wiring', () => {
-  it('guards the Apify config routes with verifyAdmin', async () => {
+  async function describeRoutes() {
     const { webscraperRouter } = await import('../../src/api/routes/webscraper/index.routes');
-    const routeLayers = (
+    // Each method registers its own layer, even when two share a path, so every
+    // layer carries its own handler stack and has to be inspected separately.
+    return (
       webscraperRouter as unknown as {
         stack: Array<{
           route?: {
@@ -99,20 +101,48 @@ describe('webscraper route wiring', () => {
           };
         }>;
       }
-    ).stack.filter((layer) => layer.route);
-    // GET and PUT on the same path register as two distinct layers, each with its
-    // own handler stack, so both must be checked individually.
-    const configRoutes = routeLayers.filter((layer) => layer.route?.path === '/apify/config');
-    const getConfigRoute = configRoutes.find((layer) => layer.route?.methods.get);
-    const putConfigRoute = configRoutes.find((layer) => layer.route?.methods.put);
+    ).stack
+      .flatMap((layer) => (layer.route ? [layer.route] : []))
+      .map((route) => ({
+        id: `${Object.keys(route.methods)
+          .filter((method) => route.methods[method])
+          .map((method) => method.toUpperCase())
+          .sort()
+          .join('/')} ${route.path}`,
+        handlers: route.stack.map((handler) => handler.handle.name),
+      }));
+  }
 
-    expect(getConfigRoute).toBeDefined();
-    expect(putConfigRoute).toBeDefined();
-    expect(getConfigRoute?.route?.stack.map((handler) => handler.handle.name)).toContain(
-      'verifyAdmin'
-    );
-    expect(putConfigRoute?.route?.stack.map((handler) => handler.handle.name)).toContain(
-      'verifyAdmin'
+  // Every route here reads or writes the project's Apify data, and /apify/token
+  // hands back a live credential — none may be reachable with an anon key. The
+  // assertion covers the whole router rather than the two config routes, so a
+  // guard dropped from any of them (or a new route added without one) fails.
+  it('guards every webscraper route with verifyAdmin', async () => {
+    const routes = await describeRoutes();
+
+    expect(routes.length).toBeGreaterThan(0);
+    for (const route of routes) {
+      expect(route.handlers, `${route.id} is missing verifyAdmin`).toContain('verifyAdmin');
+    }
+  });
+
+  // Pins the surface itself: without this, deleting a route would silently
+  // shrink the loop above to a set that happens to still pass.
+  it('registers exactly the documented webscraper routes', async () => {
+    const routes = await describeRoutes();
+
+    expect(new Set(routes.map((route) => route.id))).toEqual(
+      new Set([
+        'GET /apify/connection',
+        'DELETE /apify/connection',
+        'GET /apify/token',
+        'GET /apify/runs',
+        'GET /apify/actors',
+        'GET /apify/datasets',
+        'GET /apify/data',
+        'GET /apify/config',
+        'PUT /apify/config',
+      ])
     );
   });
 });
