@@ -29,7 +29,7 @@ export async function verifyAppleIdToken(
   }
 
   const { payload } = await jwtVerify(idToken, getKey, {
-    algorithms: ['ES256'],
+    algorithms: ['RS256'],
     issuer: APPLE_ISSUER,
     audience: audiences,
   });

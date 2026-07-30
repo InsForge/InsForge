@@ -13,12 +13,12 @@ describe('verifyAppleIdToken', () => {
   let jwk: JWK;
 
   beforeAll(async () => {
-    const keyPair = await generateKeyPair('ES256');
+    const keyPair = await generateKeyPair('RS256');
     privateKey = keyPair.privateKey;
     jwk = {
       ...(await exportJWK(keyPair.publicKey)),
       kid: 'apple-test-key',
-      alg: 'ES256',
+      alg: 'RS256',
       use: 'sig',
     };
   });
@@ -34,7 +34,7 @@ describe('verifyAppleIdToken', () => {
       nonce: HASHED_NONCE,
       ...claims,
     })
-      .setProtectedHeader({ alg: 'ES256', kid: 'apple-test-key' })
+      .setProtectedHeader({ alg: 'RS256', kid: 'apple-test-key' })
       .setIssuer(options.issuer ?? ISSUER)
       .setSubject('apple-subject')
       .setAudience(options.audience ?? NATIVE_CLIENT_ID)
@@ -125,7 +125,7 @@ describe('verifyAppleIdToken', () => {
 
   it('rejects tokens without a subject', async () => {
     const token = await new SignJWT({ nonce: HASHED_NONCE })
-      .setProtectedHeader({ alg: 'ES256', kid: 'apple-test-key' })
+      .setProtectedHeader({ alg: 'RS256', kid: 'apple-test-key' })
       .setIssuer(ISSUER)
       .setAudience(NATIVE_CLIENT_ID)
       .setIssuedAt()
