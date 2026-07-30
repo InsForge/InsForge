@@ -23,6 +23,7 @@ import {
 import type { ApifyConnection } from '#features/webscraper/services/webscraper.service';
 import { useApifyConfig, useUpdateApifyConfig } from '#features/webscraper/hooks/useWebscraper';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { ApifyTokenForm } from './ApifyTokenForm';
 import { APIFY_CONSOLE_URL, SCRAPE_PROMPT } from './shared';
 import { WebScraperDisconnectDialog } from './WebScraperDisconnectDialog';
 
@@ -263,13 +264,19 @@ export function WebScraperSettingsDialog({
                         defaultValue: "You haven't connected Apify yet.",
                       })}
                     </p>
-                    <Button
-                      variant="primary"
-                      disabled={!onConnectApify}
-                      onClick={() => onConnectApify?.(projectId)}
-                    >
-                      {t('webscraper.connectApify', { defaultValue: 'Connect Apify' })}
-                    </Button>
+                    {isSelfHosted ? (
+                      <div className="w-full max-w-md text-left">
+                        <ApifyTokenForm />
+                      </div>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        disabled={!onConnectApify}
+                        onClick={() => onConnectApify?.(projectId)}
+                      >
+                        {t('webscraper.connectApify', { defaultValue: 'Connect Apify' })}
+                      </Button>
+                    )}
                   </div>
                 )
               ) : (
