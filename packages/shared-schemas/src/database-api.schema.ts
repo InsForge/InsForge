@@ -369,6 +369,28 @@ export const createMigrationResponseSchema = migrationSchema.extend({
   message: z.string(),
 });
 
+export const dryRunMigrationRequestSchema = z.object({
+  sql: z.string().trim().min(1, 'Migration SQL is required'),
+});
+
+export const migrationRiskLevelSchema = z.enum(['SAFE', 'WARNING', 'DANGER']);
+
+export const migrationRiskFactorSchema = z.object({
+  code: z.string(),
+  description: z.string(),
+  level: migrationRiskLevelSchema,
+  statement: z.string().optional(),
+});
+
+export const dryRunMigrationResponseSchema = z.object({
+  valid: z.boolean(),
+  statementCount: z.number(),
+  statements: z.array(z.string()),
+  riskLevel: migrationRiskLevelSchema,
+  riskFactors: z.array(migrationRiskFactorSchema),
+  error: z.string().optional(),
+});
+
 export type CreateTableRequest = z.infer<typeof createTableRequestSchema>;
 export type CreateTableResponse = z.infer<typeof createTableResponseSchema>;
 export type GetTableSchemaResponse = z.infer<typeof getTableSchemaResponseSchema>;
@@ -407,6 +429,10 @@ export type AdminTableRecordsListResponse = z.infer<typeof adminTableRecordsList
 export type AdminTableRecordsDeleteResponse = z.infer<typeof adminTableRecordsDeleteResponseSchema>;
 export type CreateMigrationRequest = z.infer<typeof createMigrationRequestSchema>;
 export type CreateMigrationResponse = z.infer<typeof createMigrationResponseSchema>;
+export type DryRunMigrationRequest = z.infer<typeof dryRunMigrationRequestSchema>;
+export type MigrationRiskLevel = z.infer<typeof migrationRiskLevelSchema>;
+export type MigrationRiskFactor = z.infer<typeof migrationRiskFactorSchema>;
+export type DryRunMigrationResponse = z.infer<typeof dryRunMigrationResponseSchema>;
 
 // Database Metadata Response Schemas
 export const databaseFunctionsResponseSchema = z.object({

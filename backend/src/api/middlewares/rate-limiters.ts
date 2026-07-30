@@ -473,3 +473,19 @@ function createWriteEndpointLimiter(category: WriteLimiterCategory) {
 export const functionsWriteLimiter = createWriteEndpointLimiter('functions');
 export const deploymentsWriteLimiter = createWriteEndpointLimiter('deployments');
 export const computeWriteLimiter = createWriteEndpointLimiter('compute');
+
+export const migrationsDryRunLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many migration dry-run requests. Please try again later.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+});
