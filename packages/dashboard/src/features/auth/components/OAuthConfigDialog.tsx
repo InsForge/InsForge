@@ -48,6 +48,48 @@ interface OAuthConfigDialogProps {
 
 export type OAuthDialogMode = OAuthConfigDialogProps['mode'];
 
+function NativeClientIdsInput({
+  value,
+  onChange,
+  onBlur,
+  onTextChange,
+}: {
+  value?: string[];
+  onChange: (value: string[]) => void;
+  onBlur: () => void;
+  onTextChange: (value: string) => void;
+}) {
+  const [text, setText] = useState((value ?? []).join(', '));
+
+  useEffect(() => {
+    const nextText = (value ?? []).join(', ');
+    setText(nextText);
+    onTextChange(nextText);
+  }, [onTextChange, value]);
+
+  return (
+    <Input
+      type="text"
+      value={text}
+      onChange={(event) => {
+        setText(event.target.value);
+        onTextChange(event.target.value);
+      }}
+      onBlur={() => {
+        onChange(
+          text
+            .split(',')
+            .map((clientId) => clientId.trim())
+            .filter(Boolean)
+        );
+        onBlur();
+      }}
+      placeholder="com.example.ios-app"
+      className="w-[340px]"
+    />
+  );
+}
+
 export function OAuthConfigDialog({
   provider,
   mode,
@@ -64,6 +106,7 @@ export function OAuthConfigDialog({
     defaultValues: {
       provider: provider?.id || 'google',
       clientId: '',
+      nativeClientIds: [],
       clientSecret: '',
       useSharedKey: false,
     },
@@ -72,6 +115,7 @@ export function OAuthConfigDialog({
   const useSharedKey = form.watch('useSharedKey');
   const clientId = form.watch('clientId');
   const clientSecret = form.watch('clientSecret');
+  const [nativeClientIdsText, setNativeClientIdsText] = useState('');
   const [isClientSecretVisible, setIsClientSecretVisible] = useState(false);
 
   // Our Cloud only support shared keys of these OAuth Providers for now
@@ -108,6 +152,7 @@ export function OAuthConfigDialog({
       form.reset({
         provider: provider.id,
         clientId: '',
+        nativeClientIds: [],
         clientSecret: '',
         useSharedKey: isSharedKeysAvailable,
       });
@@ -118,6 +163,7 @@ export function OAuthConfigDialog({
       form.reset({
         provider: provider.id,
         clientId: providerConfig.clientId || '',
+        nativeClientIds: providerConfig.nativeClientIds || [],
         clientSecret: providerConfig.clientSecret || '',
         useSharedKey: providerConfig.useSharedKey || false,
       });
@@ -130,6 +176,12 @@ export function OAuthConfigDialog({
     }
 
     try {
+      const isNativeOnlyApple =
+        provider.id === 'apple' &&
+        (data.nativeClientIds?.length ?? 0) > 0 &&
+        !data.clientId &&
+        !data.clientSecret;
+
       if (mode === 'edit') {
         if (!providerConfig) {
           return;
@@ -139,18 +191,22 @@ export function OAuthConfigDialog({
         updateConfig({
           provider: provider.id,
           config: data.useSharedKey
-            ? { useSharedKey: true }
-            : {
-                clientId: data.clientId,
-                clientSecret: data.clientSecret,
-                useSharedKey: false,
-              },
+            ? { useSharedKey: true, nativeClientIds: data.nativeClientIds }
+            : isNativeOnlyApple
+              ? { useSharedKey: false, nativeClientIds: data.nativeClientIds }
+              : {
+                  clientId: data.clientId,
+                  nativeClientIds: data.nativeClientIds,
+                  clientSecret: data.clientSecret || undefined,
+                  useSharedKey: false,
+                },
         });
       } else {
         // Create new config
         createConfig({
           provider: provider.id,
           clientId: data.useSharedKey ? undefined : data.clientId,
+          nativeClientIds: data.nativeClientIds,
           clientSecret: data.useSharedKey ? undefined : clientSecret,
           useSharedKey: data.useSharedKey,
         });
@@ -191,7 +247,15 @@ export function OAuthConfigDialog({
       return false;
     }
 
-    // If NOT using shared keys, require both clientId and clientSecret
+    // Native-only Apple setups require a trusted app audience but no browser credentials.
+    if (
+      provider?.id === 'apple' &&
+      nativeClientIdsText.split(',').some((clientIdValue) => clientIdValue.trim().length > 0)
+    ) {
+      return false;
+    }
+
+    // If NOT using shared keys, require both clientId and clientSecret.
     return !clientId || !clientSecret;
   };
 
@@ -331,6 +395,35 @@ export function OAuthConfigDialog({
                         defaultValue: 'Enter {{name}} OAuth App Secret',
                       })}
                       className="w-[340px]"
+                    />
+                  </div>
+                </div>
+              )}
+              {provider?.id === 'apple' && (
+                <div className="p-6 border-t border-zinc-200 dark:border-neutral-700">
+                  <div className="flex flex-row items-start justify-between gap-10">
+                    <div className="space-y-1">
+                      <label className="text-sm text-zinc-950 dark:text-white">
+                        {t('auth.nativeClientIds', { defaultValue: 'Native App IDs' })}
+                      </label>
+                      <p className="max-w-52 text-xs text-zinc-500 dark:text-neutral-400">
+                        {t('auth.nativeClientIdsDescription', {
+                          defaultValue:
+                            'Comma-separated bundle IDs trusted for native Apple ID tokens.',
+                        })}
+                      </p>
+                    </div>
+                    <Controller
+                      name="nativeClientIds"
+                      control={form.control}
+                      render={({ field }) => (
+                        <NativeClientIdsInput
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          onTextChange={setNativeClientIdsText}
+                        />
+                      )}
                     />
                   </div>
                 </div>

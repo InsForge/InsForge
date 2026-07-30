@@ -14,8 +14,11 @@ import {
 import { CreateBackupDialog } from '#features/database/components/CreateBackupDialog';
 import { ConfirmRestoreDialog } from '#features/database/components/ConfirmRestoreDialog';
 import { DatabaseEmptyState } from '#features/database/components/DatabaseEmptyState';
+import { DatabaseSettingsDialog } from '#features/database/components/DatabaseSettingsDialog';
 import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
 import { RenameBackupDialog } from '#features/database/components/RenameBackupDialog';
+import { useBackupConfig } from '#features/database/hooks/useBackupConfig';
+import { formatUtcTimestamp } from '#features/database/utils';
 import {
   useDatabaseBackupActions,
   useDatabaseBackupInfo,
@@ -52,7 +55,9 @@ export default function BackupsPage() {
   const { backupInfo, refetch } = useDatabaseBackupInfo();
   const { instanceInfo } = useDatabaseBackupInstanceInfo();
   const backupActions = useDatabaseBackupActions();
+  const { config: backupConfig, isLoading: isBackupConfigLoading } = useBackupConfig();
   const [createBackupDialogOpen, setCreateBackupDialogOpen] = useState(false);
+  const [databaseSettingsOpen, setDatabaseSettingsOpen] = useState(false);
   const [renameBackupDialogState, setRenameBackupDialogState] = useState<{
     id: string;
     name: string;
@@ -62,12 +67,13 @@ export default function BackupsPage() {
     timestampLabel: string;
   } | null>(null);
 
-  // Self-hosting has no plans, quotas, or backup scheduler — only the
-  // cloud-hosting control plane does.
+  // Self-hosting has no plans or quotas; its scheduled backups run in the
+  // backend and are configured through Database Settings, while cloud-hosting
+  // scheduling is owned by the control plane (paid plans only).
   const isFreePlan =
     isCloudHostingMode && (instanceInfo?.planName?.toLowerCase() ?? 'free') === 'free';
   const hasManualBackupQuota = isCloudHostingMode;
-  const showScheduledBackups = isCloudHostingMode && !isFreePlan;
+  const showScheduledBackups = isCloudHostingMode ? !isFreePlan : true;
   const manualBackups = backupInfo?.manualBackups ?? [];
   const scheduledBackups = backupInfo?.scheduledBackups ?? [];
 
@@ -417,41 +423,97 @@ export default function BackupsPage() {
 
             {showScheduledBackups && (
               <div className="overflow-hidden rounded-lg border border-[var(--alpha-8)] bg-card">
-                <div className="px-6 py-6">
+                <div className="flex flex-col gap-4 px-6 py-6 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <h2 className="text-xl font-medium leading-7 text-foreground">
                       {t('database.scheduledBackups', { defaultValue: 'Scheduled Backups' })}
                     </h2>
                     <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      {t('database.scheduledBackupsDescription', {
-                        defaultValue:
-                          "Projects are auto backed up each day around midnight in the project's region and can be restored at any time.",
-                      })}
+                      {isCloudHostingMode
+                        ? t('database.scheduledBackupsDescription', {
+                            defaultValue:
+                              "Projects are auto backed up each day around midnight in the project's region and can be restored at any time.",
+                          })
+                        : !backupConfig && isBackupConfigLoading
+                          ? t('database.loadingConfiguration', {
+                              defaultValue: 'Loading configuration...',
+                            })
+                          : backupConfig?.enabled
+                            ? backupConfig.nextBackupAt
+                              ? t('database.scheduledBackupsSelfHostEnabled', {
+                                  date: formatUtcTimestamp(backupConfig.nextBackupAt),
+                                  defaultValue:
+                                    'The database is backed up automatically on your configured schedule. Next backup: {{date}}',
+                                })
+                              : t('database.scheduledBackupsSelfHostEnabledNoDate', {
+                                  defaultValue:
+                                    'The database is backed up automatically on your configured schedule.',
+                                })
+                            : t('database.scheduledBackupsSelfHostDisabled', {
+                                defaultValue:
+                                  'Scheduled backups are disabled. Enable them in Database Settings.',
+                              })}
                     </p>
                   </div>
+                  {!isCloudHostingMode && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-8 shrink-0 rounded border-[var(--alpha-12)] bg-transparent px-3 text-sm font-medium text-foreground hover:bg-[var(--alpha-4)]"
+                      onClick={() => setDatabaseSettingsOpen(true)}
+                    >
+                      {t('database.configure', { defaultValue: 'Configure' })}
+                    </Button>
+                  )}
                 </div>
 
                 {scheduledBackups.length === 0 ? (
                   <div className="border-t border-[var(--alpha-8)]">
                     <DatabaseEmptyState
                       title={t('database.noBackupFound', { defaultValue: 'No Backup Found' })}
-                      description={t('database.checkBackTomorrow', {
-                        defaultValue: 'Check back tomorrow or backup manually',
-                      })}
+                      description={
+                        isCloudHostingMode
+                          ? t('database.checkBackTomorrow', {
+                              defaultValue: 'Check back tomorrow or backup manually',
+                            })
+                          : undefined
+                      }
                     />
                   </div>
                 ) : (
                   <div className="flex flex-col">
                     {scheduledBackups.map((backup) => {
+                      const savedOnLabel = formatBackupTimestamp(backup.createdAt);
+                      const backupLabel = backup.name?.trim() || savedOnLabel;
+                      const showStatus = !isCloudHostingMode && backup.status !== 'completed';
+                      const isRestorable = isCloudHostingMode || backup.status === 'completed';
+
                       return (
                         <div
                           key={backup.id}
                           className="flex flex-col gap-3 border-t border-[var(--alpha-8)] px-6 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium leading-6 text-foreground">
-                              {backup.name?.trim() || formatBackupTimestamp(backup.createdAt)}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="truncate text-sm font-medium leading-6 text-foreground">
+                                {backupLabel}
+                              </p>
+                              {showStatus && backup.status === 'running' && (
+                                <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  {t('database.backingUp', { defaultValue: 'Backing up…' })}
+                                </span>
+                              )}
+                              {showStatus && backup.status === 'failed' && (
+                                <span
+                                  className="flex shrink-0 items-center gap-1 text-xs text-destructive"
+                                  title={backup.errorMessage ?? undefined}
+                                >
+                                  <CircleAlert className="h-3 w-3" />
+                                  {t('common.failed', { defaultValue: 'Failed' })}
+                                </span>
+                              )}
+                            </div>
                             {backup.expiresAt && (
                               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-4 text-muted-foreground">
                                 <span>
@@ -469,16 +531,51 @@ export default function BackupsPage() {
                               type="button"
                               variant="secondary"
                               size="sm"
+                              disabled={!isRestorable}
                               className="h-7 rounded border-[var(--alpha-8)] px-2 text-sm font-medium text-foreground"
                               onClick={() => {
                                 handleOpenRestoreBackupDialog(
                                   backup.id,
-                                  formatBackupTimestamp(backup.createdAt).replace(', ', ' ')
+                                  savedOnLabel.replace(', ', ' ')
                                 );
                               }}
                             >
                               {t('database.restore', { defaultValue: 'Restore' })}
                             </Button>
+
+                            {!isCloudHostingMode && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="icon-sm"
+                                    className="h-7 w-7 rounded border-[var(--alpha-8)] text-muted-foreground hover:text-foreground"
+                                    aria-label={t('database.moreActionsFor', {
+                                      backupLabel,
+                                      defaultValue: 'More actions for {{backupLabel}}',
+                                    })}
+                                  >
+                                    <MoreHorizontal className="h-5 w-5" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                  align="end"
+                                  sideOffset={6}
+                                  className="w-44 p-1.5"
+                                >
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      void handleDeleteBackupClick(backup.id, backupLabel);
+                                    }}
+                                    className="cursor-pointer gap-2 text-destructive"
+                                  >
+                                    <Trash2 className="h-5 w-5" />
+                                    {t('database.deleteBackup', { defaultValue: 'Delete Backup' })}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                         </div>
                       );
@@ -590,6 +687,14 @@ export default function BackupsPage() {
         }}
       />
       <ConfirmDialog {...confirmDialogProps} />
+      {/* Stays mounted (Radix close animation); its config query only runs
+          while open. */}
+      {!isCloudHostingMode && (
+        <DatabaseSettingsDialog
+          open={databaseSettingsOpen}
+          onOpenChange={setDatabaseSettingsOpen}
+        />
+      )}
     </>
   );
 }

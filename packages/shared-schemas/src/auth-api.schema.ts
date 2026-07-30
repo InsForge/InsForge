@@ -84,6 +84,33 @@ export const createSessionRequestSchema = z.preprocess(
 );
 
 /**
+ * POST /api/auth/id-token - Exchange a provider ID token for an InsForge session.
+ * Apple requires the nonce that the client attached to its native authorization request.
+ */
+const googleIdTokenSignInRequestSchema = z.object({
+  provider: z.literal('google'),
+  token: z.string().min(1, 'Token is required'),
+});
+
+const appleIdTokenSignInRequestSchema = z
+  .object({
+    provider: z.literal('apple'),
+    token: z.string().min(1, 'Token is required'),
+    nonce: z
+      .string()
+      .min(1, 'Nonce is required')
+      .max(255, 'Nonce is too long')
+      .refine((nonce) => nonce.trim().length > 0, 'Nonce is required'),
+    name: nameSchema.optional(),
+  })
+  .strict();
+
+export const idTokenSignInRequestSchema = z.discriminatedUnion('provider', [
+  googleIdTokenSignInRequestSchema,
+  appleIdTokenSignInRequestSchema,
+]);
+
+/**
  * POST /api/auth/email/send-otp - Send a sign-in OTP
  */
 export const sendOTPRequestSchema = z.object({
@@ -553,6 +580,7 @@ type OTPSessionRequest = z.infer<typeof otpSessionRequestSchema>;
 export type CreateSessionRequest =
   | (Omit<PasswordSessionRequest, 'method'> & { method?: 'password' })
   | OTPSessionRequest;
+export type IdTokenSignInRequest = z.infer<typeof idTokenSignInRequestSchema>;
 export type SendOTPRequest = z.infer<typeof sendOTPRequestSchema>;
 export type CreateAdminSessionRequest = z.infer<typeof createAdminSessionRequestSchema>;
 export type RefreshSessionRequest = z.infer<typeof refreshSessionRequestSchema>;

@@ -146,6 +146,31 @@ export const verifyOTPRateLimiter = rateLimit({
 });
 
 /**
+ * Per-IP rate limiter for native provider ID-token exchanges.
+ * These unauthenticated requests perform cryptographic token verification and
+ * may fetch provider signing keys, so count both successful and failed calls.
+ *
+ * Limits: 30 attempts per 15 minutes per IP
+ */
+export const idTokenSignInRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many ID token sign-in attempts from this IP. Please try again in 15 minutes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+  skipSuccessfulRequests: false,
+  skipFailedRequests: false,
+});
+
+/**
  * Per-email cooldown middleware
  * Prevents enumeration attacks by enforcing minimum time between requests for same email
  *
@@ -448,3 +473,19 @@ function createWriteEndpointLimiter(category: WriteLimiterCategory) {
 export const functionsWriteLimiter = createWriteEndpointLimiter('functions');
 export const deploymentsWriteLimiter = createWriteEndpointLimiter('deployments');
 export const computeWriteLimiter = createWriteEndpointLimiter('compute');
+
+export const migrationsDryRunLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many migration dry-run requests. Please try again later.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+});
