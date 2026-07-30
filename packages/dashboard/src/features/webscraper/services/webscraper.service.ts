@@ -137,12 +137,6 @@ export const webscraperService = {
   },
 
   // Self-hosting only — cloud projects answer 400 here and connect via OAuth.
-  async getApifyConfig(): Promise<ApifyConfig> {
-    return apiClient.request('/webscraper/apify/config', {
-      headers: apiClient.withAccessToken({}),
-    });
-  },
-
   async updateApifyConfig(apiToken: string): Promise<ApifyConfig> {
     return apiClient.request('/webscraper/apify/config', {
       method: 'PUT',

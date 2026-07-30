@@ -1813,9 +1813,7 @@
     "apifyTokenHint": "在 Apify Console 的 Settings → Integrations 中创建 token。它会加密保存在你自己的后端。",
     "apifyTokenFailed": "无法保存 token，请检查后重试。",
     "openApifyConsole": "打开 Apify Console",
-    "connecting": "连接中…",
-    "save": "保存",
-    "replaceToken": "更换 token"
+    "connecting": "连接中…"
   },
   "loginPage": {
     "title": "Insforge 管理后台",

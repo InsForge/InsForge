@@ -8,7 +8,6 @@ export const webscraperQueryKeys = {
   apifyDatasets: ['webscraper', 'apify', 'datasets'] as const,
   apifyRuns: ['webscraper', 'apify', 'runs'] as const,
   apifyData: ['webscraper', 'apify', 'data'] as const,
-  apifyConfig: ['webscraper', 'apify', 'config'] as const,
 };
 
 export function useApifyConnection() {
@@ -55,22 +54,12 @@ export function useApifyLatestData(enabled: boolean) {
   });
 }
 
-export function useApifyConfig(enabled: boolean) {
-  return useQuery({
-    queryKey: webscraperQueryKeys.apifyConfig,
-    queryFn: () => webscraperService.getApifyConfig(),
-    enabled,
-    staleTime: 30_000,
-  });
-}
-
 export function useUpdateApifyConfig() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (apiToken: string) => webscraperService.updateApifyConfig(apiToken),
     onSuccess: () => {
-      // The connection is derived from the token, so both have to refetch.
-      void queryClient.invalidateQueries({ queryKey: webscraperQueryKeys.apifyConfig });
+      // The connection is derived from the token, so it has to refetch.
       void queryClient.invalidateQueries({ queryKey: webscraperQueryKeys.apifyConnection });
     },
   });

@@ -9,11 +9,10 @@ vi.mock('../../src/api/middlewares/auth', () => ({
   verifyAdmin: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
-const getConfigMock = vi.fn();
 const setTokenMock = vi.fn();
 vi.mock('../../src/services/webscraper/webscraper.service', () => ({
   WebscraperService: {
-    getInstance: () => ({ getApifyConfig: getConfigMock, setApifyToken: setTokenMock }),
+    getInstance: () => ({ setApifyToken: setTokenMock }),
     isSelfHosted: () => !configMock.cloud.projectId || configMock.cloud.projectId === 'local',
   },
 }));
@@ -45,15 +44,6 @@ describe('webscraper config routes', () => {
     configMock.cloud.projectId = undefined;
   });
 
-  it('returns the masked token status', async () => {
-    getConfigMock.mockResolvedValue({ token: { configured: true, maskedKey: 'apify_ap••••••••mnop' } });
-
-    const res = await request(app()).get('/webscraper/apify/config');
-
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ token: { configured: true, maskedKey: 'apify_ap••••••••mnop' } });
-  });
-
   it('stores a submitted token', async () => {
     setTokenMock.mockResolvedValue({ token: { configured: true, maskedKey: 'apify_ap••••••••mnop' } });
 
@@ -75,12 +65,10 @@ describe('webscraper config routes', () => {
   it('refuses config routes on cloud projects', async () => {
     configMock.cloud.projectId = '77777777-7777-7777-7777-777777777777';
 
-    const get = await request(app()).get('/webscraper/apify/config');
     const put = await request(app())
       .put('/webscraper/apify/config')
       .send({ apiToken: 'apify_api_tok1234567890' });
 
-    expect(get.status).toBe(400);
     expect(put.status).toBe(400);
     expect(setTokenMock).not.toHaveBeenCalled();
   });
@@ -115,7 +103,7 @@ describe('webscraper route wiring', () => {
 
   // Every route here reads or writes the project's Apify data, and /apify/token
   // hands back a live credential — none may be reachable with an anon key. The
-  // assertion covers the whole router rather than the two config routes, so a
+  // assertion covers the whole router rather than just the config route, so a
   // guard dropped from any of them (or a new route added without one) fails.
   it('guards every webscraper route with verifyAdmin', async () => {
     const routes = await describeRoutes();
@@ -140,7 +128,6 @@ describe('webscraper route wiring', () => {
         'GET /apify/actors',
         'GET /apify/datasets',
         'GET /apify/data',
-        'GET /apify/config',
         'PUT /apify/config',
       ])
     );

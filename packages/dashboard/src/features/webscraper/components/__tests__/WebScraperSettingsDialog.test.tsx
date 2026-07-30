@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '@insforge/ui';
@@ -67,22 +67,6 @@ describe('WebScraperSettingsDialog', () => {
     hostValue.onConnectApify = undefined;
   });
 
-  it('shows the masked token in self-hosting', async () => {
-    renderDialog();
-
-    expect(await screen.findByText('apify_ap••••••••mnop')).toBeInTheDocument();
-  });
-
-  it('replaces the token', async () => {
-    renderDialog();
-
-    await userEvent.click(await screen.findByRole('button', { name: /replace token/i }));
-    await userEvent.type(screen.getByLabelText(/apify api token/i), 'apify_api_rotated1234567');
-    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
-
-    await waitFor(() => expect(updateApifyConfig).toHaveBeenCalledWith('apify_api_rotated1234567'));
-  });
-
   it('hides the token controls when the host runs OAuth', async () => {
     hostValue.onConnectApify = vi.fn();
     renderDialog();
@@ -93,19 +77,6 @@ describe('WebScraperSettingsDialog', () => {
     // elements" failure unrelated to the token feature.
     await screen.findAllByText(/carmen/);
     expect(screen.queryByRole('button', { name: /replace token/i })).toBeNull();
-  });
-
-  it('does not throw and keeps the dialog open when the save is rejected', async () => {
-    updateApifyConfig.mockRejectedValueOnce(new Error('Apify rejected this API token.'));
-    renderDialog();
-
-    await userEvent.click(await screen.findByRole('button', { name: /replace token/i }));
-    await userEvent.type(screen.getByLabelText(/apify api token/i), 'apify_api_rotated1234567');
-    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
-
-    await waitFor(() => expect(updateApifyConfig).toHaveBeenCalled());
-    // The draft stays put after a rejected save — nothing throws, nothing unmounts.
-    expect(screen.getByLabelText(/apify api token/i)).toBeInTheDocument();
   });
 
   it('shows a working token entry form when self-hosted and not yet connected', async () => {

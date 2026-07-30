@@ -62,10 +62,6 @@ export class WebscraperService {
     return this.provider().getLatestData(limit);
   }
 
-  getApifyConfig() {
-    return this.config.getConfig();
-  }
-
   async setApifyToken(apiToken: string) {
     await LocalWebscraperProvider.getInstance().verifyToken(apiToken);
     return this.config.setToken(apiToken);

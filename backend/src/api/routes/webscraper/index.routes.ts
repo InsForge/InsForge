@@ -152,20 +152,6 @@ function assertSelfHostedWebscraperConfig(): void {
   }
 }
 
-// GET /api/webscraper/apify/config — masked token status for the dashboard.
-webscraperRouter.get(
-  '/apify/config',
-  verifyAdmin,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      assertSelfHostedWebscraperConfig();
-      res.json(await service.getApifyConfig());
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
 // PUT /api/webscraper/apify/config — store the developer's Apify API token. The
 // token is validated against Apify before it is written, so an invalid paste fails
 // loudly instead of producing a connection that 401s on every read.
