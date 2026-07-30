@@ -731,6 +731,21 @@ InsForge session:
 POST /api/auth/id-token?client_type=mobile
 ```
 
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `client_type` | `web` \| `mobile` \| `desktop` \| `server` | No | Defaults to `web`. Controls whether the refresh token is set as a cookie or returned in the response body. |
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `provider` | `google` \| `apple` | Yes | Native identity provider that issued the token. |
+| `token` | string | Yes | Raw provider ID token. For Apple, use `identityToken` from `ASAuthorizationAppleIDCredential`. |
+| `nonce` | string | Apple only | Original raw nonce, 1–255 characters. It is hashed without normalization and must match Apple's signed `nonce` claim. |
+| `name` | string | No | Apple first-authorization display name, 1–100 characters. Apple may only provide this value once. |
+
 For native Sign in with Apple, generate a high-entropy raw nonce and attach its lowercase
 SHA-256 hex digest to the `ASAuthorizationAppleIDRequest`. Send the original raw nonce with the
 returned identity token. InsForge hashes it before comparing it with Apple's signed `nonce`
@@ -776,8 +791,39 @@ Google keeps its existing request shape:
 }
 ```
 
-For `client_type=mobile`, `desktop`, or `server`, the response includes `accessToken` and
-`refreshToken` in the JSON body. Web clients receive the refresh token in an HTTP-only cookie.
+### Response
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user` | object | Authenticated InsForge user, including `id`, `email`, verification state, providers, profile, metadata, and timestamps. |
+| `accessToken` | string | InsForge access token for authenticated API requests. |
+| `refreshToken` | string | Returned for `mobile`, `desktop`, and `server` clients. Omitted for web clients. |
+| `csrfToken` | string | Returned for web clients alongside the HTTP-only refresh-token cookie. |
+
+```json
+{
+  "user": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["apple"]
+  },
+  "accessToken": "INSFORGE_ACCESS_TOKEN",
+  "refreshToken": "INSFORGE_REFRESH_TOKEN"
+}
+```
+
+### Errors
+
+| Status | Meaning |
+|--------|---------|
+| `400` | Invalid request shape, unsupported provider, missing nonce, or missing verified email for a new Apple identity. |
+| `401` | Provider token is invalid, expired, has an untrusted audience, or fails Apple nonce verification. |
+| `429` | Too many ID-token sign-in attempts from the requesting IP. |
+
+For `client_type=mobile`, `desktop`, or `server`, the response includes `refreshToken` in the
+JSON body. Web clients receive the refresh token in an HTTP-only cookie and a `csrfToken` in the
+response body.
 
 ---
 

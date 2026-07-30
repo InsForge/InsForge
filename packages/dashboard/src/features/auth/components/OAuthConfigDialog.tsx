@@ -48,6 +48,48 @@ interface OAuthConfigDialogProps {
 
 export type OAuthDialogMode = OAuthConfigDialogProps['mode'];
 
+function NativeClientIdsInput({
+  value,
+  onChange,
+  onBlur,
+  onTextChange,
+}: {
+  value?: string[];
+  onChange: (value: string[]) => void;
+  onBlur: () => void;
+  onTextChange: (value: string) => void;
+}) {
+  const [text, setText] = useState((value ?? []).join(', '));
+
+  useEffect(() => {
+    const nextText = (value ?? []).join(', ');
+    setText(nextText);
+    onTextChange(nextText);
+  }, [onTextChange, value]);
+
+  return (
+    <Input
+      type="text"
+      value={text}
+      onChange={(event) => {
+        setText(event.target.value);
+        onTextChange(event.target.value);
+      }}
+      onBlur={() => {
+        onChange(
+          text
+            .split(',')
+            .map((clientId) => clientId.trim())
+            .filter(Boolean)
+        );
+        onBlur();
+      }}
+      placeholder="com.example.ios-app"
+      className="w-[340px]"
+    />
+  );
+}
+
 export function OAuthConfigDialog({
   provider,
   mode,
@@ -73,6 +115,7 @@ export function OAuthConfigDialog({
   const useSharedKey = form.watch('useSharedKey');
   const clientId = form.watch('clientId');
   const clientSecret = form.watch('clientSecret');
+  const [nativeClientIdsText, setNativeClientIdsText] = useState('');
   const [isClientSecretVisible, setIsClientSecretVisible] = useState(false);
 
   // Our Cloud only support shared keys of these OAuth Providers for now
@@ -133,6 +176,12 @@ export function OAuthConfigDialog({
     }
 
     try {
+      const isNativeOnlyApple =
+        provider.id === 'apple' &&
+        (data.nativeClientIds?.length ?? 0) > 0 &&
+        !data.clientId &&
+        !data.clientSecret;
+
       if (mode === 'edit') {
         if (!providerConfig) {
           return;
@@ -143,12 +192,14 @@ export function OAuthConfigDialog({
           provider: provider.id,
           config: data.useSharedKey
             ? { useSharedKey: true, nativeClientIds: data.nativeClientIds }
-            : {
-                clientId: data.clientId,
-                nativeClientIds: data.nativeClientIds,
-                clientSecret: data.clientSecret,
-                useSharedKey: false,
-              },
+            : isNativeOnlyApple
+              ? { useSharedKey: false, nativeClientIds: data.nativeClientIds }
+              : {
+                  clientId: data.clientId,
+                  nativeClientIds: data.nativeClientIds,
+                  clientSecret: data.clientSecret || undefined,
+                  useSharedKey: false,
+                },
         });
       } else {
         // Create new config
@@ -196,7 +247,15 @@ export function OAuthConfigDialog({
       return false;
     }
 
-    // If NOT using shared keys, require both clientId and clientSecret
+    // Native-only Apple setups require a trusted app audience but no browser credentials.
+    if (
+      provider?.id === 'apple' &&
+      nativeClientIdsText.split(',').some((clientIdValue) => clientIdValue.trim().length > 0)
+    ) {
+      return false;
+    }
+
+    // If NOT using shared keys, require both clientId and clientSecret.
     return !clientId || !clientSecret;
   };
 
@@ -358,19 +417,11 @@ export function OAuthConfigDialog({
                       name="nativeClientIds"
                       control={form.control}
                       render={({ field }) => (
-                        <Input
-                          type="text"
-                          value={(field.value ?? []).join(', ')}
-                          onChange={(event) =>
-                            field.onChange(
-                              event.target.value
-                                .split(',')
-                                .map((value) => value.trim())
-                                .filter(Boolean)
-                            )
-                          }
-                          placeholder="com.example.ios-app"
-                          className="w-[340px]"
+                        <NativeClientIdsInput
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          onTextChange={setNativeClientIdsText}
                         />
                       )}
                     />

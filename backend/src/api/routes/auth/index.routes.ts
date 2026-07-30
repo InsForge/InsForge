@@ -13,6 +13,7 @@ import adminRouter from './admin.routes.js';
 import oauthRouter from './oauth.routes.js';
 import customOAuthRouter from './custom-oauth.routes.js';
 import {
+  idTokenSignInRateLimiter,
   sendEmailOTPLimiter,
   verifyOTPLimiter,
   verifyOTPRateLimiter,
@@ -472,54 +473,58 @@ router.post(
 
 // POST /api/auth/id-token - Sign in with an ID token from a native provider SDK
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
-router.post('/id-token', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const clientType = parseClientType(req.query.client_type);
+router.post(
+  '/id-token',
+  idTokenSignInRateLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const clientType = parseClientType(req.query.client_type);
 
-    const validationResult = idTokenSignInRequestSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      throw new AppError(
-        validationResult.error.issues
-          .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-          .join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
+      const validationResult = idTokenSignInRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues
+            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+            .join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const request = validationResult.data;
+
+      // Sign in with ID token
+      const result: CreateSessionResponse =
+        request.provider === 'apple'
+          ? await authService.signInWithIdToken('apple', request.token, {
+              nonce: request.nonce,
+              name: request.name,
+            })
+          : await authService.signInWithIdToken('google', request.token);
+
+      // Set refresh token based on client type
+      const tokenManager = TokenManager.getInstance();
+      if (clientType === 'web') {
+        // Web clients: use httpOnly cookie + CSRF token
+        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+          result.user.id,
+          'user'
+        );
+        setRefreshTokenCookie(res, refreshToken);
+        result.csrfToken = csrfToken;
+      } else {
+        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
+        // Non-web clients (mobile, desktop, server): return refresh token in response body.
+        // Server clients cannot rely on browser cookies, so they follow the native-app flow.
+        result.refreshToken = refreshToken;
+      }
+
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
     }
-
-    const request = validationResult.data;
-
-    // Sign in with ID token
-    const result: CreateSessionResponse =
-      request.provider === 'apple'
-        ? await authService.signInWithIdToken('apple', request.token, {
-            nonce: request.nonce,
-            name: request.name,
-          })
-        : await authService.signInWithIdToken('google', request.token);
-
-    // Set refresh token based on client type
-    const tokenManager = TokenManager.getInstance();
-    if (clientType === 'web') {
-      // Web clients: use httpOnly cookie + CSRF token
-      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-        result.user.id,
-        'user'
-      );
-      setRefreshTokenCookie(res, refreshToken);
-      result.csrfToken = csrfToken;
-    } else {
-      const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
-      // Non-web clients (mobile, desktop, server): return refresh token in response body.
-      // Server clients cannot rely on browser cookies, so they follow the native-app flow.
-      result.refreshToken = refreshToken;
-    }
-
-    successResponse(res, result);
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /api/auth/refresh - Refresh access token
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'

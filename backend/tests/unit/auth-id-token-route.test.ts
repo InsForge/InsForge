@@ -9,6 +9,7 @@ interface AppErrorLike {
 
 const mocks = vi.hoisted(() => ({
   signInWithIdToken: vi.fn(),
+  idTokenRateLimit: vi.fn(),
   generateRefreshToken: vi.fn().mockReturnValue('mobile-refresh-token'),
   generateRefreshTokenWithCsrf: vi.fn(),
 }));
@@ -18,6 +19,16 @@ vi.mock('@/api/middlewares/auth.js', () => ({
   verifyOptionalUser: vi.fn((_req, _res, next: NextFunction) => next()),
   verifyAdmin: vi.fn((_req, _res, next: NextFunction) => next()),
   verifyToken: vi.fn((_req, _res, next: NextFunction) => next()),
+}));
+
+vi.mock('@/api/middlewares/rate-limiters.js', () => ({
+  idTokenSignInRateLimiter: (_req: Request, _res: Response, next: NextFunction) => {
+    mocks.idTokenRateLimit();
+    next();
+  },
+  sendEmailOTPLimiter: [(_req: Request, _res: Response, next: NextFunction) => next()],
+  verifyOTPLimiter: [(_req: Request, _res: Response, next: NextFunction) => next()],
+  verifyOTPRateLimiter: (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
 vi.mock('@/services/auth/auth.service.js', () => ({
@@ -162,6 +173,19 @@ describe('POST /api/auth/id-token', () => {
       nonce: 'native-nonce',
       name: 'First Sign In Name',
     });
+  });
+
+  it('rate limits requests before external token verification', async () => {
+    await callRoute(router, {
+      provider: 'apple',
+      token: 'apple-token',
+      nonce: 'native-nonce',
+    });
+
+    expect(mocks.idTokenRateLimit).toHaveBeenCalledOnce();
+    expect(mocks.idTokenRateLimit.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.signInWithIdToken.mock.invocationCallOrder[0]
+    );
   });
 
   it('rejects Apple requests without a nonce', async () => {

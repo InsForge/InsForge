@@ -24,6 +24,10 @@ export interface UpdateOAuthConfigInput {
   useSharedKey?: boolean;
 }
 
+function normalizeNativeClientIds(ids?: string[]): string[] {
+  return [...new Set((ids ?? []).map((id) => id.trim()).filter(Boolean))];
+}
+
 export class OAuthConfigService {
   private static instance: OAuthConfigService;
   private pool: Pool | null = null;
@@ -256,7 +260,7 @@ export class OAuthConfigService {
         [
           input.provider.toLowerCase(),
           input.clientId || null,
-          input.nativeClientIds || [],
+          normalizeNativeClientIds(input.nativeClientIds),
           secretId,
           null, // Deprecating redirect_uri
           scopes,
@@ -344,7 +348,7 @@ export class OAuthConfigService {
 
       if (input.nativeClientIds !== undefined) {
         updates.push(`native_client_ids = $${paramCount++}`);
-        values.push(input.nativeClientIds);
+        values.push(normalizeNativeClientIds(input.nativeClientIds));
       }
 
       if (input.redirectUri !== undefined) {

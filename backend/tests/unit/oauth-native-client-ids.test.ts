@@ -86,7 +86,7 @@ describe('OAuthConfigService native client IDs', () => {
 
     await service.createConfig({
       provider: 'apple',
-      nativeClientIds: ['com.example.ios'],
+      nativeClientIds: [' com.example.ios ', 'com.example.ios', '', 'com.example.ipados'],
       useSharedKey: true,
     });
 
@@ -94,7 +94,7 @@ describe('OAuthConfigService native client IDs', () => {
       ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO auth.oauth_configs')
     );
     expect(insertCall?.[0]).toContain('native_client_ids');
-    expect(insertCall?.[1]?.[2]).toEqual(['com.example.ios']);
+    expect(insertCall?.[1]?.[2]).toEqual(['com.example.ios', 'com.example.ipados']);
   });
 
   it('updates native client IDs independently of browser credentials', async () => {
@@ -123,7 +123,7 @@ describe('OAuthConfigService native client IDs', () => {
     });
 
     const result = await service.updateConfig('apple', {
-      nativeClientIds: ['com.example.ios', 'com.example.ipados'],
+      nativeClientIds: ['com.example.ios', ' com.example.ipados ', 'com.example.ios', ''],
     });
 
     const updateCall = mocks.client.query.mock.calls.find(

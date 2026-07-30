@@ -6,4 +6,14 @@
 -- audience selected by an unauthenticated sign-in request.
 
 ALTER TABLE auth.oauth_configs
-  ADD COLUMN IF NOT EXISTS native_client_ids TEXT[] NOT NULL DEFAULT '{}';
+  ADD COLUMN IF NOT EXISTS native_client_ids TEXT[];
+
+UPDATE auth.oauth_configs
+SET native_client_ids = '{}'
+WHERE native_client_ids IS NULL;
+
+ALTER TABLE auth.oauth_configs
+  ALTER COLUMN native_client_ids SET DEFAULT '{}';
+
+ALTER TABLE auth.oauth_configs
+  ALTER COLUMN native_client_ids SET NOT NULL;

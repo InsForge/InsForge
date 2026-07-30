@@ -873,7 +873,8 @@ export class AuthService {
       | FacebookUserInfo
       | XUserInfo
       | AppleUserInfo
-      | Record<string, unknown>
+      | Record<string, unknown>,
+    options?: { requireEmailForNewAccount?: boolean }
   ): Promise<CreateSessionResponse> {
     const pool = this.getPool();
 
@@ -912,7 +913,7 @@ export class AuthService {
       return { user, accessToken };
     }
 
-    if (!email) {
+    if (options?.requireEmailForNewAccount && !email) {
       throw new AppError(
         'A verified email address is required to create or link an OAuth account.',
         400,
@@ -921,9 +922,14 @@ export class AuthService {
     }
 
     // If not found by provider_id, try to find by email in _user table
-    const existingUserResult = await pool.query('SELECT * FROM auth.users WHERE email = $1', [
-      email,
-    ]);
+    const existingUserResult = await pool.query(
+      `SELECT *
+       FROM auth.users
+       WHERE lower(email) = lower($1)
+       ORDER BY created_at ASC
+       LIMIT 1`,
+      [email]
+    );
     const existingUser = existingUserResult.rows[0];
 
     if (existingUser) {
@@ -1317,8 +1323,8 @@ export class AuthService {
       }
 
       case 'apple': {
-        const nonce = options?.nonce?.trim();
-        if (!nonce) {
+        const nonce = options?.nonce;
+        if (!nonce || !nonce.trim()) {
           throw new AppError(
             'Nonce is required for Apple ID token sign-in',
             400,
@@ -1372,7 +1378,8 @@ export class AuthService {
       userData.email,
       userData.userName,
       userData.avatarUrl,
-      userData.identityData
+      userData.identityData,
+      provider === 'apple' ? { requireEmailForNewAccount: true } : undefined
     );
   }
 

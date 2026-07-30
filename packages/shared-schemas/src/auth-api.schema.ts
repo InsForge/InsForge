@@ -96,7 +96,11 @@ const appleIdTokenSignInRequestSchema = z
   .object({
     provider: z.literal('apple'),
     token: z.string().min(1, 'Token is required'),
-    nonce: z.string().trim().min(1, 'Nonce is required').max(255, 'Nonce is too long'),
+    nonce: z
+      .string()
+      .min(1, 'Nonce is required')
+      .max(255, 'Nonce is too long')
+      .refine((nonce) => nonce.trim().length > 0, 'Nonce is required'),
     name: nameSchema.optional(),
   })
   .strict();

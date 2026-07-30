@@ -25,6 +25,26 @@ describe('idTokenSignInRequestSchema', () => {
     ).toBe(false);
   });
 
+  it('preserves the exact raw Apple nonce while rejecting whitespace-only values', () => {
+    const result = idTokenSignInRequestSchema.safeParse({
+      provider: 'apple',
+      token: 'apple-token',
+      nonce: '  native-nonce  ',
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.nonce).toBe('  native-nonce  ');
+    }
+    expect(
+      idTokenSignInRequestSchema.safeParse({
+        provider: 'apple',
+        token: 'apple-token',
+        nonce: '   ',
+      }).success
+    ).toBe(false);
+  });
+
   it('rejects a caller-selected Apple audience', () => {
     expect(
       idTokenSignInRequestSchema.safeParse({

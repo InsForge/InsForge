@@ -155,7 +155,8 @@ describe('AuthService native ID-token sign-in', () => {
       'relay@privaterelay.appleid.com',
       'First Sign In Name',
       '',
-      expect.objectContaining({ sub: 'apple-subject', is_private_email: true })
+      expect.objectContaining({ sub: 'apple-subject', is_private_email: true }),
+      { requireEmailForNewAccount: true }
     );
   });
 
@@ -165,6 +166,24 @@ describe('AuthService native ID-token sign-in', () => {
       code: 'INVALID_INPUT',
     });
     expect(mocks.verifyAppleIdToken).not.toHaveBeenCalled();
+  });
+
+  it('passes the exact raw nonce to Apple verification', async () => {
+    mocks.verifyAppleIdToken.mockResolvedValue({
+      sub: 'apple-subject',
+      email: 'relay@privaterelay.appleid.com',
+      email_verified: true,
+    });
+    vi.spyOn(service, 'findOrCreateThirdPartyUser').mockResolvedValue(session);
+
+    await service.signInWithIdToken('apple', 'apple-token', {
+      nonce: '  native-nonce  ',
+    });
+
+    expect(mocks.verifyAppleIdToken).toHaveBeenCalledWith('apple-token', {
+      nonce: '  native-nonce  ',
+      native: true,
+    });
   });
 
   it('maps Apple verification failures to an authentication error', async () => {
@@ -219,12 +238,56 @@ describe('AuthService native ID-token sign-in', () => {
     mocks.pool.query.mockResolvedValueOnce({ rows: [] });
 
     await expect(
-      service.findOrCreateThirdPartyUser('apple', 'new-apple-subject', '', 'Apple User', '', {
-        sub: 'new-apple-subject',
-        email: '',
-      })
+      service.findOrCreateThirdPartyUser(
+        'apple',
+        'new-apple-subject',
+        '',
+        'Apple User',
+        '',
+        {
+          sub: 'new-apple-subject',
+          email: '',
+        },
+        { requireEmailForNewAccount: true }
+      )
     ).rejects.toThrow('A verified email address is required');
     expect(mocks.pool.query).toHaveBeenCalledOnce();
+  });
+
+  it('links Apple identities to case-variant existing emails', async () => {
+    const existingUserId = '00000000-0000-4000-8000-000000000002';
+    mocks.pool.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ id: existingUserId, email: 'Relay@Example.com' }],
+      })
+      .mockResolvedValue({ rows: [] });
+    vi.spyOn(service, 'getUserById').mockResolvedValue({
+      id: existingUserId,
+      email: 'Relay@Example.com',
+      email_verified: true,
+      profile: { name: 'Existing User', avatar_url: '' },
+      created_at: new Date('2026-01-01T00:00:00.000Z'),
+      updated_at: new Date('2026-01-01T00:00:00.000Z'),
+      auth_metadata: null,
+    });
+
+    await service.findOrCreateThirdPartyUser(
+      'apple',
+      'apple-subject',
+      'relay@example.com',
+      'Apple User',
+      '',
+      { sub: 'apple-subject', email: 'relay@example.com' },
+      { requireEmailForNewAccount: true }
+    );
+
+    expect(mocks.pool.query.mock.calls[1]?.[0]).toContain('lower(email) = lower($1)');
+    expect(mocks.pool.query.mock.calls[1]?.[1]).toEqual(['relay@example.com']);
+    expect(mocks.pool.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO auth.user_providers'),
+      expect.arrayContaining([existingUserId, 'apple', 'apple-subject'])
+    );
   });
 
   it('keeps Google ID-token sign-in behavior unchanged', async () => {
@@ -244,7 +307,8 @@ describe('AuthService native ID-token sign-in', () => {
       'google@example.com',
       'Google User',
       'https://example.com/avatar.png',
-      expect.objectContaining({ sub: 'google-subject' })
+      expect.objectContaining({ sub: 'google-subject' }),
+      undefined
     );
   });
 });
