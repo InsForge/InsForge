@@ -5,6 +5,7 @@ import TerminalIcon from '#assets/icons/terminal.svg?react';
 import {
   Button,
   CodeBlock,
+  Input,
   MenuDialog,
   MenuDialogBody,
   MenuDialogCloseButton,
@@ -20,6 +21,7 @@ import {
   MenuDialogTitle,
 } from '@insforge/ui';
 import type { ApifyConnection } from '#features/webscraper/services/webscraper.service';
+import { useApifyConfig, useUpdateApifyConfig } from '#features/webscraper/hooks/useWebscraper';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { APIFY_CONSOLE_URL, SCRAPE_PROMPT } from './shared';
 import { WebScraperDisconnectDialog } from './WebScraperDisconnectDialog';
@@ -43,6 +45,27 @@ export function WebScraperSettingsDialog({
   const [section, setSection] = useState<Section>('general');
   const [disconnecting, setDisconnecting] = useState(false);
   const { onConnectApify } = useDashboardHost();
+
+  const isSelfHosted = !onConnectApify;
+  const { data: apifyConfig } = useApifyConfig(isSelfHosted && open);
+  const { mutateAsync: saveToken, isPending: savingToken } = useUpdateApifyConfig();
+  const [replacing, setReplacing] = useState(false);
+  const [tokenDraft, setTokenDraft] = useState('');
+
+  const handleSaveToken = async () => {
+    const trimmed = tokenDraft.trim();
+    if (!trimmed) {
+      return;
+    }
+    try {
+      await saveToken(trimmed);
+      setTokenDraft('');
+      setReplacing(false);
+    } catch {
+      // Swallowed — the mutation's own state drives any display; nothing
+      // else to do here.
+    }
+  };
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -180,6 +203,58 @@ export function WebScraperSettingsDialog({
                         </FieldRow>
                       </>
                     )}
+
+                    {isSelfHosted ? (
+                      <>
+                        <div className="h-px w-full bg-[var(--alpha-8)]" />
+                        <div className="flex flex-col gap-2">
+                          <label
+                            htmlFor="apify-api-token"
+                            className="text-sm font-medium leading-6 text-foreground"
+                          >
+                            {t('webscraper.apifyTokenLabel', { defaultValue: 'Apify API token' })}
+                          </label>
+                          {replacing ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                id="apify-api-token"
+                                type="password"
+                                autoComplete="off"
+                                value={tokenDraft}
+                                onChange={(event) => setTokenDraft(event.target.value)}
+                                placeholder="apify_api_..."
+                                className="max-w-md"
+                              />
+                              <Button
+                                variant="primary"
+                                disabled={!tokenDraft.trim() || savingToken}
+                                onClick={() => void handleSaveToken()}
+                              >
+                                {t('webscraper.save', { defaultValue: 'Save' })}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                onClick={() => {
+                                  setTokenDraft('');
+                                  setReplacing(false);
+                                }}
+                              >
+                                {t('webscraper.cancel', { defaultValue: 'Cancel' })}
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono text-sm leading-6 text-muted-foreground">
+                                {apifyConfig?.token.maskedKey ?? '—'}
+                              </span>
+                              <Button variant="outline" onClick={() => setReplacing(true)}>
+                                {t('webscraper.replaceToken', { defaultValue: 'Replace token' })}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-center">

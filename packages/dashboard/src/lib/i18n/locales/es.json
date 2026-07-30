@@ -1844,7 +1844,9 @@
     "apifyTokenHint": "Crea un token en Apify Console, en Settings → Integrations. Se guarda cifrado en tu propio backend.",
     "apifyTokenFailed": "No se pudo guardar el token. Compruébalo y vuelve a intentarlo.",
     "openApifyConsole": "Abrir Apify Console",
-    "connecting": "Conectando…"
+    "connecting": "Conectando…",
+    "save": "Guardar",
+    "replaceToken": "Reemplazar token"
   },
   "loginPage": {
     "title": "Insforge Admin",
