@@ -12,12 +12,12 @@ import { APIFY_CONSOLE_URL } from './shared';
 // input + submit + inline-error behavior, so this lives in its own file
 // instead of being duplicated.
 //
-// The two call sites can be mounted at the same time (the settings dialog
-// overlays the connect panel rather than replacing it), so the input's id
-// is scoped per instance via `useId()` — matching the precedent in
-// `CreateBackupDialog.tsx`/`RenameBackupDialog.tsx` — instead of a
-// hardcoded id, which would collide and break both accessibility and
-// `getByLabelText`-style queries whenever both instances are on screen.
+// More than one of these three call sites can be mounted at the same time
+// (e.g. the settings dialog overlays the connect panel rather than replacing
+// it), so the input's id is scoped per instance via `useId()` — matching the
+// precedent in `CreateBackupDialog.tsx`/`RenameBackupDialog.tsx` — instead of
+// a hardcoded id, which would collide and break both accessibility and
+// `getByLabelText`-style queries whenever more than one instance is on screen.
 export function ApifyTokenForm() {
   const { t } = useTranslation('chrome');
   const tokenInputId = useId();

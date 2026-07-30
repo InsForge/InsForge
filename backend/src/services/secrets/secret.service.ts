@@ -325,7 +325,9 @@ export class SecretService {
    * ApifyConfigService dropping APIFY_API_TOKEN when the admin disconnects
    * Apify. Without this the disconnect would report success while leaving the
    * credential in the store. Never wire this to a generic, user-facing secrets
-   * route: reserved secrets are hidden from that surface on purpose.
+   * route: reserved secrets still show up in the Secrets list — `isReserved`
+   * does not hide them — but they are deliberately not editable or deletable
+   * there, so the owning service is the only thing allowed to remove one.
    */
   async deleteReservedSecretByKey(key: string, client?: PoolClient): Promise<boolean> {
     return this.runDeleteByKey(key, true, client);
