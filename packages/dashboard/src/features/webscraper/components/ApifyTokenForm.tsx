@@ -5,10 +5,12 @@ import { useUpdateApifyConfig } from '#features/webscraper/hooks/useWebscraper';
 import { APIFY_CONSOLE_URL } from './shared';
 
 // The self-hosted "paste your own Apify token" form. Shared by
-// `ApifyConnectPanel` (first-time setup from the onboarding checklist) and
+// `ApifyConnectPanel` (first-time setup from the onboarding checklist),
 // `WebScraperSettingsDialog` (the not-yet-connected state reached via the
-// settings dialog) — both need the same input + submit + inline-error
-// behavior, so this lives in its own file instead of being duplicated.
+// settings dialog) and `WebscraperLayout`'s revoked/degraded banner (where
+// replacing the token is the only remedy off-cloud) — all three need the same
+// input + submit + inline-error behavior, so this lives in its own file
+// instead of being duplicated.
 //
 // The two call sites can be mounted at the same time (the settings dialog
 // overlays the connect panel rather than replacing it), so the input's id
