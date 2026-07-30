@@ -5,7 +5,9 @@ import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { ApifyTokenForm } from './ApifyTokenForm';
 import { SCRAPE_PROMPT } from './shared';
 
-export function ApifyConnectPanel({ projectId }: { projectId: string }) {
+// `projectId` is undefined on self-hosted deployments (PROJECT_ID is empty by
+// design) and is only read by the cloud OAuth handoff below.
+export function ApifyConnectPanel({ projectId }: { projectId: string | undefined }) {
   const { t } = useTranslation('chrome');
   const { onConnectApify } = useDashboardHost();
 
@@ -26,7 +28,13 @@ export function ApifyConnectPanel({ projectId }: { projectId: string }) {
         {onConnectApify ? (
           <Button
             variant="primary"
-            onClick={() => onConnectApify(projectId)}
+            onClick={() => {
+              // Always set on this branch: WebscraperLayout returns early for a
+              // cloud project that has no project id.
+              if (projectId) {
+                onConnectApify(projectId);
+              }
+            }}
             className="self-start"
           >
             {t('webscraper.connectApify', { defaultValue: 'Connect Apify' })}

@@ -33,7 +33,9 @@ interface WebScraperSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   connection: ApifyConnection | null;
-  projectId: string;
+  // Undefined on self-hosted deployments (PROJECT_ID is empty by design); only
+  // the cloud OAuth handoff below reads it.
+  projectId: string | undefined;
 }
 
 export function WebScraperSettingsDialog({
@@ -276,7 +278,13 @@ export function WebScraperSettingsDialog({
                       <Button
                         variant="primary"
                         disabled={!onConnectApify}
-                        onClick={() => onConnectApify?.(projectId)}
+                        onClick={() => {
+                          // Always set on this branch: WebscraperLayout returns
+                          // early for a cloud project that has no project id.
+                          if (projectId) {
+                            onConnectApify?.(projectId);
+                          }
+                        }}
                       >
                         {t('webscraper.connectApify', { defaultValue: 'Connect Apify' })}
                       </Button>
