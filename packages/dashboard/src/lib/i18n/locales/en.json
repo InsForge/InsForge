@@ -970,6 +970,8 @@
     "providerKeyHelp": "Use lowercase letters, numbers, hyphens, and underscores. Add this callback URL to your provider:",
     "discoveryEndpoint": "Discovery endpoint",
     "clientId": "Client ID",
+    "nativeClientIds": "Native App IDs",
+    "nativeClientIdsDescription": "Comma-separated bundle IDs trusted for native Apple ID tokens.",
     "clientSecret": "Client Secret",
     "enterClientSecret": "Enter client secret",
     "createProvider": "Create provider",

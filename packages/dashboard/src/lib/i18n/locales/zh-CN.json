@@ -950,6 +950,8 @@
     "providerKeyHelp": "只能使用小写字母、数字、连字符和下划线。请将此回调 URL 添加到您的提供商：",
     "discoveryEndpoint": "发现端点",
     "clientId": "客户端 ID",
+    "nativeClientIds": "原生应用 ID",
+    "nativeClientIdsDescription": "以逗号分隔、受信任用于原生 Apple ID 令牌的软件包 ID。",
     "clientSecret": "客户端密钥",
     "enterClientSecret": "输入客户端密钥",
     "createProvider": "创建提供商",

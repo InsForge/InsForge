@@ -722,6 +722,111 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/reset-password" \
 
 ---
 
+## Native ID Token Sign-In
+
+Exchange an ID token from Google or Apple's native AuthenticationServices framework for an
+InsForge session:
+
+```
+POST /api/auth/id-token?client_type=mobile
+```
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `client_type` | `web` \| `mobile` \| `desktop` \| `server` | No | Defaults to `web`. Controls whether the refresh token is set as a cookie or returned in the response body. |
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `provider` | `google` \| `apple` | Yes | Native identity provider that issued the token. |
+| `token` | string | Yes | Raw provider ID token. For Apple, use `identityToken` from `ASAuthorizationAppleIDCredential`. |
+| `nonce` | string | Apple only | Original raw nonce, 1–255 characters. It is hashed without normalization and must match Apple's signed `nonce` claim. |
+| `name` | string | No | Apple first-authorization display name, 1–100 characters. Apple may only provide this value once. |
+
+For native Sign in with Apple, generate a high-entropy raw nonce and attach its lowercase
+SHA-256 hex digest to the `ASAuthorizationAppleIDRequest`. Send the original raw nonce with the
+returned identity token. InsForge hashes it before comparing it with Apple's signed `nonce`
+claim. If Apple returns a name on first authorization, send the display name in the same request;
+later authorizations may omit it.
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/id-token?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "apple",
+    "token": "APPLE_IDENTITY_TOKEN",
+    "nonce": "ORIGINAL_RAW_NONCE",
+    "name": "Optional First Sign-In Name"
+  }'
+```
+
+InsForge verifies Apple's signature, issuer, expiry, subject, nonce, and token audience. The
+audience is selected exclusively from the project's Apple OAuth configuration; the sign-in
+request cannot override it. Configure the native App ID (normally the iOS bundle identifier) in
+`nativeClientIds` while retaining `clientId` for the browser/service OAuth client when needed:
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/auth/oauth/apple/config" \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nativeClientIds": ["com.example.ios-app"]
+  }'
+```
+
+Apple private-relay addresses are supported. InsForge finds returning accounts by Apple's stable
+subject before inspecting profile claims, so a returning user can sign in when optional profile
+data is absent. Creating or email-linking a new account requires a verified email from the Apple
+identity token; InsForge never creates a fabricated placeholder address.
+
+Google keeps its existing request shape:
+
+```json
+{
+  "provider": "google",
+  "token": "GOOGLE_ID_TOKEN"
+}
+```
+
+### Response
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user` | object | Authenticated InsForge user, including `id`, `email`, verification state, providers, profile, metadata, and timestamps. |
+| `accessToken` | string | InsForge access token for authenticated API requests. |
+| `refreshToken` | string | Returned for `mobile`, `desktop`, and `server` clients. Omitted for web clients. |
+| `csrfToken` | string | Returned for web clients alongside the HTTP-only refresh-token cookie. |
+
+```json
+{
+  "user": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["apple"]
+  },
+  "accessToken": "INSFORGE_ACCESS_TOKEN",
+  "refreshToken": "INSFORGE_REFRESH_TOKEN"
+}
+```
+
+### Errors
+
+| Status | Meaning |
+|--------|---------|
+| `400` | Invalid request shape, unsupported provider, missing nonce, or missing verified email for a new Apple identity. |
+| `401` | Provider token is invalid, expired, has an untrusted audience, or fails Apple nonce verification. |
+| `429` | Too many ID-token sign-in attempts from the requesting IP. |
+
+For `client_type=mobile`, `desktop`, or `server`, the response includes `refreshToken` in the
+JSON body. Web clients receive the refresh token in an HTTP-only cookie and a `csrfToken` in the
+response body.
+
+---
+
 ## OAuth Authentication
 
 OAuth authentication now uses the PKCE (Proof Key for Code Exchange) flow for enhanced security. Instead of returning tokens directly in the redirect URL, an authorization code is returned which must be exchanged for tokens.

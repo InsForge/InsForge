@@ -974,6 +974,8 @@
     "providerKeyHelp": "Usa letras minúsculas, números, guiones y guiones bajos. Agrega esta URL de callback a tu proveedor:",
     "discoveryEndpoint": "Endpoint de descubrimiento",
     "clientId": "ID de cliente",
+    "nativeClientIds": "IDs de aplicaciones nativas",
+    "nativeClientIdsDescription": "IDs de paquete separados por comas y autorizados para tokens de ID nativos de Apple.",
     "clientSecret": "Secreto de cliente",
     "enterClientSecret": "Introduce el secreto de cliente",
     "createProvider": "Crear proveedor",
