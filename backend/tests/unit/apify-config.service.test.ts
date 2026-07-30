@@ -120,19 +120,19 @@ describe('ApifyConfigService', () => {
     });
   });
 
-  it('falls back to APIFY_API_TOKEN from the environment when nothing is stored', async () => {
+  // There is deliberately no environment-variable fallback: the encrypted
+  // secret store is the only source of truth for self-hosted deployments. An
+  // env fallback would let Disconnect delete the secret row while the env var
+  // kept reviving the connection on the next read, reporting "disconnected"
+  // to an admin who was still connected.
+  it('ignores APIFY_API_TOKEN in the environment when nothing is stored', async () => {
     vi.stubEnv('APIFY_API_TOKEN', 'apify_api_fromenv1234567');
     const { service } = makeService();
 
-    await expect(service.getToken()).resolves.toBe('apify_api_fromenv1234567');
-  });
-
-  it('prefers the stored token over the environment variable', async () => {
-    vi.stubEnv('APIFY_API_TOKEN', 'apify_api_fromenv1234567');
-    const { service, store } = makeService();
-    store.getSecretByKey.mockResolvedValue('apify_api_stored12345678');
-
-    await expect(service.getToken()).resolves.toBe('apify_api_stored12345678');
+    await expect(service.getToken()).resolves.toBeNull();
+    await expect(service.getConfig()).resolves.toEqual({
+      token: { configured: false, maskedKey: null },
+    });
   });
 
   it('creates a reserved secret on first write', async () => {

@@ -29,26 +29,30 @@ export class ApifyConfigService {
     return ApifyConfigService.instance;
   }
 
-  // Stored secret wins; the env var is a bootstrap for docker-compose deployments
-  // that ship a token without any UI interaction. Secret-store failures propagate
-  // deliberately so an outage cannot silently revive the env token.
+  // The encrypted secret store is the only source of truth for self-hosted
+  // deployments — there is no environment-variable fallback. Secret-store
+  // failures propagate deliberately so an outage is surfaced as an error
+  // instead of being silently reported as "not configured".
   async getToken(): Promise<string | null> {
-    const stored = await this.getStoredToken();
-    return stored ?? this.normalize(process.env.APIFY_API_TOKEN);
+    return this.getStoredToken();
   }
 
-  // createdAt is the connection's age. For an env-provided token there is no secret
-  // row, so the connection has existed since the process started.
+  // createdAt is the connection's age, taken from the secret row. getToken()
+  // only ever returns a value read from the secret store, so a non-null token
+  // implies a matching row — except for a narrow cross-instance race: this
+  // instance's 60s cache can still hold a token that another instance just
+  // deleted. Treat that as "no record" rather than fabricating a createdAt;
+  // the cache clears within the TTL and the next read is consistent again.
   async getTokenRecord(): Promise<ApifyTokenRecord | null> {
     const token = await this.getToken();
     if (!token) {
       return null;
     }
     const secret = await this.findSecret();
-    return {
-      token,
-      createdAt: secret?.createdAt ?? new Date(Date.now() - process.uptime() * 1000).toISOString(),
-    };
+    if (!secret) {
+      return null;
+    }
+    return { token, createdAt: secret.createdAt };
   }
 
   async getConfig(): Promise<ApifyConfig> {
@@ -87,10 +91,13 @@ export class ApifyConfigService {
     return this.getConfig();
   }
 
-  // The token is stored with isReserved: true, which hides it from the Secrets
-  // UI — and also puts it out of reach of the default deleteSecretByKey(), whose
-  // statement filters on `is_reserved = false`. Disconnect must use the explicit
-  // reserved-capable path, or it removes nothing and still answers 204.
+  // The token is stored with isReserved: true, which does not hide it from the
+  // Secrets UI (listSecrets() returns reserved rows like any other) — it makes
+  // the row un-editable and un-deletable through the generic secrets routes
+  // (403 "Cannot update/delete reserved secret"). It also puts it out of reach
+  // of the default deleteSecretByKey(), whose statement filters on
+  // `is_reserved = false`. Disconnect must use the explicit reserved-capable
+  // path, or it removes nothing and still answers 204.
   async deleteToken(): Promise<void> {
     try {
       const removed = await this.secretService.deleteReservedSecretByKey(APIFY_API_TOKEN_SECRET);
