@@ -130,6 +130,8 @@ services:
       # Stripe Payments Configuration
       - STRIPE_TEST_SECRET_KEY=${STRIPE_TEST_SECRET_KEY:-}
       - STRIPE_LIVE_SECRET_KEY=${STRIPE_LIVE_SECRET_KEY:-}
+      # Web Scraper (Apify) — optional bootstrap token for self-hosting
+      - APIFY_API_TOKEN=${APIFY_API_TOKEN:-}
       # OAuth Configuration
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
