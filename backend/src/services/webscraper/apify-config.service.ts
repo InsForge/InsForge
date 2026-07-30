@@ -47,8 +47,7 @@ export class ApifyConfigService {
     const secret = await this.findSecret();
     return {
       token,
-      createdAt:
-        secret?.createdAt ?? new Date(Date.now() - process.uptime() * 1000).toISOString(),
+      createdAt: secret?.createdAt ?? new Date(Date.now() - process.uptime() * 1000).toISOString(),
     };
   }
 
@@ -112,9 +111,7 @@ export class ApifyConfigService {
     }
     const epoch = this.cacheEpoch;
     try {
-      const value = this.normalize(
-        await this.secretService.getSecretByKey(APIFY_API_TOKEN_SECRET)
-      );
+      const value = this.normalize(await this.secretService.getSecretByKey(APIFY_API_TOKEN_SECRET));
       // A write invalidated the cache while this read was in flight, so the value is
       // already stale. Return it to this caller but do not cache it over the newer one.
       if (epoch === this.cacheEpoch) {

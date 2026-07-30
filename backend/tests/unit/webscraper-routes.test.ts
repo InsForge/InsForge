@@ -85,3 +85,34 @@ describe('webscraper config routes', () => {
     expect(setTokenMock).not.toHaveBeenCalled();
   });
 });
+
+describe('webscraper route wiring', () => {
+  it('guards the Apify config routes with verifyAdmin', async () => {
+    const { webscraperRouter } = await import('../../src/api/routes/webscraper/index.routes');
+    const routeLayers = (
+      webscraperRouter as unknown as {
+        stack: Array<{
+          route?: {
+            path: string;
+            methods: Record<string, boolean>;
+            stack: Array<{ handle: { name: string } }>;
+          };
+        }>;
+      }
+    ).stack.filter((layer) => layer.route);
+    // GET and PUT on the same path register as two distinct layers, each with its
+    // own handler stack, so both must be checked individually.
+    const configRoutes = routeLayers.filter((layer) => layer.route?.path === '/apify/config');
+    const getConfigRoute = configRoutes.find((layer) => layer.route?.methods.get);
+    const putConfigRoute = configRoutes.find((layer) => layer.route?.methods.put);
+
+    expect(getConfigRoute).toBeDefined();
+    expect(putConfigRoute).toBeDefined();
+    expect(getConfigRoute?.route?.stack.map((handler) => handler.handle.name)).toContain(
+      'verifyAdmin'
+    );
+    expect(putConfigRoute?.route?.stack.map((handler) => handler.handle.name)).toContain(
+      'verifyAdmin'
+    );
+  });
+});
