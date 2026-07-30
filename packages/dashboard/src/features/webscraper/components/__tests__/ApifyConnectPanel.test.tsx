@@ -67,4 +67,17 @@ describe('ApifyConnectPanel', () => {
     expect(onConnectApify).toHaveBeenCalledWith('p1');
     expect(screen.queryByLabelText(/apify api token/i)).toBeNull();
   });
+
+  it('shows an inline error and does not throw when the token is rejected', async () => {
+    updateApifyConfig.mockRejectedValueOnce(new Error('Apify rejected this API token.'));
+    renderPanel();
+
+    await userEvent.type(
+      await screen.findByLabelText(/apify api token/i),
+      'apify_api_tok1234567890'
+    );
+    await userEvent.click(screen.getByRole('button', { name: /connect apify/i }));
+
+    expect(await screen.findByText('Apify rejected this API token.')).toBeInTheDocument();
+  });
 });

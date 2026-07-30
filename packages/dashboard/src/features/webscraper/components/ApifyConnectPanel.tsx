@@ -89,8 +89,13 @@ function ApifyTokenForm() {
     if (!trimmed) {
       return;
     }
-    await mutateAsync(trimmed);
-    setToken('');
+    try {
+      await mutateAsync(trimmed);
+      setToken('');
+    } catch {
+      // Swallowed — the mutation's own `error` state already drives the
+      // rendered message below; nothing else to do here.
+    }
   };
 
   return (

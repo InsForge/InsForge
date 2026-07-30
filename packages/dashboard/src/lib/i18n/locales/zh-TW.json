@@ -1806,7 +1806,7 @@
     "recordRuns": "筆執行記錄",
     "noRunsYet": "尚無執行記錄。",
     "apifyTokenLabel": "Apify API token",
-    "apifyTokenHint": "在 Apify Console 的 Settings → Integrations 中建立 token。它會加密儲存在你自己的後端。",
+    "apifyTokenHint": "在 Apify Console 的 Settings → Integrations 中建立 token。它會加密儲存在您自己的後端。",
     "apifyTokenFailed": "無法儲存 token，請檢查後重試。",
     "openApifyConsole": "開啟 Apify Console",
     "connecting": "連接中…"
