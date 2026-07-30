@@ -69,6 +69,8 @@ const NEW_USER = {
   accessToken: 'test-access-token',
 };
 
+let callRouteCounter = 1;
+
 function callRoute(
   router: Router,
   overrides: { headers?: Record<string, string>; body?: Record<string, unknown> }
@@ -82,8 +84,14 @@ function callRoute(
       headers: overrides.headers ?? {},
       query: {},
       body: overrides.body ?? {},
+      // registrationRateLimiter keys on the client IP, so every call gets its OWN ip.
+      // Sharing one would make these tests share a rate-limit bucket: harmless today at
+      // 20/15min, but the suite would start failing on whichever test happened to be
+      // ~21st, with a 429 that has nothing to do with what it asserts.
+      ip: `10.0.0.${callRouteCounter++ % 255}`,
     };
 
+    const headers = new Map<string, unknown>();
     const res: Partial<Response> = {
       status: vi.fn((c: number) => {
         statusCode = c;
@@ -91,6 +99,14 @@ function callRoute(
       }),
       json: vi.fn((d: unknown) => resolve({ statusCode, body: d })),
       cookie: vi.fn(() => res),
+      // `standardHeaders: true` on the registration limiter writes RateLimit-* headers.
+      // These are no-ops here, but their absence made the limiter throw inside a promise
+      // that never settled, so every test on this route timed out rather than failing.
+      setHeader: vi.fn((name: string, value: unknown) => {
+        headers.set(name, value);
+        return res as Response;
+      }),
+      getHeader: vi.fn((name: string) => headers.get(name)),
     };
 
     router(

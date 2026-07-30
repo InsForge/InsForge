@@ -221,6 +221,50 @@ export const sendEmailOTPLimiter = [
 export const verifyOTPLimiter = [verifyOTPRateLimiter];
 
 /**
+ * Per-IP rate limiter for public self-serve registration (POST /api/auth/users).
+ *
+ * Every other public write path here is already bounded (OTP send/verify, functions,
+ * deployments, compute, storage); registration is brought in line with them.
+ *
+ * `skipSuccessfulRequests` is deliberately FALSE, unlike the OTP-verify limiter above.
+ * There, a success means a legitimate user finished a flow and shouldn't spend budget.
+ * On registration a success is what consumes the resource being bounded, since it writes
+ * a user row, so successes are counted too.
+ *
+ * The ceiling is per IP and deliberately generous — end users of a busy app can share an
+ * egress IP (office NAT, carrier CGNAT), and throttling a customer's real signups is the
+ * more costly failure. Override with REGISTRATION_RATE_LIMIT_MAX where a deployment
+ * needs a different shape.
+ */
+const REGISTRATION_LIMIT_MAX = parseInt(process.env.REGISTRATION_RATE_LIMIT_MAX ?? '', 10) || 20;
+
+export const registrationRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: REGISTRATION_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many registration attempts from this IP. Please try again in 15 minutes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+  // Count successes AND failures — see above.
+  skipSuccessfulRequests: false,
+  skipFailedRequests: false,
+  // Admin-initiated creation is not self-serve signup: the dashboard adding a user and
+  // server-side API-key calls (bulk import, seeding) must not be throttled. Mirrors the
+  // route's own `adminCreatingUser` check, so the two cannot drift apart silently.
+  skip: (req: Request) => {
+    const authReq = req as Request & { hasApiKey?: boolean; user?: { role?: string } };
+    return authReq.hasApiKey === true || authReq.user?.role === 'project_admin';
+  },
+});
+
+/**
  * Per-IP rate limiters for "write" endpoints that ultimately drive an external
  * provider call.
  *
