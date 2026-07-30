@@ -1804,7 +1804,12 @@
     "reconnectToLoadRuns": "重新连接以加载运行记录。",
     "loadRunsFailed": "加载运行记录失败",
     "recordRuns": "条运行记录",
-    "noRunsYet": "暂无运行记录。"
+    "noRunsYet": "暂无运行记录。",
+    "apifyTokenLabel": "Apify API token",
+    "apifyTokenHint": "在 Apify Console 的 Settings → Integrations 中创建 token。它会加密保存在你自己的后端。",
+    "apifyTokenFailed": "无法保存 token，请检查后重试。",
+    "openApifyConsole": "打开 Apify Console",
+    "connecting": "连接中…"
   },
   "loginPage": {
     "title": "Insforge 管理后台",

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { webscraperService } from '#features/webscraper/services/webscraper.service';
 
 export const webscraperQueryKeys = {
@@ -8,6 +8,7 @@ export const webscraperQueryKeys = {
   apifyDatasets: ['webscraper', 'apify', 'datasets'] as const,
   apifyRuns: ['webscraper', 'apify', 'runs'] as const,
   apifyData: ['webscraper', 'apify', 'data'] as const,
+  apifyConfig: ['webscraper', 'apify', 'config'] as const,
 };
 
 export function useApifyConnection() {
@@ -51,5 +52,26 @@ export function useApifyLatestData(enabled: boolean) {
     queryFn: () => webscraperService.getApifyLatestData(5),
     enabled,
     staleTime: 60_000,
+  });
+}
+
+export function useApifyConfig(enabled: boolean) {
+  return useQuery({
+    queryKey: webscraperQueryKeys.apifyConfig,
+    queryFn: () => webscraperService.getApifyConfig(),
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useUpdateApifyConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (apiToken: string) => webscraperService.updateApifyConfig(apiToken),
+    onSuccess: () => {
+      // The connection is derived from the token, so both have to refetch.
+      void queryClient.invalidateQueries({ queryKey: webscraperQueryKeys.apifyConfig });
+      void queryClient.invalidateQueries({ queryKey: webscraperQueryKeys.apifyConnection });
+    },
   });
 }

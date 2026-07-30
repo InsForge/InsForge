@@ -1839,7 +1839,12 @@
     "reconnectToLoadRuns": "Reconéctate para cargar las ejecuciones.",
     "loadRunsFailed": "No se pudieron cargar las ejecuciones",
     "recordRuns": "ejecuciones",
-    "noRunsYet": "Aún no hay ejecuciones."
+    "noRunsYet": "Aún no hay ejecuciones.",
+    "apifyTokenLabel": "Token de API de Apify",
+    "apifyTokenHint": "Crea un token en Apify Console, en Settings → Integrations. Se guarda cifrado en tu propio backend.",
+    "apifyTokenFailed": "No se pudo guardar el token. Compruébalo y vuelve a intentarlo.",
+    "openApifyConsole": "Abrir Apify Console",
+    "connecting": "Conectando…"
   },
   "loginPage": {
     "title": "Insforge Admin",

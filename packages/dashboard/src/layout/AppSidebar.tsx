@@ -39,6 +39,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const isDTestCloud = isDTest && host.mode === 'cloud-hosting';
 
   // Cloud-only additions: Deployments inserted after AI, Analytics appended at end.
+  // Web Scraper ships in both modes — self-hosting connects with its own Apify token.
   const mainMenuItems = useMemo(() => {
     const items = dashboardStaticMenuItems.map((item) => ({ ...item }));
 
@@ -53,9 +54,9 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
       }
 
       items.push({ ...dashboardAnalyticsMenuItem });
-
-      items.push({ ...dashboardWebscraperMenuItem });
     }
+
+    items.push({ ...dashboardWebscraperMenuItem });
 
     return items;
   }, [isCloud]);
