@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Input } from '@insforge/ui';
 import { useUpdateApifyConfig } from '#features/webscraper/hooks/useWebscraper';
@@ -9,8 +9,16 @@ import { APIFY_CONSOLE_URL } from './shared';
 // `WebScraperSettingsDialog` (the not-yet-connected state reached via the
 // settings dialog) — both need the same input + submit + inline-error
 // behavior, so this lives in its own file instead of being duplicated.
+//
+// The two call sites can be mounted at the same time (the settings dialog
+// overlays the connect panel rather than replacing it), so the input's id
+// is scoped per instance via `useId()` — matching the precedent in
+// `CreateBackupDialog.tsx`/`RenameBackupDialog.tsx` — instead of a
+// hardcoded id, which would collide and break both accessibility and
+// `getByLabelText`-style queries whenever both instances are on screen.
 export function ApifyTokenForm() {
   const { t } = useTranslation('chrome');
+  const tokenInputId = useId();
   const [token, setToken] = useState('');
   const { mutateAsync, isPending, error } = useUpdateApifyConfig();
 
@@ -31,12 +39,12 @@ export function ApifyTokenForm() {
 
   return (
     <form onSubmit={(event) => void handleSubmit(event)} className="flex w-full flex-col gap-2">
-      <label htmlFor="apify-api-token" className="text-sm leading-6 text-muted-foreground">
+      <label htmlFor={tokenInputId} className="text-sm leading-6 text-muted-foreground">
         {t('webscraper.apifyTokenLabel', { defaultValue: 'Apify API token' })}
       </label>
       <div className="flex items-start gap-2">
         <Input
-          id="apify-api-token"
+          id={tokenInputId}
           type="password"
           autoComplete="off"
           value={token}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Settings } from 'lucide-react';
 import TerminalIcon from '#assets/icons/terminal.svg?react';
@@ -52,6 +52,10 @@ export function WebScraperSettingsDialog({
   const { mutateAsync: saveToken, isPending: savingToken } = useUpdateApifyConfig();
   const [replacing, setReplacing] = useState(false);
   const [tokenDraft, setTokenDraft] = useState('');
+  // Scoped like `ApifyTokenForm`'s own input id — this dialog and
+  // `ApifyConnectPanel` can both be on screen at once (see WebscraperLayout),
+  // so a hardcoded id here would risk the same duplicate-id class of bug.
+  const rotateTokenInputId = useId();
 
   const handleSaveToken = async () => {
     const trimmed = tokenDraft.trim();
@@ -210,7 +214,7 @@ export function WebScraperSettingsDialog({
                         <div className="h-px w-full bg-[var(--alpha-8)]" />
                         <div className="flex flex-col gap-2">
                           <label
-                            htmlFor="apify-api-token"
+                            htmlFor={rotateTokenInputId}
                             className="text-sm font-medium leading-6 text-foreground"
                           >
                             {t('webscraper.apifyTokenLabel', { defaultValue: 'Apify API token' })}
@@ -218,7 +222,7 @@ export function WebScraperSettingsDialog({
                           {replacing ? (
                             <div className="flex items-center gap-2">
                               <Input
-                                id="apify-api-token"
+                                id={rotateTokenInputId}
                                 type="password"
                                 autoComplete="off"
                                 value={tokenDraft}

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '@insforge/ui';
 import { WebScraperSettingsDialog } from '#features/webscraper/components/WebScraperSettingsDialog';
+import { ApifyConnectPanel } from '#features/webscraper/components/ApifyConnectPanel';
 
 vi.mock('#assets/icons/terminal.svg?react', () => ({
   default: () => <svg aria-hidden="true" />,
@@ -132,5 +133,31 @@ describe('WebScraperSettingsDialog', () => {
     const connectButton = await screen.findByRole('button', { name: /connect apify/i });
     expect(connectButton).not.toBeDisabled();
     expect(screen.queryByLabelText(/apify api token/i)).toBeNull();
+  });
+
+  it('gives each mounted ApifyTokenForm a distinct input id when both surfaces are on screen at once', async () => {
+    // Reachability: WebscraperLayout renders ApifyConnectPanel in the main
+    // pane whenever `connection` is null, and WebscraperSidebar's settings
+    // gear (rendered unconditionally alongside that pane) opens
+    // WebScraperSettingsDialog as an overlay rather than replacing the page
+    // underneath it. A disconnected self-hosted admin can therefore have
+    // both ApifyTokenForm instances mounted simultaneously. Each must get
+    // its own id or the two <label>/<input> pairs collide.
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <ToastProvider>
+          <ApifyConnectPanel projectId="p1" />
+          <WebScraperSettingsDialog open onOpenChange={() => {}} connection={null} projectId="p1" />
+        </ToastProvider>
+      </QueryClientProvider>
+    );
+
+    const tokenInputs = await screen.findAllByLabelText(/apify api token/i);
+    expect(tokenInputs).toHaveLength(2);
+    const ids = tokenInputs.map((input) => input.id);
+    expect(new Set(ids).size).toBe(2);
+    expect(ids[0]).not.toBe('');
+    expect(ids[1]).not.toBe('');
   });
 });
