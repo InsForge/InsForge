@@ -7,7 +7,7 @@ const TOKEN_CACHE_TTL_MS = 60 * 1000;
 
 type SecretStore = Pick<
   SecretService,
-  'createSecret' | 'getSecretByKey' | 'listSecrets' | 'updateSecret' | 'deleteSecretByKey'
+  'createSecret' | 'getSecretByKey' | 'listSecrets' | 'updateSecret' | 'deleteReservedSecretByKey'
 >;
 
 export interface ApifyTokenRecord {
@@ -87,9 +87,19 @@ export class ApifyConfigService {
     return this.getConfig();
   }
 
+  // The token is stored with isReserved: true, which hides it from the Secrets
+  // UI — and also puts it out of reach of the default deleteSecretByKey(), whose
+  // statement filters on `is_reserved = false`. Disconnect must use the explicit
+  // reserved-capable path, or it removes nothing and still answers 204.
   async deleteToken(): Promise<void> {
     try {
-      await this.secretService.deleteSecretByKey(APIFY_API_TOKEN_SECRET);
+      const removed = await this.secretService.deleteReservedSecretByKey(APIFY_API_TOKEN_SECRET);
+      // Zero rows deleted with nothing left behind just means there was nothing
+      // to delete — disconnect stays idempotent. Zero rows with the secret still
+      // present is a real failure and must not be reported as a disconnect.
+      if (!removed && (await this.findSecret())) {
+        throw new Error(`Failed to delete ${APIFY_API_TOKEN_SECRET}`);
+      }
     } finally {
       this.invalidate();
     }

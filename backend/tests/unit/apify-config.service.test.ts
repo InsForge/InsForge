@@ -9,11 +9,93 @@ function createSecretStore() {
     getSecretByKey: vi.fn().mockResolvedValue(null),
     listSecrets: vi.fn().mockResolvedValue([]),
     updateSecret: vi.fn(),
-    deleteSecretByKey: vi.fn().mockResolvedValue(true),
+    deleteReservedSecretByKey: vi.fn().mockResolvedValue(true),
   };
 }
 
 function makeService(store = createSecretStore()) {
+  return { service: new ApifyConfigService(store as unknown as ApifySecretStore), store };
+}
+
+interface FakeSecretRow {
+  id: string;
+  value: string;
+  isReserved: boolean;
+  createdAt: string;
+}
+
+/**
+ * A behavioural stand-in for SecretService rather than a per-call mock.
+ *
+ * It reproduces the one rule that matters here, taken from the real SQL in
+ * secret.service.ts and pinned separately in secret-delete-reserved.test.ts:
+ *
+ *   deleteSecretByKey         -> WHERE key = $1 AND is_reserved = false
+ *   deleteReservedSecretByKey -> WHERE key = $1
+ *
+ * so a reserved row is silently untouched by the first and removed by the
+ * second. The suite previously stubbed `deleteSecretByKey` to resolve `true`,
+ * which asserted the answer the service was supposed to be checked against —
+ * that is exactly why Disconnect shipped reporting success while leaving the
+ * Apify token in the store.
+ */
+function createBehaviouralSecretStore() {
+  const rows = new Map<string, FakeSecretRow>();
+  let nextId = 1;
+
+  return {
+    rows,
+    createSecret: vi.fn(
+      async (input: { key: string; value: string; isReserved?: boolean; expiresAt?: Date }) => {
+        const id = `sec-${nextId++}`;
+        rows.set(input.key, {
+          id,
+          value: input.value,
+          isReserved: input.isReserved === true,
+          createdAt: '2026-03-04T05:06:07.000Z',
+        });
+        return { id };
+      }
+    ),
+    getSecretByKey: vi.fn(async (key: string) => rows.get(key)?.value ?? null),
+    listSecrets: vi.fn(async () =>
+      [...rows.entries()].map(([key, row]) => ({
+        id: row.id,
+        key,
+        isActive: true,
+        isReserved: row.isReserved,
+        createdAt: row.createdAt,
+      }))
+    ),
+    updateSecret: vi.fn(
+      async (id: string, input: { value?: string; isReserved?: boolean; isActive?: boolean }) => {
+        const entry = [...rows.values()].find((row) => row.id === id);
+        if (!entry) {
+          return false;
+        }
+        if (input.value !== undefined) {
+          entry.value = input.value;
+        }
+        if (input.isReserved !== undefined) {
+          entry.isReserved = input.isReserved;
+        }
+        return true;
+      }
+    ),
+    deleteSecretByKey: vi.fn(async (key: string) => {
+      const row = rows.get(key);
+      if (!row || row.isReserved) {
+        return false;
+      }
+      rows.delete(key);
+      return true;
+    }),
+    deleteReservedSecretByKey: vi.fn(async (key: string) => rows.delete(key)),
+  };
+}
+
+function makeBehaviouralService() {
+  const store = createBehaviouralSecretStore();
   return { service: new ApifyConfigService(store as unknown as ApifySecretStore), store };
 }
 
@@ -106,24 +188,61 @@ describe('ApifyConfigService', () => {
     });
   });
 
-  it('deletes the secret and reports not configured afterwards', async () => {
-    const { service, store } = makeService();
-    store.getSecretByKey.mockResolvedValue('apify_api_stored12345678');
-    await service.getToken();
-
-    await service.deleteToken();
-    store.getSecretByKey.mockResolvedValue(null);
-
-    expect(store.deleteSecretByKey).toHaveBeenCalledWith('APIFY_API_TOKEN');
-    await expect(service.getConfig()).resolves.toEqual({
-      token: { configured: false, maskedKey: null },
-    });
-  });
-
   it('propagates secret-store failures instead of silently falling back', async () => {
     const { service, store } = makeService();
     store.getSecretByKey.mockRejectedValue(new Error('decryption failed'));
 
     await expect(service.getToken()).rejects.toThrow('decryption failed');
+  });
+});
+
+describe('ApifyConfigService.deleteToken against reserved-secret semantics', () => {
+  beforeEach(() => vi.unstubAllEnvs());
+  afterEach(() => vi.unstubAllEnvs());
+
+  // Regression: setToken() stores with isReserved: true, and the default
+  // deleteSecretByKey() filters those rows out. Disconnect matched zero rows,
+  // discarded the `false`, answered 204 — and the admin kept a live Apify
+  // credential in InsForge they believed they had revoked.
+  it('really removes the reserved token it stored', async () => {
+    const { service, store } = makeBehaviouralService();
+    await service.setToken('apify_api_stored12345678');
+    await expect(service.getConfig()).resolves.toEqual({
+      token: { configured: true, maskedKey: 'apify_ap••••••••5678' },
+    });
+    expect(store.rows.get('APIFY_API_TOKEN')?.isReserved).toBe(true);
+
+    await service.deleteToken();
+
+    expect(store.rows.has('APIFY_API_TOKEN')).toBe(false);
+    await expect(service.getConfig()).resolves.toEqual({
+      token: { configured: false, maskedKey: null },
+    });
+  });
+
+  it('goes through the reserved-capable delete, never the default one', async () => {
+    const { service, store } = makeBehaviouralService();
+    await service.setToken('apify_api_stored12345678');
+
+    await service.deleteToken();
+
+    expect(store.deleteReservedSecretByKey).toHaveBeenCalledWith('APIFY_API_TOKEN');
+    expect(store.deleteSecretByKey).not.toHaveBeenCalled();
+  });
+
+  it('raises rather than swallowing a delete that leaves the secret behind', async () => {
+    const { service, store } = makeBehaviouralService();
+    await service.setToken('apify_api_stored12345678');
+    store.deleteReservedSecretByKey.mockResolvedValueOnce(false);
+
+    await expect(service.deleteToken()).rejects.toThrow('APIFY_API_TOKEN');
+    expect(store.rows.has('APIFY_API_TOKEN')).toBe(true);
+  });
+
+  it('stays idempotent when there is nothing stored to delete', async () => {
+    const { service, store } = makeBehaviouralService();
+
+    await expect(service.deleteToken()).resolves.toBeUndefined();
+    expect(store.deleteReservedSecretByKey).toHaveBeenCalledWith('APIFY_API_TOKEN');
   });
 });
