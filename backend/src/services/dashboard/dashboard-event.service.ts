@@ -3,6 +3,7 @@ import type {
   DashboardEvent,
   DashboardMcpConnectedEvent,
 } from '@insforge/shared-schemas';
+import logger from '@/utils/logger.js';
 
 type DashboardEventListener = (event: DashboardEvent) => void;
 
@@ -34,7 +35,13 @@ export class DashboardEventService {
 
   private publish(event: DashboardEvent): void {
     for (const listener of this.listeners) {
-      listener(event);
+      // A failing subscriber must not break delivery to the others or
+      // propagate into the publishing request.
+      try {
+        listener(event);
+      } catch (error) {
+        logger.warn('Dashboard event listener failed', { error, eventType: event.type });
+      }
     }
   }
 }

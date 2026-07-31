@@ -15,6 +15,13 @@ describe('getDashboardInvalidationKeys', () => {
     ]);
   });
 
+  it('invalidates both the deployment metadata and list queries', () => {
+    expect(getDashboardInvalidationKeys({ type: 'data-update', resource: 'deployments' })).toEqual([
+      ['deployment-metadata'],
+      ['deployments'],
+    ]);
+  });
+
   it('invalidates compute services for compute events', () => {
     expect(
       getDashboardInvalidationKeys({ type: 'data-update', resource: 'compute_services' })

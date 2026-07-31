@@ -10,7 +10,7 @@ import { TEXT_LIKE_DATA_TYPES } from '@/utils/constants.js';
 import { successResponse } from '@/utils/response.js';
 import { DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 import { PostgrestProxyService } from '@/services/database/postgrest-proxy.service.js';
-import { resolvePostgrestSchema } from '@/services/database/helpers.js';
+import { buildQualifiedTableKey, resolvePostgrestSchema } from '@/services/database/helpers.js';
 import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 
 const router = Router();
@@ -120,7 +120,11 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     if (['POST', 'DELETE', 'PATCH', 'PUT'].includes(method)) {
       dashboardEventService.publishDataUpdate({
         resource: 'database',
-        data: { changes: [{ type: 'records', name: tableName }] as DatabaseResourceUpdate[] },
+        data: {
+          changes: [
+            { type: 'records', name: buildQualifiedTableKey(tableName, schemaName) },
+          ] as DatabaseResourceUpdate[],
+        },
       });
     }
 

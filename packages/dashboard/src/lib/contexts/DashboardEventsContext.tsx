@@ -12,6 +12,9 @@ import { connectDashboardEventStream } from '#lib/services/dashboard-events.serv
 const INVALIDATION_DEBOUNCE_MS = 300;
 const INITIAL_RECONNECT_DELAY_MS = 1_000;
 const MAX_RECONNECT_DELAY_MS = 30_000;
+// Server heartbeat is 25s; allow two missed heartbeats before declaring the
+// connection half-open.
+const STREAM_INACTIVITY_TIMEOUT_MS = 60_000;
 
 export function getDashboardInvalidationKeys(event: DashboardDataUpdateEvent): QueryKey[] {
   switch (event.resource) {
@@ -72,7 +75,7 @@ export function getDashboardInvalidationKeys(event: DashboardDataUpdateEvent): Q
     case 'functions':
       return [['functions']];
     case 'deployments':
-      return [['deployment-metadata']];
+      return [['deployment-metadata'], ['deployments']];
     case 'realtime':
       return [['realtime']];
     case 'compute_services':
@@ -156,16 +159,36 @@ export function DashboardEventsProvider({ children }: DashboardEventsProviderPro
     let reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
 
     const connect = async () => {
+      // The server heartbeats every 25s, so a stream that delivers no bytes
+      // within this window is half-open; abort it to reach the reconnect path.
+      const attempt = new AbortController();
+      let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+      const armInactivityTimer = () => {
+        if (inactivityTimer !== null) {
+          clearTimeout(inactivityTimer);
+        }
+        inactivityTimer = setTimeout(() => attempt.abort(), STREAM_INACTIVITY_TIMEOUT_MS);
+      };
+
       try {
-        await connectDashboardEventStream(controller.signal, (event) => {
-          if (event.type === 'ready') {
-            reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
-          }
-          handleEvent(event);
-        });
+        armInactivityTimer();
+        await connectDashboardEventStream(
+          AbortSignal.any([controller.signal, attempt.signal]),
+          (event) => {
+            if (event.type === 'ready') {
+              reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
+            }
+            handleEvent(event);
+          },
+          armInactivityTimer
+        );
       } catch (error) {
         if (!controller.signal.aborted) {
           console.warn('Dashboard event stream disconnected', error);
+        }
+      } finally {
+        if (inactivityTimer !== null) {
+          clearTimeout(inactivityTimer);
         }
       }
 

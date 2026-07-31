@@ -39,6 +39,7 @@ export function handleDashboardEvents(_req: Request, res: Response): void {
   };
 
   res.once('close', cleanup);
+  res.once('error', cleanup);
 }
 
 dashboardEventsRouter.get('/events', verifyProjectAdminJwt, handleDashboardEvents);

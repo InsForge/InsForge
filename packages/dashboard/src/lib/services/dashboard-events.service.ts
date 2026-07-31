@@ -22,7 +22,8 @@ function parseEventBlock(block: string): DashboardEvent | null {
 
 export async function consumeDashboardEventStream(
   response: Response,
-  onEvent: (event: DashboardEvent) => void
+  onEvent: (event: DashboardEvent) => void,
+  onActivity?: () => void
 ): Promise<void> {
   if (!response.body) {
     throw new Error('Dashboard event stream did not include a response body');
@@ -34,6 +35,9 @@ export async function consumeDashboardEventStream(
 
   while (true) {
     const { done, value } = await reader.read();
+    // Any received bytes count as liveness, including heartbeat comments
+    // that never surface as events.
+    onActivity?.();
     buffer += decoder.decode(value, { stream: !done });
 
     const blocks = buffer.split(/\r?\n\r?\n/);
@@ -57,11 +61,12 @@ export async function consumeDashboardEventStream(
 
 export async function connectDashboardEventStream(
   signal: AbortSignal,
-  onEvent: (event: DashboardEvent) => void
+  onEvent: (event: DashboardEvent) => void,
+  onActivity?: () => void
 ): Promise<void> {
   const response = await apiClient.requestStream('/dashboard/events', {
     headers: { Accept: 'text/event-stream' },
     signal,
   });
-  await consumeDashboardEventStream(response, onEvent);
+  await consumeDashboardEventStream(response, onEvent, onActivity);
 }

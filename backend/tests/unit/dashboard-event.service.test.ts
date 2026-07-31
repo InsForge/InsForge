@@ -20,4 +20,20 @@ describe('DashboardEventService', () => {
       data: { changes: [{ type: 'records', name: 'public.todos' }] },
     });
   });
+
+  it('keeps delivering to other subscribers when one listener throws', () => {
+    const failing = vi.fn(() => {
+      throw new Error('write after end');
+    });
+    const healthy = vi.fn();
+    const unsubscribeFailing = dashboardEventService.subscribe(failing);
+    const unsubscribeHealthy = dashboardEventService.subscribe(healthy);
+
+    expect(() => dashboardEventService.publishDataUpdate({ resource: 'users' })).not.toThrow();
+
+    expect(failing).toHaveBeenCalledOnce();
+    expect(healthy).toHaveBeenCalledOnce();
+    unsubscribeFailing();
+    unsubscribeHealthy();
+  });
 });
