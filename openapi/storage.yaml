@@ -862,10 +862,9 @@ paths:
       description: |
         Returns the download strategy based on the storage backend, bucket visibility, and the `S3_USE_PRESIGNED_URLS` configuration.
 
-        - S3 with public bucket: Direct object URLs
-        - S3 with private bucket and presigned URLs enabled: Presigned URLs with expiration
-        - S3 proxy mode (`S3_USE_PRESIGNED_URLS=false`): Direct backend download endpoint
-        - Local storage: Direct backend download endpoint
+        - S3 with `S3_USE_PRESIGNED_URLS=true`: Returns `method: presigned` for both public and private buckets. Bucket visibility only affects the URL expiration period.
+        - S3 with `S3_USE_PRESIGNED_URLS=false` (proxy mode): Returns `method: direct` using the backend download endpoint.
+        - Local storage: Returns `method: direct` using the backend download endpoint.
 
         Clients must determine the download flow from the returned `method` field.
 
@@ -904,7 +903,7 @@ paths:
                 s3-public:
                   summary: S3 Public Bucket Response
                   value:
-                    method: direct
+                    method: presigned
                     url: https://s3-bucket.s3.us-east-2.amazonaws.com/app-key/public-assets/logo.png
                 s3-private:
                   summary: S3 Private Bucket Response
