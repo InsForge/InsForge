@@ -42,8 +42,6 @@ paths:
           description: Missing or invalid credential
         '403':
           description: Valid JWT without the project_admin role
-        '429':
-          description: Too many connection attempts from this IP
 
 components:
   securitySchemes:
