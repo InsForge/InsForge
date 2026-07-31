@@ -7,6 +7,18 @@ import {
 } from '../../src/api/routes/dashboard/events.routes.js';
 import { dashboardEventService } from '../../src/services/dashboard/dashboard-event.service.js';
 
+// The route module pulls in the auth middleware, which requires JWT_SECRET at
+// import time; vi.hoisted runs before the imports above are evaluated.
+vi.hoisted(() => {
+  process.env.JWT_SECRET = 'test-secret-long-enough-for-signing-32chars';
+});
+
+vi.mock('@/services/secrets/secret.service.js', () => ({
+  SecretService: {
+    getInstance: () => ({}),
+  },
+}));
+
 function createResponse() {
   const emitter = new EventEmitter();
   const response = Object.assign(emitter, {
