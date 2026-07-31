@@ -489,3 +489,31 @@ export const migrationsDryRunLimiter = rateLimit({
     );
   },
 });
+
+/**
+ * Per-IP rate limiter for dashboard SSE connection attempts.
+ *
+ * Each successful connection is long-lived, so only the open/reconnect rate
+ * needs bounding: the client backs off exponentially from 1s, so even a
+ * pathological reconnect loop stays well under this budget. The limit exists
+ * to cap credentialed retry storms, not to throttle normal dashboard tabs.
+ *
+ * Limits: 30 connection attempts per minute per IP.
+ */
+export const dashboardEventsRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many dashboard event stream connections from this IP. Please slow down and try again shortly.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+  skipSuccessfulRequests: false,
+  skipFailedRequests: false,
+});

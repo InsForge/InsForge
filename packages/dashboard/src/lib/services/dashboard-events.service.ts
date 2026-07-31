@@ -33,29 +33,35 @@ export async function consumeDashboardEventStream(
   const decoder = new TextDecoder();
   let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    // Any received bytes count as liveness, including heartbeat comments
-    // that never surface as events.
-    onActivity?.();
-    buffer += decoder.decode(value, { stream: !done });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      // Any received bytes count as liveness, including heartbeat comments
+      // that never surface as events.
+      onActivity?.();
+      buffer += decoder.decode(value, { stream: !done });
 
-    const blocks = buffer.split(/\r?\n\r?\n/);
-    buffer = blocks.pop() ?? '';
-    for (const block of blocks) {
-      const event = parseEventBlock(block);
-      if (event) {
-        onEvent(event);
+      const blocks = buffer.split(/\r?\n\r?\n/);
+      buffer = blocks.pop() ?? '';
+      for (const block of blocks) {
+        const event = parseEventBlock(block);
+        if (event) {
+          onEvent(event);
+        }
+      }
+
+      if (done) {
+        const event = parseEventBlock(buffer);
+        if (event) {
+          onEvent(event);
+        }
+        return;
       }
     }
-
-    if (done) {
-      const event = parseEventBlock(buffer);
-      if (event) {
-        onEvent(event);
-      }
-      return;
-    }
+  } finally {
+    // Release the connection when the loop exits abnormally (abort, handler
+    // throw); a no-op after the stream already ended.
+    await reader.cancel().catch(() => undefined);
   }
 }
 

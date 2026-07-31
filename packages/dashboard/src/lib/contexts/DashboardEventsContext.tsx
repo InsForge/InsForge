@@ -16,6 +16,17 @@ const MAX_RECONNECT_DELAY_MS = 30_000;
 // connection half-open.
 const STREAM_INACTIVITY_TIMEOUT_MS = 60_000;
 
+// parseDatabaseTableReference throws on malformed references; a bad name from
+// a producer must skip that key, not kill the event stream.
+function parseTableReferenceSafely(name: string): { schemaName: string; tableName: string } | null {
+  try {
+    return parseDatabaseTableReference(name);
+  } catch {
+    console.warn('Ignoring malformed table reference in dashboard event', name);
+    return null;
+  }
+}
+
 export function getDashboardInvalidationKeys(event: DashboardDataUpdateEvent): QueryKey[] {
   switch (event.resource) {
     case 'database': {
@@ -30,20 +41,22 @@ export function getDashboardInvalidationKeys(event: DashboardDataUpdateEvent): Q
           case 'tables':
             keys.push(['database', 'tables'], ['metadata', 'full']);
             break;
-          case 'table':
+          case 'table': {
             keys.push(['database', 'tables']);
-            if (change.name) {
-              const { schemaName, tableName } = parseDatabaseTableReference(change.name);
-              keys.push(databaseTableQueryKeys.tableSchema(schemaName, tableName));
+            const parsed = change.name ? parseTableReferenceSafely(change.name) : null;
+            if (parsed) {
+              keys.push(databaseTableQueryKeys.tableSchema(parsed.schemaName, parsed.tableName));
             }
             break;
-          case 'records':
-            if (change.name) {
-              const { schemaName, tableName } = parseDatabaseTableReference(change.name);
-              keys.push(['records', schemaName, tableName]);
+          }
+          case 'records': {
+            const parsed = change.name ? parseTableReferenceSafely(change.name) : null;
+            if (parsed) {
+              keys.push(['records', parsed.schemaName, parsed.tableName]);
             }
             keys.push(['metadata', 'full']);
             break;
+          }
           case 'index':
             keys.push(['database', 'indexes']);
             break;
@@ -178,7 +191,13 @@ export function DashboardEventsProvider({ children }: DashboardEventsProviderPro
             if (event.type === 'ready') {
               reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
             }
-            handleEvent(event);
+            // A handler failure must not reject the stream read loop and
+            // force a reconnect.
+            try {
+              handleEvent(event);
+            } catch (error) {
+              console.warn('Failed to handle dashboard event', error);
+            }
           },
           armInactivityTimer
         );

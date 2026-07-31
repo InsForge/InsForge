@@ -1,0 +1,52 @@
+openapi: 3.0.3
+info:
+  title: Insforge Dashboard API
+  version: 1.0.0
+  description: Dashboard-internal control-plane endpoints. Not part of the application-facing SDK contract.
+
+paths:
+  /api/dashboard/events:
+    get:
+      summary: Dashboard event stream
+      description: |
+        Long-lived Server-Sent Events stream carrying dashboard cache-invalidation
+        and MCP connection notifications. Emits a `ready` event on connect, then
+        `data-update` and `mcp-connected` events as `data:` frames, with `: keepalive`
+        comment heartbeats every 25 seconds.
+
+        Only a project admin JWT is accepted; API keys, anon keys, and authenticated
+        end-user JWTs are rejected. Proxies must pass `text/event-stream` through
+        unbuffered and allow long-lived connections.
+      tags:
+        - Dashboard
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: SSE stream of dashboard events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Each frame is `data: <json>\n\n`, where the JSON is one of:
+                  - `{"type":"ready"}`
+                  - `{"type":"data-update","resource":"database|users|buckets|functions|deployments|realtime|compute_services","data":{...}}`
+                  - `{"type":"mcp-connected","toolName":"...","createdAt":"<ISO 8601>"}`
+                example: |
+                  data: {"type":"ready"}
+
+                  data: {"type":"data-update","resource":"users"}
+        '401':
+          description: Missing or invalid credential, or a non-JWT credential (API key, anon key)
+        '403':
+          description: Valid JWT without the project_admin role
+        '429':
+          description: Too many connection attempts from this IP
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Project admin JWT. API keys are not accepted on this endpoint.

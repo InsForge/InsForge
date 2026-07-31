@@ -187,6 +187,7 @@ export class ApiClient {
       }
 
       if (!response.ok) {
+        await response.body?.cancel();
         const error: ApiError = new Error(`HTTP ${response.status}: ${response.statusText}`);
         error.response = { data: null, status: response.status };
         throw error;

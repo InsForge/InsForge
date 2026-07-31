@@ -15,6 +15,16 @@ describe('getDashboardInvalidationKeys', () => {
     ]);
   });
 
+  it('skips malformed table references instead of throwing', () => {
+    expect(
+      getDashboardInvalidationKeys({
+        type: 'data-update',
+        resource: 'database',
+        data: { changes: [{ type: 'records', name: 'too.many.parts' }] },
+      })
+    ).toEqual([['metadata', 'full']]);
+  });
+
   it('invalidates both the deployment metadata and list queries', () => {
     expect(getDashboardInvalidationKeys({ type: 'data-update', resource: 'deployments' })).toEqual([
       ['deployment-metadata'],
