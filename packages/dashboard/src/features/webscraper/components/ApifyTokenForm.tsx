@@ -76,10 +76,11 @@ export function ApifyTokenForm() {
       </p>
       {error ? (
         // Announced, not just rendered: this message is the only feedback a
-        // failed submission gives, and it appears after the fact. Matches the
-        // role="alert" + aria-live="polite" pairing used for the equivalent
-        // inline error in FilePreviewDialog.
-        <p role="alert" aria-live="polite" className="text-sm leading-6 text-destructive">
+        // failed submission gives, and it appears after the fact. role="alert"
+        // already implies aria-live="assertive", so pairing it with an explicit
+        // aria-live both contradicts that and double-announces in VoiceOver on
+        // iOS — aria-atomic instead, per W3C ARIA19 for form errors.
+        <p role="alert" aria-atomic="true" className="text-sm leading-6 text-destructive">
           {error instanceof Error
             ? error.message
             : t('webscraper.apifyTokenFailed', {

@@ -66,9 +66,14 @@ export class WebscraperService {
   }
 
   // Verify before storing, so a bad paste fails loudly instead of producing a
-  // connection that 401s on every subsequent read.
+  // connection that 401s on every subsequent read. Trim once, up front:
+  // setToken() trims before persisting, so verifying the untrimmed value would
+  // reject a token over whitespace that never reaches the store — a real path,
+  // since the CLI forwards `--token` verbatim and `$(cat token.txt)` carries a
+  // trailing newline.
   async setApifyToken(apiToken: string) {
-    await this.local.verifyToken(apiToken);
-    return this.config.setToken(apiToken);
+    const token = apiToken.trim();
+    await this.local.verifyToken(token);
+    return this.config.setToken(token);
   }
 }

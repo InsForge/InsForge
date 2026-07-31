@@ -114,4 +114,18 @@ describe('WebscraperService.setApifyToken', () => {
     );
     expect(config.setToken).not.toHaveBeenCalled();
   });
+
+  // setToken() trims before persisting, so verifying the untrimmed value would
+  // reject a token over whitespace that never reaches the store. The CLI
+  // forwards `--token` verbatim and `$(cat token.txt)` carries a newline.
+  it('verifies and stores the same trimmed token', async () => {
+    const { cloud, local } = makeProviders();
+    const config = { setToken: vi.fn() };
+    const service = new WebscraperService(cloud as never, local as never, config as never);
+
+    await service.setApifyToken('  apify_api_tok1234567890\n');
+
+    expect(local.verifyToken).toHaveBeenCalledWith('apify_api_tok1234567890');
+    expect(config.setToken).toHaveBeenCalledWith('apify_api_tok1234567890');
+  });
 });
