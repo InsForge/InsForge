@@ -10,8 +10,7 @@ import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { setRefreshTokenCookie } from '@/utils/cookies.js';
 import { parseClientType } from '@/utils/utils.js';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
 
@@ -557,13 +556,7 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
     const result = await oAuthPKCEService.exchangeCode(code, code_verifier);
 
     const tokenManager = TokenManager.getInstance();
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom(
-      'role:project_admin',
-      ServerEvents.DATA_UPDATE,
-      { resource: DataUpdateResourceType.USERS },
-      'system'
-    );
+    dashboardEventService.publishDataUpdate({ resource: 'users' });
 
     if (clientType === 'web') {
       const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
