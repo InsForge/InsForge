@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import type { DashboardEvent } from '@insforge/shared-schemas';
-import { verifyProjectAdminJwt } from '@/api/middlewares/auth.js';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { dashboardEventsRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 
@@ -46,6 +46,6 @@ export function handleDashboardEvents(_req: Request, res: Response): void {
 dashboardEventsRouter.get(
   '/events',
   dashboardEventsRateLimiter,
-  verifyProjectAdminJwt,
+  verifyAdmin,
   handleDashboardEvents
 );

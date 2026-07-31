@@ -208,14 +208,6 @@ export class SocketManager {
 
     this.socketMetadata.set(socket.id, metadata);
 
-    // Join appropriate rooms based on user role
-    if (metadata.userId) {
-      void socket.join(`user:${metadata.userId}`);
-    }
-    if (metadata.role) {
-      void socket.join(`role:${metadata.role}`);
-    }
-
     logger.info('Socket client connected', {
       socketId: socket.id,
       userId: metadata.userId,

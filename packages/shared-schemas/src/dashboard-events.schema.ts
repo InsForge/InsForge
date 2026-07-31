@@ -6,7 +6,6 @@ export const dashboardDataUpdateResourceSchema = z.enum([
   'buckets',
   'functions',
   'deployments',
-  'realtime',
   'compute_services',
 ]);
 

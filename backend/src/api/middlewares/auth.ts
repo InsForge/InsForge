@@ -157,51 +157,6 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
 }
 
 /**
- * Verifies a project admin JWT without accepting an API key.
- * Intended for dashboard-only transports that application clients must not open.
- */
-export function verifyProjectAdminJwt(req: AuthRequest, _res: Response, next: NextFunction) {
-  try {
-    const token = extractBearerToken(req.headers.authorization);
-    if (!token || token.startsWith('ik_') || token.startsWith('anon_')) {
-      throw new AppError(
-        'No admin token provided',
-        401,
-        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTIONS.CHECK_ADMIN_TOKEN
-      );
-    }
-
-    const payload = tokenManager.verifyToken(token);
-    if (payload.role !== 'project_admin') {
-      throw new AppError(
-        'Admin access required',
-        403,
-        ERROR_CODES.AUTH_UNAUTHORIZED,
-        NEXT_ACTIONS.CHECK_ADMIN_TOKEN
-      );
-    }
-
-    setRequestUser(req, payload);
-    req.authenticated = true;
-    next();
-  } catch (error) {
-    if (error instanceof AppError) {
-      next(error);
-    } else {
-      next(
-        new AppError(
-          'Invalid admin token',
-          401,
-          ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-          NEXT_ACTIONS.CHECK_ADMIN_TOKEN
-        )
-      );
-    }
-  }
-}
-
-/**
  * Verifies API key authentication
  * Accepts API key via Authorization: Bearer header or x-api-key header (backward compatibility)
  */

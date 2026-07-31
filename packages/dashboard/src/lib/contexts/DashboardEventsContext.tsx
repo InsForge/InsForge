@@ -89,8 +89,6 @@ export function getDashboardInvalidationKeys(event: DashboardDataUpdateEvent): Q
       return [['functions']];
     case 'deployments':
       return [['deployment-metadata'], ['deployments']];
-    case 'realtime':
-      return [['realtime']];
     case 'compute_services':
       return [['compute', 'services']];
   }
