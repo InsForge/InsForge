@@ -59,8 +59,7 @@ import {
 import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';
 import { EMAIL_TEMPLATE_TYPES, type EmailTemplate } from '@/types/email.js';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 import logger from '@/utils/logger.js';
 
 const router = Router();
@@ -411,13 +410,7 @@ router.post('/users', verifyUser, async (req: AuthRequest, res: Response, next: 
       }
     }
 
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom(
-      'role:project_admin',
-      ServerEvents.DATA_UPDATE,
-      { resource: DataUpdateResourceType.USERS },
-      'system'
-    );
+    dashboardEventService.publishDataUpdate({ resource: 'users' });
 
     successResponse(res, result);
   } catch (error) {

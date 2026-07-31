@@ -10,8 +10,7 @@ import {
   uploadFunctionRequestSchema,
   updateFunctionRequestSchema,
 } from '@insforge/shared-schemas';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 import { successResponse } from '@/utils/response.js';
 
 const router = Router();
@@ -85,13 +84,7 @@ router.post(
         ip_address: req.ip,
       });
 
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.FUNCTIONS },
-        'system'
-      );
+      dashboardEventService.publishDataUpdate({ resource: 'functions' });
 
       successResponse(
         res,
@@ -144,13 +137,7 @@ router.put(
         ip_address: req.ip,
       });
 
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.FUNCTIONS, data: { slug } },
-        'system'
-      );
+      dashboardEventService.publishDataUpdate({ resource: 'functions', data: { slug } });
 
       successResponse(res, {
         success: !result.deployment || result.deployment.status === 'success',
@@ -192,13 +179,7 @@ router.delete(
         ip_address: req.ip,
       });
 
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.FUNCTIONS },
-        'system'
-      );
+      dashboardEventService.publishDataUpdate({ resource: 'functions' });
 
       successResponse(res, {
         success: true,

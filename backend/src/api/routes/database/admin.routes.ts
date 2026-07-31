@@ -17,10 +17,9 @@ import {
   normalizeDatabaseSchemaName,
 } from '@/services/database/helpers.js';
 import { paginatedResponse, successResponse } from '@/utils/response.js';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import type { DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 import type { DatabaseRecord } from '@/types/database.js';
+import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 
 function getValidationMessage(error: z.ZodError): string {
   return error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
@@ -65,20 +64,14 @@ function parseSort(sort: string | undefined): AdminTableRecordsSortClause[] {
 }
 
 function broadcastRecordChange(schemaName: string, tableName: string): void {
-  const socket = SocketManager.getInstance();
-  socket.broadcastToRoom(
-    'role:project_admin',
-    ServerEvents.DATA_UPDATE,
-    {
-      resource: DataUpdateResourceType.DATABASE,
-      data: {
-        changes: [
-          { type: 'records', name: buildQualifiedTableKey(tableName, schemaName) },
-        ] as DatabaseResourceUpdate[],
-      },
+  dashboardEventService.publishDataUpdate({
+    resource: 'database',
+    data: {
+      changes: [
+        { type: 'records', name: buildQualifiedTableKey(tableName, schemaName) },
+      ] as DatabaseResourceUpdate[],
     },
-    'system'
-  );
+  });
 }
 
 const router = Router();

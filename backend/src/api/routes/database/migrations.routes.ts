@@ -11,10 +11,9 @@ import { migrationsDryRunLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AppError } from '@/utils/errors.js';
 import { DatabaseMigrationService } from '@/services/database/database-migration.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { successResponse } from '@/utils/response.js';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { type DatabaseResourceUpdate } from '@/utils/sql-parser.js';
+import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 
 const router = Router();
 const migrationService = DatabaseMigrationService.getInstance();
@@ -64,18 +63,12 @@ router.post(
         ip_address: req.ip,
       });
 
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        {
-          resource: DataUpdateResourceType.DATABASE,
-          data: {
-            changes: [{ type: 'migration' }, ...result.changes] as DatabaseResourceUpdate[],
-          },
+      dashboardEventService.publishDataUpdate({
+        resource: 'database',
+        data: {
+          changes: [{ type: 'migration' }, ...result.changes] as DatabaseResourceUpdate[],
         },
-        'system'
-      );
+      });
 
       successResponse(res, result.migration, 201);
     } catch (error) {
