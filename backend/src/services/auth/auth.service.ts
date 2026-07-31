@@ -841,8 +841,8 @@ export class AuthService {
    * Admin login with authorization token (validates JWT from external issuer)
    */
   async adminLoginWithAuthorizationCode(code: string): Promise<CreateAdminSessionResponse> {
-    const { payload } = await this.tokenManager.verifyCloudToken(code);
-    const sub = `cloud:${payload.userId}`;
+    const { userId } = await this.tokenManager.verifyCloudProjectAuthorization(code);
+    const sub = `cloud:${userId}`;
     const accessToken = this.tokenManager.generateAccessToken({
       sub,
       role: 'project_admin',
