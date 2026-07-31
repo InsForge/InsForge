@@ -516,7 +516,9 @@ paths:
     post:
       summary: Get Upload Strategy (Direct or Presigned URL)
       description: |
-        Returns upload strategy based on storage backend (S3 returns presigned URLs, local returns direct upload endpoints).
+        Returns the upload strategy for the requested object.
+        Local storage always returns direct upload endpoints. S3 storage may return either `presigned` or `direct` strategies depending on the `S3_USE_PRESIGNED_URLS` configuration.
+        Clients must determine the upload flow from the returned response, using the method field, rather than assuming behavior based on the configured storage backend. 
 
         The filename is used verbatim as the object key. Uploading to an existing key replaces the current object in place. To upload with a server-generated unique key instead, use `POST /api/storage/buckets/{bucketName}/objects`. End-user creates and replacements are gated by the `storage.objects` row-level-security policies.
       tags:
@@ -577,6 +579,13 @@ paths:
                     confirmRequired: true
                     confirmUrl: /api/storage/buckets/avatars/objects/profile-photo.jpg/confirm-upload
                     expiresAt: "2025-09-05T01:00:00Z"
+                s3Proxy:
+                  summary: S3 Backend (Proxy Mode)
+                  value:
+                    method: direct
+                    uploadUrl: /api/storage/buckets/avatars/objects/profile-photo.jpg
+                    key: profile-photo.jpg
+                    confirmRequired: false
                 local:
                   summary: Local Storage Response
                   value:
@@ -851,10 +860,14 @@ paths:
     get:
       summary: Get Download Strategy (Direct or Presigned URL)
       description: |
-        Returns download strategy based on storage backend and bucket visibility.
-        - S3 with public bucket: Direct URLs (no presigning, better performance)
-        - S3 with private bucket: Presigned URLs with expiration
-        - Local storage: Always direct endpoints
+        Returns the download strategy based on the storage backend, bucket visibility, and the `S3_USE_PRESIGNED_URLS` configuration.
+
+        - S3 with public bucket: Direct object URLs
+        - S3 with private bucket and presigned URLs enabled: Presigned URLs with expiration
+        - S3 proxy mode (`S3_USE_PRESIGNED_URLS=false`): Direct backend download endpoint
+        - Local storage: Direct backend download endpoint
+
+        Clients must determine the download flow from the returned `method` field.
 
         Expiry (when presigned) is auto-calculated server-side from bucket
         visibility; no request body is accepted.
@@ -1315,7 +1328,7 @@ components:
         method:
           type: string
           enum: [presigned, direct]
-          description: Upload method - presigned for S3, direct for local storage
+          description: Upload method. `presigned` is returned when S3 presigned URLs are enabled; `direct` is returned for local storage and S3 proxy mode.
           example: presigned
         uploadUrl:
           type: string
@@ -1335,11 +1348,11 @@ components:
           example: profile-photo.jpg
         confirmRequired:
           type: boolean
-          description: Whether upload confirmation is required
+          description: Whether the upload must be confirmed after completion. When `false`, clients must not call the confirm upload endpoint.
           example: true
         confirmUrl:
           type: string
-          description: URL to confirm the upload (if confirmRequired is true)
+          description: Upload confirmation endpoint. Present only when `confirmRequired` is `true`.
           example: /api/storage/buckets/avatars/objects/profile.jpg/confirm-upload
         expiresAt:
           type: string
@@ -1358,8 +1371,8 @@ components:
           enum: [presigned, direct]
           description: |
             Download method:
-            - `direct`: Direct URL access (S3 public buckets or local storage)
-            - `presigned`: Secure URL with signature and expiration (S3 private buckets)
+            - `direct`: Direct access using either an object URL (public S3) or a backend proxy endpoint (local storage or S3 proxy mode)
+            - `presigned`: Secure URL with signature and expiration (private S3 with presigned URLs enabled)
           example: direct
         url:
           type: string
