@@ -53,6 +53,10 @@ export function getDashboardInvalidationKeys(event: DashboardDataUpdateEvent): Q
             const parsed = change.name ? parseTableReferenceSafely(change.name) : null;
             if (parsed) {
               keys.push(['records', parsed.schemaName, parsed.tableName]);
+            } else if (change.name) {
+              // The table exists but its name could not be parsed; fall back
+              // to the broad prefix rather than leaving its records stale.
+              keys.push(['records']);
             }
             keys.push(['metadata', 'full']);
             break;

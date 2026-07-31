@@ -32,7 +32,7 @@ paths:
                 description: |
                   Each frame is `data: <json>\n\n`, where the JSON is one of:
                   - `{"type":"ready"}`
-                  - `{"type":"data-update","resource":"database|users|buckets|functions|deployments|compute_services","data":{...}}`
+                  - `{"type":"data-update","resource":"database|users|buckets|functions|deployments|compute_services","data":{...}}` (`data` is optional)
                   - `{"type":"mcp-connected","toolName":"...","createdAt":"<ISO 8601>"}`
                 example: |
                   data: {"type":"ready"}

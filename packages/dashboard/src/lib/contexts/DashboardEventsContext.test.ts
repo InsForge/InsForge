@@ -15,14 +15,14 @@ describe('getDashboardInvalidationKeys', () => {
     ]);
   });
 
-  it('skips malformed table references instead of throwing', () => {
+  it('falls back to the broad records prefix for malformed table references', () => {
     expect(
       getDashboardInvalidationKeys({
         type: 'data-update',
         resource: 'database',
         data: { changes: [{ type: 'records', name: 'too.many.parts' }] },
       })
-    ).toEqual([['metadata', 'full']]);
+    ).toEqual([['records'], ['metadata', 'full']]);
   });
 
   it('invalidates both the deployment metadata and list queries', () => {
