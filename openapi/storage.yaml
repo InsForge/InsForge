@@ -1370,8 +1370,8 @@ components:
           enum: [presigned, direct]
           description: |
             Download method:
-            - `direct`: Direct access using either an object URL (public S3) or a backend proxy endpoint (local storage or S3 proxy mode)
-            - `presigned`: Secure URL with signature and expiration (private S3 with presigned URLs enabled)
+            - `direct`: Direct backend endpoint for local storage or S3 proxy mode (`S3_USE_PRESIGNED_URLS=false`)
+            - `presigned`: Signed download URL returned when `S3_USE_PRESIGNED_URLS=true` for both public and private S3 buckets. Bucket visibility only affects the URL expiration period.
           example: direct
         url:
           type: string
