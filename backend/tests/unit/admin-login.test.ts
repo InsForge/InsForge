@@ -12,6 +12,7 @@ const { mockPool, mockTokenManager, mockOAuthProvider } = vi.hoisted(() => ({
   },
   mockTokenManager: {
     generateAccessToken: vi.fn().mockReturnValue('test-access-token'),
+    verifyCloudProjectAuthorization: vi.fn(),
   },
   mockOAuthProvider: {
     getInstance: () => ({}),
@@ -151,6 +152,25 @@ describe('AuthService.adminLogin', () => {
     expect(mockTokenManager.generateAccessToken).toHaveBeenCalledWith({
       sub: 'local:admin@test.com',
       role: 'project_admin',
+    });
+  });
+
+  it('exchanges a verified Cloud project authorization for an attributed admin session', async () => {
+    mockTokenManager.verifyCloudProjectAuthorization.mockResolvedValue({
+      projectId: 'project_123',
+      userId: 'user_123',
+    });
+
+    const result = await authService.adminLoginWithAuthorizationCode('cloud-token');
+
+    expect(mockTokenManager.verifyCloudProjectAuthorization).toHaveBeenCalledWith('cloud-token');
+    expect(mockTokenManager.generateAccessToken).toHaveBeenCalledWith({
+      sub: 'cloud:user_123',
+      role: 'project_admin',
+    });
+    expect(result).toEqual({
+      admin: { sub: 'cloud:user_123' },
+      accessToken: 'test-access-token',
     });
   });
 

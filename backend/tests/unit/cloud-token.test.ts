@@ -53,12 +53,16 @@ describe('TokenManager.verifyCloudToken', () => {
 
   it('returns payload and projectId if valid', async () => {
     (jwtVerify as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      payload: { projectId: 'project_123', user: 'testUser' },
+      payload: {
+        projectId: 'project_123',
+        userId: 'test-user',
+        type: 'project_authorization',
+      },
     });
 
     const result = await tokenManager.verifyCloudToken('valid-token');
     expect(result.projectId).toBe('project_123');
-    expect(result.payload.user).toBe('testUser');
+    expect(result.payload.userId).toBe('test-user');
   });
 
   it('throws AppError if project ID mismatch or missing', async () => {
@@ -76,5 +80,83 @@ describe('TokenManager.verifyCloudToken', () => {
       statusCode: 401,
       code: ERROR_CODES.AUTH_INVALID_CREDENTIALS,
     });
+  });
+
+  describe('verifyCloudProjectAuthorization', () => {
+    it('returns a typed project and user identity for a valid token', async () => {
+      (jwtVerify as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        payload: {
+          projectId: 'project_123',
+          userId: 'user_123',
+          type: 'project_authorization',
+        },
+      });
+
+      await expect(tokenManager.verifyCloudProjectAuthorization('valid-token')).resolves.toEqual({
+        projectId: 'project_123',
+        userId: 'user_123',
+      });
+    });
+
+    it.each([undefined, '', '   ', 123, {}])('rejects malformed userId %j', async (userId) => {
+      (jwtVerify as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        payload: {
+          projectId: 'project_123',
+          userId,
+          type: 'project_authorization',
+        },
+      });
+
+      await expect(
+        tokenManager.verifyCloudProjectAuthorization('invalid-token')
+      ).rejects.toMatchObject({
+        statusCode: 401,
+        code: ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+      });
+    });
+
+    it.each([undefined, 'access', 'project-admin'])('rejects token type %j', async (type) => {
+      (jwtVerify as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        payload: { projectId: 'project_123', userId: 'user_123', type },
+      });
+
+      await expect(
+        tokenManager.verifyCloudProjectAuthorization('invalid-token')
+      ).rejects.toMatchObject({
+        statusCode: 401,
+        code: ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+      });
+    });
+
+    it('rejects a token bound to another project', async () => {
+      (jwtVerify as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        payload: {
+          projectId: 'project_456',
+          userId: 'user_123',
+          type: 'project_authorization',
+        },
+      });
+
+      await expect(
+        tokenManager.verifyCloudProjectAuthorization('wrong-project')
+      ).rejects.toMatchObject({
+        statusCode: 403,
+        code: ERROR_CODES.AUTH_UNAUTHORIZED,
+      });
+    });
+
+    it.each(['JWT expired', 'signature verification failed'])(
+      'rejects Cloud verification failure: %s',
+      async (message) => {
+        (jwtVerify as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(new Error(message));
+
+        await expect(
+          tokenManager.verifyCloudProjectAuthorization('invalid-token')
+        ).rejects.toMatchObject({
+          statusCode: 401,
+          code: ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+        });
+      }
+    );
   });
 });
