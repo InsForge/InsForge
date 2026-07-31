@@ -200,6 +200,56 @@ describe('LocalWebscraperProvider', () => {
     await expect(p.getRuns(10)).rejects.toMatchObject({ statusCode: 502 });
   });
 
+  // A 200 whose body is not the documented envelope is an upstream contract
+  // break, and the cloud provider already 502s on one. The local provider used
+  // to coerce it: `account?.data ?? {}` reported a fully-null connection as
+  // `status: 'active'`, so the dashboard said "connected" while every
+  // subsequent call failed.
+  it.each([
+    { name: 'an HTML error page', body: '<html>502 Bad Gateway</html>' },
+    { name: 'an envelope with no data', body: {} },
+    { name: 'a null data field', body: { data: null } },
+    { name: 'an array where the account object belongs', body: { data: [] } },
+  ])('502s instead of reporting a healthy connection for $name', async ({ body }) => {
+    axiosGetMock.mockResolvedValue({ data: body });
+    const p = provider(makeConfig('apify_api_tok1234567890'));
+
+    await expect(p.getConnection()).rejects.toMatchObject({ statusCode: 502 });
+  });
+
+  // Same failure mode on the list endpoints: `data?.data?.items ?? []` rendered
+  // an outage or a changed upstream contract as "no data" rather than an error.
+  it.each([
+    { name: 'runs', call: (p: ReturnType<typeof provider>) => p.getRuns(10) },
+    { name: 'actors', call: (p: ReturnType<typeof provider>) => p.getActors(20) },
+    { name: 'datasets', call: (p: ReturnType<typeof provider>) => p.getDatasets(20) },
+    {
+      name: 'the latest data preview',
+      call: (p: ReturnType<typeof provider>) => p.getLatestData(5),
+    },
+  ])(
+    '502s instead of returning an empty list when $name comes back malformed',
+    async ({ call }) => {
+      axiosGetMock.mockResolvedValue({ data: { data: { items: 'not-a-list' } } });
+      const p = provider(makeConfig('apify_api_tok1234567890'));
+
+      await expect(call(p)).rejects.toMatchObject({ statusCode: 502 });
+    }
+  );
+
+  // The dataset-items endpoint answers with a bare array, not an envelope, so
+  // it needs its own check: anything else used to collapse to `items: []`.
+  it('502s when the dataset items payload is not an array', async () => {
+    axiosGetMock
+      .mockResolvedValueOnce({
+        data: { data: { items: [{ id: 'run1', defaultDatasetId: 'ds1' }] } },
+      })
+      .mockResolvedValueOnce({ data: { unexpected: 'shape' } });
+    const p = provider(makeConfig('apify_api_tok1234567890'));
+
+    await expect(p.getLatestData(5)).rejects.toMatchObject({ statusCode: 502 });
+  });
+
   it('rejects an invalid token with a 400 from verifyToken', async () => {
     axiosGetMock.mockRejectedValue(makeAxiosError(401));
     const p = provider(makeConfig(null));

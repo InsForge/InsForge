@@ -70,10 +70,15 @@ export class ApifyConfigService {
     try {
       const secret = await this.findSecret();
       if (secret) {
+        // expiresAt: null because taking over an existing row must clear any
+        // expiry it carried. Leave a stale expires_at in place and
+        // getSecretByKey() stops matching the row it just wrote, so getConfig()
+        // reports `configured: false` immediately after a successful PUT.
         const updated = await this.secretService.updateSecret(secret.id, {
           value,
           isActive: true,
           isReserved: true,
+          expiresAt: null,
         });
         if (!updated) {
           throw new Error(`Failed to update ${APIFY_API_TOKEN_SECRET}`);
@@ -112,9 +117,15 @@ export class ApifyConfigService {
     }
   }
 
+  // listSecrets() filters nothing, so it also returns soft-deleted rows.
+  // getSecretByKey() — the read path getToken() uses — only matches
+  // `is_active = true`, so an inactive row here would pair a live token with a
+  // dead row's createdAt in getTokenRecord(). Expiry is deliberately *not*
+  // filtered: an expired-but-active row is still the row setToken() must take
+  // over, and it clears the stale expires_at when it does.
   private async findSecret(): Promise<{ id: string; createdAt: string } | undefined> {
     const secrets = await this.secretService.listSecrets();
-    return secrets.find((secret) => secret.key === APIFY_API_TOKEN_SECRET);
+    return secrets.find((secret) => secret.key === APIFY_API_TOKEN_SECRET && secret.isActive);
   }
 
   private invalidate(): void {

@@ -11,7 +11,10 @@ export class WebscraperService {
 
   constructor(
     private readonly cloud: WebscraperProvider = CloudWebscraperProvider.getInstance(),
-    private readonly local: WebscraperProvider = LocalWebscraperProvider.getInstance(),
+    // Typed as the concrete class, not the interface: `setApifyToken` needs
+    // `verifyToken`, which is local-only (cloud tokens come from OAuth). Every
+    // other call site treats it as a plain WebscraperProvider.
+    private readonly local: LocalWebscraperProvider = LocalWebscraperProvider.getInstance(),
     private readonly config: ApifyConfigService = ApifyConfigService.getInstance()
   ) {}
 
@@ -62,8 +65,10 @@ export class WebscraperService {
     return this.provider().getLatestData(limit);
   }
 
+  // Verify before storing, so a bad paste fails loudly instead of producing a
+  // connection that 401s on every subsequent read.
   async setApifyToken(apiToken: string) {
-    await LocalWebscraperProvider.getInstance().verifyToken(apiToken);
+    await this.local.verifyToken(apiToken);
     return this.config.setToken(apiToken);
   }
 }

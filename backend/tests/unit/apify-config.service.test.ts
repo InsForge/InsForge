@@ -20,24 +20,30 @@ function makeService(store = createSecretStore()) {
 interface FakeSecretRow {
   id: string;
   value: string;
+  isActive: boolean;
   isReserved: boolean;
+  expiresAt: Date | null;
   createdAt: string;
 }
 
 /**
  * A behavioural stand-in for SecretService rather than a per-call mock.
  *
- * It reproduces the one rule that matters here, taken from the real SQL in
+ * It reproduces the rules that matter here, taken from the real SQL in
  * secret.service.ts and pinned separately in secret-delete-reserved.test.ts:
  *
  *   deleteSecretByKey         -> WHERE key = $1 AND is_reserved = false
  *   deleteReservedSecretByKey -> WHERE key = $1
+ *   getSecretByKey            -> WHERE key = $1 AND is_active = true
+ *                                AND (expires_at IS NULL OR expires_at > NOW())
+ *   listSecrets               -> no filter at all
  *
  * so a reserved row is silently untouched by the first and removed by the
- * second. The suite previously stubbed `deleteSecretByKey` to resolve `true`,
- * which asserted the answer the service was supposed to be checked against —
- * that is exactly why Disconnect shipped reporting success while leaving the
- * Apify token in the store.
+ * second, and a soft-deleted or expired row is invisible to the read path while
+ * still showing up in the listing. The suite previously stubbed
+ * `deleteSecretByKey` to resolve `true`, which asserted the answer the service
+ * was supposed to be checked against — that is exactly why Disconnect shipped
+ * reporting success while leaving the Apify token in the store.
  */
 function createBehaviouralSecretStore() {
   const rows = new Map<string, FakeSecretRow>();
@@ -51,24 +57,41 @@ function createBehaviouralSecretStore() {
         rows.set(input.key, {
           id,
           value: input.value,
+          isActive: true,
           isReserved: input.isReserved === true,
+          expiresAt: input.expiresAt ?? null,
           createdAt: '2026-03-04T05:06:07.000Z',
         });
         return { id };
       }
     ),
-    getSecretByKey: vi.fn(async (key: string) => rows.get(key)?.value ?? null),
+    getSecretByKey: vi.fn(async (key: string) => {
+      const row = rows.get(key);
+      if (!row || !row.isActive || (row.expiresAt !== null && row.expiresAt <= new Date())) {
+        return null;
+      }
+      return row.value;
+    }),
     listSecrets: vi.fn(async () =>
       [...rows.entries()].map(([key, row]) => ({
         id: row.id,
         key,
-        isActive: true,
+        isActive: row.isActive,
         isReserved: row.isReserved,
+        expiresAt: row.expiresAt?.toISOString() ?? null,
         createdAt: row.createdAt,
       }))
     ),
     updateSecret: vi.fn(
-      async (id: string, input: { value?: string; isReserved?: boolean; isActive?: boolean }) => {
+      async (
+        id: string,
+        input: {
+          value?: string;
+          isReserved?: boolean;
+          isActive?: boolean;
+          expiresAt?: Date | null;
+        }
+      ) => {
         const entry = [...rows.values()].find((row) => row.id === id);
         if (!entry) {
           return false;
@@ -78,6 +101,12 @@ function createBehaviouralSecretStore() {
         }
         if (input.isReserved !== undefined) {
           entry.isReserved = input.isReserved;
+        }
+        if (input.isActive !== undefined) {
+          entry.isActive = input.isActive;
+        }
+        if (input.expiresAt !== undefined) {
+          entry.expiresAt = input.expiresAt;
         }
         return true;
       }
@@ -150,7 +179,12 @@ describe('ApifyConfigService', () => {
   it('updates the existing secret instead of creating a duplicate', async () => {
     const { service, store } = makeService();
     store.listSecrets.mockResolvedValue([
-      { id: 'sec-1', key: 'APIFY_API_TOKEN', createdAt: '2026-01-01T00:00:00.000Z' },
+      {
+        id: 'sec-1',
+        key: 'APIFY_API_TOKEN',
+        isActive: true,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
     ]);
     store.updateSecret.mockResolvedValue(true);
 
@@ -160,6 +194,7 @@ describe('ApifyConfigService', () => {
       value: 'apify_api_rotated1234567',
       isActive: true,
       isReserved: true,
+      expiresAt: null,
     });
     expect(store.createSecret).not.toHaveBeenCalled();
   });
@@ -179,7 +214,12 @@ describe('ApifyConfigService', () => {
     const { service, store } = makeService();
     store.getSecretByKey.mockResolvedValue('apify_api_stored12345678');
     store.listSecrets.mockResolvedValue([
-      { id: 'sec-1', key: 'APIFY_API_TOKEN', createdAt: '2026-03-04T05:06:07.000Z' },
+      {
+        id: 'sec-1',
+        key: 'APIFY_API_TOKEN',
+        isActive: true,
+        createdAt: '2026-03-04T05:06:07.000Z',
+      },
     ]);
 
     await expect(service.getTokenRecord()).resolves.toEqual({
@@ -188,11 +228,60 @@ describe('ApifyConfigService', () => {
     });
   });
 
+  // listSecrets() filters nothing, so a soft-deleted row still shows up in it
+  // while getSecretByKey() (is_active = true) no longer matches. Pairing the
+  // 60s-cached token with that dead row's createdAt would report a connection
+  // age for a row the read path has already stopped honouring.
+  it('does not pair a token with a soft-deleted row', async () => {
+    const { service, store } = makeService();
+    store.getSecretByKey.mockResolvedValue('apify_api_stored12345678');
+    store.listSecrets.mockResolvedValue([
+      {
+        id: 'sec-1',
+        key: 'APIFY_API_TOKEN',
+        isActive: false,
+        createdAt: '2026-03-04T05:06:07.000Z',
+      },
+    ]);
+
+    await expect(service.getTokenRecord()).resolves.toBeNull();
+  });
+
   it('propagates secret-store failures instead of silently falling back', async () => {
     const { service, store } = makeService();
     store.getSecretByKey.mockRejectedValue(new Error('decryption failed'));
 
     await expect(service.getToken()).rejects.toThrow('decryption failed');
+  });
+
+  // Regression: the update left expires_at alone. Rewriting a row whose expiry
+  // had already passed stored the new token somewhere getSecretByKey() still
+  // refuses to match, so getConfig() answered `configured: false` the moment
+  // after a PUT that had just reported success.
+  it('clears a stale expiry when it takes over an existing row', async () => {
+    const { service, store } = makeBehaviouralService();
+    store.rows.set('APIFY_API_TOKEN', {
+      id: 'sec-expired',
+      value: 'apify_api_expired1234567',
+      isActive: true,
+      isReserved: true,
+      expiresAt: new Date('2020-01-01T00:00:00.000Z'),
+      createdAt: '2020-01-01T00:00:00.000Z',
+    });
+    await expect(service.getToken()).resolves.toBeNull();
+
+    await service.setToken('apify_api_fresh123456789');
+
+    expect(store.updateSecret).toHaveBeenCalledWith('sec-expired', {
+      value: 'apify_api_fresh123456789',
+      isActive: true,
+      isReserved: true,
+      expiresAt: null,
+    });
+    expect(store.rows.get('APIFY_API_TOKEN')?.expiresAt).toBeNull();
+    await expect(service.getConfig()).resolves.toEqual({
+      token: { configured: true, maskedKey: 'apify_ap••••••••6789' },
+    });
   });
 });
 

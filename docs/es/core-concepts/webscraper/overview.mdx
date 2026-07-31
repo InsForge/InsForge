@@ -6,14 +6,14 @@ description: "Raspado web para su aplicación, impulsado por Apify."
 
 Use InsForge Web Scraper para dar a su agente de codificación acceso en vivo a datos externos: conecte su propia cuenta de Apify una sola vez, y su agente podrá ejecutar raspadores (Apify los llama actors) bajo demanda, mientras el panel muestra sus actors, el historial de ejecuciones y los conjuntos de datos raspados sin salir de InsForge.
 
-Conecte Apify con un solo clic y luego pegue el prompt de raspado en su agente de codificación. El agente se autentica con su token de Apify gestionado por InsForge, elige el actor adecuado para la tarea y devuelve los resultados.
+Conecte Apify una sola vez y luego pegue el prompt de raspado en su agente de codificación. El agente se autentica con su token de Apify gestionado por InsForge, elige el actor adecuado para la tarea y devuelve los resultados.
 
 <Frame caption="Panel de Web Scraper: actors conectados con su última ejecución y el número total de ejecuciones.">
   <img src="/images/dashboard-webscraper.png" alt="Panel de InsForge Web Scraper mostrando la pestaña Actors con los actors de Apify conectados, sus últimos horarios de ejecución y el número de ejecuciones" />
 </Frame>
 
 <Note>
-  Apify sigue siendo la fuente de verdad para los actors, las ejecuciones y los conjuntos de datos. InsForge muestra un subconjunto enfocado para las verificaciones diarias, y luego enlaza directamente a la consola de Apify para cualquier cosa que vaya más allá. La integración de Web Scraper está disponible en InsForge Cloud; las implementaciones autoalojadas devuelven `501 Not Implemented` en estas rutas.
+  Apify sigue siendo la fuente de verdad para los actors, las ejecuciones y los conjuntos de datos. InsForge muestra un subconjunto enfocado para las verificaciones diarias, y luego enlaza directamente a la consola de Apify para cualquier cosa que vaya más allá. La integración de Web Scraper funciona tanto en InsForge Cloud como en las implementaciones autoalojadas; lo único que cambia es la forma de conectar Apify.
 </Note>
 
 ```mermaid
@@ -45,9 +45,24 @@ flowchart TB
 
 ## Funciones
 
-### Conexión a Apify con un clic
+### Conexión a Apify
 
-Conecte Apify desde la página Web Scraper en el panel. InsForge lo guía a través del flujo de OAuth de Apify, almacena las credenciales en el servidor y mantiene el token de acceso actualizado por usted. El token en bruto nunca llega a su repositorio ni a su frontend; los agentes y las funciones obtienen un token en vivo desde el backend cuando lo necesitan.
+Conecte Apify desde la página Web Scraper en el panel. Lo que ocurre a continuación depende de dónde se ejecute InsForge.
+
+En InsForge Cloud basta con un clic: InsForge lo guía a través del flujo de OAuth de Apify, almacena las credenciales en el servidor y mantiene el token de acceso actualizado por usted.
+
+Las implementaciones autoalojadas no tienen un intermediario de OAuth delante, así que aporta usted su propia credencial. Cree un token de API en la consola de Apify, en **Settings → Integrations**, péguelo en la página Web Scraper e InsForge lo guardará cifrado en el almacén de secretos de su propio backend. `insforge webscraper apify connect --token <token>` hace lo mismo desde el CLI.
+
+En cualquiera de los dos casos, el token no llega a su repositorio ni al paquete de su aplicación; los agentes y las funciones obtienen un token en vivo desde el backend cuando lo necesitan.
+
+<Warning>
+  Autoalojado: emita un token de Apify con el alcance más restringido posible en
+  lugar de uno de cuenta completa. `GET /api/webscraper/apify/token` devuelve el
+  token almacenado tal cual a quien llame como administrador, que es lo que
+  permite al agente iniciar sesión en el CLI de Apify; por eso, lo que ese token
+  pueda hacer en Apify es lo que puede hacer una clave de administrador de
+  InsForge.
+</Warning>
 
 ### Raspar mediante su agente de codificación
 
@@ -77,7 +92,7 @@ Los resultados raspados residen en los conjuntos de datos de Apify de forma pred
 
 ### Configuración y desconexión
 
-El cuadro de diálogo de configuración de Web Scraper (el icono de engranaje en la barra lateral) muestra la cuenta de Apify conectada, el plan y la retención de datos, enlaza a la consola de Apify y permite a los administradores desconectarse. Desconectar solo detiene el uso de sus credenciales de Apify por parte de InsForge; su cuenta de Apify, sus actors y sus conjuntos de datos permanecen intactos, y puede volver a conectarse en cualquier momento.
+El cuadro de diálogo de configuración de Web Scraper (el icono de engranaje en la barra lateral) muestra la cuenta de Apify conectada, el plan y la retención de datos, enlaza a la consola de Apify y permite a los administradores desconectarse. Desconectar solo detiene el uso de sus credenciales de Apify por parte de InsForge; en una implementación autoalojada, elimina directamente el token de API guardado en su almacén de secretos. Su cuenta de Apify, sus actors y sus conjuntos de datos permanecen intactos, y puede volver a conectarse en cualquier momento.
 
 ## Conceptos
 
@@ -109,6 +124,6 @@ El cuadro de diálogo de configuración de Web Scraper (el icono de engranaje en
 
 ## Próximos pasos
 
-- Abra la página Web Scraper en el panel y haga clic en **Connect Apify**.
+- Abra la página Web Scraper en el panel y haga clic en **Connect Apify**; si se autoaloja, pegue ahí su token de API de Apify.
 - Pegue el prompt de raspado en su agente de codificación e indíquele qué desea raspar.
 - Cuando un raspado valga la pena conservar, pida a su agente que lleve el conjunto de datos a una tabla mediante una [función edge](/core-concepts/functions/overview) o un [horario](/core-concepts/functions/schedules).

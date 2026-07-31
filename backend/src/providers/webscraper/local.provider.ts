@@ -1,10 +1,22 @@
 import axios from 'axios';
+import { z } from 'zod';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import type { ApifyConnection, WebscraperProvider } from '@/providers/webscraper/base.provider.js';
 import { ApifyConfigService } from '@/services/webscraper/apify-config.service.js';
 
 const APIFY_API_BASE = 'https://api.apify.com/v2';
+
+// Envelopes returned by api.apify.com. Only the envelope is pinned: the item
+// fields are Apify-defined and every read below already copes with a missing
+// one, exactly as CloudWebscraperProvider validates its envelopes and leaves
+// `items` as `unknown`. The point is that a 2xx which is *not* one of these is
+// an upstream contract break — a 502 — rather than a healthy-but-empty answer.
+type ApifyRecord = Record<string, any>;
+const apifyRecordSchema: z.ZodType<ApifyRecord> = z.record(z.any());
+const apifyAccountSchema = z.object({ data: apifyRecordSchema });
+const apifyListSchema = z.object({ data: z.object({ items: z.array(apifyRecordSchema) }) });
+const apifyDatasetItemsSchema = z.array(z.unknown());
 
 // Self-hosted counterpart of CloudWebscraperProvider: the developer's own token,
 // stored locally, used to call Apify directly. Field mapping mirrors
@@ -26,7 +38,7 @@ export class LocalWebscraperProvider implements WebscraperProvider {
     if (!record) {
       return null;
     }
-    let account: Record<string, any>;
+    let account: unknown;
     try {
       account = await this.apiGetRaw('/users/me', record.token, 10000);
     } catch (err) {
@@ -45,7 +57,15 @@ export class LocalWebscraperProvider implements WebscraperProvider {
       }
       throw this.upstreamError('/users/me', err);
     }
-    const user = account?.data ?? {};
+    // Falling back to `{}` here would turn any unrecognised 2xx into a
+    // fully-null connection reported as `status: 'active'` — the dashboard says
+    // "connected" while every later call fails. Cloud zod-validates and 502s on
+    // a bad shape; so does this.
+    const parsed = apifyAccountSchema.safeParse(account);
+    if (!parsed.success) {
+      throw this.upstreamError('/users/me', new Error('unexpected response shape'));
+    }
+    const user = parsed.data.data;
     return {
       apifyUsername: user.username ?? null,
       plan: user.plan?.id ?? user.plan ?? null,
@@ -96,11 +116,10 @@ export class LocalWebscraperProvider implements WebscraperProvider {
     if (!token) {
       return null;
     }
-    const data = await this.apiGet(
+    const items = await this.fetchListItems(
       `/acts?sortBy=stats.lastRunStartedAt&desc=1&limit=${limit}`,
       token
     );
-    const items: any[] = data?.data?.items ?? [];
     return {
       actors: items.map((a) => ({
         id: String(a.id),
@@ -119,8 +138,7 @@ export class LocalWebscraperProvider implements WebscraperProvider {
     }
     // unnamed=1 so run-generated datasets are included; Apify otherwise returns
     // only explicitly-named ones, hiding most run output.
-    const data = await this.apiGet(`/datasets?desc=1&unnamed=1&limit=${limit}`, token);
-    const items: any[] = data?.data?.items ?? [];
+    const items = await this.fetchListItems(`/datasets?desc=1&unnamed=1&limit=${limit}`, token);
     return {
       datasets: items.map((d) => ({
         id: String(d.id),
@@ -140,23 +158,25 @@ export class LocalWebscraperProvider implements WebscraperProvider {
       return null;
     }
     const runs = await this.fetchRuns(token, 1);
+    // A genuinely empty result, not a malformed one: the latest run may simply
+    // not have produced a dataset yet. Keep it as an empty preview.
     const datasetId = runs[0]?.defaultDatasetId ?? null;
     if (!datasetId) {
       return { datasetId: null, items: [] };
     }
-    const data = await this.apiGet(
+    const items = await this.validatedGet(
       `/datasets/${encodeURIComponent(datasetId)}/items?clean=true&limit=${limit}`,
-      token
+      token,
+      apifyDatasetItemsSchema
     );
-    return { datasetId, items: Array.isArray(data) ? data : [] };
+    return { datasetId, items };
   }
 
   private async fetchRuns(
     token: string,
     limit: number
   ): Promise<Array<{ defaultDatasetId: string | null; [k: string]: unknown }>> {
-    const data = await this.apiGet(`/actor-runs?desc=1&limit=${limit}`, token);
-    const items: any[] = data?.data?.items ?? [];
+    const items = await this.fetchListItems(`/actor-runs?desc=1&limit=${limit}`, token);
     return items.map((r) => ({
       id: String(r.id),
       actId: r.actId ?? null,
@@ -166,6 +186,29 @@ export class LocalWebscraperProvider implements WebscraperProvider {
       usageTotalUsd: typeof r.usageTotalUsd === 'number' ? r.usageTotalUsd : null,
       defaultDatasetId: r.defaultDatasetId ?? null,
     }));
+  }
+
+  // `{ data: { items: [...] } }` is the envelope every Apify list endpoint
+  // returns, so all three list reads share one schema and one failure mode.
+  private async fetchListItems(path: string, token: string): Promise<ApifyRecord[]> {
+    const data = await this.validatedGet(path, token, apifyListSchema);
+    return data.data.items;
+  }
+
+  // Mirrors CloudWebscraperProvider.validatedGet: a 2xx whose body is not the
+  // documented shape is an upstream contract break and becomes a 502, rather
+  // than degrading to `[]` and rendering an outage as "no data".
+  private async validatedGet<T>(path: string, token: string, schema: z.ZodType<T>): Promise<T> {
+    const data = await this.apiGet(path, token);
+    const parsed = schema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        `Invalid Apify ${path} response: ${parsed.error.message}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+    return parsed.data;
   }
 
   // Data-path helper: any failure is an upstream failure. Callers that need to

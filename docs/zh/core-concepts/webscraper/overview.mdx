@@ -6,14 +6,14 @@ description: "为您的应用进行网络爬取，由 Apify 提供支持。"
 
 使用 InsForge Web Scraper 让您的编码代理实时访问外部数据：只需连接一次您自己的 Apify 账户，您的代理就可以按需运行爬虫（Apify 称之为 actor），同时仪表盘会显示您的 actor、运行历史和爬取到的数据集，无需离开 InsForge。
 
-一键连接 Apify，然后将爬取提示粘贴到您的编码代理中。代理使用您由 InsForge 托管的 Apify 令牌进行身份验证，为任务挑选合适的 actor，并返回结果。
+连接一次 Apify，然后将爬取提示粘贴到您的编码代理中。代理使用您由 InsForge 托管的 Apify 令牌进行身份验证，为任务挑选合适的 actor，并返回结果。
 
 <Frame caption="Web Scraper 仪表盘：已连接的 actor 及其最近一次运行时间和总运行次数。">
   <img src="/images/dashboard-webscraper.png" alt="InsForge Web Scraper 仪表盘显示 Actors 标签页，其中包含已连接的 Apify actor、它们的最近运行时间和运行次数" />
 </Frame>
 
 <Note>
-  Apify 始终是 actor、运行记录和数据集的权威来源。InsForge 展示了用于日常检查的一个精简子集，对于超出该范围的内容，会深链到 Apify 控制台。Web Scraper 集成仅在 InsForge Cloud 上可用；自托管部署在这些路由上会返回 `501 Not Implemented`。
+  Apify 始终是 actor、运行记录和数据集的权威来源。InsForge 展示了用于日常检查的一个精简子集，对于超出该范围的内容，会深链到 Apify 控制台。Web Scraper 集成在 InsForge Cloud 和自托管部署上均可使用；两者只是连接 Apify 的方式不同。
 </Note>
 
 ```mermaid
@@ -45,9 +45,21 @@ flowchart TB
 
 ## 功能
 
-### 一键连接 Apify
+### 连接 Apify
 
-在仪表盘中的 Web Scraper 页面连接 Apify。InsForge 会引导您完成 Apify OAuth 流程，在服务端存储凭证，并为您持续刷新访问令牌。原始令牌永远不会出现在您的代码仓库或前端中；代理和函数在需要时会从后端获取一个实时令牌。
+在仪表盘中的 Web Scraper 页面连接 Apify。接下来的流程取决于 InsForge 运行在哪里。
+
+在 InsForge Cloud 上只需一键：InsForge 会引导您完成 Apify OAuth 流程，在服务端存储凭证，并为您持续刷新访问令牌。
+
+自托管部署前面没有 OAuth 中介，因此需要您自带凭证。在 Apify 控制台的 **Settings → Integrations** 中创建一个 API 令牌，将其粘贴到 Web Scraper 页面，InsForge 会把它加密存放在您自己后端的秘密存储中。使用 CLI 的 `insforge webscraper apify connect --token <token>` 也能完成同样的事。
+
+无论采用哪种方式，令牌都不会出现在您的代码仓库或前端产物中；代理和函数在需要时会从后端获取一个实时令牌。
+
+<Warning>
+  自托管时，请签发一个权限范围尽量收窄的 Apify 令牌，而不是覆盖整个账户的令牌。`GET
+  /api/webscraper/apify/token` 会把已存储的令牌原样返回给管理员调用方，代理路径正是借此登录
+  Apify CLI；因此该令牌在 Apify 上能做的事，等同于一个 InsForge 管理员密钥能做的事。
+</Warning>
 
 ### 通过您的编码代理进行爬取
 
@@ -77,7 +89,7 @@ Use the insforge webscraper apify skill to scrape <what you want> and return the
 
 ### 设置与断开连接
 
-Web Scraper 配置对话框（侧边栏中的齿轮图标）显示已连接的 Apify 账户、套餐和数据保留策略，链接到 Apify 控制台，并允许管理员断开连接。断开连接只会阻止 InsForge 使用您的 Apify 凭证；您的 Apify 账户、actor 和数据集将保持完整，您随时可以重新连接。
+Web Scraper 配置对话框（侧边栏中的齿轮图标）显示已连接的 Apify 账户、套餐和数据保留策略，链接到 Apify 控制台，并允许管理员断开连接。断开连接只会阻止 InsForge 使用您的 Apify 凭证；在自托管部署上，它会直接从您的秘密存储中删除已保存的 API 令牌。您的 Apify 账户、actor 和数据集将保持完整，您随时可以重新连接。
 
 ## 概念
 
@@ -109,6 +121,6 @@ Web Scraper 配置对话框（侧边栏中的齿轮图标）显示已连接的 A
 
 ## 下一步
 
-- 打开仪表盘中的 Web Scraper 页面，点击 **Connect Apify**。
+- 打开仪表盘中的 Web Scraper 页面，点击 **Connect Apify**；若为自托管，则在此粘贴您的 Apify API 令牌。
 - 将爬取提示粘贴到您的编码代理中，并告诉它您想要爬取的内容。
 - 当某次爬取值得保留时，让您的代理通过[边缘函数](/core-concepts/functions/overview)或[计划任务](/core-concepts/functions/schedules)将数据集存入表中。

@@ -14,7 +14,7 @@ import { useApifyActors } from '#features/webscraper/hooks/useWebscraper';
 import { useClientPagination } from '#features/webscraper/hooks/useClientPagination';
 import type { ApifyActor } from '#features/webscraper/services/webscraper.service';
 import { useWebscraperContext } from '#features/webscraper/components/WebscraperLayout';
-import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { APIFY_CONSOLE_URL, fmtTime } from '#features/webscraper/components/shared';
 
 type ActorRow = ApifyActor & {
@@ -91,8 +91,7 @@ export function WebscraperActorsPage() {
   const isActive = connection.status === 'active';
   // Self-hosting has no OAuth to reconnect to; the way back is a new API token,
   // offered by the banner WebscraperLayout renders above these tabs.
-  const { onConnectApify } = useDashboardHost();
-  const isSelfHosted = !onConnectApify;
+  const isSelfHosted = !useIsCloudHostingMode();
   const actors = useApifyActors(isActive);
   const [search, setSearch] = useState('');
   const columns = useMemo(() => getColumns(t), [t]);

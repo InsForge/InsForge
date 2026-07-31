@@ -75,7 +75,11 @@ export function ApifyTokenForm() {
         </a>
       </p>
       {error ? (
-        <p className="text-sm leading-6 text-destructive">
+        // Announced, not just rendered: this message is the only feedback a
+        // failed submission gives, and it appears after the fact. Matches the
+        // role="alert" + aria-live="polite" pairing used for the equivalent
+        // inline error in FilePreviewDialog.
+        <p role="alert" aria-live="polite" className="text-sm leading-6 text-destructive">
           {error instanceof Error
             ? error.message
             : t('webscraper.apifyTokenFailed', {

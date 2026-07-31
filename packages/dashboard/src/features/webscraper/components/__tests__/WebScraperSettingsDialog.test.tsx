@@ -25,9 +25,16 @@ vi.mock('#features/webscraper/services/webscraper.service', () => ({
   },
 }));
 
-const hostValue = { onConnectApify: undefined as undefined | ((id: string) => void) };
+// `mode` is what the dialog reads to decide self-hosted vs cloud;
+// `onConnectApify` is only the callback the cloud branch invokes. The cloud
+// shell always supplies both together, so the fixtures set them together too.
+const hostValue: {
+  mode: 'self-hosting' | 'cloud-hosting';
+  onConnectApify: undefined | ((id: string) => void);
+} = { mode: 'self-hosting', onConnectApify: undefined };
 vi.mock('#lib/config/DashboardHostContext', () => ({
   useDashboardHost: () => hostValue,
+  useIsCloudHostingMode: () => hostValue.mode === 'cloud-hosting',
 }));
 
 const connection = {
@@ -64,10 +71,12 @@ function renderDialog({
 describe('WebScraperSettingsDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hostValue.mode = 'self-hosting';
     hostValue.onConnectApify = undefined;
   });
 
   it('hides the token controls when the host runs OAuth', async () => {
+    hostValue.mode = 'cloud-hosting';
     hostValue.onConnectApify = vi.fn();
     renderDialog();
 
@@ -98,6 +107,7 @@ describe('WebScraperSettingsDialog', () => {
   });
 
   it('shows the enabled OAuth button (no token input) when the host runs OAuth and is not yet connected', async () => {
+    hostValue.mode = 'cloud-hosting';
     hostValue.onConnectApify = vi.fn();
     renderDialog({ connection: null });
 

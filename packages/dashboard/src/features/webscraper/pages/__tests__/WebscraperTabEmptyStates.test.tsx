@@ -15,9 +15,13 @@ vi.mock('#features/webscraper/services/webscraper.service', () => ({
   },
 }));
 
-const hostValue = { onConnectApify: undefined as undefined | ((id: string) => void) };
+// The tabs pick their copy from the host's declared mode. `useDashboardHost`
+// stays mocked because WebscraperLayout — imported here for
+// `useWebscraperContext` — pulls it in from the same module.
+const hostValue: { mode: 'self-hosting' | 'cloud-hosting' } = { mode: 'self-hosting' };
 vi.mock('#lib/config/DashboardHostContext', () => ({
   useDashboardHost: () => hostValue,
+  useIsCloudHostingMode: () => hostValue.mode === 'cloud-hosting',
 }));
 
 // A revoked token is the only state that reaches these messages: the tabs are
@@ -75,7 +79,7 @@ const pages = [
 describe('webscraper tab empty states with a revoked connection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hostValue.onConnectApify = undefined;
+    hostValue.mode = 'self-hosting';
   });
 
   // Regression: all three tabs told a self-hosted admin to "Reconnect", an
@@ -92,7 +96,7 @@ describe('webscraper tab empty states with a revoked connection', () => {
   );
 
   it.each(pages)('keeps the cloud reconnect copy ($name)', ({ element, selfHosted, cloud }) => {
-    hostValue.onConnectApify = vi.fn();
+    hostValue.mode = 'cloud-hosting';
     renderPage(element);
 
     expect(screen.getByText(cloud)).toBeInTheDocument();
