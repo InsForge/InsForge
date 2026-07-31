@@ -367,6 +367,14 @@ export class TokenManager {
    * binding verification succeeds.
    */
   async verifyCloudProjectAuthorization(token: string): Promise<CloudProjectAuthorization> {
+    if (!appConfig.cloud.projectId) {
+      throw new AppError(
+        'PROJECT_ID not found in environment variables',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
     const { projectId, payload } = await this.verifyCloudToken(token);
 
     if (

@@ -1,6 +1,7 @@
 import { TokenManager } from '../../src/infra/security/token.manager';
 import { jwtVerify } from 'jose';
 import { AppError } from '../../src/utils/errors';
+import { appConfig } from '../../src/infra/config/app.config';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 
@@ -19,7 +20,7 @@ vi.mock('../../src/utils/logger', () => ({
 vi.mock('../../src/infra/config/app.config', () => {
   const c = {
     cloud: {
-      projectId: 'project_123',
+      projectId: 'project_123' as string | undefined,
       apiHost: 'https://mock-api.dev',
     },
     app: {
@@ -38,6 +39,7 @@ describe('TokenManager.verifyCloudToken', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    appConfig.cloud.projectId = 'project_123';
     process.env = {
       ...oldEnv,
       PROJECT_ID: 'project_123',
@@ -83,6 +85,18 @@ describe('TokenManager.verifyCloudToken', () => {
   });
 
   describe('verifyCloudProjectAuthorization', () => {
+    it('fails closed before Cloud verification when the local project ID is missing', async () => {
+      appConfig.cloud.projectId = undefined;
+
+      await expect(
+        tokenManager.verifyCloudProjectAuthorization('valid-token')
+      ).rejects.toMatchObject({
+        statusCode: 500,
+        code: ERROR_CODES.INTERNAL_ERROR,
+      });
+      expect(jwtVerify).not.toHaveBeenCalled();
+    });
+
     it('returns a typed project and user identity for a valid token', async () => {
       (jwtVerify as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
         payload: {
@@ -96,6 +110,7 @@ describe('TokenManager.verifyCloudToken', () => {
         projectId: 'project_123',
         userId: 'user_123',
       });
+      expect(jwtVerify).toHaveBeenCalledOnce();
     });
 
     it.each([undefined, '', '   ', 123, {}])('rejects malformed userId %j', async (userId) => {
@@ -143,6 +158,7 @@ describe('TokenManager.verifyCloudToken', () => {
         statusCode: 403,
         code: ERROR_CODES.AUTH_UNAUTHORIZED,
       });
+      expect(jwtVerify).toHaveBeenCalledOnce();
     });
 
     it.each(['JWT expired', 'signature verification failed'])(
