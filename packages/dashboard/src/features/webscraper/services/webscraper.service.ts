@@ -1,4 +1,5 @@
 import { apiClient } from '#lib/api/client';
+import type { ApifyConfig } from '@insforge/shared-schemas';
 
 // Apify-specific connection shape kept local (not in @insforge/shared-schemas) —
 // the connector catalog grows by adding providers, not shared types.
@@ -133,5 +134,14 @@ export const webscraperService = {
       }
       throw err;
     }
+  },
+
+  // Self-hosting only — cloud projects answer 400 here and connect via OAuth.
+  async updateApifyConfig(apiToken: string): Promise<ApifyConfig> {
+    return apiClient.request('/webscraper/apify/config', {
+      method: 'PUT',
+      headers: apiClient.withAccessToken({}),
+      body: JSON.stringify({ apiToken }),
+    });
   },
 };

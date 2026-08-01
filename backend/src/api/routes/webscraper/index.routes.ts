@@ -1,6 +1,8 @@
 import { Router, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { WebscraperService } from '@/services/webscraper/webscraper.service.js';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES, updateApifyConfigSchema } from '@insforge/shared-schemas';
 
 export const webscraperRouter = Router();
 const service = WebscraperService.getInstance();
@@ -132,6 +134,42 @@ webscraperRouter.get(
         return;
       }
       res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// Cloud projects get their Apify connection through OAuth on cloud-backend, so the
+// local token store is not theirs to write. Mirrors assertSelfHostedModelGatewayConfig().
+function assertSelfHostedWebscraperConfig(): void {
+  if (!WebscraperService.isSelfHosted()) {
+    throw new AppError(
+      'The Apify connection is managed by InsForge Cloud.',
+      400,
+      ERROR_CODES.INVALID_INPUT
+    );
+  }
+}
+
+// PUT /api/webscraper/apify/config — store the developer's Apify API token. The
+// token is validated against Apify before it is written, so an invalid paste fails
+// loudly instead of producing a connection that 401s on every read.
+webscraperRouter.put(
+  '/apify/config',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      assertSelfHostedWebscraperConfig();
+      const validation = updateApifyConfigSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          `Validation error: ${validation.error.errors.map((e) => e.message).join(', ')}`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+      res.json(await service.setApifyToken(validation.data.apiToken));
     } catch (err) {
       next(err);
     }

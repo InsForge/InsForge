@@ -9,11 +9,14 @@ import {
   type CreateDatabaseBackupRequest,
   type DatabaseBackup,
   type DatabaseBackupsResponse,
+  type DatabaseBackupConfigResponse,
+  type UpdateDatabaseBackupConfig,
 } from '@insforge/shared-schemas';
 import { AppError, isPgErrorLike } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
+import { assertValidBackupCron, computeNextBackupAt, isScheduledBackupDue } from './helpers.js';
 import logger from '@/utils/logger.js';
 
 // Internal artifact bucket, mirroring the `_deployments` convention. With S3
@@ -24,6 +27,7 @@ const MAX_STDERR_LENGTH = 4000;
 const RESTORE_APPLICATION_NAME = 'insforge-backup-restore';
 const RESTORE_LOCK_POLL_INTERVAL_MS = 5_000;
 const RESTORE_LOCK_WAIT_TIMEOUT_MS = 30_000;
+const SCHEDULER_TICK_MS = 60_000;
 
 const BACKUP_COLUMNS = `
   id,
@@ -39,6 +43,31 @@ const BACKUP_COLUMNS = `
 
 interface BackupRow extends DatabaseBackup {
   storageKey?: string | null;
+}
+
+interface BackupConfigRow {
+  enabled: boolean;
+  cronSchedule: string;
+  retentionDays: number | null;
+  scheduleAnchorAt: Date | string;
+}
+
+const BACKUP_CONFIG_COLUMNS = `
+  backup_enabled AS "enabled",
+  backup_cron_schedule AS "cronSchedule",
+  backup_retention_days AS "retentionDays",
+  backup_schedule_anchor AS "scheduleAnchorAt"
+`;
+
+function toDateOrNull(value: unknown): Date | null {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
 }
 
 function toIsoString(value: unknown): string | null {
@@ -59,6 +88,7 @@ function serializeBackup(row: BackupRow): DatabaseBackup {
     createdAt: toIsoString(row.createdAt) ?? row.createdAt,
     completedAt: toIsoString(row.completedAt),
     createdBy: row.createdBy,
+    expiresAt: toIsoString(row.expiresAt),
   };
 }
 
@@ -72,6 +102,7 @@ export class DatabaseBackupService {
   private backupInFlight = false;
   private restoreInProgress = false;
   private metadataMutationsInFlight = 0;
+  private schedulerTimer: NodeJS.Timeout | null = null;
 
   private constructor() {
     if (appConfig.storage.s3Bucket) {
@@ -94,8 +125,16 @@ export class DatabaseBackupService {
   async listBackups(): Promise<DatabaseBackupsResponse> {
     await this.failInterruptedBackups();
 
+    // expiresAt mirrors the retention prune criteria: scheduled non-running
+    // rows age out created_at + retention; NULL retention means never.
     const result = await this.dbManager.getPool().query(`
-      SELECT ${BACKUP_COLUMNS}
+      SELECT ${BACKUP_COLUMNS},
+        CASE
+          WHEN trigger_source = 'scheduled' AND status <> 'running' THEN
+            created_at + make_interval(days =>
+              (SELECT backup_retention_days FROM system.database_config LIMIT 1))
+          ELSE NULL
+        END AS "expiresAt"
       FROM system.database_backups
       ORDER BY created_at DESC
     `);
@@ -105,7 +144,8 @@ export class DatabaseBackupService {
 
   async createBackup(
     input: CreateDatabaseBackupRequest,
-    createdBy: string | null
+    createdBy: string | null,
+    triggerSource: DatabaseBackup['triggerSource'] = 'manual'
   ): Promise<DatabaseBackup> {
     this.assertNoRestoreInProgress();
     if (this.backupInFlight) {
@@ -122,10 +162,10 @@ export class DatabaseBackupService {
       const result = await this.dbManager.getPool().query(
         `
           INSERT INTO system.database_backups (name, trigger_source, status, created_by)
-          VALUES ($1, 'manual', 'running', $2)
+          VALUES ($1, $3, 'running', $2)
           RETURNING ${BACKUP_COLUMNS}
         `,
-        [input.name ?? null, createdBy]
+        [input.name ?? null, createdBy, triggerSource]
       );
       row = result.rows[0] as BackupRow;
     } catch (error) {
@@ -141,7 +181,7 @@ export class DatabaseBackupService {
     }
 
     this.activeBackupId = row.id;
-    void this.runBackup(row.id)
+    void this.runBackup(row.id, triggerSource)
       .catch((error: unknown) => {
         logger.error('Database backup failed', {
           backupId: row.id,
@@ -276,6 +316,10 @@ export class DatabaseBackupService {
                 error_message, created_by, completed_at, created_at, updated_at
          FROM system.database_backups`
       );
+      // The dump also contains system.database_config, so an old archive
+      // would silently revert the operator's current backup schedule —
+      // snapshot it for the same write-back treatment as the metadata above.
+      const configSnapshot = await this.getBackupConfigRow();
 
       // Do NOT pg_terminate_backend other sessions here: that kills the
       // backend's own long-lived clients (realtime LISTEN, pool) and crashes
@@ -303,7 +347,10 @@ export class DatabaseBackupService {
         watchdog.stop();
       }
 
-      await this.writeBackMetadataSnapshot(snapshot.rows as Record<string, unknown>[]);
+      await this.writeBackMetadataSnapshot(
+        snapshot.rows as Record<string, unknown>[],
+        configSnapshot
+      );
       await pool.query(`NOTIFY pgrst, 'reload schema';`).catch((error: unknown) => {
         logger.warn('Failed to notify PostgREST after restore', {
           error: error instanceof Error ? error.message : String(error),
@@ -315,6 +362,210 @@ export class DatabaseBackupService {
     } finally {
       this.restoreInProgress = false;
     }
+  }
+
+  async getBackupConfig(): Promise<DatabaseBackupConfigResponse> {
+    const row = await this.getBackupConfigRow();
+    if (!row) {
+      // The migration seeds the singleton row; a missing row means migrations
+      // have not run against this database yet.
+      throw new AppError(
+        'Backup configuration is not initialized.',
+        500,
+        ERROR_CODES.DATABASE_INTERNAL_ERROR
+      );
+    }
+    return this.serializeBackupConfig(row);
+  }
+
+  async updateBackupConfig(
+    patch: UpdateDatabaseBackupConfig
+  ): Promise<DatabaseBackupConfigResponse> {
+    if (patch.cronSchedule !== undefined) {
+      assertValidBackupCron(patch.cronSchedule);
+    }
+
+    // A restore's config write-back would clobber a concurrent update (and
+    // the update would corrupt the restore snapshot), so serialize exactly
+    // like the rename/delete metadata mutations.
+    this.assertNoRestoreInProgress();
+    this.metadataMutationsInFlight += 1;
+    try {
+      // Enabling must never leave an unparseable stored cron active. Only
+      // reachable through out-of-band writes, but cheap to keep invariant.
+      if (patch.enabled === true && patch.cronSchedule === undefined) {
+        const current = await this.getBackupConfigRow();
+        if (current) {
+          assertValidBackupCron(current.cronSchedule);
+        }
+      }
+
+      return await this.applyBackupConfigPatch(patch);
+    } finally {
+      this.metadataMutationsInFlight -= 1;
+    }
+  }
+
+  private async applyBackupConfigPatch(
+    patch: UpdateDatabaseBackupConfig
+  ): Promise<DatabaseBackupConfigResponse> {
+    const result = await this.dbManager.getPool().query(
+      `
+        UPDATE system.database_config
+        SET backup_enabled = COALESCE($1::boolean, backup_enabled),
+            backup_cron_schedule = COALESCE($2::text, backup_cron_schedule),
+            backup_retention_days = CASE WHEN $3::boolean THEN $4::integer ELSE backup_retention_days END,
+            -- The due-ness anchor moves only when scheduling itself changes;
+            -- an unrelated edit (e.g. retention) must not swallow a cron fire
+            -- that has not been attempted yet.
+            backup_schedule_anchor = CASE
+              WHEN ($1::boolean IS NOT NULL AND $1::boolean IS DISTINCT FROM backup_enabled)
+                OR ($2::text IS NOT NULL AND $2::text IS DISTINCT FROM backup_cron_schedule)
+              THEN NOW()
+              ELSE backup_schedule_anchor
+            END,
+            updated_at = NOW()
+        RETURNING ${BACKUP_CONFIG_COLUMNS}
+      `,
+      [
+        patch.enabled ?? null,
+        patch.cronSchedule ?? null,
+        patch.retentionDays !== undefined,
+        patch.retentionDays ?? null,
+      ]
+    );
+
+    const row = result.rows[0] as BackupConfigRow | undefined;
+    if (!row) {
+      throw new AppError(
+        'Backup configuration is not initialized.',
+        500,
+        ERROR_CODES.DATABASE_INTERNAL_ERROR
+      );
+    }
+
+    logger.info('Database backup config updated', {
+      enabled: row.enabled,
+      cronSchedule: row.cronSchedule,
+      retentionDays: row.retentionDays,
+    });
+    return this.serializeBackupConfig(row);
+  }
+
+  /**
+   * Evaluates the schedule roughly once a minute in-process. Due-ness is
+   * derived from persisted state (last scheduled attempt vs the most recent
+   * cron fire time), not from timer continuity, so backups missed while the
+   * server was down run shortly after startup.
+   */
+  startScheduler(): void {
+    if (this.schedulerTimer) {
+      return;
+    }
+    this.schedulerTimer = setInterval(() => {
+      void this.runScheduledBackupIfDue();
+    }, SCHEDULER_TICK_MS);
+    // Never keep the process alive just for the scheduler.
+    this.schedulerTimer.unref();
+    void this.runScheduledBackupIfDue();
+  }
+
+  stopScheduler(): void {
+    if (this.schedulerTimer) {
+      clearInterval(this.schedulerTimer);
+      this.schedulerTimer = null;
+    }
+  }
+
+  private async runScheduledBackupIfDue(): Promise<void> {
+    try {
+      if (this.backupInFlight || this.restoreInProgress) {
+        // The due fire time stays newer than the last attempt, so the next
+        // tick retries once the in-flight operation finishes.
+        return;
+      }
+
+      const config = await this.getBackupConfigRow();
+      if (!config?.enabled) {
+        return;
+      }
+
+      const result = await this.dbManager.getPool().query(
+        `SELECT MAX(created_at) AS "lastAttemptAt"
+         FROM system.database_backups
+         WHERE trigger_source = 'scheduled'`
+      );
+
+      const due = isScheduledBackupDue({
+        cronSchedule: config.cronSchedule,
+        now: new Date(),
+        lastAttemptAt: toDateOrNull(result.rows[0]?.lastAttemptAt),
+        scheduleAnchorAt: toDateOrNull(config.scheduleAnchorAt),
+      });
+      if (!due) {
+        return;
+      }
+
+      logger.info('Starting scheduled database backup', { cronSchedule: config.cronSchedule });
+      await this.createBackup({}, null, 'scheduled');
+    } catch (error) {
+      logger.error('Scheduled backup evaluation failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  private async pruneExpiredScheduledBackups(): Promise<void> {
+    const config = await this.getBackupConfigRow();
+    if (!config?.retentionDays) {
+      return;
+    }
+
+    const result = await this.dbManager.getPool().query(
+      `SELECT id, storage_key AS "storageKey" FROM system.database_backups
+       WHERE trigger_source = 'scheduled'
+         AND status <> 'running'
+         AND created_at < NOW() - make_interval(days => $1)`,
+      [config.retentionDays]
+    );
+
+    for (const row of result.rows as { id: string; storageKey: string | null }[]) {
+      try {
+        // Artifact first: if its deletion fails, the metadata row survives so
+        // the next scheduled run retries — the reverse order would orphan the
+        // artifact with nothing left to retry from. Artifact deletion is
+        // idempotent on both backends, so a row-delete failure after this is
+        // also retried safely.
+        if (row.storageKey) {
+          await this.deleteArtifact(row.storageKey);
+        }
+        await this.dbManager
+          .getPool()
+          .query(`DELETE FROM system.database_backups WHERE id = $1`, [row.id]);
+        logger.info('Pruned expired scheduled backup', { backupId: row.id });
+      } catch (error) {
+        logger.warn('Failed to prune expired scheduled backup; will retry next run', {
+          backupId: row.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  private async getBackupConfigRow(): Promise<BackupConfigRow | null> {
+    const result = await this.dbManager
+      .getPool()
+      .query(`SELECT ${BACKUP_CONFIG_COLUMNS} FROM system.database_config LIMIT 1`);
+    return (result.rows[0] as BackupConfigRow | undefined) ?? null;
+  }
+
+  private serializeBackupConfig(row: BackupConfigRow): DatabaseBackupConfigResponse {
+    return {
+      enabled: row.enabled,
+      cronSchedule: row.cronSchedule,
+      retentionDays: row.retentionDays,
+      nextBackupAt: row.enabled ? computeNextBackupAt(row.cronSchedule) : null,
+    };
   }
 
   /**
@@ -369,12 +620,16 @@ export class DatabaseBackupService {
   }
 
   /**
-   * Rewrites system.database_backups with the pre-restore snapshot. Retried
-   * because the table was just recreated by pg_restore; on final failure the
-   * restore is still reported as successful and the stale list is logged for
-   * the operator (it self-corrects on the next backup mutation).
+   * Rewrites system.database_backups (and the backup schedule columns of
+   * system.database_config) with the pre-restore snapshot. Retried because
+   * the tables were just recreated by pg_restore; on final failure the
+   * restore is still reported as successful and the stale state is logged
+   * for the operator (it self-corrects on the next mutation).
    */
-  private async writeBackMetadataSnapshot(rows: Record<string, unknown>[]): Promise<void> {
+  private async writeBackMetadataSnapshot(
+    rows: Record<string, unknown>[],
+    configSnapshot: BackupConfigRow | null
+  ): Promise<void> {
     const pool = this.dbManager.getPool();
     let lastError: unknown = null;
 
@@ -410,6 +665,24 @@ export class DatabaseBackupService {
             ]
           );
         }
+        if (configSnapshot) {
+          // An archive that predates the config table leaves the current row
+          // untouched (pg_restore --clean only drops dumped objects), so this
+          // UPDATE is correct for both old and new archives.
+          await client.query(
+            `UPDATE system.database_config
+             SET backup_enabled = $1,
+                 backup_cron_schedule = $2,
+                 backup_retention_days = $3,
+                 backup_schedule_anchor = $4`,
+            [
+              configSnapshot.enabled,
+              configSnapshot.cronSchedule,
+              configSnapshot.retentionDays,
+              configSnapshot.scheduleAnchorAt,
+            ]
+          );
+        }
         await client.query('COMMIT');
         return;
       } catch (error) {
@@ -426,7 +699,10 @@ export class DatabaseBackupService {
     );
   }
 
-  private async runBackup(id: string): Promise<void> {
+  private async runBackup(
+    id: string,
+    triggerSource: DatabaseBackup['triggerSource']
+  ): Promise<void> {
     // Suffix with the backup id: the timestamp alone has second resolution,
     // so two quick successive backups would otherwise share a key and the
     // second archive would overwrite the first.
@@ -455,6 +731,16 @@ export class DatabaseBackupService {
         [id, storageKey, size]
       );
       logger.info('Database backup completed', { backupId: id, storageKey, sizeBytes: size });
+
+      if (triggerSource === 'scheduled') {
+        // Runs while backupInFlight is still held, so a restore cannot start
+        // mid-prune and clobber the metadata mutations.
+        await this.pruneExpiredScheduledBackups().catch((error: unknown) => {
+          logger.warn('Failed to prune expired scheduled backups', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      }
     } catch (error) {
       // A failed row never gets a storage_key, so an artifact persisted just
       // before a late failure (e.g. the completed-status update) would be

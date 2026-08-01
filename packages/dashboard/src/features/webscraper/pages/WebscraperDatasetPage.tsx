@@ -14,6 +14,7 @@ import { useApifyActors, useApifyDatasets } from '#features/webscraper/hooks/use
 import { useClientPagination } from '#features/webscraper/hooks/useClientPagination';
 import type { ApifyDataset } from '#features/webscraper/services/webscraper.service';
 import { useWebscraperContext } from '#features/webscraper/components/WebscraperLayout';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { APIFY_CONSOLE_URL, fmtTime } from '#features/webscraper/components/shared';
 
 type DatasetRow = ApifyDataset & {
@@ -100,6 +101,9 @@ export function WebscraperDatasetPage() {
   const { t } = useTranslation('chrome');
   const { connection } = useWebscraperContext();
   const isActive = connection.status === 'active';
+  // Self-hosting has no OAuth to reconnect to; the way back is a new API token,
+  // offered by the banner WebscraperLayout renders above these tabs.
+  const isSelfHosted = !useIsCloudHostingMode();
   const datasets = useApifyDatasets(isActive);
   // Join dataset.actId against the actor list for the originating actor's name.
   const actors = useApifyActors(isActive);
@@ -144,9 +148,15 @@ export function WebscraperDatasetPage() {
       <div className="relative min-h-0 flex-1">
         {!isActive ? (
           <EmptyMessage
-            message={t('webscraper.reconnectToLoadDatasets', {
-              defaultValue: 'Reconnect to load datasets.',
-            })}
+            message={
+              isSelfHosted
+                ? t('webscraper.replaceTokenToLoadDatasets', {
+                    defaultValue: 'Replace your Apify API token to load datasets.',
+                  })
+                : t('webscraper.reconnectToLoadDatasets', {
+                    defaultValue: 'Reconnect to load datasets.',
+                  })
+            }
           />
         ) : datasets.isError ? (
           <div className="flex h-full items-center justify-center px-6">
