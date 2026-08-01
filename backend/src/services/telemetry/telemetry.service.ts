@@ -6,7 +6,7 @@ import fetch from 'node-fetch';
 import { appConfig } from '@/infra/config/app.config.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
-import { FeatureUsageCollector } from './feature-usage.collector.js';
+import { FeatureUsageCollector, type FeatureUsageSnapshot } from './feature-usage.collector.js';
 import packageJson from '../../../../package.json';
 
 export type TelemetryEventName = 'instance_started' | 'heartbeat';
@@ -164,7 +164,11 @@ export class TelemetryService {
     }
 
     try {
-      const event = this.buildEvent(eventName, this.getOrCreateInstallationId());
+      // Snapshot without clearing: the window is only released once the
+      // heartbeat carrying it has actually been accepted, so a timeout, a
+      // network blip, or a process exit mid-request cannot swallow it.
+      const usage = eventName === 'heartbeat' ? this.featureUsage.snapshot() : undefined;
+      const event = this.buildEvent(eventName, this.getOrCreateInstallationId(), usage);
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.config.requestTimeoutMs);
       timeout.unref?.();
@@ -180,7 +184,11 @@ export class TelemetryService {
           signal: controller.signal,
         });
 
-        if (!response.ok) {
+        if (response.ok) {
+          if (usage) {
+            this.featureUsage.commit(usage);
+          }
+        } else {
           logger.warn('InsForge telemetry request failed', {
             status: response.status,
             statusText: response.statusText,
@@ -244,11 +252,11 @@ export class TelemetryService {
     }
   }
 
-  private buildEvent(eventName: TelemetryEventName, installationId: string): PostHogTelemetryEvent {
-    // Draining resets the window, so it must happen only for events that
-    // actually carry the feature list.
-    const usage = eventName === 'heartbeat' ? this.featureUsage.drain() : undefined;
-
+  private buildEvent(
+    eventName: TelemetryEventName,
+    installationId: string,
+    usage?: FeatureUsageSnapshot
+  ): PostHogTelemetryEvent {
     return {
       api_key: this.config.posthogApiKey,
       event: POSTHOG_EVENT_NAMES[eventName],

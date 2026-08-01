@@ -168,6 +168,41 @@ describe('TelemetryService', () => {
     expect(second.features_used).toEqual([]);
   });
 
+  it('keeps the feature window when the heartbeat is rejected', async () => {
+    const config = makeConfig();
+    const fetchMock = makeFetchMock(500);
+    const featureUsage = new FeatureUsageCollector();
+    const service = new TelemetryService(config, fetchMock, featureUsage);
+
+    featureUsage.record('database');
+    await service.sendEvent('heartbeat');
+
+    // Rejected, so the window is retained rather than lost.
+    expect(featureUsage.snapshot().featuresUsed).toEqual(['database']);
+
+    const retryFetch = makeFetchMock();
+    await new TelemetryService(config, retryFetch, featureUsage).sendEvent('heartbeat');
+
+    // The next heartbeat carries it, and only then is it released.
+    expect((getPostedBody(retryFetch).properties as Record<string, unknown>).features_used).toEqual([
+      'database',
+    ]);
+    expect(featureUsage.snapshot().featuresUsed).toEqual([]);
+  });
+
+  it('keeps the feature window when the heartbeat request throws', async () => {
+    const config = makeConfig();
+    const fetchMock = vi.fn(async () => {
+      throw new Error('network unreachable');
+    }) as unknown as FetchFunction;
+    const featureUsage = new FeatureUsageCollector();
+
+    featureUsage.record('storage');
+    await new TelemetryService(config, fetchMock, featureUsage).sendEvent('heartbeat');
+
+    expect(featureUsage.snapshot().featuresUsed).toEqual(['storage']);
+  });
+
   it('flushes remaining feature usage on shutdown so short-lived instances still report', async () => {
     const config = makeConfig();
     const fetchMock = makeFetchMock();

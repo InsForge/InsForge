@@ -12,6 +12,7 @@
 
 import type { Request, Response } from 'express';
 import type { AuthRequest } from '@/api/middlewares/auth.js';
+import logger from '@/utils/logger.js';
 
 export type FeatureUsageSnapshot = {
   featuresUsed: string[];
@@ -48,6 +49,19 @@ const API_FEATURES = new Set([
 ]);
 
 const READ_METHODS = new Set(['GET', 'HEAD']);
+
+/**
+ * Statuses meaning the caller never reached the feature.
+ *
+ * Excluding these keeps two kinds of noise out: an unauthenticated probe
+ * against /api/database would otherwise mark the database used, and a dashboard
+ * tab whose 15-minute access token has expired fires a rejected read before it
+ * refreshes and retries, which would defeat the dashboard-read exclusion below.
+ *
+ * Other failures still count. A validation error or a missing record means the
+ * app did reach the feature and used it.
+ */
+const REJECTED_STATUSES = new Set([401, 403]);
 
 const S3_GATEWAY_PREFIX = '/storage/v1/s3';
 const FUNCTION_INVOKE_PREFIX = '/functions/';
@@ -100,6 +114,11 @@ export function resolveFeature(pathname: string): string | null {
  * is using the database — and every non-dashboard request counts regardless of
  * which credential it carried.
  */
+/** Whether the response says the caller was turned away at the door. */
+export function isRejected(statusCode: number): boolean {
+  return REJECTED_STATUSES.has(statusCode);
+}
+
 export function isDashboardRead(req: Request): boolean {
   if (!READ_METHODS.has(req.method.toUpperCase())) {
     return false;
@@ -142,32 +161,48 @@ export class FeatureUsageCollector {
     }
 
     res.once('finish', () => {
-      if (!isDashboardRead(req)) {
-        this.used.add(feature);
+      // This listener runs outside the middleware stack, where Express cannot
+      // catch a throw — an escaped error would reach the process, not the
+      // request. Usage tracking must never be able to take the server down.
+      try {
+        if (!isRejected(res.statusCode) && !isDashboardRead(req)) {
+          this.used.add(feature);
+        }
+      } catch (error) {
+        logger.warn('InsForge feature usage tracking skipped', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     });
   }
 
-  /** Returns the features used since the last drain and starts a new window. */
-  public drain(): FeatureUsageSnapshot {
-    const now = Date.now();
-    const snapshot = this.snapshot(now);
-
-    this.used = new Set();
-    this.windowStartedAt = now;
-
-    return snapshot;
-  }
-
-  public reset(): void {
-    this.used = new Set();
-    this.windowStartedAt = Date.now();
-  }
-
-  private snapshot(now: number): FeatureUsageSnapshot {
+  /**
+   * Returns the features used so far without clearing them.
+   *
+   * Reading and clearing are separate so a heartbeat that never arrives cannot
+   * take the window with it: the caller clears only after delivery is
+   * confirmed, via commit().
+   */
+  public snapshot(): FeatureUsageSnapshot {
     return {
       featuresUsed: Array.from(this.used).sort(),
-      windowMs: Math.max(0, now - this.windowStartedAt),
+      windowMs: Math.max(0, Date.now() - this.windowStartedAt),
     };
+  }
+
+  /**
+   * Clears a snapshot that was successfully reported and starts a new window.
+   *
+   * Only the reported features are removed, so anything recorded while the
+   * request was in flight survives. A feature used during that brief overlap
+   * is dropped from the next window, which is harmless: the payload is a set,
+   * and continued use re-records it immediately.
+   */
+  public commit(reported: FeatureUsageSnapshot): void {
+    for (const feature of reported.featuresUsed) {
+      this.used.delete(feature);
+    }
+
+    this.windowStartedAt = Date.now();
   }
 }

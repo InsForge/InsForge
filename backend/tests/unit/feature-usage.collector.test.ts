@@ -76,15 +76,22 @@ describe('isDashboardRead', () => {
 });
 
 describe('FeatureUsageCollector', () => {
-  // The middleware sees the request before auth runs; the caller is only
-  // resolved onto it by the time the response finishes.
-  function track(collector: FeatureUsageCollector, req: Request): void {
+  // The middleware sees the request before auth runs; the caller and the
+  // status are only resolved onto it by the time the response finishes.
+  function track(collector: FeatureUsageCollector, req: Request, statusCode = 200): void {
     const res = new EventEmitter() as unknown as Response;
     collector.track(req, res);
+    (res as { statusCode: number }).statusCode = statusCode;
     res.emit('finish');
   }
 
-  it('records the set of features used, once each, and resets on drain', () => {
+  function drain(collector: FeatureUsageCollector): string[] {
+    const snapshot = collector.snapshot();
+    collector.commit(snapshot);
+    return snapshot.featuresUsed;
+  }
+
+  it('records the set of features used, once each', () => {
     const collector = new FeatureUsageCollector();
 
     track(collector, makeRequest('GET', '/api/database/records/posts'));
@@ -92,12 +99,12 @@ describe('FeatureUsageCollector', () => {
     track(collector, makeRequest('GET', '/functions/send-email'));
     track(collector, makeRequest('PUT', '/storage/v1/s3/media/logo.png'));
 
-    const first = collector.drain();
+    const first = collector.snapshot();
     expect(first.featuresUsed).toEqual(['database', 'functions', 'storage']);
     expect(first.windowMs).toEqual(expect.any(Number));
 
-    const second = collector.drain();
-    expect(second.featuresUsed).toEqual([]);
+    collector.commit(first);
+    expect(collector.snapshot().featuresUsed).toEqual([]);
   });
 
   it('ignores dashboard reads but keeps dashboard writes', () => {
@@ -108,7 +115,7 @@ describe('FeatureUsageCollector', () => {
     track(collector, makeRequest('GET', '/api/database/tables', DASHBOARD));
     track(collector, makeRequest('POST', '/api/database/tables', DASHBOARD));
 
-    expect(collector.drain().featuresUsed).toEqual(['database']);
+    expect(drain(collector)).toEqual(['database']);
   });
 
   it('records app reads on the same paths a dashboard read would be ignored on', () => {
@@ -116,7 +123,29 @@ describe('FeatureUsageCollector', () => {
 
     track(collector, makeRequest('GET', '/api/database/records/posts'));
 
-    expect(collector.drain().featuresUsed).toEqual(['database']);
+    expect(drain(collector)).toEqual(['database']);
+  });
+
+  it('ignores requests rejected before they reached the feature', () => {
+    const collector = new FeatureUsageCollector();
+
+    // An unauthenticated probe against a data endpoint.
+    track(collector, makeRequest('GET', '/api/database/records/posts'), 401);
+    track(collector, makeRequest('POST', '/api/storage/buckets/media/objects'), 403);
+    // A dashboard read whose 15-minute token expired: auth rejects it before
+    // req.user is populated, so the dashboard rule alone would not catch it.
+    track(collector, makeRequest('GET', '/api/metadata'), 401);
+
+    expect(drain(collector)).toEqual([]);
+  });
+
+  it('still records failures that did reach the feature', () => {
+    const collector = new FeatureUsageCollector();
+
+    track(collector, makeRequest('POST', '/api/database/records/posts'), 400);
+    track(collector, makeRequest('GET', '/api/storage/buckets/media/objects/gone.png'), 404);
+
+    expect(drain(collector)).toEqual(['database', 'storage']);
   });
 
   it('ignores admin auth and non-feature paths', () => {
@@ -127,6 +156,46 @@ describe('FeatureUsageCollector', () => {
     track(collector, makeRequest('GET', '/api/health'));
     track(collector, makeRequest('GET', '/assets/index-a1b2c3.js'));
 
-    expect(collector.drain().featuresUsed).toEqual([]);
+    expect(drain(collector)).toEqual([]);
+  });
+
+  it('keeps the window when a snapshot is never committed', () => {
+    const collector = new FeatureUsageCollector();
+
+    track(collector, makeRequest('POST', '/api/database/records/posts'));
+    const abandoned = collector.snapshot();
+    expect(abandoned.featuresUsed).toEqual(['database']);
+
+    // The heartbeat carrying it never arrived, so the feature is still pending.
+    track(collector, makeRequest('POST', '/functions/send-email'));
+    expect(collector.snapshot().featuresUsed).toEqual(['database', 'functions']);
+  });
+
+  it('commits only what was reported, keeping anything recorded since', () => {
+    const collector = new FeatureUsageCollector();
+
+    track(collector, makeRequest('POST', '/api/database/records/posts'));
+    const reported = collector.snapshot();
+
+    track(collector, makeRequest('POST', '/functions/send-email'));
+    collector.commit(reported);
+
+    expect(collector.snapshot().featuresUsed).toEqual(['functions']);
+  });
+
+  it('never lets a tracking failure escape into the request lifecycle', () => {
+    const collector = new FeatureUsageCollector();
+    const res = new EventEmitter() as unknown as Response;
+    const req = makeRequest('GET', '/api/database/records/posts');
+    Object.defineProperty(req, 'user', {
+      get() {
+        throw new Error('auth context exploded');
+      },
+    });
+
+    collector.track(req, res);
+
+    expect(() => res.emit('finish')).not.toThrow();
+    expect(collector.snapshot().featuresUsed).toEqual([]);
   });
 });
