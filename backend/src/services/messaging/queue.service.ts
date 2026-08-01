@@ -160,7 +160,7 @@ export class MessagingQueueService {
           lease_expires_at = NULL,
           claim_token = NULL,
           updated_at = NOW()
-      WHERE id = $1 AND claimed_by = $3 AND claim_token = $4::uuid AND lease_expires_at > NOW();
+      WHERE id = $1 AND claimed_by = $3 AND claim_token = $4::uuid;
     `;
     const res = await this.getPool().query(sql, [
       messageId,

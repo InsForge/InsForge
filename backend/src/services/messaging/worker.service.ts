@@ -112,6 +112,7 @@ export class MessagingWorker {
     }
 
     try {
+      await this.queueService.reconcile().catch(() => {});
       const message = await this.queueService.claim(this.workerId);
       if (!message) {
         return;
@@ -159,6 +160,7 @@ export class MessagingWorker {
       Math.floor(leaseDurationMs / 2)
     );
 
+    let emailSent = false;
     try {
       if (message.channel === 'email') {
         const { to, subject, body } = message.payload;
@@ -167,6 +169,7 @@ export class MessagingWorker {
         }
 
         await this.emailService.sendRaw({ to, subject, html: body }, abortController.signal);
+        emailSent = true;
 
         const sent = await this.queueService.markSent(
           message.id,
@@ -184,13 +187,20 @@ export class MessagingWorker {
       const error = err instanceof Error ? err : new Error(String(err));
       logger.error(`Failed to process message: ${message.id}`, { error: error.message });
 
-      try {
-        await this.queueService.markFailed(message.id, error, this.workerId, claimToken);
-      } catch (markFailedErr) {
-        logger.error(`Failed markFailed for message: ${message.id}`, { error: markFailedErr });
-      }
+      if (!emailSent) {
+        try {
+          await this.queueService.markFailed(message.id, error, this.workerId, claimToken);
+        } catch (markFailedErr) {
+          logger.error(`Failed markFailed for message: ${message.id}`, { error: markFailedErr });
+        }
 
-      await this.logAttempt(message.id, 'failed', error, Date.now() - startTime);
+        await this.logAttempt(message.id, 'failed', error, Date.now() - startTime);
+      } else {
+        logger.error(
+          `Database persistence error after successful delivery for message: ${message.id}. Skipping markFailed to prevent duplicate delivery.`,
+          { error: error.message }
+        );
+      }
     } finally {
       clearInterval(intervalId);
     }

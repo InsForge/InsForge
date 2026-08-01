@@ -114,11 +114,21 @@ describe('Messaging System Phase 1 Consolidated Tests', () => {
 
   it('markSent updates status to sent only when workerId and claim_token match', async () => {
     mockPool.query.mockResolvedValueOnce({ rowCount: 1 });
-    const matchSuccess = await queueService.markSent('msg-202', 'msg-202', 'worker-alpha', '3c66641c-74a4-44b4-82a8-fdb1284ccbb1');
+    const matchSuccess = await queueService.markSent(
+      'msg-202',
+      'msg-202',
+      'worker-alpha',
+      '3c66641c-74a4-44b4-82a8-fdb1284ccbb1'
+    );
     expect(matchSuccess).toBe(true);
 
     mockPool.query.mockResolvedValueOnce({ rowCount: 0 });
-    const mismatchFailed = await queueService.markSent('msg-202', 'msg-202', 'worker-alpha', 'wrong-token');
+    const mismatchFailed = await queueService.markSent(
+      'msg-202',
+      'msg-202',
+      'worker-alpha',
+      'wrong-token'
+    );
     expect(mismatchFailed).toBe(false);
   });
 
@@ -141,7 +151,12 @@ describe('Messaging System Phase 1 Consolidated Tests', () => {
       return Promise.resolve({ rows: [] });
     });
 
-    await queueService.markFailed('msg-303', new Error('SMTP Timeout'), 'worker-alpha', '3c66641c-74a4-44b4-82a8-fdb1284ccbb1');
+    await queueService.markFailed(
+      'msg-303',
+      new Error('SMTP Timeout'),
+      'worker-alpha',
+      '3c66641c-74a4-44b4-82a8-fdb1284ccbb1'
+    );
     expect(mockClient.query).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE messaging.outbox'),
       expect.any(Array)
@@ -167,12 +182,18 @@ describe('Messaging System Phase 1 Consolidated Tests', () => {
           ],
         });
       }
-      if (sql.includes('INSERT INTO messaging.dead_letter')) return Promise.resolve({ rowCount: 1 });
+      if (sql.includes('INSERT INTO messaging.dead_letter'))
+        return Promise.resolve({ rowCount: 1 });
       if (sql.includes('DELETE FROM messaging.outbox')) return Promise.resolve({ rowCount: 1 });
       return Promise.resolve({ rows: [] });
     });
 
-    await queueService.markFailed('msg-404', new Error('Fatal Error'), 'worker-alpha', '3c66641c-74a4-44b4-82a8-fdb1284ccbb1');
+    await queueService.markFailed(
+      'msg-404',
+      new Error('Fatal Error'),
+      'worker-alpha',
+      '3c66641c-74a4-44b4-82a8-fdb1284ccbb1'
+    );
     expect(mockClient.query).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO messaging.dead_letter'),
       expect.any(Array)
@@ -193,7 +214,12 @@ describe('Messaging System Phase 1 Consolidated Tests', () => {
       id: 'msg-505',
       channel: 'email' as const,
       status: 'claimed' as const,
-      payload: { channel: 'email' as const, to: 'user@example.com', subject: 'Subject', body: 'Body' },
+      payload: {
+        channel: 'email' as const,
+        to: 'user@example.com',
+        subject: 'Subject',
+        body: 'Body',
+      },
       claimToken: '3c66641c-74a4-44b4-82a8-fdb1284ccbb1',
       retryCount: 0,
       maxRetries: 5,
@@ -210,6 +236,11 @@ describe('Messaging System Phase 1 Consolidated Tests', () => {
       { to: 'user@example.com', subject: 'Subject', html: 'Body' },
       expect.any(AbortSignal)
     );
-    expect(queueService.markSent).toHaveBeenCalledWith('msg-505', 'msg-505', (worker as any).workerId, '3c66641c-74a4-44b4-82a8-fdb1284ccbb1');
+    expect(queueService.markSent).toHaveBeenCalledWith(
+      'msg-505',
+      'msg-505',
+      (worker as any).workerId,
+      '3c66641c-74a4-44b4-82a8-fdb1284ccbb1'
+    );
   });
 });

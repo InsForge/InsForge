@@ -182,11 +182,26 @@ export class CloudEmailProvider implements EmailProvider {
   /**
    * Send custom/raw email via cloud backend
    */
-  async sendRaw(options: SendRawEmailRequest, _signal?: AbortSignal): Promise<void> {
+  async sendRaw(options: SendRawEmailRequest, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) {
+      throw new AppError(
+        'Email sending aborted due to lost claim',
+        500,
+        ERROR_CODES.EMAIL_SMTP_SEND_FAILED
+      );
+    }
     try {
       const projectId = appConfig.cloud.projectId;
       const apiHost = appConfig.cloud.apiHost;
       const signToken = this.generateSignToken();
+
+      if (signal?.aborted) {
+        throw new AppError(
+          'Email sending aborted due to lost claim',
+          500,
+          ERROR_CODES.EMAIL_SMTP_SEND_FAILED
+        );
+      }
 
       const url = `${apiHost}/email/v1/${projectId}/send-on-demand`;
       const response = await axios.post(url, options, {
@@ -194,6 +209,7 @@ export class CloudEmailProvider implements EmailProvider {
           'Content-Type': 'application/json',
           sign: signToken,
         },
+        signal,
         timeout: 10000,
       });
 
