@@ -3,7 +3,12 @@ import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Response } from 'node-fetch';
-import { TelemetryConfig, TelemetryService } from '../../src/services/telemetry/telemetry.service';
+import {
+  TelemetryConfig,
+  TelemetryService,
+  isTelemetryRuntimeDisabled,
+} from '../../src/services/telemetry/telemetry.service';
+import { FeatureUsageCollector } from '../../src/services/telemetry/feature-usage.collector';
 import logger from '../../src/utils/logger';
 
 type FetchFunction = ConstructorParameters<typeof TelemetryService>[1];
@@ -115,6 +120,102 @@ describe('TelemetryService', () => {
     expect(installationId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     );
+  });
+
+  it('is disabled on cloud, so no collection or reporting happens there', () => {
+    delete process.env.INSFORGE_TELEMETRY_DISABLED;
+    expect(isTelemetryRuntimeDisabled()).toBe(false);
+
+    // Cloud is identified by the AWS instance profile. This gates both halves:
+    // server.ts skips registering the usage middleware, and the service never
+    // starts a heartbeat or writes an installation id.
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'insforge-cloud-profile';
+    expect(isTelemetryRuntimeDisabled()).toBe(true);
+  });
+
+  it('reports the features used on heartbeats', async () => {
+    const config = makeConfig();
+    const fetchMock = makeFetchMock();
+    const featureUsage = new FeatureUsageCollector();
+    featureUsage.record('storage');
+    featureUsage.record('database');
+    featureUsage.record('database');
+
+    await new TelemetryService(config, fetchMock, featureUsage).sendEvent('heartbeat');
+
+    const properties = getPostedBody(fetchMock).properties as Record<string, unknown>;
+    expect(properties.features_used).toEqual(['database', 'storage']);
+    expect(properties.features_used_window_ms).toEqual(expect.any(Number));
+  });
+
+  it('clears the feature list after each delivered heartbeat and omits it from instance_started', async () => {
+    const config = makeConfig();
+    const fetchMock = makeFetchMock();
+    const featureUsage = new FeatureUsageCollector();
+    const service = new TelemetryService(config, fetchMock, featureUsage);
+
+    featureUsage.record('auth');
+    await service.sendEvent('instance_started');
+    await service.sendEvent('heartbeat');
+    await service.sendEvent('heartbeat');
+
+    const started = getPostedBody(fetchMock, 0).properties as Record<string, unknown>;
+    const first = getPostedBody(fetchMock, 1).properties as Record<string, unknown>;
+    const second = getPostedBody(fetchMock, 2).properties as Record<string, unknown>;
+
+    expect(started.features_used).toBeUndefined();
+    expect(first.features_used).toEqual(['auth']);
+    expect(second.features_used).toEqual([]);
+  });
+
+  it('keeps the feature window when the heartbeat is rejected', async () => {
+    const config = makeConfig();
+    const fetchMock = makeFetchMock(500);
+    const featureUsage = new FeatureUsageCollector();
+    const service = new TelemetryService(config, fetchMock, featureUsage);
+
+    featureUsage.record('database');
+    await service.sendEvent('heartbeat');
+
+    // Rejected, so the window is retained rather than lost.
+    expect(featureUsage.snapshot().featuresUsed).toEqual(['database']);
+
+    const retryFetch = makeFetchMock();
+    await new TelemetryService(config, retryFetch, featureUsage).sendEvent('heartbeat');
+
+    // The next heartbeat carries it, and only then is it released.
+    expect((getPostedBody(retryFetch).properties as Record<string, unknown>).features_used).toEqual(
+      ['database']
+    );
+    expect(featureUsage.snapshot().featuresUsed).toEqual([]);
+  });
+
+  it('keeps the feature window when the heartbeat request throws', async () => {
+    const config = makeConfig();
+    const fetchMock = vi.fn(async () => {
+      throw new Error('network unreachable');
+    }) as unknown as FetchFunction;
+    const featureUsage = new FeatureUsageCollector();
+
+    featureUsage.record('storage');
+    await new TelemetryService(config, fetchMock, featureUsage).sendEvent('heartbeat');
+
+    expect(featureUsage.snapshot().featuresUsed).toEqual(['storage']);
+  });
+
+  it('flushes remaining feature usage on shutdown so short-lived instances still report', async () => {
+    const config = makeConfig();
+    const fetchMock = makeFetchMock();
+    const featureUsage = new FeatureUsageCollector();
+    const service = new TelemetryService(config, fetchMock, featureUsage);
+
+    featureUsage.record('functions');
+    await service.shutdown();
+
+    const properties = getPostedBody(fetchMock).properties as Record<string, unknown>;
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(properties.telemetry_event_name).toBe('heartbeat');
+    expect(properties.features_used).toEqual(['functions']);
   });
 
   it('reuses an installation id published by another process during the atomic create', async () => {
@@ -388,6 +489,8 @@ describe('TelemetryService', () => {
           compute_configured: expect.any(Boolean),
           openrouter_configured: expect.any(Boolean),
         },
+        features_used: expect.any(Array),
+        features_used_window_ms: expect.any(Number),
       },
     });
     expect(JSON.stringify(body)).not.toContain('JWT_SECRET');
