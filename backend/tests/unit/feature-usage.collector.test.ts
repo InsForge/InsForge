@@ -131,7 +131,6 @@ describe('FeatureUsageCollector', () => {
 
     // An unauthenticated probe against a data endpoint.
     track(collector, makeRequest('GET', '/api/database/records/posts'), 401);
-    track(collector, makeRequest('POST', '/api/storage/buckets/media/objects'), 403);
     // A dashboard read whose 15-minute token expired: auth rejects it before
     // req.user is populated, so the dashboard rule alone would not catch it.
     track(collector, makeRequest('GET', '/api/metadata'), 401);
@@ -146,6 +145,19 @@ describe('FeatureUsageCollector', () => {
     track(collector, makeRequest('GET', '/api/storage/buckets/media/objects/gone.png'), 404);
 
     expect(drain(collector)).toEqual(['database', 'storage']);
+  });
+
+  it('records policy denials, which reached the feature and exercised it', () => {
+    const collector = new FeatureUsageCollector();
+
+    // An RLS denial: SQLSTATE 42501 surfaces as 403. Excluding these would
+    // undercount precisely the projects that configure RLS.
+    track(collector, makeRequest('GET', '/api/database/records/posts'), 403);
+    track(collector, makeRequest('PUT', '/api/storage/buckets/media/objects/logo.png'), 403);
+    // Signups disabled: the app reached auth and auth answered.
+    track(collector, makeRequest('POST', '/api/auth/users'), 403);
+
+    expect(drain(collector)).toEqual(['auth', 'database', 'storage']);
   });
 
   it('ignores admin auth and non-feature paths', () => {

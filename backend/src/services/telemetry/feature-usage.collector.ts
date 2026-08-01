@@ -51,17 +51,21 @@ const API_FEATURES = new Set([
 const READ_METHODS = new Set(['GET', 'HEAD']);
 
 /**
- * Statuses meaning the caller never reached the feature.
+ * The status meaning the caller was turned away before reaching the feature.
  *
- * Excluding these keeps two kinds of noise out: an unauthenticated probe
- * against /api/database would otherwise mark the database used, and a dashboard
- * tab whose 15-minute access token has expired fires a rejected read before it
+ * Excluding it keeps two kinds of noise out: an unauthenticated probe against
+ * /api/database would otherwise mark the database used, and a dashboard tab
+ * whose 15-minute access token has expired fires a rejected read before it
  * refreshes and retries, which would defeat the dashboard-read exclusion below.
  *
- * Other failures still count. A validation error or a missing record means the
- * app did reach the feature and used it.
+ * Deliberately only 401. A 403 usually means the request did reach the feature
+ * and was denied by policy — an RLS denial (SQLSTATE 42501 maps to 403),
+ * storage permission checks, or signups being disabled. Those exercised the
+ * feature, and excluding them would systematically undercount exactly the
+ * projects that configure RLS properly. Every other failure counts too: a
+ * validation error or a missing record still means the app reached the feature.
  */
-const REJECTED_STATUSES = new Set([401, 403]);
+const UNAUTHENTICATED_STATUS = 401;
 
 const S3_GATEWAY_PREFIX = '/storage/v1/s3';
 const FUNCTION_INVOKE_PREFIX = '/functions/';
@@ -116,7 +120,7 @@ export function resolveFeature(pathname: string): string | null {
  */
 /** Whether the response says the caller was turned away at the door. */
 export function isRejected(statusCode: number): boolean {
-  return REJECTED_STATUSES.has(statusCode);
+  return statusCode === UNAUTHENTICATED_STATUS;
 }
 
 export function isDashboardRead(req: Request): boolean {
