@@ -236,6 +236,36 @@ description: "InsForge 常見問題：資料庫呼叫、Edge Function、Custom C
     這個字串以擁有完整權限的 `postgres` 角色連線，因此不受行級安全（RLS）限制，而且字串裡嵌了該角色的密碼。請把它當成機密：只在伺服端使用，絕不要發到瀏覽器。
   </Accordion>
 
+  <Accordion title="怎麼把既有的 PostgreSQL 資料庫匯入到 InsForge？">
+    把既有的資料庫匯出為純 SQL 檔案，再把該檔案載入你的專案。有兩條可驗證的路徑。
+
+    **CLI（推薦）。** 先用 `pg_dump` 匯出本地資料庫，再把檔案匯入已關聯的專案：
+
+    ```bash
+    # 把本地資料庫匯出為純 SQL 檔案
+    pg_dump --no-owner --no-privileges your_local_db > dump.sql
+
+    # 把它載入已關聯的 InsForge 專案
+    npx @insforge/cli db import dump.sql
+    ```
+
+    加上 `--truncate` 會在匯入前清空既有的資料表（`npx @insforge/cli db import dump.sql --truncate`）。此命令會把檔案上傳到僅限管理員的 `POST /api/database/advance/import` 端點，並回報匯入的資料表和列數——參見 [Import Database](/sdks/rest/database)。反向命令 `npx @insforge/cli db export -o dump.sql` 則會把你的 InsForge 資料庫匯出到檔案。
+
+    **直連 Postgres。** 在 cloud 專案上，你也可以用標準 Postgres 工具直接還原到 connection string（見上）：
+
+    ```bash
+    # 純 SQL dump
+    psql "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" < dump.sql
+
+    # 或自訂格式 dump（pg_dump -Fc your_local_db > dump.dump）
+    pg_restore --no-owner -d "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" dump.dump
+    ```
+
+    這種方式以擁有完整權限的 `postgres` 角色連線，會繞過行級安全（RLS）——請把 connection string 只保留在伺服端。它**只對 cloud 專案有效**；自行託管的實例其 Postgres 由你的 `docker-compose` 直接暴露。
+
+    在往已有資料的專案裡匯入之前，建議先從 **Database → Backup & Restore** 做一次手動備份以便回滾——參見 [資料庫備份和復原](/core-concepts/database/backups)。備份和這些 dump 只涵蓋資料庫，不包含 Storage 裡的檔案。
+  </Accordion>
+
   <Accordion title="怎麼下線或刪除已部署的站點（site）？">
     目前沒有自助下線已部署 [Site](/core-concepts/sites/overview) 的方式——既沒有 `deployments delete` 命令，dashboard 裡也沒有對應操作。已部署的站點託管在外部，所以即使刪除專案（`npx @insforge/cli projects delete --project <id>`）也只會清掉後端資源——資料庫、Storage 和後端分支——而*不會*移除已託管的站點。
 

@@ -236,6 +236,36 @@ description: "Answers to common InsForge questions on database calls, edge funct
     The string connects as the privileged `postgres` role, so it isn't limited by row-level security and it embeds that role's password. Treat it like a secret: keep it server-side and never ship it to the browser.
   </Accordion>
 
+  <Accordion title="How do I load an existing PostgreSQL database into InsForge?">
+    Dump your existing database to a plain-SQL file, then load that file into your project. There are two verifiable paths.
+
+    **CLI (recommended).** Dump your local database with `pg_dump`, then import the file into your linked project:
+
+    ```bash
+    # Dump your local database to a plain-SQL file
+    pg_dump --no-owner --no-privileges your_local_db > dump.sql
+
+    # Load it into your linked InsForge project
+    npx @insforge/cli db import dump.sql
+    ```
+
+    Add `--truncate` to empty existing tables before loading (`npx @insforge/cli db import dump.sql --truncate`). The command uploads the file to the admin-only `POST /api/database/advance/import` endpoint and reports the tables and row count imported — see [Import Database](/sdks/rest/database). The reverse command, `npx @insforge/cli db export -o dump.sql`, dumps your InsForge database back out to a file.
+
+    **Direct Postgres connection.** On cloud projects you can also restore straight into the connection string (see above) using the standard Postgres tools:
+
+    ```bash
+    # Plain-SQL dump
+    psql "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" < dump.sql
+
+    # Or a custom-format dump (pg_dump -Fc your_local_db > dump.dump)
+    pg_restore --no-owner -d "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" dump.dump
+    ```
+
+    This connects as the privileged `postgres` role, so it bypasses row-level security — keep the string server-side. It works for **cloud projects only**; self-hosted instances expose Postgres directly via your `docker-compose` setup.
+
+    Before importing into a project that already holds data, take a manual backup first from **Database → Backup & Restore** so you can roll back — see [Database backups and restore](/core-concepts/database/backups). Backups and these dumps cover the database only, not files in Storage.
+  </Accordion>
+
   <Accordion title="How do I take down or remove a deployed site?">
     There's currently no self-serve way to take down a deployed [Site](/core-concepts/sites/overview) — there's no `deployments delete` command and no dashboard action for it. Deployed sites are hosted externally, so even deleting your project (`npx @insforge/cli projects delete --project <id>`) tears down your backend resources — database, storage, and backend branches — but does *not* remove the hosted site.
 

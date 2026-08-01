@@ -236,6 +236,36 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     La cadena se conecta con el rol privilegiado `postgres`, por lo que no está limitada por row-level security e incluye la contraseña de ese rol. Trátala como un secreto: mantenla en el servidor y nunca la envíes al navegador.
   </Accordion>
 
+  <Accordion title="¿Cómo cargo una base de datos PostgreSQL existente en InsForge?">
+    Vuelca tu base de datos existente a un archivo SQL plano y luego carga ese archivo en tu proyecto. Hay dos rutas verificables.
+
+    **CLI (recomendado).** Vuelca tu base de datos local con `pg_dump` y luego importa el archivo en tu proyecto vinculado:
+
+    ```bash
+    # Vuelca tu base de datos local a un archivo SQL plano
+    pg_dump --no-owner --no-privileges your_local_db > dump.sql
+
+    # Cárgalo en tu proyecto InsForge vinculado
+    npx @insforge/cli db import dump.sql
+    ```
+
+    Añade `--truncate` para vaciar las tablas existentes antes de la carga (`npx @insforge/cli db import dump.sql --truncate`). El comando sube el archivo al endpoint `POST /api/database/advance/import`, que requiere autenticación de administrador, e informa de las tablas y el número de filas importadas — consulta [Import Database](/sdks/rest/database). El comando inverso, `npx @insforge/cli db export -o dump.sql`, vuelca tu base de datos de InsForge de vuelta a un archivo.
+
+    **Conexión directa a Postgres.** En proyectos cloud también puedes restaurar directamente sobre la connection string (ver arriba) con las herramientas estándar de Postgres:
+
+    ```bash
+    # Volcado SQL plano
+    psql "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" < dump.sql
+
+    # O un volcado en formato custom (pg_dump -Fc your_local_db > dump.dump)
+    pg_restore --no-owner -d "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" dump.dump
+    ```
+
+    Esto se conecta con el rol privilegiado `postgres`, por lo que omite row-level security — mantén la cadena en el servidor. Funciona **solo para proyectos cloud**; las instancias autoalojadas exponen Postgres directamente mediante tu configuración de `docker-compose`.
+
+    Antes de importar en un proyecto que ya contiene datos, haz primero una copia de seguridad manual desde **Database → Backup & Restore** para poder revertir — consulta [Copias de seguridad y restauración de la base de datos](/core-concepts/database/backups). Las copias de seguridad y estos volcados cubren solo la base de datos, no los archivos en Storage.
+  </Accordion>
+
   <Accordion title="¿Cómo doy de baja o elimino un sitio desplegado?">
     Por ahora no hay una forma autoservicio de dar de baja un [Site](/core-concepts/sites/overview) desplegado: no existe un comando `deployments delete` ni una acción en el dashboard para ello. Los sitios desplegados se alojan de forma externa, así que incluso eliminar tu proyecto (`npx @insforge/cli projects delete --project <id>`) borra tus recursos de backend —base de datos, Storage y backend branches— pero *no* quita el sitio alojado.
 
