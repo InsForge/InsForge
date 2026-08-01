@@ -5,12 +5,12 @@ import {
   verifyAdmin,
   AuthRequest,
 } from '@/api/middlewares/auth.js';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
-import { ServerEvents } from '@/types/socket.js';
+import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 import { UsageService } from '@/services/usage/usage.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
+import logger from '@/utils/logger.js';
 
 export const usageRouter = Router();
 const usageService = UsageService.getInstance();
@@ -30,15 +30,16 @@ usageRouter.post(
       // Create MCP usage record via service
       const result = await usageService.recordMCPUsage(tool_name, success);
 
-      // Broadcast MCP tool usage to frontend via socket
-      const socketService = SocketManager.getInstance();
-
-      socketService.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.MCP_CONNECTED,
-        { tool_name, created_at: result.created_at },
-        'system'
-      );
+      // Best-effort notification; the usage record is already committed, so a
+      // malformed timestamp must not turn this request into an error.
+      try {
+        dashboardEventService.publishMcpConnected({
+          toolName: tool_name,
+          createdAt: new Date(result.created_at).toISOString(),
+        });
+      } catch (notifyError) {
+        logger.warn('Failed to publish MCP connected event', { error: notifyError, tool_name });
+      }
 
       successResponse(res, { success: true });
     } catch (error) {

@@ -257,4 +257,28 @@ describe('AuthService.findOrCreateThirdPartyUser – disableSignup gate', () => 
     expect(result.user.email).toBe('brand-new@test.com');
     expect(mockGetAuthConfig).toHaveBeenCalledOnce();
   });
+
+  it('preserves non-Apple provider behavior when an email is unavailable', async () => {
+    mockPool.query
+      .mockResolvedValueOnce({ rows: [] }) // user_providers lookup
+      .mockResolvedValueOnce({ rows: [] }); // email lookup
+    mockGetAuthConfig.mockResolvedValueOnce(ENABLED_CONFIG);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(authService as any, 'createThirdPartyUser').mockResolvedValue({
+      user: { id: 'facebook-user', email: '' },
+      accessToken: 'token',
+    });
+
+    const result = await authService.findOrCreateThirdPartyUser(
+      'facebook',
+      'facebook-id-new',
+      '',
+      'Facebook User',
+      '',
+      {}
+    );
+
+    expect(result.user.email).toBe('');
+  });
 });

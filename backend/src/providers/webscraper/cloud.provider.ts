@@ -4,22 +4,11 @@ import { z } from 'zod';
 import { appConfig } from '@/infra/config/app.config.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
-
-// The Apify connection response is small and Apify-specific, so its schema lives
-// here rather than in @insforge/shared-schemas. Mirrors PostHogProvider: signs a
-// short-lived project JWT and proxies to cloud-backend's project-JWT routes.
-export const apifyConnectionSchema = z.object({
-  apifyUsername: z.string().nullable(),
-  plan: z.string().nullable(),
-  // Live account metadata from cloud-backend (/users/me), surfaced on the
-  // dashboard. Optional so an older cloud-backend that omits them still parses.
-  planTier: z.string().nullable().optional(),
-  email: z.string().nullable().optional(),
-  dataRetentionDays: z.number().nullable().optional(),
-  status: z.enum(['active', 'degraded', 'revoked']),
-  createdAt: z.string(),
-});
-export type ApifyConnection = z.infer<typeof apifyConnectionSchema>;
+import {
+  apifyConnectionSchema,
+  type ApifyConnection,
+  type WebscraperProvider,
+} from '@/providers/webscraper/base.provider.js';
 
 // Envelopes returned by the cloud-backend project routes. Run/dataset item
 // shapes are Apify-defined, so items stay `unknown` — we validate the envelope,
@@ -33,14 +22,14 @@ const apifyLatestDataSchema = z.object({
   items: z.array(z.unknown()),
 });
 
-export class ApifyProvider {
-  private static instance: ApifyProvider;
+export class CloudWebscraperProvider implements WebscraperProvider {
+  private static instance: CloudWebscraperProvider;
   private constructor() {}
-  static getInstance(): ApifyProvider {
-    if (!ApifyProvider.instance) {
-      ApifyProvider.instance = new ApifyProvider();
+  static getInstance(): CloudWebscraperProvider {
+    if (!CloudWebscraperProvider.instance) {
+      CloudWebscraperProvider.instance = new CloudWebscraperProvider();
     }
-    return ApifyProvider.instance;
+    return CloudWebscraperProvider.instance;
   }
 
   private isEnabled(): boolean {
@@ -211,3 +200,5 @@ export class ApifyProvider {
     }
   }
 }
+
+export type { ApifyConnection };

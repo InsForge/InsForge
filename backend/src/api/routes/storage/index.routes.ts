@@ -15,8 +15,7 @@ import {
   uploadStrategyRequestSchema,
   confirmUploadRequestSchema,
 } from '@insforge/shared-schemas';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js';
 import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiters.js';
@@ -149,13 +148,7 @@ router.post(
         ip_address: req.ip,
       });
 
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.BUCKETS },
-        'system'
-      );
+      dashboardEventService.publishDataUpdate({ resource: 'buckets' });
 
       const accessInfo = isPublic
         ? 'This is a PUBLIC bucket - objects can be accessed without authentication.'
@@ -224,13 +217,7 @@ router.patch(
       });
 
       try {
-        const socket = SocketManager.getInstance();
-        socket.broadcastToRoom(
-          'role:project_admin',
-          ServerEvents.DATA_UPDATE,
-          { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
-          'system'
-        );
+        dashboardEventService.publishDataUpdate({ resource: 'buckets', data: { bucketName } });
       } catch {
         // Best-effort notification; do not fail completed storage mutation
       }
@@ -336,13 +323,7 @@ router.put(
       );
 
       try {
-        const socket = SocketManager.getInstance();
-        socket.broadcastToRoom(
-          'role:project_admin',
-          ServerEvents.DATA_UPDATE,
-          { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
-          'system'
-        );
+        dashboardEventService.publishDataUpdate({ resource: 'buckets', data: { bucketName } });
       } catch {
         // Best-effort notification; do not fail completed storage mutation
       }
@@ -392,13 +373,7 @@ router.post(
       );
 
       try {
-        const socket = SocketManager.getInstance();
-        socket.broadcastToRoom(
-          'role:project_admin',
-          ServerEvents.DATA_UPDATE,
-          { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
-          'system'
-        );
+        dashboardEventService.publishDataUpdate({ resource: 'buckets', data: { bucketName } });
       } catch {
         // Best-effort notification; do not fail completed storage mutation
       }
@@ -702,13 +677,7 @@ router.delete(
         ip_address: req.ip,
       });
 
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.BUCKETS },
-        'system'
-      );
+      dashboardEventService.publishDataUpdate({ resource: 'buckets' });
 
       successResponse(
         res,
@@ -872,13 +841,7 @@ router.post(
       );
 
       try {
-        const socket = SocketManager.getInstance();
-        socket.broadcastToRoom(
-          'role:project_admin',
-          ServerEvents.DATA_UPDATE,
-          { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
-          'system'
-        );
+        dashboardEventService.publishDataUpdate({ resource: 'buckets', data: { bucketName } });
       } catch {
         // Best-effort notification; do not fail completed storage mutation
       }

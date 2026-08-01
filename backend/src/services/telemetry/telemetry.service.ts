@@ -6,6 +6,7 @@ import fetch from 'node-fetch';
 import { appConfig } from '@/infra/config/app.config.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
+import { FeatureUsageCollector, type FeatureUsageSnapshot } from './feature-usage.collector.js';
 import packageJson from '../../../../package.json';
 
 export type TelemetryEventName = 'instance_started' | 'heartbeat';
@@ -45,6 +46,11 @@ interface PostHogTelemetryEvent {
       compute_configured: boolean;
       openrouter_configured: boolean;
     };
+    // Features touched since the previous heartbeat. Present on heartbeat
+    // events only: an instance_started event is emitted before any traffic
+    // exists.
+    features_used?: string[];
+    features_used_window_ms?: number;
   };
 }
 
@@ -86,7 +92,7 @@ function detectRuntimeEnvironment(): TelemetryRuntimeEnvironment {
   return 'unknown';
 }
 
-function isTelemetryRuntimeDisabled(): boolean {
+export function isTelemetryRuntimeDisabled(): boolean {
   return appConfig.telemetry.disabled || isCloudEnvironment();
 }
 
@@ -108,7 +114,8 @@ export class TelemetryService {
 
   public constructor(
     private readonly config: TelemetryConfig = defaultTelemetryConfig(),
-    private readonly fetchImpl: FetchFunction = fetch
+    private readonly fetchImpl: FetchFunction = fetch,
+    private readonly featureUsage: FeatureUsageCollector = FeatureUsageCollector.getInstance()
   ) {}
 
   public static getInstance(): TelemetryService {
@@ -140,13 +147,28 @@ export class TelemetryService {
     this.heartbeatTimer = undefined;
   }
 
+  /**
+   * Stops the heartbeat and reports the features used since the last one.
+   * Without this, an instance that runs for less than the heartbeat interval —
+   * the short-lived and trial deployments most worth measuring — would report
+   * no feature usage at all.
+   */
+  public async shutdown(): Promise<void> {
+    this.stop();
+    await this.sendEvent('heartbeat');
+  }
+
   public async sendEvent(eventName: TelemetryEventName): Promise<void> {
     if (this.config.disabled) {
       return;
     }
 
     try {
-      const event = this.buildEvent(eventName, this.getOrCreateInstallationId());
+      // Snapshot without clearing: the window is only released once the
+      // heartbeat carrying it has actually been accepted, so a timeout, a
+      // network blip, or a process exit mid-request cannot swallow it.
+      const usage = eventName === 'heartbeat' ? this.featureUsage.snapshot() : undefined;
+      const event = this.buildEvent(eventName, this.getOrCreateInstallationId(), usage);
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.config.requestTimeoutMs);
       timeout.unref?.();
@@ -162,7 +184,11 @@ export class TelemetryService {
           signal: controller.signal,
         });
 
-        if (!response.ok) {
+        if (response.ok) {
+          if (usage) {
+            this.featureUsage.commit(usage);
+          }
+        } else {
           logger.warn('InsForge telemetry request failed', {
             status: response.status,
             statusText: response.statusText,
@@ -226,7 +252,11 @@ export class TelemetryService {
     }
   }
 
-  private buildEvent(eventName: TelemetryEventName, installationId: string): PostHogTelemetryEvent {
+  private buildEvent(
+    eventName: TelemetryEventName,
+    installationId: string,
+    usage?: FeatureUsageSnapshot
+  ): PostHogTelemetryEvent {
     return {
       api_key: this.config.posthogApiKey,
       event: POSTHOG_EVENT_NAMES[eventName],
@@ -258,6 +288,12 @@ export class TelemetryService {
           compute_configured: Boolean(appConfig.fly.apiToken && appConfig.fly.org),
           openrouter_configured: Boolean(appConfig.ai.openrouterApiKey),
         },
+        ...(usage
+          ? {
+              features_used: usage.featuresUsed,
+              features_used_window_ms: usage.windowMs,
+            }
+          : {}),
       },
     };
   }

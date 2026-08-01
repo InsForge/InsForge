@@ -92,6 +92,10 @@ export const oAuthConfigSchema = z.object({
   id: z.string().uuid(),
   provider: oAuthProvidersSchema,
   clientId: z.string().optional(),
+  nativeClientIds: z
+    .array(z.string().trim().min(1).max(255))
+    .max(20, 'At most 20 native client IDs are allowed')
+    .optional(),
   scopes: z.array(z.string()).optional(),
   redirectUri: z.string().optional(),
   useSharedKey: z.boolean(),
