@@ -29,7 +29,7 @@ export interface EmailProvider {
    * Send custom/raw email (optional - not all providers may support this)
    * @param options - Email options (to, subject, html, cc, bcc, from, replyTo)
    */
-  sendRaw?(options: SendRawEmailRequest): Promise<void>;
+  sendRaw?(options: SendRawEmailRequest, signal?: AbortSignal): Promise<void>;
 
   /**
    * Check if provider supports template-based emails

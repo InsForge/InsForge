@@ -182,7 +182,7 @@ export class CloudEmailProvider implements EmailProvider {
   /**
    * Send custom/raw email via cloud backend
    */
-  async sendRaw(options: SendRawEmailRequest): Promise<void> {
+  async sendRaw(options: SendRawEmailRequest, _signal?: AbortSignal): Promise<void> {
     try {
       const projectId = appConfig.cloud.projectId;
       const apiHost = appConfig.cloud.apiHost;

@@ -123,8 +123,14 @@ export class SmtpEmailProvider implements EmailProvider {
     );
   }
 
-  async sendRaw(options: SendRawEmailRequest): Promise<void> {
+  async sendRaw(options: SendRawEmailRequest, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) {
+      throw new AppError('Email sending aborted due to lost claim', 500, ERROR_CODES.EMAIL_SMTP_SEND_FAILED);
+    }
     const config = await this.getRequiredConfig();
+    if (signal?.aborted) {
+      throw new AppError('Email sending aborted due to lost claim', 500, ERROR_CODES.EMAIL_SMTP_SEND_FAILED);
+    }
 
     await this.send(
       config,
