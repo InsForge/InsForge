@@ -236,6 +236,44 @@ description: "InsForge 常見問題：資料庫呼叫、Edge Function、Custom C
     這個字串以擁有完整權限的 `postgres` 角色連線，因此不受行級安全（RLS）限制，而且字串裡嵌了該角色的密碼。請把它當成機密：只在伺服端使用，絕不要發到瀏覽器。
   </Accordion>
 
+  <Accordion title="怎麼把既有的 Postgres 資料庫匯入（load）到 InsForge？">
+    用專案的 Postgres connection string（就是上一個問題裡的那個 URL）把既有資料庫還原（restore）過去即可。標準的 PostgreSQL 用戶端工具——`pg_dump`、`pg_restore` 和 `psql`——都能直接連它，所以匯入就是一次「先 dump、再 restore」。不需要專門的 InsForge 命令。
+
+    1. dump 你本地（或其他）的資料庫：
+
+    ```bash
+    # 自訂格式（推薦——體積更小，且支援平行 restore）
+    pg_dump -Fc your_local_db > local.dump
+
+    # ……或者純 SQL 檔
+    pg_dump your_local_db > local.sql
+    ```
+
+    2. 拿到 InsForge 的 connection string（僅限 cloud 專案）：
+
+    ```bash
+    npx @insforge/cli db connection-string
+    ```
+
+    3. restore 到 InsForge：
+
+    ```bash
+    # 自訂格式的 dump
+    pg_restore --no-owner -d "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" local.dump
+
+    # ……或者純 SQL 檔
+    psql "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" < local.sql
+    ```
+
+    有幾點需要注意：
+
+    - 加上 `--no-owner`，讓還原出來的物件歸 `postgres` 角色所有，而不是只存在於來源庫裡的那些角色。
+    - 這個 connection string 以擁有完整權限的 `postgres` 角色連線（會繞過行級安全 RLS），請把它當成機密，只在伺服端執行這些命令。
+    - 這只對 **cloud 專案**有效。自行託管的實例請改用本地 Postgres 憑證（`.env` 裡的 `DATABASE_URL` / `POSTGRES_*`）來 restore。
+    - restore 會寫入你正在使用的資料庫，並可能覆蓋既有物件。請先手動做一次備份——參見 [資料庫備份與還原](/core-concepts/database/backups)。
+    - 匯入完成後，每張表都會像其他 InsForge 表一樣自動暴露成 REST 和 SDK 端點。如果你更想把 schema 變更納入 git 版本管理，參見 [資料庫遷移](/core-concepts/database/migrations)。
+  </Accordion>
+
   <Accordion title="怎麼下線或刪除已部署的站點（site）？">
     目前沒有自助下線已部署 [Site](/core-concepts/sites/overview) 的方式——既沒有 `deployments delete` 命令，dashboard 裡也沒有對應操作。已部署的站點託管在外部，所以即使刪除專案（`npx @insforge/cli projects delete --project <id>`）也只會清掉後端資源——資料庫、Storage 和後端分支——而*不會*移除已託管的站點。
 
