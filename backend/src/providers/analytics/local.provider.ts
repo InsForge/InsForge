@@ -161,7 +161,7 @@ export class LocalAnalyticsProvider implements AnalyticsProvider {
   }
 
   async disconnect(): Promise<void> {
-    await this.config.disconnect();
+    await this.config.deleteConnection();
   }
 
   async getDashboards(): Promise<PosthogDashboardsResponse> {

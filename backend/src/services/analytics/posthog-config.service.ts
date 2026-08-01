@@ -126,7 +126,7 @@ export class PostHogConfigService {
   // of reach of the default deleteSecretByKey(), whose statement filters on
   // `is_reserved = false` — disconnect must use the reserved-capable path or it
   // removes nothing and still answers 204.
-  async disconnect(): Promise<void> {
+  async deleteConnection(): Promise<void> {
     try {
       const removed = await this.secretService.deleteReservedSecretByKey(POSTHOG_CONNECTION_SECRET);
       // Zero rows deleted with nothing left behind just means there was nothing

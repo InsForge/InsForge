@@ -123,17 +123,17 @@ describe('PostHogConfigService', () => {
 
   it('disconnect clears the connection and is idempotent', async () => {
     await service.setConnection(connection());
-    await service.disconnect();
+    await service.deleteConnection();
     expect((await service.getConfig()).personalApiKey.configured).toBe(false);
 
-    await expect(service.disconnect()).resolves.toBeUndefined();
+    await expect(service.deleteConnection()).resolves.toBeUndefined();
   });
 
   it('disconnect throws when the row survives the delete', async () => {
     await service.setConnection(connection());
     store.deleteReservedSecretByKey.mockResolvedValueOnce(false);
 
-    await expect(service.disconnect()).rejects.toThrow(/Failed to delete/);
+    await expect(service.deleteConnection()).rejects.toThrow(/Failed to delete/);
   });
 
   it('treats an unparsable stored row as not connected', async () => {
@@ -158,7 +158,7 @@ describe('PostHogConfigService', () => {
     await service.getConnection();
     expect(store.getSecretByKey).toHaveBeenCalledTimes(1);
 
-    await service.disconnect();
+    await service.deleteConnection();
     await service.getConnection();
     expect(store.getSecretByKey).toHaveBeenCalledTimes(2);
   });

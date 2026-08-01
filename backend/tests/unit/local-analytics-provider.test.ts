@@ -54,7 +54,7 @@ function makeProvider(conn: StoredPosthogConnection | null = CONNECTION) {
   const api = makeApi();
   const config = {
     getConnection: vi.fn(async () => conn),
-    disconnect: vi.fn(async () => undefined),
+    deleteConnection: vi.fn(async () => undefined),
   };
   const provider = new LocalAnalyticsProvider(config as never, api as never);
   return { provider, api, config };
@@ -382,7 +382,7 @@ describe('LocalAnalyticsProvider', () => {
     it('clears the stored credential', async () => {
       const { provider, config } = makeProvider();
       await provider.disconnect();
-      expect(config.disconnect).toHaveBeenCalledOnce();
+      expect(config.deleteConnection).toHaveBeenCalledOnce();
     });
   });
 });
