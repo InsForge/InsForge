@@ -4,22 +4,22 @@ import {
   type PosthogDiscoveredProject,
   type PosthogRegion,
 } from '@insforge/shared-schemas';
-import { PostHogProvider } from '@/providers/analytics/posthog.provider.js';
-import { PostHogLocalProvider } from '@/providers/analytics/posthog-local.provider.js';
+import { CloudAnalyticsProvider } from '@/providers/analytics/cloud.provider.js';
+import { LocalAnalyticsProvider } from '@/providers/analytics/local.provider.js';
 import type { AnalyticsProvider } from '@/providers/analytics/base.provider.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import { AppError } from '@/utils/errors.js';
-import { PosthogConfigService } from './posthog-config.service.js';
-import { PosthogApiClient, POSTHOG_HOST_BY_REGION } from './posthog-api.client.js';
+import { PostHogConfigService } from './posthog-config.service.js';
+import { PostHogApiService, POSTHOG_HOST_BY_REGION } from './posthog-api.service.js';
 
 export class AnalyticsService {
   private static instance: AnalyticsService;
 
   constructor(
-    private readonly cloud: AnalyticsProvider = PostHogProvider.getInstance(),
-    private readonly local: AnalyticsProvider = PostHogLocalProvider.getInstance(),
-    private readonly config: PosthogConfigService = PosthogConfigService.getInstance(),
-    private readonly api: PosthogApiClient = PosthogApiClient.getInstance()
+    private readonly cloud: AnalyticsProvider = CloudAnalyticsProvider.getInstance(),
+    private readonly local: AnalyticsProvider = LocalAnalyticsProvider.getInstance(),
+    private readonly config: PostHogConfigService = PostHogConfigService.getInstance(),
+    private readonly api: PostHogApiService = PostHogApiService.getInstance()
   ) {}
 
   static getInstance(): AnalyticsService {

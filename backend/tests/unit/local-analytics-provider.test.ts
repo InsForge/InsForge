@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
-import { PostHogLocalProvider } from '../../src/providers/analytics/posthog-local.provider.js';
+import { LocalAnalyticsProvider } from '../../src/providers/analytics/local.provider.js';
 import type { StoredPosthogConnection } from '../../src/services/analytics/posthog-config.service.js';
 
 vi.mock('../../src/utils/logger.js', () => ({
@@ -56,11 +56,11 @@ function makeProvider(conn: StoredPosthogConnection | null = CONNECTION) {
     getConnection: vi.fn(async () => conn),
     disconnect: vi.fn(async () => undefined),
   };
-  const provider = new PostHogLocalProvider(config as never, api as never);
+  const provider = new LocalAnalyticsProvider(config as never, api as never);
   return { provider, api, config };
 }
 
-describe('PostHogLocalProvider', () => {
+describe('LocalAnalyticsProvider', () => {
   beforeEach(() => vi.clearAllMocks());
 
   describe('connection gating', () => {
@@ -297,7 +297,9 @@ describe('PostHogLocalProvider', () => {
     it('maps rows and preserves null counts', async () => {
       const { provider, api } = makeProvider();
       api.runQuery.mockResolvedValue({
-        results: [{ date: '2026-01-01', label: 'Week 0', values: [{ count: 10 }, { count: null }] }],
+        results: [
+          { date: '2026-01-01', label: 'Week 0', values: [{ count: 10 }, { count: null }] },
+        ],
       });
 
       const out = await provider.getRetention();

@@ -17,10 +17,10 @@ import {
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import {
-  PosthogConfigService,
+  PostHogConfigService,
   type StoredPosthogConnection,
 } from '@/services/analytics/posthog-config.service.js';
-import { PosthogApiClient } from '@/services/analytics/posthog-api.client.js';
+import { PostHogApiService } from '@/services/analytics/posthog-api.service.js';
 import type { AnalyticsProvider } from './base.provider.js';
 
 // timeframe → PostHog dateRange.date_from + TrendsQuery.interval. Mirrors
@@ -63,22 +63,22 @@ function timeframeOf(raw: string): PosthogTimeframe {
 
 /**
  * Self-hosted analytics: talks to PostHog directly using the personal API key
- * stored by PosthogConfigService. The cloud path proxies the equivalent calls
+ * stored by PostHogConfigService. The cloud path proxies the equivalent calls
  * to cloud-backend, which holds an OAuth connection instead.
  */
-export class PostHogLocalProvider implements AnalyticsProvider {
-  private static instance: PostHogLocalProvider;
+export class LocalAnalyticsProvider implements AnalyticsProvider {
+  private static instance: LocalAnalyticsProvider;
 
   constructor(
-    private readonly config: PosthogConfigService = PosthogConfigService.getInstance(),
-    private readonly api: PosthogApiClient = PosthogApiClient.getInstance()
+    private readonly config: PostHogConfigService = PostHogConfigService.getInstance(),
+    private readonly api: PostHogApiService = PostHogApiService.getInstance()
   ) {}
 
-  static getInstance(): PostHogLocalProvider {
-    if (!PostHogLocalProvider.instance) {
-      PostHogLocalProvider.instance = new PostHogLocalProvider();
+  static getInstance(): LocalAnalyticsProvider {
+    if (!LocalAnalyticsProvider.instance) {
+      LocalAnalyticsProvider.instance = new LocalAnalyticsProvider();
     }
-    return PostHogLocalProvider.instance;
+    return LocalAnalyticsProvider.instance;
   }
 
   // Panel endpoints need a connection to do anything; 404 is what the dashboard's

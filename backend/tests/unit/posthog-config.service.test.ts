@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  PosthogConfigService,
+  PostHogConfigService,
   POSTHOG_CONNECTION_SECRET,
   type StoredPosthogConnection,
 } from '../../src/services/analytics/posthog-config.service.js';
@@ -51,13 +51,13 @@ function makeStore(initial: string | null = null) {
   };
 }
 
-describe('PosthogConfigService', () => {
+describe('PostHogConfigService', () => {
   let store: ReturnType<typeof makeStore>;
-  let service: PosthogConfigService;
+  let service: PostHogConfigService;
 
   beforeEach(() => {
     store = makeStore();
-    service = new PosthogConfigService(store as never);
+    service = new PostHogConfigService(store as never);
   });
 
   it('reports not-configured when nothing is stored', async () => {
@@ -138,21 +138,21 @@ describe('PosthogConfigService', () => {
 
   it('treats an unparsable stored row as not connected', async () => {
     store = makeStore('not json at all');
-    service = new PosthogConfigService(store as never);
+    service = new PostHogConfigService(store as never);
 
     await expect(service.getConnection()).resolves.toBeNull();
   });
 
   it('treats a row missing required fields as not connected', async () => {
     store = makeStore(JSON.stringify({ personalApiKey: PERSONAL_KEY }));
-    service = new PosthogConfigService(store as never);
+    service = new PostHogConfigService(store as never);
 
     await expect(service.getConnection()).resolves.toBeNull();
   });
 
   it('serves reads from cache and re-reads after a write', async () => {
     store = makeStore(JSON.stringify(connection()));
-    service = new PosthogConfigService(store as never);
+    service = new PostHogConfigService(store as never);
 
     await service.getConnection();
     await service.getConnection();

@@ -130,9 +130,9 @@ describe('AnalyticsService', () => {
         service.connect({ personalApiKey: PERSONAL_KEY, region: 'US' })
       ).rejects.toMatchObject({ statusCode: 400, code: ERROR_CODES.INVALID_INPUT });
       // Naming the options is what makes the error actionable.
-      await expect(
-        service.connect({ personalApiKey: PERSONAL_KEY, region: 'US' })
-      ).rejects.toThrow(/1 \(Web\), 2 \(Mobile\)/);
+      await expect(service.connect({ personalApiKey: PERSONAL_KEY, region: 'US' })).rejects.toThrow(
+        /1 \(Web\), 2 \(Mobile\)/
+      );
       expect(config.setConnection).not.toHaveBeenCalled();
     });
 
@@ -164,9 +164,9 @@ describe('AnalyticsService', () => {
     it('rejects a key with access to no projects', async () => {
       const { service } = makeService(makeDeps([]));
 
-      await expect(
-        service.connect({ personalApiKey: PERSONAL_KEY, region: 'US' })
-      ).rejects.toThrow(/does not have access to any project/);
+      await expect(service.connect({ personalApiKey: PERSONAL_KEY, region: 'US' })).rejects.toThrow(
+        /does not have access to any project/
+      );
     });
 
     it('stores an empty phc_ when PostHog omits api_token', async () => {
@@ -195,9 +195,9 @@ describe('AnalyticsService', () => {
       await expect(
         service.connect({ personalApiKey: PERSONAL_KEY, region: 'US' })
       ).rejects.toMatchObject({ statusCode: 400, code: ERROR_CODES.INVALID_INPUT });
-      await expect(
-        service.connect({ personalApiKey: PERSONAL_KEY, region: 'US' })
-      ).rejects.toThrow(/scopes/);
+      await expect(service.connect({ personalApiKey: PERSONAL_KEY, region: 'US' })).rejects.toThrow(
+        /scopes/
+      );
       expect(config.setConnection).not.toHaveBeenCalled();
     });
 
@@ -216,7 +216,9 @@ describe('AnalyticsService', () => {
       deps.api.listProjects.mockRejectedValue(authError(401));
       const { service, config } = makeService(deps);
 
-      await expect(service.connect({ personalApiKey: PERSONAL_KEY, region: 'US' })).rejects.toThrow();
+      await expect(
+        service.connect({ personalApiKey: PERSONAL_KEY, region: 'US' })
+      ).rejects.toThrow();
       expect(config.setConnection).not.toHaveBeenCalled();
     });
   });

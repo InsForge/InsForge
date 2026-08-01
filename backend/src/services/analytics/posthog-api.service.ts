@@ -57,14 +57,14 @@ export interface PosthogProjectSummary {
  * self-hosting talks to PostHog directly instead of proxying through
  * InsForge Cloud. Auth is always `Bearer <personal API key>`.
  */
-export class PosthogApiClient {
-  private static instance: PosthogApiClient;
+export class PostHogApiService {
+  private static instance: PostHogApiService;
 
-  static getInstance(): PosthogApiClient {
-    if (!PosthogApiClient.instance) {
-      PosthogApiClient.instance = new PosthogApiClient();
+  static getInstance(): PostHogApiService {
+    if (!PostHogApiService.instance) {
+      PostHogApiService.instance = new PostHogApiService();
     }
-    return PosthogApiClient.instance;
+    return PostHogApiService.instance;
   }
 
   // Defence in depth: validated at write time too, but re-checked here so a

@@ -31,18 +31,18 @@ export interface StoredPosthogConnection {
   createdAt: string;
 }
 
-export class PosthogConfigService {
-  private static instance: PosthogConfigService;
+export class PostHogConfigService {
+  private static instance: PostHogConfigService;
   private cached: { value: StoredPosthogConnection | null; expiresAt: number } | null = null;
   private cacheEpoch = 0;
 
   constructor(private readonly secretService: SecretStore = SecretService.getInstance()) {}
 
-  static getInstance(): PosthogConfigService {
-    if (!PosthogConfigService.instance) {
-      PosthogConfigService.instance = new PosthogConfigService();
+  static getInstance(): PostHogConfigService {
+    if (!PostHogConfigService.instance) {
+      PostHogConfigService.instance = new PostHogConfigService();
     }
-    return PosthogConfigService.instance;
+    return PostHogConfigService.instance;
   }
 
   // The encrypted secret store is the only source of truth for self-hosted
