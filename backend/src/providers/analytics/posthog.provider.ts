@@ -25,8 +25,9 @@ import {
   type PosthogRecordingsResponse,
   type PosthogShareTokenResponse,
 } from '@insforge/shared-schemas';
+import type { AnalyticsProvider } from './base.provider.js';
 
-export class PostHogProvider {
+export class PostHogProvider implements AnalyticsProvider {
   private static instance: PostHogProvider;
   private constructor() {}
   static getInstance(): PostHogProvider {
