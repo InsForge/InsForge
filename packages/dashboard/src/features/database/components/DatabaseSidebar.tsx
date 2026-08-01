@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Database, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Database, Pencil, Plus, Settings, Trash2 } from 'lucide-react';
 import { Link, useLocation, useMatch, useNavigate } from 'react-router-dom';
 import {
   EmptyStateIllustration,
@@ -12,6 +12,8 @@ import {
 import { ScrollArea } from '#components/radix/ScrollArea';
 import { Button, cn } from '@insforge/ui';
 import { DatabaseSchemaSelect } from '#features/database/components/DatabaseSchemaSelect';
+import { DatabaseSettingsDialog } from '#features/database/components/DatabaseSettingsDialog';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import type { DatabaseSchemaInfo } from '@insforge/shared-schemas';
 
 const DATABASE_STUDIO_SIDEBAR_BASE_ITEMS: Array<{
@@ -169,6 +171,10 @@ export function DatabaseSidebar({
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<'tables' | 'studio'>(initialMode);
+  // The settings dialog only holds backup schedule config, which the cloud
+  // control plane owns in cloud-hosting mode.
+  const isCloudHostingMode = useIsCloudHostingMode();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const showEmptyState = tables.length === 0;
   const navigateTimerRef = useRef<number | null>(null);
 
@@ -266,6 +272,18 @@ export function DatabaseSidebar({
         <div className="h-full w-1/2">
           <FeatureSidebar
             title={t('database.paneTitle')}
+            headerButtons={
+              isCloudHostingMode
+                ? undefined
+                : [
+                    {
+                      id: 'database-settings',
+                      label: t('database.settingsTitle', { defaultValue: 'Database Settings' }),
+                      icon: Settings,
+                      onClick: () => setSettingsOpen(true),
+                    },
+                  ]
+            }
             headerContent={
               <DatabaseSchemaSelect
                 schemas={schemas}
@@ -308,6 +326,12 @@ export function DatabaseSidebar({
           <DatabaseStudioSidebarPanel onBack={() => setMode('tables')} />
         </div>
       </div>
+
+      {/* Stays mounted (Radix close animation); its config query only runs
+          while open. */}
+      {!isCloudHostingMode && (
+        <DatabaseSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      )}
     </div>
   );
 }

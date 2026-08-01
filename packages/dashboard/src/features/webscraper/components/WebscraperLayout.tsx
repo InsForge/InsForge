@@ -4,16 +4,19 @@ import { Outlet, useOutletContext } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, useToast } from '@insforge/ui';
 import { ErrorState, LoadingState } from '#components';
-import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { useProjectId } from '#lib/hooks/useMetadata';
 import { webscraperQueryKeys, useApifyConnection } from '#features/webscraper/hooks/useWebscraper';
 import type { ApifyConnection } from '#features/webscraper/services/webscraper.service';
 import { ApifyConnectPanel } from './ApifyConnectPanel';
+import { ApifyTokenForm } from './ApifyTokenForm';
 import { WebscraperSidebar } from './WebscraperSidebar';
 
 export interface WebscraperOutletContext {
   connection: ApifyConnection;
-  projectId: string;
+  // Undefined on self-hosted deployments: they leave PROJECT_ID empty by design
+  // (.env.example), and the id is only ever needed by the cloud OAuth handoff.
+  projectId: string | undefined;
 }
 
 export function useWebscraperContext() {
@@ -23,10 +26,17 @@ export function useWebscraperContext() {
 export default function WebscraperLayout() {
   const { t } = useTranslation('chrome');
   const conn = useApifyConnection();
-  const { projectId, isLoading: projectIdLoading } = useProjectId();
+  // `useProjectId()` reports "not fetched yet" as undefined and "this backend
+  // has no project id" as null. Downstream only cares that there is not one.
+  const { projectId: fetchedProjectId, isLoading: projectIdLoading } = useProjectId();
+  const projectId = fetchedProjectId ?? undefined;
   const qc = useQueryClient();
   const { showToast } = useToast();
   const { subscribeApifyConnectionStatus, onConnectApify } = useDashboardHost();
+  // The host tells us its mode outright, so read that rather than inferring it
+  // from a callback that merely happens to be cloud-only today. Two signals for
+  // one fact is how the earlier misclassification bug got in.
+  const isSelfHosted = !useIsCloudHostingMode();
 
   // OAuth completes in the parent cloud shell, which posts the result back here.
   useEffect(() => {
@@ -90,7 +100,12 @@ export default function WebscraperLayout() {
       </div>
     );
   }
-  if (!projectId) {
+  // Cloud only. `projectId` is consumed in exactly one place — as the argument
+  // to `onConnectApify`, the cloud OAuth handoff — so a cloud project without
+  // one genuinely cannot connect and must say so. Self-hosted deployments have
+  // no project id by design and need none, so they fall through to the normal
+  // layout instead of a full-page error the admin can never clear.
+  if (!projectId && !isSelfHosted) {
     return (
       <div className="flex h-full min-h-0 items-center justify-center px-6">
         <div className="w-full max-w-[420px]">
@@ -136,25 +151,48 @@ export default function WebscraperLayout() {
           </div>
         ) : (
           <>
-            {unhealthy && (
-              <div className="flex items-center justify-between gap-3 border-b border-warning bg-warning/10 px-6 py-3">
-                <p className="text-sm text-warning">
-                  {t('webscraper.connectionUnhealthy', {
-                    defaultValue:
-                      'Apify connection is {{status}}. Token refresh may have failed, reconnect to restore access.',
-                    status: connection.status,
-                  })}
-                </p>
-                <Button
-                  variant="secondary"
-                  disabled={!onConnectApify}
-                  onClick={() => onConnectApify?.(projectId)}
-                  className="shrink-0"
-                >
-                  {t('webscraper.reconnect', { defaultValue: 'Reconnect' })}
-                </Button>
-              </div>
-            )}
+            {unhealthy &&
+              // Self-hosting has no OAuth and no refresh token, so "reconnect"
+              // is not a thing the admin can do — replacing the stored API
+              // token is. Offer the same form the connect panel and the
+              // settings dialog use rather than a button wired to a callback
+              // that is never supplied off-cloud.
+              (isSelfHosted ? (
+                <div className="flex flex-col gap-2 border-b border-warning bg-warning/10 px-6 py-3">
+                  <p className="text-sm text-warning">
+                    {t('webscraper.connectionUnhealthySelfHosted', {
+                      defaultValue:
+                        'Apify connection is {{status}}. Replace the API token below to restore access.',
+                      status: connection.status,
+                    })}
+                  </p>
+                  <ApifyTokenForm />
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-3 border-b border-warning bg-warning/10 px-6 py-3">
+                  <p className="text-sm text-warning">
+                    {t('webscraper.connectionUnhealthy', {
+                      defaultValue:
+                        'Apify connection is {{status}}. Token refresh may have failed, reconnect to restore access.',
+                      status: connection.status,
+                    })}
+                  </p>
+                  <Button
+                    variant="secondary"
+                    disabled={!onConnectApify}
+                    onClick={() => {
+                      // `projectId` is always set on this branch — the gate
+                      // above returns early for a cloud project without one.
+                      if (projectId) {
+                        onConnectApify?.(projectId);
+                      }
+                    }}
+                    className="shrink-0"
+                  >
+                    {t('webscraper.reconnect', { defaultValue: 'Reconnect' })}
+                  </Button>
+                </div>
+              ))}
             <div className="min-h-0 flex-1 overflow-hidden">
               <Outlet context={{ connection, projectId } satisfies WebscraperOutletContext} />
             </div>

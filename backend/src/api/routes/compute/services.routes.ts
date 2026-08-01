@@ -6,8 +6,7 @@ import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, createServiceSchema, updateServiceSchema } from '@insforge/shared-schemas';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 import logger from '@/utils/logger.js';
 
 const router = Router();
@@ -27,13 +26,7 @@ function bestEffortAudit(params: Parameters<typeof auditService.log>[0]) {
 
 function bestEffortBroadcast() {
   try {
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom(
-      'role:project_admin',
-      ServerEvents.DATA_UPDATE,
-      { resource: DataUpdateResourceType.COMPUTE_SERVICES },
-      'system'
-    );
+    dashboardEventService.publishDataUpdate({ resource: 'compute_services' });
   } catch (err) {
     logger.error('Socket broadcast failed (best-effort)', { error: err });
   }

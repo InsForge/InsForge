@@ -14,6 +14,7 @@ function toDashboardBackup(backup: DatabaseBackup): DashboardBackup {
     errorMessage: backup.errorMessage,
     createdAt: backup.createdAt,
     createdBy: backup.createdBy,
+    expiresAt: backup.expiresAt ?? undefined,
   };
 }
 

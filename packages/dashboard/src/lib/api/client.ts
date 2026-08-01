@@ -156,6 +156,49 @@ export class ApiClient {
     return makeRequest();
   }
 
+  requestStream(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    const url = `${getDashboardApiBaseUrl()}${endpoint}`;
+
+    const makeRequest = async (isRetry = false): Promise<Response> => {
+      const headers: Record<string, string> = {
+        ...((options.headers as Record<string, string>) || {}),
+        ...(this.accessToken && { Authorization: `Bearer ${this.accessToken}` }),
+      };
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        credentials: 'include',
+      });
+
+      if (response.status === 401 && !isRetry) {
+        await response.body?.cancel();
+        if (!this.refreshPromise && this.onRefreshAccessToken) {
+          this.refreshPromise = this.onRefreshAccessToken().finally(() => {
+            this.refreshPromise = null;
+          });
+        }
+
+        const refreshed = await this.refreshPromise;
+        if (refreshed) {
+          return makeRequest(true);
+        }
+        this.clearTokens();
+        this.onAuthError?.();
+      }
+
+      if (!response.ok) {
+        await response.body?.cancel();
+        const error: ApiError = new Error(`HTTP ${response.status}: ${response.statusText}`);
+        error.response = { data: null, status: response.status };
+        throw error;
+      }
+
+      return response;
+    };
+
+    return makeRequest();
+  }
+
   withAccessToken(headers: Record<string, string> = {}) {
     return this.accessToken ? { ...headers, Authorization: `Bearer ${this.accessToken}` } : headers;
   }

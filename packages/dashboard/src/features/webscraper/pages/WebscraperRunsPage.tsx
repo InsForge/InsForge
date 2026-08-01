@@ -13,6 +13,7 @@ import { useApifyActors, useApifyRuns } from '#features/webscraper/hooks/useWebs
 import { useClientPagination } from '#features/webscraper/hooks/useClientPagination';
 import type { ApifyRun } from '#features/webscraper/services/webscraper.service';
 import { useWebscraperContext } from '#features/webscraper/components/WebscraperLayout';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import {
   APIFY_CONSOLE_URL,
   RunStatusBadge,
@@ -97,6 +98,9 @@ export function WebscraperRunsPage() {
   const { t } = useTranslation('chrome');
   const { connection } = useWebscraperContext();
   const isActive = connection.status === 'active';
+  // Self-hosting has no OAuth to reconnect to; the way back is a new API token,
+  // offered by the banner WebscraperLayout renders above these tabs.
+  const isSelfHosted = !useIsCloudHostingMode();
   const runs = useApifyRuns(isActive);
   const actors = useApifyActors(isActive);
   const [search, setSearch] = useState('');
@@ -150,9 +154,15 @@ export function WebscraperRunsPage() {
       <div className="relative min-h-0 flex-1">
         {!isActive ? (
           <EmptyMessage
-            message={t('webscraper.reconnectToLoadRuns', {
-              defaultValue: 'Reconnect to load runs.',
-            })}
+            message={
+              isSelfHosted
+                ? t('webscraper.replaceTokenToLoadRuns', {
+                    defaultValue: 'Replace your Apify API token to load runs.',
+                  })
+                : t('webscraper.reconnectToLoadRuns', {
+                    defaultValue: 'Reconnect to load runs.',
+                  })
+            }
           />
         ) : runs.isError ? (
           <div className="flex h-full items-center justify-center px-6">

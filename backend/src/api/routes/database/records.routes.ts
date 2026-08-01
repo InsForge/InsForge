@@ -8,11 +8,10 @@ import { validateTableName } from '@/utils/validations.js';
 import { DatabaseRecord } from '@/types/database.js';
 import { TEXT_LIKE_DATA_TYPES } from '@/utils/constants.js';
 import { successResponse } from '@/utils/response.js';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 import { PostgrestProxyService } from '@/services/database/postgrest-proxy.service.js';
-import { resolvePostgrestSchema } from '@/services/database/helpers.js';
+import { buildQualifiedTableKey, resolvePostgrestSchema } from '@/services/database/helpers.js';
+import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 
 const router = Router();
 const proxyService = PostgrestProxyService.getInstance();
@@ -117,18 +116,16 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
       responseData = [];
     }
 
-    // Broadcast socket events for mutations
+    // Notify the dashboard about record mutations.
     if (['POST', 'DELETE', 'PATCH', 'PUT'].includes(method)) {
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        {
-          resource: DataUpdateResourceType.DATABASE,
-          data: { changes: [{ type: 'records', name: tableName }] as DatabaseResourceUpdate[] },
+      dashboardEventService.publishDataUpdate({
+        resource: 'database',
+        data: {
+          changes: [
+            { type: 'records', name: buildQualifiedTableKey(tableName, schemaName) },
+          ] as DatabaseResourceUpdate[],
         },
-        'system'
-      );
+      });
     }
 
     successResponse(res, responseData, result.status);

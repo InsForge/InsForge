@@ -14,6 +14,7 @@ import { useApifyActors } from '#features/webscraper/hooks/useWebscraper';
 import { useClientPagination } from '#features/webscraper/hooks/useClientPagination';
 import type { ApifyActor } from '#features/webscraper/services/webscraper.service';
 import { useWebscraperContext } from '#features/webscraper/components/WebscraperLayout';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { APIFY_CONSOLE_URL, fmtTime } from '#features/webscraper/components/shared';
 
 type ActorRow = ApifyActor & {
@@ -88,6 +89,9 @@ export function WebscraperActorsPage() {
   const { t } = useTranslation('chrome');
   const { connection } = useWebscraperContext();
   const isActive = connection.status === 'active';
+  // Self-hosting has no OAuth to reconnect to; the way back is a new API token,
+  // offered by the banner WebscraperLayout renders above these tabs.
+  const isSelfHosted = !useIsCloudHostingMode();
   const actors = useApifyActors(isActive);
   const [search, setSearch] = useState('');
   const columns = useMemo(() => getColumns(t), [t]);
@@ -122,9 +126,15 @@ export function WebscraperActorsPage() {
       <div className="relative min-h-0 flex-1">
         {!isActive ? (
           <EmptyMessage
-            message={t('webscraper.reconnectToLoadActors', {
-              defaultValue: 'Reconnect to load actors.',
-            })}
+            message={
+              isSelfHosted
+                ? t('webscraper.replaceTokenToLoadActors', {
+                    defaultValue: 'Replace your Apify API token to load actors.',
+                  })
+                : t('webscraper.reconnectToLoadActors', {
+                    defaultValue: 'Reconnect to load actors.',
+                  })
+            }
           />
         ) : actors.isError ? (
           <div className="flex h-full items-center justify-center px-6">
