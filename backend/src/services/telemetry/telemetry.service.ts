@@ -6,6 +6,7 @@ import fetch from 'node-fetch';
 import { appConfig } from '@/infra/config/app.config.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
+import { FeatureUsageCollector } from './feature-usage.collector.js';
 import packageJson from '../../../../package.json';
 
 export type TelemetryEventName = 'instance_started' | 'heartbeat';
@@ -45,6 +46,11 @@ interface PostHogTelemetryEvent {
       compute_configured: boolean;
       openrouter_configured: boolean;
     };
+    // Features touched since the previous heartbeat. Present on heartbeat
+    // events only: an instance_started event is emitted before any traffic
+    // exists.
+    features_used?: string[];
+    features_used_window_ms?: number;
   };
 }
 
@@ -86,7 +92,7 @@ function detectRuntimeEnvironment(): TelemetryRuntimeEnvironment {
   return 'unknown';
 }
 
-function isTelemetryRuntimeDisabled(): boolean {
+export function isTelemetryRuntimeDisabled(): boolean {
   return appConfig.telemetry.disabled || isCloudEnvironment();
 }
 
@@ -108,7 +114,8 @@ export class TelemetryService {
 
   public constructor(
     private readonly config: TelemetryConfig = defaultTelemetryConfig(),
-    private readonly fetchImpl: FetchFunction = fetch
+    private readonly fetchImpl: FetchFunction = fetch,
+    private readonly featureUsage: FeatureUsageCollector = FeatureUsageCollector.getInstance()
   ) {}
 
   public static getInstance(): TelemetryService {
@@ -138,6 +145,17 @@ export class TelemetryService {
 
     clearInterval(this.heartbeatTimer);
     this.heartbeatTimer = undefined;
+  }
+
+  /**
+   * Stops the heartbeat and reports the features used since the last one.
+   * Without this, an instance that runs for less than the heartbeat interval —
+   * the short-lived and trial deployments most worth measuring — would report
+   * no feature usage at all.
+   */
+  public async shutdown(): Promise<void> {
+    this.stop();
+    await this.sendEvent('heartbeat');
   }
 
   public async sendEvent(eventName: TelemetryEventName): Promise<void> {
@@ -227,6 +245,10 @@ export class TelemetryService {
   }
 
   private buildEvent(eventName: TelemetryEventName, installationId: string): PostHogTelemetryEvent {
+    // Draining resets the window, so it must happen only for events that
+    // actually carry the feature list.
+    const usage = eventName === 'heartbeat' ? this.featureUsage.drain() : undefined;
+
     return {
       api_key: this.config.posthogApiKey,
       event: POSTHOG_EVENT_NAMES[eventName],
@@ -258,6 +280,12 @@ export class TelemetryService {
           compute_configured: Boolean(appConfig.fly.apiToken && appConfig.fly.org),
           openrouter_configured: Boolean(appConfig.ai.openrouterApiKey),
         },
+        ...(usage
+          ? {
+              features_used: usage.featuresUsed,
+              features_used_window_ms: usage.windowMs,
+            }
+          : {}),
       },
     };
   }

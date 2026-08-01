@@ -43,7 +43,11 @@ import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
 import { webscraperRouter } from '@/api/routes/webscraper/index.routes.js';
 import { appConfig } from '@/infra/config/app.config.js';
-import { TelemetryService } from '@/services/telemetry/telemetry.service.js';
+import {
+  TelemetryService,
+  isTelemetryRuntimeDisabled,
+} from '@/services/telemetry/telemetry.service.js';
+import { FeatureUsageCollector } from '@/services/telemetry/feature-usage.collector.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { DatabaseBackupService } from '@/services/database/database-backup.service.js';
 const __filename = fileURLToPath(import.meta.url);
@@ -156,6 +160,19 @@ export async function createApp() {
 
     next();
   });
+
+  // Count feature usage for anonymous telemetry. Registered before every route
+  // so the /api routers, the S3 protocol gateway, and direct edge-function
+  // invocations are all covered, and before any router rewrites req.url for
+  // its mount path. Skipped entirely when telemetry is off, so no counters
+  // accumulate that nothing will ever drain.
+  if (!isTelemetryRuntimeDisabled()) {
+    const featureUsage = FeatureUsageCollector.getInstance();
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      featureUsage.track(req, res);
+      next();
+    });
+  }
 
   // Mount webhooks with raw body parser BEFORE JSON middleware
   // This ensures signature verification uses the original bytes
@@ -404,7 +421,7 @@ async function cleanup() {
   }
 
   try {
-    TelemetryService.getInstance().stop();
+    await TelemetryService.getInstance().shutdown();
   } catch (error) {
     logger.error('Error closing TelemetryService', {
       error: error instanceof Error ? error.message : String(error),
