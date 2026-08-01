@@ -148,7 +148,7 @@ describe('TelemetryService', () => {
     expect(properties.features_used_window_ms).toEqual(expect.any(Number));
   });
 
-  it('drains the feature list per heartbeat and omits it from instance_started', async () => {
+  it('clears the feature list after each delivered heartbeat and omits it from instance_started', async () => {
     const config = makeConfig();
     const fetchMock = makeFetchMock();
     const featureUsage = new FeatureUsageCollector();
@@ -184,9 +184,9 @@ describe('TelemetryService', () => {
     await new TelemetryService(config, retryFetch, featureUsage).sendEvent('heartbeat');
 
     // The next heartbeat carries it, and only then is it released.
-    expect((getPostedBody(retryFetch).properties as Record<string, unknown>).features_used).toEqual([
-      'database',
-    ]);
+    expect((getPostedBody(retryFetch).properties as Record<string, unknown>).features_used).toEqual(
+      ['database']
+    );
     expect(featureUsage.snapshot().featuresUsed).toEqual([]);
   });
 
