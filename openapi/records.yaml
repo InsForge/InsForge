@@ -323,6 +323,28 @@ paths:
                 no_records:
                   summary: No records found to delete
                   value: []
+        '404':
+          description: Table not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "TABLE_NOT_FOUND"
+                message: "Table 'nonexistent' does not exist"
+                statusCode: 404
+                nextActions: "Check table name and try again"
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "INVALID_QUERY"
+                message: "Invalid filter syntax"
+                statusCode: 400
+                nextActions: "Check PostgREST filter documentation"
 
 components:
   securitySchemes:
