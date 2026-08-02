@@ -259,10 +259,10 @@ description: "Answers to common InsForge questions on database calls, edge funct
 
     ```bash
     # Custom-format dump
-    pg_restore --no-owner -d "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" local.dump
+    pg_restore --no-owner --single-transaction -d "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" local.dump
 
     # ...or a plain SQL file
-    psql "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" < local.sql
+    psql --single-transaction "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" < local.sql
     ```
 
     A few things to keep in mind:
@@ -271,7 +271,8 @@ description: "Answers to common InsForge questions on database calls, edge funct
     - The connection string connects as the privileged `postgres` role (it bypasses row-level security), so treat it as a secret and run these commands server-side only.
     - This works for **cloud projects only**. On a self-hosted instance, restore against your local Postgres credentials (the `DATABASE_URL` / `POSTGRES_*` values from your `.env`) instead.
     - A restore writes into your live database and can overwrite existing objects. Take a manual backup first — see [Database backups and restore](/core-concepts/database/backups).
-    - Once imported, each table is exposed as a REST and SDK endpoint like any other InsForge table. If you'd rather version schema changes in git, see [Database migrations](/core-concepts/database/migrations).
+    - `--single-transaction` runs the restore as one transaction, so if a statement fails (a conflicting object, a missing extension or role, a constraint error) the whole import rolls back instead of leaving the database half-restored.
+    - Imported tables do **not** get InsForge's managed access automatically. A raw restore skips the `anon` / `authenticated` grants and row-level security InsForge applies, so imported tables are **not** reachable through the REST API or SDK — and any access rules from your source dump don't carry InsForge's RLS protection — until you grant access and add RLS policies for each table (see [Database](/core-concepts/database/overview)). If you'd rather version schema changes in git, see [Database migrations](/core-concepts/database/migrations).
   </Accordion>
 
   <Accordion title="How do I take down or remove a deployed site?">

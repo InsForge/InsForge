@@ -259,10 +259,10 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
 
     ```bash
     # Volcado en formato personalizado
-    pg_restore --no-owner -d "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" local.dump
+    pg_restore --no-owner --single-transaction -d "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" local.dump
 
     # ...o un archivo SQL plano
-    psql "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" < local.sql
+    psql --single-transaction "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" < local.sql
     ```
 
     Algunas cosas a tener en cuenta:
@@ -271,7 +271,8 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     - La cadena de conexión se conecta con el rol privilegiado `postgres` (omite row-level security), así que trátala como un secreto y ejecuta estos comandos solo en el servidor.
     - Esto funciona **solo para proyectos cloud**. En una instancia autoalojada, restaura contra tus credenciales de Postgres locales (los valores `DATABASE_URL` / `POSTGRES_*` de tu `.env`).
     - Una restauración escribe en tu base de datos en vivo y puede sobrescribir objetos existentes. Haz primero una copia de seguridad manual — consulta [Copias de seguridad y restauración de la base de datos](/core-concepts/database/backups).
-    - Una vez importada, cada tabla queda expuesta como un endpoint REST y de SDK, igual que cualquier otra tabla de InsForge. Si prefieres versionar los cambios de esquema en git, consulta [Migraciones de base de datos](/core-concepts/database/migrations).
+    - `--single-transaction` ejecuta el restore como una sola transacción, así que si alguna sentencia falla (un objeto en conflicto, una extensión o rol que falta, un error de restricción) toda la importación se revierte en lugar de dejar la base de datos a medio restaurar.
+    - Las tablas importadas **no** obtienen el acceso gestionado de InsForge automáticamente. Un restore directo se salta los permisos de los roles `anon` / `authenticated` y la seguridad a nivel de fila (RLS) que InsForge aplica, así que las tablas importadas **no** son accesibles a través de la API REST ni del SDK —y las reglas de acceso de tu volcado de origen no llevan la protección RLS de InsForge— hasta que concedas acceso y añadas políticas de RLS a cada tabla (consulta [Base de datos](/core-concepts/database/overview)). Si prefieres versionar los cambios de esquema en git, consulta [Migraciones de base de datos](/core-concepts/database/migrations).
   </Accordion>
 
   <Accordion title="¿Cómo doy de baja o elimino un sitio desplegado?">
