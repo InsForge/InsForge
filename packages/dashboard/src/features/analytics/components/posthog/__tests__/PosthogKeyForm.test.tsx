@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -13,6 +13,14 @@ const { listPosthogProjects, updatePosthogConfig } = vi.hoisted(() => ({
 vi.mock('#features/analytics/services/analytics.service', () => ({
   analyticsService: { listPosthogProjects, updatePosthogConfig },
 }));
+
+// jsdom lacks the pointer-capture and scroll APIs Radix Select drives.
+beforeAll(() => {
+  Element.prototype.hasPointerCapture = () => false;
+  Element.prototype.setPointerCapture = () => {};
+  Element.prototype.releasePointerCapture = () => {};
+  Element.prototype.scrollIntoView = () => {};
+});
 
 const KEY = 'phx_AaBbCcDdEeFf';
 
@@ -72,15 +80,20 @@ describe('PosthogKeyForm', () => {
     await submit();
 
     expect(await screen.findByLabelText(/posthog project/i)).toBeInTheDocument();
-    // Nothing written yet — the ambiguity has to be resolved first.
+    // Nothing written yet, and nothing preselected — the submit beside the
+    // picker stays disabled until the ambiguity is resolved explicitly.
     expect(updatePosthogConfig).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /connect posthog/i })).toBeDisabled();
 
+    await userEvent.click(screen.getByLabelText(/posthog project/i));
+    await userEvent.click(await screen.findByRole('option', { name: /mobile/i }));
     await submit();
+
     await waitFor(() =>
       expect(updatePosthogConfig).toHaveBeenCalledWith({
         personalApiKey: KEY,
         region: 'US',
-        posthogProjectId: '1',
+        posthogProjectId: '2',
       })
     );
   });

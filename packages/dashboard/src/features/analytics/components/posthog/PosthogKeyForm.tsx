@@ -91,7 +91,6 @@ export function PosthogKeyForm() {
       // Ambiguous — show the picker rather than guessing, which would silently
       // wire the dashboard to the wrong product's data.
       setChoices(projects);
-      setChosenId(projects[0]?.posthogProjectId ?? '');
     } catch {
       // Swallowed — the mutation's own `error` state drives the message below.
     }
@@ -135,16 +134,18 @@ export function PosthogKeyForm() {
             <SelectItem value="EU">EU</SelectItem>
           </SelectContent>
         </Select>
-        <Button
-          type="submit"
-          variant="primary"
-          className="shrink-0"
-          disabled={!personalApiKey.trim() || isPending || (choices.length > 0 && !chosenId)}
-        >
-          {isPending
-            ? t('analytics.connecting', { defaultValue: 'Connecting…' })
-            : t('analytics.connectPosthog', { defaultValue: 'Connect PostHog' })}
-        </Button>
+        {choices.length === 0 ? (
+          <Button
+            type="submit"
+            variant="primary"
+            className="shrink-0"
+            disabled={!personalApiKey.trim() || isPending}
+          >
+            {isPending
+              ? t('analytics.connecting', { defaultValue: 'Connecting…' })
+              : t('analytics.connectPosthog', { defaultValue: 'Connect PostHog' })}
+          </Button>
+        ) : null}
       </div>
 
       {choices.length > 0 ? (
@@ -154,20 +155,38 @@ export function PosthogKeyForm() {
               defaultValue: 'This key can see several PostHog projects. Choose one:',
             })}
           </p>
-          <Select value={chosenId} onValueChange={setChosenId}>
-            <SelectTrigger className="max-w-md" aria-label="PostHog project">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {choices.map((project) => (
-                <SelectItem key={project.posthogProjectId} value={project.posthogProjectId}>
-                  {project.organizationName
-                    ? `${project.organizationName} / ${project.name}`
-                    : project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-start gap-2">
+            <Select value={chosenId} onValueChange={setChosenId}>
+              <SelectTrigger className="min-w-0 max-w-md flex-1" aria-label="PostHog project">
+                <SelectValue
+                  placeholder={t('analytics.posthogChooseProject', {
+                    defaultValue: 'Choose a project…',
+                  })}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {choices.map((project) => (
+                  <SelectItem key={project.posthogProjectId} value={project.posthogProjectId}>
+                    {project.organizationName
+                      ? `${project.organizationName} / ${project.name}`
+                      : project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* The submit lives beside the picker in this phase — the next
+                action sits next to the control that unlocks it. */}
+            <Button
+              type="submit"
+              variant="primary"
+              className="shrink-0"
+              disabled={!chosenId || isPending}
+            >
+              {isPending
+                ? t('analytics.connecting', { defaultValue: 'Connecting…' })
+                : t('analytics.connectPosthog', { defaultValue: 'Connect PostHog' })}
+            </Button>
+          </div>
         </div>
       ) : null}
 
