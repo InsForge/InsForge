@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const queryMock = vi.hoisted(() => vi.fn());
 
@@ -19,6 +19,14 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
 }));
 
 import { ScheduleService } from '../../src/services/schedules/schedule.service.js';
+
+beforeEach(() => {
+  queryMock.mockReset();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('ScheduleService outbound URL validation', () => {
   it('rejects private schedule destinations', async () => {
@@ -66,7 +74,7 @@ describe('ScheduleService outbound URL validation', () => {
     expect(queryMock).not.toHaveBeenCalled();
   });
 
-  it('does not re-resolve a stored URL when updating unrelated fields', async () => {
+  it('preserves the stored pinned target when updating unrelated fields', async () => {
     const service = ScheduleService.getInstance();
     const schedule = {
       id: '00000000-0000-0000-0000-000000000001',
@@ -88,5 +96,6 @@ describe('ScheduleService outbound URL validation', () => {
 
     await expect(service.updateSchedule(schedule.id, { name: 'renamed' })).resolves.toBeTruthy();
     expect(queryMock).toHaveBeenCalled();
+    expect(queryMock.mock.calls[0][1]?.[8]).toBeNull();
   });
 });

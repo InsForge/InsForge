@@ -7,6 +7,9 @@
 ALTER TABLE schedules.jobs
   ADD COLUMN IF NOT EXISTS resolved_target JSONB;
 
+ALTER TABLE schedules.jobs
+  ADD COLUMN IF NOT EXISTS legacy_unpinned BOOLEAN NOT NULL DEFAULT FALSE;
+
 CREATE OR REPLACE FUNCTION schedules.is_safe_url(p_url TEXT)
 RETURNS BOOLEAN AS $$
 DECLARE
@@ -69,6 +72,7 @@ BEGIN
     v_ip <<= '198.51.100.0/24'::CIDR OR
     v_ip <<= '203.0.113.0/24'::CIDR OR
     v_ip <<= '224.0.0.0/4'::CIDR OR
+    v_ip <<= '240.0.0.0/4'::CIDR OR
     v_ip <<= '::/128'::CIDR OR
     v_ip <<= '::1/128'::CIDR OR
     v_ip <<= '::ffff:0:0/96'::CIDR OR
@@ -100,13 +104,24 @@ DECLARE
   v_new_cron_id BIGINT;
   v_function_call TEXT;
   v_encrypted_headers TEXT;
+  v_resolved_target JSONB;
 BEGIN
+  SELECT j.cron_job_id, j.resolved_target
+  INTO v_existing_cron_id, v_resolved_target
+  FROM schedules.jobs AS j
+  WHERE j.id = p_job_id;
+
+  v_resolved_target := COALESCE(p_resolved_target, v_resolved_target);
+
   IF NOT schedules.is_safe_url(p_function_url) OR
-     p_resolved_target IS NULL OR
-     (COALESCE((p_resolved_target->>'allowPrivateNetworks')::BOOLEAN, FALSE) = FALSE AND
+     v_resolved_target IS NULL OR
+     v_resolved_target->>'rawUrl' IS DISTINCT FROM p_function_url OR
+     jsonb_array_length(COALESCE(v_resolved_target->'addresses', '[]'::JSONB)) = 0 OR
+     (COALESCE((v_resolved_target->>'allowPrivateNetworks')::BOOLEAN, FALSE) = FALSE AND
+      COALESCE((v_resolved_target->>'allowlistedHost')::BOOLEAN, FALSE) = FALSE AND
       EXISTS (
         SELECT 1
-        FROM jsonb_array_elements_text(COALESCE(p_resolved_target->'addresses', '[]'::JSONB)) AS address
+        FROM jsonb_array_elements_text(COALESCE(v_resolved_target->'addresses', '[]'::JSONB)) AS address
         WHERE NOT schedules.is_safe_address(address)
       )) THEN
     RETURN QUERY SELECT NULL::BIGINT, FALSE, 'Scheduled URL failed outbound policy validation';
@@ -114,10 +129,6 @@ BEGIN
   END IF;
 
   v_encrypted_headers := schedules.encrypt_headers(p_resolved_headers);
-
-  SELECT j.cron_job_id INTO v_existing_cron_id
-  FROM schedules.jobs AS j
-  WHERE j.id = p_job_id;
 
   IF v_existing_cron_id IS NOT NULL THEN
     PERFORM cron.unschedule(v_existing_cron_id);
@@ -128,10 +139,10 @@ BEGIN
 
   INSERT INTO schedules.jobs (
     id, name, cron_schedule, function_url, http_method, encrypted_headers, headers, body,
-    resolved_target, cron_job_id, is_active, created_at, updated_at
+    resolved_target, legacy_unpinned, cron_job_id, is_active, created_at, updated_at
   ) VALUES (
     p_job_id, p_name, p_cron_expression, p_function_url, p_http_method, v_encrypted_headers,
-    p_headers_template, p_body, p_resolved_target, v_new_cron_id, TRUE, NOW(), NOW()
+    p_headers_template, p_body, v_resolved_target, FALSE, v_new_cron_id, TRUE, NOW(), NOW()
   ) ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
     cron_schedule = EXCLUDED.cron_schedule,
@@ -141,13 +152,15 @@ BEGIN
     headers = EXCLUDED.headers,
     body = EXCLUDED.body,
     resolved_target = EXCLUDED.resolved_target,
+    legacy_unpinned = FALSE,
     cron_job_id = EXCLUDED.cron_job_id,
     is_active = TRUE,
     updated_at = NOW();
 
   RETURN QUERY SELECT v_new_cron_id, TRUE, 'Cron job scheduled successfully';
 EXCEPTION WHEN OTHERS THEN
-  RETURN QUERY SELECT NULL::BIGINT, FALSE, SQLERRM;
+  RAISE WARNING 'schedules.upsert_job failed for job %: %', p_job_id, SQLERRM;
+  RETURN QUERY SELECT NULL::BIGINT, FALSE, 'Failed to schedule job';
 END;
 $$ LANGUAGE plpgsql;
 
@@ -162,6 +175,7 @@ DECLARE
   v_decrypted_headers JSONB;
   v_final_body JSONB;
   v_resolved_target JSONB;
+  v_legacy_unpinned BOOLEAN;
   v_start_time TIMESTAMP := clock_timestamp();
   v_end_time TIMESTAMP;
   v_duration_ms BIGINT;
@@ -177,7 +191,8 @@ BEGIN
     j.http_method,
     j.body,
     j.encrypted_headers,
-    j.resolved_target
+    j.resolved_target,
+    j.legacy_unpinned
   INTO v_job
   FROM schedules.jobs AS j
   WHERE j.id = p_job_id;
@@ -199,15 +214,16 @@ BEGIN
     RETURN;
   END IF;
 
-  IF v_job.resolved_target IS NULL OR
+  IF NOT v_job.legacy_unpinned AND (v_job.resolved_target IS NULL OR
      v_job.resolved_target->>'rawUrl' <> v_job.function_url OR
      jsonb_array_length(COALESCE(v_job.resolved_target->'addresses', '[]'::JSONB)) = 0 OR
      (COALESCE((v_job.resolved_target->>'allowPrivateNetworks')::BOOLEAN, FALSE) = FALSE AND
+      COALESCE((v_job.resolved_target->>'allowlistedHost')::BOOLEAN, FALSE) = FALSE AND
       EXISTS (
         SELECT 1
         FROM jsonb_array_elements_text(COALESCE(v_job.resolved_target->'addresses', '[]'::JSONB)) AS address
         WHERE NOT schedules.is_safe_address(address)
-      )) THEN
+       )) THEN
     PERFORM schedules.log_job_execution(
       v_job.id,
       v_job.name,
@@ -219,16 +235,24 @@ BEGIN
     RETURN;
   END IF;
 
-  v_resolved_target := v_job.resolved_target;
-  PERFORM http_set_curlopt(
-    'CURLOPT_RESOLVE',
-    format(
-      '%s:%s:%s',
-      v_resolved_target->>'hostname',
-      v_resolved_target->>'port',
-      v_resolved_target->'addresses'->>0
-    )
-  );
+  IF v_job.legacy_unpinned THEN
+    PERFORM http_set_curlopt('CURLOPT_RESOLVE', '');
+  ELSE
+    v_resolved_target := v_job.resolved_target;
+    PERFORM http_set_curlopt(
+      'CURLOPT_RESOLVE',
+      format(
+        '%s:%s:%s',
+        v_resolved_target->>'hostname',
+        v_resolved_target->>'port',
+        CASE
+          WHEN position(':' IN v_resolved_target->'addresses'->>0) > 0
+            THEN '[' || (v_resolved_target->'addresses'->>0) || ']'
+          ELSE v_resolved_target->'addresses'->>0
+        END
+      )
+    );
+  END IF;
 
   BEGIN
     v_decrypted_headers := schedules.decrypt_headers(v_job.encrypted_headers);
@@ -256,10 +280,12 @@ BEGIN
       v_error_message
     );
   EXCEPTION WHEN OTHERS THEN
+    PERFORM http_set_curlopt('CURLOPT_RESOLVE', '');
     v_end_time := clock_timestamp();
     v_duration_ms := EXTRACT(EPOCH FROM (v_end_time - v_start_time)) * 1000;
     PERFORM schedules.log_job_execution(v_job.id, v_job.name, FALSE, 500, v_duration_ms, SQLERRM);
   END;
+  PERFORM http_set_curlopt('CURLOPT_RESOLVE', '');
 END;
 $$ LANGUAGE plpgsql;
 
@@ -267,12 +293,24 @@ DO $$
 DECLARE
   v_job RECORD;
 BEGIN
+  UPDATE schedules.jobs
+  SET legacy_unpinned = TRUE,
+      updated_at = NOW()
+  WHERE schedules.is_safe_url(function_url)
+    AND resolved_target IS NULL;
+
   FOR v_job IN
-    SELECT id, cron_job_id
+    SELECT id, cron_job_id, function_url, resolved_target
     FROM schedules.jobs
     WHERE NOT schedules.is_safe_url(function_url)
-       OR resolved_target IS NULL
   LOOP
+    IF v_job.resolved_target IS NULL AND schedules.is_safe_url(v_job.function_url) THEN
+      UPDATE schedules.jobs
+      SET legacy_unpinned = TRUE,
+          updated_at = NOW()
+      WHERE id = v_job.id;
+      CONTINUE;
+    END IF;
     IF v_job.cron_job_id IS NOT NULL THEN
       PERFORM cron.unschedule(v_job.cron_job_id);
     END IF;

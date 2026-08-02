@@ -20,6 +20,8 @@ describe('outbound URL guard migration', () => {
     expect(sql).toMatch(/resolved_target JSONB/i);
     expect(sql).toMatch(/resolved_target->>'rawUrl'/i);
     expect(sql).toMatch(/CREATE OR REPLACE FUNCTION schedules\.is_safe_address/i);
+    expect(sql).toMatch(/rawUrl' IS DISTINCT FROM p_function_url/i);
+    expect(sql).toMatch(/jsonb_array_length\(COALESCE\(v_resolved_target->'addresses'/i);
     expect(sql).toMatch(/DROP CONSTRAINT IF EXISTS schedules_jobs_function_url_safe/i);
     expect(sql).toMatch(/ADD CONSTRAINT schedules_jobs_function_url_safe/i);
   });
@@ -28,7 +30,7 @@ describe('outbound URL guard migration', () => {
     expect(sql).toMatch(/v_authority\s+~\s+'@'/i);
     expect(sql).toMatch(/127\.0\.0\.0\/8/i);
     expect(sql).toMatch(/169\.254\.0\.0\/16/i);
-    expect(sql).toMatch(/2130706433|0x/i);
+    expect(sql).toMatch(/v_host\s+~\s+'\^\[0-9\]\+\$'/i);
   });
 
   it('does not introduce top-level transaction control', () => {
