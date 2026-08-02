@@ -359,12 +359,17 @@ describe('LocalAnalyticsProvider', () => {
       expect(api.listRecordings.mock.lastCall?.[0]).toMatchObject({ limit: 5 });
     });
 
-    it('builds the app.posthog.com embed URL regardless of region', async () => {
-      const { provider, api } = makeProvider({ ...CONNECTION, host: 'https://eu.posthog.com' });
+    // An EU recording is not readable through a US host, so the embed URL has
+    // to follow the connection's region rather than a fixed app.posthog.com.
+    it.each([
+      ['https://us.posthog.com', 'https://us.posthog.com/embedded/tok123'],
+      ['https://eu.posthog.com', 'https://eu.posthog.com/embedded/tok123'],
+    ])('builds the embed URL on the connection host (%s)', async (host, expected) => {
+      const { provider, api } = makeProvider({ ...CONNECTION, host });
       api.refreshRecordingShare.mockResolvedValue({ access_token: 'tok123' });
 
       const out = await provider.createRecordingShare('rec1');
-      expect(out.embedUrl).toBe('https://app.posthog.com/embedded/tok123');
+      expect(out.embedUrl).toBe(expected);
     });
 
     it('fails clearly when PostHog returns no share token', async () => {

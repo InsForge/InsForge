@@ -484,9 +484,10 @@ export class LocalAnalyticsProvider implements AnalyticsProvider {
           ERROR_CODES.UPSTREAM_FAILURE
         );
       }
-      // PostHog hosts embedded recordings on app.posthog.com regardless of the
-      // project's region. /embedded/<token> is the iframe-friendly URL.
-      return { embedUrl: `https://app.posthog.com/embedded/${raw.access_token}` };
+      // Regional host, not app.posthog.com: PostHog's own embed example uses
+      // `https://us.posthog.com/embedded/<token>`, and an EU recording is not
+      // readable cross-region. cloud-backend hardcodes app.posthog.com here.
+      return { embedUrl: `${conn.host}/embedded/${raw.access_token}` };
     } catch (err) {
       if (err instanceof AppError) {
         throw err;
