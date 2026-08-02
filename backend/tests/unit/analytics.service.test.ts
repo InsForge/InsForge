@@ -223,6 +223,18 @@ describe('AnalyticsService', () => {
     });
   });
 
+  describe('host validation', () => {
+    it('rejects a plaintext PostHog host', async () => {
+      const { isValidPosthogHost } =
+        await import('../../src/services/analytics/posthog-api.service.js');
+      // Only reachable via a hand-edited row — the region map never produces
+      // http — but this is the check that stops the key going out in the clear.
+      expect(isValidPosthogHost('http://us.posthog.com')).toBe(false);
+      expect(isValidPosthogHost('https://us.posthog.com')).toBe(true);
+      expect(isValidPosthogHost('https://evil.example.com')).toBe(false);
+    });
+  });
+
   describe('listAvailableProjects', () => {
     it('returns the picker options without storing anything', async () => {
       const { service, config } = makeService(

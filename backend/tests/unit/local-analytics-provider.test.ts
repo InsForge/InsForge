@@ -278,7 +278,25 @@ describe('LocalAnalyticsProvider', () => {
       await provider.getTrends('bounce_rate', '3m');
       sql = (api.runQuery.mock.lastCall?.[0].queryBody as { query: { query: string } }).query.query;
       expect(sql).toContain('toStartOfWeek');
-      expect(sql).toContain('INTERVAL 90 WEEK');
+      expect(sql).toContain('INTERVAL 90 DAY');
+    });
+
+    // The window and the grouping bucket are separate concerns: 3m groups by
+    // week but must still read 90 days, not 90 weeks.
+    it.each([
+      ['24h', 'INTERVAL 24 HOUR'],
+      ['7d', 'INTERVAL 7 DAY'],
+      ['30d', 'INTERVAL 30 DAY'],
+      ['3m', 'INTERVAL 90 DAY'],
+    ])('reads the same window as the other panels for %s', async (tf, expected) => {
+      const { provider, api } = makeProvider();
+      api.runQuery.mockResolvedValue({ results: [] });
+
+      await provider.getTrends('bounce_rate', tf);
+      const sql = (api.runQuery.mock.lastCall?.[0].queryBody as { query: { query: string } }).query
+        .query;
+      expect(sql).toContain(expected);
+      expect(sql).not.toMatch(/INTERVAL \d+ WEEK/);
     });
   });
 

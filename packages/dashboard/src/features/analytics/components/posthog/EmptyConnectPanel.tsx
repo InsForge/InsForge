@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button, CopyButton } from '@insforge/ui';
-import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { ANALYTICS_SETUP_PROMPT } from '#features/analytics/lib/constants';
 import { PosthogKeyForm } from './PosthogKeyForm';
 
@@ -9,6 +9,9 @@ import { PosthogKeyForm } from './PosthogKeyForm';
 export function EmptyConnectPanel({ projectId }: { projectId: string }) {
   const { t } = useTranslation('chrome');
   const { onConnectPosthog } = useDashboardHost();
+  // Host mode, not handler presence: a cloud deployment that hasn't wired
+  // onConnectPosthog would otherwise get the key form, whose PUT 400s there.
+  const isSelfHosted = !useIsCloudHostingMode();
 
   return (
     <div className="flex flex-col self-stretch rounded border border-[var(--alpha-8)] bg-card p-6">
@@ -18,7 +21,7 @@ export function EmptyConnectPanel({ projectId }: { projectId: string }) {
             {t('analytics.connectPosthog', { defaultValue: 'Connect PostHog' })}
           </p>
           <p className="text-sm leading-6 text-muted-foreground">
-            {onConnectPosthog
+            {!isSelfHosted
               ? t('analytics.connectPosthogDescription', {
                   defaultValue: 'One-click setup of a PostHog project for product analytics.',
                 })
@@ -28,10 +31,11 @@ export function EmptyConnectPanel({ projectId }: { projectId: string }) {
                 })}
           </p>
         </div>
-        {onConnectPosthog ? (
+        {!isSelfHosted ? (
           <Button
             variant="primary"
-            onClick={() => onConnectPosthog(projectId)}
+            disabled={!onConnectPosthog}
+            onClick={() => onConnectPosthog?.(projectId)}
             className="self-start"
           >
             {t('analytics.connectPosthog', { defaultValue: 'Connect PostHog' })}

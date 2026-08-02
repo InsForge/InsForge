@@ -36,13 +36,8 @@ export const posthogDiscoveredProjectSchema = z.object({
   organizationName: z.string().nullable(),
 });
 
-export const posthogDiscoveredProjectsSchema = z.object({
-  projects: z.array(posthogDiscoveredProjectSchema),
-});
-
 export type PosthogCredentialStatus = z.infer<typeof posthogCredentialStatusSchema>;
 export type PosthogConfig = z.infer<typeof posthogConfigSchema>;
 export type PosthogRegion = z.infer<typeof posthogRegionSchema>;
 export type UpdatePosthogConfig = z.infer<typeof updatePosthogConfigSchema>;
 export type PosthogDiscoveredProject = z.infer<typeof posthogDiscoveredProjectSchema>;
-export type PosthogDiscoveredProjects = z.infer<typeof posthogDiscoveredProjectsSchema>;

@@ -4,22 +4,20 @@ import logger from '@/utils/logger.js';
 
 export const POSTHOG_CONNECTION_SECRET = 'POSTHOG_CONNECTION';
 const CACHE_TTL_MS = 60 * 1000;
+const PG_UNIQUE_VIOLATION = '23505';
+
+function isUniqueViolation(error: unknown): boolean {
+  return (error as { code?: string } | null)?.code === PG_UNIQUE_VIOLATION;
+}
 
 type SecretStore = Pick<
   SecretService,
   'createSecret' | 'getSecretByKey' | 'listSecrets' | 'updateSecret' | 'deleteReservedSecretByKey'
 >;
 
-/**
- * What we persist for a self-hosted PostHog connection.
- *
- * `personalApiKey` (phx_) is the only sensitive member — it is what reads data
- * out of PostHog. `apiKey` (phc_) is PostHog's public, write-only ingestion key
- * and is deliberately handed to the dashboard and the CLI. Both live in the
- * same encrypted row because connect/disconnect must be atomic: two rows can
- * drift into a half-connected state that neither the UI nor disconnect can
- * describe.
- */
+// `personalApiKey` (phx_) is the only sensitive member; `apiKey` (phc_) is
+// PostHog's public ingestion key. One row, not two, so connect/disconnect stay
+// atomic — two rows can drift into a half-connected state.
 export interface StoredPosthogConnection {
   personalApiKey: string;
   host: string;
@@ -108,11 +106,30 @@ export class PostHogConfigService {
           throw new Error(`Failed to update ${POSTHOG_CONNECTION_SECRET}`);
         }
       } else {
-        await this.secretService.createSecret({
-          key: POSTHOG_CONNECTION_SECRET,
-          value: JSON.stringify(record),
-          isReserved: true,
-        });
+        try {
+          await this.secretService.createSecret({
+            key: POSTHOG_CONNECTION_SECRET,
+            value: JSON.stringify(record),
+            isReserved: true,
+          });
+        } catch (error) {
+          // Two concurrent first-time connects both see no row and both insert;
+          // one wins on UNIQUE(key). The loser's credential is still valid, so
+          // take over the winner's row instead of failing a good request.
+          if (!isUniqueViolation(error)) {
+            throw error;
+          }
+          const existing = await this.findSecret();
+          if (!existing) {
+            throw error;
+          }
+          await this.secretService.updateSecret(existing.id, {
+            value: JSON.stringify(record),
+            isActive: true,
+            isReserved: true,
+            expiresAt: null,
+          });
+        }
       }
     } finally {
       this.invalidate();

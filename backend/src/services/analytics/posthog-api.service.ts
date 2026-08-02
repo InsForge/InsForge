@@ -17,9 +17,26 @@ const VALID_HOSTNAMES = new Set(
   Object.values(POSTHOG_HOST_BY_REGION).map((u) => new URL(u).hostname)
 );
 
+// RFC 9110 allows Retry-After as delta-seconds or an HTTP-date; parseInt turns
+// the date form into NaN, abandoning a retry PostHog invited. Null when unusable.
+function parseRetryAfterSeconds(raw: unknown): number | null {
+  if (typeof raw !== 'string' || !raw.trim()) {
+    return null;
+  }
+  const seconds = Number(raw.trim());
+  if (Number.isFinite(seconds)) {
+    return Math.max(0, seconds);
+  }
+  const at = Date.parse(raw);
+  return Number.isNaN(at) ? null : Math.max(0, Math.ceil((at - Date.now()) / 1000));
+}
+
+// Scheme too, not just hostname: a hand-edited `http://us.posthog.com` would
+// otherwise pass and put the personal API key on the wire in plaintext.
 export function isValidPosthogHost(urlString: string): boolean {
   try {
-    return VALID_HOSTNAMES.has(new URL(urlString).hostname);
+    const url = new URL(urlString);
+    return url.protocol === 'https:' && VALID_HOSTNAMES.has(url.hostname);
   } catch {
     return false;
   }
@@ -27,6 +44,8 @@ export function isValidPosthogHost(urlString: string): boolean {
 
 const REQUEST_TIMEOUT_MS = 15000;
 const MAX_RETRY_AFTER_SECONDS = 30;
+// Bounds a cyclic or unbounded `next` cursor during discovery.
+const MAX_DISCOVERY_PAGES = 20;
 // Pinned to match cloud-backend's POSTHOG_API_VERSION default so both paths
 // speak the same PostHog API contract.
 const API_VERSION = '0.1d';
@@ -79,22 +98,34 @@ export class PostHogApiService {
 
   async listOrganizations(input: AuthedInput): Promise<PosthogOrganization[]> {
     this.assertHost(input.host);
-    const data = await this.get<{ results?: PosthogOrganization[] }>(
+    return this.getAllPages<PosthogOrganization>(
       `${input.host}/api/organizations/`,
       input.personalApiKey
     );
-    return data.results ?? [];
   }
 
   async listProjects(
     input: AuthedInput & { organizationId: string }
   ): Promise<PosthogProjectSummary[]> {
     this.assertHost(input.host);
-    const data = await this.get<{ results?: PosthogProjectSummary[] }>(
+    return this.getAllPages<PosthogProjectSummary>(
       `${input.host}/api/organizations/${encodeURIComponent(input.organizationId)}/projects/`,
       input.personalApiKey
     );
-    return data.results ?? [];
+  }
+
+  // Discovery must be exhaustive — a project on page two would be missing from
+  // the picker and rejected as invisible if passed explicitly. `next` is only
+  // followed while it stays on the validated host.
+  private async getAllPages<T>(firstUrl: string, personalApiKey: string): Promise<T[]> {
+    const items: T[] = [];
+    let url: string | null = firstUrl;
+    for (let page = 0; url && page < MAX_DISCOVERY_PAGES; page++) {
+      const data: { results?: T[]; next?: string | null } = await this.get(url, personalApiKey);
+      items.push(...(data.results ?? []));
+      url = data.next && isValidPosthogHost(data.next) ? data.next : null;
+    }
+    return items;
   }
 
   // --- data reads used by the dashboard ---
@@ -219,11 +250,11 @@ export class PostHogApiService {
       return await call();
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 429) {
-        const retryAfter = parseInt((err.response.headers['retry-after'] as string) || '1', 10);
-        if (!Number.isFinite(retryAfter) || retryAfter > MAX_RETRY_AFTER_SECONDS) {
+        const retryAfter = parseRetryAfterSeconds(err.response.headers['retry-after']);
+        if (retryAfter === null || retryAfter > MAX_RETRY_AFTER_SECONDS) {
           throw err;
         }
-        await new Promise((r) => setTimeout(r, Math.max(0, retryAfter) * 1000));
+        await new Promise((r) => setTimeout(r, retryAfter * 1000));
         return call();
       }
       throw err;

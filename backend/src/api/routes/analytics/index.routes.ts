@@ -121,6 +121,10 @@ analyticsRouter.get(
   verifyAdmin,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      // Guarded like the two writes below. Unguarded on Cloud it reads a store
+      // Cloud never writes and answers `configured: false`, which invites the
+      // settings UI to render a connect form whose PUT then 400s.
+      assertSelfHostedAnalyticsConfig();
       res.json(await service.getConfig());
     } catch (err) {
       next(err);

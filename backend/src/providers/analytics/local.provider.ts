@@ -50,12 +50,16 @@ const HOGQL_BUCKET_BY_INTERVAL: Record<
   week: { toStartOf: 'toStartOfWeek', intervalUnit: 'WEEK' },
 };
 
-const HOGQL_SPAN_BY_TIMEFRAME: Record<PosthogTimeframe, number> = {
-  '24h': 24,
-  '7d': 7,
-  '30d': 30,
-  '3m': 90,
-};
+// Independent of the bucket above: reusing `bucket.intervalUnit` made 3m mean
+// `INTERVAL 90 WEEK` (~630 days) while every other panel read -90d.
+// cloud-backend's PosthogController has the same defect.
+const HOGQL_WINDOW_BY_TIMEFRAME: Record<PosthogTimeframe, { span: number; unit: 'HOUR' | 'DAY' }> =
+  {
+    '24h': { span: 24, unit: 'HOUR' },
+    '7d': { span: 7, unit: 'DAY' },
+    '30d': { span: 30, unit: 'DAY' },
+    '3m': { span: 90, unit: 'DAY' },
+  };
 
 function timeframeOf(raw: string): PosthogTimeframe {
   return raw === '24h' || raw === '7d' || raw === '30d' || raw === '3m' ? raw : '7d';
@@ -99,15 +103,9 @@ export class LocalAnalyticsProvider implements AnalyticsProvider {
     };
   }
 
-  /**
-   * Maps a PostHog failure onto an AppError.
-   *
-   * PostHog auth failures (401/403) are reported as 502 rather than passed
-   * through: a 401 reaching the dashboard would be read as an InsForge session
-   * problem and bounce the user to the login screen, when the actual fix is to
-   * reconnect PostHog. The upstream detail is logged and a generic message is
-   * returned so PostHog internals do not leak to the browser.
-   */
+  // PostHog 401/403 becomes 502: a 401 reaching the dashboard reads as an
+  // expired InsForge session and bounces the user to login, when the fix is to
+  // reconnect PostHog. Detail is logged, not returned.
   private upstreamError(err: unknown, label: string): AppError {
     let status = 502;
     let detail = 'unknown error';
@@ -372,7 +370,7 @@ export class LocalAnalyticsProvider implements AnalyticsProvider {
     interval: 'hour' | 'day' | 'week'
   ): Promise<PosthogTrendsResponse> {
     const bucket = HOGQL_BUCKET_BY_INTERVAL[interval];
-    const span = HOGQL_SPAN_BY_TIMEFRAME[tf];
+    const window = HOGQL_WINDOW_BY_TIMEFRAME[tf];
     const sql =
       `SELECT\n` +
       `  ${bucket.toStartOf}(min_ts) AS day,\n` +
@@ -384,7 +382,7 @@ export class LocalAnalyticsProvider implements AnalyticsProvider {
       `    any(session.$is_bounce) AS is_bounce\n` +
       `  FROM events\n` +
       `  WHERE event = '$pageview'\n` +
-      `    AND timestamp > now() - INTERVAL ${span} ${bucket.intervalUnit}\n` +
+      `    AND timestamp > now() - INTERVAL ${window.span} ${window.unit}\n` +
       `    AND session.$is_bounce IS NOT NULL\n` +
       `    AND session.session_id IS NOT NULL\n` +
       `  GROUP BY session_id\n` +
