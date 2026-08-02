@@ -1,6 +1,6 @@
 ---
-title: "Schedules: cron-triggered functions"
-description: "Trigger InsForge functions on a cron schedule with pg_cron: secret-aware headers, job logs, retry guidance, and keep-alive tips."
+title: 'Schedules: cron-triggered functions'
+description: 'Trigger InsForge functions on a cron schedule with pg_cron: secret-aware headers, job logs, retry guidance, and keep-alive tips.'
 ---
 
 Schedules invoke functions on a recurring cron expression. [pg_cron](https://github.com/citusdata/pg_cron) fires an HTTP request to the function URL at each tick and logs the result.
@@ -8,6 +8,10 @@ Schedules invoke functions on a recurring cron expression. [pg_cron](https://git
 ## Concepts
 
 A schedule is a cron expression, a target URL, and headers. On creation, `${{secrets.KEY}}` placeholders in headers are resolved and encrypted with `pgcrypto`. At each tick, `execute_job()` decrypts headers, calls the function, and writes status and duration to `schedules.job_logs`.
+
+InsForge validates schedule targets before they are stored. Only HTTP(S) URLs without embedded credentials are accepted, and loopback, private, link-local, metadata, multicast, and reserved network destinations are rejected by default. This protects the database-backed scheduler from being used to reach internal services. Self-hosted installations that intentionally call private services can configure `OUTBOUND_ALLOW_PRIVATE_NETWORKS=true` and should restrict `OUTBOUND_ALLOWED_HOSTS` to the required domains.
+
+Outbound requests use a configurable timeout and do not follow redirects by default. Configure `OUTBOUND_REQUEST_TIMEOUT_MS`, `OUTBOUND_MAX_RESPONSE_BYTES`, and `OUTBOUND_MAX_REDIRECTS` in the backend environment when a deployment needs different limits.
 
 ## Usage
 
