@@ -88,6 +88,42 @@ describe('config.app', () => {
   });
 });
 
+describe('config.outbound', () => {
+  it('uses secure outbound defaults', () => {
+    unsetEnvKeys(
+      'OUTBOUND_ALLOW_PRIVATE_NETWORKS',
+      'OUTBOUND_ALLOWED_HOSTS',
+      'OUTBOUND_REQUEST_TIMEOUT_MS',
+      'OUTBOUND_MAX_RESPONSE_BYTES',
+      'OUTBOUND_MAX_REDIRECTS'
+    );
+
+    expect(loadConfig().outbound).toEqual({
+      allowPrivateNetworks: false,
+      allowedHosts: [],
+      requestTimeoutMs: 10000,
+      maxResponseBytes: 1024 * 1024,
+      maxRedirects: 0,
+    });
+  });
+
+  it('parses outbound policy overrides', () => {
+    process.env.OUTBOUND_ALLOW_PRIVATE_NETWORKS = 'true';
+    process.env.OUTBOUND_ALLOWED_HOSTS = 'internal.example, .corp.example ';
+    process.env.OUTBOUND_REQUEST_TIMEOUT_MS = '5000';
+    process.env.OUTBOUND_MAX_RESPONSE_BYTES = '2048';
+    process.env.OUTBOUND_MAX_REDIRECTS = '2';
+
+    expect(loadConfig().outbound).toEqual({
+      allowPrivateNetworks: true,
+      allowedHosts: ['internal.example', '.corp.example'],
+      requestTimeoutMs: 5000,
+      maxResponseBytes: 2048,
+      maxRedirects: 2,
+    });
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Section: telemetry
 // ═══════════════════════════════════════════════════════════════════════════
