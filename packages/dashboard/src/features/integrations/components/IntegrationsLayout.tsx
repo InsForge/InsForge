@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+
 import { IntegrationsSidebar } from './IntegrationsSidebar';
 
 export const IntegrationsLayout = () => {
@@ -56,7 +56,7 @@ export const IntegrationsLayout = () => {
                     Add an App
                   </button>
                 </div>
-                
+
                 <div className="border border-[var(--alpha-8)] rounded-md p-8 text-center bg-[rgb(var(--semantic-0))] mt-4">
                   <p className="text-sm text-muted-foreground">
                     No results found. You do not have any published applications yet.
@@ -68,10 +68,10 @@ export const IntegrationsLayout = () => {
                 <div>
                   <h3 className="text-base text-foreground">Authorized Apps</h3>
                   <p className="text-sm text-muted-foreground">
-                    Applications that have access to your organization's settings and projects.
+                    Applications that have access to your organization&apos;s settings and projects.
                   </p>
                 </div>
-                
+
                 <div className="border border-[var(--alpha-8)] rounded-md p-8 text-center bg-[rgb(var(--semantic-0))] mt-4">
                   <p className="text-sm text-muted-foreground">
                     No results found. You do not have any authorized applications yet.

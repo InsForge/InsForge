@@ -26,13 +26,13 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
 router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { name, website, redirect_uris } = req.body;
-    
+
     if (!name || !website || !redirect_uris || !Array.isArray(redirect_uris)) {
       throw new AppError('Invalid input payload', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     const result = await oauthService.createOAuthApp({ name, website, redirect_uris });
-    
+
     successResponse(res, result, 201);
   } catch (error) {
     next(error);
@@ -44,11 +44,11 @@ router.delete('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next:
   try {
     const { id } = req.params;
     const deleted = await oauthService.deleteOAuthApp(id);
-    
+
     if (!deleted) {
       throw new AppError('App not found', 404, ERROR_CODES.NOT_FOUND);
     }
-    
+
     successResponse(res, { success: true });
   } catch (error) {
     next(error);
@@ -60,30 +60,38 @@ router.delete('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next:
  */
 
 // GET /api/oauth-apps/authorizations/:projectId
-router.get('/authorizations/:projectId', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { projectId } = req.params;
-    const authorizations = await oauthService.listAuthorizedApps(projectId);
-    successResponse(res, authorizations);
-  } catch (error) {
-    next(error);
+router.get(
+  '/authorizations/:projectId',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { projectId } = req.params;
+      const authorizations = await oauthService.listAuthorizedApps(projectId);
+      successResponse(res, authorizations);
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // DELETE /api/oauth-apps/authorizations/:id
-router.delete('/authorizations/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const revoked = await oauthService.revokeAuthorization(id);
-    
-    if (!revoked) {
-      throw new AppError('Authorization not found', 404, ERROR_CODES.NOT_FOUND);
+router.delete(
+  '/authorizations/:id',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const revoked = await oauthService.revokeAuthorization(id);
+
+      if (!revoked) {
+        throw new AppError('Authorization not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      successResponse(res, { success: true });
+    } catch (error) {
+      next(error);
     }
-    
-    successResponse(res, { success: true });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 export default router;
