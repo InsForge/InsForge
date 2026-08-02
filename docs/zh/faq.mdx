@@ -236,6 +236,45 @@ description: "InsForge 常见问题：数据库调用、Edge Function、Custom C
     这个串以拥有完整权限的 `postgres` 角色连接，因此不受行级安全（RLS）限制，而且串里嵌了该角色的密码。请把它当成机密：只在服务端使用，绝不要发到浏览器。
   </Accordion>
 
+  <Accordion title="怎么把已有的 Postgres 数据库导入（load）到 InsForge？">
+    用项目的 Postgres connection string（就是上一个问题里的那个 URL）把已有数据库还原（restore）过去即可。标准的 PostgreSQL 客户端工具——`pg_dump`、`pg_restore` 和 `psql`——都能直接连它，所以导入就是一次「先 dump、再 restore」。不需要专门的 InsForge 命令。
+
+    1. dump 你本地（或其他）的数据库：
+
+    ```bash
+    # 自定义格式（推荐——体积更小，且支持并行 restore）
+    pg_dump -Fc your_local_db > local.dump
+
+    # ……或者纯 SQL 文件
+    pg_dump your_local_db > local.sql
+    ```
+
+    2. 拿到 InsForge 的 connection string（仅限 cloud 项目）：
+
+    ```bash
+    npx @insforge/cli db connection-string
+    ```
+
+    3. restore 到 InsForge：
+
+    ```bash
+    # 自定义格式的 dump
+    pg_restore --no-owner --single-transaction -d "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" local.dump
+
+    # ……或者纯 SQL 文件
+    psql --single-transaction "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" < local.sql
+    ```
+
+    有几点需要注意：
+
+    - 加上 `--no-owner`，让还原出来的对象归 `postgres` 角色所有，而不是只存在于源库里的那些角色。
+    - 这个 connection string 以拥有完整权限的 `postgres` 角色连接（会绕过行级安全 RLS），请把它当成机密，只在服务端运行这些命令。
+    - 这只对 **cloud 项目**有效。自托管实例请改用本地 Postgres 凭据（`.env` 里的 `DATABASE_URL` / `POSTGRES_*`）来 restore。
+    - restore 会写入你正在使用的数据库，并可能覆盖已有对象。请先手动做一次备份——参见 [数据库备份与恢复](/core-concepts/database/backups)。
+    - `--single-transaction` 让整个恢复在单个事务里执行：任何一句失败（对象已存在、扩展或角色缺失、约束冲突），整个导入都会回滚，而不会把数据库留在导入了一半的状态。
+    - 导入的表**不会**自动获得 InsForge 托管的访问设置。raw 恢复会跳过 InsForge 为表配置的 `anon` / `authenticated` 授权和行级安全（RLS），因此在你为每张表授予访问权限并添加 RLS 策略之前，这些表**无法**通过 REST API 或 SDK 访问，源库里的访问规则也不带 InsForge 的 RLS 保护（参见 [数据库](/core-concepts/database/overview)）。如果你更想把 schema 变更纳入 git 版本管理，参见 [数据库迁移](/core-concepts/database/migrations)。
+  </Accordion>
+
   <Accordion title="怎么下线或删除已部署的站点（site）？">
     目前没有自助下线已部署 [Site](/core-concepts/sites/overview) 的方式——既没有 `deployments delete` 命令，dashboard 里也没有对应操作。已部署的站点托管在外部，所以即使删除项目（`npx @insforge/cli projects delete --project <id>`）也只会清掉后端资源——数据库、Storage 和后端分支——而*不会*移除已托管的站点。
 
