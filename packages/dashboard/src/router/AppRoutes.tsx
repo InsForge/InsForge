@@ -104,7 +104,6 @@ const VisualizerLayout = lazy(() => import('#features/visualizer/components/Visu
 const VisualizerPage = lazy(() => import('#features/visualizer/pages/VisualizerPage'));
 
 interface ChunkErrorBoundaryProps {
-  /** Route key; when it changes we clear a prior error so navigation recovers. */
   resetKey: string;
   children: ReactNode;
 }
@@ -113,16 +112,12 @@ interface ChunkErrorBoundaryState {
   error: Error | null;
 }
 
-// Matches failed dynamic-import signatures (a stale/missing hashed chunk after a
-// deploy) so the "reload for latest assets" copy shows only for those, not plain
-// render bugs.
 function isChunkLoadError(error: Error): boolean {
   return /dynamically imported module|failed to fetch|loading chunk|importing a module script failed/i.test(
     error.message
   );
 }
 
-// A function component (not inline in the class boundary) so it can use hooks.
 function RouteErrorFallback({ error }: { error: Error }) {
   const { t } = useTranslation('chrome');
   const isChunkError = isChunkLoadError(error);
@@ -138,10 +133,6 @@ function RouteErrorFallback({ error }: { error: Error }) {
   );
 }
 
-// Without this, a rejected lazy import (usually a stale hashed chunk after a
-// deploy) unmounts the whole app into a blank screen. Clears the error on
-// navigation so the still-mounted nav (outside this boundary) recovers the
-// content area without a full reload.
 class ChunkErrorBoundary extends Component<ChunkErrorBoundaryProps, ChunkErrorBoundaryState> {
   state: ChunkErrorBoundaryState = { error: null };
 
@@ -168,10 +159,6 @@ class ChunkErrorBoundary extends Component<ChunkErrorBoundaryProps, ChunkErrorBo
   }
 }
 
-/**
- * Wraps a `<Routes>` tree with the chunk error boundary and a Suspense fallback.
- * Keyed on the current pathname so a caught chunk error is reset on navigation.
- */
 function RouteBoundary({ children }: { children: ReactNode }) {
   const location = useLocation();
   return (
