@@ -7,6 +7,7 @@ import {
   type FeatureSidebarHeaderButton,
   type FeatureSidebarListItem,
 } from '#components';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { AnalyticsConfigDialog } from './AnalyticsConfigDialog';
 
 interface AnalyticsSidebarProps {
@@ -16,6 +17,7 @@ interface AnalyticsSidebarProps {
 
 export function AnalyticsSidebar({ connection, projectId }: AnalyticsSidebarProps) {
   const { t } = useTranslation('chrome');
+  const isSelfHosted = !useIsCloudHostingMode();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const items: FeatureSidebarListItem[] = [
@@ -42,7 +44,10 @@ export function AnalyticsSidebar({ connection, projectId }: AnalyticsSidebarProp
       label: t('analytics.config.title', { defaultValue: 'Analytics Config' }),
       icon: Settings,
       onClick: () => setSettingsOpen(true),
-      disabled: !projectId,
+      // A missing project id only blocks the cloud OAuth handoff — self-hosting
+      // has none and needs none, so gating on it there would make this gear
+      // permanently unclickable. Mirrors WebscraperSidebar.
+      disabled: !isSelfHosted && !projectId,
     },
   ];
 
