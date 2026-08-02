@@ -95,6 +95,7 @@ describe('config.outbound', () => {
       'OUTBOUND_ALLOWED_HOSTS',
       'OUTBOUND_REQUEST_TIMEOUT_MS',
       'OUTBOUND_MAX_RESPONSE_BYTES',
+      'OUTBOUND_MAX_REQUEST_BYTES',
       'OUTBOUND_MAX_REDIRECTS'
     );
 
@@ -103,6 +104,7 @@ describe('config.outbound', () => {
       allowedHosts: [],
       requestTimeoutMs: 10000,
       maxResponseBytes: 1024 * 1024,
+      maxRequestBytes: 10 * 1024 * 1024,
       maxRedirects: 0,
     });
   });
@@ -112,6 +114,7 @@ describe('config.outbound', () => {
     process.env.OUTBOUND_ALLOWED_HOSTS = 'internal.example, .corp.example ';
     process.env.OUTBOUND_REQUEST_TIMEOUT_MS = '5000';
     process.env.OUTBOUND_MAX_RESPONSE_BYTES = '2048';
+    process.env.OUTBOUND_MAX_REQUEST_BYTES = '4096';
     process.env.OUTBOUND_MAX_REDIRECTS = '2';
 
     expect(loadConfig().outbound).toEqual({
@@ -119,6 +122,7 @@ describe('config.outbound', () => {
       allowedHosts: ['internal.example', '.corp.example'],
       requestTimeoutMs: 5000,
       maxResponseBytes: 2048,
+      maxRequestBytes: 4096,
       maxRedirects: 2,
     });
   });

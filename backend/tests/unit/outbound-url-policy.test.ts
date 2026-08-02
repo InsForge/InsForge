@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertSafeOutboundUrl,
+  createOutboundAgents,
   isPrivateNetworkAddress,
   OutboundUrlPolicyError,
+  resolveSafeOutboundUrl,
 } from '../../src/infra/network/outbound-url-policy.js';
 
 describe('outbound URL policy', () => {
@@ -15,6 +17,7 @@ describe('outbound URL policy', () => {
     '::1',
     'fc00::1',
     'fe80::1',
+    'fec0::1',
     '::ffff:127.0.0.1',
   ])('identifies %s as a private or reserved address', (address) => {
     expect(isPrivateNetworkAddress(address)).toBe(true);
@@ -43,9 +46,37 @@ describe('outbound URL policy', () => {
 
   it('allows an explicitly configured host before DNS resolution', async () => {
     await expect(
-      assertSafeOutboundUrl('https://internal.example.test/health', {
-        allowedHosts: ['internal.example.test'],
+      assertSafeOutboundUrl('http://localhost:7130/health', {
+        allowedHosts: ['localhost'],
       })
     ).resolves.toBeInstanceOf(URL);
+  });
+
+  it('returns the resolved address needed for DNS-pinned schedule execution', async () => {
+    const result = await resolveSafeOutboundUrl('http://8.8.8.8:8080/hook');
+
+    expect(result).toMatchObject({
+      rawUrl: 'http://8.8.8.8:8080/hook',
+      hostname: '8.8.8.8',
+      port: 8080,
+      addresses: ['8.8.8.8'],
+    });
+  });
+
+  it('rejects a private address at socket lookup time', async () => {
+    const { httpAgent } = createOutboundAgents();
+    const lookup = httpAgent.options.lookup as unknown as (
+      hostname: string,
+      options: object,
+      callback: (error: Error | null, address?: string, family?: number) => void
+    ) => void;
+
+    await new Promise<void>((resolve) => {
+      lookup('localhost', {}, (error) => {
+        expect(error).toBeInstanceOf(Error);
+        expect(error?.message).toContain('private or reserved');
+        resolve();
+      });
+    });
   });
 });

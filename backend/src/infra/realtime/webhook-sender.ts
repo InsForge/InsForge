@@ -42,10 +42,11 @@ export class WebhookSender {
       try {
         await assertSafeOutboundUrl(url);
         const response = await axios.post(url, message.payload, {
-          timeout: Math.min(this.timeout, limits.timeoutMs),
+          timeout: limits.timeoutMs,
           maxContentLength: limits.maxResponseBytes,
-          maxBodyLength: limits.maxResponseBytes,
+          maxBodyLength: limits.maxRequestBytes,
           maxRedirects: limits.maxRedirects,
+          signal: AbortSignal.timeout(limits.timeoutMs),
           httpAgent,
           httpsAgent,
           headers: {
@@ -62,17 +63,36 @@ export class WebhookSender {
           statusCode: response.status,
         };
       } catch (error) {
-        if (error instanceof OutboundUrlPolicyError) {
+        const axiosError = error as AxiosError;
+        const policyError =
+          error instanceof OutboundUrlPolicyError
+            ? error
+            : axiosError.cause instanceof OutboundUrlPolicyError
+              ? axiosError.cause
+              : null;
+        if (
+          policyError ||
+          (axiosError.cause &&
+            typeof axiosError.cause === 'object' &&
+            'code' in axiosError.cause &&
+            axiosError.cause.code === 'ERR_OUTBOUND_POLICY')
+        ) {
+          let origin = url;
+          try {
+            origin = new URL(url).origin;
+          } catch {
+            // The URL policy already reports malformed URLs.
+          }
           logger.warn('Webhook delivery blocked by outbound URL policy', {
-            reason: error.reason,
+            reason: policyError?.reason || 'private or reserved network address',
+            origin,
           });
           return {
             url,
             success: false,
-            error: error.reason,
+            error: policyError?.reason || 'private or reserved network address',
           };
         }
-        const axiosError = error as AxiosError;
         lastError = axiosError.message;
 
         if (axiosError.response) {

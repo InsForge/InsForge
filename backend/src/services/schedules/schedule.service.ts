@@ -3,8 +3,9 @@ import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/utils/errors.js';
 import {
-  assertSafeOutboundUrl,
+  resolveSafeOutboundUrl,
   OutboundUrlPolicyError,
+  type ResolvedOutboundUrl,
 } from '@/infra/network/outbound-url-policy.js';
 import {
   ERROR_CODES,
@@ -263,14 +264,14 @@ export class ScheduleService {
   async createSchedule(data: CreateScheduleRequest) {
     try {
       this.validateCronExpression(data.cronSchedule);
-      await this.validateOutboundScheduleUrl(data.functionUrl);
+      const resolvedTarget = await this.validateOutboundScheduleUrl(data.functionUrl);
 
       const scheduleId = randomUUID();
       const headersTemplate = data.headers || {};
       const resolvedHeaders = data.headers ? await this.resolveHeaderSecrets(data.headers) : {};
       const sql = `
         SELECT * FROM schedules.upsert_job(
-          $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB, $8::JSONB
+          $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB, $8::JSONB, $9::JSONB
         )
       `;
       const values = [
@@ -282,6 +283,7 @@ export class ScheduleService {
         headersTemplate,
         resolvedHeaders,
         data.body || {},
+        resolvedTarget,
       ];
       const result = await this.getPool().query(sql, values);
       const jobResult = (result.rows && result.rows[0]) as
@@ -333,7 +335,9 @@ export class ScheduleService {
       if (hasScheduleFields) {
         const cronSchedule = data.cronSchedule ?? existingSchedule.cronSchedule;
         this.validateCronExpression(cronSchedule);
-        await this.validateOutboundScheduleUrl(data.functionUrl ?? existingSchedule.functionUrl);
+        const resolvedTarget = data.functionUrl
+          ? await this.validateOutboundScheduleUrl(data.functionUrl)
+          : null;
 
         const headersTemplate = data.headers ?? existingSchedule.headers ?? {};
         const resolvedHeaders = data.headers
@@ -342,7 +346,7 @@ export class ScheduleService {
 
         const sql = `
           SELECT * FROM schedules.upsert_job(
-            $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB, $8::JSONB
+            $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB, $8::JSONB, $9::JSONB
           )
         `;
         const values = [
@@ -354,6 +358,7 @@ export class ScheduleService {
           headersTemplate,
           resolvedHeaders,
           data.body ?? existingSchedule.body ?? {},
+          resolvedTarget,
         ];
         const result = await this.getPool().query(sql, values);
         const jobResult = (result.rows && result.rows[0]) as
@@ -390,12 +395,30 @@ export class ScheduleService {
     }
   }
 
-  private async validateOutboundScheduleUrl(functionUrl: string): Promise<void> {
+  private async validateOutboundScheduleUrl(functionUrl: string): Promise<ResolvedOutboundUrl> {
     try {
-      await assertSafeOutboundUrl(functionUrl);
+      return await resolveSafeOutboundUrl(functionUrl);
     } catch (error) {
       if (error instanceof OutboundUrlPolicyError) {
         throw new AppError(`Invalid schedule URL: ${error.reason}`, 400, ERROR_CODES.INVALID_INPUT);
+      }
+      const errorCode =
+        typeof error === 'object' && error !== null && 'code' in error
+          ? String(error.code)
+          : undefined;
+      let origin = functionUrl;
+      try {
+        origin = new URL(functionUrl).origin;
+      } catch {
+        // The policy already reports malformed URLs.
+      }
+      logger.error('Failed to resolve schedule URL during outbound policy validation', {
+        origin,
+        errorCode,
+        error,
+      });
+      if (errorCode && !['ENOTFOUND', 'EAI_NONAME', 'EINVAL'].includes(errorCode)) {
+        throw error;
       }
       throw new AppError(
         'Schedule URL hostname could not be resolved.',
