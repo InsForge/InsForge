@@ -23,6 +23,20 @@ describe('outbound URL policy', () => {
     expect(isPrivateNetworkAddress(address)).toBe(true);
   });
 
+  it.each(['8.8.8.8', '1.1.1.1', '2606:4700:4700::1111', '2002:0808:0808::1'])(
+    'allows public address %s',
+    (address) => {
+      expect(isPrivateNetworkAddress(address)).toBe(false);
+    }
+  );
+
+  it.each(['2002:7f00:1::1', '64:ff9b::7f00:1'])(
+    'blocks private address embedded in %s',
+    (address) => {
+      expect(isPrivateNetworkAddress(address)).toBe(true);
+    }
+  );
+
   it('rejects non-http protocols and URL credentials', async () => {
     await expect(assertSafeOutboundUrl('file:///etc/passwd')).rejects.toThrow(
       'only http and https are allowed'
@@ -64,19 +78,20 @@ describe('outbound URL policy', () => {
   });
 
   it('rejects a private address at socket lookup time', async () => {
-    const { httpAgent } = createOutboundAgents();
+    const { httpAgent } = createOutboundAgents({
+      allowPrivateNetworks: false,
+      allowedHosts: [],
+    });
     const lookup = httpAgent.options.lookup as unknown as (
       hostname: string,
       options: object,
       callback: (error: Error | null, address?: string, family?: number) => void
     ) => void;
 
-    await new Promise<void>((resolve) => {
-      lookup('localhost', {}, (error) => {
-        expect(error).toBeInstanceOf(Error);
-        expect(error?.message).toContain('private or reserved');
-        resolve();
-      });
+    const lookupError = await new Promise<Error | null>((resolve) => {
+      lookup('localhost', {}, (error) => resolve(error));
     });
+    expect(lookupError).toBeInstanceOf(Error);
+    expect(lookupError?.message).toContain('private or reserved');
   });
 });

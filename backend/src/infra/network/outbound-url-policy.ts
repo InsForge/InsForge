@@ -16,6 +16,7 @@ export interface ResolvedOutboundUrl {
   port: number;
   addresses: string[];
   allowPrivateNetworks: boolean;
+  allowlistedHost: boolean;
 }
 
 export class OutboundUrlPolicyError extends Error {
@@ -150,6 +151,10 @@ function isPrivateIpv6(address: string): boolean {
     ipv6StartsWith(groups, [0xfe80], 10) ||
     ipv6StartsWith(groups, [0xff00], 8) ||
     ipv6StartsWith(groups, [0x2001, 0xdb8], 32) ||
+    (ipv6StartsWith(groups, [0x2002], 16) &&
+      isPrivateIpv4(`${groups[1] >> 8}.${groups[1] & 255}.${groups[2] >> 8}.${groups[2] & 255}`)) ||
+    (ipv6StartsWith(groups, [0x64, 0xff9b], 32) &&
+      isPrivateIpv4(`${groups[6] >> 8}.${groups[6] & 255}.${groups[7] >> 8}.${groups[7] & 255}`)) ||
     (groups.slice(0, 5).every((group) => group === 0) &&
       (groups[5] === 0 || groups[5] === 0xffff) &&
       isPrivateIpv4(`${groups[6] >> 8}.${groups[6] & 255}.${groups[7] >> 8}.${groups[7] & 255}`))
@@ -215,6 +220,7 @@ export async function resolveSafeOutboundUrl(
     port: Number(parsed.port) || (parsed.protocol === 'https:' ? 443 : 80),
     addresses,
     allowPrivateNetworks,
+    allowlistedHost: allowedHost,
   };
 }
 
@@ -234,20 +240,27 @@ export function getOutboundRequestLimits() {
   };
 }
 
-export function createOutboundAgents(): {
+export function createOutboundAgents(options: OutboundUrlPolicyOptions = {}): {
   httpAgent: HttpAgent;
   httpsAgent: HttpsAgent;
 } {
-  const allowPrivateNetworks = appConfig.outbound.allowPrivateNetworks;
-  const allowedHosts = appConfig.outbound.allowedHosts;
-  const lookup: NonNullable<AgentOptions['lookup']> = (hostname, _options, callback) => {
+  const allowPrivateNetworks =
+    options.allowPrivateNetworks ?? appConfig.outbound.allowPrivateNetworks;
+  const allowedHosts = options.allowedHosts ?? appConfig.outbound.allowedHosts;
+  const lookup: NonNullable<AgentOptions['lookup']> = (hostname, options, callback) => {
     void dns
-      .lookup(hostname, { all: false, verbatim: true })
-      .then(({ address, family }) => {
+      .lookup(hostname, {
+        all: options.all ?? false,
+        family: options.family ?? 0,
+        verbatim: true,
+      })
+      .then((result) => {
+        const addresses = Array.isArray(result) ? result : [result];
+        const allowedHost = isAllowedHost(hostname, allowedHosts);
         if (
           !allowPrivateNetworks &&
-          !isAllowedHost(hostname, allowedHosts) &&
-          isPrivateNetworkAddress(address)
+          !allowedHost &&
+          addresses.some((entry) => isPrivateNetworkAddress(entry.address))
         ) {
           callback(
             new OutboundUrlPolicyError(
@@ -259,7 +272,12 @@ export function createOutboundAgents(): {
           );
           return;
         }
-        callback(null, address, family);
+        if (options.all) {
+          callback(null, addresses);
+        } else {
+          const address = addresses[0];
+          callback(null, address.address, address.family);
+        }
       })
       .catch((error: unknown) => {
         callback(error instanceof Error ? error : new Error(String(error)), '', 0);

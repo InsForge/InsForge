@@ -147,14 +147,18 @@ const AWS_MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024;
 /** Largest delay `setTimeout` honours; anything above it is silently treated as 1ms. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
-function parseEnvBytes(val: string | undefined, fallback: number): number {
+function parseEnvBytes(
+  val: string | undefined,
+  fallback: number,
+  maxBytes: number = AWS_MAX_SINGLE_PUT_BYTES
+): number {
   if (!val) return fallback;
   if (!/^\d+$/.test(val)) return fallback;
   const parsed = Number(val);
   if (!Number.isFinite(parsed) || !Number.isSafeInteger(parsed) || parsed <= 0) {
     return fallback;
   }
-  return Math.min(parsed, AWS_MAX_SINGLE_PUT_BYTES);
+  return Math.min(parsed, maxBytes);
 }
 
 export function loadConfig(): AppConfig {
@@ -260,8 +264,16 @@ export function loadConfig(): AppConfig {
         .map((host) => host.trim())
         .filter(Boolean),
       requestTimeoutMs: parseEnvInt(process.env.OUTBOUND_REQUEST_TIMEOUT_MS, 10000),
-      maxResponseBytes: parseEnvBytes(process.env.OUTBOUND_MAX_RESPONSE_BYTES, 1024 * 1024),
-      maxRequestBytes: parseEnvBytes(process.env.OUTBOUND_MAX_REQUEST_BYTES, 10 * 1024 * 1024),
+      maxResponseBytes: parseEnvBytes(
+        process.env.OUTBOUND_MAX_RESPONSE_BYTES,
+        1024 * 1024,
+        100 * 1024 * 1024
+      ),
+      maxRequestBytes: parseEnvBytes(
+        process.env.OUTBOUND_MAX_REQUEST_BYTES,
+        10 * 1024 * 1024,
+        100 * 1024 * 1024
+      ),
       maxRedirects: parseEnvInt(process.env.OUTBOUND_MAX_REDIRECTS, 0),
     },
     database: {
