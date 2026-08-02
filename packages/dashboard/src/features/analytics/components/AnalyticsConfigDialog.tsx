@@ -24,7 +24,10 @@ import {
 import type { PosthogConnection } from '@insforge/shared-schemas';
 import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { PosthogKeyForm } from './posthog/PosthogKeyForm';
-import { ANALYTICS_SETUP_PROMPT } from '#features/analytics/lib/constants';
+import {
+  ANALYTICS_SETUP_PROMPT,
+  ANALYTICS_SETUP_PROMPT_SELF_HOSTED,
+} from '#features/analytics/lib/constants';
 import { DisconnectDialog } from './posthog/DisconnectDialog';
 
 type Section = 'general' | 'setup-prompt';
@@ -51,6 +54,7 @@ export function AnalyticsConfigDialog({
   // Self-hosted deployments paste their own PostHog key here; cloud projects
   // hand off to the host's OAuth flow. Mirrors WebScraperSettingsDialog.
   const isSelfHosted = !useIsCloudHostingMode();
+  const setupPrompt = isSelfHosted ? ANALYTICS_SETUP_PROMPT_SELF_HOSTED : ANALYTICS_SETUP_PROMPT;
   const { showToast } = useToast();
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -304,15 +308,9 @@ export function AnalyticsConfigDialog({
                           {t('analytics.setupPromptBadge', { defaultValue: 'setup prompt' })}
                         </span>
                       </div>
-                      <CopyButton
-                        text={ANALYTICS_SETUP_PROMPT}
-                        showText={false}
-                        className="shrink-0"
-                      />
+                      <CopyButton text={setupPrompt} showText={false} className="shrink-0" />
                     </div>
-                    <p className="font-mono text-sm leading-6 text-foreground">
-                      {ANALYTICS_SETUP_PROMPT}
-                    </p>
+                    <p className="font-mono text-sm leading-6 text-foreground">{setupPrompt}</p>
                   </div>
                 </div>
               )}
