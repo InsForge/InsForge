@@ -210,13 +210,20 @@ export class AnalyticsService {
   // 400 with remediation rather than 502, so the connect dialog can show it
   // inline on the field.
   private rejectCredentials(err: unknown): AppError {
-    const status =
+    const response =
       typeof err === 'object' && err !== null && 'response' in err
-        ? (err as { response?: { status?: number } }).response?.status
+        ? (err as { response?: { status?: number; data?: { detail?: unknown } } }).response
         : undefined;
+    const status = response?.status;
     if (status === 401 || status === 403) {
+      // PostHog's 403 body names the exact missing scope (e.g. "API key missing
+      // required scope 'organization:read'") — pass it through instead of
+      // making the user guess.
+      const detail = typeof response?.data?.detail === 'string' ? response.data.detail : null;
       return new AppError(
-        'PostHog rejected that personal API key. Check the key and that its scopes include project and query read access.',
+        detail
+          ? `PostHog rejected that personal API key: ${detail}. It needs read scopes for organizations, projects and queries.`
+          : 'PostHog rejected that personal API key. Check the key and that its scopes include organization, project and query read access.',
         400,
         ERROR_CODES.INVALID_INPUT
       );

@@ -117,7 +117,7 @@ export function PosthogKeyForm() {
             }
           }}
           placeholder="phx_..."
-          className="max-w-md"
+          className="min-w-0 max-w-md flex-1"
         />
         <Select
           value={region}
@@ -127,7 +127,7 @@ export function PosthogKeyForm() {
             setChosenId('');
           }}
         >
-          <SelectTrigger className="w-28" aria-label="PostHog region">
+          <SelectTrigger className="w-28 shrink-0" aria-label="PostHog region">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -138,6 +138,7 @@ export function PosthogKeyForm() {
         <Button
           type="submit"
           variant="primary"
+          className="shrink-0"
           disabled={!personalApiKey.trim() || isPending || (choices.length > 0 && !chosenId)}
         >
           {isPending
@@ -173,7 +174,7 @@ export function PosthogKeyForm() {
       <p className="text-sm leading-6 text-muted-foreground">
         {t('analytics.posthogKeyHint', {
           defaultValue:
-            'Create a key in PostHog under Settings → Personal API keys, with read access to projects and queries. It is stored encrypted on your own backend.',
+            'Create a key in PostHog under Settings → Personal API keys, with read access to organizations, projects and queries (plus session recording read and sharing write for replays). It is stored encrypted on your own backend.',
         })}{' '}
         <a
           href={`${POSTHOG_APP_URL[region]}/settings/user-api-keys`}
