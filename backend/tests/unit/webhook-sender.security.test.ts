@@ -47,7 +47,7 @@ describe('WebhookSender outbound URL policy', () => {
       expect.objectContaining({
         maxRedirects: 0,
         maxContentLength: 1024 * 1024,
-        maxBodyLength: 1024 * 1024,
+        maxBodyLength: 10 * 1024 * 1024,
       })
     );
   });

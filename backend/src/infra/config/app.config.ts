@@ -71,6 +71,7 @@ export interface AppConfig {
     allowedHosts: string[];
     requestTimeoutMs: number;
     maxResponseBytes: number;
+    maxRequestBytes: number;
     maxRedirects: number;
   };
   database: {
@@ -260,6 +261,7 @@ export function loadConfig(): AppConfig {
         .filter(Boolean),
       requestTimeoutMs: parseEnvInt(process.env.OUTBOUND_REQUEST_TIMEOUT_MS, 10000),
       maxResponseBytes: parseEnvBytes(process.env.OUTBOUND_MAX_RESPONSE_BYTES, 1024 * 1024),
+      maxRequestBytes: parseEnvBytes(process.env.OUTBOUND_MAX_REQUEST_BYTES, 10 * 1024 * 1024),
       maxRedirects: parseEnvInt(process.env.OUTBOUND_MAX_REDIRECTS, 0),
     },
     database: {

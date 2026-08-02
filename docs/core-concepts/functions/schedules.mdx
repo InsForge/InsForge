@@ -11,7 +11,7 @@ A schedule is a cron expression, a target URL, and headers. On creation, `${{sec
 
 InsForge validates schedule targets before they are stored. Only HTTP(S) URLs without embedded credentials are accepted, and loopback, private, link-local, metadata, multicast, and reserved network destinations are rejected by default. This protects the database-backed scheduler from being used to reach internal services. Self-hosted installations that intentionally call private services can configure `OUTBOUND_ALLOW_PRIVATE_NETWORKS=true` and should restrict `OUTBOUND_ALLOWED_HOSTS` to the required domains.
 
-Outbound requests use a configurable timeout and do not follow redirects by default. Configure `OUTBOUND_REQUEST_TIMEOUT_MS`, `OUTBOUND_MAX_RESPONSE_BYTES`, and `OUTBOUND_MAX_REDIRECTS` in the backend environment when a deployment needs different limits.
+Scheduled calls use a database-level five-minute timeout and a five-second connection timeout. The `OUTBOUND_*` request limits configure realtime webhook delivery; scheduled calls pin the DNS result captured when the schedule is created or its URL is changed.
 
 ## Usage
 

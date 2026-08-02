@@ -4,6 +4,9 @@
 -- This database-side guard provides defense in depth for direct SQL callers and
 -- rejects unsafe literal destinations before pg_cron can persist them.
 
+ALTER TABLE schedules.jobs
+  ADD COLUMN IF NOT EXISTS resolved_target JSONB;
+
 CREATE OR REPLACE FUNCTION schedules.is_safe_url(p_url TEXT)
 RETURNS BOOLEAN AS $$
 DECLARE
@@ -15,34 +18,138 @@ BEGIN
   END IF;
 
   -- Credentials in a scheduled URL would be exposed to database metadata and logs.
-  v_authority := substring(p_url FROM '^https?://([^/?#]+)');
+  v_authority := substring(lower(p_url) FROM '^https?://([^/?#]+)');
   IF v_authority ~ '@' THEN
     RETURN FALSE;
   END IF;
 
-  v_host := lower(regexp_replace(v_authority, ':([0-9]+)$', ''));
+  IF left(v_authority, 1) = '[' THEN
+    v_host := lower(split_part(v_authority, ']', 1) || ']');
+  ELSE
+    v_host := lower(regexp_replace(v_authority, ':([0-9]+)$', ''));
+  END IF;
 
-  IF v_host IN ('localhost', 'localhost.') OR
-     v_host ~ '(^|\.)localhost$' OR
-     v_host ~ '^127\.' OR
-     v_host ~ '^10\.' OR
-     v_host ~ '^0\.' OR
-     v_host ~ '^192\.168\.' OR
-     v_host ~ '^169\.254\.' OR
-     v_host ~ '^172\.(1[6-9]|2[0-9]|3[0-1])\.' OR
-     v_host ~ '^224\.' OR
-     v_host ~ '^255\.' OR
-     v_host ~ '^\[::1\]$' OR
-     v_host ~ '^\[fc' OR
-     v_host ~ '^\[fd' OR
-     v_host ~ '^\[fe80:' OR
-     v_host ~ '^\[ff' THEN
+  IF v_host ~ '^[0-9]+$' OR
+     v_host ~ '^0x[0-9a-f]+$' OR
+     v_host ~ '^0[0-7]+$' THEN
     RETURN FALSE;
   END IF;
 
   RETURN TRUE;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION schedules.is_safe_address(p_address TEXT)
+RETURNS BOOLEAN AS $$
+DECLARE
+  v_ip INET;
+BEGIN
+  IF p_address IS NULL OR p_address ~ '^[0-9]+$' THEN
+    RETURN FALSE;
+  END IF;
+
+  BEGIN
+    v_ip := p_address::INET;
+  EXCEPTION WHEN OTHERS THEN
+    RETURN FALSE;
+  END;
+
+  RETURN NOT (
+    v_ip <<= '0.0.0.0/8'::CIDR OR
+    v_ip <<= '10.0.0.0/8'::CIDR OR
+    v_ip <<= '100.64.0.0/10'::CIDR OR
+    v_ip <<= '127.0.0.0/8'::CIDR OR
+    v_ip <<= '169.254.0.0/16'::CIDR OR
+    v_ip <<= '172.16.0.0/12'::CIDR OR
+    v_ip <<= '192.0.0.0/24'::CIDR OR
+    v_ip <<= '192.0.2.0/24'::CIDR OR
+    v_ip <<= '192.88.99.0/24'::CIDR OR
+    v_ip <<= '192.168.0.0/16'::CIDR OR
+    v_ip <<= '198.18.0.0/15'::CIDR OR
+    v_ip <<= '198.51.100.0/24'::CIDR OR
+    v_ip <<= '203.0.113.0/24'::CIDR OR
+    v_ip <<= '224.0.0.0/4'::CIDR OR
+    v_ip <<= '::/128'::CIDR OR
+    v_ip <<= '::1/128'::CIDR OR
+    v_ip <<= '::ffff:0:0/96'::CIDR OR
+    v_ip <<= 'fc00::/7'::CIDR OR
+    v_ip <<= 'fec0::/10'::CIDR OR
+    v_ip <<= 'fe80::/10'::CIDR OR
+    v_ip <<= 'ff00::/8'::CIDR OR
+    v_ip <<= '2001:db8::/32'::CIDR
+  );
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+DROP FUNCTION IF EXISTS schedules.upsert_job(UUID, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, JSONB);
+
+CREATE OR REPLACE FUNCTION schedules.upsert_job(
+  p_job_id UUID,
+  p_name TEXT,
+  p_cron_expression TEXT,
+  p_http_method TEXT,
+  p_function_url TEXT,
+  p_headers_template JSONB,
+  p_resolved_headers JSONB,
+  p_body JSONB,
+  p_resolved_target JSONB
+)
+RETURNS TABLE(cron_job_id BIGINT, success BOOLEAN, message TEXT) AS $$
+DECLARE
+  v_existing_cron_id BIGINT;
+  v_new_cron_id BIGINT;
+  v_function_call TEXT;
+  v_encrypted_headers TEXT;
+BEGIN
+  IF NOT schedules.is_safe_url(p_function_url) OR
+     p_resolved_target IS NULL OR
+     (COALESCE((p_resolved_target->>'allowPrivateNetworks')::BOOLEAN, FALSE) = FALSE AND
+      EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements_text(COALESCE(p_resolved_target->'addresses', '[]'::JSONB)) AS address
+        WHERE NOT schedules.is_safe_address(address)
+      )) THEN
+    RETURN QUERY SELECT NULL::BIGINT, FALSE, 'Scheduled URL failed outbound policy validation';
+    RETURN;
+  END IF;
+
+  v_encrypted_headers := schedules.encrypt_headers(p_resolved_headers);
+
+  SELECT j.cron_job_id INTO v_existing_cron_id
+  FROM schedules.jobs AS j
+  WHERE j.id = p_job_id;
+
+  IF v_existing_cron_id IS NOT NULL THEN
+    PERFORM cron.unschedule(v_existing_cron_id);
+  END IF;
+
+  v_function_call := format('SELECT schedules.execute_job(%L::UUID)', p_job_id);
+  SELECT cron.schedule(p_cron_expression, v_function_call) INTO v_new_cron_id;
+
+  INSERT INTO schedules.jobs (
+    id, name, cron_schedule, function_url, http_method, encrypted_headers, headers, body,
+    resolved_target, cron_job_id, is_active, created_at, updated_at
+  ) VALUES (
+    p_job_id, p_name, p_cron_expression, p_function_url, p_http_method, v_encrypted_headers,
+    p_headers_template, p_body, p_resolved_target, v_new_cron_id, TRUE, NOW(), NOW()
+  ) ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    cron_schedule = EXCLUDED.cron_schedule,
+    function_url = EXCLUDED.function_url,
+    http_method = EXCLUDED.http_method,
+    encrypted_headers = EXCLUDED.encrypted_headers,
+    headers = EXCLUDED.headers,
+    body = EXCLUDED.body,
+    resolved_target = EXCLUDED.resolved_target,
+    cron_job_id = EXCLUDED.cron_job_id,
+    is_active = TRUE,
+    updated_at = NOW();
+
+  RETURN QUERY SELECT v_new_cron_id, TRUE, 'Cron job scheduled successfully';
+EXCEPTION WHEN OTHERS THEN
+  RETURN QUERY SELECT NULL::BIGINT, FALSE, SQLERRM;
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION schedules.execute_job(p_job_id UUID)
 RETURNS void AS $$
@@ -54,6 +161,7 @@ DECLARE
   v_status INT;
   v_decrypted_headers JSONB;
   v_final_body JSONB;
+  v_resolved_target JSONB;
   v_start_time TIMESTAMP := clock_timestamp();
   v_end_time TIMESTAMP;
   v_duration_ms BIGINT;
@@ -68,7 +176,8 @@ BEGIN
     j.function_url,
     j.http_method,
     j.body,
-    j.encrypted_headers
+    j.encrypted_headers,
+    j.resolved_target
   INTO v_job
   FROM schedules.jobs AS j
   WHERE j.id = p_job_id;
@@ -89,6 +198,37 @@ BEGIN
     );
     RETURN;
   END IF;
+
+  IF v_job.resolved_target IS NULL OR
+     v_job.resolved_target->>'rawUrl' <> v_job.function_url OR
+     jsonb_array_length(COALESCE(v_job.resolved_target->'addresses', '[]'::JSONB)) = 0 OR
+     (COALESCE((v_job.resolved_target->>'allowPrivateNetworks')::BOOLEAN, FALSE) = FALSE AND
+      EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements_text(COALESCE(v_job.resolved_target->'addresses', '[]'::JSONB)) AS address
+        WHERE NOT schedules.is_safe_address(address)
+      )) THEN
+    PERFORM schedules.log_job_execution(
+      v_job.id,
+      v_job.name,
+      FALSE,
+      400,
+      0,
+      'Scheduled URL has no valid DNS-pinned destination'
+    );
+    RETURN;
+  END IF;
+
+  v_resolved_target := v_job.resolved_target;
+  PERFORM http_set_curlopt(
+    'CURLOPT_RESOLVE',
+    format(
+      '%s:%s:%s',
+      v_resolved_target->>'hostname',
+      v_resolved_target->>'port',
+      v_resolved_target->'addresses'->>0
+    )
+  );
 
   BEGIN
     v_decrypted_headers := schedules.decrypt_headers(v_job.encrypted_headers);
@@ -123,13 +263,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-ALTER TABLE schedules.jobs
-  DROP CONSTRAINT IF EXISTS schedules_jobs_function_url_safe;
-
-ALTER TABLE schedules.jobs
-  ADD CONSTRAINT schedules_jobs_function_url_safe
-  CHECK (schedules.is_safe_url(function_url)) NOT VALID;
-
 DO $$
 DECLARE
   v_job RECORD;
@@ -138,6 +271,7 @@ BEGIN
     SELECT id, cron_job_id
     FROM schedules.jobs
     WHERE NOT schedules.is_safe_url(function_url)
+       OR resolved_target IS NULL
   LOOP
     IF v_job.cron_job_id IS NOT NULL THEN
       PERFORM cron.unschedule(v_job.cron_job_id);
@@ -150,3 +284,10 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+ALTER TABLE schedules.jobs
+  DROP CONSTRAINT IF EXISTS schedules_jobs_function_url_safe;
+
+ALTER TABLE schedules.jobs
+  ADD CONSTRAINT schedules_jobs_function_url_safe
+  CHECK (schedules.is_safe_url(function_url)) NOT VALID;
