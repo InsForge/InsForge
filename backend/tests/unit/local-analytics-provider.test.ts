@@ -105,6 +105,18 @@ describe('LocalAnalyticsProvider', () => {
       await expect(provider.getWebOverview('7d')).rejects.toThrow(/reconnect PostHog/i);
     });
 
+    // A missing scope must not read as a revoked key — PostHog's detail names
+    // the one checkbox to fix.
+    it('surfaces the missing-scope detail from a PostHog 403', async () => {
+      const { provider, api } = makeProvider();
+      const err = makeAxiosError(403);
+      err.response.data = { detail: "API key missing required scope 'session_recording:read'" };
+      api.listRecordings.mockRejectedValue(err);
+
+      await expect(provider.getRecordings()).rejects.toThrow(/session_recording:read/);
+      await expect(provider.getRecordings()).rejects.toThrow(/scopes/);
+    });
+
     it('passes through non-auth upstream status codes', async () => {
       const { provider, api } = makeProvider();
       api.runQuery.mockRejectedValue(makeAxiosError(429));

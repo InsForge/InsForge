@@ -130,9 +130,19 @@ export class LocalAnalyticsProvider implements AnalyticsProvider {
 
     logger.error(`PostHog ${label} request failed`, { err: detail, status, upstreamStatus });
 
+    // On auth failures PostHog's body names the exact problem (e.g. "API key
+    // missing required scope 'session_recording:read'") — surface it, or the
+    // user is told to reconnect when the fix is one scope checkbox.
+    const authDetail =
+      typeof (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail ===
+      'string'
+        ? ((err as { response: { data: { detail: string } } }).response.data.detail as string)
+        : null;
     const message =
       upstreamStatus === 401 || upstreamStatus === 403
-        ? 'PostHog rejected the request. The stored personal API key may have been revoked — reconnect PostHog.'
+        ? authDetail
+          ? `PostHog rejected the request: ${authDetail}. Update the key's scopes, or reconnect PostHog.`
+          : 'PostHog rejected the request. The stored personal API key may have been revoked — reconnect PostHog.'
         : 'PostHog request failed.';
     return new AppError(message, status, ERROR_CODES.UPSTREAM_FAILURE);
   }
