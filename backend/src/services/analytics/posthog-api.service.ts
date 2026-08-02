@@ -116,11 +116,18 @@ export class PostHogApiService {
 
   // Discovery must be exhaustive — a project on page two would be missing from
   // the picker and rejected as invisible if passed explicitly. `next` is only
-  // followed while it stays on the validated host.
+  // followed while it stays on the validated host. Hitting the page cap with a
+  // valid link left throws rather than returning a silently truncated list the
+  // connect flow would treat as complete.
   private async getAllPages<T>(firstUrl: string, personalApiKey: string): Promise<T[]> {
     const items: T[] = [];
     let url: string | null = firstUrl;
-    for (let page = 0; url && page < MAX_DISCOVERY_PAGES; page++) {
+    for (let page = 0; url; page++) {
+      if (page >= MAX_DISCOVERY_PAGES) {
+        throw new Error(
+          `PostHog discovery exceeded ${MAX_DISCOVERY_PAGES} pages; refusing to return a partial list`
+        );
+      }
       const data: { results?: T[]; next?: string | null } = await this.get(url, personalApiKey);
       items.push(...(data.results ?? []));
       url = data.next && isValidPosthogHost(data.next) ? data.next : null;
@@ -250,8 +257,11 @@ export class PostHogApiService {
       return await call();
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 429) {
-        const retryAfter = parseRetryAfterSeconds(err.response.headers['retry-after']);
-        if (retryAfter === null || retryAfter > MAX_RETRY_AFTER_SECONDS) {
+        // Absent or unparseable header still gets the one retry, after 1s —
+        // the behaviour this was ported with. Only an explicit long delay
+        // (> 30s) is surfaced instead of holding an inbound request open.
+        const retryAfter = parseRetryAfterSeconds(err.response.headers['retry-after']) ?? 1;
+        if (retryAfter > MAX_RETRY_AFTER_SECONDS) {
           throw err;
         }
         await new Promise((r) => setTimeout(r, retryAfter * 1000));

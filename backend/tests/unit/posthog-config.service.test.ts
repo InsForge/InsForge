@@ -129,6 +129,44 @@ describe('PostHogConfigService', () => {
     await expect(service.deleteConnection()).resolves.toBeUndefined();
   });
 
+  // The duplicate reaches this service as the AppError createSecret translates
+  // 23505 into (code SECRET_ALREADY_EXISTS), not as the raw Postgres error.
+  it('recovers a lost first-connect race by taking over the winning row', async () => {
+    store.createSecret.mockImplementationOnce(async () => {
+      // The concurrent winner's row appears between findSecret and createSecret.
+      store.state.value = JSON.stringify(connection({ posthogProjectId: 'winner' }));
+      store.state.rows.push({ key: POSTHOG_CONNECTION_SECRET, id: 'secret-1', isActive: true });
+      const err = new Error('Secret already exists') as Error & { code: string };
+      err.code = 'SECRET_ALREADY_EXISTS';
+      throw err;
+    });
+
+    const config = await service.setConnection(connection({ posthogProjectId: 'loser' }));
+
+    expect(store.updateSecret).toHaveBeenCalledTimes(1);
+    expect(config.posthogProjectId).toBe('loser');
+  });
+
+  it('does not report success when the takeover update fails', async () => {
+    store.createSecret.mockImplementationOnce(async () => {
+      store.state.value = JSON.stringify(connection());
+      store.state.rows.push({ key: POSTHOG_CONNECTION_SECRET, id: 'secret-1', isActive: true });
+      const err = new Error('Secret already exists') as Error & { code: string };
+      err.code = 'SECRET_ALREADY_EXISTS';
+      throw err;
+    });
+    store.updateSecret.mockResolvedValueOnce(false);
+
+    await expect(service.setConnection(connection())).rejects.toThrow(/Failed to update/);
+  });
+
+  it('rethrows non-duplicate create failures untouched', async () => {
+    store.createSecret.mockRejectedValueOnce(new Error('connection refused'));
+
+    await expect(service.setConnection(connection())).rejects.toThrow('connection refused');
+    expect(store.updateSecret).not.toHaveBeenCalled();
+  });
+
   it('disconnect throws when the row survives the delete', async () => {
     await service.setConnection(connection());
     store.deleteReservedSecretByKey.mockResolvedValueOnce(false);

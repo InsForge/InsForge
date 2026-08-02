@@ -52,6 +52,10 @@ export function PosthogKeyForm() {
     setPersonalApiKey('');
     setChoices([]);
     setChosenId('');
+    // Mutations retain their variables — the raw key — after settling; drop
+    // them once the credential is stored server-side.
+    discover.reset();
+    connect.reset();
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -76,7 +80,10 @@ export function PosthogKeyForm() {
       }
 
       const projects = await discover.mutateAsync({ personalApiKey: trimmed, region });
-      if (projects.length === 1) {
+      // Zero projects: hand the key to connect anyway — the backend rejects it
+      // with an actionable scopes message that renders in the error block below,
+      // instead of the form silently doing nothing.
+      if (projects.length <= 1) {
         await connect.mutateAsync({ personalApiKey: trimmed, region });
         reset();
         return;

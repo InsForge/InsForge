@@ -1,4 +1,4 @@
-import type { PosthogConfig } from '@insforge/shared-schemas';
+import { ERROR_CODES, type PosthogConfig } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
 
@@ -6,8 +6,12 @@ export const POSTHOG_CONNECTION_SECRET = 'POSTHOG_CONNECTION';
 const CACHE_TTL_MS = 60 * 1000;
 const PG_UNIQUE_VIOLATION = '23505';
 
-function isUniqueViolation(error: unknown): boolean {
-  return (error as { code?: string } | null)?.code === PG_UNIQUE_VIOLATION;
+// createSecret() translates Postgres 23505 into an AppError carrying
+// SECRET_ALREADY_EXISTS before it reaches callers, so both spellings of the
+// duplicate-key case are matched here.
+function isDuplicateSecret(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code === PG_UNIQUE_VIOLATION || code === ERROR_CODES.SECRET_ALREADY_EXISTS;
 }
 
 type SecretStore = Pick<
@@ -116,19 +120,22 @@ export class PostHogConfigService {
           // Two concurrent first-time connects both see no row and both insert;
           // one wins on UNIQUE(key). The loser's credential is still valid, so
           // take over the winner's row instead of failing a good request.
-          if (!isUniqueViolation(error)) {
+          if (!isDuplicateSecret(error)) {
             throw error;
           }
           const existing = await this.findSecret();
           if (!existing) {
             throw error;
           }
-          await this.secretService.updateSecret(existing.id, {
+          const updated = await this.secretService.updateSecret(existing.id, {
             value: JSON.stringify(record),
             isActive: true,
             isReserved: true,
             expiresAt: null,
           });
+          if (!updated) {
+            throw new Error(`Failed to update ${POSTHOG_CONNECTION_SECRET}`);
+          }
         }
       }
     } finally {
