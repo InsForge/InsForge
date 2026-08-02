@@ -1,7 +1,7 @@
 ---
 title: "Funciones perimetrales"
 sidebarTitle: "Overview"
-description: "TypeScript sin servidor impulsado por Deno con calendarios de primera clase."
+description: "Ejecute funciones perimetrales TypeScript sin servidor sobre Deno con invocación HTTP, cron, activadores de base de datos, secretos y variables de entorno."
 ---
 
 Utilice InsForge Edge Functions para ejecutar TypeScript en [Deno](https://deno.com), implementado cerca de sus usuarios para baja latencia. Las funciones se pueden invocar bajo demanda desde cualquier cliente, encadenarse desde activadores de base de datos o programarse para ejecutarse en una expresión cron. El tiempo de ejecución incluye búsqueda estándar, respuestas de transmisión e importaciones ESM listos para usar.
@@ -48,6 +48,15 @@ Conecte una función para que se dispare en `INSERT`, `UPDATE` o `DELETE` en una
 ### Secretos y variables de entorno
 
 Establezca variables de entorno y secretos por función. El panel, CLI y MCP leen y escriben el mismo almacén; los secretos nunca realizan un viaje de ida y vuelta a través de su repositorio.
+
+La diferencia está en cómo se almacena y protege cada valor. Los **secretos** se cifran en reposo: `secrets list` muestra solo metadatos con los valores ocultos, y `secrets get` devuelve el valor descifrado cuando lo necesita. Un secreto también puede llevar una fecha de expiración (`--expires <ISO-8601>`) y marcarse como protegido contra eliminación (`--reserved`). Las **variables de entorno** son valores de configuración simples, sin cifrado ni expiración. Ponga credenciales como claves de API y contraseñas en secretos, y la configuración no sensible en variables de entorno. Ambos quedan disponibles para el código de su función de la misma manera.
+
+```bash
+# un secreto protegido con expiración
+npx @insforge/cli secrets add STRIPE_SECRET_KEY sk_live_xxx --reserved --expires 2027-01-01T00:00:00Z
+# lea de vuelta el valor descifrado
+npx @insforge/cli secrets get STRIPE_SECRET_KEY
+```
 
 ### Registros
 

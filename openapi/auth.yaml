@@ -509,7 +509,17 @@ paths:
   /api/auth/sessions:
     post:
       summary: User login
-      description: Authenticates user and returns access token. For web clients, sets httpOnly refresh token cookie. For mobile/desktop/server clients, returns refreshToken in response body.
+      description: |
+        Authenticates with a password or email OTP and returns an access token.
+        Existing password clients may omit `method`; it defaults to `password`.
+
+        With `method: otp`, InsForge verifies and consumes the 6-digit sign-in
+        code. If the email is new and public signups are enabled, it then creates
+        a verified passwordless user. If public signups are disabled, a valid
+        code for an unknown email is consumed and the request returns 403.
+
+        For web clients, this endpoint sets an httpOnly refresh token cookie.
+        For mobile/desktop/server clients, it returns refreshToken in the body.
       tags:
         - Client
       parameters:
@@ -528,16 +538,48 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - email
-                - password
-              properties:
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
+              oneOf:
+                - title: Password login
+                  type: object
+                  required:
+                    - email
+                    - password
+                  properties:
+                    method:
+                      type: string
+                      enum: [password]
+                      default: password
+                      description: May be omitted for backward compatibility
+                    email:
+                      type: string
+                      format: email
+                    password:
+                      type: string
+                - title: Email OTP login
+                  type: object
+                  required:
+                    - method
+                    - email
+                    - otp
+                  properties:
+                    method:
+                      type: string
+                      enum: [otp]
+                    email:
+                      type: string
+                      format: email
+                      example: user@example.com
+                    otp:
+                      type: string
+                      pattern: '^\d{6}$'
+                      description: 6-digit sign-in code
+                      example: "123456"
+                    name:
+                      type: string
+                      minLength: 1
+                      maxLength: 100
+                      description: Profile name used only when a new user is created
+                      example: Ada Lovelace
       responses:
         '200':
           description: Login successful
@@ -558,10 +600,14 @@ paths:
                     type: string
                     nullable: true
                     description: Refresh token for mobile/desktop/server clients (null for web clients)
+        '400':
+          description: Invalid input or invalid, expired, consumed, or attempt-limited sign-in code
         '401':
-          description: Invalid credentials
+          description: Invalid password credentials
         '403':
-          description: Email verification required
+          description: Email verification required, or public signups are disabled for a verified unknown email
+        '429':
+          description: Too many OTP verification attempts
 
   /api/auth/refresh:
     post:
@@ -889,6 +935,48 @@ paths:
           description: Forbidden - admin access required
         '404':
           description: Anon key not initialized
+
+  /api/auth/email/send-otp:
+    post:
+      summary: Send an email sign-in OTP
+      description: |
+        Sends a 6-digit code that can be exchanged at POST /api/auth/sessions
+        with `method: otp`.
+        The response is intentionally generic and does not reveal whether a user
+        already exists. The code expires after 5 minutes.
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '202':
+          description: The sign-in code was accepted for delivery
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: If sign-in is available for this email, we have sent a verification code.
+        '400':
+          description: Invalid request
+        '429':
+          description: Too many sign-in code requests
 
   /api/auth/email/send-verification:
     post:
@@ -1265,6 +1353,14 @@ paths:
                   enum: [google, github, discord, linkedin, facebook, instagram, tiktok, apple, x, spotify, microsoft]
                 clientId:
                   type: string
+                nativeClientIds:
+                  type: array
+                  maxItems: 20
+                  description: Server-trusted native app client IDs used as ID-token audiences
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 255
                 clientSecret:
                   type: string
                 redirectUri:
@@ -1346,6 +1442,14 @@ paths:
               properties:
                 clientId:
                   type: string
+                nativeClientIds:
+                  type: array
+                  maxItems: 20
+                  description: Server-trusted native app client IDs used as ID-token audiences
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 255
                 clientSecret:
                   type: string
                 redirectUri:
@@ -1925,10 +2029,13 @@ paths:
 
   /api/auth/id-token:
     post:
-      summary: Sign in with ID token (Google One Tap, native SDKs)
+      summary: Sign in with a native provider ID token
       description: |
-        Authenticate a user using an ID token obtained from a native SDK (e.g., Google One Tap).
-        Currently only the `google` provider is supported.
+        Authenticate a user using an ID token obtained from Google or Apple's native SDK.
+        Apple requests require the original raw nonce whose lowercase SHA-256 hex digest was
+        attached to the native authorization request. Apple token audiences are validated only
+        against the project's configured clientId and nativeClientIds; callers cannot select a
+        trusted audience.
       tags:
         - Client
       parameters:
@@ -1947,18 +2054,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - provider
-                - token
-              properties:
-                provider:
-                  type: string
-                  enum: [google]
-                  description: Identity provider that issued the token
-                token:
-                  type: string
-                  description: Raw ID token from the provider SDK
+              oneOf:
+                - $ref: '#/components/schemas/GoogleIdTokenSignInRequest'
+                - $ref: '#/components/schemas/AppleIdTokenSignInRequest'
+              discriminator:
+                propertyName: provider
+                mapping:
+                  google: '#/components/schemas/GoogleIdTokenSignInRequest'
+                  apple: '#/components/schemas/AppleIdTokenSignInRequest'
       responses:
         '200':
           description: Sign-in successful
@@ -2136,7 +2239,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [email-verification-code, email-verification-link, reset-password-code, reset-password-link]
+            enum: [email-verification-code, email-verification-link, request-otp, reset-password-code, reset-password-link]
           description: Template type to update
       requestBody:
         required: true
@@ -2180,6 +2283,41 @@ components:
       name: x-api-key
 
   schemas:
+    GoogleIdTokenSignInRequest:
+      type: object
+      required: [provider, token]
+      properties:
+        provider:
+          type: string
+          enum: [google]
+        token:
+          type: string
+          minLength: 1
+          description: Raw Google ID token
+
+    AppleIdTokenSignInRequest:
+      type: object
+      additionalProperties: false
+      required: [provider, token, nonce]
+      properties:
+        provider:
+          type: string
+          enum: [apple]
+        token:
+          type: string
+          minLength: 1
+          description: Raw identityToken from ASAuthorizationAppleIDCredential
+        nonce:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Original raw nonce whose lowercase SHA-256 hex digest was attached to ASAuthorizationAppleIDRequest
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Optional display name returned on first Apple authorization
+
     ProjectAdminResponse:
       type: object
       required:
@@ -2262,6 +2400,14 @@ components:
         clientId:
           type: string
           nullable: true
+        nativeClientIds:
+          type: array
+          maxItems: 20
+          description: Server-trusted native app client IDs used as ID-token audiences
+          items:
+            type: string
+            minLength: 1
+            maxLength: 255
         redirectUri:
           type: string
           nullable: true
@@ -2412,7 +2558,7 @@ components:
           format: uuid
         templateType:
           type: string
-          enum: [email-verification-code, email-verification-link, reset-password-code, reset-password-link]
+          enum: [email-verification-code, email-verification-link, request-otp, reset-password-code, reset-password-link]
         subject:
           type: string
         bodyHtml:

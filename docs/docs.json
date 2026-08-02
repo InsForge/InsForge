@@ -173,6 +173,7 @@
                 "group": "Self-Hosting",
                 "pages": [
                   "deployment/deployment-security-guide",
+                  "deployment/self-host-storage",
                   "deployment/deploy-to-aws-ec2",
                   "deployment/deploy-to-azure-virtual-machines",
                   "deployment/deploy-to-containarium",
@@ -283,6 +284,10 @@
               {
                 "group": "Tables",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
+              },
+              {
+                "group": "Schedules",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/schedules.yaml"
               },
               {
                 "group": "Authentication",
@@ -582,6 +587,10 @@
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
               },
               {
+                "group": "Schedules",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/schedules.yaml"
+              },
+              {
                 "group": "身份认证",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/auth.yaml"
               },
@@ -879,6 +888,10 @@
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
               },
               {
+                "group": "Schedules",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/schedules.yaml"
+              },
+              {
                 "group": "身分驗證",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/auth.yaml"
               },
@@ -1174,6 +1187,10 @@
               {
                 "group": "Tables",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
+              },
+              {
+                "group": "Schedules",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/schedules.yaml"
               },
               {
                 "group": "Autenticación",

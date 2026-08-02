@@ -20,7 +20,8 @@ import {
   MenuDialogTitle,
 } from '@insforge/ui';
 import type { ApifyConnection } from '#features/webscraper/services/webscraper.service';
-import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { ApifyTokenForm } from './ApifyTokenForm';
 import { APIFY_CONSOLE_URL, SCRAPE_PROMPT } from './shared';
 import { WebScraperDisconnectDialog } from './WebScraperDisconnectDialog';
 
@@ -30,7 +31,9 @@ interface WebScraperSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   connection: ApifyConnection | null;
-  projectId: string;
+  // Undefined on self-hosted deployments (PROJECT_ID is empty by design); only
+  // the cloud OAuth handoff below reads it.
+  projectId: string | undefined;
 }
 
 export function WebScraperSettingsDialog({
@@ -43,6 +46,8 @@ export function WebScraperSettingsDialog({
   const [section, setSection] = useState<Section>('general');
   const [disconnecting, setDisconnecting] = useState(false);
   const { onConnectApify } = useDashboardHost();
+  // The host's own mode, not "the OAuth callback happens to be missing".
+  const isSelfHosted = !useIsCloudHostingMode();
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -188,13 +193,25 @@ export function WebScraperSettingsDialog({
                         defaultValue: "You haven't connected Apify yet.",
                       })}
                     </p>
-                    <Button
-                      variant="primary"
-                      disabled={!onConnectApify}
-                      onClick={() => onConnectApify?.(projectId)}
-                    >
-                      {t('webscraper.connectApify', { defaultValue: 'Connect Apify' })}
-                    </Button>
+                    {isSelfHosted ? (
+                      <div className="w-full max-w-md text-left">
+                        <ApifyTokenForm />
+                      </div>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        disabled={!onConnectApify}
+                        onClick={() => {
+                          // Always set on this branch: WebscraperLayout returns
+                          // early for a cloud project that has no project id.
+                          if (projectId) {
+                            onConnectApify?.(projectId);
+                          }
+                        }}
+                      >
+                        {t('webscraper.connectApify', { defaultValue: 'Connect Apify' })}
+                      </Button>
+                    )}
                   </div>
                 )
               ) : (

@@ -29,6 +29,11 @@ export interface RefreshTokenWithCsrf {
   csrfToken: string;
 }
 
+export interface CloudProjectAuthorization {
+  projectId: string;
+  userId: string;
+}
+
 /**
  * Create JWKS instance with caching and timeout configuration
  * The instance will automatically cache keys and handle refetching
@@ -352,6 +357,40 @@ export class TokenManager {
         NEXT_ACTIONS.CHECK_TOKEN
       );
     }
+  }
+
+  /**
+   * Verify a cloud-signed project authorization token.
+   *
+   * This is the shared authority boundary for credentials that grant project
+   * admin access. Claims are inspected only after Cloud signature and project
+   * binding verification succeeds.
+   */
+  async verifyCloudProjectAuthorization(token: string): Promise<CloudProjectAuthorization> {
+    if (!appConfig.cloud.projectId) {
+      throw new AppError(
+        'PROJECT_ID not found in environment variables',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    const { projectId, payload } = await this.verifyCloudToken(token);
+
+    if (
+      payload.type !== 'project_authorization' ||
+      typeof payload.userId !== 'string' ||
+      payload.userId.trim().length === 0
+    ) {
+      throw new AppError(
+        'Invalid cloud project authorization token',
+        401,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+        NEXT_ACTIONS.CHECK_TOKEN
+      );
+    }
+
+    return { projectId, userId: payload.userId };
   }
 
   /**
