@@ -18,11 +18,7 @@ export function useConfirm() {
   const pendingPromiseRef = useRef<Promise<boolean> | null>(null);
 
   const confirm = (confirmOptions: ConfirmOptions): Promise<boolean> => {
-    // A dialog is already pending: return the existing promise instead of
-    // orphaning its resolver (which would leave the first promise hanging).
-    if (pendingPromiseRef.current) {
-      return pendingPromiseRef.current;
-    }
+    resolveRef.current?.(false);
 
     setOptions(confirmOptions);
     setIsOpen(true);
