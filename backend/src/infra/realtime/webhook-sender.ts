@@ -1,6 +1,12 @@
 import axios, { AxiosError } from 'axios';
 import logger from '@/utils/logger.js';
 import type { WebhookMessage } from '@insforge/shared-schemas';
+import {
+  assertSafeOutboundUrl,
+  createOutboundAgents,
+  getOutboundRequestLimits,
+  OutboundUrlPolicyError,
+} from '@/infra/network/outbound-url-policy.js';
 
 export interface WebhookResult {
   url: string;
@@ -29,11 +35,19 @@ export class WebhookSender {
    */
   private async send(url: string, message: WebhookMessage): Promise<WebhookResult> {
     let lastError: string | undefined;
+    const limits = getOutboundRequestLimits();
+    const { httpAgent, httpsAgent } = createOutboundAgents();
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
+        await assertSafeOutboundUrl(url);
         const response = await axios.post(url, message.payload, {
-          timeout: this.timeout,
+          timeout: Math.min(this.timeout, limits.timeoutMs),
+          maxContentLength: limits.maxResponseBytes,
+          maxBodyLength: limits.maxResponseBytes,
+          maxRedirects: limits.maxRedirects,
+          httpAgent,
+          httpsAgent,
           headers: {
             'Content-Type': 'application/json',
             'X-InsForge-Event': message.eventName,
@@ -48,6 +62,16 @@ export class WebhookSender {
           statusCode: response.status,
         };
       } catch (error) {
+        if (error instanceof OutboundUrlPolicyError) {
+          logger.warn('Webhook delivery blocked by outbound URL policy', {
+            reason: error.reason,
+          });
+          return {
+            url,
+            success: false,
+            error: error.reason,
+          };
+        }
         const axiosError = error as AxiosError;
         lastError = axiosError.message;
 

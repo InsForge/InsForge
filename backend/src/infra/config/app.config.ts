@@ -56,6 +56,13 @@ export interface AppConfig {
     trustProxy: TrustProxySetting;
     keepAliveTimeoutMs: number;
   };
+  outbound: {
+    allowPrivateNetworks: boolean;
+    allowedHosts: string[];
+    requestTimeoutMs: number;
+    maxResponseBytes: number;
+    maxRedirects: number;
+  };
   database: {
     host: string;
     port: number;
@@ -187,6 +194,16 @@ export function loadConfig(): AppConfig {
       // Must exceed the idle timeout of any proxy/LB in front of the backend,
       // otherwise clients can reuse a socket the server already closed.
       keepAliveTimeoutMs: parseEnvInt(process.env.KEEP_ALIVE_TIMEOUT_MS, 65000),
+    },
+    outbound: {
+      allowPrivateNetworks: parseEnvBool(process.env.OUTBOUND_ALLOW_PRIVATE_NETWORKS),
+      allowedHosts: (process.env.OUTBOUND_ALLOWED_HOSTS || '')
+        .split(',')
+        .map((host) => host.trim())
+        .filter(Boolean),
+      requestTimeoutMs: parseEnvInt(process.env.OUTBOUND_REQUEST_TIMEOUT_MS, 10000),
+      maxResponseBytes: parseEnvBytes(process.env.OUTBOUND_MAX_RESPONSE_BYTES, 1024 * 1024),
+      maxRedirects: parseEnvInt(process.env.OUTBOUND_MAX_REDIRECTS, 0),
     },
     database: {
       host: process.env.POSTGRES_HOST || 'localhost',

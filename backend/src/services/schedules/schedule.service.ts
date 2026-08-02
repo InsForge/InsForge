@@ -3,6 +3,10 @@ import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/utils/errors.js';
 import {
+  assertSafeOutboundUrl,
+  OutboundUrlPolicyError,
+} from '@/infra/network/outbound-url-policy.js';
+import {
   ERROR_CODES,
   type CreateScheduleRequest,
   type UpdateScheduleRequest,
@@ -259,6 +263,7 @@ export class ScheduleService {
   async createSchedule(data: CreateScheduleRequest) {
     try {
       this.validateCronExpression(data.cronSchedule);
+      await this.validateOutboundScheduleUrl(data.functionUrl);
 
       const scheduleId = randomUUID();
       const headersTemplate = data.headers || {};
@@ -328,6 +333,7 @@ export class ScheduleService {
       if (hasScheduleFields) {
         const cronSchedule = data.cronSchedule ?? existingSchedule.cronSchedule;
         this.validateCronExpression(cronSchedule);
+        await this.validateOutboundScheduleUrl(data.functionUrl ?? existingSchedule.functionUrl);
 
         const headersTemplate = data.headers ?? existingSchedule.headers ?? {};
         const resolvedHeaders = data.headers
@@ -381,6 +387,21 @@ export class ScheduleService {
     } catch (error) {
       logger.error('Error in updateSchedule service', { scheduleId: id, error });
       throw error;
+    }
+  }
+
+  private async validateOutboundScheduleUrl(functionUrl: string): Promise<void> {
+    try {
+      await assertSafeOutboundUrl(functionUrl);
+    } catch (error) {
+      if (error instanceof OutboundUrlPolicyError) {
+        throw new AppError(`Invalid schedule URL: ${error.reason}`, 400, ERROR_CODES.INVALID_INPUT);
+      }
+      throw new AppError(
+        'Schedule URL hostname could not be resolved.',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
   }
 
