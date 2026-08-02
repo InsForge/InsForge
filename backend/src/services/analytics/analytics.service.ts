@@ -222,8 +222,8 @@ export class AnalyticsService {
       const detail = typeof response?.data?.detail === 'string' ? response.data.detail : null;
       return new AppError(
         detail
-          ? `PostHog rejected that personal API key: ${detail}. It needs read scopes for organizations, projects and queries.`
-          : 'PostHog rejected that personal API key. Check the key and that its scopes include organization, project and query read access.',
+          ? `PostHog rejected that personal API key: ${detail}. It needs read scopes for organizations, projects and queries, and the region must match your PostHog account.`
+          : 'PostHog rejected that personal API key. Check the key, that its scopes include organization, project and query read access, and that the selected region matches your PostHog account.',
         400,
         ERROR_CODES.INVALID_INPUT
       );
