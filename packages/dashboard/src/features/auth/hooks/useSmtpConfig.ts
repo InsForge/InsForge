@@ -22,6 +22,7 @@ export function useSmtpConfig({ enabled = true }: UseSmtpConfigOptions = {}) {
   } = useQuery<SmtpConfigSchema>({
     queryKey: ['smtp-config'],
     queryFn: () => smtpConfigService.getConfig(),
+    retry: 1,
     enabled,
   });
 
