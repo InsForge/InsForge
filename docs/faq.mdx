@@ -236,6 +236,45 @@ description: "Answers to common InsForge questions on database calls, edge funct
     The string connects as the privileged `postgres` role, so it isn't limited by row-level security and it embeds that role's password. Treat it like a secret: keep it server-side and never ship it to the browser.
   </Accordion>
 
+  <Accordion title="How do I import or load an existing Postgres database into InsForge?">
+    Restore your existing database over your project's Postgres connection string (the same URL from the question above). Standard PostgreSQL client tools — `pg_dump`, `pg_restore`, and `psql` — connect to it directly, so an import is just a dump-then-restore. No special InsForge command is involved.
+
+    1. Dump your local (or other) database:
+
+    ```bash
+    # Custom format (recommended — smaller and supports parallel restore)
+    pg_dump -Fc your_local_db > local.dump
+
+    # ...or a plain SQL file
+    pg_dump your_local_db > local.sql
+    ```
+
+    2. Get your InsForge connection string (cloud projects only):
+
+    ```bash
+    npx @insforge/cli db connection-string
+    ```
+
+    3. Restore into InsForge:
+
+    ```bash
+    # Custom-format dump
+    pg_restore --no-owner --single-transaction -d "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" local.dump
+
+    # ...or a plain SQL file
+    psql --single-transaction "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" < local.sql
+    ```
+
+    A few things to keep in mind:
+
+    - Pass `--no-owner` so restored objects are owned by the `postgres` role rather than roles that only exist in your source database.
+    - The connection string connects as the privileged `postgres` role (it bypasses row-level security), so treat it as a secret and run these commands server-side only.
+    - This works for **cloud projects only**. On a self-hosted instance, restore against your local Postgres credentials (the `DATABASE_URL` / `POSTGRES_*` values from your `.env`) instead.
+    - A restore writes into your live database and can overwrite existing objects. Take a manual backup first — see [Database backups and restore](/core-concepts/database/backups).
+    - `--single-transaction` runs the restore as one transaction, so if a statement fails (a conflicting object, a missing extension or role, a constraint error) the whole import rolls back instead of leaving the database half-restored.
+    - Imported tables do **not** get InsForge's managed access automatically. A raw restore skips the `anon` / `authenticated` grants and row-level security InsForge applies, so imported tables are **not** reachable through the REST API or SDK — and any access rules from your source dump don't carry InsForge's RLS protection — until you grant access and add RLS policies for each table (see [Database](/core-concepts/database/overview)). If you'd rather version schema changes in git, see [Database migrations](/core-concepts/database/migrations).
+  </Accordion>
+
   <Accordion title="How do I take down or remove a deployed site?">
     There's currently no self-serve way to take down a deployed [Site](/core-concepts/sites/overview) — there's no `deployments delete` command and no dashboard action for it. Deployed sites are hosted externally, so even deleting your project (`npx @insforge/cli projects delete --project <id>`) tears down your backend resources — database, storage, and backend branches — but does *not* remove the hosted site.
 

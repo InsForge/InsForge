@@ -236,6 +236,45 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     La cadena se conecta con el rol privilegiado `postgres`, por lo que no está limitada por row-level security e incluye la contraseña de ese rol. Trátala como un secreto: mantenla en el servidor y nunca la envíes al navegador.
   </Accordion>
 
+  <Accordion title="¿Cómo importo o cargo una base de datos Postgres existente en InsForge?">
+    Restaura tu base de datos existente sobre la cadena de conexión de Postgres de tu proyecto (la misma URL de la pregunta anterior). Las herramientas cliente estándar de PostgreSQL —`pg_dump`, `pg_restore` y `psql`— se conectan a ella directamente, así que importar es un simple «volcar y restaurar» (dump-then-restore). No interviene ningún comando especial de InsForge.
+
+    1. Vuelca tu base de datos local (u otra):
+
+    ```bash
+    # Formato personalizado (recomendado: más pequeño y admite restauración en paralelo)
+    pg_dump -Fc your_local_db > local.dump
+
+    # ...o un archivo SQL plano
+    pg_dump your_local_db > local.sql
+    ```
+
+    2. Obtén tu cadena de conexión de InsForge (solo para proyectos cloud):
+
+    ```bash
+    npx @insforge/cli db connection-string
+    ```
+
+    3. Restaura en InsForge:
+
+    ```bash
+    # Volcado en formato personalizado
+    pg_restore --no-owner --single-transaction -d "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" local.dump
+
+    # ...o un archivo SQL plano
+    psql --single-transaction "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" < local.sql
+    ```
+
+    Algunas cosas a tener en cuenta:
+
+    - Pasa `--no-owner` para que los objetos restaurados pertenezcan al rol `postgres` en lugar de a roles que solo existen en tu base de datos de origen.
+    - La cadena de conexión se conecta con el rol privilegiado `postgres` (omite row-level security), así que trátala como un secreto y ejecuta estos comandos solo en el servidor.
+    - Esto funciona **solo para proyectos cloud**. En una instancia autoalojada, restaura contra tus credenciales de Postgres locales (los valores `DATABASE_URL` / `POSTGRES_*` de tu `.env`).
+    - Una restauración escribe en tu base de datos en vivo y puede sobrescribir objetos existentes. Haz primero una copia de seguridad manual — consulta [Copias de seguridad y restauración de la base de datos](/core-concepts/database/backups).
+    - `--single-transaction` ejecuta el restore como una sola transacción, así que si alguna sentencia falla (un objeto en conflicto, una extensión o rol que falta, un error de restricción) toda la importación se revierte en lugar de dejar la base de datos a medio restaurar.
+    - Las tablas importadas **no** obtienen el acceso gestionado de InsForge automáticamente. Un restore directo se salta los permisos de los roles `anon` / `authenticated` y la seguridad a nivel de fila (RLS) que InsForge aplica, así que las tablas importadas **no** son accesibles a través de la API REST ni del SDK —y las reglas de acceso de tu volcado de origen no llevan la protección RLS de InsForge— hasta que concedas acceso y añadas políticas de RLS a cada tabla (consulta [Base de datos](/core-concepts/database/overview)). Si prefieres versionar los cambios de esquema en git, consulta [Migraciones de base de datos](/core-concepts/database/migrations).
+  </Accordion>
+
   <Accordion title="¿Cómo doy de baja o elimino un sitio desplegado?">
     Por ahora no hay una forma autoservicio de dar de baja un [Site](/core-concepts/sites/overview) desplegado: no existe un comando `deployments delete` ni una acción en el dashboard para ello. Los sitios desplegados se alojan de forma externa, así que incluso eliminar tu proyecto (`npx @insforge/cli projects delete --project <id>`) borra tus recursos de backend —base de datos, Storage y backend branches— pero *no* quita el sitio alojado.
 
