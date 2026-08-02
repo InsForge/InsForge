@@ -22,7 +22,8 @@ import {
   useToast,
 } from '@insforge/ui';
 import type { PosthogConnection } from '@insforge/shared-schemas';
-import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { PosthogKeyForm } from './posthog/PosthogKeyForm';
 import { ANALYTICS_SETUP_PROMPT } from '#features/analytics/lib/constants';
 import { DisconnectDialog } from './posthog/DisconnectDialog';
 
@@ -47,6 +48,9 @@ export function AnalyticsConfigDialog({
   const [disconnecting, setDisconnecting] = useState(false);
 
   const { onOpenPosthog, onConnectPosthog } = useDashboardHost();
+  // Self-hosted deployments paste their own PostHog key here; cloud projects
+  // hand off to the host's OAuth flow. Mirrors WebScraperSettingsDialog.
+  const isSelfHosted = !useIsCloudHostingMode();
   const { showToast } = useToast();
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -270,13 +274,19 @@ export function AnalyticsConfigDialog({
                         defaultValue: "You haven't connected PostHog yet.",
                       })}
                     </p>
-                    <Button
-                      variant="primary"
-                      disabled={!onConnectPosthog}
-                      onClick={() => onConnectPosthog?.(projectId)}
-                    >
-                      {t('analytics.connectPosthog', { defaultValue: 'Connect PostHog' })}
-                    </Button>
+                    {isSelfHosted ? (
+                      <div className="w-full max-w-md text-left">
+                        <PosthogKeyForm />
+                      </div>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        disabled={!onConnectPosthog}
+                        onClick={() => onConnectPosthog?.(projectId)}
+                      >
+                        {t('analytics.connectPosthog', { defaultValue: 'Connect PostHog' })}
+                      </Button>
+                    )}
                   </div>
                 )
               ) : (

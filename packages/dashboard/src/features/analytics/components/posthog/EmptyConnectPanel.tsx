@@ -2,7 +2,10 @@ import { useTranslation } from 'react-i18next';
 import { Button, CopyButton } from '@insforge/ui';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { ANALYTICS_SETUP_PROMPT } from '#features/analytics/lib/constants';
+import { PosthogKeyForm } from './PosthogKeyForm';
 
+// `projectId` is only read by the cloud OAuth handoff below; self-hosted
+// deployments have no project id and connect by pasting a key instead.
 export function EmptyConnectPanel({ projectId }: { projectId: string }) {
   const { t } = useTranslation('chrome');
   const { onConnectPosthog } = useDashboardHost();
@@ -15,19 +18,27 @@ export function EmptyConnectPanel({ projectId }: { projectId: string }) {
             {t('analytics.connectPosthog', { defaultValue: 'Connect PostHog' })}
           </p>
           <p className="text-sm leading-6 text-muted-foreground">
-            {t('analytics.connectPosthogDescription', {
-              defaultValue: 'One-click setup of a PostHog project for product analytics.',
-            })}
+            {onConnectPosthog
+              ? t('analytics.connectPosthogDescription', {
+                  defaultValue: 'One-click setup of a PostHog project for product analytics.',
+                })
+              : t('analytics.connectPosthogDescriptionSelfHosted', {
+                  defaultValue:
+                    'Connect your own PostHog project so this dashboard can show your product analytics.',
+                })}
           </p>
         </div>
-        <Button
-          variant="primary"
-          disabled={!onConnectPosthog}
-          onClick={() => onConnectPosthog?.(projectId)}
-          className="self-start"
-        >
-          {t('analytics.connectPosthog', { defaultValue: 'Connect PostHog' })}
-        </Button>
+        {onConnectPosthog ? (
+          <Button
+            variant="primary"
+            onClick={() => onConnectPosthog(projectId)}
+            className="self-start"
+          >
+            {t('analytics.connectPosthog', { defaultValue: 'Connect PostHog' })}
+          </Button>
+        ) : (
+          <PosthogKeyForm />
+        )}
       </StepItem>
 
       <StepItem number={2}>
