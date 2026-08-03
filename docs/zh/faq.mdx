@@ -285,4 +285,18 @@ description: "InsForge 常见问题：数据库调用、Edge Function、Custom C
     - **取消还在跑的构建：** `npx @insforge/cli deployments cancel <id>` 会终止一个进行中的部署；它不会下线一个已经上线的站点。
     - **替换当前上线的内容：** 用 `npx @insforge/cli deployments deploy ./frontend` 在同一个站点上重新部署——最新一次 ready 的部署会接管这个 URL。
   </Accordion>
+
+  <Accordion title="能不能把后端 API 挂到自定义域名上（比如 api.example.com）？">
+    可以。这和 [Sites](/core-concepts/sites/overview) 的自定义域名不是一回事——后者指向的是已部署的前端。这里改的是 InsForge 默认托管在 `https://<appkey>.<region>.insforge.app`（例如 `https://<appkey>.us-east.insforge.app`）的**后端 API**，把它重新指向你自己的域名。
+
+    用 CLI 设置自定义域名：
+
+    ```bash
+    npx @insforge/cli projects update --domain api.example.com
+    ```
+
+    默认作用于已 link 的 project；加 `--project <id>` 可指定其他 project。它底层调用的是 `PUT /projects/v1/{projectId}`，带上 `customizedDomain` 字段，所以同样的改动也能通过 admin API 完成。只有组织的 **Administrator** 能修改 project 的域名。设置之后，InsForge 的路由层会在该域名上同时对外提供你的后端 API（默认的 `insforge.app` URL 依然可用）。
+
+    你仍然要在自己的域名注册商那里加一条 DNS 记录把域名指向 InsForge，之后 InsForge 会为该域名做 TLS 终结。{/* TODO: confirm dashboard location */}具体要加哪条 DNS 记录（CNAME 指向的目标）以及后端自定义域名的 TLS 验证/签发步骤，并不在 CLI/API 里，所以在确认之前，请到 [Discord](https://discord.com/invite/DvBtaEc9Jz) 找 InsForge 团队要具体要创建的记录。
+  </Accordion>
 </AccordionGroup>
