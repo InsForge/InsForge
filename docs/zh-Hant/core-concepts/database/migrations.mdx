@@ -60,7 +60,7 @@ npx @insforge/cli db query --unrestricted "CREATE INDEX CONCURRENTLY idx_employe
 
 普通的 `db query`（不帶 `--unrestricted`）仍在交易內執行，因此這些命令需要 `--unrestricted`。由於這會繞過遷移歷史，請自行保持各環境同步——記錄該手動步驟，或在所有環境中執行等效陳述式。
 
-`VACUUM` 通常由 PostgreSQL 的 autovacuum 常駐程式處理，很少需要手動執行；當你確實需要時，以同樣的方式執行：
+`VACUUM` 通常由 PostgreSQL 的 `autovacuum` 常駐程式處理，很少需要手動執行；當你確實需要時，以同樣的方式執行：
 
 ```bash
 npx @insforge/cli db query --unrestricted "VACUUM (ANALYZE) public.employees"

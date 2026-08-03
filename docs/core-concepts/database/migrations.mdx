@@ -60,7 +60,7 @@ npx @insforge/cli db query --unrestricted "CREATE INDEX CONCURRENTLY idx_employe
 
 A plain `db query` (without `--unrestricted`) still runs inside a transaction, so `--unrestricted` is required for these commands. Because this bypasses migration history, keep the two environments in sync yourself — note the manual step, or run the equivalent statement everywhere.
 
-`VACUUM` is normally handled by PostgreSQL's autovacuum daemon and rarely needs to be run by hand; when you do, run it the same way:
+`VACUUM` is normally handled by PostgreSQL's `autovacuum` daemon and rarely needs to be run by hand; when you do, run it the same way:
 
 ```bash
 npx @insforge/cli db query --unrestricted "VACUUM (ANALYZE) public.employees"
