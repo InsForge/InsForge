@@ -45,5 +45,19 @@ jobs:
         if: steps.changed-files-prettier.outputs.any_changed == 'true'
         run: npx prettier --check --ignore-unknown ${{ steps.changed-files-prettier.outputs.all_changed_files }}
 
+      - name: Get changed OpenAPI specs
+        id: changed-openapi
+        uses: tj-actions/changed-files@v45
+        with:
+          files: openapi/**/*.yaml
+
+      - name: Validate changed OpenAPI specs
+        if: steps.changed-openapi.outputs.any_changed == 'true'
+        run: |
+          for spec in ${{ steps.changed-openapi.outputs.all_changed_files }}; do
+            echo "Validating $spec"
+            npx --yes @apidevtools/swagger-cli@4.0.4 validate "$spec"
+          done
+
       - name: Run TypeScript type checking
         run: npm run typecheck
