@@ -74,13 +74,13 @@ describe('ScheduleService outbound URL validation', () => {
     expect(queryMock).not.toHaveBeenCalled();
   });
 
-  it('preserves the stored pinned target when updating unrelated fields', async () => {
+  it('pins the effective URL when updating unrelated fields', async () => {
     const service = ScheduleService.getInstance();
     const schedule = {
       id: '00000000-0000-0000-0000-000000000001',
       name: 'existing',
       cronSchedule: '*/5 * * * *',
-      functionUrl: 'http://internal.invalid/hook',
+      functionUrl: 'http://8.8.8.8/hook',
       httpMethod: 'POST' as const,
       headers: null,
       body: null,
@@ -96,6 +96,9 @@ describe('ScheduleService outbound URL validation', () => {
 
     await expect(service.updateSchedule(schedule.id, { name: 'renamed' })).resolves.toBeTruthy();
     expect(queryMock).toHaveBeenCalled();
-    expect(queryMock.mock.calls[0][1]?.[8]).toBeNull();
+    expect(queryMock.mock.calls[0][1]?.[8]).toMatchObject({
+      rawUrl: 'http://8.8.8.8/hook',
+      addresses: ['8.8.8.8'],
+    });
   });
 });
