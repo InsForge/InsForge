@@ -285,4 +285,28 @@ description: "Answers to common InsForge questions on database calls, edge funct
     - **Cancel a build that's still running:** `npx @insforge/cli deployments cancel <id>` stops an in-progress deployment; it does not take down a site that is already live.
     - **Replace what's live:** redeploy over the same site with `npx @insforge/cli deployments deploy ./frontend` — the newest ready deployment serves the URL.
   </Accordion>
+
+  <Accordion title="How do I let users sign in with GitHub (or another OAuth provider)?">
+    Signing in with GitHub takes two parts: enable GitHub as a provider once, then start the flow from your app with the SDK.
+
+    **1. Enable GitHub.** In the dashboard, open **Auth Methods** and enable GitHub. On InsForge Cloud you can use InsForge's shared GitHub app, so there are no credentials to fill in. To use your own GitHub OAuth app instead (required when self-hosting), create one on GitHub under **Settings → Developer settings → OAuth Apps**, paste its **Client ID** and **Client Secret**, and set the app's **Authorization callback URL** to:
+
+    ```text
+    <your-project-url>/api/auth/oauth/github/callback
+    ```
+
+    GitHub is one of the built-in providers (`google`, `github`, `discord`, `linkedin`, `facebook`, `instagram`, `tiktok`, `apple`, `x`, `spotify`, `microsoft`); the steps are the same for the others. When you bring your own app, the default GitHub scope requested is `user:email`.
+
+    **2. Allow your app's redirect URL.** The `redirectTo` you pass below must be in your project's allowed redirect URLs (set in the authentication configuration), otherwise the sign-in is rejected.
+
+    **3. Start the flow from your app** with `signInWithOAuth()`, passing `github` as the provider:
+
+    ```javascript
+    await insforge.auth.signInWithOAuth('github', {
+      redirectTo: 'http://localhost:3000/dashboard',
+    });
+    ```
+
+    The browser redirects to GitHub, and after the user approves, InsForge sends them back to `redirectTo` with an `insforge_code` query parameter. The SDK detects that code automatically, exchanges it for a session, and saves it. See [`signInWithOAuth()`](/sdks/typescript/auth#signinwithoauth) for the full reference — including `skipBrowserRedirect` for server-rendered or mobile flows — and the [Authentication overview](/core-concepts/authentication/overview).
+  </Accordion>
 </AccordionGroup>
