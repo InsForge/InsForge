@@ -2,11 +2,10 @@ import { Component, lazy, Suspense, type ErrorInfo, type ReactNode } from 'react
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LoadingState } from '@insforge/ui';
-// Direct import (not the `#components` barrel) to keep this eager router's deps explicit.
-import { ErrorState } from '#components/ErrorState';
+import { ErrorState } from '#components';
 import { RequireAuth } from './RequireAuth';
 import AppLayout from '#layout/AppLayout';
-import { getFeatureFlag } from '#lib/analytics/posthog';
+import { getFeatureFlag, trackEvent } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 
 // Lazy-loaded so heavy feature libs (CodeMirror, Recharts, XYFlow, data-grid)
@@ -112,7 +111,7 @@ interface ChunkErrorBoundaryState {
 }
 
 function isChunkLoadError(error: Error): boolean {
-  return /dynamically imported module|failed to fetch|loading chunk|importing a module script failed/i.test(
+  return /dynamically imported module|failed to fetch|loading chunk|importing a module script failed|unable to preload/i.test(
     error.message
   );
 }
@@ -141,6 +140,13 @@ class ChunkErrorBoundary extends Component<ChunkErrorBoundaryProps, ChunkErrorBo
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Dashboard route failed to render', error, errorInfo);
+    // This is the app's only error boundary, so surface caught crashes to
+    // analytics — otherwise a page render failure is just a console line.
+    trackEvent('dashboard_route_error', {
+      message: error.message,
+      isChunkLoadError: isChunkLoadError(error),
+      componentStack: errorInfo.componentStack ?? undefined,
+    });
   }
 
   componentDidUpdate(prevProps: ChunkErrorBoundaryProps) {
@@ -160,9 +166,26 @@ class ChunkErrorBoundary extends Component<ChunkErrorBoundaryProps, ChunkErrorBo
 
 function RouteBoundary({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const { t } = useTranslation('chrome');
   return (
     <ChunkErrorBoundary resetKey={location.pathname}>
-      <Suspense fallback={<LoadingState className="min-h-[240px]" />}>{children}</Suspense>
+      {/*
+       * `key` on Suspense is load-bearing, not cosmetic. react-router v7 runs
+       * navigations inside a `startTransition`, and React deliberately keeps an
+       * already-mounted Suspense boundary showing its old content during a
+       * transition instead of its fallback. Without the key, clicking a nav item
+       * whose chunk hasn't loaded leaves the previous page on screen with no
+       * feedback until the chunk lands (seconds, on a slow link + the ~440 kB
+       * chart chunk). Keying on pathname makes the boundary newly mounted per
+       * navigation, and a fresh boundary *does* fall back mid-transition.
+       * Already-cached chunks resolve synchronously, so there's no flash.
+       */}
+      <Suspense
+        key={location.pathname}
+        fallback={<LoadingState message={t('common.loadingEllipsis')} className="min-h-[240px]" />}
+      >
+        {children}
+      </Suspense>
     </ChunkErrorBoundary>
   );
 }
