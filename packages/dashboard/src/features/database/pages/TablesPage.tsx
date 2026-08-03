@@ -319,6 +319,11 @@ export default function TablesPage() {
           totalRecords: searchQuery.trim()
             ? (recordsData.pagination?.total ?? recordsData.records.length)
             : Math.max(schemaData.recordCount ?? 0, recordsData.pagination?.total ?? 0),
+          // Large or filtered counts come back approximate (planner estimate, or a
+          // capped "at least N") so the browser never pays an unbounded COUNT(*).
+          totalRecordsIsEstimate: searchQuery.trim()
+            ? (recordsData.pagination?.isEstimate ?? false)
+            : (schemaData.recordCountIsEstimate ?? recordsData.pagination?.isEstimate ?? false),
         }
       : null;
 
@@ -767,6 +772,7 @@ export default function TablesPage() {
                   pageSize={pageSize}
                   pageSizeOptions={pageSizeOptions}
                   totalRecords={tableData?.totalRecords || 0}
+                  totalRecordsIsEstimate={tableData?.totalRecordsIsEstimate ?? false}
                   paginationRecordLabel={t('database.recordsRecordLabel', {
                     defaultValue: 'records',
                   })}

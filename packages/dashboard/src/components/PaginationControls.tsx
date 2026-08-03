@@ -7,6 +7,12 @@ export interface PaginationControlsProps {
   totalPages?: number;
   onPageChange?: (page: number) => void;
   totalRecords?: number;
+  /**
+   * Marks `totalRecords` as approximate. Large tables are counted from the query
+   * planner's statistics rather than an unbounded COUNT(*), so the figure is shown
+   * as "~N" instead of implying a precision it doesn't have.
+   */
+  totalRecordsIsEstimate?: boolean;
   pageSize?: number;
   pageSizeOptions?: number[];
   recordLabel?: string;
@@ -19,6 +25,7 @@ export function PaginationControls({
   totalPages = 1,
   onPageChange,
   totalRecords = 0,
+  totalRecordsIsEstimate = false,
   pageSize = 50,
   pageSizeOptions,
   recordLabel,
@@ -31,6 +38,10 @@ export function PaginationControls({
   const startRecord = totalRecords === 0 ? 0 : (normalizedCurrentPage - 1) * pageSize + 1;
   const endRecord =
     totalRecords === 0 ? 0 : Math.min(normalizedCurrentPage * pageSize, totalRecords);
+  const totalDisplay =
+    totalRecordsIsEstimate && totalRecords > 0
+      ? `~${totalRecords.toLocaleString()}`
+      : totalRecords.toLocaleString();
 
   return (
     <Pagination
@@ -46,7 +57,7 @@ export function PaginationControls({
       summaryText={t('common.paginationSummary', {
         start: startRecord,
         end: endRecord,
-        total: totalRecords,
+        total: totalDisplay,
         label,
         defaultValue: 'Showing {{start}} to {{end}} of {{total}} {{label}}',
       })}
