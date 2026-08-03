@@ -25,15 +25,16 @@ import {
   type PosthogRecordingsResponse,
   type PosthogShareTokenResponse,
 } from '@insforge/shared-schemas';
+import type { AnalyticsProvider } from './base.provider.js';
 
-export class PostHogProvider {
-  private static instance: PostHogProvider;
+export class CloudAnalyticsProvider implements AnalyticsProvider {
+  private static instance: CloudAnalyticsProvider;
   private constructor() {}
-  static getInstance(): PostHogProvider {
-    if (!PostHogProvider.instance) {
-      PostHogProvider.instance = new PostHogProvider();
+  static getInstance(): CloudAnalyticsProvider {
+    if (!CloudAnalyticsProvider.instance) {
+      CloudAnalyticsProvider.instance = new CloudAnalyticsProvider();
     }
-    return PostHogProvider.instance;
+    return CloudAnalyticsProvider.instance;
   }
 
   private isEnabled(): boolean {

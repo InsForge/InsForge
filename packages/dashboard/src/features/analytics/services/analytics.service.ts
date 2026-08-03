@@ -7,6 +7,9 @@ import type {
   PosthogRetentionResponse,
   PosthogRecordingsResponse,
   PosthogShareTokenResponse,
+  PosthogConfig,
+  PosthogDiscoveredProject,
+  PosthogRegion,
 } from '@insforge/shared-schemas';
 import { apiClient } from '#lib/api/client';
 
@@ -80,5 +83,34 @@ export const analyticsService = {
       method: 'POST',
       headers: apiClient.withAccessToken({}),
     }) as Promise<PosthogShareTokenResponse>;
+  },
+
+  // Self-hosting only — cloud projects answer 400 here and connect via OAuth.
+
+  // Lists the PostHog projects a candidate key can reach. Nothing is stored, so
+  // this doubles as the credential test: a bad key fails here, before the user
+  // has committed to anything.
+  async listPosthogProjects(
+    personalApiKey: string,
+    region: PosthogRegion
+  ): Promise<PosthogDiscoveredProject[]> {
+    const res = (await apiClient.request('/analytics/config/projects', {
+      method: 'POST',
+      headers: apiClient.withAccessToken({}),
+      body: JSON.stringify({ personalApiKey, region }),
+    })) as { projects?: PosthogDiscoveredProject[] };
+    return res?.projects ?? [];
+  },
+
+  async updatePosthogConfig(input: {
+    personalApiKey: string;
+    region: PosthogRegion;
+    posthogProjectId?: string;
+  }): Promise<PosthogConfig> {
+    return apiClient.request('/analytics/config', {
+      method: 'PUT',
+      headers: apiClient.withAccessToken({}),
+      body: JSON.stringify(input),
+    }) as Promise<PosthogConfig>;
   },
 };

@@ -336,6 +336,14 @@
               {
                 "group": "Health",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+              },
+              {
+                "group": "Deployments",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/deployments.yaml"
+              },
+              {
+                "group": "Dashboard",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/dashboard.yaml"
               }
             ]
           }
@@ -637,6 +645,14 @@
               {
                 "group": "Health",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+              },
+              {
+                "group": "Deployments",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/deployments.yaml"
+              },
+              {
+                "group": "Dashboard",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/dashboard.yaml"
               }
             ]
           }
@@ -938,6 +954,14 @@
               {
                 "group": "Health",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+              },
+              {
+                "group": "Deployments",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/deployments.yaml"
+              },
+              {
+                "group": "Dashboard",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/dashboard.yaml"
               }
             ]
           }
@@ -1239,6 +1263,14 @@
               {
                 "group": "Health",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+              },
+              {
+                "group": "Deployments",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/deployments.yaml"
+              },
+              {
+                "group": "Dashboard",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/dashboard.yaml"
               }
             ]
           }
