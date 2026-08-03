@@ -386,6 +386,14 @@ export class ScheduleService {
 
   async deleteSchedule(id: string) {
     try {
+      // delete_job reports a missing row the same way it reports a genuine
+      // failure (success = false), so check first and surface the 404 that
+      // GET and PATCH on this id already return.
+      const existingSchedule = await this.getScheduleById(id);
+      if (!existingSchedule) {
+        throw new AppError('Schedule not found', 404, ERROR_CODES.SCHEDULE_NOT_FOUND);
+      }
+
       const sql = 'SELECT * FROM schedules.delete_job($1::UUID)';
       const result = await this.getPool().query(sql, [id]);
       const deleteResult = (result.rows && result.rows[0]) as

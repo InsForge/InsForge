@@ -3,6 +3,7 @@ dist/
 data/
 coverage/
 playwright-report/
+.playwright-mcp/
 test-results/
 .env
 .worktrees/
