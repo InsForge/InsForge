@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import type { PosthogTimeframe } from '@insforge/shared-schemas';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { PosthogRegion, PosthogTimeframe } from '@insforge/shared-schemas';
 import {
   analyticsService,
   type Breakdown,
@@ -104,5 +104,34 @@ export function useShareToken(recordingId: string | null, enabled: boolean) {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
+  });
+}
+
+// Self-hosting only. Lists the PostHog projects a candidate key can see so the
+// connect form can offer a picker instead of asking for a numeric id. A
+// mutation rather than a query: it is driven by a submit, takes the key as
+// input, and must never be cached or refetched — the key is a credential.
+export function useListPosthogProjects() {
+  return useMutation({
+    mutationFn: (input: { personalApiKey: string; region: PosthogRegion }) =>
+      analyticsService.listPosthogProjects(input.personalApiKey, input.region),
+  });
+}
+
+export function useUpdatePosthogConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      personalApiKey: string;
+      region: PosthogRegion;
+      posthogProjectId?: string;
+    }) => analyticsService.updatePosthogConfig(input),
+    onSuccess: () => {
+      // Every analytics panel is derived from the stored credential, not just
+      // the connection — invalidating the connection alone would leave the
+      // traffic/retention/replay queries serving the previous project's data
+      // for their staleTime.
+      void queryClient.invalidateQueries({ queryKey: analyticsQueryKeys.all });
+    },
   });
 }
