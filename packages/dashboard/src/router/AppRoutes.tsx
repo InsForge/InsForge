@@ -8,7 +8,6 @@ import { RequireAuth } from './RequireAuth';
 import AppLayout from '#layout/AppLayout';
 import { getFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
-import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 
 // Lazy-loaded so heavy feature libs (CodeMirror, Recharts, XYFlow, data-grid)
 // split into on-demand chunks instead of the initial bundle.
@@ -172,7 +171,6 @@ function AuthenticatedRoutes() {
   const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
   const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;
   const DashboardHomePage = isDTest ? DTestDashboardPage : DashboardPage;
-  const isCloudHosting = useIsCloudHostingMode();
 
   return (
     <AppLayout>
@@ -254,14 +252,18 @@ function AuthenticatedRoutes() {
             <Route path="domains" element={<DeploymentDomainsPage />} />
           </Route>
           <Route path="/dashboard/compute" element={<ComputePage />} />
-          {isCloudHosting && (
-            <Route path="/dashboard/analytics" element={<AnalyticsLayout />}>
-              <Route index element={<Navigate to="traffic" replace />} />
-              <Route path="traffic" element={<TrafficPage />} />
-              <Route path="retention" element={<RetentionPage />} />
-              <Route path="session-replay" element={<SessionReplayPage />} />
-            </Route>
-          )}
+          {/* Analytics ships in both host modes — self-hosting connects with
+              the admin's own PostHog personal API key — so this subtree is
+              deliberately ungated, matching AppSidebar, which pushes the nav
+              entry unconditionally. A cloud-only gate here would make the nav
+              entry fall through to the catch-all below and bounce self-hosted
+              admins back to /dashboard. */}
+          <Route path="/dashboard/analytics" element={<AnalyticsLayout />}>
+            <Route index element={<Navigate to="traffic" replace />} />
+            <Route path="traffic" element={<TrafficPage />} />
+            <Route path="retention" element={<RetentionPage />} />
+            <Route path="session-replay" element={<SessionReplayPage />} />
+          </Route>
           {/* Web Scraper ships in both host modes — self-hosting connects with
               the admin's own Apify token — so this subtree is deliberately
               ungated, matching AppSidebar, which pushes the nav entry

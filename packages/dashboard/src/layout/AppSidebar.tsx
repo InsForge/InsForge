@@ -38,8 +38,9 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
     getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT) === FEATURE_FLAG_VARIANTS.D_TEST;
   const isDTestCloud = isDTest && host.mode === 'cloud-hosting';
 
-  // Cloud-only additions: Deployments inserted after AI, Analytics appended at end.
-  // Web Scraper ships in both modes — self-hosting connects with its own Apify token.
+  // Cloud-only addition: Deployments inserted after AI.
+  // Analytics and Web Scraper ship in both modes — self-hosting connects each
+  // with its own credential (a PostHog personal API key / an Apify token).
   const mainMenuItems = useMemo(() => {
     const items = dashboardStaticMenuItems.map((item) => ({ ...item }));
 
@@ -52,10 +53,9 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
       } else {
         items.push(deploymentsItem);
       }
-
-      items.push({ ...dashboardAnalyticsMenuItem });
     }
 
+    items.push({ ...dashboardAnalyticsMenuItem });
     items.push({ ...dashboardWebscraperMenuItem });
 
     return items;
