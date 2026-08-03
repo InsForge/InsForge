@@ -23,6 +23,7 @@ import {
   FOREIGN_KEY_INTROSPECTION_QUERY,
   groupForeignKeyRows,
 } from './helpers.js';
+import { estimateOrExactCount } from './record-count.js';
 import { withAdminContext } from './user-context.service.js';
 
 const reservedColumns = {
@@ -424,13 +425,20 @@ export class DatabaseTableService {
       const uniqueColumns = uniqueColumnsResult.rows;
       const uniqueSet = new Set(uniqueColumns.map((u: { column_name: string }) => u.column_name));
 
-      // Get exact row count using standard COUNT(*)
+      // Row count: exact on small tables, planner estimate on large ones. An exact
+      // COUNT(*) here is a full scan paid on every table-open, on top of the one the
+      // record listing already runs -- see estimateOrExactCount.
       let row_count = 0;
+      let row_count_is_estimate = false;
       try {
-        const countResult = await client.query(
-          `SELECT COUNT(*) as row_count FROM ${quoteQualifiedName(schemaName, table)}`
+        const counted = await estimateOrExactCount(
+          client,
+          quoteQualifiedName(schemaName, table),
+          '',
+          []
         );
-        row_count = Number(countResult.rows[0]?.row_count || 0);
+        row_count = counted.total;
+        row_count_is_estimate = counted.isEstimate;
       } catch {
         row_count = 0;
       }
@@ -452,6 +460,7 @@ export class DatabaseTableService {
         }),
         foreignKeys,
         recordCount: row_count,
+        recordCountIsEstimate: row_count_is_estimate,
       };
     } finally {
       client.release();
