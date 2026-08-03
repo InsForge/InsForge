@@ -285,4 +285,18 @@ description: "Answers to common InsForge questions on database calls, edge funct
     - **Cancel a build that's still running:** `npx @insforge/cli deployments cancel <id>` stops an in-progress deployment; it does not take down a site that is already live.
     - **Replace what's live:** redeploy over the same site with `npx @insforge/cli deployments deploy ./frontend` — the newest ready deployment serves the URL.
   </Accordion>
+
+  <Accordion title="Can I put my backend API on a custom domain (like api.example.com)?">
+    Yes. This is different from a [Sites](/core-concepts/sites/overview) custom domain, which points at a deployed frontend. Here you re-point the **backend API** that InsForge serves by default at `https://<appkey>.<region>.insforge.app` (for example `https://<appkey>.us-east.insforge.app`) to a domain you own.
+
+    Set the custom domain from the CLI:
+
+    ```bash
+    npx @insforge/cli projects update --domain api.example.com
+    ```
+
+    This targets the linked project by default; pass `--project <id>` to update another. Under the hood it calls `PUT /projects/v1/{projectId}` with a `customizedDomain` field, so the same change is available through the admin API. Only an organization **Administrator** can update a project's domain. Once it's set, InsForge's routing layer serves your backend API on that hostname alongside the default `insforge.app` URL.
+
+    You still have to point the domain at InsForge with a DNS record at your registrar, after which InsForge terminates TLS for the hostname. {{TODO: confirm dashboard location}} — the exact DNS record (CNAME target) and the TLS verification/provisioning step for a backend custom domain aren't in the CLI/API surface, so until they're confirmed, ask the InsForge team in [Discord](https://discord.com/invite/DvBtaEc9Jz) for the record to create.
+  </Accordion>
 </AccordionGroup>

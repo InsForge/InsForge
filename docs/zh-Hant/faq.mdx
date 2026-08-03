@@ -285,4 +285,18 @@ description: "InsForge 常見問題：資料庫呼叫、Edge Function、Custom C
     - **取消還在跑的建置：** `npx @insforge/cli deployments cancel <id>` 會終止一個進行中的部署；它不會下線一個已經上線的站點。
     - **替換目前上線的內容：** 用 `npx @insforge/cli deployments deploy ./frontend` 在同一個站點上重新部署——最新一次 ready 的部署會接管這個 URL。
   </Accordion>
+
+  <Accordion title="能不能把後端 API 掛到自訂網域上（例如 api.example.com）？">
+    可以。這和 [Sites](/core-concepts/sites/overview) 的自訂網域不是一回事——後者指向的是已部署的前端。這裡改的是 InsForge 預設託管在 `https://<appkey>.<region>.insforge.app`（例如 `https://<appkey>.us-east.insforge.app`）的**後端 API**，把它重新指向你自己的網域。
+
+    用 CLI 設定自訂網域：
+
+    ```bash
+    npx @insforge/cli projects update --domain api.example.com
+    ```
+
+    預設作用於已 link 的 project；加 `--project <id>` 可指定其他 project。它底層呼叫的是 `PUT /projects/v1/{projectId}`，帶上 `customizedDomain` 欄位，所以同樣的變更也能透過 admin API 完成。只有組織的 **Administrator** 能修改 project 的網域。設定之後，InsForge 的路由層會在該網域上同時對外提供你的後端 API（預設的 `insforge.app` URL 依然可用）。
+
+    你仍然要在自己的網域註冊商那裡加一筆 DNS 記錄把網域指向 InsForge，之後 InsForge 會為該網域做 TLS 終結。{{TODO: confirm dashboard location}}——具體要加哪筆 DNS 記錄（CNAME 指向的目標）以及後端自訂網域的 TLS 驗證/簽發步驟，並不在 CLI/API 裡，所以在確認之前，請到 [Discord](https://discord.com/invite/DvBtaEc9Jz) 找 InsForge 團隊要具體要建立的記錄。
+  </Accordion>
 </AccordionGroup>
