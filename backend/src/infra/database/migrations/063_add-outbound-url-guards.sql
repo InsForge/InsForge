@@ -7,9 +7,6 @@
 ALTER TABLE schedules.jobs
   ADD COLUMN IF NOT EXISTS resolved_target JSONB;
 
-ALTER TABLE schedules.jobs
-  ADD COLUMN IF NOT EXISTS legacy_unpinned BOOLEAN NOT NULL DEFAULT FALSE;
-
 CREATE OR REPLACE FUNCTION schedules.is_safe_url(p_url TEXT)
 RETURNS BOOLEAN AS $$
 DECLARE
@@ -139,10 +136,10 @@ BEGIN
 
   INSERT INTO schedules.jobs (
     id, name, cron_schedule, function_url, http_method, encrypted_headers, headers, body,
-    resolved_target, legacy_unpinned, cron_job_id, is_active, created_at, updated_at
+    resolved_target, cron_job_id, is_active, created_at, updated_at
   ) VALUES (
     p_job_id, p_name, p_cron_expression, p_function_url, p_http_method, v_encrypted_headers,
-    p_headers_template, p_body, v_resolved_target, FALSE, v_new_cron_id, TRUE, NOW(), NOW()
+    p_headers_template, p_body, v_resolved_target, v_new_cron_id, TRUE, NOW(), NOW()
   ) ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
     cron_schedule = EXCLUDED.cron_schedule,
@@ -152,7 +149,6 @@ BEGIN
     headers = EXCLUDED.headers,
     body = EXCLUDED.body,
     resolved_target = EXCLUDED.resolved_target,
-    legacy_unpinned = FALSE,
     cron_job_id = EXCLUDED.cron_job_id,
     is_active = TRUE,
     updated_at = NOW();
@@ -175,7 +171,6 @@ DECLARE
   v_decrypted_headers JSONB;
   v_final_body JSONB;
   v_resolved_target JSONB;
-  v_legacy_unpinned BOOLEAN;
   v_start_time TIMESTAMP := clock_timestamp();
   v_end_time TIMESTAMP;
   v_duration_ms BIGINT;
@@ -191,8 +186,7 @@ BEGIN
     j.http_method,
     j.body,
     j.encrypted_headers,
-    j.resolved_target,
-    j.legacy_unpinned
+    j.resolved_target
   INTO v_job
   FROM schedules.jobs AS j
   WHERE j.id = p_job_id;
@@ -214,7 +208,7 @@ BEGIN
     RETURN;
   END IF;
 
-  IF NOT v_job.legacy_unpinned AND (v_job.resolved_target IS NULL OR
+  IF v_job.resolved_target IS NULL OR
      v_job.resolved_target->>'rawUrl' <> v_job.function_url OR
      jsonb_array_length(COALESCE(v_job.resolved_target->'addresses', '[]'::JSONB)) = 0 OR
      (COALESCE((v_job.resolved_target->>'allowPrivateNetworks')::BOOLEAN, FALSE) = FALSE AND
@@ -235,24 +229,20 @@ BEGIN
     RETURN;
   END IF;
 
-  IF v_job.legacy_unpinned THEN
-    PERFORM http_set_curlopt('CURLOPT_RESOLVE', '');
-  ELSE
-    v_resolved_target := v_job.resolved_target;
-    PERFORM http_set_curlopt(
-      'CURLOPT_RESOLVE',
-      format(
-        '%s:%s:%s',
-        v_resolved_target->>'hostname',
-        v_resolved_target->>'port',
-        CASE
-          WHEN position(':' IN v_resolved_target->'addresses'->>0) > 0
-            THEN '[' || (v_resolved_target->'addresses'->>0) || ']'
-          ELSE v_resolved_target->'addresses'->>0
-        END
-      )
-    );
-  END IF;
+  v_resolved_target := v_job.resolved_target;
+  PERFORM http_set_curlopt(
+    'CURLOPT_RESOLVE',
+    format(
+      '%s:%s:%s',
+      v_resolved_target->>'hostname',
+      v_resolved_target->>'port',
+      CASE
+        WHEN position(':' IN v_resolved_target->'addresses'->>0) > 0
+          THEN '[' || (v_resolved_target->'addresses'->>0) || ']'
+        ELSE v_resolved_target->'addresses'->>0
+      END
+    )
+  );
 
   BEGIN
     v_decrypted_headers := schedules.decrypt_headers(v_job.encrypted_headers);
@@ -293,24 +283,12 @@ DO $$
 DECLARE
   v_job RECORD;
 BEGIN
-  UPDATE schedules.jobs
-  SET legacy_unpinned = TRUE,
-      updated_at = NOW()
-  WHERE schedules.is_safe_url(function_url)
-    AND resolved_target IS NULL;
-
   FOR v_job IN
-    SELECT id, cron_job_id, function_url, resolved_target
+    SELECT id, cron_job_id
     FROM schedules.jobs
     WHERE NOT schedules.is_safe_url(function_url)
+       OR resolved_target IS NULL
   LOOP
-    IF v_job.resolved_target IS NULL AND schedules.is_safe_url(v_job.function_url) THEN
-      UPDATE schedules.jobs
-      SET legacy_unpinned = TRUE,
-          updated_at = NOW()
-      WHERE id = v_job.id;
-      CONTINUE;
-    END IF;
     IF v_job.cron_job_id IS NOT NULL THEN
       PERFORM cron.unschedule(v_job.cron_job_id);
     END IF;

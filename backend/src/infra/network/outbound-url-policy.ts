@@ -252,6 +252,7 @@ export function createOutboundAgents(options: OutboundUrlPolicyOptions = {}): {
       .lookup(hostname, {
         all: options.all ?? false,
         family: options.family ?? 0,
+        hints: options.hints ?? 0,
         verbatim: true,
       })
       .then((result) => {

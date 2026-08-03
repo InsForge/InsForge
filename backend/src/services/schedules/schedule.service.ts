@@ -335,9 +335,9 @@ export class ScheduleService {
       if (hasScheduleFields) {
         const cronSchedule = data.cronSchedule ?? existingSchedule.cronSchedule;
         this.validateCronExpression(cronSchedule);
-        const resolvedTarget = data.functionUrl
-          ? await this.validateOutboundScheduleUrl(data.functionUrl)
-          : null;
+        const resolvedTarget = await this.validateOutboundScheduleUrl(
+          data.functionUrl ?? existingSchedule.functionUrl
+        );
 
         const headersTemplate = data.headers ?? existingSchedule.headers ?? {};
         const resolvedHeaders = data.headers

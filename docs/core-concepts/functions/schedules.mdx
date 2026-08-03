@@ -13,7 +13,7 @@ InsForge validates schedule targets before they are stored. Only HTTP(S) URLs wi
 
 Scheduled calls use a database-level five-minute timeout and a five-second connection timeout. The `OUTBOUND_*` request limits configure realtime webhook delivery; scheduled calls pin the DNS result captured when the schedule is created or its URL is changed.
 
-Existing schedules created before DNS pinning continue with their previous behavior until they are edited. Saving a schedule with its URL causes InsForge to capture and pin a validated destination for future runs.
+Existing schedules created before DNS pinning are disabled during the migration because their destinations cannot be safely pinned automatically. Saving a schedule, including a rename or other non-URL edit, causes InsForge to resolve and pin its effective URL before re-enabling it.
 
 ## Usage
 
