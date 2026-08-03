@@ -336,6 +336,10 @@
               {
                 "group": "Health",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+              },
+              {
+                "group": "RPC",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/rpc.yaml"
               }
             ]
           }
@@ -637,6 +641,10 @@
               {
                 "group": "Health",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+              },
+              {
+                "group": "RPC",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/rpc.yaml"
               }
             ]
           }
@@ -938,6 +946,10 @@
               {
                 "group": "Health",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+              },
+              {
+                "group": "RPC",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/rpc.yaml"
               }
             ]
           }
@@ -1239,6 +1251,10 @@
               {
                 "group": "Health",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+              },
+              {
+                "group": "RPC",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/rpc.yaml"
               }
             ]
           }

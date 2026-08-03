@@ -1,0 +1,179 @@
+openapi: 3.0.3
+info:
+  title: Insforge RPC API
+  version: 2.0.0
+  description: |
+    Calls Postgres functions through PostgREST's `/rpc` interface.
+
+    Requests are forwarded to PostgREST as the caller: project admins and API
+    key holders are forwarded with admin rights, signed-in users with their own
+    role, and anonymous callers as `anon`. Row level security therefore applies
+    exactly as it does for record queries.
+
+    The response body is whatever the function returns, so its shape depends on
+    the function being called.
+
+paths:
+  /api/database/rpc/{functionName}:
+    post:
+      summary: Call Function
+      description: |
+        Calls a Postgres function with named arguments supplied in the request
+        body. This is the usual way to call a function, and the only way to call
+        one that modifies data.
+      tags:
+        - Client
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: functionName
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Name of the Postgres function to call
+          example: search_posts
+        - name: schema
+          in: query
+          schema:
+            type: string
+          description: |
+            Schema that owns the function. Desugared into PostgREST's
+            `Content-Profile` header. Defaults to the public schema.
+          example: analytics
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: Named arguments for the function
+            example:
+              term: "postgres"
+              limit: 10
+      responses:
+        '200':
+          description: Function result. The shape depends on the function.
+          content:
+            application/json:
+              schema:
+                description: Whatever the function returns
+              examples:
+                rows:
+                  summary: Function returning a set of rows
+                  value:
+                    - id: "123e4567-e89b-12d3-a456-426614174000"
+                      title: "Getting started with Postgres"
+                scalar:
+                  summary: Function returning a scalar
+                  value: 42
+        '400':
+          description: Invalid function name, or PostgREST rejected the arguments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "INVALID_INPUT"
+                message: "Invalid function name: search posts"
+                statusCode: 400
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Function not found in the target schema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: Call Function (read only)
+      description: |
+        Calls a function that is marked `STABLE` or `IMMUTABLE`, passing
+        arguments as query parameters. PostgREST rejects `GET` for functions
+        that write, so use `POST` for those.
+      tags:
+        - Client
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: functionName
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Name of the Postgres function to call
+          example: search_posts
+        - name: schema
+          in: query
+          schema:
+            type: string
+          description: |
+            Schema that owns the function. Desugared into PostgREST's
+            `Accept-Profile` header. Defaults to the public schema.
+          example: analytics
+      responses:
+        '200':
+          description: Function result. The shape depends on the function.
+          content:
+            application/json:
+              schema:
+                description: Whatever the function returns
+        '400':
+          description: Invalid function name, or PostgREST rejected the arguments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Function not found in the target schema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error code for programmatic handling
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Invalid input data"
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        nextActions:
+          type: string
+          description: Suggested remediation, when the API can offer one
