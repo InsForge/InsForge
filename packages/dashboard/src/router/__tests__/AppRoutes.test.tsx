@@ -50,8 +50,7 @@ describe('AppRoutes host-mode gating', () => {
   // the nav entry therefore matched no route, fell through to the catch-all
   // `<Route path="*">` and silently bounced back to /dashboard — making the
   // whole self-hosted Web Scraper feature unreachable.
-  // Routes are lazy-loaded (React.lazy), so the matched layout resolves through
-  // Suspense on a later tick — assert with async findByText, not sync getByText.
+  // Lazy routes resolve through Suspense, so assert with async findByText.
   it('serves the webscraper route in self-hosting', async () => {
     renderAt('/dashboard/webscraper/actors');
 
@@ -68,8 +67,7 @@ describe('AppRoutes host-mode gating', () => {
   // Analytics used to be cloud-only and this asserted that. Self-hosting now
   // connects with the admin's own PostHog personal API key, so the sidebar
   // pushes the entry in both modes and the route has to match in both — the
-  // same trap the webscraper cases above cover. Routes are lazy-loaded
-  // (React.lazy), so assert with async findByText, not sync getByText.
+  // same trap the webscraper cases above cover.
   it('serves the analytics route in self-hosting', async () => {
     renderAt('/dashboard/analytics/traffic');
 

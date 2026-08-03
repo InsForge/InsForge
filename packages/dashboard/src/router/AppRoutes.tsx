@@ -8,8 +8,7 @@ import AppLayout from '#layout/AppLayout';
 import { getFeatureFlag, trackEvent } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 
-// Lazy-loaded so heavy feature libs (CodeMirror, Recharts, XYFlow, data-grid)
-// split into on-demand chunks instead of the initial bundle.
+// Lazy-loaded so heavy feature libs load on demand, not in the initial bundle.
 const AILayout = lazy(() => import('#features/ai/components/AILayout'));
 const AIOverviewPage = lazy(() => import('#features/ai/pages/AIOverviewPage'));
 const AIUsagePage = lazy(() => import('#features/ai/pages/AIUsagePage'));
@@ -140,8 +139,7 @@ class ChunkErrorBoundary extends Component<ChunkErrorBoundaryProps, ChunkErrorBo
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Dashboard route failed to render', error, errorInfo);
-    // This is the app's only error boundary, so surface caught crashes to
-    // analytics — otherwise a page render failure is just a console line.
+    // Report to analytics too.
     trackEvent('dashboard_route_error', {
       message: error.message,
       isChunkLoadError: isChunkLoadError(error),
@@ -169,17 +167,8 @@ function RouteBoundary({ children }: { children: ReactNode }) {
   const { t } = useTranslation('chrome');
   return (
     <ChunkErrorBoundary resetKey={location.pathname}>
-      {/*
-       * `key` on Suspense is load-bearing, not cosmetic. react-router v7 runs
-       * navigations inside a `startTransition`, and React deliberately keeps an
-       * already-mounted Suspense boundary showing its old content during a
-       * transition instead of its fallback. Without the key, clicking a nav item
-       * whose chunk hasn't loaded leaves the previous page on screen with no
-       * feedback until the chunk lands (seconds, on a slow link + the ~440 kB
-       * chart chunk). Keying on pathname makes the boundary newly mounted per
-       * navigation, and a fresh boundary *does* fall back mid-transition.
-       * Already-cached chunks resolve synchronously, so there's no flash.
-       */}
+      {/* Keyed per route so the boundary remounts on navigation: react-router
+          runs nav in a transition, where only a fresh Suspense shows a fallback. */}
       <Suspense
         key={location.pathname}
         fallback={<LoadingState message={t('common.loadingEllipsis')} className="min-h-[240px]" />}
