@@ -40,8 +40,10 @@ describe('AdminRecordService', () => {
           ],
         };
       }
-      if (sql.includes('COUNT(*)::text AS total')) {
-        return { rows: [{ total: '2' }] };
+      // A search is a filtered count, which is counted exactly but capped (see
+      // estimateOrExactCount) rather than with an unbounded COUNT(*).
+      if (sql.includes('AS observed')) {
+        return { rows: [{ observed: '2' }] };
       }
       if (sql.includes('SELECT * FROM "auth"."users"')) {
         return {
@@ -64,6 +66,8 @@ describe('AdminRecordService', () => {
 
     expect(result.total).toBe(2);
     expect(result.records).toHaveLength(2);
+    // Under the cap, the count is exact and must not be flagged as approximate.
+    expect(result.isEstimate).toBe(false);
 
     const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
     const beginIndex = sqlCalls.indexOf('BEGIN');
@@ -84,6 +88,19 @@ describe('AdminRecordService', () => {
     expect(sqlCalls.some((sql) => sql.includes('information_schema.table_constraints'))).toBe(
       false
     );
+
+    // Regression (#1797): the data browser used to run an unbounded `COUNT(*)` over the
+    // whole filtered set on every page load and every keystroke of search, making it
+    // O(N) in table size. The filtered count must stay bounded by a LIMIT.
+    const countCall = sqlCalls.find((sql) => sql.includes('AS observed'));
+    expect(countCall).toMatch(/LIMIT \d+\) AS capped/);
+    expect(sqlCalls.some((sql) => /COUNT\(\*\)::text AS total FROM "auth"\."users"/.test(sql))).toBe(
+      false
+    );
+
+    // The read is bounded in time as well as in rows, so a pathological scan fails
+    // fast instead of holding the connection until the browser gives up.
+    expect(sqlCalls.some((sql) => sql.startsWith('SET LOCAL statement_timeout'))).toBe(true);
   });
 
   it('delegates protected-schema writes to project_admin privileges', async () => {
