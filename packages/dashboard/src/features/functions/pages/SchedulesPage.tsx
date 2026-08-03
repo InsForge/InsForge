@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, CirclePlus } from 'lucide-react';
 import { useSchedules } from '#features/functions/hooks/useSchedules';
+import type { ScheduleSchema } from '@insforge/shared-schemas';
 import {
   Button,
   ConfirmDialog,
@@ -63,30 +64,30 @@ export default function SchedulesPage() {
     setSearchQuery(value);
   }, []);
 
+  const matchesSearch = useCallback(
+    (s: ScheduleSchema) => {
+      if (!searchQuery) {
+        return true;
+      }
+
+      const query = searchQuery.toLowerCase();
+
+      return (
+        s.name.toLowerCase().includes(query) ||
+        s.functionUrl.toLowerCase().includes(query) ||
+        s.cronSchedule.toLowerCase().includes(query)
+      );
+    },
+    [searchQuery]
+  );
+
   const filteredSchedules = useMemo(() => {
-    const filtered = searchQuery
-      ? schedules.filter(
-          (s) =>
-            s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.functionUrl.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.functionUrl.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      : schedules;
+    const filtered = schedules.filter(matchesSearch);
     const offset = (currentPage - 1) * PAGE_SIZE;
     return filtered.slice(offset, offset + PAGE_SIZE);
-  }, [schedules, searchQuery, currentPage]);
+  }, [schedules, matchesSearch, currentPage]);
 
-  const totalPages = Math.ceil(
-    (searchQuery
-      ? schedules.filter(
-          (s) =>
-            s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.functionUrl.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.functionUrl.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      : schedules
-    ).length / PAGE_SIZE
-  );
+  const totalPages = Math.ceil(schedules.filter(matchesSearch).length / PAGE_SIZE);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

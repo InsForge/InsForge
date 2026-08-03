@@ -13,6 +13,11 @@ info:
     The response body is whatever the function returns, so its shape depends on
     the function being called.
 
+    Failures come from two places, and the body differs accordingly. A rejected
+    function name is produced by this service and uses the platform
+    `ErrorResponse` shape. Anything PostgREST rejects is forwarded verbatim, so
+    the body is PostgREST's own `code`, `message`, `details` and `hint`.
+
 paths:
   /api/database/rpc/{functionName}:
     post:
@@ -21,6 +26,10 @@ paths:
         Calls a Postgres function with named arguments supplied in the request
         body. This is the usual way to call a function, and the only way to call
         one that modifies data.
+
+        Use this method when a function has an argument named `schema`, since
+        `schema` is reserved as a query parameter and is not forwarded as an
+        argument.
       tags:
         - Client
       security:
@@ -39,8 +48,10 @@ paths:
           schema:
             type: string
           description: |
-            Schema that owns the function. Desugared into PostgREST's
-            `Content-Profile` header. Defaults to the public schema.
+            Schema that owns the function. Reserved: it is consumed here,
+            desugared into PostgREST's `Content-Profile` header, and stripped
+            from the forwarded query rather than passed to the function.
+            Defaults to the public schema.
           example: analytics
       requestBody:
         required: false
@@ -70,15 +81,29 @@ paths:
                   summary: Function returning a scalar
                   value: 42
         '400':
-          description: Invalid function name, or PostgREST rejected the arguments
+          description: |
+            Either the function name was rejected here, or PostgREST rejected
+            the arguments. The two cases return different bodies.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "INVALID_INPUT"
-                message: "Invalid function name: search posts"
-                statusCode: 400
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/PostgrestError'
+              examples:
+                rejected_name:
+                  summary: Function name rejected by this service
+                  value:
+                    error: "INVALID_INPUT"
+                    message: "Invalid function name: search posts"
+                    statusCode: 400
+                postgrest_rejected:
+                  summary: Arguments rejected by PostgREST, body forwarded verbatim
+                  value:
+                    code: "PGRST202"
+                    message: "Could not find the function public.search_posts(trm) in the schema cache"
+                    details: null
+                    hint: "Perhaps you meant to call public.search_posts(term)"
         '401':
           description: Missing or invalid credentials
           content:
@@ -86,17 +111,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Function not found in the target schema
+          description: |
+            Function not found in the target schema. Reported by PostgREST and
+            forwarded verbatim, so the body is PostgREST's.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PostgrestError'
+              example:
+                code: "PGRST202"
+                message: "Could not find the function public.missing_fn in the schema cache"
+                details: null
+                hint: null
     get:
       summary: Call Function (read only)
       description: |
         Calls a function that is marked `STABLE` or `IMMUTABLE`, passing
         arguments as query parameters. PostgREST rejects `GET` for functions
         that write, so use `POST` for those.
+
+        `schema` is reserved as a query parameter, so a function argument of
+        that name cannot be sent this way. Call such a function with `POST` and
+        put the argument in the JSON body.
       tags:
         - Client
       security:
@@ -115,8 +151,10 @@ paths:
           schema:
             type: string
           description: |
-            Schema that owns the function. Desugared into PostgREST's
-            `Accept-Profile` header. Defaults to the public schema.
+            Schema that owns the function. Reserved: it is consumed here,
+            desugared into PostgREST's `Accept-Profile` header, and stripped
+            from the forwarded query rather than passed to the function.
+            Defaults to the public schema.
           example: analytics
       responses:
         '200':
@@ -126,11 +164,15 @@ paths:
               schema:
                 description: Whatever the function returns
         '400':
-          description: Invalid function name, or PostgREST rejected the arguments
+          description: |
+            Either the function name was rejected here, or PostgREST rejected
+            the arguments. The two cases return different bodies.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/PostgrestError'
         '401':
           description: Missing or invalid credentials
           content:
@@ -138,11 +180,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Function not found in the target schema
+          description: |
+            Function not found in the target schema. Reported by PostgREST and
+            forwarded verbatim, so the body is PostgREST's.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PostgrestError'
 
 components:
   securitySchemes:
@@ -155,6 +199,26 @@ components:
       name: x-api-key
 
   schemas:
+    PostgrestError:
+      type: object
+      description: |
+        Error body produced by PostgREST and forwarded unchanged by the proxy.
+        Upstream failures are not reshaped, so the fields are PostgREST's, not
+        the platform `ErrorResponse` used elsewhere.
+      properties:
+        code:
+          type: string
+          description: PostgREST or Postgres error code
+          example: PGRST202
+        message:
+          type: string
+          example: "Could not find the function public.missing_fn in the schema cache"
+        details:
+          type: string
+          nullable: true
+        hint:
+          type: string
+          nullable: true
     ErrorResponse:
       type: object
       required:
@@ -165,11 +229,11 @@ components:
         error:
           type: string
           description: Error code for programmatic handling
-          example: "VALIDATION_ERROR"
+          example: "INVALID_INPUT"
         message:
           type: string
           description: Human-readable error message
-          example: "Invalid input data"
+          example: "Invalid function name: search posts"
         statusCode:
           type: integer
           description: HTTP status code
