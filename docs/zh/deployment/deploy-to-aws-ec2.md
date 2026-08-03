@@ -1,6 +1,6 @@
 ---
 title: "将 InsForge 部署到 AWS EC2"
-description: "在 AWS EC2 实例上使用 Docker Compose 部署 InsForge 的分步指南，包括 SSH 设置、域名配置和 TLS 终止。"
+description: "在 AWS EC2 实例上使用 Docker Compose 自托管 InsForge 的分步指南，涵盖 SSH 密钥设置、安全组、自定义域名、TLS 终止与生产环境加固。"
 ---
 
 # 将 InsForge 部署到 AWS EC2
