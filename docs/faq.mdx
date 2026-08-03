@@ -297,6 +297,6 @@ description: "Answers to common InsForge questions on database calls, edge funct
 
     This targets the linked project by default; pass `--project <id>` to update another. Under the hood it calls `PUT /projects/v1/{projectId}` with a `customizedDomain` field, so the same change is available through the admin API. Only an organization **Administrator** can update a project's domain. Once it's set, InsForge's routing layer serves your backend API on that hostname alongside the default `insforge.app` URL.
 
-    You still have to point the domain at InsForge with a DNS record at your registrar, after which InsForge terminates TLS for the hostname. {{TODO: confirm dashboard location}} — the exact DNS record (CNAME target) and the TLS verification/provisioning step for a backend custom domain aren't in the CLI/API surface, so until they're confirmed, ask the InsForge team in [Discord](https://discord.com/invite/DvBtaEc9Jz) for the record to create.
+    You still have to point the domain at InsForge with a DNS record at your registrar, after which InsForge terminates TLS for the hostname. {/* TODO: confirm dashboard location */}The exact DNS record (CNAME target) and the TLS verification/provisioning step for a backend custom domain aren't in the CLI/API surface, so until they're confirmed, ask the InsForge team in [Discord](https://discord.com/invite/DvBtaEc9Jz) for the record to create.
   </Accordion>
 </AccordionGroup>

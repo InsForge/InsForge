@@ -297,6 +297,6 @@ description: "InsForge 常見問題：資料庫呼叫、Edge Function、Custom C
 
     預設作用於已 link 的 project；加 `--project <id>` 可指定其他 project。它底層呼叫的是 `PUT /projects/v1/{projectId}`，帶上 `customizedDomain` 欄位，所以同樣的變更也能透過 admin API 完成。只有組織的 **Administrator** 能修改 project 的網域。設定之後，InsForge 的路由層會在該網域上同時對外提供你的後端 API（預設的 `insforge.app` URL 依然可用）。
 
-    你仍然要在自己的網域註冊商那裡加一筆 DNS 記錄把網域指向 InsForge，之後 InsForge 會為該網域做 TLS 終結。{{TODO: confirm dashboard location}}——具體要加哪筆 DNS 記錄（CNAME 指向的目標）以及後端自訂網域的 TLS 驗證/簽發步驟，並不在 CLI/API 裡，所以在確認之前，請到 [Discord](https://discord.com/invite/DvBtaEc9Jz) 找 InsForge 團隊要具體要建立的記錄。
+    你仍然要在自己的網域註冊商那裡加一筆 DNS 記錄把網域指向 InsForge，之後 InsForge 會為該網域做 TLS 終結。{/* TODO: confirm dashboard location */}具體要加哪筆 DNS 記錄（CNAME 指向的目標）以及後端自訂網域的 TLS 驗證/簽發步驟，並不在 CLI/API 裡，所以在確認之前，請到 [Discord](https://discord.com/invite/DvBtaEc9Jz) 找 InsForge 團隊要具體要建立的記錄。
   </Accordion>
 </AccordionGroup>
