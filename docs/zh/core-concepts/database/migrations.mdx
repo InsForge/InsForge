@@ -1,6 +1,6 @@
 ---
 title: "数据库迁移"
-description: "在 git 中跟踪架构变更，并使用 InsForge CLI 应用它们"
+description: "在 git 中跟踪 Postgres 架构变更，使用 InsForge CLI 应用版本化 SQL 迁移，运行记录写入 system.custom_migrations。"
 ---
 
 迁移是 `migrations/` 中应用于 `@insforge/cli` 的版本化 SQL 文件。每次成功运行都记录在 `system.custom_migrations` 中。工作流是仅向前的。

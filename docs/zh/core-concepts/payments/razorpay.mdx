@@ -1,7 +1,7 @@
 ---
 title: "Razorpay 支付"
 sidebarTitle: "Razorpay"
-description: "将 Razorpay 订单、订阅、手动 Webhook 与 Webhook 履约集成到 InsForge 中。"
+description: "将 Razorpay 订单、订阅与 Webhook 履约集成到 InsForge：通过 SDK 与仪表板配置密钥、验证签名并同步支付状态到 Postgres 数据库。"
 ---
 
 如果您需要使用 Razorpay Orders、Razorpay Checkout、Items、Plans 和 Subscriptions，请使用 Razorpay 集成。Razorpay 不像 Stripe Checkout 那样是托管的重定向流程。您的后端创建服务商对象，您的前端打开 Razorpay Checkout 脚本，然后由您的后端验证返回的签名。

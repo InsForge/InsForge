@@ -1,6 +1,6 @@
 ---
 title: "將 InsForge 部署到 Containarium"
-description: "在 Containarium LXC 伺服器上執行 InsForge，使用按租戶容器、ZFS 快照和 MCP 驅動的設定，實現代理原生部署。"
+description: "在 Containarium LXC 伺服器上執行 InsForge，透過每租戶容器、ZFS 快照與 MCP 驅動設定，實現代理原生部署。"
 ---
 
 # 將 InsForge 部署到 Containarium
