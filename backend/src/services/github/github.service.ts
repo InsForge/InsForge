@@ -48,13 +48,18 @@ export class GitHubService {
 
       return metadata;
     } catch (error) {
-      logger.warn('Failed to fetch GitHub repository metadata', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+  logger.warn('Failed to fetch GitHub repository metadata', {
+    error: error instanceof Error ? error.message : String(error),
+  });
 
-      return {
-        stars: null,
-      };
-    }
+  const metadata: GitHubRepositoryMetadata = {
+    stars: null,
+  };
+
+  this.cachedMetadata = metadata;
+  this.cacheExpiresAt = Date.now() + CACHE_TTL_MS;
+
+  return metadata;
+}
   }
 }
