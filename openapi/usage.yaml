@@ -136,7 +136,12 @@ paths:
   /api/usage/stats:
     get:
       summary: Get usage statistics
-      description: Returns usage counters for the requested date range. Both `start_date` and `end_date` are required.
+      description: >
+          Returns usage statistics for the supplied date range. The
+          `mcp_usage_count` field is filtered by `start_date` and `end_date`,
+          while `database_size_bytes`, `storage_size_bytes`, and `user_count`
+          reflect the current system state. Both `start_date` and `end_date`
+          are required.
       tags:
         - Usage
       security:
