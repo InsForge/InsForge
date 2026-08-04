@@ -285,4 +285,28 @@ description: "InsForge 常見問題：解說資料庫呼叫、Edge Function 與 
     - **取消還在跑的建置：** `npx @insforge/cli deployments cancel <id>` 會終止一個進行中的部署；它不會下線一個已經上線的站點。
     - **替換目前上線的內容：** 用 `npx @insforge/cli deployments deploy ./frontend` 在同一個站點上重新部署——最新一次 ready 的部署會接管這個 URL。
   </Accordion>
+
+  <Accordion title="怎麼讓使用者用 GitHub（或其他 OAuth 提供商）登入？">
+    用 GitHub 登入分兩部分：先把 GitHub 作為提供商啟用一次，然後在你的應用裡用 SDK 發起登入流程。
+
+    **1. 啟用 GitHub。** 在儀表板中開啟 **Auth Methods** 並啟用 GitHub。在 InsForge Cloud 上，你可以使用 InsForge 的共享 GitHub 應用，因此無需填寫任何認證資訊。如果想改用你自己的 GitHub OAuth 應用（自架時必須這樣做），在 GitHub 的 **Settings → Developer settings → OAuth Apps** 下建立一個，填入它的 **Client ID** 和 **Client Secret**，並把該應用的 **Authorization callback URL** 設為：
+
+    ```text
+    <你的專案 URL>/api/auth/oauth/github/callback
+    ```
+
+    GitHub 是內建提供商之一（`google`、`github`、`discord`、`linkedin`、`facebook`、`instagram`、`tiktok`、`apple`、`x`、`spotify`、`microsoft`）；其他提供商的步驟相同。當你使用自己的應用時，預設請求的 GitHub scope 是 `user:email`。
+
+    **2. 允許你的應用回跳 URL。** 你在下面傳入的 `redirectTo` 必須在專案的允許回跳 URL 清單中（在身分驗證設定裡設定），否則登入會被拒絕。
+
+    **3. 在你的應用裡發起流程**，用 `signInWithOAuth()` 並把 `github` 作為提供商傳入：
+
+    ```javascript
+    await insforge.auth.signInWithOAuth('github', {
+      redirectTo: 'http://localhost:3000/dashboard',
+    });
+    ```
+
+    瀏覽器會跳轉到 GitHub，使用者授權後，InsForge 會帶著一個 `insforge_code` 查詢參數把使用者送回 `redirectTo`。SDK 會自動偵測該 code，用它換取工作階段並儲存。完整參考見 [`signInWithOAuth()`](/sdks/typescript/auth#signinwithoauth)——包括用於伺服器端渲染或行動端流程的 `skipBrowserRedirect`——以及[身分驗證概覽](/core-concepts/authentication/overview)。
+  </Accordion>
 </AccordionGroup>
