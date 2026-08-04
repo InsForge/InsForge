@@ -137,11 +137,11 @@ paths:
     get:
       summary: Get usage statistics
       description: >
-          Returns usage statistics for the supplied date range. The
-          `mcp_usage_count` field is filtered by `start_date` and `end_date`,
-          while `database_size_bytes`, `storage_size_bytes`, and `user_count`
-          reflect the current system state. Both `start_date` and `end_date`
-          are required.
+        Returns usage statistics for the supplied date range. The
+        `mcp_usage_count` field counts successful MCP usage records and is
+        filtered by `start_date` and `end_date`, while `database_size_bytes`,
+        `storage_size_bytes`, and `user_count` reflect the current system
+        state. Both `start_date` and `end_date` are required.
       tags:
         - Usage
       security:
@@ -195,6 +195,16 @@ paths:
                 error: AUTH_INVALID_CREDENTIALS
                 message: No authorization token provided
                 statusCode: 401
+        '403':
+          description: Forbidden - the cloud backend token is valid but not authorized for the configured project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: AUTH_UNAUTHORIZED
+                message: Forbidden
+                statusCode: 403
         '500':
           description: Failed to get usage stats
           content:
