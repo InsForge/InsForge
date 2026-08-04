@@ -48,27 +48,27 @@ export default function AppHeader() {
 
   // Fetch GitHub stars
   useEffect(() => {
-  let mounted = true;
+    let mounted = true;
 
-  const loadRepositoryMetadata = async () => {
-    try {
-      const metadata = await githubService.getRepositoryMetadata();
+    const loadRepositoryMetadata = async () => {
+      try {
+        const metadata = await githubService.getRepositoryMetadata();
 
-      if (mounted) {
-        setGithubStars(metadata.stars);
+        if (mounted) {
+          setGithubStars(metadata.stars);
+        }
+      } catch {
+        // Repository metadata is optional.
+        // Ignore failures so the dashboard remains usable.
       }
-    } catch {
-      // Repository metadata is optional.
-      // Ignore failures so the dashboard remains usable.
-    }
-  };
+    };
 
-  void loadRepositoryMetadata();
+    void loadRepositoryMetadata();
 
-  return () => {
-    mounted = false;
-  };
-}, []);
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const formatStars = (count: number): string => {
     if (count >= 1000) {

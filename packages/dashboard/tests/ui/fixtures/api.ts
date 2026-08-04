@@ -66,9 +66,9 @@ export async function mockSelfHostingDashboardApi(page: Page) {
   });
 
   await page.route('**/api/github/repository', (route) =>
-  fulfillJson(route, 200, {
-    stars: 0,
-  })
+    fulfillJson(route, 200, {
+      stars: 0,
+    })
   );
 
   await page.route('**/api/auth/admin/sessions', (route) => {

@@ -12,16 +12,13 @@ router.use(verifyAdmin);
  * GET /api/github/repository
  * Returns cached GitHub repository metadata.
  */
-router.get(
-  '/repository',
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const metadata = await gitHubService.getRepositoryMetadata();
-      successResponse(res, metadata);
-    } catch (error) {
-      next(error);
-    }
+router.get('/repository', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const metadata = await gitHubService.getRepositoryMetadata();
+    successResponse(res, metadata);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 export { router as githubRouter };

@@ -1,11 +1,16 @@
 import axios from 'axios';
 import logger from '@/utils/logger.js';
+import { z } from 'zod';
 
 export interface GitHubRepositoryMetadata {
   stars: number | null;
 }
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
+
+const gitHubRepositorySchema = z.object({
+  stargazers_count: z.number().int().nonnegative(),
+});
 
 export class GitHubService {
   private static instance: GitHubService;
@@ -29,18 +34,17 @@ export class GitHubService {
     }
 
     try {
-      const response = await axios.get(
-  'https://api.github.com/repos/InsForge/InsForge',
-  {
-    timeout: 5000,
-    headers: {
-      Accept: 'application/vnd.github+json',
-    },
-  }
-);
+      const response = await axios.get('https://api.github.com/repos/InsForge/InsForge', {
+        timeout: 5000,
+        headers: {
+          Accept: 'application/vnd.github+json',
+        },
+      });
+
+      const parsed = gitHubRepositorySchema.safeParse(response.data);
 
       const metadata: GitHubRepositoryMetadata = {
-        stars: response.data.stargazers_count ?? null,
+        stars: parsed.success ? parsed.data.stargazers_count : null,
       };
 
       this.cachedMetadata = metadata;
@@ -48,18 +52,18 @@ export class GitHubService {
 
       return metadata;
     } catch (error) {
-  logger.warn('Failed to fetch GitHub repository metadata', {
-    error: error instanceof Error ? error.message : String(error),
-  });
+      logger.warn('Failed to fetch GitHub repository metadata', {
+        error: error instanceof Error ? error.message : String(error),
+      });
 
-  const metadata: GitHubRepositoryMetadata = {
-    stars: null,
-  };
+      const metadata: GitHubRepositoryMetadata = {
+        stars: null,
+      };
 
-  this.cachedMetadata = metadata;
-  this.cacheExpiresAt = Date.now() + CACHE_TTL_MS;
+      this.cachedMetadata = metadata;
+      this.cacheExpiresAt = Date.now() + CACHE_TTL_MS;
 
-  return metadata;
-}
+      return metadata;
+    }
   }
 }
