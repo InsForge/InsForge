@@ -30,13 +30,14 @@ export class GitHubService {
 
     try {
       const response = await axios.get(
-        'https://api.github.com/repos/InsForge/InsForge',
-        {
-          headers: {
-            Accept: 'application/vnd.github+json',
-          },
-        }
-      );
+  'https://api.github.com/repos/InsForge/InsForge',
+  {
+    timeout: 5000,
+    headers: {
+      Accept: 'application/vnd.github+json',
+    },
+  }
+);
 
       const metadata: GitHubRepositoryMetadata = {
         stars: response.data.stargazers_count ?? null,
