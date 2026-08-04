@@ -45,6 +45,29 @@ Adoptar migraciones en un proyecto existente: ejecute `db migrations fetch` prim
 
 Una vez que opte por participar, rute todos los cambios de esquema a través de archivos. Las ediciones ad hoc del panel causan una desviación entre git y `system.custom_migrations`.
 
+## Sentencias que no pueden ejecutarse en una transacción
+
+Como cada archivo de migración se ejecuta dentro de una única transacción (consulte [Conceptos](#conceptos)), un puñado de comandos de PostgreSQL que PostgreSQL solo permite *fuera* de un bloque de transacción fallan al colocarse en una migración. Verá un error como `CREATE INDEX CONCURRENTLY cannot run inside a transaction block` o `VACUUM cannot run inside a transaction block`. Los más comunes son `CREATE INDEX CONCURRENTLY` (y `DROP INDEX CONCURRENTLY` / `REINDEX ... CONCURRENTLY`), `VACUUM` y `CLUSTER` sin argumentos.
+
+Hay dos formas de manejarlos:
+
+- **Prefiera la forma en transacción sencilla cuando exista.** Un `CREATE INDEX` normal (sin `CONCURRENTLY`) funciona dentro de una migración y mantiene el cambio versionado y reproducible. Toma un bloqueo más fuerte mientras se construye el índice, así que recurra a `CONCURRENTLY` solo cuando no pueda permitirse ese bloqueo en una tabla con mucha actividad.
+- **Ejecute la sentencia no transaccional fuera de las migraciones** con `db query --unrestricted`, que envía una única sentencia a la base de datos sin envolverla en una transacción:
+
+```bash
+npx @insforge/cli db query --unrestricted "CREATE INDEX CONCURRENTLY idx_employees_email ON public.employees (email)"
+```
+
+Un `db query` normal (sin `--unrestricted`) todavía se ejecuta dentro de una transacción, por lo que `--unrestricted` es obligatorio para estos comandos. Como esto omite el historial de migraciones, mantenga usted mismo los entornos sincronizados: anote el paso manual o ejecute la sentencia equivalente en todas partes.
+
+`VACUUM` normalmente lo maneja el demonio `autovacuum` de PostgreSQL y rara vez necesita ejecutarse a mano; cuando lo haga, ejecútelo de la misma manera:
+
+```bash
+npx @insforge/cli db query --unrestricted "VACUUM (ANALYZE) public.employees"
+```
+
+El SQL sin procesar se ejecuta con un tiempo de espera de sentencia de 30 segundos, por lo que una construcción `CONCURRENTLY` o un `VACUUM` en una tabla muy grande puede agotar el tiempo. Para el mantenimiento de larga duración, conecte un cliente como `psql` a la cadena de conexión de Postgres del proyecto (`npx @insforge/cli db connection-string`, solo proyectos en la nube; consulte las [Preguntas frecuentes](/faq)) y ejecute la sentencia allí.
+
 ## Más recursos
 
 - [Database branching](/agent-native/branching) para ensayar una migración en una copia.

@@ -45,6 +45,29 @@ Adopting migrations on an existing project: run `db migrations fetch` first to m
 
 Once you opt in, route all schema changes through files. Ad hoc dashboard edits cause drift between git and `system.custom_migrations`.
 
+## Statements that can't run in a transaction
+
+Because every migration file runs inside a single transaction (see [Concepts](#concepts)), a handful of PostgreSQL commands that PostgreSQL only allows *outside* a transaction block fail when placed in a migration. You'll see an error such as `CREATE INDEX CONCURRENTLY cannot run inside a transaction block` or `VACUUM cannot run inside a transaction block`. The common ones are `CREATE INDEX CONCURRENTLY` (and `DROP INDEX CONCURRENTLY` / `REINDEX ... CONCURRENTLY`), `VACUUM`, and `CLUSTER` without arguments.
+
+Two ways to handle them:
+
+- **Prefer the plain in-transaction form when one exists.** A regular `CREATE INDEX` (without `CONCURRENTLY`) works inside a migration and keeps the change versioned and reproducible. It takes a stronger lock while the index builds, so reach for `CONCURRENTLY` only when you can't afford that lock on a busy table.
+- **Run the non-transactional statement outside migrations** with `db query --unrestricted`, which sends a single statement to the database without wrapping it in a transaction:
+
+```bash
+npx @insforge/cli db query --unrestricted "CREATE INDEX CONCURRENTLY idx_employees_email ON public.employees (email)"
+```
+
+A plain `db query` (without `--unrestricted`) still runs inside a transaction, so `--unrestricted` is required for these commands. Because this bypasses migration history, keep the two environments in sync yourself — note the manual step, or run the equivalent statement everywhere.
+
+`VACUUM` is normally handled by PostgreSQL's `autovacuum` daemon and rarely needs to be run by hand; when you do, run it the same way:
+
+```bash
+npx @insforge/cli db query --unrestricted "VACUUM (ANALYZE) public.employees"
+```
+
+Raw SQL runs with a 30-second statement timeout, so a `CONCURRENTLY` build or `VACUUM` on a very large table may time out. For long-running maintenance, connect a client such as `psql` to the project's Postgres connection string (`npx @insforge/cli db connection-string`, cloud projects only — see the [FAQ](/faq)) and run the statement there.
+
 ## More resources
 
 - [Database branching](/agent-native/branching) to rehearse a migration on a copy.

@@ -45,6 +45,29 @@ npx @insforge/cli db migrations list
 
 选择加入后，通过文件路由所有架构变更。临时仪表盘编辑会在 git 和 `system.custom_migrations` 之间造成漂移。
 
+## 无法在事务中运行的语句
+
+由于每个迁移文件都在单个事务内运行（参见[概念](#概念)），少数 PostgreSQL 只允许在事务块*之外*执行的命令在放入迁移时会失败。你会看到类似 `CREATE INDEX CONCURRENTLY cannot run inside a transaction block` 或 `VACUUM cannot run inside a transaction block` 的错误。常见的有 `CREATE INDEX CONCURRENTLY`（以及 `DROP INDEX CONCURRENTLY` / `REINDEX ... CONCURRENTLY`）、`VACUUM` 和不带参数的 `CLUSTER`。
+
+有两种处理方式：
+
+- **在存在普通事务内形式时优先使用它。** 普通的 `CREATE INDEX`（不带 `CONCURRENTLY`）可以在迁移内运行，并使变更保持版本化和可重现。它在构建索引时会持有更强的锁，因此只有在繁忙表上无法承受该锁时才使用 `CONCURRENTLY`。
+- **在迁移之外运行非事务性语句**，使用 `db query --unrestricted`，它将单条语句发送到数据库而不将其包裹在事务中：
+
+```bash
+npx @insforge/cli db query --unrestricted "CREATE INDEX CONCURRENTLY idx_employees_email ON public.employees (email)"
+```
+
+普通的 `db query`（不带 `--unrestricted`）仍在事务内运行，因此这些命令需要 `--unrestricted`。由于这会绕过迁移历史，请自行保持各环境同步——记录该手动步骤，或在所有环境中运行等效语句。
+
+`VACUUM` 通常由 PostgreSQL 的 `autovacuum` 守护进程处理，很少需要手动运行；当你确实需要时，以同样的方式运行：
+
+```bash
+npx @insforge/cli db query --unrestricted "VACUUM (ANALYZE) public.employees"
+```
+
+原始 SQL 以 30 秒的语句超时运行，因此在非常大的表上进行 `CONCURRENTLY` 构建或 `VACUUM` 可能会超时。对于长时间运行的维护任务，请使用 `psql` 等客户端连接到项目的 Postgres 连接字符串（`npx @insforge/cli db connection-string`，仅限云项目——参见 [FAQ](/faq)），并在那里运行该语句。
+
 ## 更多资源
 
 - [Database branching](/agent-native/branching) 在副本上排练迁移。
