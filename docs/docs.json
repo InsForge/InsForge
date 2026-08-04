@@ -1354,7 +1354,7 @@
   "integrations": {
     "posthog": {
       "apiKey": "phc_ueV1ii62wdBTkH7E70ugyeqHIHu8dFDdjs0qq3TZhJz",
-      "sessionRecording": true
+      "sessionRecording": false
     }
   }
 }
