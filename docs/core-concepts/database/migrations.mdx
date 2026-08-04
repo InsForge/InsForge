@@ -1,6 +1,6 @@
 ---
 title: "Database migrations"
-description: "Track schema changes in git and apply them with the InsForge CLI"
+description: "Track Postgres schema changes as timestamped SQL files in git and apply them forward-only with the InsForge CLI, recording history for every project."
 ---
 
 Migrations are versioned SQL files in `migrations/` applied with `@insforge/cli`. Each successful run is recorded in `system.custom_migrations`. The workflow is forward-only.

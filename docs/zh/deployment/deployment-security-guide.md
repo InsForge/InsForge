@@ -1,6 +1,6 @@
 ---
 title: "VPS 部署与安全指南"
-description: "在通用 Linux VPS 上部署 InsForge，使用防火墙、SSH 和 TLS 最佳实践对其进行加固，并通过安全的更新和回滚流程进行维护。"
+description: "在通用 Linux VPS 上部署并加固 InsForge：防火墙、SSH 密钥、TLS 证书与操作系统补丁最佳实践，配合安全的更新流程与回滚策略确保长期运行。"
 ---
 
 # VPS 安装部署与安全指南

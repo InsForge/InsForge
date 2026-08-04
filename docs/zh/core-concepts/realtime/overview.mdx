@@ -1,7 +1,7 @@
 ---
 title: "实时"
 sidebarTitle: "Overview"
-description: "通过实时频道发送数据库更改、广播、状态呈现和 webhook 分发。"
+description: "通过 InsForge 实时频道推送数据库变更、广播消息、在线状态（presence）与 Webhook 分发，基于 Socket.IO 为客户端 SDK 提供低延迟双向通信。"
 ---
 
 当你的应用需要在不刷新页面的情况下更新时，可以使用 InsForge Realtime。客户端订阅诸如 `order:123` 或 `chat:room-1` 这样的频道，然后通过 WebSocket 接收数据库更改、广播和状态呈现更新。当另一个服务需要接收事件时，频道还可以将相同的消息分发到 webhook URL。
