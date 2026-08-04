@@ -111,6 +111,19 @@ export class DatabaseAdvanceService {
 
       // Refresh schema cache if it was a DDL operation
       if (/CREATE|ALTER|DROP/i.test(sanitizedQuery)) {
+        if (asRoot) {
+          // Root-created public objects stay owned by the superuser, which
+          // breaks later project_admin DDL (custom migrations, restricted raw
+          // SQL) with "must be owner of ..." errors. Reassign before anyone
+          // can hit that. Best-effort: the user's DDL already succeeded.
+          await client
+            .query('SELECT system.reassign_public_objects_to_project_admin()')
+            .catch((error: unknown) => {
+              logger.warn('Failed to reassign public object ownership after unrestricted DDL', {
+                error: error instanceof Error ? error.message : String(error),
+              });
+            });
+        }
         await client.query(`NOTIFY pgrst, 'reload schema';`);
         // Metadata is now updated on-demand
       }
