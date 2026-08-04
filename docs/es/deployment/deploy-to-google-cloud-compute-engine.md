@@ -1,6 +1,6 @@
 ---
 title: "Implementar InsForge en Google Cloud Compute Engine"
-description: "Implementa InsForge en una VM de Google Cloud Compute Engine con Docker Compose, cubriendo reglas de firewall, acceso SSH, dominios personalizados y configuración de HTTPS."
+description: "Despliega InsForge en una VM de Google Cloud Compute Engine con Docker Compose, cubriendo reglas de firewall, acceso SSH, dominios personalizados y HTTPS."
 ---
 
 # Implementar InsForge en Google Cloud Compute Engine
