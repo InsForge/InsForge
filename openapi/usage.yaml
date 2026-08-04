@@ -203,7 +203,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error: AUTH_UNAUTHORIZED
-                message: Forbidden
+                message: Project ID mismatch
                 statusCode: 403
         '500':
           description: Failed to get usage stats
