@@ -330,6 +330,10 @@
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
               },
               {
+                "group": "Usage",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/usage.yaml"
+              },
+              {
                 "group": "Metadata",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/metadata.yaml"
               },
@@ -637,6 +641,10 @@
               {
                 "group": "Logs",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
+              },
+              {
+                "group": "用量",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/usage.yaml"
               },
               {
                 "group": "Metadata",
@@ -948,6 +956,10 @@
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
               },
               {
+                "group": "用量",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/usage.yaml"
+              },
+              {
                 "group": "Metadata",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/metadata.yaml"
               },
@@ -1255,6 +1267,10 @@
               {
                 "group": "Logs",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
+              },
+              {
+                "group": "Uso",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/usage.yaml"
               },
               {
                 "group": "Metadata",
