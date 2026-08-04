@@ -43,6 +43,12 @@ export class GitHubService {
 
       const parsed = gitHubRepositorySchema.safeParse(response.data);
 
+      if (!parsed.success) {
+        logger.warn('GitHub repository response validation failed', {
+          error: parsed.error.flatten(),
+        });
+      }
+
       const metadata: GitHubRepositoryMetadata = {
         stars: parsed.success ? parsed.data.stargazers_count : null,
       };
