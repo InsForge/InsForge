@@ -1,6 +1,6 @@
 ---
 title: "將 InsForge 部署到 Google Cloud Compute Engine"
-description: "使用 Docker Compose 將 InsForge 部署到 Google Cloud Compute Engine 執行個體，涵蓋防火牆規則、SSH 存取、自訂網域與 HTTPS 設定。"
+description: "使用 Docker Compose 將 InsForge 部署至 Google Cloud Compute Engine，涵蓋防火牆、SSH、自訂網域與 HTTPS 設定。"
 ---
 
 # 將 InsForge 部署到 Google Cloud Compute Engine

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ErrorState, LoadingState } from '#components';
-import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { useProjectId } from '#lib/hooks/useMetadata';
 import { useToast } from '@insforge/ui';
 import { TimeRangeProvider } from '#features/analytics/context/TimeRangeContext';
@@ -13,7 +13,15 @@ import { AnalyticsSidebar } from './AnalyticsSidebar';
 export default function AnalyticsLayout() {
   const { t } = useTranslation('chrome');
   const conn = useAnalyticsConnection();
-  const { projectId, isLoading: projectIdLoading, error: projectIdError } = useProjectId();
+  // Cloud only: the OAuth handoff needs the InsForge project id. Self-hosted
+  // deployments have none by design (/metadata/project-id answers null), so
+  // querying and gating on it there would error out the whole feature.
+  const isCloudHosting = useIsCloudHostingMode();
+  const {
+    projectId,
+    isLoading: projectIdLoading,
+    error: projectIdError,
+  } = useProjectId({ enabled: isCloudHosting });
   const qc = useQueryClient();
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -81,7 +89,7 @@ export default function AnalyticsLayout() {
         </div>
       </div>
     );
-  } else if (projectIdError || !projectId) {
+  } else if (isCloudHosting && (projectIdError || !projectId)) {
     topLevelStatus = (
       <div className="flex h-full min-h-0 items-center justify-center px-6">
         <div className="w-full max-w-[420px]">

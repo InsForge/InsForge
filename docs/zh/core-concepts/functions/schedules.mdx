@@ -1,6 +1,6 @@
 ---
 title: "时间表：cron 触发的函数"
-description: "使用 pg_cron 在 cron 时间表上运行函数"
+description: "使用 pg_cron 扩展按 cron 时间表调用 InsForge 边缘函数：定期任务在每个刻度向函数 URL 发送 HTTP 请求并记录执行结果，便于调度与审计。"
 ---
 
 时间表在定期 cron 表达式上调用函数。[pg_cron](https://github.com/citusdata/pg_cron) 在每个刻度处向函数 URL 发送 HTTP 请求并记录结果。

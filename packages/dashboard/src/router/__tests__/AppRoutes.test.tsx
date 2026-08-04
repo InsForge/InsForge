@@ -63,17 +63,20 @@ describe('AppRoutes host-mode gating', () => {
     expect(screen.getByText('WEBSCRAPER_LAYOUT')).toBeInTheDocument();
   });
 
-  // Analytics/PostHog is cloud-only in the sidebar too, so the router must keep
-  // matching it. This pins the pairing so a later sweep does not ungate it
-  // along with Web Scraper.
-  it('keeps analytics cloud-only', () => {
+  // Analytics used to be cloud-only and this asserted that. Self-hosting now
+  // connects with the admin's own PostHog personal API key, so the sidebar
+  // pushes the entry in both modes and the route has to match in both — the
+  // same trap the webscraper cases above cover.
+  it('serves the analytics route in self-hosting', () => {
     renderAt('/dashboard/analytics/traffic');
 
-    expect(screen.queryByText('ANALYTICS_LAYOUT')).toBeNull();
-    expect(screen.getByText('DASHBOARD_HOME')).toBeInTheDocument();
+    expect(screen.getByText('ANALYTICS_LAYOUT')).toBeInTheDocument();
+    // Falling through to the catch-all is the failure mode being guarded here,
+    // and it renders the dashboard home rather than erroring.
+    expect(screen.queryByText('DASHBOARD_HOME')).toBeNull();
   });
 
-  it('serves analytics in cloud-hosting', () => {
+  it('still serves analytics in cloud-hosting', () => {
     host.mode = 'cloud-hosting';
     renderAt('/dashboard/analytics/traffic');
 
