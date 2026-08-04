@@ -145,7 +145,7 @@ paths:
       tags:
         - Usage
       security:
-        - bearerAuth: []
+        - cloudBackendAuth: []
       parameters:
         - name: start_date
           in: query
@@ -215,6 +215,11 @@ components:
       type: apiKey
       in: header
       name: x-api-key
+    cloudBackendAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token issued by InsForge Cloud and verified by the backend cloud token verifier.
   schemas:
     RecordMcpUsageRequest:
       type: object
