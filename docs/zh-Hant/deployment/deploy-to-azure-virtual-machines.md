@@ -1,3 +1,8 @@
+---
+title: "在 Azure 虛擬機器上自架 InsForge"
+description: "在 Azure 虛擬機器上使用 Docker Compose 部署 InsForge，涵蓋 SSH 存取、自訂網域、HTTPS 設定與生產環境安全強化。"
+---
+
 # 📖 將 InsForge 部署到 Azure 虛擬機器（擴充指南）
 
 本指南提供了在 Azure 虛擬機器（VM）上使用 Docker Compose 部署、管理和保護 InsForge 的完整、逐步說明。

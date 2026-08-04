@@ -1,6 +1,6 @@
 ---
 title: "將 InsForge 部署到 AWS EC2"
-description: "逐步說明如何使用 Docker Compose 將 InsForge 部署到 AWS EC2 執行個體，包含 SSH 設定、網域設定與 TLS 終止。"
+description: "逐步說明如何以 Docker Compose 將 InsForge 部署至 AWS EC2 執行個體，涵蓋 SSH、安全群組、自訂網域與 TLS。"
 ---
 
 # 將 InsForge 部署到 AWS EC2
