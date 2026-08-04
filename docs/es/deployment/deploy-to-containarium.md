@@ -1,6 +1,6 @@
 ---
 title: "Desplegar InsForge en Containarium"
-description: "Ejecute InsForge en un host de Containarium LXC con contenedores por inquilino, instantáneas ZFS y aprovisionamiento impulsado por MCP para despliegues nativos de agentes."
+description: "Ejecuta InsForge en un host Containarium LXC con contenedores por inquilino, instantáneas ZFS y aprovisionamiento vía MCP para despliegues nativos de agentes."
 ---
 
 # Desplegar InsForge en Containarium
