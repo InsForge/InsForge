@@ -50,36 +50,37 @@ describe('AppRoutes host-mode gating', () => {
   // the nav entry therefore matched no route, fell through to the catch-all
   // `<Route path="*">` and silently bounced back to /dashboard — making the
   // whole self-hosted Web Scraper feature unreachable.
-  it('serves the webscraper route in self-hosting', () => {
+  // Lazy routes resolve through Suspense, so assert with async findByText.
+  it('serves the webscraper route in self-hosting', async () => {
     renderAt('/dashboard/webscraper/actors');
 
-    expect(screen.getByText('WEBSCRAPER_LAYOUT')).toBeInTheDocument();
+    expect(await screen.findByText('WEBSCRAPER_LAYOUT')).toBeInTheDocument();
   });
 
-  it('still serves the webscraper route in cloud-hosting', () => {
+  it('still serves the webscraper route in cloud-hosting', async () => {
     host.mode = 'cloud-hosting';
     renderAt('/dashboard/webscraper/actors');
 
-    expect(screen.getByText('WEBSCRAPER_LAYOUT')).toBeInTheDocument();
+    expect(await screen.findByText('WEBSCRAPER_LAYOUT')).toBeInTheDocument();
   });
 
   // Analytics used to be cloud-only and this asserted that. Self-hosting now
   // connects with the admin's own PostHog personal API key, so the sidebar
   // pushes the entry in both modes and the route has to match in both — the
   // same trap the webscraper cases above cover.
-  it('serves the analytics route in self-hosting', () => {
+  it('serves the analytics route in self-hosting', async () => {
     renderAt('/dashboard/analytics/traffic');
 
-    expect(screen.getByText('ANALYTICS_LAYOUT')).toBeInTheDocument();
+    expect(await screen.findByText('ANALYTICS_LAYOUT')).toBeInTheDocument();
     // Falling through to the catch-all is the failure mode being guarded here,
     // and it renders the dashboard home rather than erroring.
     expect(screen.queryByText('DASHBOARD_HOME')).toBeNull();
   });
 
-  it('still serves analytics in cloud-hosting', () => {
+  it('still serves analytics in cloud-hosting', async () => {
     host.mode = 'cloud-hosting';
     renderAt('/dashboard/analytics/traffic');
 
-    expect(screen.getByText('ANALYTICS_LAYOUT')).toBeInTheDocument();
+    expect(await screen.findByText('ANALYTICS_LAYOUT')).toBeInTheDocument();
   });
 });
