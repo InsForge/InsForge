@@ -5,16 +5,30 @@ import { LoadingState } from '@insforge/ui';
 import { ErrorState } from '#components';
 import { RequireAuth } from './RequireAuth';
 import AppLayout from '#layout/AppLayout';
+import AILayout from '#features/ai/components/AILayout';
+import AnalyticsLayout from '#features/analytics/components/AnalyticsLayout';
+import WebscraperLayout from '#features/webscraper/components/WebscraperLayout';
+import AuthenticationLayout from '#features/auth/components/AuthenticationLayout';
+import DashboardLayout from '#features/dashboard/components/DashboardLayout';
+import DatabaseLayout from '#features/database/components/DatabaseLayout';
+import SQLEditorLayout from '#features/database/components/SQLEditorLayout';
+import DeploymentsLayout from '#features/deployments/components/DeploymentsLayout';
+import FunctionsLayout from '#features/functions/components/FunctionsLayout';
+import LogsLayout from '#features/logs/components/LogsLayout';
+import PaymentsLayout from '#features/payments/components/PaymentsLayout';
+import RealtimeLayout from '#features/realtime/components/RealtimeLayout';
+import StorageLayout from '#features/storage/components/StorageLayout';
+import VisualizerLayout from '#features/visualizer/components/VisualizerLayout';
 import { getFeatureFlag, trackEvent } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 
-// Lazy-loaded so heavy feature libs load on demand, not in the initial bundle.
-const AILayout = lazy(() => import('#features/ai/components/AILayout'));
+// Leaf pages stay lazy so their feature dependencies load on demand. Layouts
+// remain eager as stable routing chrome, which lets React start loading the
+// matched page without a layout -> page waterfall.
 const AIOverviewPage = lazy(() => import('#features/ai/pages/AIOverviewPage'));
 const AIUsagePage = lazy(() => import('#features/ai/pages/AIUsagePage'));
 const AIQuickStartPage = lazy(() => import('#features/ai/pages/AIQuickStartPage'));
 const AIModelsPage = lazy(() => import('#features/ai/pages/AIModelsPage'));
-const AnalyticsLayout = lazy(() => import('#features/analytics/components/AnalyticsLayout'));
 const TrafficPage = lazy(() =>
   import('#features/analytics/pages/TrafficPage').then((m) => ({ default: m.TrafficPage }))
 );
@@ -26,7 +40,6 @@ const SessionReplayPage = lazy(() =>
     default: m.SessionReplayPage,
   }))
 );
-const WebscraperLayout = lazy(() => import('#features/webscraper/components/WebscraperLayout'));
 const WebscraperActorsPage = lazy(() =>
   import('#features/webscraper/pages/WebscraperActorsPage').then((m) => ({
     default: m.WebscraperActorsPage,
@@ -42,17 +55,13 @@ const WebscraperDatasetPage = lazy(() =>
     default: m.WebscraperDatasetPage,
   }))
 );
-const AuthenticationLayout = lazy(() => import('#features/auth/components/AuthenticationLayout'));
 const AuthMethodsPage = lazy(() => import('#features/auth/pages/AuthMethodsPage'));
 const EmailPage = lazy(() => import('#features/auth/pages/EmailPage'));
 const UsersPage = lazy(() => import('#features/auth/pages/UsersPage'));
 const ComputePage = lazy(() => import('#features/compute/pages/ComputePage'));
-const DashboardLayout = lazy(() => import('#features/dashboard/components/DashboardLayout'));
 const DashboardPage = lazy(() => import('#features/dashboard/pages/DashboardPage'));
 const DTestDashboardPage = lazy(() => import('#features/dashboard/pages/DTestDashboardPage'));
 const DTestInstallPage = lazy(() => import('#features/dashboard/pages/DTestInstallPage'));
-const DatabaseLayout = lazy(() => import('#features/database/components/DatabaseLayout'));
-const SQLEditorLayout = lazy(() => import('#features/database/components/SQLEditorLayout'));
 const BackupsPage = lazy(() => import('#features/database/pages/BackupsPage'));
 const DatabaseFunctionsPage = lazy(() => import('#features/database/pages/FunctionsPage'));
 const IndexesPage = lazy(() => import('#features/database/pages/IndexesPage'));
@@ -62,7 +71,6 @@ const SQLEditorPage = lazy(() => import('#features/database/pages/SQLEditorPage'
 const TablesPage = lazy(() => import('#features/database/pages/TablesPage'));
 const TemplatesPage = lazy(() => import('#features/database/pages/TemplatesPage'));
 const TriggersPage = lazy(() => import('#features/database/pages/TriggersPage'));
-const DeploymentsLayout = lazy(() => import('#features/deployments/components/DeploymentsLayout'));
 const DeploymentDomainsPage = lazy(
   () => import('#features/deployments/pages/DeploymentDomainsPage')
 );
@@ -73,31 +81,25 @@ const DeploymentLogsPage = lazy(() => import('#features/deployments/pages/Deploy
 const DeploymentOverviewPage = lazy(
   () => import('#features/deployments/pages/DeploymentOverviewPage')
 );
-const FunctionsLayout = lazy(() => import('#features/functions/components/FunctionsLayout'));
 const FunctionsPage = lazy(() => import('#features/functions/pages/FunctionsPage'));
 const SchedulesPage = lazy(() => import('#features/functions/pages/SchedulesPage'));
 const SecretsPage = lazy(() => import('#features/functions/pages/SecretsPage'));
 const CloudLoginPage = lazy(() => import('#features/login/pages/CloudLoginPage'));
 const LoginPage = lazy(() => import('#features/login/pages/LoginPage'));
-const LogsLayout = lazy(() => import('#features/logs/components/LogsLayout'));
 const AuditsPage = lazy(() => import('#features/logs/pages/AuditsPage'));
 const FunctionLogsPage = lazy(() => import('#features/logs/pages/FunctionLogsPage'));
 const LogsPage = lazy(() => import('#features/logs/pages/LogsPage'));
 const MCPLogsPage = lazy(() => import('#features/logs/pages/MCPLogsPage'));
-const PaymentsLayout = lazy(() => import('#features/payments/components/PaymentsLayout'));
 const CatalogPage = lazy(() => import('#features/payments/pages/CatalogPage'));
 const CustomersPage = lazy(() => import('#features/payments/pages/CustomersPage'));
 const SubscriptionsPage = lazy(() => import('#features/payments/pages/SubscriptionsPage'));
 const TransactionsPage = lazy(() => import('#features/payments/pages/TransactionsPage'));
-const RealtimeLayout = lazy(() => import('#features/realtime/components/RealtimeLayout'));
 const RealtimeChannelsPage = lazy(() => import('#features/realtime/pages/RealtimeChannelsPage'));
 const RealtimeMessagesPage = lazy(() => import('#features/realtime/pages/RealtimeMessagesPage'));
 const RealtimePermissionsPage = lazy(
   () => import('#features/realtime/pages/RealtimePermissionsPage')
 );
-const StorageLayout = lazy(() => import('#features/storage/components/StorageLayout'));
 const BucketsPage = lazy(() => import('#features/storage/pages/BucketsPage'));
-const VisualizerLayout = lazy(() => import('#features/visualizer/components/VisualizerLayout'));
 const VisualizerPage = lazy(() => import('#features/visualizer/pages/VisualizerPage'));
 
 interface ChunkErrorBoundaryProps {
@@ -297,19 +299,31 @@ function AuthenticatedRoutes() {
 
 export function AppRoutes() {
   return (
-    <RouteBoundary>
-      <Routes>
-        <Route path="/dashboard/login" element={<LoginPage />} />
-        <Route path="/cloud/login" element={<CloudLoginPage />} />
-        <Route
-          path="/*"
-          element={
-            <RequireAuth>
-              <AuthenticatedRoutes />
-            </RequireAuth>
-          }
-        />
-      </Routes>
-    </RouteBoundary>
+    <Routes>
+      <Route
+        path="/dashboard/login"
+        element={
+          <RouteBoundary>
+            <LoginPage />
+          </RouteBoundary>
+        }
+      />
+      <Route
+        path="/cloud/login"
+        element={
+          <RouteBoundary>
+            <CloudLoginPage />
+          </RouteBoundary>
+        }
+      />
+      <Route
+        path="/*"
+        element={
+          <RequireAuth>
+            <AuthenticatedRoutes />
+          </RequireAuth>
+        }
+      />
+    </Routes>
   );
 }

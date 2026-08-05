@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { ReactNode } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // The router pulls in every feature layout in the app. Only the three this file
@@ -10,9 +10,26 @@ import { MemoryRouter } from 'react-router-dom';
 vi.mock('#router/RequireAuth', () => ({
   RequireAuth: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
-vi.mock('#layout/AppLayout', () => ({
-  default: ({ children }: { children: ReactNode }) => <>{children}</>,
-}));
+vi.mock('#layout/AppLayout', async () => {
+  const { useState } = await import('react');
+  const { Link } = await import('react-router-dom');
+
+  return {
+    default: ({ children }: { children: ReactNode }) => {
+      const [layoutState, setLayoutState] = useState(0);
+
+      return (
+        <>
+          <button onClick={() => setLayoutState((value) => value + 1)}>
+            LAYOUT_STATE_{layoutState}
+          </button>
+          <Link to="/dashboard/analytics/traffic">GO_TO_ANALYTICS</Link>
+          {children}
+        </>
+      );
+    },
+  };
+});
 vi.mock('#features/webscraper/components/WebscraperLayout', () => ({
   default: () => <div>WEBSCRAPER_LAYOUT</div>,
 }));
@@ -82,5 +99,17 @@ describe('AppRoutes host-mode gating', () => {
     renderAt('/dashboard/analytics/traffic');
 
     expect(await screen.findByText('ANALYTICS_LAYOUT')).toBeInTheDocument();
+  });
+
+  it('preserves AppLayout state while navigating between authenticated routes', async () => {
+    renderAt('/dashboard/webscraper/actors');
+    expect(await screen.findByText('WEBSCRAPER_LAYOUT')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'LAYOUT_STATE_0' }));
+    expect(screen.getByRole('button', { name: 'LAYOUT_STATE_1' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'GO_TO_ANALYTICS' }));
+    expect(await screen.findByText('ANALYTICS_LAYOUT')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'LAYOUT_STATE_1' })).toBeInTheDocument();
   });
 });

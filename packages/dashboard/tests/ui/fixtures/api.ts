@@ -57,6 +57,17 @@ export async function mockLoggedOutApi(page: Page) {
 export async function mockSelfHostingDashboardApi(page: Page) {
   let isLoggedIn = false;
 
+  // Keep the authenticated event stream from falling through to the absent
+  // backend. A 401 here clears the dashboard session and makes navigation
+  // smoke tests race back to the login page.
+  await page.route('**/api/dashboard/events', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: ': dashboard-ui-smoke\n\n',
+    })
+  );
+
   await page.route('**/api/auth/admin/sessions/current', (route) => {
     if (!isLoggedIn) {
       return fulfillLoggedOutSession(route);
@@ -84,9 +95,26 @@ export async function mockSelfHostingDashboardApi(page: Page) {
     });
   });
 
+  await page.route('**/api/auth/config', (route) =>
+    fulfillJson(route, 200, selfHostingMetadata.auth)
+  );
+
+  await page.route('**/api/auth/oauth/custom/configs', (route) =>
+    fulfillJson(route, 200, {
+      data: [],
+      count: 0,
+    })
+  );
+
   await page.route('**/api/metadata/api-key', (route) =>
     fulfillJson(route, 200, {
       apiKey: 'ik_test_dashboard_ui_smoke_key',
+    })
+  );
+
+  await page.route('**/api/metadata/anon-key', (route) =>
+    fulfillJson(route, 200, {
+      anonKey: 'anon_test_dashboard_ui_smoke_key',
     })
   );
 
