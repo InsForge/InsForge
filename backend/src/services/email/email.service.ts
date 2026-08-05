@@ -100,7 +100,7 @@ export class EmailService {
     }
   }
 
-  public async sendRaw(options: SendRawEmailRequest): Promise<void> {
+  public async sendRaw(options: SendRawEmailRequest, signal?: AbortSignal): Promise<void> {
     const [provider, smtpConfig] = await this.resolveProvider();
 
     const recipients = Array.isArray(options.to) ? options.to : [options.to];
@@ -114,7 +114,7 @@ export class EmailService {
     if (!provider.sendRaw) {
       throw new Error('Current email provider does not support raw email sending');
     }
-    await provider.sendRaw(options);
+    await provider.sendRaw(options, signal);
 
     if (smtpConfig) {
       for (const recipient of recipients) {
