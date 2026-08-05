@@ -41,6 +41,7 @@ import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
+import oauthAppsRouter from '@/api/routes/oauth-apps/index.routes.js';
 import { webscraperRouter } from '@/api/routes/webscraper/index.routes.js';
 import { dashboardEventsRouter } from '@/api/routes/dashboard/events.routes.js';
 import { appConfig } from '@/infra/config/app.config.js';
@@ -242,6 +243,7 @@ export async function createApp() {
   apiRouter.use('/webscraper', webscraperRouter);
   apiRouter.use('/advisor', advisorRouter);
   apiRouter.use('/dashboard', dashboardEventsRouter);
+  apiRouter.use('/oauth-apps', oauthAppsRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
