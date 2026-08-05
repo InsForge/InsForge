@@ -4,6 +4,21 @@
 
 - Docker and Docker Compose installed on your machine
 
+## The short way: let the CLI do it
+
+For local development, the CLI drives this same compose file for you — it
+generates the secrets, picks the keys, waits for health, links the directory,
+and writes `.env.local`:
+
+```bash
+npx -y @insforge/cli@latest local start
+```
+
+Each directory gets its own isolated instance. Use `local status` to see ports
+and keys, and `local stop` to shut down without losing data. The rest of this
+guide covers running Compose yourself — for servers, CI, or any case where you
+want direct control.
+
 ## Setup InsForge
 
 ### Step 1: Download the Docker Compose file

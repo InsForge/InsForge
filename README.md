@@ -112,24 +112,51 @@ If you find InsForge useful or interesting, a GitHub Star ⭐️ would be greatl
 
 <a href="https://insforge.dev" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/insforge.dev-181818?logo=data:image/svg%2bxml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjI0MCIgdmlld0JveD0iMCAwIDI0MCAyNDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTI2LjExODQgMTAxLjZDMjMuMjkzOSA5OC43ODMzIDIzLjI5MzkgOTQuMjE2NiAyNi4xMTg0IDkxLjRMOTcuNzE2NyAyMEwyMDAgMjBMNzcuMjYgMTQyLjRDNzQuNDM1NSAxNDUuMjE3IDY5Ljg1NjIgMTQ1LjIxNyA2Ny4wMzE3IDE0Mi40TDI2LjExODQgMTAxLjZaIiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik0xNTUuMjUxIDc3LjM3NUwyMDAgMTIyVjIyNEwxMDQuMTA5IDEyOC4zNzVMMTU1LjI1MSA3Ny4zNzVaIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPgo=&logoColor=white" alt="InsForge.dev"></a>
 
-### Self-hosted: Docker Compose
+### Self-hosted: one command
 
 Prerequisites: [Docker](https://www.docker.com/) + [Node.js](https://nodejs.org/)
 
-#### 1. Setup
+#### 1. Start
 
-You can run InsForge locally using Docker Compose. This will start a local InsForge instance on your machine.
+```bash
+npx -y @insforge/cli@latest local start
+```
+
+Run it in your app directory. It pulls the published images, waits for the
+backend to be healthy, links the directory, and writes `.env.local` with your
+API URL and anon key — no clone, no `.env` to fill in, no account required.
+
+```bash
+npx -y @insforge/cli@latest local status   # ports, keys, container health
+npx -y @insforge/cli@latest local stop     # stop (data is kept)
+```
+
+Every other CLI command then targets the local instance: `insforge db query`,
+`insforge storage upload`, `insforge functions deploy`, and so on.
+
+<details>
+<summary>Or drive Docker Compose yourself</summary>
 
 [![Deploy on Docker][docker-btn]][docker-deploy]
 
-Or run from source:
+No checkout needed — every service pulls a published image:
+
 ```bash
-# Run with Docker
+curl -O https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/docker-compose/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/docker-compose/.env.example
+docker compose up -d
+```
+
+To build from source instead:
+
+```bash
 git clone https://github.com/InsForge/InsForge.git
 cd InsForge
 cp .env.example .env
 docker compose -f docker-compose.prod.yml up
 ```
+
+</details>
 
 #### 2. Connect InsForge MCP
 
@@ -149,6 +176,10 @@ I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool t
 ```
 
 #### 4. Running Multiple Projects
+
+`insforge local start` already isolates per directory — each app folder gets its
+own containers, database, and volumes, so running it in two projects needs no
+setup. The rest of this section is for driving Compose by hand.
 
 You can run multiple InsForge projects on the same host by using different ports and project names.
 
