@@ -48,7 +48,7 @@ services:
       - insforge-network
 
   insforge:
-    image: ghcr.io/insforge/insforge-oss:v1.5.0
+    image: ghcr.io/insforge/insforge-oss:latest
 
     working_dir: /app
     depends_on:
