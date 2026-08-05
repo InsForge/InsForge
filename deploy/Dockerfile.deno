@@ -1,10 +1,27 @@
 FROM denoland/deno:alpine-2.0.6
 
-# Create non-root user
-RUN addgroup -S deno && adduser -S deno -G deno
+# The base image already ships a non-root `deno` user (uid/gid 1000), so we run
+# as it directly. Creating one here fails the build with "group 'deno' in use".
 
-WORKDIR /app/functions
+# Pre-create DENO_DIR owned by the non-root user. The compose files mount a
+# named volume here; Docker seeds a fresh named volume from the image's
+# directory, ownership included, so this is what lets the `deno` user write
+# its module cache. Without it the first run fails with EACCES on /deno-dir.
+RUN mkdir -p /deno-dir && chown deno:deno /deno-dir
+ENV DENO_DIR=/deno-dir
+
+# WORKDIR is /app, not /app/functions: the compose files set working_dir: /app
+# and the run command's paths (functions/server.ts, ./functions/worker-template.js)
+# are relative to it. Keeping them in sync avoids a module-not-found on boot.
+WORKDIR /app
 
 COPY --chown=deno:deno functions /app/functions
 
 USER deno
+
+EXPOSE 7133
+
+# Mirrors the dev compose's command without --watch. `deno cache` warms the
+# module cache into the mounted DENO_DIR volume on first boot; later starts
+# find it already populated and skip the download.
+CMD ["sh", "-c", "deno cache functions/server.ts && exec deno run --allow-net --allow-env --allow-read=./functions/worker-template.js --unstable-worker-options functions/server.ts"]
