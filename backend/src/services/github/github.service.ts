@@ -19,6 +19,9 @@ export class GitHubService {
 
   private cacheExpiresAt = 0;
 
+  /** In-flight fetch promise shared by all concurrent callers. */
+  private inflightRequest: Promise<GitHubRepositoryMetadata> | null = null;
+
   private constructor() {}
 
   public static getInstance(): GitHubService {
@@ -33,6 +36,21 @@ export class GitHubService {
       return this.cachedMetadata;
     }
 
+    // Coalesce concurrent callers onto a single in-flight request so we never
+    // fire more than one GitHub API call at a time while the cache is empty or
+    // expired (prevents cache-refresh stampede / rate-limit exhaustion).
+    if (this.inflightRequest) {
+      return this.inflightRequest;
+    }
+
+    this.inflightRequest = this.fetchAndCache().finally(() => {
+      this.inflightRequest = null;
+    });
+
+    return this.inflightRequest;
+  }
+
+  private async fetchAndCache(): Promise<GitHubRepositoryMetadata> {
     try {
       const response = await axios.get('https://api.github.com/repos/InsForge/InsForge', {
         timeout: 5000,
