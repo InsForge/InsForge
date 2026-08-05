@@ -50,14 +50,22 @@ jobs:
         uses: tj-actions/changed-files@v45
         with:
           files: openapi/**/*.yaml
+          separator: "\n"
 
       - name: Validate changed OpenAPI specs
         if: steps.changed-openapi.outputs.any_changed == 'true'
+        # The file list arrives through the environment rather than being
+        # interpolated into the script, so a filename cannot be read as shell
+        # syntax. Newline separated and read line by line so a name containing
+        # spaces stays one argument.
+        env:
+          CHANGED_SPECS: ${{ steps.changed-openapi.outputs.all_changed_files }}
         run: |
-          for spec in ${{ steps.changed-openapi.outputs.all_changed_files }}; do
+          while IFS= read -r spec; do
+            [ -n "$spec" ] || continue
             echo "Validating $spec"
             npx --yes @apidevtools/swagger-cli@4.0.4 validate "$spec"
-          done
+          done <<< "$CHANGED_SPECS"
 
       - name: Run TypeScript type checking
         run: npm run typecheck
