@@ -24,8 +24,10 @@ describe('database schema route wiring', () => {
   it('mounts a separate admin database router for dashboard-only record access', () => {
     expect(indexRoutesSource).toContain("router.use('/admin', databaseAdminRouter);");
     expect(adminRoutesSource).toMatch(/router\.get\(\s*'\/tables\/:tableName\/records'/);
-    expect(adminRoutesSource).toContain(
-      'paginatedResponse(res, response.records, response.total, offset);'
+    // Matched loosely so formatting (and the trailing options argument that carries
+    // the estimated-count flag) can change without failing the wiring assertion.
+    expect(adminRoutesSource).toMatch(
+      /paginatedResponse\(\s*res,\s*response\.records,\s*response\.total,\s*offset\b/s
     );
     expect(adminRoutesSource).not.toContain('PostgrestProxyService');
   });
