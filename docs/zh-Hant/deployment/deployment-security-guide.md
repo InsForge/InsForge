@@ -167,7 +167,7 @@ docker run hello-world
 curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
 
-checkout 這個 stack 會讀的檔案，並把 `JWT_SECRET`、`ENCRYPTION_KEY`、`ROOT_ADMIN_PASSWORD` 產生到 `deploy/docker-compose/.env`。不啟動任何東西。
+checkout 這個 stack 會讀的檔案，並把 `JWT_SECRET`、`ENCRYPTION_KEY`、`ROOT_ADMIN_PASSWORD` 產生到 `.env`。不啟動任何東西。
 
 <details>
 <summary>不想把腳本管線給 shell？手動執行相同步驟</summary>
@@ -183,8 +183,8 @@ git sparse-checkout set --no-cone \
   /deploy/docker-compose/docker-compose.yml \
   /deploy/docker-init/db/
 
-cd deploy/docker-compose
-cp ../../.env.example .env
+cp .env.example .env
+echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
 ```
 
 </details>
@@ -192,6 +192,7 @@ cp ../../.env.example .env
 #### 4.2 啟動 InsForge
 
 ```bash
+cd ~/insforge
 docker compose up -d
 ```
 
@@ -295,20 +296,15 @@ DENO_PORT=7133
 
 以下變數僅在你打算使用 InsForge 的**部署功能**（透過控制台部署專案）時才需要設定。若你不需要部署功能，可以跳過本節。
 
-> ⚠️ **注意**：這些變數（`AWS_S3_BUCKET`、`AWS_REGION`、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`、`PROJECT_ID`、`MAX_FILE_SIZE`）來自根目錄下的 `.env.example` 設定。它們**並不**存在於 `deploy/docker-compose/.env.example` 中，而 `deploy/docker-compose/docker-compose.yml` 也**不會**將它們傳遞給 `insforge` 容器，因此在你的 `.env` 中設定它們，對此正式環境 compose 檔案不會有任何作用。若要使用它們，請將每一項加入你 `docker-compose.yml` 中 `insforge` 服務的 `environment` 區塊。
-
 ```env
 # ── Deployments ──────────────────────────────────────────────
-# S3 bucket for legacy zip deployment uploads.
-# Direct uploads use the backend proxy, but POST /api/deployments still requires S3.
-AWS_S3_BUCKET=your-deployment-bucket
-AWS_REGION=us-east-2
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-
 # Project ID used by OpenRouter AI token renewal and Vercel deployments
 PROJECT_ID=your-project-id
 ```
+
+> ⚠️ `deploy/docker-compose/docker-compose.yml` 不會把 `PROJECT_ID` 傳給 `insforge` 容器。需要使用時，請加入該服務的 `environment` 區塊。
+
+舊版 zip 上傳介面 `POST /api/deployments` 還需要一個 S3 bucket，用 5.5 的 `S3_*` 變數設定。
 
 #### 5.5 選用變數
 
@@ -347,7 +343,7 @@ WORKER_TIMEOUT_MS=60000
 編輯完成後，重新啟動服務以套用變更：
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 docker compose down
 docker compose up -d
 ```
@@ -508,7 +504,7 @@ sudo systemctl status certbot.timer
 取得憑證後，更新你的 `.env` 以使用 HTTPS 網址：
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 nano .env
 ```
 
@@ -820,7 +816,7 @@ tmpfs:
 #### 14.1 備份資料庫
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 source .env
 
 # Create a timestamped database backup
@@ -877,7 +873,7 @@ sh deploy/setup.sh .
 #### 15.2 拉取最新映像檔
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 
 # Pull the latest versions
 docker compose pull
@@ -915,7 +911,7 @@ curl http://localhost:7130/api/health
 #### 16.1 停止異常的服務
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 docker compose down
 ```
 
@@ -942,7 +938,7 @@ image: ghcr.io/insforge/insforge-oss:v1.5.0
 僅當此次更新包含造成問題的資料庫遷移時，才需要還原資料庫：
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 source .env
 
 # Start only PostgreSQL

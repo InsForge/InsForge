@@ -95,13 +95,14 @@ description: "在 Azure 虛擬機器上使用 Docker Compose 部署 InsForge，�
     ```bash
     cd ~
     git clone https://github.com/InsForge/InsForge.git
-    cd InsForge/deploy/docker-compose
+    cd InsForge
     ```
 
 2.  **建立環境設定：**
     從範例檔案建立你的 `.env` 檔案並開啟以進行編輯。
     ```bash
     cp .env.example .env
+    echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
     nano .env
     ```
     `.env.example` 列出了所有支援的變數並附有註解。對於基本部署，你只需要設定少數幾項。設定以下值，並將 API URL 更新為你的虛擬機器的公開 IP：
@@ -240,7 +241,7 @@ description: "在 Azure 虛擬機器上使用 Docker Compose 部署 InsForge，�
 * **重新啟動服務：** `docker compose restart`
 * **更新 InsForge：** 從 `~/InsForge/deploy/docker-compose` 執行以下命令。映像是預先建置好的，因此拉取最新標籤即可，無需重新建置。
     ```bash
-    cd ~/InsForge/deploy/docker-compose
+    cd ~/InsForge
     git -C ~/InsForge pull origin main
     docker compose pull && docker compose up -d
     ```

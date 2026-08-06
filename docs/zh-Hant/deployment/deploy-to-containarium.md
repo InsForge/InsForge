@@ -55,14 +55,15 @@ ssh insforge
 ```bash
 ssh insforge <<'EOF'
   git clone https://github.com/InsForge/InsForge.git ~/insforge
-  cd ~/insforge/deploy/docker-compose
+  cd ~/insforge
   cp .env.example .env
+  echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
 EOF
 ```
 
 ### 3. 設定環境
 
-在 box 內編輯 `~/insforge/deploy/docker-compose/.env`。至少需要設定：
+在 box 內編輯 `~/insforge/.env`。至少需要設定：
 
 ```env
 JWT_SECRET=<32+ char random string — `openssl rand -base64 32`>
@@ -75,7 +76,7 @@ API_BASE_URL=https://<your-subdomain>
 VITE_API_BASE_URL=https://<your-subdomain>
 ```
 
-完整清單（OpenRouter、OAuth 提供者、Stripe、Vercel）請參閱 [`deploy/docker-compose/.env.example`](https://github.com/insforge/insforge/blob/main/deploy/docker-compose/.env.example)。
+完整清單（OpenRouter、OAuth 提供者、Stripe、Vercel）請參閱 [`.env.example`](https://github.com/insforge/insforge/blob/main/.env.example)。
 
 > **密鑰處理：** 對於正式環境，優先使用 Containarium 的 tmpfs 密鑰（`--delivery=file`；參閱 [Containarium 的密鑰操作文件](https://github.com/footprintai/Containarium/blob/main/docs/SECRETS-OPERATIONS.md)）。這些密鑰以 0440 檔案的形式交付到 tmpfs 上，永遠不會出現在 `/proc/<pid>/environ` 中。透過使用 `env_file:` 的 compose 覆寫檔案將它們接入 compose 堆疊。
 
@@ -84,13 +85,13 @@ VITE_API_BASE_URL=https://<your-subdomain>
 你可以手動啟動一次：
 
 ```bash
-ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose up -d'
+ssh insforge 'cd ~/insforge && docker compose up -d'
 ```
 
 ……或者——建議做法——將其接入 Containarium 的 compose 自動啟動，使堆疊在伺服器重新開機後仍能存活：
 
 ```bash
-containarium compose enable insforge --dir /home/insforge/insforge/deploy/docker-compose
+containarium compose enable insforge --dir /home/insforge/insforge
 ```
 
 這會在 box 內安裝一個 systemd-user 單元，在每次容器啟動時拉起堆疊，並在失敗時帶退避重試地重新啟動服務。使用以下命令驗證：
@@ -154,7 +155,7 @@ agent: create me a container called 'insforge'
 agent: clone InsForge, fill in .env
   → ssh insforge agent-box
     → shell_exec("git clone https://github.com/InsForge/InsForge.git ~/insforge")
-    → write_file("~/insforge/deploy/docker-compose/.env", "<contents>")
+    → write_file("~/insforge/.env", "<contents>")
 
 agent: enable autostart
   → mcp__containarium__compose_enable(
@@ -191,7 +192,7 @@ containarium expose-port insforge-globex --container-port 7130 \
 ### 檢視記錄檔
 
 ```bash
-ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose logs -f'
+ssh insforge 'cd ~/insforge && docker compose logs -f'
 ```
 
 或依服務檢視：`docker compose logs -f insforge` / `postgres` / `deno`。
@@ -200,7 +201,7 @@ ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose logs -f'
 
 ```bash
 ssh insforge <<'EOF'
-  cd ~/insforge/deploy/docker-compose
+  cd ~/insforge
   git -C ~/insforge pull origin main
   docker compose pull
   docker compose up -d
@@ -212,7 +213,7 @@ EOF
 ### 備份資料庫
 
 ```bash
-ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose exec -T postgres \
+ssh insforge 'cd ~/insforge && docker compose exec -T postgres \
   pg_dump -U postgres insforge' > backup_$(date +%Y%m%d_%H%M%S).sql
 ```
 

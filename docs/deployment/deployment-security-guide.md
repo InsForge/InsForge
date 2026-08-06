@@ -171,7 +171,7 @@ docker run hello-world
 curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
 
-Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY` and `ROOT_ADMIN_PASSWORD` into `deploy/docker-compose/.env`. Nothing is started.
+Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY` and `ROOT_ADMIN_PASSWORD` into `.env`. Nothing is started.
 
 <details>
 <summary>Prefer not to pipe a script into a shell? Do the same by hand</summary>
@@ -187,8 +187,8 @@ git sparse-checkout set --no-cone \
   /deploy/docker-compose/docker-compose.yml \
   /deploy/docker-init/db/
 
-cd deploy/docker-compose
-cp ../../.env.example .env
+cp .env.example .env
+echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
 ```
 
 </details>
@@ -196,6 +196,7 @@ cp ../../.env.example .env
 #### 4.2 Start InsForge
 
 ```bash
+cd ~/insforge
 docker compose up -d
 ```
 
@@ -299,20 +300,15 @@ DENO_PORT=7133
 
 These variables are only needed if you plan to use InsForge's **deployment features** (deploying projects via the dashboard). If you don't need deployments, skip this section.
 
-> ⚠️ **Note**: `PROJECT_ID` comes from the root `.env.example` setup. It is **not** present in `deploy/docker-compose/.env.example`, and the `deploy/docker-compose/docker-compose.yml` does **not** pass it through to the `insforge` container, so setting it in your `.env` has no effect on that production compose. To use it, add it to the `insforge` service's `environment` block in your `docker-compose.yml`. The storage variables (`S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `S3_USE_PRESIGNED_URLS`, `S3_MAX_OBJECT_SIZE_BYTES`, `MAX_FILE_SIZE`) **are** passed through — set them in your `.env` and restart.
-
 ```env
 # ── Deployments ──────────────────────────────────────────────
-# S3 bucket for legacy zip deployment uploads.
-# Direct uploads use the backend proxy, but POST /api/deployments still requires S3.
-S3_BUCKET=your-deployment-bucket
-S3_REGION=us-east-2
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-
 # Project ID used by OpenRouter AI token renewal and Vercel deployments
 PROJECT_ID=your-project-id
 ```
+
+> ⚠️ `deploy/docker-compose/docker-compose.yml` does not pass `PROJECT_ID` through to the `insforge` container. Add it to that service's `environment` block to use it.
+
+Legacy zip uploads to `POST /api/deployments` also need an S3 bucket — configure it with the `S3_*` variables in 5.5.
 
 #### 5.5 Optional Variables
 
@@ -365,7 +361,7 @@ WORKER_TIMEOUT_MS=60000
 After editing, restart services to apply changes:
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 docker compose down
 docker compose up -d
 ```
@@ -526,7 +522,7 @@ sudo systemctl status certbot.timer
 After obtaining your certificate, update your `.env` to use HTTPS URLs:
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 nano .env
 ```
 
@@ -838,7 +834,7 @@ By default the backend allows all origins. It reflects the request's `Origin` he
 #### 14.1 Back Up the Database
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 source .env
 
 # Create a timestamped database backup
@@ -895,7 +891,7 @@ Review the diff before merging. New variables in `.env.example` have to be copie
 #### 15.2 Pull the Latest Images
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 
 # Pull the latest versions
 docker compose pull
@@ -933,7 +929,7 @@ If an update causes issues, follow these steps to revert:
 #### 16.1 Stop the Broken Services
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 docker compose down
 ```
 
@@ -960,7 +956,7 @@ image: ghcr.io/insforge/insforge-oss:v1.5.0
 Only restore the database if the update included a database migration that caused issues:
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 source .env
 
 # Start only PostgreSQL

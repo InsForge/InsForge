@@ -117,7 +117,7 @@ sudo apt install git -y
 ```bash
 cd ~
 git clone https://github.com/insforge/insforge.git
-cd insforge/deploy/docker-compose
+cd insforge
 ```
 
 #### 4.2 Crear la configuración del entorno
@@ -126,10 +126,11 @@ Copia la plantilla de ejemplo para crear tu archivo `.env`:
 
 ```bash
 cp .env.example .env
+echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
 nano .env
 ```
 
-La plantilla completa se encuentra en `deploy/docker-compose/.env.example`. Estas son las variables que debes establecer:
+La plantilla completa se encuentra en `.env.example`. Estas son las variables que debes establecer:
 
 ```env
 # Required
@@ -307,7 +308,7 @@ sudo certbot --nginx -d api.yourdomain.com -d app.yourdomain.com
 Actualiza tu archivo `.env` con las URLs de HTTPS:
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 nano .env
 ```
 
@@ -355,7 +356,7 @@ docker compose restart
 InsForge distribuye imágenes precompiladas, así que actualizar consiste en descargar y reiniciar. Ejecuta esto desde `~/insforge/deploy/docker-compose`:
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 git pull origin main
 docker compose pull && docker compose up -d
 ```

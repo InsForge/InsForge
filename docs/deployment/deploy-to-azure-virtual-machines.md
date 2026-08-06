@@ -99,13 +99,14 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
     ```bash
     cd ~
     git clone https://github.com/InsForge/InsForge.git
-    cd InsForge/deploy/docker-compose
+    cd InsForge
     ```
 
 2.  **Create Environment Configuration:**
     Create your `.env` file from the example and open it for editing.
     ```bash
     cp .env.example .env
+    echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
     nano .env
     ```
     `.env.example` lists every supported variable with comments. For a basic deployment you only need to set a few. Set these values and update the API URLs to your VM's public IP:
@@ -244,7 +245,7 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
 * **Restart Services:** `docker compose restart`
 * **Update InsForge:** Run these from `~/InsForge/deploy/docker-compose`. The images are prebuilt, so pull the latest tags instead of rebuilding.
     ```bash
-    cd ~/InsForge/deploy/docker-compose
+    cd ~/InsForge
     git -C ~/InsForge pull origin main
     docker compose pull && docker compose up -d
     ```

@@ -10,20 +10,19 @@
 ### Step 1: Get the repository
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
 
-It checks out only the seven files the stack reads, then generates `JWT_SECRET`,
-`ENCRYPTION_KEY` and `ROOT_ADMIN_PASSWORD` into `deploy/docker-compose/.env` at
-mode 600. Nothing is started — review that file first.
+Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY`
+and `ROOT_ADMIN_PASSWORD` into `.env`. Nothing is started.
 
 <details>
 <summary>Prefer not to pipe a script into a shell? Do the same by hand</summary>
 
 ```bash
 git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/InsForge/InsForge.git
-cd InsForge
+  https://github.com/InsForge/InsForge.git ~/insforge
+cd ~/insforge
 git sparse-checkout set --no-cone \
   /.env.example \
   /docker-compose.minio.yml /docker-compose.rustfs.yml \
@@ -31,8 +30,8 @@ git sparse-checkout set --no-cone \
   /deploy/docker-compose/docker-compose.yml \
   /deploy/docker-init/db/
 
-cd deploy/docker-compose
-cp ../../.env.example .env
+cp .env.example .env
+echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
 ```
 
 </details>
@@ -43,6 +42,7 @@ required because Postgres mounts `deploy/docker-init/db/` from it.
 ### Step 2: Start InsForge
 
 ```bash
+cd ~/insforge
 docker compose up -d
 ```
 
@@ -61,8 +61,10 @@ You can run multiple InsForge projects on the same host by using different ports
 ### Step 1: Create a separate env file for each project
 
 ```bash
-cp .env.example .env.project1
-cp .env.example .env.project2
+for p in project1 project2; do
+  cp .env.example ".env.$p"
+  echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> ".env.$p"
+done
 ```
 
 ### Step 2: Edit each env file with unique ports
