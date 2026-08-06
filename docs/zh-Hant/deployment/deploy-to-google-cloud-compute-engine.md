@@ -151,7 +151,7 @@ sudo apt install git -y
 ```bash
 cd ~
 git clone https://github.com/insforge/insforge.git
-cd insforge/deploy/docker-compose
+cd insforge
 ```
 
 #### 4.2 建立環境設定
@@ -162,10 +162,11 @@ cd insforge/deploy/docker-compose
 nano .env
 ```
 
-儲存庫內附有範本檔案 `deploy/docker-compose/.env.example`。複製它並編輯其中的值：
+儲存庫內附有範本檔案 `.env.example`。複製它並編輯其中的值：
 
 ```bash
 cp .env.example .env
+echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
 nano .env
 ```
 
@@ -206,7 +207,7 @@ GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
 ```
 
-完整支援的變數清單請參閱 `deploy/docker-compose/.env.example`。
+完整支援的變數清單請參閱 `.env.example`。
 
 **產生安全的密鑰：**
 
@@ -364,7 +365,7 @@ sudo certbot --nginx -d api.yourdomain.com -d app.yourdomain.com
 更新您的 `.env` 檔案，改用 HTTPS 網址：
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 nano .env
 ```
 
@@ -410,7 +411,7 @@ docker compose restart
 ### 更新 InsForge
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 git pull origin main
 docker compose pull && docker compose up -d
 ```

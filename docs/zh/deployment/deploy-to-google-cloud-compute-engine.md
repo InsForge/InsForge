@@ -151,7 +151,7 @@ sudo apt install git -y
 ```bash
 cd ~
 git clone https://github.com/insforge/insforge.git
-cd insforge/deploy/docker-compose
+cd insforge
 ```
 
 #### 4.2 创建环境配置
@@ -162,10 +162,11 @@ cd insforge/deploy/docker-compose
 nano .env
 ```
 
-仓库中提供了一个模板，位于 `deploy/docker-compose/.env.example`。复制该文件并编辑其中的值：
+仓库中提供了一个模板，位于 `.env.example`。复制该文件并编辑其中的值：
 
 ```bash
 cp .env.example .env
+echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
 nano .env
 ```
 
@@ -206,7 +207,7 @@ GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
 ```
 
-完整的支持变量列表请参见 `deploy/docker-compose/.env.example`。
+完整的支持变量列表请参见 `.env.example`。
 
 **生成安全密钥：**
 
@@ -364,7 +365,7 @@ sudo certbot --nginx -d api.yourdomain.com -d app.yourdomain.com
 使用 HTTPS 地址更新你的 `.env` 文件：
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 nano .env
 ```
 
@@ -410,7 +411,7 @@ docker compose restart
 ### 更新 InsForge
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 git pull origin main
 docker compose pull && docker compose up -d
 ```

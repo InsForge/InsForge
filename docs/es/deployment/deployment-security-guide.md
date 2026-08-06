@@ -161,22 +161,38 @@ docker run hello-world
 
 ### 4. Desplegar InsForge con Docker Compose
 
-#### 4.1 Descarga el archivo de Docker Compose para producción
+#### 4.1 Clona el repositorio
 
 ```bash
-mkdir -p ~/insforge && cd ~/insforge
-
-# Download the production-ready Docker Compose file and environment template
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/docker-compose.yml
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/.env.example
-
-# Create your environment file
-cp .env.example .env
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
+
+Descarga los archivos que el stack lee y genera `JWT_SECRET`, `ENCRYPTION_KEY` y `ROOT_ADMIN_PASSWORD` en `.env`. No arranca nada.
+
+<details>
+<summary>¿Prefieres no pasar un script a la shell? Hazlo a mano</summary>
+
+```bash
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/InsForge/InsForge.git ~/insforge
+cd ~/insforge
+git sparse-checkout set --no-cone \
+  /.env.example \
+  /docker-compose.minio.yml /docker-compose.rustfs.yml \
+  /deploy/setup.sh \
+  /deploy/docker-compose/docker-compose.yml \
+  /deploy/docker-init/db/
+
+cp .env.example .env
+echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
+```
+
+</details>
 
 #### 4.2 Inicia InsForge
 
 ```bash
+cd ~/insforge
 docker compose up -d
 ```
 
@@ -276,24 +292,27 @@ DENO_PORT=7133
 
 > 💡 Puedes cambiarlos si entran en conflicto con otros servicios de tu VPS.
 
+`COMPOSE_PROJECT_NAME` prefija cada contenedor, volumen y red:
+
+```env
+COMPOSE_PROJECT_NAME=insforge
+```
+
+> ⚠️ Una segunda instancia en el mismo host necesita su propio valor, además de sus propios puertos. Si dos archivos `.env` comparten este nombre, ejecutar `docker compose up` en uno de ellos adopta y recrea los contenedores del otro.
+
 #### 5.4 Requeridas para despliegues
 
 Estas variables solo son necesarias si planeas usar las **funciones de despliegue** de InsForge (desplegar proyectos a través del panel). Si no necesitas despliegues, omite esta sección.
 
-> ⚠️ **Nota**: Estas variables (`AWS_S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `PROJECT_ID`, `MAX_FILE_SIZE`) provienen de la configuración del `.env.example` raíz. **No** están presentes en `deploy/docker-compose/.env.example`, y `deploy/docker-compose/docker-compose.yml` **no** las pasa al contenedor `insforge`, por lo que definirlas en tu `.env` no tiene efecto en ese compose de producción. Para usarlas, añade cada una al bloque `environment` del servicio `insforge` en tu `docker-compose.yml`.
-
 ```env
 # ── Deployments ──────────────────────────────────────────────
-# S3 bucket for legacy zip deployment uploads.
-# Direct uploads use the backend proxy, but POST /api/deployments still requires S3.
-AWS_S3_BUCKET=your-deployment-bucket
-AWS_REGION=us-east-2
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-
 # Project ID used by OpenRouter AI token renewal and Vercel deployments
 PROJECT_ID=your-project-id
 ```
+
+> ⚠️ `deploy/docker-compose/docker-compose.yml` no pasa `PROJECT_ID` al contenedor `insforge`. Añádela al bloque `environment` de ese servicio para usarla.
+
+Las subidas zip heredadas a `POST /api/deployments` también necesitan un bucket S3: configúralo con las variables `S3_*` de 5.5.
 
 #### 5.5 Variables opcionales
 
@@ -841,7 +860,25 @@ docker compose images
 
 ### 15. Actualizar InsForge
 
-#### 15.1 Descarga las imágenes más recientes
+#### 15.1 Actualiza el repositorio
+
+Actualiza el checkout antes de descargar las imágenes: contiene el archivo de compose y la configuración de Postgres.
+
+```bash
+cd ~/insforge
+
+git fetch origin main
+git diff HEAD origin/main -- deploy .env.example
+
+git merge --ff-only origin/main
+
+# Pick up any files this release added
+sh deploy/setup.sh .
+```
+
+Revisa el diff antes de hacer merge. Las variables nuevas de `.env.example` deben copiarse a tu `.env` a mano.
+
+#### 15.2 Descarga las imágenes más recientes
 
 ```bash
 cd ~/insforge
@@ -850,7 +887,7 @@ cd ~/insforge
 docker compose pull
 ```
 
-#### 15.2 Aplica la actualización
+#### 15.3 Aplica la actualización
 
 ```bash
 # Stop current services, start with new images
@@ -863,7 +900,7 @@ docker compose logs -f --tail=50
 
 Presiona `Ctrl+C` para dejar de seguir los logs.
 
-#### 15.3 Verifica la actualización
+#### 15.4 Verifica la actualización
 
 ```bash
 # Check all services are healthy
@@ -874,31 +911,6 @@ curl http://localhost:7130/api/health
 
 # Check the version in the response
 ```
-
-#### 15.4 Actualiza el archivo de Docker Compose (si es necesario)
-
-Ocasionalmente, las nuevas versiones pueden incluir cambios en `docker-compose.yml`. Para incorporar estos cambios:
-
-```bash
-cd ~/insforge
-
-# Download the updated compose file
-wget -O docker-compose.yml.new \
-  https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/docker-compose.yml
-
-# Compare with your current file
-diff docker-compose.yml docker-compose.yml.new
-
-# If changes look safe, apply them
-mv docker-compose.yml docker-compose.yml.old
-mv docker-compose.yml.new docker-compose.yml
-
-# Restart with the new configuration
-docker compose down
-docker compose up -d
-```
-
----
 
 ### 16. Procedimiento de reversión
 
@@ -977,9 +989,11 @@ nano ~/insforge/backup.sh
 set -euo pipefail
 
 # InsForge Automated Backup Script
-# Load .env so POSTGRES_USER / POSTGRES_DB are available outside Docker Compose
+# Run from the checkout so docker compose reads COMPOSE_FILE and
+# COMPOSE_PROJECT_NAME from .env, which also carries POSTGRES_USER / POSTGRES_DB
+cd "$HOME/insforge"
 set -a
-source "$HOME/insforge/.env"
+source .env
 set +a
 
 BACKUP_DIR="$HOME/insforge/backups"
@@ -991,7 +1005,7 @@ trap 'echo "[$(date)] ERROR: Backup failed at line $LINENO" >&2; exit 1' ERR
 mkdir -p "$BACKUP_DIR"
 
 # Dump the database
-docker compose -f "$HOME/insforge/docker-compose.yml" exec -T postgres \
+docker compose exec -T postgres \
   pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" \
   > "$BACKUP_DIR/db_$TIMESTAMP.sql"
 

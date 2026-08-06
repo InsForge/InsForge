@@ -95,13 +95,14 @@ Esta guía proporciona instrucciones completas y paso a paso para desplegar, ges
     ```bash
     cd ~
     git clone https://github.com/InsForge/InsForge.git
-    cd InsForge/deploy/docker-compose
+    cd InsForge
     ```
 
 2.  **Crear la configuración del entorno:**
     Cree su archivo `.env` a partir del ejemplo y ábralo para editarlo.
     ```bash
     cp .env.example .env
+    echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
     nano .env
     ```
     `.env.example` enumera todas las variables admitidas con comentarios. Para un despliegue básico solo necesita configurar unas pocas. Configure estos valores y actualice las URLs de la API con la IP pública de su VM:
@@ -240,7 +241,7 @@ Esta guía proporciona instrucciones completas y paso a paso para desplegar, ges
 * **Reiniciar servicios:** `docker compose restart`
 * **Actualizar InsForge:** Ejecute esto desde `~/InsForge/deploy/docker-compose`. Las imágenes están preconstruidas, así que descargue las últimas etiquetas en lugar de reconstruir.
     ```bash
-    cd ~/InsForge/deploy/docker-compose
+    cd ~/InsForge
     git -C ~/InsForge pull origin main
     docker compose pull && docker compose up -d
     ```

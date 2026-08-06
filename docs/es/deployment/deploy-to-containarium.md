@@ -55,14 +55,15 @@ ssh insforge
 ```bash
 ssh insforge <<'EOF'
   git clone https://github.com/InsForge/InsForge.git ~/insforge
-  cd ~/insforge/deploy/docker-compose
+  cd ~/insforge
   cp .env.example .env
+  echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
 EOF
 ```
 
 ### 3. Configurar el entorno
 
-Edite `~/insforge/deploy/docker-compose/.env` dentro de la caja. Como mínimo, configure:
+Edite `~/insforge/.env` dentro de la caja. Como mínimo, configure:
 
 ```env
 JWT_SECRET=<32+ char random string — `openssl rand -base64 32`>
@@ -75,7 +76,7 @@ API_BASE_URL=https://<your-subdomain>
 VITE_API_BASE_URL=https://<your-subdomain>
 ```
 
-Consulte [`deploy/docker-compose/.env.example`](https://github.com/insforge/insforge/blob/main/deploy/docker-compose/.env.example) para ver la lista completa (OpenRouter, proveedores OAuth, Stripe, Vercel).
+Consulte [`.env.example`](https://github.com/insforge/insforge/blob/main/.env.example) para ver la lista completa (OpenRouter, proveedores OAuth, Stripe, Vercel).
 
 > **Manejo de secretos:** para producción, prefiera los secretos tmpfs de Containarium (`--delivery=file`; vea el [documento de operaciones de secretos de Containarium](https://github.com/footprintai/Containarium/blob/main/docs/SECRETS-OPERATIONS.md)). Estos se entregan como archivos 0440 en tmpfs y nunca aparecen en `/proc/<pid>/environ`. Conéctelos a la pila de compose mediante un archivo de anulación (override) de compose usando `env_file:`.
 
@@ -84,13 +85,13 @@ Consulte [`deploy/docker-compose/.env.example`](https://github.com/insforge/insf
 Puede iniciarlo una vez manualmente:
 
 ```bash
-ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose up -d'
+ssh insforge 'cd ~/insforge && docker compose up -d'
 ```
 
 ...o —recomendado— conectarlo al inicio automático de compose de Containarium para que la pila sobreviva a los reinicios del host:
 
 ```bash
-containarium compose enable insforge --dir /home/insforge/insforge/deploy/docker-compose
+containarium compose enable insforge --dir /home/insforge/insforge
 ```
 
 Esto instala una unidad systemd-user dentro de la caja que levanta la pila en cada arranque del contenedor y reinicia los servicios ante fallos con retroceso (backoff). Verifique con:
@@ -154,7 +155,7 @@ agent: create me a container called 'insforge'
 agent: clone InsForge, fill in .env
   → ssh insforge agent-box
     → shell_exec("git clone https://github.com/InsForge/InsForge.git ~/insforge")
-    → write_file("~/insforge/deploy/docker-compose/.env", "<contents>")
+    → write_file("~/insforge/.env", "<contents>")
 
 agent: enable autostart
   → mcp__containarium__compose_enable(
@@ -191,7 +192,7 @@ Cada proyecto obtiene volúmenes de postgres / storage / deno aislados.
 ### Ver registros
 
 ```bash
-ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose logs -f'
+ssh insforge 'cd ~/insforge && docker compose logs -f'
 ```
 
 O por servicio: `docker compose logs -f insforge` / `postgres` / `deno`.
@@ -200,7 +201,7 @@ O por servicio: `docker compose logs -f insforge` / `postgres` / `deno`.
 
 ```bash
 ssh insforge <<'EOF'
-  cd ~/insforge/deploy/docker-compose
+  cd ~/insforge
   git -C ~/insforge pull origin main
   docker compose pull
   docker compose up -d
@@ -212,7 +213,7 @@ Si el inicio automático de compose está habilitado, no es necesario volver a h
 ### Respaldar la base de datos
 
 ```bash
-ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose exec -T postgres \
+ssh insforge 'cd ~/insforge && docker compose exec -T postgres \
   pg_dump -U postgres insforge' > backup_$(date +%Y%m%d_%H%M%S).sql
 ```
 
