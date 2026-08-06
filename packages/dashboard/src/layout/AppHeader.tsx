@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { useOpenConnectDialog } from './ConnectDialogContext';
 import { getFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
+import { githubService } from '#features/dashboard/services/github.service';
 
 // Import SVG icons
 import DiscordIcon from '#assets/logos/discord.svg?react';
@@ -47,16 +48,26 @@ export default function AppHeader() {
 
   // Fetch GitHub stars
   useEffect(() => {
-    fetch('https://api.github.com/repos/InsForge/InsForge')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.stargazers_count !== undefined) {
-          setGithubStars(data.stargazers_count);
+    let mounted = true;
+
+    const loadRepositoryMetadata = async () => {
+      try {
+        const metadata = await githubService.getRepositoryMetadata();
+
+        if (mounted) {
+          setGithubStars(metadata.stars);
         }
-      })
-      .catch((err) => {
-        console.error('Failed to fetch GitHub stars:', err);
-      });
+      } catch {
+        // Repository metadata is optional.
+        // Ignore failures so the dashboard remains usable.
+      }
+    };
+
+    void loadRepositoryMetadata();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const formatStars = (count: number): string => {
