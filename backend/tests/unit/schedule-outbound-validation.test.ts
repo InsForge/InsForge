@@ -101,4 +101,34 @@ describe('ScheduleService outbound URL validation', () => {
       addresses: ['8.8.8.8'],
     });
   });
+
+  it('re-pins a legacy target before reactivating it', async () => {
+    const service = ScheduleService.getInstance();
+    const schedule = {
+      id: '00000000-0000-0000-0000-000000000002',
+      name: 'legacy',
+      cronSchedule: '*/5 * * * *',
+      functionUrl: 'http://8.8.8.8/hook',
+      httpMethod: 'POST' as const,
+      headers: null,
+      body: null,
+      cronJobId: null,
+      lastExecutedAt: null,
+      isActive: false,
+      nextRun: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    vi.spyOn(service, 'getScheduleById').mockResolvedValue(schedule);
+    queryMock.mockResolvedValue({ rows: [{ cron_job_id: '3', success: true }] });
+
+    await expect(service.updateSchedule(schedule.id, { isActive: true })).resolves.toBeTruthy();
+
+    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock.mock.calls[0][1]?.[8]).toMatchObject({
+      rawUrl: 'http://8.8.8.8/hook',
+      addresses: ['8.8.8.8'],
+    });
+    expect(queryMock.mock.calls[1][0]).toContain('schedules.enable_job');
+  });
 });
