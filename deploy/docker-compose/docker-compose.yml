@@ -1,15 +1,23 @@
 services:
   postgres:
-    image: ghcr.io/insforge/postgres-all:latest
+    image: ghcr.io/insforge/postgres:v15.13.4
 
-    command: postgres -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c cron.database_name='${POSTGRES_DB:-insforge}' -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
+      # Keep the on-disk layout ghcr.io/insforge/postgres-all used, so an existing
+      # postgres-data volume is found instead of being treated as an empty target.
+      - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      # :z relabels for SELinux hosts (RHEL/Fedora), where an unlabelled bind
+      # mount is denied; :ro because Postgres only reads these.
+      - ../docker-init/db/db-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro,z
+      - ../docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql:ro,z
+      - ../docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf:ro,z
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     networks:

@@ -6,13 +6,18 @@
 
 ## Setup InsForge
 
-### Step 1: Download the Docker Compose file
+### Step 1: Get the repository
 
 ```bash
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/docker-compose.yml
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/.env.example
-mv .env.example .env
+git clone --depth 1 https://github.com/InsForge/InsForge.git
+cd InsForge/deploy/docker-compose
+cp .env.example .env
 ```
+
+No build step is involved — every service pulls a published image. The checkout is
+needed because Postgres mounts this repository's `deploy/docker-init/db/` files
+(the role/grant bootstrap and `postgresql.conf`) rather than getting a copy baked
+into an image.
 
 ### Step 2: Start InsForge
 

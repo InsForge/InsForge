@@ -164,11 +164,11 @@ docker run hello-world
 #### 4.1 下載正式環境的 Docker Compose 檔案
 
 ```bash
-mkdir -p ~/insforge && cd ~/insforge
-
-# Download the production-ready Docker Compose file and environment template
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/docker-compose.yml
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/.env.example
+# Clone the repository — no build step, every service pulls a published image.
+# The checkout is needed because Postgres mounts the repo's deploy/docker-init/db
+# files (role bootstrap and postgresql.conf).
+git clone --depth 1 https://github.com/InsForge/InsForge.git ~/insforge
+cd ~/insforge/deploy/docker-compose
 
 # Create your environment file
 cp .env.example .env
@@ -882,18 +882,15 @@ curl http://localhost:7130/api/health
 ```bash
 cd ~/insforge
 
-# Download the updated compose file
-wget -O docker-compose.yml.new \
-  https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/docker-compose.yml
+# Review what changed, including the Postgres init files and postgresql.conf
+git fetch origin main
+git diff HEAD origin/main -- deploy/docker-compose deploy/docker-init
 
-# Compare with your current file
-diff docker-compose.yml docker-compose.yml.new
-
-# If changes look safe, apply them
-mv docker-compose.yml docker-compose.yml.old
-mv docker-compose.yml.new docker-compose.yml
+# If the changes look safe, apply them
+git merge --ff-only origin/main
 
 # Restart with the new configuration
+cd deploy/docker-compose
 docker compose down
 docker compose up -d
 ```
@@ -924,10 +921,10 @@ mv docker-compose.yml.old docker-compose.yml
 
 ```yaml
 # Example: pin to a known-good version (replace with your previous tag)
-image: ghcr.io/insforge/insforge-oss:v1.5.0
+image: ghcr.io/insforge/insforge-oss:v2.2.9
 ```
 
-> 注意：目前 `deploy/docker-compose` 固定使用 `v1.5.0`，而專案現已進展到 2.x 系列。請固定至你更新前所執行的版本。
+> 注意：`deploy/docker-compose` 追蹤 `:latest`。回溯時請將 tag 固定至你更新前所執行的版本。
 
 #### 16.4 還原資料庫（如有需要）
 

@@ -168,11 +168,11 @@ docker run hello-world
 #### 4.1 Download the Production Docker Compose File
 
 ```bash
-mkdir -p ~/insforge && cd ~/insforge
-
-# Download the production-ready Docker Compose file and environment template
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/docker-compose.yml
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/.env.example
+# Clone the repository — no build step, every service pulls a published image.
+# The checkout is needed because Postgres mounts the repo's deploy/docker-init/db
+# files (role bootstrap and postgresql.conf).
+git clone --depth 1 https://github.com/InsForge/InsForge.git ~/insforge
+cd ~/insforge/deploy/docker-compose
 
 # Create your environment file
 cp .env.example .env
@@ -900,18 +900,15 @@ Occasionally, new releases may include changes to `docker-compose.yml`. To pick 
 ```bash
 cd ~/insforge
 
-# Download the updated compose file
-wget -O docker-compose.yml.new \
-  https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/docker-compose.yml
+# Review what changed, including the Postgres init files and postgresql.conf
+git fetch origin main
+git diff HEAD origin/main -- deploy/docker-compose deploy/docker-init
 
-# Compare with your current file
-diff docker-compose.yml docker-compose.yml.new
-
-# If changes look safe, apply them
-mv docker-compose.yml docker-compose.yml.old
-mv docker-compose.yml.new docker-compose.yml
+# If the changes look safe, apply them
+git merge --ff-only origin/main
 
 # Restart with the new configuration
+cd deploy/docker-compose
 docker compose down
 docker compose up -d
 ```
@@ -942,10 +939,10 @@ Edit `docker-compose.yml` and replace `latest` tags with the previous version:
 
 ```yaml
 # Example: pin to a known-good version (replace with your previous tag)
-image: ghcr.io/insforge/insforge-oss:v1.5.0
+image: ghcr.io/insforge/insforge-oss:v2.2.9
 ```
 
-> Note: the current `deploy/docker-compose` pins `v1.5.0`, and the project is now on the 2.x line. Pin to whatever version you were running before the update.
+> Note: `deploy/docker-compose` tracks `:latest`. To roll back, pin the tag to whatever version you were running before the update.
 
 #### 16.4 Restore the Database (If Needed)
 
