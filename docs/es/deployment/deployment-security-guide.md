@@ -164,10 +164,12 @@ docker run hello-world
 #### 4.1 Clona el repositorio
 
 ```bash
-git clone --depth 1 https://github.com/InsForge/InsForge.git ~/insforge
-cd ~/insforge/deploy/docker-compose
+# Sparse checkout: only deploy/ is needed, not the whole monorepo
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/InsForge/InsForge.git ~/insforge
+cd ~/insforge && git sparse-checkout set deploy
 
-# Create your environment file
+cd deploy/docker-compose
 cp ../../.env.example .env
 ```
 

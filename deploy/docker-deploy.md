@@ -10,8 +10,12 @@
 ### Step 1: Get the repository
 
 ```bash
-git clone --depth 1 https://github.com/InsForge/InsForge.git
-cd InsForge/deploy/docker-compose
+# Sparse checkout: only deploy/ is needed, not the whole monorepo
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/InsForge/InsForge.git
+cd InsForge && git sparse-checkout set deploy
+
+cd deploy/docker-compose
 cp ../../.env.example .env
 ```
 
