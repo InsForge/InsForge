@@ -1,3 +1,8 @@
+---
+title: "在 Azure 虚拟机上自托管 InsForge"
+description: "在 Azure 虚拟机上使用 Docker Compose 自托管 InsForge，涵盖 SSH 访问、网络安全组、自定义域名、HTTPS 证书与生产环境加固的完整分步指南。"
+---
+
 # 📖 将 InsForge 部署到 Azure 虚拟机（扩展指南）
 
 本指南提供了在 Azure 虚拟机（VM）上使用 Docker Compose 部署、管理和保护 InsForge 的全面、逐步说明。

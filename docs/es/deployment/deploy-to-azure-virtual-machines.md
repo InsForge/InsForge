@@ -1,3 +1,8 @@
+---
+title: "Autoalojar InsForge en Azure Virtual Machines"
+description: "Autoaloja InsForge en una máquina virtual de Azure con Docker Compose, cubriendo acceso SSH, dominios personalizados, HTTPS y refuerzo para producción."
+---
+
 # 📖 Desplegar InsForge en Azure Virtual Machines (Guía extendida)
 
 Esta guía proporciona instrucciones completas y paso a paso para desplegar, gestionar y proteger InsForge en una máquina virtual (VM) de Azure usando Docker Compose.
