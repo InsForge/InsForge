@@ -838,7 +838,23 @@ docker compose images
 
 ### 15. Actualizar InsForge
 
-#### 15.1 Descarga las imágenes más recientes
+#### 15.1 Actualiza el repositorio
+
+El checkout contiene el archivo de compose y los archivos de inicialización de Postgres, así que actualízalo antes de descargar las imágenes — de lo contrario las imágenes nuevas arrancan con la configuración antigua y hace falta un segundo reinicio.
+
+```bash
+cd ~/insforge
+
+git fetch origin main
+git diff HEAD origin/main -- deploy .env.example
+
+# If the changes look safe, apply them
+git merge --ff-only origin/main
+```
+
+Revisa el diff antes de hacer merge. Las variables nuevas de `.env.example` deben copiarse a tu `.env` a mano.
+
+#### 15.2 Descarga las imágenes más recientes
 
 ```bash
 cd ~/insforge/deploy/docker-compose
@@ -847,7 +863,7 @@ cd ~/insforge/deploy/docker-compose
 docker compose pull
 ```
 
-#### 15.2 Aplica la actualización
+#### 15.3 Aplica la actualización
 
 ```bash
 # Stop current services, start with new images
@@ -860,7 +876,7 @@ docker compose logs -f --tail=50
 
 Presiona `Ctrl+C` para dejar de seguir los logs.
 
-#### 15.3 Verifica la actualización
+#### 15.4 Verifica la actualización
 
 ```bash
 # Check all services are healthy
@@ -871,27 +887,6 @@ curl http://localhost:7130/api/health
 
 # Check the version in the response
 ```
-
-#### 15.4 Actualiza el archivo de Docker Compose (si es necesario)
-
-Ocasionalmente, las nuevas versiones pueden incluir cambios en `docker-compose.yml`. Para incorporar estos cambios:
-
-```bash
-cd ~/insforge/deploy/docker-compose
-
-# Review what changed, including the Postgres init files
-git -C ../.. fetch origin main
-git -C ../.. diff HEAD origin/main -- deploy
-
-# If the changes look safe, apply them
-git -C ../.. merge --ff-only origin/main
-
-# Restart with the new configuration
-docker compose down
-docker compose up -d
-```
-
----
 
 ### 16. Procedimiento de reversión
 

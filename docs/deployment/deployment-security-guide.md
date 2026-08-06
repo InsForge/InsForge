@@ -856,7 +856,23 @@ docker compose images
 
 ### 15. Updating InsForge
 
-#### 15.1 Pull the Latest Images
+#### 15.1 Update the Repository
+
+The checkout carries the compose file and the Postgres init files, so update it before pulling images — otherwise the new images start against the old configuration and need a second restart.
+
+```bash
+cd ~/insforge
+
+git fetch origin main
+git diff HEAD origin/main -- deploy .env.example
+
+# If the changes look safe, apply them
+git merge --ff-only origin/main
+```
+
+Review the diff before merging. New variables in `.env.example` have to be copied into your `.env` by hand.
+
+#### 15.2 Pull the Latest Images
 
 ```bash
 cd ~/insforge/deploy/docker-compose
@@ -865,7 +881,7 @@ cd ~/insforge/deploy/docker-compose
 docker compose pull
 ```
 
-#### 15.2 Apply the Update
+#### 15.3 Apply the Update
 
 ```bash
 # Stop current services, start with new images
@@ -878,7 +894,7 @@ docker compose logs -f --tail=50
 
 Press `Ctrl+C` to stop following logs.
 
-#### 15.3 Verify the Update
+#### 15.4 Verify the Update
 
 ```bash
 # Check all services are healthy
@@ -889,27 +905,6 @@ curl http://localhost:7130/api/health
 
 # Check the version in the response
 ```
-
-#### 15.4 Update the Docker Compose File (If Needed)
-
-Occasionally, new releases may include changes to `docker-compose.yml`. To pick up these changes:
-
-```bash
-cd ~/insforge/deploy/docker-compose
-
-# Review what changed, including the Postgres init files
-git -C ../.. fetch origin main
-git -C ../.. diff HEAD origin/main -- deploy
-
-# If the changes look safe, apply them
-git -C ../.. merge --ff-only origin/main
-
-# Restart with the new configuration
-docker compose down
-docker compose up -d
-```
-
----
 
 ### 16. Rollback Procedure
 

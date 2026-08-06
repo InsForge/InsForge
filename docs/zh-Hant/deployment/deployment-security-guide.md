@@ -838,7 +838,23 @@ docker compose images
 
 ### 15. 更新 InsForge
 
-#### 15.1 拉取最新映像檔
+#### 15.1 更新倉庫
+
+checkout 裡帶著 compose 檔案和 Postgres 的初始化檔案，所以要在拉映像檔之前更新它 —— 否則新映像檔會用舊設定啟動，還得再重啟一次。
+
+```bash
+cd ~/insforge
+
+git fetch origin main
+git diff HEAD origin/main -- deploy .env.example
+
+# If the changes look safe, apply them
+git merge --ff-only origin/main
+```
+
+合併前先看 diff。`.env.example` 裡新增的變數需要手動抄進你的 `.env`。
+
+#### 15.2 拉取最新映像檔
 
 ```bash
 cd ~/insforge/deploy/docker-compose
@@ -847,7 +863,7 @@ cd ~/insforge/deploy/docker-compose
 docker compose pull
 ```
 
-#### 15.2 套用更新
+#### 15.3 套用更新
 
 ```bash
 # Stop current services, start with new images
@@ -860,7 +876,7 @@ docker compose logs -f --tail=50
 
 按下 `Ctrl+C` 可停止追蹤日誌。
 
-#### 15.3 驗證更新
+#### 15.4 驗證更新
 
 ```bash
 # Check all services are healthy
@@ -871,27 +887,6 @@ curl http://localhost:7130/api/health
 
 # Check the version in the response
 ```
-
-#### 15.4 更新 Docker Compose 檔案（如有需要）
-
-新版本有時會包含對 `docker-compose.yml` 的變更。若要套用這些變更：
-
-```bash
-cd ~/insforge/deploy/docker-compose
-
-# Review what changed, including the Postgres init files
-git -C ../.. fetch origin main
-git -C ../.. diff HEAD origin/main -- deploy
-
-# If the changes look safe, apply them
-git -C ../.. merge --ff-only origin/main
-
-# Restart with the new configuration
-docker compose down
-docker compose up -d
-```
-
----
 
 ### 16. 回復流程
 
