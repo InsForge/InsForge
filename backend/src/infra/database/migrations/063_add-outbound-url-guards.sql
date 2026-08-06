@@ -113,15 +113,17 @@ BEGIN
   IF NOT schedules.is_safe_url(p_function_url) OR
      v_resolved_target IS NULL OR
      v_resolved_target->>'rawUrl' IS DISTINCT FROM p_function_url OR
-     jsonb_array_length(COALESCE(v_resolved_target->'addresses', '[]'::JSONB)) = 0 OR
-     (COALESCE((v_resolved_target->>'allowPrivateNetworks')::BOOLEAN, FALSE) = FALSE AND
-      COALESCE((v_resolved_target->>'allowlistedHost')::BOOLEAN, FALSE) = FALSE AND
-      EXISTS (
-        SELECT 1
-        FROM jsonb_array_elements_text(COALESCE(v_resolved_target->'addresses', '[]'::JSONB)) AS address
-        WHERE NOT schedules.is_safe_address(address)
-      )) THEN
+     jsonb_array_length(COALESCE(v_resolved_target->'addresses', '[]'::JSONB)) = 0 THEN
     RETURN QUERY SELECT NULL::BIGINT, FALSE, 'Scheduled URL failed outbound policy validation';
+    RETURN;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements_text(COALESCE(v_resolved_target->'addresses', '[]'::JSONB)) AS address
+    WHERE NOT schedules.is_safe_address(address)
+  ) THEN
+    RETURN QUERY SELECT NULL::BIGINT, FALSE, 'Scheduled URL resolved to unsafe network address';
     RETURN;
   END IF;
 
@@ -209,15 +211,8 @@ BEGIN
   END IF;
 
   IF v_job.resolved_target IS NULL OR
-     v_job.resolved_target->>'rawUrl' <> v_job.function_url OR
-     jsonb_array_length(COALESCE(v_job.resolved_target->'addresses', '[]'::JSONB)) = 0 OR
-     (COALESCE((v_job.resolved_target->>'allowPrivateNetworks')::BOOLEAN, FALSE) = FALSE AND
-      COALESCE((v_job.resolved_target->>'allowlistedHost')::BOOLEAN, FALSE) = FALSE AND
-      EXISTS (
-        SELECT 1
-        FROM jsonb_array_elements_text(COALESCE(v_job.resolved_target->'addresses', '[]'::JSONB)) AS address
-        WHERE NOT schedules.is_safe_address(address)
-       )) THEN
+     v_job.resolved_target->>'rawUrl' IS DISTINCT FROM v_job.function_url OR
+     jsonb_array_length(COALESCE(v_job.resolved_target->'addresses', '[]'::JSONB)) = 0 THEN
     PERFORM schedules.log_job_execution(
       v_job.id,
       v_job.name,
@@ -225,6 +220,22 @@ BEGIN
       400,
       0,
       'Scheduled URL has no valid DNS-pinned destination'
+    );
+    RETURN;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements_text(COALESCE(v_job.resolved_target->'addresses', '[]'::JSONB)) AS address
+    WHERE NOT schedules.is_safe_address(address)
+  ) THEN
+    PERFORM schedules.log_job_execution(
+      v_job.id,
+      v_job.name,
+      FALSE,
+      400,
+      0,
+      'Scheduled URL resolved to unsafe network address'
     );
     RETURN;
   END IF;
