@@ -11,18 +11,20 @@
 
 ```bash
 git clone --depth 1 https://github.com/InsForge/InsForge.git
-cd InsForge/deploy/docker-compose
+cd InsForge
 cp .env.example .env
 ```
 
-Every service pulls a published image — there is no build step. The checkout is
-required because Postgres mounts `deploy/docker-init/db/` from it.
+Every service pulls a published image — there is no build step.
 
 ### Step 2: Start InsForge
 
 ```bash
-docker compose up -d
+./deploy/docker-compose/run.sh up -d
 ```
+
+`run.sh` forwards everything to `docker compose` and locates the compose file, the
+`.env` and the project name itself, so it works from any directory.
 
 ### Step 3: Access InsForge
 
@@ -68,8 +70,8 @@ Make sure each project has its own `JWT_SECRET` and `ROOT_ADMIN_PASSWORD`.
 ### Step 3: Start each project with a unique name
 
 ```bash
-docker compose --env-file .env.project1 -p project1 up -d
-docker compose --env-file .env.project2 -p project2 up -d
+./deploy/docker-compose/run.sh --env-file .env.project1 -p project1 up -d
+./deploy/docker-compose/run.sh --env-file .env.project2 -p project2 up -d
 ```
 
 The `-p` flag gives each project isolated containers, volumes, and networks. The `--env-file` flag assigns unique ports so they don't conflict.
@@ -78,16 +80,16 @@ The `-p` flag gives each project isolated containers, volumes, and networks. The
 
 ```bash
 # Check status
-docker compose --env-file .env.project1 -p project1 ps
+./deploy/docker-compose/run.sh --env-file .env.project1 -p project1 ps
 
 # View logs
-docker compose --env-file .env.project1 -p project1 logs -f
+./deploy/docker-compose/run.sh --env-file .env.project1 -p project1 logs -f
 
 # Stop an instance
-docker compose --env-file .env.project1 -p project1 down
+./deploy/docker-compose/run.sh --env-file .env.project1 -p project1 down
 
 # Stop and remove all data
-docker compose --env-file .env.project1 -p project1 down -v
+./deploy/docker-compose/run.sh --env-file .env.project1 -p project1 down -v
 ```
 
 Each project has its own database, storage, and configuration. They are completely independent.

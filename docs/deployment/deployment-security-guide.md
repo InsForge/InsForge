@@ -128,7 +128,7 @@ sudo dpkg-reconfigure -plow unattended-upgrades
 
 ```bash
 # Add Docker's official GPG key
-sudo apt install ca-certificates curl gnupg git -y
+sudo apt install ca-certificates curl gnupg -y
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
@@ -155,7 +155,7 @@ newgrp docker
 
 ```bash
 docker --version
-docker compose version
+./deploy/docker-compose/run.sh version
 docker run hello-world
 ```
 
@@ -165,14 +165,11 @@ docker run hello-world
 
 ### 4. Deploy InsForge with Docker Compose
 
-#### 4.1 Download the Production Docker Compose File
+#### 4.1 Get the Repository
 
 ```bash
-# Clone the repository — no build step, every service pulls a published image.
-# The checkout is needed because Postgres mounts the repo's deploy/docker-init/db
-# files (role bootstrap and postgresql.conf).
 git clone --depth 1 https://github.com/InsForge/InsForge.git ~/insforge
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 
 # Create your environment file
 cp .env.example .env
@@ -181,13 +178,16 @@ cp .env.example .env
 #### 4.2 Start InsForge
 
 ```bash
-docker compose up -d
+./deploy/docker-compose/run.sh up -d
 ```
+
+`run.sh` forwards everything to `docker compose`, and locates the compose file,
+the `.env` and the project name itself — so it works from any directory.
 
 #### 4.3 Verify All Services Are Running
 
 ```bash
-docker compose ps
+./deploy/docker-compose/run.sh ps
 ```
 
 You should see 4 containers in a `running` or `healthy` state:
@@ -350,9 +350,9 @@ WORKER_TIMEOUT_MS=60000
 After editing, restart services to apply changes:
 
 ```bash
-cd ~/insforge/deploy/docker-compose
-docker compose down
-docker compose up -d
+cd ~/insforge
+./deploy/docker-compose/run.sh down
+./deploy/docker-compose/run.sh up -d
 ```
 
 ---
@@ -511,7 +511,7 @@ sudo systemctl status certbot.timer
 After obtaining your certificate, update your `.env` to use HTTPS URLs:
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 nano .env
 ```
 
@@ -523,8 +523,8 @@ VITE_API_BASE_URL=https://insforge.yourdomain.com
 Restart InsForge to apply:
 
 ```bash
-docker compose down
-docker compose up -d
+./deploy/docker-compose/run.sh down
+./deploy/docker-compose/run.sh up -d
 ```
 
 ---
@@ -669,7 +669,7 @@ InsForge's Docker image already follows non-root best practices:
 **Verify the container user:**
 
 ```bash
-docker compose exec insforge whoami
+./deploy/docker-compose/run.sh exec insforge whoami
 # Expected output: node
 ```
 
@@ -823,11 +823,11 @@ By default the backend allows all origins. It reflects the request's `Origin` he
 #### 14.1 Back Up the Database
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 source .env
 
 # Create a timestamped database backup
-docker compose exec -T postgres pg_dump \
+./deploy/docker-compose/run.sh exec -T postgres pg_dump \
   -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" \
   > backup_$(date +%Y%m%d_%H%M%S).sql
 
@@ -852,7 +852,7 @@ docker run --rm \
 
 ```bash
 # Note the current image versions before updating
-docker compose images
+./deploy/docker-compose/run.sh images
 ```
 
 ---
@@ -862,21 +862,21 @@ docker compose images
 #### 15.1 Pull the Latest Images
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 
 # Pull the latest versions
-docker compose pull
+./deploy/docker-compose/run.sh pull
 ```
 
 #### 15.2 Apply the Update
 
 ```bash
 # Stop current services, start with new images
-docker compose down
-docker compose up -d
+./deploy/docker-compose/run.sh down
+./deploy/docker-compose/run.sh up -d
 
 # Watch logs for errors during startup
-docker compose logs -f --tail=50
+./deploy/docker-compose/run.sh logs -f --tail=50
 ```
 
 Press `Ctrl+C` to stop following logs.
@@ -885,7 +885,7 @@ Press `Ctrl+C` to stop following logs.
 
 ```bash
 # Check all services are healthy
-docker compose ps
+./deploy/docker-compose/run.sh ps
 
 # Test the health endpoint
 curl http://localhost:7130/api/health
@@ -897,22 +897,14 @@ curl http://localhost:7130/api/health
 
 Occasionally, new releases may include changes to `docker-compose.yml`. To pick up these changes:
 
-> Installed without `.git`? Re-clone into a fresh directory and carry your existing `.env` over — losing it makes stored secrets unrecoverable.
-
 ```bash
 cd ~/insforge
 
-# Review what changed, including the Postgres init files and postgresql.conf
-git fetch origin main
-git diff HEAD origin/main -- deploy/docker-compose deploy/docker-init
+# Show what would change
+./deploy/docker-compose/update.sh
 
-# If the changes look safe, apply them
-git merge --ff-only origin/main
-
-# Restart with the new configuration
-cd deploy/docker-compose
-docker compose down
-docker compose up -d
+# Apply it: pulls the repo, pulls images, restarts
+./deploy/docker-compose/update.sh --apply
 ```
 
 ---
@@ -924,8 +916,8 @@ If an update causes issues, follow these steps to revert:
 #### 16.1 Stop the Broken Services
 
 ```bash
-cd ~/insforge/deploy/docker-compose
-docker compose down
+cd ~/insforge
+./deploy/docker-compose/run.sh down
 ```
 
 #### 16.2 Restore the Previous Docker Compose File
@@ -941,24 +933,24 @@ Edit `docker-compose.yml` and replace `latest` tags with the previous version:
 
 ```yaml
 # Example: pin to a known-good version (replace with your previous tag)
-image: ghcr.io/insforge/insforge-oss:v2.2.9
+image: ghcr.io/insforge/insforge-oss:v1.5.0
 ```
 
-> Note: `deploy/docker-compose` tracks `:latest`. To roll back, pin the tag to whatever version you were running before the update.
+> Note: the current `deploy/docker-compose` pins `v1.5.0`, and the project is now on the 2.x line. Pin to whatever version you were running before the update.
 
 #### 16.4 Restore the Database (If Needed)
 
 Only restore the database if the update included a database migration that caused issues:
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 source .env
 
 # Start only PostgreSQL
-docker compose up -d postgres
+./deploy/docker-compose/run.sh up -d postgres
 
 # Wait for it to be healthy
-docker compose exec postgres pg_isready -U "${POSTGRES_USER:-postgres}"
+./deploy/docker-compose/run.sh exec postgres pg_isready -U "${POSTGRES_USER:-postgres}"
 
 # Restore from backup
 cat backup_YYYYMMDD_HHMMSS.sql | \
@@ -966,15 +958,15 @@ cat backup_YYYYMMDD_HHMMSS.sql | \
   -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"
 
 # Start remaining services
-docker compose up -d
+./deploy/docker-compose/run.sh up -d
 ```
 
 #### 16.5 Restore Environment File (If Changed)
 
 ```bash
 cp .env.backup_YYYYMMDD .env
-docker compose down
-docker compose up -d
+./deploy/docker-compose/run.sh down
+./deploy/docker-compose/run.sh up -d
 ```
 
 ---
@@ -1008,7 +1000,7 @@ trap 'echo "[$(date)] ERROR: Backup failed at line $LINENO" >&2; exit 1' ERR
 mkdir -p "$BACKUP_DIR"
 
 # Dump the database
-docker compose -f "$HOME/insforge/docker-compose.yml" exec -T postgres \
+./deploy/docker-compose/run.sh -f "$HOME/insforge/docker-compose.yml" exec -T postgres \
   pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" \
   > "$BACKUP_DIR/db_$TIMESTAMP.sql"
 
@@ -1058,7 +1050,7 @@ rsync -avz ~/insforge/backups/ user@backup-server:/backups/insforge/
 
 ```bash
 # Container status
-docker compose ps
+./deploy/docker-compose/run.sh ps
 
 # Resource usage per container
 docker stats --no-stream
@@ -1074,12 +1066,12 @@ free -h
 
 ```bash
 # All services
-docker compose logs -f --tail=100
+./deploy/docker-compose/run.sh logs -f --tail=100
 
 # Specific service
-docker compose logs -f insforge
-docker compose logs -f postgres
-docker compose logs -f deno
+./deploy/docker-compose/run.sh logs -f insforge
+./deploy/docker-compose/run.sh logs -f postgres
+./deploy/docker-compose/run.sh logs -f deno
 ```
 
 #### 18.3 Health Check Endpoint
@@ -1101,25 +1093,25 @@ Or use a free uptime monitoring service like [UptimeRobot](https://uptimerobot.c
 
 ```bash
 # ── Lifecycle ─────────────────────────────────
-docker compose up -d              # Start all services
-docker compose down               # Stop all services
-docker compose restart            # Restart all services
-docker compose pull               # Pull latest images
+./deploy/docker-compose/run.sh up -d              # Start all services
+./deploy/docker-compose/run.sh down               # Stop all services
+./deploy/docker-compose/run.sh restart            # Restart all services
+./deploy/docker-compose/run.sh pull               # Pull latest images
 
 # ── Diagnostics ───────────────────────────────
-docker compose ps                 # Service status
-docker compose logs -f            # Follow all logs
-docker compose logs -f insforge   # Follow specific service
+./deploy/docker-compose/run.sh ps                 # Service status
+./deploy/docker-compose/run.sh logs -f            # Follow all logs
+./deploy/docker-compose/run.sh logs -f insforge   # Follow specific service
 docker stats --no-stream          # Resource usage
 
 # ── Database (source .env first for vars) ────
 source ~/insforge/.env
-docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" > backup.sql  # Backup
+./deploy/docker-compose/run.sh exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" > backup.sql  # Backup
 cat backup.sql | docker compose exec -T postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"  # Restore
 
 # ── Updates ───────────────────────────────────
-docker compose pull               # Pull new images
-docker compose down && docker compose up -d   # Apply update
+./deploy/docker-compose/run.sh pull               # Pull new images
+./deploy/docker-compose/run.sh down && docker compose up -d   # Apply update
 ```
 
 ### Security Checklist
@@ -1161,8 +1153,8 @@ Docker directly manipulates iptables. Bind ports to `127.0.0.1` in `docker-compo
 
 ```bash
 # Check logs for the failing service
-docker compose logs postgres
-docker compose logs insforge
+./deploy/docker-compose/run.sh logs postgres
+./deploy/docker-compose/run.sh logs insforge
 
 # Verify disk space
 df -h
@@ -1172,7 +1164,7 @@ free -h
 
 # Restart Docker daemon
 sudo systemctl restart docker
-docker compose up -d
+./deploy/docker-compose/run.sh up -d
 ```
 
 ### SSL Certificate Won't Renew
@@ -1202,13 +1194,13 @@ APP_PORT=7140
 
 ```bash
 # Check PostgreSQL is healthy
-docker compose ps postgres
+./deploy/docker-compose/run.sh ps postgres
 
 # View PostgreSQL logs
-docker compose logs postgres
+./deploy/docker-compose/run.sh logs postgres
 
 # Connect to the database directly
-docker compose exec postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"
+./deploy/docker-compose/run.sh exec postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"
 ```
 
 ---
