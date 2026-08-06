@@ -8,8 +8,10 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
-      # The cluster lives in a subdirectory of the volume. Changing this path
-      # makes Postgres initialize an empty cluster and orphan existing data.
+      # postgres-all baked this path into its own ENV, so every install made
+      # with it has its cluster in this subdirectory. The base image defaults to
+      # the volume root instead — without this line Postgres would initdb an
+      # empty cluster beside the real one and read as total data loss.
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
       - postgres-data:/var/lib/postgresql/data
