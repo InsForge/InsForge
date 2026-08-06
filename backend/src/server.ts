@@ -9,6 +9,7 @@ import authRouter from '@/api/routes/auth/index.routes.js';
 import databaseRouter from '@/api/routes/database/index.routes.js';
 import { storageRouter } from '@/api/routes/storage/index.routes.js';
 import { metadataRouter } from '@/api/routes/metadata/index.routes.js';
+import { githubRouter } from '@/api/routes/github/index.routes.js';
 import { logsRouter } from '@/api/routes/logs/index.routes.js';
 import { docsRouter } from '@/api/routes/docs/index.routes.js';
 import functionsRouter from '@/api/routes/functions/index.routes.js';
@@ -239,6 +240,7 @@ export async function createApp() {
   apiRouter.use('/payments', paymentsRouter);
   apiRouter.use('/compute/services', servicesRouter);
   apiRouter.use('/analytics', analyticsRouter);
+  apiRouter.use('/github', githubRouter);
   apiRouter.use('/webscraper', webscraperRouter);
   apiRouter.use('/advisor', advisorRouter);
   apiRouter.use('/dashboard', dashboardEventsRouter);
