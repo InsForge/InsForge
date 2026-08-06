@@ -19,7 +19,6 @@ export interface WebhookResult {
  * WebhookSender - Handles HTTP delivery of realtime messages to webhook endpoints
  */
 export class WebhookSender {
-  private readonly timeout = 10000; // 10 seconds
   private readonly maxRetries = 2;
 
   /**
