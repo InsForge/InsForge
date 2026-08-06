@@ -124,7 +124,7 @@ sudo dpkg-reconfigure -plow unattended-upgrades
 
 ```bash
 # Add Docker's official GPG key
-sudo apt install ca-certificates curl gnupg -y
+sudo apt install ca-certificates curl gnupg git -y
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
@@ -332,7 +332,7 @@ WORKER_TIMEOUT_MS=60000
 編輯完成後，重新啟動服務以套用變更：
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 docker compose down
 docker compose up -d
 ```
@@ -493,7 +493,7 @@ sudo systemctl status certbot.timer
 取得憑證後，更新你的 `.env` 以使用 HTTPS 網址：
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 nano .env
 ```
 
@@ -805,7 +805,7 @@ tmpfs:
 #### 14.1 備份資料庫
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 source .env
 
 # Create a timestamped database backup
@@ -844,7 +844,7 @@ docker compose images
 #### 15.1 拉取最新映像檔
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 
 # Pull the latest versions
 docker compose pull
@@ -879,6 +879,11 @@ curl http://localhost:7130/api/health
 
 新版本有時會包含對 `docker-compose.yml` 的變更。若要套用這些變更：
 
+> 如果你的部署早於倉庫 checkout 的方式（當初是直接下載 `docker-compose.yml`），
+> 在使用下面的指令前先做一次性轉換：
+> `mv ~/insforge ~/insforge.bak && git clone --depth 1 https://github.com/InsForge/InsForge.git ~/insforge && cp ~/insforge.bak/.env ~/insforge/deploy/docker-compose/.env`。
+> Docker 卷與目錄無關，資料不受影響。
+
 ```bash
 cd ~/insforge
 
@@ -904,7 +909,7 @@ docker compose up -d
 #### 16.1 停止異常的服務
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 docker compose down
 ```
 
@@ -931,7 +936,7 @@ image: ghcr.io/insforge/insforge-oss:v2.2.9
 僅當此次更新包含造成問題的資料庫遷移時，才需要還原資料庫：
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 source .env
 
 # Start only PostgreSQL

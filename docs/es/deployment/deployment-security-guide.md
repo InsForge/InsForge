@@ -124,7 +124,7 @@ sudo dpkg-reconfigure -plow unattended-upgrades
 
 ```bash
 # Add Docker's official GPG key
-sudo apt install ca-certificates curl gnupg -y
+sudo apt install ca-certificates curl gnupg git -y
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
@@ -332,7 +332,7 @@ WORKER_TIMEOUT_MS=60000
 Después de editar, reinicia los servicios para aplicar los cambios:
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 docker compose down
 docker compose up -d
 ```
@@ -493,7 +493,7 @@ sudo systemctl status certbot.timer
 Después de obtener tu certificado, actualiza tu `.env` para usar URLs HTTPS:
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 nano .env
 ```
 
@@ -805,7 +805,7 @@ Por defecto, el backend permite todos los orígenes. Refleja el encabezado `Orig
 #### 14.1 Haz una copia de seguridad de la base de datos
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 source .env
 
 # Create a timestamped database backup
@@ -844,7 +844,7 @@ docker compose images
 #### 15.1 Descarga las imágenes más recientes
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 
 # Pull the latest versions
 docker compose pull
@@ -879,6 +879,11 @@ curl http://localhost:7130/api/health
 
 Ocasionalmente, las nuevas versiones pueden incluir cambios en `docker-compose.yml`. Para incorporar estos cambios:
 
+> Si tu instalación es anterior al checkout del repositorio (descargaste
+> `docker-compose.yml` directamente), conviértela una vez antes de usar los comandos siguientes:
+> `mv ~/insforge ~/insforge.bak && git clone --depth 1 https://github.com/InsForge/InsForge.git ~/insforge && cp ~/insforge.bak/.env ~/insforge/deploy/docker-compose/.env`.
+> Los volúmenes de Docker son independientes del directorio, así que tus datos no se ven afectados.
+
 ```bash
 cd ~/insforge
 
@@ -904,7 +909,7 @@ Si una actualización causa problemas, sigue estos pasos para revertirla:
 #### 16.1 Detén los servicios afectados
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 docker compose down
 ```
 
@@ -931,7 +936,7 @@ image: ghcr.io/insforge/insforge-oss:v2.2.9
 Restaura la base de datos solo si la actualización incluyó una migración de base de datos que causó problemas:
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 source .env
 
 # Start only PostgreSQL

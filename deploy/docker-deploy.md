@@ -3,6 +3,7 @@
 ## Prerequisites
 
 - Docker and Docker Compose installed on your machine
+- Git, to check out the repository
 
 ## Setup InsForge
 
