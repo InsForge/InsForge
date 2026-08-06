@@ -164,6 +164,15 @@ docker run hello-world
 #### 4.1 Clona el repositorio
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
+```
+
+Descarga solo los siete archivos que el stack lee y genera `JWT_SECRET`, `ENCRYPTION_KEY` y `ROOT_ADMIN_PASSWORD` en `deploy/docker-compose/.env` con permisos 600. No arranca nada — revisa ese archivo primero.
+
+<details>
+<summary>¿Prefieres no pasar un script a la shell? Hazlo a mano</summary>
+
+```bash
 # Check out only the files the stack reads — 7 files, not the whole monorepo
 git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/InsForge/InsForge.git ~/insforge
@@ -177,6 +186,8 @@ git sparse-checkout set --no-cone \
 cd deploy/docker-compose
 cp ../../.env.example .env
 ```
+
+</details>
 
 #### 4.2 Inicia InsForge
 
@@ -857,6 +868,11 @@ git diff HEAD origin/main -- deploy .env.example
 
 # If the changes look safe, apply them
 git merge --ff-only origin/main
+
+# Re-apply the file list this release needs. A release that adds a file the
+# compose reads also ships its path in setup.sh; without this the merge records
+# the file in git but never writes it to disk.
+sh deploy/setup.sh .
 ```
 
 Revisa el diff antes de hacer merge. Las variables nuevas de `.env.example` deben copiarse a tu `.env` a mano.

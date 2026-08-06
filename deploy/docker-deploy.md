@@ -10,6 +10,17 @@
 ### Step 1: Get the repository
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh
+```
+
+It checks out only the seven files the stack reads, then generates `JWT_SECRET`,
+`ENCRYPTION_KEY` and `ROOT_ADMIN_PASSWORD` into `deploy/docker-compose/.env` at
+mode 600. Nothing is started — review that file first.
+
+<details>
+<summary>Prefer not to pipe a script into a shell? Do the same by hand</summary>
+
+```bash
 # Check out only the files the stack reads — 7 files, not the whole monorepo
 git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/InsForge/InsForge.git
@@ -23,6 +34,8 @@ git sparse-checkout set --no-cone \
 cd deploy/docker-compose
 cp ../../.env.example .env
 ```
+
+</details>
 
 Every service pulls a published image — there is no build step. The checkout is
 required because Postgres mounts `deploy/docker-init/db/` from it.

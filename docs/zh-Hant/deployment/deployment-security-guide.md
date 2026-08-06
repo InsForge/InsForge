@@ -164,6 +164,15 @@ docker run hello-world
 #### 4.1 取得倉庫
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
+```
+
+它只 checkout 這個 stack 會讀的那 7 個檔案，然後把 `JWT_SECRET`、`ENCRYPTION_KEY`、`ROOT_ADMIN_PASSWORD` 產生到 `deploy/docker-compose/.env`（權限 600）。不會啟動任何東西 —— 先檢查那個檔案。
+
+<details>
+<summary>不想把腳本管線給 shell？手動執行相同步驟</summary>
+
+```bash
 # Check out only the files the stack reads — 7 files, not the whole monorepo
 git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/InsForge/InsForge.git ~/insforge
@@ -177,6 +186,8 @@ git sparse-checkout set --no-cone \
 cd deploy/docker-compose
 cp ../../.env.example .env
 ```
+
+</details>
 
 #### 4.2 啟動 InsForge
 
@@ -857,6 +868,11 @@ git diff HEAD origin/main -- deploy .env.example
 
 # If the changes look safe, apply them
 git merge --ff-only origin/main
+
+# Re-apply the file list this release needs. A release that adds a file the
+# compose reads also ships its path in setup.sh; without this the merge records
+# the file in git but never writes it to disk.
+sh deploy/setup.sh .
 ```
 
 合併前先看 diff。`.env.example` 裡新增的變數需要手動抄進你的 `.env`。
