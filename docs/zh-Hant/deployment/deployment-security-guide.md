@@ -167,19 +167,19 @@ docker run hello-world
 curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
 
-它只 checkout 這個 stack 會讀的那 7 個檔案，然後把 `JWT_SECRET`、`ENCRYPTION_KEY`、`ROOT_ADMIN_PASSWORD` 產生到 `deploy/docker-compose/.env`（權限 600）。不會啟動任何東西 —— 先檢查那個檔案。
+checkout 這個 stack 會讀的檔案，並把 `JWT_SECRET`、`ENCRYPTION_KEY`、`ROOT_ADMIN_PASSWORD` 產生到 `deploy/docker-compose/.env`。不啟動任何東西。
 
 <details>
 <summary>不想把腳本管線給 shell？手動執行相同步驟</summary>
 
 ```bash
-# Check out only the files the stack reads — 7 files, not the whole monorepo
 git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/InsForge/InsForge.git ~/insforge
 cd ~/insforge
 git sparse-checkout set --no-cone \
   /.env.example \
   /docker-compose.minio.yml /docker-compose.rustfs.yml \
+  /deploy/setup.sh \
   /deploy/docker-compose/docker-compose.yml \
   /deploy/docker-init/db/
 
@@ -858,7 +858,7 @@ docker compose images
 
 #### 15.1 更新倉庫
 
-checkout 裡帶著 compose 檔案和 Postgres 的初始化檔案，所以要在拉映像檔之前更新它 —— 否則新映像檔會用舊設定啟動，還得再重啟一次。
+先更新 checkout 再拉映像檔：它帶著 compose 檔案和 Postgres 的設定。
 
 ```bash
 cd ~/insforge
@@ -866,12 +866,9 @@ cd ~/insforge
 git fetch origin main
 git diff HEAD origin/main -- deploy .env.example
 
-# If the changes look safe, apply them
 git merge --ff-only origin/main
 
-# Re-apply the file list this release needs. A release that adds a file the
-# compose reads also ships its path in setup.sh; without this the merge records
-# the file in git but never writes it to disk.
+# Pick up any files this release added
 sh deploy/setup.sh .
 ```
 

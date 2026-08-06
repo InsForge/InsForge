@@ -21,13 +21,13 @@ mode 600. Nothing is started — review that file first.
 <summary>Prefer not to pipe a script into a shell? Do the same by hand</summary>
 
 ```bash
-# Check out only the files the stack reads — 7 files, not the whole monorepo
 git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/InsForge/InsForge.git
 cd InsForge
 git sparse-checkout set --no-cone \
   /.env.example \
   /docker-compose.minio.yml /docker-compose.rustfs.yml \
+  /deploy/setup.sh \
   /deploy/docker-compose/docker-compose.yml \
   /deploy/docker-init/db/
 

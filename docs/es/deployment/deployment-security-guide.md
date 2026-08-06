@@ -167,19 +167,19 @@ docker run hello-world
 curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
 
-Descarga solo los siete archivos que el stack lee y genera `JWT_SECRET`, `ENCRYPTION_KEY` y `ROOT_ADMIN_PASSWORD` en `deploy/docker-compose/.env` con permisos 600. No arranca nada — revisa ese archivo primero.
+Descarga los archivos que el stack lee y genera `JWT_SECRET`, `ENCRYPTION_KEY` y `ROOT_ADMIN_PASSWORD` en `deploy/docker-compose/.env`. No arranca nada.
 
 <details>
 <summary>¿Prefieres no pasar un script a la shell? Hazlo a mano</summary>
 
 ```bash
-# Check out only the files the stack reads — 7 files, not the whole monorepo
 git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/InsForge/InsForge.git ~/insforge
 cd ~/insforge
 git sparse-checkout set --no-cone \
   /.env.example \
   /docker-compose.minio.yml /docker-compose.rustfs.yml \
+  /deploy/setup.sh \
   /deploy/docker-compose/docker-compose.yml \
   /deploy/docker-init/db/
 
@@ -858,7 +858,7 @@ docker compose images
 
 #### 15.1 Actualiza el repositorio
 
-El checkout contiene el archivo de compose y los archivos de inicialización de Postgres, así que actualízalo antes de descargar las imágenes — de lo contrario las imágenes nuevas arrancan con la configuración antigua y hace falta un segundo reinicio.
+Actualiza el checkout antes de descargar las imágenes: contiene el archivo de compose y la configuración de Postgres.
 
 ```bash
 cd ~/insforge
@@ -866,12 +866,9 @@ cd ~/insforge
 git fetch origin main
 git diff HEAD origin/main -- deploy .env.example
 
-# If the changes look safe, apply them
 git merge --ff-only origin/main
 
-# Re-apply the file list this release needs. A release that adds a file the
-# compose reads also ships its path in setup.sh; without this the merge records
-# the file in git but never writes it to disk.
+# Pick up any files this release added
 sh deploy/setup.sh .
 ```
 
