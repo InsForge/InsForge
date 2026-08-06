@@ -60,12 +60,15 @@ set_var() {
   ' "$ENV_FILE" > "$tmp" && mv "$tmp" "$ENV_FILE"
 }
 
+COMPOSE_FILE_VALUE=deploy/docker-compose/docker-compose.yml
+
 # Docker Compose reads .env, and COMPOSE_FILE within it, from the directory you
-# run it in — so both live here and every command runs from here. Only added when
-# missing: a storage overlay appended by hand has to survive re-runs.
+# run it in — so both live here and every command runs from here. Added only when
+# absent, because a storage overlay appended by hand has to survive re-runs; the
+# fresh-install path below sets it outright, replacing .env.example's development
+# value.
 pin_compose_file() {
-  grep -q '^COMPOSE_FILE=' "$ENV_FILE" ||
-    set_var COMPOSE_FILE deploy/docker-compose/docker-compose.yml
+  grep -q '^COMPOSE_FILE=' "$ENV_FILE" || set_var COMPOSE_FILE "$COMPOSE_FILE_VALUE"
 }
 
 # Installs from before this layout kept .env beside the compose file. Left there
@@ -87,7 +90,7 @@ if [ -f "$ENV_FILE" ]; then
 fi
 
 cp .env.example "$ENV_FILE"
-pin_compose_file
+set_var COMPOSE_FILE "$COMPOSE_FILE_VALUE"
 
 # Generated as separate values on purpose. If ENCRYPTION_KEY is unset InsForge
 # falls back to JWT_SECRET, and rotating JWT_SECRET afterwards makes every stored
@@ -95,6 +98,10 @@ pin_compose_file
 set_var JWT_SECRET "$(openssl rand -hex 32)"
 set_var ENCRYPTION_KEY "$(openssl rand -hex 32)"
 set_var ROOT_ADMIN_PASSWORD "$(openssl rand -hex 12)"
+
+# Postgres reads this only when it initializes the cluster, so it has to be
+# settled before the first boot — after that, editing .env changes nothing.
+set_var POSTGRES_PASSWORD "$(openssl rand -hex 16)"
 
 chmod 600 "$ENV_FILE"
 

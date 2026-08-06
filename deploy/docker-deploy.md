@@ -31,8 +31,9 @@ git sparse-checkout set --no-cone \
   /deploy/docker-init/db/
 
 cp .env.example .env
-echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
 ```
+
+Then set `COMPOSE_FILE` in `.env` to `deploy/docker-compose/docker-compose.yml` — the template ships the development value.
 
 </details>
 
@@ -61,10 +62,8 @@ You can run multiple InsForge projects on the same host by using different ports
 ### Step 1: Create a separate env file for each project
 
 ```bash
-for p in project1 project2; do
-  cp .env.example ".env.$p"
-  echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> ".env.$p"
-done
+cp .env.example .env.project1
+cp .env.example .env.project2
 ```
 
 ### Step 2: Give each env file its own project name and ports

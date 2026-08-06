@@ -90,46 +90,25 @@ Esta guía proporciona instrucciones completas y paso a paso para desplegar, ges
 
 ## Paso 3: 🚀 Desplegar InsForge
 
-1.  **Clonar el repositorio:**
-    Navegue a su directorio de inicio y clone el proyecto InsForge.
+1.  **Obtener el repositorio:**
     ```bash
-    cd ~
-    git clone https://github.com/InsForge/InsForge.git
-    cd InsForge
+    curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
     ```
+    Descarga los archivos que el stack lee y genera `JWT_SECRET`, `ENCRYPTION_KEY`, `ROOT_ADMIN_PASSWORD` y `POSTGRES_PASSWORD` en `.env`. No arranca nada.
 
 2.  **Crear la configuración del entorno:**
-    Cree su archivo `.env` a partir del ejemplo y ábralo para editarlo.
+    Los secretos ya están generados: déjalos como están. Apunta las URL de la API a tu VM.
     ```bash
-    cp .env.example .env
-    echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
+    cd ~/insforge
     nano .env
     ```
-    `.env.example` enumera todas las variables admitidas con comentarios. Para un despliegue básico solo necesita configurar unas pocas. Configure estos valores y actualice las URLs de la API con la IP pública de su VM:
 
     ```ini
-    # Required
-    JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-    ROOT_ADMIN_USERNAME=admin
-    ROOT_ADMIN_PASSWORD=change-this-password
-    POSTGRES_PASSWORD=change-this-password
-
-    # API URLs (replace with your VM public IP or domain)
-    API_BASE_URL=http://<your-vm-public-ip>:7130
-    VITE_API_BASE_URL=http://<your-vm-public-ip>:7130
-
-    # Optional
-    # ENCRYPTION_KEY falls back to JWT_SECRET if left empty
-    ENCRYPTION_KEY=
-    # OPENROUTER_API_KEY=
-    # VERCEL_TOKEN=
-    # GOOGLE_CLIENT_ID=
+    API_BASE_URL=http://<ip-publica-de-tu-vm>:7130
+    VITE_API_BASE_URL=http://<ip-publica-de-tu-vm>:7130
     ```
-    El resto de `.env.example` cubre características opcionales (OpenRouter, despliegues de Vercel, proveedores OAuth). Déjelas en blanco a menos que las necesite.
-    > **Generar un secreto JWT seguro:** Ejecute esto en su VM y pegue el resultado en `JWT_SECRET`:
-    > ```bash
-    > openssl rand -base64 32
-    > ```
+    El resto de `.env.example` cubre funciones opcionales (OpenRouter, despliegues de Vercel, proveedores OAuth). Déjalas en blanco si no las necesitas.
+    > Guarda una copia de `.env` en un lugar seguro. Sus secretos son lo que te permite migrar o restaurar esta instancia.
 
 3.  **Iniciar los servicios de InsForge:**
     Descargue las imágenes de Docker e inicie todos los servicios en segundo plano.

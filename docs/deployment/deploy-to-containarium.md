@@ -54,31 +54,24 @@ containarium ssh-config sync
 ssh insforge
 ```
 
-### 2. Clone InsForge inside the box
+### 2. Set InsForge up inside the box
 
 ```bash
-ssh insforge <<'EOF'
-  git clone https://github.com/InsForge/InsForge.git ~/insforge
-  cd ~/insforge
-  cp .env.example .env
-  echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
-EOF
+ssh insforge 'curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge'
 ```
+
+Checks out the files the stack reads and generates the secrets into `~/insforge/.env`. Nothing is started.
 
 ### 3. Configure environment
 
 Edit `~/insforge/.env` inside the box. At minimum set:
 
 ```env
-JWT_SECRET=<32+ char random string — `openssl rand -base64 32`>
-ENCRYPTION_KEY=<24+ char random string — `openssl rand -base64 24`>
-POSTGRES_PASSWORD=<strong password>
-ROOT_ADMIN_USERNAME=admin
-ROOT_ADMIN_PASSWORD=<change this>
-
 API_BASE_URL=https://<your-subdomain>
 VITE_API_BASE_URL=https://<your-subdomain>
 ```
+
+The secrets are already generated — leave them as they are.
 
 See [`.env.example`](https://github.com/insforge/insforge/blob/main/.env.example) for the full list (OpenRouter, OAuth providers, Stripe, Vercel).
 
@@ -156,15 +149,15 @@ agent: create me a container called 'insforge'
       username="insforge", cpu="2", memory="4GB",
       disk="30GB", stack="docker")
 
-agent: clone InsForge, fill in .env
+agent: set InsForge up, fill in .env
   → ssh insforge agent-box
-    → shell_exec("git clone https://github.com/InsForge/InsForge.git ~/insforge")
+    → shell_exec("curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge")
     → write_file("~/insforge/.env", "<contents>")
 
 agent: enable autostart
   → mcp__containarium__compose_enable(
       username="insforge",
-      dir="/home/insforge/insforge/deploy/docker-compose")
+      dir="/home/insforge/insforge")
 
 agent: expose on a public hostname
   → mcp__containarium__expose_port(

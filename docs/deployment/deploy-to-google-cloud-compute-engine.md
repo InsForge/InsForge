@@ -150,80 +150,40 @@ sudo apt install git -y
 
 ### 4. Deploy InsForge
 
-#### 4.1 Clone Repository
+#### 4.1 Get the Repository
 
 ```bash
-cd ~
-git clone https://github.com/insforge/insforge.git
-cd insforge
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
+
+Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY`, `ROOT_ADMIN_PASSWORD` and `POSTGRES_PASSWORD` into `.env`. Nothing is started.
 
 #### 4.2 Create Environment Configuration
 
-Create your `.env` file with production settings:
-
 ```bash
+cd ~/insforge
 nano .env
 ```
 
-The repo ships a template at `.env.example`. Copy it and edit the values:
-
-```bash
-cp .env.example .env
-echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
-nano .env
-```
-
-At a minimum, set these values:
+The secrets are already generated — leave them as they are. Set the URL browsers will use:
 
 ```env
-# Authentication (required)
-# IMPORTANT: Generate a strong random secret for production (32+ characters)
-JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-
-# Admin account (used for initial setup)
-ROOT_ADMIN_USERNAME=admin
-ROOT_ADMIN_PASSWORD=change-this-password
-
-# Database (required)
-POSTGRES_PASSWORD=your-secure-postgres-password
+API_BASE_URL=http://<your-public-ip>:7130
+VITE_API_BASE_URL=http://<your-public-ip>:7130
 ```
 
-Optional values you may want to set:
+Optional, all off by default:
 
 ```env
-# Encryption key for secrets and database encryption.
-# Falls back to JWT_SECRET if left empty.
-ENCRYPTION_KEY=
-
-# AI/LLM (get a key from https://openrouter.ai/keys)
-OPENROUTER_API_KEY=
-
-# Site deployments and custom domains
-VERCEL_TOKEN=
-VERCEL_TEAM_ID=
-VERCEL_PROJECT_ID=
-
-# OAuth providers (Google, GitHub, etc.)
-GOOGLE_CLIENT_ID=
+OPENROUTER_API_KEY=      # AI features
+VERCEL_TOKEN=            # site deployments
+GOOGLE_CLIENT_ID=        # OAuth providers
 GOOGLE_CLIENT_SECRET=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
 ```
 
-See `.env.example` for the full list of supported variables.
+`.env.example` carries every remaining variable with its defaults.
 
-**Generate Secure Secrets:**
-
-```bash
-# Generate JWT_SECRET (32+ characters)
-openssl rand -base64 32
-
-# Generate ENCRYPTION_KEY (32 characters)
-openssl rand -base64 24
-```
-
-> 💡 **Important**: Save these secrets securely. You'll need them if you ever migrate or restore your instance.
+> 💡 Back up `.env` somewhere safe. Its secrets are what let you migrate or restore this instance.
 
 #### 4.3 Start InsForge Services
 

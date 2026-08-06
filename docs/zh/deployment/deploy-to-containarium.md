@@ -50,31 +50,24 @@ containarium ssh-config sync
 ssh insforge
 ```
 
-### 2. 在 box 内克隆 InsForge
+### 2. 在 box 内安装 InsForge
 
 ```bash
-ssh insforge <<'EOF'
-  git clone https://github.com/InsForge/InsForge.git ~/insforge
-  cd ~/insforge
-  cp .env.example .env
-  echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
-EOF
+ssh insforge 'curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge'
 ```
+
+会 checkout 这个栈要读的文件，并把密钥生成到 `~/insforge/.env`。不启动任何东西。
 
 ### 3. 配置环境
 
 在 box 内编辑 `~/insforge/.env`。至少需要设置：
 
 ```env
-JWT_SECRET=<32+ char random string — `openssl rand -base64 32`>
-ENCRYPTION_KEY=<24+ char random string — `openssl rand -base64 24`>
-POSTGRES_PASSWORD=<strong password>
-ROOT_ADMIN_USERNAME=admin
-ROOT_ADMIN_PASSWORD=<change this>
-
-API_BASE_URL=https://<your-subdomain>
-VITE_API_BASE_URL=https://<your-subdomain>
+API_BASE_URL=https://<你的子域名>
+VITE_API_BASE_URL=https://<你的子域名>
 ```
+
+密钥已经生成好了，不要改动。
 
 完整列表（OpenRouter、OAuth 提供商、Stripe、Vercel）请参见 [`.env.example`](https://github.com/insforge/insforge/blob/main/.env.example)。
 
@@ -152,15 +145,15 @@ agent: create me a container called 'insforge'
       username="insforge", cpu="2", memory="4GB",
       disk="30GB", stack="docker")
 
-agent: clone InsForge, fill in .env
+agent: set InsForge up, fill in .env
   → ssh insforge agent-box
-    → shell_exec("git clone https://github.com/InsForge/InsForge.git ~/insforge")
+    → shell_exec("curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge")
     → write_file("~/insforge/.env", "<contents>")
 
 agent: enable autostart
   → mcp__containarium__compose_enable(
       username="insforge",
-      dir="/home/insforge/insforge/deploy/docker-compose")
+      dir="/home/insforge/insforge")
 
 agent: expose on a public hostname
   → mcp__containarium__expose_port(

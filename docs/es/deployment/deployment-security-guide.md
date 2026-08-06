@@ -184,8 +184,9 @@ git sparse-checkout set --no-cone \
   /deploy/docker-init/db/
 
 cp .env.example .env
-echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
 ```
+
+Luego cambia `COMPOSE_FILE` en `.env` a `deploy/docker-compose/docker-compose.yml`: la plantilla trae el valor de desarrollo.
 
 </details>
 

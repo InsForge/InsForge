@@ -184,8 +184,9 @@ git sparse-checkout set --no-cone \
   /deploy/docker-init/db/
 
 cp .env.example .env
-echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
 ```
+
+然后把 `.env` 里的 `COMPOSE_FILE` 改成 `deploy/docker-compose/docker-compose.yml`——模板里带的是开发用的值。
 
 </details>
 

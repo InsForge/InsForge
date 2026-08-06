@@ -90,46 +90,25 @@ description: "在 Azure 虛擬機器上使用 Docker Compose 部署 InsForge，�
 
 ## 步驟 3：🚀 部署 InsForge
 
-1.  **複製儲存庫：**
-    導覽至你的主目錄並複製 InsForge 專案。
+1.  **取得儲存庫：**
     ```bash
-    cd ~
-    git clone https://github.com/InsForge/InsForge.git
-    cd InsForge
+    curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
     ```
+    會 checkout 這個 stack 要讀的檔案，並把 `JWT_SECRET`、`ENCRYPTION_KEY`、`ROOT_ADMIN_PASSWORD`、`POSTGRES_PASSWORD` 產生到 `.env`。不啟動任何東西。
 
 2.  **建立環境設定：**
-    從範例檔案建立你的 `.env` 檔案並開啟以進行編輯。
+    密鑰已經產生好了，請勿改動。將 API 位址指向你的虛擬機。
     ```bash
-    cp .env.example .env
-    echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
+    cd ~/insforge
     nano .env
     ```
-    `.env.example` 列出了所有支援的變數並附有註解。對於基本部署，你只需要設定少數幾項。設定以下值，並將 API URL 更新為你的虛擬機器的公開 IP：
 
     ```ini
-    # Required
-    JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-    ROOT_ADMIN_USERNAME=admin
-    ROOT_ADMIN_PASSWORD=change-this-password
-    POSTGRES_PASSWORD=change-this-password
-
-    # API URLs (replace with your VM public IP or domain)
-    API_BASE_URL=http://<your-vm-public-ip>:7130
-    VITE_API_BASE_URL=http://<your-vm-public-ip>:7130
-
-    # Optional
-    # ENCRYPTION_KEY falls back to JWT_SECRET if left empty
-    ENCRYPTION_KEY=
-    # OPENROUTER_API_KEY=
-    # VERCEL_TOKEN=
-    # GOOGLE_CLIENT_ID=
+    API_BASE_URL=http://<你的虛擬機公開IP>:7130
+    VITE_API_BASE_URL=http://<你的虛擬機公開IP>:7130
     ```
-    `.env.example` 的其餘部分涵蓋了可選功能（OpenRouter、Vercel 部署、OAuth 提供者）。除非你需要它們，否則將這些留空。
-    > **產生一個安全的 JWT 密鑰：** 在你的虛擬機器上執行以下命令，並將結果貼到 `JWT_SECRET` 中：
-    > ```bash
-    > openssl rand -base64 32
-    > ```
+    `.env.example` 其餘部分是選用功能（OpenRouter、Vercel 部署、OAuth 提供者），不需要就留空。
+    > 請將 `.env` 備份到安全的地方。遷移或還原這個實例靠的就是其中的密鑰。
 
 3.  **啟動 InsForge 服務：**
     拉取 Docker 映像並在背景啟動所有服務。

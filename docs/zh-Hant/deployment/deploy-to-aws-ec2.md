@@ -112,64 +112,40 @@ sudo apt install git -y
 
 ### 4. 部署 InsForge
 
-#### 4.1 複製儲存庫
+#### 4.1 取得儲存庫
 
 ```bash
-cd ~
-git clone https://github.com/insforge/insforge.git
-cd insforge
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
+
+會 checkout 這個 stack 要讀的檔案，並把 `JWT_SECRET`、`ENCRYPTION_KEY`、`ROOT_ADMIN_PASSWORD`、`POSTGRES_PASSWORD` 產生到 `.env`。不啟動任何東西。
 
 #### 4.2 建立環境設定
 
-複製範本檔案以建立您的 `.env` 檔案：
-
 ```bash
-cp .env.example .env
-echo 'COMPOSE_FILE=deploy/docker-compose/docker-compose.yml' >> .env
+cd ~/insforge
 nano .env
 ```
 
-完整範本位於 `.env.example`。以下是您必須設定的變數：
+密鑰已經產生好了，請勿改動。設定瀏覽器會存取的位址：
 
 ```env
-# Required
-JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-ROOT_ADMIN_USERNAME=admin
-ROOT_ADMIN_PASSWORD=change-this-password
-POSTGRES_PASSWORD=change-this-password
+API_BASE_URL=http://<你的公開IP>:7130
+VITE_API_BASE_URL=http://<你的公開IP>:7130
+```
 
-# Optional: falls back to JWT_SECRET if left blank
-ENCRYPTION_KEY=
+選用項目，預設全部關閉：
 
-# Optional: enables AI features
-OPENROUTER_API_KEY=
-
-# Optional: enables site deployments
-VERCEL_TOKEN=
-VERCEL_TEAM_ID=
-VERCEL_PROJECT_ID=
-
-# Optional: OAuth providers
-GOOGLE_CLIENT_ID=
+```env
+OPENROUTER_API_KEY=      # AI 功能
+VERCEL_TOKEN=            # 網站部署
+GOOGLE_CLIENT_ID=        # OAuth 提供者
 GOOGLE_CLIENT_SECRET=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
 ```
 
-`.env.example` 範本已包含其餘變數及其預設值，因此只需編輯複製後的檔案即可。
+其餘變數與其預設值都在 `.env.example` 中。
 
-**產生安全的密鑰：**
-
-```bash
-# Generate JWT_SECRET (32+ characters)
-openssl rand -base64 32
-
-# Generate ENCRYPTION_KEY (must be exactly 32 characters)
-openssl rand -base64 24
-```
-
-> 💡 **重要**：請妥善保存這些密鑰。若您日後需要遷移或還原您的執行個體，將會需要用到它們。
+> 💡 請將 `.env` 備份到安全的地方。遷移或還原這個實例靠的就是其中的密鑰。
 
 #### 4.3 啟動 InsForge 服務
 
