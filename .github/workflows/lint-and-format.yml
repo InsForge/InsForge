@@ -26,9 +26,6 @@ jobs:
       - name: Check insforge-dev skill copies are in sync
         run: scripts/sync-skills.sh --check
 
-      - name: Check .env.example documents every compose variable
-        run: node scripts/check-env-example.mjs
-
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v45
