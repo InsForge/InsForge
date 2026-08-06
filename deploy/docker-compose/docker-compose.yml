@@ -8,13 +8,12 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
-      # Keep the on-disk layout ghcr.io/insforge/postgres-all used, so an existing
-      # postgres-data volume is found instead of being treated as an empty target.
+      # The cluster lives in a subdirectory of the volume. Changing this path
+      # makes Postgres initialize an empty cluster and orphan existing data.
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      # :z relabels for SELinux hosts (RHEL/Fedora), where an unlabelled bind
-      # mount is denied; :ro because Postgres only reads these.
+      # :ro — read-only; :z — SELinux relabel, required on RHEL/Fedora hosts.
       - ../docker-init/db/db-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro,z
       - ../docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql:ro,z
       - ../docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf:ro,z

@@ -15,10 +15,8 @@ cd InsForge/deploy/docker-compose
 cp .env.example .env
 ```
 
-No build step is involved — every service pulls a published image. The checkout is
-needed because Postgres mounts this repository's `deploy/docker-init/db/` files
-(the role/grant bootstrap and `postgresql.conf`) rather than getting a copy baked
-into an image.
+Every service pulls a published image — there is no build step. The checkout is
+required because Postgres mounts `deploy/docker-init/db/` from it.
 
 ### Step 2: Start InsForge
 

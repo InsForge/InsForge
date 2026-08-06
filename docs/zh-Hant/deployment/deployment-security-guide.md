@@ -879,10 +879,8 @@ curl http://localhost:7130/api/health
 
 新版本有時會包含對 `docker-compose.yml` 的變更。若要套用這些變更：
 
-> 如果你的部署早於倉庫 checkout 的方式（當初是直接下載 `docker-compose.yml`），
-> 在使用下面的指令前先做一次性轉換：
-> `mv ~/insforge ~/insforge.bak && git clone --depth 1 https://github.com/InsForge/InsForge.git ~/insforge && cp ~/insforge.bak/.env ~/insforge/deploy/docker-compose/.env`。
-> Docker 卷與目錄無關，資料不受影響。
+> `~/insforge` 裡沒有 `.git`？做一次性轉換（不影響卷）：
+> `mv ~/insforge ~/insforge.bak && git clone --depth 1 https://github.com/InsForge/InsForge.git ~/insforge && cp ~/insforge.bak/.env ~/insforge/deploy/docker-compose/.env`
 
 ```bash
 cd ~/insforge

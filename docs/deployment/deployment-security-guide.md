@@ -897,10 +897,8 @@ curl http://localhost:7130/api/health
 
 Occasionally, new releases may include changes to `docker-compose.yml`. To pick up these changes:
 
-> If your installation predates the repository checkout (you downloaded
-> `docker-compose.yml` directly), convert it once before using the commands below:
-> `mv ~/insforge ~/insforge.bak && git clone --depth 1 https://github.com/InsForge/InsForge.git ~/insforge && cp ~/insforge.bak/.env ~/insforge/deploy/docker-compose/.env`.
-> Docker volumes are independent of the directory, so your data is unaffected.
+> No `.git` in `~/insforge`? Convert once (volumes are untouched):
+> `mv ~/insforge ~/insforge.bak && git clone --depth 1 https://github.com/InsForge/InsForge.git ~/insforge && cp ~/insforge.bak/.env ~/insforge/deploy/docker-compose/.env`
 
 ```bash
 cd ~/insforge
