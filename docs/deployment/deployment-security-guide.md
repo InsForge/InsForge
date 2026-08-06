@@ -296,6 +296,14 @@ DENO_PORT=7133
 
 > 💡 You can change these if they conflict with other services on your VPS.
 
+`COMPOSE_PROJECT_NAME` prefixes every container, volume and network:
+
+```env
+COMPOSE_PROJECT_NAME=insforge
+```
+
+> ⚠️ Give a second instance on the same host its own value, along with its own ports. Two `.env` files sharing this name means `docker compose up` in one of them adopts and recreates the other's containers.
+
 #### 5.4 Required for Deployments
 
 These variables are only needed if you plan to use InsForge's **deployment features** (deploying projects via the dashboard). If you don't need deployments, skip this section.
@@ -999,9 +1007,11 @@ nano ~/insforge/backup.sh
 set -euo pipefail
 
 # InsForge Automated Backup Script
-# Load .env so POSTGRES_USER / POSTGRES_DB are available outside Docker Compose
+# Run from the checkout so docker compose reads COMPOSE_FILE and
+# COMPOSE_PROJECT_NAME from .env, which also carries POSTGRES_USER / POSTGRES_DB
+cd "$HOME/insforge"
 set -a
-source "$HOME/insforge/.env"
+source .env
 set +a
 
 BACKUP_DIR="$HOME/insforge/backups"
@@ -1013,7 +1023,7 @@ trap 'echo "[$(date)] ERROR: Backup failed at line $LINENO" >&2; exit 1' ERR
 mkdir -p "$BACKUP_DIR"
 
 # Dump the database
-docker compose -f "$HOME/insforge/docker-compose.yml" exec -T postgres \
+docker compose exec -T postgres \
   pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" \
   > "$BACKUP_DIR/db_$TIMESTAMP.sql"
 

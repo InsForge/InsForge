@@ -6,6 +6,9 @@ playwright-report/
 .playwright-mcp/
 test-results/
 .env
+# Per-instance env files and pre-update backups, both created next to .env
+.env.*
+!.env.example
 .worktrees/
 .DS_Store
 *.log

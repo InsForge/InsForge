@@ -292,6 +292,14 @@ DENO_PORT=7133
 
 > 💡 若這些連接埠與你 VPS 上其他服務衝突，可以自行修改。
 
+`COMPOSE_PROJECT_NAME` 是所有容器、卷與網路的名稱前綴：
+
+```env
+COMPOSE_PROJECT_NAME=insforge
+```
+
+> ⚠️ 同一台機器上的第二個實例必須改成自己的值，連接埠也要另設。兩個 `.env` 共用同一個名稱時，在其中一個裡執行 `docker compose up` 會接管並重建另一個的容器。
+
 #### 5.4 部署功能所需的變數
 
 以下變數僅在你打算使用 InsForge 的**部署功能**（透過控制台部署專案）時才需要設定。若你不需要部署功能，可以跳過本節。
@@ -981,9 +989,11 @@ nano ~/insforge/backup.sh
 set -euo pipefail
 
 # InsForge Automated Backup Script
-# Load .env so POSTGRES_USER / POSTGRES_DB are available outside Docker Compose
+# Run from the checkout so docker compose reads COMPOSE_FILE and
+# COMPOSE_PROJECT_NAME from .env, which also carries POSTGRES_USER / POSTGRES_DB
+cd "$HOME/insforge"
 set -a
-source "$HOME/insforge/.env"
+source .env
 set +a
 
 BACKUP_DIR="$HOME/insforge/backups"
@@ -995,7 +1005,7 @@ trap 'echo "[$(date)] ERROR: Backup failed at line $LINENO" >&2; exit 1' ERR
 mkdir -p "$BACKUP_DIR"
 
 # Dump the database
-docker compose -f "$HOME/insforge/docker-compose.yml" exec -T postgres \
+docker compose exec -T postgres \
   pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" \
   > "$BACKUP_DIR/db_$TIMESTAMP.sql"
 

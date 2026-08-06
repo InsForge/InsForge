@@ -67,10 +67,11 @@ for p in project1 project2; do
 done
 ```
 
-### Step 2: Edit each env file with unique ports
+### Step 2: Give each env file its own project name and ports
 
 **.env.project1** (default ports):
 ```
+COMPOSE_PROJECT_NAME=project1
 POSTGRES_PORT=5432
 POSTGREST_PORT=5430
 APP_PORT=7130
@@ -80,6 +81,7 @@ DENO_PORT=7133
 
 **.env.project2** (different ports):
 ```
+COMPOSE_PROJECT_NAME=project2
 POSTGRES_PORT=5442
 POSTGREST_PORT=5440
 APP_PORT=7230
@@ -89,29 +91,29 @@ DENO_PORT=7233
 
 Make sure each project has its own `JWT_SECRET` and `ROOT_ADMIN_PASSWORD`.
 
-### Step 3: Start each project with a unique name
+### Step 3: Start each project
 
 ```bash
-docker compose --env-file .env.project1 -p project1 up -d
-docker compose --env-file .env.project2 -p project2 up -d
+docker compose --env-file .env.project1 up -d
+docker compose --env-file .env.project2 up -d
 ```
 
-The `-p` flag gives each project isolated containers, volumes, and networks. The `--env-file` flag assigns unique ports so they don't conflict.
+`COMPOSE_PROJECT_NAME` gives each one isolated containers, volumes, and networks; the ports keep them from colliding on the host. Leaving two env files on the same name is what you have to avoid — `docker compose up` with either one adopts and recreates the other's containers.
 
 ### Managing multiple instances
 
 ```bash
 # Check status
-docker compose --env-file .env.project1 -p project1 ps
+docker compose --env-file .env.project1 ps
 
 # View logs
-docker compose --env-file .env.project1 -p project1 logs -f
+docker compose --env-file .env.project1 logs -f
 
 # Stop an instance
-docker compose --env-file .env.project1 -p project1 down
+docker compose --env-file .env.project1 down
 
 # Stop and remove all data
-docker compose --env-file .env.project1 -p project1 down -v
+docker compose --env-file .env.project1 down -v
 ```
 
 Each project has its own database, storage, and configuration. They are completely independent.
