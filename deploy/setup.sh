@@ -1,0 +1,110 @@
+#!/usr/bin/env sh
+# Check out the files a self-hosted InsForge needs, and generate its secrets.
+#
+#   curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
+#   sh deploy/setup.sh .        # re-apply after `git merge`, see below
+#
+# Safe to re-run: an existing .env is left untouched. Does not start anything —
+# review .env first, since API_BASE_URL has to match the URL browsers will use
+# and Postgres reads .env only at first boot.
+set -e
+
+REPO=${INSFORGE_REPO:-https://github.com/InsForge/InsForge.git}
+TARGET=${1:-insforge}
+CLONED=
+
+if [ -e "$TARGET/.git" ]; then
+  cd "$TARGET"
+elif [ -z "$1" ] && [ -e .git ] && [ -f deploy/docker-compose/docker-compose.yml ]; then
+  : # no target given and we are already inside a checkout
+else
+  git clone --depth 1 --filter=blob:none --sparse "$REPO" "$TARGET"
+  cd "$TARGET"
+  CLONED=1
+fi
+
+ROOT=$(pwd)
+ENV_FILE=.env
+
+# A full checkout is somebody's development clone: the sparse-checkout below
+# would empty its working tree, and COMPOSE_FILE would repoint its .env at the
+# production compose file.
+if [ -z "$CLONED" ] && [ "$(git config --get core.sparseCheckout)" != true ]; then
+  echo "$ROOT is a full checkout, not a self-hosting one." >&2
+  echo "Pass a target instead: sh deploy/setup.sh ~/insforge" >&2
+  exit 1
+fi
+
+# Every file the image-only stack reads, plus this script so it travels with the
+# checkout. Re-applied on every run, which is why the update procedure calls this
+# after `git merge`: a release that adds a file the compose reads also ships the
+# path for it here, and without re-applying, the merge would land the file in git
+# but never in the working tree.
+#
+# --no-cone rather than cone mode: cone always adds every root-level file, which
+# would include the development docker-compose.yml. Running that in production
+# builds from source and starts dev servers.
+git sparse-checkout set --no-cone \
+  /.env.example \
+  /docker-compose.minio.yml /docker-compose.rustfs.yml \
+  /deploy/setup.sh \
+  /deploy/docker-compose/docker-compose.yml \
+  /deploy/docker-init/db/
+
+set_var() {
+  tmp=$(mktemp)
+  awk -v key="$1" -v val="$2" '
+    $0 ~ "^"key"=" { print key "=" val; found=1; next }
+    { print }
+    END { if (!found) print key "=" val }
+  ' "$ENV_FILE" > "$tmp" && mv "$tmp" "$ENV_FILE"
+}
+
+# Docker Compose reads .env, and COMPOSE_FILE within it, from the directory you
+# run it in — so both live here and every command runs from here. Only added when
+# missing: a storage overlay appended by hand has to survive re-runs.
+pin_compose_file() {
+  grep -q '^COMPOSE_FILE=' "$ENV_FILE" ||
+    set_var COMPOSE_FILE deploy/docker-compose/docker-compose.yml
+}
+
+# Installs from before this layout kept .env beside the compose file. Left there
+# it is silently ignored, and secrets that no longer reach Postgres read as a
+# lost database.
+if [ -f deploy/docker-compose/.env ] && [ ! -f "$ENV_FILE" ]; then
+  mv deploy/docker-compose/.env "$ENV_FILE"
+  pin_compose_file
+  echo "Moved deploy/docker-compose/.env to $ROOT/.env."
+  echo "Run docker compose from $ROOT from now on."
+  exit 0
+fi
+
+if [ -f "$ENV_FILE" ]; then
+  pin_compose_file
+  echo "Checkout refreshed. $ROOT/.env already exists — left untouched."
+  echo "Compare it against .env.example for variables added since you created it."
+  exit 0
+fi
+
+cp .env.example "$ENV_FILE"
+pin_compose_file
+
+# Generated as separate values on purpose. If ENCRYPTION_KEY is unset InsForge
+# falls back to JWT_SECRET, and rotating JWT_SECRET afterwards makes every stored
+# secret undecryptable.
+set_var JWT_SECRET "$(openssl rand -hex 32)"
+set_var ENCRYPTION_KEY "$(openssl rand -hex 32)"
+set_var ROOT_ADMIN_PASSWORD "$(openssl rand -hex 12)"
+
+chmod 600 "$ENV_FILE"
+
+cat <<DONE
+
+Secrets generated in $ROOT/.env (mode 600).
+
+Set the public URL browsers will use, then start:
+
+  cd $ROOT
+  \$EDITOR .env          # API_BASE_URL, VITE_API_BASE_URL
+  docker compose up -d
+DONE
