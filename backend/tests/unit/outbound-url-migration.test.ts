@@ -22,7 +22,7 @@ describe('outbound URL guard migration', () => {
     expect(sql).toMatch(/CREATE OR REPLACE FUNCTION schedules\.is_safe_address/i);
     expect(sql).toMatch(/rawUrl' IS DISTINCT FROM p_function_url/i);
     expect(sql).toMatch(/jsonb_array_length\(COALESCE\(v_resolved_target->'addresses'/i);
-    expect(sql).toMatch(/allowPrivateNetworks.*allowlistedHost/is);
+    expect(sql).not.toMatch(/allowPrivateNetworks.*allowlistedHost/is);
     expect(sql).toMatch(/DROP CONSTRAINT IF EXISTS schedules_jobs_function_url_safe/i);
     expect(sql).toMatch(/ADD CONSTRAINT schedules_jobs_function_url_safe/i);
   });

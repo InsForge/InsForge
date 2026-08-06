@@ -381,7 +381,11 @@ export class ScheduleService {
       }
 
       // Handle isActive toggle if provided
-      if (data.isActive !== undefined && data.isActive !== existingSchedule.isActive) {
+      if (
+        data.isActive !== undefined &&
+        data.isActive !== existingSchedule.isActive &&
+        !(hasScheduleFields && data.isActive === true)
+      ) {
         const toggleSql = data.isActive
           ? 'SELECT * FROM schedules.enable_job($1::UUID)'
           : 'SELECT * FROM schedules.disable_job($1::UUID)';
