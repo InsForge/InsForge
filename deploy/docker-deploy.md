@@ -10,10 +10,15 @@
 ### Step 1: Get the repository
 
 ```bash
-# Sparse checkout: only deploy/ is needed, not the whole monorepo
+# Check out only the files the stack reads — 7 files, not the whole monorepo
 git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/InsForge/InsForge.git
-cd InsForge && git sparse-checkout set deploy
+cd InsForge
+git sparse-checkout set --no-cone \
+  /.env.example \
+  /docker-compose.minio.yml /docker-compose.rustfs.yml \
+  /deploy/docker-compose/docker-compose.yml \
+  /deploy/docker-init/db/
 
 cd deploy/docker-compose
 cp ../../.env.example .env

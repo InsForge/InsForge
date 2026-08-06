@@ -164,10 +164,15 @@ docker run hello-world
 #### 4.1 获取仓库
 
 ```bash
-# Sparse checkout: only deploy/ is needed, not the whole monorepo
+# Check out only the files the stack reads — 7 files, not the whole monorepo
 git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/InsForge/InsForge.git ~/insforge
-cd ~/insforge && git sparse-checkout set deploy
+cd ~/insforge
+git sparse-checkout set --no-cone \
+  /.env.example \
+  /docker-compose.minio.yml /docker-compose.rustfs.yml \
+  /deploy/docker-compose/docker-compose.yml \
+  /deploy/docker-init/db/
 
 cd deploy/docker-compose
 cp ../../.env.example .env
