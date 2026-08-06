@@ -148,18 +148,14 @@ spec:
                 - path: /etc/postgresql/postgresql.conf
                   template: |
                     # PostgreSQL configuration for InsForge
-                    # Enable logical replication for Logflare
 
                     # Listen on all interfaces to allow container connections
                     listen_addresses = '*'
 
-                    # Set WAL level to logical for Logflare replication
+                    # Kept for logical-replication tooling; changing wal_level needs a restart.
+                    # Unused today — realtime uses pg_notify, not logical decoding.
                     wal_level = logical
-
-                    # Set max replication slots (needed for logical replication)
                     max_replication_slots = 10
-
-                    # Set max WAL senders
                     max_wal_senders = 10
 
                     shared_preload_libraries = 'pg_cron,http,pgcrypto,insforge_pg_utils'

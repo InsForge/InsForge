@@ -1,0 +1,307 @@
+openapi: 3.0.3
+info:
+  title: Insforge Usage API
+  version: 1.0.0
+  description: MCP usage tracking and usage statistics for the backend usage module.
+
+tags:
+  - name: Usage
+    description: Record MCP tool usage and fetch usage summaries.
+
+paths:
+  /api/usage/mcp:
+    post:
+      summary: Record MCP tool usage
+      description: Records an MCP tool invocation in `system.mcp_usage`. The `success` flag defaults to `true` when omitted.
+      tags:
+        - Usage
+      security:
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordMcpUsageRequest'
+            example:
+              tool_name: generate_report
+              success: true
+      responses:
+        '200':
+          description: MCP usage recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordMcpUsageResponse'
+              example:
+                success: true
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INVALID_INPUT
+                message: tool_name is required
+                statusCode: 400
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: AUTH_INVALID_API_KEY
+                message: Invalid API key
+                statusCode: 401
+        '500':
+          description: Failed to record MCP usage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INTERNAL_ERROR
+                message: Failed to record MCP usage
+                statusCode: 500
+
+    get:
+      summary: List MCP usage records
+      description: Returns recent MCP usage rows filtered by `success`.
+      tags:
+        - Usage
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 5
+          description: Maximum number of usage records to return.
+        - name: success
+          in: query
+          schema:
+            type: boolean
+            default: true
+          description: Filter records by success state.
+      responses:
+        '200':
+          description: MCP usage records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpUsageListResponse'
+              example:
+                records:
+                  - tool_name: generate_report
+                    success: true
+                    created_at: '2026-08-04T04:30:00.000Z'
+                  - tool_name: sync_docs
+                    success: true
+                    created_at: '2026-08-04T03:15:00.000Z'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: AUTH_INVALID_CREDENTIALS
+                message: No admin token provided
+                statusCode: 401
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: AUTH_UNAUTHORIZED
+                message: Admin access required
+                statusCode: 403
+        '500':
+          description: Failed to get MCP usage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INTERNAL_ERROR
+                message: Failed to get MCP usage
+                statusCode: 500
+
+  /api/usage/stats:
+    get:
+      summary: Get usage statistics
+      description: >
+        Returns usage statistics for the supplied date range. The
+        `mcp_usage_count` field counts successful MCP usage records and is
+        filtered by `start_date` and `end_date`, while `database_size_bytes`,
+        `storage_size_bytes`, and `user_count` reflect the current system
+        state. Both `start_date` and `end_date` are required.
+      tags:
+        - Usage
+      security:
+        - cloudBackendAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Start date, inclusive.
+          example: '2026-07-01'
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: End date, exclusive.
+          example: '2026-08-01'
+      responses:
+        '200':
+          description: Usage statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageStats'
+              example:
+                mcp_usage_count: 128
+                database_size_bytes: 2147483648
+                storage_size_bytes: 1073741824
+                user_count: 42
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INVALID_INPUT
+                message: start_date and end_date are required
+                statusCode: 400
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: AUTH_INVALID_CREDENTIALS
+                message: No authorization token provided
+                statusCode: 401
+        '403':
+          description: Forbidden - the cloud backend token is valid but not authorized for the configured project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: AUTH_UNAUTHORIZED
+                message: Project ID mismatch
+                statusCode: 403
+        '500':
+          description: Failed to get usage stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INTERNAL_ERROR
+                message: Failed to get usage stats
+                statusCode: 500
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+    cloudBackendAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token issued by InsForge Cloud and verified by the backend cloud token verifier.
+  schemas:
+    RecordMcpUsageRequest:
+      type: object
+      required:
+        - tool_name
+      properties:
+        tool_name:
+          type: string
+          description: MCP tool name to record.
+        success:
+          type: boolean
+          default: true
+          description: Whether the tool invocation succeeded.
+    RecordMcpUsageResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          example: true
+    McpUsageRecord:
+      type: object
+      required:
+        - tool_name
+        - success
+        - created_at
+      properties:
+        tool_name:
+          type: string
+        success:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    McpUsageListResponse:
+      type: object
+      required:
+        - records
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpUsageRecord'
+    UsageStats:
+      type: object
+      required:
+        - mcp_usage_count
+        - database_size_bytes
+        - storage_size_bytes
+        - user_count
+      properties:
+        mcp_usage_count:
+          type: integer
+        database_size_bytes:
+          type: integer
+        storage_size_bytes:
+          type: integer
+        user_count:
+          type: integer
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        statusCode:
+          type: integer
+        nextActions:
+          type: string
