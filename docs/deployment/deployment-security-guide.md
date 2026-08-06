@@ -171,28 +171,15 @@ docker run hello-world
 curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
 
-Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY` and `ROOT_ADMIN_PASSWORD` into `.env`. Nothing is started.
+Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY`, `ROOT_ADMIN_PASSWORD` and `POSTGRES_PASSWORD` into `.env`. Nothing is started.
 
-<details>
-<summary>Prefer not to pipe a script into a shell? Do the same by hand</summary>
-
-```bash
-git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/InsForge/InsForge.git ~/insforge
-cd ~/insforge
-git sparse-checkout set --no-cone \
-  /.env.example \
-  /docker-compose.minio.yml /docker-compose.rustfs.yml \
-  /deploy/setup.sh \
-  /deploy/docker-compose/docker-compose.yml \
-  /deploy/docker-init/db/
-
-cp .env.example .env
-```
-
-Then set `COMPOSE_FILE` in `.env` to `deploy/docker-compose/docker-compose.yml` — the template ships the development value.
-
-</details>
+> Rather not pipe a script into a shell? Read it first:
+>
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh -o setup.sh
+> less setup.sh
+> sh setup.sh ~/insforge
+> ```
 
 #### 4.2 Start InsForge
 

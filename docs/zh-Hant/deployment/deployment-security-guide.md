@@ -167,28 +167,15 @@ docker run hello-world
 curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
 
-checkout 這個 stack 會讀的檔案，並把 `JWT_SECRET`、`ENCRYPTION_KEY`、`ROOT_ADMIN_PASSWORD` 產生到 `.env`。不啟動任何東西。
+checkout 這個 stack 會讀的檔案，並把 `JWT_SECRET`、`ENCRYPTION_KEY`、`ROOT_ADMIN_PASSWORD`、`POSTGRES_PASSWORD` 產生到 `.env`。不啟動任何東西。
 
-<details>
-<summary>不想把腳本管線給 shell？手動執行相同步驟</summary>
-
-```bash
-git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/InsForge/InsForge.git ~/insforge
-cd ~/insforge
-git sparse-checkout set --no-cone \
-  /.env.example \
-  /docker-compose.minio.yml /docker-compose.rustfs.yml \
-  /deploy/setup.sh \
-  /deploy/docker-compose/docker-compose.yml \
-  /deploy/docker-init/db/
-
-cp .env.example .env
-```
-
-接著把 `.env` 中的 `COMPOSE_FILE` 改為 `deploy/docker-compose/docker-compose.yml`——範本帶的是開發用的值。
-
-</details>
+> 不想把腳本管線給 shell？先讀一遍再執行：
+>
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh -o setup.sh
+> less setup.sh
+> sh setup.sh ~/insforge
+> ```
 
 #### 4.2 啟動 InsForge
 

@@ -167,28 +167,15 @@ docker run hello-world
 curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
 
-Descarga los archivos que el stack lee y genera `JWT_SECRET`, `ENCRYPTION_KEY` y `ROOT_ADMIN_PASSWORD` en `.env`. No arranca nada.
+Descarga los archivos que el stack lee y genera `JWT_SECRET`, `ENCRYPTION_KEY`, `ROOT_ADMIN_PASSWORD` y `POSTGRES_PASSWORD` en `.env`. No arranca nada.
 
-<details>
-<summary>¿Prefieres no pasar un script a la shell? Hazlo a mano</summary>
-
-```bash
-git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/InsForge/InsForge.git ~/insforge
-cd ~/insforge
-git sparse-checkout set --no-cone \
-  /.env.example \
-  /docker-compose.minio.yml /docker-compose.rustfs.yml \
-  /deploy/setup.sh \
-  /deploy/docker-compose/docker-compose.yml \
-  /deploy/docker-init/db/
-
-cp .env.example .env
-```
-
-Luego cambia `COMPOSE_FILE` en `.env` a `deploy/docker-compose/docker-compose.yml`: la plantilla trae el valor de desarrollo.
-
-</details>
+> ¿Prefieres no pasar un script a la shell? Léelo primero:
+>
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh -o setup.sh
+> less setup.sh
+> sh setup.sh ~/insforge
+> ```
 
 #### 4.2 Inicia InsForge
 
