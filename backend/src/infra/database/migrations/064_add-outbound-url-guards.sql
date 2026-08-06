@@ -121,9 +121,7 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM jsonb_array_elements_text(COALESCE(v_resolved_target->'addresses', '[]'::JSONB)) AS address
-    WHERE NOT COALESCE((v_resolved_target->>'allowPrivateNetworks')::BOOLEAN, FALSE)
-      AND NOT COALESCE((v_resolved_target->>'allowlistedHost')::BOOLEAN, FALSE)
-      AND NOT schedules.is_safe_address(address)
+    WHERE NOT schedules.is_safe_address(address)
   ) THEN
     RETURN QUERY SELECT NULL::BIGINT, FALSE, 'Scheduled URL resolved to unsafe network address';
     RETURN;
@@ -229,9 +227,7 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM jsonb_array_elements_text(COALESCE(v_job.resolved_target->'addresses', '[]'::JSONB)) AS address
-    WHERE NOT COALESCE((v_job.resolved_target->>'allowPrivateNetworks')::BOOLEAN, FALSE)
-      AND NOT COALESCE((v_job.resolved_target->>'allowlistedHost')::BOOLEAN, FALSE)
-      AND NOT schedules.is_safe_address(address)
+    WHERE NOT schedules.is_safe_address(address)
   ) THEN
     PERFORM schedules.log_job_execution(
       v_job.id,

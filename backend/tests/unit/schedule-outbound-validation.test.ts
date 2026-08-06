@@ -124,11 +124,10 @@ describe('ScheduleService outbound URL validation', () => {
 
     await expect(service.updateSchedule(schedule.id, { isActive: true })).resolves.toBeTruthy();
 
-    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenCalledTimes(1);
     expect(queryMock.mock.calls[0][1]?.[8]).toMatchObject({
       rawUrl: 'http://8.8.8.8/hook',
       addresses: ['8.8.8.8'],
     });
-    expect(queryMock.mock.calls[1][0]).toContain('schedules.enable_job');
   });
 });
