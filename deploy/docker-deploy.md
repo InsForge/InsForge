@@ -11,20 +11,18 @@
 
 ```bash
 git clone --depth 1 https://github.com/InsForge/InsForge.git
-cd InsForge
-cp .env.example .env
+cd InsForge/deploy/docker-compose
+cp ../../.env.example .env
 ```
 
-Every service pulls a published image — there is no build step.
+Every service pulls a published image — there is no build step. The checkout is
+required because Postgres mounts `deploy/docker-init/db/` from it.
 
 ### Step 2: Start InsForge
 
 ```bash
-./deploy/docker-compose/run.sh up -d
+docker compose up -d
 ```
-
-`run.sh` forwards everything to `docker compose` and locates the compose file, the
-`.env` and the project name itself, so it works from any directory.
 
 ### Step 3: Access InsForge
 
@@ -70,8 +68,8 @@ Make sure each project has its own `JWT_SECRET` and `ROOT_ADMIN_PASSWORD`.
 ### Step 3: Start each project with a unique name
 
 ```bash
-./deploy/docker-compose/run.sh --env-file .env.project1 -p project1 up -d
-./deploy/docker-compose/run.sh --env-file .env.project2 -p project2 up -d
+docker compose --env-file .env.project1 -p project1 up -d
+docker compose --env-file .env.project2 -p project2 up -d
 ```
 
 The `-p` flag gives each project isolated containers, volumes, and networks. The `--env-file` flag assigns unique ports so they don't conflict.
@@ -80,16 +78,16 @@ The `-p` flag gives each project isolated containers, volumes, and networks. The
 
 ```bash
 # Check status
-./deploy/docker-compose/run.sh --env-file .env.project1 -p project1 ps
+docker compose --env-file .env.project1 -p project1 ps
 
 # View logs
-./deploy/docker-compose/run.sh --env-file .env.project1 -p project1 logs -f
+docker compose --env-file .env.project1 -p project1 logs -f
 
 # Stop an instance
-./deploy/docker-compose/run.sh --env-file .env.project1 -p project1 down
+docker compose --env-file .env.project1 -p project1 down
 
 # Stop and remove all data
-./deploy/docker-compose/run.sh --env-file .env.project1 -p project1 down -v
+docker compose --env-file .env.project1 -p project1 down -v
 ```
 
 Each project has its own database, storage, and configuration. They are completely independent.
