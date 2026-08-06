@@ -1,13 +1,39 @@
+# InsForge on Coolify
+#
+# Coolify → New Resource → Docker Compose, then set:
+#   Base Directory          /
+#   Docker Compose Location /deploy/coolify/docker-compose.yml
+#
+# Set the environment variables in Coolify's own Environment Variables tab. At
+# minimum JWT_SECRET, ENCRYPTION_KEY, POSTGRES_PASSWORD, ROOT_ADMIN_PASSWORD and
+# the two API_BASE_URL values; the defaults below are placeholders, not safe
+# values.
+#
+# No service bind-mounts anything out of the repository. Coolify creates file
+# bind mounts as directories (coollabsio/coolify#3375, still open), which breaks
+# Postgres outright. Postgres gets its init files by being built here instead.
+
 services:
   postgres:
-    image: ghcr.io/insforge/postgres-all:latest
+    # Built here rather than pulled. postgres-all bakes the init files in, and
+    # its copy is frozen at whatever the image was built from — that is how
+    # self-hosted RLS on managed tables broke: no insforge_pg_utils in its
+    # shared_preload_libraries. Building from the repo at deploy time keeps the
+    # files current. 
+    build:
+      context: ../..
+      dockerfile: deploy/Dockerfile.postgres
     restart: unless-stopped
-    command: postgres -c app.encryption_key='${ENCRYPTION_KEY:-change-this-encryption-key-32chars}'
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c cron.database_name='${POSTGRES_DB:-insforge}' -c app.encryption_key='${ENCRYPTION_KEY:-change-this-encryption-key-32chars}'
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-insforge}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-encryption-key-32chars}
+      # postgres-all carried this in its image ENV, so clusters created under it
+      # live in this subdirectory. The base image defaults to the volume root,
+      # which would initdb an empty cluster beside the existing data.
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -90,7 +116,7 @@ services:
       S3_USE_PRESIGNED_URLS: ${S3_USE_PRESIGNED_URLS:-}
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-}
       INSFORGE_TELEMETRY_DISABLED: ${INSFORGE_TELEMETRY_DISABLED:-}
-      INSFORGE_DEPLOYMENT_METHOD: dokploy
+      INSFORGE_DEPLOYMENT_METHOD: coolify
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       STRIPE_TEST_SECRET_KEY: ${STRIPE_TEST_SECRET_KEY:-}
       STRIPE_LIVE_SECRET_KEY: ${STRIPE_LIVE_SECRET_KEY:-}
