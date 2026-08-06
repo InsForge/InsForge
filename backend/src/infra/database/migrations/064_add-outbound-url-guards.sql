@@ -1,4 +1,4 @@
--- Migration 063: Add outbound URL guards for scheduled HTTP jobs
+-- Migration 064: Add outbound URL guards for scheduled HTTP jobs
 --
 -- The backend performs DNS-aware validation before creating or updating jobs.
 -- This database-side guard provides defense in depth for direct SQL callers and
@@ -121,7 +121,9 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM jsonb_array_elements_text(COALESCE(v_resolved_target->'addresses', '[]'::JSONB)) AS address
-    WHERE NOT schedules.is_safe_address(address)
+    WHERE NOT COALESCE((v_resolved_target->>'allowPrivateNetworks')::BOOLEAN, FALSE)
+      AND NOT COALESCE((v_resolved_target->>'allowlistedHost')::BOOLEAN, FALSE)
+      AND NOT schedules.is_safe_address(address)
   ) THEN
     RETURN QUERY SELECT NULL::BIGINT, FALSE, 'Scheduled URL resolved to unsafe network address';
     RETURN;
@@ -227,7 +229,9 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM jsonb_array_elements_text(COALESCE(v_job.resolved_target->'addresses', '[]'::JSONB)) AS address
-    WHERE NOT schedules.is_safe_address(address)
+    WHERE NOT COALESCE((v_job.resolved_target->>'allowPrivateNetworks')::BOOLEAN, FALSE)
+      AND NOT COALESCE((v_job.resolved_target->>'allowlistedHost')::BOOLEAN, FALSE)
+      AND NOT schedules.is_safe_address(address)
   ) THEN
     PERFORM schedules.log_job_execution(
       v_job.id,

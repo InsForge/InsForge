@@ -327,7 +327,8 @@ export class ScheduleService {
         data.functionUrl !== undefined ||
         data.httpMethod !== undefined ||
         data.headers !== undefined ||
-        data.body !== undefined;
+        data.body !== undefined ||
+        (data.isActive === true && existingSchedule.isActive === false);
 
       let cronJobId: string | null | undefined = existingSchedule.cronJobId;
 
