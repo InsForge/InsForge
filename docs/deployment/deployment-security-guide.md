@@ -897,8 +897,7 @@ curl http://localhost:7130/api/health
 
 Occasionally, new releases may include changes to `docker-compose.yml`. To pick up these changes:
 
-> No `.git` in `~/insforge`? Convert once (volumes are untouched):
-> `mv ~/insforge ~/insforge.bak && git clone --depth 1 https://github.com/InsForge/InsForge.git ~/insforge && cp ~/insforge.bak/.env ~/insforge/deploy/docker-compose/.env`
+> Installed without `.git`? Re-clone into a fresh directory and carry your existing `.env` over — losing it makes stored secrets unrecoverable.
 
 ```bash
 cd ~/insforge

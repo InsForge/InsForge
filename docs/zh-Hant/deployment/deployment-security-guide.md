@@ -879,8 +879,7 @@ curl http://localhost:7130/api/health
 
 新版本有時會包含對 `docker-compose.yml` 的變更。若要套用這些變更：
 
-> `~/insforge` 裡沒有 `.git`？做一次性轉換（不影響卷）：
-> `mv ~/insforge ~/insforge.bak && git clone --depth 1 https://github.com/InsForge/InsForge.git ~/insforge && cp ~/insforge.bak/.env ~/insforge/deploy/docker-compose/.env`
+> 當初沒有用 `.git` 安裝？重新 clone 到新目錄，並把原本的 `.env` 帶過去 —— 遺失它，庫裡加密儲存的 secret 將無法復原。
 
 ```bash
 cd ~/insforge
