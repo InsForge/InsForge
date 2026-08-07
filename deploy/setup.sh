@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Check out the files a self-hosted InsForge needs, and generate its secrets.
+# Fetch the files a self-hosted InsForge needs, and generate its secrets.
 #
 #   curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 #   sh deploy/setup.sh .        # re-apply after `git merge`, see below
@@ -7,18 +7,57 @@
 # Safe to re-run: an existing .env is left untouched. Does not start anything —
 # review .env first, since API_BASE_URL has to match the URL browsers will use
 # and Postgres reads .env only at first boot.
+#
+# Environment:
+#   INSFORGE_REF=v2.2.9   Stay on one release instead of tracking main.
+#   INSFORGE_NO_GIT=1     Fetch the files over HTTPS instead of cloning. Loses
+#                         the update path below, which needs a checkout.
 set -e
 
 REPO=${INSFORGE_REPO:-https://github.com/InsForge/InsForge.git}
+RAW=${INSFORGE_RAW:-https://raw.githubusercontent.com/InsForge/InsForge}
+REF=${INSFORGE_REF:-}
 TARGET=${1:-insforge}
 CLONED=
 
-if [ -e "$TARGET/.git" ]; then
+# Every file the image-only stack reads, plus this script so it travels with the
+# checkout. One list, used by both acquisition modes below.
+FILES='.env.example
+docker-compose.minio.yml
+docker-compose.rustfs.yml
+functions/deno.json
+functions/server.ts
+functions/worker-template.js
+deploy/setup.sh
+deploy/docker-compose/docker-compose.yml
+deploy/docker-init/db/db-init.sql
+deploy/docker-init/db/jwt.sql
+deploy/docker-init/db/postgresql.conf'
+
+# No git, or asked not to use it: fetch each file straight from the ref. 34KB in
+# total, against 47MB for the repository tarball, and precise where a tar glob
+# would not be — `*/functions` also matches backend/src/.../functions.
+if [ -n "${INSFORGE_NO_GIT:-}" ] || ! command -v git >/dev/null 2>&1; then
+  mkdir -p "$TARGET"
+  cd "$TARGET"
+  for f in $FILES; do
+    mkdir -p "$(dirname "$f")"
+    curl -fsSL "$RAW/${REF:-main}/$f" -o "$f" ||
+      { echo "Could not fetch $f at ${REF:-main} from $RAW." >&2; exit 1; }
+  done
+  NO_GIT=1
+fi
+
+if [ -n "${NO_GIT:-}" ]; then
+  : # already fetched above
+elif [ -e "$TARGET/.git" ]; then
   cd "$TARGET"
 elif [ -z "$1" ] && [ -e .git ] && [ -f deploy/docker-compose/docker-compose.yml ]; then
   : # no target given and we are already inside a checkout
 else
-  git clone --depth 1 --filter=blob:none --sparse "$REPO" "$TARGET"
+  # --branch takes a tag as well, so one flag covers both refs.
+  git clone --depth 1 --filter=blob:none --sparse \
+    ${REF:+--branch "$REF"} "$REPO" "$TARGET"
   cd "$TARGET"
   CLONED=1
 fi
@@ -29,7 +68,8 @@ ENV_FILE=.env
 # A full checkout is somebody's development clone: the sparse-checkout below
 # would empty its working tree, and COMPOSE_FILE would repoint its .env at the
 # production compose file.
-if [ -z "$CLONED" ] && [ "$(git config --get core.sparseCheckout)" != true ]; then
+if [ -z "${NO_GIT:-}" ] && [ -z "$CLONED" ] &&
+   [ "$(git config --get core.sparseCheckout)" != true ]; then
   echo "$ROOT is a full checkout, not a self-hosting one." >&2
   echo "Pass a target instead: sh deploy/setup.sh ~/insforge" >&2
   exit 1
@@ -49,13 +89,16 @@ fi
 # git's own docs call non-cone mode deprecated, so a future git dropping the
 # flag would break this script rather than silently widening the checkout.
 # There is no cone-mode spelling of "these root files but not those".
-git sparse-checkout set --no-cone \
-  /.env.example \
-  /docker-compose.minio.yml /docker-compose.rustfs.yml \
-  /functions/ \
-  /deploy/setup.sh \
-  /deploy/docker-compose/docker-compose.yml \
-  /deploy/docker-init/db/
+#
+# Built from FILES so the two acquisition modes cannot list different files. That
+# makes the patterns file-level rather than the directory-level ones this used:
+# a release that mounts a new file has to add it here, which is what the note
+# above already says.
+if [ -z "${NO_GIT:-}" ]; then
+  # Leading slash anchors each pattern at the repository root.
+  # shellcheck disable=SC2086
+  git sparse-checkout set --no-cone $(for f in $FILES; do printf '/%s ' "$f"; done)
+fi
 
 set_var() {
   tmp=$(mktemp)
