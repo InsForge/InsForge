@@ -4,19 +4,17 @@
 #   curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 #   sh deploy/setup.sh .        # re-apply after `git merge`, see below
 #
-# Safe to re-run: an existing .env is left untouched. Does not start anything —
-# review .env first, since API_BASE_URL has to match the URL browsers will use
-# and Postgres reads .env only at first boot.
+# Safe to re-run: an existing .env is left untouched. Starts nothing — review
+# .env first, since Postgres reads it only at first boot.
 #
 # Environment:
-#   INSFORGE_REF=vX.Y.Z   Stay on one release instead of tracking main.
-#   INSFORGE_NO_GIT=1     Fetch the files over HTTPS instead of cloning. Loses
-#                         the update path below, which needs a checkout.
+#   INSFORGE_REF=vX.Y.Z   A tag, branch or commit instead of main.
+#   INSFORGE_NO_GIT=1     Fetch over HTTPS instead of cloning. No update path.
+#   INSFORGE_REPO=...     Clone source. INSFORGE_RAW=... for the HTTPS host.
 set -e
 
 REPO=${INSFORGE_REPO:-https://github.com/InsForge/InsForge.git}
-# Derived from REPO so pointing at a fork does not silently fetch the official
-# files. INSFORGE_RAW overrides it for a host that is not raw.githubusercontent.
+# Derived from REPO, so a fork does not silently fetch the official files.
 RAW=${INSFORGE_RAW:-$(echo "$REPO" |
   sed -e 's|^git@github\.com:|https://raw.githubusercontent.com/|' \
       -e 's|^https://github\.com/|https://raw.githubusercontent.com/|' \
@@ -45,18 +43,13 @@ checkout_ref() {
 }
 
 
-# Every file the image-only stack reads. One list, used by both acquisition modes
-# below, so they cannot disagree about what the stack needs.
+# Every file the image-only stack reads. Both acquisition modes read this list,
+# so they cannot disagree about what the stack needs.
 #
-# This script is not in it. The git path adds it to the sparse patterns so it
-# travels with the checkout for the update procedure; the HTTPS path has no
-# update procedure, its caller already holds the script, and a ref older than
-# this file would 404 on it and fail the whole fetch.
+# Not this script: the git path adds it to the sparse patterns separately, and on
+# the HTTPS path a ref older than this file would 404 and fail the whole fetch.
 #
-# functions/examples/ is deliberately absent, where the old directory pattern
-# swept it in: the compose file mounts all of functions/ but the runtime only
-# loads server.ts, and demo functions are not something a self-host install
-# needs on disk.
+# functions/examples/ is left out on purpose: the runtime only loads server.ts.
 FILES='.env.example
 docker-compose.minio.yml
 docker-compose.rustfs.yml
@@ -133,19 +126,10 @@ checkout_ref
 # path for it here, and without re-applying, the merge would land the file in git
 # but never in the working tree.
 #
-# --no-cone rather than cone mode: cone always adds every root-level file, which
-# would include the development docker-compose.yml. With COMPOSE_FILE unset for
-# any reason, `docker compose up` would then build from source and start dev
-# servers instead of failing with "no configuration file provided".
-#
-# git's own docs call non-cone mode deprecated, so a future git dropping the
-# flag would break this script rather than silently widening the checkout.
-# There is no cone-mode spelling of "these root files but not those".
-#
-# Built from FILES so the two acquisition modes cannot list different files. That
-# makes the patterns file-level rather than the directory-level ones this used:
-# a release that mounts a new file has to add it here, which is what the note
-# above already says.
+# --no-cone: cone mode always adds every root-level file, including the
+# development docker-compose.yml, and there is no cone-mode way to say "these
+# root files but not those". git calls non-cone deprecated, so a git that drops
+# the flag breaks this script rather than silently widening the checkout.
 if [ -z "${NO_GIT:-}" ]; then
   # Leading slash anchors each pattern at the repository root.
   # shellcheck disable=SC2086

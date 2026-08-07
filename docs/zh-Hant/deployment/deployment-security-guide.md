@@ -925,28 +925,25 @@ docker compose down
 
 #### 16.2 固定回先前的版本
 
-在 `.env` 旁邊寫一個 overlay，指明你更新前執行的版本：
+1. 在 `.env` 旁邊寫 `pin.yml`，填 14.3 記錄的版本：
 
-```yaml
-# pin.yml
-services:
-  insforge:
-    image: ghcr.io/insforge/insforge-oss:v2.2.9
-```
+   ```yaml
+   services:
+     insforge:
+       image: ghcr.io/insforge/insforge-oss:v2.2.9
+   ```
 
-將它**附加**到 `.env` 中 `COMPOSE_FILE` 既有的內容之後——保留原有項目，否則你啟用過的儲存 overlay 會從 stack 中掉出：
+2. 附加到 `.env` 中的 `COMPOSE_FILE`，保留既有項目：
 
-```env
-COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
-```
+   ```env
+   COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
+   ```
 
-```bash
-docker compose up -d
-```
+3. `docker compose up -d`
 
-**用完請將 `:pin.yml` 移除。** 它留著的期間，第 15 節的更新會拉取新映像，然後繼續執行被固定的那個——pin 會靜默地覆蓋 `latest`。
+4. 回到可用版本後，將 `:pin.yml` 移除。
 
-用 overlay 而不是直接修改 compose 檔案：它是你自己的檔案，任何更新都不會動；而且同樣的方式能固定 stack 中任何一個映像，不限於這一個。`docker compose images` 可以看到目前執行的版本，14.3 會在更新前記錄，這樣才有可回退的目標。
+在移除之前，第 15 節的更新會拉取新映像，但仍然執行被固定的那個。
 
 #### 16.3 還原資料庫（如有需要）
 

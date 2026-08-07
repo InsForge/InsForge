@@ -924,28 +924,25 @@ docker compose down
 
 #### 16.2 固定回之前的版本
 
-在 `.env` 旁边写一个 overlay，指明你更新前运行的版本：
+1. 在 `.env` 旁边写 `pin.yml`，填 14.3 记录的版本：
 
-```yaml
-# pin.yml
-services:
-  insforge:
-    image: ghcr.io/insforge/insforge-oss:v2.2.9
-```
+   ```yaml
+   services:
+     insforge:
+       image: ghcr.io/insforge/insforge-oss:v2.2.9
+   ```
 
-把它**追加**到 `.env` 中 `COMPOSE_FILE` 已有的内容之后——保留原有条目，否则你启用过的存储 overlay 会从栈里掉出去：
+2. 追加到 `.env` 里的 `COMPOSE_FILE`，保留已有条目：
 
-```env
-COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
-```
+   ```env
+   COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
+   ```
 
-```bash
-docker compose up -d
-```
+3. `docker compose up -d`
 
-**用完记得把 `:pin.yml` 去掉。** 它留在那里的期间，第 15 节的更新会拉到新镜像，然后继续跑被钉住的那个——pin 会静默地压过 `latest`。
+4. 回到可用版本后，把 `:pin.yml` 去掉。
 
-用 overlay 而不是直接改 compose 文件：它是你自己的文件，任何更新都不会碰；而且同样的办法能钉栈里任何一个镜像，不限于这一个。`docker compose images` 能看到当前跑的版本，14.3 会在更新前记录，这样才有可回退的目标。
+在去掉之前，第 15 节的更新会拉到新镜像，但仍然跑被钉住的那个。
 
 #### 16.3 恢复数据库（如有需要）
 

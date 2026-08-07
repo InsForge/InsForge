@@ -935,35 +935,26 @@ docker compose down
 
 #### 16.2 Pin the Previous Version
 
-Write an overlay naming the version you were running, next to your `.env`:
+1. Write `pin.yml` next to your `.env`, naming the version 14.3 recorded:
 
-```yaml
-# pin.yml
-services:
-  insforge:
-    image: ghcr.io/insforge/insforge-oss:v2.2.9
-```
+   ```yaml
+   services:
+     insforge:
+       image: ghcr.io/insforge/insforge-oss:v2.2.9
+   ```
 
-Append it to whatever `COMPOSE_FILE` already holds in `.env` — keep the entries
-that are there, or a storage overlay you had enabled drops out of the stack:
+2. Append it to `COMPOSE_FILE` in `.env`, keeping the entries already there:
 
-```env
-# was: COMPOSE_FILE=deploy/docker-compose/docker-compose.yml
-COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
-```
+   ```env
+   COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
+   ```
 
-```bash
-docker compose up -d
-```
+3. `docker compose up -d`
 
-**Remove the `:pin.yml` when you are done.** While it is there, section 15's
-update pulls new images and then keeps running the pinned one — the pin wins over
-`latest`, silently, for as long as the entry stays.
+4. Remove `:pin.yml` once you are back on a good release.
 
-An overlay rather than an edit to the compose file: it is a file of your own that
-no update touches, and the same trick pins any image in the stack, not just this
-one. `docker compose images` lists what is running, and 14.3 records the versions
-before an update so there is something to pin back to.
+Until you do, section 15's update pulls new images and keeps running the pinned
+one.
 
 #### 16.3 Restore the Database (If Needed)
 

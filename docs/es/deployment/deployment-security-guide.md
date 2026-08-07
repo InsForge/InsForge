@@ -926,31 +926,26 @@ docker compose down
 
 #### 16.2 Fija la versión anterior
 
-Escribe un overlay con la versión que ejecutabas, junto a tu `.env`:
+1. Escribe `pin.yml` junto a tu `.env`, con la versión que registró 14.3:
 
-```yaml
-# pin.yml
-services:
-  insforge:
-    image: ghcr.io/insforge/insforge-oss:v2.2.9
-```
+   ```yaml
+   services:
+     insforge:
+       image: ghcr.io/insforge/insforge-oss:v2.2.9
+   ```
 
-Añádelo a lo que `COMPOSE_FILE` ya contenga en `.env` — conserva las entradas que estén allí, o un overlay de almacenamiento que hubieras activado desaparece del stack:
+2. Añádelo a `COMPOSE_FILE` en `.env`, conservando las entradas que ya estén:
 
-```env
-COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
-```
+   ```env
+   COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
+   ```
 
-```bash
-docker compose up -d
-```
+3. `docker compose up -d`
 
-**Quita el `:pin.yml` cuando termines.** Mientras esté ahí, la actualización de la sección 15 descarga imágenes nuevas y sigue ejecutando la fijada: el pin gana sobre `latest`, en silencio, mientras la entrada permanezca.
+4. Quita `:pin.yml` cuando vuelvas a una versión buena.
 
-Un overlay en lugar de editar el archivo compose: es un archivo tuyo que ninguna
-actualización toca, y el mismo recurso fija cualquier imagen del stack, no solo
-esta. `docker compose images` muestra qué se está ejecutando, y 14.3 registra las
-versiones antes de una actualización para tener algo a lo que volver.
+Hasta que lo hagas, la actualización de la sección 15 descarga imágenes nuevas y
+sigue ejecutando la fijada.
 
 #### 16.3 Restaura la base de datos (si es necesario)
 
