@@ -68,14 +68,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      # postgrest/postgrest ships no wget, so a wget probe never succeeds and the
-      # service reads as permanently unhealthy. It does ship bash.
-      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/3000'"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
+    # No healthcheck: the amd64 postgrest image carries no shell and no
+    # utilities, so nothing inside the container can probe it.
     security_opt:
       - no-new-privileges:true
 

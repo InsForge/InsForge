@@ -47,12 +47,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/3000'"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+    # No healthcheck: the amd64 postgrest image is 24 files — bin/postgrest and
+    # a certificate directory, no shell and no utilities — so nothing can probe
+    # it from inside the container. A CMD-SHELL probe here reports unhealthy
+    # forever, and anything gating on it never starts.
     networks:
       - insforge-network
 
@@ -64,7 +62,7 @@ services:
       postgres:
         condition: service_healthy
       postgrest:
-        condition: service_healthy
+        condition: service_started
     ports:
       - "${APP_PORT:-7130}:7130"
       - "127.0.0.1:${AUTH_PORT:-7131}:7131"
