@@ -933,25 +933,23 @@ cd ~/insforge
 docker compose down
 ```
 
-#### 16.2 Restore the Previous Docker Compose File
+#### 16.2 Pin the Previous Version
+
+Set the version you were running in `.env`, then start again:
+
+```env
+INSFORGE_OSS_VERSION=v2.2.9
+```
 
 ```bash
-# If you saved the old file
-mv docker-compose.yml.old docker-compose.yml
+docker compose up -d
 ```
 
-#### 16.3 Pin to a Specific Image Version
+Set it in `.env` rather than editing the compose file. `.env` is yours and no update touches it, while a compose file you have edited makes the next `git merge --ff-only` refuse rather than overwrite your change — which is the protection working, but it leaves you unable to update until you revert the edit.
 
-Edit `docker-compose.yml` and replace `latest` tags with the previous version:
+`docker compose images` lists what is running now, and 14.3 records the version before an update so there is something to pin back to.
 
-```yaml
-# Example: pin to a known-good version (replace with your previous tag)
-image: ghcr.io/insforge/insforge-oss:v1.5.0
-```
-
-> Note: the current `deploy/docker-compose` pins `v1.5.0`, and the project is now on the 2.x line. Pin to whatever version you were running before the update.
-
-#### 16.4 Restore the Database (If Needed)
+#### 16.3 Restore the Database (If Needed)
 
 Only restore the database if the update included a database migration that caused issues:
 
@@ -974,7 +972,7 @@ cat backup_YYYYMMDD_HHMMSS.sql | \
 docker compose up -d
 ```
 
-#### 16.5 Restore Environment File (If Changed)
+#### 16.4 Restore Environment File (If Changed)
 
 ```bash
 cp .env.backup_YYYYMMDD .env

@@ -924,25 +924,23 @@ cd ~/insforge
 docker compose down
 ```
 
-#### 16.2 Restaura el archivo de Docker Compose anterior
+#### 16.2 Fija la versión anterior
+
+Escribe en `.env` la versión que ejecutabas antes y arranca de nuevo:
+
+```env
+INSFORGE_OSS_VERSION=v2.2.9
+```
 
 ```bash
-# If you saved the old file
-mv docker-compose.yml.old docker-compose.yml
+docker compose up -d
 ```
 
-#### 16.3 Fija una versión específica de la imagen
+Defínela en `.env` en lugar de editar el archivo compose. `.env` es tuyo y ninguna actualización lo toca, mientras que un archivo compose que hayas editado hace que el siguiente `git merge --ff-only` se niegue en vez de sobrescribir tu cambio — la protección funcionando, pero te deja sin poder actualizar hasta que revi ertas la edición.
 
-Edita `docker-compose.yml` y sustituye las etiquetas `latest` por la versión anterior:
+`docker compose images` muestra qué versión se está ejecutando, y 14.3 registra la versión antes de una actualización para tener algo a lo que volver.
 
-```yaml
-# Example: pin to a known-good version (replace with your previous tag)
-image: ghcr.io/insforge/insforge-oss:v1.5.0
-```
-
-> Nota: el `deploy/docker-compose` actual fija la versión `v1.5.0`, y el proyecto ya está en la línea 2.x. Fija la versión que estuvieras ejecutando antes de la actualización.
-
-#### 16.4 Restaura la base de datos (si es necesario)
+#### 16.3 Restaura la base de datos (si es necesario)
 
 Restaura la base de datos solo si la actualización incluyó una migración de base de datos que causó problemas:
 
@@ -965,7 +963,7 @@ cat backup_YYYYMMDD_HHMMSS.sql | \
 docker compose up -d
 ```
 
-#### 16.5 Restaura el archivo de entorno (si cambió)
+#### 16.4 Restaura el archivo de entorno (si cambió)
 
 ```bash
 cp .env.backup_YYYYMMDD .env

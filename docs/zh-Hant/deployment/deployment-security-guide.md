@@ -923,25 +923,23 @@ cd ~/insforge
 docker compose down
 ```
 
-#### 16.2 還原先前的 Docker Compose 檔案
+#### 16.2 固定回先前的版本
+
+在 `.env` 中寫上你更新前執行的版本，然後重新啟動：
+
+```env
+INSFORGE_OSS_VERSION=v2.2.9
+```
 
 ```bash
-# If you saved the old file
-mv docker-compose.yml.old docker-compose.yml
+docker compose up -d
 ```
 
-#### 16.3 固定至指定的映像檔版本
+要寫在 `.env` 中，不要去修改 compose 檔案。`.env` 屬於你，任何更新都不會動它；而被你修改過的 compose 檔案會讓下一次 `git merge --ff-only` 拒絕合併——那是保護機制在運作，但在你還原修改之前就無法更新了。
 
-編輯 `docker-compose.yml`，將 `latest` 標籤替換為先前的版本：
+`docker compose images` 可以看到目前執行的版本，14.3 會在更新前記錄版本，這樣才有可回退的目標。
 
-```yaml
-# Example: pin to a known-good version (replace with your previous tag)
-image: ghcr.io/insforge/insforge-oss:v1.5.0
-```
-
-> 注意：目前 `deploy/docker-compose` 固定使用 `v1.5.0`，而專案現已進展到 2.x 系列。請固定至你更新前所執行的版本。
-
-#### 16.4 還原資料庫（如有需要）
+#### 16.3 還原資料庫（如有需要）
 
 僅當此次更新包含造成問題的資料庫遷移時，才需要還原資料庫：
 
@@ -964,7 +962,7 @@ cat backup_YYYYMMDD_HHMMSS.sql | \
 docker compose up -d
 ```
 
-#### 16.5 還原環境變數檔案（如有變更）
+#### 16.4 還原環境變數檔案（如有變更）
 
 ```bash
 cp .env.backup_YYYYMMDD .env
