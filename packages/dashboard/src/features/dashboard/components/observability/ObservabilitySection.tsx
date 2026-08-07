@@ -134,6 +134,12 @@ export function ObservabilitySection() {
       fixedDomain: (totalBytes !== null ? [0, totalBytes] : undefined) as
         | [number, number]
         | undefined,
+      totalBytes,
+      // Supabase-style read: the hovered value as a share of the provisioned disk.
+      tooltipDetail:
+        totalBytes !== null && totalBytes > 0
+          ? (v: number) => `${((v / totalBytes) * 100).toFixed(1)}% of ${BYTES_SIZE(totalBytes)}`
+          : undefined,
     };
   }, [data]);
 
@@ -249,6 +255,15 @@ export function ObservabilitySection() {
                   threshold={diskCardProps.threshold}
                   fixedDomain={diskCardProps.fixedDomain}
                   formatAxisLabel={BYTES_SIZE}
+                  ceilingLabel={
+                    diskCardProps.totalBytes !== null
+                      ? t('overview.metrics.diskUsed.ceiling', {
+                          value: BYTES_SIZE(diskCardProps.totalBytes),
+                          defaultValue: 'Disk Size {{value}}',
+                        })
+                      : undefined
+                  }
+                  tooltipDetail={diskCardProps.tooltipDetail}
                   description={t('overview.metrics.diskUsed.description', {
                     defaultValue:
                       "How much of your instance's storage the database, files, and logs are using. A full disk stops writes and can take the backend offline.",

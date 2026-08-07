@@ -20,6 +20,14 @@ export interface MetricChartCardProps {
   formatAxisLabel?: (value: number) => string;
   /** Short explanation of the metric, surfaced via an info tooltip next to the title. */
   description?: string;
+  /**
+   * Labels the top of a fixed domain (e.g. "Disk Size 3.9 GB") with a dashed
+   * ceiling line, the Supabase-style read of "how much room is there at all".
+   * Only meaningful with `fixedDomain`.
+   */
+  ceilingLabel?: string;
+  /** Extra tooltip line under the value, e.g. the value as a share of the ceiling. */
+  tooltipDetail?: (value: number) => string;
 }
 
 const SPARKLINE_WIDTH = 434;
@@ -113,6 +121,8 @@ export function MetricChartCard({
   fixedDomain,
   formatAxisLabel,
   description,
+  ceilingLabel,
+  tooltipDetail,
 }: MetricChartCardProps) {
   const { t } = useTranslation('chrome');
   const effectiveDomain =
@@ -135,6 +145,19 @@ export function MetricChartCard({
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   const renderValue = (value: number | null) => (value === null ? '—' : formatValue(value));
+
+  // Timestamp of the newest sample, under the headline (Supabase-style): the
+  // big number is a reading at a moment, not a live gauge, and saying which
+  // moment stops "why doesn't it move?" confusion on slow-scrape metrics.
+  const latestTimestamp = useMemo(() => {
+    let latest: number | null = null;
+    for (const point of data) {
+      if (Number.isFinite(point.value) && (latest === null || point.timestamp > latest)) {
+        latest = point.timestamp;
+      }
+    }
+    return latest;
+  }, [data]);
 
   const handleMove: MouseEventHandler<SVGSVGElement> = (e) => {
     const svg = svgRef.current;
@@ -215,9 +238,22 @@ export function MetricChartCard({
             </Popover>
           )}
         </div>
-        <p className="text-[20px] font-medium leading-7 text-foreground">
-          {isLoading ? '—' : renderValue(aggregates.latest)}
-        </p>
+        <div className="flex flex-col">
+          <p className="text-[20px] font-medium leading-7 text-foreground">
+            {isLoading ? '—' : renderValue(aggregates.latest)}
+          </p>
+          {!isLoading && latestTimestamp !== null && (
+            <p className="text-xs leading-4 text-muted-foreground">
+              {new Date(latestTimestamp * 1000).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </p>
+          )}
+        </div>
         <div className="flex flex-col gap-1">
           <div className="relative h-[100px]">
             {sparkline.line ? (
@@ -292,6 +328,18 @@ export function MetricChartCard({
                       vectorEffect="non-scaling-stroke"
                     />
                   )}
+                  {ceilingLabel !== undefined && fixedDomain && (
+                    <line
+                      x1={Y_AXIS_LABEL_WIDTH}
+                      x2={SPARKLINE_WIDTH}
+                      y1={1}
+                      y2={1}
+                      stroke="var(--alpha-16)"
+                      strokeWidth={1}
+                      strokeDasharray="4 3"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
                   <path
                     d={sparkline.line}
                     fill="none"
@@ -312,6 +360,11 @@ export function MetricChartCard({
                       {renderAxisLabel(domainMin)}
                     </span>
                   </>
+                )}
+                {ceilingLabel !== undefined && fixedDomain && (
+                  <span className="pointer-events-none absolute left-0 top-0.5 text-xs leading-4 text-muted-foreground">
+                    {ceilingLabel}
+                  </span>
                 )}
                 {hover && (
                   <>
@@ -341,6 +394,9 @@ export function MetricChartCard({
                       >
                         {formatValue(hover.value)}
                       </div>
+                      {tooltipDetail && (
+                        <div className="text-muted-foreground">{tooltipDetail(hover.value)}</div>
+                      )}
                       <div className="text-muted-foreground">
                         {formatHoverTime(hover.timestamp, rangeSeconds)}
                       </div>
