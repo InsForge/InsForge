@@ -35,6 +35,9 @@ NO_GIT=
 # the same protection the update path relies on.
 checkout_ref() {
   [ -n "$REF" ] || return 0
+  # The HTTPS path already fetched each file at $REF, and there is no repository
+  # here to fetch into.
+  [ -z "${NO_GIT:-}" ] || return 0
   git fetch --depth 1 origin "$REF" ||
     { echo "Could not fetch $REF from origin." >&2; exit 1; }
   git checkout --detach FETCH_HEAD ||
@@ -42,8 +45,13 @@ checkout_ref() {
 }
 
 
-# Every file the image-only stack reads, plus this script so it travels with the
-# checkout. One list, used by both acquisition modes below.
+# Every file the image-only stack reads. One list, used by both acquisition modes
+# below, so they cannot disagree about what the stack needs.
+#
+# This script is not in it. The git path adds it to the sparse patterns so it
+# travels with the checkout for the update procedure; the HTTPS path has no
+# update procedure, its caller already holds the script, and a ref older than
+# this file would 404 on it and fail the whole fetch.
 #
 # functions/examples/ is deliberately absent, where the old directory pattern
 # swept it in: the compose file mounts all of functions/ but the runtime only
@@ -55,7 +63,6 @@ docker-compose.rustfs.yml
 functions/deno.json
 functions/server.ts
 functions/worker-template.js
-deploy/setup.sh
 deploy/docker-compose/docker-compose.yml
 deploy/docker-init/db/db-init.sql
 deploy/docker-init/db/jwt.sql
@@ -68,7 +75,9 @@ if [ -n "${INSFORGE_NO_GIT:-}" ] || ! command -v git >/dev/null 2>&1; then
   # Same guard as the git path below, and it matters more here: curl overwrites
   # tracked files in place without asking, where git at least refuses. A previous
   # self-host install is sparse, so it is not caught.
-  if [ -d "$TARGET/.git" ] &&
+  # -e, not -d: in a linked worktree .git is a file, and this guard read as
+  # "no git here" for exactly the tree it most needs to protect.
+  if [ -e "$TARGET/.git" ] &&
      [ "$(git -C "$TARGET" config --get core.sparseCheckout 2>/dev/null)" != true ]; then
     echo "$TARGET is a git working tree. Fetching into it would overwrite files" >&2
     echo "it tracks, including uncommitted changes." >&2
@@ -140,7 +149,8 @@ checkout_ref
 if [ -z "${NO_GIT:-}" ]; then
   # Leading slash anchors each pattern at the repository root.
   # shellcheck disable=SC2086
-  git sparse-checkout set --no-cone $(for f in $FILES; do printf '/%s ' "$f"; done)
+  git sparse-checkout set --no-cone /deploy/setup.sh \
+    $(for f in $FILES; do printf '/%s ' "$f"; done)
 fi
 
 set_var() {
