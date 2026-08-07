@@ -399,6 +399,25 @@ describe('ComputeServicesService', () => {
       mockQuery.mockRejectedValueOnce(new Error('connection terminated'));
       await expect(service.reconcile()).resolves.toMatchObject({ checked: 0 });
     });
+
+    // The heal is a write inside the catch block. Letting it throw would escape
+    // the loop and abandon every row after it — nine healthy corrections lost to
+    // one bad write.
+    it('keeps sweeping when a heal write fails', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [row(), row({ id: 'svc-2', name: 'api', provider_instance_id: 'machine-2' })],
+      });
+      mockGetMachineStatus
+        .mockRejectedValueOnce(new MachineGoneError('app-1', 'machine-1'))
+        .mockResolvedValueOnce({ state: 'stopped' });
+      mockQuery.mockRejectedValueOnce(new Error('deadlock detected')); // the heal
+      mockQuery.mockResolvedValueOnce({ rows: [] }); // svc-2's correction still lands
+
+      const stats = await service.reconcile();
+
+      expect(stats).toMatchObject({ checked: 2, healed: 0, corrected: 1, skipped: 1 });
+      expect(mockQuery.mock.calls[2][1]).toEqual(['stopped', 'svc-2']);
+    });
   });
 
   describe('buildAndDeploy', () => {
@@ -1783,6 +1802,49 @@ describe('ComputeServicesService', () => {
       const updateCall = mockQuery.mock.calls[2];
       expect(updateCall[0]).toContain('protocol');
       expect(updateCall[1]).toContain('tcp');
+    });
+
+    // Docker cannot change an image in place, so it replaces the container. The
+    // replacement comes up running, and a row that was 'stopped' (the caller had
+    // stopped the service, then redeployed it) would otherwise keep claiming
+    // 'stopped' while the container runs.
+    it('flips a stopped row to running when the driver replaced the instance', async () => {
+      const stoppedRow = {
+        ...baseRow,
+        provider_instance_id: 'mach-old',
+        status: 'stopped',
+      };
+      mockQuery.mockResolvedValueOnce({ rows: [stoppedRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockUpdateMachine.mockResolvedValue({ machineId: 'mach-new', endpointUrl: null });
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...stoppedRow, status: 'running' }] });
+
+      await service.updateService('svc-pa-1', { imageUrl: 'nginx:1.27' });
+
+      const [sql, params] = mockQuery.mock.calls[2];
+      expect(sql).toContain('status');
+      expect(params).toContain('running');
+      expect(params).toContain('mach-new');
+    });
+
+    // The mirror image: an in-place update starts nothing, so a stopped service
+    // that only resizes stays stopped.
+    it('leaves a stopped row stopped when the driver updated in place', async () => {
+      const stoppedRow = {
+        ...baseRow,
+        provider_instance_id: 'mach-existing',
+        status: 'stopped',
+      };
+      mockQuery.mockResolvedValueOnce({ rows: [stoppedRow] });
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] });
+      mockUpdateMachine.mockResolvedValue({}); // same instance, resized in place
+      mockQuery.mockResolvedValueOnce({ rows: [stoppedRow] });
+
+      await service.updateService('svc-pa-1', { memory: 1024 });
+
+      const [sql, params] = mockQuery.mock.calls[2];
+      expect(sql).not.toContain('status');
+      expect(params).not.toContain('running');
     });
 
     // Back-compat — if the caller doesn't pass `protocol`, the persisted value

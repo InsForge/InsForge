@@ -243,10 +243,16 @@ export class DockerProvider implements ComputeProvider {
     } catch (error) {
       // Not fatal — the backend may not be running in a container at all (local
       // dev against a host daemon). Containers land on the default bridge.
-      this.ownNetwork = null;
+      //
+      // Deliberately not cached. A daemon blip during the first launch would
+      // otherwise pin `null` for the rest of the process lifetime and detach
+      // every later container from the project network — the one failure mode
+      // this lookup exists to prevent. Retrying costs one inspect per launch,
+      // which is also the steady state when we genuinely aren't containerized.
       logger.warn('Docker compute: own-container inspect failed; using the default bridge', {
         error: error instanceof Error ? error.message : String(error),
       });
+      return null;
     }
     return this.ownNetwork;
   }
@@ -826,11 +832,22 @@ export class DockerProvider implements ComputeProvider {
       stdout: '1',
       stderr: '1',
       timestamps: '1',
-      tail: String(limit),
     });
-    if (watermark !== null) {
+    if (watermark === null) {
+      // First page: no cursor to be consistent with, so ask for the newest
+      // `limit` lines instead of the whole retained history.
+      params.set('tail', String(limit));
+    } else {
       // Floor to whole seconds — the only precision the parameter accepts.
       params.set('since', String(watermark / 1_000_000_000n));
+      // No `tail` when resuming. `tail` keeps the *newest* N, so pairing it with
+      // `since` drops the middle of a backlog: 500 lines since the cursor with
+      // tail=100 returns the newest 100 and the cursor then advances past the
+      // other 400, which no later request can reach. Taking everything since the
+      // cursor and returning the oldest `limit` (below) makes the next page
+      // resume exactly where this one stopped, so a paging caller sees them all.
+      // The response is then only as large as what the container logged since
+      // the last poll.
     }
 
     const res = await dockerRequestRaw(
@@ -845,8 +862,7 @@ export class DockerProvider implements ComputeProvider {
       );
     }
 
-    const lines: ComputeLogLine[] = [];
-    let highest = watermark;
+    const entries: { line: ComputeLogLine; nanos: bigint }[] = [];
     for (const frame of demuxDockerStream(res.body)) {
       for (const raw of frame.text.split('\n')) {
         if (!raw.trim()) {
@@ -860,15 +876,27 @@ export class DockerProvider implements ComputeProvider {
         if (watermark !== null && parsed.nanos <= watermark) {
           continue;
         }
-        lines.push({ timestamp: parsed.ms, message: parsed.message });
-        if (highest === null || parsed.nanos > highest) {
-          highest = parsed.nanos;
-        }
+        entries.push({
+          line: { timestamp: parsed.ms, message: parsed.message },
+          nanos: parsed.nanos,
+        });
       }
     }
 
-    const bounded = lines.length > limit ? lines.slice(-limit) : lines;
-    return { lines: bounded, nextToken: highest === null ? null : highest.toString() };
+    // Docker emits oldest-first, so trimming the tail keeps the oldest `limit`
+    // and leaves the remainder for the next page. The cursor is taken from what
+    // is actually returned — never from a line that got trimmed.
+    const page = entries.length > limit ? entries.slice(0, limit) : entries;
+    let highest = watermark;
+    for (const entry of page) {
+      if (highest === null || entry.nanos > highest) {
+        highest = entry.nanos;
+      }
+    }
+    return {
+      lines: page.map((entry) => entry.line),
+      nextToken: highest === null ? null : highest.toString(),
+    };
   }
 
   private parseWatermark(token: string): bigint | null {

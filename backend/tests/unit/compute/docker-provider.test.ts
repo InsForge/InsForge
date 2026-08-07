@@ -603,6 +603,96 @@ describe('DockerProvider', () => {
       const result = await provider.getLogs('app', 'container-abc');
       expect(result).toEqual({ lines: [], nextToken: null });
     });
+
+    // `tail` keeps the newest N. Pairing it with `since` would return the newest
+    // N of the backlog and then advance the cursor past everything older, which
+    // no later request could reach — the middle of the backlog would be gone.
+    it('asks for a tail on the first page but not when resuming from a cursor', async () => {
+      mockRequest.mockResolvedValueOnce(ownedContainer());
+      mockRequestRaw.mockResolvedValueOnce({ status: 200, body: Buffer.alloc(0) });
+      await provider.getLogs('app', 'container-abc', { limit: 50 });
+      expect(mockRequestRaw.mock.calls[0][1]).toContain('tail=50');
+
+      mockRequest.mockResolvedValueOnce(ownedContainer());
+      mockRequestRaw.mockResolvedValueOnce({ status: 200, body: Buffer.alloc(0) });
+      await provider.getLogs('app', 'container-abc', {
+        limit: 50,
+        nextToken: '1786056693200000000',
+      });
+      const resumed = mockRequestRaw.mock.calls[1][1] as string;
+      expect(resumed).toContain('since=1786056693');
+      expect(resumed).not.toContain('tail=');
+    });
+
+    it('hands back the oldest `limit` lines and a cursor that reaches the rest', async () => {
+      const backlog = Buffer.concat(
+        Array.from({ length: 5 }, (_, i) => frame(`2026-08-06T22:51:4${i}.000000000Z line-${i}\n`))
+      );
+      mockRequest.mockResolvedValueOnce(ownedContainer());
+      mockRequestRaw.mockResolvedValueOnce({ status: 200, body: backlog });
+
+      const first = await provider.getLogs('app', 'container-abc', { limit: 2 });
+      // Oldest first, so nothing is skipped — not the newest 2.
+      expect(first.lines.map((l) => l.message)).toEqual(['line-0', 'line-1']);
+      // Cursor is the last line returned, never one that got trimmed.
+      expect(first.nextToken).toBe(String(Date.parse('2026-08-06T22:51:41Z') * 1_000_000));
+
+      // Replay the same backlog: the cursor picks up exactly where page 1 stopped.
+      mockRequest.mockResolvedValueOnce(ownedContainer());
+      mockRequestRaw.mockResolvedValueOnce({ status: 200, body: backlog });
+      const second = await provider.getLogs('app', 'container-abc', {
+        limit: 2,
+        nextToken: first.nextToken as string,
+      });
+      expect(second.lines.map((l) => l.message)).toEqual(['line-2', 'line-3']);
+    });
+  });
+
+  describe('project network discovery', () => {
+    // A cached null would detach every later container from the project network
+    // for the rest of the process lifetime, so a failed inspect must not stick.
+    it('retries after a failed self-inspect instead of caching the failure', async () => {
+      const { config } = await import('@/infra/config/app.config.js');
+      const isolated = config.docker.isolateNetwork;
+      config.docker.isolateNetwork = false;
+      try {
+        const fresh = new DockerProvider();
+        const params = {
+          appId: 'insforge-testkey1-api',
+          image: 'nginx:alpine',
+          port: 80,
+          cpu: 'shared-1x',
+          memory: 256,
+          region: 'local',
+        };
+        const createBody = () =>
+          mockRequest.mock.calls.find((c) => String(c[1]).includes('/containers/create'))?.[2]
+            ?.body;
+
+        // First launch: the self-inspect blips, so we fall back to the bridge.
+        imageAlreadyPresent();
+        mockRequest.mockRejectedValueOnce(new Error('daemon restarting'));
+        mockRequest.mockResolvedValueOnce({ Id: 'new-1' });
+        mockRequest.mockResolvedValueOnce(undefined);
+        await fresh.launchMachine(params);
+        expect(createBody()?.NetworkingConfig).toBeUndefined();
+
+        // Second launch: the daemon is back, so the network is found and used.
+        mockRequest.mockClear();
+        imageAlreadyPresent();
+        mockRequest.mockResolvedValueOnce({
+          NetworkSettings: { Networks: { bridge: {}, 'myproj_insforge-network': {} } },
+        });
+        mockRequest.mockResolvedValueOnce({ Id: 'new-2' });
+        mockRequest.mockResolvedValueOnce(undefined);
+        await fresh.launchMachine(params);
+        expect(createBody()?.NetworkingConfig).toEqual({
+          EndpointsConfig: { 'myproj_insforge-network': {} },
+        });
+      } finally {
+        config.docker.isolateNetwork = isolated;
+      }
+    });
   });
 
   describe('endpointUrl', () => {

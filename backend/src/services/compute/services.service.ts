@@ -699,8 +699,21 @@ export class ComputeServicesService {
         }
       } catch (error) {
         if (error instanceof MachineGoneError) {
-          await this.healMachineGone(row.id, instanceId);
-          stats.healed++;
+          // Guarded: this is the one write inside the catch, and letting it throw
+          // would escape the loop and abandon every row still unchecked. A sweep
+          // that heals nine of ten rows beats one that stops at the first bad
+          // write — the next boot retries this row anyway.
+          try {
+            await this.healMachineGone(row.id, instanceId);
+            stats.healed++;
+          } catch (healError) {
+            logger.error('Compute reconcile: could not heal a vanished machine', {
+              id: row.id,
+              name: row.name,
+              error: healError instanceof Error ? healError.message : String(healError),
+            });
+            stats.skipped++;
+          }
           continue;
         }
         // Transient (daemon restarting, network blip). Leave the row as-is —
@@ -1285,6 +1298,13 @@ export class ComputeServicesService {
             updates.push(`endpoint_url = $${paramIdx++}`);
             values.push(updated.endpointUrl);
           }
+          // The replacement is launched running, so the row has to follow: a
+          // service the caller had stopped and then redeployed would otherwise
+          // keep reporting 'stopped' while its container runs. Unconditional
+          // because Path A owns the only other status write and cannot co-occur
+          // with this branch (it requires no instance).
+          updates.push(`status = $${paramIdx++}`);
+          values.push('running');
           logger.info('Compute service instance replaced to apply the update', {
             id,
             previous: existing.providerInstanceId,

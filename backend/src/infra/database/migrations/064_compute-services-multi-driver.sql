@@ -50,12 +50,21 @@ END $$;
 -- was created by the Fly or cloud-proxied Fly path, since that was the only
 -- option. Cloud mode is Fly behind a control plane and shares the same app and
 -- machine identifiers, so one value covers both.
+--
+-- Split from the column add for the same reason as `ingress` below: on a rerun
+-- against an existing nullable column, `ADD COLUMN IF NOT EXISTS ... NOT NULL
+-- DEFAULT` applies neither the backfill nor the constraint.
 ALTER TABLE compute.services
-  ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'fly';
+  ADD COLUMN IF NOT EXISTS provider TEXT;
 
--- Drop the default once the backfill is done. New rows must state their driver
--- explicitly — a Docker row silently defaulting to 'fly' is exactly the
--- corruption the column exists to prevent.
+UPDATE compute.services SET provider = 'fly' WHERE provider IS NULL;
+
+ALTER TABLE compute.services ALTER COLUMN provider SET NOT NULL;
+
+-- No default: new rows must state their driver explicitly — a Docker row
+-- silently defaulting to 'fly' is exactly the corruption the column exists to
+-- prevent. Dropping it covers a rerun over an earlier revision of this file,
+-- which created the column with `DEFAULT 'fly'`.
 ALTER TABLE compute.services ALTER COLUMN provider DROP DEFAULT;
 
 ALTER TABLE compute.services DROP CONSTRAINT IF EXISTS compute_services_provider_check;
