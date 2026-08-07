@@ -56,6 +56,14 @@ export interface AppConfig {
     trustProxy: TrustProxySetting;
     keepAliveTimeoutMs: number;
   };
+  outbound: {
+    allowPrivateNetworks: boolean;
+    allowedHosts: string[];
+    requestTimeoutMs: number;
+    maxResponseBytes: number;
+    maxRequestBytes: number;
+    maxRedirects: number;
+  };
   database: {
     host: string;
     port: number;
@@ -126,14 +134,18 @@ function parseEnvBool(val: string | undefined): boolean {
 
 const AWS_MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024;
 
-function parseEnvBytes(val: string | undefined, fallback: number): number {
+function parseEnvBytes(
+  val: string | undefined,
+  fallback: number,
+  maxBytes: number = AWS_MAX_SINGLE_PUT_BYTES
+): number {
   if (!val) return fallback;
   if (!/^\d+$/.test(val)) return fallback;
   const parsed = Number(val);
   if (!Number.isFinite(parsed) || !Number.isSafeInteger(parsed) || parsed <= 0) {
     return fallback;
   }
-  return Math.min(parsed, AWS_MAX_SINGLE_PUT_BYTES);
+  return Math.min(parsed, maxBytes);
 }
 
 export function loadConfig(): AppConfig {
@@ -187,6 +199,25 @@ export function loadConfig(): AppConfig {
       // Must exceed the idle timeout of any proxy/LB in front of the backend,
       // otherwise clients can reuse a socket the server already closed.
       keepAliveTimeoutMs: parseEnvInt(process.env.KEEP_ALIVE_TIMEOUT_MS, 65000),
+    },
+    outbound: {
+      allowPrivateNetworks: parseEnvBool(process.env.OUTBOUND_ALLOW_PRIVATE_NETWORKS),
+      allowedHosts: (process.env.OUTBOUND_ALLOWED_HOSTS || '')
+        .split(',')
+        .map((host) => host.trim())
+        .filter(Boolean),
+      requestTimeoutMs: parseEnvInt(process.env.OUTBOUND_REQUEST_TIMEOUT_MS, 10000),
+      maxResponseBytes: parseEnvBytes(
+        process.env.OUTBOUND_MAX_RESPONSE_BYTES,
+        1024 * 1024,
+        100 * 1024 * 1024
+      ),
+      maxRequestBytes: parseEnvBytes(
+        process.env.OUTBOUND_MAX_REQUEST_BYTES,
+        10 * 1024 * 1024,
+        100 * 1024 * 1024
+      ),
+      maxRedirects: parseEnvInt(process.env.OUTBOUND_MAX_REDIRECTS, 0),
     },
     database: {
       host: process.env.POSTGRES_HOST || 'localhost',
