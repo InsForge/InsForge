@@ -326,11 +326,20 @@ OPENROUTER_API_KEY=
 
 # ── Storage (S3-compatible — leave empty for local storage) ──
 # For general file storage only (not deployments). If omitted, local
-# filesystem storage is used automatically.
-AWS_S3_BUCKET=
-AWS_REGION=
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
+# filesystem storage is used automatically. See the "Self-hosted storage"
+# guide for bring-your-own S3, bundled MinIO/RustFS overlays, and the
+# S3-compatible gateway.
+S3_BUCKET=
+S3_REGION=
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+# Custom S3-compatible endpoint (MinIO, RustFS, Wasabi, R2, COS, OSS ...);
+# leave empty for AWS S3
+S3_ENDPOINT_URL=
+S3_FORCE_PATH_STYLE=true
+# Set to false to proxy object bytes through the backend (required when the
+# endpoint is not reachable by browsers)
+S3_USE_PRESIGNED_URLS=
 
 # ── Deno Functions ────────────────────────────────────────────
 WORKER_TIMEOUT_MS=60000

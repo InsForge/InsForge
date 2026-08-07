@@ -53,6 +53,13 @@ cp .env.example .env.project1
 cp .env.example .env.project2
 ```
 
+`.env.example` ships the development value for `COMPOSE_FILE`, and the checkout
+does not contain that file — set it in each copy:
+
+```
+COMPOSE_FILE=deploy/docker-compose/docker-compose.yml
+```
+
 ### Step 2: Give each env file its own project name and ports
 
 **.env.project1** (default ports):

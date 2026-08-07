@@ -93,9 +93,9 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (openssl rand -hex 32) in this platform's environment settings}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY (openssl rand -hex 32, different from JWT_SECRET) in this platform's environment settings}
       ROOT_ADMIN_USERNAME: ${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
-      ROOT_ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-changeme123}}
+      ROOT_ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:?set ROOT_ADMIN_PASSWORD in this platform's environment settings — the dashboard is reachable from the internet}
       ADMIN_EMAIL: ${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
-      ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-changeme123}}
+      ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:?set ROOT_ADMIN_PASSWORD in this platform's environment settings — the dashboard is reachable from the internet}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:-insforge}

@@ -35,7 +35,7 @@ Use this skill for `backend/` work in the InsForge repository.
    - Preserve existing auth middleware patterns such as `verifyAdmin`, `verifyUser`, and `verifyApiKey`.
    - Never use the TypeScript `any` type. Prefer precise interfaces, schema-derived types, `unknown`, or constrained generics.
    - A new environment variable must be documented in the repository's single `.env.example`. Every compose file reads that one file, so a variable missing from it is one self-hosters cannot discover — the S3 storage settings went undocumented that way for months.
-   - `deploy/coolify/docker-compose.yml` and `deploy/dokploy/docker-compose.yml` carry identical service definitions apart from `INSFORGE_DEPLOYMENT_METHOD`, which telemetry reads to tell the two platforms apart; only their header comments differ by design. Change both, or one platform silently misses whatever you added.
+   - `deploy/coolify/docker-compose.yml` and `deploy/dokploy/docker-compose.yml` carry identical service definitions apart from two lines: `INSFORGE_DEPLOYMENT_METHOD`, which telemetry reads to tell the two platforms apart, and the build `context`, which differs because Coolify builds with `--project-directory <repo root>` and Dokploy does not. Their header comments are per-platform by design. Change both, or one platform silently misses whatever you added.
    - For schema changes, write a new migration file instead of editing database structure manually.
    - Put schema changes under `backend/src/infra/database/migrations/`.
 

@@ -383,7 +383,7 @@ docker compose pull && docker compose up -d
 ### 备份数据库
 
 ```bash
-# Create backup (run from deploy/docker-compose/)
+# Create backup (run from ~/insforge)
 docker compose exec postgres pg_dump -U postgres insforge > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # Store backup in Google Cloud Storage (optional)

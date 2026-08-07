@@ -148,7 +148,8 @@ agent: create me a container called 'insforge'
 agent: set InsForge up, fill in .env
   → ssh insforge agent-box
     → shell_exec("curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge")
-    → write_file("~/insforge/.env", "<contents>")
+    → edit ~/insforge/.env: API_BASE_URL, VITE_API_BASE_URL
+      (setup.sh already generated the secrets — do not rewrite the file)
 
 agent: enable autostart
   → mcp__containarium__compose_enable(

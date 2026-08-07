@@ -98,6 +98,9 @@ pin_compose_file() {
 # lost database.
 if [ -f deploy/docker-compose/.env ] && [ ! -f "$ENV_FILE" ]; then
   mv deploy/docker-compose/.env "$ENV_FILE"
+  # The old location was not necessarily 600, and this branch exits before the
+  # fresh-install path that sets it.
+  chmod 600 "$ENV_FILE"
   pin_compose_file
   echo "Moved deploy/docker-compose/.env to $ROOT/.env."
   echo "Run docker compose from $ROOT from now on."
