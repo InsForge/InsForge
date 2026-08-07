@@ -62,12 +62,14 @@ deploy/docker-init/db/postgresql.conf'
 # total, against 47MB for the repository tarball, and precise where a tar glob
 # would not be — `*/functions` also matches backend/src/.../functions.
 if [ -n "${INSFORGE_NO_GIT:-}" ] || ! command -v git >/dev/null 2>&1; then
-  # Same guard as the git path below: overwriting a development clone's tracked
-  # files in place is worse here, because curl does it without asking.
+  # Same guard as the git path below, and it matters more here: curl overwrites
+  # tracked files in place without asking, where git at least refuses. A previous
+  # self-host install is sparse, so it is not caught.
   if [ -d "$TARGET/.git" ] &&
      [ "$(git -C "$TARGET" config --get core.sparseCheckout 2>/dev/null)" != true ]; then
-    echo "$TARGET is a full checkout, not a self-hosting one." >&2
-    echo "Pass a different target: sh deploy/setup.sh ~/insforge" >&2
+    echo "$TARGET is a git working tree. Fetching into it would overwrite files" >&2
+    echo "it tracks, including uncommitted changes." >&2
+    echo "Pass a directory of its own: sh deploy/setup.sh ~/insforge" >&2
     exit 1
   fi
   mkdir -p "$TARGET"
@@ -104,8 +106,10 @@ ENV_FILE=.env
 # production compose file.
 if [ -z "${NO_GIT:-}" ] && [ -z "$CLONED" ] &&
    [ "$(git config --get core.sparseCheckout)" != true ]; then
-  echo "$ROOT is a full checkout, not a self-hosting one." >&2
-  echo "Pass a target instead: sh deploy/setup.sh ~/insforge" >&2
+  echo "$ROOT is a git working tree that is not a self-host checkout." >&2
+  echo "Applying a sparse checkout here would empty it of everything outside" >&2
+  echo "this script's file list. Pass a directory of its own instead:" >&2
+  echo "  sh deploy/setup.sh ~/insforge" >&2
   exit 1
 fi
 
