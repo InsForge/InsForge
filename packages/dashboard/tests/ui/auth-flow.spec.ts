@@ -19,6 +19,23 @@ test('signs in with mocked self-hosting admin credentials', async ({ page }) => 
   await expect(page).toHaveURL(/\/dashboard$/);
 });
 
+test('lazy-loads a feature section on navigation after signing in', async ({ page }) => {
+  await mockSelfHostingDashboardApi(page);
+
+  await page.goto('/dashboard/login');
+  await page.locator('input[name="username"]').fill('admin');
+  await page.locator('input[type="password"]').fill('test-admin-password-for-ci');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+
+  // Navigating to another section must resolve that section's lazy route chunk
+  // through Suspense and render the page — not the loading fallback or the
+  // chunk error boundary. This guards route-level code splitting in AppRoutes.
+  await page.getByRole('link', { name: 'Authentication' }).click();
+  await expect(page).toHaveURL(/\/dashboard\/authentication\/users$/);
+  await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
+});
+
 test('redirects unauthenticated dashboard visitors to the self-hosting login page', async ({
   page,
 }) => {
