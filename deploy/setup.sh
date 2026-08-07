@@ -18,7 +18,9 @@ REPO=${INSFORGE_REPO:-https://github.com/InsForge/InsForge.git}
 # Derived from REPO so pointing at a fork does not silently fetch the official
 # files. INSFORGE_RAW overrides it for a host that is not raw.githubusercontent.
 RAW=${INSFORGE_RAW:-$(echo "$REPO" |
-  sed -e 's|^https://github.com/|https://raw.githubusercontent.com/|' -e 's|\.git$||')}
+  sed -e 's|^git@github\.com:|https://raw.githubusercontent.com/|' \
+      -e 's|^https://github\.com/|https://raw.githubusercontent.com/|' \
+      -e 's|\.git$||')}
 REF=${INSFORGE_REF:-}
 TARGET=${1:-insforge}
 CLONED=
@@ -38,6 +40,7 @@ checkout_ref() {
   git checkout --detach FETCH_HEAD ||
     { echo "Could not check out $REF. Commit or stash local changes first." >&2; exit 1; }
 }
+
 
 # Every file the image-only stack reads, plus this script so it travels with the
 # checkout. One list, used by both acquisition modes below.
@@ -86,10 +89,8 @@ if [ -n "${NO_GIT:-}" ]; then
   : # already fetched above
 elif [ -e "$TARGET/.git" ]; then
   cd "$TARGET"
-  checkout_ref
 elif [ -z "$1" ] && [ -e .git ] && [ -f deploy/docker-compose/docker-compose.yml ]; then
-  # no target given and we are already inside a checkout
-  checkout_ref
+  : # no target given and we are already inside a checkout
 else
   # --branch takes a tag as well, so one flag covers both refs.
   git clone --depth 1 --filter=blob:none --sparse \
@@ -112,6 +113,10 @@ if [ -z "${NO_GIT:-}" ] && [ -z "$CLONED" ] &&
   echo "  sh deploy/setup.sh ~/insforge" >&2
   exit 1
 fi
+
+# Only now that the guard has accepted this directory: moving HEAD first would
+# leave a development checkout detached at the requested ref and *then* fail.
+checkout_ref
 
 # Every file the image-only stack reads, plus this script so it travels with the
 # checkout. Re-applied on every run, which is why the update procedure calls this
@@ -150,6 +155,10 @@ set_var() {
 # Compose treats an empty value as unset, so `${JWT_SECRET:-dev-secret-...}`
 # would fall back to the placeholder default. An openssl that fails — or is
 # missing — must stop the script rather than hand out a known secret.
+# $3 is an optional prefix the backend expects on that kind of key. It is added
+# here rather than by the caller so a failed openssl cannot leave the prefix
+# behind as the whole value — `ACCESS_API_KEY=ik_` is non-empty, so Compose would
+# pass it through and the backend would seed three characters as its API key.
 gen_secret() {
   value=$(openssl rand -hex "$2") || value=
   if [ -z "$value" ]; then
@@ -160,7 +169,7 @@ gen_secret() {
     echo "Could not generate $1: openssl rand failed. No .env was written." >&2
     exit 1
   fi
-  set_var "$1" "$value"
+  set_var "$1" "${3:-}$value"
 }
 
 COMPOSE_FILE_VALUE=deploy/docker-compose/docker-compose.yml
@@ -224,8 +233,8 @@ gen_secret POSTGRES_PASSWORD 16
 # The keys the CLI and SDKs authenticate with. The backend would generate its own
 # if these were empty, but then only it would know them; generating here means the
 # install has credentials to hand out. Prefixed because the backend expects it.
-set_var ACCESS_API_KEY "ik_$(openssl rand -hex 20)"
-set_var ACCESS_ANON_KEY "anon_$(openssl rand -hex 20)"
+gen_secret ACCESS_API_KEY 20 ik_
+gen_secret ACCESS_ANON_KEY 20 anon_
 
 cat <<DONE
 
