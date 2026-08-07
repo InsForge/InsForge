@@ -1,6 +1,6 @@
 ---
 title: "Autoalojar InsForge en Coolify"
-description: "Despliega el backend de InsForge en Coolify como recurso de Docker Compose, con la imagen de Postgres construida desde el repositorio para que su configuración siempre coincida con la versión."
+description: "Autoaloja InsForge en Coolify como recurso de Docker Compose, con la imagen de Postgres construida desde el repositorio para coincidir con la versión."
 ---
 
 # Autoalojar InsForge en Coolify
