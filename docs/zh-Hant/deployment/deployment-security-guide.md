@@ -260,9 +260,12 @@ openssl rand -base64 18
 
 #### 5.2 資料庫變數
 
+`setup.sh` 已經產生了 `POSTGRES_PASSWORD`。Postgres 僅在初始化資料叢集時讀取它，
+因此在 4.2 啟動 stack 之後再修改不會變更資料庫密碼——除非你尚未啟動任何東西，
+否則請勿改動。
+
 ```env
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=<strong-unique-password>
 POSTGRES_DB=insforge
 ```
 
@@ -865,7 +868,7 @@ docker compose images
 cd ~/insforge
 
 git fetch origin main
-git diff HEAD origin/main -- deploy .env.example
+git diff HEAD origin/main -- deploy functions .env.example
 
 git merge --ff-only origin/main
 

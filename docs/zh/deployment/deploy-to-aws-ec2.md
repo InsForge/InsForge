@@ -329,7 +329,7 @@ docker compose restart
 
 ### 更新 InsForge
 
-InsForge 发布的是预构建镜像，因此更新只需拉取镜像并重启。请在 `~/insforge` 下运行以下命令：
+更新是拉镜像加重启——但 checkout 同样重要：Postgres 的配置和 Deno 函数都是从它读的。请在 `~/insforge` 下运行以下命令：
 
 ```bash
 cd ~/insforge

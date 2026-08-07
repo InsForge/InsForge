@@ -198,7 +198,7 @@ Esta guía proporciona instrucciones completas y paso a paso para desplegar, ges
 4.  **Actualizar `.env` con URLs HTTPS:**
     Edite su archivo `.env` y actualice las URLs.
     ```bash
-    cd ~/InsForge
+    cd ~/insforge
     nano .env
     ```
     Cambie las URLs a `https`:
@@ -220,8 +220,8 @@ Esta guía proporciona instrucciones completas y paso a paso para desplegar, ges
 * **Reiniciar servicios:** `docker compose restart`
 * **Actualizar InsForge:** Ejecute esto desde `~/insforge`. Las imágenes están preconstruidas, así que descargue las últimas etiquetas en lugar de reconstruir.
     ```bash
-    cd ~/InsForge
-    git -C ~/InsForge pull origin main
+    cd ~/insforge
+    git -C ~/insforge pull origin main
     sh deploy/setup.sh .
     docker compose pull && docker compose up -d
     ```

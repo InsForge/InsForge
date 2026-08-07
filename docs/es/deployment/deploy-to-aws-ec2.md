@@ -329,7 +329,7 @@ docker compose restart
 
 ### Actualizar InsForge
 
-InsForge distribuye imágenes precompiladas, así que actualizar consiste en descargar y reiniciar. Ejecuta esto desde `~/insforge`:
+Actualizar consiste en descargar y reiniciar, pero el checkout también importa: el stack lee de él la configuración de Postgres y las funciones de Deno. Ejecuta esto desde `~/insforge`:
 
 ```bash
 cd ~/insforge

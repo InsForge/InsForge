@@ -333,7 +333,7 @@ docker compose restart
 
 ### Update InsForge
 
-InsForge ships prebuilt images, so an update is a pull and restart. Run this from `~/insforge`:
+An update is a pull and restart — but the checkout matters too: the stack reads Postgres's configuration and the Deno functions from it. Run this from `~/insforge`:
 
 ```bash
 cd ~/insforge

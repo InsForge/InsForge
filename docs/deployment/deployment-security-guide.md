@@ -264,9 +264,13 @@ openssl rand -base64 18
 
 #### 5.2 Database Variables
 
+`setup.sh` already generated `POSTGRES_PASSWORD`. Postgres reads it only when it
+initializes the cluster, so changing it after 4.2 has started the stack does not
+change the database password — leave it alone unless you are setting up for the
+first time and have not started anything yet.
+
 ```env
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=<strong-unique-password>
 POSTGRES_DB=insforge
 ```
 
@@ -874,7 +878,7 @@ Update the checkout before pulling images: it carries the compose file and the P
 cd ~/insforge
 
 git fetch origin main
-git diff HEAD origin/main -- deploy .env.example
+git diff HEAD origin/main -- deploy functions .env.example
 
 git merge --ff-only origin/main
 

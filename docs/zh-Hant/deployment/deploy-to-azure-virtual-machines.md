@@ -198,7 +198,7 @@ description: "在 Azure 虛擬機器上使用 Docker Compose 部署 InsForge，�
 4.  **使用 HTTPS URL 更新 `.env`：**
     編輯你的 `.env` 檔案並更新 URL。
     ```bash
-    cd ~/InsForge
+    cd ~/insforge
     nano .env
     ```
     將 URL 變更為 `https`：
@@ -220,8 +220,8 @@ description: "在 Azure 虛擬機器上使用 Docker Compose 部署 InsForge，�
 * **重新啟動服務：** `docker compose restart`
 * **更新 InsForge：** 從 `~/insforge` 執行以下命令。映像是預先建置好的，因此拉取最新標籤即可，無需重新建置。
     ```bash
-    cd ~/InsForge
-    git -C ~/InsForge pull origin main
+    cd ~/insforge
+    git -C ~/insforge pull origin main
     sh deploy/setup.sh .
     docker compose pull && docker compose up -d
     ```

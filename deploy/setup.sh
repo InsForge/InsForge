@@ -89,8 +89,19 @@ COMPOSE_FILE_VALUE=deploy/docker-compose/docker-compose.yml
 # absent, because a storage overlay appended by hand has to survive re-runs; the
 # fresh-install path below sets it outright, replacing .env.example's development
 # value.
+# Must equal .env.example's COMPOSE_FILE. Anyone who copied that template by
+# hand is pointing at a file this checkout does not have.
+DEV_COMPOSE_FILE_VALUE=docker-compose.yml
+
 pin_compose_file() {
-  grep -q '^COMPOSE_FILE=' "$ENV_FILE" || set_var COMPOSE_FILE "$COMPOSE_FILE_VALUE"
+  if ! grep -q '^COMPOSE_FILE=' "$ENV_FILE"; then
+    set_var COMPOSE_FILE "$COMPOSE_FILE_VALUE"
+  elif grep -q "^COMPOSE_FILE=$DEV_COMPOSE_FILE_VALUE\$" "$ENV_FILE"; then
+    # Copied from .env.example by hand. Neither of those files is in this
+    # checkout, so the value cannot be what anyone here wants.
+    set_var COMPOSE_FILE "$COMPOSE_FILE_VALUE"
+    echo "Repointed COMPOSE_FILE from the development stack to $COMPOSE_FILE_VALUE."
+  fi
 }
 
 # Installs from before this layout kept .env beside the compose file. Left there

@@ -202,7 +202,7 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
 4.  **Update `.env` with HTTPS URLs:**
     Edit your `.env` file and update the URLs.
     ```bash
-    cd ~/InsForge
+    cd ~/insforge
     nano .env
     ```
     Change the URLs to `https`:
@@ -224,8 +224,8 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
 * **Restart Services:** `docker compose restart`
 * **Update InsForge:** Run these from `~/insforge`. The images are prebuilt, so pull the latest tags instead of rebuilding.
     ```bash
-    cd ~/InsForge
-    git -C ~/InsForge pull origin main
+    cd ~/insforge
+    git -C ~/insforge pull origin main
     sh deploy/setup.sh .
     docker compose pull && docker compose up -d
     ```

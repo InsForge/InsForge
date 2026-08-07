@@ -260,9 +260,11 @@ openssl rand -base64 18
 
 #### 5.2 数据库变量
 
+`setup.sh` 已经生成了 `POSTGRES_PASSWORD`。Postgres 只在初始化数据簇时读它，所以
+在 4.2 启动栈之后再改不会改变数据库密码——除非你还没启动任何东西，否则不要动它。
+
 ```env
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=<strong-unique-password>
 POSTGRES_DB=insforge
 ```
 
@@ -865,7 +867,7 @@ docker compose images
 cd ~/insforge
 
 git fetch origin main
-git diff HEAD origin/main -- deploy .env.example
+git diff HEAD origin/main -- deploy functions .env.example
 
 git merge --ff-only origin/main
 
