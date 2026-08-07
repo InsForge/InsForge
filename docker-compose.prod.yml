@@ -149,9 +149,38 @@ services:
       - INSFORGE_DEPLOYMENT_METHOD=docker-compose
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
+      # ─── Custom Compute: Docker provider (opt-in) ──────────────────────────
+      # Mounting the Docker socket below is what enables it: the driver registers
+      # itself when the socket is reachable, so nothing runs containers on your
+      # host unless you deliberately grant this.
+      #
+      # Read the security note in the compute docs first. The driver constructs
+      # every container spec itself and never forwards caller-supplied options, so
+      # a leaked API key cannot request a privileged container — but the socket is
+      # still root-equivalent on the host.
+      - COMPUTE_PROVIDER=${COMPUTE_PROVIDER:-}
+      # Ingress default for services that do not choose one. `none` publishes no
+      # host port, which is right for workers and processors.
+      - COMPUTE_DEFAULT_INGRESS=${COMPUTE_DEFAULT_INGRESS:-none}
+      # Host address used to build URLs for `port` ingress. Unset, no URL is
+      # advertised rather than guessing an address that may not resolve.
+      - COMPUTE_PUBLIC_HOST=${COMPUTE_PUBLIC_HOST:-}
+      # Bind address for published ports. Loopback by default — reaching a
+      # container from the internet should be a deliberate choice.
+      - COMPUTE_BIND_ADDRESS=${COMPUTE_BIND_ADDRESS:-127.0.0.1}
+      # Keep compute containers off this project's network. Off by default:
+      # proximity to the database and storage is the point.
+      - COMPUTE_ISOLATE_NETWORK=${COMPUTE_ISOLATE_NETWORK:-}
     volumes:
       - storage-data:/insforge-storage
       - shared-logs:/insforge-logs
+      # Uncomment to enable the Docker compute provider. `group_add` is required
+      # because the socket is mode 660 root:docker — without a matching group the
+      # backend gets EACCES. The GID is host-specific (993 on Amazon Linux 2023,
+      # commonly 999 on Debian/Ubuntu), so it cannot be baked in:
+      #   DOCKER_GID=$(getent group docker | cut -d: -f3)
+      # - /var/run/docker.sock:/var/run/docker.sock
+    # group_add: ["${DOCKER_GID:?set DOCKER_GID to your host docker group id}"]
     restart: unless-stopped
     networks:
       - insforge-network

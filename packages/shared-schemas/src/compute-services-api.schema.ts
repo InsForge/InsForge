@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { serviceSchema, cpuTierEnum } from './compute-services.schema.js';
+import { serviceSchema, cpuTierEnum, ingressModeEnum } from './compute-services.schema.js';
 
 const envVarKeyRegex = /^[A-Z_][A-Z0-9_]*$/;
 
@@ -46,6 +46,14 @@ export const createServiceSchema = z.object({
    * inspection. Optional and back-compat: omitting the field is identical to
    * sending `'http'` at every fallback site downstream.
    */
+  /**
+   * How the service should be reachable. Omitted, the server picks the active
+   * driver's default (see ComputeCapabilities.ingressModes) — which for a
+   * single-host driver is `none`, since most compute takes no inbound traffic.
+   * A driver that cannot honour the requested mode coerces it and logs the
+   * substitution rather than failing an otherwise valid deploy.
+   */
+  ingress: ingressModeEnum.optional(),
   protocol: z.enum(['http', 'tcp']).optional(),
   /**
    * Scale-to-zero. `true` (default) is the existing behaviour — Fly stops the
@@ -112,6 +120,8 @@ export const updateServiceSchema = z
       })
       .optional(),
     region: z.string().optional(),
+    /** Ingress — same semantics as createServiceSchema.ingress. */
+    ingress: ingressModeEnum.optional(),
     /**
      * Edge protocol — same semantics as createServiceSchema.protocol. Optional
      * on update; omitting it leaves the existing service's protocol in place.

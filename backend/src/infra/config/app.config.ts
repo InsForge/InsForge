@@ -47,6 +47,14 @@ export interface AppConfig {
     org: string;
     domain: string;
   };
+  docker: {
+    socketPath: string;
+    publicHost: string;
+    domain: string;
+    defaultIngress: string;
+    bindAddress: string;
+    isolateNetwork: boolean;
+  };
   server: {
     maxJsonBodySize: string;
     maxUrlencodedBodySize: string;
@@ -173,6 +181,28 @@ export function loadConfig(): AppConfig {
       apiToken: process.env.FLY_API_TOKEN || '',
       org: process.env.FLY_ORG || '',
       domain: process.env.COMPUTE_DOMAIN || '',
+    },
+    docker: {
+      // Presence of a reachable socket is how an operator opts in: they mount it
+      // into the InsForge container, and the driver registers itself.
+      socketPath: process.env.DOCKER_SOCKET_PATH || '/var/run/docker.sock',
+      // Host address published-port URLs are built from. Left empty we return a
+      // null endpoint rather than guessing the host's public IP and handing out
+      // a URL that does not resolve.
+      publicHost: process.env.COMPUTE_PUBLIC_HOST || '',
+      // Wildcard domain for `host` ingress, shared with the Fly path.
+      domain: process.env.COMPUTE_DOMAIN || '',
+      // Ingress default for containers this driver creates. `none` publishes no
+      // host port at all, which is right for the majority of compute (queue
+      // workers, processors, inference loops) that takes no inbound traffic.
+      defaultIngress: process.env.COMPUTE_DEFAULT_INGRESS || 'none',
+      // Bind address for published ports. Defaults to loopback: a container
+      // reachable from the whole internet should be a deliberate choice, and
+      // Docker's own default (0.0.0.0, plus [::]) is not.
+      bindAddress: process.env.COMPUTE_BIND_ADDRESS || '127.0.0.1',
+      // Skip attaching containers to the project's own compose network. Off by
+      // default — proximity to the database and storage is the point.
+      isolateNetwork: process.env.COMPUTE_ISOLATE_NETWORK === 'true',
     },
     server: {
       maxJsonBodySize: process.env.MAX_JSON_BODY_SIZE || '100mb',

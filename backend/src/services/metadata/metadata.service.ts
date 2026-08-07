@@ -7,6 +7,7 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { RealtimeChannelService } from '@/services/realtime/realtime-channel.service.js';
+import { getComputeMetadata } from '@/services/compute/services.service.js';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import type { AppMetadataSchema } from '@insforge/shared-schemas';
@@ -40,6 +41,10 @@ export class MetadataService {
       deploymentService.getConfigMetadata(),
     ]);
 
+    // Synchronous and database-free (it reads the in-memory driver registry), so
+    // it stays out of the Promise.all above.
+    const compute = getComputeMetadata();
+
     const version = process.env.npm_package_version || '1.0.0';
 
     return {
@@ -54,6 +59,9 @@ export class MetadataService {
       // probe depends on this presence/absence signal to gate
       // [deployments] TOML sections.
       ...(deployments ? { deployments } : {}),
+      // Absent when no compute provider is configured — same presence/absence
+      // capability signal as the deployments slice above.
+      ...(compute ? { compute } : {}),
       version,
     };
   }

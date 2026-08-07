@@ -1,4 +1,5 @@
-import { Router, Response, NextFunction } from 'express';
+import express, { Router, Response, NextFunction } from 'express';
+import { appConfig } from '@/infra/config/app.config.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { computeWriteLimiter, computeLogsRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { ComputeServicesService } from '@/services/compute/services.service.js';
@@ -150,6 +151,67 @@ router.post(
 
       const tokenResult = await svc.issueDeployTokenForService(req.params.id);
       successResponse(res, tokenResult);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Build an uploaded context and deploy the result.
+//
+// The body is the build context tarball itself, which is what Docker's build
+// endpoint natively consumes — so the context streams through without an
+// intermediate copy. Pair with POST /deploy, which reserves the name first.
+//
+// A note for whoever builds the tarball: archive it with `tar --no-xattrs` (or
+// COPYFILE_DISABLE=1) on macOS. Extended attributes the Linux daemon cannot apply
+// make it reject the whole context; the error is recognised and explained, but not
+// producing them is simpler.
+router.post(
+  '/:id/build',
+  verifyAdmin,
+  computeWriteLimiter,
+  express.raw({ type: 'application/x-tar', limit: appConfig.server.maxJsonBodySize }),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const svc = ComputeServicesService.getInstance();
+      const existing = await svc.getService(req.params.id);
+
+      if (existing.projectId !== getProjectId(req)) {
+        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      }
+
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        throw new AppError(
+          'Build context must be a non-empty tar archive sent as application/x-tar.',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const dockerfile =
+        typeof req.query.dockerfile === 'string' ? req.query.dockerfile : undefined;
+      const result = await svc.buildAndDeploy(req.params.id, req.body, { dockerfile });
+
+      successResponse(res, {
+        service: result.service,
+        imageTag: result.imageTag,
+        logs: result.logs,
+      });
+
+      bestEffortAudit({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'BUILD_COMPUTE_SERVICE',
+        module: 'COMPUTE',
+        details: {
+          serviceId: req.params.id,
+          serviceName: existing.name,
+          imageTag: result.imageTag,
+          contextBytes: req.body.length,
+        },
+        ip_address: req.ip,
+      });
+      bestEffortBroadcast();
     } catch (error) {
       next(error);
     }

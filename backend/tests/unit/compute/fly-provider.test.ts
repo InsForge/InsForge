@@ -37,6 +37,8 @@ describe('FlyProvider', () => {
   let provider: FlyProvider;
 
   beforeEach(() => {
+    // createApp derives the 6PN network name from APP_KEY.
+    process.env.APP_KEY = 'testkey1';
     provider = FlyProvider.getInstance();
     vi.restoreAllMocks();
   });
@@ -54,11 +56,7 @@ describe('FlyProvider', () => {
         .mockResolvedValueOnce(graphqlOkResponse());
       vi.stubGlobal('fetch', mockFetch);
 
-      const result = await provider.createApp({
-        name: 'my-app',
-        network: 'default',
-        org: 'test-org',
-      });
+      const result = await provider.createApp({ name: 'my-app' });
 
       expect(mockFetch).toHaveBeenCalledTimes(3);
 
@@ -71,7 +69,8 @@ describe('FlyProvider', () => {
           body: JSON.stringify({
             app_name: 'my-app',
             org_slug: 'test-org',
-            network: 'default',
+            // Derived from APP_KEY by flyNetworkName(), not passed in.
+            network: 'n-testkey1',
           }),
         })
       );
@@ -105,9 +104,9 @@ describe('FlyProvider', () => {
       });
       vi.stubGlobal('fetch', mockFetch);
 
-      await expect(
-        provider.createApp({ name: 'my-app', network: 'default', org: 'test-org' })
-      ).rejects.toThrow('Fly API error (422): app already exists');
+      await expect(provider.createApp({ name: 'my-app' })).rejects.toThrow(
+        'Fly API error (422): app already exists'
+      );
     });
 
     it('throws when GraphQL allocateIpAddress returns errors', async () => {
@@ -120,9 +119,9 @@ describe('FlyProvider', () => {
         });
       vi.stubGlobal('fetch', mockFetch);
 
-      await expect(
-        provider.createApp({ name: 'my-app', network: 'default', org: 'test-org' })
-      ).rejects.toThrow(/Fly GraphQL allocateIpAddress\(shared_v4\) errors/);
+      await expect(provider.createApp({ name: 'my-app' })).rejects.toThrow(
+        /Fly GraphQL allocateIpAddress\(shared_v4\) errors/
+      );
     });
 
     it('throws when GraphQL allocateIpAddress responds non-2xx', async () => {
@@ -136,9 +135,9 @@ describe('FlyProvider', () => {
         });
       vi.stubGlobal('fetch', mockFetch);
 
-      await expect(
-        provider.createApp({ name: 'my-app', network: 'default', org: 'test-org' })
-      ).rejects.toThrow(/Fly GraphQL allocateIpAddress\(shared_v4\) failed \(500\)/);
+      await expect(provider.createApp({ name: 'my-app' })).rejects.toThrow(
+        /Fly GraphQL allocateIpAddress\(shared_v4\) failed \(500\)/
+      );
     });
   });
 
