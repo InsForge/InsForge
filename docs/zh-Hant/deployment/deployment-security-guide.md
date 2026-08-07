@@ -161,22 +161,26 @@ docker run hello-world
 
 ### 4. 使用 Docker Compose 部署 InsForge
 
-#### 4.1 下載正式環境的 Docker Compose 檔案
+#### 4.1 取得倉庫
 
 ```bash
-mkdir -p ~/insforge && cd ~/insforge
-
-# Download the production-ready Docker Compose file and environment template
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/docker-compose.yml
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/.env.example
-
-# Create your environment file
-cp .env.example .env
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
+
+checkout 這個 stack 會讀的檔案，並把 `JWT_SECRET`、`ENCRYPTION_KEY`、`ROOT_ADMIN_PASSWORD`、`POSTGRES_PASSWORD` 產生到 `.env`。不啟動任何東西。
+
+> 不想把腳本管線給 shell？先讀一遍再執行：
+>
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh -o setup.sh
+> less setup.sh
+> sh setup.sh ~/insforge
+> ```
 
 #### 4.2 啟動 InsForge
 
 ```bash
+cd ~/insforge
 docker compose up -d
 ```
 
@@ -256,9 +260,12 @@ openssl rand -base64 18
 
 #### 5.2 資料庫變數
 
+`setup.sh` 已經產生了 `POSTGRES_PASSWORD`。Postgres 僅在初始化資料叢集時讀取它，
+因此在 4.2 啟動 stack 之後再修改不會變更資料庫密碼——除非你尚未啟動任何東西，
+否則請勿改動。
+
 ```env
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=<strong-unique-password>
 POSTGRES_DB=insforge
 ```
 
@@ -276,24 +283,27 @@ DENO_PORT=7133
 
 > 💡 若這些連接埠與你 VPS 上其他服務衝突，可以自行修改。
 
+`COMPOSE_PROJECT_NAME` 是所有容器、卷與網路的名稱前綴：
+
+```env
+COMPOSE_PROJECT_NAME=insforge
+```
+
+> ⚠️ 同一台機器上的第二個實例必須改成自己的值，連接埠也要另設。兩個 `.env` 共用同一個名稱時，在其中一個裡執行 `docker compose up` 會接管並重建另一個的容器。
+
 #### 5.4 部署功能所需的變數
 
 以下變數僅在你打算使用 InsForge 的**部署功能**（透過控制台部署專案）時才需要設定。若你不需要部署功能，可以跳過本節。
 
-> ⚠️ **注意**：這些變數（`AWS_S3_BUCKET`、`AWS_REGION`、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`、`PROJECT_ID`、`MAX_FILE_SIZE`）來自根目錄下的 `.env.example` 設定。它們**並不**存在於 `deploy/docker-compose/.env.example` 中，而 `deploy/docker-compose/docker-compose.yml` 也**不會**將它們傳遞給 `insforge` 容器，因此在你的 `.env` 中設定它們，對此正式環境 compose 檔案不會有任何作用。若要使用它們，請將每一項加入你 `docker-compose.yml` 中 `insforge` 服務的 `environment` 區塊。
-
 ```env
 # ── Deployments ──────────────────────────────────────────────
-# S3 bucket for legacy zip deployment uploads.
-# Direct uploads use the backend proxy, but POST /api/deployments still requires S3.
-AWS_S3_BUCKET=your-deployment-bucket
-AWS_REGION=us-east-2
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-
 # Project ID used by OpenRouter AI token renewal and Vercel deployments
 PROJECT_ID=your-project-id
 ```
+
+> ⚠️ `deploy/docker-compose/docker-compose.yml` 不會把 `PROJECT_ID` 傳給 `insforge` 容器。需要使用時，請加入該服務的 `environment` 區塊。
+
+舊版 zip 上傳介面 `POST /api/deployments` 還需要一個 S3 bucket，用 5.5 的 `S3_*` 變數設定。
 
 #### 5.5 選用變數
 
@@ -319,11 +329,20 @@ OPENROUTER_API_KEY=
 
 # ── Storage (S3-compatible — leave empty for local storage) ──
 # For general file storage only (not deployments). If omitted, local
-# filesystem storage is used automatically.
-AWS_S3_BUCKET=
-AWS_REGION=
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
+# filesystem storage is used automatically. See the "Self-hosted storage"
+# guide for bring-your-own S3, bundled MinIO/RustFS overlays, and the
+# S3-compatible gateway.
+S3_BUCKET=
+S3_REGION=
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+# Custom S3-compatible endpoint (MinIO, RustFS, Wasabi, R2, COS, OSS ...);
+# leave empty for AWS S3
+S3_ENDPOINT_URL=
+S3_FORCE_PATH_STYLE=true
+# Set to false to proxy object bytes through the backend (required when the
+# endpoint is not reachable by browsers)
+S3_USE_PRESIGNED_URLS=
 
 # ── Deno Functions ────────────────────────────────────────────
 WORKER_TIMEOUT_MS=60000
@@ -841,7 +860,25 @@ docker compose images
 
 ### 15. 更新 InsForge
 
-#### 15.1 拉取最新映像檔
+#### 15.1 更新倉庫
+
+先更新 checkout 再拉映像檔：它帶著 compose 檔案和 Postgres 的設定。
+
+```bash
+cd ~/insforge
+
+git fetch origin main
+git diff HEAD origin/main -- deploy functions .env.example
+
+git merge --ff-only origin/main
+
+# Pick up any files this release added
+sh deploy/setup.sh .
+```
+
+合併前先看 diff。`.env.example` 裡新增的變數需要手動抄進你的 `.env`。
+
+#### 15.2 拉取最新映像檔
 
 ```bash
 cd ~/insforge
@@ -850,7 +887,7 @@ cd ~/insforge
 docker compose pull
 ```
 
-#### 15.2 套用更新
+#### 15.3 套用更新
 
 ```bash
 # Stop current services, start with new images
@@ -863,7 +900,7 @@ docker compose logs -f --tail=50
 
 按下 `Ctrl+C` 可停止追蹤日誌。
 
-#### 15.3 驗證更新
+#### 15.4 驗證更新
 
 ```bash
 # Check all services are healthy
@@ -874,31 +911,6 @@ curl http://localhost:7130/api/health
 
 # Check the version in the response
 ```
-
-#### 15.4 更新 Docker Compose 檔案（如有需要）
-
-新版本有時會包含對 `docker-compose.yml` 的變更。若要套用這些變更：
-
-```bash
-cd ~/insforge
-
-# Download the updated compose file
-wget -O docker-compose.yml.new \
-  https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/docker-compose.yml
-
-# Compare with your current file
-diff docker-compose.yml docker-compose.yml.new
-
-# If changes look safe, apply them
-mv docker-compose.yml docker-compose.yml.old
-mv docker-compose.yml.new docker-compose.yml
-
-# Restart with the new configuration
-docker compose down
-docker compose up -d
-```
-
----
 
 ### 16. 回復流程
 
@@ -977,9 +989,11 @@ nano ~/insforge/backup.sh
 set -euo pipefail
 
 # InsForge Automated Backup Script
-# Load .env so POSTGRES_USER / POSTGRES_DB are available outside Docker Compose
+# Run from the checkout so docker compose reads COMPOSE_FILE and
+# COMPOSE_PROJECT_NAME from .env, which also carries POSTGRES_USER / POSTGRES_DB
+cd "$HOME/insforge"
 set -a
-source "$HOME/insforge/.env"
+source .env
 set +a
 
 BACKUP_DIR="$HOME/insforge/backups"
@@ -991,7 +1005,7 @@ trap 'echo "[$(date)] ERROR: Backup failed at line $LINENO" >&2; exit 1' ERR
 mkdir -p "$BACKUP_DIR"
 
 # Dump the database
-docker compose -f "$HOME/insforge/docker-compose.yml" exec -T postgres \
+docker compose exec -T postgres \
   pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" \
   > "$BACKUP_DIR/db_$TIMESTAMP.sql"
 

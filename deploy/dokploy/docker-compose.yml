@@ -1,13 +1,44 @@
+# InsForge on Dokploy
+#
+# Dokploy → Create Compose → set Compose Path to:
+#   deploy/dokploy/docker-compose.yml
+#
+# JWT_SECRET and ENCRYPTION_KEY are mandatory: the deploy fails with a message
+# rather than starting on a placeholder anyone can read in this file.
+#
+# Set the environment variables in Dokploy's own Environment tab. At minimum
+# JWT_SECRET, ENCRYPTION_KEY, POSTGRES_PASSWORD, ROOT_ADMIN_PASSWORD and the two
+# API_BASE_URL values; the defaults below are placeholders, not safe values.
+#
+# Nothing is published to the host. Add a domain for the `insforge` service on
+# port 7130 under Domains, then set API_BASE_URL and VITE_API_BASE_URL to it —
+# without one the stack stays on Dokploy's internal network.
+#
+# No service bind-mounts anything out of the repository: Dokploy re-clones code/
+# on every deploy, so those mounts go stale. Postgres gets its init files by
+# being built here instead, which needs no File Mount setup in the UI.
+
 services:
   postgres:
-    image: ghcr.io/insforge/postgres-all:latest
+    # Built here rather than pulled. postgres-all bakes the init files in, and
+    # its copy is frozen at whatever the image was built from — that is how
+    # self-hosted RLS on managed tables broke: no insforge_pg_utils in its
+    # shared_preload_libraries. Building from the repo at deploy time keeps the
+    # files current. 
+    build:
+      context: ../..
+      dockerfile: deploy/Dockerfile.postgres
     restart: unless-stopped
-    command: postgres -c app.encryption_key='${ENCRYPTION_KEY:-change-this-encryption-key-32chars}'
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c cron.database_name='${POSTGRES_DB:-insforge}' -c app.encryption_key='${ENCRYPTION_KEY:?set ENCRYPTION_KEY in Dokploy Environment - openssl rand -hex 32, must differ from JWT_SECRET}'
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-insforge}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-encryption-key-32chars}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in Dokploy Environment - openssl rand -hex 32, must differ from JWT_SECRET}
+      # postgres-all carried this in its image ENV, so clusters created under it
+      # live in this subdirectory. The base image defaults to the volume root,
+      # which would initdb an empty cluster beside the existing data.
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -28,18 +59,14 @@ services:
       PGRST_DB_ANON_ROLE: anon
       # Keep in sync with the backend's POSTGREST_MAX_SOCKETS (default 50)
       PGRST_DB_POOL: ${PGRST_DB_POOL:-50}
-      PGRST_JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-min-32-characters}
+      PGRST_JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in Dokploy Environment - generate with openssl rand -hex 32}
       PGRST_DB_CHANNEL_ENABLED: "true"
       PGRST_DB_CHANNEL: pgrst
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ > /dev/null 2>&1 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
+    # No healthcheck: the amd64 postgrest image carries no shell and no
+    # utilities, so nothing inside the container can probe it.
     security_opt:
       - no-new-privileges:true
 
@@ -57,12 +84,12 @@ services:
       PROJECT_ROOT: /app
       API_BASE_URL: ${API_BASE_URL:-http://localhost:7130}
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:7130}
-      JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-min-32-characters}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-encryption-key-32chars}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in Dokploy Environment - generate with openssl rand -hex 32}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in Dokploy Environment - openssl rand -hex 32, must differ from JWT_SECRET}
       ROOT_ADMIN_USERNAME: ${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
-      ROOT_ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-changeme123}}
+      ROOT_ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:?set ROOT_ADMIN_PASSWORD in Dokploy Environment - the dashboard is reachable from the internet}
       ADMIN_EMAIL: ${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
-      ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-changeme123}}
+      ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:?set ROOT_ADMIN_PASSWORD in Dokploy Environment - the dashboard is reachable from the internet}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:-insforge}
@@ -92,6 +119,10 @@ services:
       INSFORGE_TELEMETRY_DISABLED: ${INSFORGE_TELEMETRY_DISABLED:-}
       INSFORGE_DEPLOYMENT_METHOD: dokploy
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # Site deployments and custom domains
+      VERCEL_TOKEN: ${VERCEL_TOKEN:-}
+      VERCEL_TEAM_ID: ${VERCEL_TEAM_ID:-}
+      VERCEL_PROJECT_ID: ${VERCEL_PROJECT_ID:-}
       STRIPE_TEST_SECRET_KEY: ${STRIPE_TEST_SECRET_KEY:-}
       STRIPE_LIVE_SECRET_KEY: ${STRIPE_LIVE_SECRET_KEY:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
@@ -115,8 +146,18 @@ services:
       - no-new-privileges:true
 
   deno:
-    image: ghcr.io/insforge/deno-runtime:latest
+    # Built here for the same reason as postgres: the published deno-runtime
+    # image is assembled in another repository and its copy of functions/ matches
+    # no commit in this one, so fixes made here never reach it.
+    build:
+      context: ../..
+      dockerfile: deploy/Dockerfile.deno
     working_dir: /app
+    command: >
+      sh -c "
+        deno cache --no-lock functions/server.ts &&
+        deno run --no-lock --unstable-worker-options --allow-net --allow-env --allow-read=./functions/worker-template.js functions/server.ts
+      "
     restart: unless-stopped
     depends_on:
       - postgres
@@ -132,13 +173,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGREST_BASE_URL: http://postgrest:3000
       WORKER_TIMEOUT_MS: ${WORKER_TIMEOUT_MS:-60000}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-encryption-key-32chars}
-      JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-min-32-characters}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
-      AWS_REGION: ${AWS_REGION:-}
-      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in Dokploy Environment - openssl rand -hex 32, must differ from JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in Dokploy Environment - generate with openssl rand -hex 32}
     volumes:
       - deno_cache:/deno-dir
     healthcheck:

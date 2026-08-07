@@ -112,63 +112,40 @@ sudo apt install git -y
 
 ### 4. 部署 InsForge
 
-#### 4.1 克隆仓库
+#### 4.1 获取仓库
 
 ```bash
-cd ~
-git clone https://github.com/insforge/insforge.git
-cd insforge/deploy/docker-compose
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
+
+会 checkout 这个栈要读的文件，并把 `JWT_SECRET`、`ENCRYPTION_KEY`、`ROOT_ADMIN_PASSWORD`、`POSTGRES_PASSWORD` 生成到 `.env`。不启动任何东西。
 
 #### 4.2 创建环境配置
 
-复制示例模板以创建你的 `.env` 文件：
-
 ```bash
-cp .env.example .env
+cd ~/insforge
 nano .env
 ```
 
-完整模板位于 `deploy/docker-compose/.env.example`。以下是你必须设置的变量：
+密钥已经生成好了，不要改动。设置浏览器会访问的地址：
 
 ```env
-# Required
-JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-ROOT_ADMIN_USERNAME=admin
-ROOT_ADMIN_PASSWORD=change-this-password
-POSTGRES_PASSWORD=change-this-password
+API_BASE_URL=http://<你的公网IP>:7130
+VITE_API_BASE_URL=http://<你的公网IP>:7130
+```
 
-# Optional: falls back to JWT_SECRET if left blank
-ENCRYPTION_KEY=
+可选项，默认全部关闭：
 
-# Optional: enables AI features
-OPENROUTER_API_KEY=
-
-# Optional: enables site deployments
-VERCEL_TOKEN=
-VERCEL_TEAM_ID=
-VERCEL_PROJECT_ID=
-
-# Optional: OAuth providers
-GOOGLE_CLIENT_ID=
+```env
+OPENROUTER_API_KEY=      # AI 功能
+VERCEL_TOKEN=            # 站点部署
+GOOGLE_CLIENT_ID=        # OAuth 提供商
 GOOGLE_CLIENT_SECRET=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
 ```
 
-`.env.example` 模板中包含了其余变量及其默认值，因此编辑复制出来的文件就足够了。
+其余变量及其默认值都在 `.env.example` 里。
 
-**生成安全密钥：**
-
-```bash
-# Generate JWT_SECRET (32+ characters)
-openssl rand -base64 32
-
-# Generate ENCRYPTION_KEY (must be exactly 32 characters)
-openssl rand -base64 24
-```
-
-> 💡 **重要提示**：请妥善保存这些密钥。如果你以后需要迁移或恢复实例，将需要用到它们。
+> 💡 请把 `.env` 备份到安全的地方。迁移或恢复这个实例靠的就是里面的密钥。
 
 #### 4.3 启动 InsForge 服务
 
@@ -307,7 +284,7 @@ sudo certbot --nginx -d api.yourdomain.com -d app.yourdomain.com
 使用 HTTPS 地址更新你的 `.env` 文件：
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 nano .env
 ```
 
@@ -352,17 +329,21 @@ docker compose restart
 
 ### 更新 InsForge
 
-InsForge 发布的是预构建镜像，因此更新只需拉取镜像并重启。请在 `~/insforge/deploy/docker-compose` 下运行以下命令：
+更新是拉镜像加重启——但 checkout 同样重要：Postgres 的配置和 Deno 函数都是从它读的。请在 `~/insforge` 下运行以下命令：
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 git pull origin main
+
+# Pick up any files this release added to the sparse checkout
+sh deploy/setup.sh .
+
 docker compose pull && docker compose up -d
 ```
 
 ### 备份数据库
 
-请在 `~/insforge/deploy/docker-compose` 下运行以下命令：
+请在 `~/insforge` 下运行以下命令：
 
 ```bash
 # Create backup

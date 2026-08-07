@@ -39,6 +39,8 @@ Containarium
 Containarium's
 contentType
 cooldown
+Coolify
+Coolify's
 Coroutines
 created_at
 cron

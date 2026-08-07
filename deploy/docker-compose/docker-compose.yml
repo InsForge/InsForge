@@ -1,21 +1,30 @@
 services:
   postgres:
-    image: ghcr.io/insforge/postgres-all:latest
+    image: ghcr.io/insforge/postgres:v15.13.4
 
-    command: postgres -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c cron.database_name='${POSTGRES_DB:-insforge}' -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
+      # postgres-all baked this path into its own ENV, so every install made
+      # with it has its cluster in this subdirectory. The base image defaults to
+      # the volume root instead — without this line Postgres would initdb an
+      # empty cluster beside the real one and read as total data loss.
+      - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      # :ro — read-only; :z — SELinux relabel, required on RHEL/Fedora hosts.
+      - ../docker-init/db/db-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro,z
+      - ../docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql:ro,z
+      - ../docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf:ro,z
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     networks:
       - insforge-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -30,6 +39,10 @@ services:
       PGRST_DB_SCHEMA: public
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${JWT_SECRET:-dev-secret-please-change-in-production}
+      # Keep in sync with the backend's POSTGREST_MAX_SOCKETS below. PostgREST
+      # defaults to a pool of 10; the backend opens up to 50 sockets into it,
+      # which just moves queuing into PostgREST under load.
+      PGRST_DB_POOL: ${PGRST_DB_POOL:-50}
       # Enable schema reloading via NOTIFY
       PGRST_DB_CHANNEL_ENABLED: true
       PGRST_DB_CHANNEL: pgrst
@@ -38,12 +51,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/3000'"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+    # No healthcheck: the amd64 postgrest image is 24 files — bin/postgrest and
+    # a certificate directory, no shell and no utilities — so nothing can probe
+    # it from inside the container. A CMD-SHELL probe here reports unhealthy
+    # forever, and anything gating on it never starts.
     networks:
       - insforge-network
 
@@ -55,7 +66,7 @@ services:
       postgres:
         condition: service_healthy
       postgrest:
-        condition: service_healthy
+        condition: service_started
     ports:
       - "${APP_PORT:-7130}:7130"
       - "127.0.0.1:${AUTH_PORT:-7131}:7131"
@@ -78,6 +89,9 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       - POSTGREST_BASE_URL=http://postgrest:3000
+      - POSTGREST_MAX_SOCKETS=${POSTGREST_MAX_SOCKETS:-}
+      - POSTGREST_MAX_FREE_SOCKETS=${POSTGREST_MAX_FREE_SOCKETS:-}
+      - POSTGREST_FREE_SOCKET_TIMEOUT_MS=${POSTGREST_FREE_SOCKET_TIMEOUT_MS:-}
       # Deno Runtime URL for serverless functions
       - DENO_RUNTIME_URL=http://deno:7133
       # LLM Model API keys
@@ -132,7 +146,18 @@ services:
 
   # Deno serverless runtime for edge functions
   deno:
-    image: ghcr.io/insforge/deno-runtime:latest
+    # Runs as the image default (root), unlike the platform files, which build
+    # Dockerfile.deno and drop to uid 1000. Doing that here would need the
+    # deno_cache volume chowned, and a fresh named volume inherits ownership
+    # from the image — which needs a build step this stack deliberately avoids.
+    # functions/ is mounted read-only, and function code itself runs inside
+    # Deno's own permission sandbox.
+    #
+    # The official Deno image plus this checkout's function host. The published
+    # deno-runtime image is built in another repository and its copy of
+    # functions/ matches no commit here, so fixes made in this repo never reach
+    # it — the same split that left postgres-all's config three months stale.
+    image: denoland/deno:alpine-2.0.6
 
     working_dir: /app
     depends_on:
@@ -142,7 +167,7 @@ services:
       - "127.0.0.1:${DENO_PORT:-7133}:7133"
     environment:
       - PORT=7133
-      - DENO_ENV=development
+      - DENO_ENV=${DENO_ENV:-production}
       - DENO_DIR=/deno-dir
       # PostgreSQL connection
       - POSTGRES_HOST=postgres
@@ -157,7 +182,16 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
     volumes:
+      # :ro — the runtime only reads the host; :z — SELinux relabel.
+      - ../../functions:/app/functions:ro,z
       - deno_cache:/deno-dir
+    # --no-lock: functions/ is mounted read-only, and Deno would otherwise try to
+    # write deno.lock back into the checkout.
+    command: >
+      sh -c "
+        deno cache --no-lock functions/server.ts &&
+        deno run --no-lock --unstable-worker-options --allow-net --allow-env --allow-read=./functions/worker-template.js functions/server.ts
+      "
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:7133/health"]
       interval: 10s
