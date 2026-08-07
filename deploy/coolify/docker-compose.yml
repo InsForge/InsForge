@@ -4,8 +4,13 @@
 #   Base Directory          /
 #   Docker Compose Location /deploy/coolify/docker-compose.yml
 #
-# JWT_SECRET and ENCRYPTION_KEY are mandatory: the deploy fails with a message
-# rather than starting on a placeholder anyone can read in this file.
+# The REPLACE_ME defaults below are not safe values — replace all three.
+#
+# Compose's mandatory-variable form (${VAR:?...}) would be better, and Dokploy's
+# copy of this file uses it, but Coolify's parser treats `:?` like `:-`: it seeds
+# the environment row with the message text instead of failing, and a message
+# containing an apostrophe then breaks the postgres command line. Measured on
+# Coolify 4.1.2.
 #
 # Set the environment variables in Coolify's own Environment Variables tab. At
 # minimum JWT_SECRET, ENCRYPTION_KEY, POSTGRES_PASSWORD, ROOT_ADMIN_PASSWORD and
@@ -35,12 +40,12 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.postgres
     restart: unless-stopped
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c cron.database_name='${POSTGRES_DB:-insforge}' -c app.encryption_key='${ENCRYPTION_KEY:?set ENCRYPTION_KEY (openssl rand -hex 32, different from JWT_SECRET) in this platform's environment settings}'
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c cron.database_name='${POSTGRES_DB:-insforge}' -c app.encryption_key='${ENCRYPTION_KEY:-REPLACE_ME_openssl_rand_hex_32_DIFFERENT_FROM_JWT}'
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-insforge}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY (openssl rand -hex 32, different from JWT_SECRET) in this platform's environment settings}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-REPLACE_ME_openssl_rand_hex_32_DIFFERENT_FROM_JWT}
       # postgres-all carried this in its image ENV, so clusters created under it
       # live in this subdirectory. The base image defaults to the volume root,
       # which would initdb an empty cluster beside the existing data.
@@ -65,7 +70,7 @@ services:
       PGRST_DB_ANON_ROLE: anon
       # Keep in sync with the backend's POSTGREST_MAX_SOCKETS (default 50)
       PGRST_DB_POOL: ${PGRST_DB_POOL:-50}
-      PGRST_JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (openssl rand -hex 32) in this platform's environment settings}
+      PGRST_JWT_SECRET: ${JWT_SECRET:-REPLACE_ME_openssl_rand_hex_32}
       PGRST_DB_CHANNEL_ENABLED: "true"
       PGRST_DB_CHANNEL: pgrst
     depends_on:
@@ -90,12 +95,12 @@ services:
       PROJECT_ROOT: /app
       API_BASE_URL: ${API_BASE_URL:-http://localhost:7130}
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:7130}
-      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (openssl rand -hex 32) in this platform's environment settings}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY (openssl rand -hex 32, different from JWT_SECRET) in this platform's environment settings}
+      JWT_SECRET: ${JWT_SECRET:-REPLACE_ME_openssl_rand_hex_32}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-REPLACE_ME_openssl_rand_hex_32_DIFFERENT_FROM_JWT}
       ROOT_ADMIN_USERNAME: ${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
-      ROOT_ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:?set ROOT_ADMIN_PASSWORD in this platform's environment settings — the dashboard is reachable from the internet}
+      ROOT_ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:-REPLACE_ME_the_dashboard_is_public}
       ADMIN_EMAIL: ${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
-      ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:?set ROOT_ADMIN_PASSWORD in this platform's environment settings — the dashboard is reachable from the internet}
+      ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:-REPLACE_ME_the_dashboard_is_public}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:-insforge}
@@ -179,8 +184,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGREST_BASE_URL: http://postgrest:3000
       WORKER_TIMEOUT_MS: ${WORKER_TIMEOUT_MS:-60000}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY (openssl rand -hex 32, different from JWT_SECRET) in this platform's environment settings}
-      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (openssl rand -hex 32) in this platform's environment settings}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-REPLACE_ME_openssl_rand_hex_32_DIFFERENT_FROM_JWT}
+      JWT_SECRET: ${JWT_SECRET:-REPLACE_ME_openssl_rand_hex_32}
     volumes:
       - deno_cache:/deno-dir
     healthcheck:
