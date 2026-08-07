@@ -9,19 +9,43 @@
 # and Postgres reads .env only at first boot.
 #
 # Environment:
-#   INSFORGE_REF=v2.2.9   Stay on one release instead of tracking main.
+#   INSFORGE_REF=vX.Y.Z   Stay on one release instead of tracking main.
 #   INSFORGE_NO_GIT=1     Fetch the files over HTTPS instead of cloning. Loses
 #                         the update path below, which needs a checkout.
 set -e
 
 REPO=${INSFORGE_REPO:-https://github.com/InsForge/InsForge.git}
-RAW=${INSFORGE_RAW:-https://raw.githubusercontent.com/InsForge/InsForge}
+# Derived from REPO so pointing at a fork does not silently fetch the official
+# files. INSFORGE_RAW overrides it for a host that is not raw.githubusercontent.
+RAW=${INSFORGE_RAW:-$(echo "$REPO" |
+  sed -e 's|^https://github.com/|https://raw.githubusercontent.com/|' -e 's|\.git$||')}
 REF=${INSFORGE_REF:-}
 TARGET=${1:-insforge}
 CLONED=
+# Initialized rather than assigned only inside the branch below: an inherited
+# NO_GIT from the caller's environment would otherwise skip acquisition entirely
+# and run the rest against whatever directory invoked this.
+NO_GIT=
+
+# Move an existing checkout onto INSFORGE_REF. Without this the ref was honoured
+# only by the first clone, so re-running with a different one reported success
+# and changed nothing. git refuses rather than discarding local edits, which is
+# the same protection the update path relies on.
+checkout_ref() {
+  [ -n "$REF" ] || return 0
+  git fetch --depth 1 origin "$REF" ||
+    { echo "Could not fetch $REF from origin." >&2; exit 1; }
+  git checkout --detach FETCH_HEAD ||
+    { echo "Could not check out $REF. Commit or stash local changes first." >&2; exit 1; }
+}
 
 # Every file the image-only stack reads, plus this script so it travels with the
 # checkout. One list, used by both acquisition modes below.
+#
+# functions/examples/ is deliberately absent, where the old directory pattern
+# swept it in: the compose file mounts all of functions/ but the runtime only
+# loads server.ts, and demo functions are not something a self-host install
+# needs on disk.
 FILES='.env.example
 docker-compose.minio.yml
 docker-compose.rustfs.yml
@@ -38,6 +62,14 @@ deploy/docker-init/db/postgresql.conf'
 # total, against 47MB for the repository tarball, and precise where a tar glob
 # would not be — `*/functions` also matches backend/src/.../functions.
 if [ -n "${INSFORGE_NO_GIT:-}" ] || ! command -v git >/dev/null 2>&1; then
+  # Same guard as the git path below: overwriting a development clone's tracked
+  # files in place is worse here, because curl does it without asking.
+  if [ -d "$TARGET/.git" ] &&
+     [ "$(git -C "$TARGET" config --get core.sparseCheckout 2>/dev/null)" != true ]; then
+    echo "$TARGET is a full checkout, not a self-hosting one." >&2
+    echo "Pass a different target: sh deploy/setup.sh ~/insforge" >&2
+    exit 1
+  fi
   mkdir -p "$TARGET"
   cd "$TARGET"
   for f in $FILES; do
@@ -52,8 +84,10 @@ if [ -n "${NO_GIT:-}" ]; then
   : # already fetched above
 elif [ -e "$TARGET/.git" ]; then
   cd "$TARGET"
+  checkout_ref
 elif [ -z "$1" ] && [ -e .git ] && [ -f deploy/docker-compose/docker-compose.yml ]; then
-  : # no target given and we are already inside a checkout
+  # no target given and we are already inside a checkout
+  checkout_ref
 else
   # --branch takes a tag as well, so one flag covers both refs.
   git clone --depth 1 --filter=blob:none --sparse \
@@ -182,6 +216,12 @@ gen_secret ROOT_ADMIN_PASSWORD 12
 # Postgres reads this only when it initializes the cluster, so it has to be
 # settled before the first boot — after that, editing .env changes nothing.
 gen_secret POSTGRES_PASSWORD 16
+
+# The keys the CLI and SDKs authenticate with. The backend would generate its own
+# if these were empty, but then only it would know them; generating here means the
+# install has credentials to hand out. Prefixed because the backend expects it.
+set_var ACCESS_API_KEY "ik_$(openssl rand -hex 20)"
+set_var ACCESS_ANON_KEY "anon_$(openssl rand -hex 20)"
 
 cat <<DONE
 
