@@ -329,17 +329,21 @@ docker compose restart
 
 ### 更新 InsForge
 
-InsForge 提供預先建置的映像檔，因此更新只需要拉取映像檔並重新啟動。請從 `~/insforge/deploy/docker-compose` 執行以下指令：
+InsForge 提供預先建置的映像檔，因此更新只需要拉取映像檔並重新啟動。請從 `~/insforge` 執行以下指令：
 
 ```bash
 cd ~/insforge
 git pull origin main
+
+# Pick up any files this release added to the sparse checkout
+sh deploy/setup.sh .
+
 docker compose pull && docker compose up -d
 ```
 
 ### 備份資料庫
 
-請從 `~/insforge/deploy/docker-compose` 執行以下指令：
+請從 `~/insforge` 執行以下指令：
 
 ```bash
 # Create backup

@@ -218,13 +218,14 @@ description: "在 Azure 虚拟机上使用 Docker Compose 自托管 InsForge，�
 * **查看日志：** `docker compose logs -f`（所有服务）或 `docker compose logs -f insforge`（指定服务）。
 * **停止服务：** `docker compose down`
 * **重启服务：** `docker compose restart`
-* **更新 InsForge：** 从 `~/InsForge/deploy/docker-compose` 运行以下命令。镜像是预先构建好的，因此拉取最新标签即可，无需重新构建。
+* **更新 InsForge：** 从 `~/insforge` 运行以下命令。镜像是预先构建好的，因此拉取最新标签即可，无需重新构建。
     ```bash
     cd ~/InsForge
     git -C ~/InsForge pull origin main
+    sh deploy/setup.sh .
     docker compose pull && docker compose up -d
     ```
-* **备份数据库：** 从 `~/InsForge/deploy/docker-compose` 运行。
+* **备份数据库：** 从 `~/insforge` 运行。
     ```bash
     docker compose exec postgres pg_dump -U postgres insforge > backup_$(date +%Y%m%d_%H%M%S).sql
     ```

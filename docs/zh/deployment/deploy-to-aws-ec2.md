@@ -329,17 +329,21 @@ docker compose restart
 
 ### 更新 InsForge
 
-InsForge 发布的是预构建镜像，因此更新只需拉取镜像并重启。请在 `~/insforge/deploy/docker-compose` 下运行以下命令：
+InsForge 发布的是预构建镜像，因此更新只需拉取镜像并重启。请在 `~/insforge` 下运行以下命令：
 
 ```bash
 cd ~/insforge
 git pull origin main
+
+# Pick up any files this release added to the sparse checkout
+sh deploy/setup.sh .
+
 docker compose pull && docker compose up -d
 ```
 
 ### 备份数据库
 
-请在 `~/insforge/deploy/docker-compose` 下运行以下命令：
+请在 `~/insforge` 下运行以下命令：
 
 ```bash
 # Create backup

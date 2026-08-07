@@ -222,13 +222,14 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
 * **View Logs:** `docker compose logs -f` (all services) or `docker compose logs -f insforge` (specific service).
 * **Stop Services:** `docker compose down`
 * **Restart Services:** `docker compose restart`
-* **Update InsForge:** Run these from `~/InsForge/deploy/docker-compose`. The images are prebuilt, so pull the latest tags instead of rebuilding.
+* **Update InsForge:** Run these from `~/insforge`. The images are prebuilt, so pull the latest tags instead of rebuilding.
     ```bash
     cd ~/InsForge
     git -C ~/InsForge pull origin main
+    sh deploy/setup.sh .
     docker compose pull && docker compose up -d
     ```
-* **Backup Database:** Run from `~/InsForge/deploy/docker-compose`.
+* **Backup Database:** Run from `~/insforge`.
     ```bash
     docker compose exec postgres pg_dump -U postgres insforge > backup_$(date +%Y%m%d_%H%M%S).sql
     ```

@@ -200,6 +200,7 @@ Or per service: `docker compose logs -f insforge` / `postgres` / `deno`.
 ssh insforge <<'EOF'
   cd ~/insforge
   git -C ~/insforge pull origin main
+  sh deploy/setup.sh .
   docker compose pull
   docker compose up -d
 EOF

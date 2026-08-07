@@ -37,7 +37,7 @@ ROOT_ADMIN_USERNAME=admin
 ROOT_ADMIN_PASSWORD=<strong password>
 ```
 
-`ENCRYPTION_KEY` falls back to `JWT_SECRET` when unset, and rotating `JWT_SECRET` afterwards makes every stored secret undecryptable — set it to its own value now.
+`ENCRYPTION_KEY` falls back to `JWT_SECRET` when unset, and rotating `JWT_SECRET` afterwards makes every stored secret impossible to decrypt — set it to its own value now.
 
 Postgres reads `POSTGRES_PASSWORD` only when it initializes the cluster. Changing it later does not change the database password.
 
@@ -81,6 +81,6 @@ Object storage defaults to the container filesystem on a Docker volume. Dokploy 
 
 ## Why Postgres is built rather than pulled
 
-InsForge's Postgres needs three files from this repository: `postgresql.conf` (which preloads the `insforge_pg_utils` extension that row-level security on managed tables depends on) and two init scripts.
+InsForge's Postgres needs three files from this repository: `postgresql.conf`, which loads the `insforge_pg_utils` extension that row-level security on managed tables depends on, plus two init scripts.
 
 Dokploy re-clones `code/` on every deploy, so a bind mount pointing into the repository goes stale — [its docs](https://docs.dokploy.com/docs/core/troubleshooting/volumes-mounts) require File Mounts created in the UI and referenced as `../files/`, which is manual setup for every install. Building the image at deploy time puts the current files in it instead, with nothing to configure, and the configuration cannot fall behind the code the way a prebuilt image can.

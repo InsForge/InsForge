@@ -333,17 +333,21 @@ docker compose restart
 
 ### Update InsForge
 
-InsForge ships prebuilt images, so an update is a pull and restart. Run this from `~/insforge/deploy/docker-compose`:
+InsForge ships prebuilt images, so an update is a pull and restart. Run this from `~/insforge`:
 
 ```bash
 cd ~/insforge
 git pull origin main
+
+# Pick up any files this release added to the sparse checkout
+sh deploy/setup.sh .
+
 docker compose pull && docker compose up -d
 ```
 
 ### Backup Database
 
-Run these from `~/insforge/deploy/docker-compose`:
+Run these from `~/insforge`:
 
 ```bash
 # Create backup

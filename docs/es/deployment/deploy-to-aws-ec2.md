@@ -329,17 +329,21 @@ docker compose restart
 
 ### Actualizar InsForge
 
-InsForge distribuye imágenes precompiladas, así que actualizar consiste en descargar y reiniciar. Ejecuta esto desde `~/insforge/deploy/docker-compose`:
+InsForge distribuye imágenes precompiladas, así que actualizar consiste en descargar y reiniciar. Ejecuta esto desde `~/insforge`:
 
 ```bash
 cd ~/insforge
 git pull origin main
+
+# Pick up any files this release added to the sparse checkout
+sh deploy/setup.sh .
+
 docker compose pull && docker compose up -d
 ```
 
 ### Copia de seguridad de la base de datos
 
-Ejecuta esto desde `~/insforge/deploy/docker-compose`:
+Ejecuta esto desde `~/insforge`:
 
 ```bash
 # Crea una copia de seguridad

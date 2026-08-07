@@ -218,13 +218,14 @@ Esta guía proporciona instrucciones completas y paso a paso para desplegar, ges
 * **Ver registros:** `docker compose logs -f` (todos los servicios) o `docker compose logs -f insforge` (servicio específico).
 * **Detener servicios:** `docker compose down`
 * **Reiniciar servicios:** `docker compose restart`
-* **Actualizar InsForge:** Ejecute esto desde `~/InsForge/deploy/docker-compose`. Las imágenes están preconstruidas, así que descargue las últimas etiquetas en lugar de reconstruir.
+* **Actualizar InsForge:** Ejecute esto desde `~/insforge`. Las imágenes están preconstruidas, así que descargue las últimas etiquetas en lugar de reconstruir.
     ```bash
     cd ~/InsForge
     git -C ~/InsForge pull origin main
+    sh deploy/setup.sh .
     docker compose pull && docker compose up -d
     ```
-* **Respaldar la base de datos:** Ejecute desde `~/InsForge/deploy/docker-compose`.
+* **Respaldar la base de datos:** Ejecute desde `~/insforge`.
     ```bash
     docker compose exec postgres pg_dump -U postgres insforge > backup_$(date +%Y%m%d_%H%M%S).sql
     ```
