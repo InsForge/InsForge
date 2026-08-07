@@ -21,11 +21,15 @@ export interface MetricChartCardProps {
   /** Short explanation of the metric, surfaced via an info tooltip next to the title. */
   description?: string;
   /**
-   * Labels the top of a fixed domain (e.g. "Disk Size 3.9 GB") with a dashed
-   * ceiling line, the Supabase-style read of "how much room is there at all".
-   * Only meaningful with `fixedDomain`.
+   * Supabase-style capacity chart: samples drawn as bars against a fixed
+   * domain whose top edge is the provisioned ceiling (dashed line), with
+   * labeled y-axis ticks and a legend naming the ceiling and the bars.
+   * Only meaningful with `fixedDomain`; replaces the area/line rendering.
    */
-  ceilingLabel?: string;
+  capacity?: {
+    ticks: number[];
+    legend: { ceiling: string; used: string };
+  };
   /** Extra tooltip line under the value, e.g. the value as a share of the ceiling. */
   tooltipDetail?: (value: number) => string;
 }
@@ -121,7 +125,7 @@ export function MetricChartCard({
   fixedDomain,
   formatAxisLabel,
   description,
-  ceilingLabel,
+  capacity,
   tooltipDetail,
 }: MetricChartCardProps) {
   const { t } = useTranslation('chrome');
@@ -182,6 +186,24 @@ export function MetricChartCard({
   };
 
   const handleLeave = () => setHoverIdx(null);
+
+  // Capacity variant: each sample becomes a slim bar rising from the floor,
+  // matching the Supabase disk chart. Bars reuse the sparkline's x/y mapping,
+  // so the hover hit-testing above works unchanged.
+  const bars = useMemo(() => {
+    if (!capacity || sparkline.points.length === 0) {
+      return [];
+    }
+    const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / sparkline.points.length;
+    const width = Math.max(2, slot * 0.85);
+    // Bars live to the right of the y-axis label gutter, like the gridlines.
+    return sparkline.points.map((point) => ({
+      x: Math.max(Y_AXIS_LABEL_WIDTH + 2, Math.min(point.x, SPARKLINE_WIDTH - width)),
+      y: point.y,
+      width,
+      height: Math.max(1.5, SPARKLINE_HEIGHT - point.y),
+    }));
+  }, [capacity, sparkline.points]);
 
   const hover = hoverIdx !== null ? sparkline.points[hoverIdx] : null;
   const hoverLeftPct = hover ? (hover.x / SPARKLINE_WIDTH) * 100 : 0;
@@ -311,11 +333,13 @@ export function MetricChartCard({
                       </linearGradient>
                     </defs>
                   )}
-                  <path
-                    d={sparkline.area}
-                    fill={threshold !== undefined ? `url(#${gradientId}-area)` : 'currentColor'}
-                    className={threshold !== undefined ? '' : 'text-emerald-300/15'}
-                  />
+                  {!capacity && (
+                    <path
+                      d={sparkline.area}
+                      fill={threshold !== undefined ? `url(#${gradientId}-area)` : 'currentColor'}
+                      className={threshold !== undefined ? '' : 'text-emerald-300/15'}
+                    />
+                  )}
                   {threshold !== undefined && (
                     <line
                       x1={Y_AXIS_LABEL_WIDTH}
@@ -328,25 +352,49 @@ export function MetricChartCard({
                       vectorEffect="non-scaling-stroke"
                     />
                   )}
-                  {ceilingLabel !== undefined && fixedDomain && (
-                    <line
-                      x1={Y_AXIS_LABEL_WIDTH}
-                      x2={SPARKLINE_WIDTH}
-                      y1={1}
-                      y2={1}
-                      stroke="var(--alpha-16)"
-                      strokeWidth={1}
-                      strokeDasharray="4 3"
-                      vectorEffect="non-scaling-stroke"
+                  {capacity &&
+                    capacity.ticks.map((tick) => {
+                      const yPct = 1 - (tick - domainMin) / domainRange;
+                      const y = Math.max(
+                        1,
+                        Math.min(SPARKLINE_HEIGHT - 1, yPct * SPARKLINE_HEIGHT)
+                      );
+                      const isCeiling = tick === domainMax;
+                      return (
+                        <line
+                          key={tick}
+                          x1={Y_AXIS_LABEL_WIDTH}
+                          x2={SPARKLINE_WIDTH}
+                          y1={y}
+                          y2={y}
+                          stroke={isCeiling ? 'var(--alpha-16)' : 'var(--alpha-8)'}
+                          strokeWidth={1}
+                          strokeDasharray={isCeiling ? '4 3' : undefined}
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      );
+                    })}
+                  {!capacity && (
+                    <path
+                      d={sparkline.line}
+                      fill="none"
+                      stroke={threshold !== undefined ? `url(#${gradientId}-line)` : 'currentColor'}
+                      strokeWidth={2}
+                      className={threshold !== undefined ? '' : 'text-emerald-300'}
                     />
                   )}
-                  <path
-                    d={sparkline.line}
-                    fill="none"
-                    stroke={threshold !== undefined ? `url(#${gradientId}-line)` : 'currentColor'}
-                    strokeWidth={2}
-                    className={threshold !== undefined ? '' : 'text-emerald-300'}
-                  />
+                  {capacity &&
+                    bars.map((bar, i) => (
+                      <rect
+                        key={i}
+                        x={bar.x}
+                        y={bar.y}
+                        width={bar.width}
+                        height={bar.height}
+                        rx={1}
+                        className="fill-emerald-300"
+                      />
+                    ))}
                 </svg>
                 {threshold !== undefined && (
                   <>
@@ -361,11 +409,23 @@ export function MetricChartCard({
                     </span>
                   </>
                 )}
-                {ceilingLabel !== undefined && fixedDomain && (
-                  <span className="pointer-events-none absolute left-0 top-0.5 text-xs leading-4 text-muted-foreground">
-                    {ceilingLabel}
-                  </span>
-                )}
+                {capacity &&
+                  capacity.ticks.map((tick) => {
+                    const yPct = (1 - (tick - domainMin) / domainRange) * 100;
+                    const atTop = tick === domainMax;
+                    const atBottom = tick === domainMin;
+                    return (
+                      <span
+                        key={tick}
+                        className={`pointer-events-none absolute left-0 text-xs leading-4 text-muted-foreground ${
+                          atTop ? '' : atBottom ? '-translate-y-full' : '-translate-y-1/2'
+                        }`}
+                        style={{ top: `${Math.max(0, Math.min(100, yPct))}%` }}
+                      >
+                        {renderAxisLabel(tick)}
+                      </span>
+                    );
+                  })}
                 {hover && (
                   <>
                     <div
@@ -414,9 +474,25 @@ export function MetricChartCard({
           </div>
           {sparkline.line && (
             <div className="relative h-4 text-xs leading-4 text-muted-foreground">
-              {threshold === undefined && <span className="absolute left-0">{xAxisTicks[0]}</span>}
+              {threshold === undefined && !capacity && (
+                <span className="absolute left-0">{xAxisTicks[0]}</span>
+              )}
               <span className="absolute left-1/2 -translate-x-1/2">{xAxisTicks[1]}</span>
               <span className="absolute right-0">{xAxisTicks[2]}</span>
+            </div>
+          )}
+          {capacity && sparkline.line && (
+            <div className="flex items-center justify-center gap-4 pt-1 text-xs leading-4 text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden className="tracking-[2px]">
+                  ···
+                </span>
+                {capacity.legend.ceiling}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-300" />
+                {capacity.legend.used}
+              </span>
             </div>
           )}
         </div>

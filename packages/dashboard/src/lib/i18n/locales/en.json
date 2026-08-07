@@ -169,7 +169,8 @@
       "diskUsed": {
         "title": "Disk Usage",
         "description": "How much of your instance's storage the database, files, and logs are using. A full disk stops writes and can take the backend offline.",
-        "ceiling": "Disk Size {{value}}"
+        "ceiling": "Disk Size",
+        "used": "Used"
       }
     },
     "memoryAdvisory": {

@@ -130,12 +130,15 @@ export function ObservabilitySection() {
       [...diskTotalData].reverse().find((p) => Number.isFinite(p.value))?.value ?? null;
     return {
       data: diskUsedData,
-      threshold: totalBytes !== null ? 0.9 * totalBytes : undefined,
       fixedDomain: (totalBytes !== null ? [0, totalBytes] : undefined) as
         | [number, number]
         | undefined,
+      // Capacity chart (Supabase-style): dashed ceiling at the provisioned
+      // size, a mid gridline, bars for the samples. No 90% threshold line —
+      // the ceiling is the reference, and two dashed lines collide visually.
+      ticks: totalBytes !== null ? [0, totalBytes / 2, totalBytes] : [],
       totalBytes,
-      // Supabase-style read: the hovered value as a share of the provisioned disk.
+      // The hovered value as a share of the provisioned disk.
       tooltipDetail:
         totalBytes !== null && totalBytes > 0
           ? (v: number) => `${((v / totalBytes) * 100).toFixed(1)}% of ${BYTES_SIZE(totalBytes)}`
@@ -252,15 +255,21 @@ export function ObservabilitySection() {
                   rangeSeconds={RANGE_SECONDS[range]}
                   formatValue={BYTES_SIZE}
                   isLoading={isLoading}
-                  threshold={diskCardProps.threshold}
                   fixedDomain={diskCardProps.fixedDomain}
                   formatAxisLabel={BYTES_SIZE}
-                  ceilingLabel={
-                    diskCardProps.totalBytes !== null
-                      ? t('overview.metrics.diskUsed.ceiling', {
-                          value: BYTES_SIZE(diskCardProps.totalBytes),
-                          defaultValue: 'Disk Size {{value}}',
-                        })
+                  capacity={
+                    diskCardProps.fixedDomain
+                      ? {
+                          ticks: diskCardProps.ticks,
+                          legend: {
+                            ceiling: t('overview.metrics.diskUsed.ceiling', {
+                              defaultValue: 'Disk Size',
+                            }),
+                            used: t('overview.metrics.diskUsed.used', {
+                              defaultValue: 'Used',
+                            }),
+                          },
+                        }
                       : undefined
                   }
                   tooltipDetail={diskCardProps.tooltipDetail}
