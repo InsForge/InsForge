@@ -1,13 +1,47 @@
+# InsForge on Coolify
+#
+# Coolify → New Resource → Docker Compose, then set:
+#   Base Directory          /
+#   Docker Compose Location /deploy/coolify/docker-compose.yml
+#
+# Set the environment variables in Coolify's own Environment Variables tab. At
+# minimum JWT_SECRET, ENCRYPTION_KEY, POSTGRES_PASSWORD, ROOT_ADMIN_PASSWORD and
+# the two API_BASE_URL values; the defaults below are placeholders, not safe
+# values.
+#
+# Nothing is published to the host. Assign a domain to the `insforge` service on
+# port 7130 in Coolify's UI, then set API_BASE_URL and VITE_API_BASE_URL to it —
+# without a domain or a port mapping the stack stays on the private network.
+#
+# No service bind-mounts anything out of the repository. Coolify creates file
+# bind mounts as directories (coollabsio/coolify#3375, still open), which breaks
+# Postgres outright. Postgres gets its init files by being built here instead.
+
 services:
   postgres:
-    image: ghcr.io/insforge/postgres-all:latest
+    # Built here rather than pulled. postgres-all bakes the init files in, and
+    # its copy is frozen at whatever the image was built from — that is how
+    # self-hosted RLS on managed tables broke: no insforge_pg_utils in its
+    # shared_preload_libraries. Building from the repo at deploy time keeps the
+    # files current. 
+    # context is the repository root, spelled relative to it rather than to this
+    # file: Coolify builds with `--project-directory <repo root>`, so Compose
+    # resolves these against the root. Dokploy passes no --project-directory, so
+    # its copy of this file uses ../.. instead. Verified on Coolify 4.1.2.
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.postgres
     restart: unless-stopped
-    command: postgres -c app.encryption_key='${ENCRYPTION_KEY:-change-this-encryption-key-32chars}'
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c cron.database_name='${POSTGRES_DB:-insforge}' -c app.encryption_key='${ENCRYPTION_KEY:-change-this-encryption-key-32chars}'
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-insforge}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-encryption-key-32chars}
+      # postgres-all carried this in its image ENV, so clusters created under it
+      # live in this subdirectory. The base image defaults to the volume root,
+      # which would initdb an empty cluster beside the existing data.
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -34,12 +68,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ > /dev/null 2>&1 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
+    # No healthcheck: the amd64 postgrest image carries no shell and no
+    # utilities, so nothing inside the container can probe it.
     security_opt:
       - no-new-privileges:true
 
@@ -90,7 +120,7 @@ services:
       S3_USE_PRESIGNED_URLS: ${S3_USE_PRESIGNED_URLS:-}
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-}
       INSFORGE_TELEMETRY_DISABLED: ${INSFORGE_TELEMETRY_DISABLED:-}
-      INSFORGE_DEPLOYMENT_METHOD: dokploy
+      INSFORGE_DEPLOYMENT_METHOD: coolify
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       STRIPE_TEST_SECRET_KEY: ${STRIPE_TEST_SECRET_KEY:-}
       STRIPE_LIVE_SECRET_KEY: ${STRIPE_LIVE_SECRET_KEY:-}
@@ -115,8 +145,18 @@ services:
       - no-new-privileges:true
 
   deno:
-    image: ghcr.io/insforge/deno-runtime:latest
+    # Built here for the same reason as postgres: the published deno-runtime
+    # image is assembled in another repository and its copy of functions/ matches
+    # no commit in this one, so fixes made here never reach it.
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.deno
     working_dir: /app
+    command: >
+      sh -c "
+        deno cache --no-lock functions/server.ts &&
+        deno run --no-lock --unstable-worker-options --allow-net --allow-env --allow-read=./functions/worker-template.js functions/server.ts
+      "
     restart: unless-stopped
     depends_on:
       - postgres
