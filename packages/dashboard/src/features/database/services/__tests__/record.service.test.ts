@@ -84,4 +84,22 @@ describe('recordService.exportTableAsCSV', () => {
     );
     expect(requestedOffsets).toEqual(Array.from({ length: 20 }, (_, i) => i * 500));
   });
+
+  it('conservatively flags limited when hitting the cap without pagination.total', async () => {
+    // If the backend response is ever missing an exact total, we can't tell
+    // whether the export was actually truncated. Fail safe: assume it was,
+    // so the user isn't silently handed a partial export with no warning.
+    apiClientMock.request.mockImplementation((url: string) => {
+      const offset = offsetFromRequestUrl(url);
+      const data = makeRecords(500, offset);
+      return Promise.resolve({ data, pagination: { offset: offset + 500, limit: 500 } });
+    });
+
+    const result = await recordService.exportTableAsCSV('users', 'public');
+
+    expect(result.limited).toBe(true);
+    expect(dataExportMock.convertToCSV.mock.calls[0][0]).toHaveLength(10_000);
+    // Still stops fetching once the cap is reached, even without a total to compare against.
+    expect(apiClientMock.request).toHaveBeenCalledTimes(20);
+  });
 });

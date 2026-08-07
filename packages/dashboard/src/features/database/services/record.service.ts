@@ -318,7 +318,10 @@ export class RecordService {
         }
       } else if (allRecords.length >= MAX_EXPORT_ROWS) {
         // Fallback if the backend ever omits pagination.total: we can't tell
-        // whether the exact cap was a coincidence, so don't claim truncation.
+        // whether the exact cap was a coincidence, so assume the conservative
+        // (pre-fix) behavior and flag as limited rather than risk silently
+        // truncating an export with no warning shown to the user.
+        isLimited = true;
         break;
       }
 
