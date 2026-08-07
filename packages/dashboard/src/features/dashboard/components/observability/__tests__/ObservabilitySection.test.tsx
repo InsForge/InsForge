@@ -44,24 +44,15 @@ afterEach(() => {
 });
 
 describe('ObservabilitySection memory advisory', () => {
-  it('shows the advisory with an Upgrade Instance CTA when the latest sample is at 75%+', async () => {
+  it('always shows the advisory with the latest reading and an Upgrade Instance CTA', async () => {
     setDashboardBackendUrl(CLOUD_BACKEND);
-    // history below threshold, current reading above — the banner tracks the
-    // headline number, so it must show now, not after an hour of high history
-    renderSection('cloud-hosting', metricsResponse([65, 66, 80]));
+    // no threshold: the reassurance is permanent, keyed to the same latest
+    // sample the Memory card's headline shows
+    renderSection('cloud-hosting', metricsResponse([65, 66, 67]));
 
     await waitFor(() => expect(advisoryText()).toBeInTheDocument());
+    expect(screen.getByText(/67\.0%/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upgrade Instance' })).toBeInTheDocument();
-  });
-
-  it('stays silent when the latest sample is below 75%, even after an earlier spike', async () => {
-    setDashboardBackendUrl(CLOUD_BACKEND);
-    renderSection('cloud-hosting', metricsResponse([80, 70, 67]));
-
-    // Wait for the cards to render off the resolved query, then assert absence.
-    await waitFor(() => expect(screen.getAllByText('AVG').length).toBeGreaterThan(0));
-    expect(advisoryText()).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Upgrade Instance' })).toBeNull();
   });
 
   it('stays silent when the series is empty', async () => {

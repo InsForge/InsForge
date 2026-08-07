@@ -12,20 +12,6 @@ import { MetricChartCard } from './MetricChartCard';
 
 const RANGES: DashboardMetricsRange[] = ['1h', '6h', '24h', '3d'];
 
-/**
- * Memory advisory trigger, on the LATEST sample — the same number the card's
- * headline shows, so the banner agrees with what the user is currently reading
- * and appears the moment memory is high (a window average lags the reading by
- * most of the window, which is exactly when the "is this normal?" question is
- * being asked). A dedicated Postgres instance parked high on memory is its
- * healthy steady state (idle RAM becomes query cache), but it reads as a leak —
- * support keeps fielding "my idle database sits at ~78% memory" reports. 75 is
- * low enough to be seen BEFORE a small instance tips into OOM kills, and below
- * the chart's own 85% red-line so the reassurance arrives ahead of the alarm
- * color.
- */
-const MEMORY_ADVISORY_PCT = 75;
-
 const RANGE_SECONDS: Record<DashboardMetricsRange, number> = {
   '1h': 3600,
   '6h': 21600,
@@ -123,10 +109,15 @@ export function ObservabilitySection() {
   const [computeSettingsOpen, setComputeSettingsOpen] = useState(false);
   const { data, isLoading, isUnavailable, error } = useProjectMetrics(range);
 
+  // Always shown (Tony's call, QA 2026-08-07): the reassurance IS the point —
+  // a dedicated Postgres instance parked high on memory is its healthy steady
+  // state (idle RAM becomes query cache), but it reads as a leak, and support
+  // keeps fielding "my idle database sits at ~78% memory" reports. The value is
+  // the latest sample, the same number the Memory card's headline shows; only a
+  // series with no samples (fresh instance, metrics gap) has nothing to say.
   const memoryAdvisoryPct = useMemo(() => {
     const series = data?.metrics.find((m) => m.metric === 'memory_usage')?.data ?? [];
-    const latest = aggregateMetricSeries(series).latest;
-    return latest !== null && latest >= MEMORY_ADVISORY_PCT ? latest : null;
+    return aggregateMetricSeries(series).latest;
   }, [data]);
 
   // Memoize disk card derivations so the [0, totalBytes] domain array reference
