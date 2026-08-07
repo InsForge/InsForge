@@ -925,19 +925,26 @@ docker compose down
 
 #### 16.2 固定回先前的版本
 
-在 `.env` 中寫上你更新前執行的版本，然後重新啟動：
+在 `.env` 旁邊寫一個 overlay，指明你更新前執行的版本：
+
+```yaml
+# pin.yml
+services:
+  insforge:
+    image: ghcr.io/insforge/insforge-oss:v2.2.9
+```
+
+將它附加到 `.env` 中的 `COMPOSE_FILE`，然後重新啟動：
 
 ```env
-INSFORGE_OSS_VERSION=v2.2.9
+COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
 ```
 
 ```bash
 docker compose up -d
 ```
 
-要寫在 `.env` 中，不要去修改 compose 檔案。`.env` 屬於你，任何更新都不會動它；而被你修改過的 compose 檔案會讓下一次 `git merge --ff-only` 拒絕合併——那是保護機制在運作，但在你還原修改之前就無法更新了。
-
-`docker compose images` 可以看到目前執行的版本，14.3 會在更新前記錄版本，這樣才有可回退的目標。
+用 overlay 而不是直接修改 compose 檔案：它是你自己的檔案，任何更新都不會動；而且同樣的方式能固定 stack 中任何一個映像，不限於這一個。`docker compose images` 可以看到目前執行的版本，14.3 會在更新前記錄，這樣才有可回退的目標。
 
 #### 16.3 還原資料庫（如有需要）
 

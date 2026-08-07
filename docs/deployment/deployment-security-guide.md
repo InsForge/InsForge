@@ -935,19 +935,29 @@ docker compose down
 
 #### 16.2 Pin the Previous Version
 
-Set the version you were running in `.env`, then start again:
+Write an overlay naming the version you were running, next to your `.env`:
+
+```yaml
+# pin.yml
+services:
+  insforge:
+    image: ghcr.io/insforge/insforge-oss:v2.2.9
+```
+
+Append it to `COMPOSE_FILE` in `.env`, then start again:
 
 ```env
-INSFORGE_OSS_VERSION=v2.2.9
+COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
 ```
 
 ```bash
 docker compose up -d
 ```
 
-Set it in `.env` rather than editing the compose file. `.env` is yours and no update touches it, while a compose file you have edited makes the next `git merge --ff-only` refuse rather than overwrite your change — which is the protection working, but it leaves you unable to update until you revert the edit.
-
-`docker compose images` lists what is running now, and 14.3 records the version before an update so there is something to pin back to.
+An overlay rather than an edit to the compose file: it is a file of your own that
+no update touches, and the same trick pins any image in the stack, not just this
+one. `docker compose images` lists what is running, and 14.3 records the versions
+before an update so there is something to pin back to.
 
 #### 16.3 Restore the Database (If Needed)
 

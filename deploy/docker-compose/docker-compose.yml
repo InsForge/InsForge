@@ -59,11 +59,7 @@ services:
       - insforge-network
 
   insforge:
-    # The one image on a release train. Postgres, PostgREST and Deno are pinned
-    # to their own upstream versions above and below, which is why this names the
-    # image rather than the stack. Defaults to latest, which is what this file has
-    # always run.
-    image: ghcr.io/insforge/insforge-oss:${INSFORGE_OSS_VERSION:-latest}
+    image: ghcr.io/insforge/insforge-oss:latest
 
     working_dir: /app
     depends_on:
@@ -129,9 +125,6 @@ services:
       - APPLE_CLIENT_SECRET=${APPLE_CLIENT_SECRET:-}
       # Logs directory
       - LOGS_DIR=/insforge-logs
-      # Artifact stamp telemetry reads to tell the deployment paths apart. This
-      # file is the docker-compose one; a caller that wraps it says so instead.
-      - INSFORGE_DEPLOYMENT_METHOD=${INSFORGE_DEPLOYMENT_METHOD:-docker-compose}
       # Anonymous telemetry (set INSFORGE_TELEMETRY_DISABLED=1 to opt out)
       - INSFORGE_TELEMETRY_DISABLED=${INSFORGE_TELEMETRY_DISABLED:-}
       # Storage directory (for local file storage when S3 is not configured)

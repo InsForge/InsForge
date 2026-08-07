@@ -926,19 +926,29 @@ docker compose down
 
 #### 16.2 Fija la versión anterior
 
-Escribe en `.env` la versión que ejecutabas antes y arranca de nuevo:
+Escribe un overlay con la versión que ejecutabas, junto a tu `.env`:
+
+```yaml
+# pin.yml
+services:
+  insforge:
+    image: ghcr.io/insforge/insforge-oss:v2.2.9
+```
+
+Añádelo a `COMPOSE_FILE` en `.env` y arranca de nuevo:
 
 ```env
-INSFORGE_OSS_VERSION=v2.2.9
+COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
 ```
 
 ```bash
 docker compose up -d
 ```
 
-Defínela en `.env` en lugar de editar el archivo compose. `.env` es tuyo y ninguna actualización lo toca, mientras que un archivo compose que hayas editado hace que el siguiente `git merge --ff-only` se niegue en vez de sobrescribir tu cambio — la protección funcionando, pero te deja sin poder actualizar hasta que revi ertas la edición.
-
-`docker compose images` muestra qué versión se está ejecutando, y 14.3 registra la versión antes de una actualización para tener algo a lo que volver.
+Un overlay en lugar de editar el archivo compose: es un archivo tuyo que ninguna
+actualización toca, y el mismo recurso fija cualquier imagen del stack, no solo
+esta. `docker compose images` muestra qué se está ejecutando, y 14.3 registra las
+versiones antes de una actualización para tener algo a lo que volver.
 
 #### 16.3 Restaura la base de datos (si es necesario)
 
