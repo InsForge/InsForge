@@ -268,11 +268,19 @@ router.post(
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
 
+        let aborted = false;
+        req.on('close', () => {
+          aborted = true;
+        });
+
         // Create and process the stream
         try {
           const streamGenerator = chatService.streamChat(messages, options);
 
           for await (const data of streamGenerator) {
+            if (aborted) {
+              break;
+            }
             if (data.chunk) {
               res.write(`data: ${JSON.stringify({ chunk: data.chunk })}\n\n`);
             }
@@ -287,8 +295,10 @@ router.post(
             }
           }
 
-          // Send completion signal
-          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+          if (!aborted) {
+            // Send completion signal
+            res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+          }
         } catch (streamError) {
           // If error occurs during streaming, send it in SSE format
           logger.error('Stream error during chat completion', {

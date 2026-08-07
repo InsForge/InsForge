@@ -25,6 +25,10 @@ const configUpdateErrorMock = vi.hoisted(() => {
   return { ModelGatewayConfigUpdateError };
 });
 const auditMock = vi.hoisted(() => ({ log: vi.fn() }));
+const chatServiceMock = vi.hoisted(() => ({
+  streamChat: vi.fn(),
+  chat: vi.fn(),
+}));
 
 vi.hoisted(() => {
   process.env.JWT_SECRET = 'test-secret-long-enough-for-signing-32chars';
@@ -61,7 +65,7 @@ vi.mock('../../src/services/logs/audit.service.js', () => ({
 }));
 
 vi.mock('../../src/services/ai/chat-completion.service.js', () => ({
-  ChatCompletionService: { getInstance: () => ({}) },
+  ChatCompletionService: { getInstance: () => chatServiceMock },
 }));
 
 vi.mock('../../src/services/ai/image-generation.service.js', () => ({
@@ -330,5 +334,37 @@ describe('ai route wiring', () => {
     expect(rotateRoute?.route?.stack.map((handler) => handler.handle.name)).toContain(
       'verifyAdmin'
     );
+  });
+
+  it('aborts AI streaming generator loop when client closes the connection', async () => {
+    let yieldCount = 0;
+    async function* mockStreamGenerator() {
+      yieldCount++;
+      yield { chunk: 'Chunk 1' };
+      yieldCount++;
+      yield { chunk: 'Chunk 2' };
+      yieldCount++;
+      yield { chunk: 'Chunk 3' };
+    }
+
+    chatServiceMock.streamChat.mockImplementation(() => mockStreamGenerator());
+
+    const app = await createApp();
+    const req = request(app)
+      .post('/api/ai/chat/completion')
+      .send({
+        messages: [{ role: 'user', content: 'Hello' }],
+        model: 'openai/gpt-4o',
+        stream: true,
+      });
+
+    // Abort client request mid-flight
+    setTimeout(() => {
+      req.abort();
+    }, 5);
+
+    await req.catch(() => {});
+    expect(chatServiceMock.streamChat).toHaveBeenCalled();
+    expect(yieldCount).toBeLessThan(3);
   });
 });

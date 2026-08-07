@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -34,6 +35,7 @@ import { LogService } from '@/services/logs/log.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
+import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
@@ -85,10 +87,53 @@ export async function createApp() {
   // Enable trust proxy setting for rate limiting behind proxies/load balancers.
   app.set('trust proxy', appConfig.server.trustProxy);
 
+  // Security headers
+  app.use(helmet());
+
   // Basic middleware
   app.use(
     cors({
-      origin: true, // Allow all origins (matches Better Auth's trustedOrigins: ['*'])
+      origin: (origin, callback) => {
+        if (!origin) {
+          return callback(null, true);
+        }
+
+        const apiBaseUrl = process.env.API_BASE_URL;
+        if (apiBaseUrl) {
+          try {
+            const apiOrigin = new URL(apiBaseUrl).origin;
+            if (origin === apiOrigin || origin === apiBaseUrl) {
+              return callback(null, true);
+            }
+          } catch {
+            if (origin === apiBaseUrl) {
+              return callback(null, true);
+            }
+          }
+        }
+
+        AuthConfigService.getInstance()
+          .getAuthConfig()
+          .then((authConfig) => {
+            const allowedUrls = authConfig.allowedRedirectUrls || [];
+            const isAllowed = allowedUrls.some((url) => {
+              try {
+                const allowedOrigin = new URL(url).origin;
+                return origin === allowedOrigin || origin === url;
+              } catch {
+                return origin === url;
+              }
+            });
+
+            if (isAllowed) {
+              return callback(null, true);
+            }
+            return callback(null, false);
+          })
+          .catch(() => {
+            return callback(null, false);
+          });
+      },
       credentials: true, // Allow cookies/credentials
       exposedHeaders: ['Content-Range', 'Preference-Applied'],
     })
