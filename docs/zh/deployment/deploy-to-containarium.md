@@ -50,32 +50,26 @@ containarium ssh-config sync
 ssh insforge
 ```
 
-### 2. 在 box 内克隆 InsForge
+### 2. 在 box 内安装 InsForge
 
 ```bash
-ssh insforge <<'EOF'
-  git clone https://github.com/InsForge/InsForge.git ~/insforge
-  cd ~/insforge/deploy/docker-compose
-  cp .env.example .env
-EOF
+ssh insforge 'curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge'
 ```
+
+会 checkout 这个栈要读的文件，并把密钥生成到 `~/insforge/.env`。不启动任何东西。
 
 ### 3. 配置环境
 
-在 box 内编辑 `~/insforge/deploy/docker-compose/.env`。至少需要设置：
+在 box 内编辑 `~/insforge/.env`。至少需要设置：
 
 ```env
-JWT_SECRET=<32+ char random string — `openssl rand -base64 32`>
-ENCRYPTION_KEY=<24+ char random string — `openssl rand -base64 24`>
-POSTGRES_PASSWORD=<strong password>
-ROOT_ADMIN_USERNAME=admin
-ROOT_ADMIN_PASSWORD=<change this>
-
-API_BASE_URL=https://<your-subdomain>
-VITE_API_BASE_URL=https://<your-subdomain>
+API_BASE_URL=https://<你的子域名>
+VITE_API_BASE_URL=https://<你的子域名>
 ```
 
-完整列表（OpenRouter、OAuth 提供商、Stripe、Vercel）请参见 [`deploy/docker-compose/.env.example`](https://github.com/insforge/insforge/blob/main/deploy/docker-compose/.env.example)。
+密钥已经生成好了，不要改动。
+
+完整列表（OpenRouter、OAuth 提供商、Stripe、Vercel）请参见 [`.env.example`](https://github.com/insforge/insforge/blob/main/.env.example)。
 
 > **密钥处理：** 对于生产环境，优先使用 Containarium 的 tmpfs 密钥（`--delivery=file`；参见 [Containarium 的密钥操作文档](https://github.com/footprintai/Containarium/blob/main/docs/SECRETS-OPERATIONS.md)）。这些密钥以 0440 文件的形式交付到 tmpfs 上，永远不会出现在 `/proc/<pid>/environ` 中。通过使用 `env_file:` 的 compose 覆盖文件将它们接入 compose 堆栈。
 
@@ -84,13 +78,13 @@ VITE_API_BASE_URL=https://<your-subdomain>
 你可以手动启动一次：
 
 ```bash
-ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose up -d'
+ssh insforge 'cd ~/insforge && docker compose up -d'
 ```
 
 ……或者——推荐做法——将其接入 Containarium 的 compose 自动启动，使堆栈在主机重启后仍能存活：
 
 ```bash
-containarium compose enable insforge --dir /home/insforge/insforge/deploy/docker-compose
+containarium compose enable insforge --dir /home/insforge/insforge
 ```
 
 这会在 box 内安装一个 systemd-user 单元，在每次容器启动时拉起堆栈，并在失败时带退避重试地重启服务。使用以下命令验证：
@@ -151,15 +145,15 @@ agent: create me a container called 'insforge'
       username="insforge", cpu="2", memory="4GB",
       disk="30GB", stack="docker")
 
-agent: clone InsForge, fill in .env
+agent: set InsForge up, fill in .env
   → ssh insforge agent-box
-    → shell_exec("git clone https://github.com/InsForge/InsForge.git ~/insforge")
-    → write_file("~/insforge/deploy/docker-compose/.env", "<contents>")
+    → shell_exec("curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge")
+    → write_file("~/insforge/.env", "<contents>")
 
 agent: enable autostart
   → mcp__containarium__compose_enable(
       username="insforge",
-      dir="/home/insforge/insforge/deploy/docker-compose")
+      dir="/home/insforge/insforge")
 
 agent: expose on a public hostname
   → mcp__containarium__expose_port(
@@ -191,7 +185,7 @@ containarium expose-port insforge-globex --container-port 7130 \
 ### 查看日志
 
 ```bash
-ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose logs -f'
+ssh insforge 'cd ~/insforge && docker compose logs -f'
 ```
 
 或按服务查看：`docker compose logs -f insforge` / `postgres` / `deno`。
@@ -200,7 +194,7 @@ ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose logs -f'
 
 ```bash
 ssh insforge <<'EOF'
-  cd ~/insforge/deploy/docker-compose
+  cd ~/insforge
   git -C ~/insforge pull origin main
   docker compose pull
   docker compose up -d
@@ -212,7 +206,7 @@ EOF
 ### 备份数据库
 
 ```bash
-ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose exec -T postgres \
+ssh insforge 'cd ~/insforge && docker compose exec -T postgres \
   pg_dump -U postgres insforge' > backup_$(date +%Y%m%d_%H%M%S).sql
 ```
 

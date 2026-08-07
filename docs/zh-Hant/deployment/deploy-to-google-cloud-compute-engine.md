@@ -146,79 +146,40 @@ sudo apt install git -y
 
 ### 4. 部署 InsForge
 
-#### 4.1 複製儲存庫
+#### 4.1 取得儲存庫
 
 ```bash
-cd ~
-git clone https://github.com/insforge/insforge.git
-cd insforge/deploy/docker-compose
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
+
+會 checkout 這個 stack 要讀的檔案，並把 `JWT_SECRET`、`ENCRYPTION_KEY`、`ROOT_ADMIN_PASSWORD`、`POSTGRES_PASSWORD` 產生到 `.env`。不啟動任何東西。
 
 #### 4.2 建立環境設定
 
-建立包含正式環境設定的 `.env` 檔案：
-
 ```bash
+cd ~/insforge
 nano .env
 ```
 
-儲存庫內附有範本檔案 `deploy/docker-compose/.env.example`。複製它並編輯其中的值：
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-至少須設定以下值：
+密鑰已經產生好了，請勿改動。設定瀏覽器會存取的位址：
 
 ```env
-# Authentication (required)
-# IMPORTANT: Generate a strong random secret for production (32+ characters)
-JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-
-# Admin account (used for initial setup)
-ROOT_ADMIN_USERNAME=admin
-ROOT_ADMIN_PASSWORD=change-this-password
-
-# Database (required)
-POSTGRES_PASSWORD=your-secure-postgres-password
+API_BASE_URL=http://<你的公開IP>:7130
+VITE_API_BASE_URL=http://<你的公開IP>:7130
 ```
 
-您可能還想設定的選用值：
+選用項目，預設全部關閉：
 
 ```env
-# Encryption key for secrets and database encryption.
-# Falls back to JWT_SECRET if left empty.
-ENCRYPTION_KEY=
-
-# AI/LLM (get a key from https://openrouter.ai/keys)
-OPENROUTER_API_KEY=
-
-# Site deployments and custom domains
-VERCEL_TOKEN=
-VERCEL_TEAM_ID=
-VERCEL_PROJECT_ID=
-
-# OAuth providers (Google, GitHub, etc.)
-GOOGLE_CLIENT_ID=
+OPENROUTER_API_KEY=      # AI 功能
+VERCEL_TOKEN=            # 網站部署
+GOOGLE_CLIENT_ID=        # OAuth 提供者
 GOOGLE_CLIENT_SECRET=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
 ```
 
-完整支援的變數清單請參閱 `deploy/docker-compose/.env.example`。
+其餘變數與其預設值都在 `.env.example` 中。
 
-**產生安全的密鑰：**
-
-```bash
-# Generate JWT_SECRET (32+ characters)
-openssl rand -base64 32
-
-# Generate ENCRYPTION_KEY (32 characters)
-openssl rand -base64 24
-```
-
-> 💡 **重要**：請妥善保存這些密鑰。若您日後需要遷移或還原您的執行個體，將會需要用到它們。
+> 💡 請將 `.env` 備份到安全的地方。遷移或還原這個實例靠的就是其中的密鑰。
 
 #### 4.3 啟動 InsForge 服務
 
@@ -364,7 +325,7 @@ sudo certbot --nginx -d api.yourdomain.com -d app.yourdomain.com
 更新您的 `.env` 檔案，改用 HTTPS 網址：
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 nano .env
 ```
 
@@ -410,7 +371,7 @@ docker compose restart
 ### 更新 InsForge
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 git pull origin main
 docker compose pull && docker compose up -d
 ```

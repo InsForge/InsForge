@@ -54,32 +54,26 @@ containarium ssh-config sync
 ssh insforge
 ```
 
-### 2. Clone InsForge inside the box
+### 2. Set InsForge up inside the box
 
 ```bash
-ssh insforge <<'EOF'
-  git clone https://github.com/InsForge/InsForge.git ~/insforge
-  cd ~/insforge/deploy/docker-compose
-  cp .env.example .env
-EOF
+ssh insforge 'curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge'
 ```
+
+Checks out the files the stack reads and generates the secrets into `~/insforge/.env`. Nothing is started.
 
 ### 3. Configure environment
 
-Edit `~/insforge/deploy/docker-compose/.env` inside the box. At minimum set:
+Edit `~/insforge/.env` inside the box. At minimum set:
 
 ```env
-JWT_SECRET=<32+ char random string — `openssl rand -base64 32`>
-ENCRYPTION_KEY=<24+ char random string — `openssl rand -base64 24`>
-POSTGRES_PASSWORD=<strong password>
-ROOT_ADMIN_USERNAME=admin
-ROOT_ADMIN_PASSWORD=<change this>
-
 API_BASE_URL=https://<your-subdomain>
 VITE_API_BASE_URL=https://<your-subdomain>
 ```
 
-See [`deploy/docker-compose/.env.example`](https://github.com/insforge/insforge/blob/main/deploy/docker-compose/.env.example) for the full list (OpenRouter, OAuth providers, Stripe, Vercel).
+The secrets are already generated — leave them as they are.
+
+See [`.env.example`](https://github.com/insforge/insforge/blob/main/.env.example) for the full list (OpenRouter, OAuth providers, Stripe, Vercel).
 
 > **Secrets handling:** for production, prefer Containarium's tmpfs secrets (`--delivery=file`; see [Containarium's secrets ops doc](https://github.com/footprintai/Containarium/blob/main/docs/SECRETS-OPERATIONS.md)). These are delivered as 0440 files on tmpfs and never appear in `/proc/<pid>/environ`. Wire them into the compose stack via a compose override using `env_file:`.
 
@@ -88,13 +82,13 @@ See [`deploy/docker-compose/.env.example`](https://github.com/insforge/insforge/
 You can start it once by hand:
 
 ```bash
-ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose up -d'
+ssh insforge 'cd ~/insforge && docker compose up -d'
 ```
 
 …or — recommended — wire it into Containarium's compose-autostart so the stack survives host reboots:
 
 ```bash
-containarium compose enable insforge --dir /home/insforge/insforge/deploy/docker-compose
+containarium compose enable insforge --dir /home/insforge/insforge
 ```
 
 This installs a systemd-user unit inside the box that brings the stack up at every container boot and restarts services on failure with backoff. Verify with:
@@ -155,15 +149,15 @@ agent: create me a container called 'insforge'
       username="insforge", cpu="2", memory="4GB",
       disk="30GB", stack="docker")
 
-agent: clone InsForge, fill in .env
+agent: set InsForge up, fill in .env
   → ssh insforge agent-box
-    → shell_exec("git clone https://github.com/InsForge/InsForge.git ~/insforge")
-    → write_file("~/insforge/deploy/docker-compose/.env", "<contents>")
+    → shell_exec("curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge")
+    → write_file("~/insforge/.env", "<contents>")
 
 agent: enable autostart
   → mcp__containarium__compose_enable(
       username="insforge",
-      dir="/home/insforge/insforge/deploy/docker-compose")
+      dir="/home/insforge/insforge")
 
 agent: expose on a public hostname
   → mcp__containarium__expose_port(
@@ -195,7 +189,7 @@ Each project gets isolated postgres / storage / deno volumes.
 ### View logs
 
 ```bash
-ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose logs -f'
+ssh insforge 'cd ~/insforge && docker compose logs -f'
 ```
 
 Or per service: `docker compose logs -f insforge` / `postgres` / `deno`.
@@ -204,7 +198,7 @@ Or per service: `docker compose logs -f insforge` / `postgres` / `deno`.
 
 ```bash
 ssh insforge <<'EOF'
-  cd ~/insforge/deploy/docker-compose
+  cd ~/insforge
   git -C ~/insforge pull origin main
   docker compose pull
   docker compose up -d
@@ -216,7 +210,7 @@ If compose-autostart is enabled, no need to re-enable the unit — it tracks the
 ### Back up the database
 
 ```bash
-ssh insforge 'cd ~/insforge/deploy/docker-compose && docker compose exec -T postgres \
+ssh insforge 'cd ~/insforge && docker compose exec -T postgres \
   pg_dump -U postgres insforge' > backup_$(date +%Y%m%d_%H%M%S).sql
 ```
 

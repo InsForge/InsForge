@@ -165,22 +165,26 @@ docker run hello-world
 
 ### 4. Deploy InsForge with Docker Compose
 
-#### 4.1 Download the Production Docker Compose File
+#### 4.1 Get the Repository
 
 ```bash
-mkdir -p ~/insforge && cd ~/insforge
-
-# Download the production-ready Docker Compose file and environment template
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/docker-compose.yml
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/.env.example
-
-# Create your environment file
-cp .env.example .env
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
+
+Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY`, `ROOT_ADMIN_PASSWORD` and `POSTGRES_PASSWORD` into `.env`. Nothing is started.
+
+> Rather not pipe a script into a shell? Read it first:
+>
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh -o setup.sh
+> less setup.sh
+> sh setup.sh ~/insforge
+> ```
 
 #### 4.2 Start InsForge
 
 ```bash
+cd ~/insforge
 docker compose up -d
 ```
 
@@ -280,24 +284,27 @@ DENO_PORT=7133
 
 > 💡 You can change these if they conflict with other services on your VPS.
 
+`COMPOSE_PROJECT_NAME` prefixes every container, volume and network:
+
+```env
+COMPOSE_PROJECT_NAME=insforge
+```
+
+> ⚠️ Give a second instance on the same host its own value, along with its own ports. Two `.env` files sharing this name means `docker compose up` in one of them adopts and recreates the other's containers.
+
 #### 5.4 Required for Deployments
 
 These variables are only needed if you plan to use InsForge's **deployment features** (deploying projects via the dashboard). If you don't need deployments, skip this section.
 
-> ⚠️ **Note**: `PROJECT_ID` comes from the root `.env.example` setup. It is **not** present in `deploy/docker-compose/.env.example`, and the `deploy/docker-compose/docker-compose.yml` does **not** pass it through to the `insforge` container, so setting it in your `.env` has no effect on that production compose. To use it, add it to the `insforge` service's `environment` block in your `docker-compose.yml`. The storage variables (`S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `S3_USE_PRESIGNED_URLS`, `S3_MAX_OBJECT_SIZE_BYTES`, `MAX_FILE_SIZE`) **are** passed through — set them in your `.env` and restart.
-
 ```env
 # ── Deployments ──────────────────────────────────────────────
-# S3 bucket for legacy zip deployment uploads.
-# Direct uploads use the backend proxy, but POST /api/deployments still requires S3.
-S3_BUCKET=your-deployment-bucket
-S3_REGION=us-east-2
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-
 # Project ID used by OpenRouter AI token renewal and Vercel deployments
 PROJECT_ID=your-project-id
 ```
+
+> ⚠️ `deploy/docker-compose/docker-compose.yml` does not pass `PROJECT_ID` through to the `insforge` container. Add it to that service's `environment` block to use it.
+
+Legacy zip uploads to `POST /api/deployments` also need an S3 bucket — configure it with the `S3_*` variables in 5.5.
 
 #### 5.5 Optional Variables
 
@@ -859,7 +866,25 @@ docker compose images
 
 ### 15. Updating InsForge
 
-#### 15.1 Pull the Latest Images
+#### 15.1 Update the Repository
+
+Update the checkout before pulling images: it carries the compose file and the Postgres config.
+
+```bash
+cd ~/insforge
+
+git fetch origin main
+git diff HEAD origin/main -- deploy .env.example
+
+git merge --ff-only origin/main
+
+# Pick up any files this release added
+sh deploy/setup.sh .
+```
+
+Review the diff before merging. New variables in `.env.example` have to be copied into your `.env` by hand.
+
+#### 15.2 Pull the Latest Images
 
 ```bash
 cd ~/insforge
@@ -868,7 +893,7 @@ cd ~/insforge
 docker compose pull
 ```
 
-#### 15.2 Apply the Update
+#### 15.3 Apply the Update
 
 ```bash
 # Stop current services, start with new images
@@ -881,7 +906,7 @@ docker compose logs -f --tail=50
 
 Press `Ctrl+C` to stop following logs.
 
-#### 15.3 Verify the Update
+#### 15.4 Verify the Update
 
 ```bash
 # Check all services are healthy
@@ -892,31 +917,6 @@ curl http://localhost:7130/api/health
 
 # Check the version in the response
 ```
-
-#### 15.4 Update the Docker Compose File (If Needed)
-
-Occasionally, new releases may include changes to `docker-compose.yml`. To pick up these changes:
-
-```bash
-cd ~/insforge
-
-# Download the updated compose file
-wget -O docker-compose.yml.new \
-  https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/docker-compose.yml
-
-# Compare with your current file
-diff docker-compose.yml docker-compose.yml.new
-
-# If changes look safe, apply them
-mv docker-compose.yml docker-compose.yml.old
-mv docker-compose.yml.new docker-compose.yml
-
-# Restart with the new configuration
-docker compose down
-docker compose up -d
-```
-
----
 
 ### 16. Rollback Procedure
 
@@ -995,9 +995,11 @@ nano ~/insforge/backup.sh
 set -euo pipefail
 
 # InsForge Automated Backup Script
-# Load .env so POSTGRES_USER / POSTGRES_DB are available outside Docker Compose
+# Run from the checkout so docker compose reads COMPOSE_FILE and
+# COMPOSE_PROJECT_NAME from .env, which also carries POSTGRES_USER / POSTGRES_DB
+cd "$HOME/insforge"
 set -a
-source "$HOME/insforge/.env"
+source .env
 set +a
 
 BACKUP_DIR="$HOME/insforge/backups"
@@ -1009,7 +1011,7 @@ trap 'echo "[$(date)] ERROR: Backup failed at line $LINENO" >&2; exit 1' ERR
 mkdir -p "$BACKUP_DIR"
 
 # Dump the database
-docker compose -f "$HOME/insforge/docker-compose.yml" exec -T postgres \
+docker compose exec -T postgres \
   pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" \
   > "$BACKUP_DIR/db_$TIMESTAMP.sql"
 
