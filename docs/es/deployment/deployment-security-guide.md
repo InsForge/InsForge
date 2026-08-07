@@ -935,7 +935,7 @@ services:
     image: ghcr.io/insforge/insforge-oss:v2.2.9
 ```
 
-Añádelo a `COMPOSE_FILE` en `.env` y arranca de nuevo:
+Añádelo a lo que `COMPOSE_FILE` ya contenga en `.env` — conserva las entradas que estén allí, o un overlay de almacenamiento que hubieras activado desaparece del stack:
 
 ```env
 COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
@@ -944,6 +944,8 @@ COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
 ```bash
 docker compose up -d
 ```
+
+**Quita el `:pin.yml` cuando termines.** Mientras esté ahí, la actualización de la sección 15 descarga imágenes nuevas y sigue ejecutando la fijada: el pin gana sobre `latest`, en silencio, mientras la entrada permanezca.
 
 Un overlay en lugar de editar el archivo compose: es un archivo tuyo que ninguna
 actualización toca, y el mismo recurso fija cualquier imagen del stack, no solo

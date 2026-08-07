@@ -944,15 +944,21 @@ services:
     image: ghcr.io/insforge/insforge-oss:v2.2.9
 ```
 
-Append it to `COMPOSE_FILE` in `.env`, then start again:
+Append it to whatever `COMPOSE_FILE` already holds in `.env` — keep the entries
+that are there, or a storage overlay you had enabled drops out of the stack:
 
 ```env
+# was: COMPOSE_FILE=deploy/docker-compose/docker-compose.yml
 COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
 ```
 
 ```bash
 docker compose up -d
 ```
+
+**Remove the `:pin.yml` when you are done.** While it is there, section 15's
+update pulls new images and then keeps running the pinned one — the pin wins over
+`latest`, silently, for as long as the entry stays.
 
 An overlay rather than an edit to the compose file: it is a file of your own that
 no update touches, and the same trick pins any image in the stack, not just this
