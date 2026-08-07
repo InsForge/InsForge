@@ -171,6 +171,11 @@
         "description": "How much of your instance's storage the database, files, and logs are using. A full disk stops writes and can take the backend offline."
       }
     },
+    "memoryAdvisory": {
+      "title": "Memory is sitting at {{value}}. For Postgres, that's normal.",
+      "description": "Postgres grabs spare memory to cache your data and keeps it, even when the database is idle. A high number here doesn't mean something is wrong. The warning signs that actually matter are restarts and queries slowing down. If you're seeing those, a bigger instance will give it room.",
+      "cta": "Upgrade Instance"
+    },
     "steps": {
       "database": {
         "category": "Database",

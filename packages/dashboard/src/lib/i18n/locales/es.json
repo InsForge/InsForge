@@ -171,6 +171,11 @@
         "description": "Cuánto almacenamiento de tu instancia usan la base de datos, los archivos y los registros. Un disco lleno detiene las escrituras y puede dejar el backend fuera de línea."
       }
     },
+    "memoryAdvisory": {
+      "title": "La memoria está en {{value}}. Para Postgres, eso es normal.",
+      "description": "Postgres usa la memoria libre para cachear tus datos y la retiene incluso cuando la base de datos está inactiva, así que un número alto aquí no significa que algo vaya mal. Las señales que sí importan son los reinicios y las consultas cada vez más lentas. Si las estás viendo, una instancia más grande le dará espacio.",
+      "cta": "Mejorar instancia"
+    },
     "steps": {
       "database": {
         "category": "Base de datos",

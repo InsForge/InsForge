@@ -1,11 +1,26 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDownToLine, ArrowUpFromLine, Cpu, HardDrive, MemoryStick } from 'lucide-react';
+import { Button } from '@insforge/ui';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { isInsForgeCloudProject } from '#lib/utils/utils';
 import { useProjectMetrics } from '#features/dashboard/hooks/useProjectMetrics';
+import { aggregateMetricSeries } from '#features/dashboard/utils/aggregateMetricSeries';
 import type { DashboardMetricName, DashboardMetricsRange } from '#types';
+import { ProjectSettingsMenuDialog } from '#features/dashboard/components';
 import { MetricChartCard } from './MetricChartCard';
 
 const RANGES: DashboardMetricsRange[] = ['1h', '6h', '24h', '3d'];
+
+/**
+ * Memory advisory trigger, as the average over the visible window. A dedicated
+ * Postgres instance parked high on memory is its healthy steady state (idle RAM
+ * becomes query cache), but it reads as a leak — support keeps fielding
+ * "my idle database sits at ~78% memory" reports. 75 is low enough to be seen
+ * BEFORE a small instance tips into OOM kills, and below the chart's own 85%
+ * red-line so the reassurance arrives ahead of the alarm color.
+ */
+const MEMORY_ADVISORY_PCT = 75;
 
 const RANGE_SECONDS: Record<DashboardMetricsRange, number> = {
   '1h': 3600,
@@ -95,8 +110,20 @@ const DISK_GRID_INDEX = 2;
 
 export function ObservabilitySection() {
   const { t } = useTranslation('chrome');
+  const isCloudHostingMode = useIsCloudHostingMode();
+  // Same pair of signals the settings dialog gates its Compute tab on
+  // (ProjectSettingsMenuDialog's canUseCloudHost) — the CTA must not show
+  // when the tab it promises would fall back to Project Information.
+  const canOpenComputeSettings = isCloudHostingMode && isInsForgeCloudProject();
   const [range, setRange] = useState<DashboardMetricsRange>('1h');
+  const [computeSettingsOpen, setComputeSettingsOpen] = useState(false);
   const { data, isLoading, isUnavailable, error } = useProjectMetrics(range);
+
+  const memoryAdvisoryAvg = useMemo(() => {
+    const series = data?.metrics.find((m) => m.metric === 'memory_usage')?.data ?? [];
+    const avg = aggregateMetricSeries(series).avg;
+    return avg !== null && avg >= MEMORY_ADVISORY_PCT ? avg : null;
+  }, [data]);
 
   // Memoize disk card derivations so the [0, totalBytes] domain array reference
   // is stable across renders — otherwise MetricChartCard's sparkline useMemo
@@ -157,52 +184,98 @@ export function ObservabilitySection() {
           })}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {(() => {
-            const cards = METRICS.map((config) => {
-              const series = data?.metrics.find((m) => m.metric === config.metric);
-              return (
+        <>
+          {memoryAdvisoryAvg !== null && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-[var(--alpha-8)] bg-card p-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)] text-muted-foreground">
+                  <MemoryStick className="h-5 w-5" />
+                </span>
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <p className="text-sm font-medium leading-5 text-foreground">
+                    {t('overview.memoryAdvisory.title', {
+                      value: PERCENT(memoryAdvisoryAvg),
+                      defaultValue: "Memory is sitting at {{value}}. For Postgres, that's normal.",
+                    })}
+                  </p>
+                  <p className="text-sm leading-5 text-muted-foreground">
+                    {t('overview.memoryAdvisory.description', {
+                      defaultValue:
+                        "Postgres grabs spare memory to cache your data and keeps it, even when the database is idle. A high number here doesn't mean something is wrong. The warning signs that actually matter are restarts and queries slowing down. If you're seeing those, a bigger instance will give it room.",
+                    })}
+                  </p>
+                </div>
+              </div>
+              {canOpenComputeSettings && (
+                <Button
+                  type="button"
+                  className="h-8 shrink-0 rounded px-3 text-sm font-medium"
+                  onClick={() => setComputeSettingsOpen(true)}
+                >
+                  {t('overview.memoryAdvisory.cta', { defaultValue: 'Upgrade Instance' })}
+                </Button>
+              )}
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {(() => {
+              const cards = METRICS.map((config) => {
+                const series = data?.metrics.find((m) => m.metric === config.metric);
+                return (
+                  <MetricChartCard
+                    key={config.metric}
+                    title={t(`overview.metrics.${config.i18nKey}.title`, {
+                      defaultValue: config.title,
+                    })}
+                    icon={config.icon}
+                    data={series?.data ?? []}
+                    rangeSeconds={RANGE_SECONDS[range]}
+                    formatValue={config.format}
+                    isLoading={isLoading}
+                    threshold={config.threshold}
+                    description={t(`overview.metrics.${config.i18nKey}.description`, {
+                      defaultValue: config.description,
+                    })}
+                  />
+                );
+              });
+
+              cards.splice(
+                DISK_GRID_INDEX,
+                0,
                 <MetricChartCard
-                  key={config.metric}
-                  title={t(`overview.metrics.${config.i18nKey}.title`, {
-                    defaultValue: config.title,
-                  })}
-                  icon={config.icon}
-                  data={series?.data ?? []}
+                  key="disk_used"
+                  title={t('overview.metrics.diskUsed.title', { defaultValue: 'Disk Usage' })}
+                  icon={<HardDrive className="h-5 w-5" />}
+                  data={diskCardProps.data}
                   rangeSeconds={RANGE_SECONDS[range]}
-                  formatValue={config.format}
+                  formatValue={BYTES_SIZE}
                   isLoading={isLoading}
-                  threshold={config.threshold}
-                  description={t(`overview.metrics.${config.i18nKey}.description`, {
-                    defaultValue: config.description,
+                  threshold={diskCardProps.threshold}
+                  fixedDomain={diskCardProps.fixedDomain}
+                  formatAxisLabel={BYTES_SIZE}
+                  description={t('overview.metrics.diskUsed.description', {
+                    defaultValue:
+                      "How much of your instance's storage the database, files, and logs are using. A full disk stops writes and can take the backend offline.",
                   })}
                 />
               );
-            });
-
-            cards.splice(
-              DISK_GRID_INDEX,
-              0,
-              <MetricChartCard
-                key="disk_used"
-                title={t('overview.metrics.diskUsed.title', { defaultValue: 'Disk Usage' })}
-                icon={<HardDrive className="h-5 w-5" />}
-                data={diskCardProps.data}
-                rangeSeconds={RANGE_SECONDS[range]}
-                formatValue={BYTES_SIZE}
-                isLoading={isLoading}
-                threshold={diskCardProps.threshold}
-                fixedDomain={diskCardProps.fixedDomain}
-                formatAxisLabel={BYTES_SIZE}
-                description={t('overview.metrics.diskUsed.description', {
-                  defaultValue:
-                    "How much of your instance's storage the database, files, and logs are using. A full disk stops writes and can take the backend offline.",
-                })}
-              />
-            );
-            return cards;
-          })()}
-        </div>
+              return cards;
+            })()}
+          </div>
+        </>
+      )}
+      {/* The CTA lands on the settings dialog's Compute tab because that tab is
+          already the tier-aware surface: a free plan sees the Upgrade Plan
+          upsell, a paid plan picks a larger instance type. Mounted only while
+          open — the sidebar already keeps a permanent instance, and the
+          dialog's hooks subscribe on mount whether or not it is shown. */}
+      {computeSettingsOpen && (
+        <ProjectSettingsMenuDialog
+          open={computeSettingsOpen}
+          onOpenChange={setComputeSettingsOpen}
+          defaultTab="compute"
+        />
       )}
     </section>
   );
