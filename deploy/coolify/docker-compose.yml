@@ -9,6 +9,10 @@
 # the two API_BASE_URL values; the defaults below are placeholders, not safe
 # values.
 #
+# Nothing is published to the host. Assign a domain to the `insforge` service on
+# port 7130 in Coolify's UI, then set API_BASE_URL and VITE_API_BASE_URL to it —
+# without a domain or a port mapping the stack stays on the private network.
+#
 # No service bind-mounts anything out of the repository. Coolify creates file
 # bind mounts as directories (coollabsio/coolify#3375, still open), which breaks
 # Postgres outright. Postgres gets its init files by being built here instead.

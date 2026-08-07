@@ -7,6 +7,10 @@
 # JWT_SECRET, ENCRYPTION_KEY, POSTGRES_PASSWORD, ROOT_ADMIN_PASSWORD and the two
 # API_BASE_URL values; the defaults below are placeholders, not safe values.
 #
+# Nothing is published to the host. Add a domain for the `insforge` service on
+# port 7130 under Domains, then set API_BASE_URL and VITE_API_BASE_URL to it —
+# without one the stack stays on Dokploy's internal network.
+#
 # No service bind-mounts anything out of the repository: Dokploy re-clones code/
 # on every deploy, so those mounts go stale. Postgres gets its init files by
 # being built here instead, which needs no File Mount setup in the UI.
