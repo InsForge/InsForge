@@ -42,8 +42,13 @@ fi
 # but never in the working tree.
 #
 # --no-cone rather than cone mode: cone always adds every root-level file, which
-# would include the development docker-compose.yml. Running that in production
-# builds from source and starts dev servers.
+# would include the development docker-compose.yml. With COMPOSE_FILE unset for
+# any reason, `docker compose up` would then build from source and start dev
+# servers instead of failing with "no configuration file provided".
+#
+# git's own docs call non-cone mode deprecated, so a future git dropping the
+# flag would break this script rather than silently widening the checkout.
+# There is no cone-mode spelling of "these root files but not those".
 git sparse-checkout set --no-cone \
   /.env.example \
   /docker-compose.minio.yml /docker-compose.rustfs.yml \
@@ -59,6 +64,22 @@ set_var() {
     { print }
     END { if (!found) print key "=" val }
   ' "$ENV_FILE" > "$tmp" && mv "$tmp" "$ENV_FILE"
+}
+
+# Compose treats an empty value as unset, so `${JWT_SECRET:-dev-secret-...}`
+# would fall back to the placeholder default. An openssl that fails — or is
+# missing — must stop the script rather than hand out a known secret.
+gen_secret() {
+  value=$(openssl rand -hex "$2") || value=
+  if [ -z "$value" ]; then
+    # Leaving the half-written file behind would be worse than failing: the
+    # re-run path below leaves an existing .env untouched, so the secrets would
+    # never be generated and the stack would come up on the placeholders.
+    rm -f "$ENV_FILE"
+    echo "Could not generate $1: openssl rand failed. No .env was written." >&2
+    exit 1
+  fi
+  set_var "$1" "$value"
 }
 
 COMPOSE_FILE_VALUE=deploy/docker-compose/docker-compose.yml
@@ -91,20 +112,19 @@ if [ -f "$ENV_FILE" ]; then
 fi
 
 cp .env.example "$ENV_FILE"
+chmod 600 "$ENV_FILE"
 set_var COMPOSE_FILE "$COMPOSE_FILE_VALUE"
 
 # Generated as separate values on purpose. If ENCRYPTION_KEY is unset InsForge
 # falls back to JWT_SECRET, and rotating JWT_SECRET afterwards makes every stored
 # secret undecryptable.
-set_var JWT_SECRET "$(openssl rand -hex 32)"
-set_var ENCRYPTION_KEY "$(openssl rand -hex 32)"
-set_var ROOT_ADMIN_PASSWORD "$(openssl rand -hex 12)"
+gen_secret JWT_SECRET 32
+gen_secret ENCRYPTION_KEY 32
+gen_secret ROOT_ADMIN_PASSWORD 12
 
 # Postgres reads this only when it initializes the cluster, so it has to be
 # settled before the first boot — after that, editing .env changes nothing.
-set_var POSTGRES_PASSWORD "$(openssl rand -hex 16)"
-
-chmod 600 "$ENV_FILE"
+gen_secret POSTGRES_PASSWORD 16
 
 cat <<DONE
 

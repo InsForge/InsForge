@@ -39,6 +39,10 @@ services:
       PGRST_DB_SCHEMA: public
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${JWT_SECRET:-dev-secret-please-change-in-production}
+      # Keep in sync with the backend's POSTGREST_MAX_SOCKETS below. PostgREST
+      # defaults to a pool of 10; the backend opens up to 50 sockets into it,
+      # which just moves queuing into PostgREST under load.
+      PGRST_DB_POOL: ${PGRST_DB_POOL:-50}
       # Enable schema reloading via NOTIFY
       PGRST_DB_CHANNEL_ENABLED: true
       PGRST_DB_CHANNEL: pgrst
@@ -85,6 +89,9 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       - POSTGREST_BASE_URL=http://postgrest:3000
+      - POSTGREST_MAX_SOCKETS=${POSTGREST_MAX_SOCKETS:-}
+      - POSTGREST_MAX_FREE_SOCKETS=${POSTGREST_MAX_FREE_SOCKETS:-}
+      - POSTGREST_FREE_SOCKET_TIMEOUT_MS=${POSTGREST_FREE_SOCKET_TIMEOUT_MS:-}
       # Deno Runtime URL for serverless functions
       - DENO_RUNTIME_URL=http://deno:7133
       # LLM Model API keys
@@ -139,6 +146,13 @@ services:
 
   # Deno serverless runtime for edge functions
   deno:
+    # Runs as the image default (root), unlike the platform files, which build
+    # Dockerfile.deno and drop to uid 1000. Doing that here would need the
+    # deno_cache volume chowned, and a fresh named volume inherits ownership
+    # from the image — which needs a build step this stack deliberately avoids.
+    # functions/ is mounted read-only, and function code itself runs inside
+    # Deno's own permission sandbox.
+    #
     # The official Deno image plus this checkout's function host. The published
     # deno-runtime image is built in another repository and its copy of
     # functions/ matches no commit here, so fixes made in this repo never reach
