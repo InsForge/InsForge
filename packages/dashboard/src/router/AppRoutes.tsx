@@ -63,11 +63,11 @@ import BucketsPage from '#features/storage/pages/BucketsPage';
 import VisualizerLayout from '#features/visualizer/components/VisualizerLayout';
 import VisualizerPage from '#features/visualizer/pages/VisualizerPage';
 import AppLayout from '#layout/AppLayout';
-import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useFeatureFlagVariant } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 
 function AuthenticatedRoutes() {
-  const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
+  const dashboardVariant = useFeatureFlagVariant(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
   const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;
   const DashboardHomePage = isDTest ? DTestDashboardPage : DashboardPage;
 

@@ -1,5 +1,5 @@
 import posthog from 'posthog-js';
-import { PostHogProvider } from 'posthog-js/react';
+import { PostHogProvider, useFeatureFlagVariantKey } from 'posthog-js/react';
 
 const POSTHOG_KEY = import.meta.env.VITE_PUBLIC_POSTHOG_KEY || '';
 
@@ -83,4 +83,8 @@ export const getFeatureFlag = (featureFlag: string): string | boolean | undefine
     return undefined;
   }
   return posthog.getFeatureFlag(featureFlag);
+};
+
+export const useFeatureFlagVariant = (featureFlag: string) => {
+  return useFeatureFlagVariantKey(featureFlag);
 };
