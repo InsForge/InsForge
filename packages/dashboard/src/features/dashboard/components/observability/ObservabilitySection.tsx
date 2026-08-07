@@ -13,12 +13,16 @@ import { MetricChartCard } from './MetricChartCard';
 const RANGES: DashboardMetricsRange[] = ['1h', '6h', '24h', '3d'];
 
 /**
- * Memory advisory trigger, as the average over the visible window. A dedicated
- * Postgres instance parked high on memory is its healthy steady state (idle RAM
- * becomes query cache), but it reads as a leak — support keeps fielding
- * "my idle database sits at ~78% memory" reports. 75 is low enough to be seen
- * BEFORE a small instance tips into OOM kills, and below the chart's own 85%
- * red-line so the reassurance arrives ahead of the alarm color.
+ * Memory advisory trigger, on the LATEST sample — the same number the card's
+ * headline shows, so the banner agrees with what the user is currently reading
+ * and appears the moment memory is high (a window average lags the reading by
+ * most of the window, which is exactly when the "is this normal?" question is
+ * being asked). A dedicated Postgres instance parked high on memory is its
+ * healthy steady state (idle RAM becomes query cache), but it reads as a leak —
+ * support keeps fielding "my idle database sits at ~78% memory" reports. 75 is
+ * low enough to be seen BEFORE a small instance tips into OOM kills, and below
+ * the chart's own 85% red-line so the reassurance arrives ahead of the alarm
+ * color.
  */
 const MEMORY_ADVISORY_PCT = 75;
 
@@ -119,10 +123,10 @@ export function ObservabilitySection() {
   const [computeSettingsOpen, setComputeSettingsOpen] = useState(false);
   const { data, isLoading, isUnavailable, error } = useProjectMetrics(range);
 
-  const memoryAdvisoryAvg = useMemo(() => {
+  const memoryAdvisoryPct = useMemo(() => {
     const series = data?.metrics.find((m) => m.metric === 'memory_usage')?.data ?? [];
-    const avg = aggregateMetricSeries(series).avg;
-    return avg !== null && avg >= MEMORY_ADVISORY_PCT ? avg : null;
+    const latest = aggregateMetricSeries(series).latest;
+    return latest !== null && latest >= MEMORY_ADVISORY_PCT ? latest : null;
   }, [data]);
 
   // Memoize disk card derivations so the [0, totalBytes] domain array reference
@@ -185,7 +189,7 @@ export function ObservabilitySection() {
         </div>
       ) : (
         <>
-          {memoryAdvisoryAvg !== null && (
+          {memoryAdvisoryPct !== null && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-[var(--alpha-8)] bg-card p-4">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)] text-muted-foreground">
@@ -194,7 +198,7 @@ export function ObservabilitySection() {
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <p className="text-sm font-medium leading-5 text-foreground">
                     {t('overview.memoryAdvisory.title', {
-                      value: PERCENT(memoryAdvisoryAvg),
+                      value: PERCENT(memoryAdvisoryPct),
                       defaultValue: "Memory is sitting at {{value}}. For Postgres, that's normal.",
                     })}
                   </p>

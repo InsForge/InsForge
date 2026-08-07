@@ -44,17 +44,19 @@ afterEach(() => {
 });
 
 describe('ObservabilitySection memory advisory', () => {
-  it('shows the advisory with an Upgrade Instance CTA from 75% average on a cloud project', async () => {
+  it('shows the advisory with an Upgrade Instance CTA when the latest sample is at 75%+', async () => {
     setDashboardBackendUrl(CLOUD_BACKEND);
-    renderSection('cloud-hosting', metricsResponse([70, 75, 80]));
+    // history below threshold, current reading above — the banner tracks the
+    // headline number, so it must show now, not after an hour of high history
+    renderSection('cloud-hosting', metricsResponse([65, 66, 80]));
 
     await waitFor(() => expect(advisoryText()).toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'Upgrade Instance' })).toBeInTheDocument();
   });
 
-  it('stays silent below the 75% threshold', async () => {
+  it('stays silent when the latest sample is below 75%, even after an earlier spike', async () => {
     setDashboardBackendUrl(CLOUD_BACKEND);
-    renderSection('cloud-hosting', metricsResponse([65, 66, 67]));
+    renderSection('cloud-hosting', metricsResponse([80, 70, 67]));
 
     // Wait for the cards to render off the resolved query, then assert absence.
     await waitFor(() => expect(screen.getAllByText('AVG').length).toBeGreaterThan(0));
@@ -74,7 +76,7 @@ describe('ObservabilitySection memory advisory', () => {
     // cloud-hosting mode but a non-insforge.app backend: the Compute tab the
     // CTA opens would fall back to Project Information, so no button.
     setDashboardBackendUrl('https://localhost:7130');
-    renderSection('cloud-hosting', metricsResponse([80, 82, 84]));
+    renderSection('cloud-hosting', metricsResponse([70, 72, 84]));
 
     await waitFor(() => expect(advisoryText()).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Upgrade Instance' })).toBeNull();
