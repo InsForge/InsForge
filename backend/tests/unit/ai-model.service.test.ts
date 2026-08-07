@@ -14,9 +14,9 @@ describe('AIModelService', () => {
     _resetCacheForTesting();
   });
 
-  // Guarded here rather than at the end of an individual test: if an assertion
-  // throws before the restore, fake timers would leak into every later test in
-  // the same worker.
+  // Suite-level safety net: a test that reaches for fake timers and throws
+  // mid-assertion would otherwise leak them into every later test in the same
+  // worker.
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -120,10 +120,6 @@ describe('AIModelService', () => {
   });
 
   it('includes embedding-only models with correct pricing', async () => {
-    // Advance time past the 1-hour cache TTL so the stale cache from prior tests is bypassed
-    vi.useFakeTimers();
-    vi.advanceTimersByTime(61 * 60 * 1000);
-
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -163,20 +159,20 @@ describe('AIModelService', () => {
     expect(models).toHaveLength(2);
 
     // Embedding-only model: input has text so inputPrice is set, output is embeddings so no outputPrice
-    const smallModel = models.find((m) => m.id === 'openai/text-embedding-3-small');
+    const smallModel = models.find((model) => model.id === 'openai/text-embedding-3-small');
     expect(smallModel).toBeDefined();
     expect(smallModel!.inputModality).toEqual(['text']);
     expect(smallModel!.outputModality).toEqual(['embeddings']);
-    expect(smallModel!.inputPrice).toBeGreaterThanOrEqual(0);
+    expect(smallModel!.inputPrice).toBeGreaterThan(0);
     expect(smallModel!.outputPrice).toBeUndefined();
     expect(smallModel!.outputPriceLabel).toBeUndefined();
 
     // Multimodal embedding model: input has text (among others) so inputPrice is set
-    const geminiModel = models.find((m) => m.id === 'google/gemini-embedding-2-preview');
+    const geminiModel = models.find((model) => model.id === 'google/gemini-embedding-2-preview');
     expect(geminiModel).toBeDefined();
     expect(geminiModel!.inputModality).toContain('text');
     expect(geminiModel!.outputModality).toEqual(['embeddings']);
-    expect(geminiModel!.inputPrice).toBeGreaterThanOrEqual(0);
+    expect(geminiModel!.inputPrice).toBeGreaterThan(0);
   });
 
   it('clears in-flight state after a failed fetch so a later call retries', async () => {

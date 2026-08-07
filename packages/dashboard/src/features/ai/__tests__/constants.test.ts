@@ -10,10 +10,10 @@ import {
 
 describe('AI Quick Start constants', () => {
   it('includes embeddings in QUICK_START_MODES', () => {
-    const modeValues = QUICK_START_MODES.map((m) => m.value);
+    const modeValues = QUICK_START_MODES.map((mode) => mode.value);
     expect(modeValues).toContain('embeddings');
 
-    const embeddingsMode = QUICK_START_MODES.find((m) => m.value === 'embeddings');
+    const embeddingsMode = QUICK_START_MODES.find((mode) => mode.value === 'embeddings');
     expect(embeddingsMode?.label).toBe('Embeddings');
   });
 
