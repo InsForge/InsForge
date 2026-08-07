@@ -63,7 +63,9 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ > /dev/null 2>&1 || exit 1"]
+      # postgrest/postgrest ships no wget, so a wget probe never succeeds and the
+      # service reads as permanently unhealthy. It does ship bash.
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/3000'"]
       interval: 10s
       timeout: 5s
       retries: 10
