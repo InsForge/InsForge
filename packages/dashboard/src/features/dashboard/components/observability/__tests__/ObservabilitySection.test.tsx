@@ -51,7 +51,8 @@ describe('ObservabilitySection memory advisory', () => {
     renderSection('cloud-hosting', metricsResponse([65, 66, 67]));
 
     await waitFor(() => expect(advisoryText()).toBeInTheDocument());
-    expect(screen.getByText(/67\.0%/)).toBeInTheDocument();
+    // the banner carries the same latest sample the card headline shows
+    expect(advisoryText()).toHaveTextContent('67.0%');
     expect(screen.getByRole('button', { name: 'Upgrade Instance' })).toBeInTheDocument();
   });
 
