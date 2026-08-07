@@ -47,7 +47,7 @@ jobs:
 
       - name: Get changed OpenAPI specs
         id: changed-openapi
-        uses: tj-actions/changed-files@v45
+        uses: tj-actions/changed-files@48d8f15b2aaa3d255ca5af3eba4870f807ce6b3c # v45
         with:
           files: openapi/**/*.yaml
           separator: "\n"
