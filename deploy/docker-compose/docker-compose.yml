@@ -89,6 +89,11 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       - POSTGREST_BASE_URL=http://postgrest:3000
+      # The keys the CLI and SDKs authenticate with. Empty here means the backend
+      # generates its own on first boot; set them to drive this instance from a
+      # machine that already knows the values.
+      - ACCESS_API_KEY=${ACCESS_API_KEY:-}
+      - ACCESS_ANON_KEY=${ACCESS_ANON_KEY:-}
       - POSTGREST_MAX_SOCKETS=${POSTGREST_MAX_SOCKETS:-}
       - POSTGREST_MAX_FREE_SOCKETS=${POSTGREST_MAX_FREE_SOCKETS:-}
       - POSTGREST_FREE_SOCKET_TIMEOUT_MS=${POSTGREST_FREE_SOCKET_TIMEOUT_MS:-}

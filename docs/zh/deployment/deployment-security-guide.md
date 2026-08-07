@@ -922,25 +922,29 @@ cd ~/insforge
 docker compose down
 ```
 
-#### 16.2 恢复之前的 Docker Compose 文件
+#### 16.2 固定回之前的版本
 
-```bash
-# If you saved the old file
-mv docker-compose.yml.old docker-compose.yml
-```
+1. 在 `.env` 旁边写 `pin.yml`，填 14.3 记录的版本：
 
-#### 16.3 固定到指定的镜像版本
+   ```yaml
+   services:
+     insforge:
+       image: ghcr.io/insforge/insforge-oss:v2.2.9
+   ```
 
-编辑 `docker-compose.yml`，将 `latest` 标签替换为之前的版本：
+2. 追加到 `.env` 里的 `COMPOSE_FILE`，保留已有条目：
 
-```yaml
-# Example: pin to a known-good version (replace with your previous tag)
-image: ghcr.io/insforge/insforge-oss:v1.5.0
-```
+   ```env
+   COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
+   ```
 
-> 注意：目前 `deploy/docker-compose` 固定使用 `v1.5.0`，而项目目前已在 2.x 系列。请固定到你更新之前所运行的版本。
+3. `docker compose up -d`
 
-#### 16.4 恢复数据库（如有需要）
+4. 回到可用版本后，把 `:pin.yml` 去掉。
+
+在去掉之前，第 15 节的更新会拉到新镜像，但仍然跑被钉住的那个。
+
+#### 16.3 恢复数据库（如有需要）
 
 只有当此次更新包含导致问题的数据库迁移时，才需要恢复数据库：
 
@@ -963,7 +967,7 @@ cat backup_YYYYMMDD_HHMMSS.sql | \
 docker compose up -d
 ```
 
-#### 16.5 恢复环境变量文件（如有更改）
+#### 16.4 恢复环境变量文件（如有更改）
 
 ```bash
 cp .env.backup_YYYYMMDD .env

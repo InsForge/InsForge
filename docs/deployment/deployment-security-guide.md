@@ -933,25 +933,30 @@ cd ~/insforge
 docker compose down
 ```
 
-#### 16.2 Restore the Previous Docker Compose File
+#### 16.2 Pin the Previous Version
 
-```bash
-# If you saved the old file
-mv docker-compose.yml.old docker-compose.yml
-```
+1. Write `pin.yml` next to your `.env`, naming the version 14.3 recorded:
 
-#### 16.3 Pin to a Specific Image Version
+   ```yaml
+   services:
+     insforge:
+       image: ghcr.io/insforge/insforge-oss:v2.2.9
+   ```
 
-Edit `docker-compose.yml` and replace `latest` tags with the previous version:
+2. Append it to `COMPOSE_FILE` in `.env`, keeping the entries already there:
 
-```yaml
-# Example: pin to a known-good version (replace with your previous tag)
-image: ghcr.io/insforge/insforge-oss:v1.5.0
-```
+   ```env
+   COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
+   ```
 
-> Note: the current `deploy/docker-compose` pins `v1.5.0`, and the project is now on the 2.x line. Pin to whatever version you were running before the update.
+3. `docker compose up -d`
 
-#### 16.4 Restore the Database (If Needed)
+4. Remove `:pin.yml` once you are back on a good release.
+
+Until you do, section 15's update pulls new images and keeps running the pinned
+one.
+
+#### 16.3 Restore the Database (If Needed)
 
 Only restore the database if the update included a database migration that caused issues:
 
@@ -974,7 +979,7 @@ cat backup_YYYYMMDD_HHMMSS.sql | \
 docker compose up -d
 ```
 
-#### 16.5 Restore Environment File (If Changed)
+#### 16.4 Restore Environment File (If Changed)
 
 ```bash
 cp .env.backup_YYYYMMDD .env

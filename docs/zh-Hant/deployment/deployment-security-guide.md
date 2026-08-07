@@ -923,25 +923,29 @@ cd ~/insforge
 docker compose down
 ```
 
-#### 16.2 還原先前的 Docker Compose 檔案
+#### 16.2 固定回先前的版本
 
-```bash
-# If you saved the old file
-mv docker-compose.yml.old docker-compose.yml
-```
+1. 在 `.env` 旁邊寫 `pin.yml`，填 14.3 記錄的版本：
 
-#### 16.3 固定至指定的映像檔版本
+   ```yaml
+   services:
+     insforge:
+       image: ghcr.io/insforge/insforge-oss:v2.2.9
+   ```
 
-編輯 `docker-compose.yml`，將 `latest` 標籤替換為先前的版本：
+2. 附加到 `.env` 中的 `COMPOSE_FILE`，保留既有項目：
 
-```yaml
-# Example: pin to a known-good version (replace with your previous tag)
-image: ghcr.io/insforge/insforge-oss:v1.5.0
-```
+   ```env
+   COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
+   ```
 
-> 注意：目前 `deploy/docker-compose` 固定使用 `v1.5.0`，而專案現已進展到 2.x 系列。請固定至你更新前所執行的版本。
+3. `docker compose up -d`
 
-#### 16.4 還原資料庫（如有需要）
+4. 回到可用版本後，將 `:pin.yml` 移除。
+
+在移除之前，第 15 節的更新會拉取新映像，但仍然執行被固定的那個。
+
+#### 16.3 還原資料庫（如有需要）
 
 僅當此次更新包含造成問題的資料庫遷移時，才需要還原資料庫：
 
@@ -964,7 +968,7 @@ cat backup_YYYYMMDD_HHMMSS.sql | \
 docker compose up -d
 ```
 
-#### 16.5 還原環境變數檔案（如有變更）
+#### 16.4 還原環境變數檔案（如有變更）
 
 ```bash
 cp .env.backup_YYYYMMDD .env
