@@ -290,7 +290,12 @@ export class RecordService {
     let isLimited = false;
 
     while (allRecords.length < MAX_EXPORT_ROWS) {
-      const { records } = await this.getTableRecords(tableName, schemaName, limit, offset);
+      const { records, pagination } = await this.getTableRecords(
+        tableName,
+        schemaName,
+        limit,
+        offset
+      );
 
       if (records.length === 0) {
         break;
@@ -300,9 +305,20 @@ export class RecordService {
       const remaining = MAX_EXPORT_ROWS - allRecords.length;
       allRecords.push(...records.slice(0, remaining));
 
-      // Check if we've hit the limit or exhausted records
-      if (allRecords.length >= MAX_EXPORT_ROWS) {
-        isLimited = true;
+      // The API returns an exact total count (Prefer: count=exact), so use it
+      // directly rather than inferring truncation from page sizes. Inferring
+      // from `records.length` alone is wrong whenever the true row count is
+      // an exact multiple of the page size or lands exactly on MAX_EXPORT_ROWS:
+      // in both cases every fetched page is "full" even though nothing (or
+      // everything) was actually cut off.
+      if (typeof pagination?.total === 'number') {
+        isLimited = pagination.total > MAX_EXPORT_ROWS;
+        if (allRecords.length >= MAX_EXPORT_ROWS || allRecords.length >= pagination.total) {
+          break;
+        }
+      } else if (allRecords.length >= MAX_EXPORT_ROWS) {
+        // Fallback if the backend ever omits pagination.total: we can't tell
+        // whether the exact cap was a coincidence, so don't claim truncation.
         break;
       }
 
