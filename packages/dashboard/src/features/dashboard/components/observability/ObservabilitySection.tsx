@@ -190,13 +190,13 @@ export function ObservabilitySection() {
                   <p className="text-sm font-medium leading-5 text-foreground">
                     {t('overview.memoryAdvisory.title', {
                       value: PERCENT(memoryAdvisoryAvg),
-                      defaultValue: 'Memory averaging {{value}} — usually normal.',
+                      defaultValue: "Memory is sitting at {{value}}. For Postgres, that's normal.",
                     })}
                   </p>
                   <p className="text-sm leading-5 text-muted-foreground">
                     {t('overview.memoryAdvisory.description', {
                       defaultValue:
-                        'A dedicated Postgres database turns idle RAM into query cache, so steady high memory is expected on its own. On smaller instances real load can still tip it into out-of-memory kills — if you see restarts or slowdowns, move to a larger instance for headroom.',
+                        "Postgres grabs spare memory to cache your data and keeps it, even when the database is idle. A high number here doesn't mean something is wrong. The warning signs that actually matter are restarts and queries slowing down. If you're seeing those, a bigger instance will give it room.",
                     })}
                   </p>
                 </div>

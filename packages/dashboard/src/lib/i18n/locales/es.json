@@ -172,8 +172,8 @@
       }
     },
     "memoryAdvisory": {
-      "title": "Memoria en promedio {{value}} — normalmente es normal.",
-      "description": "Una base de datos Postgres dedicada convierte la RAM libre en caché de consultas, por lo que un uso de memoria alto y estable es esperado por sí solo. En instancias pequeñas la carga real aún puede provocar cierres por falta de memoria — si ves reinicios o lentitud, pasa a una instancia más grande para tener margen.",
+      "title": "La memoria está en {{value}}. Para Postgres, eso es normal.",
+      "description": "Postgres usa la memoria libre para cachear tus datos y la retiene incluso cuando la base de datos está inactiva, así que un número alto aquí no significa que algo vaya mal. Las señales que sí importan son los reinicios y las consultas cada vez más lentas. Si las estás viendo, una instancia más grande le dará espacio.",
       "cta": "Mejorar instancia"
     },
     "steps": {

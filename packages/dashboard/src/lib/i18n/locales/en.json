@@ -172,8 +172,8 @@
       }
     },
     "memoryAdvisory": {
-      "title": "Memory averaging {{value}} — usually normal.",
-      "description": "A dedicated Postgres database turns idle RAM into query cache, so steady high memory is expected on its own. On smaller instances real load can still tip it into out-of-memory kills — if you see restarts or slowdowns, move to a larger instance for headroom.",
+      "title": "Memory is sitting at {{value}}. For Postgres, that's normal.",
+      "description": "Postgres grabs spare memory to cache your data and keeps it, even when the database is idle. A high number here doesn't mean something is wrong. The warning signs that actually matter are restarts and queries slowing down. If you're seeing those, a bigger instance will give it room.",
       "cta": "Upgrade Instance"
     },
     "steps": {
