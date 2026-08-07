@@ -171,6 +171,11 @@
         "description": "How much of your instance's storage the database, files, and logs are using. A full disk stops writes and can take the backend offline."
       }
     },
+    "memoryAdvisory": {
+      "title": "Memory averaging {{value}} — usually normal.",
+      "description": "A dedicated Postgres database turns idle RAM into query cache, so steady high memory is expected on its own. On smaller instances real load can still tip it into out-of-memory kills — if you see restarts or slowdowns, move to a larger instance for headroom.",
+      "cta": "Upgrade Instance"
+    },
     "steps": {
       "database": {
         "category": "Database",

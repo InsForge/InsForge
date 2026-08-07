@@ -171,6 +171,11 @@
         "description": "Cuánto almacenamiento de tu instancia usan la base de datos, los archivos y los registros. Un disco lleno detiene las escrituras y puede dejar el backend fuera de línea."
       }
     },
+    "memoryAdvisory": {
+      "title": "Memoria en promedio {{value}} — normalmente es normal.",
+      "description": "Una base de datos Postgres dedicada convierte la RAM libre en caché de consultas, por lo que un uso de memoria alto y estable es esperado por sí solo. En instancias pequeñas la carga real aún puede provocar cierres por falta de memoria — si ves reinicios o lentitud, pasa a una instancia más grande para tener margen.",
+      "cta": "Mejorar instancia"
+    },
     "steps": {
       "database": {
         "category": "Base de datos",
