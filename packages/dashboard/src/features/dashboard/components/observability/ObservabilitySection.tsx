@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowDownToLine, ArrowUpFromLine, Cpu, HardDrive, MemoryStick } from 'lucide-react';
 import { Button } from '@insforge/ui';
 import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { isInsForgeCloudProject } from '#lib/utils/utils';
 import { useProjectMetrics } from '#features/dashboard/hooks/useProjectMetrics';
 import { aggregateMetricSeries } from '#features/dashboard/utils/aggregateMetricSeries';
 import type { DashboardMetricName, DashboardMetricsRange } from '#types';
@@ -110,6 +111,10 @@ const DISK_GRID_INDEX = 2;
 export function ObservabilitySection() {
   const { t } = useTranslation('chrome');
   const isCloudHostingMode = useIsCloudHostingMode();
+  // Same pair of signals the settings dialog gates its Compute tab on
+  // (ProjectSettingsMenuDialog's canUseCloudHost) — the CTA must not show
+  // when the tab it promises would fall back to Project Information.
+  const canOpenComputeSettings = isCloudHostingMode && isInsForgeCloudProject();
   const [range, setRange] = useState<DashboardMetricsRange>('1h');
   const [computeSettingsOpen, setComputeSettingsOpen] = useState(false);
   const { data, isLoading, isUnavailable, error } = useProjectMetrics(range);
@@ -201,7 +206,7 @@ export function ObservabilitySection() {
                   </p>
                 </div>
               </div>
-              {isCloudHostingMode && (
+              {canOpenComputeSettings && (
                 <Button
                   type="button"
                   className="h-8 shrink-0 rounded px-3 text-sm font-medium"
@@ -262,12 +267,16 @@ export function ObservabilitySection() {
       )}
       {/* The CTA lands on the settings dialog's Compute tab because that tab is
           already the tier-aware surface: a free plan sees the Upgrade Plan
-          upsell, a paid plan picks a larger instance type. */}
-      <ProjectSettingsMenuDialog
-        open={computeSettingsOpen}
-        onOpenChange={setComputeSettingsOpen}
-        defaultTab="compute"
-      />
+          upsell, a paid plan picks a larger instance type. Mounted only while
+          open — the sidebar already keeps a permanent instance, and the
+          dialog's hooks subscribe on mount whether or not it is shown. */}
+      {computeSettingsOpen && (
+        <ProjectSettingsMenuDialog
+          open={computeSettingsOpen}
+          onOpenChange={setComputeSettingsOpen}
+          defaultTab="compute"
+        />
+      )}
     </section>
   );
 }
