@@ -24,8 +24,12 @@ services:
     # self-hosted RLS on managed tables broke: no insforge_pg_utils in its
     # shared_preload_libraries. Building from the repo at deploy time keeps the
     # files current. 
+    # context is the repository root, spelled relative to it rather than to this
+    # file: Coolify builds with `--project-directory <repo root>`, so Compose
+    # resolves these against the root. Dokploy passes no --project-directory, so
+    # its copy of this file uses ../.. instead. Verified on Coolify 4.1.2.
     build:
-      context: ../..
+      context: .
       dockerfile: deploy/Dockerfile.postgres
     restart: unless-stopped
     command: postgres -c config_file=/etc/postgresql/postgresql.conf -c cron.database_name='${POSTGRES_DB:-insforge}' -c app.encryption_key='${ENCRYPTION_KEY:-change-this-encryption-key-32chars}'
@@ -151,7 +155,7 @@ services:
     # image is assembled in another repository and its copy of functions/ matches
     # no commit in this one, so fixes made here never reach it.
     build:
-      context: ../..
+      context: .
       dockerfile: deploy/Dockerfile.deno
     working_dir: /app
     command: >
