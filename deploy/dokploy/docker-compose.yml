@@ -143,8 +143,18 @@ services:
       - no-new-privileges:true
 
   deno:
-    image: ghcr.io/insforge/deno-runtime:latest
+    # Built here for the same reason as postgres: the published deno-runtime
+    # image is assembled in another repository and its copy of functions/ matches
+    # no commit in this one, so fixes made here never reach it.
+    build:
+      context: ../..
+      dockerfile: deploy/Dockerfile.deno
     working_dir: /app
+    command: >
+      sh -c "
+        deno cache --no-lock functions/server.ts &&
+        deno run --no-lock --unstable-worker-options --allow-net --allow-env --allow-read=./functions/worker-template.js functions/server.ts
+      "
     restart: unless-stopped
     depends_on:
       - postgres

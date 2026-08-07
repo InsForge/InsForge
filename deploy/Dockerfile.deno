@@ -1,0 +1,16 @@
+# The Deno function host, from this repository rather than a published image.
+# ghcr.io/insforge/deno-runtime is built in another repo and its copy of
+# functions/ matches no commit here, so fixes made here never reach it.
+FROM denoland/deno:alpine-2.0.6
+
+WORKDIR /app
+
+# The base image already ships a deno user at uid 1000 — creating it again fails
+# the build, which is how this file sat broken while nothing rebuilt it.
+COPY --chown=deno:deno functions /app/functions
+
+# A fresh named volume inherits the mount point's ownership from the image, so
+# this is what lets the non-root user populate the module cache on first start.
+RUN mkdir -p /deno-dir && chown deno:deno /deno-dir
+
+USER deno

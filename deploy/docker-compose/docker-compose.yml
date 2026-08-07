@@ -141,7 +141,11 @@ services:
 
   # Deno serverless runtime for edge functions
   deno:
-    image: ghcr.io/insforge/deno-runtime:latest
+    # The official Deno image plus this checkout's function host. The published
+    # deno-runtime image is built in another repository and its copy of
+    # functions/ matches no commit here, so fixes made in this repo never reach
+    # it — the same split that left postgres-all's config three months stale.
+    image: denoland/deno:alpine-2.0.6
 
     working_dir: /app
     depends_on:
@@ -151,7 +155,7 @@ services:
       - "127.0.0.1:${DENO_PORT:-7133}:7133"
     environment:
       - PORT=7133
-      - DENO_ENV=development
+      - DENO_ENV=${DENO_ENV:-production}
       - DENO_DIR=/deno-dir
       # PostgreSQL connection
       - POSTGRES_HOST=postgres
@@ -166,7 +170,16 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
     volumes:
+      # :ro — the runtime only reads the host; :z — SELinux relabel.
+      - ../../functions:/app/functions:ro,z
       - deno_cache:/deno-dir
+    # --no-lock: functions/ is mounted read-only, and Deno would otherwise try to
+    # write deno.lock back into the checkout.
+    command: >
+      sh -c "
+        deno cache --no-lock functions/server.ts &&
+        deno run --no-lock --unstable-worker-options --allow-net --allow-env --allow-read=./functions/worker-template.js functions/server.ts
+      "
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:7133/health"]
       interval: 10s
