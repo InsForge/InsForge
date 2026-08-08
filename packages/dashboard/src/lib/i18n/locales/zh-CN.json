@@ -164,10 +164,8 @@
         "used": "已使用",
         "database": "数据库",
         "wal": "WAL",
-        "system": "系统",
-        "total": "总计",
-        "systemExcluded": "系统与运行时",
-        "notCounted": "不计入"
+        "system": "系统与运行时",
+        "total": "总计"
       }
     },
     "memoryAdvisory": {

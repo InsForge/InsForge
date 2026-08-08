@@ -186,46 +186,44 @@ export function ObservabilitySection() {
       data?.metrics.find((m) => m.metric === 'disk_wal')?.data,
       diskUsedData
     );
-    // Data-scoped ceiling (Tony's call, 2026-08-08): subtract the OS/runtime
-    // from both sides so the chart talks about the user's space, the way the
-    // Supabase data-volume chart does — but subtract the MEASURED System
-    // rather than a hardcoded constant (the retired 4GiB hack showed how a
-    // guess drifts and clamps). Ceiling = database + wal + free space; the
-    // System figure moves to a tooltip footnote.
-    const systemLatest = breakdown?.system.length
-      ? breakdown.system[breakdown.system.length - 1].value
-      : null;
-    const dataCeiling =
-      totalBytes !== null && systemLatest !== null
-        ? Math.max(0, totalBytes - systemLatest)
-        : totalBytes;
-    // With a breakdown, the card's primary series (headline + AVG/MAX/LATEST)
-    // is the user's data (database + wal per sample) — raw disk_used would
-    // read over the data-scoped ceiling.
-    const dataUsed = breakdown
+    // Zoomed axis (Tony's call, 2026-08-08, replacing the "not counted"
+    // footnote that hid System from the frame): every number on the card is a
+    // true absolute — ceiling = the real disk, bars = System + Database + WAL
+    // stacked — but the y-axis floor rises to just under the System band
+    // (its window minimum, rounded down to a whole GiB — the axis formatter's
+    // unit — ~5 GB today) so the data and the free-space gap stay legible
+    // instead of being crushed by the OS footprint. The floor is derived,
+    // never a constant: the retired 4GiB hack showed how a guessed baseline
+    // drifts and clamps.
+    const systemValues = breakdown ? breakdown.system.map((p) => p.value).filter((v) => v > 0) : [];
+    const GB = 2 ** 30;
+    const rawFloor = systemValues.length ? Math.floor(Math.min(...systemValues) / GB) * GB : 0;
+    const axisFloor = totalBytes !== null && rawFloor < totalBytes * 0.9 ? rawFloor : 0;
+    // With a breakdown the primary series (headline + AVG/MAX/LATEST + hover
+    // points) is the per-sample used total — the same stack the bars draw.
+    const usedSeries = breakdown
       ? breakdown.database.map((point, i) => ({
           timestamp: point.timestamp,
-          value: point.value + (breakdown.wal[i]?.value ?? 0),
+          value: point.value + (breakdown.wal[i]?.value ?? 0) + (breakdown.system[i]?.value ?? 0),
         }))
       : diskUsedData;
     return {
-      data: dataUsed,
-      fixedDomain: (dataCeiling !== null ? [0, dataCeiling] : undefined) as
+      data: usedSeries,
+      fixedDomain: (totalBytes !== null ? [axisFloor, totalBytes] : undefined) as
         | [number, number]
         | undefined,
       // Capacity chart (Supabase-style): dashed ceiling at the provisioned
       // size, a mid gridline, bars for the samples. No 90% threshold line —
       // the ceiling is the reference, and two dashed lines collide visually.
-      ticks: dataCeiling !== null ? [0, dataCeiling / 2, dataCeiling] : [],
-      totalBytes: dataCeiling,
-      systemLatest,
+      ticks:
+        totalBytes !== null
+          ? [axisFloor, axisFloor + (totalBytes - axisFloor) / 2, totalBytes]
+          : [],
+      totalBytes,
       breakdown,
-      // The hovered value as a share of the SAME ceiling the chart draws —
-      // data-scoped when the breakdown is present (review round 1 caught the
-      // raw-total denominator contradicting the row block).
       tooltipDetail:
-        dataCeiling !== null && dataCeiling > 0
-          ? (v: number) => `${((v / dataCeiling) * 100).toFixed(1)}% of ${BYTES_SIZE(dataCeiling)}`
+        totalBytes !== null && totalBytes > 0
+          ? (v: number) => `${((v / totalBytes) * 100).toFixed(1)}% of ${BYTES_SIZE(totalBytes)}`
           : undefined,
     };
   }, [data]);
@@ -353,11 +351,22 @@ export function ObservabilitySection() {
                               defaultValue: 'Used',
                             }),
                           },
-                          // Semantic palette: Database emerald (your data),
-                          // WAL amber (the log), System gray (not yours to
-                          // manage); stacked bottom-up in that order.
+                          // Semantic palette: System zinc (the OS footprint,
+                          // not yours to manage), Database emerald (your
+                          // data), WAL amber (the log); stacked bottom-up in
+                          // that order so the zinc band sits on the raised
+                          // axis floor and the gap above the stack is free
+                          // space.
                           components: diskCardProps.breakdown
                             ? [
+                                {
+                                  key: 'system',
+                                  label: t('overview.metrics.diskUsed.system', {
+                                    defaultValue: 'System & runtime',
+                                  }),
+                                  fillClass: 'fill-zinc-500',
+                                  data: diskCardProps.breakdown.system,
+                                },
                                 {
                                   key: 'database',
                                   label: t('overview.metrics.diskUsed.database', {
@@ -397,6 +406,10 @@ export function ObservabilitySection() {
                                   const db = breakdown.database[idx].value;
                                   const wal = breakdown.wal[idx].value;
                                   const system = breakdown.system[idx].value;
+                                  const used = system + db + wal;
+                                  // Same rows, same order as the Supabase
+                                  // disk tooltip: the ceiling, the three
+                                  // components, and a Total footer.
                                   const rows = [
                                     {
                                       label: t('overview.metrics.diskUsed.ceiling', {
@@ -419,19 +432,17 @@ export function ObservabilitySection() {
                                       swatchClass: 'bg-amber-300',
                                     },
                                     {
+                                      label: t('overview.metrics.diskUsed.system', {
+                                        defaultValue: 'System & runtime',
+                                      }),
+                                      value: `${BYTES_SIZE(system)}${pct(system)}`,
+                                      swatchClass: 'bg-zinc-500',
+                                    },
+                                    {
                                       label: t('overview.metrics.diskUsed.total', {
                                         defaultValue: 'Total',
                                       }),
-                                      value: `${BYTES_SIZE(db + wal)}${pct(db + wal)}`,
-                                    },
-                                    // Footnote, not a component: where the rest of
-                                    // the physical disk went. Kept out of the bars
-                                    // and the ceiling on purpose.
-                                    {
-                                      label: t('overview.metrics.diskUsed.systemExcluded', {
-                                        defaultValue: 'System & runtime',
-                                      }),
-                                      value: `${BYTES_SIZE(system)} · ${t('overview.metrics.diskUsed.notCounted', { defaultValue: 'not counted' })}`,
+                                      value: `${BYTES_SIZE(used)}${pct(used)}`,
                                     },
                                   ];
                                   return rows;

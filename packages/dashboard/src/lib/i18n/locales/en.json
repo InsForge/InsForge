@@ -173,10 +173,8 @@
         "used": "Used",
         "database": "Database",
         "wal": "WAL",
-        "system": "System",
-        "total": "Total",
-        "systemExcluded": "System & runtime",
-        "notCounted": "not counted"
+        "system": "System & runtime",
+        "total": "Total"
       }
     },
     "memoryAdvisory": {
