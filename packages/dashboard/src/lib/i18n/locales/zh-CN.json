@@ -159,8 +159,19 @@
       },
       "diskUsed": {
         "title": "磁盘使用率",
-        "description": "数据库、文件和日志占用实例存储的情况。磁盘写满会导致写入停止，甚至使后端下线。"
+        "description": "数据库、文件和日志占用实例存储的情况。磁盘写满会导致写入停止，甚至使后端下线。",
+        "ceiling": "磁盘容量",
+        "used": "已使用",
+        "database": "数据库",
+        "wal": "WAL",
+        "system": "系统",
+        "total": "总计"
       }
+    },
+    "memoryAdvisory": {
+      "title": "内存占用 {{value}}，对 Postgres 来说这是正常的。",
+      "description": "Postgres 会把空闲内存拿来缓存你的数据，即使数据库闲着也会一直占用，所以这里数字偏高不代表出了问题。真正要留意的信号是重启和查询变慢，如果出现了，换个更大的实例就能解决。",
+      "cta": "升级实例"
     },
     "steps": {
       "database": {
@@ -664,7 +675,8 @@
       "step2Description": {
         "text": "使用 OpenAI SDK 通过 OpenRouter 创建聊天补全。",
         "image": "使用支持图像输出的 OpenRouter 模型生成图像。",
-        "video": "提交异步视频生成任务并轮询直至完成。"
+        "video": "提交异步视频生成任务并轮询直至完成。",
+        "embeddings": "使用 OpenAI SDK 通过 OpenRouter 生成文本嵌入。"
       },
       "step3Title": "设置 API 密钥",
       "step3Description": "将你的 OpenRouter API 密钥添加到 .env.local 文件。",
@@ -673,12 +685,14 @@
       "modes": {
         "text": "文本生成",
         "image": "图像生成",
-        "video": "视频生成"
+        "video": "视频生成",
+        "embeddings": "嵌入生成"
       },
       "promptCard": {
         "text": "复制此提示词，让你的智能体通过 OpenRouter 模型网关生成文本。",
         "image": "复制此提示词，让你的智能体通过 OpenRouter 模型网关生成图像。",
-        "video": "复制此提示词，让你的智能体通过 OpenRouter 模型网关生成视频。"
+        "video": "复制此提示词，让你的智能体通过 OpenRouter 模型网关生成视频。",
+        "embeddings": "复制此提示词，让你的智能体通过 OpenRouter 模型网关生成文本嵌入。"
       }
     }
   },

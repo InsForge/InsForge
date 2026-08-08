@@ -52,6 +52,7 @@ import {
 import { FeatureUsageCollector } from '@/services/telemetry/feature-usage.collector.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { DatabaseBackupService } from '@/services/database/database-backup.service.js';
+import { ComputeServicesService } from '@/services/compute/services.service.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -373,6 +374,21 @@ async function initializeServer() {
         error: err instanceof Error ? err.message : String(err),
       });
     });
+
+    // Probe each compute driver and heal rows that drifted while we were down
+    // (a container removed out-of-band, a `docker system prune`, a reclaimed
+    // machine). Non-blocking and non-fatal: compute is optional, and it must not
+    // hold up serving. Constructing the service throws when no driver is
+    // configured at all, which is the normal case, so that is caught too.
+    void (async () => {
+      try {
+        await ComputeServicesService.getInstance().runStartupTasks();
+      } catch (err) {
+        logger.info('Compute startup tasks skipped', {
+          reason: err instanceof Error ? err.message : String(err),
+        });
+      }
+    })();
 
     TelemetryService.getInstance().start();
 

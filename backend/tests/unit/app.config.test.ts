@@ -940,3 +940,55 @@ describe('loadConfig() structural integrity', () => {
     expect(c.deployments.maxDeploymentFileBytes).not.toBeNaN();
   });
 });
+
+// ---------------------------------------------------------------------------
+// docker (self-hosted compute driver)
+// ---------------------------------------------------------------------------
+describe('docker compute config', () => {
+  it('defaults the upload idle timeout to 30 seconds', () => {
+    delete process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT;
+    expect(loadConfig().docker.buildUploadIdleTimeoutMs).toBe(30_000);
+  });
+
+  it('reads the idle timeout in seconds', () => {
+    process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT = '90';
+    expect(loadConfig().docker.buildUploadIdleTimeoutMs).toBe(90_000);
+  });
+
+  // setTimeout silently treats any delay past the 32-bit signed max as 1ms, so an
+  // unclamped value inverts the setting: asking for a very lenient timeout would
+  // abort every upload immediately.
+  it('clamps an oversized idle timeout instead of inverting it', () => {
+    process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT = '3000000';
+    const ms = loadConfig().docker.buildUploadIdleTimeoutMs;
+    expect(ms).toBe(2_147_483_647);
+    expect(ms).toBeLessThanOrEqual(2_147_483_647);
+  });
+
+  it.each(['0', '-5', 'abc', ''])('falls back to the default for %o', (v) => {
+    process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT = v;
+    expect(loadConfig().docker.buildUploadIdleTimeoutMs).toBe(30_000);
+  });
+
+  // A knob that silently ignores `=1` fails in the unsafe direction: the operator
+  // believes containers are off the project network when they are on it.
+  it.each([
+    ['true', true],
+    ['1', true],
+    ['yes', true],
+    ['on', true],
+    ['TRUE', true],
+    ['false', false],
+    ['0', false],
+    ['', false],
+  ])('parses COMPUTE_ISOLATE_NETWORK=%o as %s', (v, expected) => {
+    process.env.COMPUTE_ISOLATE_NETWORK = v;
+    expect(loadConfig().docker.isolateNetwork).toBe(expected);
+  });
+
+  it('defaults the build context ceiling to 64mb, not the JSON body limit', () => {
+    delete process.env.COMPUTE_BUILD_MAX_CONTEXT;
+    process.env.MAX_JSON_BODY_SIZE = '100mb';
+    expect(loadConfig().docker.buildMaxContextSize).toBe('64mb');
+  });
+});
