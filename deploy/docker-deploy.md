@@ -46,33 +46,32 @@ Open your browser and navigate to `http://localhost:7130`, you can see the InsFo
 
 You can run multiple InsForge projects on the same host by using different ports and project names.
 
-### Step 1: Create a separate env file for each project
+### Step 1: Run the setup script once per directory
 
 ```bash
-cp .env.example .env.project1
-cp .env.example .env.project2
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/project1
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/project2
 ```
 
-`.env.example` ships the development value for `COMPOSE_FILE`, and the checkout
-does not contain that file — set it in each copy:
+A directory each, so each gets its own generated secrets. Copying `.env.example`
+instead would give both the placeholder values it ships — the same published
+`JWT_SECRET` on every instance.
 
-```ini
-COMPOSE_FILE=deploy/docker-compose/docker-compose.yml
-```
+### Step 2: Give each one its own project name and ports
 
-### Step 2: Give each env file its own project name and ports
+Both `.env` files start with `COMPOSE_PROJECT_NAME=insforge`, and **two
+directories sharing that name share containers** — the second `up -d` adopts the
+first's and recreates them with the second's config. Set it before starting
+anything.
 
-**.env.project1** (default ports):
+`~/project1/.env` keeps the default ports:
+
 ```ini
 COMPOSE_PROJECT_NAME=project1
-POSTGRES_PORT=5432
-POSTGREST_PORT=5430
-APP_PORT=7130
-AUTH_PORT=7131
-DENO_PORT=7133
 ```
 
-**.env.project2** (different ports):
+`~/project2/.env` needs its own:
+
 ```ini
 COMPOSE_PROJECT_NAME=project2
 POSTGRES_PORT=5442
@@ -82,31 +81,29 @@ AUTH_PORT=7231
 DENO_PORT=7233
 ```
 
-Make sure each project has its own `JWT_SECRET` and `ROOT_ADMIN_PASSWORD`.
-
 ### Step 3: Start each project
 
 ```bash
-docker compose --env-file .env.project1 up -d
-docker compose --env-file .env.project2 up -d
+cd ~/project1 && docker compose up -d
+cd ~/project2 && docker compose up -d
 ```
 
-`COMPOSE_PROJECT_NAME` gives each one isolated containers, volumes, and networks; the ports keep them from colliding on the host. Leaving two env files on the same name is what you have to avoid — `docker compose up` with either one adopts and recreates the other's containers.
+`COMPOSE_PROJECT_NAME` gives each one isolated containers, volumes, and networks; the ports keep them from colliding on the host.
 
 ### Managing multiple instances
 
 ```bash
 # Check status
-docker compose --env-file .env.project1 ps
+cd ~/project1 && docker compose ps
 
 # View logs
-docker compose --env-file .env.project1 logs -f
+cd ~/project1 && docker compose logs -f
 
 # Stop an instance
-docker compose --env-file .env.project1 down
+cd ~/project1 && docker compose down
 
 # Stop and remove all data
-docker compose --env-file .env.project1 down -v
+cd ~/project1 && docker compose down -v
 ```
 
 Each project has its own database, storage, and configuration. They are completely independent.
