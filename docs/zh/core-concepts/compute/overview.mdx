@@ -120,7 +120,7 @@ graph TB
 
 ### 选择服务如何被访问
 
-每个服务选择一种 ingress 模式。默认是 `none`，因为大多数 compute——队列 worker、处理器、推理循环——根本不接收入站流量。
+每个服务选择一种 ingress 模式。有哪些模式取决于 provider，默认值也一样：单机上默认是 `none`，因为大多数 compute——队列 worker、处理器、推理循环——根本不接收入站流量；而 Fly 会给每个 app 一个主机名，因此只提供 `host`。省略该字段时采用当前 provider 的默认值；请求一个 provider 无法提供的模式时，会被强制改为它支持的模式。
 
 | 模式 | 行为 |
 | --- | --- |
@@ -139,10 +139,10 @@ graph TB
 要让 InsForge 构建你的 `Dockerfile`，先占位服务，再把构建上下文作为 tar 包上传：
 
 ```bash
-# 1. 占位服务名（此时还没有镜像）
-curl -X POST "$INSFORGE_URL/api/compute/services/deploy" \
+# 1. 占位服务名（此时还没有镜像），并保存返回的 id
+ID=$(curl -sX POST "$INSFORGE_URL/api/compute/services/deploy" \
   -H "x-api-key: $INSFORGE_API_KEY" -H 'Content-Type: application/json' \
-  -d '{"name":"worker","port":8080,"memory":512}'
+  -d '{"name":"worker","port":8080,"memory":512}' | jq -r .id)
 
 # 2. 上传上下文；响应里带有构建日志和已部署的镜像 tag
 tar --no-xattrs -cf context.tar -C ./worker .

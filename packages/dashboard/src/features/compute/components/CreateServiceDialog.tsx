@@ -47,10 +47,17 @@ export function CreateServiceDialog({
   const [region, setRegion] = useState('iad');
   const [ingress, setIngress] = useState<IngressMode>('none');
 
-  // Undefined capabilities means "not known yet" — metadata still loading, compute
-  // not configured, or a backend older than the slice. Show everything in that
-  // case, which is what the dashboard did before and stays right for an old
-  // backend that would happily accept a region.
+  // Undefined capabilities means "not known yet": metadata still loading, compute
+  // not configured, or a backend older than the slice. The two controls fall back
+  // in opposite directions, and both are deliberate — what matters is which way is
+  // right against a backend that predates this feature.
+  //
+  // Region falls back to *shown*, because a pre-capability backend is a Fly backend
+  // and regions are real there; hiding it would remove a working control.
+  //
+  // Ingress falls back to *hidden*, because a pre-capability backend has no ingress
+  // field at all — the schema would drop the key and the choice would silently do
+  // nothing, which is the exact failure this gating exists to prevent.
   const showRegion = capabilities ? capabilities.regions : true;
   const offeredIngress = capabilities?.ingressModes ?? [];
   const showIngress = offeredIngress.length > 1;

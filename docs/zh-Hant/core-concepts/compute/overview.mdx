@@ -120,7 +120,7 @@ graph TB
 
 ### 選擇服務的連線方式
 
-每個服務選擇一種 ingress 模式。預設為 `none`，因為大多數 compute——佇列工作者、處理器、推理迴圈——根本不接收傳入流量。
+每個服務選擇一種 ingress 模式。有哪些模式取決於 provider，預設值也一樣：單一主機上預設為 `none`，因為大多數 compute——佇列工作者、處理器、推理迴圈——根本不接收傳入流量；而 Fly 會為每個 app 配置主機名稱，因此只提供 `host`。省略該欄位時採用目前 provider 的預設值；若要求 provider 無法提供的模式，會被轉換為它支援的模式。
 
 | 模式 | 行為 |
 | --- | --- |
@@ -139,10 +139,10 @@ graph TB
 若要讓 InsForge 建置您的 `Dockerfile`，先保留服務，再將建置內容以 tar 上傳：
 
 ```bash
-# 1. 保留服務名稱（此時還沒有映像）
-curl -X POST "$INSFORGE_URL/api/compute/services/deploy" \
+# 1. 保留服務名稱（此時還沒有映像），並保存回傳的 id
+ID=$(curl -sX POST "$INSFORGE_URL/api/compute/services/deploy" \
   -H "x-api-key: $INSFORGE_API_KEY" -H 'Content-Type: application/json' \
-  -d '{"name":"worker","port":8080,"memory":512}'
+  -d '{"name":"worker","port":8080,"memory":512}' | jq -r .id)
 
 # 2. 上傳建置內容；回應中包含建置日誌與已部署的映像 tag
 tar --no-xattrs -cf context.tar -C ./worker .

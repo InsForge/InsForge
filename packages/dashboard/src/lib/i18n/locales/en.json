@@ -742,7 +742,8 @@
       "updated": "Updated",
       "endpoint": "Endpoint",
       "name": "Name",
-      "imageUrl": "Image URL"
+      "imageUrl": "Image URL",
+      "ingress": "Reachable from"
     },
     "builtFromDockerfile": "Built from Dockerfile",
     "notAvailable": "Not available",
@@ -802,7 +803,12 @@
     "toastStopped": "Service stopped",
     "toastStopFailed": "Failed to stop service",
     "toastStarted": "Service started",
-    "toastStartFailed": "Failed to start service"
+    "toastStartFailed": "Failed to start service",
+    "ingressModes": {
+      "none": "Private (internal network only)",
+      "port": "Published host port",
+      "host": "Hostname (routed by your gateway)"
+    }
   },
   "analytics": {
     "sidebar": {
