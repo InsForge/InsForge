@@ -162,6 +162,40 @@ services:
       - INSFORGE_DEPLOYMENT_METHOD=docker-compose
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
+      # ─── Custom Compute: Docker provider (opt-in) ──────────────────────────
+      # Mounting the Docker socket below is what enables it: the driver registers
+      # itself when the socket is reachable, so nothing runs containers on your
+      # host unless you deliberately grant this.
+      #
+      # Read the security note in the compute docs first. The driver constructs
+      # every container spec itself and never forwards caller-supplied options, so
+      # a leaked API key cannot request a privileged container — but the socket is
+      # still root-equivalent on the host.
+      - COMPUTE_PROVIDER=${COMPUTE_PROVIDER:-}
+      # Socket the driver dials, mounted at the same path below so both sides
+      # agree. Override for rootless Docker or Podman.
+      - DOCKER_SOCKET_PATH=${DOCKER_SOCKET_PATH:-}
+      # Ingress default for services that do not choose one. `none` publishes no
+      # host port, which is right for workers and processors.
+      - COMPUTE_DEFAULT_INGRESS=${COMPUTE_DEFAULT_INGRESS:-none}
+      # Host address used to build URLs for `port` ingress. Unset, no URL is
+      # advertised rather than guessing an address that may not resolve.
+      - COMPUTE_PUBLIC_HOST=${COMPUTE_PUBLIC_HOST:-}
+      # Bind address for published ports. Loopback by default — reaching a
+      # container from the internet should be a deliberate choice.
+      - COMPUTE_BIND_ADDRESS=${COMPUTE_BIND_ADDRESS:-127.0.0.1}
+      # Ceiling on an uploaded source-build context. Express buffers the whole
+      # tarball before the handler runs, so this is a memory bound, not just a
+      # policy — lower it on a small host.
+      - COMPUTE_BUILD_MAX_CONTEXT=${COMPUTE_BUILD_MAX_CONTEXT:-}
+      # Seconds an upload may send nothing before it is treated as stalled and
+      # cut loose. Only one build runs at a time, so a connection that stops
+      # making progress would otherwise block every other deploy. Resets on each
+      # chunk, so a slow but active link is never cut.
+      - COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT=${COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT:-}
+      # Keep compute containers off this project's network. Off by default:
+      # proximity to the database and storage is the point.
+      - COMPUTE_ISOLATE_NETWORK=${COMPUTE_ISOLATE_NETWORK:-}
     volumes:
       - ./package.json:/app/package.json
       - ./package-lock.json:/app/package-lock.json
@@ -178,6 +212,15 @@ services:
       - ui_node_modules:/app/packages/ui/node_modules
       - shared-logs:/insforge-logs
       - storage-data:/insforge-storage
+      # Uncomment to enable the Docker compute provider. `group_add` is required
+      # because the socket is mode 660 root:docker — without a matching group the
+      # backend gets EACCES. The GID is host-specific (993 on Amazon Linux 2023,
+      # commonly 999 on Debian/Ubuntu), so it cannot be baked in:
+      #   getent group docker | cut -d: -f3
+      # The value goes on .env's DOCKER_GID line (or the exported environment).
+      # Compose does not see a bare assignment made in your shell.
+      # - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:${DOCKER_SOCKET_PATH:-/var/run/docker.sock}
+    # group_add: ["${DOCKER_GID:?set DOCKER_GID to your host docker group id}"]
     command: sh -c 'npm install && npx turbo run build --filter=@insforge/shared-schemas --filter=@insforge/ui --filter=@insforge/dashboard && cd backend && npm run migrate:up && cd .. && npx concurrently -n backend,frontend -c cyan,magenta "npm run dev:backend" "npm run dev:frontend"'
     restart: unless-stopped
     security_opt:

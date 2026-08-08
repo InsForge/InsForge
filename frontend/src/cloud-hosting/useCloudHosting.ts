@@ -22,6 +22,8 @@ const VALID_METRIC_NAMES: readonly DashboardMetricName[] = [
   'disk_usage',
   'disk_used',
   'disk_total',
+  'disk_database',
+  'disk_wal',
   'network_in',
   'network_out',
 ] as const;

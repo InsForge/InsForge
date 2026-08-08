@@ -50,7 +50,13 @@ Provider notes:
 
 ## Bundled MinIO
 
-Run MinIO next to InsForge with a single overlay — no `.env` editing:
+Run MinIO next to InsForge with a single overlay. In a `deploy/setup.sh` checkout, append it to `COMPOSE_FILE` in your `.env`:
+
+```env
+COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:docker-compose.minio.yml
+```
+
+Then `docker compose up -d` as usual. Building from source instead:
 
 ```bash
 docker compose -f docker-compose.prod.yml -f docker-compose.minio.yml up -d
@@ -67,7 +73,11 @@ MINIO_ROOT_PASSWORD=a-long-random-secret
 
 ## Bundled RustFS
 
-Same shape with [RustFS](https://rustfs.com) (Apache-2.0 licensed, written in Rust):
+Same shape with [RustFS](https://rustfs.com) (Apache-2.0 licensed, written in Rust) — swap the filename:
+
+```env
+COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:docker-compose.rustfs.yml
+```
 
 ```bash
 docker compose -f docker-compose.prod.yml -f docker-compose.rustfs.yml up -d
@@ -78,7 +88,7 @@ RUSTFS_ACCESS_KEY=your-user
 RUSTFS_SECRET_KEY=a-long-random-secret
 ```
 
-Both overlays also work with the dev compose (`docker-compose.yml`) and the `deploy/docker-compose/docker-compose.yml` self-host file (place the overlay next to it).
+Switching stores does not migrate existing objects. Set the overlay before you upload anything, or move the objects yourself.
 
 <Warning>
 Switching an existing deployment from local storage to an S3 backend does not migrate previously uploaded files. Migrate the contents of the `storage-data` volume (e.g. with `mc mirror` or `aws s3 sync`) before switching, or start fresh.
@@ -88,7 +98,7 @@ Switching an existing deployment from local storage to an S3 backend does not mi
 
 Dokploy takes a single compose file, so overlays don't apply. Two options:
 
-1. **External store** — set `S3_BUCKET`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE=true` (and `S3_USE_PRESIGNED_URLS=false` for private endpoints) in Dokploy's environment UI. `docker-compose.dokploy.yml` passes them through.
+1. **External store** — set `S3_BUCKET`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE=true` (and `S3_USE_PRESIGNED_URLS=false` for private endpoints) in Dokploy's environment UI. `deploy/dokploy/docker-compose.yml` passes them through.
 2. **MinIO/RustFS on the same Dokploy host** — deploy the store as its own Dokploy service, then point the env vars above at its internal address.
 
 ## Using the S3-compatible gateway
