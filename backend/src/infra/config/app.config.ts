@@ -136,6 +136,9 @@ function parseEnvBool(val: string | undefined): boolean {
 
 const AWS_MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024;
 
+/** Largest delay `setTimeout` honours; anything above it is silently treated as 1ms. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
+
 function parseEnvBytes(val: string | undefined, fallback: number): number {
   if (!val) return fallback;
   if (!/^\d+$/.test(val)) return fallback;
@@ -218,8 +221,15 @@ export function loadConfig(): AppConfig {
       // progress while holding the slot blocks every other deploy. The timer resets
       // on each chunk, so this bounds silence, not total upload time — a slow but
       // active link is never cut.
-      buildUploadIdleTimeoutMs:
+      //
+      // Clamped to the 32-bit signed max because `setTimeout` silently drops a
+      // larger delay to 1ms: without this, an operator asking for a very lenient
+      // timeout would get the harshest possible behaviour and see every upload
+      // aborted instantly.
+      buildUploadIdleTimeoutMs: Math.min(
         parseEnvInt(process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT, 30) * 1000,
+        MAX_TIMEOUT_MS
+      ),
     },
     server: {
       maxJsonBodySize: process.env.MAX_JSON_BODY_SIZE || '100mb',

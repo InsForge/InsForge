@@ -359,15 +359,22 @@ describe('POST /api/compute/services/:id/build', () => {
       const { port, close } = await listen(app);
       try {
         const partial = openPartialUpload(port);
-        await new Promise((r) => setTimeout(r, 50));
 
         // Held: the upload is parked inside express.raw, so nothing else gets in.
+        // Polled rather than slept on — a fixed wait that loses the race reads as a
+        // spurious 200 on a loaded worker.
+        await waitUntilSlotHeld(app);
+
+        // Counted as a delta rather than "never called": a probe that raced ahead of
+        // the partial upload legitimately takes the slot and builds once, and that
+        // says nothing about whether a *rejected* upload reaches the service.
+        const callsBefore = computeServiceMock.buildAndDeploy.mock.calls.length;
         const blocked = await request(app)
           .post('/api/compute/services/svc-1/build')
           .set('Content-Type', 'application/x-tar')
           .send(TAR);
         expect(blocked.status).toBe(429);
-        expect(computeServiceMock.buildAndDeploy).not.toHaveBeenCalled();
+        expect(computeServiceMock.buildAndDeploy.mock.calls.length).toBe(callsBefore);
 
         // The client disappears without ever reaching the handler. `res.close` is the
         // only thing that can hand the slot back here.
@@ -382,8 +389,10 @@ describe('POST /api/compute/services/:id/build', () => {
 
     it('cuts a stalled upload loose after the configured idle timeout', async () => {
       const original = process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT;
-      // Seconds, so this is the smallest value the knob expresses.
-      process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT = '1';
+      // Seconds. Two rather than one so there is room to observe the slot held
+      // before the watchdog fires — at one, a slow worker can reach the probe after
+      // the release and see 200 for the right reason at the wrong time.
+      process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT = '2';
       vi.resetModules();
       try {
         const app = await createApp();
@@ -394,13 +403,8 @@ describe('POST /api/compute/services/:id/build', () => {
             stalled.on('error', () => resolve('socket dropped'));
             stalled.on('response', () => resolve('got a response'));
           });
-          await new Promise((r) => setTimeout(r, 50));
-
           // Held while the upload looks alive.
-          const blocked = await request(app)
-            .post('/api/compute/services/svc-1/build')
-            .set('Content-Type', 'application/x-tar')
-            .send(TAR);
+          const blocked = await waitUntilSlotHeld(app);
           expect(blocked.status).toBe(429);
 
           // Send nothing further: the watchdog should destroy the request and release.
@@ -437,6 +441,26 @@ async function retryUntilNot429(app: express.Express) {
       return last;
     }
     await new Promise((r) => setTimeout(r, 10));
+  }
+  return last!;
+}
+
+/**
+ * Poll until a probe is actually turned away, i.e. the slot is observably held.
+ * Returns that 429 response so the caller can assert on it. Bounded, so a gate that
+ * never closes fails the test with a real status instead of hanging.
+ */
+async function waitUntilSlotHeld(app: express.Express) {
+  let last;
+  for (let i = 0; i < 200; i++) {
+    last = await request(app)
+      .post('/api/compute/services/svc-1/build')
+      .set('Content-Type', 'application/x-tar')
+      .send(TAR);
+    if (last.status === 429) {
+      return last;
+    }
+    await new Promise((r) => setTimeout(r, 5));
   }
   return last!;
 }
