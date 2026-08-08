@@ -1,7 +1,7 @@
 import { apiClient } from '#lib/api/client';
 import type {
   ServiceSchema,
-  CreateServiceRequest,
+  CreateServiceRequestInput,
   UpdateServiceRequest,
 } from '@insforge/shared-schemas';
 
@@ -30,7 +30,7 @@ class ComputeServicesApiService {
     });
   }
 
-  async create(data: CreateServiceRequest): Promise<ServiceSchema> {
+  async create(data: CreateServiceRequestInput): Promise<ServiceSchema> {
     return apiClient.request('/compute/services', {
       method: 'POST',
       headers: apiClient.withAccessToken(),
