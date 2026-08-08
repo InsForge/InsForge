@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ComputeCapabilitiesSchema } from '@insforge/shared-schemas';
 
 // The dialog reads capabilities through this hook; driving it directly keeps the
@@ -13,6 +13,14 @@ vi.mock('#features/compute/hooks/useComputeCapabilities', () => ({
     isLoading: false,
   }),
 }));
+
+// Radix's Select uses pointer-capture and scroll APIs jsdom does not implement.
+beforeAll(() => {
+  Element.prototype.hasPointerCapture = vi.fn(() => false);
+  Element.prototype.releasePointerCapture = vi.fn();
+  Element.prototype.setPointerCapture = vi.fn();
+  Element.prototype.scrollIntoView = vi.fn();
+});
 
 const { CreateServiceDialog } = await import('#features/compute/components/CreateServiceDialog');
 
@@ -63,16 +71,32 @@ describe('CreateServiceDialog capability gating', () => {
 
   // Ingress is only a choice where more than one mode exists, and without the
   // control every dashboard-created service on Docker would be unreachable.
-  it('offers the provider’s ingress modes and sends the chosen one', async () => {
-    caps.value = DOCKER;
+  it('offers exactly the provider’s ingress modes and sends the chosen one', async () => {
+    caps.value = { ...DOCKER, ingressModes: ['none', 'port'] };
     const onCreate = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
     render(
       <CreateServiceDialog open onOpenChange={vi.fn()} onCreate={onCreate} isCreating={false} />
     );
 
     expect(screen.getByText('Reachable from')).toBeTruthy();
-    const payload = await fillAndSubmit(onCreate);
-    expect(payload.ingress).toBe('none');
+
+    // Open the select and check the options are filtered to what the provider
+    // reported — offering `host` here would be the bug this gating prevents.
+    const trigger = screen
+      .getAllByRole('combobox')
+      .find((el) => el.textContent?.includes('Private'));
+    await user.click(trigger!);
+    expect(screen.getByRole('option', { name: 'Published host port' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: /Hostname/ })).toBeNull();
+
+    // And the choice actually reaches the payload, rather than the default.
+    await user.click(screen.getByRole('option', { name: 'Published host port' }));
+    await user.type(screen.getByPlaceholderText('my-api'), 'worker');
+    await user.type(screen.getByPlaceholderText('nginx:alpine'), 'nginx:alpine');
+    await user.click(screen.getByRole('button', { name: 'Create Service' }));
+    await waitFor(() => expect(onCreate).toHaveBeenCalledOnce());
+    expect((onCreate.mock.calls[0][0] as Record<string, unknown>).ingress).toBe('port');
   });
 
   it('keeps Region and drops the ingress control for a single-mode provider', async () => {

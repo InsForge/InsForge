@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
 } from '@insforge/ui';
 import type { ServiceSchema } from '@insforge/shared-schemas';
-import { statusColors, getReachableUrl } from '#features/compute/constants';
+import { statusColors, getReachableUrl, INGRESS_MODES } from '#features/compute/constants';
 import { useServiceHealth } from '#features/compute/hooks/useComputeServices';
 import { useComputeCapabilities } from '#features/compute/hooks/useComputeCapabilities';
 
@@ -22,9 +22,17 @@ interface ServiceCardProps {
 
 export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: ServiceCardProps) {
   const { t } = useTranslation('chrome');
-  const { capabilities } = useComputeCapabilities();
+  // This service's own provider, not the deployment default. Providers coexist and
+  // the backend routes per row, so a Docker service in a Fly-default deployment
+  // would otherwise show the meaningless region `local`, and a Fly service in a
+  // Docker-default deployment would hide the region it genuinely has.
+  const { capabilities } = useComputeCapabilities(service.provider);
   const showRegion = capabilities ? capabilities.regions : true;
   const reachableUrl = getReachableUrl(service);
+  // Same table the create dialog uses, so the card cannot say `port` where the
+  // form said "Published host port".
+  const ingressLabel =
+    INGRESS_MODES.find((m) => m.value === service.ingress)?.label ?? service.ingress;
   // Only poll Fly events for services that could plausibly be crash-looping —
   // a stopped/failed/destroying machine has nothing to loop on, and these
   // calls hit Fly's per-org rate limit.
@@ -140,7 +148,7 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
           <span>{service.region}</span>
         ) : (
           <span>
-            {t(`compute.ingressModes.${service.ingress}`, { defaultValue: service.ingress })}
+            {t(`compute.ingressModes.${service.ingress}`, { defaultValue: ingressLabel })}
           </span>
         )}
       </div>

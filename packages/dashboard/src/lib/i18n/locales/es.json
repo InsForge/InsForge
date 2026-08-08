@@ -745,7 +745,8 @@
       "updated": "Actualizado",
       "endpoint": "Endpoint",
       "name": "Nombre",
-      "imageUrl": "URL de la imagen"
+      "imageUrl": "URL de la imagen",
+      "ingress": "Alcanzable desde"
     },
     "builtFromDockerfile": "Compilado desde Dockerfile",
     "notAvailable": "No disponible",
@@ -805,7 +806,12 @@
     "toastStopped": "Servicio detenido",
     "toastStopFailed": "Error al detener el servicio",
     "toastStarted": "Servicio iniciado",
-    "toastStartFailed": "Error al iniciar el servicio"
+    "toastStartFailed": "Error al iniciar el servicio",
+    "ingressModes": {
+      "none": "Privado (solo red interna)",
+      "port": "Puerto publicado en el host",
+      "host": "Nombre de host (enrutado por tu pasarela)"
+    }
   },
   "analytics": {
     "sidebar": {

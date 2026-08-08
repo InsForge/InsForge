@@ -120,7 +120,7 @@ If both are configured, existing services stay with the provider that created th
 
 ### Choosing how a service is reachable
 
-Each service picks an ingress mode. The default is `none`, because most compute — queue workers, processors, inference loops — takes no inbound traffic at all.
+Each service picks an ingress mode. Which modes exist depends on the provider, and so does the default: on a single host it is `none`, because most compute — queue workers, processors, inference loops — takes no inbound traffic at all, while Fly gives every app a hostname and so offers only `host`. Omit the field and the active provider's default applies; ask for a mode the provider cannot give and it is coerced to one it can.
 
 | Mode | What happens |
 | --- | --- |
@@ -139,10 +139,10 @@ Deploying a pre-built image needs nothing special: create the service with an im
 To have InsForge build your `Dockerfile`, reserve the service, then upload the build context as a tarball:
 
 ```bash
-# 1. Reserve the name (no image yet)
-curl -X POST "$INSFORGE_URL/api/compute/services/deploy" \
+# 1. Reserve the name (no image yet) and keep the id it returns
+ID=$(curl -sX POST "$INSFORGE_URL/api/compute/services/deploy" \
   -H "x-api-key: $INSFORGE_API_KEY" -H 'Content-Type: application/json' \
-  -d '{"name":"worker","port":8080,"memory":512}'
+  -d '{"name":"worker","port":8080,"memory":512}' | jq -r .id)
 
 # 2. Upload the context; the response carries the build log and the deployed tag
 tar --no-xattrs -cf context.tar -C ./worker .

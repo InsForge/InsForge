@@ -120,7 +120,7 @@ Si configuras los dos, los servicios existentes se quedan con el proveedor que l
 
 ### Elegir cómo se alcanza un servicio
 
-Cada servicio elige un modo de ingress. El valor por defecto es `none`, porque la mayor parte del compute —workers de cola, procesadores, bucles de inferencia— no recibe tráfico entrante en absoluto.
+Cada servicio elige un modo de ingress. Qué modos existen depende del proveedor, y el valor por defecto también: en un solo host es `none`, porque la mayor parte del compute —workers de cola, procesadores, bucles de inferencia— no recibe tráfico entrante en absoluto, mientras que Fly da un nombre de host a cada app y por eso solo ofrece `host`. Si omites el campo se aplica el valor por defecto del proveedor activo; si pides un modo que el proveedor no puede dar, se ajusta a uno que sí.
 
 | Modo | Qué ocurre |
 | --- | --- |
@@ -139,10 +139,10 @@ Desplegar una imagen ya construida no necesita nada especial: crea el servicio c
 Para que InsForge construya tu `Dockerfile`, reserva el servicio y luego sube el contexto de construcción como un tarball:
 
 ```bash
-# 1. Reserva el nombre (todavía sin imagen)
-curl -X POST "$INSFORGE_URL/api/compute/services/deploy" \
+# 1. Reserva el nombre (todavía sin imagen) y guarda el id que devuelve
+ID=$(curl -sX POST "$INSFORGE_URL/api/compute/services/deploy" \
   -H "x-api-key: $INSFORGE_API_KEY" -H 'Content-Type: application/json' \
-  -d '{"name":"worker","port":8080,"memory":512}'
+  -d '{"name":"worker","port":8080,"memory":512}' | jq -r .id)
 
 # 2. Sube el contexto; la respuesta trae el log de construcción y el tag desplegado
 tar --no-xattrs -cf context.tar -C ./worker .

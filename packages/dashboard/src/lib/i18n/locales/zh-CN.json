@@ -726,7 +726,8 @@
       "updated": "更新时间",
       "endpoint": "端点",
       "name": "名称",
-      "imageUrl": "镜像 URL"
+      "imageUrl": "镜像 URL",
+      "ingress": "访问方式"
     },
     "builtFromDockerfile": "由 Dockerfile 构建",
     "notAvailable": "不可用",
@@ -785,7 +786,12 @@
     "toastStopped": "服务已停止",
     "toastStopFailed": "停止服务失败",
     "toastStarted": "服务已启动",
-    "toastStartFailed": "启动服务失败"
+    "toastStartFailed": "启动服务失败",
+    "ingressModes": {
+      "none": "私有（仅项目内网）",
+      "port": "发布到宿主机端口",
+      "host": "主机名（由你的网关路由）"
+    }
   },
   "analytics": {
     "sidebar": {

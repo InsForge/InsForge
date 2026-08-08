@@ -726,7 +726,8 @@
       "updated": "更新時間",
       "endpoint": "端點",
       "name": "名稱",
-      "imageUrl": "映像檔 URL"
+      "imageUrl": "映像檔 URL",
+      "ingress": "存取方式"
     },
     "builtFromDockerfile": "由 Dockerfile 建置",
     "notAvailable": "無法取得",
@@ -785,7 +786,12 @@
     "toastStopped": "服務已停止",
     "toastStopFailed": "停止服務失敗",
     "toastStarted": "服務已啟動",
-    "toastStartFailed": "啟動服務失敗"
+    "toastStartFailed": "啟動服務失敗",
+    "ingressModes": {
+      "none": "私有（僅專案內網）",
+      "port": "發佈到主機連接埠",
+      "host": "主機名稱（由您的閘道路由）"
+    }
   },
   "analytics": {
     "sidebar": {
