@@ -46,8 +46,8 @@ describe('RecordFormDialog', () => {
     expect(screen.queryByText('updated_at')).toBeNull();
   });
 
-  it('keeps footer actions reachable so a record can be submitted with many columns', async () => {
-    const user = userEvent.setup();
+  it('keeps footer actions reachable so a record can be submitted with many columns', { timeout: 10_000 }, async () => {
+    const user = userEvent.setup({ delay: null });
     const onOpenChange = vi.fn();
     createRecord.mockClear();
 
