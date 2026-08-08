@@ -186,21 +186,46 @@ export function ObservabilitySection() {
       data?.metrics.find((m) => m.metric === 'disk_wal')?.data,
       diskUsedData
     );
+    // Data-scoped ceiling (Tony's call, 2026-08-08): subtract the OS/runtime
+    // from both sides so the chart talks about the user's space, the way the
+    // Supabase data-volume chart does — but subtract the MEASURED System
+    // rather than a hardcoded constant (the retired 4GiB hack showed how a
+    // guess drifts and clamps). Ceiling = database + wal + free space; the
+    // System figure moves to a tooltip footnote.
+    const systemLatest = breakdown?.system.length
+      ? breakdown.system[breakdown.system.length - 1].value
+      : null;
+    const dataCeiling =
+      totalBytes !== null && systemLatest !== null
+        ? Math.max(0, totalBytes - systemLatest)
+        : totalBytes;
+    // With a breakdown, the card's primary series (headline + AVG/MAX/LATEST)
+    // is the user's data (database + wal per sample) — raw disk_used would
+    // read over the data-scoped ceiling.
+    const dataUsed = breakdown
+      ? breakdown.database.map((point, i) => ({
+          timestamp: point.timestamp,
+          value: point.value + (breakdown.wal[i]?.value ?? 0),
+        }))
+      : diskUsedData;
     return {
-      data: diskUsedData,
-      fixedDomain: (totalBytes !== null ? [0, totalBytes] : undefined) as
+      data: dataUsed,
+      fixedDomain: (dataCeiling !== null ? [0, dataCeiling] : undefined) as
         | [number, number]
         | undefined,
       // Capacity chart (Supabase-style): dashed ceiling at the provisioned
       // size, a mid gridline, bars for the samples. No 90% threshold line —
       // the ceiling is the reference, and two dashed lines collide visually.
-      ticks: totalBytes !== null ? [0, totalBytes / 2, totalBytes] : [],
-      totalBytes,
+      ticks: dataCeiling !== null ? [0, dataCeiling / 2, dataCeiling] : [],
+      totalBytes: dataCeiling,
+      systemLatest,
       breakdown,
-      // The hovered value as a share of the provisioned disk.
+      // The hovered value as a share of the SAME ceiling the chart draws —
+      // data-scoped when the breakdown is present (review round 1 caught the
+      // raw-total denominator contradicting the row block).
       tooltipDetail:
-        totalBytes !== null && totalBytes > 0
-          ? (v: number) => `${((v / totalBytes) * 100).toFixed(1)}% of ${BYTES_SIZE(totalBytes)}`
+        dataCeiling !== null && dataCeiling > 0
+          ? (v: number) => `${((v / dataCeiling) * 100).toFixed(1)}% of ${BYTES_SIZE(dataCeiling)}`
           : undefined,
     };
   }, [data]);
@@ -349,14 +374,6 @@ export function ObservabilitySection() {
                                   fillClass: 'fill-amber-300',
                                   data: diskCardProps.breakdown.wal,
                                 },
-                                {
-                                  key: 'system',
-                                  label: t('overview.metrics.diskUsed.system', {
-                                    defaultValue: 'System',
-                                  }),
-                                  fillClass: 'fill-zinc-500',
-                                  data: diskCardProps.breakdown.system,
-                                },
                               ]
                             : undefined,
                           tooltipRows: ((breakdown) =>
@@ -402,17 +419,19 @@ export function ObservabilitySection() {
                                       swatchClass: 'bg-amber-300',
                                     },
                                     {
-                                      label: t('overview.metrics.diskUsed.system', {
-                                        defaultValue: 'System',
-                                      }),
-                                      value: `${BYTES_SIZE(system)}${pct(system)}`,
-                                      swatchClass: 'bg-zinc-500',
-                                    },
-                                    {
                                       label: t('overview.metrics.diskUsed.total', {
                                         defaultValue: 'Total',
                                       }),
-                                      value: `${BYTES_SIZE(db + wal + system)}${pct(db + wal + system)}`,
+                                      value: `${BYTES_SIZE(db + wal)}${pct(db + wal)}`,
+                                    },
+                                    // Footnote, not a component: where the rest of
+                                    // the physical disk went. Kept out of the bars
+                                    // and the ceiling on purpose.
+                                    {
+                                      label: t('overview.metrics.diskUsed.systemExcluded', {
+                                        defaultValue: 'System & runtime',
+                                      }),
+                                      value: `${BYTES_SIZE(system)} · ${t('overview.metrics.diskUsed.notCounted', { defaultValue: 'not counted' })}`,
                                     },
                                   ];
                                   return rows;
