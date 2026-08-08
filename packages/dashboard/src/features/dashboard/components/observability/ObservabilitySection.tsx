@@ -338,7 +338,7 @@ export function ObservabilitySection() {
                                   label: t('overview.metrics.diskUsed.database', {
                                     defaultValue: 'Database',
                                   }),
-                                  fillClass: 'fill-emerald-400',
+                                  fillClass: 'fill-emerald-300',
                                   data: diskCardProps.breakdown.database,
                                 },
                                 {
@@ -392,7 +392,7 @@ export function ObservabilitySection() {
                                         defaultValue: 'Database',
                                       }),
                                       value: `${BYTES_SIZE(db)}${pct(db)}`,
-                                      swatchClass: 'bg-emerald-400',
+                                      swatchClass: 'bg-emerald-300',
                                     },
                                     {
                                       label: t('overview.metrics.diskUsed.wal', {
