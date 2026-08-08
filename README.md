@@ -114,22 +114,46 @@ If you find InsForge useful or interesting, a GitHub Star ⭐️ would be greatl
 
 ### Self-hosted: Docker Compose
 
-Prerequisites: [Docker](https://www.docker.com/) + [Node.js](https://nodejs.org/)
+Prerequisites: [Docker](https://www.docker.com/) with Compose v2.
 
 #### 1. Setup
 
-You can run InsForge locally using Docker Compose. This will start a local InsForge instance on your machine.
+```bash
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
+```
+
+Fetches the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY`,
+`POSTGRES_PASSWORD`, `ROOT_ADMIN_PASSWORD`, and the two access keys into
+`~/insforge/.env` (mode 600). Nothing is started, and re-running leaves an
+existing `.env` untouched.
+
+```bash
+cd ~/insforge
+$EDITOR .env          # API_BASE_URL, VITE_API_BASE_URL — the URL browsers will use
+docker compose up -d
+```
+
+`.env` sets `COMPOSE_FILE`, so plain `docker compose` commands work from that
+directory — no `-f` flags to remember.
 
 [![Deploy on Docker][docker-btn]][docker-deploy]
 
-Or run from source:
+<details>
+<summary>Building from source instead</summary>
+
+For working on InsForge itself. `docker-compose.prod.yml` reads the same
+variables but generates nothing, so set the secrets in `.env` yourself before
+starting anything you expose.
+
 ```bash
-# Run with Docker
 git clone https://github.com/InsForge/InsForge.git
 cd InsForge
 cp .env.example .env
+$EDITOR .env          # JWT_SECRET, ENCRYPTION_KEY, POSTGRES_PASSWORD, ROOT_ADMIN_PASSWORD
 docker compose -f docker-compose.prod.yml up
 ```
+
+</details>
 
 #### 2. Connect InsForge MCP
 
@@ -138,7 +162,7 @@ Open [http://localhost:7130](http://localhost:7130)
 Follow the steps to connect InsForge MCP Server
 
 <div align="center">
-  <img src="assets/connect.png" alt="Connect InsForge MCP" width="600">
+<img src="assets/connect.png" alt="Connect InsForge MCP" width="600">
 </div>
 
 #### 3. Verify installation
@@ -150,16 +174,28 @@ I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool t
 
 #### 4. Running Multiple Projects
 
-You can run multiple InsForge projects on the same host by using different ports and project names.
+Give each project its own directory:
 
 ```bash
-# Create a separate env file for each project
-cp .env.example .env.project1
-cp .env.example .env.project2
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/project1
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/project2
 ```
 
-Edit `.env.project2` with different ports:
+Then give each a project name and its own ports. Both `.env` files start with
+`COMPOSE_PROJECT_NAME=insforge`, and **two directories sharing that name share
+containers** — the second `up -d` adopts the first's, rebuilt with the second's
+config. Set it before starting anything.
+
+`~/project1/.env`:
+
 ```
+COMPOSE_PROJECT_NAME=project1
+```
+
+`~/project2/.env`:
+
+```
+COMPOSE_PROJECT_NAME=project2
 POSTGRES_PORT=5442
 POSTGREST_PORT=5440
 APP_PORT=7230
@@ -167,30 +203,32 @@ AUTH_PORT=7231
 DENO_PORT=7233
 ```
 
-Start each project with a unique name:
+Now each directory is a separate instance with its own containers, volumes,
+database, and secrets:
+
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.project1 -p project1 up -d
-docker compose -f docker-compose.prod.yml --env-file .env.project2 -p project2 up -d
+cd ~/project1 && docker compose up -d
+cd ~/project2 && docker compose up -d
 ```
 
-Each project gets its own isolated database, storage, and configuration. Manage them with:
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.project1 -p project1 ps      # status
-docker compose -f docker-compose.prod.yml --env-file .env.project1 -p project1 logs -f  # logs
-docker compose -f docker-compose.prod.yml --env-file .env.project1 -p project1 down     # stop
-```
+`docker compose ps`, `logs -f`, and `down` operate on whichever directory you
+run them from.
 
 #### 5. Storage Backends (Optional)
 
-InsForge stores files on the local filesystem by default. Backing storage with an S3-compatible store also enables the S3-compatible gateway at `/storage/v1/s3` (use `aws` CLI, rclone, or any AWS SDK against your InsForge Storage):
+InsForge stores files on the local filesystem by default. Backing storage with an S3-compatible store also enables the S3-compatible gateway at `/storage/v1/s3` (use `aws` CLI, rclone, or any AWS SDK against your InsForge Storage).
 
-```bash
-# Bundled MinIO — one command, store stays internal to the Docker network
-docker compose -f docker-compose.prod.yml -f docker-compose.minio.yml up -d
+Append the overlay to `COMPOSE_FILE` in `.env`:
+
+```env
+# Bundled MinIO — store stays internal to the Docker network
+COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:docker-compose.minio.yml
 
 # Bundled RustFS (Apache-2.0 licensed alternative)
-docker compose -f docker-compose.prod.yml -f docker-compose.rustfs.yml up -d
+COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:docker-compose.rustfs.yml
 ```
+
+Then `docker compose up -d` as usual.
 
 The overlays ship with default store credentials — set `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` (or `RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY`) in `.env` before production use.
 
