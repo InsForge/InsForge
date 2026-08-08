@@ -64,7 +64,9 @@ directories sharing that name share containers** — the second `up -d` adopts t
 first's and recreates them with the second's config. Set it before starting
 anything.
 
-`~/project1/.env` keeps the default ports:
+`~/project1/.env` keeps the default ports — which collide with the `~/insforge`
+instance from the quickstart above if it is still running. Stop that one, or give
+`project1` its own ports the way `project2` has:
 
 ```ini
 COMPOSE_PROJECT_NAME=project1
