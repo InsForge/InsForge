@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@insforge/ui';
 import { useComputeServices } from '#features/compute/hooks/useComputeServices';
+import { useMetadata } from '#lib/hooks/useMetadata';
+import { ComputeNotConfigured } from '#features/compute/components/ComputeNotConfigured';
 import { ServiceCard } from '#features/compute/components/ServiceCard';
 import { ServiceEvents } from '#features/compute/components/ServiceEvents';
 import { ServiceLogs } from '#features/compute/components/ServiceLogs';
@@ -22,9 +24,15 @@ import type { ServiceSchema } from '@insforge/shared-schemas';
 
 export default function ComputePage() {
   const { t } = useTranslation('chrome');
+  // Metadata already tells us whether compute is configured, and it is cached
+  // across the dashboard, so decide from that instead of firing a list request
+  // that 503s. Spinning on a call whose failure is already known makes an
+  // unconfigured feature look like a broken page.
+  const { metadata, isLoading: metadataLoading } = useMetadata();
+  const computeConfigured = metadata ? metadata.compute !== undefined : undefined;
   const {
     services,
-    isLoading,
+    isLoading: servicesLoading,
     error,
     create,
     remove,
@@ -34,7 +42,8 @@ export default function ComputePage() {
     isDeleting,
     isStopping,
     isStarting,
-  } = useComputeServices();
+  } = useComputeServices(computeConfigured === true);
+  const isLoading = metadataLoading || (computeConfigured === true && servicesLoading);
   const [selectedService, setSelectedService] = useState<ServiceSchema | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -58,6 +67,13 @@ export default function ComputePage() {
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
+  }
+
+  // Known-unconfigured: the setup state, reached without a failed round trip. The
+  // backend's guidance covers both providers, but it is only in the 503 body, so
+  // state the choice here too rather than leaving the page blank.
+  if (computeConfigured === false) {
+    return <ComputeNotConfigured />;
   }
 
   if (error) {

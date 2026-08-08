@@ -362,12 +362,18 @@ export function buildComputeRegistry(): ComputeRegistry {
   }
 
   if (providers.size === 0) {
+    // Both ways in, Docker first: it needs no third-party account, and a
+    // self-hoster reading Fly-only advice has no way to discover the option that
+    // is actually easier for them. This text reaches the dashboard verbatim as the
+    // not-configured empty state, so it is the whole of what they are told.
     throw new AppError(
       'Compute services not configured.',
       503,
       ERROR_CODES.COMPUTE_NOT_CONFIGURED,
-      'Set FLY_API_TOKEN and FLY_ORG in your .env, then restart the container. ' +
-        'See https://docs.insforge.dev/core-concepts/compute/overview for setup details.'
+      'Pick a provider and restart the container:\n' +
+        `• Your own Docker host — mount the Docker socket into the InsForge container (it is already in your compose file, commented out) and set DOCKER_GID to your host's docker group id. Currently looking for a socket at ${dockerConfig().socketPath}.\n` +
+        '• Fly.io — set FLY_API_TOKEN and FLY_ORG in your .env.\n' +
+        'See https://docs.insforge.dev/core-concepts/compute/overview for both.'
     );
   }
 
