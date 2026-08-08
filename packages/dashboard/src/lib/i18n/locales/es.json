@@ -170,7 +170,11 @@
         "title": "Uso de disco",
         "description": "Cuánto almacenamiento de tu instancia usan la base de datos, los archivos y los registros. Un disco lleno detiene las escrituras y puede dejar el backend fuera de línea.",
         "ceiling": "Tamaño del disco",
-        "used": "Usado"
+        "used": "Usado",
+        "database": "Base de datos",
+        "wal": "WAL",
+        "system": "Sistema",
+        "total": "Total"
       }
     },
     "memoryAdvisory": {

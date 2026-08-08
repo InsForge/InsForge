@@ -29,6 +29,22 @@ export interface MetricChartCardProps {
   capacity?: {
     ticks: number[];
     legend: { ceiling: string; used: string };
+    /**
+     * Stacked composition series (bottom-up render order). When present the
+     * bars stack these instead of drawing the primary series, giving the
+     * Supabase-style Database/WAL/System breakdown; all series come from one
+     * sampler so they share timestamps.
+     */
+    components?: Array<{
+      key: string;
+      label: string;
+      fillClass: string;
+      data: DashboardMetricDataPoint[];
+    }>;
+    /** Component rows for the hovered moment; null hides the row block. */
+    tooltipRows?: (
+      timestamp: number
+    ) => Array<{ label: string; value: string; swatchClass?: string }> | null;
   };
   /** Extra tooltip line under the value, e.g. the value as a share of the ceiling. */
   tooltipDetail?: (value: number) => string;
@@ -191,7 +207,7 @@ export function MetricChartCard({
   // matching the Supabase disk chart. Bars reuse the sparkline's x/y mapping,
   // so the hover hit-testing above works unchanged.
   const bars = useMemo(() => {
-    if (!capacity || sparkline.points.length === 0) {
+    if (!capacity || capacity.components?.length || sparkline.points.length === 0) {
       return [];
     }
     const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / sparkline.points.length;
@@ -204,6 +220,56 @@ export function MetricChartCard({
       height: Math.max(1.5, SPARKLINE_HEIGHT - point.y),
     }));
   }, [capacity, sparkline.points]);
+
+  // Stacked composition bars: segments accumulate bottom-up per shared sample
+  // timestamp, mapped onto the same time window and domain as the primary
+  // series so the stack lines up with the axis and the used/AVG stats.
+  const stackedBars = useMemo(() => {
+    const components = capacity?.components;
+    if (!components?.length) {
+      return [];
+    }
+    const finitePrimary = data.filter((point) => Number.isFinite(point.value));
+    const windowEnd = finitePrimary.length
+      ? finitePrimary[finitePrimary.length - 1].timestamp
+      : (components[0].data[components[0].data.length - 1]?.timestamp ??
+        Math.floor(Date.now() / 1000));
+    const windowStart = windowEnd - rangeSeconds;
+    const [min, max] = effectiveDomain ?? [0, 100];
+    const valueRange = max - min || 1;
+    const base = components[0].data;
+    const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / Math.max(1, base.length);
+    const width = Math.max(2, slot * 0.85);
+
+    return base
+      .map((point, i) => {
+        const rawX =
+          ((point.timestamp - windowStart) / Math.max(1, rangeSeconds)) * SPARKLINE_WIDTH;
+        const x = Math.max(Y_AXIS_LABEL_WIDTH + 2, Math.min(rawX, SPARKLINE_WIDTH - width));
+        let cumulative = 0;
+        const segments = components.map((component) => {
+          const value = component.data[i]?.value ?? 0;
+          const y0 = cumulative;
+          cumulative += value;
+          const yTop = SPARKLINE_HEIGHT - ((cumulative - min) / valueRange) * SPARKLINE_HEIGHT;
+          const yBottom = SPARKLINE_HEIGHT - ((y0 - min) / valueRange) * SPARKLINE_HEIGHT;
+          return {
+            key: component.key,
+            fillClass: component.fillClass,
+            y: yTop,
+            height: Math.max(value > 0 ? 1 : 0, yBottom - yTop),
+          };
+        });
+        return {
+          x,
+          width,
+          timestamp: point.timestamp,
+          inWindow: point.timestamp >= windowStart,
+          segments,
+        };
+      })
+      .filter((bar) => bar.inWindow);
+  }, [capacity, data, rangeSeconds, effectiveDomain]);
 
   const hover = hoverIdx !== null ? sparkline.points[hoverIdx] : null;
   const hoverLeftPct = hover ? (hover.x / SPARKLINE_WIDTH) * 100 : 0;
@@ -395,6 +461,22 @@ export function MetricChartCard({
                         className="fill-emerald-300"
                       />
                     ))}
+                  {stackedBars.map((bar) => (
+                    <g key={bar.timestamp}>
+                      {bar.segments.map((segment) =>
+                        segment.height > 0 ? (
+                          <rect
+                            key={segment.key}
+                            x={bar.x}
+                            y={segment.y}
+                            width={bar.width}
+                            height={segment.height}
+                            className={segment.fillClass}
+                          />
+                        ) : null
+                      )}
+                    </g>
+                  ))}
                 </svg>
                 {threshold !== undefined && (
                   <>
@@ -457,6 +539,33 @@ export function MetricChartCard({
                       {tooltipDetail && (
                         <div className="text-muted-foreground">{tooltipDetail(hover.value)}</div>
                       )}
+                      {capacity?.tooltipRows &&
+                        (() => {
+                          const rows = capacity.tooltipRows(hover.timestamp);
+                          if (!rows?.length) {
+                            return null;
+                          }
+                          return (
+                            <div className="mt-1 flex flex-col gap-0.5 border-t border-[var(--alpha-8)] pt-1">
+                              {rows.map((row) => (
+                                <div
+                                  key={row.label}
+                                  className="flex items-center justify-between gap-3"
+                                >
+                                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                                    {row.swatchClass && (
+                                      <span
+                                        className={`h-1.5 w-1.5 rounded-full ${row.swatchClass}`}
+                                      />
+                                    )}
+                                    {row.label}
+                                  </span>
+                                  <span className="tabular-nums">{row.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       <div className="text-muted-foreground">
                         {formatHoverTime(hover.timestamp, rangeSeconds)}
                       </div>
@@ -489,10 +598,22 @@ export function MetricChartCard({
                 </span>
                 {capacity.legend.ceiling}
               </span>
-              <span className="flex items-center gap-1.5">
-                <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-300" />
-                {capacity.legend.used}
-              </span>
+              {capacity.components?.length ? (
+                capacity.components.map((component) => (
+                  <span key={component.key} className="flex items-center gap-1.5">
+                    <span
+                      aria-hidden
+                      className={`h-2 w-2 rounded-full ${component.fillClass.replace('fill-', 'bg-')}`}
+                    />
+                    {component.label}
+                  </span>
+                ))
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-300" />
+                  {capacity.legend.used}
+                </span>
+              )}
             </div>
           )}
         </div>

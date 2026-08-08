@@ -6,7 +6,7 @@ import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { isInsForgeCloudProject } from '#lib/utils/utils';
 import { useProjectMetrics } from '#features/dashboard/hooks/useProjectMetrics';
 import { aggregateMetricSeries } from '#features/dashboard/utils/aggregateMetricSeries';
-import type { DashboardMetricName, DashboardMetricsRange } from '#types';
+import type { DashboardMetricDataPoint, DashboardMetricName, DashboardMetricsRange } from '#types';
 import { ProjectSettingsMenuDialog } from '#features/dashboard/components';
 import { MetricChartCard } from './MetricChartCard';
 
@@ -98,6 +98,59 @@ const METRICS: MetricConfig[] = [
 // Disk card slot in the grid (after CPU + Memory, before Network).
 const DISK_GRID_INDEX = 2;
 
+/**
+ * Assemble the Database/WAL/System stack from the metric series. Database and
+ * WAL arrive from the cloud sampler and share timestamps; System is derived
+ * per sample as (nearest disk_used) − database − wal, clamped at zero — it is
+ * never measured, so it must never be fabricated when the used series has no
+ * nearby sample (10-minute tolerance). Returns null when the breakdown series
+ * are absent (older cloud backend, self-host) so the card falls back to the
+ * single-color capacity chart. Exported for tests.
+ */
+export function buildDiskBreakdown(
+  database: DashboardMetricDataPoint[] | undefined,
+  wal: DashboardMetricDataPoint[] | undefined,
+  used: DashboardMetricDataPoint[]
+): {
+  database: DashboardMetricDataPoint[];
+  wal: DashboardMetricDataPoint[];
+  system: DashboardMetricDataPoint[];
+} | null {
+  if (!database?.length || !wal?.length) {
+    return null;
+  }
+  const walByTs = new Map(wal.map((p) => [p.timestamp, p.value]));
+  const nearestUsed = (ts: number): number | null => {
+    let best: DashboardMetricDataPoint | null = null;
+    for (const point of used) {
+      if (!Number.isFinite(point.value)) {
+        continue;
+      }
+      if (!best || Math.abs(point.timestamp - ts) < Math.abs(best.timestamp - ts)) {
+        best = point;
+      }
+    }
+    return best && Math.abs(best.timestamp - ts) <= 600 ? best.value : null;
+  };
+  const alignedWal: DashboardMetricDataPoint[] = [];
+  const system: DashboardMetricDataPoint[] = [];
+  const alignedDb: DashboardMetricDataPoint[] = [];
+  for (const point of database) {
+    const walValue = walByTs.get(point.timestamp);
+    if (walValue === undefined) {
+      continue;
+    }
+    alignedDb.push(point);
+    alignedWal.push({ timestamp: point.timestamp, value: walValue });
+    const usedValue = nearestUsed(point.timestamp);
+    system.push({
+      timestamp: point.timestamp,
+      value: usedValue === null ? 0 : Math.max(0, usedValue - point.value - walValue),
+    });
+  }
+  return alignedDb.length ? { database: alignedDb, wal: alignedWal, system } : null;
+}
+
 export function ObservabilitySection() {
   const { t } = useTranslation('chrome');
   const isCloudHostingMode = useIsCloudHostingMode();
@@ -128,6 +181,11 @@ export function ObservabilitySection() {
     const diskTotalData = data?.metrics.find((m) => m.metric === 'disk_total')?.data ?? [];
     const totalBytes =
       [...diskTotalData].reverse().find((p) => Number.isFinite(p.value))?.value ?? null;
+    const breakdown = buildDiskBreakdown(
+      data?.metrics.find((m) => m.metric === 'disk_database')?.data,
+      data?.metrics.find((m) => m.metric === 'disk_wal')?.data,
+      diskUsedData
+    );
     return {
       data: diskUsedData,
       fixedDomain: (totalBytes !== null ? [0, totalBytes] : undefined) as
@@ -138,6 +196,7 @@ export function ObservabilitySection() {
       // the ceiling is the reference, and two dashed lines collide visually.
       ticks: totalBytes !== null ? [0, totalBytes / 2, totalBytes] : [],
       totalBytes,
+      breakdown,
       // The hovered value as a share of the provisioned disk.
       tooltipDetail:
         totalBytes !== null && totalBytes > 0
@@ -269,6 +328,95 @@ export function ObservabilitySection() {
                               defaultValue: 'Used',
                             }),
                           },
+                          // Supabase palette: Database orange, WAL light green,
+                          // System green; stacked bottom-up in that order.
+                          components: diskCardProps.breakdown
+                            ? [
+                                {
+                                  key: 'database',
+                                  label: t('overview.metrics.diskUsed.database', {
+                                    defaultValue: 'Database',
+                                  }),
+                                  fillClass: 'fill-orange-300',
+                                  data: diskCardProps.breakdown.database,
+                                },
+                                {
+                                  key: 'wal',
+                                  label: t('overview.metrics.diskUsed.wal', {
+                                    defaultValue: 'WAL',
+                                  }),
+                                  fillClass: 'fill-emerald-200',
+                                  data: diskCardProps.breakdown.wal,
+                                },
+                                {
+                                  key: 'system',
+                                  label: t('overview.metrics.diskUsed.system', {
+                                    defaultValue: 'System',
+                                  }),
+                                  fillClass: 'fill-emerald-400',
+                                  data: diskCardProps.breakdown.system,
+                                },
+                              ]
+                            : undefined,
+                          tooltipRows: ((breakdown) =>
+                            breakdown
+                              ? (timestamp: number) => {
+                                  const total = diskCardProps.totalBytes;
+                                  let idx = -1;
+                                  let bestDelta = Infinity;
+                                  breakdown.database.forEach((point, i) => {
+                                    const delta = Math.abs(point.timestamp - timestamp);
+                                    if (delta < bestDelta) {
+                                      bestDelta = delta;
+                                      idx = i;
+                                    }
+                                  });
+                                  if (idx < 0 || bestDelta > 600) {
+                                    return null;
+                                  }
+                                  const pct = (v: number) =>
+                                    total ? ` (${((v / total) * 100).toFixed(2)}%)` : '';
+                                  const db = breakdown.database[idx].value;
+                                  const wal = breakdown.wal[idx].value;
+                                  const system = breakdown.system[idx].value;
+                                  const rows = [
+                                    {
+                                      label: t('overview.metrics.diskUsed.ceiling', {
+                                        defaultValue: 'Disk Size',
+                                      }),
+                                      value: total !== null ? BYTES_SIZE(total) : '—',
+                                    },
+                                    {
+                                      label: t('overview.metrics.diskUsed.database', {
+                                        defaultValue: 'Database',
+                                      }),
+                                      value: `${BYTES_SIZE(db)}${pct(db)}`,
+                                      swatchClass: 'bg-orange-300',
+                                    },
+                                    {
+                                      label: t('overview.metrics.diskUsed.wal', {
+                                        defaultValue: 'WAL',
+                                      }),
+                                      value: `${BYTES_SIZE(wal)}${pct(wal)}`,
+                                      swatchClass: 'bg-emerald-200',
+                                    },
+                                    {
+                                      label: t('overview.metrics.diskUsed.system', {
+                                        defaultValue: 'System',
+                                      }),
+                                      value: `${BYTES_SIZE(system)}${pct(system)}`,
+                                      swatchClass: 'bg-emerald-400',
+                                    },
+                                    {
+                                      label: t('overview.metrics.diskUsed.total', {
+                                        defaultValue: 'Total',
+                                      }),
+                                      value: `${BYTES_SIZE(db + wal + system)}${pct(db + wal + system)}`,
+                                    },
+                                  ];
+                                  return rows;
+                                }
+                              : undefined)(diskCardProps.breakdown),
                         }
                       : undefined
                   }
