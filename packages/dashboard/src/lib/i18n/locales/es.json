@@ -174,7 +174,9 @@
         "database": "Base de datos",
         "wal": "WAL",
         "system": "Sistema",
-        "total": "Total"
+        "total": "Total",
+        "systemExcluded": "Sistema y runtime",
+        "notCounted": "no contado"
       }
     },
     "memoryAdvisory": {
