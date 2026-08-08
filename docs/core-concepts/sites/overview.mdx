@@ -82,6 +82,26 @@ npx @insforge/cli deployments cancel deployment_123
 
 Every ready deployment gets a default URL at `https://<appkey>.insforge.site`. You can also set an InsForge-managed slug at `https://<slug>.insforge.site`. For a custom domain, add the domain in the dashboard and configure the DNS record it returns, usually a CNAME for subdomains.
 
+## Troubleshooting
+
+### 404: NOT_FOUND on client-side routes
+
+Single-page apps that handle routing in the browser (React Router, Vue Router, and similar) can return `404: NOT_FOUND` when a deep link or a page refresh hits a path that has no matching file on the server. Because InsForge builds your site on Vercel, add a `vercel.json` at your project root that rewrites every path to `index.html`, so the browser router takes over:
+
+```json
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+Then redeploy:
+
+```bash
+npx @insforge/cli deployments deploy ./frontend
+```
+
+If the 404 appears on the very first load rather than only on a sub-route, the build output directory is likely wrong for your framework. Vercel detects it from `package.json` and `vercel.json`, so confirm your build produces the expected output folder.
+
 ## Deploy with it
 
 <CardGroup cols={2}>

@@ -28,6 +28,16 @@ Un panel se construye para un puntero humano; una CLI se construye para cualquie
 
 Ejecute `npx @insforge/cli help <command>` para las banderas en cualquiera de estos.
 
+## Transferir un proyecto a otra organización
+
+Para mover un proyecto a otra organización —por ejemplo, para entregarlo a otra cuenta o equipo— use `projects transfer`. La facturación, la membresía y el acceso se trasladan a la organización de destino.
+
+```bash
+npx @insforge/cli projects transfer <targetOrgId> --project <id>
+```
+
+Pase el id de la organización de destino como argumento. `--project` es obligatorio y nunca recurre al proyecto vinculado, por lo que la transferencia no puede actuar sobre el proyecto equivocado por accidente. Los miembros de la organización actual pueden perder el acceso una vez que el proyecto se mueva, así que verifique primero el id de la organización de destino. El comando confirma antes de actuar en modo interactivo; `--yes` o `--json` omiten la confirmación.
+
 ## Una ejecución de agente típica
 
 ```bash
