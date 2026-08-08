@@ -5,7 +5,11 @@ import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
   MachineGoneError,
   translateMachineGone,
+  flyNetworkName,
+  flyAppNameFor,
+  flyEndpointUrl,
   type ComputeProvider,
+  type ComputeCapabilities,
   type LaunchMachineParams,
   type UpdateMachineParams,
   type MachineSummary,
@@ -31,6 +35,31 @@ export class CloudComputeProvider implements ComputeProvider {
       !!appConfig.app?.jwtSecret
     );
   }
+
+  // Cloud mode is Fly behind a control plane and shares Fly's app/machine
+  // identifiers, so rows it creates are recorded as 'fly'.
+  readonly name = 'fly' as const;
+
+  // Cloud-managed mode runs on Fly, so the machine-level capabilities match
+  // FlyProvider's. The one difference is deploy-token issuance: the cloud holds
+  // an org-wide token and must narrow it to one app before it leaves the
+  // backend, which is exactly what makes source mode work without the user
+  // holding any Fly credentials.
+  readonly capabilities: ComputeCapabilities = {
+    scaleToZero: true,
+    regions: true,
+    // Every Fly app gets public IPs and a `.fly.dev` hostname at create time, so
+    // there is no private-only or bare-port option to offer.
+    ingressModes: ['host'],
+    sourceBuild: 'flyctl',
+    deployTokenIssuance: true,
+  };
+
+  // Identical naming and URL rules to the Fly path — cloud mode is Fly behind a
+  // control plane, so both call the shared helpers rather than one borrowing
+  // from the other (which would drag fly.provider's imports in here).
+  resolveAppName = flyAppNameFor;
+  endpointUrl = flyEndpointUrl;
 
   private signToken(): string {
     if (!this.isConfigured()) {
@@ -89,16 +118,13 @@ export class CloudComputeProvider implements ComputeProvider {
     return text ? (JSON.parse(text) as T) : undefined;
   }
 
-  async createApp(params: { name: string; network?: string; org: string }) {
-    // Forward `network` only if the caller passed one. We keep it short
-    // (services.service.ts uses APP_KEY, ~8 chars) so Fly's network-name
+  async createApp(params: { name: string }) {
+    // `network` is kept short (APP_KEY, ~8 chars) so Fly's network-name
     // validator accepts it. Live e2e on prod (project 2163e1eb-…) showed
     // the previous long `${projectId}-network` (~44 chars) 422'd as
-    // "Name not a valid network name".
-    const body: Record<string, unknown> = { name: params.name };
-    if (params.network !== undefined) {
-      body.network = params.network;
-    }
+    // "Name not a valid network name". Derived here rather than passed in so
+    // the payload stays byte-identical to what the service used to send.
+    const body: Record<string, unknown> = { name: params.name, network: flyNetworkName() };
     const result = await this.call<{ appId: string; serviceId?: string }>('POST', '/apps', body);
     return { appId: result?.appId ?? params.name };
   }
@@ -158,10 +184,12 @@ export class CloudComputeProvider implements ComputeProvider {
     );
   }
 
-  async updateMachine(params: UpdateMachineParams): Promise<void> {
+  // Fly updates a machine in place, so the instance identity never changes.
+  async updateMachine(params: UpdateMachineParams): Promise<{ machineId?: string }> {
     await this.machineScoped(params.appId, params.machineId, () =>
       this.call('PATCH', `/machines/${encodeURIComponent(params.machineId)}`, params)
     );
+    return {};
   }
 
   async stopMachine(appId: string, machineId: string): Promise<void> {

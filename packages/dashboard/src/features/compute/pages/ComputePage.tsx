@@ -284,8 +284,8 @@ export default function ComputePage() {
               </dl>
             </div>
 
-            {currentService.flyMachineId && <ServiceLogs serviceId={currentService.id} />}
-            {currentService.flyMachineId && <ServiceEvents serviceId={currentService.id} />}
+            {currentService.providerInstanceId && <ServiceLogs serviceId={currentService.id} />}
+            {currentService.providerInstanceId && <ServiceEvents serviceId={currentService.id} />}
           </div>
         </div>
 
