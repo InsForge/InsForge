@@ -30,6 +30,7 @@ vi.mock('@/infra/config/app.config.js', () => {
       org: 'test-org',
       domain: 'fly.dev',
     },
+    docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
     cloud: {
       projectId: '',
       apiHost: '',
@@ -61,7 +62,23 @@ const mockDestroyMachine = vi.fn();
 const mockGetEvents = vi.fn();
 const mockGetLogs = vi.fn();
 const mockListMachines = vi.fn();
+// reconcile is the first caller of these two, so they were not mocked before.
+const mockGetMachineStatus = vi.fn();
+const mockWaitForState = vi.fn();
 const mockIsConfigured = vi.fn(() => true);
+
+/**
+ * Canonical Fly capabilities. Tests that need a different shape assign onto
+ * `mockFlyInstance.capabilities`; `beforeEach` restores from this, so a test that
+ * throws mid-body cannot leak its mutation into everything that follows.
+ */
+const FLY_CAPABILITIES = {
+  scaleToZero: true,
+  regions: true,
+  ingressModes: ['host'] as ('none' | 'port' | 'host')[],
+  sourceBuild: 'flyctl' as const,
+  deployTokenIssuance: false,
+};
 
 const mockFlyInstance = {
   createApp: mockCreateApp,
@@ -74,7 +91,19 @@ const mockFlyInstance = {
   getEvents: mockGetEvents,
   getLogs: mockGetLogs,
   listMachines: mockListMachines,
+  getMachineStatus: mockGetMachineStatus,
+  waitForState: mockWaitForState,
   isConfigured: mockIsConfigured,
+  // Provider-neutral surface (migration 064 / capability descriptor). The real
+  // FlyProvider derives these itself; the mock mirrors its behaviour so the
+  // service's naming and URL calls resolve to the same values the fixtures use.
+  name: 'fly' as const,
+  capabilities: { ...FLY_CAPABILITIES },
+  // Delegates to the real helper (rather than a naive template) so the service
+  // test keeps covering the Fly app-name length guard, which moved here from
+  // the service layer.
+  resolveAppName: (params: { name: string; projectId: string }) => flyAppNameFor(params),
+  endpointUrl: (appId: string) => `https://${appId}.fly.dev`,
 };
 
 vi.mock('@/providers/compute/fly.provider.js', () => ({
@@ -84,7 +113,7 @@ vi.mock('@/providers/compute/fly.provider.js', () => ({
 }));
 
 import { ComputeServicesService } from '@/services/compute/services.service.js';
-import { MachineGoneError } from '@/providers/compute/compute.provider.js';
+import { MachineGoneError, flyAppNameFor } from '@/providers/compute/compute.provider.js';
 
 describe('ComputeServicesService', () => {
   let service: ComputeServicesService;
@@ -96,6 +125,11 @@ describe('ComputeServicesService', () => {
     process.env.APP_KEY = 'testkey1';
     service = ComputeServicesService.getInstance();
     mockIsConfigured.mockReturnValue(true);
+    // The mock provider is a module-scoped singleton, so a capability override
+    // survives the test that made it. Restore here rather than at the end of each
+    // test body, where a failing assertion skips the restore and the leak shows up
+    // as unrelated failures further down the file.
+    mockFlyInstance.capabilities = { ...FLY_CAPABILITIES };
   });
 
   afterEach(() => {
@@ -104,6 +138,423 @@ describe('ComputeServicesService', () => {
     } else {
       process.env.APP_KEY = oldEnvAppKey;
     }
+  });
+
+  describe('driver routing and capabilities', () => {
+    // Served as the `compute` slice of /api/metadata rather than its own endpoint:
+    // the CLI already capability-probes through metadata slices, and a second
+    // mechanism for "what can this deployment do" would drift from the first.
+    it('reports the compute metadata slice keyed by provider', async () => {
+      const { getComputeMetadata } = await import('@/services/compute/services.service.js');
+      expect(getComputeMetadata()).toEqual({
+        defaultProvider: 'fly',
+        providers: {
+          fly: {
+            scaleToZero: true,
+            regions: true,
+            ingressModes: ['host'],
+            sourceBuild: 'flyctl',
+            deployTokenIssuance: false,
+          },
+        },
+      });
+    });
+
+    // A stored value the driver cannot honour is worse than a rejected request:
+    // nothing later contradicts it, so the API and dashboard keep reporting a
+    // region the container is not in. The CLI defaults `--region iad`, so this
+    // path is hit by every Docker deploy from an unmodified CLI.
+    it('records a capability-less region as local instead of the requested value', async () => {
+      mockFlyInstance.capabilities = { ...mockFlyInstance.capabilities, regions: false };
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+      mockCreateApp.mockResolvedValue({ appId: 'a' });
+      mockLaunchMachine.mockResolvedValue({ machineId: 'm1' });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly', region: 'local' }] });
+
+      await service.createService({
+        projectId: 'proj-123',
+        name: 'svc',
+        imageUrl: 'nginx',
+        port: 80,
+        cpu: 'shared-1x',
+        memory: 256,
+        region: 'iad',
+      });
+
+      // The INSERT stores `local`, and the launch is told the same thing.
+      expect(mockQuery.mock.calls[0][1]).toContain('local');
+      expect(mockQuery.mock.calls[0][1]).not.toContain('iad');
+      expect(mockLaunchMachine.mock.calls[0][0].region).toBe('local');
+    });
+
+    // Found by the first end-to-end run: the API default for scaleToZero is
+    // `true`, so omitting it stored `true` against a driver that cannot do it.
+    // Coercing only an explicit `true` missed the common path.
+    it('records always-on even when the caller omits scaleToZero entirely', async () => {
+      mockFlyInstance.capabilities = { ...mockFlyInstance.capabilities, scaleToZero: false };
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+      mockCreateApp.mockResolvedValue({ appId: 'a' });
+      mockLaunchMachine.mockResolvedValue({ machineId: 'm1' });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+
+      await service.createService({
+        projectId: 'proj-123',
+        name: 'svc',
+        imageUrl: 'nginx',
+        port: 80,
+        cpu: 'shared-1x',
+        memory: 256,
+        region: 'iad',
+        // scaleToZero deliberately not sent
+      });
+
+      // The INSERT must persist false, not the schema default of true.
+      expect(mockQuery.mock.calls[0][1]).toContain(false);
+      expect(mockLaunchMachine.mock.calls[0][0].scaleToZero).toBe(false);
+    });
+
+    // On update, an omitted field means "leave it alone". Filling it in would turn
+    // a metadata-only PATCH into a deploy change and call the provider needlessly.
+    it('does not invent a scaleToZero change on an update that omits it', async () => {
+      mockFlyInstance.capabilities = { ...mockFlyInstance.capabilities, scaleToZero: false };
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 's1',
+            name: 'svc',
+            provider: 'fly',
+            provider_app_id: 'a',
+            provider_instance_id: 'm1',
+            status: 'running',
+            cpu: 'shared-1x',
+            region: 'local',
+            ingress: 'host',
+            scale_to_zero: false,
+          },
+        ],
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+
+      await service.updateService('s1', { region: 'local' });
+
+      // Region-only change: no deploy-affecting field was implied, so the provider
+      // was never asked to update the instance.
+      expect(mockUpdateMachine).not.toHaveBeenCalled();
+    });
+
+    it('records a service as always-on when the driver cannot scale to zero', async () => {
+      mockFlyInstance.capabilities = { ...mockFlyInstance.capabilities, scaleToZero: false };
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+      mockCreateApp.mockResolvedValue({ appId: 'a' });
+      mockLaunchMachine.mockResolvedValue({ machineId: 'm1' });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+
+      await service.createService({
+        projectId: 'proj-123',
+        name: 'svc',
+        imageUrl: 'nginx',
+        port: 80,
+        cpu: 'shared-1x',
+        memory: 256,
+        region: 'iad',
+        scaleToZero: true,
+      });
+
+      expect(mockLaunchMachine.mock.calls[0][0].scaleToZero).toBe(false);
+    });
+
+    // prepareForDeploy reserves a name and creates the provider-side app, then
+    // waits for a build. On a driver with no source-build path, succeeding would
+    // strand the row in `deploying` with nothing able to advance it — the exact
+    // shape of the self-host Fly bug this work exists to stop repeating.
+    it('rejects prepareForDeploy on a driver that cannot build from source', async () => {
+      mockFlyInstance.capabilities = { ...mockFlyInstance.capabilities, sourceBuild: 'none' };
+
+      await expect(
+        service.prepareForDeploy({
+          projectId: 'proj-123',
+          name: 'svc',
+          port: 80,
+          cpu: 'shared-1x',
+          memory: 256,
+          region: 'iad',
+        })
+      ).rejects.toThrow(/cannot build from source/);
+
+      // Nothing was written and no provider-side app was created.
+      expect(mockQuery).not.toHaveBeenCalled();
+      expect(mockCreateApp).not.toHaveBeenCalled();
+    });
+
+    // Drivers coexist, so a row is routed by its own `provider`. When that
+    // driver isn't configured here we must refuse rather than hand Docker a Fly
+    // machine id (or vice versa) — that would 404 confusingly at best, and at
+    // worst heal a live, billing machine into a `stopped` row.
+    it('refuses machine operations on a row whose driver is not configured', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'svc-docker-1',
+            project_id: 'proj-123',
+            name: 'local-worker',
+            image_url: 'nginx:alpine',
+            port: 8080,
+            cpu: 'shared-1x',
+            memory: 512,
+            region: 'local',
+            provider: 'docker',
+            provider_app_id: 'insforge-local-worker',
+            provider_instance_id: 'container-abc',
+            status: 'running',
+            endpoint_url: null,
+            created_at: 'now',
+            updated_at: 'now',
+          },
+        ],
+      });
+
+      await expect(service.stopService('svc-docker-1')).rejects.toThrow(/"docker".*not configured/);
+      expect(mockStopMachine).not.toHaveBeenCalled();
+    });
+  });
+
+  // Reconcile exists for drift that accumulates while the backend is down, which
+  // is precisely the state no request-path test ever reaches.
+  describe('reconcile', () => {
+    function row(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'svc-1',
+        name: 'worker',
+        provider: 'fly',
+        provider_app_id: 'app-1',
+        provider_instance_id: 'machine-1',
+        status: 'running',
+        cpu: 'shared-1x',
+        ...overrides,
+      };
+    }
+
+    it('corrects a row that says running when the instance is stopped', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [row()] });
+      mockGetMachineStatus.mockResolvedValueOnce({ state: 'stopped' });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      const stats = await service.reconcile();
+
+      expect(stats).toMatchObject({ checked: 1, corrected: 1, healed: 0 });
+      const [sql, params] = mockQuery.mock.calls[1];
+      expect(sql).toContain('SET status = $1');
+      // Scoped to the instance the reading was taken against, so a deploy that
+      // replaced it concurrently is not overwritten by a stale observation.
+      expect(sql).toContain('provider_instance_id = $3');
+      expect(params).toEqual(['stopped', 'svc-1', 'machine-1']);
+    });
+
+    // The guard firing is the normal outcome of a race, not a correction. Counting
+    // it as one would report work that never happened and hide how often the race
+    // actually fires.
+    it('reports a skip, not a correction, when the guard blocks the write', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [row()] });
+      mockGetMachineStatus.mockResolvedValueOnce({ state: 'stopped' });
+      // A concurrent deploy already replaced provider_instance_id, so the guarded
+      // UPDATE matches nothing.
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      const stats = await service.reconcile();
+
+      expect(stats).toMatchObject({ checked: 1, corrected: 0, skipped: 1, healed: 0 });
+    });
+
+    it('leaves a row alone when reality already matches', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [row()] });
+      mockGetMachineStatus.mockResolvedValueOnce({ state: 'running' });
+
+      const stats = await service.reconcile();
+
+      expect(stats).toMatchObject({ checked: 1, corrected: 0 });
+      expect(mockQuery).toHaveBeenCalledTimes(1); // read only, no write
+    });
+
+    it('heals a row whose instance is gone entirely', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [row()] });
+      mockGetMachineStatus.mockRejectedValueOnce(new MachineGoneError('app-1', 'machine-1'));
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+
+      const stats = await service.reconcile();
+
+      expect(stats).toMatchObject({ healed: 1 });
+      // Healing clears the dead pointer so the next deploy relaunches.
+      expect(mockQuery.mock.calls[1][0]).toContain('provider_instance_id = NULL');
+    });
+
+    // Deciding what a half-finished create should become means guessing whether
+    // provider-side resources exist; guessing wrong destroys a service.
+    it('reports but does not touch rows left in a transient state', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [row({ status: 'deploying' }), row({ id: 'svc-2', status: 'destroying' })],
+      });
+
+      const stats = await service.reconcile();
+
+      expect(stats).toMatchObject({ skipped: 2, checked: 0, corrected: 0 });
+      expect(mockGetMachineStatus).not.toHaveBeenCalled();
+    });
+
+    it('skips rows belonging to a driver that is not configured', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [row({ provider: 'docker' })] });
+
+      const stats = await service.reconcile();
+
+      expect(stats).toMatchObject({ skipped: 1, checked: 0 });
+      expect(mockGetMachineStatus).not.toHaveBeenCalled();
+    });
+
+    // A daemon restarting mid-reconcile must not be mistaken for "instance gone".
+    it('leaves a row unchanged on a transient provider error', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [row()] });
+      mockGetMachineStatus.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+
+      const stats = await service.reconcile();
+
+      expect(stats).toMatchObject({ checked: 1, corrected: 0, healed: 0 });
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('survives a database read failure without throwing into startup', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('connection terminated'));
+      await expect(service.reconcile()).resolves.toMatchObject({ checked: 0 });
+    });
+
+    // The heal is a write inside the catch block. Letting it throw would escape
+    // the loop and abandon every row after it — nine healthy corrections lost to
+    // one bad write.
+    it('keeps sweeping when a heal write fails', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [row(), row({ id: 'svc-2', name: 'api', provider_instance_id: 'machine-2' })],
+      });
+      mockGetMachineStatus
+        .mockRejectedValueOnce(new MachineGoneError('app-1', 'machine-1'))
+        .mockResolvedValueOnce({ state: 'stopped' });
+      mockQuery.mockRejectedValueOnce(new Error('deadlock detected')); // the heal
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // svc-2's correction lands
+
+      const stats = await service.reconcile();
+
+      expect(stats).toMatchObject({ checked: 2, healed: 0, corrected: 1, skipped: 1 });
+      expect(mockQuery.mock.calls[2][1]).toEqual(['stopped', 'svc-2', 'machine-2']);
+    });
+  });
+
+  describe('buildAndDeploy', () => {
+    function serviceRow() {
+      return {
+        id: 'svc-b1',
+        project_id: 'proj-123',
+        name: 'api',
+        image_url: 'old:tag',
+        port: 8080,
+        cpu: 'shared-1x',
+        memory: 256,
+        region: 'local',
+        provider: 'fly',
+        provider_app_id: 'app-1',
+        provider_instance_id: 'inst-1',
+        status: 'deploying',
+        ingress: 'host',
+      };
+    }
+
+    // A driver whose source builds run on the caller's machine (flyctl) must not
+    // silently accept a context upload it will never build.
+    it('refuses a context upload on a driver that builds through flyctl', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow()] });
+
+      await expect(service.buildAndDeploy('svc-b1', Buffer.from('tar-bytes'))).rejects.toThrow(
+        /does not build uploaded contexts/
+      );
+    });
+
+    it('builds, deploys the resulting tag, and prunes superseded images', async () => {
+      mockFlyInstance.capabilities = {
+        ...mockFlyInstance.capabilities,
+        sourceBuild: 'context-upload',
+      };
+      const build = vi
+        .fn()
+        .mockResolvedValue({ imageTag: 'insforge-x/api:abc', logs: ['Step 1/2'] });
+      const prune = vi.fn().mockResolvedValue({ removed: 1 });
+      (mockFlyInstance as Record<string, unknown>).buildFromContext = build;
+      (mockFlyInstance as Record<string, unknown>).pruneServiceImages = prune;
+
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow()] }); // getService in buildAndDeploy
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow()] }); // getService in updateService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] });
+      mockUpdateMachine.mockResolvedValue({});
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...serviceRow(), image_url: 'insforge-x/api:abc' }],
+      });
+
+      const result = await service.buildAndDeploy('svc-b1', Buffer.from('tar-bytes'), {
+        dockerfile: 'Dockerfile.prod',
+      });
+
+      expect(build).toHaveBeenCalledWith(
+        expect.objectContaining({ serviceName: 'api', dockerfile: 'Dockerfile.prod' })
+      );
+      expect(result.imageTag).toBe('insforge-x/api:abc');
+      // Deployment goes through updateService, so the tested recreate/instance-id
+      // bookkeeping applies rather than a second copy of it.
+      expect(mockUpdateMachine.mock.calls[0][0].image).toBe('insforge-x/api:abc');
+      expect(prune).toHaveBeenCalledWith('api');
+
+      delete (mockFlyInstance as Record<string, unknown>).buildFromContext;
+      delete (mockFlyInstance as Record<string, unknown>).pruneServiceImages;
+    });
+
+    // A failed build must leave the previous image serving, and must say why.
+    it('surfaces the builder error and does not deploy anything', async () => {
+      mockFlyInstance.capabilities = {
+        ...mockFlyInstance.capabilities,
+        sourceBuild: 'context-upload',
+      };
+      (mockFlyInstance as Record<string, unknown>).buildFromContext = vi
+        .fn()
+        .mockRejectedValue(new Error('process "/bin/sh -c exit 7" did not complete successfully'));
+
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow()] });
+      mockQuery.mockResolvedValueOnce({ rows: [] }); // status -> failed
+
+      await expect(service.buildAndDeploy('svc-b1', Buffer.from('t'))).rejects.toThrow(/exit 7/);
+      expect(mockUpdateMachine).not.toHaveBeenCalled();
+
+      delete (mockFlyInstance as Record<string, unknown>).buildFromContext;
+    });
+
+    // The build already wrote an image to disk before the deploy ran, and nothing
+    // else removes service images — so a deploy failure that skipped the prune let
+    // repeated failures pile up without bound.
+    it('still prunes when the build succeeded but the deploy failed', async () => {
+      mockFlyInstance.capabilities = {
+        ...mockFlyInstance.capabilities,
+        sourceBuild: 'context-upload',
+      };
+      const prune = vi.fn().mockResolvedValue({ removed: 1 });
+      (mockFlyInstance as Record<string, unknown>).buildFromContext = vi
+        .fn()
+        .mockResolvedValue({ imageTag: 'insforge-x/api:abc', logs: [] });
+      (mockFlyInstance as Record<string, unknown>).pruneServiceImages = prune;
+
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow()] }); // getService in buildAndDeploy
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow()] }); // getService in updateService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] });
+      mockUpdateMachine.mockRejectedValue(new Error('daemon refused to start the container'));
+
+      await expect(service.buildAndDeploy('svc-b1', Buffer.from('t'))).rejects.toThrow();
+      expect(prune).toHaveBeenCalledWith('api');
+
+      delete (mockFlyInstance as Record<string, unknown>).buildFromContext;
+      delete (mockFlyInstance as Record<string, unknown>).pruneServiceImages;
+    });
   });
 
   describe('createService', () => {
@@ -133,8 +584,8 @@ describe('ComputeServicesService', () => {
             cpu: input.cpu,
             memory: input.memory,
             region: input.region,
-            fly_app_id: null,
-            fly_machine_id: null,
+            provider_app_id: null,
+            provider_instance_id: null,
             status: 'creating',
             endpoint_url: null,
             env_vars_encrypted: null,
@@ -159,8 +610,8 @@ describe('ComputeServicesService', () => {
             cpu: input.cpu,
             memory: input.memory,
             region: input.region,
-            fly_app_id: 'my-api-proj-123',
-            fly_machine_id: 'machine-abc',
+            provider_app_id: 'my-api-proj-123',
+            provider_instance_id: 'machine-abc',
             status: 'running',
             endpoint_url: 'https://my-api-proj-123.fly.dev',
             env_vars_encrypted: null,
@@ -180,11 +631,7 @@ describe('ComputeServicesService', () => {
       expect(insertCall[1]).toContain(input.name);
 
       // Verify Fly calls
-      expect(mockCreateApp).toHaveBeenCalledWith({
-        name: 'my-api-proj-123',
-        network: 'n-testkey1',
-        org: 'test-org',
-      });
+      expect(mockCreateApp).toHaveBeenCalledWith({ name: 'my-api-proj-123' });
       expect(mockLaunchMachine).toHaveBeenCalledWith(
         expect.objectContaining({
           appId: 'my-api-proj-123',
@@ -233,8 +680,8 @@ describe('ComputeServicesService', () => {
             cpu: input.cpu,
             memory: input.memory,
             region: input.region,
-            fly_app_id: null,
-            fly_machine_id: null,
+            provider_app_id: null,
+            provider_instance_id: null,
             status: 'creating',
             endpoint_url: null,
             env_vars_encrypted: null,
@@ -276,8 +723,8 @@ describe('ComputeServicesService', () => {
             memory: tcpInput.memory,
             region: tcpInput.region,
             protocol: 'tcp',
-            fly_app_id: null,
-            fly_machine_id: null,
+            provider_app_id: null,
+            provider_instance_id: null,
             status: 'creating',
             endpoint_url: null,
             env_vars_encrypted: null,
@@ -300,8 +747,8 @@ describe('ComputeServicesService', () => {
             memory: tcpInput.memory,
             region: tcpInput.region,
             protocol: 'tcp',
-            fly_app_id: 'my-redis-proj-123',
-            fly_machine_id: 'mach-tcp',
+            provider_app_id: 'my-redis-proj-123',
+            provider_instance_id: 'mach-tcp',
             status: 'running',
             endpoint_url: 'https://my-redis-proj-123.fly.dev',
             env_vars_encrypted: null,
@@ -347,8 +794,8 @@ describe('ComputeServicesService', () => {
             cpu: input.cpu,
             memory: input.memory,
             region: input.region,
-            fly_app_id: null,
-            fly_machine_id: null,
+            provider_app_id: null,
+            provider_instance_id: null,
             status: 'creating',
             endpoint_url: null,
             env_vars_encrypted: null,
@@ -370,8 +817,8 @@ describe('ComputeServicesService', () => {
             cpu: input.cpu,
             memory: input.memory,
             region: input.region,
-            fly_app_id: 'my-api-proj-123',
-            fly_machine_id: 'mach-default',
+            provider_app_id: 'my-api-proj-123',
+            provider_instance_id: 'mach-default',
             status: 'running',
             endpoint_url: 'https://my-api-proj-123.fly.dev',
             env_vars_encrypted: null,
@@ -410,8 +857,8 @@ describe('ComputeServicesService', () => {
             region: alwaysOnInput.region,
             protocol: 'http',
             scale_to_zero: false,
-            fly_app_id: null,
-            fly_machine_id: null,
+            provider_app_id: null,
+            provider_instance_id: null,
             status: 'creating',
             endpoint_url: null,
             env_vars_encrypted: null,
@@ -435,8 +882,8 @@ describe('ComputeServicesService', () => {
             region: alwaysOnInput.region,
             protocol: 'http',
             scale_to_zero: false,
-            fly_app_id: 'my-always-on-proj-123',
-            fly_machine_id: 'mach-always-on',
+            provider_app_id: 'my-always-on-proj-123',
+            provider_instance_id: 'mach-always-on',
             status: 'running',
             endpoint_url: 'https://my-always-on-proj-123.fly.dev',
             env_vars_encrypted: null,
@@ -480,8 +927,8 @@ describe('ComputeServicesService', () => {
             cpu: input.cpu,
             memory: input.memory,
             region: input.region,
-            fly_app_id: null,
-            fly_machine_id: null,
+            provider_app_id: null,
+            provider_instance_id: null,
             status: 'creating',
             endpoint_url: null,
             env_vars_encrypted: null,
@@ -503,8 +950,8 @@ describe('ComputeServicesService', () => {
             cpu: input.cpu,
             memory: input.memory,
             region: input.region,
-            fly_app_id: 'my-api-proj-123',
-            fly_machine_id: 'mach-default-stz',
+            provider_app_id: 'my-api-proj-123',
+            provider_instance_id: 'mach-default-stz',
             status: 'running',
             endpoint_url: 'https://my-api-proj-123.fly.dev',
             env_vars_encrypted: null,
@@ -545,8 +992,8 @@ describe('ComputeServicesService', () => {
             cpu: input.cpu,
             memory: input.memory,
             region: input.region,
-            fly_app_id: null,
-            fly_machine_id: null,
+            provider_app_id: null,
+            provider_instance_id: null,
             status: 'creating',
             endpoint_url: null,
             env_vars_encrypted: null,
@@ -601,8 +1048,8 @@ describe('ComputeServicesService', () => {
             cpu: 'shared-1x',
             memory: 256,
             region: 'iad',
-            fly_app_id: 'app-one-proj-123',
-            fly_machine_id: 'machine-1',
+            provider_app_id: 'app-one-proj-123',
+            provider_instance_id: 'machine-1',
             status: 'running',
             endpoint_url: 'https://app-one-proj-123.fly.dev',
             env_vars_encrypted: null,
@@ -639,8 +1086,8 @@ describe('ComputeServicesService', () => {
             cpu: 'shared-1x',
             memory: 256,
             region: 'iad',
-            fly_app_id: 'app-gone-proj-123',
-            fly_machine_id: 'machine-gone-1',
+            provider_app_id: 'app-gone-proj-123',
+            provider_instance_id: 'machine-gone-1',
             status: 'stopped',
             endpoint_url: 'https://app-gone-proj-123.fly.dev',
             env_vars_encrypted: null,
@@ -683,8 +1130,8 @@ describe('ComputeServicesService', () => {
             cpu: 'shared-1x',
             memory: 256,
             region: 'iad',
-            fly_app_id: 'app-del-proj-123',
-            fly_machine_id: 'machine-del',
+            provider_app_id: 'app-del-proj-123',
+            provider_instance_id: 'machine-del',
             status: 'running',
             endpoint_url: 'https://app-del-proj-123.fly.dev',
             env_vars_encrypted: null,
@@ -734,8 +1181,14 @@ describe('ComputeServicesService', () => {
         // Same back-compat fallback: fixture has no scale_to_zero column, so
         // the snapshot surfaces the default (true).
         scaleToZero: true,
-        flyAppId: 'app-del-proj-123',
-        flyMachineId: 'machine-del',
+        // Same back-compat fallback again: the fixture predates migration 064, so
+        // the snapshot surfaces its documented defaults — 'fly' because that was
+        // the only driver, and 'host' because every Fly app is already on a public
+        // hostname.
+        ingress: 'host',
+        provider: 'fly',
+        providerAppId: 'app-del-proj-123',
+        providerInstanceId: 'machine-del',
         endpointUrl: 'https://app-del-proj-123.fly.dev',
         envVarsEncrypted: null,
         createdAt: '2026-01-01T00:00:00Z',
@@ -761,8 +1214,8 @@ describe('ComputeServicesService', () => {
             cpu: 'shared-1x',
             memory: 256,
             region: 'iad',
-            fly_app_id: 'app-env-proj-123',
-            fly_machine_id: 'machine-env',
+            provider_app_id: 'app-env-proj-123',
+            provider_instance_id: 'machine-env',
             status: 'running',
             endpoint_url: 'https://app-env-proj-123.fly.dev',
             env_vars_encrypted: ciphertext,
@@ -796,8 +1249,8 @@ describe('ComputeServicesService', () => {
             cpu: 'shared-1x',
             memory: 256,
             region: 'iad',
-            fly_app_id: 'app-del2-proj-123',
-            fly_machine_id: 'machine-del2',
+            provider_app_id: 'app-del2-proj-123',
+            provider_instance_id: 'machine-del2',
             status: 'running',
             endpoint_url: 'https://app-del2-proj-123.fly.dev',
             env_vars_encrypted: null,
@@ -848,8 +1301,8 @@ describe('ComputeServicesService', () => {
             cpu: input.cpu,
             memory: input.memory,
             region: input.region,
-            fly_app_id: 'my-api-proj-123',
-            fly_machine_id: null,
+            provider_app_id: 'my-api-proj-123',
+            provider_instance_id: null,
             status: 'deploying',
             endpoint_url: 'https://my-api-proj-123.fly.dev',
             env_vars_encrypted: null,
@@ -871,11 +1324,7 @@ describe('ComputeServicesService', () => {
       expect(insertCall[1]).toContain('my-api-proj-123'); // flyAppId
 
       // Verify Fly app created
-      expect(mockCreateApp).toHaveBeenCalledWith({
-        name: 'my-api-proj-123',
-        network: 'n-testkey1',
-        org: 'test-org',
-      });
+      expect(mockCreateApp).toHaveBeenCalledWith({ name: 'my-api-proj-123' });
 
       // Verify NO machine launched
       expect(mockLaunchMachine).not.toHaveBeenCalled();
@@ -909,8 +1358,8 @@ describe('ComputeServicesService', () => {
             cpu: input.cpu,
             memory: input.memory,
             region: input.region,
-            fly_app_id: 'my-api-proj-123',
-            fly_machine_id: null,
+            provider_app_id: 'my-api-proj-123',
+            provider_instance_id: null,
             status: 'deploying',
             endpoint_url: 'https://my-api-proj-123.fly.dev',
             env_vars_encrypted: null,
@@ -942,8 +1391,8 @@ describe('ComputeServicesService', () => {
             cpu: input.cpu,
             memory: input.memory,
             region: input.region,
-            fly_app_id: 'my-api-proj-123',
-            fly_machine_id: null,
+            provider_app_id: 'my-api-proj-123',
+            provider_instance_id: null,
             status: 'deploying',
             endpoint_url: 'https://my-api-proj-123.fly.dev',
             env_vars_encrypted: null,
@@ -986,8 +1435,8 @@ describe('ComputeServicesService', () => {
             cpu: input.cpu,
             memory: input.memory,
             region: input.region,
-            fly_app_id: 'my-api-proj-123',
-            fly_machine_id: null,
+            provider_app_id: 'my-api-proj-123',
+            provider_instance_id: null,
             status: 'deploying',
             endpoint_url: 'https://my-api-proj-123.fly.dev',
             env_vars_encrypted: null,
@@ -1040,8 +1489,8 @@ describe('ComputeServicesService', () => {
       cpu: 'shared-1x',
       memory: 256,
       region: 'iad',
-      fly_app_id: 'my-api-proj-123',
-      fly_machine_id: 'machine-1',
+      provider_app_id: 'my-api-proj-123',
+      provider_instance_id: 'machine-1',
       status: 'running',
       endpoint_url: 'https://my-api-proj-123.fly.dev',
       env_vars_encrypted: null,
@@ -1086,8 +1535,8 @@ describe('ComputeServicesService', () => {
       cpu: 'shared-1x',
       memory: 256,
       region: 'iad',
-      fly_app_id: 'my-api-proj-123',
-      fly_machine_id: 'machine-1',
+      provider_app_id: 'my-api-proj-123',
+      provider_instance_id: 'machine-1',
       status: 'stopped',
       endpoint_url: 'https://my-api-proj-123.fly.dev',
       env_vars_encrypted: null,
@@ -1137,8 +1586,8 @@ describe('ComputeServicesService', () => {
       cpu: 'shared-1x',
       memory: 256,
       region: 'iad',
-      fly_app_id: 'my-api-proj-123',
-      fly_machine_id: 'machine-ghost',
+      provider_app_id: 'my-api-proj-123',
+      provider_instance_id: 'machine-ghost',
       status: 'running',
       endpoint_url: 'https://my-api-proj-123.fly.dev',
       env_vars_encrypted: null,
@@ -1149,7 +1598,7 @@ describe('ComputeServicesService', () => {
 
     function expectHealQuery() {
       const healCall = mockQuery.mock.calls.find(
-        ([sql]) => typeof sql === 'string' && sql.includes('fly_machine_id = NULL')
+        ([sql]) => typeof sql === 'string' && sql.includes('provider_instance_id = NULL')
       );
       expect(healCall).toBeDefined();
       expect(healCall?.[1]).toEqual(['svc-ghost-1', 'machine-ghost']);
@@ -1196,7 +1645,7 @@ describe('ComputeServicesService', () => {
       mockStopMachine.mockRejectedValue(gone());
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // heal UPDATE
       mockQuery.mockResolvedValueOnce({
-        rows: [{ ...serviceRow, fly_machine_id: null, status: 'stopped' }],
+        rows: [{ ...serviceRow, provider_instance_id: null, status: 'stopped' }],
       }); // status UPDATE
 
       const result = await service.stopService('svc-ghost-1');
@@ -1206,7 +1655,7 @@ describe('ComputeServicesService', () => {
     });
 
     it('post-heal requests get COMPUTE_MACHINE_NOT_FOUND + redeploy guidance, not "Service not found"', async () => {
-      const healedRow = { ...serviceRow, fly_machine_id: null, status: 'stopped' };
+      const healedRow = { ...serviceRow, provider_instance_id: null, status: 'stopped' };
       const calls = [
         () => service.getServiceEvents('svc-ghost-1'),
         () => service.getServiceLogs('svc-ghost-1'),
@@ -1223,12 +1672,12 @@ describe('ComputeServicesService', () => {
     });
 
     it('updateService relaunches the stored image when a deploy-field PATCH hits a healed row', async () => {
-      const healedRow = { ...serviceRow, fly_machine_id: null, status: 'stopped' };
+      const healedRow = { ...serviceRow, provider_instance_id: null, status: 'stopped' };
       mockQuery.mockResolvedValueOnce({ rows: [healedRow] }); // getService
       mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
       mockLaunchMachine.mockResolvedValue({ machineId: 'mach-fresh' });
       mockQuery.mockResolvedValueOnce({
-        rows: [{ ...healedRow, fly_machine_id: 'mach-fresh', status: 'running' }],
+        rows: [{ ...healedRow, provider_instance_id: 'mach-fresh', status: 'running' }],
       }); // final UPDATE
 
       const result = await service.updateService('svc-ghost-1', {
@@ -1248,7 +1697,7 @@ describe('ComputeServicesService', () => {
       // prepareForDeploy rows: status deploying, image_url is a placeholder.
       const prepareRow = {
         ...serviceRow,
-        fly_machine_id: null,
+        provider_instance_id: null,
         status: 'deploying',
         image_url: 'dockerfile',
       };
@@ -1268,7 +1717,7 @@ describe('ComputeServicesService', () => {
 
       await expect(service.getServiceEvents('svc-ghost-1')).rejects.toThrow(/500/);
       const healCall = mockQuery.mock.calls.find(
-        ([sql]) => typeof sql === 'string' && sql.includes('fly_machine_id = NULL')
+        ([sql]) => typeof sql === 'string' && sql.includes('provider_instance_id = NULL')
       );
       expect(healCall).toBeUndefined();
     });
@@ -1287,8 +1736,8 @@ describe('ComputeServicesService', () => {
       cpu: 'shared-1x',
       memory: 512,
       region: 'iad',
-      fly_app_id: 'my-api-proj-123',
-      fly_machine_id: null,
+      provider_app_id: 'my-api-proj-123',
+      provider_instance_id: null,
       status: 'deploying',
       endpoint_url: 'https://my-api-proj-123.fly.dev',
       env_vars_encrypted: null,
@@ -1304,7 +1753,7 @@ describe('ComputeServicesService', () => {
         rows: [
           {
             ...baseRow,
-            fly_machine_id: 'mach-pa-1',
+            provider_instance_id: 'mach-pa-1',
             status: 'running',
             endpoint_url: 'https://my-api-proj-123.fly.dev',
             image_url: 'registry.fly.io/my-api-proj-123:deployment-abc',
@@ -1333,7 +1782,7 @@ describe('ComputeServicesService', () => {
       // The final UPDATE carries the optimistic lock.
       const updateCall = mockQuery.mock.calls[2];
       expect(updateCall[0]).toContain('UPDATE compute.services');
-      expect(updateCall[0]).toContain('fly_machine_id IS NULL');
+      expect(updateCall[0]).toContain('provider_instance_id IS NULL');
       expect(updateCall[1]).toContain('mach-pa-1');
       expect(updateCall[1]).toContain('running');
 
@@ -1377,7 +1826,7 @@ describe('ComputeServicesService', () => {
     it('forwards protocol: tcp to updateMachine on redeploy', async () => {
       const deployedRow = {
         ...baseRow,
-        fly_machine_id: 'mach-existing',
+        provider_instance_id: 'mach-existing',
         status: 'running',
         protocol: 'http',
       };
@@ -1404,13 +1853,76 @@ describe('ComputeServicesService', () => {
       expect(updateCall[1]).toContain('tcp');
     });
 
+    // Docker cannot change an image in place, so it replaces the container. The
+    // replacement comes up running, and a row that was 'stopped' (the caller had
+    // stopped the service, then redeployed it) would otherwise keep claiming
+    // 'stopped' while the container runs.
+    it('flips a stopped row to running when the driver replaced the instance', async () => {
+      const stoppedRow = {
+        ...baseRow,
+        provider_instance_id: 'mach-old',
+        status: 'stopped',
+      };
+      mockQuery.mockResolvedValueOnce({ rows: [stoppedRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockUpdateMachine.mockResolvedValue({ machineId: 'mach-new', endpointUrl: null });
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...stoppedRow, status: 'running' }] });
+
+      await service.updateService('svc-pa-1', { imageUrl: 'nginx:1.27' });
+
+      const [sql, params] = mockQuery.mock.calls[2];
+      expect(sql).toContain('status');
+      expect(params).toContain('running');
+      expect(params).toContain('mach-new');
+    });
+
+    // The provider contract does not tie `endpointUrl` to a replacement: a driver
+    // that re-publishes a port on the same instance (ingress none -> port) reports
+    // a fresh URL with no new id, and nesting the write under the id check dropped
+    // it.
+    it('persists a new endpointUrl even when the instance was not replaced', async () => {
+      const deployedRow = { ...baseRow, provider_instance_id: 'mach-existing', status: 'running' };
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] });
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] });
+      mockUpdateMachine.mockResolvedValue({ endpointUrl: 'http://127.0.0.1:32770' });
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] });
+
+      await service.updateService('svc-pa-1', { ingress: 'port' });
+
+      const [sql, params] = mockQuery.mock.calls[2];
+      expect(sql).toContain('endpoint_url');
+      expect(params).toContain('http://127.0.0.1:32770');
+      // No replacement happened, so the stored instance id must not be touched.
+      expect(sql).not.toContain('provider_instance_id');
+    });
+
+    // The mirror image: an in-place update starts nothing, so a stopped service
+    // that only resizes stays stopped.
+    it('leaves a stopped row stopped when the driver updated in place', async () => {
+      const stoppedRow = {
+        ...baseRow,
+        provider_instance_id: 'mach-existing',
+        status: 'stopped',
+      };
+      mockQuery.mockResolvedValueOnce({ rows: [stoppedRow] });
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] });
+      mockUpdateMachine.mockResolvedValue({}); // same instance, resized in place
+      mockQuery.mockResolvedValueOnce({ rows: [stoppedRow] });
+
+      await service.updateService('svc-pa-1', { memory: 1024 });
+
+      const [sql, params] = mockQuery.mock.calls[2];
+      expect(sql).not.toContain('status');
+      expect(params).not.toContain('running');
+    });
+
     // Back-compat — if the caller doesn't pass `protocol`, the persisted value
     // (from `existing.protocol`) flows through. This is how a port-only update
     // keeps the existing service's protocol setting.
     it('preserves existing.protocol when update omits the field', async () => {
       const deployedRow = {
         ...baseRow,
-        fly_machine_id: 'mach-existing',
+        provider_instance_id: 'mach-existing',
         status: 'running',
         protocol: 'tcp',
       };
@@ -1431,7 +1943,7 @@ describe('ComputeServicesService', () => {
     it('forwards scaleToZero: false to updateMachine on redeploy', async () => {
       const deployedRow = {
         ...baseRow,
-        fly_machine_id: 'mach-existing',
+        provider_instance_id: 'mach-existing',
         status: 'running',
         scale_to_zero: true,
       };
@@ -1465,7 +1977,7 @@ describe('ComputeServicesService', () => {
     it('preserves existing scaleToZero: false when update omits the field', async () => {
       const deployedRow = {
         ...baseRow,
-        fly_machine_id: 'mach-existing',
+        provider_instance_id: 'mach-existing',
         status: 'running',
         scale_to_zero: false,
       };
@@ -1482,7 +1994,7 @@ describe('ComputeServicesService', () => {
     });
 
     it('regression: existing machine + imageUrl takes the redeploy path (updateMachine, no launch, no optimistic lock)', async () => {
-      const deployedRow = { ...baseRow, fly_machine_id: 'mach-existing', status: 'running' };
+      const deployedRow = { ...baseRow, provider_instance_id: 'mach-existing', status: 'running' };
       mockQuery.mockResolvedValueOnce({ rows: [deployedRow] }); // getService
       mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
       mockUpdateMachine.mockResolvedValue(undefined);
@@ -1504,7 +2016,7 @@ describe('ComputeServicesService', () => {
       const updateCall = mockQuery.mock.calls[2];
       expect(updateCall[0]).toContain('UPDATE compute.services');
       // No optimistic lock on the redeploy path — only first-launch needs it.
-      expect(updateCall[0]).not.toContain('fly_machine_id IS NULL');
+      expect(updateCall[0]).not.toContain('provider_instance_id IS NULL');
     });
 
     it('race condition: concurrent launch loses DB write, destroys orphan, returns winning state', async () => {
@@ -1516,7 +2028,7 @@ describe('ComputeServicesService', () => {
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
       mockDestroyMachine.mockResolvedValue(undefined);
       // Cleanup path: getService returns the winning state.
-      const winningRow = { ...baseRow, fly_machine_id: 'mach-winner', status: 'running' };
+      const winningRow = { ...baseRow, provider_instance_id: 'mach-winner', status: 'running' };
       mockQuery.mockResolvedValueOnce({ rows: [winningRow] }); // final getService
 
       const result = await service.updateService('svc-pa-1', {
@@ -1537,7 +2049,7 @@ describe('ComputeServicesService', () => {
       mockLaunchMachine.mockResolvedValue({ machineId: 'mach-loser' });
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // optimistic lock filters us out
       mockDestroyMachine.mockRejectedValue(new Error('Fly transient 503'));
-      const winningRow = { ...baseRow, fly_machine_id: 'mach-winner', status: 'running' };
+      const winningRow = { ...baseRow, provider_instance_id: 'mach-winner', status: 'running' };
       mockQuery.mockResolvedValueOnce({ rows: [winningRow] }); // final getService
 
       const result = await service.updateService('svc-pa-1', {
@@ -1560,8 +2072,8 @@ describe('ComputeServicesService', () => {
       cpu: 'shared-1x',
       memory: 256,
       region: 'iad',
-      fly_app_id: 'patch-svc-proj-1',
-      fly_machine_id: 'mach-1',
+      provider_app_id: 'patch-svc-proj-1',
+      provider_instance_id: 'mach-1',
       status: 'running',
       endpoint_url: 'https://patch-svc-proj-1.fly.dev',
       env_vars_encrypted: `encrypted:${JSON.stringify({ KEEP: 'k', ROTATE_ME: 'old' })}`,
@@ -1647,8 +2159,8 @@ describe('ComputeServicesService', () => {
       cpu: 'shared-1x',
       memory: 256,
       region: 'iad',
-      fly_app_id: 'my-api-proj-123',
-      fly_machine_id: 'machine-1',
+      provider_app_id: 'my-api-proj-123',
+      provider_instance_id: 'machine-1',
       status: 'running',
       endpoint_url: 'https://my-api-proj-123.fly.dev',
       env_vars_encrypted: null,
@@ -1672,7 +2184,7 @@ describe('ComputeServicesService', () => {
 
     it('throws COMPUTE_SERVICE_NOT_FOUND when the service has no machine yet', async () => {
       mockQuery.mockResolvedValueOnce({
-        rows: [{ ...serviceRow, fly_app_id: null, fly_machine_id: null }],
+        rows: [{ ...serviceRow, provider_app_id: null, provider_instance_id: null }],
       });
 
       await expect(service.getServiceLogs('svc-logs-1')).rejects.toThrow('Service not found');
@@ -1699,6 +2211,7 @@ describe('selectComputeProvider factory', () => {
     vi.doMock('@/infra/config/app.config.js', () => {
       const c = {
         fly: { apiToken: 'tok', org: 'o', enabled: true, domain: 'd' },
+        docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
         cloud: { projectId: 'local', apiHost: '' },
         app: { jwtSecret: 'x' },
       };
@@ -1716,6 +2229,7 @@ describe('selectComputeProvider factory', () => {
     vi.doMock('@/infra/config/app.config.js', () => {
       const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
+        docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
         cloud: { projectId: 'p', apiHost: 'https://x' },
         app: { jwtSecret: 'x' },
       };
@@ -1733,6 +2247,7 @@ describe('selectComputeProvider factory', () => {
     vi.doMock('@/infra/config/app.config.js', () => {
       const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
+        docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
         cloud: { projectId: 'local', apiHost: '' },
         app: { jwtSecret: 'x' },
       };
@@ -1743,5 +2258,158 @@ describe('selectComputeProvider factory', () => {
     });
     const { selectComputeProvider } = await import('@/services/compute/services.service.js');
     expect(() => selectComputeProvider()).toThrow(/COMPUTE_NOT_CONFIGURED|not configured/);
+  });
+});
+
+describe('buildComputeRegistry', () => {
+  const flyConfigured = () => {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
+        fly: { apiToken: 'tok', org: 'o', enabled: true, domain: 'd' },
+        docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
+        cloud: { projectId: 'p', apiHost: 'https://x' },
+        app: { jwtSecret: 'x' },
+      };
+      return { config: c, appConfig: c };
+    });
+  };
+
+  /** Fly credentials present, but NOT a cloud-managed project. */
+  const selfHostedFly = () => {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
+        fly: { apiToken: 'tok', org: 'o', enabled: true, domain: 'd' },
+        docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
+        cloud: { projectId: 'local', apiHost: '' },
+        app: { jwtSecret: 'x' },
+      };
+      return { config: c, appConfig: c };
+    });
+  };
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doUnmock('@/providers/compute/fly.provider.js');
+    vi.doUnmock('@/providers/compute/cloud.provider.js');
+    delete process.env.COMPUTE_PROVIDER;
+  });
+
+  afterEach(() => {
+    delete process.env.COMPUTE_PROVIDER;
+  });
+
+  // Self-host Fly and cloud-proxied mode are two credential paths to the same
+  // Fly resources, so registering both would put two sets of credentials on one
+  // set of apps. They share the 'fly' key, which makes that impossible.
+  it('registers fly and cloud under a single key, self-host winning', async () => {
+    flyConfigured();
+    const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
+    const { FlyProvider } = await import('@/providers/compute/fly.provider.js');
+    const registry = buildComputeRegistry();
+
+    expect([...registry.providers.keys()]).toEqual(['fly']);
+    expect(registry.providers.get('fly')).toBe(FlyProvider.getInstance());
+    expect(registry.defaultProvider).toBe('fly');
+  });
+
+  it('COMPUTE_PROVIDER=cloud selects the cloud credential path for the fly key', async () => {
+    flyConfigured();
+    process.env.COMPUTE_PROVIDER = 'cloud';
+    const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
+    const { CloudComputeProvider } = await import('@/providers/compute/cloud.provider.js');
+    const registry = buildComputeRegistry();
+
+    expect(registry.providers.get('fly')).toBe(CloudComputeProvider.getInstance());
+    expect(registry.defaultProvider).toBe('fly');
+  });
+
+  it('COMPUTE_PROVIDER=off disables compute outright', async () => {
+    flyConfigured();
+    process.env.COMPUTE_PROVIDER = 'off';
+    const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
+    expect(() => buildComputeRegistry()).toThrow(/disabled/);
+  });
+
+  it('rejects an unknown COMPUTE_PROVIDER rather than silently falling back', async () => {
+    flyConfigured();
+    process.env.COMPUTE_PROVIDER = 'kubernetes';
+    const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
+    expect(() => buildComputeRegistry()).toThrow(/Unknown COMPUTE_PROVIDER/);
+  });
+
+  // Naming a default that isn't configured is a stated intent we can't honour —
+  // failing at startup beats 500-ing on the operator's first deploy. The message
+  // names the socket path it looked at, since a wrong DOCKER_SOCKET_PATH or a
+  // missing compose mount is the whole failure mode.
+  it('rejects COMPUTE_PROVIDER=docker when no socket is present', async () => {
+    selfHostedFly();
+    process.env.COMPUTE_PROVIDER = 'docker';
+    const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
+    expect(() => buildComputeRegistry()).toThrow(
+      /no Docker socket at .*insforge-test-docker\.sock/
+    );
+  });
+
+  // The Docker driver's safety argument is that the operator and the developer
+  // deploying containers are the same principal. On a cloud-managed project they
+  // are not — the operator is InsForge and the developer is a customer — so a
+  // customer creating containers on shared infrastructure is a tenant escape.
+  // Fail closed, and say the real reason rather than blaming a missing socket.
+  it('refuses the Docker driver on a cloud-managed project', async () => {
+    flyConfigured(); // cloud projectId + apiHost present
+    process.env.COMPUTE_PROVIDER = 'docker';
+    const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
+    expect(() => buildComputeRegistry()).toThrow(/self-host only/);
+  });
+
+  it('never registers Docker on a cloud-managed project, socket or not', async () => {
+    flyConfigured();
+    const { DockerProvider } = await import('@/providers/compute/docker.provider.js');
+    // isConfigured is the "can I be used at all" question, so the guard lives
+    // there too — any future caller inherits it, not just the registry.
+    expect(DockerProvider.getInstance().isConfigured()).toBe(false);
+
+    const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
+    expect([...buildComputeRegistry().providers.keys()]).toEqual(['fly']);
+  });
+
+  // Presence/absence of the slice is the coarse "is compute available" signal, so
+  // it has to be absent rather than throwing or returning an empty object — a
+  // caller gating a whole feature must not have to first make a request that 503s.
+  it('omits the metadata slice entirely when no provider is configured', async () => {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
+        fly: { apiToken: '', org: '', enabled: false, domain: '' },
+        docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
+        cloud: { projectId: 'local', apiHost: '' },
+        app: { jwtSecret: 'x' },
+      };
+      return { config: c, appConfig: c };
+    });
+    const { getComputeMetadata } = await import('@/services/compute/services.service.js');
+    expect(getComputeMetadata()).toBeUndefined();
+  });
+
+  it('omits the slice when compute is explicitly disabled', async () => {
+    selfHostedFly();
+    process.env.COMPUTE_PROVIDER = 'off';
+    const { getComputeMetadata } = await import('@/services/compute/services.service.js');
+    // `off` and `not configured` are the same answer to "should I offer compute".
+    expect(getComputeMetadata()).toBeUndefined();
+  });
+
+  it('COMPUTE_PROVIDER=fly errors when Fly credentials are absent', async () => {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
+        fly: { apiToken: '', org: '', enabled: false, domain: '' },
+        docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
+        cloud: { projectId: 'p', apiHost: 'https://x' },
+        app: { jwtSecret: 'x' },
+      };
+      return { config: c, appConfig: c };
+    });
+    process.env.COMPUTE_PROVIDER = 'fly';
+    const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
+    expect(() => buildComputeRegistry()).toThrow(/FLY_API_TOKEN/);
   });
 });

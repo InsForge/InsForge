@@ -47,6 +47,16 @@ export interface AppConfig {
     org: string;
     domain: string;
   };
+  docker: {
+    socketPath: string;
+    publicHost: string;
+    domain: string;
+    defaultIngress: string;
+    bindAddress: string;
+    isolateNetwork: boolean;
+    buildMaxContextSize: string;
+    buildUploadIdleTimeoutMs: number;
+  };
   server: {
     maxJsonBodySize: string;
     maxUrlencodedBodySize: string;
@@ -126,6 +136,9 @@ function parseEnvBool(val: string | undefined): boolean {
 
 const AWS_MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024;
 
+/** Largest delay `setTimeout` honours; anything above it is silently treated as 1ms. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
+
 function parseEnvBytes(val: string | undefined, fallback: number): number {
   if (!val) return fallback;
   if (!/^\d+$/.test(val)) return fallback;
@@ -173,6 +186,50 @@ export function loadConfig(): AppConfig {
       apiToken: process.env.FLY_API_TOKEN || '',
       org: process.env.FLY_ORG || '',
       domain: process.env.COMPUTE_DOMAIN || '',
+    },
+    docker: {
+      // Presence of a reachable socket is how an operator opts in: they mount it
+      // into the InsForge container, and the driver registers itself.
+      socketPath: process.env.DOCKER_SOCKET_PATH || '/var/run/docker.sock',
+      // Host address published-port URLs are built from. Left empty we return a
+      // null endpoint rather than guessing the host's public IP and handing out
+      // a URL that does not resolve.
+      publicHost: process.env.COMPUTE_PUBLIC_HOST || '',
+      // Wildcard domain for `host` ingress, shared with the Fly path.
+      domain: process.env.COMPUTE_DOMAIN || '',
+      // Ingress default for containers this driver creates. `none` publishes no
+      // host port at all, which is right for the majority of compute (queue
+      // workers, processors, inference loops) that takes no inbound traffic.
+      defaultIngress: process.env.COMPUTE_DEFAULT_INGRESS || 'none',
+      // Bind address for published ports. Defaults to loopback: a container
+      // reachable from the whole internet should be a deliberate choice, and
+      // Docker's own default (0.0.0.0, plus [::]) is not.
+      bindAddress: process.env.COMPUTE_BIND_ADDRESS || '127.0.0.1',
+      // Skip attaching containers to the project's own compose network. Off by
+      // default — proximity to the database and storage is the point. Uses the
+      // shared parser so `1`/`yes`/`on` work too: a knob that silently ignores
+      // `COMPUTE_ISOLATE_NETWORK=1` fails in the unsafe direction.
+      isolateNetwork: parseEnvBool(process.env.COMPUTE_ISOLATE_NETWORK),
+      // Ceiling on an uploaded build context. Deliberately *not* the JSON body
+      // limit it used to borrow: express buffers the whole tarball in memory
+      // before any handler runs, and a t4g.nano has ~418MB usable, so a 100MB
+      // ceiling is a self-inflicted OOM. A source context is normally single-digit
+      // megabytes; 64MB is generous for one that vendors dependencies.
+      buildMaxContextSize: process.env.COMPUTE_BUILD_MAX_CONTEXT || '64mb',
+      // How long an upload may send nothing before it is treated as stalled and
+      // cut loose. Only builds one at a time, so a connection that stops making
+      // progress while holding the slot blocks every other deploy. The timer resets
+      // on each chunk, so this bounds silence, not total upload time — a slow but
+      // active link is never cut.
+      //
+      // Clamped to the 32-bit signed max because `setTimeout` silently drops a
+      // larger delay to 1ms: without this, an operator asking for a very lenient
+      // timeout would get the harshest possible behaviour and see every upload
+      // aborted instantly.
+      buildUploadIdleTimeoutMs: Math.min(
+        parseEnvInt(process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT, 30) * 1000,
+        MAX_TIMEOUT_MS
+      ),
     },
     server: {
       maxJsonBodySize: process.env.MAX_JSON_BODY_SIZE || '100mb',

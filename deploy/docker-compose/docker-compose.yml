@@ -142,10 +142,41 @@ services:
       # (required when the S3 endpoint is not reachable by browsers).
       - S3_USE_PRESIGNED_URLS=${S3_USE_PRESIGNED_URLS:-}
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-}
+      # ─── Custom Compute: Docker provider (opt-in) ────────────────────────
+      # Uncommenting the socket mount in `volumes` below is what enables it.
+      # See .env.example for what each of these does.
+      - COMPUTE_PROVIDER=${COMPUTE_PROVIDER:-}
+      # Socket the driver dials, mounted at the same path below so both sides
+      # agree. Override for rootless Docker or Podman.
+      - DOCKER_SOCKET_PATH=${DOCKER_SOCKET_PATH:-}
+      - COMPUTE_DEFAULT_INGRESS=${COMPUTE_DEFAULT_INGRESS:-none}
+      - COMPUTE_PUBLIC_HOST=${COMPUTE_PUBLIC_HOST:-}
+      # Base domain for `host` ingress. Unset, a service that asks for a
+      # hostname gets no URL rather than an unroutable guess.
+      - COMPUTE_DOMAIN=${COMPUTE_DOMAIN:-}
+      - COMPUTE_BIND_ADDRESS=${COMPUTE_BIND_ADDRESS:-127.0.0.1}
+      # Ceiling on an uploaded source-build context. Express buffers the whole
+      # tarball before the handler runs, so this is a memory bound, not just a
+      # policy — lower it on a small host.
+      - COMPUTE_BUILD_MAX_CONTEXT=${COMPUTE_BUILD_MAX_CONTEXT:-}
+      # Seconds an upload may send nothing before it is treated as stalled and
+      # cut loose. Only one build runs at a time, so a connection that stops
+      # making progress would otherwise block every other deploy. Resets on each
+      # chunk, so a slow but active link is never cut.
+      - COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT=${COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT:-}
+      - COMPUTE_ISOLATE_NETWORK=${COMPUTE_ISOLATE_NETWORK:-}
     restart: unless-stopped
     volumes:
       - storage-data:/insforge-storage
       - insforge-logs:/insforge-logs
+      # Uncomment to enable the Docker compute provider. `group_add` must name the
+      # host's docker group; the GID is host-specific (993 on Amazon Linux 2023,
+      # commonly 999 on Debian/Ubuntu) so it cannot be baked in:
+      #   getent group docker | cut -d: -f3
+      # The value goes on .env's DOCKER_GID line (or the exported environment).
+      # Compose does not see a bare assignment made in your shell.
+      # - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:${DOCKER_SOCKET_PATH:-/var/run/docker.sock}
+    # group_add: ["${DOCKER_GID:?set DOCKER_GID to your host docker group id}"]
     networks:
       - insforge-network
 
