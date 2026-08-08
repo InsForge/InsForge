@@ -669,7 +669,8 @@
       "step2Description": {
         "text": "使用 OpenAI SDK 通过 OpenRouter 创建聊天补全。",
         "image": "使用支持图像输出的 OpenRouter 模型生成图像。",
-        "video": "提交异步视频生成任务并轮询直至完成。"
+        "video": "提交异步视频生成任务并轮询直至完成。",
+        "embeddings": "使用 OpenAI SDK 通过 OpenRouter 生成文本嵌入。"
       },
       "step3Title": "设置 API 密钥",
       "step3Description": "将你的 OpenRouter API 密钥添加到 .env.local 文件。",
@@ -678,12 +679,14 @@
       "modes": {
         "text": "文本生成",
         "image": "图像生成",
-        "video": "视频生成"
+        "video": "视频生成",
+        "embeddings": "嵌入生成"
       },
       "promptCard": {
         "text": "复制此提示词，让你的智能体通过 OpenRouter 模型网关生成文本。",
         "image": "复制此提示词，让你的智能体通过 OpenRouter 模型网关生成图像。",
-        "video": "复制此提示词，让你的智能体通过 OpenRouter 模型网关生成视频。"
+        "video": "复制此提示词，让你的智能体通过 OpenRouter 模型网关生成视频。",
+        "embeddings": "复制此提示词，让你的智能体通过 OpenRouter 模型网关生成文本嵌入。"
       }
     }
   },
