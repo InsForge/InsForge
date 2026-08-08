@@ -53,6 +53,11 @@ type ContainerInspect = {
 
 export type DockerIngress = 'none' | 'port' | 'host';
 
+/** Service names are DNS-safe, but a filter built by concatenation should not assume it. */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * True when this backend belongs to a cloud-managed project.
  *
@@ -498,15 +503,26 @@ export class DockerProvider implements ComputeProvider {
     const filters = encodeURIComponent(
       JSON.stringify({
         label: [`${LABEL_MANAGED}=true`, `${LABEL_PROJECT}=${this.projectKey()}`],
-        name: [appId],
+        // Anchored. Docker treats a name filter as an unanchored regex over the
+        // container's names, so a bare `api` would also match `api-v2` — and since a
+        // container name carries a leading slash, the anchors have to allow for it.
+        // The service label below is the exact-match check; the name filter only
+        // narrows the scan.
+        name: [`^/?${escapeRegExp(appId)}$`],
       })
     );
     const list =
-      (await dockerRequest<{ Id: string; State: string }[]>(
+      (await dockerRequest<{ Id: string; State: string; Names?: string[] }[]>(
         'GET',
         `/containers/json?all=true&filters=${filters}`
       )) ?? [];
-    return list.map((c) => ({ id: c.Id, state: this.mapState(c.State), region: 'local' }));
+    return (
+      list
+        // Belt and braces: the filter is the daemon's job, but a mismatch here would
+        // report someone else's container as this service's instance.
+        .filter((c) => (c.Names ?? []).some((n) => n.replace(/^\//, '') === appId))
+        .map((c) => ({ id: c.Id, state: this.mapState(c.State), region: 'local' }))
+    );
   }
 
   async getMachineStatus(appId: string, machineId: string): Promise<{ state: string }> {

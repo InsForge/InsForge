@@ -503,6 +503,26 @@ describe('DockerProvider', () => {
     });
   });
 
+  describe('listMachines', () => {
+    // Docker's name filter is an unanchored regex over container names, so a bare
+    // `api` also matches `api-v2`. Reporting a sibling service's container as this
+    // service's instance is the kind of mistake that ends with the wrong container
+    // being stopped.
+    it('anchors the name filter and drops any prefix match that slips through', async () => {
+      mockRequest.mockResolvedValueOnce([
+        { Id: 'right', State: 'running', Names: ['/insforge-testkey1-api'] },
+        { Id: 'wrong', State: 'running', Names: ['/insforge-testkey1-api-v2'] },
+      ]);
+
+      const list = await provider.listMachines('insforge-testkey1-api');
+
+      const url = mockRequest.mock.calls[0][1] as string;
+      const filters = JSON.parse(decodeURIComponent(url.split('filters=')[1]));
+      expect(filters.name).toEqual(['^/?insforge-testkey1-api$']);
+      expect(list.map((m) => m.id)).toEqual(['right']);
+    });
+  });
+
   describe('state mapping', () => {
     // Measured across a real host reboot: cleanly-stopped containers reported
     // `Exited (0)` while host-killed ones reported `Exited (137)` (SIGKILL).

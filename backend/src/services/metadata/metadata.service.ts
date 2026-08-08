@@ -196,6 +196,23 @@ export class MetadataService {
       lines.push('');
     }
 
+    // Compute (absent when no driver is configured, which is the common case)
+    if (metadata.compute) {
+      lines.push('## Compute');
+      lines.push(`- **Default provider**: ${codeSpan(metadata.compute.defaultProvider)}`);
+      for (const [name, caps] of Object.entries(metadata.compute.providers)) {
+        // The capabilities exist so a client stops offering what the provider cannot
+        // do, so spell out the answer rather than dumping the object.
+        lines.push(
+          `- ${codeSpan(name)}: regions ${caps.regions ? 'yes' : 'no'}, ` +
+            `scale-to-zero ${caps.scaleToZero ? 'yes' : 'no'}, ` +
+            `ingress ${caps.ingressModes.map(codeSpan).join('/')}, ` +
+            `source build ${codeSpan(caps.sourceBuild)}`
+        );
+      }
+      lines.push('');
+    }
+
     return lines.join('\n');
   }
 }

@@ -46,6 +46,7 @@ export const createServiceSchema = z.object({
    * inspection. Optional and back-compat: omitting the field is identical to
    * sending `'http'` at every fallback site downstream.
    */
+  protocol: z.enum(['http', 'tcp']).optional(),
   /**
    * How the service should be reachable. Omitted, the server picks the active
    * driver's default (see ComputeCapabilities.ingressModes) — which for a
@@ -54,7 +55,6 @@ export const createServiceSchema = z.object({
    * substitution rather than failing an otherwise valid deploy.
    */
   ingress: ingressModeEnum.optional(),
-  protocol: z.enum(['http', 'tcp']).optional(),
   /**
    * Scale-to-zero. `true` (default) is the existing behaviour — Fly stops the
    * machine when idle and cold-starts it on the next request. `false` keeps
