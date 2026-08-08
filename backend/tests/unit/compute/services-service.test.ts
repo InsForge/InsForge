@@ -67,6 +67,19 @@ const mockGetMachineStatus = vi.fn();
 const mockWaitForState = vi.fn();
 const mockIsConfigured = vi.fn(() => true);
 
+/**
+ * Canonical Fly capabilities. Tests that need a different shape assign onto
+ * `mockFlyInstance.capabilities`; `beforeEach` restores from this, so a test that
+ * throws mid-body cannot leak its mutation into everything that follows.
+ */
+const FLY_CAPABILITIES = {
+  scaleToZero: true,
+  regions: true,
+  ingressModes: ['host'] as ('none' | 'port' | 'host')[],
+  sourceBuild: 'flyctl' as const,
+  deployTokenIssuance: false,
+};
+
 const mockFlyInstance = {
   createApp: mockCreateApp,
   destroyApp: mockDestroyApp,
@@ -85,13 +98,7 @@ const mockFlyInstance = {
   // FlyProvider derives these itself; the mock mirrors its behaviour so the
   // service's naming and URL calls resolve to the same values the fixtures use.
   name: 'fly' as const,
-  capabilities: {
-    scaleToZero: true,
-    regions: true,
-    ingressModes: ['host'] as ('none' | 'port' | 'host')[],
-    sourceBuild: 'flyctl' as const,
-    deployTokenIssuance: false,
-  },
+  capabilities: { ...FLY_CAPABILITIES },
   // Delegates to the real helper (rather than a naive template) so the service
   // test keeps covering the Fly app-name length guard, which moved here from
   // the service layer.
@@ -118,6 +125,11 @@ describe('ComputeServicesService', () => {
     process.env.APP_KEY = 'testkey1';
     service = ComputeServicesService.getInstance();
     mockIsConfigured.mockReturnValue(true);
+    // The mock provider is a module-scoped singleton, so a capability override
+    // survives the test that made it. Restore here rather than at the end of each
+    // test body, where a failing assertion skips the restore and the leak shows up
+    // as unrelated failures further down the file.
+    mockFlyInstance.capabilities = { ...FLY_CAPABILITIES };
   });
 
   afterEach(() => {
@@ -173,7 +185,6 @@ describe('ComputeServicesService', () => {
       expect(mockQuery.mock.calls[0][1]).toContain('local');
       expect(mockQuery.mock.calls[0][1]).not.toContain('iad');
       expect(mockLaunchMachine.mock.calls[0][0].region).toBe('local');
-      mockFlyInstance.capabilities = { ...mockFlyInstance.capabilities, regions: true };
     });
 
     // Found by the first end-to-end run: the API default for scaleToZero is
@@ -200,7 +211,6 @@ describe('ComputeServicesService', () => {
       // The INSERT must persist false, not the schema default of true.
       expect(mockQuery.mock.calls[0][1]).toContain(false);
       expect(mockLaunchMachine.mock.calls[0][0].scaleToZero).toBe(false);
-      mockFlyInstance.capabilities = { ...mockFlyInstance.capabilities, scaleToZero: true };
     });
 
     // On update, an omitted field means "leave it alone". Filling it in would turn
@@ -230,7 +240,6 @@ describe('ComputeServicesService', () => {
       // Region-only change: no deploy-affecting field was implied, so the provider
       // was never asked to update the instance.
       expect(mockUpdateMachine).not.toHaveBeenCalled();
-      mockFlyInstance.capabilities = { ...mockFlyInstance.capabilities, scaleToZero: true };
     });
 
     it('records a service as always-on when the driver cannot scale to zero', async () => {
@@ -252,7 +261,6 @@ describe('ComputeServicesService', () => {
       });
 
       expect(mockLaunchMachine.mock.calls[0][0].scaleToZero).toBe(false);
-      mockFlyInstance.capabilities = { ...mockFlyInstance.capabilities, scaleToZero: true };
     });
 
     // prepareForDeploy reserves a name and creates the provider-side app, then
@@ -276,7 +284,6 @@ describe('ComputeServicesService', () => {
       // Nothing was written and no provider-side app was created.
       expect(mockQuery).not.toHaveBeenCalled();
       expect(mockCreateApp).not.toHaveBeenCalled();
-      mockFlyInstance.capabilities = { ...mockFlyInstance.capabilities, sourceBuild: 'flyctl' };
     });
 
     // Drivers coexist, so a row is routed by its own `provider`. When that
@@ -337,7 +344,10 @@ describe('ComputeServicesService', () => {
       expect(stats).toMatchObject({ checked: 1, corrected: 1, healed: 0 });
       const [sql, params] = mockQuery.mock.calls[1];
       expect(sql).toContain('SET status = $1');
-      expect(params).toEqual(['stopped', 'svc-1']);
+      // Scoped to the instance the reading was taken against, so a deploy that
+      // replaced it concurrently is not overwritten by a stale observation.
+      expect(sql).toContain('provider_instance_id = $3');
+      expect(params).toEqual(['stopped', 'svc-1', 'machine-1']);
     });
 
     it('leaves a row alone when reality already matches', async () => {
@@ -416,7 +426,7 @@ describe('ComputeServicesService', () => {
       const stats = await service.reconcile();
 
       expect(stats).toMatchObject({ checked: 2, healed: 0, corrected: 1, skipped: 1 });
-      expect(mockQuery.mock.calls[2][1]).toEqual(['stopped', 'svc-2']);
+      expect(mockQuery.mock.calls[2][1]).toEqual(['stopped', 'svc-2', 'machine-2']);
     });
   });
 
@@ -484,7 +494,6 @@ describe('ComputeServicesService', () => {
 
       delete (mockFlyInstance as Record<string, unknown>).buildFromContext;
       delete (mockFlyInstance as Record<string, unknown>).pruneServiceImages;
-      mockFlyInstance.capabilities = { ...mockFlyInstance.capabilities, sourceBuild: 'flyctl' };
     });
 
     // A failed build must leave the previous image serving, and must say why.
@@ -504,7 +513,32 @@ describe('ComputeServicesService', () => {
       expect(mockUpdateMachine).not.toHaveBeenCalled();
 
       delete (mockFlyInstance as Record<string, unknown>).buildFromContext;
-      mockFlyInstance.capabilities = { ...mockFlyInstance.capabilities, sourceBuild: 'flyctl' };
+    });
+
+    // The build already wrote an image to disk before the deploy ran, and nothing
+    // else removes service images — so a deploy failure that skipped the prune let
+    // repeated failures pile up without bound.
+    it('still prunes when the build succeeded but the deploy failed', async () => {
+      mockFlyInstance.capabilities = {
+        ...mockFlyInstance.capabilities,
+        sourceBuild: 'context-upload',
+      };
+      const prune = vi.fn().mockResolvedValue({ removed: 1 });
+      (mockFlyInstance as Record<string, unknown>).buildFromContext = vi
+        .fn()
+        .mockResolvedValue({ imageTag: 'insforge-x/api:abc', logs: [] });
+      (mockFlyInstance as Record<string, unknown>).pruneServiceImages = prune;
+
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow()] }); // getService in buildAndDeploy
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow()] }); // getService in updateService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] });
+      mockUpdateMachine.mockRejectedValue(new Error('daemon refused to start the container'));
+
+      await expect(service.buildAndDeploy('svc-b1', Buffer.from('t'))).rejects.toThrow();
+      expect(prune).toHaveBeenCalledWith('api');
+
+      delete (mockFlyInstance as Record<string, unknown>).buildFromContext;
+      delete (mockFlyInstance as Record<string, unknown>).pruneServiceImages;
     });
   });
 
@@ -1825,6 +1859,26 @@ describe('ComputeServicesService', () => {
       expect(sql).toContain('status');
       expect(params).toContain('running');
       expect(params).toContain('mach-new');
+    });
+
+    // The provider contract does not tie `endpointUrl` to a replacement: a driver
+    // that re-publishes a port on the same instance (ingress none -> port) reports
+    // a fresh URL with no new id, and nesting the write under the id check dropped
+    // it.
+    it('persists a new endpointUrl even when the instance was not replaced', async () => {
+      const deployedRow = { ...baseRow, provider_instance_id: 'mach-existing', status: 'running' };
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] });
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] });
+      mockUpdateMachine.mockResolvedValue({ endpointUrl: 'http://127.0.0.1:32770' });
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] });
+
+      await service.updateService('svc-pa-1', { ingress: 'port' });
+
+      const [sql, params] = mockQuery.mock.calls[2];
+      expect(sql).toContain('endpoint_url');
+      expect(params).toContain('http://127.0.0.1:32770');
+      // No replacement happened, so the stored instance id must not be touched.
+      expect(sql).not.toContain('provider_instance_id');
     });
 
     // The mirror image: an in-place update starts nothing, so a stopped service

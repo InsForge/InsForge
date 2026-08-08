@@ -157,11 +157,78 @@ router.post(
   }
 );
 
+/**
+ * `dockerfile` names a path *inside* the uploaded context. The daemon resolves it
+ * against the context root and rejects an escape on its own, but its error is
+ * opaque — reject the obvious shapes here so the developer gets something to act
+ * on instead of a build failure from the bottom of the stack.
+ */
+function parseDockerfileParam(raw: unknown): string | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  const reject = (why: string): never => {
+    throw new AppError(
+      `Invalid \`dockerfile\`: ${why}. It must be a path relative to the root of the uploaded context, e.g. "docker/Dockerfile".`,
+      400,
+      ERROR_CODES.INVALID_INPUT
+    );
+  };
+  if (typeof raw !== 'string' || raw.length === 0) {
+    return reject('expected a single non-empty string');
+  }
+  if (raw.length > 255) {
+    return reject('longer than 255 characters');
+  }
+  if (raw.startsWith('/') || /^[A-Za-z]:/.test(raw)) {
+    return reject('absolute paths are not allowed');
+  }
+  if (raw.split(/[\\/]/).includes('..')) {
+    return reject('`..` cannot be used to leave the context');
+  }
+  return raw;
+}
+
+/**
+ * Reject a second concurrent upload *before* `express.raw` buffers its body.
+ *
+ * The driver already caps concurrent builds at one and throws when busy, but by
+ * then express holds the entire tarball in memory, so N simultaneous uploads cost
+ * N contexts regardless of the cap. On the hosts this feature targets — a t4g.nano
+ * has ~418MB usable — that is the difference between a clear 429 and an OOM.
+ * Turning the door away keeps resident context bounded to one.
+ */
+let buildUploadInFlight = false;
+function oneBuildUploadAtATime(req: AuthRequest, res: Response, next: NextFunction) {
+  if (buildUploadInFlight) {
+    // Discard the incoming tarball instead of buffering it — that is the whole
+    // point of rejecting here. It still has to be drained: a response sent while
+    // the request body sits unread stalls the connection until the client gives
+    // up, which turns a fast 429 into a hang.
+    req.resume();
+    next(
+      new AppError(
+        'Another build is already uploading. Retry when it finishes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+    return;
+  }
+  buildUploadInFlight = true;
+  // `close` fires for a completed response and for a client that hung up
+  // mid-upload, which `finish` would miss.
+  res.once('close', () => {
+    buildUploadInFlight = false;
+  });
+  next();
+}
+
 // Build an uploaded context and deploy the result.
 //
 // The body is the build context tarball itself, which is what Docker's build
-// endpoint natively consumes — so the context streams through without an
-// intermediate copy. Pair with POST /deploy, which reserves the name first.
+// endpoint natively consumes, so it is forwarded as-is. Pair with POST /deploy,
+// which reserves the name first.
 //
 // A note for whoever builds the tarball: archive it with `tar --no-xattrs` (or
 // COPYFILE_DISABLE=1) on macOS. Extended attributes the Linux daemon cannot apply
@@ -171,7 +238,8 @@ router.post(
   '/:id/build',
   verifyAdmin,
   computeWriteLimiter,
-  express.raw({ type: 'application/x-tar', limit: appConfig.server.maxJsonBodySize }),
+  oneBuildUploadAtATime,
+  express.raw({ type: 'application/x-tar', limit: appConfig.docker.buildMaxContextSize }),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const svc = ComputeServicesService.getInstance();
@@ -189,8 +257,7 @@ router.post(
         );
       }
 
-      const dockerfile =
-        typeof req.query.dockerfile === 'string' ? req.query.dockerfile : undefined;
+      const dockerfile = parseDockerfileParam(req.query.dockerfile);
       const result = await svc.buildAndDeploy(req.params.id, req.body, { dockerfile });
 
       successResponse(res, {

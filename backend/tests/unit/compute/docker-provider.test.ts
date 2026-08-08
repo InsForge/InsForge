@@ -624,27 +624,77 @@ describe('DockerProvider', () => {
       expect(resumed).not.toContain('tail=');
     });
 
-    it('hands back the oldest `limit` lines and a cursor that reaches the rest', async () => {
-      const backlog = Buffer.concat(
-        Array.from({ length: 5 }, (_, i) => frame(`2026-08-06T22:51:4${i}.000000000Z line-${i}\n`))
-      );
+    /**
+     * Mock what the daemon would actually send for a given request, so the mock
+     * cannot assert a shape the real thing never produces: `tail=N` returns the
+     * *newest* N, and `since` alone returns everything after that second.
+     */
+    function daemonLogs(lines: { nanos: string; message: string }[]) {
+      return (_method: string, url: string) => {
+        const params = new URLSearchParams(url.split('?')[1] ?? '');
+        let out = lines;
+        const since = params.get('since');
+        if (since !== null) {
+          out = out.filter((l) => BigInt(l.nanos) / 1_000_000_000n >= BigInt(since));
+        }
+        const tail = params.get('tail');
+        if (tail !== null) {
+          out = out.slice(-Number(tail));
+        }
+        const iso = (nanos: string) => {
+          const ns = BigInt(nanos);
+          const ms = new Date(Number(ns / 1_000_000n)).toISOString().replace('Z', '');
+          return `${ms.slice(0, 19)}.${String(ns % 1_000_000_000n).padStart(9, '0')}Z`;
+        };
+        return Promise.resolve({
+          status: 200,
+          body: Buffer.concat(out.map((l) => frame(`${iso(l.nanos)} ${l.message}\n`))),
+        });
+      };
+    }
+
+    // One second apart, so every `since` boundary lands on a distinct line.
+    const FIVE_LINES = Array.from({ length: 5 }, (_, i) => ({
+      nanos: String(1786056700000000000n + BigInt(i) * 1_000_000_000n),
+      message: `line-${i}`,
+    }));
+
+    // First page asks for `tail`, so the daemon hands back the newest `limit` —
+    // "most recent logs" is what a caller with no cursor wants.
+    it('returns the newest lines on a first page, per `tail` semantics', async () => {
       mockRequest.mockResolvedValueOnce(ownedContainer());
-      mockRequestRaw.mockResolvedValueOnce({ status: 200, body: backlog });
+      mockRequestRaw.mockImplementationOnce(daemonLogs(FIVE_LINES));
 
       const first = await provider.getLogs('app', 'container-abc', { limit: 2 });
-      // Oldest first, so nothing is skipped — not the newest 2.
-      expect(first.lines.map((l) => l.message)).toEqual(['line-0', 'line-1']);
-      // Cursor is the last line returned, never one that got trimmed.
-      expect(first.nextToken).toBe(String(Date.parse('2026-08-06T22:51:41Z') * 1_000_000));
 
-      // Replay the same backlog: the cursor picks up exactly where page 1 stopped.
-      mockRequest.mockResolvedValueOnce(ownedContainer());
-      mockRequestRaw.mockResolvedValueOnce({ status: 200, body: backlog });
-      const second = await provider.getLogs('app', 'container-abc', {
-        limit: 2,
-        nextToken: first.nextToken as string,
-      });
-      expect(second.lines.map((l) => l.message)).toEqual(['line-2', 'line-3']);
+      expect(first.lines.map((l) => l.message)).toEqual(['line-3', 'line-4']);
+      expect(first.nextToken).toBe(FIVE_LINES[4].nanos);
+    });
+
+    // Resuming sends no `tail`, so the daemon returns the whole backlog and the
+    // trimming happens here. This is the only path where more lines arrive than
+    // were asked for, and the property under test is that paging reaches them all
+    // rather than jumping to the newest.
+    it('pages through a backlog larger than `limit` without skipping lines', async () => {
+      const seen: string[] = [];
+      let token: string | null = null;
+
+      // Start from before the first line so the whole backlog is "new".
+      token = String(BigInt(FIVE_LINES[0].nanos) - 1_000_000_000n);
+      for (let page = 0; page < 3; page++) {
+        mockRequest.mockResolvedValueOnce(ownedContainer());
+        mockRequestRaw.mockImplementationOnce(daemonLogs(FIVE_LINES));
+        const res = await provider.getLogs('app', 'container-abc', {
+          limit: 2,
+          nextToken: token as string,
+        });
+        seen.push(...res.lines.map((l) => l.message));
+        token = res.nextToken;
+      }
+
+      // Every line, in order, once — the failure this guards against is pages of
+      // ['line-3','line-4'] repeating while 0-2 are never delivered.
+      expect(seen).toEqual(['line-0', 'line-1', 'line-2', 'line-3', 'line-4']);
     });
   });
 

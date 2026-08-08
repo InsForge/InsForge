@@ -118,6 +118,10 @@ services:
       # hostname gets no URL rather than an unroutable guess.
       COMPUTE_DOMAIN: ${COMPUTE_DOMAIN:-}
       COMPUTE_BIND_ADDRESS: ${COMPUTE_BIND_ADDRESS:-127.0.0.1}
+      # Ceiling on an uploaded source-build context. Express buffers the whole
+      # tarball before the handler runs, so this is a memory bound, not just a
+      # policy — lower it on a small host.
+      COMPUTE_BUILD_MAX_CONTEXT: ${COMPUTE_BUILD_MAX_CONTEXT:-}
       COMPUTE_ISOLATE_NETWORK: ${COMPUTE_ISOLATE_NETWORK:-}
       # S3-compatible storage (AWS S3, MinIO, RustFS, Wasabi, R2, Tencent COS ...).
       # Leave S3_BUCKET empty to keep local filesystem storage. Set

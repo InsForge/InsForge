@@ -54,6 +54,7 @@ export interface AppConfig {
     defaultIngress: string;
     bindAddress: string;
     isolateNetwork: boolean;
+    buildMaxContextSize: string;
   };
   server: {
     maxJsonBodySize: string;
@@ -203,6 +204,12 @@ export function loadConfig(): AppConfig {
       // Skip attaching containers to the project's own compose network. Off by
       // default — proximity to the database and storage is the point.
       isolateNetwork: process.env.COMPUTE_ISOLATE_NETWORK === 'true',
+      // Ceiling on an uploaded build context. Deliberately *not* the JSON body
+      // limit it used to borrow: express buffers the whole tarball in memory
+      // before any handler runs, and a t4g.nano has ~418MB usable, so a 100MB
+      // ceiling is a self-inflicted OOM. A source context is normally single-digit
+      // megabytes; 64MB is generous for one that vendors dependencies.
+      buildMaxContextSize: process.env.COMPUTE_BUILD_MAX_CONTEXT || '64mb',
     },
     server: {
       maxJsonBodySize: process.env.MAX_JSON_BODY_SIZE || '100mb',

@@ -685,10 +685,15 @@ export class ComputeServicesService {
       try {
         const { state } = await driver.getMachineStatus(appId, instanceId);
         if (state !== row.status) {
-          await this.getPool().query(`UPDATE compute.services SET status = $1 WHERE id = $2`, [
-            state,
-            row.id,
-          ]);
+          // Scoped to the instance this observation was made against, the same way
+          // healMachineGone is. The sweep runs alongside live requests, so a
+          // concurrent deploy can replace the instance between the snapshot and
+          // this write; without the guard, a stale `stopped` reading about the old
+          // container would overwrite the `running` the deploy just committed.
+          await this.getPool().query(
+            `UPDATE compute.services SET status = $1 WHERE id = $2 AND provider_instance_id = $3`,
+            [state, row.id, instanceId]
+          );
           stats.corrected++;
           logger.info('Compute reconcile: corrected a stale status', {
             id: row.id,
@@ -866,21 +871,29 @@ export class ComputeServicesService {
       );
     }
 
-    const service = await this.updateService(serviceId, { imageUrl: built.imageTag });
-
-    // Reclaim superseded images now rather than deferring to a retention policy
-    // nobody configures: every source deploy makes another one, and nothing else
-    // removes them.
-    if (typeof builder.pruneServiceImages === 'function') {
-      await builder.pruneServiceImages(existing.name).catch((error: unknown) => {
-        logger.warn('Compute: image prune failed after a successful deploy', {
-          serviceId,
-          error: error instanceof Error ? error.message : String(error),
+    try {
+      const service = await this.updateService(serviceId, { imageUrl: built.imageTag });
+      return { service, imageTag: built.imageTag, logs: built.logs };
+    } finally {
+      // Reclaim superseded images rather than deferring to a retention policy
+      // nobody configures: every source deploy makes another one, and nothing else
+      // removes them.
+      //
+      // In a `finally` because the build already wrote an image to disk by the time
+      // the deploy runs — if the deploy throws, that image is otherwise orphaned
+      // until some later deploy happens to succeed, so repeated failures pile up
+      // without bound. Docker refuses to delete the image a container is still
+      // using (409, logged and skipped), so pruning here cannot pull the running
+      // image out from under a failed deploy.
+      if (typeof builder.pruneServiceImages === 'function') {
+        await builder.pruneServiceImages(existing.name).catch((error: unknown) => {
+          logger.warn('Compute: image prune failed after a deploy', {
+            serviceId,
+            error: error instanceof Error ? error.message : String(error),
+          });
         });
-      });
+      }
     }
-
-    return { service, imageTag: built.imageTag, logs: built.logs };
   }
 
   async createService(rawInput: CreateServiceInput): Promise<ServiceSchema> {
@@ -1285,6 +1298,17 @@ export class ComputeServicesService {
           protocol: data.protocol ?? existing.protocol,
           scaleToZero: data.scaleToZero ?? existing.scaleToZero,
         });
+        // Any URL the driver reports is authoritative, replacement or not. Kept
+        // outside the id check below because the contract does not tie the two:
+        // a driver that re-publishes a port on the same instance (an `ingress`
+        // change from `none` to `port`, say) returns a fresh URL with no new id,
+        // and nesting this under the id check would drop it. Omitting the field
+        // still means "unchanged" — both current drivers omit it on an in-place
+        // update, where the published port cannot have moved.
+        if (updated?.endpointUrl !== undefined) {
+          updates.push(`endpoint_url = $${paramIdx++}`);
+          values.push(updated.endpointUrl);
+        }
         // A driver that cannot change image/ports/env in place replaces the
         // instance instead (Docker), so the stored id has to follow — otherwise
         // it points at a container that no longer exists and every later call
@@ -1292,12 +1316,6 @@ export class ComputeServicesService {
         if (updated?.machineId && updated.machineId !== existing.providerInstanceId) {
           updates.push(`provider_instance_id = $${paramIdx++}`);
           values.push(updated.machineId);
-          // A replacement gets a newly-assigned published port, so the stored URL
-          // would otherwise point at one that has been freed.
-          if (updated.endpointUrl !== undefined) {
-            updates.push(`endpoint_url = $${paramIdx++}`);
-            values.push(updated.endpointUrl);
-          }
           // The replacement is launched running, so the row has to follow: a
           // service the caller had stopped and then redeployed would otherwise
           // keep reporting 'stopped' while its container runs. Unconditional
