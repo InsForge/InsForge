@@ -124,8 +124,9 @@ curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup
 
 Fetches the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY`,
 `POSTGRES_PASSWORD`, `ROOT_ADMIN_PASSWORD`, and the two access keys into
-`~/insforge/.env` (mode 600). Nothing is started, and re-running leaves an
-existing `.env` untouched.
+`~/insforge/.env` (mode 600). Nothing is started. Re-running refreshes the files
+and keeps every value you have set — it only ever adds `COMPOSE_FILE`, or points
+it at this checkout's compose file if it still names the development one.
 
 ```bash
 cd ~/insforge
@@ -149,9 +150,18 @@ starting anything you expose.
 git clone https://github.com/InsForge/InsForge.git
 cd InsForge
 cp .env.example .env
-$EDITOR .env          # JWT_SECRET, ENCRYPTION_KEY, POSTGRES_PASSWORD, ROOT_ADMIN_PASSWORD
+$EDITOR .env
 docker compose -f docker-compose.prod.yml up
 ```
+
+Set `JWT_SECRET`, `ENCRYPTION_KEY`, `POSTGRES_PASSWORD`, and
+`ROOT_ADMIN_PASSWORD` — `.env.example` ships placeholders for them, and the
+compose file falls back to published defaults for any you leave unset. Set
+`ACCESS_API_KEY` and `ACCESS_ANON_KEY` too if you want to know your own keys;
+left empty, the backend generates a pair only it knows.
+
+This path passes `-f` explicitly, which overrides `COMPOSE_FILE`. Add overlays as
+further `-f` flags rather than editing that variable.
 
 </details>
 
@@ -188,13 +198,13 @@ config. Set it before starting anything.
 
 `~/project1/.env`:
 
-```
+```env
 COMPOSE_PROJECT_NAME=project1
 ```
 
 `~/project2/.env`:
 
-```
+```env
 COMPOSE_PROJECT_NAME=project2
 POSTGRES_PORT=5442
 POSTGREST_PORT=5440
@@ -218,17 +228,21 @@ run them from.
 
 InsForge stores files on the local filesystem by default. Backing storage with an S3-compatible store also enables the S3-compatible gateway at `/storage/v1/s3` (use `aws` CLI, rclone, or any AWS SDK against your InsForge Storage).
 
-Append the overlay to `COMPOSE_FILE` in `.env`:
+Append one overlay to `COMPOSE_FILE` in `.env`. Bundled MinIO, whose store stays
+internal to the Docker network:
 
 ```env
-# Bundled MinIO — store stays internal to the Docker network
 COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:docker-compose.minio.yml
+```
 
-# Bundled RustFS (Apache-2.0 licensed alternative)
+Or RustFS, an Apache-2.0 licensed alternative:
+
+```env
 COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:docker-compose.rustfs.yml
 ```
 
-Then `docker compose up -d` as usual.
+Keep one — the file is read as shell assignments, so a second line replaces the
+first. Then `docker compose up -d` as usual.
 
 The overlays ship with default store credentials — set `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` (or `RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY`) in `.env` before production use.
 
