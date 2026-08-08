@@ -125,7 +125,14 @@ export class MachineGoneError extends Error {
  */
 export function flyNetworkName(): string {
   if (!process.env.APP_KEY) {
-    throw new Error('APP_KEY environment variable is required for compute network isolation');
+    // Typed, matching what the service layer threw before this moved: a plain
+    // Error surfaces as a generic 500 with no next action, which is a worse
+    // answer than the one an operator missing APP_KEY used to get.
+    throw new AppError(
+      'APP_KEY environment variable is required for compute network isolation',
+      500,
+      ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
+    );
   }
   return `n-${process.env.APP_KEY}`;
 }
