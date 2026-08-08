@@ -2,13 +2,15 @@ openapi: 3.0.3
 info:
   title: Insforge Payments API
   version: 1.0.0
-  description: Provider-specific Stripe and Razorpay payment setup, runtime flows, catalog management, sync, and webhook projections
+  description: Provider-specific Stripe, Razorpay, and Paystack payment setup, runtime flows, catalog management, sync, and webhook projections
 
 tags:
   - name: Stripe Payments
     description: Stripe Checkout, Billing Portal, catalog, sync, customer, subscription, and transaction routes
   - name: Razorpay Payments
     description: Razorpay Orders, Subscriptions, catalog, manual webhook setup, sync, customer, and transaction routes
+  - name: Paystack Payments
+    description: Paystack transaction initialization and verification, key configuration, manual webhook setup, customer, and transaction routes
   - name: Payment Webhooks
     description: Provider webhook ingestion routes
 
@@ -1361,6 +1363,266 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/payments/paystack/status:
+    get:
+      summary: Get Paystack Payments Status
+      description: Return Paystack connection and sync status for each environment.
+      tags:
+        - Paystack Payments
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Paystack payments status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPaystackStatusResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/paystack/config:
+    get:
+      summary: Get Paystack Key Configuration
+      description: >-
+        Return the stored Paystack keys for test and live environments. Values
+        are the raw stored keys, not masked: the admin settings panel hydrates
+        and resaves them, so masking here would corrupt stored keys on resave.
+        Admin-only.
+      tags:
+        - Paystack Payments
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Paystack key configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPaystackConfigResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/paystack/{environment}/config:
+    put:
+      summary: Configure Paystack Keys
+      description: Validate and store a Paystack secret key and optional public key for one environment.
+      tags:
+        - Paystack Payments
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertPaystackConfigBody'
+            example:
+              secretKey: "sk_test_xxx"
+              publicKey: "pk_test_xxx"
+      responses:
+        '200':
+          description: Updated Paystack key configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPaystackConfigResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    delete:
+      summary: Remove Paystack Keys
+      description: Remove the configured Paystack keys for one environment.
+      tags:
+        - Paystack Payments
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+      responses:
+        '200':
+          description: Updated Paystack key configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPaystackConfigResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/payments/paystack/{environment}/webhook:
+    get:
+      summary: Get Paystack Webhook Setup Values
+      description: Return the Paystack webhook URL that must be copied into the Paystack Dashboard for manual webhook setup. Paystack signs webhook requests with the configured secret key, so no separate webhook secret is returned.
+      tags:
+        - Paystack Payments
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+      responses:
+        '200':
+          description: Paystack webhook setup values
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPaystackWebhookSetupResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/paystack/{environment}/transactions/initialize:
+    post:
+      summary: Initialize Paystack Transaction
+      description: Create a local Paystack transaction record with the caller's user context, initialize a Paystack transaction, and return the authorization URL for redirect-based checkout.
+      tags:
+        - Paystack Payments
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitializePaystackTransactionBody'
+            example:
+              amount: 500000
+              currency: "NGN"
+              email: "buyer@example.com"
+              reference: "order-team_123-pro"
+              callbackUrl: "https://app.example.com/billing/callback"
+              subject:
+                type: "team"
+                id: "team_123"
+      responses:
+        '201':
+          description: Paystack transaction initialized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitializePaystackTransactionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/payments/paystack/{environment}/transactions/verify:
+    post:
+      summary: Verify Paystack Transaction
+      description: Verify a Paystack transaction by reference with the Paystack API before recording the verified transaction ID locally.
+      tags:
+        - Paystack Payments
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyPaystackTransactionBody'
+            example:
+              reference: "order-team_123-pro"
+      responses:
+        '200':
+          description: Paystack transaction verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyPaystackTransactionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/payments/paystack/{environment}/customers:
+    get:
+      summary: List Paystack Customers
+      description: Admin/debug read for mirrored Paystack customers. This is a display mirror only and should not replace app-owned billing tables.
+      tags:
+        - Paystack Payments
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Paystack customers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListPaymentCustomersResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/paystack/{environment}/transactions:
+    get:
+      summary: List Paystack Transactions
+      description: Admin/debug read for InsForge's Paystack transaction projection. Use app-owned fulfillment tables with RLS for end-user order, credit, or entitlement state.
+      tags:
+        - Paystack Payments
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+        - $ref: '#/components/parameters/SubjectTypeQuery'
+        - $ref: '#/components/parameters/SubjectIdQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Paystack transactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListPaymentTransactionsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/webhooks/stripe/{environment}:
     post:
       summary: Receive Stripe Webhook
@@ -1423,6 +1685,37 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/webhooks/paystack/{environment}:
+    post:
+      summary: Receive Paystack Webhook
+      description: Receive Paystack events for one environment. The request body must be the raw Paystack JSON body and must include the Paystack signature header.
+      tags:
+        - Payment Webhooks
+      security:
+        - paystackSignature: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Webhook received
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaystackWebhookResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1441,6 +1734,10 @@ components:
       type: apiKey
       in: header
       name: x-razorpay-signature
+    paystackSignature:
+      type: apiKey
+      in: header
+      name: x-paystack-signature
 
   parameters:
     EnvironmentPath:
@@ -1562,11 +1859,15 @@ components:
     RazorpayEnvironment:
       $ref: '#/components/schemas/PaymentEnvironment'
 
+    PaystackEnvironment:
+      $ref: '#/components/schemas/PaymentEnvironment'
+
     PaymentProvider:
       type: string
       enum:
         - stripe
         - razorpay
+        - paystack
 
     StripeConnectionStatus:
       type: string
@@ -1589,6 +1890,19 @@ components:
         - error
 
     RazorpayLatestSyncStatus:
+      type: string
+      enum:
+        - succeeded
+        - failed
+
+    PaystackConnectionStatus:
+      type: string
+      enum:
+        - unconfigured
+        - connected
+        - error
+
+    PaystackLatestSyncStatus:
       type: string
       enum:
         - succeeded
@@ -1738,6 +2052,65 @@ components:
         lastSyncStatus:
           allOf:
             - $ref: '#/components/schemas/RazorpayLatestSyncStatus'
+          nullable: true
+        lastSyncError:
+          type: string
+          nullable: true
+        lastSyncCounts:
+          type: object
+          additionalProperties:
+            type: number
+
+    PaystackConnection:
+      type: object
+      required:
+        - environment
+        - status
+        - accountId
+        - accountEmail
+        - accountLivemode
+        - webhookEndpointUrl
+        - webhookConfiguredAt
+        - maskedKey
+        - lastSyncedAt
+        - lastSyncStatus
+        - lastSyncError
+        - lastSyncCounts
+      properties:
+        environment:
+          $ref: '#/components/schemas/PaystackEnvironment'
+        status:
+          $ref: '#/components/schemas/PaystackConnectionStatus'
+        accountId:
+          type: string
+          nullable: true
+          example: "123456"
+        accountEmail:
+          type: string
+          nullable: true
+          example: "owner@example.com"
+        accountLivemode:
+          type: boolean
+          nullable: true
+        webhookEndpointUrl:
+          type: string
+          nullable: true
+          example: "https://api.example.com/api/webhooks/paystack/test"
+        webhookConfiguredAt:
+          type: string
+          format: date-time
+          nullable: true
+        maskedKey:
+          type: string
+          nullable: true
+          example: "sk_test_...abcd"
+        lastSyncedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastSyncStatus:
+          allOf:
+            - $ref: '#/components/schemas/PaystackLatestSyncStatus'
           nullable: true
         lastSyncError:
           type: string
@@ -2725,6 +3098,28 @@ components:
           nullable: true
           example: "rzp_test_...abcd"
 
+    PaystackKeyConfig:
+      type: object
+      required:
+        - environment
+        - keyType
+        - value
+      properties:
+        environment:
+          $ref: '#/components/schemas/PaystackEnvironment'
+        keyType:
+          type: string
+          enum:
+            - secret_key
+            - public_key
+        value:
+          type: string
+          nullable: true
+          description: >-
+            Raw stored key value (not masked), or null when the key is not
+            configured.
+          example: "sk_test_xxx"
+
     CreateStripeProductBody:
       type: object
       required:
@@ -3142,6 +3537,183 @@ components:
         order:
           $ref: '#/components/schemas/RazorpayOrder'
 
+    PaystackTransactionStatus:
+      type: string
+      enum:
+        - initialized
+        - pending
+        - success
+        - failed
+        - abandoned
+        - reversed
+
+    PaystackTransaction:
+      type: object
+      required:
+        - id
+        - environment
+        - status
+        - subjectType
+        - subjectId
+        - customerEmail
+        - reference
+        - accessCode
+        - authorizationUrl
+        - amount
+        - currency
+        - verifiedTransactionId
+        - verifiedAt
+        - metadata
+        - lastError
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        environment:
+          $ref: '#/components/schemas/PaystackEnvironment'
+        status:
+          $ref: '#/components/schemas/PaystackTransactionStatus'
+        subjectType:
+          type: string
+          nullable: true
+        subjectId:
+          type: string
+          nullable: true
+        customerEmail:
+          type: string
+          format: email
+          nullable: true
+        reference:
+          type: string
+          nullable: true
+          example: "order-team_123-pro"
+        accessCode:
+          type: string
+          nullable: true
+          example: "access_code_123"
+        authorizationUrl:
+          type: string
+          nullable: true
+          example: "https://checkout.paystack.com/access_code_123"
+        amount:
+          type: integer
+          example: 500000
+        currency:
+          type: string
+          example: "NGN"
+        verifiedTransactionId:
+          type: string
+          nullable: true
+          example: "1234567890"
+        verifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        lastError:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    InitializePaystackTransactionBody:
+      type: object
+      required:
+        - amount
+        - currency
+        - email
+      additionalProperties: false
+      description: Metadata keys starting with insforge_ are reserved and rejected.
+      properties:
+        amount:
+          type: integer
+          minimum: 1
+          description: Amount in the currency's minor units (subunits).
+          example: 500000
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: "NGN"
+        email:
+          type: string
+          format: email
+          example: "buyer@example.com"
+        reference:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 100
+        callbackUrl:
+          type: string
+          format: uri
+          nullable: true
+        subject:
+          $ref: '#/components/schemas/BillingSubject'
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+
+    InitializePaystackTransactionResponse:
+      type: object
+      required:
+        - transaction
+        - authorizationUrl
+        - accessCode
+        - reference
+        - publicKey
+      properties:
+        transaction:
+          $ref: '#/components/schemas/PaystackTransaction'
+        authorizationUrl:
+          type: string
+          example: "https://checkout.paystack.com/access_code_123"
+        accessCode:
+          type: string
+          example: "access_code_123"
+        reference:
+          type: string
+          example: "order-team_123-pro"
+        publicKey:
+          type: string
+          nullable: true
+          example: "pk_test_xxx"
+
+    VerifyPaystackTransactionBody:
+      type: object
+      required:
+        - reference
+      additionalProperties: false
+      properties:
+        reference:
+          type: string
+          minLength: 1
+          example: "order-team_123-pro"
+        transactionId:
+          type: string
+          format: uuid
+          description: >-
+            Local transaction id returned by initialize. Required to verify
+            sessions created without an authenticated identity, since the
+            Paystack reference alone leaks through callback URLs.
+
+    VerifyPaystackTransactionResponse:
+      type: object
+      required:
+        - verified
+        - transaction
+      properties:
+        verified:
+          type: boolean
+        transaction:
+          $ref: '#/components/schemas/PaystackTransaction'
+
     CreateRazorpayItemBody:
       type: object
       required:
@@ -3494,6 +4066,26 @@ components:
           items:
             $ref: '#/components/schemas/RazorpayKeyConfig'
 
+    GetPaystackStatusResponse:
+      type: object
+      required:
+        - paystackConnections
+      properties:
+        paystackConnections:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaystackConnection'
+
+    GetPaystackConfigResponse:
+      type: object
+      required:
+        - keys
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaystackKeyConfig'
+
     UpsertStripeConfigBody:
       type: object
       required:
@@ -3526,6 +4118,24 @@ components:
           type: string
           writeOnly: true
           example: "webhook_secret_xxx"
+
+    UpsertPaystackConfigBody:
+      type: object
+      required:
+        - secretKey
+      additionalProperties: false
+      properties:
+        secretKey:
+          type: string
+          minLength: 1
+          writeOnly: true
+          example: "sk_test_xxx"
+        publicKey:
+          type: string
+          nullable: true
+          minLength: 1
+          writeOnly: true
+          example: "pk_test_xxx"
 
     SyncStripePaymentsRequest:
       type: object
@@ -3678,6 +4288,19 @@ components:
     RotateRazorpayWebhookSecretResponse:
       allOf:
         - $ref: '#/components/schemas/GetRazorpayWebhookSetupResponse'
+
+    GetPaystackWebhookSetupResponse:
+      type: object
+      required:
+        - connection
+        - webhookUrl
+      properties:
+        connection:
+          $ref: '#/components/schemas/PaystackConnection'
+        webhookUrl:
+          type: string
+          description: Webhook endpoint URL to copy into the Paystack Dashboard. Paystack signs webhook requests with the configured secret key, so no separate webhook secret is returned.
+          example: "https://api.example.com/api/webhooks/paystack/test"
 
     ListStripeCatalogResponse:
       type: object
@@ -3843,6 +4466,17 @@ components:
           $ref: '#/components/schemas/StripeWebhookEvent'
 
     RazorpayWebhookResponse:
+      type: object
+      required:
+        - received
+        - handled
+      properties:
+        received:
+          type: boolean
+        handled:
+          type: boolean
+
+    PaystackWebhookResponse:
       type: object
       required:
         - received

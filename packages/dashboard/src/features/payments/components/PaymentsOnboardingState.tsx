@@ -93,11 +93,50 @@ const PAYMENT_QUICK_GUIDES: Record<
       },
     ],
   },
+  paystack: {
+    test: [
+      {
+        title: 'Go to Paystack',
+        description: 'Log in to the Paystack Dashboard.',
+      },
+      {
+        title: 'Switch to Test Mode',
+        description: 'Use the mode toggle so the keys shown are test keys.',
+      },
+      {
+        title: 'Go to Settings -> API Keys & Webhooks',
+        description: 'Copy the secret key that starts with sk_test_.',
+      },
+      {
+        title: 'Come back here',
+        description: 'Click the button below to open Payments Settings, then paste the Secret Key.',
+      },
+    ],
+    live: [
+      {
+        title: 'Go to Paystack',
+        description: 'Log in to the Paystack Dashboard.',
+      },
+      {
+        title: 'Switch to Live Mode',
+        description: 'If live keys are unavailable, complete business activation first.',
+      },
+      {
+        title: 'Go to Settings -> API Keys & Webhooks',
+        description: 'Copy the secret key that starts with sk_live_.',
+      },
+      {
+        title: 'Come back here',
+        description: 'Click the button below to open Payments Settings, then paste the Secret Key.',
+      },
+    ],
+  },
 };
 
 const PROVIDER_LABELS: Record<PaymentProvider, string> = {
   stripe: 'Stripe',
   razorpay: 'Razorpay',
+  paystack: 'Paystack',
 };
 
 interface PaymentsOnboardingStateProps {
@@ -116,6 +155,10 @@ const WORDMARK_SIZE_CLASSES: Record<PaymentProvider, Record<WordmarkPlacement, s
     switcher: 'w-14',
   },
   razorpay: {
+    guide: 'w-32',
+    switcher: 'w-16',
+  },
+  paystack: {
     guide: 'w-32',
     switcher: 'w-16',
   },
@@ -145,6 +188,24 @@ function PaymentProviderWordmark({
           tone === 'muted' ? 'text-[#525252]' : 'text-[#635BFF]'
         )}
       />
+    );
+  }
+
+  // Paystack has no wordmark asset yet, so render a styled text placeholder.
+  if (provider === 'paystack') {
+    return (
+      <span
+        role="img"
+        aria-label={label}
+        className={cn(
+          'block text-center font-semibold leading-none',
+          placement === 'guide' ? 'text-2xl' : 'text-base',
+          sizeClassName,
+          tone === 'muted' ? 'text-[#525252]' : 'text-[#09A5DB]'
+        )}
+      >
+        Paystack
+      </span>
     );
   }
 
