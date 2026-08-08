@@ -87,28 +87,27 @@ paths:
                   createdAt: "2025-07-19T08:15:10.123Z"
                   updatedAt: "2025-07-19T08:15:10.123Z"
         '404':
-          description: Table not found
+          description: Table not found. Body is PostgREST's, forwarded unchanged.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PostgrestError'
               example:
-                error: "TABLE_NOT_FOUND"
-                message: "Table 'nonexistent' does not exist"
-                statusCode: 404
-                nextActions: "Check table name and try again"
+                code: PGRST205
+                message: "Could not find the table 'public.nonexistent' in the schema cache"
+                details: null
+                hint: null
         '400':
-          description: Invalid query parameters
+          description: Invalid filter or query. Body is PostgREST's, forwarded unchanged.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PostgrestError'
               example:
-                error: "INVALID_QUERY"
-                message: "Invalid filter syntax"
-                statusCode: 400
-                nextActions: "Check PostgREST filter documentation"
-
+                code: PGRST100
+                message: "unexpected 'z' expecting digit"
+                details: 'unexpected "z" expecting digit'
+                hint: null
     post:
       summary: Create Records
       description: Create one or more records. Request body MUST be an array.
@@ -169,28 +168,27 @@ paths:
                       createdAt: "2025-07-18T05:37:24.338Z"
                       updatedAt: "2025-07-18T05:37:24.338Z"
         '400':
-          description: Invalid input
+          description: Invalid filter or query. Body is PostgREST's, forwarded unchanged.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PostgrestError'
               example:
-                error: "VALIDATION_ERROR"
-                message: "Invalid field type: expected boolean for 'published'"
-                statusCode: 400
-                nextActions: "Ensure field types match the table schema"
+                code: PGRST100
+                message: "unexpected 'z' expecting digit"
+                details: 'unexpected "z" expecting digit'
+                hint: null
         '404':
-          description: Table not found
+          description: Table not found. Body is PostgREST's, forwarded unchanged.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PostgrestError'
               example:
-                error: "TABLE_NOT_FOUND"
-                message: "Table 'nonexistent' does not exist"
-                statusCode: 404
-                nextActions: "Create the table first"
-
+                code: PGRST205
+                message: "Could not find the table 'public.nonexistent' in the schema cache"
+                details: null
+                hint: null
     patch:
       summary: Update Records
       description: Update records matching query filters
@@ -252,26 +250,27 @@ paths:
                       createdAt: "2025-01-01T00:00:00Z"
                       updatedAt: "2025-01-21T11:00:00Z"
         '404':
-          description: No records found to update
+          description: Table not found. Body is PostgREST's, forwarded unchanged.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-              example: []
-        '400':
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PostgrestError'
               example:
-                error: "VALIDATION_ERROR"
-                message: "Invalid field type"
-                statusCode: 400
-                nextActions: "Check field types match table schema"
-
+                code: PGRST205
+                message: "Could not find the table 'public.nonexistent' in the schema cache"
+                details: null
+                hint: null
+        '400':
+          description: Invalid filter or query. Body is PostgREST's, forwarded unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgrestError'
+              example:
+                code: PGRST100
+                message: "unexpected 'z' expecting digit"
+                details: 'unexpected "z" expecting digit'
+                hint: null
     delete:
       summary: Delete Records
       description: Delete records matching query filters
@@ -323,7 +322,28 @@ paths:
                 no_records:
                   summary: No records found to delete
                   value: []
-
+        '404':
+          description: Table not found. Body is PostgREST's, forwarded unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgrestError'
+              example:
+                code: PGRST205
+                message: "Could not find the table 'public.nonexistent' in the schema cache"
+                details: null
+                hint: null
+        '400':
+          description: Invalid filter or query. Body is PostgREST's, forwarded unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgrestError'
+              example:
+                code: PGRST100
+                message: "unexpected 'z' expecting digit"
+                details: 'unexpected "z" expecting digit'
+                hint: null
 components:
   securitySchemes:
     bearerAuth:
@@ -335,6 +355,27 @@ components:
       name: x-api-key
 
   schemas:
+    PostgrestError:
+      type: object
+      description: |
+        Error body produced by PostgREST and forwarded unchanged by the proxy.
+        These operations do not reshape upstream failures, so the fields are
+        PostgREST's, not the platform `ErrorResponse` used elsewhere.
+      properties:
+        code:
+          type: string
+          description: PostgREST or Postgres error code
+          example: PGRST205
+        message:
+          type: string
+          example: "Could not find the table 'public.nonexistent' in the schema cache"
+        details:
+          type: string
+          nullable: true
+        hint:
+          type: string
+          nullable: true
+          example: "Perhaps you meant the table 'public.posts'"
     ErrorResponse:
       type: object
       required:
