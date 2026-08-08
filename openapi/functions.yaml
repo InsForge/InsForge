@@ -465,6 +465,14 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '404':
+          description: Function not found or not active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Function not found or not active"
         '502':
           description: Failed to proxy to Deno runtime
           content:
@@ -501,6 +509,14 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '404':
+          description: Function not found or not active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Function not found or not active"
         '502':
           description: Failed to proxy to Deno runtime
           content:
@@ -530,6 +546,14 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '404':
+          description: Function not found or not active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Function not found or not active"
         '502':
           description: Failed to proxy to Deno runtime
           content:
