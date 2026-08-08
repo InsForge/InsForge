@@ -165,7 +165,9 @@
         "database": "資料庫",
         "wal": "WAL",
         "system": "系統",
-        "total": "總計"
+        "total": "總計",
+        "systemExcluded": "系統與執行時",
+        "notCounted": "不計入"
       }
     },
     "memoryAdvisory": {
