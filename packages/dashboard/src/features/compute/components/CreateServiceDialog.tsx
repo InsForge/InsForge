@@ -16,13 +16,18 @@ import {
   SelectContent,
   SelectItem,
 } from '@insforge/ui';
-import { CPU_TIERS, MEMORY_OPTIONS, REGIONS } from '#features/compute/constants';
-import type { CreateServiceRequest } from '@insforge/shared-schemas';
+import { CPU_TIERS, MEMORY_OPTIONS, REGIONS, INGRESS_MODES } from '#features/compute/constants';
+import { useComputeCapabilities } from '#features/compute/hooks/useComputeCapabilities';
+import type {
+  CreateServiceRequest,
+  CreateServiceRequestInput,
+  IngressMode,
+} from '@insforge/shared-schemas';
 
 interface CreateServiceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (data: CreateServiceRequest) => Promise<unknown>;
+  onCreate: (data: CreateServiceRequestInput) => Promise<unknown>;
   isCreating: boolean;
 }
 
@@ -33,12 +38,22 @@ export function CreateServiceDialog({
   isCreating,
 }: CreateServiceDialogProps) {
   const { t } = useTranslation('chrome');
+  const { capabilities } = useComputeCapabilities();
   const [name, setName] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [port, setPort] = useState('8080');
   const [cpu, setCpu] = useState('shared-1x');
   const [memory, setMemory] = useState('512');
   const [region, setRegion] = useState('iad');
+  const [ingress, setIngress] = useState<IngressMode>('none');
+
+  // Undefined capabilities means "not known yet" — metadata still loading, compute
+  // not configured, or a backend older than the slice. Show everything in that
+  // case, which is what the dashboard did before and stays right for an old
+  // backend that would happily accept a region.
+  const showRegion = capabilities ? capabilities.regions : true;
+  const offeredIngress = capabilities?.ingressModes ?? [];
+  const showIngress = offeredIngress.length > 1;
 
   const resetForm = () => {
     setName('');
@@ -47,6 +62,7 @@ export function CreateServiceDialog({
     setCpu('shared-1x');
     setMemory('512');
     setRegion('iad');
+    setIngress('none');
   };
 
   const handleSubmit = async () => {
@@ -57,7 +73,11 @@ export function CreateServiceDialog({
         port: Number(port),
         cpu: cpu as CreateServiceRequest['cpu'],
         memory: Number(memory),
-        region,
+        // Omitted rather than sent as a default the provider would drop on the
+        // floor: a single-host driver has one place to run, and recording a
+        // region the user never chose makes the stored row a small lie.
+        ...(showRegion ? { region } : {}),
+        ...(showIngress ? { ingress } : {}),
       });
       resetForm();
       onOpenChange(false);
@@ -115,23 +135,45 @@ export function CreateServiceDialog({
                 <Input type="number" value={port} onChange={(e) => setPort(e.target.value)} />
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-foreground">
-                  {t('compute.fields.region', { defaultValue: 'Region' })}
-                </label>
-                <Select value={region} onValueChange={setRegion}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REGIONS.map((r) => (
-                      <SelectItem key={r.value} value={r.value}>
-                        {t(`compute.regions.${r.value}`, { defaultValue: r.label })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {showRegion && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-foreground">
+                    {t('compute.fields.region', { defaultValue: 'Region' })}
+                  </label>
+                  <Select value={region} onValueChange={setRegion}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {REGIONS.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>
+                          {t(`compute.regions.${r.value}`, { defaultValue: r.label })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {showIngress && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-foreground">
+                    {t('compute.fields.ingress', { defaultValue: 'Reachable from' })}
+                  </label>
+                  <Select value={ingress} onValueChange={(v) => setIngress(v as IngressMode)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INGRESS_MODES.filter((m) => offeredIngress.includes(m.value)).map((m) => (
+                        <SelectItem key={m.value} value={m.value}>
+                          {t(`compute.ingressModes.${m.value}`, { defaultValue: m.label })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

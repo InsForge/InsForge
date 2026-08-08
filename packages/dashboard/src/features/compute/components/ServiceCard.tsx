@@ -10,6 +10,7 @@ import {
 import type { ServiceSchema } from '@insforge/shared-schemas';
 import { statusColors, getReachableUrl } from '#features/compute/constants';
 import { useServiceHealth } from '#features/compute/hooks/useComputeServices';
+import { useComputeCapabilities } from '#features/compute/hooks/useComputeCapabilities';
 
 interface ServiceCardProps {
   service: ServiceSchema;
@@ -21,6 +22,8 @@ interface ServiceCardProps {
 
 export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: ServiceCardProps) {
   const { t } = useTranslation('chrome');
+  const { capabilities } = useComputeCapabilities();
+  const showRegion = capabilities ? capabilities.regions : true;
   const reachableUrl = getReachableUrl(service);
   // Only poll Fly events for services that could plausibly be crash-looping —
   // a stopped/failed/destroying machine has nothing to loop on, and these
@@ -131,7 +134,15 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
             value: service.memory,
           })}
         </span>
-        <span>{service.region}</span>
+        {/* A single-host driver reports region 'local', which tells the reader
+            nothing. Show what actually varies between services instead. */}
+        {showRegion ? (
+          <span>{service.region}</span>
+        ) : (
+          <span>
+            {t(`compute.ingressModes.${service.ingress}`, { defaultValue: service.ingress })}
+          </span>
+        )}
       </div>
     </div>
   );

@@ -19,6 +19,17 @@ export const CPU_TIERS = [
 
 export const MEMORY_OPTIONS = [256, 512, 1024, 2048, 4096, 8192] as const;
 
+/**
+ * Ingress modes, shown only when the configured provider offers more than one
+ * (see useComputeCapabilities). `none` leads because most compute takes no
+ * inbound traffic, and it is the backend's default too.
+ */
+export const INGRESS_MODES = [
+  { value: 'none', label: 'Private (internal network only)' },
+  { value: 'port', label: 'Published host port' },
+  { value: 'host', label: 'Hostname (routed by your gateway)' },
+] as const;
+
 export const REGIONS = [
   { value: 'iad', label: 'Ashburn, VA (iad)' },
   { value: 'sin', label: 'Singapore (sin)' },

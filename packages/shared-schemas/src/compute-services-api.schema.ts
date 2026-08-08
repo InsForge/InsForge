@@ -162,6 +162,16 @@ export const computeLogsResponseSchema = z.object({
 
 export type CreateServiceRequest = z.infer<typeof createServiceSchema>;
 export type UpdateServiceRequest = z.infer<typeof updateServiceSchema>;
+
+/**
+ * What a *caller* sends, as opposed to what the server has after parsing.
+ *
+ * Fields with a `.default()` — `region`, `cpu`, `memory` — are required on the
+ * inferred output type but optional on the wire. A client that deliberately omits
+ * one (the dashboard drops `region` when the provider has no regions, so the
+ * stored row does not claim a choice the user never made) needs this shape.
+ */
+export type CreateServiceRequestInput = z.input<typeof createServiceSchema>;
 export type ListServicesResponse = z.infer<typeof listServicesResponseSchema>;
 export type ComputeLogLine = z.infer<typeof computeLogLineSchema>;
 export type ComputeLogsResponse = z.infer<typeof computeLogsResponseSchema>;
