@@ -328,8 +328,9 @@ export function ObservabilitySection() {
                               defaultValue: 'Used',
                             }),
                           },
-                          // Supabase palette: Database orange, WAL light green,
-                          // System green; stacked bottom-up in that order.
+                          // Semantic palette: Database emerald (your data),
+                          // WAL amber (the log), System gray (not yours to
+                          // manage); stacked bottom-up in that order.
                           components: diskCardProps.breakdown
                             ? [
                                 {
