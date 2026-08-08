@@ -159,7 +159,13 @@
       },
       "diskUsed": {
         "title": "磁盘使用率",
-        "description": "数据库、文件和日志占用实例存储的情况。磁盘写满会导致写入停止，甚至使后端下线。"
+        "description": "数据库、文件和日志占用实例存储的情况。磁盘写满会导致写入停止，甚至使后端下线。",
+        "ceiling": "磁盘容量",
+        "used": "已使用",
+        "database": "数据库",
+        "wal": "WAL",
+        "system": "系统",
+        "total": "总计"
       }
     },
     "memoryAdvisory": {
