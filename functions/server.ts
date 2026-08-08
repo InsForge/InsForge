@@ -326,10 +326,6 @@ Deno.serve({ hostname, port }, async (req: Request) => {
         runtime: 'deno',
         version: Deno.version,
         env: Deno.env.get('DENO_ENV') || 'production',
-        database: {
-          host: dbConfig.hostname,
-          database: dbConfig.database,
-        },
       }),
       {
         headers: { 'Content-Type': 'application/json' },
