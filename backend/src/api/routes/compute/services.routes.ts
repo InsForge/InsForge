@@ -189,18 +189,40 @@ function parseDockerfileParam(raw: unknown): string | undefined {
   return raw;
 }
 
+/** Set by the gate below so the handler can hand the slot back when it is done. */
+type BuildRequest = AuthRequest & { releaseBuildSlot?: () => void; buildStarted?: boolean };
+
 /**
- * Reject a second concurrent upload *before* `express.raw` buffers its body.
- *
- * The driver already caps concurrent builds at one and throws when busy, but by
- * then express holds the entire tarball in memory, so N simultaneous uploads cost
- * N contexts regardless of the cap. On the hosts this feature targets — a t4g.nano
- * has ~418MB usable — that is the difference between a clear 429 and an OOM.
- * Turning the door away keeps resident context bounded to one.
+ * No bytes for this long means the client has stalled rather than being slow.
+ * Resets on every chunk, so a legitimately slow upload is never penalised — only a
+ * connection that stops making progress while holding the only build slot.
  */
-let buildUploadInFlight = false;
-function oneBuildUploadAtATime(req: AuthRequest, res: Response, next: NextFunction) {
-  if (buildUploadInFlight) {
+const UPLOAD_IDLE_TIMEOUT_MS = 30_000;
+
+/**
+ * Admit one build at a time, deciding *before* `express.raw` buffers a body.
+ *
+ * The driver already caps concurrent builds at one, but it only finds out once
+ * express holds the entire tarball in memory, so N simultaneous uploads cost N
+ * contexts regardless of the cap. On the hosts this targets — a t4g.nano has
+ * ~418MB usable — that is the difference between a clear 429 and an OOM.
+ *
+ * The slot is held across the build, not just the upload, because an upload that
+ * cannot be built is worth rejecting at the door rather than buffering and then
+ * failing. That makes releasing it the delicate part, with two distinct cases:
+ *
+ *   - aborted before the handler took over — nothing is building, so the socket
+ *     closing must release it, or the endpoint wedges permanently;
+ *   - aborted after the handler took over — the build carries on regardless of the
+ *     client, so the socket closing must *not* release it, or a disconnect lets a
+ *     second context in alongside the running build.
+ *
+ * Hence `buildStarted`: the handler claims ownership and releases in its own
+ * `finally`, and until it does, the close handler owns the release.
+ */
+let buildSlotTaken = false;
+function oneBuildAtATime(req: BuildRequest, res: Response, next: NextFunction) {
+  if (buildSlotTaken) {
     // Discard the incoming tarball instead of buffering it — that is the whole
     // point of rejecting here. It still has to be drained: a response sent while
     // the request body sits unread stalls the connection until the client gives
@@ -208,20 +230,84 @@ function oneBuildUploadAtATime(req: AuthRequest, res: Response, next: NextFuncti
     req.resume();
     next(
       new AppError(
-        'Another build is already uploading. Retry when it finishes.',
+        'Another build is already in progress. Retry when it finishes.',
         429,
         ERROR_CODES.TOO_MANY_REQUESTS
       )
     );
     return;
   }
-  buildUploadInFlight = true;
-  // `close` fires for a completed response and for a client that hung up
-  // mid-upload, which `finish` would miss.
+
+  buildSlotTaken = true;
+  let idle: NodeJS.Timeout | undefined;
+  let released = false;
+  const release = () => {
+    if (released) {
+      return;
+    }
+    released = true;
+    if (idle) {
+      clearTimeout(idle);
+    }
+    buildSlotTaken = false;
+  };
+  req.releaseBuildSlot = release;
+
+  // Bound how long a client can sit on the slot without sending anything.
+  const armIdleTimer = () => {
+    if (idle) {
+      clearTimeout(idle);
+    }
+    idle = setTimeout(() => {
+      logger.warn('Compute build upload stalled; releasing the build slot', {
+        serviceId: req.params.id,
+      });
+      release();
+      req.destroy();
+    }, UPLOAD_IDLE_TIMEOUT_MS);
+  };
+  armIdleTimer();
+  req.on('data', armIdleTimer);
+  req.once('end', () => {
+    if (idle) {
+      clearTimeout(idle);
+      idle = undefined;
+    }
+  });
+
   res.once('close', () => {
-    buildUploadInFlight = false;
+    // Only ours to release while no build has started — see the note above.
+    if (!req.buildStarted) {
+      release();
+    }
   });
   next();
+}
+
+/**
+ * `express.raw` rejects an over-limit body with `entity.too.large`, which the shared
+ * error middleware does not recognise — it would surface as a 500, telling an
+ * operator who set the limit that the server broke. Translate it where the limit is
+ * known so the message can name it.
+ */
+const rawTarBody = express.raw({
+  type: 'application/x-tar',
+  limit: appConfig.docker.buildMaxContextSize,
+});
+function parseTarBody(req: AuthRequest, res: Response, next: NextFunction) {
+  rawTarBody(req, res, (err?: unknown) => {
+    if (err && (err as { type?: string }).type === 'entity.too.large') {
+      next(
+        new AppError(
+          `Build context is larger than the ${appConfig.docker.buildMaxContextSize} limit. Shrink it with a .dockerignore, or raise COMPUTE_BUILD_MAX_CONTEXT.`,
+          413,
+          ERROR_CODES.INVALID_INPUT
+        )
+      );
+      return;
+    }
+    next(err);
+  });
 }
 
 // Build an uploaded context and deploy the result.
@@ -238,9 +324,13 @@ router.post(
   '/:id/build',
   verifyAdmin,
   computeWriteLimiter,
-  oneBuildUploadAtATime,
-  express.raw({ type: 'application/x-tar', limit: appConfig.docker.buildMaxContextSize }),
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  oneBuildAtATime,
+  parseTarBody,
+  async (req: BuildRequest, res: Response, next: NextFunction) => {
+    // Take ownership of the build slot: from here the build outlives the client,
+    // so a disconnect must not hand the slot to someone else.
+    req.buildStarted = true;
+    const releaseBuildSlot = req.releaseBuildSlot ?? (() => {});
     try {
       const svc = ComputeServicesService.getInstance();
       const existing = await svc.getService(req.params.id);
@@ -281,6 +371,8 @@ router.post(
       bestEffortBroadcast();
     } catch (error) {
       next(error);
+    } finally {
+      releaseBuildSlot();
     }
   }
 );

@@ -185,6 +185,84 @@ describe('POST /api/compute/services/:id/build', () => {
     );
   });
 
+  // An over-limit context is the client's problem, and the operator who set the
+  // limit is the one who needs to hear about it. The shared error middleware does
+  // not know `entity.too.large`, so without translation this is a bare 500.
+  it('answers an over-limit context with 413 and names the knob', async () => {
+    // `express.raw` captures the limit when the module loads, and resetting the
+    // module registry re-reads config from the environment — so the knob has to be
+    // set there, not on the already-built config object.
+    const original = process.env.COMPUTE_BUILD_MAX_CONTEXT;
+    process.env.COMPUTE_BUILD_MAX_CONTEXT = '1kb';
+    vi.resetModules();
+    try {
+      const app = await createApp();
+      const res = await request(app)
+        .post('/api/compute/services/svc-1/build')
+        .set('Content-Type', 'application/x-tar')
+        .send(Buffer.alloc(4096, 1));
+
+      expect(res.status).toBe(413);
+      expect(res.body.message).toMatch(/COMPUTE_BUILD_MAX_CONTEXT/);
+      expect(computeServiceMock.buildAndDeploy).not.toHaveBeenCalled();
+    } finally {
+      if (original === undefined) {
+        delete process.env.COMPUTE_BUILD_MAX_CONTEXT;
+      } else {
+        process.env.COMPUTE_BUILD_MAX_CONTEXT = original;
+      }
+      vi.resetModules();
+    }
+  });
+
+  // The build outlives the client, so a disconnect must not hand the slot to the
+  // next caller while the daemon is still working — that is how a second full
+  // context gets in alongside the first.
+  it('keeps the slot while a build runs even if the client disconnects', async () => {
+    let releaseBuild: () => void = () => {};
+    computeServiceMock.buildAndDeploy.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseBuild = () => resolve({ service: { id: 'svc-1' }, imageTag: 'tag', logs: [] });
+        })
+    );
+
+    const app = await createApp();
+    const abortable = request(app)
+      .post('/api/compute/services/svc-1/build')
+      .set('Content-Type', 'application/x-tar')
+      .send(TAR);
+    const inFlight = abortable.then(
+      (r) => r,
+      () => undefined // aborting rejects the client promise; the server keeps going
+    );
+
+    for (let i = 0; i < 200 && computeServiceMock.buildAndDeploy.mock.calls.length === 0; i++) {
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(computeServiceMock.buildAndDeploy).toHaveBeenCalledTimes(1);
+
+    abortable.abort();
+    await new Promise((r) => setTimeout(r, 30));
+
+    // Slot still held: the build did not stop just because the client left.
+    const during = await request(app)
+      .post('/api/compute/services/svc-1/build')
+      .set('Content-Type', 'application/x-tar')
+      .send(TAR);
+    expect(during.status).toBe(429);
+
+    releaseBuild();
+    await inFlight;
+    computeServiceMock.buildAndDeploy.mockResolvedValue({
+      service: { id: 'svc-1' },
+      imageTag: 'tag',
+      logs: [],
+    });
+    const after = await retryUntilNot429(app);
+    expect(after.status).toBe(200);
+  });
+
   // The point of the door: express buffers the whole tarball before any handler
   // runs, so a second upload has to be turned away *before* that, not after the
   // driver's own concurrency cap throws.
@@ -220,8 +298,6 @@ describe('POST /api/compute/services/:id/build', () => {
     expect(computeServiceMock.buildAndDeploy).toHaveBeenCalledTimes(1);
     releaseBuild();
     await first;
-    // `res.on('close')` fires a tick after the response is delivered.
-    await new Promise((r) => setTimeout(r, 20));
 
     // Back to an implementation that settles — the blocking one above would hang
     // the next request in the handler and hide whether the gate reopened.
@@ -231,11 +307,29 @@ describe('POST /api/compute/services/:id/build', () => {
       logs: [],
     });
 
-    // The door reopens once the first response closes.
-    const third = await request(app)
-      .post('/api/compute/services/svc-1/build')
-      .set('Content-Type', 'application/x-tar')
-      .send(TAR);
+    // The slot is handed back in the handler's `finally`, which runs on its own
+    // tick. Poll for the reopen instead of sleeping a guessed interval: a fixed
+    // sleep that loses the race reports a spurious 429 and flakes under load.
+    const third = await retryUntilNot429(app);
     expect(third.status).toBe(200);
   });
 });
+
+/**
+ * Re-issue the request until the build slot is free, bounded so a genuinely stuck
+ * gate still fails the test rather than hanging it.
+ */
+async function retryUntilNot429(app: express.Express) {
+  let last;
+  for (let i = 0; i < 100; i++) {
+    last = await request(app)
+      .post('/api/compute/services/svc-1/build')
+      .set('Content-Type', 'application/x-tar')
+      .send(TAR);
+    if (last.status !== 429) {
+      return last;
+    }
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  return last!;
+}

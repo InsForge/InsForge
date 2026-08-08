@@ -337,7 +337,7 @@ describe('ComputeServicesService', () => {
     it('corrects a row that says running when the instance is stopped', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [row()] });
       mockGetMachineStatus.mockResolvedValueOnce({ state: 'stopped' });
-      mockQuery.mockResolvedValueOnce({ rows: [] });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       const stats = await service.reconcile();
 
@@ -348,6 +348,21 @@ describe('ComputeServicesService', () => {
       // replaced it concurrently is not overwritten by a stale observation.
       expect(sql).toContain('provider_instance_id = $3');
       expect(params).toEqual(['stopped', 'svc-1', 'machine-1']);
+    });
+
+    // The guard firing is the normal outcome of a race, not a correction. Counting
+    // it as one would report work that never happened and hide how often the race
+    // actually fires.
+    it('reports a skip, not a correction, when the guard blocks the write', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [row()] });
+      mockGetMachineStatus.mockResolvedValueOnce({ state: 'stopped' });
+      // A concurrent deploy already replaced provider_instance_id, so the guarded
+      // UPDATE matches nothing.
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      const stats = await service.reconcile();
+
+      expect(stats).toMatchObject({ checked: 1, corrected: 0, skipped: 1, healed: 0 });
     });
 
     it('leaves a row alone when reality already matches', async () => {
@@ -421,7 +436,7 @@ describe('ComputeServicesService', () => {
         .mockRejectedValueOnce(new MachineGoneError('app-1', 'machine-1'))
         .mockResolvedValueOnce({ state: 'stopped' });
       mockQuery.mockRejectedValueOnce(new Error('deadlock detected')); // the heal
-      mockQuery.mockResolvedValueOnce({ rows: [] }); // svc-2's correction still lands
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // svc-2's correction lands
 
       const stats = await service.reconcile();
 

@@ -690,17 +690,29 @@ export class ComputeServicesService {
           // concurrent deploy can replace the instance between the snapshot and
           // this write; without the guard, a stale `stopped` reading about the old
           // container would overwrite the `running` the deploy just committed.
-          await this.getPool().query(
+          const corrected = await this.getPool().query(
             `UPDATE compute.services SET status = $1 WHERE id = $2 AND provider_instance_id = $3`,
             [state, row.id, instanceId]
           );
-          stats.corrected++;
-          logger.info('Compute reconcile: corrected a stale status', {
-            id: row.id,
-            name: row.name,
-            was: row.status,
-            now: state,
-          });
+          // Zero rows means the guard did its job, which is a skip rather than a
+          // correction — counting it either way would report work that never
+          // happened and hide how often the race actually fires.
+          if (corrected.rowCount === 0) {
+            stats.skipped++;
+            logger.info('Compute reconcile: skipped a stale reading, the row moved on', {
+              id: row.id,
+              name: row.name,
+              observedInstance: instanceId,
+            });
+          } else {
+            stats.corrected++;
+            logger.info('Compute reconcile: corrected a stale status', {
+              id: row.id,
+              name: row.name,
+              was: row.status,
+              now: state,
+            });
+          }
         }
       } catch (error) {
         if (error instanceof MachineGoneError) {
