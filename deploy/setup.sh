@@ -4,8 +4,9 @@
 #   curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 #   sh deploy/setup.sh .        # re-apply after `git merge`, see below
 #
-# Safe to re-run: an existing .env is left untouched. Starts nothing — review
-# .env first, since Postgres reads it only at first boot.
+# Safe to re-run: your values are kept, only COMPOSE_FILE is added or
+# corrected. Starts nothing — review .env first, since Postgres reads it only
+# at first boot.
 #
 # Environment:
 #   INSFORGE_REF=vX.Y.Z   A tag, branch or commit instead of main.
@@ -204,7 +205,7 @@ fi
 
 if [ -f "$ENV_FILE" ]; then
   pin_compose_file
-  echo "Checkout refreshed. $ROOT/.env already exists — left untouched."
+  echo "Checkout refreshed. $ROOT/.env already exists — your values are kept."
   echo "Compare it against .env.example for variables added since you created it."
   exit 0
 fi
