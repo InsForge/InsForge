@@ -3,7 +3,11 @@ import logger from '@/utils/logger.js';
 import {
   MachineGoneError,
   translateMachineGone,
+  flyNetworkName,
+  flyAppNameFor,
+  flyEndpointUrl,
   type ComputeProvider,
+  type ComputeCapabilities,
   type ComputeLogsResult,
 } from './compute.provider.js';
 
@@ -64,6 +68,25 @@ export class FlyProvider implements ComputeProvider {
     return FlyProvider.instance;
   }
 
+  readonly name = 'fly' as const;
+
+  // Fly machines cannot move between regions in place, so a region change
+  // requires destroy + recreate. `deployTokenIssuance` is false here: a
+  // self-hoster owns their own Fly credentials, so there is nothing for the
+  // backend to narrow — the CLI should use the operator's flyctl auth directly.
+  readonly capabilities: ComputeCapabilities = {
+    scaleToZero: true,
+    regions: true,
+    // Every Fly app gets public IPs and a `.fly.dev` hostname at create time, so
+    // there is no private-only or bare-port option to offer.
+    ingressModes: ['host'],
+    sourceBuild: 'flyctl',
+    deployTokenIssuance: false,
+  };
+
+  resolveAppName = flyAppNameFor;
+  endpointUrl = flyEndpointUrl;
+
   // Self-hosters enable compute by setting FLY_API_TOKEN AND FLY_ORG. Both
   // are required: org alone has nothing to authenticate, token alone doesn't
   // know which org to create apps in.
@@ -108,17 +131,15 @@ export class FlyProvider implements ComputeProvider {
     return result;
   }
 
-  async createApp(params: {
-    name: string;
-    network: string;
-    org: string;
-  }): Promise<{ appId: string }> {
+  // Org and network are provider concerns derived from config, not something
+  // the service layer should thread through.
+  async createApp(params: { name: string }): Promise<{ appId: string }> {
     await this.request('/apps', {
       method: 'POST',
       body: JSON.stringify({
         app_name: params.name,
-        org_slug: params.org,
-        network: params.network,
+        org_slug: appConfig.fly.org,
+        network: flyNetworkName(),
       }),
     });
     await this.allocatePublicIps(params.name);
@@ -340,7 +361,7 @@ export class FlyProvider implements ComputeProvider {
     envVars: Record<string, string>;
     protocol?: 'http' | 'tcp';
     scaleToZero?: boolean;
-  }): Promise<void> {
+  }): Promise<{ machineId?: string }> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
     await this.machineScoped(params.appId, params.machineId, () =>
       this.request(`/apps/${params.appId}/machines/${params.machineId}`, {
@@ -361,6 +382,8 @@ export class FlyProvider implements ComputeProvider {
         }),
       })
     );
+    // Fly updates the machine in place — same id, new config.
+    return {};
   }
 
   async stopMachine(appId: string, machineId: string): Promise<void> {
