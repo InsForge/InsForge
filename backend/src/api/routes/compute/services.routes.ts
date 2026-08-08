@@ -196,8 +196,12 @@ type BuildRequest = AuthRequest & { releaseBuildSlot?: () => void; buildStarted?
  * No bytes for this long means the client has stalled rather than being slow.
  * Resets on every chunk, so a legitimately slow upload is never penalised — only a
  * connection that stops making progress while holding the only build slot.
+ * Configurable for the same reason the size ceiling is: the operator knows their
+ * network, and a hard-coded value is either too tight for someone or too loose.
  */
-const UPLOAD_IDLE_TIMEOUT_MS = 30_000;
+function uploadIdleTimeoutMs(): number {
+  return appConfig.docker.buildUploadIdleTimeoutMs;
+}
 
 /**
  * Admit one build at a time, deciding *before* `express.raw` buffers a body.
@@ -261,10 +265,11 @@ function oneBuildAtATime(req: BuildRequest, res: Response, next: NextFunction) {
     idle = setTimeout(() => {
       logger.warn('Compute build upload stalled; releasing the build slot', {
         serviceId: req.params.id,
+        idleMs: uploadIdleTimeoutMs(),
       });
       release();
       req.destroy();
-    }, UPLOAD_IDLE_TIMEOUT_MS);
+    }, uploadIdleTimeoutMs());
   };
   armIdleTimer();
   req.on('data', armIdleTimer);

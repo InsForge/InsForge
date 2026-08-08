@@ -55,6 +55,7 @@ export interface AppConfig {
     bindAddress: string;
     isolateNetwork: boolean;
     buildMaxContextSize: string;
+    buildUploadIdleTimeoutMs: number;
   };
   server: {
     maxJsonBodySize: string;
@@ -202,14 +203,23 @@ export function loadConfig(): AppConfig {
       // Docker's own default (0.0.0.0, plus [::]) is not.
       bindAddress: process.env.COMPUTE_BIND_ADDRESS || '127.0.0.1',
       // Skip attaching containers to the project's own compose network. Off by
-      // default — proximity to the database and storage is the point.
-      isolateNetwork: process.env.COMPUTE_ISOLATE_NETWORK === 'true',
+      // default — proximity to the database and storage is the point. Uses the
+      // shared parser so `1`/`yes`/`on` work too: a knob that silently ignores
+      // `COMPUTE_ISOLATE_NETWORK=1` fails in the unsafe direction.
+      isolateNetwork: parseEnvBool(process.env.COMPUTE_ISOLATE_NETWORK),
       // Ceiling on an uploaded build context. Deliberately *not* the JSON body
       // limit it used to borrow: express buffers the whole tarball in memory
       // before any handler runs, and a t4g.nano has ~418MB usable, so a 100MB
       // ceiling is a self-inflicted OOM. A source context is normally single-digit
       // megabytes; 64MB is generous for one that vendors dependencies.
       buildMaxContextSize: process.env.COMPUTE_BUILD_MAX_CONTEXT || '64mb',
+      // How long an upload may send nothing before it is treated as stalled and
+      // cut loose. Only builds one at a time, so a connection that stops making
+      // progress while holding the slot blocks every other deploy. The timer resets
+      // on each chunk, so this bounds silence, not total upload time — a slow but
+      // active link is never cut.
+      buildUploadIdleTimeoutMs:
+        parseEnvInt(process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT, 30) * 1000,
     },
     server: {
       maxJsonBodySize: process.env.MAX_JSON_BODY_SIZE || '100mb',

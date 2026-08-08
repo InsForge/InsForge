@@ -1,3 +1,6 @@
+import { createServer } from 'node:http';
+import { request as httpRequest } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import express, { type ErrorRequestHandler } from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -312,6 +315,110 @@ describe('POST /api/compute/services/:id/build', () => {
     // sleep that loses the race reports a spurious 429 and flakes under load.
     const third = await retryUntilNot429(app);
     expect(third.status).toBe(200);
+  });
+
+  // The two slot-lifecycle branches that decide whether builds block forever or
+  // overlap. Neither is reachable through supertest, which always sends a complete
+  // body — they need a socket we can stall or drop mid-upload, so these drive a real
+  // listener with `http.request` and a `Content-Length` we deliberately underfill.
+  describe('build slot lifecycle under a misbehaving client', () => {
+    /** Start the app on an ephemeral port. */
+    async function listen(app: express.Express) {
+      const server = createServer(app);
+      await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+      const { port } = server.address() as AddressInfo;
+      return { server, port, close: () => new Promise<void>((r) => server.close(() => r())) };
+    }
+
+    /**
+     * Open a build request that announces more body than it sends, so the server sits
+     * inside `express.raw` waiting for the rest.
+     */
+    function openPartialUpload(port: number) {
+      const req = httpRequest({
+        host: '127.0.0.1',
+        port,
+        method: 'POST',
+        path: '/api/compute/services/svc-1/build',
+        headers: {
+          'content-type': 'application/x-tar',
+          'content-length': String(TAR.length * 2),
+          'x-api-key': 'test',
+        },
+      });
+      // Both tests kill this socket on purpose; without a listener the ECONNRESET
+      // surfaces as an unhandled error and fails the run even though the
+      // assertions pass.
+      req.on('error', () => {});
+      req.write(TAR); // half of what we promised
+      return req;
+    }
+
+    it('frees the slot when the client vanishes before the handler runs', async () => {
+      const app = await createApp();
+      const { port, close } = await listen(app);
+      try {
+        const partial = openPartialUpload(port);
+        await new Promise((r) => setTimeout(r, 50));
+
+        // Held: the upload is parked inside express.raw, so nothing else gets in.
+        const blocked = await request(app)
+          .post('/api/compute/services/svc-1/build')
+          .set('Content-Type', 'application/x-tar')
+          .send(TAR);
+        expect(blocked.status).toBe(429);
+        expect(computeServiceMock.buildAndDeploy).not.toHaveBeenCalled();
+
+        // The client disappears without ever reaching the handler. `res.close` is the
+        // only thing that can hand the slot back here.
+        partial.destroy();
+
+        const after = await retryUntilNot429(app);
+        expect(after.status).toBe(200);
+      } finally {
+        await close();
+      }
+    });
+
+    it('cuts a stalled upload loose after the configured idle timeout', async () => {
+      const original = process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT;
+      // Seconds, so this is the smallest value the knob expresses.
+      process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT = '1';
+      vi.resetModules();
+      try {
+        const app = await createApp();
+        const { port, close } = await listen(app);
+        try {
+          const stalled = openPartialUpload(port);
+          const died = new Promise<string>((resolve) => {
+            stalled.on('error', () => resolve('socket dropped'));
+            stalled.on('response', () => resolve('got a response'));
+          });
+          await new Promise((r) => setTimeout(r, 50));
+
+          // Held while the upload looks alive.
+          const blocked = await request(app)
+            .post('/api/compute/services/svc-1/build')
+            .set('Content-Type', 'application/x-tar')
+            .send(TAR);
+          expect(blocked.status).toBe(429);
+
+          // Send nothing further: the watchdog should destroy the request and release.
+          expect(await died).toBe('socket dropped');
+          const after = await retryUntilNot429(app);
+          expect(after.status).toBe(200);
+        } finally {
+          await close();
+        }
+      } finally {
+        if (original === undefined) {
+          delete process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT;
+        } else {
+          process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT = original;
+        }
+        vi.resetModules();
+      }
+    }, 15_000);
   });
 });
 
