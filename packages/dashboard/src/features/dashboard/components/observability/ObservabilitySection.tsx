@@ -328,8 +328,9 @@ export function ObservabilitySection() {
                               defaultValue: 'Used',
                             }),
                           },
-                          // Supabase palette: Database orange, WAL light green,
-                          // System green; stacked bottom-up in that order.
+                          // Semantic palette: Database emerald (your data),
+                          // WAL amber (the log), System gray (not yours to
+                          // manage); stacked bottom-up in that order.
                           components: diskCardProps.breakdown
                             ? [
                                 {
@@ -337,7 +338,7 @@ export function ObservabilitySection() {
                                   label: t('overview.metrics.diskUsed.database', {
                                     defaultValue: 'Database',
                                   }),
-                                  fillClass: 'fill-orange-300',
+                                  fillClass: 'fill-emerald-400',
                                   data: diskCardProps.breakdown.database,
                                 },
                                 {
@@ -345,7 +346,7 @@ export function ObservabilitySection() {
                                   label: t('overview.metrics.diskUsed.wal', {
                                     defaultValue: 'WAL',
                                   }),
-                                  fillClass: 'fill-emerald-200',
+                                  fillClass: 'fill-amber-300',
                                   data: diskCardProps.breakdown.wal,
                                 },
                                 {
@@ -353,7 +354,7 @@ export function ObservabilitySection() {
                                   label: t('overview.metrics.diskUsed.system', {
                                     defaultValue: 'System',
                                   }),
-                                  fillClass: 'fill-emerald-400',
+                                  fillClass: 'fill-zinc-500',
                                   data: diskCardProps.breakdown.system,
                                 },
                               ]
@@ -391,21 +392,21 @@ export function ObservabilitySection() {
                                         defaultValue: 'Database',
                                       }),
                                       value: `${BYTES_SIZE(db)}${pct(db)}`,
-                                      swatchClass: 'bg-orange-300',
+                                      swatchClass: 'bg-emerald-400',
                                     },
                                     {
                                       label: t('overview.metrics.diskUsed.wal', {
                                         defaultValue: 'WAL',
                                       }),
                                       value: `${BYTES_SIZE(wal)}${pct(wal)}`,
-                                      swatchClass: 'bg-emerald-200',
+                                      swatchClass: 'bg-amber-300',
                                     },
                                     {
                                       label: t('overview.metrics.diskUsed.system', {
                                         defaultValue: 'System',
                                       }),
                                       value: `${BYTES_SIZE(system)}${pct(system)}`,
-                                      swatchClass: 'bg-emerald-400',
+                                      swatchClass: 'bg-zinc-500',
                                     },
                                     {
                                       label: t('overview.metrics.diskUsed.total', {
