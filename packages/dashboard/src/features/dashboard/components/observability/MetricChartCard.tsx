@@ -20,6 +20,34 @@ export interface MetricChartCardProps {
   formatAxisLabel?: (value: number) => string;
   /** Short explanation of the metric, surfaced via an info tooltip next to the title. */
   description?: string;
+  /**
+   * Supabase-style capacity chart: samples drawn as bars against a fixed
+   * domain whose top edge is the provisioned ceiling (dashed line), with
+   * labeled y-axis ticks and a legend naming the ceiling and the bars.
+   * Only meaningful with `fixedDomain`; replaces the area/line rendering.
+   */
+  capacity?: {
+    ticks: number[];
+    legend: { ceiling: string; used: string };
+    /**
+     * Stacked composition series (bottom-up render order). When present the
+     * bars stack these instead of drawing the primary series, giving the
+     * Supabase-style Database/WAL/System breakdown; all series come from one
+     * sampler so they share timestamps.
+     */
+    components?: Array<{
+      key: string;
+      label: string;
+      fillClass: string;
+      data: DashboardMetricDataPoint[];
+    }>;
+    /** Component rows for the hovered moment; null hides the row block. */
+    tooltipRows?: (
+      timestamp: number
+    ) => Array<{ label: string; value: string; swatchClass?: string }> | null;
+  };
+  /** Extra tooltip line under the value, e.g. the value as a share of the ceiling. */
+  tooltipDetail?: (value: number) => string;
 }
 
 const SPARKLINE_WIDTH = 434;
@@ -113,6 +141,8 @@ export function MetricChartCard({
   fixedDomain,
   formatAxisLabel,
   description,
+  capacity,
+  tooltipDetail,
 }: MetricChartCardProps) {
   const { t } = useTranslation('chrome');
   const effectiveDomain =
@@ -135,6 +165,19 @@ export function MetricChartCard({
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   const renderValue = (value: number | null) => (value === null ? '—' : formatValue(value));
+
+  // Timestamp of the newest sample, under the headline (Supabase-style): the
+  // big number is a reading at a moment, not a live gauge, and saying which
+  // moment stops "why doesn't it move?" confusion on slow-scrape metrics.
+  const latestTimestamp = useMemo(() => {
+    let latest: number | null = null;
+    for (const point of data) {
+      if (Number.isFinite(point.value) && (latest === null || point.timestamp > latest)) {
+        latest = point.timestamp;
+      }
+    }
+    return latest;
+  }, [data]);
 
   const handleMove: MouseEventHandler<SVGSVGElement> = (e) => {
     const svg = svgRef.current;
@@ -159,6 +202,74 @@ export function MetricChartCard({
   };
 
   const handleLeave = () => setHoverIdx(null);
+
+  // Capacity variant: each sample becomes a slim bar rising from the floor,
+  // matching the Supabase disk chart. Bars reuse the sparkline's x/y mapping,
+  // so the hover hit-testing above works unchanged.
+  const bars = useMemo(() => {
+    if (!capacity || capacity.components?.length || sparkline.points.length === 0) {
+      return [];
+    }
+    const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / sparkline.points.length;
+    const width = Math.max(2, slot * 0.85);
+    // Bars live to the right of the y-axis label gutter, like the gridlines.
+    return sparkline.points.map((point) => ({
+      x: Math.max(Y_AXIS_LABEL_WIDTH + 2, Math.min(point.x, SPARKLINE_WIDTH - width)),
+      y: point.y,
+      width,
+      height: Math.max(1.5, SPARKLINE_HEIGHT - point.y),
+    }));
+  }, [capacity, sparkline.points]);
+
+  // Stacked composition bars: segments accumulate bottom-up per shared sample
+  // timestamp, mapped onto the same time window and domain as the primary
+  // series so the stack lines up with the axis and the used/AVG stats.
+  const stackedBars = useMemo(() => {
+    const components = capacity?.components;
+    if (!components?.length) {
+      return [];
+    }
+    const finitePrimary = data.filter((point) => Number.isFinite(point.value));
+    const windowEnd = finitePrimary.length
+      ? finitePrimary[finitePrimary.length - 1].timestamp
+      : (components[0].data[components[0].data.length - 1]?.timestamp ??
+        Math.floor(Date.now() / 1000));
+    const windowStart = windowEnd - rangeSeconds;
+    const [min, max] = effectiveDomain ?? [0, 100];
+    const valueRange = max - min || 1;
+    const base = components[0].data;
+    const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / Math.max(1, base.length);
+    const width = Math.max(2, slot * 0.85);
+
+    return base
+      .map((point, i) => {
+        const rawX =
+          ((point.timestamp - windowStart) / Math.max(1, rangeSeconds)) * SPARKLINE_WIDTH;
+        const x = Math.max(Y_AXIS_LABEL_WIDTH + 2, Math.min(rawX, SPARKLINE_WIDTH - width));
+        let cumulative = 0;
+        const segments = components.map((component) => {
+          const value = component.data[i]?.value ?? 0;
+          const y0 = cumulative;
+          cumulative += value;
+          const yTop = SPARKLINE_HEIGHT - ((cumulative - min) / valueRange) * SPARKLINE_HEIGHT;
+          const yBottom = SPARKLINE_HEIGHT - ((y0 - min) / valueRange) * SPARKLINE_HEIGHT;
+          return {
+            key: component.key,
+            fillClass: component.fillClass,
+            y: yTop,
+            height: Math.max(value > 0 ? 1 : 0, yBottom - yTop),
+          };
+        });
+        return {
+          x,
+          width,
+          timestamp: point.timestamp,
+          inWindow: point.timestamp >= windowStart,
+          segments,
+        };
+      })
+      .filter((bar) => bar.inWindow);
+  }, [capacity, data, rangeSeconds, effectiveDomain]);
 
   const hover = hoverIdx !== null ? sparkline.points[hoverIdx] : null;
   const hoverLeftPct = hover ? (hover.x / SPARKLINE_WIDTH) * 100 : 0;
@@ -215,9 +326,22 @@ export function MetricChartCard({
             </Popover>
           )}
         </div>
-        <p className="text-[20px] font-medium leading-7 text-foreground">
-          {isLoading ? '—' : renderValue(aggregates.latest)}
-        </p>
+        <div className="flex flex-col">
+          <p className="text-[20px] font-medium leading-7 text-foreground">
+            {isLoading ? '—' : renderValue(aggregates.latest)}
+          </p>
+          {!isLoading && latestTimestamp !== null && (
+            <p className="text-xs leading-4 text-muted-foreground">
+              {new Date(latestTimestamp * 1000).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </p>
+          )}
+        </div>
         <div className="flex flex-col gap-1">
           <div className="relative h-[100px]">
             {sparkline.line ? (
@@ -275,11 +399,13 @@ export function MetricChartCard({
                       </linearGradient>
                     </defs>
                   )}
-                  <path
-                    d={sparkline.area}
-                    fill={threshold !== undefined ? `url(#${gradientId}-area)` : 'currentColor'}
-                    className={threshold !== undefined ? '' : 'text-emerald-300/15'}
-                  />
+                  {!capacity && (
+                    <path
+                      d={sparkline.area}
+                      fill={threshold !== undefined ? `url(#${gradientId}-area)` : 'currentColor'}
+                      className={threshold !== undefined ? '' : 'text-emerald-300/15'}
+                    />
+                  )}
                   {threshold !== undefined && (
                     <line
                       x1={Y_AXIS_LABEL_WIDTH}
@@ -292,13 +418,65 @@ export function MetricChartCard({
                       vectorEffect="non-scaling-stroke"
                     />
                   )}
-                  <path
-                    d={sparkline.line}
-                    fill="none"
-                    stroke={threshold !== undefined ? `url(#${gradientId}-line)` : 'currentColor'}
-                    strokeWidth={2}
-                    className={threshold !== undefined ? '' : 'text-emerald-300'}
-                  />
+                  {capacity &&
+                    capacity.ticks.map((tick) => {
+                      const yPct = 1 - (tick - domainMin) / domainRange;
+                      const y = Math.max(
+                        1,
+                        Math.min(SPARKLINE_HEIGHT - 1, yPct * SPARKLINE_HEIGHT)
+                      );
+                      const isCeiling = tick === domainMax;
+                      return (
+                        <line
+                          key={tick}
+                          x1={Y_AXIS_LABEL_WIDTH}
+                          x2={SPARKLINE_WIDTH}
+                          y1={y}
+                          y2={y}
+                          stroke={isCeiling ? 'var(--alpha-16)' : 'var(--alpha-8)'}
+                          strokeWidth={1}
+                          strokeDasharray={isCeiling ? '4 3' : undefined}
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      );
+                    })}
+                  {!capacity && (
+                    <path
+                      d={sparkline.line}
+                      fill="none"
+                      stroke={threshold !== undefined ? `url(#${gradientId}-line)` : 'currentColor'}
+                      strokeWidth={2}
+                      className={threshold !== undefined ? '' : 'text-emerald-300'}
+                    />
+                  )}
+                  {capacity &&
+                    bars.map((bar, i) => (
+                      <rect
+                        key={i}
+                        x={bar.x}
+                        y={bar.y}
+                        width={bar.width}
+                        height={bar.height}
+                        rx={1}
+                        className="fill-emerald-300"
+                      />
+                    ))}
+                  {stackedBars.map((bar) => (
+                    <g key={bar.timestamp}>
+                      {bar.segments.map((segment) =>
+                        segment.height > 0 ? (
+                          <rect
+                            key={segment.key}
+                            x={bar.x}
+                            y={segment.y}
+                            width={bar.width}
+                            height={segment.height}
+                            className={segment.fillClass}
+                          />
+                        ) : null
+                      )}
+                    </g>
+                  ))}
                 </svg>
                 {threshold !== undefined && (
                   <>
@@ -313,6 +491,23 @@ export function MetricChartCard({
                     </span>
                   </>
                 )}
+                {capacity &&
+                  capacity.ticks.map((tick) => {
+                    const yPct = (1 - (tick - domainMin) / domainRange) * 100;
+                    const atTop = tick === domainMax;
+                    const atBottom = tick === domainMin;
+                    return (
+                      <span
+                        key={tick}
+                        className={`pointer-events-none absolute left-0 text-xs leading-4 text-muted-foreground ${
+                          atTop ? '' : atBottom ? '-translate-y-full' : '-translate-y-1/2'
+                        }`}
+                        style={{ top: `${Math.max(0, Math.min(100, yPct))}%` }}
+                      >
+                        {renderAxisLabel(tick)}
+                      </span>
+                    );
+                  })}
                 {hover && (
                   <>
                     <div
@@ -341,6 +536,36 @@ export function MetricChartCard({
                       >
                         {formatValue(hover.value)}
                       </div>
+                      {tooltipDetail && (
+                        <div className="text-muted-foreground">{tooltipDetail(hover.value)}</div>
+                      )}
+                      {capacity?.tooltipRows &&
+                        (() => {
+                          const rows = capacity.tooltipRows(hover.timestamp);
+                          if (!rows?.length) {
+                            return null;
+                          }
+                          return (
+                            <div className="mt-1 flex flex-col gap-0.5 border-t border-[var(--alpha-8)] pt-1">
+                              {rows.map((row) => (
+                                <div
+                                  key={row.label}
+                                  className="flex items-center justify-between gap-3"
+                                >
+                                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                                    {row.swatchClass && (
+                                      <span
+                                        className={`h-1.5 w-1.5 rounded-full ${row.swatchClass}`}
+                                      />
+                                    )}
+                                    {row.label}
+                                  </span>
+                                  <span className="tabular-nums">{row.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       <div className="text-muted-foreground">
                         {formatHoverTime(hover.timestamp, rangeSeconds)}
                       </div>
@@ -358,9 +583,37 @@ export function MetricChartCard({
           </div>
           {sparkline.line && (
             <div className="relative h-4 text-xs leading-4 text-muted-foreground">
-              {threshold === undefined && <span className="absolute left-0">{xAxisTicks[0]}</span>}
+              {threshold === undefined && !capacity && (
+                <span className="absolute left-0">{xAxisTicks[0]}</span>
+              )}
               <span className="absolute left-1/2 -translate-x-1/2">{xAxisTicks[1]}</span>
               <span className="absolute right-0">{xAxisTicks[2]}</span>
+            </div>
+          )}
+          {capacity && sparkline.line && (
+            <div className="flex items-center justify-center gap-4 pt-1 text-xs leading-4 text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden className="tracking-[2px]">
+                  ···
+                </span>
+                {capacity.legend.ceiling}
+              </span>
+              {capacity.components?.length ? (
+                capacity.components.map((component) => (
+                  <span key={component.key} className="flex items-center gap-1.5">
+                    <span
+                      aria-hidden
+                      className={`h-2 w-2 rounded-full ${component.fillClass.replace('fill-', 'bg-')}`}
+                    />
+                    {component.label}
+                  </span>
+                ))
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-300" />
+                  {capacity.legend.used}
+                </span>
+              )}
             </div>
           )}
         </div>

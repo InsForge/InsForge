@@ -43,6 +43,18 @@ This directory contains deployment guides for self-hosting the InsForge platform
   - Multi-tenant: many isolated InsForge projects per host
   - Optional agent-driven deploy via MCP
 
+### Self-Hosted PaaS
+
+- **[Coolify](./deploy-to-coolify.md)** - Deploy InsForge as a Docker Compose resource on your own Coolify instance
+  - Repository-connected deploys, rebuilt on push
+  - Domain and TLS handled by Coolify's proxy
+  - Postgres built from the repo, so its config tracks the release
+
+- **[Dokploy](./deploy-to-dokploy.md)** - Deploy InsForge as a Compose application on your own Dokploy instance
+  - Repository-connected deploys with optional Auto Deploy
+  - Domain and TLS handled by Dokploy's proxy
+  - Postgres built from the repo, so its config tracks the release
+
 ### Coming Soon
 
 - **Digital Ocean** - Droplet deployment guide

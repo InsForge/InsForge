@@ -168,8 +168,19 @@
       },
       "diskUsed": {
         "title": "Uso de disco",
-        "description": "Cuánto almacenamiento de tu instancia usan la base de datos, los archivos y los registros. Un disco lleno detiene las escrituras y puede dejar el backend fuera de línea."
+        "description": "Cuánto almacenamiento de tu instancia usan la base de datos, los archivos y los registros. Un disco lleno detiene las escrituras y puede dejar el backend fuera de línea.",
+        "ceiling": "Tamaño del disco",
+        "used": "Usado",
+        "database": "Base de datos",
+        "wal": "WAL",
+        "system": "Sistema",
+        "total": "Total"
       }
+    },
+    "memoryAdvisory": {
+      "title": "La memoria está en {{value}}. Para Postgres, eso es normal.",
+      "description": "Postgres usa la memoria libre para cachear tus datos y la retiene incluso cuando la base de datos está inactiva, así que un número alto aquí no significa que algo vaya mal. Las señales que sí importan son los reinicios y las consultas cada vez más lentas. Si las estás viendo, una instancia más grande le dará espacio.",
+      "cta": "Mejorar instancia"
     },
     "steps": {
       "database": {
@@ -683,7 +694,8 @@
       "step2Description": {
         "text": "Crea una respuesta de chat a través de OpenRouter con el SDK de OpenAI.",
         "image": "Genera una imagen con un modelo de OpenRouter que admita salida de imágenes.",
-        "video": "Envía un trabajo asíncrono de generación de video y consúltalo hasta que termine."
+        "video": "Envía un trabajo asíncrono de generación de video y consúltalo hasta que termine.",
+        "embeddings": "Genera embeddings de texto a través de OpenRouter con el SDK de OpenAI."
       },
       "step3Title": "Configura tu clave de API",
       "step3Description": "Agrega tu clave de API de OpenRouter a un archivo .env.local.",
@@ -692,12 +704,14 @@
       "modes": {
         "text": "Generación de texto",
         "image": "Generación de imágenes",
-        "video": "Generación de video"
+        "video": "Generación de video",
+        "embeddings": "Embeddings"
       },
       "promptCard": {
         "text": "Copia este prompt para que tu agente genere texto a través del gateway de modelos de OpenRouter.",
         "image": "Copia este prompt para que tu agente genere imágenes a través del gateway de modelos de OpenRouter.",
-        "video": "Copia este prompt para que tu agente genere videos a través del gateway de modelos de OpenRouter."
+        "video": "Copia este prompt para que tu agente genere videos a través del gateway de modelos de OpenRouter.",
+        "embeddings": "Copia este prompt para que tu agente genere embeddings de texto a través del gateway de modelos de OpenRouter."
       }
     }
   },

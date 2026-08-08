@@ -168,8 +168,19 @@
       },
       "diskUsed": {
         "title": "Disk Usage",
-        "description": "How much of your instance's storage the database, files, and logs are using. A full disk stops writes and can take the backend offline."
+        "description": "How much of your instance's storage the database, files, and logs are using. A full disk stops writes and can take the backend offline.",
+        "ceiling": "Disk Size",
+        "used": "Used",
+        "database": "Database",
+        "wal": "WAL",
+        "system": "System",
+        "total": "Total"
       }
+    },
+    "memoryAdvisory": {
+      "title": "Memory is sitting at {{value}}. For Postgres, that's normal.",
+      "description": "Postgres grabs spare memory to cache your data and keeps it, even when the database is idle. A high number here doesn't mean something is wrong. The warning signs that actually matter are restarts and queries slowing down. If you're seeing those, a bigger instance will give it room.",
+      "cta": "Upgrade Instance"
     },
     "steps": {
       "database": {
@@ -589,7 +600,7 @@
         "image": "Image",
         "audio": "Audio",
         "video": "Video",
-        "embeddings": "Embed"
+        "embeddings": "Embeddings"
       },
       "columns": {
         "model": "Model",
@@ -679,7 +690,8 @@
       "step2Description": {
         "text": "Create a chat completion through OpenRouter with the OpenAI SDK.",
         "image": "Generate an image with an OpenRouter model that supports image output.",
-        "video": "Submit an asynchronous video generation job and poll until it completes."
+        "video": "Submit an asynchronous video generation job and poll until it completes.",
+        "embeddings": "Generate text embeddings through OpenRouter with the OpenAI SDK."
       },
       "step3Title": "Set Up Your API Key",
       "step3Description": "Add your OpenRouter API key to a .env.local file.",
@@ -688,12 +700,14 @@
       "modes": {
         "text": "Text Generation",
         "image": "Image Generation",
-        "video": "Video Generation"
+        "video": "Video Generation",
+        "embeddings": "Embeddings"
       },
       "promptCard": {
         "text": "Copy this prompt for your agent to generate text through the OpenRouter model gateway.",
         "image": "Copy this prompt for your agent to generate images through the OpenRouter model gateway.",
-        "video": "Copy this prompt for your agent to generate videos through the OpenRouter model gateway."
+        "video": "Copy this prompt for your agent to generate videos through the OpenRouter model gateway.",
+        "embeddings": "Copy this prompt for your agent to generate text embeddings through the OpenRouter model gateway."
       }
     }
   },

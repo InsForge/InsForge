@@ -94,45 +94,25 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
 
 ## Step 3: 🚀 Deploy InsForge
 
-1.  **Clone the Repository:**
-    Navigate to your home directory and clone the InsForge project.
+1.  **Get the Repository:**
     ```bash
-    cd ~
-    git clone https://github.com/InsForge/InsForge.git
-    cd InsForge/deploy/docker-compose
+    curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
     ```
+    Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY`, `ROOT_ADMIN_PASSWORD` and `POSTGRES_PASSWORD` into `.env`. Nothing is started.
 
 2.  **Create Environment Configuration:**
-    Create your `.env` file from the example and open it for editing.
+    The secrets are already generated — leave them as they are. Point the API URLs at your VM.
     ```bash
-    cp .env.example .env
+    cd ~/insforge
     nano .env
     ```
-    `.env.example` lists every supported variable with comments. For a basic deployment you only need to set a few. Set these values and update the API URLs to your VM's public IP:
 
     ```ini
-    # Required
-    JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-    ROOT_ADMIN_USERNAME=admin
-    ROOT_ADMIN_PASSWORD=change-this-password
-    POSTGRES_PASSWORD=change-this-password
-
-    # API URLs (replace with your VM public IP or domain)
     API_BASE_URL=http://<your-vm-public-ip>:7130
     VITE_API_BASE_URL=http://<your-vm-public-ip>:7130
-
-    # Optional
-    # ENCRYPTION_KEY falls back to JWT_SECRET if left empty
-    ENCRYPTION_KEY=
-    # OPENROUTER_API_KEY=
-    # VERCEL_TOKEN=
-    # GOOGLE_CLIENT_ID=
     ```
     The rest of `.env.example` covers optional features (OpenRouter, Vercel deployments, OAuth providers). Leave those blank unless you need them.
-    > **Generate a Secure JWT Secret:** Run this on your VM and paste the result into `JWT_SECRET`:
-    > ```bash
-    > openssl rand -base64 32
-    > ```
+    > Back up `.env` somewhere safe. Its secrets are what let you migrate or restore this instance.
 
 3.  **Start InsForge Services:**
     Pull the Docker images and start all services in the background.
@@ -222,7 +202,7 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
 4.  **Update `.env` with HTTPS URLs:**
     Edit your `.env` file and update the URLs.
     ```bash
-    cd ~/InsForge
+    cd ~/insforge
     nano .env
     ```
     Change the URLs to `https`:
@@ -242,13 +222,14 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
 * **View Logs:** `docker compose logs -f` (all services) or `docker compose logs -f insforge` (specific service).
 * **Stop Services:** `docker compose down`
 * **Restart Services:** `docker compose restart`
-* **Update InsForge:** Run these from `~/InsForge/deploy/docker-compose`. The images are prebuilt, so pull the latest tags instead of rebuilding.
+* **Update InsForge:** Run these from `~/insforge`. The images are prebuilt, so pull the latest tags instead of rebuilding.
     ```bash
-    cd ~/InsForge/deploy/docker-compose
-    git -C ~/InsForge pull origin main
+    cd ~/insforge
+    git -C ~/insforge pull origin main
+    sh deploy/setup.sh .
     docker compose pull && docker compose up -d
     ```
-* **Backup Database:** Run from `~/InsForge/deploy/docker-compose`.
+* **Backup Database:** Run from `~/insforge`.
     ```bash
     docker compose exec postgres pg_dump -U postgres insforge > backup_$(date +%Y%m%d_%H%M%S).sql
     ```
