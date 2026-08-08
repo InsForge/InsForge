@@ -196,7 +196,9 @@ Then give each a project name and its own ports. Both `.env` files start with
 containers** — the second `up -d` adopts the first's, rebuilt with the second's
 config. Set it before starting anything.
 
-`~/project1/.env`:
+`~/project1/.env` keeps the default ports — which collide with the `~/insforge`
+instance from the quickstart above if it is still running. Stop that one, or give
+`project1` its own ports the way `project2` has:
 
 ```env
 COMPOSE_PROJECT_NAME=project1
