@@ -350,6 +350,10 @@
               {
                 "group": "Dashboard",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/dashboard.yaml"
+              },
+              {
+                "group": "RPC",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/rpc.yaml"
               }
             ]
           }
@@ -678,6 +682,10 @@
               {
                 "group": "Dashboard",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/dashboard.yaml"
+              },
+              {
+                "group": "RPC",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/rpc.yaml"
               }
             ]
           }
@@ -1006,6 +1014,10 @@
               {
                 "group": "Dashboard",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/dashboard.yaml"
+              },
+              {
+                "group": "RPC",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/rpc.yaml"
               }
             ]
           }
@@ -1334,6 +1346,10 @@
               {
                 "group": "Dashboard",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/dashboard.yaml"
+              },
+              {
+                "group": "RPC",
+                "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/rpc.yaml"
               }
             ]
           }
