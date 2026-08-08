@@ -159,8 +159,19 @@
       },
       "diskUsed": {
         "title": "磁碟使用率",
-        "description": "資料庫、檔案和日誌佔用執行個體儲存空間的情況。磁碟寫滿會導致寫入停止，甚至使後端離線。"
+        "description": "資料庫、檔案和日誌佔用執行個體儲存空間的情況。磁碟寫滿會導致寫入停止，甚至使後端離線。",
+        "ceiling": "磁碟容量",
+        "used": "已使用",
+        "database": "資料庫",
+        "wal": "WAL",
+        "system": "系統",
+        "total": "總計"
       }
+    },
+    "memoryAdvisory": {
+      "title": "記憶體佔用 {{value}}，對 Postgres 來說這是正常的。",
+      "description": "Postgres 會把閒置記憶體拿來快取你的資料，即使資料庫閒著也會一直佔用，所以這裡數字偏高不代表出了問題。真正要留意的訊號是重啟和查詢變慢，如果出現了，換個更大的執行個體就能解決。",
+      "cta": "升級執行個體"
     },
     "steps": {
       "database": {
@@ -664,7 +675,8 @@
       "step2Description": {
         "text": "使用 OpenAI SDK 透過 OpenRouter 建立聊天補全。",
         "image": "使用支援圖片輸出的 OpenRouter 模型產生圖片。",
-        "video": "提交非同步影片產生工作並輪詢直到完成。"
+        "video": "提交非同步影片產生工作並輪詢直到完成。",
+        "embeddings": "使用 OpenAI SDK 透過 OpenRouter 產生文字嵌入。"
       },
       "step3Title": "設定 API 金鑰",
       "step3Description": "將你的 OpenRouter API 金鑰加入 .env.local 檔案。",
@@ -673,12 +685,14 @@
       "modes": {
         "text": "文字生成",
         "image": "圖片生成",
-        "video": "影片生成"
+        "video": "影片生成",
+        "embeddings": "嵌入生成"
       },
       "promptCard": {
         "text": "複製此提示詞，讓你的代理透過 OpenRouter 模型閘道生成文字。",
         "image": "複製此提示詞，讓你的代理透過 OpenRouter 模型閘道產生圖片。",
-        "video": "複製此提示詞，讓你的代理透過 OpenRouter 模型閘道產生影片。"
+        "video": "複製此提示詞，讓你的代理透過 OpenRouter 模型閘道產生影片。",
+        "embeddings": "複製此提示詞，讓你的代理透過 OpenRouter 模型閘道產生文字嵌入。"
       }
     }
   },

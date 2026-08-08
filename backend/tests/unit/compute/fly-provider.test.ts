@@ -37,6 +37,8 @@ describe('FlyProvider', () => {
   let provider: FlyProvider;
 
   beforeEach(() => {
+    // createApp derives the 6PN network name from APP_KEY.
+    process.env.APP_KEY = 'testkey1';
     provider = FlyProvider.getInstance();
     vi.restoreAllMocks();
   });
@@ -54,11 +56,7 @@ describe('FlyProvider', () => {
         .mockResolvedValueOnce(graphqlOkResponse());
       vi.stubGlobal('fetch', mockFetch);
 
-      const result = await provider.createApp({
-        name: 'my-app',
-        network: 'default',
-        org: 'test-org',
-      });
+      const result = await provider.createApp({ name: 'my-app' });
 
       expect(mockFetch).toHaveBeenCalledTimes(3);
 
@@ -71,7 +69,8 @@ describe('FlyProvider', () => {
           body: JSON.stringify({
             app_name: 'my-app',
             org_slug: 'test-org',
-            network: 'default',
+            // Derived from APP_KEY by flyNetworkName(), not passed in.
+            network: 'n-testkey1',
           }),
         })
       );
@@ -105,9 +104,9 @@ describe('FlyProvider', () => {
       });
       vi.stubGlobal('fetch', mockFetch);
 
-      await expect(
-        provider.createApp({ name: 'my-app', network: 'default', org: 'test-org' })
-      ).rejects.toThrow('Fly API error (422): app already exists');
+      await expect(provider.createApp({ name: 'my-app' })).rejects.toThrow(
+        'Fly API error (422): app already exists'
+      );
     });
 
     it('throws when GraphQL allocateIpAddress returns errors', async () => {
@@ -120,9 +119,9 @@ describe('FlyProvider', () => {
         });
       vi.stubGlobal('fetch', mockFetch);
 
-      await expect(
-        provider.createApp({ name: 'my-app', network: 'default', org: 'test-org' })
-      ).rejects.toThrow(/Fly GraphQL allocateIpAddress\(shared_v4\) errors/);
+      await expect(provider.createApp({ name: 'my-app' })).rejects.toThrow(
+        /Fly GraphQL allocateIpAddress\(shared_v4\) errors/
+      );
     });
 
     it('throws when GraphQL allocateIpAddress responds non-2xx', async () => {
@@ -136,9 +135,9 @@ describe('FlyProvider', () => {
         });
       vi.stubGlobal('fetch', mockFetch);
 
-      await expect(
-        provider.createApp({ name: 'my-app', network: 'default', org: 'test-org' })
-      ).rejects.toThrow(/Fly GraphQL allocateIpAddress\(shared_v4\) failed \(500\)/);
+      await expect(provider.createApp({ name: 'my-app' })).rejects.toThrow(
+        /Fly GraphQL allocateIpAddress\(shared_v4\) failed \(500\)/
+      );
     });
   });
 
@@ -559,5 +558,43 @@ describe('FlyProvider machine-gone translation', () => {
     expect(err).not.toBeInstanceOf(MachineGoneError);
     expect(err).toBeInstanceOf(Error);
     expect((err as Error).message).toMatch(/500/);
+  });
+
+  describe('flyNetworkName', () => {
+    // The service layer used to own this and threw a typed AppError; moving it to
+    // the shared module must not downgrade a missing APP_KEY into a generic 500
+    // with no next action.
+    it('throws a typed compute error when APP_KEY is missing', async () => {
+      const { flyNetworkName } = await import('@/providers/compute/compute.provider.js');
+      const { AppError } = await import('@/utils/errors.js');
+      const saved = process.env.APP_KEY;
+      delete process.env.APP_KEY;
+      try {
+        expect(() => flyNetworkName()).toThrow(AppError);
+        try {
+          flyNetworkName();
+        } catch (e) {
+          expect((e as InstanceType<typeof AppError>).statusCode).toBe(500);
+          expect((e as InstanceType<typeof AppError>).code).toBe('COMPUTE_SERVICE_NOT_CONFIGURED');
+        }
+      } finally {
+        if (saved === undefined) {
+          delete process.env.APP_KEY;
+        } else {
+          process.env.APP_KEY = saved;
+        }
+      }
+    });
+
+    it('prefixes with `n-` so the name always starts with a letter', async () => {
+      const { flyNetworkName } = await import('@/providers/compute/compute.provider.js');
+      const saved = process.env.APP_KEY;
+      process.env.APP_KEY = '9digitlead';
+      try {
+        expect(flyNetworkName()).toBe('n-9digitlead');
+      } finally {
+        process.env.APP_KEY = saved as string;
+      }
+    });
   });
 });

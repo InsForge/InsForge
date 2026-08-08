@@ -111,6 +111,46 @@ paths:
                       customSlug:
                         type: string
                         nullable: true
+                  compute:
+                    type: object
+                    description: >-
+                      Optional; absent when no compute driver is configured, which is
+                      how a client detects that compute is unavailable. Capabilities
+                      are per provider so a client can stop offering what the
+                      configured driver cannot honour.
+                    properties:
+                      defaultProvider:
+                        type: string
+                        enum: [fly, docker]
+                        description: Provider new services are created on.
+                      providers:
+                        type: object
+                        description: Keyed by provider name; only configured providers appear.
+                        additionalProperties:
+                          type: object
+                          properties:
+                            scaleToZero:
+                              type: boolean
+                              description: Whether idle instances can stop and wake on request.
+                            regions:
+                              type: boolean
+                              description: Whether a region can be chosen. False for a single daemon.
+                            ingressModes:
+                              type: array
+                              description: Which ingress modes this provider supports.
+                              items:
+                                type: string
+                                enum: [none, port, host]
+                            sourceBuild:
+                              type: string
+                              enum: [none, flyctl, context-upload]
+                              description: >-
+                                How source builds happen. `flyctl` builds on the
+                                caller's machine; `context-upload` accepts a tarball at
+                                POST /api/compute/services/{id}/build.
+                            deployTokenIssuance:
+                              type: boolean
+                              description: Whether the backend can issue a provider deploy token.
                   version:
                     type: string
               example:
@@ -136,6 +176,15 @@ paths:
                     name: "hello-world"
                     status: "active"
                     description: "Test function"
+                compute:
+                  defaultProvider: "docker"
+                  providers:
+                    docker:
+                      scaleToZero: false
+                      regions: false
+                      ingressModes: ["none", "port", "host"]
+                      sourceBuild: "context-upload"
+                      deployTokenIssuance: false
                 version: "2.0.0"
             text/markdown:
               schema:

@@ -1,8 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDownToLine, ArrowUpFromLine, Cpu, HardDrive, MemoryStick } from 'lucide-react';
+import { Button } from '@insforge/ui';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { isInsForgeCloudProject } from '#lib/utils/utils';
 import { useProjectMetrics } from '#features/dashboard/hooks/useProjectMetrics';
-import type { DashboardMetricName, DashboardMetricsRange } from '#types';
+import { aggregateMetricSeries } from '#features/dashboard/utils/aggregateMetricSeries';
+import type { DashboardMetricDataPoint, DashboardMetricName, DashboardMetricsRange } from '#types';
+import { ProjectSettingsMenuDialog } from '#features/dashboard/components';
 import { MetricChartCard } from './MetricChartCard';
 
 const RANGES: DashboardMetricsRange[] = ['1h', '6h', '24h', '3d'];
@@ -93,10 +98,80 @@ const METRICS: MetricConfig[] = [
 // Disk card slot in the grid (after CPU + Memory, before Network).
 const DISK_GRID_INDEX = 2;
 
+/**
+ * Assemble the Database/WAL/System stack from the metric series. Database and
+ * WAL arrive from the cloud sampler and share timestamps; System is derived
+ * per sample as (nearest disk_used) − database − wal, clamped at zero — it is
+ * never measured, so it must never be fabricated when the used series has no
+ * nearby sample (10-minute tolerance). Returns null when the breakdown series
+ * are absent (older cloud backend, self-host) so the card falls back to the
+ * single-color capacity chart. Exported for tests.
+ */
+export function buildDiskBreakdown(
+  database: DashboardMetricDataPoint[] | undefined,
+  wal: DashboardMetricDataPoint[] | undefined,
+  used: DashboardMetricDataPoint[]
+): {
+  database: DashboardMetricDataPoint[];
+  wal: DashboardMetricDataPoint[];
+  system: DashboardMetricDataPoint[];
+} | null {
+  if (!database?.length || !wal?.length) {
+    return null;
+  }
+  const walByTs = new Map(wal.map((p) => [p.timestamp, p.value]));
+  const nearestUsed = (ts: number): number | null => {
+    let best: DashboardMetricDataPoint | null = null;
+    for (const point of used) {
+      if (!Number.isFinite(point.value)) {
+        continue;
+      }
+      if (!best || Math.abs(point.timestamp - ts) < Math.abs(best.timestamp - ts)) {
+        best = point;
+      }
+    }
+    return best && Math.abs(best.timestamp - ts) <= 600 ? best.value : null;
+  };
+  const alignedWal: DashboardMetricDataPoint[] = [];
+  const system: DashboardMetricDataPoint[] = [];
+  const alignedDb: DashboardMetricDataPoint[] = [];
+  for (const point of database) {
+    const walValue = walByTs.get(point.timestamp);
+    if (walValue === undefined) {
+      continue;
+    }
+    alignedDb.push(point);
+    alignedWal.push({ timestamp: point.timestamp, value: walValue });
+    const usedValue = nearestUsed(point.timestamp);
+    system.push({
+      timestamp: point.timestamp,
+      value: usedValue === null ? 0 : Math.max(0, usedValue - point.value - walValue),
+    });
+  }
+  return alignedDb.length ? { database: alignedDb, wal: alignedWal, system } : null;
+}
+
 export function ObservabilitySection() {
   const { t } = useTranslation('chrome');
+  const isCloudHostingMode = useIsCloudHostingMode();
+  // Same pair of signals the settings dialog gates its Compute tab on
+  // (ProjectSettingsMenuDialog's canUseCloudHost) — the CTA must not show
+  // when the tab it promises would fall back to Project Information.
+  const canOpenComputeSettings = isCloudHostingMode && isInsForgeCloudProject();
   const [range, setRange] = useState<DashboardMetricsRange>('1h');
+  const [computeSettingsOpen, setComputeSettingsOpen] = useState(false);
   const { data, isLoading, isUnavailable, error } = useProjectMetrics(range);
+
+  // Always shown (Tony's call, QA 2026-08-07): the reassurance IS the point —
+  // a dedicated Postgres instance parked high on memory is its healthy steady
+  // state (idle RAM becomes query cache), but it reads as a leak, and support
+  // keeps fielding "my idle database sits at ~78% memory" reports. The value is
+  // the latest sample, the same number the Memory card's headline shows; only a
+  // series with no samples (fresh instance, metrics gap) has nothing to say.
+  const memoryAdvisoryPct = useMemo(() => {
+    const series = data?.metrics.find((m) => m.metric === 'memory_usage')?.data ?? [];
+    return aggregateMetricSeries(series).latest;
+  }, [data]);
 
   // Memoize disk card derivations so the [0, totalBytes] domain array reference
   // is stable across renders — otherwise MetricChartCard's sparkline useMemo
@@ -106,12 +181,27 @@ export function ObservabilitySection() {
     const diskTotalData = data?.metrics.find((m) => m.metric === 'disk_total')?.data ?? [];
     const totalBytes =
       [...diskTotalData].reverse().find((p) => Number.isFinite(p.value))?.value ?? null;
+    const breakdown = buildDiskBreakdown(
+      data?.metrics.find((m) => m.metric === 'disk_database')?.data,
+      data?.metrics.find((m) => m.metric === 'disk_wal')?.data,
+      diskUsedData
+    );
     return {
       data: diskUsedData,
-      threshold: totalBytes !== null ? 0.9 * totalBytes : undefined,
       fixedDomain: (totalBytes !== null ? [0, totalBytes] : undefined) as
         | [number, number]
         | undefined,
+      // Capacity chart (Supabase-style): dashed ceiling at the provisioned
+      // size, a mid gridline, bars for the samples. No 90% threshold line —
+      // the ceiling is the reference, and two dashed lines collide visually.
+      ticks: totalBytes !== null ? [0, totalBytes / 2, totalBytes] : [],
+      totalBytes,
+      breakdown,
+      // The hovered value as a share of the provisioned disk.
+      tooltipDetail:
+        totalBytes !== null && totalBytes > 0
+          ? (v: number) => `${((v / totalBytes) * 100).toFixed(1)}% of ${BYTES_SIZE(totalBytes)}`
+          : undefined,
     };
   }, [data]);
 
@@ -157,52 +247,202 @@ export function ObservabilitySection() {
           })}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {(() => {
-            const cards = METRICS.map((config) => {
-              const series = data?.metrics.find((m) => m.metric === config.metric);
-              return (
+        <>
+          {memoryAdvisoryPct !== null && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-[var(--alpha-8)] bg-card p-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)] text-muted-foreground">
+                  <MemoryStick className="h-5 w-5" />
+                </span>
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <p className="text-sm font-medium leading-5 text-foreground">
+                    {t('overview.memoryAdvisory.title', {
+                      value: PERCENT(memoryAdvisoryPct),
+                      defaultValue: "Memory is sitting at {{value}}. For Postgres, that's normal.",
+                    })}
+                  </p>
+                  <p className="text-sm leading-5 text-muted-foreground">
+                    {t('overview.memoryAdvisory.description', {
+                      defaultValue:
+                        "Postgres grabs spare memory to cache your data and keeps it, even when the database is idle. A high number here doesn't mean something is wrong. The warning signs that actually matter are restarts and queries slowing down. If you're seeing those, a bigger instance will give it room.",
+                    })}
+                  </p>
+                </div>
+              </div>
+              {canOpenComputeSettings && (
+                <Button
+                  type="button"
+                  className="h-8 shrink-0 rounded px-3 text-sm font-medium"
+                  onClick={() => setComputeSettingsOpen(true)}
+                >
+                  {t('overview.memoryAdvisory.cta', { defaultValue: 'Upgrade Instance' })}
+                </Button>
+              )}
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {(() => {
+              const cards = METRICS.map((config) => {
+                const series = data?.metrics.find((m) => m.metric === config.metric);
+                return (
+                  <MetricChartCard
+                    key={config.metric}
+                    title={t(`overview.metrics.${config.i18nKey}.title`, {
+                      defaultValue: config.title,
+                    })}
+                    icon={config.icon}
+                    data={series?.data ?? []}
+                    rangeSeconds={RANGE_SECONDS[range]}
+                    formatValue={config.format}
+                    isLoading={isLoading}
+                    threshold={config.threshold}
+                    description={t(`overview.metrics.${config.i18nKey}.description`, {
+                      defaultValue: config.description,
+                    })}
+                  />
+                );
+              });
+
+              cards.splice(
+                DISK_GRID_INDEX,
+                0,
                 <MetricChartCard
-                  key={config.metric}
-                  title={t(`overview.metrics.${config.i18nKey}.title`, {
-                    defaultValue: config.title,
-                  })}
-                  icon={config.icon}
-                  data={series?.data ?? []}
+                  key="disk_used"
+                  title={t('overview.metrics.diskUsed.title', { defaultValue: 'Disk Usage' })}
+                  icon={<HardDrive className="h-5 w-5" />}
+                  data={diskCardProps.data}
                   rangeSeconds={RANGE_SECONDS[range]}
-                  formatValue={config.format}
+                  formatValue={BYTES_SIZE}
                   isLoading={isLoading}
-                  threshold={config.threshold}
-                  description={t(`overview.metrics.${config.i18nKey}.description`, {
-                    defaultValue: config.description,
+                  fixedDomain={diskCardProps.fixedDomain}
+                  formatAxisLabel={BYTES_SIZE}
+                  capacity={
+                    diskCardProps.fixedDomain
+                      ? {
+                          ticks: diskCardProps.ticks,
+                          legend: {
+                            ceiling: t('overview.metrics.diskUsed.ceiling', {
+                              defaultValue: 'Disk Size',
+                            }),
+                            used: t('overview.metrics.diskUsed.used', {
+                              defaultValue: 'Used',
+                            }),
+                          },
+                          // Supabase palette: Database orange, WAL light green,
+                          // System green; stacked bottom-up in that order.
+                          components: diskCardProps.breakdown
+                            ? [
+                                {
+                                  key: 'database',
+                                  label: t('overview.metrics.diskUsed.database', {
+                                    defaultValue: 'Database',
+                                  }),
+                                  fillClass: 'fill-orange-300',
+                                  data: diskCardProps.breakdown.database,
+                                },
+                                {
+                                  key: 'wal',
+                                  label: t('overview.metrics.diskUsed.wal', {
+                                    defaultValue: 'WAL',
+                                  }),
+                                  fillClass: 'fill-emerald-200',
+                                  data: diskCardProps.breakdown.wal,
+                                },
+                                {
+                                  key: 'system',
+                                  label: t('overview.metrics.diskUsed.system', {
+                                    defaultValue: 'System',
+                                  }),
+                                  fillClass: 'fill-emerald-400',
+                                  data: diskCardProps.breakdown.system,
+                                },
+                              ]
+                            : undefined,
+                          tooltipRows: ((breakdown) =>
+                            breakdown
+                              ? (timestamp: number) => {
+                                  const total = diskCardProps.totalBytes;
+                                  let idx = -1;
+                                  let bestDelta = Infinity;
+                                  breakdown.database.forEach((point, i) => {
+                                    const delta = Math.abs(point.timestamp - timestamp);
+                                    if (delta < bestDelta) {
+                                      bestDelta = delta;
+                                      idx = i;
+                                    }
+                                  });
+                                  if (idx < 0 || bestDelta > 600) {
+                                    return null;
+                                  }
+                                  const pct = (v: number) =>
+                                    total ? ` (${((v / total) * 100).toFixed(2)}%)` : '';
+                                  const db = breakdown.database[idx].value;
+                                  const wal = breakdown.wal[idx].value;
+                                  const system = breakdown.system[idx].value;
+                                  const rows = [
+                                    {
+                                      label: t('overview.metrics.diskUsed.ceiling', {
+                                        defaultValue: 'Disk Size',
+                                      }),
+                                      value: total !== null ? BYTES_SIZE(total) : '—',
+                                    },
+                                    {
+                                      label: t('overview.metrics.diskUsed.database', {
+                                        defaultValue: 'Database',
+                                      }),
+                                      value: `${BYTES_SIZE(db)}${pct(db)}`,
+                                      swatchClass: 'bg-orange-300',
+                                    },
+                                    {
+                                      label: t('overview.metrics.diskUsed.wal', {
+                                        defaultValue: 'WAL',
+                                      }),
+                                      value: `${BYTES_SIZE(wal)}${pct(wal)}`,
+                                      swatchClass: 'bg-emerald-200',
+                                    },
+                                    {
+                                      label: t('overview.metrics.diskUsed.system', {
+                                        defaultValue: 'System',
+                                      }),
+                                      value: `${BYTES_SIZE(system)}${pct(system)}`,
+                                      swatchClass: 'bg-emerald-400',
+                                    },
+                                    {
+                                      label: t('overview.metrics.diskUsed.total', {
+                                        defaultValue: 'Total',
+                                      }),
+                                      value: `${BYTES_SIZE(db + wal + system)}${pct(db + wal + system)}`,
+                                    },
+                                  ];
+                                  return rows;
+                                }
+                              : undefined)(diskCardProps.breakdown),
+                        }
+                      : undefined
+                  }
+                  tooltipDetail={diskCardProps.tooltipDetail}
+                  description={t('overview.metrics.diskUsed.description', {
+                    defaultValue:
+                      "How much of your instance's storage the database, files, and logs are using. A full disk stops writes and can take the backend offline.",
                   })}
                 />
               );
-            });
-
-            cards.splice(
-              DISK_GRID_INDEX,
-              0,
-              <MetricChartCard
-                key="disk_used"
-                title={t('overview.metrics.diskUsed.title', { defaultValue: 'Disk Usage' })}
-                icon={<HardDrive className="h-5 w-5" />}
-                data={diskCardProps.data}
-                rangeSeconds={RANGE_SECONDS[range]}
-                formatValue={BYTES_SIZE}
-                isLoading={isLoading}
-                threshold={diskCardProps.threshold}
-                fixedDomain={diskCardProps.fixedDomain}
-                formatAxisLabel={BYTES_SIZE}
-                description={t('overview.metrics.diskUsed.description', {
-                  defaultValue:
-                    "How much of your instance's storage the database, files, and logs are using. A full disk stops writes and can take the backend offline.",
-                })}
-              />
-            );
-            return cards;
-          })()}
-        </div>
+              return cards;
+            })()}
+          </div>
+        </>
+      )}
+      {/* The CTA lands on the settings dialog's Compute tab because that tab is
+          already the tier-aware surface: a free plan sees the Upgrade Plan
+          upsell, a paid plan picks a larger instance type. Mounted only while
+          open — the sidebar already keeps a permanent instance, and the
+          dialog's hooks subscribe on mount whether or not it is shown. */}
+      {computeSettingsOpen && (
+        <ProjectSettingsMenuDialog
+          open={computeSettingsOpen}
+          onOpenChange={setComputeSettingsOpen}
+          defaultTab="compute"
+        />
       )}
     </section>
   );
