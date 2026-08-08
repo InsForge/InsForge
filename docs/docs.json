@@ -177,6 +177,8 @@
                   "deployment/deploy-to-aws-ec2",
                   "deployment/deploy-to-azure-virtual-machines",
                   "deployment/deploy-to-containarium",
+                  "deployment/deploy-to-coolify",
+                  "deployment/deploy-to-dokploy",
                   "deployment/deploy-to-google-cloud-compute-engine"
                 ]
               },
@@ -465,6 +467,18 @@
                 ]
               },
               {
+                "group": "Integrations",
+                "pages": [
+                  "integrations/overview",
+                  "integrations/clerk",
+                  "integrations/auth0",
+                  "integrations/workos",
+                  "integrations/kinde",
+                  "integrations/stytch",
+                  "integrations/better-auth"
+                ]
+              },
+              {
                 "group": "Agent-Native Initiatives",
                 "pages": [
                   "zh/agent-native/overview",
@@ -491,9 +505,12 @@
                 "group": "Self-Hosting",
                 "pages": [
                   "zh/deployment/deployment-security-guide",
+                  "deployment/self-host-storage",
                   "zh/deployment/deploy-to-aws-ec2",
                   "zh/deployment/deploy-to-azure-virtual-machines",
                   "zh/deployment/deploy-to-containarium",
+                  "zh/deployment/deploy-to-coolify",
+                  "zh/deployment/deploy-to-dokploy",
                   "zh/deployment/deploy-to-google-cloud-compute-engine"
                 ]
               },
@@ -506,7 +523,7 @@
                 ]
               },
               {
-                "group": "常见问题",
+                "group": "FAQ",
                 "pages": [
                   "zh/faq"
                 ]
@@ -647,7 +664,7 @@
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
               },
               {
-                "group": "用量",
+                "group": "Usage",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/usage.yaml"
               },
               {
@@ -782,6 +799,18 @@
                 ]
               },
               {
+                "group": "Integrations",
+                "pages": [
+                  "integrations/overview",
+                  "integrations/clerk",
+                  "integrations/auth0",
+                  "integrations/workos",
+                  "integrations/kinde",
+                  "integrations/stytch",
+                  "integrations/better-auth"
+                ]
+              },
+              {
                 "group": "Agent-Native Initiatives",
                 "pages": [
                   "zh-Hant/agent-native/overview",
@@ -808,9 +837,12 @@
                 "group": "Self-Hosting",
                 "pages": [
                   "zh-Hant/deployment/deployment-security-guide",
+                  "deployment/self-host-storage",
                   "zh-Hant/deployment/deploy-to-aws-ec2",
                   "zh-Hant/deployment/deploy-to-azure-virtual-machines",
                   "zh-Hant/deployment/deploy-to-containarium",
+                  "zh-Hant/deployment/deploy-to-coolify",
+                  "zh-Hant/deployment/deploy-to-dokploy",
                   "zh-Hant/deployment/deploy-to-google-cloud-compute-engine"
                 ]
               },
@@ -823,7 +855,7 @@
                 ]
               },
               {
-                "group": "常見問題",
+                "group": "FAQ",
                 "pages": [
                   "zh-Hant/faq"
                 ]
@@ -964,7 +996,7 @@
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
               },
               {
-                "group": "用量",
+                "group": "Usage",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/usage.yaml"
               },
               {
@@ -1099,6 +1131,18 @@
                 ]
               },
               {
+                "group": "Integrations",
+                "pages": [
+                  "integrations/overview",
+                  "integrations/clerk",
+                  "integrations/auth0",
+                  "integrations/workos",
+                  "integrations/kinde",
+                  "integrations/stytch",
+                  "integrations/better-auth"
+                ]
+              },
+              {
                 "group": "Agent-Native Initiatives",
                 "pages": [
                   "es/agent-native/overview",
@@ -1125,9 +1169,12 @@
                 "group": "Self-Hosting",
                 "pages": [
                   "es/deployment/deployment-security-guide",
+                  "deployment/self-host-storage",
                   "es/deployment/deploy-to-aws-ec2",
                   "es/deployment/deploy-to-azure-virtual-machines",
                   "es/deployment/deploy-to-containarium",
+                  "es/deployment/deploy-to-coolify",
+                  "es/deployment/deploy-to-dokploy",
                   "es/deployment/deploy-to-google-cloud-compute-engine"
                 ]
               },
@@ -1140,7 +1187,7 @@
                 ]
               },
               {
-                "group": "Preguntas frecuentes",
+                "group": "FAQ",
                 "pages": [
                   "es/faq"
                 ]
@@ -1281,7 +1328,7 @@
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
               },
               {
-                "group": "Uso",
+                "group": "Usage",
                 "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/usage.yaml"
               },
               {

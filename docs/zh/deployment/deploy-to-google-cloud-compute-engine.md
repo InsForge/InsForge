@@ -146,79 +146,40 @@ sudo apt install git -y
 
 ### 4. 部署 InsForge
 
-#### 4.1 克隆仓库
+#### 4.1 获取仓库
 
 ```bash
-cd ~
-git clone https://github.com/insforge/insforge.git
-cd insforge/deploy/docker-compose
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
+
+会 checkout 这个栈要读的文件，并把 `JWT_SECRET`、`ENCRYPTION_KEY`、`ROOT_ADMIN_PASSWORD`、`POSTGRES_PASSWORD` 生成到 `.env`。不启动任何东西。
 
 #### 4.2 创建环境配置
 
-创建包含生产环境设置的 `.env` 文件：
-
 ```bash
+cd ~/insforge
 nano .env
 ```
 
-仓库中提供了一个模板，位于 `deploy/docker-compose/.env.example`。复制该文件并编辑其中的值：
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-至少需要设置以下值：
+密钥已经生成好了，不要改动。设置浏览器会访问的地址：
 
 ```env
-# Authentication (required)
-# IMPORTANT: Generate a strong random secret for production (32+ characters)
-JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-
-# Admin account (used for initial setup)
-ROOT_ADMIN_USERNAME=admin
-ROOT_ADMIN_PASSWORD=change-this-password
-
-# Database (required)
-POSTGRES_PASSWORD=your-secure-postgres-password
+API_BASE_URL=http://<你的公网IP>:7130
+VITE_API_BASE_URL=http://<你的公网IP>:7130
 ```
 
-你可能还需要设置的可选值：
+可选项，默认全部关闭：
 
 ```env
-# Encryption key for secrets and database encryption.
-# Falls back to JWT_SECRET if left empty.
-ENCRYPTION_KEY=
-
-# AI/LLM (get a key from https://openrouter.ai/keys)
-OPENROUTER_API_KEY=
-
-# Site deployments and custom domains
-VERCEL_TOKEN=
-VERCEL_TEAM_ID=
-VERCEL_PROJECT_ID=
-
-# OAuth providers (Google, GitHub, etc.)
-GOOGLE_CLIENT_ID=
+OPENROUTER_API_KEY=      # AI 功能
+VERCEL_TOKEN=            # 站点部署
+GOOGLE_CLIENT_ID=        # OAuth 提供商
 GOOGLE_CLIENT_SECRET=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
 ```
 
-完整的支持变量列表请参见 `deploy/docker-compose/.env.example`。
+其余变量及其默认值都在 `.env.example` 里。
 
-**生成安全密钥：**
-
-```bash
-# Generate JWT_SECRET (32+ characters)
-openssl rand -base64 32
-
-# Generate ENCRYPTION_KEY (32 characters)
-openssl rand -base64 24
-```
-
-> 💡 **重要提示**：请妥善保存这些密钥。如果你以后需要迁移或恢复实例，将需要用到它们。
+> 💡 请把 `.env` 备份到安全的地方。迁移或恢复这个实例靠的就是里面的密钥。
 
 #### 4.3 启动 InsForge 服务
 
@@ -364,7 +325,7 @@ sudo certbot --nginx -d api.yourdomain.com -d app.yourdomain.com
 使用 HTTPS 地址更新你的 `.env` 文件：
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 nano .env
 ```
 
@@ -410,15 +371,19 @@ docker compose restart
 ### 更新 InsForge
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 git pull origin main
+
+# Pick up any files this release added to the sparse checkout
+sh deploy/setup.sh .
+
 docker compose pull && docker compose up -d
 ```
 
 ### 备份数据库
 
 ```bash
-# Create backup (run from deploy/docker-compose/)
+# Create backup (run from ~/insforge)
 docker compose exec postgres pg_dump -U postgres insforge > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # Store backup in Google Cloud Storage (optional)

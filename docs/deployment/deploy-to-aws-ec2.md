@@ -116,63 +116,40 @@ sudo apt install git -y
 
 ### 4. Deploy InsForge
 
-#### 4.1 Clone Repository
+#### 4.1 Get the Repository
 
 ```bash
-cd ~
-git clone https://github.com/insforge/insforge.git
-cd insforge/deploy/docker-compose
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
+
+Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY`, `ROOT_ADMIN_PASSWORD` and `POSTGRES_PASSWORD` into `.env`. Nothing is started.
 
 #### 4.2 Create Environment Configuration
 
-Copy the example template to create your `.env` file:
-
 ```bash
-cp .env.example .env
+cd ~/insforge
 nano .env
 ```
 
-The full template lives at `deploy/docker-compose/.env.example`. These are the variables you must set:
+The secrets are already generated — leave them as they are. Set the URL browsers will use:
 
 ```env
-# Required
-JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-ROOT_ADMIN_USERNAME=admin
-ROOT_ADMIN_PASSWORD=change-this-password
-POSTGRES_PASSWORD=change-this-password
+API_BASE_URL=http://<your-public-ip>:7130
+VITE_API_BASE_URL=http://<your-public-ip>:7130
+```
 
-# Optional: falls back to JWT_SECRET if left blank
-ENCRYPTION_KEY=
+Optional, all off by default:
 
-# Optional: enables AI features
-OPENROUTER_API_KEY=
-
-# Optional: enables site deployments
-VERCEL_TOKEN=
-VERCEL_TEAM_ID=
-VERCEL_PROJECT_ID=
-
-# Optional: OAuth providers
-GOOGLE_CLIENT_ID=
+```env
+OPENROUTER_API_KEY=      # AI features
+VERCEL_TOKEN=            # site deployments
+GOOGLE_CLIENT_ID=        # OAuth providers
 GOOGLE_CLIENT_SECRET=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
 ```
 
-The `.env.example` template carries the remaining variables and their defaults, so editing the copied file is enough.
+`.env.example` carries every remaining variable with its defaults.
 
-**Generate Secure Secrets:**
-
-```bash
-# Generate JWT_SECRET (32+ characters)
-openssl rand -base64 32
-
-# Generate ENCRYPTION_KEY (must be exactly 32 characters)
-openssl rand -base64 24
-```
-
-> 💡 **Important**: Save these secrets securely. You'll need them if you ever migrate or restore your instance.
+> 💡 Back up `.env` somewhere safe. Its secrets are what let you migrate or restore this instance.
 
 #### 4.3 Start InsForge Services
 
@@ -311,7 +288,7 @@ sudo certbot --nginx -d api.yourdomain.com -d app.yourdomain.com
 Update your `.env` file with HTTPS URLs:
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 nano .env
 ```
 
@@ -356,17 +333,21 @@ docker compose restart
 
 ### Update InsForge
 
-InsForge ships prebuilt images, so an update is a pull and restart. Run this from `~/insforge/deploy/docker-compose`:
+An update is a pull and restart — but the checkout matters too: the stack reads Postgres's configuration and the Deno functions from it. Run this from `~/insforge`:
 
 ```bash
-cd ~/insforge/deploy/docker-compose
+cd ~/insforge
 git pull origin main
+
+# Pick up any files this release added to the sparse checkout
+sh deploy/setup.sh .
+
 docker compose pull && docker compose up -d
 ```
 
 ### Backup Database
 
-Run these from `~/insforge/deploy/docker-compose`:
+Run these from `~/insforge`:
 
 ```bash
 # Create backup
