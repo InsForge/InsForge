@@ -220,10 +220,12 @@ export function ObservabilitySection() {
       totalBytes: dataCeiling,
       systemLatest,
       breakdown,
-      // The hovered value as a share of the provisioned disk.
+      // The hovered value as a share of the SAME ceiling the chart draws —
+      // data-scoped when the breakdown is present (review round 1 caught the
+      // raw-total denominator contradicting the row block).
       tooltipDetail:
-        totalBytes !== null && totalBytes > 0
-          ? (v: number) => `${((v / totalBytes) * 100).toFixed(1)}% of ${BYTES_SIZE(totalBytes)}`
+        dataCeiling !== null && dataCeiling > 0
+          ? (v: number) => `${((v / dataCeiling) * 100).toFixed(1)}% of ${BYTES_SIZE(dataCeiling)}`
           : undefined,
     };
   }, [data]);
