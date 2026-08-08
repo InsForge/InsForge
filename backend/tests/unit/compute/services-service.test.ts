@@ -2337,6 +2337,38 @@ describe('buildComputeRegistry', () => {
     expect(() => buildComputeRegistry()).toThrow(/Unknown COMPUTE_PROVIDER/);
   });
 
+  // The dashboard renders this text verbatim as its not-configured empty state, so
+  // it is the entire set of instructions a self-hoster gets. Fly-only advice left
+  // them with no way to discover the Docker socket, which needs no third-party
+  // account and is the easier path.
+  it('names both providers when nothing is configured', async () => {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
+        fly: { apiToken: '', org: '', enabled: false, domain: '' },
+        docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
+        cloud: { projectId: 'local', apiHost: '' },
+        app: { jwtSecret: 'x' },
+      };
+      return { config: c, appConfig: c };
+    });
+    delete process.env.COMPUTE_PROVIDER;
+    const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
+
+    let thrown: unknown;
+    try {
+      buildComputeRegistry();
+    } catch (e) {
+      thrown = e;
+    }
+    const next = (thrown as { nextActions?: string }).nextActions ?? '';
+    expect(next).toMatch(/Docker socket/);
+    expect(next).toMatch(/DOCKER_GID/);
+    expect(next).toMatch(/insforge-test-docker\.sock/);
+    expect(next).toMatch(/FLY_API_TOKEN/);
+    // Docker first: it is the option a self-hoster can act on without signing up.
+    expect(next.indexOf('Docker socket')).toBeLessThan(next.indexOf('FLY_API_TOKEN'));
+  });
+
   // Naming a default that isn't configured is a stated intent we can't honour —
   // failing at startup beats 500-ing on the operator's first deploy. The message
   // names the socket path it looked at, since a wrong DOCKER_SOCKET_PATH or a

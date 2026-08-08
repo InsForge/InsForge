@@ -5,7 +5,13 @@ import type { CreateServiceRequestInput, UpdateServiceRequest } from '@insforge/
 import { useToast } from '@insforge/ui';
 import { deriveHealth, type ServiceHealth } from '#features/compute/lib/health';
 
-export function useComputeServices() {
+/**
+ * @param enabled Gate the list request. Pass false once it is known that compute
+ *   is not configured: the request would only 503, and spinning on a call whose
+ *   failure is already known reads as a broken page rather than an unconfigured
+ *   feature.
+ */
+export function useComputeServices(enabled = true) {
   const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
@@ -18,6 +24,7 @@ export function useComputeServices() {
     queryKey: ['compute', 'services'],
     queryFn: () => computeServicesApi.list(),
     staleTime: 30_000,
+    enabled,
   });
 
   const createMutation = useMutation({
