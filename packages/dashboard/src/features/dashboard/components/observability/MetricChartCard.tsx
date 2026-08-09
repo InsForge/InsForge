@@ -21,19 +21,22 @@ export interface MetricChartCardProps {
   /** Short explanation of the metric, surfaced via an info tooltip next to the title. */
   description?: string;
   /**
-   * Supabase-style capacity chart: samples drawn as bars against a fixed
-   * domain whose top edge is the provisioned ceiling (dashed line), with
-   * labeled y-axis ticks and a legend naming the ceiling and the bars.
-   * Only meaningful with `fixedDomain`; replaces the area/line rendering.
+   * Capacity chart: samples drawn as bars against a fixed domain. Without
+   * `components` this is the single-color fallback — dashed ceiling line at
+   * the domain top, byte-labeled ticks, legend row under the chart. With
+   * `components` it follows the Figma disk design (node 3579:68356): stacked
+   * bars, dotted reference ticks (no ceiling line), legend chips in the
+   * header. Only meaningful with `fixedDomain`; replaces the area/line
+   * rendering.
    */
   capacity?: {
     ticks: number[];
     legend: { ceiling: string; used: string };
     /**
-     * Stacked composition series (bottom-up render order). When present the
-     * bars stack these instead of drawing the primary series, giving the
-     * Supabase-style Database/WAL/System breakdown; all series come from one
-     * sampler so they share timestamps.
+     * Stacked composition series (bottom-up render order, which is also the
+     * header legend order). When present the bars stack these instead of
+     * drawing the primary series, giving the System/WAL/Database breakdown;
+     * all series come from one sampler so they share timestamps.
      */
     components?: Array<{
       key: string;
@@ -325,6 +328,21 @@ export function MetricChartCard({
               </PopoverContent>
             </Popover>
           )}
+          {/* Breakdown legend lives in the header (Figma 3579:68356): a
+              square chip per stacked component, in stack order. */}
+          {capacity?.components?.length ? (
+            <span className="ml-auto flex shrink-0 items-center gap-3 pl-2">
+              {capacity.components.map((component) => (
+                <span key={component.key} className="flex items-center gap-1 text-xs leading-4">
+                  <span
+                    aria-hidden
+                    className={`h-3 w-3 ${component.fillClass.replace('fill-', 'bg-')}`}
+                  />
+                  <span className="whitespace-nowrap text-foreground">{component.label}</span>
+                </span>
+              ))}
+            </span>
+          ) : null}
         </div>
         <div className="flex flex-col">
           <p className="text-[20px] font-medium leading-7 text-foreground">
@@ -426,6 +444,10 @@ export function MetricChartCard({
                         Math.min(SPARKLINE_HEIGHT - 1, yPct * SPARKLINE_HEIGHT)
                       );
                       const isCeiling = tick === domainMax;
+                      // Breakdown mode (Figma 3579:68356): reference ticks
+                      // above the floor are dotted, and there is no ceiling
+                      // line — the chart top is simply 100% of the disk.
+                      const dotted = capacity.components?.length && tick > domainMin;
                       return (
                         <line
                           key={tick}
@@ -433,9 +455,9 @@ export function MetricChartCard({
                           x2={SPARKLINE_WIDTH}
                           y1={y}
                           y2={y}
-                          stroke={isCeiling ? 'var(--alpha-16)' : 'var(--alpha-8)'}
+                          stroke={isCeiling || dotted ? 'var(--alpha-16)' : 'var(--alpha-8)'}
                           strokeWidth={1}
-                          strokeDasharray={isCeiling ? '4 3' : undefined}
+                          strokeDasharray={dotted ? '1 3' : isCeiling ? '4 3' : undefined}
                           vectorEffect="non-scaling-stroke"
                         />
                       );
@@ -590,7 +612,9 @@ export function MetricChartCard({
               <span className="absolute right-0">{xAxisTicks[2]}</span>
             </div>
           )}
-          {capacity && sparkline.line && (
+          {/* The under-chart legend belongs to the single-color fallback; the
+              breakdown variant carries its legend chips in the header. */}
+          {capacity && !capacity.components?.length && sparkline.line && (
             <div className="flex items-center justify-center gap-4 pt-1 text-xs leading-4 text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <span aria-hidden className="tracking-[2px]">
@@ -598,22 +622,10 @@ export function MetricChartCard({
                 </span>
                 {capacity.legend.ceiling}
               </span>
-              {capacity.components?.length ? (
-                capacity.components.map((component) => (
-                  <span key={component.key} className="flex items-center gap-1.5">
-                    <span
-                      aria-hidden
-                      className={`h-2 w-2 rounded-full ${component.fillClass.replace('fill-', 'bg-')}`}
-                    />
-                    {component.label}
-                  </span>
-                ))
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-300" />
-                  {capacity.legend.used}
-                </span>
-              )}
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-300" />
+                {capacity.legend.used}
+              </span>
             </div>
           )}
         </div>

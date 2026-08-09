@@ -173,7 +173,7 @@
         "used": "Used",
         "database": "Database",
         "wal": "WAL",
-        "system": "System & runtime",
+        "system": "System",
         "total": "Total"
       }
     },

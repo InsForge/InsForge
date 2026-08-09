@@ -186,19 +186,11 @@ export function ObservabilitySection() {
       data?.metrics.find((m) => m.metric === 'disk_wal')?.data,
       diskUsedData
     );
-    // Zoomed axis (Tony's call, 2026-08-08, replacing the "not counted"
-    // footnote that hid System from the frame): every number on the card is a
-    // true absolute — ceiling = the real disk, bars = System + Database + WAL
-    // stacked — but the y-axis floor rises to just under the System band
-    // (its window minimum, rounded down to a whole GiB — the axis formatter's
-    // unit — ~5 GB today) so the data and the free-space gap stay legible
-    // instead of being crushed by the OS footprint. The floor is derived,
-    // never a constant: the retired 4GiB hack showed how a guessed baseline
-    // drifts and clamps.
-    const systemValues = breakdown ? breakdown.system.map((p) => p.value).filter((v) => v > 0) : [];
-    const GB = 2 ** 30;
-    const rawFloor = systemValues.length ? Math.floor(Math.min(...systemValues) / GB) * GB : 0;
-    const axisFloor = totalBytes !== null && rawFloor < totalBytes * 0.9 ? rawFloor : 0;
+    // Figma disk design (node 3579:68356, Tony 2026-08-08): the y-axis is the
+    // whole disk read as a percentage — 0% at the floor, a dotted reference
+    // line at 90% (where a filling disk becomes a problem), no ceiling line.
+    // Bars stack the true absolutes bottom-up (System, WAL, Database), so the
+    // gap above the stack is the free share of the disk.
     // With a breakdown the primary series (headline + AVG/MAX/LATEST + hover
     // points) is the per-sample used total — the same stack the bars draw.
     const usedSeries = breakdown
@@ -209,16 +201,22 @@ export function ObservabilitySection() {
       : diskUsedData;
     return {
       data: usedSeries,
-      fixedDomain: (totalBytes !== null ? [axisFloor, totalBytes] : undefined) as
+      fixedDomain: (totalBytes !== null ? [0, totalBytes] : undefined) as
         | [number, number]
         | undefined,
-      // Capacity chart (Supabase-style): dashed ceiling at the provisioned
-      // size, a mid gridline, bars for the samples. No 90% threshold line —
-      // the ceiling is the reference, and two dashed lines collide visually.
       ticks:
         totalBytes !== null
-          ? [axisFloor, axisFloor + (totalBytes - axisFloor) / 2, totalBytes]
+          ? breakdown
+            ? [0, totalBytes * 0.9]
+            : [0, totalBytes / 2, totalBytes]
           : [],
+      // Percent labels against the disk in breakdown mode (the design's
+      // "90% / 0%" rail); byte labels for the single-color fallback, whose
+      // dashed ceiling still reads as the provisioned size.
+      axisLabel:
+        breakdown && totalBytes
+          ? (v: number) => `${Math.round((v / totalBytes) * 100)}%`
+          : BYTES_SIZE,
       totalBytes,
       breakdown,
       tooltipDetail:
@@ -338,7 +336,7 @@ export function ObservabilitySection() {
                   formatValue={BYTES_SIZE}
                   isLoading={isLoading}
                   fixedDomain={diskCardProps.fixedDomain}
-                  formatAxisLabel={BYTES_SIZE}
+                  formatAxisLabel={diskCardProps.axisLabel}
                   capacity={
                     diskCardProps.fixedDomain
                       ? {
@@ -351,37 +349,36 @@ export function ObservabilitySection() {
                               defaultValue: 'Used',
                             }),
                           },
-                          // Semantic palette: System zinc (the OS footprint,
-                          // not yours to manage), Database emerald (your
-                          // data), WAL amber (the log); stacked bottom-up in
-                          // that order so the zinc band sits on the raised
-                          // axis floor and the gap above the stack is free
-                          // space.
+                          // Figma palette (3579:68356): System carries the
+                          // house emerald because it is the dominant band,
+                          // WAL sky, Database purple; stacked bottom-up in
+                          // that order, which is also the header legend
+                          // order.
                           components: diskCardProps.breakdown
                             ? [
                                 {
                                   key: 'system',
                                   label: t('overview.metrics.diskUsed.system', {
-                                    defaultValue: 'System & runtime',
-                                  }),
-                                  fillClass: 'fill-zinc-500',
-                                  data: diskCardProps.breakdown.system,
-                                },
-                                {
-                                  key: 'database',
-                                  label: t('overview.metrics.diskUsed.database', {
-                                    defaultValue: 'Database',
+                                    defaultValue: 'System',
                                   }),
                                   fillClass: 'fill-emerald-300',
-                                  data: diskCardProps.breakdown.database,
+                                  data: diskCardProps.breakdown.system,
                                 },
                                 {
                                   key: 'wal',
                                   label: t('overview.metrics.diskUsed.wal', {
                                     defaultValue: 'WAL',
                                   }),
-                                  fillClass: 'fill-amber-300',
+                                  fillClass: 'fill-sky-600',
                                   data: diskCardProps.breakdown.wal,
+                                },
+                                {
+                                  key: 'database',
+                                  label: t('overview.metrics.diskUsed.database', {
+                                    defaultValue: 'Database',
+                                  }),
+                                  fillClass: 'fill-purple-600',
+                                  data: diskCardProps.breakdown.database,
                                 },
                               ]
                             : undefined,
@@ -422,21 +419,21 @@ export function ObservabilitySection() {
                                         defaultValue: 'Database',
                                       }),
                                       value: `${BYTES_SIZE(db)}${pct(db)}`,
-                                      swatchClass: 'bg-emerald-300',
+                                      swatchClass: 'bg-purple-600',
                                     },
                                     {
                                       label: t('overview.metrics.diskUsed.wal', {
                                         defaultValue: 'WAL',
                                       }),
                                       value: `${BYTES_SIZE(wal)}${pct(wal)}`,
-                                      swatchClass: 'bg-amber-300',
+                                      swatchClass: 'bg-sky-600',
                                     },
                                     {
                                       label: t('overview.metrics.diskUsed.system', {
-                                        defaultValue: 'System & runtime',
+                                        defaultValue: 'System',
                                       }),
                                       value: `${BYTES_SIZE(system)}${pct(system)}`,
-                                      swatchClass: 'bg-zinc-500',
+                                      swatchClass: 'bg-emerald-300',
                                     },
                                     {
                                       label: t('overview.metrics.diskUsed.total', {
