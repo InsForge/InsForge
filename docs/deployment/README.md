@@ -16,7 +16,7 @@ This directory contains deployment guides for self-hosting the InsForge platform
 
 ### Cloud Platforms
 
-> Note: the cloud-provider walkthroughs (AWS, Azure, GCP) are community-maintained and can lag the current release.
+> Note: the cloud-provider walkthroughs (AWS, Azure, GCP, Hetzner) are community-maintained and can lag the current release.
 
 - **[AWS EC2](./deploy-to-aws-ec2.md)** - Deploy InsForge on Amazon EC2 with Docker Compose
   - Instance setup and configuration
@@ -33,6 +33,12 @@ This directory contains deployment guides for self-hosting the InsForge platform
 - **[Azure Virtual Machines](./deploy-to-azure-virtual-machines.md)** - Deploy InsForge on an Azure VM with Docker Compose
   - VM instance setup and configuration
   - Docker Compose deployment
+  - Domain and SSL configuration
+  - Production best practices
+
+- **[Hetzner Cloud](./deploy-to-hetzner.md)** - Deploy InsForge on a Hetzner Cloud VPS with Docker Compose
+  - Server and firewall setup in the Hetzner Console
+  - Docker Compose deployment via `deploy/setup.sh`
   - Domain and SSL configuration
   - Production best practices
 
@@ -58,7 +64,6 @@ This directory contains deployment guides for self-hosting the InsForge platform
 ### Coming Soon
 
 - **Digital Ocean** - Droplet deployment guide
-- **Hetzner** - VPS deployment guide
 - **Kubernetes** - Production-grade Kubernetes deployment
 - **Railway** - One-click Railway deployment
 - **Fly.io** - Global edge deployment
@@ -74,7 +79,7 @@ This directory contains deployment guides for self-hosting the InsForge platform
 - **Kubernetes** (Coming Soon) - High availability, auto-scaling
 
 ### For Cost-Conscious
-- **Hetzner** (Coming Soon) - Best price-to-performance ratio
+- **[Hetzner Cloud](./deploy-to-hetzner.md)** - Strong price-to-performance on EU VPS plans
 - **Digital Ocean** (Coming Soon) - Simple pricing, good performance
 
 ### For Global Distribution
