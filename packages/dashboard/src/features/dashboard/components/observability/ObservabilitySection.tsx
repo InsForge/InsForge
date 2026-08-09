@@ -186,11 +186,18 @@ export function ObservabilitySection() {
       data?.metrics.find((m) => m.metric === 'disk_wal')?.data,
       diskUsedData
     );
-    // Figma disk design (node 3579:68356, Tony 2026-08-08): the y-axis is the
-    // whole disk read as a percentage — 0% at the floor, a dotted reference
-    // line at 90% (where a filling disk becomes a problem), no ceiling line.
-    // Bars stack the true absolutes bottom-up (System, WAL, Database), so the
-    // gap above the stack is the free share of the disk.
+    // Figma disk design (node 3579:68356) with Tony's -4 viewport (2026-08-08):
+    // the y-axis starts at a fixed 4 GiB floor so the System band (~5.6 GB of
+    // OS + runtime) shows as a visible sliver instead of drowning the chart,
+    // and the dotted top line is the real disk size. Labels are true
+    // absolutes in GB — the floor only crops the view, it never rewrites a
+    // number. Bars stack bottom-up (System, WAL, Database) so the gap above
+    // the stack is free space.
+    const AXIS_FLOOR_BYTES = 4 * 2 ** 30;
+    const axisFloor =
+      breakdown && totalBytes !== null && AXIS_FLOOR_BYTES < totalBytes * 0.9
+        ? AXIS_FLOOR_BYTES
+        : 0;
     // With a breakdown the primary series (headline + AVG/MAX/LATEST + hover
     // points) is the per-sample used total — the same stack the bars draw.
     const usedSeries = breakdown
@@ -201,22 +208,18 @@ export function ObservabilitySection() {
       : diskUsedData;
     return {
       data: usedSeries,
-      fixedDomain: (totalBytes !== null ? [0, totalBytes] : undefined) as
+      fixedDomain: (totalBytes !== null ? [axisFloor, totalBytes] : undefined) as
         | [number, number]
         | undefined,
+      // Breakdown mode: the floor label and a dotted line at the real disk
+      // size. Fallback keeps its three byte ticks and dashed ceiling.
       ticks:
         totalBytes !== null
           ? breakdown
-            ? [0, totalBytes * 0.9]
+            ? [axisFloor, totalBytes]
             : [0, totalBytes / 2, totalBytes]
           : [],
-      // Percent labels against the disk in breakdown mode (the design's
-      // "90% / 0%" rail); byte labels for the single-color fallback, whose
-      // dashed ceiling still reads as the provisioned size.
-      axisLabel:
-        breakdown && totalBytes
-          ? (v: number) => `${Math.round((v / totalBytes) * 100)}%`
-          : BYTES_SIZE,
+      axisLabel: BYTES_SIZE,
       totalBytes,
       breakdown,
       tooltipDetail:

@@ -182,9 +182,24 @@ export function MetricChartCard({
     return latest;
   }, [data]);
 
+  // Sparse sampler series make timestamp-proportional bars bunch up at one
+  // end of the window, so in breakdown mode every sample takes an equal slot
+  // across the full plot width instead; hover targeting and the dot follow
+  // the same remapped x so they stay centered on the bars.
+  const displayPoints = useMemo(() => {
+    if (!capacity?.components?.length || sparkline.points.length === 0) {
+      return sparkline.points;
+    }
+    const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / sparkline.points.length;
+    return sparkline.points.map((point, i) => ({
+      ...point,
+      x: Y_AXIS_LABEL_WIDTH + slot * (i + 0.5),
+    }));
+  }, [capacity, sparkline.points]);
+
   const handleMove: MouseEventHandler<SVGSVGElement> = (e) => {
     const svg = svgRef.current;
-    if (!svg || sparkline.points.length === 0) {
+    if (!svg || displayPoints.length === 0) {
       return;
     }
     const rect = svg.getBoundingClientRect();
@@ -193,9 +208,9 @@ export function MetricChartCard({
     }
     const vbX = ((e.clientX - rect.left) / rect.width) * SPARKLINE_WIDTH;
     let bestIdx = 0;
-    let bestDist = Math.abs(sparkline.points[0].x - vbX);
-    for (let i = 1; i < sparkline.points.length; i++) {
-      const d = Math.abs(sparkline.points[i].x - vbX);
+    let bestDist = Math.abs(displayPoints[0].x - vbX);
+    for (let i = 1; i < displayPoints.length; i++) {
+      const d = Math.abs(displayPoints[i].x - vbX);
       if (d < bestDist) {
         bestDist = d;
         bestIdx = i;
@@ -225,56 +240,42 @@ export function MetricChartCard({
   }, [capacity, sparkline.points]);
 
   // Stacked composition bars: segments accumulate bottom-up per shared sample
-  // timestamp, mapped onto the same time window and domain as the primary
-  // series so the stack lines up with the axis and the used/AVG stats.
+  // timestamp. Bars sit in equal slots across the plot (matching
+  // displayPoints) rather than at timestamp-proportional x — the sampler's
+  // cadence is coarse and uneven, and proportional placement reads as broken
+  // spacing rather than as a time axis.
   const stackedBars = useMemo(() => {
     const components = capacity?.components;
     if (!components?.length) {
       return [];
     }
-    const finitePrimary = data.filter((point) => Number.isFinite(point.value));
-    const windowEnd = finitePrimary.length
-      ? finitePrimary[finitePrimary.length - 1].timestamp
-      : (components[0].data[components[0].data.length - 1]?.timestamp ??
-        Math.floor(Date.now() / 1000));
-    const windowStart = windowEnd - rangeSeconds;
     const [min, max] = effectiveDomain ?? [0, 100];
     const valueRange = max - min || 1;
     const base = components[0].data;
     const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / Math.max(1, base.length);
     const width = Math.max(2, slot * 0.85);
 
-    return base
-      .map((point, i) => {
-        const rawX =
-          ((point.timestamp - windowStart) / Math.max(1, rangeSeconds)) * SPARKLINE_WIDTH;
-        const x = Math.max(Y_AXIS_LABEL_WIDTH + 2, Math.min(rawX, SPARKLINE_WIDTH - width));
-        let cumulative = 0;
-        const segments = components.map((component) => {
-          const value = component.data[i]?.value ?? 0;
-          const y0 = cumulative;
-          cumulative += value;
-          const yTop = SPARKLINE_HEIGHT - ((cumulative - min) / valueRange) * SPARKLINE_HEIGHT;
-          const yBottom = SPARKLINE_HEIGHT - ((y0 - min) / valueRange) * SPARKLINE_HEIGHT;
-          return {
-            key: component.key,
-            fillClass: component.fillClass,
-            y: yTop,
-            height: Math.max(value > 0 ? 1 : 0, yBottom - yTop),
-          };
-        });
+    return base.map((point, i) => {
+      const x = Y_AXIS_LABEL_WIDTH + slot * (i + 0.5) - width / 2;
+      let cumulative = 0;
+      const segments = components.map((component) => {
+        const value = component.data[i]?.value ?? 0;
+        const y0 = cumulative;
+        cumulative += value;
+        const yTop = SPARKLINE_HEIGHT - ((cumulative - min) / valueRange) * SPARKLINE_HEIGHT;
+        const yBottom = SPARKLINE_HEIGHT - ((y0 - min) / valueRange) * SPARKLINE_HEIGHT;
         return {
-          x,
-          width,
-          timestamp: point.timestamp,
-          inWindow: point.timestamp >= windowStart,
-          segments,
+          key: component.key,
+          fillClass: component.fillClass,
+          y: yTop,
+          height: Math.max(value > 0 ? 1 : 0, yBottom - yTop),
         };
-      })
-      .filter((bar) => bar.inWindow);
-  }, [capacity, data, rangeSeconds, effectiveDomain]);
+      });
+      return { x, width, timestamp: point.timestamp, segments };
+    });
+  }, [capacity, effectiveDomain]);
 
-  const hover = hoverIdx !== null ? sparkline.points[hoverIdx] : null;
+  const hover = hoverIdx !== null ? (displayPoints[hoverIdx] ?? null) : null;
   const hoverLeftPct = hover ? (hover.x / SPARKLINE_WIDTH) * 100 : 0;
   const hoverTopPct = hover ? (hover.y / SPARKLINE_HEIGHT) * 100 : 0;
   const tooltipTranslateX = hoverLeftPct < 15 ? '0%' : hoverLeftPct > 85 ? '-100%' : '-50%';
@@ -541,7 +542,7 @@ export function MetricChartCard({
                       style={{ left: `${hoverLeftPct}%`, top: `${hoverTopPct}%` }}
                     />
                     <div
-                      className="pointer-events-none absolute -top-1 z-10 whitespace-nowrap rounded border border-[var(--alpha-8)] bg-toast px-2 py-1 text-xs leading-4 shadow"
+                      className="pointer-events-none absolute -top-1 z-10 whitespace-nowrap rounded border border-[var(--alpha-16)] bg-card px-2.5 py-1.5 text-xs leading-4 text-foreground shadow-lg"
                       style={{
                         left: `${hoverLeftPct}%`,
                         transform: `translate(${tooltipTranslateX}, -100%)`,
@@ -582,7 +583,7 @@ export function MetricChartCard({
                                     )}
                                     {row.label}
                                   </span>
-                                  <span className="tabular-nums">{row.value}</span>
+                                  <span className="tabular-nums text-foreground">{row.value}</span>
                                 </div>
                               ))}
                             </div>
