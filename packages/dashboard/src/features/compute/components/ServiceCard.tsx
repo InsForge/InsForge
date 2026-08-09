@@ -116,15 +116,18 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1 text-xs text-primary hover:underline mb-3"
+            className="inline-flex max-w-full items-center gap-1 text-xs text-primary hover:underline mb-3"
+            title={reachableUrl.display}
           >
-            <ExternalLink className="h-3 w-3" />
-            {reachableUrl.display}
+            <ExternalLink className="h-3 w-3 shrink-0" />
+            {/* Truncated like the image URL above it: a `host`-ingress hostname is
+                longer than a card is wide, and the full value is in the tooltip. */}
+            <span className="truncate">{reachableUrl.display}</span>
           </a>
         ) : (
           <code
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center text-xs text-foreground bg-[var(--alpha-8)] px-2 py-0.5 rounded mb-3 font-mono"
+            className="inline-flex max-w-full items-center truncate text-xs text-foreground bg-[var(--alpha-8)] px-2 py-0.5 rounded mb-3 font-mono"
             title={t('compute.rawTcpEndpointTooltip', {
               defaultValue:
                 'Raw TCP endpoint — connect with redis-cli, psql, or your protocol-native client',

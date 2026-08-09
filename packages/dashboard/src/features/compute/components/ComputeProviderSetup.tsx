@@ -162,7 +162,12 @@ function Snippet({ code, label }: { code: string; label?: string }) {
         )}
         <CopyButton text={code} showText={false} className="shrink-0" />
       </div>
-      <p className="whitespace-pre-wrap font-mono text-sm leading-6 text-foreground">{code}</p>
+      {/* `break-all` because the compose volume line is one unbroken token — with
+          wrapping only at whitespace it ran past the card's edge. Same markup the
+          overview's command blocks use. */}
+      <pre className="m-0 whitespace-pre-wrap break-all font-mono text-sm leading-6 text-foreground">
+        {code}
+      </pre>
     </div>
   );
 }
