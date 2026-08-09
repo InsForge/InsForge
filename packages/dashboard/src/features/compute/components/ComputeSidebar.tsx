@@ -8,8 +8,6 @@ import {
 import { COMPUTE_PROVIDERS } from '#features/compute/constants';
 
 interface ComputeSidebarProps {
-  /** Providers the backend reports as configured. */
-  configured: string[];
   onOpenSettings: () => void;
 }
 
@@ -22,7 +20,7 @@ interface ComputeSidebarProps {
  * to discover it exists, which was the original complaint. Selecting one that is not
  * set up shows how to set it up, so the entry is useful either way.
  */
-export function ComputeSidebar({ configured, onOpenSettings }: ComputeSidebarProps) {
+export function ComputeSidebar({ onOpenSettings }: ComputeSidebarProps) {
   const { t } = useTranslation('chrome');
 
   const items: FeatureSidebarListItem[] = COMPUTE_PROVIDERS.map((provider) => ({
@@ -45,16 +43,6 @@ export function ComputeSidebar({ configured, onOpenSettings }: ComputeSidebarPro
       title={t('compute.sidebarTitle', { defaultValue: 'Compute' })}
       items={items}
       headerButtons={headerButtons}
-      headerContent={
-        configured.length === 0 ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground">
-              {t('compute.sidebarNotConfigured', { defaultValue: 'No provider configured yet' })}
-            </p>
-            <div className="h-px w-full bg-alpha-8" />
-          </div>
-        ) : undefined
-      }
     />
   );
 }

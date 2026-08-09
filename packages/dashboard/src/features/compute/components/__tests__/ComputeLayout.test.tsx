@@ -67,7 +67,9 @@ describe('ComputeLayout', () => {
 
     expect(screen.getByText('Docker')).toBeTruthy();
     expect(screen.getByText('Fly.io')).toBeTruthy();
-    expect(screen.getByText(/No provider configured yet/i)).toBeTruthy();
+    // No status text or divider in the sidebar — the content pane owns that state,
+    // the way WebscraperLayout does for an unconnected account.
+    expect(screen.queryByText(/No provider configured yet/i)).toBeNull();
   });
 
   it('skips the list request when compute is off', () => {
