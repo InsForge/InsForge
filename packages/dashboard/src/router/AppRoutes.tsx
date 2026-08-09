@@ -17,7 +17,9 @@ import AuthenticationLayout from '#features/auth/components/AuthenticationLayout
 import AuthMethodsPage from '#features/auth/pages/AuthMethodsPage';
 import EmailPage from '#features/auth/pages/EmailPage';
 import UsersPage from '#features/auth/pages/UsersPage';
-import ComputePage from '#features/compute/pages/ComputePage';
+import ComputeLayout from '#features/compute/components/ComputeLayout';
+import ComputeServicesPage from '#features/compute/pages/ComputeServicesPage';
+import ComputeSettingsPage from '#features/compute/pages/ComputeSettingsPage';
 import DashboardLayout from '#features/dashboard/components/DashboardLayout';
 import DashboardPage from '#features/dashboard/pages/DashboardPage';
 import DTestDashboardPage from '#features/dashboard/pages/DTestDashboardPage';
@@ -149,7 +151,11 @@ function AuthenticatedRoutes() {
           <Route path="env-vars" element={<DeploymentEnvVarsPage />} />
           <Route path="domains" element={<DeploymentDomainsPage />} />
         </Route>
-        <Route path="/dashboard/compute" element={<ComputePage />} />
+        <Route path="/dashboard/compute" element={<ComputeLayout />}>
+          <Route index element={<Navigate to="services" replace />} />
+          <Route path="services" element={<ComputeServicesPage />} />
+          <Route path="settings" element={<ComputeSettingsPage />} />
+        </Route>
         {/* Analytics ships in both host modes — self-hosting connects with the
             admin's own PostHog personal API key — so this subtree is
             deliberately ungated, matching AppSidebar, which pushes the nav entry
