@@ -175,3 +175,38 @@ export type CreateServiceRequestInput = z.input<typeof createServiceSchema>;
 export type ListServicesResponse = z.infer<typeof listServicesResponseSchema>;
 export type ComputeLogLine = z.infer<typeof computeLogLineSchema>;
 export type ComputeLogsResponse = z.infer<typeof computeLogsResponseSchema>;
+
+/**
+ * Whether a credential is set, and a masked hint of it — never the value.
+ *
+ * Same shape as modelGatewayCredentialStatusSchema, for the same reason: the dialog
+ * needs to say "configured" and show enough to recognise which key is stored, and
+ * nothing should hand a Fly token back over the wire once it is saved.
+ */
+export const computeCredentialStatusSchema = z.object({
+  configured: z.boolean(),
+  masked: z.string().nullable(),
+  /**
+   * Where the value came from. `environment` means it is in the container's env and
+   * this dialog cannot change it; saving here stores one that takes precedence.
+   */
+  source: z.enum(['stored', 'environment']).nullable(),
+});
+
+export const computeConfigSchema = z.object({
+  flyApiToken: computeCredentialStatusSchema,
+  flyOrg: computeCredentialStatusSchema,
+});
+
+export const updateComputeConfigSchema = z
+  .object({
+    flyApiToken: z.string().trim().min(1).max(512).optional(),
+    flyOrg: z.string().trim().min(1).max(128).optional(),
+  })
+  .refine((value) => value.flyApiToken !== undefined || value.flyOrg !== undefined, {
+    message: 'At least one credential is required',
+  });
+
+export type ComputeCredentialStatus = z.infer<typeof computeCredentialStatusSchema>;
+export type ComputeConfig = z.infer<typeof computeConfigSchema>;
+export type UpdateComputeConfig = z.infer<typeof updateComputeConfigSchema>;

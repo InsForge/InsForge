@@ -18,6 +18,7 @@ import {
   MenuDialogTitle,
 } from '@insforge/ui';
 import { computeProviderLabel } from '#features/compute/constants';
+import { FlyCredentialsForm } from './FlyCredentialsForm';
 
 interface Capabilities {
   regions?: boolean;
@@ -41,15 +42,16 @@ interface ComputeSettingsDialogProps {
 type ProviderTab = 'docker' | 'fly';
 
 /**
- * What each compute provider is configured to do.
+ * What each compute provider is configured to do, and — for Fly — its credentials.
  *
- * Read-only, because all of it comes from environment variables on the InsForge
- * container and takes a restart to change — a form here would be pretending.
+ * Fly is editable here because its credentials are just values: they go to the secret
+ * store, the backend refreshes its snapshot and rebuilds the provider registry, and
+ * Fly becomes usable without a restart. Docker is not, because enabling it means
+ * mounting a socket into this container, which no API can do from inside the container
+ * it would be changing; its steps live on the provider page.
  *
- * Setup steps deliberately live in ComputeProviderSetup, on the provider's own page,
- * not here: an operator reaching an unconfigured provider needs them in front of
- * them, and having the same three steps in two places means one of them goes stale.
- * This dialog answers the other question — what is switched on, and what can it do.
+ * The capability list is read-only for both — it reports what the backend says a
+ * provider can do, which is not something to set from here.
  */
 export function ComputeSettingsDialog({
   open,
@@ -117,6 +119,11 @@ export function ComputeSettingsDialog({
                 isDefault={activeProvider === defaultProvider}
               />
               <ProviderCapabilities caps={capabilities?.[activeProvider]} />
+              {/* Fly credentials can be stored from here; Docker cannot, because
+                  enabling it means mounting a socket into this container — a compose
+                  change no API can make from inside the container it would change. Its
+                  steps live on the provider page instead. */}
+              {activeProvider === 'fly' && <FlyCredentialsForm />}
             </div>
           </MenuDialogBody>
         </MenuDialogMain>

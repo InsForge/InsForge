@@ -846,7 +846,23 @@
     "dockerStep3Body": "socket 可访问时，驱动会自行注册。",
     "dockerSocketLookingAt": "正在查找",
     "flyStep1Body": "两者都来自已登录你自己账号的 Fly CLI。",
-    "flyStep3Body": "两个值齐备后，compute 接口就会开始响应。"
+    "flyStep3Body": "两个值齐备后，compute 接口就会开始响应。",
+    "flyApiTokenLabel": "API token",
+    "flyApiTokenHint": "来自 `fly tokens create org`。",
+    "flyApiTokenPlaceholder": "粘贴 Fly API token",
+    "flyOrgLabel": "Organization slug",
+    "flyOrgHint": "来自 `fly orgs list`。",
+    "flyOrgPlaceholder": "your-org-slug",
+    "showToken": "显示 token",
+    "hideToken": "隐藏 token",
+    "configReplaceHint": "留空则保留当前值。",
+    "configSave": "保存",
+    "configSaving": "保存中…",
+    "configLoading": "正在检查已存储的凭据…",
+    "configSaved": "Fly 凭据已保存",
+    "configSaveFailed": "保存 Fly 凭据失败",
+    "fromEnvironment": "来自环境变量",
+    "providerNotConfiguredBadge": "未配置"
   },
   "analytics": {
     "sidebar": {

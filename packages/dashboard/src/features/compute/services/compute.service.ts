@@ -3,6 +3,8 @@ import type {
   ServiceSchema,
   CreateServiceRequestInput,
   UpdateServiceRequest,
+  ComputeConfig,
+  UpdateComputeConfig,
 } from '@insforge/shared-schemas';
 
 interface ListServicesResponse {
@@ -14,6 +16,21 @@ type LogLine = { timestamp: number; message: string; instance?: string; region?:
 type LogsResponse = { lines: LogLine[]; nextToken: string | null };
 
 class ComputeServicesApiService {
+  /** Provider credential status — never the values themselves. */
+  async getConfig(): Promise<ComputeConfig> {
+    return apiClient.request('/compute/services/config', {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async updateConfig(input: UpdateComputeConfig): Promise<ComputeConfig> {
+    return apiClient.request('/compute/services/config', {
+      method: 'PUT',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(input),
+    });
+  }
+
   async list(): Promise<ServiceSchema[]> {
     const response = await apiClient.request('/compute/services', {
       headers: apiClient.withAccessToken(),
