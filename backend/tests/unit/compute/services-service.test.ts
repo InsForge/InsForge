@@ -99,6 +99,9 @@ const mockFlyInstance = {
   // service's naming and URL calls resolve to the same values the fixtures use.
   name: 'fly' as const,
   capabilities: { ...FLY_CAPABILITIES },
+  // Fly's only mode. A separate method rather than capabilities.ingressModes[0]
+  // because a single-host driver's default is an operator setting.
+  defaultIngress: (): 'none' | 'port' | 'host' => 'host',
   // Delegates to the real helper (rather than a naive template) so the service
   // test keeps covering the Fly app-name length guard, which moved here from
   // the service layer.
@@ -130,6 +133,7 @@ describe('ComputeServicesService', () => {
     // test body, where a failing assertion skips the restore and the leak shows up
     // as unrelated failures further down the file.
     mockFlyInstance.capabilities = { ...FLY_CAPABILITIES };
+    mockFlyInstance.defaultIngress = () => 'host';
   });
 
   afterEach(() => {
@@ -153,6 +157,10 @@ describe('ComputeServicesService', () => {
             scaleToZero: true,
             regions: true,
             ingressModes: ['host'],
+            // Resolved from the provider, not read off ingressModes[0]: a
+            // single-host driver's default is an operator setting, and a client
+            // that guessed would preselect one mode and be given another.
+            defaultIngress: 'host',
             sourceBuild: 'flyctl',
             deployTokenIssuance: false,
           },
@@ -211,6 +219,38 @@ describe('ComputeServicesService', () => {
       // The INSERT must persist false, not the schema default of true.
       expect(mockQuery.mock.calls[0][1]).toContain(false);
       expect(mockLaunchMachine.mock.calls[0][0].scaleToZero).toBe(false);
+    });
+
+    // Found while verifying the settings dialog on a real daemon: an omitted ingress
+    // used to resolve to `capabilities.ingressModes[0]`, a static list whose first
+    // entry is 'none'. That made COMPUTE_DEFAULT_INGRESS — and the stored setting
+    // that replaces it — have no effect on service creation.
+    it("applies the driver's configured default ingress when the caller omits it", async () => {
+      mockFlyInstance.capabilities = {
+        ...mockFlyInstance.capabilities,
+        ingressModes: ['none', 'port', 'host'],
+      };
+      mockFlyInstance.defaultIngress = () => 'port';
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+      mockCreateApp.mockResolvedValue({ appId: 'a' });
+      mockLaunchMachine.mockResolvedValue({ machineId: 'm1' });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+
+      await service.createService({
+        projectId: 'proj-123',
+        name: 'svc',
+        imageUrl: 'nginx',
+        port: 80,
+        cpu: 'shared-1x',
+        memory: 256,
+        region: 'iad',
+        // ingress deliberately not sent
+      });
+
+      // Both the stored row and the launch call, because a row that disagrees with
+      // the container is the failure this whole capability layer exists to prevent.
+      expect(mockQuery.mock.calls[0][1]).toContain('port');
+      expect(mockLaunchMachine.mock.calls[0][0].ingress).toBe('port');
     });
 
     // On update, an omitted field means "leave it alone". Filling it in would turn

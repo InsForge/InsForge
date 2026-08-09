@@ -8,7 +8,6 @@ import { dockerConfig } from '@/providers/compute/docker.client.js';
 import {
   MachineGoneError,
   type ComputeProvider,
-  type ComputeCapabilities,
   type ComputeLogsResult,
 } from '@/providers/compute/compute.provider.js';
 import { appConfig } from '@/infra/config/app.config.js';
@@ -426,9 +425,13 @@ export function getComputeMetadata(): ComputeMetadataSchema | undefined {
     return undefined;
   }
 
-  const providers: Record<string, ComputeCapabilities> = {};
+  const providers: NonNullable<ComputeMetadataSchema['providers']> = {};
   for (const [name, provider] of registry.providers) {
-    providers[name] = provider.capabilities;
+    // The caller-omitted default is resolved here rather than left to the client:
+    // for a single-host driver it is an operator setting, so a dashboard that
+    // guessed the first supported mode would preselect one thing in its create
+    // form and get another from the server.
+    providers[name] = { ...provider.capabilities, defaultIngress: provider.defaultIngress() };
   }
   return { defaultProvider: registry.defaultProvider, providers };
 }
@@ -531,13 +534,14 @@ export class ComputeServicesService {
       // that only does public hostnames (Fly) should not fail an otherwise valid
       // deploy that asked for `none`, but it must not record a mode it is not
       // delivering either.
+      const applied = driver.defaultIngress();
       logger.info('Compute: driver cannot deliver the requested ingress; using its default', {
         driver: driver.name,
         requested: out.ingress,
-        applied: modes[0],
+        applied,
         ...context,
       });
-      out.ingress = modes[0];
+      out.ingress = applied;
     }
     if (!driver.capabilities.regions && out.region !== undefined && out.region !== LOCAL_REGION) {
       logger.info('Compute: driver has no regions; recording region as local', {
@@ -971,9 +975,9 @@ export class ComputeServicesService {
           input.region,
           input.protocol ?? 'http',
           input.scaleToZero ?? true,
-          // Resolved from the driver when the caller did not choose: a
-          // single-host driver defaults to private-only, Fly to its hostname.
-          input.ingress ?? fly.capabilities.ingressModes[0],
+          // Resolved from the driver when the caller did not choose: Fly always
+          // its hostname, a single-host driver whatever the operator configured.
+          input.ingress ?? fly.defaultIngress(),
           envVarsEncrypted,
           // Migration 064 drops the column default, so every insert states the
           // driver explicitly — a row that lies about its provider is exactly
@@ -1008,7 +1012,7 @@ export class ComputeServicesService {
         memory: input.memory,
         envVars: input.envVars ?? {},
         region: input.region,
-        ingress: input.ingress ?? fly.capabilities.ingressModes[0],
+        ingress: input.ingress ?? fly.defaultIngress(),
         protocol: input.protocol,
         scaleToZero: input.scaleToZero,
       });
@@ -1118,7 +1122,7 @@ export class ComputeServicesService {
           input.region,
           input.protocol ?? 'http',
           input.scaleToZero ?? true,
-          input.ingress ?? fly.capabilities.ingressModes[0],
+          input.ingress ?? fly.defaultIngress(),
           envVarsEncrypted,
           providerName(fly),
           appName,
