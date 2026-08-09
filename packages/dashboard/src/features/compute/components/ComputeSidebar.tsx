@@ -1,67 +1,35 @@
 import { useTranslation } from 'react-i18next';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@insforge/ui';
 import { Settings } from 'lucide-react';
 import {
   FeatureSidebar,
   type FeatureSidebarListItem,
   type FeatureSidebarHeaderButton,
 } from '#components';
-import { ALL_PROVIDERS, type ProviderFilter } from '#features/compute/constants';
+import { COMPUTE_PROVIDERS } from '#features/compute/constants';
 
 interface ComputeSidebarProps {
-  /** Providers the backend reports as configured, in the order it reported them. */
+  /** Providers the backend reports as configured. */
   configured: string[];
-  filter: ProviderFilter;
-  setFilter: (filter: ProviderFilter) => void;
-  serviceCount: number;
   onOpenSettings: () => void;
 }
 
 /**
- * Secondary nav for the compute tab, in the shape the payments tab established.
+ * Secondary nav for the compute tab: one entry per provider.
  *
- * The provider control is a **filter**, not a switch. Which provider a deployment
- * uses comes from environment variables — a mounted Docker socket, `FLY_API_TOKEN`,
- * `COMPUTE_PROVIDER` — and changing it needs a container restart, so there is
- * nothing the dashboard could switch. What it can usefully do is narrow the list,
- * because providers coexist and the backend routes per service row.
- *
- * So the select only appears when more than one provider is configured. Offering a
- * one-item dropdown would be a control that does nothing, which is the same mistake
- * as offering a region picker to a single-host driver.
+ * Provider is the navigation axis rather than a filter control, so selecting Docker
+ * or Fly.io shows that provider's services in the main area. Both are always listed
+ * even when unconfigured — a self-hoster who cannot see Docker in the nav has no way
+ * to discover it exists, which was the original complaint. Selecting one that is not
+ * set up shows how to set it up, so the entry is useful either way.
  */
-export function ComputeSidebar({
-  configured,
-  filter,
-  setFilter,
-  serviceCount,
-  onOpenSettings,
-}: ComputeSidebarProps) {
+export function ComputeSidebar({ configured, onOpenSettings }: ComputeSidebarProps) {
   const { t } = useTranslation('chrome');
 
-  // Nothing configured means nothing to navigate to, but the menu stays visible with
-  // its entries dimmed — the same treatment the payments tab gives an unconnected
-  // provider. Replacing the whole tab with an error made it look broken rather than
-  // unconfigured.
-  const notConfigured = configured.length === 0;
-
-  const items: FeatureSidebarListItem[] = [
-    {
-      id: 'services',
-      label:
-        serviceCount > 0
-          ? `${t('compute.navServices', { defaultValue: 'Services' })} (${serviceCount})`
-          : t('compute.navServices', { defaultValue: 'Services' }),
-      href: '/dashboard/compute/services',
-      disabled: notConfigured,
-    },
-    {
-      id: 'settings',
-      label: t('compute.navSettings', { defaultValue: 'Settings' }),
-      href: '/dashboard/compute/settings',
-      disabled: notConfigured,
-    },
-  ];
+  const items: FeatureSidebarListItem[] = COMPUTE_PROVIDERS.map((provider) => ({
+    id: provider.slug,
+    label: provider.label,
+    href: `/dashboard/compute/${provider.slug}`,
+  }));
 
   const headerButtons: FeatureSidebarHeaderButton[] = [
     {
@@ -77,40 +45,15 @@ export function ComputeSidebar({
       title={t('compute.sidebarTitle', { defaultValue: 'Compute' })}
       items={items}
       headerButtons={headerButtons}
-      activeItemId={notConfigured ? null : undefined}
       headerContent={
-        <div className="flex flex-col gap-3">
-          {configured.length > 1 && (
-            <Select value={filter} onValueChange={(v) => setFilter(v as ProviderFilter)}>
-              <SelectTrigger
-                className="h-8 w-full rounded"
-                aria-label={t('compute.providerFilterAriaLabel', {
-                  defaultValue: 'Filter services by provider',
-                })}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="w-[216px]">
-                <SelectItem value={ALL_PROVIDERS}>
-                  {t('compute.allProviders', { defaultValue: 'All providers' })}
-                </SelectItem>
-                {configured.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          {notConfigured && (
+        configured.length === 0 ? (
+          <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
               {t('compute.sidebarNotConfigured', { defaultValue: 'No provider configured yet' })}
             </p>
-          )}
-
-          <div className="h-px w-full bg-alpha-8" />
-        </div>
+            <div className="h-px w-full bg-alpha-8" />
+          </div>
+        ) : undefined
       }
     />
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Container, Cloud, CheckCircle2, CircleDashed } from 'lucide-react';
 import {
@@ -19,12 +19,23 @@ import {
   MenuDialogTitle,
 } from '@insforge/ui';
 
+interface Capabilities {
+  regions?: boolean;
+  scaleToZero?: boolean;
+  ingressModes?: string[];
+  sourceBuild?: string;
+}
+
 interface ComputeSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Providers the backend reports as configured. */
   configured: string[];
   defaultProvider: string | undefined;
+  /** Provider to open on, so the CTA lands on the one the operator was looking at. */
+  initialProvider?: string;
+  /** Capabilities per provider, as reported by /api/metadata. */
+  capabilities?: Record<string, Capabilities | undefined>;
 }
 
 const COMPOSE_SNIPPET = `services:
@@ -50,11 +61,64 @@ export function ComputeSettingsDialog({
   onOpenChange,
   configured,
   defaultProvider,
+  initialProvider,
+  capabilities,
 }: ComputeSettingsDialogProps) {
   const { t } = useTranslation('chrome');
   const [activeProvider, setActiveProvider] = useState<'docker' | 'fly'>('docker');
 
+  // Follow the caller when it names a provider, so opening from a provider page lands
+  // on that provider's steps rather than always on Docker.
+  useEffect(() => {
+    if (open && (initialProvider === 'docker' || initialProvider === 'fly')) {
+      setActiveProvider(initialProvider);
+    }
+  }, [open, initialProvider]);
+
   const isReady = (p: string) => configured.includes(p);
+
+  const CapabilityList = ({ provider }: { provider: string }) => {
+    const caps = capabilities?.[provider];
+    if (!caps) {
+      return null;
+    }
+    const facts: [string, string][] = [
+      [
+        t('compute.capRegions', { defaultValue: 'Region choice' }),
+        caps.regions
+          ? t('compute.capYes', { defaultValue: 'Yes' })
+          : t('compute.capSingleHost', { defaultValue: 'Single host' }),
+      ],
+      [
+        t('compute.capScaleToZero', { defaultValue: 'Scale to zero' }),
+        caps.scaleToZero
+          ? t('compute.capYes', { defaultValue: 'Yes' })
+          : t('compute.capNo', { defaultValue: 'No' }),
+      ],
+      [
+        t('compute.capIngress', { defaultValue: 'Ingress modes' }),
+        (caps.ingressModes ?? []).join(', '),
+      ],
+      [
+        t('compute.capSourceBuild', { defaultValue: 'Source builds' }),
+        caps.sourceBuild === 'context-upload'
+          ? t('compute.capUploadContext', { defaultValue: 'Upload a build context' })
+          : caps.sourceBuild === 'flyctl'
+            ? t('compute.capFlyctl', { defaultValue: 'Built by the CLI with flyctl' })
+            : t('compute.capNo', { defaultValue: 'No' }),
+      ],
+    ];
+    return (
+      <dl className="flex flex-col gap-1.5 rounded-lg border border-[var(--alpha-8)] bg-card p-3">
+        {facts.map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between gap-4 text-xs">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="text-foreground">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    );
+  };
 
   const StatusLine = ({ provider }: { provider: string }) => (
     <div className="flex items-center gap-2 text-sm">
@@ -131,6 +195,7 @@ export function ComputeSettingsDialog({
             {activeProvider === 'docker' ? (
               <div className="flex flex-col gap-5">
                 <StatusLine provider="docker" />
+                <CapabilityList provider="docker" />
                 <p className="text-sm text-muted-foreground">
                   {t('compute.dockerIntro', {
                     defaultValue:
@@ -185,6 +250,7 @@ export function ComputeSettingsDialog({
             ) : (
               <div className="flex flex-col gap-5">
                 <StatusLine provider="fly" />
+                <CapabilityList provider="fly" />
                 <p className="text-sm text-muted-foreground">
                   {t('compute.flyIntro', {
                     defaultValue:

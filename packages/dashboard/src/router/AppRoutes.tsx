@@ -19,7 +19,6 @@ import EmailPage from '#features/auth/pages/EmailPage';
 import UsersPage from '#features/auth/pages/UsersPage';
 import ComputeLayout from '#features/compute/components/ComputeLayout';
 import ComputeServicesPage from '#features/compute/pages/ComputeServicesPage';
-import ComputeSettingsPage from '#features/compute/pages/ComputeSettingsPage';
 import DashboardLayout from '#features/dashboard/components/DashboardLayout';
 import DashboardPage from '#features/dashboard/pages/DashboardPage';
 import DTestDashboardPage from '#features/dashboard/pages/DTestDashboardPage';
@@ -152,9 +151,9 @@ function AuthenticatedRoutes() {
           <Route path="domains" element={<DeploymentDomainsPage />} />
         </Route>
         <Route path="/dashboard/compute" element={<ComputeLayout />}>
-          <Route index element={<Navigate to="services" replace />} />
-          <Route path="services" element={<ComputeServicesPage />} />
-          <Route path="settings" element={<ComputeSettingsPage />} />
+          {/* One route per provider: the sidebar is the switcher, and the URL is
+              shareable. The layout redirects the bare path to a sensible provider. */}
+          <Route path=":provider" element={<ComputeServicesPage />} />
         </Route>
         {/* Analytics ships in both host modes — self-hosting connects with the
             admin's own PostHog personal API key — so this subtree is

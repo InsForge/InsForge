@@ -837,7 +837,11 @@
     "capFlyctl": "由 CLI 使用 flyctl 建置",
     "settingsDocsPrefix": "provider 設定以及完整的",
     "settingsDocsLink": "compute 環境變數清單",
-    "setupProviders": "設定指南"
+    "setupProviders": "設定指南",
+    "providerNotEnabled": "{{provider}} 尚未啟用",
+    "providerSetupCta": "設定 {{provider}}",
+    "setupDockerSummary": "容器與 InsForge 執行在同一個 Docker daemon 上——不需要帳號，也沒有按容器計費。需要把 Docker socket 掛載進本容器。",
+    "setupFlySummary": "容器執行在您自己的 Fly.io 帳號下，可選擇區域並支援縮減至零。需要 API token 與 org slug。"
   },
   "analytics": {
     "sidebar": {

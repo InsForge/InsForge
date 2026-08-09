@@ -1,99 +1,87 @@
-import { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { useState } from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { LoadingState } from '#components';
 import { useMetadata } from '#lib/hooks/useMetadata';
-import { getLocalStorageJSON, setLocalStorageJSON } from '#lib/utils/local-storage';
-import { ALL_PROVIDERS, type ProviderFilter } from '#features/compute/constants';
-import { ComputeSidebar } from './ComputeSidebar';
-import { ComputeQuickStart } from './ComputeQuickStart';
-import { ComputeSettingsDialog } from './ComputeSettingsDialog';
+import { COMPUTE_PROVIDERS } from '#features/compute/constants';
 import { useComputeServices } from '#features/compute/hooks/useComputeServices';
-
-const COMPUTE_FILTER_STORAGE_KEY = 'insforge.compute.providerFilter';
+import { ComputeSidebar } from './ComputeSidebar';
+import { ComputeSettingsDialog } from './ComputeSettingsDialog';
 
 export interface ComputeOutletContext {
-  /** Services already narrowed to the selected provider. */
+  /** Every service, unfiltered; the provider page narrows to its own. */
   services: ReturnType<typeof useComputeServices>['services'];
   /** Providers the backend reports as configured. */
   configured: string[];
   defaultProvider: string | undefined;
-  filter: ProviderFilter;
   /** Opens the compute settings dialog, which the layout owns. */
-  openSettings: () => void;
+  openSettings: (provider?: string) => void;
 }
 
 /**
- * Shell for the compute tab: secondary nav plus the selected sub-page.
+ * Shell for the compute tab: one sidebar entry per provider, that provider's
+ * services in the main area.
  *
- * The not-configured state lives here rather than in each sub-page. It is decided
- * from metadata, which is cached across the dashboard, so an unconfigured
- * deployment never fires a service list request that can only 503 — a spinner
- * followed by an error reads as a broken page rather than a feature nobody turned
- * on.
+ * Provider is the navigation axis rather than a filter control. Compute is
+ * configured through environment variables, so picking one chooses what to look at,
+ * not where new services go — the backend decides that and reports it as the default.
+ *
+ * The service list is fetched once here and narrowed per page, because the API
+ * returns every provider's services in a single call.
  */
 export default function ComputeLayout() {
+  const { pathname } = useLocation();
   const { metadata, isLoading: metadataLoading } = useMetadata();
   const compute = metadata?.compute;
   const configured = compute ? Object.keys(compute.providers ?? {}) : [];
-  const isConfigured = metadata ? compute !== undefined : undefined;
 
-  const [filter, setFilter] = useState<ProviderFilter>(
-    () => getLocalStorageJSON<ProviderFilter>(COMPUTE_FILTER_STORAGE_KEY) ?? ALL_PROVIDERS
-  );
-  useEffect(() => {
-    setLocalStorageJSON(COMPUTE_FILTER_STORAGE_KEY, filter);
-  }, [filter]);
-
+  const [settingsProvider, setSettingsProvider] = useState<string | undefined>(undefined);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const { services } = useComputeServices(isConfigured === true);
+  const openSettings = (provider?: string) => {
+    setSettingsProvider(provider);
+    setIsSettingsOpen(true);
+  };
 
-  // A filter naming a provider that is no longer configured would silently hide
-  // everything, so fall back to showing all rather than an empty list.
-  const effectiveFilter =
-    filter !== ALL_PROVIDERS && configured.includes(filter) ? filter : ALL_PROVIDERS;
-  const visible =
-    effectiveFilter === ALL_PROVIDERS
-      ? services
-      : services.filter((s) => s.provider === effectiveFilter);
+  // Gate the list request on metadata: it would only 503 when nothing is configured,
+  // and spinning on a call whose failure is already known reads as a broken page.
+  const isConfigured = metadata ? compute !== undefined : undefined;
+  const { services } = useComputeServices(isConfigured === true);
 
   if (metadataLoading) {
     return <LoadingState />;
   }
 
+  // Land on something useful: the provider new services go to, else the first one
+  // configured, else Docker — the option a self-hoster can act on without an account.
+  if (pathname === '/dashboard/compute' || pathname === '/dashboard/compute/') {
+    const landing =
+      (compute?.defaultProvider && COMPUTE_PROVIDERS.some((p) => p.slug === compute.defaultProvider)
+        ? compute.defaultProvider
+        : configured[0]) ?? 'docker';
+    return <Navigate to={`/dashboard/compute/${landing}`} replace />;
+  }
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <ComputeSidebar
-        configured={configured}
-        filter={effectiveFilter}
-        setFilter={setFilter}
-        serviceCount={visible.length}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-      />
+      <ComputeSidebar configured={configured} onOpenSettings={() => openSettings()} />
       <div className="min-w-0 flex-1 overflow-hidden">
-        {/* Unconfigured keeps the tab's shape — sidebar present, entries dimmed —
-            and puts the quick start where a sub-page would be, rather than
-            replacing the whole tab with something that reads as an error. */}
-        {isConfigured === false ? (
-          <ComputeQuickStart onOpenSettings={() => setIsSettingsOpen(true)} />
-        ) : (
-          <Outlet
-            context={
-              {
-                services: visible,
-                configured,
-                defaultProvider: compute?.defaultProvider,
-                filter: effectiveFilter,
-                openSettings: () => setIsSettingsOpen(true),
-              } satisfies ComputeOutletContext
-            }
-          />
-        )}
+        <Outlet
+          context={
+            {
+              services,
+              configured,
+              defaultProvider: compute?.defaultProvider,
+              openSettings,
+            } satisfies ComputeOutletContext
+          }
+        />
       </div>
       <ComputeSettingsDialog
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
         configured={configured}
         defaultProvider={compute?.defaultProvider}
+        initialProvider={settingsProvider}
+        capabilities={compute?.providers}
       />
     </div>
   );
