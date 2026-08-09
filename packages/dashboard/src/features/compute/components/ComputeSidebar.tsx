@@ -1,17 +1,16 @@
 import { useTranslation } from 'react-i18next';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn } from '@insforge/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@insforge/ui';
 import { Settings } from 'lucide-react';
 import {
   FeatureSidebar,
   type FeatureSidebarListItem,
   type FeatureSidebarHeaderButton,
-} from '#components/FeatureSidebar';
+} from '#components';
 import { ALL_PROVIDERS, type ProviderFilter } from '#features/compute/constants';
 
 interface ComputeSidebarProps {
   /** Providers the backend reports as configured, in the order it reported them. */
   configured: string[];
-  defaultProvider: string | undefined;
   filter: ProviderFilter;
   setFilter: (filter: ProviderFilter) => void;
   serviceCount: number;
@@ -33,7 +32,6 @@ interface ComputeSidebarProps {
  */
 export function ComputeSidebar({
   configured,
-  defaultProvider,
   filter,
   setFilter,
   serviceCount,
@@ -105,24 +103,8 @@ export function ComputeSidebar({
             </Select>
           )}
 
-          {/* Which providers are usable, and which one new services go to. Reading
-              this off the sidebar is the answer to "is my Docker socket working". */}
-          <div className="flex flex-col gap-1">
-            {configured.map((p) => (
-              <div key={p} className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-500" aria-hidden />
-                <span className="text-foreground">{p}</span>
-                {p === defaultProvider && (
-                  <span className={cn('text-[10px] uppercase tracking-wide')}>
-                    {t('compute.defaultProviderTag', { defaultValue: 'default' })}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-
           {notConfigured && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {t('compute.sidebarNotConfigured', { defaultValue: 'No provider configured yet' })}
             </p>
           )}

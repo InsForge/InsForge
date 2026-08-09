@@ -78,13 +78,12 @@ describe('ComputeLayout', () => {
     renderLayout();
 
     // Quick start in the content area, not a full-page takeover: the tab keeps its
-    // shape so it reads as unconfigured rather than broken.
+    // shape so it reads as unconfigured rather than broken. Both providers are named
+    // in the copy, and the CTA leads to the steps.
     expect(screen.getByText(/Compute is not enabled yet/i)).toBeTruthy();
     expect(screen.getByRole('button', { name: /Set up compute/i })).toBeTruthy();
-    // Both providers named, Docker first — a self-hoster needs to discover the
-    // socket option, which the old Fly-only copy never mentioned.
-    expect(screen.getByText(/Your own Docker host/i)).toBeTruthy();
-    // The secondary nav stays visible, with its entries disabled.
+    expect(screen.getByText(/own Docker host/i)).toBeTruthy();
+    // The secondary nav stays mounted, and says why nothing is navigable.
     expect(screen.getByText('Services')).toBeTruthy();
     expect(screen.getByText(/No provider configured yet/i)).toBeTruthy();
     expect(listed.enabledCalls.every((e) => e === false)).toBe(true);

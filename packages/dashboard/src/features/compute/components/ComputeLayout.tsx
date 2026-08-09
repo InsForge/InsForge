@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { LoadingState } from '#components';
 import { useMetadata } from '#lib/hooks/useMetadata';
 import { getLocalStorageJSON, setLocalStorageJSON } from '#lib/utils/local-storage';
 import { ALL_PROVIDERS, type ProviderFilter } from '#features/compute/constants';
@@ -57,18 +57,13 @@ export default function ComputeLayout() {
       : services.filter((s) => s.provider === effectiveFilter);
 
   if (metadataLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingState />;
   }
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
       <ComputeSidebar
         configured={configured}
-        defaultProvider={compute?.defaultProvider}
         filter={effectiveFilter}
         setFilter={setFilter}
         serviceCount={visible.length}
