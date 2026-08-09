@@ -55,10 +55,7 @@ function renderLayout(initialPath = '/dashboard/compute/services') {
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/dashboard/compute" element={<ComputeLayout />}>
-          <Route
-            path="services"
-            element={<div data-testid="child">rendered</div>}
-          />
+          <Route path="services" element={<div data-testid="child">rendered</div>} />
         </Route>
       </Routes>
     </MemoryRouter>
@@ -80,11 +77,16 @@ describe('ComputeLayout', () => {
     meta.value = { version: '1' }; // metadata present, no compute slice
     renderLayout();
 
+    // Quick start in the content area, not a full-page takeover: the tab keeps its
+    // shape so it reads as unconfigured rather than broken.
     expect(screen.getByText(/Compute is not enabled yet/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Set up compute/i })).toBeTruthy();
     // Both providers named, Docker first — a self-hoster needs to discover the
     // socket option, which the old Fly-only copy never mentioned.
     expect(screen.getByText(/Your own Docker host/i)).toBeTruthy();
-    expect(screen.getByText(/Fly.io/i)).toBeTruthy();
+    // The secondary nav stays visible, with its entries disabled.
+    expect(screen.getByText('Services')).toBeTruthy();
+    expect(screen.getByText(/No provider configured yet/i)).toBeTruthy();
     expect(listed.enabledCalls.every((e) => e === false)).toBe(true);
     expect(screen.queryByTestId('child')).toBeNull();
   });

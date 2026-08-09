@@ -5,7 +5,8 @@ import { useMetadata } from '#lib/hooks/useMetadata';
 import { getLocalStorageJSON, setLocalStorageJSON } from '#lib/utils/local-storage';
 import { ALL_PROVIDERS, type ProviderFilter } from '#features/compute/constants';
 import { ComputeSidebar } from './ComputeSidebar';
-import { ComputeNotConfigured } from './ComputeNotConfigured';
+import { ComputeQuickStart } from './ComputeQuickStart';
+import { ComputeSettingsDialog } from './ComputeSettingsDialog';
 import { useComputeServices } from '#features/compute/hooks/useComputeServices';
 
 const COMPUTE_FILTER_STORAGE_KEY = 'insforge.compute.providerFilter';
@@ -17,6 +18,8 @@ export interface ComputeOutletContext {
   configured: string[];
   defaultProvider: string | undefined;
   filter: ProviderFilter;
+  /** Opens the compute settings dialog, which the layout owns. */
+  openSettings: () => void;
 }
 
 /**
@@ -41,6 +44,7 @@ export default function ComputeLayout() {
     setLocalStorageJSON(COMPUTE_FILTER_STORAGE_KEY, filter);
   }, [filter]);
 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { services } = useComputeServices(isConfigured === true);
 
   // A filter naming a provider that is no longer configured would silently hide
@@ -60,10 +64,6 @@ export default function ComputeLayout() {
     );
   }
 
-  if (isConfigured === false) {
-    return <ComputeNotConfigured />;
-  }
-
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
       <ComputeSidebar
@@ -72,19 +72,34 @@ export default function ComputeLayout() {
         filter={effectiveFilter}
         setFilter={setFilter}
         serviceCount={visible.length}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
       <div className="min-w-0 flex-1 overflow-hidden">
-        <Outlet
-          context={
-            {
-              services: visible,
-              configured,
-              defaultProvider: compute?.defaultProvider,
-              filter: effectiveFilter,
-            } satisfies ComputeOutletContext
-          }
-        />
+        {/* Unconfigured keeps the tab's shape — sidebar present, entries dimmed —
+            and puts the quick start where a sub-page would be, rather than
+            replacing the whole tab with something that reads as an error. */}
+        {isConfigured === false ? (
+          <ComputeQuickStart onOpenSettings={() => setIsSettingsOpen(true)} />
+        ) : (
+          <Outlet
+            context={
+              {
+                services: visible,
+                configured,
+                defaultProvider: compute?.defaultProvider,
+                filter: effectiveFilter,
+                openSettings: () => setIsSettingsOpen(true),
+              } satisfies ComputeOutletContext
+            }
+          />
+        )}
       </div>
+      <ComputeSettingsDialog
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        configured={configured}
+        defaultProvider={compute?.defaultProvider}
+      />
     </div>
   );
 }

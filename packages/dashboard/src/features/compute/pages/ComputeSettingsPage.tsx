@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next';
+import { Settings } from 'lucide-react';
+import { Button } from '@insforge/ui';
 import { useOutletContext } from 'react-router-dom';
 import { useMetadata } from '#lib/hooks/useMetadata';
 import type { ComputeOutletContext } from '#features/compute/components/ComputeLayout';
@@ -14,7 +16,7 @@ import type { ComputeOutletContext } from '#features/compute/components/ComputeL
  */
 export default function ComputeSettingsPage() {
   const { t } = useTranslation('chrome');
-  const { configured, defaultProvider } = useOutletContext<ComputeOutletContext>();
+  const { configured, defaultProvider, openSettings } = useOutletContext<ComputeOutletContext>();
   const { metadata } = useMetadata();
   const providers = metadata?.compute?.providers ?? {};
 
@@ -59,16 +61,24 @@ export default function ComputeSettingsPage() {
   return (
     <div className="h-full overflow-auto px-6 py-6">
       <div className="max-w-3xl space-y-6">
-        <div className="space-y-1">
-          <h1 className="text-base font-medium text-foreground">
-            {t('compute.settingsTitle', { defaultValue: 'Compute settings' })}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {t('compute.settingsSubtitle', {
-              defaultValue:
-                'Set by environment variables on the InsForge container. Changing them needs a restart.',
-            })}
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-base font-medium text-foreground">
+              {t('compute.settingsTitle', { defaultValue: 'Compute Settings' })}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {t('compute.settingsSubtitle', {
+                defaultValue:
+                  'Set by environment variables on the InsForge container. Changing them needs a restart.',
+              })}
+            </p>
+          </div>
+          {/* Same dialog the sidebar gear and the quick-start CTA open, so the setup
+              steps are one click away from wherever the operator happens to be. */}
+          <Button variant="secondary" size="sm" onClick={openSettings} className="shrink-0">
+            <Settings className="mr-2 h-4 w-4" />
+            {t('compute.setupProviders', { defaultValue: 'Setup guide' })}
+          </Button>
         </div>
 
         <div className="overflow-hidden rounded-lg border border-[var(--alpha-8)]">
