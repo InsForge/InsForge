@@ -60,7 +60,7 @@ export function ComputeSettingsDialog({
     <div className="flex items-center gap-2 text-sm">
       {isReady(provider) ? (
         <>
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           <span className="text-foreground">
             {t('compute.providerReady', { defaultValue: 'Configured and ready' })}
           </span>
@@ -129,7 +129,7 @@ export function ComputeSettingsDialog({
 
           <MenuDialogBody>
             {activeProvider === 'docker' ? (
-              <div className="space-y-5">
+              <div className="flex flex-col gap-5">
                 <StatusLine provider="docker" />
                 <p className="text-sm text-muted-foreground">
                   {t('compute.dockerIntro', {
@@ -138,7 +138,7 @@ export function ComputeSettingsDialog({
                   })}
                 </p>
 
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <h4 className="text-sm font-medium text-foreground">
                     {t('compute.dockerStep1', {
                       defaultValue: '1. Uncomment these lines in your compose file',
@@ -147,7 +147,7 @@ export function ComputeSettingsDialog({
                   <CodeBlock code={COMPOSE_SNIPPET} variant="compact" label="docker-compose.yml" />
                 </div>
 
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <h4 className="text-sm font-medium text-foreground">
                     {t('compute.dockerStep2', {
                       defaultValue: '2. Put your host’s docker group id in .env',
@@ -168,7 +168,7 @@ export function ComputeSettingsDialog({
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <h4 className="text-sm font-medium text-foreground">
                     {t('compute.dockerStep3', { defaultValue: '3. Restart InsForge' })}
                   </h4>
@@ -183,7 +183,7 @@ export function ComputeSettingsDialog({
                 </p>
               </div>
             ) : (
-              <div className="space-y-5">
+              <div className="flex flex-col gap-5">
                 <StatusLine provider="fly" />
                 <p className="text-sm text-muted-foreground">
                   {t('compute.flyIntro', {
@@ -192,14 +192,14 @@ export function ComputeSettingsDialog({
                   })}
                 </p>
 
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <h4 className="text-sm font-medium text-foreground">
                     {t('compute.flyStep1', { defaultValue: '1. Create a token and find your org' })}
                   </h4>
                   <CodeBlock code={'fly tokens create org\nfly orgs list'} variant="compact" />
                 </div>
 
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <h4 className="text-sm font-medium text-foreground">
                     {t('compute.flyStep2', { defaultValue: '2. Set both values in .env' })}
                   </h4>
@@ -216,7 +216,7 @@ export function ComputeSettingsDialog({
                   </p>
                 </div>
 
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <h4 className="text-sm font-medium text-foreground">
                     {t('compute.flyStep3', { defaultValue: '3. Restart InsForge' })}
                   </h4>
