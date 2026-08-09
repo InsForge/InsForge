@@ -12,8 +12,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@insforge/ui';
 import { useComputeServices } from '#features/compute/hooks/useComputeServices';
-import { useMetadata } from '#lib/hooks/useMetadata';
-import { ComputeNotConfigured } from '#features/compute/components/ComputeNotConfigured';
+import { useOutletContext } from 'react-router-dom';
+import type { ComputeOutletContext } from '#features/compute/components/ComputeLayout';
 import { ServiceCard } from '#features/compute/components/ServiceCard';
 import { ServiceEvents } from '#features/compute/components/ServiceEvents';
 import { ServiceLogs } from '#features/compute/components/ServiceLogs';
@@ -22,17 +22,13 @@ import { DeleteServiceDialog } from '#features/compute/components/DeleteServiceD
 import { statusColors, getReachableUrl } from '#features/compute/constants';
 import type { ServiceSchema } from '@insforge/shared-schemas';
 
-export default function ComputePage() {
+export default function ComputeServicesPage() {
   const { t } = useTranslation('chrome');
-  // Metadata already tells us whether compute is configured, and it is cached
-  // across the dashboard, so decide from that instead of firing a list request
-  // that 503s. Spinning on a call whose failure is already known makes an
-  // unconfigured feature look like a broken page.
-  const { metadata, isLoading: metadataLoading } = useMetadata();
-  const computeConfigured = metadata ? metadata.compute !== undefined : undefined;
+  // The layout has already established that compute is configured and narrowed the
+  // list to the selected provider; this page renders what it was handed.
+  const { services } = useOutletContext<ComputeOutletContext>();
   const {
-    services,
-    isLoading: servicesLoading,
+    isLoading,
     error,
     create,
     remove,
@@ -42,8 +38,7 @@ export default function ComputePage() {
     isDeleting,
     isStopping,
     isStarting,
-  } = useComputeServices(computeConfigured === true);
-  const isLoading = metadataLoading || (computeConfigured === true && servicesLoading);
+  } = useComputeServices();
   const [selectedService, setSelectedService] = useState<ServiceSchema | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -67,13 +62,6 @@ export default function ComputePage() {
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
-  }
-
-  // Known-unconfigured: the setup state, reached without a failed round trip. The
-  // backend's guidance covers both providers, but it is only in the 503 body, so
-  // state the choice here too rather than leaving the page blank.
-  if (computeConfigured === false) {
-    return <ComputeNotConfigured />;
   }
 
   if (error) {

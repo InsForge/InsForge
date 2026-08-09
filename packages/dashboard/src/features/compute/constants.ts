@@ -69,3 +69,9 @@ export function getReachableUrl(service: ServiceSchema): ServiceEndpoint | null 
   }
   return { display: service.endpointUrl, href: service.endpointUrl };
 }
+
+/** Sentinel for "don't filter", so the select has a value for the no-filter case. */
+export const ALL_PROVIDERS = 'all';
+
+/** A provider name, or the all-providers sentinel. */
+export type ProviderFilter = string;
