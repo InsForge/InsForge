@@ -87,6 +87,11 @@ export class FlyProvider implements ComputeProvider {
   resolveAppName = flyAppNameFor;
   endpointUrl = flyEndpointUrl;
 
+  /** The only mode Fly has: every app gets public IPs and a hostname at create time. */
+  defaultIngress(): 'host' {
+    return 'host';
+  }
+
   // Self-hosters enable compute by setting FLY_API_TOKEN AND FLY_ORG. Both
   // are required: org alone has nothing to authenticate, token alone doesn't
   // know which org to create apps in.

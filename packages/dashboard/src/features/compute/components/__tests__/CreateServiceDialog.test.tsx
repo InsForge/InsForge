@@ -55,6 +55,34 @@ describe('CreateServiceDialog capability gating', () => {
     vi.clearAllMocks();
   });
 
+  // The operator's stored default, not the first mode in the list. Preselecting
+  // 'none' against a deployment configured for published ports showed one thing in
+  // the form and stored another.
+  it("preselects the provider's default ingress and sends it unchanged", async () => {
+    caps.value = { ...DOCKER, defaultIngress: 'port' };
+    const onCreate = vi.fn().mockResolvedValue(undefined);
+    render(
+      <CreateServiceDialog open onOpenChange={vi.fn()} onCreate={onCreate} isCreating={false} />
+    );
+
+    expect(screen.getByText('Published host port')).toBeTruthy();
+    const payload = await fillAndSubmit(onCreate);
+    expect(payload.ingress).toBe('port');
+  });
+
+  // A backend older than the field reports no default; falling back to private-only
+  // keeps the previous behaviour rather than guessing something exposed.
+  it('falls back to private-only when the backend reports no default', async () => {
+    caps.value = DOCKER;
+    const onCreate = vi.fn().mockResolvedValue(undefined);
+    render(
+      <CreateServiceDialog open onOpenChange={vi.fn()} onCreate={onCreate} isCreating={false} />
+    );
+
+    const payload = await fillAndSubmit(onCreate);
+    expect(payload.ingress).toBe('none');
+  });
+
   // A single-host driver has one place to run. Offering a region picker there
   // records a choice that goes nowhere, with nothing telling the user.
   it('hides Region and omits it from the payload when the provider has none', async () => {

@@ -41,6 +41,7 @@ vi.mock('@/providers/compute/docker.client.js', async () => {
 
 import { DockerProvider } from '@/providers/compute/docker.provider.js';
 import { MachineGoneError } from '@/providers/compute/compute.provider.js';
+import { setDockerConfigOverrides } from '@/providers/compute/docker.client.js';
 
 /** An inspect payload that passes the ownership check. */
 function ownedContainer(overrides: Record<string, unknown> = {}) {
@@ -93,6 +94,9 @@ describe('DockerProvider', () => {
     } else {
       process.env.APP_KEY = oldAppKey;
     }
+    // Stored settings are module state in docker.client, so a test that sets one
+    // would otherwise change what every later test's daemon config says.
+    setDockerConfigOverrides({});
   });
 
   describe('capabilities', () => {
@@ -105,6 +109,23 @@ describe('DockerProvider', () => {
         deployTokenIssuance: false,
       });
       expect(provider.name).toBe('docker');
+    });
+
+    // Not a capability: the caller-omitted default is an operator setting, so it is
+    // read per call. Taking it off `ingressModes[0]` is what silently disabled
+    // COMPUTE_DEFAULT_INGRESS, and would have disabled the dashboard setting too.
+    it('reports the configured default ingress, not the first supported mode', () => {
+      expect(provider.defaultIngress()).toBe('none');
+
+      setDockerConfigOverrides({ defaultIngress: 'port' });
+      expect(provider.defaultIngress()).toBe('port');
+      // Still a member of the declared set, which is what the interface promises.
+      expect(provider.capabilities.ingressModes).toContain(provider.defaultIngress());
+    });
+
+    it('falls back to private-only when a stored value is not a mode it can deliver', () => {
+      setDockerConfigOverrides({ defaultIngress: 'nonsense' });
+      expect(provider.defaultIngress()).toBe('none');
     });
   });
 

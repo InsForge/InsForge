@@ -12,6 +12,21 @@ function resetLimiter(limiter: RequestHandler): void {
   (limiter as unknown as { resetKey: (k: string) => void }).resetKey(DEFAULT_KEY);
 }
 
+/**
+ * Spend the whole budget.
+ *
+ * Concurrent rather than sequential: the memory store increments synchronously per
+ * request, so each of these takes a distinct slot 1..BUDGET regardless of ordering,
+ * and 120 sequential supertest round-trips were slow enough to time out on a loaded
+ * machine — a bound that says nothing about the limiter.
+ */
+async function spendBudget(app: express.Express): Promise<void> {
+  const results = await Promise.all(
+    Array.from({ length: BUDGET }, () => request(app).get('/logs'))
+  );
+  expect(results.map((r) => r.status)).toEqual(Array.from({ length: BUDGET }, () => 200));
+}
+
 function buildApp() {
   const app = express();
   // logs is a GET endpoint — model it as such.
@@ -27,17 +42,12 @@ describe('computeLogsRateLimiter', () => {
   });
 
   it(`allows up to ${BUDGET} GETs in the window from a single IP`, async () => {
-    const app = buildApp();
-    for (let i = 0; i < BUDGET; i++) {
-      await request(app).get('/logs').expect(200);
-    }
+    await spendBudget(buildApp());
   });
 
   it(`rejects GET #${BUDGET + 1} with 429`, async () => {
     const app = buildApp();
-    for (let i = 0; i < BUDGET; i++) {
-      await request(app).get('/logs').expect(200);
-    }
+    await spendBudget(app);
     const r = await request(app).get('/logs');
     expect(r.status).toBe(429);
   });

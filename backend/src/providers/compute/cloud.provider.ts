@@ -61,6 +61,11 @@ export class CloudComputeProvider implements ComputeProvider {
   resolveAppName = flyAppNameFor;
   endpointUrl = flyEndpointUrl;
 
+  /** Fly's only mode, for the same reason: apps are public from the moment they exist. */
+  defaultIngress(): 'host' {
+    return 'host';
+  }
+
   private signToken(): string {
     if (!this.isConfigured()) {
       throw new AppError(

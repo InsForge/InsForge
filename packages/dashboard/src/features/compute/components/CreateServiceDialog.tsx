@@ -45,7 +45,7 @@ export function CreateServiceDialog({
   const [cpu, setCpu] = useState('shared-1x');
   const [memory, setMemory] = useState('512');
   const [region, setRegion] = useState('iad');
-  const [ingress, setIngress] = useState<IngressMode>('none');
+  const [ingress, setIngress] = useState<IngressMode | undefined>(undefined);
 
   // Undefined capabilities means "not known yet": metadata still loading, compute
   // not configured, or a backend older than the slice. The two controls fall back
@@ -61,6 +61,11 @@ export function CreateServiceDialog({
   const showRegion = capabilities ? capabilities.regions : true;
   const offeredIngress = capabilities?.ingressModes ?? [];
   const showIngress = offeredIngress.length > 1;
+  // The provider's own default until the user picks something, because for a
+  // single-host driver that default is an operator setting: preselecting 'none'
+  // against a deployment configured for published ports would show one thing here
+  // and store another. Falls back to 'none' only when the backend reports nothing.
+  const selectedIngress = ingress ?? capabilities?.defaultIngress ?? 'none';
 
   const resetForm = () => {
     setName('');
@@ -69,7 +74,7 @@ export function CreateServiceDialog({
     setCpu('shared-1x');
     setMemory('512');
     setRegion('iad');
-    setIngress('none');
+    setIngress(undefined);
   };
 
   const handleSubmit = async () => {
@@ -84,7 +89,7 @@ export function CreateServiceDialog({
         // floor: a single-host driver has one place to run, and recording a
         // region the user never chose makes the stored row a small lie.
         ...(showRegion ? { region } : {}),
-        ...(showIngress ? { ingress } : {}),
+        ...(showIngress ? { ingress: selectedIngress } : {}),
       });
       resetForm();
       onOpenChange(false);
@@ -167,7 +172,10 @@ export function CreateServiceDialog({
                   <label className="text-sm font-medium text-foreground">
                     {t('compute.fields.ingress', { defaultValue: 'Reachable from' })}
                   </label>
-                  <Select value={ingress} onValueChange={(v) => setIngress(v as IngressMode)}>
+                  <Select
+                    value={selectedIngress}
+                    onValueChange={(v) => setIngress(v as IngressMode)}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>

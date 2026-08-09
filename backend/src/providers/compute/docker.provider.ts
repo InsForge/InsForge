@@ -177,6 +177,14 @@ export class DockerProvider implements ComputeProvider {
   }
 
   /**
+   * The operator's deployment-wide default, read per call because it is a stored
+   * setting they can change without restarting.
+   */
+  defaultIngress(): DockerIngress {
+    return this.ingressFor();
+  }
+
+  /**
    * Ingress for one call: the service's own choice, else the operator's
    * deployment-wide default, else private-only.
    */
