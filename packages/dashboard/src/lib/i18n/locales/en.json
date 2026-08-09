@@ -857,7 +857,12 @@
     "providerNotEnabled": "{{provider}} is not enabled yet",
     "providerSetupCta": "Set up {{provider}}",
     "setupDockerSummary": "Run containers on the same Docker daemon as InsForge — no account and no per-container bill. Needs the Docker socket mounted into this container.",
-    "setupFlySummary": "Run containers on Fly.io under your own account, with selectable regions and scale-to-zero. Needs an API token and an org slug."
+    "setupFlySummary": "Run containers on Fly.io under your own account, with selectable regions and scale-to-zero. Needs an API token and an org slug.",
+    "dockerStep1Body": "These two lines are already in your compose file, commented out. The socket is root-equivalent on the host, so uncommenting it is a deliberate choice.",
+    "dockerStep3Body": "The driver registers itself once the socket is reachable.",
+    "dockerSocketLookingAt": "Looking for",
+    "flyStep1Body": "Both come from the Fly CLI, signed in to your own account.",
+    "flyStep3Body": "Compute endpoints start answering once both values are present."
   },
   "analytics": {
     "sidebar": {

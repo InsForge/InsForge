@@ -62,7 +62,7 @@ export default function ComputeLayout() {
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <ComputeSidebar configured={configured} onOpenSettings={() => openSettings()} />
+      <ComputeSidebar onOpenSettings={() => openSettings()} />
       <div className="min-w-0 flex-1 overflow-hidden">
         <Outlet
           context={

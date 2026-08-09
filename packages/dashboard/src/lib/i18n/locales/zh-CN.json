@@ -841,7 +841,12 @@
     "providerNotEnabled": "{{provider}} 尚未启用",
     "providerSetupCta": "设置 {{provider}}",
     "setupDockerSummary": "容器与 InsForge 跑在同一个 Docker daemon 上——不需要账号，也没有按容器计费。需要把 Docker socket 挂载进本容器。",
-    "setupFlySummary": "容器跑在你自己的 Fly.io 账号下，可选择区域并支持缩容到零。需要 API token 和 org slug。"
+    "setupFlySummary": "容器跑在你自己的 Fly.io 账号下，可选择区域并支持缩容到零。需要 API token 和 org slug。",
+    "dockerStep1Body": "这两行已经在你的 compose 文件里，只是被注释掉了。socket 在宿主机上等同于 root，所以取消注释应当是一个有意识的决定。",
+    "dockerStep3Body": "socket 可访问时，驱动会自行注册。",
+    "dockerSocketLookingAt": "正在查找",
+    "flyStep1Body": "两者都来自已登录你自己账号的 Fly CLI。",
+    "flyStep3Body": "两个值齐备后，compute 接口就会开始响应。"
   },
   "analytics": {
     "sidebar": {

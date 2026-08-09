@@ -861,7 +861,12 @@
     "providerNotEnabled": "{{provider}} aún no está activado",
     "providerSetupCta": "Configurar {{provider}}",
     "setupDockerSummary": "Ejecuta contenedores en el mismo daemon de Docker que InsForge: sin cuenta y sin factura por contenedor. Necesita el socket de Docker montado en este contenedor.",
-    "setupFlySummary": "Ejecuta contenedores en Fly.io con tu propia cuenta, con regiones seleccionables y escalado a cero. Necesita un token de API y un slug de organización."
+    "setupFlySummary": "Ejecuta contenedores en Fly.io con tu propia cuenta, con regiones seleccionables y escalado a cero. Necesita un token de API y un slug de organización.",
+    "dockerStep1Body": "Estas dos líneas ya están en tu archivo compose, comentadas. El socket equivale a root en el host, así que descomentarlo es una decisión deliberada.",
+    "dockerStep3Body": "El driver se registra solo cuando el socket es accesible.",
+    "dockerSocketLookingAt": "Buscando",
+    "flyStep1Body": "Ambos vienen de la CLI de Fly, con tu propia cuenta.",
+    "flyStep3Body": "Los endpoints de compute empiezan a responder cuando ambos valores están presentes."
   },
   "analytics": {
     "sidebar": {
