@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Container, Cloud, CheckCircle2, CircleDashed } from 'lucide-react';
+import { Container, Cloud, CheckCircle2 } from 'lucide-react';
 import {
   MenuDialog,
   MenuDialogBody,
@@ -132,20 +132,19 @@ export function ComputeSettingsDialog({
   );
 }
 
+/**
+ * Shown only once a provider is configured.
+ *
+ * There is no not-configured counterpart: the Fly panel's own per-field badges
+ * already say which credential is missing, and Docker's panel is reached from a page
+ * that is entirely about how to enable it. A second "not configured" line said
+ * nothing the surrounding UI had not already said.
+ */
 function ProviderStatus({ configured, isDefault }: { configured: boolean; isDefault: boolean }) {
   const { t } = useTranslation('chrome');
 
   if (!configured) {
-    return (
-      <div className="flex items-center gap-2 text-sm">
-        <CircleDashed className="h-4 w-4 text-muted-foreground" />
-        <span className="text-muted-foreground">
-          {t('compute.providerNotConfigured', {
-            defaultValue: 'Not configured — open this provider to see how to enable it',
-          })}
-        </span>
-      </div>
-    );
+    return null;
   }
 
   return (
