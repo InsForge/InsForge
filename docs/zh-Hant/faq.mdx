@@ -168,6 +168,18 @@ description: "InsForge 常見問題：解說資料庫呼叫、Edge Function 與 
     無論哪種情況，你的資料都完好無損。想徹底不再被暫停，把 organization 升級到 Pro。參見 [Pricing](/pricing)。
   </Accordion>
 
+  <Accordion title="我可以自己手動暫停專案嗎？">
+    可以。手動暫停和上面說的閒置自動暫停是兩回事，而且不限於 Free 方案——organization 裡任何擁有 **Developer** 或 **Administrator** 角色的成員，都可以主動暫停一個活躍專案來釋放資源。暫停期間你的資料完好無損。CLI 沒有 `pause` 命令；請在 dashboard 裡暫停，或在 InsForge Cloud 上直接呼叫平台 API：
+
+    {/* TODO: confirm dashboard location */}
+
+    ```bash
+    POST /projects/v1/:projectId/pause
+    ```
+
+    想讓專案重新上線，就恢復它——參見下面的「我的專案被暫停了，要怎麼重新啟動？」（在 dashboard 裡點 **Restore Project**，或執行 `npx @insforge/cli projects restore --project <id>`）。
+  </Accordion>
+
   <Accordion title="我的專案被暫停了，要怎麼重新啟動？">
     在 dashboard 裡打開這個專案，點 **Restore Project**，幾分鐘後就會帶著完整資料恢復。有幾種情況要注意：
 

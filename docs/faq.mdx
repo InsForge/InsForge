@@ -168,6 +168,18 @@ description: "Answers to common InsForge questions on database calls, edge funct
     Your data stays intact either way. To stop projects from pausing at all, upgrade the organization to Pro. See [Pricing](/pricing).
   </Accordion>
 
+  <Accordion title="Can I pause a project myself?">
+    Yes. Manual pausing is separate from the automatic inactivity pause described above, and it isn't limited to the Free plan — any organization member with the **Developer** or **Administrator** role can pause an active project on purpose to free up its resources. Your data stays intact while the project is paused. There is no CLI `pause` command; pause it from the dashboard, or, on InsForge Cloud, call the platform API directly:
+
+    {/* TODO: confirm dashboard location */}
+
+    ```bash
+    POST /projects/v1/:projectId/pause
+    ```
+
+    To bring the project back online, restore it — see "My project is paused. How do I restart it?" below (click **Restore Project** in the dashboard, or run `npx @insforge/cli projects restore --project <id>`).
+  </Accordion>
+
   <Accordion title="My project is paused. How do I restart it?">
     Open the project in the dashboard and click **Restore Project**. It comes back in a few minutes with your data intact. A couple of cases to know:
 
