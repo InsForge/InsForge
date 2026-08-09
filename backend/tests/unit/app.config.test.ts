@@ -691,23 +691,41 @@ describe('config.storage', () => {
     }
   });
 
-  it('disables path style for 0, including whitespace variants', () => {
-    for (const value of ['0', ' 0 ']) {
+  // An opt-out knob defaults ON, so anything that is not "false" keeps the safe
+  // default rather than guessing at intent. This is the convention the
+  // S3_USE_PRESIGNED_URLS test above already asserts.
+  it('keeps path style on for values that are not false', () => {
+    for (const value of ['0', 'no', 'off', 'disabled', 'flase']) {
       process.env.S3_FORCE_PATH_STYLE = value;
       expect(
         loadConfig().storage.s3ForcePathStyle,
         `S3_FORCE_PATH_STYLE=${JSON.stringify(value)}`
+      ).toBe(true);
+    }
+  });
+
+  // ── S3_USE_PRESIGNED_URLS normalization ───────────────────────────────────
+  // Same opt-out shape, same exact-match bug, three lines below in loadConfig.
+  // Turning presigned URLs off is what an operator does when the S3 endpoint is
+  // not reachable from a browser, so a capitalization that silently leaves them
+  // on hands clients URLs they cannot fetch.
+  it('enters proxy mode for case and whitespace variants of false', () => {
+    for (const value of ['false', 'False', 'FALSE', ' false ']) {
+      process.env.S3_USE_PRESIGNED_URLS = value;
+      expect(
+        loadConfig().storage.s3UsePresignedUrls,
+        `S3_USE_PRESIGNED_URLS=${JSON.stringify(value)}`
       ).toBe(false);
     }
   });
 
-  it('disables path style for no/off, mirroring parseEnvBool falsy symmetry', () => {
-    for (const value of ['no', 'NO', 'off', ' Off ']) {
-      process.env.S3_FORCE_PATH_STYLE = value;
+  it('keeps presigned URLs on for values that are not false', () => {
+    for (const value of ['', '0', 'no', 'off', 'true', 'flase']) {
+      process.env.S3_USE_PRESIGNED_URLS = value;
       expect(
-        loadConfig().storage.s3ForcePathStyle,
-        `S3_FORCE_PATH_STYLE=${JSON.stringify(value)}`
-      ).toBe(false);
+        loadConfig().storage.s3UsePresignedUrls,
+        `S3_USE_PRESIGNED_URLS=${JSON.stringify(value)}`
+      ).toBe(true);
     }
   });
 

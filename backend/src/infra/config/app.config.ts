@@ -167,6 +167,20 @@ function parseEnvBool(val: string | undefined): boolean {
   return ['1', 'true', 'yes', 'on'].includes(val.trim().toLowerCase());
 }
 
+/**
+ * Opt-out knobs that default to `true`: only an explicit "false" turns them off.
+ *
+ * Deliberately narrower than parseEnvBool's truthy list. These knobs default ON,
+ * so an unrecognised value must keep the safe default rather than guess at intent
+ * — that convention is already asserted for S3_USE_PRESIGNED_URLS in
+ * app.config.test.ts. The only thing wrong with the previous
+ * `!== 'false'` comparisons was that they were exact: `False`, `FALSE` and
+ * ` false ` all read as "not false" and left the knob on.
+ */
+function isEnvOptOut(val: string | undefined): boolean {
+  return (val ?? '').trim().toLowerCase() === 'false';
+}
+
 const AWS_MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024;
 
 /** Largest delay `setTimeout` honours; anything above it is silently treated as 1ms. */
@@ -309,18 +323,15 @@ export function loadConfig(): AppConfig {
       awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID || undefined,
       awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || undefined,
       s3EndpointUrl: process.env.S3_ENDPOINT_URL || undefined,
-      // Default true (MinIO etc.). Set S3_FORCE_PATH_STYLE=false/0/no/off for
-      // providers that require virtual-hosted-style addressing (Tencent COS,
-      // Aliyun OSS). Falsy list mirrors parseEnvBool's truthy list.
-      s3ForcePathStyle: !['false', '0', 'no', 'off'].includes(
-        (process.env.S3_FORCE_PATH_STYLE ?? '').trim().toLowerCase()
-      ),
+      // Default true (MinIO etc.). Set S3_FORCE_PATH_STYLE=false for providers
+      // that require virtual-hosted-style addressing (Tencent COS, Aliyun OSS).
+      s3ForcePathStyle: !isEnvOptOut(process.env.S3_FORCE_PATH_STYLE),
       // Default true (presigned upload/download URLs handed to clients). Set
       // S3_USE_PRESIGNED_URLS=false to proxy all object bytes through the backend
       // instead — required when the S3 endpoint is not reachable by browsers
       // (bundled MinIO/RustFS on the Docker network) or lacks POST-policy
       // support (Cloudflare R2).
-      s3UsePresignedUrls: process.env.S3_USE_PRESIGNED_URLS !== 'false',
+      s3UsePresignedUrls: !isEnvOptOut(process.env.S3_USE_PRESIGNED_URLS),
       awsConfigBucket: process.env.AWS_CONFIG_BUCKET || 'insforge-config',
       awsConfigRegion: process.env.AWS_CONFIG_REGION || 'us-east-2',
       maxS3UploadSize: parseEnvBytes(
