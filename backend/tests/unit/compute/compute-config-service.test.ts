@@ -123,3 +123,34 @@ describe('ComputeConfigService', () => {
     expect(svc.flyCredentials().apiToken).toBe('env-token');
   });
 });
+
+describe('ComputeConfigService settings', () => {
+  // Every compute setting read goes through dockerConfig(), so pushing overrides into
+  // that seam is what makes a stored value take effect everywhere at once.
+  it('pushes stored settings into the seam, and leaves nulls to the environment', async () => {
+    const { setDockerConfigOverrides, dockerConfig } =
+      await import('@/providers/compute/docker.client.js');
+    setDockerConfigOverrides({});
+
+    // What primeSettings() does with a row: non-null columns become overrides.
+    setDockerConfigOverrides({ publicHost: 'box.example', defaultIngress: 'port' });
+
+    const active = dockerConfig();
+    expect(active.publicHost).toBe('box.example');
+    expect(active.defaultIngress).toBe('port');
+    // Not overridden, so it keeps its default rather than becoming undefined.
+    expect(active.socketPath).toBe('/var/run/docker.sock');
+    setDockerConfigOverrides({});
+  });
+
+  // An empty public host is a real setting — "advertise no URL" — and must not fall
+  // through to the environment the way an unset value does.
+  it('treats an empty stored value as deliberate, not as unset', async () => {
+    const { setDockerConfigOverrides, dockerConfig } =
+      await import('@/providers/compute/docker.client.js');
+    setDockerConfigOverrides({ publicHost: '' });
+
+    expect(dockerConfig().publicHost).toBe('');
+    setDockerConfigOverrides({});
+  });
+});

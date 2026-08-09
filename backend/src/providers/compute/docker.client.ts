@@ -38,20 +38,37 @@ export interface DockerRawResponse {
  * deep inside provider selection; CloudComputeProvider already guards its own
  * slice the same way.
  */
-export function dockerConfig(): {
+export interface DockerConfig {
   socketPath: string;
   publicHost: string;
   domain: string;
   defaultIngress: string;
   bindAddress: string;
   isolateNetwork: boolean;
-} {
+}
+
+/**
+ * Settings stored in the database, overriding the environment.
+ *
+ * Held here rather than read from a service so this module keeps no dependency on
+ * one — the provider imports this client, and a service import would close the
+ * cycle. ComputeConfigService pushes values in at startup and after every write, and
+ * because every read site goes through `dockerConfig()`, they all pick it up.
+ */
+let storedOverrides: Partial<DockerConfig> = {};
+
+export function setDockerConfigOverrides(overrides: Partial<DockerConfig>): void {
+  storedOverrides = overrides;
+}
+
+export function dockerConfig(): DockerConfig {
   const c = appConfig.docker;
+  const stored = storedOverrides;
   return {
-    socketPath: c?.socketPath || '/var/run/docker.sock',
-    publicHost: c?.publicHost || '',
-    domain: c?.domain || '',
-    defaultIngress: c?.defaultIngress || 'none',
+    socketPath: stored.socketPath ?? c?.socketPath ?? '/var/run/docker.sock',
+    publicHost: stored.publicHost ?? c?.publicHost ?? '',
+    domain: stored.domain ?? c?.domain ?? '',
+    defaultIngress: stored.defaultIngress ?? c?.defaultIngress ?? 'none',
     bindAddress: c?.bindAddress || '127.0.0.1',
     isolateNetwork: c?.isolateNetwork ?? false,
   };

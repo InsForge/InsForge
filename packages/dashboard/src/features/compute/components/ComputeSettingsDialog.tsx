@@ -19,6 +19,7 @@ import {
 } from '@insforge/ui';
 import { computeProviderLabel } from '#features/compute/constants';
 import { FlyCredentialsForm } from './FlyCredentialsForm';
+import { DockerSettingsForm } from './DockerSettingsForm';
 
 interface Capabilities {
   regions?: boolean;
@@ -123,7 +124,7 @@ export function ComputeSettingsDialog({
                   enabling it means mounting a socket into this container — a compose
                   change no API can make from inside the container it would change. Its
                   steps live on the provider page instead. */}
-              {activeProvider === 'fly' && <FlyCredentialsForm />}
+              {activeProvider === 'fly' ? <FlyCredentialsForm /> : <DockerSettingsForm />}
             </div>
           </MenuDialogBody>
         </MenuDialogMain>

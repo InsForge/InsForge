@@ -1,7 +1,24 @@
 import type { ComputeConfig, UpdateComputeConfig } from '@insforge/shared-schemas';
 import { appConfig } from '@/infra/config/app.config.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { dockerConfig, setDockerConfigOverrides } from '@/providers/compute/docker.client.js';
 import logger from '@/utils/logger.js';
+
+/** Columns of the singleton system.compute_config row, as stored. */
+interface StoredSettings {
+  default_ingress: string | null;
+  public_host: string | null;
+  domain: string | null;
+  socket_path: string | null;
+}
+
+const SETTING_COLUMNS: Record<string, keyof StoredSettings> = {
+  defaultIngress: 'default_ingress',
+  publicHost: 'public_host',
+  domain: 'domain',
+  socketPath: 'socket_path',
+};
 
 const FLY_API_TOKEN_SECRET = 'FLY_API_TOKEN';
 const FLY_ORG_SECRET = 'FLY_ORG';
@@ -67,6 +84,38 @@ export class ComputeConfigService {
    * leave compute running on whatever the environment provides rather than take the
    * whole feature down.
    */
+  /** Load stored settings and push them into the seam every read site goes through. */
+  async primeSettings(): Promise<void> {
+    try {
+      const result = await DatabaseManager.getInstance()
+        .getPool()
+        .query<StoredSettings>(
+          `SELECT default_ingress, public_host, domain, socket_path
+             FROM system.compute_config WHERE id = TRUE`
+        );
+      const row = result.rows[0];
+      if (!row) {
+        setDockerConfigOverrides({});
+        return;
+      }
+      // Only non-null columns become overrides: null means "fall back to the
+      // environment", which is what leaving the key out of the object achieves.
+      setDockerConfigOverrides({
+        ...(row.default_ingress !== null ? { defaultIngress: row.default_ingress } : {}),
+        ...(row.public_host !== null ? { publicHost: row.public_host } : {}),
+        ...(row.domain !== null ? { domain: row.domain } : {}),
+        ...(row.socket_path !== null ? { socketPath: row.socket_path } : {}),
+      });
+    } catch (error) {
+      // Same reasoning as the credential snapshot: an unreadable config table should
+      // leave compute on the environment rather than take the feature down.
+      logger.warn('Compute config: could not read stored settings; using the environment', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      setDockerConfigOverrides({});
+    }
+  }
+
   async primeSnapshot(): Promise<void> {
     try {
       const [apiToken, org] = await Promise.all([
@@ -88,7 +137,14 @@ export class ComputeConfigService {
       this.secretService.getSecretByKey(FLY_API_TOKEN_SECRET),
       this.secretService.getSecretByKey(FLY_ORG_SECRET),
     ]);
+    const active = dockerConfig();
     return {
+      settings: {
+        defaultIngress: active.defaultIngress as ComputeConfig['settings']['defaultIngress'],
+        publicHost: active.publicHost,
+        domain: active.domain,
+        socketPath: active.socketPath,
+      },
       flyApiToken: describe(normalize(storedToken), appConfig.fly.apiToken, true),
       // The org is not a secret — showing it in full is more useful than masking a
       // value the operator can read off `fly orgs list` anyway.
@@ -119,6 +175,31 @@ export class ComputeConfigService {
     if (update.flyOrg !== undefined) {
       await this.upsert(FLY_ORG_SECRET, update.flyOrg, existing.get(FLY_ORG_SECRET));
     }
+
+    // Settings are a separate store — plain values in a config table, not encrypted
+    // secrets — so they are written separately and only when present.
+    const settingUpdates = Object.entries(SETTING_COLUMNS).filter(
+      ([field]) => (update as Record<string, unknown>)[field] !== undefined
+    );
+    if (settingUpdates.length > 0) {
+      const assignments = settingUpdates.map(([, column], i) => `${column} = $${i + 1}`);
+      const values = settingUpdates.map(([field]) => {
+        const value = (update as Record<string, string | null | undefined>)[field];
+        // Empty string is a real setting ("advertise no URL"); null clears back to the
+        // environment. Only the latter stores NULL.
+        return value ?? null;
+      });
+      await DatabaseManager.getInstance()
+        .getPool()
+        .query(
+          `UPDATE system.compute_config
+              SET ${assignments.join(', ')}, updated_at = NOW()
+            WHERE id = TRUE`,
+          values
+        );
+      await this.primeSettings();
+    }
+
     await this.primeSnapshot();
   }
 
