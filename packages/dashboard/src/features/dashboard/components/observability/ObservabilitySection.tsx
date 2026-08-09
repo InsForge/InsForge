@@ -27,6 +27,7 @@ interface MetricConfig {
   format: (value: number) => string;
   threshold?: number;
   description: string;
+  barChart?: boolean;
 }
 
 const PERCENT = (value: number) => `${value.toFixed(1)}%`;
@@ -62,6 +63,7 @@ const METRICS: MetricConfig[] = [
     icon: <Cpu className="h-5 w-5" />,
     format: PERCENT,
     threshold: 60,
+    barChart: true,
     description:
       "How hard your instance's processor is working. Sustained high usage slows down API requests and background jobs.",
   },
@@ -72,6 +74,7 @@ const METRICS: MetricConfig[] = [
     icon: <MemoryStick className="h-5 w-5" />,
     format: PERCENT,
     threshold: 85,
+    barChart: true,
     description:
       "How much of your instance's RAM is in use. When memory runs low, processes can be killed or start swapping, which hurts performance.",
   },
@@ -198,12 +201,42 @@ export function ObservabilitySection() {
       breakdown && totalBytes !== null && AXIS_FLOOR_BYTES < totalBytes * 0.9
         ? AXIS_FLOOR_BYTES
         : 0;
+    // The design draws a dense rail of thin bars, but the fleet sampler's
+    // cadence is ~15 min — so the window is cut into fixed slots and each
+    // slot repeats the newest sample at its time (a step chart's forward
+    // fill; slots before the first sample take that first sample). Slots
+    // keep the SOURCE sample's timestamp, so hovering any thin bar shows a
+    // real reading and its real time, never an interpolated one.
+    const DISK_SLOTS = 48;
+    const densified = breakdown
+      ? (() => {
+          const source = breakdown.database;
+          const windowEnd = source[source.length - 1].timestamp;
+          const step = RANGE_SECONDS[range] / DISK_SLOTS;
+          const windowStart = windowEnd - RANGE_SECONDS[range];
+          const database: DashboardMetricDataPoint[] = [];
+          const wal: DashboardMetricDataPoint[] = [];
+          const system: DashboardMetricDataPoint[] = [];
+          let idx = 0;
+          for (let slot = 0; slot < DISK_SLOTS; slot++) {
+            const slotTime = windowStart + (slot + 0.5) * step;
+            while (idx + 1 < source.length && source[idx + 1].timestamp <= slotTime) {
+              idx += 1;
+            }
+            const ts = source[idx].timestamp;
+            database.push({ timestamp: ts, value: source[idx].value });
+            wal.push({ timestamp: ts, value: breakdown.wal[idx].value });
+            system.push({ timestamp: ts, value: breakdown.system[idx].value });
+          }
+          return { database, wal, system };
+        })()
+      : null;
     // With a breakdown the primary series (headline + AVG/MAX/LATEST + hover
-    // points) is the per-sample used total — the same stack the bars draw.
-    const usedSeries = breakdown
-      ? breakdown.database.map((point, i) => ({
+    // points) is the per-slot used total — the same stack the bars draw.
+    const usedSeries = densified
+      ? densified.database.map((point, i) => ({
           timestamp: point.timestamp,
-          value: point.value + (breakdown.wal[i]?.value ?? 0) + (breakdown.system[i]?.value ?? 0),
+          value: point.value + (densified.wal[i]?.value ?? 0) + (densified.system[i]?.value ?? 0),
         }))
       : diskUsedData;
     return {
@@ -221,13 +254,16 @@ export function ObservabilitySection() {
           : [],
       axisLabel: BYTES_SIZE,
       totalBytes,
+      // Raw samples feed the tooltip (real readings); the densified slots
+      // feed the bars.
       breakdown,
+      densified,
       tooltipDetail:
         totalBytes !== null && totalBytes > 0
           ? (v: number) => `${((v / totalBytes) * 100).toFixed(1)}% of ${BYTES_SIZE(totalBytes)}`
           : undefined,
     };
-  }, [data]);
+  }, [data, range]);
 
   return (
     <section className="flex flex-col gap-6">
@@ -320,6 +356,7 @@ export function ObservabilitySection() {
                     formatValue={config.format}
                     isLoading={isLoading}
                     threshold={config.threshold}
+                    barChart={config.barChart}
                     description={t(`overview.metrics.${config.i18nKey}.description`, {
                       defaultValue: config.description,
                     })}
@@ -357,7 +394,7 @@ export function ObservabilitySection() {
                           // WAL sky, Database purple; stacked bottom-up in
                           // that order, which is also the header legend
                           // order.
-                          components: diskCardProps.breakdown
+                          components: diskCardProps.densified
                             ? [
                                 {
                                   key: 'system',
@@ -365,7 +402,7 @@ export function ObservabilitySection() {
                                     defaultValue: 'System',
                                   }),
                                   fillClass: 'fill-emerald-300',
-                                  data: diskCardProps.breakdown.system,
+                                  data: diskCardProps.densified.system,
                                 },
                                 {
                                   key: 'wal',
@@ -373,7 +410,7 @@ export function ObservabilitySection() {
                                     defaultValue: 'WAL',
                                   }),
                                   fillClass: 'fill-sky-600',
-                                  data: diskCardProps.breakdown.wal,
+                                  data: diskCardProps.densified.wal,
                                 },
                                 {
                                   key: 'database',
@@ -381,7 +418,7 @@ export function ObservabilitySection() {
                                     defaultValue: 'Database',
                                   }),
                                   fillClass: 'fill-purple-600',
-                                  data: diskCardProps.breakdown.database,
+                                  data: diskCardProps.densified.database,
                                 },
                               ]
                             : undefined,

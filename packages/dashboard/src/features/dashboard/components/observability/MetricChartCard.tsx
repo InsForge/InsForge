@@ -51,6 +51,12 @@ export interface MetricChartCardProps {
   };
   /** Extra tooltip line under the value, e.g. the value as a share of the ceiling. */
   tooltipDetail?: (value: number) => string;
+  /**
+   * Draw the primary series as bars instead of a line/area (the Figma
+   * observability look). With a threshold, bars above it turn destructive
+   * while the dashed threshold line stays.
+   */
+  barChart?: boolean;
 }
 
 const SPARKLINE_WIDTH = 434;
@@ -146,6 +152,7 @@ export function MetricChartCard({
   description,
   capacity,
   tooltipDetail,
+  barChart,
 }: MetricChartCardProps) {
   const { t } = useTranslation('chrome');
   const effectiveDomain =
@@ -182,12 +189,12 @@ export function MetricChartCard({
     return latest;
   }, [data]);
 
-  // Sparse sampler series make timestamp-proportional bars bunch up at one
-  // end of the window, so in breakdown mode every sample takes an equal slot
+  // Sparse or uneven series make timestamp-proportional bars bunch up with
+  // erratic gaps, so in every bar mode each sample takes an equal slot
   // across the full plot width instead; hover targeting and the dot follow
   // the same remapped x so they stay centered on the bars.
   const displayPoints = useMemo(() => {
-    if (!capacity?.components?.length || sparkline.points.length === 0) {
+    if ((!capacity && !barChart) || sparkline.points.length === 0) {
       return sparkline.points;
     }
     const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / sparkline.points.length;
@@ -195,7 +202,7 @@ export function MetricChartCard({
       ...point,
       x: Y_AXIS_LABEL_WIDTH + slot * (i + 0.5),
     }));
-  }, [capacity, sparkline.points]);
+  }, [capacity, barChart, sparkline.points]);
 
   const handleMove: MouseEventHandler<SVGSVGElement> = (e) => {
     const svg = svgRef.current;
@@ -221,23 +228,24 @@ export function MetricChartCard({
 
   const handleLeave = () => setHoverIdx(null);
 
-  // Capacity variant: each sample becomes a slim bar rising from the floor,
-  // matching the Supabase disk chart. Bars reuse the sparkline's x/y mapping,
-  // so the hover hit-testing above works unchanged.
+  // Single-color bar variants: the capacity fallback and the barChart mode
+  // both draw the primary series as one bar per sample, centered in the
+  // displayPoints slots so bars, hover dot and hit-testing share an x.
   const bars = useMemo(() => {
-    if (!capacity || capacity.components?.length || sparkline.points.length === 0) {
+    const active = barChart || (capacity && !capacity.components?.length);
+    if (!active || displayPoints.length === 0) {
       return [];
     }
-    const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / sparkline.points.length;
-    const width = Math.max(2, slot * 0.85);
-    // Bars live to the right of the y-axis label gutter, like the gridlines.
-    return sparkline.points.map((point) => ({
-      x: Math.max(Y_AXIS_LABEL_WIDTH + 2, Math.min(point.x, SPARKLINE_WIDTH - width)),
+    const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / displayPoints.length;
+    const width = Math.max(1.5, slot * 0.85);
+    return displayPoints.map((point) => ({
+      x: point.x - width / 2,
       y: point.y,
       width,
       height: Math.max(1.5, SPARKLINE_HEIGHT - point.y),
+      value: point.value,
     }));
-  }, [capacity, sparkline.points]);
+  }, [capacity, barChart, displayPoints]);
 
   // Stacked composition bars: segments accumulate bottom-up per shared sample
   // timestamp. Bars sit in equal slots across the plot (matching
@@ -418,7 +426,7 @@ export function MetricChartCard({
                       </linearGradient>
                     </defs>
                   )}
-                  {!capacity && (
+                  {!capacity && !barChart && (
                     <path
                       d={sparkline.area}
                       fill={threshold !== undefined ? `url(#${gradientId}-area)` : 'currentColor'}
@@ -463,7 +471,7 @@ export function MetricChartCard({
                         />
                       );
                     })}
-                  {!capacity && (
+                  {!capacity && !barChart && (
                     <path
                       d={sparkline.line}
                       fill="none"
@@ -472,18 +480,20 @@ export function MetricChartCard({
                       className={threshold !== undefined ? '' : 'text-emerald-300'}
                     />
                   )}
-                  {capacity &&
-                    bars.map((bar, i) => (
-                      <rect
-                        key={i}
-                        x={bar.x}
-                        y={bar.y}
-                        width={bar.width}
-                        height={bar.height}
-                        rx={1}
-                        className="fill-emerald-300"
-                      />
-                    ))}
+                  {bars.map((bar, i) => (
+                    <rect
+                      key={i}
+                      x={bar.x}
+                      y={bar.y}
+                      width={bar.width}
+                      height={bar.height}
+                      className={
+                        threshold !== undefined && bar.value > threshold
+                          ? 'fill-[rgb(var(--destructive))]'
+                          : 'fill-emerald-300'
+                      }
+                    />
+                  ))}
                   {stackedBars.map((bar) => (
                     <g key={bar.timestamp}>
                       {bar.segments.map((segment) =>
