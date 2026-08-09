@@ -312,7 +312,9 @@ export function MetricChartCard({
   );
 
   return (
-    <div className="flex flex-col overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
+    // No overflow-hidden on the card: the hover tooltip must be able to
+    // escape the chart area without being clipped at the card edge.
+    <div className="flex flex-col rounded border border-[var(--alpha-8)] bg-card">
       <div className="flex flex-col gap-3 p-4">
         <div className="flex items-center gap-1.5 text-[13px] leading-[22px] text-muted-foreground">
           <span className="flex h-5 w-5 shrink-0 items-center justify-center">{icon}</span>
@@ -511,13 +513,14 @@ export function MetricChartCard({
                     </g>
                   ))}
                 </svg>
+                {/* Threshold cards label the full domain (100% / 0%); the
+                    dashed threshold line stays but carries no label of its
+                    own — an 85% at the top edge read as the chart's upper
+                    bound. */}
                 {threshold !== undefined && (
                   <>
-                    <span
-                      className="pointer-events-none absolute left-0 -translate-y-1/2 text-xs leading-4 text-muted-foreground"
-                      style={{ top: `${thresholdOffsetPct}%` }}
-                    >
-                      {renderAxisLabel(threshold)}
+                    <span className="pointer-events-none absolute left-0 top-0 text-xs leading-4 text-muted-foreground">
+                      {renderAxisLabel(domainMax)}
                     </span>
                     <span className="pointer-events-none absolute bottom-0 left-0 text-xs leading-4 text-muted-foreground">
                       {renderAxisLabel(domainMin)}
@@ -529,11 +532,15 @@ export function MetricChartCard({
                     const yPct = (1 - (tick - domainMin) / domainRange) * 100;
                     const atTop = tick === domainMax;
                     const atBottom = tick === domainMin;
+                    // The floor label hangs BELOW the chart line, in the
+                    // x-axis row's empty left slot — byte labels like
+                    // "4.0 GB" are wider than the gutter and would sit on
+                    // top of the first bars otherwise.
                     return (
                       <span
                         key={tick}
                         className={`pointer-events-none absolute left-0 text-xs leading-4 text-muted-foreground ${
-                          atTop ? '' : atBottom ? '-translate-y-full' : '-translate-y-1/2'
+                          atTop || atBottom ? '' : '-translate-y-1/2'
                         }`}
                         style={{ top: `${Math.max(0, Math.min(100, yPct))}%` }}
                       >
@@ -551,24 +558,21 @@ export function MetricChartCard({
                       className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground ring-2 ring-card"
                       style={{ left: `${hoverLeftPct}%`, top: `${hoverTopPct}%` }}
                     />
+                    {/* The tooltip drops BELOW the hover dot: anchored upward
+                        it reaches past the card top and turns unreadable near
+                        the viewport edge while scrolling. */}
                     <div
-                      className="pointer-events-none absolute -top-1 z-10 whitespace-nowrap rounded border border-[var(--alpha-16)] bg-card px-2.5 py-1.5 text-xs leading-4 text-foreground shadow-lg"
+                      className="pointer-events-none absolute z-10 whitespace-nowrap rounded border border-[var(--alpha-16)] bg-card px-2.5 py-1.5 text-xs leading-4 text-foreground shadow-lg"
                       style={{
                         left: `${hoverLeftPct}%`,
-                        transform: `translate(${tooltipTranslateX}, -100%)`,
+                        top: `calc(${hoverTopPct}% + 12px)`,
+                        transform: `translate(${tooltipTranslateX}, 0)`,
                       }}
                     >
-                      <div
-                        className={`font-medium ${
-                          threshold === undefined
-                            ? 'text-foreground'
-                            : hover.value > threshold
-                              ? 'text-destructive'
-                              : 'text-primary'
-                        }`}
-                      >
-                        {formatValue(hover.value)}
-                      </div>
+                      {/* Always white — a green/red hover value reads as a
+                          verdict, and the chart already carries the
+                          threshold signal. */}
+                      <div className="font-medium text-foreground">{formatValue(hover.value)}</div>
                       {tooltipDetail && (
                         <div className="text-muted-foreground">{tooltipDetail(hover.value)}</div>
                       )}
