@@ -863,7 +863,17 @@
     "configSaved": "Fly 認證已儲存",
     "configSaveFailed": "儲存 Fly 認證失敗",
     "fromEnvironment": "來自環境變數",
-    "providerNotConfiguredBadge": "未設定"
+    "providerNotConfiguredBadge": "未設定",
+    "settingDefaultIngress": "預設 ingress",
+    "settingDefaultIngressHint": "未自行選擇時，服務的預設連線方式。",
+    "settingPublicHost": "公開主機位址",
+    "settingPublicHostHint": "用於組成已發佈連接埠 URL 的位址。留空則不公告 URL，而不是給出一個可能無法解析的位址。",
+    "settingDomain": "基礎網域",
+    "settingDomainHint": "用於為 `host` ingress 產生主機名稱，由您自己的閘道路由。",
+    "settingSocketPath": "Docker socket",
+    "settingSocketPathHint": "用於 rootless Docker 或 Podman。只有 socket 確實掛載在該路徑時才生效——掛載本身是 compose 層的變更。",
+    "settingsApplyHint": "對之後建立的容器生效。",
+    "settingsLoading": "正在載入設定……"
   },
   "analytics": {
     "sidebar": {

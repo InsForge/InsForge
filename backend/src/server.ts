@@ -386,7 +386,8 @@ async function initializeServer() {
         // Load stored Fly credentials before the registry is built, so a deployment
         // configured through the dashboard comes up with Fly available instead of
         // waiting for the first write to rebuild.
-        await ComputeConfigService.getInstance().primeSnapshot();
+        const computeConfig = ComputeConfigService.getInstance();
+        await Promise.all([computeConfig.primeSnapshot(), computeConfig.primeSettings()]);
         await ComputeServicesService.getInstance().runStartupTasks();
       } catch (err) {
         logger.info('Compute startup tasks skipped', {

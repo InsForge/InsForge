@@ -879,7 +879,17 @@
     "configSaved": "Fly credentials saved",
     "configSaveFailed": "Failed to save Fly credentials",
     "fromEnvironment": "From environment",
-    "providerNotConfiguredBadge": "Not configured"
+    "providerNotConfiguredBadge": "Not configured",
+    "settingDefaultIngress": "Default ingress",
+    "settingDefaultIngressHint": "Reachability for services that do not choose their own.",
+    "settingPublicHost": "Public host",
+    "settingPublicHostHint": "Address that published-port URLs are built from. Leave empty to advertise no URL rather than one that may not resolve.",
+    "settingDomain": "Base domain",
+    "settingDomainHint": "Used to build hostnames for `host` ingress, routed by your own gateway.",
+    "settingSocketPath": "Docker socket",
+    "settingSocketPathHint": "For rootless Docker or Podman. Only takes effect if the socket is mounted there — the mount itself is a compose change.",
+    "settingsApplyHint": "Applies to containers created from now on.",
+    "settingsLoading": "Loading settings…"
   },
   "analytics": {
     "sidebar": {
