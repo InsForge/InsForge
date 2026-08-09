@@ -70,8 +70,24 @@ export function getReachableUrl(service: ServiceSchema): ServiceEndpoint | null 
   return { display: service.endpointUrl, href: service.endpointUrl };
 }
 
-/** Sentinel for "don't filter", so the select has a value for the no-filter case. */
-export const ALL_PROVIDERS = 'all';
+/**
+ * The providers the compute tab navigates between, in sidebar order.
+ *
+ * Both are listed whether or not they are configured: a self-hoster who cannot see
+ * Docker in the nav has no way to discover that it is an option, which is exactly the
+ * confusion this replaced. Selecting an unconfigured one shows how to enable it.
+ */
+export const COMPUTE_PROVIDERS = [
+  { slug: 'docker', label: 'Docker' },
+  { slug: 'fly', label: 'Fly.io' },
+] as const;
 
-/** A provider name, or the all-providers sentinel. */
-export type ProviderFilter = string;
+export type ComputeProviderSlug = (typeof COMPUTE_PROVIDERS)[number]['slug'];
+
+export function isComputeProviderSlug(value: string | undefined): value is ComputeProviderSlug {
+  return COMPUTE_PROVIDERS.some((p) => p.slug === value);
+}
+
+export function computeProviderLabel(slug: string): string {
+  return COMPUTE_PROVIDERS.find((p) => p.slug === slug)?.label ?? slug;
+}

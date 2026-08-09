@@ -858,7 +858,11 @@
     "capFlyctl": "Construido por la CLI con flyctl",
     "settingsDocsPrefix": "Configuración del proveedor y la lista completa de",
     "settingsDocsLink": "variables de entorno de compute",
-    "setupProviders": "Guía de configuración"
+    "setupProviders": "Guía de configuración",
+    "providerNotEnabled": "{{provider}} aún no está activado",
+    "providerSetupCta": "Configurar {{provider}}",
+    "setupDockerSummary": "Ejecuta contenedores en el mismo daemon de Docker que InsForge: sin cuenta y sin factura por contenedor. Necesita el socket de Docker montado en este contenedor.",
+    "setupFlySummary": "Ejecuta contenedores en Fly.io con tu propia cuenta, con regiones seleccionables y escalado a cero. Necesita un token de API y un slug de organización."
   },
   "analytics": {
     "sidebar": {

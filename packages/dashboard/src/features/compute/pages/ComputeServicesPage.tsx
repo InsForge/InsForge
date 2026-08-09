@@ -1,32 +1,32 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Loader2,
-  ArrowLeft,
-  Plus,
-  Play,
-  Square,
-  Trash2,
-  AlertTriangle,
-  XCircle,
-} from 'lucide-react';
+import { ArrowLeft, Plus, Play, Square, Trash2, AlertTriangle, XCircle } from 'lucide-react';
 import { Button } from '@insforge/ui';
+import { LoadingState } from '#components';
 import { useComputeServices } from '#features/compute/hooks/useComputeServices';
-import { useOutletContext } from 'react-router-dom';
+import { Navigate, useOutletContext, useParams } from 'react-router-dom';
 import type { ComputeOutletContext } from '#features/compute/components/ComputeLayout';
+import { ComputeProviderSetup } from '#features/compute/components/ComputeProviderSetup';
 import { ServiceCard } from '#features/compute/components/ServiceCard';
 import { ServiceEvents } from '#features/compute/components/ServiceEvents';
 import { ServiceLogs } from '#features/compute/components/ServiceLogs';
 import { CreateServiceDialog } from '#features/compute/components/CreateServiceDialog';
 import { DeleteServiceDialog } from '#features/compute/components/DeleteServiceDialog';
-import { statusColors, getReachableUrl } from '#features/compute/constants';
+import { statusColors, getReachableUrl, isComputeProviderSlug } from '#features/compute/constants';
 import type { ServiceSchema } from '@insforge/shared-schemas';
 
 export default function ComputeServicesPage() {
   const { t } = useTranslation('chrome');
-  // The layout has already established that compute is configured and narrowed the
-  // list to the selected provider; this page renders what it was handed.
-  const { services } = useOutletContext<ComputeOutletContext>();
+  // The provider comes from the route, so the sidebar is the switcher and the URL is
+  // shareable. The layout hands over every service; this page shows its own.
+  const { provider } = useParams();
+  const {
+    services: allServices,
+    configured,
+    openSettings,
+  } = useOutletContext<ComputeOutletContext>();
+  const services = allServices.filter((s) => s.provider === provider);
+  const providerConfigured = provider !== undefined && configured.includes(provider);
   const {
     isLoading,
     error,
@@ -56,12 +56,22 @@ export default function ComputeServicesPage() {
     setDeleteTarget(null);
   };
 
-  if (isLoading) {
+  // An unknown slug in the URL is a typo or a stale bookmark, not an error worth a
+  // crash — send it back to the tab, which picks a sensible provider.
+  if (!isComputeProviderSlug(provider)) {
+    return <Navigate to="/dashboard/compute" replace />;
+  }
+
+  // This provider is not set up: show how, rather than an empty list that looks like
+  // "you have no services" when the truth is "this provider is not enabled".
+  if (!providerConfigured) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
+      <ComputeProviderSetup provider={provider} onOpenSettings={() => openSettings(provider)} />
     );
+  }
+
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {

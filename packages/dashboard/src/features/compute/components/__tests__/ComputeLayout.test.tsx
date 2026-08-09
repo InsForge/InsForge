@@ -3,22 +3,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ServiceSchema } from '@insforge/shared-schemas';
 
-const meta = vi.hoisted(() => ({
-  value: undefined as unknown,
-  isLoading: false,
-}));
+const meta = vi.hoisted(() => ({ value: undefined as unknown, isLoading: false }));
 const listed = vi.hoisted(() => ({
   services: [] as ServiceSchema[],
   enabledCalls: [] as boolean[],
-}));
-
-const stored = vi.hoisted(() => ({ filter: null as unknown }));
-vi.mock('#lib/utils/local-storage', () => ({
-  getLocalStorageJSON: () => stored.filter,
-  setLocalStorageJSON: (_key: string, value: unknown) => {
-    stored.filter = value;
-    return true;
-  },
 }));
 
 vi.mock('#lib/hooks/useMetadata', () => ({
@@ -49,13 +37,13 @@ function service(overrides: Partial<ServiceSchema>): ServiceSchema {
   } as ServiceSchema;
 }
 
-/** Renders the layout with a child that reports what the outlet handed it. */
-function renderLayout(initialPath = '/dashboard/compute/services') {
+/** Renders the layout with a stub provider page in place of the real one. */
+function renderAt(path: string) {
   render(
-    <MemoryRouter initialEntries={[initialPath]}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/dashboard/compute" element={<ComputeLayout />}>
-          <Route path="services" element={<div data-testid="child">rendered</div>} />
+          <Route path=":provider" element={<div data-testid="provider-page">page</div>} />
         </Route>
       </Routes>
     </MemoryRouter>
@@ -67,64 +55,51 @@ describe('ComputeLayout', () => {
     listed.services = [];
     listed.enabledCalls = [];
     meta.isLoading = false;
-    stored.filter = null;
     vi.clearAllMocks();
   });
 
-  // The bug this replaces: a spinner followed by a 503 body, which reads as a
-  // broken page rather than a feature nobody turned on.
-  it('shows the setup state and skips the list request when compute is off', () => {
-    meta.value = { version: '1' }; // metadata present, no compute slice
-    renderLayout();
+  // Provider is the navigation axis, so both are always offered. A self-hoster who
+  // cannot see Docker in the nav has no way to discover that it exists, which is the
+  // confusion this replaced.
+  it('lists both providers even when neither is configured', () => {
+    meta.value = { version: '1' };
+    renderAt('/dashboard/compute/docker');
 
-    // Quick start in the content area, not a full-page takeover: the tab keeps its
-    // shape so it reads as unconfigured rather than broken. Both providers are named
-    // in the copy, and the CTA leads to the steps.
-    expect(screen.getByText(/Compute is not enabled yet/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Set up compute/i })).toBeTruthy();
-    expect(screen.getByText(/own Docker host/i)).toBeTruthy();
-    // The secondary nav stays mounted, and says why nothing is navigable.
-    expect(screen.getByText('Services')).toBeTruthy();
+    expect(screen.getByText('Docker')).toBeTruthy();
+    expect(screen.getByText('Fly.io')).toBeTruthy();
     expect(screen.getByText(/No provider configured yet/i)).toBeTruthy();
+  });
+
+  it('skips the list request when compute is off', () => {
+    meta.value = { version: '1' };
+    renderAt('/dashboard/compute/docker');
+
     expect(listed.enabledCalls.every((e) => e === false)).toBe(true);
-    expect(screen.queryByTestId('child')).toBeNull();
   });
 
-  // One provider is the common case; a one-item dropdown is a control that does
-  // nothing, the same mistake as a region picker on a single-host driver.
-  it('hides the provider filter when only one provider is configured', () => {
+  // The bare path has to land on a provider rather than render an empty shell.
+  it('redirects the bare path to a provider route', () => {
+    meta.value = { compute: { defaultProvider: 'fly', providers: { fly: {}, docker: {} } } };
+    renderAt('/dashboard/compute');
+
+    expect(screen.getByTestId('provider-page')).toBeTruthy();
+  });
+
+  // With nothing configured there is no default, and Docker is the option an operator
+  // can act on without signing up for anything.
+  it('still lands on a provider when there is no default', () => {
+    meta.value = { version: '1' };
+    renderAt('/dashboard/compute');
+
+    expect(screen.getByTestId('provider-page')).toBeTruthy();
+  });
+
+  it('fetches the list once compute is configured', () => {
     meta.value = { compute: { defaultProvider: 'docker', providers: { docker: {} } } };
-    renderLayout();
+    listed.services = [service({ id: 'a' }), service({ id: 'b', provider: 'fly' })];
+    renderAt('/dashboard/compute/docker');
 
-    expect(screen.queryByLabelText(/Filter services by provider/i)).toBeNull();
-    expect(screen.getByTestId('child')).toBeTruthy();
-  });
-
-  it('offers the filter and narrows the list when providers coexist', () => {
-    meta.value = {
-      compute: { defaultProvider: 'fly', providers: { fly: {}, docker: {} } },
-    };
-    listed.services = [
-      service({ id: 'a', provider: 'docker' }),
-      service({ id: 'b', provider: 'fly' }),
-      service({ id: 'c', provider: 'fly' }),
-    ];
-    stored.filter = 'fly';
-    renderLayout();
-
-    expect(screen.getByLabelText(/Filter services by provider/i)).toBeTruthy();
-    // The nav label carries the visible count, so filtering to fly shows 2 of 3.
-    expect(screen.getByText('Services (2)')).toBeTruthy();
-  });
-
-  // A stored filter naming a provider that is no longer configured would silently
-  // hide every service.
-  it('falls back to all providers when the stored filter is stale', () => {
-    meta.value = { compute: { defaultProvider: 'docker', providers: { docker: {} } } };
-    listed.services = [service({ id: 'a', provider: 'docker' })];
-    stored.filter = 'fly';
-    renderLayout();
-
-    expect(screen.getByText('Services (1)')).toBeTruthy();
+    expect(screen.getByTestId('provider-page')).toBeTruthy();
+    expect(listed.enabledCalls.some((e) => e === true)).toBe(true);
   });
 });
