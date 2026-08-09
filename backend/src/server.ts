@@ -53,6 +53,7 @@ import { FeatureUsageCollector } from '@/services/telemetry/feature-usage.collec
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { DatabaseBackupService } from '@/services/database/database-backup.service.js';
 import { ComputeServicesService } from '@/services/compute/services.service.js';
+import { ComputeConfigService } from '@/services/compute/compute-config.service.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -382,6 +383,10 @@ async function initializeServer() {
     // configured at all, which is the normal case, so that is caught too.
     void (async () => {
       try {
+        // Load stored Fly credentials before the registry is built, so a deployment
+        // configured through the dashboard comes up with Fly available instead of
+        // waiting for the first write to rebuild.
+        await ComputeConfigService.getInstance().primeSnapshot();
         await ComputeServicesService.getInstance().runStartupTasks();
       } catch (err) {
         logger.info('Compute startup tasks skipped', {

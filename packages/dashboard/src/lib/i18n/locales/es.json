@@ -867,7 +867,23 @@
     "dockerStep3Body": "El driver se registra solo cuando el socket es accesible.",
     "dockerSocketLookingAt": "Buscando",
     "flyStep1Body": "Ambos vienen de la CLI de Fly, con tu propia cuenta.",
-    "flyStep3Body": "Los endpoints de compute empiezan a responder cuando ambos valores están presentes."
+    "flyStep3Body": "Los endpoints de compute empiezan a responder cuando ambos valores están presentes.",
+    "flyApiTokenLabel": "Token de API",
+    "flyApiTokenHint": "De `fly tokens create org`.",
+    "flyApiTokenPlaceholder": "Pega un token de API de Fly",
+    "flyOrgLabel": "Slug de organización",
+    "flyOrgHint": "De `fly orgs list`.",
+    "flyOrgPlaceholder": "tu-org-slug",
+    "showToken": "Mostrar token",
+    "hideToken": "Ocultar token",
+    "configReplaceHint": "Deja un campo vacío para conservar su valor actual.",
+    "configSave": "Guardar",
+    "configSaving": "Guardando…",
+    "configLoading": "Comprobando credenciales guardadas…",
+    "configSaved": "Credenciales de Fly guardadas",
+    "configSaveFailed": "No se pudieron guardar las credenciales de Fly",
+    "fromEnvironment": "Del entorno",
+    "providerNotConfiguredBadge": "Sin configurar"
   },
   "analytics": {
     "sidebar": {

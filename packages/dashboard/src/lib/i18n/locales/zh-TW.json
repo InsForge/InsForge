@@ -847,7 +847,23 @@
     "dockerStep3Body": "socket 可連線時，驅動會自行註冊。",
     "dockerSocketLookingAt": "正在尋找",
     "flyStep1Body": "兩者都來自已登入您自己帳號的 Fly CLI。",
-    "flyStep3Body": "兩個值齊備後，compute 端點就會開始回應。"
+    "flyStep3Body": "兩個值齊備後，compute 端點就會開始回應。",
+    "flyApiTokenLabel": "API token",
+    "flyApiTokenHint": "來自 `fly tokens create org`。",
+    "flyApiTokenPlaceholder": "貼上 Fly API token",
+    "flyOrgLabel": "Organization slug",
+    "flyOrgHint": "來自 `fly orgs list`。",
+    "flyOrgPlaceholder": "your-org-slug",
+    "showToken": "顯示 token",
+    "hideToken": "隱藏 token",
+    "configReplaceHint": "留空則保留目前的值。",
+    "configSave": "儲存",
+    "configSaving": "儲存中…",
+    "configLoading": "正在檢查已儲存的認證…",
+    "configSaved": "Fly 認證已儲存",
+    "configSaveFailed": "儲存 Fly 認證失敗",
+    "fromEnvironment": "來自環境變數",
+    "providerNotConfiguredBadge": "未設定"
   },
   "analytics": {
     "sidebar": {

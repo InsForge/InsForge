@@ -459,7 +459,7 @@ function warnIfFlyOrgMissing(): void {
 }
 
 export class ComputeServicesService {
-  private static instance: ComputeServicesService;
+  private static instance: ComputeServicesService | undefined;
   private pool: Pool | null = null;
   private readonly registry: ComputeRegistry = buildComputeRegistry();
 
@@ -470,6 +470,19 @@ export class ComputeServicesService {
       ComputeServicesService.instance = new ComputeServicesService();
     }
     return ComputeServicesService.instance;
+  }
+
+  /**
+   * Drop the singleton so the next call rebuilds the provider registry.
+   *
+   * Called after Fly credentials are stored through the dashboard. The registry is
+   * built in a field initialiser, and construction *throws* when nothing is
+   * configured — so a deployment that had no provider has no instance to rebuild, and
+   * one that did holds a registry that predates the new credentials. Discarding it
+   * covers both, and the pool is re-acquired lazily so nothing leaks.
+   */
+  static resetForConfigChange(): void {
+    ComputeServicesService.instance = undefined;
   }
 
   private getPool(): Pool {

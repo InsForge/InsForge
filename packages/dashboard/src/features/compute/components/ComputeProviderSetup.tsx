@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CopyButton } from '@insforge/ui';
 import { computeProviderLabel } from '#features/compute/constants';
+import { FlyCredentialsForm } from './FlyCredentialsForm';
 
 interface ComputeProviderSetupProps {
   provider: string;
@@ -118,25 +119,18 @@ export function ComputeProviderSetup({ provider, socketPath }: ComputeProviderSe
                 <Snippet code={'fly tokens create org\nfly orgs list'} />
               </StepItem>
 
-              <StepItem number={2}>
+              {/* The form inline, the way ApifyConnectPanel embeds ApifyTokenForm:
+                  these are values, so they can be entered here and take effect
+                  without a restart. No third step — that is the whole point. */}
+              <StepItem number={2} last>
                 <StepText
-                  title={t('compute.flyStep2', { defaultValue: 'Set both values' })}
+                  title={t('compute.flyStep2', { defaultValue: 'Enter them here' })}
                   body={t('compute.flyBothRequired', {
                     defaultValue:
-                      'Both are required — a token with no org has nothing to authenticate against.',
+                      'Both are required — a token with no org has nothing to authenticate against. Saving takes effect immediately; no restart needed.',
                   })}
                 />
-                <Snippet label=".env" code={'FLY_API_TOKEN=...\nFLY_ORG=your-org-slug'} />
-              </StepItem>
-
-              <StepItem number={3} last>
-                <StepText
-                  title={t('compute.flyStep3', { defaultValue: 'Restart InsForge' })}
-                  body={t('compute.flyStep3Body', {
-                    defaultValue: 'Compute endpoints start answering once both values are present.',
-                  })}
-                />
-                <Snippet code={RESTART_COMMAND} />
+                <FlyCredentialsForm />
               </StepItem>
             </>
           )}
