@@ -839,7 +839,7 @@
     "flyIntro": "Containers run on Fly.io under your own account, with selectable regions and scale-to-zero.",
     "flyStep1": "Find your org, then create a token",
     "flyStep2": "Come back here",
-    "flyBothRequired": "Click the button below to open Compute Settings, then paste the token and the org slug. Both are required, and saving takes effect right away.",
+    "flyBothRequired": "Click the button below to open Compute Settings, then paste the token and the org slug.",
     "flyStep3": "3. Restart InsForge",
     "settingsSubtitle": "Set by environment variables on the InsForge container. Changing them needs a restart.",
     "capability": "Capability",

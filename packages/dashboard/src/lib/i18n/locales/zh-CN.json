@@ -823,7 +823,7 @@
     "flyIntro": "容器跑在你自己的 Fly.io 账号下，可选择区域并支持缩容到零。",
     "flyStep1": "先查到 org，再创建 token",
     "flyStep2": "回到这里",
-    "flyBothRequired": "点击下面的按钮打开 Compute 设置，把 token 和 org slug 粘贴进去。两者都必填，保存后立即生效。",
+    "flyBothRequired": "点击下面的按钮打开 Compute 设置，把 token 和 org slug 粘贴进去。",
     "flyStep3": "3. 重启 InsForge",
     "settingsSubtitle": "由 InsForge 容器的环境变量决定，修改后需要重启。",
     "capability": "能力",

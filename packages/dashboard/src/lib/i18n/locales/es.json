@@ -843,7 +843,7 @@
     "flyIntro": "Los contenedores se ejecutan en Fly.io con tu propia cuenta, con regiones seleccionables y escalado a cero.",
     "flyStep1": "Localiza tu organización y crea un token",
     "flyStep2": "Vuelve aquí",
-    "flyBothRequired": "Haz clic en el botón de abajo para abrir los ajustes de Compute y pega el token y el slug de la organización. Ambos son obligatorios y el guardado surte efecto de inmediato.",
+    "flyBothRequired": "Haz clic en el botón de abajo para abrir los ajustes de Compute y pega el token y el slug de la organización.",
     "flyStep3": "3. Reinicia InsForge",
     "settingsSubtitle": "Definido por variables de entorno en el contenedor de InsForge. Cambiarlas requiere un reinicio.",
     "capability": "Capacidad",

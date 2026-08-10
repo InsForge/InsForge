@@ -142,7 +142,7 @@ export function ComputeProviderSetup({
                   title={t('compute.flyStep2', { defaultValue: 'Come back here' })}
                   body={t('compute.flyBothRequired', {
                     defaultValue:
-                      'Click the button below to open Compute Settings, then paste the token and the org slug. Both are required, and saving takes effect right away.',
+                      'Click the button below to open Compute Settings, then paste the token and the org slug.',
                   })}
                 />
               </StepItem>
