@@ -178,8 +178,8 @@
       }
     },
     "memoryAdvisory": {
-      "title": "La memoria está en {{value}}. Para Postgres, eso es normal.",
-      "description": "Postgres usa la memoria libre para cachear tus datos y la retiene incluso cuando la base de datos está inactiva, así que un número alto aquí no significa que algo vaya mal. Las señales que sí importan son los reinicios y las consultas cada vez más lentas. Si las estás viendo, una instancia más grande le dará espacio.",
+      "title": "La memoria está en {{value}}. Para Postgres eso es normal, pero queda poco margen.",
+      "description": "Postgres usa la memoria libre para cachear tus datos y la retiene, así que un número alto por sí solo no es un problema. Si crees que tu uso va a seguir creciendo, conviene subir a una instancia más grande ahora, antes de que algo falle.",
       "cta": "Mejorar instancia"
     },
     "steps": {

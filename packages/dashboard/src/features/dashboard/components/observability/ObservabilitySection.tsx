@@ -101,6 +101,11 @@ const METRICS: MetricConfig[] = [
 // Disk card slot in the grid (after CPU + Memory, before Network).
 const DISK_GRID_INDEX = 2;
 
+// The memory advisory appears from this latest-sample percentage up. Below it
+// a dedicated Postgres instance's cache-heavy memory needs no commentary;
+// above it headroom is thin enough that growth deserves a nudge.
+const MEMORY_ADVISORY_THRESHOLD_PCT = 70;
+
 /**
  * Assemble the Database/WAL/System stack from the metric series. Database and
  * WAL arrive from the cloud sampler and share timestamps; System is derived
@@ -165,12 +170,10 @@ export function ObservabilitySection() {
   const [computeSettingsOpen, setComputeSettingsOpen] = useState(false);
   const { data, isLoading, isUnavailable, error } = useProjectMetrics(range);
 
-  // Always shown (Tony's call, QA 2026-08-07): the reassurance IS the point —
-  // a dedicated Postgres instance parked high on memory is its healthy steady
-  // state (idle RAM becomes query cache), but it reads as a leak, and support
-  // keeps fielding "my idle database sits at ~78% memory" reports. The value is
-  // the latest sample, the same number the Memory card's headline shows; only a
-  // series with no samples (fresh instance, metrics gap) has nothing to say.
+  // Shown from 70% up (Tony's call, 2026-08-09, replacing the always-on
+  // banner): below that the card needs no commentary; at 70%+ the message is
+  // "normal, but headroom is thin, upgrade if you expect growth". The value
+  // is the latest sample, the same number the Memory card's headline shows.
   const memoryAdvisoryPct = useMemo(() => {
     const series = data?.metrics.find((m) => m.metric === 'memory_usage')?.data ?? [];
     return aggregateMetricSeries(series).latest;
@@ -308,7 +311,7 @@ export function ObservabilitySection() {
         </div>
       ) : (
         <>
-          {memoryAdvisoryPct !== null && (
+          {memoryAdvisoryPct !== null && memoryAdvisoryPct >= MEMORY_ADVISORY_THRESHOLD_PCT && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-[var(--alpha-8)] bg-card p-4">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)] text-muted-foreground">
@@ -318,13 +321,14 @@ export function ObservabilitySection() {
                   <p className="text-sm font-medium leading-5 text-foreground">
                     {t('overview.memoryAdvisory.title', {
                       value: PERCENT(memoryAdvisoryPct),
-                      defaultValue: "Memory is sitting at {{value}}. For Postgres, that's normal.",
+                      defaultValue:
+                        "Memory is at {{value}}. For Postgres that's normal, but the headroom is getting thin.",
                     })}
                   </p>
                   <p className="text-sm leading-5 text-muted-foreground">
                     {t('overview.memoryAdvisory.description', {
                       defaultValue:
-                        "Postgres grabs spare memory to cache your data and keeps it, even when the database is idle. A high number here doesn't mean something is wrong. The warning signs that actually matter are restarts and queries slowing down. If you're seeing those, a bigger instance will give it room.",
+                        "Postgres grabs spare memory to cache your data and keeps it, so a high number by itself is fine. If you think your usage is going to keep growing, it's worth moving up an instance size now instead of after something breaks.",
                     })}
                   </p>
                 </div>

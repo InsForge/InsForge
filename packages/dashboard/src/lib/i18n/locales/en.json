@@ -178,8 +178,8 @@
       }
     },
     "memoryAdvisory": {
-      "title": "Memory is sitting at {{value}}. For Postgres, that's normal.",
-      "description": "Postgres grabs spare memory to cache your data and keeps it, even when the database is idle. A high number here doesn't mean something is wrong. The warning signs that actually matter are restarts and queries slowing down. If you're seeing those, a bigger instance will give it room.",
+      "title": "Memory is at {{value}}. For Postgres that's normal, but the headroom is getting thin.",
+      "description": "Postgres grabs spare memory to cache your data and keeps it, so a high number by itself is fine. If you think your usage is going to keep growing, it's worth moving up an instance size now instead of after something breaks.",
       "cta": "Upgrade Instance"
     },
     "steps": {
