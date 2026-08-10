@@ -109,7 +109,7 @@ graph TB
   <Tab title="Fly.io">
     容器跑在你自己的 [Fly.io](https://fly.io) 账号下。在 `.env` 里用两个环境变量启用：
 
-    - `FLY_API_TOKEN`：Fly.io API token，用 `fly tokens create org` 生成。InsForge 用它来创建和管理 compute 容器。
+    - `FLY_API_TOKEN`：Fly.io API token，用 `fly tokens create org -o <your-org>` 生成。把 CLI 打印的整行都粘进来，`FlyV1` 前缀会自动处理。InsForge 用它来创建和管理 compute 容器。
     - `FLY_ORG`：你的 Fly organization slug，用 `fly orgs list` 查看。容器会创建在这个 org 下。
 
     两者都必填。只有 token 而没有 org，就没有可认证的对象；只有 org 而没有 token，则无法调用。设置完成后重启容器。

@@ -113,13 +113,15 @@ export function ComputeProviderSetup({ provider, socketPath }: ComputeProviderSe
               <StepItem number={1}>
                 <StepText
                   title={t('compute.flyStep1', {
-                    defaultValue: 'Create a token and find your org',
+                    defaultValue: 'Find your org, then create a token',
                   })}
                   body={t('compute.flyStep1Body', {
                     defaultValue: 'Both come from the Fly CLI, signed in to your own account.',
                   })}
                 />
-                <Snippet code={'fly tokens create org\nfly orgs list'} />
+                {/* Org first: `tokens create org` takes the slug with -o, and without
+                    it flyctl stops to ask for an org you have not looked up yet. */}
+                <Snippet code={'fly orgs list\nfly tokens create org -o <your-org>'} />
               </StepItem>
 
               {/* The form inline, the way ApifyConnectPanel embeds ApifyTokenForm:

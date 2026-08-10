@@ -208,9 +208,12 @@ export class ComputeConfigService {
     value: string,
     existing: { id: string } | undefined
   ): Promise<void> {
+    // Stored in the form the request path wants, so what is in the secret store and
+    // what goes on the wire are the same string.
+    const stored = normalize(value) ?? value.trim();
     if (existing) {
       const updated = await this.secretService.updateSecret(existing.id, {
-        value: value.trim(),
+        value: stored,
         isActive: true,
         isReserved: true,
       });
@@ -219,13 +222,30 @@ export class ComputeConfigService {
       }
       return;
     }
-    await this.secretService.createSecret({ key, value: value.trim(), isReserved: true });
+    await this.secretService.createSecret({ key, value: stored, isReserved: true });
   }
 }
 
 function normalize(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
+  const trimmed = stripFlyScheme(value?.trim());
   return trimmed ? trimmed : null;
+}
+
+/**
+ * Drop a leading `FlyV1 ` scheme from a pasted token.
+ *
+ * `fly tokens create org` prints the macaroon with the scheme attached, and the two
+ * Fly endpoints this backend calls disagree about who supplies it: the Machines API
+ * gets `Bearer <token>` while the logs API gets `FlyV1 <token>` (verified against a
+ * live app in the container-logs work — logs reject `Bearer`). Storing the value
+ * verbatim would send `FlyV1 FlyV1 fm2_…` to logs and break the panel for anyone who
+ * copied the CLI's output as printed, which is the obvious thing to do.
+ *
+ * A token that never had the prefix is left alone, so this cannot make an older
+ * credential worse.
+ */
+function stripFlyScheme(value: string | undefined): string | undefined {
+  return value?.replace(/^FlyV1\s+/i, '');
 }
 
 /**
