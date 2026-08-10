@@ -834,9 +834,9 @@
     "providerIsDefault": "· los nuevos servicios van aquí",
     "providerNotConfigured": "Sin configurar",
     "dockerIntro": "Los contenedores se ejecutan en el mismo daemon de Docker que InsForge, como hermanos de este contenedor. Sin cuenta y sin factura por contenedor.",
-    "dockerStep1": "Descomenta estas líneas en tu archivo compose",
+    "dockerStep1": "Monta el socket de Docker",
     "dockerStep2": "Pon el id del grupo docker de tu host en .env",
-    "dockerStep2Body": "El socket tiene modo 660 root:docker, así que el backend necesita un grupo que coincida. En Docker Desktop el socket pertenece a root dentro de la VM: usa 0.",
+    "dockerStep2Body": "El socket es 660 root:docker, así que el backend necesita un grupo que coincida. Imprime el id y escribe el número en .env: compose lee ese archivo tal cual y no ejecuta comandos. En Docker Desktop el socket pertenece a root dentro de la VM, así que el id es 0.",
     "dockerStep3": "Reinicia InsForge",
     "dockerSocketWarning": "El socket de Docker equivale a root en el host, así que montarlo es una decisión deliberada. InsForge construye la especificación de cada contenedor por su cuenta y nunca reenvía opciones de quien llama, así que una API key filtrada no puede pedir un contenedor privilegiado.",
     "flyIntro": "Los contenedores se ejecutan en Fly.io con tu propia cuenta, con regiones seleccionables y escalado a cero.",
@@ -862,7 +862,7 @@
     "providerSetupCta": "Configurar {{provider}}",
     "setupDockerSummary": "Ejecuta contenedores en el mismo daemon de Docker que InsForge: sin cuenta y sin factura por contenedor. Necesita el socket de Docker montado en este contenedor.",
     "setupFlySummary": "Ejecuta contenedores en Fly.io con tu propia cuenta, con regiones seleccionables y escalado a cero. Necesita un token de API y un slug de organización.",
-    "dockerStep1Body": "Estas dos líneas ya están en tu archivo compose, comentadas. El socket equivale a root en el host, así que descomentarlo es una decisión deliberada.",
+    "dockerStep1Body": "Quien alcanza el socket es root en el host, así que InsForge se distribuye con él desactivado. En el archivo compose de InsForge esas dos líneas ya están, comentadas; añádelas si usas el tuyo.",
     "dockerStep3Body": "El driver se registra en cuanto el socket es accesible. En Docker rootless o Podman el socket está en otra ruta: haz clic en el botón de abajo para indicarla antes.",
     "dockerSocketLookingAt": "Buscando",
     "flyStep1Body": "Ambos vienen de la CLI de Fly, con tu propia cuenta.",
@@ -894,7 +894,8 @@
     "settingsApplyHint": "Se aplica a los contenedores creados de ahora en adelante.",
     "settingsLoading": "Cargando ajustes…",
     "openDockerSettings": "Abrir ajustes de Docker",
-    "enterFlyCredentials": "Introducir credenciales de Fly.io"
+    "enterFlyCredentials": "Introducir credenciales de Fly.io",
+    "terminalLabel": "Terminal"
   },
   "analytics": {
     "sidebar": {

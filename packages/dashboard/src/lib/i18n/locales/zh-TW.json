@@ -814,9 +814,9 @@
     "providerIsDefault": "· 新服務預設在此",
     "providerNotConfigured": "未設定",
     "dockerIntro": "容器與 InsForge 執行在同一個 Docker daemon 上，互為同層容器。不需要帳號，也沒有按容器計費。",
-    "dockerStep1": "取消 compose 檔案中這兩行的註解",
+    "dockerStep1": "掛載 Docker socket",
     "dockerStep2": "把主機 docker 群組 id 寫進 .env",
-    "dockerStep2Body": "socket 權限為 660 root:docker，後端需要相符的群組。Docker Desktop 上 VM 內的 socket 屬於 root——請填 0。",
+    "dockerStep2Body": "socket 權限是 660 root:docker，後端需要一個相符的群組。先把 id 印出來，再把數字寫進 .env——compose 是逐字讀取該檔案的，不會替您執行命令。Docker Desktop 裡 socket 在 VM 內屬於 root，所以 id 是 0。",
     "dockerStep3": "重新啟動 InsForge",
     "dockerSocketWarning": "Docker socket 在主機上等同於 root，因此掛載它應當是有意識的決定。InsForge 自行建構每個容器的 spec，從不轉送呼叫方提供的選項，因此即使 API key 外洩也無法要求特權容器。",
     "flyIntro": "容器執行在您自己的 Fly.io 帳號下，可選擇區域並支援縮減至零。",
@@ -842,7 +842,7 @@
     "providerSetupCta": "設定 {{provider}}",
     "setupDockerSummary": "容器與 InsForge 執行在同一個 Docker daemon 上——不需要帳號，也沒有按容器計費。需要把 Docker socket 掛載進本容器。",
     "setupFlySummary": "容器執行在您自己的 Fly.io 帳號下，可選擇區域並支援縮減至零。需要 API token 與 org slug。",
-    "dockerStep1Body": "這兩行已經在您的 compose 檔案裡，只是被註解掉了。socket 在主機上等同於 root，因此取消註解應當是有意識的決定。",
+    "dockerStep1Body": "能存取 socket 就等於拿到主機 root，所以 InsForge 預設不開啟。InsForge 自帶的 compose 檔案裡這兩行已經寫好並註解掉了；如果您用自己的 compose，就手動加上。",
     "dockerStep3Body": "socket 一旦可達，driver 就會自行註冊。rootless Docker 或 Podman 的 socket 在別的路徑——先點下方按鈕把路徑填好。",
     "dockerSocketLookingAt": "正在尋找",
     "flyStep1Body": "兩者都來自已登入您自己帳號的 Fly CLI。",
@@ -874,7 +874,8 @@
     "settingsApplyHint": "對之後建立的容器生效。",
     "settingsLoading": "正在載入設定……",
     "openDockerSettings": "開啟 Docker 設定",
-    "enterFlyCredentials": "填寫 Fly.io 憑證"
+    "enterFlyCredentials": "填寫 Fly.io 憑證",
+    "terminalLabel": "終端機"
   },
   "analytics": {
     "sidebar": {

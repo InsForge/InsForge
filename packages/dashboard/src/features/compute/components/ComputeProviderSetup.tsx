@@ -17,6 +17,8 @@ const COMPOSE_SNIPPET = `services:
       - \${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:\${DOCKER_SOCKET_PATH:-/var/run/docker.sock}
     group_add: ["\${DOCKER_GID:?set DOCKER_GID to your host docker group id}"]`;
 
+const GID_COMMAND = 'getent group docker | cut -d: -f3';
+
 const RESTART_COMMAND = 'docker compose up -d insforge';
 
 /**
@@ -39,6 +41,9 @@ export function ComputeProviderSetup({
 }: ComputeProviderSetupProps) {
   const { t } = useTranslation('chrome');
   const label = computeProviderLabel(provider);
+  // Every snippet is badged with where it goes: a filename for the ones you edit, and
+  // this for the ones you run. Unbadged, a shell command and a file looked alike.
+  const terminalLabel = t('compute.terminalLabel', { defaultValue: 'Terminal' });
 
   return (
     <div className="flex min-h-0 flex-1 justify-center overflow-auto p-6">
@@ -71,12 +76,10 @@ export function ComputeProviderSetup({
             <>
               <StepItem number={1}>
                 <StepText
-                  title={t('compute.dockerStep1', {
-                    defaultValue: 'Uncomment these lines in your compose file',
-                  })}
+                  title={t('compute.dockerStep1', { defaultValue: 'Mount the Docker socket' })}
                   body={t('compute.dockerStep1Body', {
                     defaultValue:
-                      'These two lines are already in your compose file, commented out. The socket is root-equivalent on the host, so uncommenting it is a deliberate choice.',
+                      'Whoever can reach the socket is root on the host, so InsForge ships with it disabled. In InsForge’s own compose file these two lines are already there, commented out; add them if you run your own.',
                   })}
                 />
                 <Snippet label="docker-compose.yml" code={COMPOSE_SNIPPET} />
@@ -89,15 +92,11 @@ export function ComputeProviderSetup({
                   })}
                   body={t('compute.dockerStep2Body', {
                     defaultValue:
-                      'The socket is mode 660 root:docker, so the backend needs a matching group. On Docker Desktop it is owned by root inside the VM, so the value is 0.',
+                      'The socket is mode 660 root:docker, so the backend needs a matching group. Print the id, then write the number into .env — compose reads that file literally and will not run a command for you. On Docker Desktop the socket is owned by root inside the VM, so the id is 0.',
                   })}
                 />
-                <Snippet
-                  label=".env"
-                  code={
-                    'DOCKER_GID=$(getent group docker | cut -d: -f3)   # Linux\nDOCKER_GID=0                                     # Docker Desktop'
-                  }
-                />
+                <Snippet label={terminalLabel} code={GID_COMMAND} />
+                <Snippet label=".env" code={'DOCKER_GID=993'} />
               </StepItem>
 
               <StepItem number={3} last>
@@ -116,7 +115,7 @@ export function ComputeProviderSetup({
                     <span className="font-mono text-foreground">{socketPath}</span>
                   </p>
                 )}
-                <Snippet code={RESTART_COMMAND} />
+                <Snippet label={terminalLabel} code={RESTART_COMMAND} />
               </StepItem>
             </>
           ) : (
@@ -132,7 +131,10 @@ export function ComputeProviderSetup({
                 />
                 {/* Org first: `tokens create org` takes the slug with -o, and without
                     it flyctl stops to ask for an org you have not looked up yet. */}
-                <Snippet code={'fly orgs list\nfly tokens create org -o <your-org>'} />
+                <Snippet
+                  label={terminalLabel}
+                  code={'fly orgs list\nfly tokens create org -o <your-org>'}
+                />
               </StepItem>
 
               {/* No third step: these are values, so saving them in the dialog takes
