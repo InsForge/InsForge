@@ -153,4 +153,32 @@ describe('ComputeConfigService settings', () => {
     expect(dockerConfig().publicHost).toBe('');
     setDockerConfigOverrides({});
   });
+
+  // `fly tokens create org` prints the macaroon with its scheme attached, and copying
+  // that line as printed is the obvious thing to do. The logs endpoint prepends
+  // `FlyV1 ` itself, so storing it verbatim would send the scheme twice.
+  it('stores a pasted token without its FlyV1 scheme', async () => {
+    const secretStore = store();
+    const service = new ComputeConfigService(secretStore);
+
+    await service.updateConfig({ flyApiToken: 'FlyV1 fm2_pasted_from_the_cli' });
+
+    expect(secretStore.createSecret).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'FLY_API_TOKEN', value: 'fm2_pasted_from_the_cli' })
+    );
+    expect(service.flyCredentials().apiToken).toBe('fm2_pasted_from_the_cli');
+  });
+
+  // A token that never carried the scheme is untouched, so this cannot degrade a
+  // credential that already worked.
+  it('leaves a token with no scheme prefix alone', async () => {
+    const secretStore = store();
+    const service = new ComputeConfigService(secretStore);
+
+    await service.updateConfig({ flyApiToken: 'fm2_already_bare' });
+
+    expect(secretStore.createSecret).toHaveBeenCalledWith(
+      expect.objectContaining({ value: 'fm2_already_bare' })
+    );
+  });
 });

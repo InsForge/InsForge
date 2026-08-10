@@ -109,7 +109,7 @@ En InsForge Cloud, compute está totalmente gestionado y no configuras nada. Cua
   <Tab title="Fly.io">
     Los contenedores se ejecutan en [Fly.io](https://fly.io) bajo tu propia cuenta. Actívalo con dos variables de entorno en tu `.env`:
 
-    - `FLY_API_TOKEN`: un token de la API de Fly.io, creado con `fly tokens create org`. InsForge lo usa para crear y gestionar tus contenedores de compute.
+    - `FLY_API_TOKEN`: un token de la API de Fly.io, creado con `fly tokens create org -o <your-org>`. Pega la línea completa que imprime la CLI; el prefijo `FlyV1` se gestiona por ti. InsForge lo usa para crear y gestionar tus contenedores de compute.
     - `FLY_ORG`: el slug de tu organización de Fly, que ves con `fly orgs list`. Es la organización donde se crean los contenedores.
 
     Ambas son obligatorias. Un token sin organización no tiene contra qué autenticarse, y una organización sin token no se puede llamar. Defínelas y reinicia el contenedor.
