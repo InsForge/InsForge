@@ -86,6 +86,7 @@ if [ -n "${INSFORGE_NO_GIT:-}" ] || ! command -v git >/dev/null 2>&1; then
     curl -fsSL "$RAW/${REF:-main}/$f" -o "$f" ||
       { echo "Could not fetch $f at ${REF:-main} from $RAW." >&2; exit 1; }
   done
+  chmod +x deploy/backup.sh
   NO_GIT=1
 fi
 

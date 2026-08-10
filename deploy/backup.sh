@@ -10,6 +10,7 @@
 #   RETENTION_DAYS=30 ./deploy/backup.sh
 #   BACKUP_DIR=/mnt/backups/insforge ./deploy/backup.sh
 set -euo pipefail
+umask 077
 
 INSTALL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="$INSTALL_ROOT/.env"
