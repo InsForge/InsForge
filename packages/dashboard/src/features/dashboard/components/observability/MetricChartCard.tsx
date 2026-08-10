@@ -190,11 +190,14 @@ export function MetricChartCard({
   }, [data]);
 
   // Sparse or uneven series make timestamp-proportional bars bunch up with
-  // erratic gaps, so in every bar mode each sample takes an equal slot
-  // across the full plot width instead; hover targeting and the dot follow
-  // the same remapped x so they stay centered on the bars.
+  // erratic gaps, so the stacked-breakdown and barChart modes give each
+  // sample an equal slot across the full plot width; hover targeting and the
+  // dot follow the same remapped x so they stay centered on the bars. The
+  // single-color capacity fallback (self-host, older backend) keeps its
+  // timestamp-proportional placement — its x-axis labels describe real time.
   const displayPoints = useMemo(() => {
-    if ((!capacity && !barChart) || sparkline.points.length === 0) {
+    const uniform = capacity?.components?.length || barChart;
+    if (!uniform || sparkline.points.length === 0) {
       return sparkline.points;
     }
     const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / sparkline.points.length;
@@ -238,8 +241,10 @@ export function MetricChartCard({
     }
     const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / displayPoints.length;
     const width = Math.max(1.5, slot * 0.85);
+    // Clamp into the plot area: a no-op for the uniform slots (barChart), but
+    // the capacity fallback's timestamp-proportional x can sit at either edge.
     return displayPoints.map((point) => ({
-      x: point.x - width / 2,
+      x: Math.max(Y_AXIS_LABEL_WIDTH + 2, Math.min(point.x - width / 2, SPARKLINE_WIDTH - width)),
       y: point.y,
       width,
       height: Math.max(1.5, SPARKLINE_HEIGHT - point.y),
