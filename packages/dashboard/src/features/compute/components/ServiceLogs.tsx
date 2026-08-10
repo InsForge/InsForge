@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { RefreshCw, Play, Pause } from 'lucide-react';
 import { Button } from '@insforge/ui';
 import { useServiceLogs } from '#features/compute/hooks/useComputeServices';
+import { formatLocalLogTime, formatUtcTime } from '#lib/utils/utils';
 
 interface ServiceLogsProps {
   serviceId: string;
@@ -56,13 +57,8 @@ export function ServiceLogs({ serviceId }: ServiceLogsProps) {
           <pre className="text-xs font-mono text-muted-foreground space-y-0.5">
             {lines.map((entry, i) => (
               <div key={`${entry.timestamp}-${i}`}>
-                <span className="text-foreground/60">
-                  {(() => {
-                    const d = new Date(entry.timestamp);
-                    return isNaN(d.getTime())
-                      ? String(entry.timestamp)
-                      : d.toISOString().replace('T', ' ').slice(0, 19);
-                  })()}
+                <span className="text-foreground/60" title={formatUtcTime(entry.timestamp)}>
+                  {formatLocalLogTime(entry.timestamp)}
                 </span>
                 {'  '}
                 {entry.message}

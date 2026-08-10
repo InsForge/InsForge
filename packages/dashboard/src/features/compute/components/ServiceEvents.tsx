@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@insforge/ui';
 import { useServiceEvents } from '#features/compute/hooks/useComputeServices';
+import { formatLocalLogTime, formatUtcTime } from '#lib/utils/utils';
 
 interface ServiceEventsProps {
   serviceId: string;
@@ -47,13 +48,8 @@ export function ServiceEvents({ serviceId }: ServiceEventsProps) {
           <pre className="text-xs font-mono text-muted-foreground space-y-0.5">
             {events.map((entry, i) => (
               <div key={i}>
-                <span className="text-foreground/60">
-                  {(() => {
-                    const d = new Date(entry.timestamp);
-                    return isNaN(d.getTime())
-                      ? String(entry.timestamp)
-                      : d.toISOString().replace('T', ' ').slice(0, 19);
-                  })()}
+                <span className="text-foreground/60" title={formatUtcTime(entry.timestamp)}>
+                  {formatLocalLogTime(entry.timestamp)}
                 </span>
                 {'  '}
                 {entry.message}
