@@ -496,8 +496,11 @@ export function MetricChartCard({
                       }
                     />
                   ))}
-                  {stackedBars.map((bar) => (
-                    <g key={bar.timestamp}>
+                  {/* Key by slot index: densified slots forward-fill the same
+                      source timestamp across many bars, so timestamps are NOT
+                      unique here. */}
+                  {stackedBars.map((bar, barIdx) => (
+                    <g key={barIdx}>
                       {bar.segments.map((segment) =>
                         segment.height > 0 ? (
                           <rect
