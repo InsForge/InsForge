@@ -327,13 +327,15 @@ export class ScheduleService {
         data.functionUrl !== undefined ||
         data.httpMethod !== undefined ||
         data.headers !== undefined ||
-        data.body !== undefined ||
-        (data.isActive === true && existingSchedule.isActive === false);
+        data.body !== undefined;
+
+      const desiredIsActive = data.isActive ?? existingSchedule.isActive;
+      const needsUpsert = hasScheduleFields || (data.isActive === true && existingSchedule.isActive === false);
 
       let cronJobId: string | null | undefined = existingSchedule.cronJobId;
 
       // Update schedule fields if any provided
-      if (hasScheduleFields) {
+      if (needsUpsert) {
         const cronSchedule = data.cronSchedule ?? existingSchedule.cronSchedule;
         this.validateCronExpression(cronSchedule);
         const resolvedTarget = await this.validateOutboundScheduleUrl(
@@ -347,7 +349,7 @@ export class ScheduleService {
 
         const sql = `
           SELECT * FROM schedules.upsert_job(
-            $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB, $8::JSONB, $9::JSONB
+            $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB, $8::JSONB, $9::JSONB, $10::BOOLEAN
           )
         `;
         const values = [
@@ -360,6 +362,7 @@ export class ScheduleService {
           resolvedHeaders,
           data.body ?? existingSchedule.body ?? {},
           resolvedTarget,
+          desiredIsActive,
         ];
         const result = await this.getPool().query(sql, values);
         const jobResult = (result.rows && result.rows[0]) as
@@ -380,16 +383,14 @@ export class ScheduleService {
         cronJobId = jobResult.cron_job_id;
       }
 
-      // Handle isActive toggle if provided
+      // Handle pure deactivation (no field changes, just toggling off)
       if (
         data.isActive !== undefined &&
-        data.isActive !== existingSchedule.isActive &&
-        !(hasScheduleFields && data.isActive === true)
+        data.isActive === false &&
+        existingSchedule.isActive === true &&
+        !hasScheduleFields
       ) {
-        const toggleSql = data.isActive
-          ? 'SELECT * FROM schedules.enable_job($1::UUID)'
-          : 'SELECT * FROM schedules.disable_job($1::UUID)';
-        await this.getPool().query(toggleSql, [id]);
+        await this.getPool().query('SELECT * FROM schedules.disable_job($1::UUID)', [id]);
       }
 
       logger.info('Successfully updated schedule', { scheduleId: id });

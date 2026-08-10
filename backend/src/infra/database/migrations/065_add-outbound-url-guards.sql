@@ -1,4 +1,4 @@
--- Migration 064: Add outbound URL guards for scheduled HTTP jobs
+-- Migration 065: Add outbound URL guards for scheduled HTTP jobs
 --
 -- The backend performs DNS-aware validation before creating or updating jobs.
 -- This database-side guard provides defense in depth for direct SQL callers and
@@ -82,6 +82,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+DROP FUNCTION IF EXISTS schedules.upsert_job(UUID, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, JSONB, JSONB);
 DROP FUNCTION IF EXISTS schedules.upsert_job(UUID, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, JSONB);
 
 CREATE OR REPLACE FUNCTION schedules.upsert_job(
@@ -93,7 +94,8 @@ CREATE OR REPLACE FUNCTION schedules.upsert_job(
   p_headers_template JSONB,
   p_resolved_headers JSONB,
   p_body JSONB,
-  p_resolved_target JSONB
+  p_resolved_target JSONB,
+  p_is_active BOOLEAN DEFAULT TRUE
 )
 RETURNS TABLE(cron_job_id BIGINT, success BOOLEAN, message TEXT) AS $$
 DECLARE
@@ -141,7 +143,7 @@ BEGIN
     resolved_target, cron_job_id, is_active, created_at, updated_at
   ) VALUES (
     p_job_id, p_name, p_cron_expression, p_function_url, p_http_method, v_encrypted_headers,
-    p_headers_template, p_body, v_resolved_target, v_new_cron_id, TRUE, NOW(), NOW()
+    p_headers_template, p_body, v_resolved_target, v_new_cron_id, p_is_active, NOW(), NOW()
   ) ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
     cron_schedule = EXCLUDED.cron_schedule,
@@ -152,7 +154,7 @@ BEGIN
     body = EXCLUDED.body,
     resolved_target = EXCLUDED.resolved_target,
     cron_job_id = EXCLUDED.cron_job_id,
-    is_active = TRUE,
+    is_active = p_is_active,
     updated_at = NOW();
 
   RETURN QUERY SELECT v_new_cron_id, TRUE, 'Cron job scheduled successfully';

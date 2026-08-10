@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const migrationPath = path.resolve(
   currentDir,
-  '../../src/infra/database/migrations/064_add-outbound-url-guards.sql'
+  '../../src/infra/database/migrations/065_add-outbound-url-guards.sql'
 );
 
 describe('outbound URL guard migration', () => {
