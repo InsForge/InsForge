@@ -837,7 +837,7 @@
     "dockerSocketWarning": "The Docker socket is root-equivalent on the host, so mounting it is a deliberate choice. InsForge builds every container spec itself and never forwards caller-supplied options, so a leaked API key cannot request a privileged container.",
     "flyIntro": "Containers run on Fly.io under your own account, with selectable regions and scale-to-zero.",
     "flyStep1": "Find your org, then create a token",
-    "flyStep2": "Enter them here",
+    "flyStep2": "Paste them into compute settings",
     "flyBothRequired": "Both are required — a token with no org has nothing to authenticate against. Saving takes effect immediately; no restart needed.",
     "flyStep3": "3. Restart InsForge",
     "settingsSubtitle": "Set by environment variables on the InsForge container. Changing them needs a restart.",
@@ -864,7 +864,7 @@
     "flyStep1Body": "Both come from the Fly CLI, signed in to your own account.",
     "flyStep3Body": "Compute endpoints start answering once both values are present.",
     "flyApiTokenLabel": "API token",
-    "flyApiTokenHint": "The org token from step 1. Paste the whole line the CLI prints.",
+    "flyApiTokenHint": "Org-scoped token from the Fly CLI. Paste the whole line it prints.",
     "flyApiTokenPlaceholder": "Paste a Fly API token",
     "flyOrgLabel": "Organization slug",
     "flyOrgHint": "Your organization’s slug, not its display name.",
@@ -888,7 +888,9 @@
     "settingSocketPath": "Docker socket",
     "settingSocketPathHint": "For rootless Docker or Podman. Only takes effect if the socket is mounted there — the mount itself is a compose change.",
     "settingsApplyHint": "Applies to containers created from now on.",
-    "settingsLoading": "Loading settings…"
+    "settingsLoading": "Loading settings…",
+    "openDockerSettings": "Open Docker settings",
+    "enterFlyCredentials": "Enter Fly.io credentials"
   },
   "analytics": {
     "sidebar": {
