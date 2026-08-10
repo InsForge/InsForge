@@ -28,6 +28,16 @@ description: "InsForge CLI 是 AI 代理的雙手，提供結構描述管理、�
 
 執行 `npx @insforge/cli help <command>` 以取得任何這些命令的旗標。
 
+## 將專案轉移到另一個組織
+
+要將專案移動到另一個組織（例如交給另一個帳戶或團隊），請使用 `projects transfer`。計費、成員資格和存取權限都會一併轉移到目標組織。
+
+```bash
+npx @insforge/cli projects transfer <targetOrgId> --project <id>
+```
+
+將目標組織的 id 作為引數傳入。`--project` 是必需的，並且永遠不會回退到已連結的專案，因此轉移不會意外作用於錯誤的專案。專案轉移後，目前組織的成員可能會失去存取權限，所以請先核實目標組織 id。該命令在互動模式下會先確認再執行；`--yes` 或 `--json` 會跳過確認提示。
+
 ## 典型代理執行
 
 ```bash

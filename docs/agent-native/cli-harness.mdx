@@ -59,6 +59,16 @@ npx @insforge/cli projects delete --project <id>
 
 To do either from the dashboard instead, both live under **Settings → General**.
 
+## Transferring a project to another organization
+
+To move a project to a different organization — for example to hand it to another account or team — use `projects transfer`. Billing, membership, and access all move to the target org.
+
+```bash
+npx @insforge/cli projects transfer <targetOrgId> --project <id>
+```
+
+Pass the target organization's id as the argument. `--project` is required and never falls back to the linked project, so the transfer can't act on the wrong one by accident. Members of the current org may lose access once the project moves, so verify the target org id first. The command confirms before acting in interactive mode; `--yes` or `--json` skips the prompt.
+
 ## A typical agent run
 
 ```bash
