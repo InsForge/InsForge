@@ -141,6 +141,7 @@
     "tablesUnit_other": "Tables",
     "terminalCommandLower": "terminal command",
     "thresholdNote": "Green while healthy; the line turns red above {{threshold}}.",
+    "thresholdNoteBars": "Green while healthy; bars turn red above {{threshold}}.",
     "timeRange": "Time range",
     "tip": "Tip",
     "useInsForgeWithCli": "Use InsForge with CLI",

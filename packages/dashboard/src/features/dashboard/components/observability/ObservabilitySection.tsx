@@ -234,16 +234,26 @@ export function ObservabilitySection() {
           return { database, wal, system };
         })()
       : null;
-    // With a breakdown the primary series (headline + AVG/MAX/LATEST + hover
-    // points) is the per-slot used total — the same stack the bars draw.
+    // With a breakdown the chart's primary series is the per-slot used total
+    // (the same stack the bars draw), but AVG/MAX/LATEST and the headline
+    // timestamp are computed from the RAW per-sample totals — averaging the
+    // forward-filled slots would weight each reading by how many slots it
+    // happened to fill.
     const usedSeries = densified
       ? densified.database.map((point, i) => ({
           timestamp: point.timestamp,
           value: point.value + (densified.wal[i]?.value ?? 0) + (densified.system[i]?.value ?? 0),
         }))
       : diskUsedData;
+    const rawUsedSeries = breakdown
+      ? breakdown.database.map((point, i) => ({
+          timestamp: point.timestamp,
+          value: point.value + (breakdown.wal[i]?.value ?? 0) + (breakdown.system[i]?.value ?? 0),
+        }))
+      : undefined;
     return {
       data: usedSeries,
+      statsData: rawUsedSeries,
       fixedDomain: (totalBytes !== null ? [axisFloor, totalBytes] : undefined) as
         | [number, number]
         | undefined,
@@ -376,6 +386,7 @@ export function ObservabilitySection() {
                   title={t('overview.metrics.diskUsed.title', { defaultValue: 'Disk Usage' })}
                   icon={<HardDrive className="h-5 w-5" />}
                   data={diskCardProps.data}
+                  statsData={diskCardProps.statsData}
                   rangeSeconds={RANGE_SECONDS[range]}
                   formatValue={BYTES_SIZE}
                   isLoading={isLoading}

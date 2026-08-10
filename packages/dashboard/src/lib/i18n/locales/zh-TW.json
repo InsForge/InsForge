@@ -132,6 +132,7 @@
     "tablesUnit_other": "張資料表",
     "terminalCommandLower": "終端機指令",
     "thresholdNote": "健康時為綠色；超過 {{threshold}} 時曲線變紅。",
+    "thresholdNoteBars": "健康時為綠色；超過 {{threshold}} 的柱形變紅。",
     "timeRange": "時間範圍",
     "tip": "提示",
     "useInsForgeWithCli": "透過 CLI 使用 InsForge",

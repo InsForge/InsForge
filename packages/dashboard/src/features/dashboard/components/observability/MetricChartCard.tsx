@@ -57,6 +57,12 @@ export interface MetricChartCardProps {
    * while the dashed threshold line stays.
    */
   barChart?: boolean;
+  /**
+   * Raw readings for AVG/MAX/LATEST and the headline timestamp when `data`
+   * has been densified for rendering (slot forward-fill) — stats over the
+   * densified series would be slot-weighted artifacts. Defaults to `data`.
+   */
+  statsData?: DashboardMetricDataPoint[];
 }
 
 const SPARKLINE_WIDTH = 434;
@@ -153,11 +159,16 @@ export function MetricChartCard({
   capacity,
   tooltipDetail,
   barChart,
+  statsData,
 }: MetricChartCardProps) {
   const { t } = useTranslation('chrome');
   const effectiveDomain =
     fixedDomain ?? (threshold !== undefined ? FIXED_PERCENT_DOMAIN : undefined);
-  const aggregates = useMemo(() => aggregateMetricSeries(data), [data]);
+  // Aggregates and the headline timestamp come from the RAW readings when the
+  // chart data has been densified into slots — a forward-filled series would
+  // turn AVG into a slot-weighted artifact of the densification pass.
+  const statsSeries = statsData ?? data;
+  const aggregates = useMemo(() => aggregateMetricSeries(statsSeries), [statsSeries]);
   const sparkline = useMemo(
     () => buildSparkline(data, rangeSeconds, effectiveDomain),
     [data, rangeSeconds, effectiveDomain]
@@ -181,13 +192,13 @@ export function MetricChartCard({
   // moment stops "why doesn't it move?" confusion on slow-scrape metrics.
   const latestTimestamp = useMemo(() => {
     let latest: number | null = null;
-    for (const point of data) {
+    for (const point of statsSeries) {
       if (Number.isFinite(point.value) && (latest === null || point.timestamp > latest)) {
         latest = point.timestamp;
       }
     }
     return latest;
-  }, [data]);
+  }, [statsSeries]);
 
   // Sparse or uneven series make timestamp-proportional bars bunch up with
   // erratic gaps, so the stacked-breakdown and barChart modes give each
@@ -301,10 +312,15 @@ export function MetricChartCard({
     formatAxisLabel ? formatAxisLabel(value) : `${value}%`;
   const thresholdNote =
     threshold !== undefined
-      ? t('overview.thresholdNote', {
-          threshold: renderAxisLabel(threshold),
-          defaultValue: 'Green while healthy; the line turns red above {{threshold}}.',
-        })
+      ? barChart
+        ? t('overview.thresholdNoteBars', {
+            threshold: renderAxisLabel(threshold),
+            defaultValue: 'Green while healthy; bars turn red above {{threshold}}.',
+          })
+        : t('overview.thresholdNote', {
+            threshold: renderAxisLabel(threshold),
+            defaultValue: 'Green while healthy; the line turns red above {{threshold}}.',
+          })
       : null;
   const gradientTransitionHalfWidth = 8;
   const gradientTransitionStart = Math.max(
