@@ -110,10 +110,11 @@ const MEMORY_ADVISORY_THRESHOLD_PCT = 70;
  * Assemble the Database/WAL/System stack from the metric series. Database and
  * WAL arrive from the cloud sampler and share timestamps; System is derived
  * per sample as (nearest disk_used) − database − wal, clamped at zero — it is
- * never measured, so it must never be fabricated when the used series has no
- * nearby sample (10-minute tolerance). Returns null when the breakdown series
- * are absent (older cloud backend, self-host) so the card falls back to the
- * single-color capacity chart. Exported for tests.
+ * never measured, so samples with no disk_used within the 10-minute tolerance
+ * are dropped rather than shown with a fabricated System. Returns null when
+ * the breakdown series are absent (older cloud backend, self-host) or no
+ * sample aligns, so the card falls back to the single-color capacity chart.
+ * Exported for tests.
  */
 export function buildDiskBreakdown(
   database: DashboardMetricDataPoint[] | undefined,
@@ -148,12 +149,20 @@ export function buildDiskBreakdown(
     if (walValue === undefined) {
       continue;
     }
+    // No disk_used sample near enough to derive System from → drop the
+    // sample entirely. Treating System as zero here would silently
+    // under-report the used total everywhere it is displayed; if nothing
+    // aligns, the null return sends the card to the honest single-color
+    // fallback instead.
+    const usedValue = nearestUsed(point.timestamp);
+    if (usedValue === null) {
+      continue;
+    }
     alignedDb.push(point);
     alignedWal.push({ timestamp: point.timestamp, value: walValue });
-    const usedValue = nearestUsed(point.timestamp);
     system.push({
       timestamp: point.timestamp,
-      value: usedValue === null ? 0 : Math.max(0, usedValue - point.value - walValue),
+      value: Math.max(0, usedValue - point.value - walValue),
     });
   }
   return alignedDb.length ? { database: alignedDb, wal: alignedWal, system } : null;

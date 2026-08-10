@@ -62,6 +62,30 @@ describe('MetricChartCard rendering modes', () => {
     expect(Math.abs(gaps[0] - gaps[1])).toBeGreaterThan(10);
   });
 
+  it('computes AVG/MAX/LATEST from statsData, not the densified display series', () => {
+    // Densified data forward-fills one reading into three slots; averaging it
+    // would give 15, but the raw readings average 20.
+    const { getByText, getAllByText } = render(
+      <MetricChartCard
+        {...base}
+        formatValue={(v) => `V${v}`}
+        barChart
+        data={pts([
+          [1000, 10],
+          [1200, 10],
+          [1400, 10],
+          [1600, 30],
+        ])}
+        statsData={pts([
+          [1000, 10],
+          [1600, 30],
+        ])}
+      />
+    );
+    expect(getByText('V20')).toBeInTheDocument(); // AVG over raw readings, not slot-weighted V15
+    expect(getAllByText('V30').length).toBeGreaterThan(0); // headline / MAX / LATEST
+  });
+
   it('stacked breakdown gives every sample an equal slot with one segment per component', () => {
     const component = (key: string) => ({
       key,
