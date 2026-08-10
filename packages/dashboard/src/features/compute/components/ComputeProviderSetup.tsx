@@ -31,8 +31,11 @@ export function ComputeProviderSetup({ provider, socketPath }: ComputeProviderSe
   const label = computeProviderLabel(provider);
 
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-6">
-      <div className="flex w-full max-w-[760px] flex-col gap-4">
+    <div className="flex min-h-0 flex-1 justify-center overflow-auto p-6">
+      {/* Centred with `my-auto` rather than `items-center` on the scroll container:
+          auto margins collapse to 0 once the content is taller than the box, while
+          `items-center` keeps centring and pushes the top out of reach. */}
+      <div className="my-auto flex w-full max-w-[760px] flex-col gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-lg font-semibold text-foreground">
             {t('compute.providerNotEnabled', {
