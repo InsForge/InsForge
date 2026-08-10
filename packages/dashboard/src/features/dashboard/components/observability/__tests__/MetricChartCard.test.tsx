@@ -62,6 +62,40 @@ describe('MetricChartCard rendering modes', () => {
     expect(Math.abs(gaps[0] - gaps[1])).toBeGreaterThan(10);
   });
 
+  it('capacity fallback does not stack the oldest bars on one another', () => {
+    // buildSparkline mapped timestamps across the full 434px width and `bars`
+    // then clamped with Math.max(Y_AXIS_LABEL_WIDTH + 2, ...). Clamping does not
+    // move a sample out of the 29px y-axis gutter, it pins every gutter sample
+    // to the same x, so the oldest bars were painted over each other: 5 of 60 at
+    // a one-minute cadence. #1919 fixed the uniform-slot modes; this one kept
+    // timestamp placement and kept the bug.
+    const count = 60;
+    const rangeSeconds = 3600;
+    const step = rangeSeconds / (count - 1);
+    const { container } = render(
+      <MetricChartCard
+        {...base}
+        rangeSeconds={rangeSeconds}
+        fixedDomain={[0, 100]}
+        formatAxisLabel={(v) => `${v}`}
+        capacity={{ ticks: [0, 100], legend: { ceiling: 'Size', used: 'Used' } }}
+        data={pts(
+          Array.from(
+            { length: count },
+            (_, i) => [1000 + i * step, 50 + (i % 7)] as [number, number]
+          )
+        )}
+      />
+    );
+    const xs = svgRects(container).map((r) => parseFloat(r.getAttribute('x') ?? '0'));
+
+    expect(xs).toHaveLength(count);
+    expect(new Set(xs).size).toBe(count);
+    // And still inside the plot, clear of the y-axis labels.
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(31);
+    expect(Math.max(...xs)).toBeLessThanOrEqual(434);
+  });
+
   it('computes AVG/MAX/LATEST from statsData, not the densified display series', () => {
     // Densified data forward-fills one reading into three slots; averaging it
     // would give 15, but the raw readings average 20.
