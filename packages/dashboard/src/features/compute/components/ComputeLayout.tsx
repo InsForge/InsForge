@@ -63,7 +63,11 @@ export default function ComputeLayout() {
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
       <ComputeSidebar onOpenSettings={() => openSettings()} />
-      <div className="min-w-0 flex-1 overflow-hidden">
+      {/* flex-col, not a plain block: the pages inside size themselves with
+          `flex-1 min-h-0`, which needs a flex parent to resolve against. As a block
+          this grew to content height and the `overflow-hidden` here clipped the
+          overflow with nothing able to scroll it. Same wrapper WebscraperLayout uses. */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Outlet
           context={
             {
