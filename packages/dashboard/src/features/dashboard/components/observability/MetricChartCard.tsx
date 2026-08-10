@@ -71,6 +71,12 @@ const SPARKLINE_HEIGHT = 100;
 // threshold dashed line and reference grid start after them.
 const Y_AXIS_LABEL_WIDTH = 29;
 
+/** Bar width for `count` samples sharing the plot. */
+function barWidthFor(count: number): number {
+  const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / Math.max(1, count);
+  return Math.max(1.5, slot * 0.85);
+}
+
 interface SparklinePoint {
   x: number;
   y: number;
@@ -86,10 +92,33 @@ interface SparklineGeometry {
   max: number | null;
 }
 
+/**
+ * Map a timestamp onto the chart's x axis.
+ *
+ * `plotRange` is the span samples may occupy. It defaults to the whole width,
+ * which is what the line/area variant wants: no y-axis gutter to clear, and the
+ * stroke should reach both edges.
+ *
+ * The single-color capacity fallback passes its bar region instead. Mapping into
+ * the region matters because clamping into it does not relocate a sample that
+ * lands in the gutter, it pins every such sample to the same x.
+ */
+function timestampToX(
+  timestamp: number,
+  windowStart: number,
+  tRange: number,
+  plotRange: [number, number]
+): number {
+  const [left, right] = plotRange;
+  const progress = (timestamp - windowStart) / tRange;
+  return left + Math.max(0, Math.min(1, progress)) * (right - left);
+}
+
 function buildSparkline(
   data: DashboardMetricDataPoint[],
   rangeSeconds: number,
-  fixedDomain?: [number, number]
+  fixedDomain?: [number, number],
+  plotRange: [number, number] = [0, SPARKLINE_WIDTH]
 ): SparklineGeometry {
   const finite = data
     .filter((p) => Number.isFinite(p.value))
@@ -113,8 +142,7 @@ function buildSparkline(
   const tRange = Math.max(1, windowEnd - windowStart);
 
   const points: SparklinePoint[] = finite.map((p) => {
-    const rawX = ((p.timestamp - windowStart) / tRange) * SPARKLINE_WIDTH;
-    const x = Math.max(0, Math.min(SPARKLINE_WIDTH, rawX));
+    const x = timestampToX(p.timestamp, windowStart, tRange, plotRange);
     const y = SPARKLINE_HEIGHT - ((p.value - min) / valueRange) * SPARKLINE_HEIGHT;
     return { x, y, timestamp: p.timestamp, value: p.value };
   });
@@ -169,9 +197,24 @@ export function MetricChartCard({
   // turn AVG into a slot-weighted artifact of the densification pass.
   const statsSeries = statsData ?? data;
   const aggregates = useMemo(() => aggregateMetricSeries(statsSeries), [statsSeries]);
+  // The single-color capacity fallback keeps timestamp-proportional placement,
+  // so its samples have to be mapped into the bar region rather than clamped
+  // into it by `bars` below. Bars are centered on the sample x, hence the half
+  // width of inset on each side: that makes the clamp there a true no-op.
+  const fallbackPlotRange = useMemo((): [number, number] | undefined => {
+    if (!capacity || capacity.components?.length || barChart) {
+      return undefined;
+    }
+    const count = data.filter((p) => Number.isFinite(p.value)).length;
+    if (count < 2) {
+      return undefined;
+    }
+    const width = barWidthFor(count);
+    return [Y_AXIS_LABEL_WIDTH + 2 + width / 2, SPARKLINE_WIDTH - width / 2];
+  }, [capacity, barChart, data]);
   const sparkline = useMemo(
-    () => buildSparkline(data, rangeSeconds, effectiveDomain),
-    [data, rangeSeconds, effectiveDomain]
+    () => buildSparkline(data, rangeSeconds, effectiveDomain, fallbackPlotRange),
+    [data, rangeSeconds, effectiveDomain, fallbackPlotRange]
   );
   const gradientId = useId();
   const xAxisTicks = useMemo(() => {
@@ -250,10 +293,11 @@ export function MetricChartCard({
     if (!active || displayPoints.length === 0) {
       return [];
     }
-    const slot = (SPARKLINE_WIDTH - Y_AXIS_LABEL_WIDTH) / displayPoints.length;
-    const width = Math.max(1.5, slot * 0.85);
-    // Clamp into the plot area: a no-op for the uniform slots (barChart), but
-    // the capacity fallback's timestamp-proportional x can sit at either edge.
+    const width = barWidthFor(displayPoints.length);
+    // Both variants now arrive pre-fitted to the plot: barChart via uniform
+    // slots, the capacity fallback via fallbackPlotRange. The clamp stays as a
+    // backstop against rounding at the edges, but it no longer decides
+    // placement, which is what made it collapse the oldest bars.
     return displayPoints.map((point) => ({
       x: Math.max(Y_AXIS_LABEL_WIDTH + 2, Math.min(point.x - width / 2, SPARKLINE_WIDTH - width)),
       y: point.y,
