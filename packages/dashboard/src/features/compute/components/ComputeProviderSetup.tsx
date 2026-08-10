@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CopyButton } from '@insforge/ui';
+import { Settings } from 'lucide-react';
+import { Button, CopyButton } from '@insforge/ui';
 import { computeProviderLabel } from '#features/compute/constants';
-import { FlyCredentialsForm } from './FlyCredentialsForm';
 
 interface ComputeProviderSetupProps {
   provider: string;
   socketPath?: string;
+  /** Opens the compute settings dialog on this provider. */
+  onConfigure: () => void;
 }
 
 const COMPOSE_SNIPPET = `services:
@@ -25,8 +27,16 @@ const RESTART_COMMAND = 'docker compose up -d insforge';
  * Per provider rather than one generic screen: enabling Docker means editing compose
  * and restarting, enabling Fly means two credentials, and a single screen covering
  * both would bury whichever one the operator actually wants.
+ *
+ * Values are entered in the settings dialog, not here — the same split
+ * PaymentsOnboardingState uses. The guide is a guide; one place owns the inputs, so
+ * there is no second form to keep in step with it.
  */
-export function ComputeProviderSetup({ provider, socketPath }: ComputeProviderSetupProps) {
+export function ComputeProviderSetup({
+  provider,
+  socketPath,
+  onConfigure,
+}: ComputeProviderSetupProps) {
   const { t } = useTranslation('chrome');
   const label = computeProviderLabel(provider);
 
@@ -62,7 +72,7 @@ export function ComputeProviderSetup({ provider, socketPath }: ComputeProviderSe
               <StepItem number={1}>
                 <StepText
                   title={t('compute.dockerStep1', {
-                    defaultValue: 'Mount the Docker socket',
+                    defaultValue: 'Uncomment these lines in your compose file',
                   })}
                   body={t('compute.dockerStep1Body', {
                     defaultValue:
@@ -75,7 +85,7 @@ export function ComputeProviderSetup({ provider, socketPath }: ComputeProviderSe
               <StepItem number={2}>
                 <StepText
                   title={t('compute.dockerStep2', {
-                    defaultValue: 'Set your host’s docker group id',
+                    defaultValue: 'Put your host’s docker group id in .env',
                   })}
                   body={t('compute.dockerStep2Body', {
                     defaultValue:
@@ -124,21 +134,37 @@ export function ComputeProviderSetup({ provider, socketPath }: ComputeProviderSe
                 <Snippet code={'fly orgs list\nfly tokens create org -o <your-org>'} />
               </StepItem>
 
-              {/* The form inline, the way ApifyConnectPanel embeds ApifyTokenForm:
-                  these are values, so they can be entered here and take effect
-                  without a restart. No third step — that is the whole point. */}
+              {/* No third step: these are values, so saving them in the dialog takes
+                  effect immediately and nothing needs restarting. */}
               <StepItem number={2} last>
                 <StepText
-                  title={t('compute.flyStep2', { defaultValue: 'Enter them here' })}
+                  title={t('compute.flyStep2', {
+                    defaultValue: 'Paste them into compute settings',
+                  })}
                   body={t('compute.flyBothRequired', {
                     defaultValue:
                       'Both are required — a token with no org has nothing to authenticate against. Saving takes effect immediately; no restart needed.',
                   })}
                 />
-                <FlyCredentialsForm />
               </StepItem>
             </>
           )}
+
+          <div className="pl-10">
+            <Button
+              variant="outline"
+              size="default"
+              onClick={onConfigure}
+              className="h-8 rounded px-2.5"
+            >
+              <Settings className="h-4 w-4" />
+              {provider === 'docker'
+                ? t('compute.openDockerSettings', { defaultValue: 'Open Docker settings' })
+                : t('compute.enterFlyCredentials', {
+                    defaultValue: 'Enter Fly.io credentials',
+                  })}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

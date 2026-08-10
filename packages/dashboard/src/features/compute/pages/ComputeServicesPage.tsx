@@ -20,7 +20,11 @@ export default function ComputeServicesPage() {
   // The provider comes from the route, so the sidebar is the switcher and the URL is
   // shareable. The layout hands over every service; this page shows its own.
   const { provider } = useParams();
-  const { services: allServices, configured } = useOutletContext<ComputeOutletContext>();
+  const {
+    services: allServices,
+    configured,
+    openSettings,
+  } = useOutletContext<ComputeOutletContext>();
   const services = allServices.filter((s) => s.provider === provider);
   const providerConfigured = provider !== undefined && configured.includes(provider);
   const {
@@ -61,7 +65,7 @@ export default function ComputeServicesPage() {
   // This provider is not set up: show how, rather than an empty list that looks like
   // "you have no services" when the truth is "this provider is not enabled".
   if (!providerConfigured) {
-    return <ComputeProviderSetup provider={provider} />;
+    return <ComputeProviderSetup provider={provider} onConfigure={() => openSettings(provider)} />;
   }
 
   if (isLoading) {

@@ -62,7 +62,7 @@ export function FlyCredentialsForm() {
             </label>
             <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">
               {t('compute.flyApiTokenHint', {
-                defaultValue: 'From `fly tokens create org`.',
+                defaultValue: 'Org-scoped token from the Fly CLI. Paste the whole line it prints.',
               })}
             </p>
           </div>
@@ -103,7 +103,9 @@ export function FlyCredentialsForm() {
               {t('compute.flyOrgLabel', { defaultValue: 'Organization slug' })}
             </label>
             <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">
-              {t('compute.flyOrgHint', { defaultValue: 'From `fly orgs list`.' })}
+              {t('compute.flyOrgHint', {
+                defaultValue: 'Your organization’s slug, not its display name.',
+              })}
             </p>
           </div>
           <CredentialBadge status={config?.flyOrg} />

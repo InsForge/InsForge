@@ -842,7 +842,7 @@
     "dockerSocketWarning": "El socket de Docker equivale a root en el host, así que montarlo es una decisión deliberada. InsForge construye la especificación de cada contenedor por su cuenta y nunca reenvía opciones de quien llama, así que una API key filtrada no puede pedir un contenedor privilegiado.",
     "flyIntro": "Los contenedores se ejecutan en Fly.io con tu propia cuenta, con regiones seleccionables y escalado a cero.",
     "flyStep1": "Localiza tu organización y crea un token",
-    "flyStep2": "Introdúcelos aquí",
+    "flyStep2": "Pégalos en los ajustes de compute",
     "flyBothRequired": "Ambos son obligatorios: un token sin organización no tiene contra qué autenticarse. Se aplica al guardar, sin reiniciar.",
     "flyStep3": "3. Reinicia InsForge",
     "settingsSubtitle": "Definido por variables de entorno en el contenedor de InsForge. Cambiarlas requiere un reinicio.",
@@ -869,7 +869,7 @@
     "flyStep1Body": "Ambos vienen de la CLI de Fly, con tu propia cuenta.",
     "flyStep3Body": "Los endpoints de compute empiezan a responder cuando ambos valores están presentes.",
     "flyApiTokenLabel": "Token de API",
-    "flyApiTokenHint": "El token de organización del paso 1. Pega la línea completa que imprime la CLI.",
+    "flyApiTokenHint": "Token de organización de la CLI de Fly. Pega la línea completa que imprime.",
     "flyApiTokenPlaceholder": "Pega un token de API de Fly",
     "flyOrgLabel": "Slug de organización",
     "flyOrgHint": "El slug de tu organización, no su nombre visible.",
@@ -893,7 +893,9 @@
     "settingSocketPath": "Socket de Docker",
     "settingSocketPathHint": "Para Docker rootless o Podman. Solo surte efecto si el socket está montado ahí; el montaje en sí es un cambio en compose.",
     "settingsApplyHint": "Se aplica a los contenedores creados de ahora en adelante.",
-    "settingsLoading": "Cargando ajustes…"
+    "settingsLoading": "Cargando ajustes…",
+    "openDockerSettings": "Abrir ajustes de Docker",
+    "enterFlyCredentials": "Introducir credenciales de Fly.io"
   },
   "analytics": {
     "sidebar": {

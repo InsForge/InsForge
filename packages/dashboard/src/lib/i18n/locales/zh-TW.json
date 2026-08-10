@@ -822,7 +822,7 @@
     "dockerSocketWarning": "Docker socket 在主機上等同於 root，因此掛載它應當是有意識的決定。InsForge 自行建構每個容器的 spec，從不轉送呼叫方提供的選項，因此即使 API key 外洩也無法要求特權容器。",
     "flyIntro": "容器執行在您自己的 Fly.io 帳號下，可選擇區域並支援縮減至零。",
     "flyStep1": "先查到 org，再建立 token",
-    "flyStep2": "在這裡填入",
+    "flyStep2": "貼到 compute 設定裡",
     "flyBothRequired": "兩者都必填——沒有 org 的 token 無從認證。儲存後立即生效，無需重新啟動。",
     "flyStep3": "3. 重新啟動 InsForge",
     "settingsSubtitle": "由 InsForge 容器的環境變數決定，修改後需要重新啟動。",
@@ -849,7 +849,7 @@
     "flyStep1Body": "兩者都來自已登入您自己帳號的 Fly CLI。",
     "flyStep3Body": "兩個值齊備後，compute 端點就會開始回應。",
     "flyApiTokenLabel": "API token",
-    "flyApiTokenHint": "第 1 步產生的 org token。把 CLI 印出的整行都貼進來。",
+    "flyApiTokenHint": "Fly CLI 產生的 org 級 token。把它印出的整行都貼進來。",
     "flyApiTokenPlaceholder": "貼上 Fly API token",
     "flyOrgLabel": "Organization slug",
     "flyOrgHint": "組織的 slug，不是顯示名稱。",
@@ -873,7 +873,9 @@
     "settingSocketPath": "Docker socket",
     "settingSocketPathHint": "用於 rootless Docker 或 Podman。只有 socket 確實掛載在該路徑時才生效——掛載本身是 compose 層的變更。",
     "settingsApplyHint": "對之後建立的容器生效。",
-    "settingsLoading": "正在載入設定……"
+    "settingsLoading": "正在載入設定……",
+    "openDockerSettings": "開啟 Docker 設定",
+    "enterFlyCredentials": "填寫 Fly.io 憑證"
   },
   "analytics": {
     "sidebar": {
