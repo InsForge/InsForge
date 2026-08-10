@@ -104,7 +104,8 @@ export function ComputeProviderSetup({
                 <StepText
                   title={t('compute.dockerStep3', { defaultValue: 'Restart InsForge' })}
                   body={t('compute.dockerStep3Body', {
-                    defaultValue: 'The driver registers itself once the socket is reachable.',
+                    defaultValue:
+                      'The driver registers itself once the socket is reachable. On rootless Docker or Podman the socket is somewhere else — click the button below to set its path first.',
                   })}
                 />
                 {/* The path is data, not prose: the single most useful diagnostic when
@@ -138,19 +139,20 @@ export function ComputeProviderSetup({
                   effect immediately and nothing needs restarting. */}
               <StepItem number={2} last>
                 <StepText
-                  title={t('compute.flyStep2', {
-                    defaultValue: 'Paste them into compute settings',
-                  })}
+                  title={t('compute.flyStep2', { defaultValue: 'Come back here' })}
                   body={t('compute.flyBothRequired', {
                     defaultValue:
-                      'Both are required — a token with no org has nothing to authenticate against. Saving takes effect immediately; no restart needed.',
+                      'Click the button below to open Compute Settings, then paste the token and the org slug. Both are required, and saving takes effect right away.',
                   })}
                 />
               </StepItem>
             </>
           )}
 
-          <div className="pl-10">
+          {/* mt-6 is the card's own rhythm — the same 24px that separates one step from
+              the next, so the button reads as the step after the last one rather than
+              stuck to its snippet. Indented to the step text, as payments does. */}
+          <div className="mt-6 pl-10">
             <Button
               variant="outline"
               size="default"
