@@ -863,7 +863,6 @@
     "setupDockerSummary": "Ejecuta contenedores en el mismo daemon de Docker que ejecuta InsForge.",
     "setupFlySummary": "Ejecuta contenedores en Fly.io con tu propia cuenta, con regiones a elegir y escalado a cero.",
     "dockerStep1Body": "En docker-compose.yml, descomenta el volumen del servicio insforge:",
-    "dockerStep3Body": "Docker aparece aquí en cuanto se reinicia.",
     "dockerSocketLookingAt": "Buscando",
     "flyStep1Body": "Ejecuta esto con la CLI de Fly, con tu cuenta iniciada:",
     "flyStep3Body": "Los endpoints de compute empiezan a responder cuando ambos valores están presentes.",

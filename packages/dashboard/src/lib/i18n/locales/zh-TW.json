@@ -843,7 +843,6 @@
     "setupDockerSummary": "在執行 InsForge 的同一個 Docker daemon 上執行容器。",
     "setupFlySummary": "用您自己的帳號在 Fly.io 上執行容器，可選區域，支援縮容到零。",
     "dockerStep1Body": "在 docker-compose.yml 裡，取消 insforge 服務下這個 volume 的註解：",
-    "dockerStep3Body": "重新啟動完成後 Docker 就會出現在這裡。",
     "dockerSocketLookingAt": "正在尋找",
     "flyStep1Body": "用已登入您自己帳號的 Fly CLI 執行：",
     "flyStep3Body": "兩個值齊備後，compute 端點就會開始回應。",
