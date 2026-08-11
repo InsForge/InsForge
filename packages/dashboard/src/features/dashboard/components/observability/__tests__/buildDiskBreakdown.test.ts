@@ -24,14 +24,28 @@ describe('buildDiskBreakdown', () => {
     expect(breakdown!.system.map((p) => p.value)).toEqual([50, 40]);
   });
 
-  it('clamps System at zero when the 4GiB-clamped used underruns the components', () => {
+  it('clamps System at zero when used underruns the components', () => {
     const breakdown = buildDiskBreakdown(pts([[1000, 30]]), pts([[1000, 20]]), pts([[1000, 0]]));
     expect(breakdown!.system[0].value).toBe(0);
   });
 
-  it('reports System as zero (never fabricated) when no used sample is nearby', () => {
-    const breakdown = buildDiskBreakdown(pts([[5000, 30]]), pts([[5000, 20]]), pts([[1000, 100]]));
-    expect(breakdown!.system[0].value).toBe(0);
+  it('drops samples with no nearby used reading instead of fabricating System as zero', () => {
+    const breakdown = buildDiskBreakdown(
+      pts([
+        [1000, 30],
+        [5000, 30],
+      ]),
+      pts([
+        [1000, 20],
+        [5000, 20],
+      ]),
+      pts([[1000, 100]])
+    );
+    expect(breakdown!.database.map((p) => p.timestamp)).toEqual([1000]);
+  });
+
+  it('returns null when no sample has a nearby used reading', () => {
+    expect(buildDiskBreakdown(pts([[5000, 30]]), pts([[5000, 20]]), pts([[1000, 100]]))).toBeNull();
   });
 
   it('returns null without breakdown series — older backend and self-host fall back', () => {
