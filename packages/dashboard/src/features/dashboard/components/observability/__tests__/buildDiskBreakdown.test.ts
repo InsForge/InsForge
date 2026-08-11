@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildDiskBreakdown , densifyDiskBreakdown } from '#features/dashboard/components/observability/ObservabilitySection';
+import {
+  buildDiskBreakdown,
+  densifyDiskBreakdown,
+} from '#features/dashboard/components/observability/ObservabilitySection';
 
 const pts = (pairs: Array<[number, number]>) =>
   pairs.map(([timestamp, value]) => ({ timestamp, value }));
