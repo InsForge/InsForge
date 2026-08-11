@@ -713,7 +713,7 @@
   },
   "compute": {
     "notConfigured": "Compute services not configured",
-    "loadServicesFailed": "Failed to load services. Please refresh the page.",
+    "loadServicesFailed": "Failed to load services.",
     "backToServices": "Back to services",
     "statuses": {
       "running": "running",
@@ -890,7 +890,9 @@
     "settingsLoading": "Loading settings…",
     "openDockerSettings": "Open Docker settings",
     "enterFlyCredentials": "Enter Fly.io credentials",
-    "terminalLabel": "Terminal"
+    "terminalLabel": "Terminal",
+    "loadingCompute": "Loading Compute…",
+    "loadingServices": "Loading services..."
   },
   "analytics": {
     "sidebar": {

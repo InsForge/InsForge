@@ -717,7 +717,7 @@
   },
   "compute": {
     "notConfigured": "Servicios de cómputo no configurados",
-    "loadServicesFailed": "Error al cargar los servicios. Actualiza la página.",
+    "loadServicesFailed": "No se pudieron cargar los servicios.",
     "backToServices": "Volver a los servicios",
     "statuses": {
       "running": "en ejecución",
@@ -894,7 +894,9 @@
     "settingsLoading": "Cargando ajustes…",
     "openDockerSettings": "Abrir ajustes de Docker",
     "enterFlyCredentials": "Introducir credenciales de Fly.io",
-    "terminalLabel": "Terminal"
+    "terminalLabel": "Terminal",
+    "loadingCompute": "Cargando Compute…",
+    "loadingServices": "Cargando servicios..."
   },
   "analytics": {
     "sidebar": {

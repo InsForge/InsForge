@@ -698,7 +698,7 @@
   },
   "compute": {
     "notConfigured": "计算服务未配置",
-    "loadServicesFailed": "加载服务失败，请刷新页面。",
+    "loadServicesFailed": "加载服务失败。",
     "backToServices": "返回服务列表",
     "statuses": {
       "running": "运行中",
@@ -874,7 +874,9 @@
     "settingsLoading": "正在加载设置……",
     "openDockerSettings": "打开 Docker 设置",
     "enterFlyCredentials": "填写 Fly.io 凭据",
-    "terminalLabel": "终端"
+    "terminalLabel": "终端",
+    "loadingCompute": "正在加载 Compute……",
+    "loadingServices": "正在加载服务……"
   },
   "analytics": {
     "sidebar": {

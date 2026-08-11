@@ -698,7 +698,7 @@
   },
   "compute": {
     "notConfigured": "運算服務尚未設定",
-    "loadServicesFailed": "載入服務失敗，請重新整理頁面。",
+    "loadServicesFailed": "載入服務失敗。",
     "backToServices": "返回服務列表",
     "statuses": {
       "running": "執行中",
@@ -874,7 +874,9 @@
     "settingsLoading": "正在載入設定……",
     "openDockerSettings": "開啟 Docker 設定",
     "enterFlyCredentials": "填寫 Fly.io 憑證",
-    "terminalLabel": "終端機"
+    "terminalLabel": "終端機",
+    "loadingCompute": "正在載入 Compute……",
+    "loadingServices": "正在載入服務……"
   },
   "analytics": {
     "sidebar": {

@@ -58,6 +58,24 @@ describe('ComputeLayout', () => {
     vi.clearAllMocks();
   });
 
+  // Every other feature layout centres its spinner in the pane and names what is
+  // loading (WebscraperLayout, AnalyticsLayout). Compute rendered a bare LoadingState,
+  // which sits at the top of the pane and says "Loading...", so switching tabs looked
+  // like a different app for a moment.
+  it('centres the spinner and names the feature, like the other layouts', () => {
+    meta.isLoading = true;
+    renderAt('/dashboard/compute/docker');
+
+    const message = screen.getByText('Loading Compute…');
+    // LoadingState's own padding is dropped in favour of the wrapper's centring —
+    // py-12 plus items-center is what made it sit high in the pane.
+    const spinnerBox = message.parentElement;
+    expect(spinnerBox?.className).toContain('py-0');
+    expect(spinnerBox?.parentElement?.className).toContain('items-center');
+    expect(spinnerBox?.parentElement?.className).toContain('justify-center');
+    expect(spinnerBox?.parentElement?.className).toContain('h-full');
+  });
+
   // Provider is the navigation axis, so both are always offered. A self-hoster who
   // cannot see Docker in the nav has no way to discover that it exists, which is the
   // confusion this replaced.

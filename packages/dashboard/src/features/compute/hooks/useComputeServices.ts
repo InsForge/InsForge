@@ -20,6 +20,7 @@ export function useComputeServices(enabled = true) {
     data: services = [],
     isLoading,
     error,
+    refetch,
   } = useQuery({
     queryKey: ['compute', 'services'],
     queryFn: () => computeServicesApi.list(),
@@ -114,6 +115,9 @@ export function useComputeServices(enabled = true) {
 
     // Errors
     error,
+    // Exposed so a failed list can offer Try again, the way payments' pages do,
+    // instead of telling the reader to refresh the page themselves.
+    refetch,
 
     // Actions
     create: createMutation.mutateAsync,
