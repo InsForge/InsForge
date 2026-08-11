@@ -168,6 +168,58 @@ export function buildDiskBreakdown(
   return alignedDb.length ? { database: alignedDb, wal: alignedWal, system } : null;
 }
 
+export function densifyDiskBreakdown(
+  breakdown: {
+    database: DashboardMetricDataPoint[];
+    wal: DashboardMetricDataPoint[];
+    system: DashboardMetricDataPoint[];
+  },
+  range: DashboardMetricsRange
+): {
+  database: DashboardMetricDataPoint[];
+  wal: DashboardMetricDataPoint[];
+  system: DashboardMetricDataPoint[];
+} {
+  const DISK_SLOTS = 48;
+  const source = breakdown.database;
+  const windowEnd = source[source.length - 1].timestamp;
+  const step = RANGE_SECONDS[range] / DISK_SLOTS;
+  const windowStart = windowEnd - RANGE_SECONDS[range];
+
+  const database: DashboardMetricDataPoint[] = [];
+  const wal: DashboardMetricDataPoint[] = [];
+  const system: DashboardMetricDataPoint[] = [];
+
+  let idx = 0;
+
+  for (let slot = 0; slot < DISK_SLOTS; slot++) {
+    const slotTime = windowStart + (slot + 1) * step;
+
+    while (idx + 1 < source.length && source[idx + 1].timestamp <= slotTime) {
+      idx += 1;
+    }
+
+    const ts = source[idx].timestamp;
+
+    database.push({
+      timestamp: ts,
+      value: source[idx].value,
+    });
+
+    wal.push({
+      timestamp: ts,
+      value: breakdown.wal[idx].value,
+    });
+
+    system.push({
+      timestamp: ts,
+      value: breakdown.system[idx].value,
+    });
+  }
+
+  return { database, wal, system };
+}
+
 export function ObservabilitySection() {
   const { t } = useTranslation('chrome');
   const isCloudHostingMode = useIsCloudHostingMode();
@@ -219,30 +271,7 @@ export function ObservabilitySection() {
     // fill; slots before the first sample take that first sample). Slots
     // keep the SOURCE sample's timestamp, so hovering any thin bar shows a
     // real reading and its real time, never an interpolated one.
-    const DISK_SLOTS = 48;
-    const densified = breakdown
-      ? (() => {
-          const source = breakdown.database;
-          const windowEnd = source[source.length - 1].timestamp;
-          const step = RANGE_SECONDS[range] / DISK_SLOTS;
-          const windowStart = windowEnd - RANGE_SECONDS[range];
-          const database: DashboardMetricDataPoint[] = [];
-          const wal: DashboardMetricDataPoint[] = [];
-          const system: DashboardMetricDataPoint[] = [];
-          let idx = 0;
-          for (let slot = 0; slot < DISK_SLOTS; slot++) {
-            const slotTime = windowStart + (slot + 0.5) * step;
-            while (idx + 1 < source.length && source[idx + 1].timestamp <= slotTime) {
-              idx += 1;
-            }
-            const ts = source[idx].timestamp;
-            database.push({ timestamp: ts, value: source[idx].value });
-            wal.push({ timestamp: ts, value: breakdown.wal[idx].value });
-            system.push({ timestamp: ts, value: breakdown.system[idx].value });
-          }
-          return { database, wal, system };
-        })()
-      : null;
+    const densified = breakdown ? densifyDiskBreakdown(breakdown, range) : null;
     // With a breakdown the chart's primary series is the per-slot used total
     // (the same stack the bars draw), but AVG/MAX/LATEST and the headline
     // timestamp are computed from the RAW per-sample totals — averaging the

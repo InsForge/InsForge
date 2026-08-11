@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDiskBreakdown } from '#features/dashboard/components/observability/ObservabilitySection';
+import { buildDiskBreakdown , densifyDiskBreakdown } from '#features/dashboard/components/observability/ObservabilitySection';
 
 const pts = (pairs: Array<[number, number]>) =>
   pairs.map(([timestamp, value]) => ({ timestamp, value }));
@@ -65,5 +65,98 @@ describe('buildDiskBreakdown', () => {
     );
     expect(breakdown!.database).toHaveLength(1);
     expect(breakdown!.database[0].timestamp).toBe(1000);
+  });
+});
+
+describe('densifyDiskBreakdown', () => {
+  it.each([
+    ['1h', 3600],
+    ['6h', 21600],
+    ['24h', 86400],
+    ['3d', 259200],
+  ] as const)('includes the newest sample for %s range', (range, windowSeconds) => {
+    const newestTimestamp = windowSeconds;
+
+    const breakdown = {
+      database: pts([
+        [0, 100],
+        [windowSeconds - 900, 200],
+        [newestTimestamp, 500],
+      ]),
+      wal: pts([
+        [0, 10],
+        [windowSeconds - 900, 20],
+        [newestTimestamp, 50],
+      ]),
+      system: pts([
+        [0, 1000],
+        [windowSeconds - 900, 1100],
+        [newestTimestamp, 1400],
+      ]),
+    };
+
+    const result = densifyDiskBreakdown(breakdown, range);
+    const lastPoint = result.database[result.database.length - 1];
+
+    expect(lastPoint).toEqual({
+      timestamp: newestTimestamp,
+      value: 500,
+    });
+  });
+
+  it.each([
+    ['1-minute cadence', 60],
+    ['15-minute cadence', 900],
+  ] as const)('includes the newest sample with %s', (_label, cadence) => {
+    const newestTimestamp = 3600;
+
+    const breakdown = {
+      database: pts([
+        [newestTimestamp - cadence * 2, 100],
+        [newestTimestamp - cadence, 200],
+        [newestTimestamp, 500],
+      ]),
+      wal: pts([
+        [newestTimestamp - cadence * 2, 10],
+        [newestTimestamp - cadence, 20],
+        [newestTimestamp, 50],
+      ]),
+      system: pts([
+        [newestTimestamp - cadence * 2, 1000],
+        [newestTimestamp - cadence, 1100],
+        [newestTimestamp, 1400],
+      ]),
+    };
+
+    const result = densifyDiskBreakdown(breakdown, '1h');
+    const lastPoint = result.database[result.database.length - 1];
+
+    expect(lastPoint).toEqual({
+      timestamp: newestTimestamp,
+      value: 500,
+    });
+  });
+
+  it('preserves the source timestamp for the newest sample', () => {
+    const breakdown = {
+      database: pts([
+        [0, 100],
+        [3600, 500],
+      ]),
+      wal: pts([
+        [0, 10],
+        [3600, 50],
+      ]),
+      system: pts([
+        [0, 1000],
+        [3600, 1400],
+      ]),
+    };
+
+    const result = densifyDiskBreakdown(breakdown, '1h');
+    const lastPoint = result.database[result.database.length - 1];
+
+    expect(lastPoint.timestamp).toBe(3600);
+    expect(lastPoint.value).toBe(500);
   });
 });
