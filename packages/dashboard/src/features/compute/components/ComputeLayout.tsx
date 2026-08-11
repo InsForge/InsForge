@@ -2,11 +2,15 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { LoadingState } from '#components';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { useMetadata } from '#lib/hooks/useMetadata';
 import { COMPUTE_PROVIDERS } from '#features/compute/constants';
 import { useComputeServices } from '#features/compute/hooks/useComputeServices';
 import { ComputeSidebar } from './ComputeSidebar';
 import { ComputeSettingsDialog } from './ComputeSettingsDialog';
+
+/** The only compute page a cloud project has. */
+const CLOUD_PATH = '/dashboard/compute/fly';
 
 export interface ComputeOutletContext {
   /** Every service, unfiltered; the provider page narrows to its own. */
@@ -14,8 +18,12 @@ export interface ComputeOutletContext {
   /** Providers the backend reports as configured. */
   configured: string[];
   defaultProvider: string | undefined;
-  /** Opens the compute settings dialog, which the layout owns. */
-  openSettings: (provider?: string) => void;
+  /**
+   * Opens the compute settings dialog, which the layout owns. Absent on cloud, where
+   * there is no dialog: the socket is not mountable and the Fly credentials belong to
+   * InsForge, not the project.
+   */
+  openSettings?: (provider?: string) => void;
 }
 
 /**
@@ -28,10 +36,17 @@ export interface ComputeOutletContext {
  *
  * The service list is fetched once here and narrowed per page, because the API
  * returns every provider's services in a single call.
+ *
+ * Cloud-managed projects get none of that. Docker is self-host only — the backend
+ * refuses to register it when either cloud signal is present, because there the
+ * operator and the developer are different principals and a container on the host
+ * would be a tenant escape. With one provider there is nothing to switch between, so
+ * the sidebar and its settings gear are dropped and Fly's page is the whole tab.
  */
 export default function ComputeLayout() {
   const { t } = useTranslation('chrome');
   const { pathname } = useLocation();
+  const isCloud = useIsCloudHostingMode();
   const { metadata, isLoading: metadataLoading } = useMetadata();
   const compute = metadata?.compute;
   const configured = compute ? Object.keys(compute.providers ?? {}) : [];
@@ -55,6 +70,30 @@ export default function ComputeLayout() {
           className="py-0"
           message={t('compute.loadingCompute', { defaultValue: 'Loading Compute…' })}
         />
+      </div>
+    );
+  }
+
+  // One provider, so there is nowhere else to be — including a bookmark of the Docker
+  // page, which on cloud would otherwise offer setup steps for something the backend
+  // will not register.
+  if (isCloud) {
+    if (pathname !== CLOUD_PATH) {
+      return <Navigate to={CLOUD_PATH} replace />;
+    }
+    return (
+      <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <Outlet
+            context={
+              {
+                services,
+                configured,
+                defaultProvider: compute?.defaultProvider,
+              } satisfies ComputeOutletContext
+            }
+          />
+        </div>
       </div>
     );
   }

@@ -7,8 +7,11 @@ import { computeProviderLabel } from '#features/compute/constants';
 interface ComputeProviderSetupProps {
   provider: string;
   socketPath?: string;
-  /** Opens the compute settings dialog on this provider. */
-  onConfigure: () => void;
+  /**
+   * Opens the compute settings dialog on this provider. Omitted where there is no
+   * dialog to open (cloud), and then no button is offered rather than a dead one.
+   */
+  onConfigure?: () => void;
 }
 
 const COMPOSE_SNIPPET = `services:
@@ -131,21 +134,23 @@ export function ComputeProviderSetup({
           {/* mt-6 is the card's own rhythm — the same 24px that separates one step from
               the next, so the button reads as the step after the last one rather than
               stuck to its snippet. Indented to the step text, as payments does. */}
-          <div className="mt-6 pl-10">
-            <Button
-              variant="outline"
-              size="default"
-              onClick={onConfigure}
-              className="h-8 rounded px-2.5"
-            >
-              <Settings className="h-4 w-4" />
-              {provider === 'docker'
-                ? t('compute.openDockerSettings', { defaultValue: 'Open Docker settings' })
-                : t('compute.enterFlyCredentials', {
-                    defaultValue: 'Enter Fly.io credentials',
-                  })}
-            </Button>
-          </div>
+          {onConfigure && (
+            <div className="mt-6 pl-10">
+              <Button
+                variant="outline"
+                size="default"
+                onClick={onConfigure}
+                className="h-8 rounded px-2.5"
+              >
+                <Settings className="h-4 w-4" />
+                {provider === 'docker'
+                  ? t('compute.openDockerSettings', { defaultValue: 'Open Docker settings' })
+                  : t('compute.enterFlyCredentials', {
+                      defaultValue: 'Enter Fly.io credentials',
+                    })}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>
