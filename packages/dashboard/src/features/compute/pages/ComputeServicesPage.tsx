@@ -66,7 +66,12 @@ export default function ComputeServicesPage() {
   // This provider is not set up: show how, rather than an empty list that looks like
   // "you have no services" when the truth is "this provider is not enabled".
   if (!providerConfigured) {
-    return <ComputeProviderSetup provider={provider} onConfigure={() => openSettings(provider)} />;
+    return (
+      <ComputeProviderSetup
+        provider={provider}
+        onConfigure={openSettings && (() => openSettings(provider))}
+      />
+    );
   }
 
   if (isLoading) {

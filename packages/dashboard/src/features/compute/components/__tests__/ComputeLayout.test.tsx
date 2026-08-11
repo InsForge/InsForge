@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ServiceSchema } from '@insforge/shared-schemas';
 
 const meta = vi.hoisted(() => ({ value: undefined as unknown, isLoading: false }));
+const host = vi.hoisted(() => ({ isCloud: false }));
 const listed = vi.hoisted(() => ({
   services: [] as ServiceSchema[],
   enabledCalls: [] as boolean[],
@@ -11,6 +12,10 @@ const listed = vi.hoisted(() => ({
 
 vi.mock('#lib/hooks/useMetadata', () => ({
   useMetadata: () => ({ metadata: meta.value, isLoading: meta.isLoading }),
+}));
+
+vi.mock('#lib/config/DashboardHostContext', () => ({
+  useIsCloudHostingMode: () => host.isCloud,
 }));
 
 // Records the `enabled` flag so the fail-fast gate is observable: an unconfigured
@@ -37,13 +42,23 @@ function service(overrides: Partial<ServiceSchema>): ServiceSchema {
   } as ServiceSchema;
 }
 
+/**
+ * Stub provider page that reports which slug it was mounted for, so a test can tell a
+ * redirect from a render — asserting only that "a page appeared" passes even when the
+ * layout sent the reader to the wrong provider.
+ */
+function ProviderStub() {
+  const { provider } = useParams();
+  return <div data-testid="provider-page">{provider}</div>;
+}
+
 /** Renders the layout with a stub provider page in place of the real one. */
 function renderAt(path: string) {
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/dashboard/compute" element={<ComputeLayout />}>
-          <Route path=":provider" element={<div data-testid="provider-page">page</div>} />
+          <Route path=":provider" element={<ProviderStub />} />
         </Route>
       </Routes>
     </MemoryRouter>
@@ -55,6 +70,7 @@ describe('ComputeLayout', () => {
     listed.services = [];
     listed.enabledCalls = [];
     meta.isLoading = false;
+    host.isCloud = false;
     vi.clearAllMocks();
   });
 
@@ -121,5 +137,39 @@ describe('ComputeLayout', () => {
 
     expect(screen.getByTestId('provider-page')).toBeTruthy();
     expect(listed.enabledCalls.some((e) => e === true)).toBe(true);
+  });
+
+  // Docker is self-host only: the backend refuses to register it when either cloud
+  // signal is present, so on cloud there is one provider and nothing to switch
+  // between. A sidebar whose only job is switching would be furniture.
+  describe('cloud-managed projects', () => {
+    beforeEach(() => {
+      host.isCloud = true;
+      meta.value = {
+        compute: { defaultProvider: 'fly', providers: { fly: { ingressModes: ['host'] } } },
+      };
+    });
+
+    it('shows Fly’s page with no provider sidebar', () => {
+      renderAt('/dashboard/compute/fly');
+
+      expect(screen.getByTestId('provider-page')).toBeTruthy();
+      expect(screen.queryByText('Docker')).toBeNull();
+      expect(screen.queryByRole('button', { name: /settings/i })).toBeNull();
+    });
+
+    it('sends the bare path to Fly', () => {
+      renderAt('/dashboard/compute');
+
+      expect(screen.getByTestId('provider-page').textContent).toBe('fly');
+    });
+
+    // A bookmark from a self-hosted project would otherwise land on a page offering
+    // socket-mount steps for a provider this backend will not register.
+    it('redirects a Docker bookmark to Fly', () => {
+      renderAt('/dashboard/compute/docker');
+
+      expect(screen.getByTestId('provider-page').textContent).toBe('fly');
+    });
   });
 });
