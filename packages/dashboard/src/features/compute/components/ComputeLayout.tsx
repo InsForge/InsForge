@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { LoadingState } from '#components';
 import { useMetadata } from '#lib/hooks/useMetadata';
@@ -29,6 +30,7 @@ export interface ComputeOutletContext {
  * returns every provider's services in a single call.
  */
 export default function ComputeLayout() {
+  const { t } = useTranslation('chrome');
   const { pathname } = useLocation();
   const { metadata, isLoading: metadataLoading } = useMetadata();
   const compute = metadata?.compute;
@@ -47,7 +49,14 @@ export default function ComputeLayout() {
   const { services } = useComputeServices(isConfigured === true);
 
   if (metadataLoading) {
-    return <LoadingState />;
+    return (
+      <div className="flex h-full min-h-0 items-center justify-center">
+        <LoadingState
+          className="py-0"
+          message={t('compute.loadingCompute', { defaultValue: 'Loading Compute…' })}
+        />
+      </div>
+    );
   }
 
   // Land on something useful: the provider new services go to, else the first one

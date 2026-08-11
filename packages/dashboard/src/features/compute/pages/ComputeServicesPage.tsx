@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Plus, Play, Square, Trash2, AlertTriangle, XCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Play, Square, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '@insforge/ui';
-import { LoadingState } from '#components';
+import { ErrorState, LoadingState } from '#components';
 import { useComputeServices } from '#features/compute/hooks/useComputeServices';
 import { Navigate, useOutletContext, useParams } from 'react-router-dom';
 import type { ComputeOutletContext } from '#features/compute/components/ComputeLayout';
@@ -30,6 +30,7 @@ export default function ComputeServicesPage() {
   const {
     isLoading,
     error,
+    refetch,
     create,
     remove,
     stop,
@@ -69,7 +70,11 @@ export default function ComputeServicesPage() {
   }
 
   if (isLoading) {
-    return <LoadingState />;
+    return (
+      <LoadingState
+        message={t('compute.loadingServices', { defaultValue: 'Loading services...' })}
+      />
+    );
   }
 
   if (error) {
@@ -98,15 +103,15 @@ export default function ComputeServicesPage() {
       );
     }
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex items-center gap-2 text-destructive">
-          <XCircle className="w-5 h-5 shrink-0" />
-          <span className="text-sm">
-            {t('compute.loadServicesFailed', {
-              defaultValue: 'Failed to load services. Please refresh the page.',
-            })}
-          </span>
-        </div>
+      <div className="p-6">
+        <ErrorState
+          error={
+            error instanceof Error
+              ? error
+              : t('compute.loadServicesFailed', { defaultValue: 'Failed to load services.' })
+          }
+          onRetry={() => void refetch()}
+        />
       </div>
     );
   }
