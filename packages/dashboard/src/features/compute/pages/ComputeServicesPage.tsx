@@ -404,18 +404,6 @@ export default function ComputeServicesPage() {
               </div>
             )}
           </div>
-
-          {/* Jobs Section Placeholder */}
-          <div className="flex flex-col gap-2">
-            <h2 className="text-lg font-medium text-foreground">
-              {t('compute.jobs', { defaultValue: 'Jobs' })}
-            </h2>
-            <div className="bg-card border border-[var(--alpha-8)] rounded-lg p-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                {t('compute.comingSoon', { defaultValue: 'Coming soon' })}
-              </p>
-            </div>
-          </div>
         </div>
       </div>
 
