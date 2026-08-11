@@ -63,6 +63,23 @@ export const recallResponseSchema = z.object({
 });
 export type RecallResponse = z.infer<typeof recallResponseSchema>;
 
+// POST /api/memory/forget
+// Removal is by explicit id only, and always within a scope: a model that can
+// hallucinate a target_id for the reconcile UPDATE can hallucinate one here
+// too, and this is the verb that cannot be undone.
+export const forgetRequestSchema = z.object({
+  scope: z.string().min(1).default('default'),
+  ids: z.array(z.string().uuid()).min(1).max(100),
+});
+export type ForgetRequest = z.infer<typeof forgetRequestSchema>;
+
+// Echoes only the ids actually removed; an id that does not exist in this
+// scope is simply absent, so a retry of a partly-applied call is a no-op.
+export const forgetResponseSchema = z.object({
+  forgotten: z.array(z.string().uuid()),
+});
+export type ForgetResponse = z.infer<typeof forgetResponseSchema>;
+
 // POST /api/memory/index — cheap title-only listing (the always-load tier)
 export const memoryIndexRequestSchema = z.object({
   scope: z.string().min(1).default('default'),
