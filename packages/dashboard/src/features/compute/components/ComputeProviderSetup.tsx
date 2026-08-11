@@ -58,7 +58,7 @@ export function ComputeProviderSetup({
           <p className="text-sm text-muted-foreground">
             {provider === 'docker'
               ? t('compute.setupDockerSummary', {
-                  defaultValue: 'Run containers on the same Docker daemon as InsForge.',
+                  defaultValue: 'Run containers on the same Docker daemon that runs InsForge.',
                 })
               : t('compute.setupFlySummary', {
                   defaultValue:
@@ -74,7 +74,8 @@ export function ComputeProviderSetup({
                 <StepText
                   title={t('compute.dockerStep1', { defaultValue: 'Mount the Docker socket' })}
                   body={t('compute.dockerStep1Body', {
-                    defaultValue: 'This line is in your compose file, commented out. Uncomment it.',
+                    defaultValue:
+                      'In docker-compose.yml, uncomment the volume on the insforge service:',
                   })}
                 />
                 <Snippet label="docker-compose.yml" code={COMPOSE_SNIPPET} />
@@ -84,8 +85,7 @@ export function ComputeProviderSetup({
                 <StepText
                   title={t('compute.dockerStep3', { defaultValue: 'Restart InsForge' })}
                   body={t('compute.dockerStep3Body', {
-                    defaultValue:
-                      'Docker appears here once the socket is reachable. On rootless Docker or Podman, set the socket path below first.',
+                    defaultValue: 'Docker shows up here once it restarts.',
                   })}
                 />
                 {/* The path is data, not prose: the single most useful diagnostic when
@@ -107,7 +107,7 @@ export function ComputeProviderSetup({
                     defaultValue: 'Find your org, then create a token',
                   })}
                   body={t('compute.flyStep1Body', {
-                    defaultValue: 'Both come from the Fly CLI, signed in to your own account.',
+                    defaultValue: 'Run these with the Fly CLI, signed in to your own account:',
                   })}
                 />
                 {/* Org first: `tokens create org` takes the slug with -o, and without
