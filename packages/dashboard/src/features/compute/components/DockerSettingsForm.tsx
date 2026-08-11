@@ -82,7 +82,7 @@ export function DockerSettingsForm() {
         })}
       >
         <Select value={defaultIngress} onValueChange={setDefaultIngress}>
-          <SelectTrigger id="docker-default-ingress">
+          <SelectTrigger id="docker-default-ingress" className="px-1.5">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
