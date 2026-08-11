@@ -1,10 +1,17 @@
 import express, { Request, Response, NextFunction } from 'express';
-import cors from 'cors';
+import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import {
+  createCorsMiddleware,
+  refreshCorsAllowlist,
+  getCorsAllowlist,
+  setCorsAllowlist,
+  buildEnvAllowlist,
+} from '@/api/middlewares/cors.js';
 import authRouter from '@/api/routes/auth/index.routes.js';
 import databaseRouter from '@/api/routes/database/index.routes.js';
 import { storageRouter } from '@/api/routes/storage/index.routes.js';
@@ -65,6 +72,12 @@ if (fs.existsSync(envPath)) {
   dotenv.config();
 }
 
+/**
+ * Creates and configures the main Express application instance.
+ * Initializes database, storage, log services, CORS allowlist, and mounts all API routers.
+ *
+ * @returns Configured Express application instance
+ */
 export async function createApp() {
   // Initialize database first
   const dbManager = DatabaseManager.getInstance();
@@ -81,19 +94,40 @@ export async function createApp() {
   // Initialize SQL parser WASM module
   await initSqlParser();
 
+  // Build CORS allowlist after database is initialized
+  await refreshCorsAllowlist();
+
+  // Fallback: if DB was unreachable at startup, at least env origins work
+  if (!getCorsAllowlist()) {
+    setCorsAllowlist(buildEnvAllowlist());
+  }
+
   const app = express();
 
   // Enable trust proxy setting for rate limiting behind proxies/load balancers.
   app.set('trust proxy', appConfig.server.trustProxy);
 
-  // Basic middleware
+  // Helmet security headers (must be top of middleware stack)
+  // Disable upgrade-insecure-requests so HTTP self-hosted installs are not forced to HTTPS
   app.use(
-    cors({
-      origin: true, // Allow all origins (matches Better Auth's trustedOrigins: ['*'])
-      credentials: true, // Allow cookies/credentials
-      exposedHeaders: ['Content-Range', 'Preference-Applied'],
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+          'upgrade-insecure-requests': null,
+        },
+      },
     })
   );
+
+  // Basic middleware
+  app.use(createCorsMiddleware());
+
+  // Refresh CORS allowlist every 5 minutes so runtime config updates take effect
+  const CORS_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+  setInterval(() => {
+    refreshCorsAllowlist().catch(() => {});
+  }, CORS_REFRESH_INTERVAL_MS);
   app.use(cookieParser()); // Parse cookies for refresh token handling
   app.use((req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
@@ -300,11 +334,14 @@ export async function createApp() {
         responseHeaders[key] = value;
       }
 
-      res
-        .status(response.status)
-        .set(responseHeaders)
-        .set('Access-Control-Allow-Origin', '*')
-        .send(responseBody);
+      const sanitizedHeaders = { ...responseHeaders };
+      for (const key of Object.keys(sanitizedHeaders)) {
+        if (key.toLowerCase().startsWith('access-control-')) {
+          delete sanitizedHeaders[key];
+        }
+      }
+
+      res.status(response.status).set(sanitizedHeaders).send(responseBody);
     } catch (error) {
       logger.error('Failed to proxy function', { slug, error: String(error) });
       res.status(502).json({ error: error instanceof Error ? error.message : String(error) });
@@ -408,6 +445,10 @@ async function initializeServer() {
 
 void initializeServer();
 
+/**
+ * Performs graceful shutdown of server resources including database backup scheduler,
+ * realtime sockets, OAuth PKCE cleanup, and telemetry services.
+ */
 async function cleanup() {
   logger.info('Shutting down gracefully...');
 

@@ -833,15 +833,6 @@ By default the backend allows all origins. It reflects the request's `Origin` he
 
 #### 14.1 Back Up the Database
 
-For a database dump and `.env` copy in one step, use the shipped backup script:
-
-```bash
-cd ~/insforge
-./deploy/backup.sh
-```
-
-Or dump manually:
-
 ```bash
 cd ~/insforge
 source .env
@@ -1000,29 +991,51 @@ docker compose up -d
 
 ### 17. Automated Backups
 
-Set up a cron job for daily automated backups.
+Set up a cron job for daily automated backups:
 
-#### 17.1 Run the Backup Script
-
-Self-host installs include `deploy/backup.sh` (delivered by `deploy/setup.sh`). It dumps Postgres and copies `.env` into a `backups/` directory under your install root.
+#### 17.1 Create a Backup Script
 
 ```bash
-cd ~/insforge
-./deploy/backup.sh
+nano ~/insforge/backup.sh
 ```
 
-By default, backups land in `~/insforge/backups/` and files older than 14 days are removed. Override retention:
-
 ```bash
-RETENTION_DAYS=30 ./deploy/backup.sh
+#!/bin/bash
+set -euo pipefail
+
+# InsForge Automated Backup Script
+# Run from the checkout so docker compose reads COMPOSE_FILE and
+# COMPOSE_PROJECT_NAME from .env, which also carries POSTGRES_USER / POSTGRES_DB
+cd "$HOME/insforge"
+set -a
+source .env
+set +a
+
+BACKUP_DIR="$HOME/insforge/backups"
+RETENTION_DAYS=14
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+trap 'echo "[$(date)] ERROR: Backup failed at line $LINENO" >&2; exit 1' ERR
+
+mkdir -p "$BACKUP_DIR"
+
+# Dump the database
+docker compose exec -T postgres \
+  pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" \
+  > "$BACKUP_DIR/db_$TIMESTAMP.sql"
+
+# Copy the environment file
+cp "$HOME/insforge/.env" "$BACKUP_DIR/env_$TIMESTAMP.bak"
+
+# Remove backups older than retention period
+find "$BACKUP_DIR" -name "db_*.sql" -mtime +$RETENTION_DAYS -delete
+find "$BACKUP_DIR" -name "env_*.bak" -mtime +$RETENTION_DAYS -delete
+
+echo "[$(date)] Backup completed successfully: db_$TIMESTAMP.sql"
 ```
 
-Restore a database dump:
-
 ```bash
-cd ~/insforge
-set -a && source .env && set +a
-cat backups/db_YYYYMMDD_HHMMSS.sql | docker compose exec -T postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"
+chmod +x ~/insforge/backup.sh
 ```
 
 #### 17.2 Schedule with Cron
@@ -1031,10 +1044,10 @@ cat backups/db_YYYYMMDD_HHMMSS.sql | docker compose exec -T postgres psql -U "${
 crontab -e
 ```
 
-Add this line for daily backups at 3:00 AM (adjust the path if your install lives elsewhere):
+Add this line for daily backups at 3:00 AM:
 
 ```cron
-0 3 * * * /home/deploy/insforge/deploy/backup.sh >> /home/deploy/insforge/backups/cron.log 2>&1
+0 3 * * * /home/deploy/insforge/backup.sh >> /home/deploy/insforge/backups/cron.log 2>&1
 ```
 
 #### 17.3 Off-Site Backups (Recommended)
@@ -1113,8 +1126,7 @@ docker stats --no-stream          # Resource usage
 
 # ── Database (source .env first for vars) ────
 source ~/insforge/.env
-./deploy/backup.sh                                                                              # Backup (db + .env)
-docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" > backup.sql  # Manual backup
+docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" > backup.sql  # Backup
 cat backup.sql | docker compose exec -T postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"  # Restore
 
 # ── Updates ───────────────────────────────────

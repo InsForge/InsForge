@@ -201,6 +201,10 @@ function parseAIProvider(value: string | undefined): AIProvider {
   );
 }
 
+/**
+ * Asserts that the application is running in a self-hosted environment.
+ * Throws an AppError if executed within InsForge Cloud.
+ */
 function assertSelfHostedModelGatewayConfig(): void {
   if (isCloudEnvironment()) {
     throw new AppError(
@@ -211,6 +215,13 @@ function assertSelfHostedModelGatewayConfig(): void {
   }
 }
 
+/**
+ * Resolves the API key for the specified AI provider.
+ *
+ * @param provider - The AI provider identifier
+ * @param openRouterProvider - The OpenRouter provider instance
+ * @returns The active API key and its masked representation
+ */
 function getProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterProvider) {
   switch (provider) {
     case 'openrouter':
@@ -226,6 +237,13 @@ function getProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterP
   }
 }
 
+/**
+ * Rotates the API key for the specified AI provider.
+ *
+ * @param provider - The AI provider identifier
+ * @param openRouterProvider - The OpenRouter provider instance
+ * @returns Promise resolving to the newly generated API key details
+ */
 function rotateProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterProvider) {
   switch (provider) {
     case 'openrouter':
@@ -271,8 +289,19 @@ router.post(
         // Create and process the stream
         try {
           const streamGenerator = chatService.streamChat(messages, options);
+          let aborted = false;
+
+          res.on('close', () => {
+            if (!res.writableEnded) {
+              aborted = true;
+              streamGenerator.return?.(undefined).catch(() => {});
+            }
+          });
 
           for await (const data of streamGenerator) {
+            if (aborted) {
+              break;
+            }
             if (data.chunk) {
               res.write(`data: ${JSON.stringify({ chunk: data.chunk })}\n\n`);
             }
@@ -287,8 +316,10 @@ router.post(
             }
           }
 
-          // Send completion signal
-          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+          if (!aborted) {
+            // Send completion signal
+            res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+          }
         } catch (streamError) {
           // If error occurs during streaming, send it in SSE format
           logger.error('Stream error during chat completion', {

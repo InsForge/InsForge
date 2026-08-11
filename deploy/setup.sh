@@ -55,9 +55,9 @@ FILES='.env.example
 docker-compose.minio.yml
 docker-compose.rustfs.yml
 functions/deno.json
+functions/lib/info-payload.ts
 functions/server.ts
 functions/worker-template.js
-deploy/backup.sh
 deploy/docker-compose/docker-compose.yml
 deploy/docker-init/db/db-init.sql
 deploy/docker-init/db/jwt.sql
@@ -86,7 +86,6 @@ if [ -n "${INSFORGE_NO_GIT:-}" ] || ! command -v git >/dev/null 2>&1; then
     curl -fsSL "$RAW/${REF:-main}/$f" -o "$f" ||
       { echo "Could not fetch $f at ${REF:-main} from $RAW." >&2; exit 1; }
   done
-  chmod +x deploy/backup.sh
   NO_GIT=1
 fi
 

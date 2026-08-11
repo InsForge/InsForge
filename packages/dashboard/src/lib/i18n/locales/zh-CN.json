@@ -132,7 +132,6 @@
     "tablesUnit_other": "张表",
     "terminalCommandLower": "终端命令",
     "thresholdNote": "健康时为绿色；超过 {{threshold}} 时曲线变红。",
-    "thresholdNoteBars": "健康时为绿色；超过 {{threshold}} 的柱形变红。",
     "timeRange": "时间范围",
     "tip": "提示",
     "useInsForgeWithCli": "通过 CLI 使用 InsForge",
@@ -161,17 +160,20 @@
       "diskUsed": {
         "title": "磁盘使用率",
         "description": "数据库、文件和日志占用实例存储的情况。磁盘写满会导致写入停止，甚至使后端下线。",
-        "ceiling": "磁盘容量",
-        "used": "已使用",
+        "ceiling": "磁盘大小",
+        "dataCapacity": "数据容量",
+        "used": "已用",
         "database": "数据库",
         "wal": "WAL",
         "system": "系统",
-        "total": "总计"
+        "total": "总计",
+        "systemExcluded": "系统与运行时",
+        "notCounted": "不计入"
       }
     },
     "memoryAdvisory": {
-      "title": "内存占用 {{value}}，对 Postgres 来说这是正常的，不过余量不多了。",
-      "description": "Postgres 会把空闲内存拿来缓存你的数据并一直占着，所以数字高本身没有问题。如果你预计用量还会继续增长，建议现在就升级到更大的实例，别等到出问题再动手。",
+      "title": "内存占用 {{value}}，对 Postgres 来说这是正常的。",
+      "description": "Postgres 会把空闲内存拿来缓存你的数据，即使数据库闲着也会一直占用，所以这里数字偏高不代表出了问题。真正要留意的信号是重启和查询变慢，如果出现了，换个更大的实例就能解决。",
       "cta": "升级实例"
     },
     "steps": {

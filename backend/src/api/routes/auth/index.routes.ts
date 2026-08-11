@@ -58,6 +58,11 @@ import {
 } from '@insforge/shared-schemas';
 import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';
+import {
+  refreshCorsAllowlist,
+  bumpMinRequiredGeneration,
+  setAllowlistFromOrigins,
+} from '@/api/middlewares/cors.js';
 import { EMAIL_TEMPLATE_TYPES, type EmailTemplate } from '@/types/email.js';
 import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 import logger from '@/utils/logger.js';
@@ -65,6 +70,14 @@ import logger from '@/utils/logger.js';
 const router = Router();
 const authService = AuthService.getInstance();
 
+/**
+ * Express middleware that conditionally applies the OTP rate limiter
+ * if the request body method is 'otp'.
+ *
+ * @param req - Express Request object
+ * @param res - Express Response object
+ * @param next - Express NextFunction callback
+ */
 const verifySessionOTPLimiter = (req: Request, res: Response, next: NextFunction): void => {
   if (req.body?.method !== 'otp') {
     next();
@@ -83,6 +96,13 @@ const emailLinkRequestSchema = z.object({
   token: z.string().regex(/^[a-fA-F0-9]{64}$/, 'token must be a 64-character hexadecimal token'),
 });
 
+/**
+ * Builds a redirect URL by appending query parameters to a base URL string.
+ *
+ * @param baseUrl - The base URL string to construct from
+ * @param params - Record of query parameter keys and values to attach
+ * @returns The fully constructed URL string with appended query parameters
+ */
 function buildRedirectUrl(baseUrl: string, params: Record<string, string>): string {
   const url = new URL(baseUrl);
   Object.entries(params).forEach(([key, value]) => {
@@ -328,15 +348,37 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
     const input = validationResult.data;
     const config: GetAuthConfigResponse = await authConfigService.updateAuthConfig(input);
 
-    await auditService.log({
-      actor: req.hasApiKey ? 'api-key' : req.user?.id,
-      action: 'UPDATE_AUTH_CONFIG',
-      module: 'AUTH',
-      details: {
-        updatedFields: Object.keys(input),
-      },
-      ip_address: req.ip,
-    });
+    // Advance generation token to invalidate older in-flight periodic refreshes
+    const generation = bumpMinRequiredGeneration();
+    const refreshed = await refreshCorsAllowlist();
+
+    // Fallback: If DB query refresh fails or is superseded, apply allowedRedirectUrls directly
+    // to guarantee revoked origins are immediately removed and new origins are authorized.
+    if (!refreshed && input.allowedRedirectUrls !== undefined) {
+      setAllowlistFromOrigins(input.allowedRedirectUrls, generation);
+      logger.warn(
+        'AuthConfig updated in database; applied allowedRedirectUrls directly to active allowlist'
+      );
+    }
+
+    // Audit log is non-blocking — fire and forget, with error logging on failure
+    auditService
+      .log({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'UPDATE_AUTH_CONFIG',
+        module: 'AUTH',
+        details: {
+          updatedFields: Object.keys(input),
+          corsRefreshed: refreshed,
+        },
+        ip_address: req.ip,
+      })
+      .catch((error: unknown) => {
+        logger.error('Failed to log audit event for auth config update', {
+          error: error instanceof Error ? error.message : String(error),
+          actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        });
+      });
 
     successResponse(res, config);
   } catch (error) {

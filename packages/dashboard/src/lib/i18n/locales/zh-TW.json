@@ -132,7 +132,6 @@
     "tablesUnit_other": "張資料表",
     "terminalCommandLower": "終端機指令",
     "thresholdNote": "健康時為綠色；超過 {{threshold}} 時曲線變紅。",
-    "thresholdNoteBars": "健康時為綠色；超過 {{threshold}} 的柱形變紅。",
     "timeRange": "時間範圍",
     "tip": "提示",
     "useInsForgeWithCli": "透過 CLI 使用 InsForge",
@@ -161,17 +160,20 @@
       "diskUsed": {
         "title": "磁碟使用率",
         "description": "資料庫、檔案和日誌佔用執行個體儲存空間的情況。磁碟寫滿會導致寫入停止，甚至使後端離線。",
-        "ceiling": "磁碟容量",
-        "used": "已使用",
+        "ceiling": "磁碟大小",
+        "dataCapacity": "資料容量",
+        "used": "已用",
         "database": "資料庫",
         "wal": "WAL",
         "system": "系統",
-        "total": "總計"
+        "total": "總計",
+        "systemExcluded": "系統與執行時",
+        "notCounted": "不計入"
       }
     },
     "memoryAdvisory": {
-      "title": "記憶體佔用 {{value}}，對 Postgres 來說這是正常的，不過餘量不多了。",
-      "description": "Postgres 會把閒置記憶體拿來快取你的資料並一直佔著，所以數字高本身沒有問題。如果你預期用量還會繼續成長，建議現在就升級到更大的執行個體，別等到出問題再動手。",
+      "title": "記憶體佔用 {{value}}，對 Postgres 來說這是正常的。",
+      "description": "Postgres 會把閒置記憶體拿來快取你的資料，即使資料庫閒著也會一直佔用，所以這裡數字偏高不代表出了問題。真正要留意的訊號是重啟和查詢變慢，如果出現了，換個更大的執行個體就能解決。",
       "cta": "升級執行個體"
     },
     "steps": {

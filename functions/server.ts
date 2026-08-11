@@ -1,5 +1,6 @@
 import { Client } from 'https://deno.land/x/postgres@v0.17.0/mod.ts';
 import { join, dirname, fromFileUrl } from 'https://deno.land/std@0.224.0/path/mod.ts';
+import { buildInfoPayload } from './lib/info-payload.ts';
 
 /* eslint-disable no-console */
 const rawPort = Deno.env.get('PORT');
@@ -21,6 +22,11 @@ const WORKER_TIMEOUT_MS = parseInt(Deno.env.get('WORKER_TIMEOUT_MS') ?? '60000')
 // Worker template code - loaded on first use
 let workerTemplateCode: string | null = null;
 
+/**
+ * Loads the Web Worker template code from disk on first use.
+ *
+ * @returns Promise resolving to the worker template JS string
+ */
 async function getWorkerTemplateCode(): Promise<string> {
   if (!workerTemplateCode) {
     const currentDir = dirname(fromFileUrl(import.meta.url));
@@ -29,7 +35,13 @@ async function getWorkerTemplateCode(): Promise<string> {
   return workerTemplateCode;
 }
 
-// Decrypt function for Deno (compatible with Node.js encryption)
+/**
+ * Decrypts an AES-GCM ciphertext string using Web Crypto API.
+ *
+ * @param ciphertext - The encrypted string in format iv:tag:data
+ * @param key - The secret key string used for decryption
+ * @returns Decrypted plaintext string
+ */
 async function decryptSecret(ciphertext: string, key: string): Promise<string> {
   try {
     const parts = ciphertext.split(':');
@@ -77,7 +89,12 @@ const dbConfig = {
   port: parseInt(Deno.env.get('POSTGRES_PORT') || '5432', 10),
 };
 
-// Get function code from database
+/**
+ * Fetches edge function source code from PostgreSQL database by slug.
+ *
+ * @param slug - The unique slug identifier of the edge function
+ * @returns Function source code string, or null if not found or inactive
+ */
 async function getFunctionCode(slug: string): Promise<string | null> {
   const client = new Client(dbConfig);
 
@@ -322,15 +339,13 @@ Deno.serve({ hostname, port }, async (req: Request) => {
   // Runtime info
   if (pathname === '/info') {
     return new Response(
-      JSON.stringify({
-        runtime: 'deno',
-        version: Deno.version,
-        env: Deno.env.get('DENO_ENV') || 'production',
-        database: {
-          host: dbConfig.hostname,
-          database: dbConfig.database,
-        },
-      }),
+      JSON.stringify(
+        buildInfoPayload({
+          runtime: 'deno',
+          version: Deno.version,
+          env: Deno.env.get('DENO_ENV') || 'production',
+        })
+      ),
       {
         headers: { 'Content-Type': 'application/json' },
       }

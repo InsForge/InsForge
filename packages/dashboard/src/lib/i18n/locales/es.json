@@ -141,7 +141,6 @@
     "tablesUnit_other": "Tablas",
     "terminalCommandLower": "comando de terminal",
     "thresholdNote": "Verde mientras está sano; la línea se vuelve roja por encima de {{threshold}}.",
-    "thresholdNoteBars": "Verde mientras está sano; las barras se vuelven rojas por encima de {{threshold}}.",
     "timeRange": "Rango de tiempo",
     "tip": "Consejo",
     "useInsForgeWithCli": "Usa InsForge con la CLI",
@@ -171,16 +170,19 @@
         "title": "Uso de disco",
         "description": "Cuánto almacenamiento de tu instancia usan la base de datos, los archivos y los registros. Un disco lleno detiene las escrituras y puede dejar el backend fuera de línea.",
         "ceiling": "Tamaño del disco",
+        "dataCapacity": "Capacidad de datos",
         "used": "Usado",
         "database": "Base de datos",
         "wal": "WAL",
         "system": "Sistema",
-        "total": "Total"
+        "total": "Total",
+        "systemExcluded": "Sistema y runtime",
+        "notCounted": "no contado"
       }
     },
     "memoryAdvisory": {
-      "title": "La memoria está en {{value}}. Para Postgres eso es normal, pero queda poco margen.",
-      "description": "Postgres usa la memoria libre para cachear tus datos y la retiene, así que un número alto por sí solo no es un problema. Si crees que tu uso va a seguir creciendo, conviene subir a una instancia más grande ahora, antes de que algo falle.",
+      "title": "La memoria está en {{value}}. Para Postgres, eso es normal.",
+      "description": "Postgres usa la memoria libre para cachear tus datos y la retiene incluso cuando la base de datos está inactiva, así que un número alto aquí no significa que algo vaya mal. Las señales que sí importan son los reinicios y las consultas cada vez más lentas. Si las estás viendo, una instancia más grande le dará espacio.",
       "cta": "Mejorar instancia"
     },
     "steps": {
