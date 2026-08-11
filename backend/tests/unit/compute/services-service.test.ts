@@ -2402,7 +2402,7 @@ describe('buildComputeRegistry', () => {
     }
     const next = (thrown as { nextActions?: string }).nextActions ?? '';
     expect(next).toMatch(/Docker socket/);
-    expect(next).toMatch(/DOCKER_GID/);
+    expect(next).toMatch(/uncomment the Docker socket volume/i);
     expect(next).toMatch(/insforge-test-docker\.sock/);
     expect(next).toMatch(/FLY_API_TOKEN/);
     // Docker first: it is the option a self-hoster can act on without signing up.

@@ -14,14 +14,12 @@ describe('ComputeProviderSetup', () => {
 
     expect(screen.getByText(/is not enabled yet/i)).toBeTruthy();
     expect(screen.getByText(/^Mount the Docker socket/i)).toBeTruthy();
-    expect(screen.getByText(/^Put your host/i)).toBeTruthy();
     expect(screen.getByText('docker-compose.yml')).toBeTruthy();
     expect(screen.queryByText(/FLY_API_TOKEN/)).toBeNull();
 
     // Badged by where it goes: a shell command and a file you edit looked alike
-    // without it, and the group-id step has one of each.
+    // without it.
     expect(screen.getAllByText('Terminal').length).toBeGreaterThan(0);
-    expect(screen.getByText('.env')).toBeTruthy();
   });
 
   it('walks through the Fly steps, not Docker’s', () => {
@@ -32,15 +30,15 @@ describe('ComputeProviderSetup', () => {
     expect(screen.queryByText('docker-compose.yml')).toBeNull();
   });
 
-  // Compose reads .env literally — verified against the real binary, which passed
-  // `$(getent group docker | cut -d: -f3)` through as that exact string. A snippet
-  // badged .env has to hold a value, not a command.
-  it('puts the group-id command in a terminal block and a plain number in .env', () => {
+  // The entrypoint reads the socket's group and joins it before dropping to the app
+  // user, so there is no group id to look up. Asking for one was the step people got
+  // wrong, and a wrong value is a silent EACCES.
+  it('asks for nothing but the mount', () => {
     render(<ComputeProviderSetup provider="docker" onConfigure={vi.fn()} />);
 
-    expect(screen.getByText(/getent group docker/)).toBeTruthy();
-    expect(screen.getByText(/^DOCKER_GID=\d+$/)).toBeTruthy();
-    expect(screen.queryByText(/DOCKER_GID=\$\(/)).toBeNull();
+    expect(screen.queryByText(/DOCKER_GID/)).toBeNull();
+    expect(screen.queryByText(/group_add/)).toBeNull();
+    expect(screen.queryByText(/getent/)).toBeNull();
   });
 
   // The socket path is the single most useful diagnostic when a mount is missing.

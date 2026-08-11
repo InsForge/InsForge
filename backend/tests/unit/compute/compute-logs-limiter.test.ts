@@ -15,16 +15,26 @@ function resetLimiter(limiter: RequestHandler): void {
 /**
  * Spend the whole budget.
  *
- * Concurrent rather than sequential: the memory store increments synchronously per
- * request, so each of these takes a distinct slot 1..BUDGET regardless of ordering,
- * and 120 sequential supertest round-trips were slow enough to time out on a loaded
- * machine — a bound that says nothing about the limiter.
+ * Batched rather than one-at-a-time or all-at-once. 120 sequential round-trips took
+ * over the 10s test timeout when the machine was busy; 120 simultaneous sockets got
+ * connections dropped instead, which failed fast and looked like a limiter bug. Ten in
+ * flight at a time is neither.
+ *
+ * Asserted by count, not by position: the memory store increments synchronously per
+ * request, so a batch of ten takes ten distinct slots whatever order they land in.
  */
+const BATCH = 10;
+
 async function spendBudget(app: express.Express): Promise<void> {
-  const results = await Promise.all(
-    Array.from({ length: BUDGET }, () => request(app).get('/logs'))
-  );
-  expect(results.map((r) => r.status)).toEqual(Array.from({ length: BUDGET }, () => 200));
+  const statuses: number[] = [];
+  for (let sent = 0; sent < BUDGET; sent += BATCH) {
+    const batch = Math.min(BATCH, BUDGET - sent);
+    const results = await Promise.all(
+      Array.from({ length: batch }, () => request(app).get('/logs'))
+    );
+    statuses.push(...results.map((r) => r.status));
+  }
+  expect(statuses.filter((s) => s === 200)).toHaveLength(BUDGET);
 }
 
 function buildApp() {

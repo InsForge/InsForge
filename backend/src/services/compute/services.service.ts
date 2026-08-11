@@ -370,7 +370,7 @@ export function buildComputeRegistry(): ComputeRegistry {
       503,
       ERROR_CODES.COMPUTE_NOT_CONFIGURED,
       'Pick a provider and restart the container:\n' +
-        `• Your own Docker host — mount the Docker socket into the InsForge container (it is already in your compose file, commented out) and set DOCKER_GID to your host's docker group id. Currently looking for a socket at ${dockerConfig().socketPath}.\n` +
+        `• Your own Docker host — uncomment the Docker socket volume in your compose file and restart. Currently looking for a socket at ${dockerConfig().socketPath}.\n` +
         '• Fly.io — set FLY_API_TOKEN and FLY_ORG in your .env.\n' +
         'See https://docs.insforge.dev/core-concepts/compute/overview for both.'
     );
