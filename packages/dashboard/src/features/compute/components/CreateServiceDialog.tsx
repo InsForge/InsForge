@@ -31,6 +31,13 @@ interface CreateServiceDialogProps {
   isCreating: boolean;
 }
 
+/**
+ * Horizontal padding that lines a Select up with the Inputs beside it: `Input` is
+ * `p-1.5` while the shared `SelectTrigger` is `px-2.5`, so untouched the selected
+ * value sits 4px further in than every field above it.
+ */
+const SELECT_INSET = 'px-1.5';
+
 export function CreateServiceDialog({
   open,
   onOpenChange,
@@ -153,7 +160,7 @@ export function CreateServiceDialog({
                     {t('compute.fields.region', { defaultValue: 'Region' })}
                   </label>
                   <Select value={region} onValueChange={setRegion}>
-                    <SelectTrigger>
+                    <SelectTrigger className={SELECT_INSET}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -176,7 +183,7 @@ export function CreateServiceDialog({
                     value={selectedIngress}
                     onValueChange={(v) => setIngress(v as IngressMode)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={SELECT_INSET}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -197,7 +204,7 @@ export function CreateServiceDialog({
                   {t('compute.fields.cpu', { defaultValue: 'CPU' })}
                 </label>
                 <Select value={cpu} onValueChange={setCpu}>
-                  <SelectTrigger>
+                  <SelectTrigger className={SELECT_INSET}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -215,7 +222,7 @@ export function CreateServiceDialog({
                   {t('compute.fields.memory', { defaultValue: 'Memory' })}
                 </label>
                 <Select value={memory} onValueChange={setMemory}>
-                  <SelectTrigger>
+                  <SelectTrigger className={SELECT_INSET}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

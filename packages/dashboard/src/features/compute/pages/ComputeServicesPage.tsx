@@ -348,7 +348,7 @@ export default function ComputeServicesPage() {
                   })}
                 </p>
               </div>
-              <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
+              <Button variant="primary" onClick={() => setCreateOpen(true)}>
                 <Plus className="h-4 w-4" />
                 {t('compute.createService', { defaultValue: 'Create Service' })}
               </Button>
