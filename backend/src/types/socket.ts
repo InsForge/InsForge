@@ -8,8 +8,6 @@
  */
 export enum ServerEvents {
   NOTIFICATION = 'notification',
-  DATA_UPDATE = 'data:update',
-  MCP_CONNECTED = 'mcp:connected',
   // Realtime events
   REALTIME_ERROR = 'realtime:error',
   // Presence events
@@ -35,16 +33,6 @@ export interface NotificationPayload {
   level: 'info' | 'warning' | 'error' | 'success';
   title: string;
   message: string;
-}
-
-export enum DataUpdateResourceType {
-  DATABASE = 'database',
-  USERS = 'users',
-  BUCKETS = 'buckets',
-  FUNCTIONS = 'functions',
-  DEPLOYMENTS = 'deployments',
-  REALTIME = 'realtime',
-  COMPUTE_SERVICES = 'compute_services',
 }
 
 /**

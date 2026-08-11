@@ -1,4 +1,5 @@
-import { Router, Response, NextFunction } from 'express';
+import express, { Router, Response, NextFunction } from 'express';
+import { appConfig } from '@/infra/config/app.config.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { computeWriteLimiter, computeLogsRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { ComputeServicesService } from '@/services/compute/services.service.js';
@@ -6,8 +7,7 @@ import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, createServiceSchema, updateServiceSchema } from '@insforge/shared-schemas';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 import logger from '@/utils/logger.js';
 
 const router = Router();
@@ -27,13 +27,7 @@ function bestEffortAudit(params: Parameters<typeof auditService.log>[0]) {
 
 function bestEffortBroadcast() {
   try {
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom(
-      'role:project_admin',
-      ServerEvents.DATA_UPDATE,
-      { resource: DataUpdateResourceType.COMPUTE_SERVICES },
-      'system'
-    );
+    dashboardEventService.publishDataUpdate({ resource: 'compute_services' });
   } catch (err) {
     logger.error('Socket broadcast failed (best-effort)', { error: err });
   }
@@ -159,6 +153,231 @@ router.post(
       successResponse(res, tokenResult);
     } catch (error) {
       next(error);
+    }
+  }
+);
+
+/**
+ * `dockerfile` names a path *inside* the uploaded context. The daemon resolves it
+ * against the context root and rejects an escape on its own, but its error is
+ * opaque — reject the obvious shapes here so the developer gets something to act
+ * on instead of a build failure from the bottom of the stack.
+ */
+function parseDockerfileParam(raw: unknown): string | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  const reject = (why: string): never => {
+    throw new AppError(
+      `Invalid \`dockerfile\`: ${why}. It must be a path relative to the root of the uploaded context, e.g. "docker/Dockerfile".`,
+      400,
+      ERROR_CODES.INVALID_INPUT
+    );
+  };
+  if (typeof raw !== 'string' || raw.length === 0) {
+    return reject('expected a single non-empty string');
+  }
+  if (raw.length > 255) {
+    return reject('longer than 255 characters');
+  }
+  if (raw.startsWith('/') || /^[A-Za-z]:/.test(raw)) {
+    return reject('absolute paths are not allowed');
+  }
+  if (raw.split(/[\\/]/).includes('..')) {
+    return reject('`..` cannot be used to leave the context');
+  }
+  return raw;
+}
+
+/** Set by the gate below so the handler can hand the slot back when it is done. */
+type BuildRequest = AuthRequest & { releaseBuildSlot?: () => void; buildStarted?: boolean };
+
+/**
+ * No bytes for this long means the client has stalled rather than being slow.
+ * Resets on every chunk, so a legitimately slow upload is never penalised — only a
+ * connection that stops making progress while holding the only build slot.
+ * Configurable for the same reason the size ceiling is: the operator knows their
+ * network, and a hard-coded value is either too tight for someone or too loose.
+ */
+function uploadIdleTimeoutMs(): number {
+  return appConfig.docker.buildUploadIdleTimeoutMs;
+}
+
+/**
+ * Admit one build at a time, deciding *before* `express.raw` buffers a body.
+ *
+ * The driver already caps concurrent builds at one, but it only finds out once
+ * express holds the entire tarball in memory, so N simultaneous uploads cost N
+ * contexts regardless of the cap. On the hosts this targets — a t4g.nano has
+ * ~418MB usable — that is the difference between a clear 429 and an OOM.
+ *
+ * The slot is held across the build, not just the upload, because an upload that
+ * cannot be built is worth rejecting at the door rather than buffering and then
+ * failing. That makes releasing it the delicate part, with two distinct cases:
+ *
+ *   - aborted before the handler took over — nothing is building, so the socket
+ *     closing must release it, or the endpoint wedges permanently;
+ *   - aborted after the handler took over — the build carries on regardless of the
+ *     client, so the socket closing must *not* release it, or a disconnect lets a
+ *     second context in alongside the running build.
+ *
+ * Hence `buildStarted`: the handler claims ownership and releases in its own
+ * `finally`, and until it does, the close handler owns the release.
+ */
+let buildSlotTaken = false;
+function oneBuildAtATime(req: BuildRequest, res: Response, next: NextFunction) {
+  if (buildSlotTaken) {
+    // Discard the incoming tarball instead of buffering it — that is the whole
+    // point of rejecting here. It still has to be drained: a response sent while
+    // the request body sits unread stalls the connection until the client gives
+    // up, which turns a fast 429 into a hang.
+    req.resume();
+    next(
+      new AppError(
+        'Another build is already in progress. Retry when it finishes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+    return;
+  }
+
+  buildSlotTaken = true;
+  let idle: NodeJS.Timeout | undefined;
+  let released = false;
+  const release = () => {
+    if (released) {
+      return;
+    }
+    released = true;
+    if (idle) {
+      clearTimeout(idle);
+    }
+    buildSlotTaken = false;
+  };
+  req.releaseBuildSlot = release;
+
+  // Bound how long a client can sit on the slot without sending anything.
+  const armIdleTimer = () => {
+    if (idle) {
+      clearTimeout(idle);
+    }
+    idle = setTimeout(() => {
+      logger.warn('Compute build upload stalled; releasing the build slot', {
+        serviceId: req.params.id,
+        idleMs: uploadIdleTimeoutMs(),
+      });
+      release();
+      req.destroy();
+    }, uploadIdleTimeoutMs());
+  };
+  armIdleTimer();
+  req.on('data', armIdleTimer);
+  req.once('end', () => {
+    if (idle) {
+      clearTimeout(idle);
+      idle = undefined;
+    }
+  });
+
+  res.once('close', () => {
+    // Only ours to release while no build has started — see the note above.
+    if (!req.buildStarted) {
+      release();
+    }
+  });
+  next();
+}
+
+/**
+ * `express.raw` rejects an over-limit body with `entity.too.large`, which the shared
+ * error middleware does not recognise — it would surface as a 500, telling an
+ * operator who set the limit that the server broke. Translate it where the limit is
+ * known so the message can name it.
+ */
+const rawTarBody = express.raw({
+  type: 'application/x-tar',
+  limit: appConfig.docker.buildMaxContextSize,
+});
+function parseTarBody(req: AuthRequest, res: Response, next: NextFunction) {
+  rawTarBody(req, res, (err?: unknown) => {
+    if (err && (err as { type?: string }).type === 'entity.too.large') {
+      next(
+        new AppError(
+          `Build context is larger than the ${appConfig.docker.buildMaxContextSize} limit. Shrink it with a .dockerignore, or raise COMPUTE_BUILD_MAX_CONTEXT.`,
+          413,
+          ERROR_CODES.INVALID_INPUT
+        )
+      );
+      return;
+    }
+    next(err);
+  });
+}
+
+// Build an uploaded context and deploy the result.
+//
+// The body is the build context tarball itself, which is what Docker's build
+// endpoint natively consumes, so it is forwarded as-is. Pair with POST /deploy,
+// which reserves the name first.
+//
+// A note for whoever builds the tarball: archive it with `tar --no-xattrs` (or
+// COPYFILE_DISABLE=1) on macOS. Extended attributes the Linux daemon cannot apply
+// make it reject the whole context; the error is recognised and explained, but not
+// producing them is simpler.
+router.post(
+  '/:id/build',
+  verifyAdmin,
+  computeWriteLimiter,
+  oneBuildAtATime,
+  parseTarBody,
+  async (req: BuildRequest, res: Response, next: NextFunction) => {
+    // Take ownership of the build slot: from here the build outlives the client,
+    // so a disconnect must not hand the slot to someone else.
+    req.buildStarted = true;
+    const releaseBuildSlot = req.releaseBuildSlot ?? (() => {});
+    try {
+      const svc = ComputeServicesService.getInstance();
+      const existing = await svc.getService(req.params.id);
+
+      if (existing.projectId !== getProjectId(req)) {
+        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      }
+
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        throw new AppError(
+          'Build context must be a non-empty tar archive sent as application/x-tar.',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const dockerfile = parseDockerfileParam(req.query.dockerfile);
+      const result = await svc.buildAndDeploy(req.params.id, req.body, { dockerfile });
+
+      successResponse(res, {
+        service: result.service,
+        imageTag: result.imageTag,
+        logs: result.logs,
+      });
+
+      bestEffortAudit({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'BUILD_COMPUTE_SERVICE',
+        module: 'COMPUTE',
+        details: {
+          serviceId: req.params.id,
+          serviceName: existing.name,
+          imageTag: result.imageTag,
+          contextBytes: req.body.length,
+        },
+        ip_address: req.ip,
+      });
+      bestEffortBroadcast();
+    } catch (error) {
+      next(error);
+    } finally {
+      releaseBuildSlot();
     }
   }
 );

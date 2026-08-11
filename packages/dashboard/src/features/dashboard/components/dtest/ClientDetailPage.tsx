@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';
 import { Button, cn } from '@insforge/ui';
 import { ConnectionStringSectionV2 } from '#features/dashboard/components/connect/ConnectionStringSectionV2';
@@ -6,7 +7,13 @@ import { APIKeysSectionV2 } from '#features/dashboard/components/connect/APIKeys
 import { DTestMCPSection } from './DTestMCPSection';
 import { DTestCLISection } from './DTestCLISection';
 import { QuickStartPromptCard } from './QuickStartPromptCard';
-import { CLIENT_ENTRIES, DEFAULT_AGENT_TABS, type AgentTab, type ClientId } from './clientRegistry';
+import {
+  CLIENT_ENTRIES,
+  CLIENT_LABEL_I18N_KEYS,
+  DEFAULT_AGENT_TABS,
+  type AgentTab,
+  type ClientId,
+} from './clientRegistry';
 import {
   useApiKey,
   useAnonKey,
@@ -23,7 +30,11 @@ interface ClientDetailPageProps {
 }
 
 export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
+  const { t } = useTranslation('chrome');
   const entry = CLIENT_ENTRIES[clientId];
+  const entryLabel = CLIENT_LABEL_I18N_KEYS[clientId]
+    ? t(CLIENT_LABEL_I18N_KEYS[clientId] as string, { defaultValue: entry.label })
+    : entry.label;
   const declaredTabs = entry.tabs ?? DEFAULT_AGENT_TABS;
   const mcpVsCliVariant = getFeatureFlag(FEATURE_FLAGS.MCP_VS_CLI);
   const variantAllowed: ReadonlyArray<AgentTab> =
@@ -66,13 +77,13 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
           className="w-fit gap-1 px-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-5 w-5" />
-          All Clients
+          {t('overview.allClients', { defaultValue: 'All Clients' })}
         </Button>
 
         {/* Title row */}
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 shrink-0">{entry.detailIcon}</div>
-          <h1 className="text-[28px] font-medium leading-10 text-foreground">{entry.label}</h1>
+          <h1 className="text-[28px] font-medium leading-10 text-foreground">{entryLabel}</h1>
         </div>
 
         {/* Body per kind */}
@@ -93,7 +104,7 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
             )}
 
             {activeTab === 'cli' ? (
-              <DTestCLISection agentName={entry.label} />
+              <DTestCLISection agentName={entryLabel} />
             ) : (
               <DTestMCPSection
                 apiKey={displayApiKey}
@@ -107,7 +118,9 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
         ) : clientId === 'connection-string' ? (
           <div className="flex flex-col gap-3">
             <QuickStartPromptCard
-              subtitle="Paste this into your agent to setup Connection String"
+              subtitle={t('overview.connectionStringPromptSubtitle', {
+                defaultValue: 'Paste this into your agent to setup Connection String',
+              })}
               prompt={connectionStringPrompt}
             />
             <div className="rounded border border-[var(--alpha-8)] bg-card p-6">

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { RequireAuth } from './RequireAuth';
 import AILayout from '#features/ai/components/AILayout';
 import AIOverviewPage from '#features/ai/pages/AIOverviewPage';
+import AIUsagePage from '#features/ai/pages/AIUsagePage';
 import AIQuickStartPage from '#features/ai/pages/AIQuickStartPage';
 import AIModelsPage from '#features/ai/pages/AIModelsPage';
 import AnalyticsLayout from '#features/analytics/components/AnalyticsLayout';
@@ -64,13 +65,11 @@ import VisualizerPage from '#features/visualizer/pages/VisualizerPage';
 import AppLayout from '#layout/AppLayout';
 import { getFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
-import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 
 function AuthenticatedRoutes() {
   const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
   const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;
   const DashboardHomePage = isDTest ? DTestDashboardPage : DashboardPage;
-  const isCloudHosting = useIsCloudHostingMode();
 
   return (
     <AppLayout>
@@ -126,6 +125,7 @@ function AuthenticatedRoutes() {
         <Route path="/dashboard/ai" element={<AILayout />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<AIOverviewPage />} />
+          <Route path="usage" element={<AIUsagePage />} />
           <Route path="quick-start" element={<AIQuickStartPage />} />
           <Route path="models" element={<AIModelsPage />} />
         </Route>
@@ -150,22 +150,29 @@ function AuthenticatedRoutes() {
           <Route path="domains" element={<DeploymentDomainsPage />} />
         </Route>
         <Route path="/dashboard/compute" element={<ComputePage />} />
-        {isCloudHosting && (
-          <Route path="/dashboard/analytics" element={<AnalyticsLayout />}>
-            <Route index element={<Navigate to="traffic" replace />} />
-            <Route path="traffic" element={<TrafficPage />} />
-            <Route path="retention" element={<RetentionPage />} />
-            <Route path="session-replay" element={<SessionReplayPage />} />
-          </Route>
-        )}
-        {isCloudHosting && (
-          <Route path="/dashboard/webscraper" element={<WebscraperLayout />}>
-            <Route index element={<Navigate to="actors" replace />} />
-            <Route path="actors" element={<WebscraperActorsPage />} />
-            <Route path="runs" element={<WebscraperRunsPage />} />
-            <Route path="dataset" element={<WebscraperDatasetPage />} />
-          </Route>
-        )}
+        {/* Analytics ships in both host modes — self-hosting connects with the
+            admin's own PostHog personal API key — so this subtree is
+            deliberately ungated, matching AppSidebar, which pushes the nav entry
+            unconditionally. A cloud-only gate here would make the nav entry fall
+            through to the catch-all below and bounce self-hosted admins back to
+            /dashboard. */}
+        <Route path="/dashboard/analytics" element={<AnalyticsLayout />}>
+          <Route index element={<Navigate to="traffic" replace />} />
+          <Route path="traffic" element={<TrafficPage />} />
+          <Route path="retention" element={<RetentionPage />} />
+          <Route path="session-replay" element={<SessionReplayPage />} />
+        </Route>
+        {/* Web Scraper ships in both host modes — self-hosting connects with the
+            admin's own Apify token — so this subtree is deliberately ungated,
+            matching AppSidebar, which pushes the nav entry unconditionally. A
+            cloud-only gate here would make the nav entry fall through to the
+            catch-all below and bounce self-hosted admins back to /dashboard. */}
+        <Route path="/dashboard/webscraper" element={<WebscraperLayout />}>
+          <Route index element={<Navigate to="actors" replace />} />
+          <Route path="actors" element={<WebscraperActorsPage />} />
+          <Route path="runs" element={<WebscraperRunsPage />} />
+          <Route path="dataset" element={<WebscraperDatasetPage />} />
+        </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>

@@ -15,6 +15,8 @@ export interface DashboardUserInfo {
   userId: string;
   email: string;
   name?: string;
+  /** Account-level BCP 47 locale preference; null when the user has none. */
+  preferredLocale?: string | null;
 }
 
 export interface DashboardBackup {
@@ -69,6 +71,8 @@ export type DashboardMetricName =
   | 'disk_usage'
   | 'disk_used'
   | 'disk_total'
+  | 'disk_database'
+  | 'disk_wal'
   | 'network_in'
   | 'network_out';
 
@@ -208,6 +212,7 @@ export interface DashboardProps {
   ) => Promise<{ success: boolean; instanceType?: string; error?: string }>;
   onUpdateVersion?: () => Promise<void>;
   onRequestUserInfo?: () => Promise<DashboardUserInfo>;
+  onUpdatePreferredLocale?: (locale: string) => void;
   onRequestUserApiKey?: () => Promise<string>;
   onRequestModelCredits?: () => Promise<DashboardModelCreditUsage>;
   onRequestProjectMetrics?: (range: DashboardMetricsRange) => Promise<DashboardMetricsResponse>;

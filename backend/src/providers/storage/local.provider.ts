@@ -12,7 +12,6 @@ import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
   DownloadStrategyResponse,
-  DELETE_OBJECT_FAILURE_MESSAGE,
   UploadStrategyResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
@@ -116,7 +115,7 @@ export class LocalStorageProvider implements StorageProvider {
           });
           failed.push({
             key,
-            message: DELETE_OBJECT_FAILURE_MESSAGE,
+            message: 'Failed to delete object',
           });
         }
       });
@@ -212,7 +211,7 @@ export class LocalStorageProvider implements StorageProvider {
   private notImplemented(op: string): never {
     throw new AppError(
       `S3 protocol operation '${op}' requires an S3 storage backend. ` +
-        `Set AWS_S3_BUCKET (and optionally S3_ENDPOINT_URL for MinIO).`,
+        `Set S3_BUCKET (and optionally S3_ENDPOINT_URL for MinIO).`,
       501,
       ERROR_CODES.S3_PROTOCOL_UNAVAILABLE
     );

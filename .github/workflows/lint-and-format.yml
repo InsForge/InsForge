@@ -26,9 +26,12 @@ jobs:
       - name: Check insforge-dev skill copies are in sync
         run: scripts/sync-skills.sh --check
 
+      - name: Check deploy/setup.sh invariants
+        run: sh scripts/check-setup-sh.sh
+
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v45
+        uses: tj-actions/changed-files@48d8f15b2aaa3d255ca5af3eba4870f807ce6b3c # v45
         with:
           files: |
             **/*.{ts,tsx,js,jsx,mjs,cjs}
@@ -39,11 +42,33 @@ jobs:
 
       - name: Get changed files for Prettier
         id: changed-files-prettier
-        uses: tj-actions/changed-files@v45
+        uses: tj-actions/changed-files@48d8f15b2aaa3d255ca5af3eba4870f807ce6b3c # v45
 
       - name: Check Prettier formatting on changed files
         if: steps.changed-files-prettier.outputs.any_changed == 'true'
         run: npx prettier --check --ignore-unknown ${{ steps.changed-files-prettier.outputs.all_changed_files }}
+
+      - name: Get changed OpenAPI specs
+        id: changed-openapi
+        uses: tj-actions/changed-files@48d8f15b2aaa3d255ca5af3eba4870f807ce6b3c # v45
+        with:
+          files: openapi/**/*.yaml
+          separator: "\n"
+
+      - name: Validate changed OpenAPI specs
+        if: steps.changed-openapi.outputs.any_changed == 'true'
+        # The file list arrives through the environment rather than being
+        # interpolated into the script, so a filename cannot be read as shell
+        # syntax. Newline separated and read line by line so a name containing
+        # spaces stays one argument.
+        env:
+          CHANGED_SPECS: ${{ steps.changed-openapi.outputs.all_changed_files }}
+        run: |
+          while IFS= read -r spec; do
+            [ -n "$spec" ] || continue
+            echo "Validating $spec"
+            npx --yes @apidevtools/swagger-cli@4.0.4 validate "$spec"
+          done <<< "$CHANGED_SPECS"
 
       - name: Run TypeScript type checking
         run: npm run typecheck

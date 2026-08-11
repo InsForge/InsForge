@@ -12,6 +12,7 @@ import {
   type SubscribeResponse,
   type UnsubscribeChannelPayload,
   type PresenceMember,
+  type PresenceMemberEvent,
 } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { AppError } from '@/utils/errors.js';
@@ -206,14 +207,6 @@ export class SocketManager {
     };
 
     this.socketMetadata.set(socket.id, metadata);
-
-    // Join appropriate rooms based on user role
-    if (metadata.userId) {
-      void socket.join(`user:${metadata.userId}`);
-    }
-    if (metadata.role) {
-      void socket.join(`role:${metadata.role}`);
-    }
 
     logger.info('Socket client connected', {
       socketId: socket.id,
@@ -627,7 +620,7 @@ export class SocketManager {
       return;
     }
 
-    const message = this.buildSocketMessage(
+    const message: PresenceMemberEvent = this.buildSocketMessage(
       { member },
       {
         channel,

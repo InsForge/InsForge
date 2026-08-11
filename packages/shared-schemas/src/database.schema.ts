@@ -154,6 +154,17 @@ export const databaseBackupSchema = z.object({
   createdAt: z.string(),
   completedAt: z.string().nullable(),
   createdBy: z.string().nullable(),
+  // When retention will delete this backup; only set for scheduled backups
+  // while a retention period is configured.
+  expiresAt: z.string().nullable(),
+});
+
+// Self-hosting scheduled backup configuration. Retention applies to scheduled
+// backups only; manual backups are never auto-deleted.
+export const databaseBackupConfigSchema = z.object({
+  enabled: z.boolean(),
+  cronSchedule: z.string(),
+  retentionDays: z.number().int().positive().nullable(),
 });
 
 export type DatabaseFunction = z.infer<typeof databaseFunctionSchema>;
@@ -162,3 +173,4 @@ export type DatabasePolicy = z.infer<typeof databasePolicySchema>;
 export type DatabaseTrigger = z.infer<typeof databaseTriggerSchema>;
 export type Migration = z.infer<typeof migrationSchema>;
 export type DatabaseBackup = z.infer<typeof databaseBackupSchema>;
+export type DatabaseBackupConfig = z.infer<typeof databaseBackupConfigSchema>;

@@ -1,5 +1,6 @@
 import type { ScheduleSchema } from '@insforge/shared-schemas';
 import { format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import {
   Button,
@@ -31,6 +32,7 @@ export function ScheduleRow({
   isLoading,
   className,
 }: ScheduleRowProps) {
+  const { t } = useTranslation('chrome');
   return (
     <ListRow className={className} contentClassName="pl-2" onClick={onClick}>
       {/* Name Column */}
@@ -60,8 +62,8 @@ export function ScheduleRow({
           {schedule.isActive
             ? schedule.nextRun
               ? format(new Date(schedule.nextRun), 'MMM dd, yyyy HH:mm')
-              : 'Not scheduled'
-            : 'Inactive'}
+              : t('functions.notScheduled', { defaultValue: 'Not scheduled' })
+            : t('functions.inactive', { defaultValue: 'Inactive' })}
         </span>
       </ListRowCell>
 
@@ -70,7 +72,7 @@ export function ScheduleRow({
         <span className="text-sm text-foreground truncate" title={schedule.lastExecutedAt ?? ''}>
           {schedule.lastExecutedAt
             ? format(new Date(schedule.lastExecutedAt), 'MMM dd, yyyy HH:mm')
-            : 'Never'}
+            : t('functions.never', { defaultValue: 'Never' })}
         </span>
       </ListRowCell>
 
@@ -87,7 +89,10 @@ export function ScheduleRow({
           checked={Boolean(schedule.isActive)}
           onCheckedChange={(next) => onToggle(schedule.id, next)}
           disabled={isLoading}
-          aria-label={`${schedule.name} active toggle`}
+          aria-label={t('functions.activeToggleAria', {
+            name: schedule.name,
+            defaultValue: '{{name}} active toggle',
+          })}
         />
       </ListRowCell>
 
@@ -95,7 +100,14 @@ export function ScheduleRow({
       <ListRowCell className="w-12 shrink-0 justify-end" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" title={`Actions for ${schedule.name}`}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              title={t('functions.actionsFor', {
+                name: schedule.name,
+                defaultValue: 'Actions for {{name}}',
+              })}
+            >
               <MoreVertical className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -106,11 +118,11 @@ export function ScheduleRow({
           >
             <DropdownMenuItem onSelect={() => onEdit(schedule.id)}>
               <Pencil className="mr-2 h-4 w-4" />
-              <span>Edit</span>
+              <span>{t('functions.edit', { defaultValue: 'Edit' })}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onDelete(schedule.id)} className="text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
-              <span>Delete</span>
+              <span>{t('functions.delete', { defaultValue: 'Delete' })}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -54,6 +55,7 @@ function parsePoliciesFromResponse(response: DatabasePoliciesResponse | undefine
 }
 
 export default function PoliciesPage() {
+  const { t } = useTranslation('chrome');
   const location = useLocation();
   const navigate = useNavigate();
   const { selectedSchema, setSelectedSchema } = useDatabaseSchemaSelection();
@@ -108,21 +110,21 @@ export default function PoliciesPage() {
     () => [
       {
         key: 'tableName',
-        name: 'Table',
+        name: t('database.tableColumn', { defaultValue: 'Table' }),
         width: 'minmax(180px, 1.5fr)',
         resizable: true,
         sortable: true,
       },
       {
         key: 'policyName',
-        name: 'Name',
+        name: t('common.nameColumn', { defaultValue: 'Name' }),
         width: 'minmax(200px, 2fr)',
         resizable: true,
         sortable: true,
       },
       {
         key: 'cmd',
-        name: 'Command',
+        name: t('database.commandColumn', { defaultValue: 'Command' }),
         width: 'minmax(100px, 1fr)',
         resizable: true,
         sortable: true,
@@ -138,25 +140,32 @@ export default function PoliciesPage() {
       },
       {
         key: 'roles',
-        name: 'Roles',
+        name: t('database.rolesColumn', { defaultValue: 'Roles' }),
         width: 'minmax(150px, 1.5fr)',
         resizable: true,
       },
       {
         key: 'qual',
-        name: 'Using',
+        name: t('database.usingColumn', { defaultValue: 'Using' }),
         width: 'minmax(200px, 2fr)',
         resizable: true,
         renderCell: ({ row }) => (
           <SQLCellButton
             value={row.qual}
-            onClick={() => row.qual && setSqlModal({ open: true, title: 'Using', value: row.qual })}
+            onClick={() =>
+              row.qual &&
+              setSqlModal({
+                open: true,
+                title: t('database.usingColumn', { defaultValue: 'Using' }),
+                value: row.qual,
+              })
+            }
           />
         ),
       },
       {
         key: 'withCheck',
-        name: 'With Check',
+        name: t('database.withCheckColumn', { defaultValue: 'With Check' }),
         width: 'minmax(200px, 2fr)',
         resizable: true,
         renderCell: ({ row }) => (
@@ -164,13 +173,17 @@ export default function PoliciesPage() {
             value={row.withCheck}
             onClick={() =>
               row.withCheck &&
-              setSqlModal({ open: true, title: 'With Check', value: row.withCheck })
+              setSqlModal({
+                open: true,
+                title: t('database.withCheckColumn', { defaultValue: 'With Check' }),
+                value: row.withCheck,
+              })
             }
           />
         ),
       },
     ],
-    [setSqlModal]
+    [setSqlModal, t]
   );
 
   useEffect(() => {
@@ -198,7 +211,11 @@ export default function PoliciesPage() {
           </Button>
         </TooltipTrigger>
         <TooltipContent side="bottom" align="center">
-          <p>{isRefreshing ? 'Refreshing...' : 'Refresh policies'}</p>
+          <p>
+            {isRefreshing
+              ? t('common.refreshing', { defaultValue: 'Refreshing...' })
+              : t('database.refreshPolicies', { defaultValue: 'Refresh policies' })}
+          </p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -220,8 +237,14 @@ export default function PoliciesPage() {
         />
         <div className="min-w-0 flex-1 flex items-center justify-center bg-[rgb(var(--semantic-1))]">
           <EmptyState
-            title="Failed to load policies"
-            description={error instanceof Error ? error.message : 'An error occurred'}
+            title={t('database.failedToLoadPolicies', {
+              defaultValue: 'Failed to load policies',
+            })}
+            description={
+              error instanceof Error
+                ? error.message
+                : t('common.anErrorOccurred', { defaultValue: 'An error occurred' })
+            }
           />
         </div>
       </div>
@@ -243,7 +266,7 @@ export default function PoliciesPage() {
       />
       <div className="min-w-0 flex-1 flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
         <TableHeader
-          title="RLS Policies"
+          title={t('database.rlsPolicies', { defaultValue: 'RLS Policies' })}
           showDividerAfterTitle
           titleButtons={
             <div className="w-56">
@@ -262,11 +285,14 @@ export default function PoliciesPage() {
           leftSlot={refreshButton}
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
-          searchPlaceholder="Search policy"
+          searchPlaceholder={t('database.searchPolicy', { defaultValue: 'Search policy' })}
         />
         {isLoading ? (
           <div className="min-h-0 flex-1 flex items-center justify-center">
-            <EmptyState title="Loading policies..." description="Please wait" />
+            <EmptyState
+              title={t('database.loadingPolicies', { defaultValue: 'Loading policies...' })}
+              description={t('common.pleaseWait', { defaultValue: 'Please wait' })}
+            />
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-hidden">
@@ -280,7 +306,9 @@ export default function PoliciesPage() {
               pageSize={pageSize}
               pageSizeOptions={pageSizeOptions}
               totalRecords={filteredPolicies.length}
-              paginationRecordLabel="policies"
+              paginationRecordLabel={t('database.policiesRecordLabel', {
+                defaultValue: 'policies',
+              })}
               onPageChange={setCurrentPage}
               onPageSizeChange={onPageSizeChange}
               noPadding={true}
@@ -289,7 +317,11 @@ export default function PoliciesPage() {
               emptyState={
                 <DataGridEmptyState
                   message={
-                    searchQuery ? 'No policies match your search criteria' : 'No policies found'
+                    searchQuery
+                      ? t('database.noPoliciesMatchSearch', {
+                          defaultValue: 'No policies match your search criteria',
+                        })
+                      : t('database.noPoliciesFound', { defaultValue: 'No policies found' })
                   }
                 />
               }

@@ -1,9 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { SmtpConfigSchema, UpsertSmtpConfigRequest } from '@insforge/shared-schemas';
 import { smtpConfigService } from '#features/auth/services/smtp-config.service';
 import { useToast } from '@insforge/ui';
 
-export function useSmtpConfig() {
+interface UseSmtpConfigOptions {
+  enabled?: boolean;
+}
+
+export function useSmtpConfig({ enabled = true }: UseSmtpConfigOptions = {}) {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -16,17 +22,29 @@ export function useSmtpConfig() {
   } = useQuery<SmtpConfigSchema>({
     queryKey: ['smtp-config'],
     queryFn: () => smtpConfigService.getConfig(),
+    enabled,
   });
 
   // Mutation to update SMTP configuration
   const updateConfigMutation = useMutation({
     mutationFn: (config: UpsertSmtpConfigRequest) => smtpConfigService.updateConfig(config),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['smtp-config'] });
-      showToast('SMTP configuration updated successfully', 'success');
+    onSuccess: (config) => {
+      queryClient.setQueryData(['smtp-config'], config);
+      showToast(
+        t('auth.smtpConfigUpdatedToast', {
+          defaultValue: 'SMTP configuration updated successfully',
+        }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to update SMTP configuration', 'error');
+      showToast(
+        error.message ||
+          t('auth.smtpConfigUpdateFailed', {
+            defaultValue: 'Failed to update SMTP configuration',
+          }),
+        'error'
+      );
     },
   });
 

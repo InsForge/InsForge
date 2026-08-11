@@ -1,0 +1,143 @@
+---
+title: Swift 实时 SDK 参考
+description: 通过 Socket.IO 连接、订阅频道、发布事件、跟踪状态并在 Apple 上使用 InsForge Swift 实时客户端处理重新连接。
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+## 安装
+
+<SwiftSdkInstallation />
+
+## 思维模型
+
+Swift SDK 通过 Socket.IO 连接到 InsForge 实时。订阅频道名称，如 `order:123` 或 `chat:room-1`，然后监听发布到这些频道的事件名称。
+
+事件由数据库触发器发布，这些触发器调用 `realtime.publish(...)` 或由已加入频道的客户端发布。有关频道和 RLS 模型的详细信息，请参阅[实时概览](/core-concepts/realtime/overview)。
+
+## 快速入门
+
+```swift
+try await insforge.realtime.connect()
+
+await insforge.realtime.subscribe(to: "order:\\(orderId)") { message in
+    if message.eventName == "status_changed" {
+        print("Payload: \\(String(describing: message.payload))")
+    }
+}
+```
+
+## connect()
+
+建立实时连接。
+
+```swift
+do {
+    try await insforge.realtime.connect()
+    print("Connected to realtime")
+} catch {
+    print("Connection failed: \\(error)")
+}
+```
+
+## subscribe()
+
+订阅一个频道并接收发布到该频道的消息。
+
+```swift
+await insforge.realtime.subscribe(to: "chat:room-1") { message in
+    print("Event: \\(message.eventName ?? "")")
+    print("Channel: \\(message.channelName ?? "")")
+
+    if let payload = message.payload {
+        print("Payload: \\(payload)")
+    }
+}
+```
+
+如果在 `realtime.channels` 上启用了 RLS，订阅会根据 `SELECT` 策略进行检查。
+
+## publish()
+
+发布一个事件到频道。
+
+```swift
+try await insforge.realtime.publish(
+    to: "chat:room-1",
+    event: "new_message",
+    payload: [
+        "text": "Hello from Swift",
+        "sentAt": ISO8601DateFormatter().string(from: Date())
+    ]
+)
+```
+
+<Note>
+  客户端必须订阅频道才能发布到该频道。
+</Note>
+
+如果在 `realtime.messages` 上启用了 RLS，发布也会根据 `INSERT` 策略进行检查。
+
+## unsubscribe()
+
+离开频道。
+
+```swift
+await insforge.realtime.unsubscribe(from: "chat:room-1")
+```
+
+## disconnect()
+
+关闭实时连接。
+
+```swift
+await insforge.realtime.disconnect()
+```
+
+## 频道 API
+
+频道 API 为一个频道名称分组操作。
+
+```swift
+let channel = await insforge.realtime.channel("chat:room-1")
+try await channel.subscribe()
+```
+
+### 广播消息
+
+监听事件：
+
+```swift
+let channel = await insforge.realtime.channel("chat:room-1")
+try await channel.subscribe()
+
+for await message in await channel.broadcast(event: "new_message") {
+    print("Payload: \\(message.payload)")
+}
+```
+
+通过频道发布：
+
+```swift
+struct ChatMessage: Codable {
+    let text: String
+    let author: String
+}
+
+try await channel.broadcast(
+    event: "new_message",
+    message: ChatMessage(text: "Hello", author: currentUser.name)
+)
+```
+
+不再需要频道对象时将其移除：
+
+```swift
+await insforge.realtime.removeChannel("chat:room-1")
+```
+
+## 状态
+
+成功订阅会返回当前状态快照，SDK API 支持时。通过频道或 SDK 公开的较低级事件 API 监听状态更新。
+
+状态是临时的在线状态。它不存储在 Postgres 中。

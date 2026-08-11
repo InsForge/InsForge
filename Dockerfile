@@ -115,6 +115,16 @@ ENV LOGS_DIR=/insforge-logs
 ENV MAX_JSON_BODY_SIZE=100mb
 ENV MAX_URLENCODED_BODY_SIZE=10mb
 
+# Express production mode + telemetry runtime_environment classification.
+# Only safe in this stage: node_modules are copied in prebuilt, so no npm
+# install runs under it. Do NOT set this in the dev stage — its containers
+# run `npm install` at startup, which would skip devDependencies.
+ENV NODE_ENV=production
+
+# Telemetry deployment-channel default for bare `docker run`. Compose files
+# and PaaS templates override it; platform-injected vars win over both.
+ENV INSFORGE_DEPLOYMENT_METHOD=docker
+
 RUN mkdir -p /data /insforge-storage /insforge-logs && \
     chown node:node /data /insforge-storage /insforge-logs
 
@@ -156,7 +166,11 @@ USER node
 EXPOSE 7130 7131
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "cd backend && npm run migrate:up && cd .. && exec npm start"]
+# Exec node directly instead of `npm start`: the npm wrapper chain
+# (npm start -> npm run start -> node) keeps two extra npm processes resident
+# (~20-40MB on a 512MB nano) and breaks direct signal delivery. cwd stays
+# /app/backend, matching what `npm run start` ("node ../dist/server.js") used.
+CMD ["sh", "-c", "cd backend && npm run migrate:up && exec node ../dist/server.js"]
 
 
 # ============================================================

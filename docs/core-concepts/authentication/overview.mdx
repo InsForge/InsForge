@@ -1,7 +1,7 @@
 ---
 title: "Authentication"
 sidebarTitle: "Overview"
-description: "Use InsForge to authenticate and authorize your users."
+description: "Authenticate and authorize users in InsForge with email, magic links, one-time codes, OAuth, OIDC providers, and JWT-based sessions."
 ---
 
 Use InsForge Authentication to handle sign-up, login, sessions, and identity for your app. Users can sign in with email and password, magic link, one-time code, OAuth providers (Google, GitHub, Apple, and others), or any OIDC-compliant identity provider you bring. InsForge issues JSON Web Tokens on login, and every other product on the platform consumes the same token.
@@ -52,6 +52,10 @@ graph TB
 
 The default. New users sign up with an email and password, get a confirmation email, and receive a session JWT on login. Password reset, email verification, and brute-force throttling are built in.
 
+<Note>
+  **Self-hosting?** Sending these emails, including passwordless magic-link and one-time-code sign-in, requires an email provider. Cloud-linked projects use the managed sender automatically; a self-hosted instance must set up [Custom SMTP](/core-concepts/messaging/custom-smtp) first, otherwise verification, reset, and sign-in emails will not be delivered.
+</Note>
+
 ### Magic link and OTP
 
 Send a one-time link or six-digit code to the user's email. Passwordless sign-in, account recovery, and step-up auth all use the same primitive.
@@ -71,6 +75,8 @@ The auth JWT flows through every InsForge SDK call automatically. Postgres RLS p
 ### `auth.users` in your database
 
 User state lives in your project's Postgres database in the `auth` schema. Join `auth.users` to your application tables via foreign keys, react to identity changes with triggers, and back the whole thing up the same way you back up everything else.
+
+When you add a user from the dashboard, the Auto-confirm toggle sets `email_verified` on the new row. Enable it to mark the email as verified at creation, so the user can sign in without confirming it.
 
 ## Build with it
 

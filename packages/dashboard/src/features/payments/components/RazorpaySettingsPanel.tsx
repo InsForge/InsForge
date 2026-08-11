@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ExternalLink, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button, ConfirmDialog, CopyButton } from '@insforge/ui';
 import type { PaymentEnvironment, RazorpayKeyConfig } from '@insforge/shared-schemas';
@@ -109,6 +110,7 @@ function isPublicHttpsWebhookUrl(value: string) {
  * calls `reset()` on close.
  */
 export function useRazorpaySettings(open: boolean) {
+  const { t } = useTranslation('chrome');
   const { keys, isLoading, error, saveKey, removeKey } = useRazorpayConfig();
   const { syncPayments } = useRazorpaySync();
   const { rotateWebhookSecret } = useRazorpayWebhook();
@@ -169,7 +171,9 @@ export function useRazorpaySettings(open: boolean) {
     if (!keyId || !secretKey) {
       setErrors((current) => ({
         ...current,
-        [environment]: 'Please enter both Key ID and Key Secret.',
+        [environment]: t('payments.enterKeyIdAndSecret', {
+          defaultValue: 'Please enter both Key ID and Key Secret.',
+        }),
       }));
       return;
     }
@@ -177,7 +181,10 @@ export function useRazorpaySettings(open: boolean) {
     if (!keyId.startsWith(expectedPrefix)) {
       setErrors((current) => ({
         ...current,
-        [environment]: `Razorpay Key ID must start with ${expectedPrefix}`,
+        [environment]: t('payments.razorpayKeyIdPrefixError', {
+          defaultValue: 'Razorpay Key ID must start with {{prefix}}',
+          prefix: expectedPrefix,
+        }),
       }));
       return;
     }
@@ -196,7 +203,12 @@ export function useRazorpaySettings(open: boolean) {
     } catch (err) {
       setErrors((current) => ({
         ...current,
-        [environment]: err instanceof Error ? err.message : 'Failed to remove Razorpay keys.',
+        [environment]:
+          err instanceof Error
+            ? err.message
+            : t('payments.removeRazorpayKeysFailed', {
+                defaultValue: 'Failed to remove Razorpay keys',
+              }),
       }));
     }
   };
@@ -308,11 +320,15 @@ function RazorpayKeysTabContent({
   onSave: (environment: PaymentEnvironment) => void;
   onRemove: (environment: PaymentEnvironment) => void;
 }) {
+  const { t } = useTranslation('chrome');
   if (isLoading && !error) {
     return (
       <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Loading Razorpay key configuration...
+        {t('payments.loadingKeyConfiguration', {
+          defaultValue: 'Loading {{provider}} key configuration...',
+          provider: 'Razorpay',
+        })}
       </div>
     );
   }
@@ -320,7 +336,11 @@ function RazorpayKeysTabContent({
   if (error) {
     return (
       <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-        Failed to load Razorpay key configuration. Close the dialog and try again.
+        {t('payments.loadKeyConfigurationFailed', {
+          defaultValue:
+            'Failed to load {{provider}} key configuration. Close the dialog and try again.',
+          provider: 'Razorpay',
+        })}
       </div>
     );
   }
@@ -329,7 +349,9 @@ function RazorpayKeysTabContent({
     <div className="flex flex-col gap-6">
       <div>
         <p className="text-sm leading-6 text-muted-foreground">
-          Configure the Razorpay API Keys to use Payments.
+          {t('payments.razorpayKeysIntro', {
+            defaultValue: 'Configure the Razorpay API Keys to use Payments.',
+          })}
         </p>
       </div>
 
@@ -344,7 +366,10 @@ function RazorpayKeysTabContent({
 
           const hasAnyKey = Boolean(envIdKey?.value || envSecretKey?.value);
           const expectedPrefix = RAZORPAY_PREFIX_BY_ENVIRONMENT[environment];
-          const environmentLabel = environment === 'test' ? 'Test Mode' : 'Live Mode';
+          const environmentLabel =
+            environment === 'test'
+              ? t('payments.testMode', { defaultValue: 'Test Mode' })
+              : t('payments.liveMode', { defaultValue: 'Live Mode' });
           const savedKeyId = envIdKey?.value ?? '';
           const savedKeySecret = envSecretKey?.value ?? '';
           const hasPendingInput =
@@ -359,9 +384,13 @@ function RazorpayKeysTabContent({
                 label={environmentLabel}
                 description={
                   <>
-                    Use a Razorpay Key ID that starts with{' '}
-                    <span className="font-mono text-foreground">{expectedPrefix}</span> and its
-                    matching Key Secret.
+                    {t('payments.razorpayKeyIdHintBefore', {
+                      defaultValue: 'Use a Razorpay Key ID that starts with',
+                    })}{' '}
+                    <span className="font-mono text-foreground">{expectedPrefix}</span>{' '}
+                    {t('payments.razorpayKeyIdHintAfter', {
+                      defaultValue: 'and its matching Key Secret.',
+                    })}
                   </>
                 }
               >
@@ -372,7 +401,7 @@ function RazorpayKeysTabContent({
                         htmlFor={keyIdInputId}
                         className="text-xs font-medium text-muted-foreground"
                       >
-                        Key ID
+                        {t('payments.keyId', { defaultValue: 'Key ID' })}
                       </label>
                       <input
                         id={keyIdInputId}
@@ -389,7 +418,7 @@ function RazorpayKeysTabContent({
                         htmlFor={keySecretInputId}
                         className="text-xs font-medium text-muted-foreground"
                       >
-                        Key Secret
+                        {t('payments.keySecret', { defaultValue: 'Key Secret' })}
                       </label>
                       <div className="relative">
                         <input
@@ -397,7 +426,9 @@ function RazorpayKeysTabContent({
                           type={visibleKeys[environment] ? 'text' : 'password'}
                           value={keySecretInputs[environment]}
                           onChange={(event) => onSecretInputChange(environment, event.target.value)}
-                          placeholder="Enter key secret"
+                          placeholder={t('payments.enterKeySecret', {
+                            defaultValue: 'Enter key secret',
+                          })}
                           disabled={isBusy}
                           className="h-8 w-full rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] px-2.5 pr-9 text-sm leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:shadow-[0_0_0_1px_rgb(var(--inverse)),0_0_0_2px_rgb(var(--foreground))] hover:bg-[var(--alpha-4)] disabled:opacity-50"
                         />
@@ -406,7 +437,9 @@ function RazorpayKeysTabContent({
                           onClick={() => onToggleShowKey(environment)}
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                           aria-label={
-                            visibleKeys[environment] ? 'Hide key secret' : 'Show key secret'
+                            visibleKeys[environment]
+                              ? t('payments.hideKeySecret', { defaultValue: 'Hide key secret' })
+                              : t('payments.showKeySecret', { defaultValue: 'Show key secret' })
                           }
                           disabled={isBusy}
                         >
@@ -436,7 +469,7 @@ function RazorpayKeysTabContent({
                             disabled={isBusy}
                             className="h-7 px-2"
                           >
-                            Remove
+                            {t('payments.remove', { defaultValue: 'Remove' })}
                           </Button>
                         )}
 
@@ -450,7 +483,7 @@ function RazorpayKeysTabContent({
                             className="h-7 px-2"
                           >
                             {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                            Save
+                            {t('payments.save', { defaultValue: 'Save' })}
                           </Button>
                         )}
                       </div>
@@ -478,11 +511,14 @@ function RazorpayWebhooksTabContent({
   isBusy: boolean;
   onGoToKeys: () => void;
 }) {
+  const { t } = useTranslation('chrome');
   return (
     <div className="flex flex-col gap-6">
       <div>
         <p className="text-sm leading-6 text-muted-foreground">
-          Razorpay webhooks must be added manually in the Razorpay Dashboard.
+          {t('payments.razorpayWebhooksIntro', {
+            defaultValue: 'Razorpay webhooks must be added manually in the Razorpay Dashboard.',
+          })}
         </p>
       </div>
 
@@ -505,32 +541,58 @@ function RazorpayWebhooksTabContent({
 }
 
 function RazorpayWebhookManualSetupGuidance() {
+  const { t } = useTranslation('chrome');
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded border border-[var(--alpha-8)] p-3">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-medium text-foreground">Manual setup steps</p>
+          <p className="text-sm font-medium text-foreground">
+            {t('payments.manualSetupSteps', { defaultValue: 'Manual setup steps' })}
+          </p>
           <a
             href={RAZORPAY_WEBHOOK_DOCS_URL}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
           >
-            Razorpay docs
+            {t('payments.razorpayDocs', { defaultValue: 'Razorpay docs' })}
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
         </div>
         <ol className="mt-3 list-decimal space-y-1 pl-4 text-xs leading-5 text-muted-foreground">
-          <li>Open Razorpay Dashboard and go to Accounts &amp; Settings → Webhooks.</li>
-          <li>Add a webhook for each environment you enable.</li>
-          <li>Paste the matching environment&apos;s Webhook URL and Webhook Secret above.</li>
-          <li>Select the Active Events listed below.</li>
-          <li>Save the webhook, then make a test payment to verify delivery.</li>
+          <li>
+            {t('payments.razorpayWebhookStep1', {
+              defaultValue: 'Open Razorpay Dashboard and go to Accounts & Settings → Webhooks.',
+            })}
+          </li>
+          <li>
+            {t('payments.razorpayWebhookStep2', {
+              defaultValue: 'Add a webhook for each environment you enable.',
+            })}
+          </li>
+          <li>
+            {t('payments.razorpayWebhookStep3', {
+              defaultValue:
+                "Paste the matching environment's Webhook URL and Webhook Secret above.",
+            })}
+          </li>
+          <li>
+            {t('payments.razorpayWebhookStep4', {
+              defaultValue: 'Select the Active Events listed below.',
+            })}
+          </li>
+          <li>
+            {t('payments.razorpayWebhookStep5', {
+              defaultValue: 'Save the webhook, then make a test payment to verify delivery.',
+            })}
+          </li>
         </ol>
       </div>
 
       <div className="rounded border border-[var(--alpha-8)] p-3">
-        <p className="text-sm font-medium text-foreground">Active Events to select</p>
+        <p className="text-sm font-medium text-foreground">
+          {t('payments.activeEventsToSelect', { defaultValue: 'Active Events to select' })}
+        </p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {RAZORPAY_RECOMMENDED_WEBHOOK_EVENTS.map((event) => (
             <span
@@ -559,8 +621,12 @@ function RazorpayWebhookEnvironmentSection({
   isBusy: boolean;
   onGoToKeys: () => void;
 }) {
+  const { t } = useTranslation('chrome');
   const [isRotateConfirmOpen, setIsRotateConfirmOpen] = useState(false);
-  const environmentLabel = environment === 'test' ? 'Test mode' : 'Live mode';
+  const environmentLabel =
+    environment === 'test'
+      ? t('payments.testMode', { defaultValue: 'Test Mode' })
+      : t('payments.liveMode', { defaultValue: 'Live Mode' });
   const hasKeyId = keys.some(
     (key) => key.environment === environment && key.keyType === 'api_key' && Boolean(key.value)
   );
@@ -579,32 +645,47 @@ function RazorpayWebhookEnvironmentSection({
       label={environmentLabel}
       description={
         isKeyConfigured
-          ? 'Copy these values into the Razorpay Dashboard for this environment.'
-          : 'Configure Razorpay keys first.'
+          ? t('payments.razorpayWebhookCopyValues', {
+              defaultValue: 'Copy these values into the Razorpay Dashboard for this environment.',
+            })
+          : t('payments.configureRazorpayKeysFirst', {
+              defaultValue: 'Configure Razorpay keys first.',
+            })
       }
     >
       {!isKeyConfigured ? (
         <div className="rounded border border-[var(--alpha-8)] bg-muted/40 p-4">
-          <p className="text-sm text-muted-foreground">Configure Razorpay keys first.</p>
+          <p className="text-sm text-muted-foreground">
+            {t('payments.configureRazorpayKeysFirst', {
+              defaultValue: 'Configure Razorpay keys first.',
+            })}
+          </p>
           <Button type="button" size="sm" className="mt-3 h-8" onClick={onGoToKeys}>
-            Connection Keys
+            {t('payments.connectionKeys', { defaultValue: 'Connection Keys' })}
           </Button>
         </div>
       ) : setupQuery.isLoading ? (
         <div className="flex min-h-[96px] items-center justify-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Loading Razorpay webhook setup values...
+          {t('payments.loadingRazorpayWebhookSetup', {
+            defaultValue: 'Loading Razorpay webhook setup values...',
+          })}
         </div>
       ) : setupQuery.error || !setup ? (
         <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-          Failed to load Razorpay webhook setup values. Close the dialog and try again.
+          {t('payments.loadRazorpayWebhookSetupFailed', {
+            defaultValue:
+              'Failed to load Razorpay webhook setup values. Close the dialog and try again.',
+          })}
         </div>
       ) : (
         <div className="flex flex-col gap-4">
           <div className="rounded border border-[var(--alpha-8)] bg-muted/40 p-3">
             <div className="grid gap-3 text-xs">
               <div className="grid grid-cols-[112px_minmax(0,1fr)_auto] items-center gap-3">
-                <span className="text-muted-foreground">Webhook URL</span>
+                <span className="text-muted-foreground">
+                  {t('payments.webhookUrl', { defaultValue: 'Webhook URL' })}
+                </span>
                 <span className="min-w-0 break-all font-mono text-foreground">
                   {setup.webhookUrl}
                 </span>
@@ -612,11 +693,15 @@ function RazorpayWebhookEnvironmentSection({
               </div>
               {!isWebhookUrlPublic && (
                 <div className="rounded border border-destructive/20 bg-destructive/10 p-2 text-xs text-destructive">
-                  Razorpay can only deliver webhooks to a public HTTPS URL.
+                  {t('payments.razorpayWebhookPublicHttps', {
+                    defaultValue: 'Razorpay can only deliver webhooks to a public HTTPS URL.',
+                  })}
                 </div>
               )}
               <div className="grid grid-cols-[112px_minmax(0,1fr)_auto_auto] items-center gap-3">
-                <span className="text-muted-foreground">Webhook Secret</span>
+                <span className="text-muted-foreground">
+                  {t('payments.webhookSecret', { defaultValue: 'Webhook Secret' })}
+                </span>
                 <span className="min-w-0 break-all font-mono text-foreground">
                   {setup.webhookSecret}
                 </span>
@@ -630,7 +715,7 @@ function RazorpayWebhookEnvironmentSection({
                   onClick={() => setIsRotateConfirmOpen(true)}
                 >
                   {isRotating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                  Rotate
+                  {t('payments.rotate', { defaultValue: 'Rotate' })}
                 </Button>
               </div>
             </div>
@@ -639,10 +724,15 @@ function RazorpayWebhookEnvironmentSection({
           <ConfirmDialog
             open={isRotateConfirmOpen}
             onOpenChange={setIsRotateConfirmOpen}
-            title="Rotate Razorpay webhook secret?"
-            description="Rotating the webhook secret will break existing Razorpay webhook deliveries until you update the secret in Razorpay Dashboard."
-            cancelText="Cancel"
-            confirmText="Rotate"
+            title={t('payments.rotateWebhookSecretTitle', {
+              defaultValue: 'Rotate Razorpay webhook secret?',
+            })}
+            description={t('payments.rotateWebhookSecretDescription', {
+              defaultValue:
+                'Rotating the webhook secret will break existing Razorpay webhook deliveries until you update the secret in Razorpay Dashboard.',
+            })}
+            cancelText={t('payments.cancel', { defaultValue: 'Cancel' })}
+            confirmText={t('payments.rotate', { defaultValue: 'Rotate' })}
             destructive
             isLoading={isRotating}
             onConfirm={async () => {

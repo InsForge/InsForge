@@ -1,0 +1,288 @@
+---
+title: "InsForge FAQ: databases, schemas, edge functions, and SDK"
+sidebarTitle: "FAQ"
+description: "Answers to common InsForge questions on database calls, edge functions, custom compute, querying non-public schemas from the SDK, and RLS."
+---
+
+<AccordionGroup>
+  <Accordion title="Is reading or writing the database an edge function? What's the difference between database calls, edge functions, and custom compute?">
+    No. When you read or write a table, no function runs at all, so it isn't an edge function.
+
+    In InsForge your code talks to the backend in three different ways, and they're easy to mix up:
+
+    | | How it's triggered | Does it keep running? | What it's for |
+    |----|--------------------|-----------------------|---------------|
+    | **Database call** (auto-generated REST API) | Your client sends an SDK or REST request | No, it's fully managed | Reading and writing table rows |
+    | **Edge Function** | An HTTP request, a cron schedule, or a database trigger | No, it runs once and exits | Custom endpoints, webhooks, trigger logic, calling external services |
+    | **Custom Compute** | You start a long-running process | Yes, it stays up | Queue workers, AI inference loops, websockets, anything that holds state |
+
+    **Database call.** Define a table and InsForge instantly gives you a set of REST endpoints (like `GET /api/database/records/{table}`) and a typed SDK. Calling `select` or `insert` reads and writes the database directly, with nothing to deploy and nothing running. This is all you need for ordinary create/read/update/delete. See [Database](/core-concepts/database/overview).
+
+    **Edge Function.** Reach for one when the auto-generated API isn't enough and you want your own server-side logic: a payment webhook, an auth hook, code that fires when a row is `INSERT`ed / `UPDATE`d / `DELETE`d, or a scheduled job. The point is that it runs once per request or event and then exits. See [Edge Functions](/core-concepts/functions/overview).
+
+    **Custom Compute.** Use this when you need a process that stays up, like a queue worker or an AI inference loop. An edge function can't do this because it doesn't run continuously. See [Custom Compute](/core-concepts/compute/overview).
+
+    Quick rule: just moving data in and out? That's the database (auto REST). Writing logic that runs and finishes? Edge function. Need something running all the time? Custom compute.
+  </Accordion>
+
+  <Accordion title="How do I query a table in a schema other than `public`?">
+    By default all of your tables live in `public`. You only have another schema if you created one yourself with `CREATE SCHEMA` (InsForge's own internal schemas, like `auth` and `storage`, aren't exposed to the data API, so `.schema()` and `?schema=` can't reach them; as project admin you can still read them with raw SQL, e.g. `insforge db query` or the dashboard SQL editor). Once you have one, you can read and write it from the dashboard, the REST API, the CLI, and the SDK.
+
+    The examples below use a schema you created called `my_schema`.
+
+    **Dashboard.** Open **Database** and use the schema selector at the top of the sidebar. Any schema you created is listed alongside `public`, and picking it browses that schema's tables.
+
+    **REST API.** The records endpoint takes the target schema either as a query param or as a PostgREST profile header. Reads use `Accept-Profile`, writes and RPC use `Content-Profile`:
+
+    ```bash
+    # read: ?schema= param, or an Accept-Profile header
+    curl "$PROJECT_URL/api/database/records/mytable?schema=my_schema" \
+      -H "Authorization: Bearer $TOKEN"
+
+    # write: send Content-Profile
+    curl -X POST "$PROJECT_URL/api/database/records/mytable" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Profile: my_schema" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "hello"}'
+    ```
+
+    **CLI.** The CLI reads and writes any schema through `db query`, just schema-qualify the table:
+
+    ```bash
+    insforge db query "SELECT * FROM my_schema.mytable"
+    ```
+
+    **SDK.** Chain `.schema()` before the query builder (supported by `@insforge/sdk`). It maps to the same `Accept-Profile` / `Content-Profile` header, so reads, writes, and RPC all route to the schema you name:
+
+    ```javascript
+    // read
+    const { data } = await client.database
+      .schema('my_schema')
+      .from('mytable')
+      .select('*')
+
+    // write
+    await client.database
+      .schema('my_schema')
+      .from('mytable')
+      .insert([{ name: 'hello' }])
+
+    // RPC
+    await client.database.schema('my_schema').rpc('my_function', { day: '2026-01-01' })
+    ```
+
+    One more step for API access: a custom schema is only routable, not readable. The `anon` and `authenticated` roles have no privileges on it until you grant them, no matter who owns the tables, so calls come back empty or permission-denied until you do. Grant each role you expose, then add RLS:
+
+    ```sql
+    GRANT USAGE ON SCHEMA my_schema TO anon, authenticated;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA my_schema TO anon, authenticated;
+    ```
+
+    Row visibility is then gated by RLS as usual. Project-admin ownership only lets the admin manage and directly query the tables (for example from the dashboard SQL editor); it does not give the API roles access.
+  </Accordion>
+
+  <Accordion title="How do I turn row-level security (RLS) on or off for a table?">
+    New tables have RLS **on** by default. When you create a table (from the dashboard, `POST /api/database/tables`, or the SDK), RLS is enabled unless you explicitly pass `rlsEnabled: false`.
+
+    There is no field to toggle RLS on the update-table-schema endpoint (`PATCH /api/database/tables/{table}/schema`) — it only handles columns, foreign keys, and renames. To change RLS on an **existing** table, run one SQL statement:
+
+    ```sql
+    -- turn RLS off
+    ALTER TABLE public.mytable DISABLE ROW LEVEL SECURITY;
+
+    -- turn RLS back on
+    ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;
+    ```
+
+    Run that SQL any way you run admin SQL, all of which require project-owner / admin access:
+
+    ```bash
+    # one-off, via the CLI
+    insforge db query "ALTER TABLE public.mytable DISABLE ROW LEVEL SECURITY"
+
+    # or track it as a migration
+    npx @insforge/cli db migrations new disable-rls-on-mytable
+    # put the ALTER TABLE statement in the generated .sql file, then:
+    npx @insforge/cli db migrations up --all
+    ```
+
+    You can also run it from the dashboard SQL editor, the MCP `run-raw-sql` tool, or the raw SQL REST endpoint (`POST /api/database/advance/rawsql/unrestricted`).
+
+    <Warning>
+      Turning RLS **off** removes all row-level filtering: any role with table privileges (such as `authenticated`, and `anon` where granted) can read and write every row through the data API. Prefer writing RLS policies over disabling RLS. Admin requests made with the API Key (`ik_...`) bypass RLS either way.
+
+      Turning RLS **on** for a table that has no policies applies PostgreSQL's default-deny: `anon` and `authenticated` lose all access to it through the data API (every `SELECT`/`INSERT`/`UPDATE`/`DELETE` is blocked) until you add at least one policy. Add the policies you need before, or right after, enabling RLS.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="Does InsForge have a `service_role` key / `INSFORGE_SERVICE_ROLE_KEY`?">
+    Not under that name. InsForge's equivalent is your project's **API Key** (it starts with `ik_`), the full-access admin key. Every project has two keys:
+
+    - **Anon Key**: public, for the browser. Requests run as the `anon` role, gated by RLS. This is the one that hits `permission denied for schema storage`.
+    - **API Key**: full-access admin key, server-only. Bypasses RLS.
+
+    Find the API Key in the dashboard under **Project Settings → General** (the **API Key** row, marked "full access control... do not expose in your frontend"), or run `npx @insforge/cli secrets get API_KEY`.
+
+    Use it from trusted server code through `createAdminClient`, never the browser:
+
+    ```javascript
+    import { createAdminClient } from '@insforge/sdk'
+
+    const admin = createAdminClient({
+      baseUrl: process.env.INSFORGE_URL,
+      apiKey: process.env.INSFORGE_API_KEY, // admin key (ik_...), bypasses RLS
+    })
+
+    const { data, error } = await admin.storage
+      .from('post-images')
+      .upload('posts/post-123/cover.jpg', fileObject)
+    ```
+
+    Keep it in a server-only env var, never one exposed to the browser (no `NEXT_PUBLIC_`, `VITE_`, or `PUBLIC_` prefix).
+  </Accordion>
+
+  <Accordion title="How do I share a project with another admin, or invite a teammate?">
+    Access is shared at the **organization** level, not per project. You invite someone to the organization that owns your projects, and they get access to every project inside it. There is no separate "share just this one project" flow.
+
+    To invite someone:
+
+    1. In the dashboard, open the organization that owns the project using the org switcher in the top-left.
+    2. Click **Members** in the left sidebar.
+    3. Click **Invite Member**, enter their email, and pick a role:
+       - **Administrator** has full control: manage projects, plus invite, remove, and change the roles of other members.
+       - **Developer** has normal access to the organization's projects but cannot manage members.
+    4. They get an email invite that is valid for 7 days. When they sign in to InsForge **with that same email address** and accept it, they join the organization with the role you chose.
+
+    To add another admin specifically, choose the **Administrator** role when inviting, or change their role later from the Members list. Only Administrators can invite or manage members.
+
+    Handing the organization over to a new **Owner** entirely is a separate action from inviting members. To do that, open **Organization Settings** and use **Transfer Ownership** (only the current owner can start it, and the recipient must be a verified InsForge user who accepts the emailed request).
+  </Accordion>
+
+  <Accordion title="Why did my project get paused, and how do I keep it from pausing?">
+    Pausing only happens on the Free plan, for two reasons:
+
+    - **Inactivity.** A free project is paused after 7 days with no requests. We email a heads-up first, and any request resets the 7-day clock.
+    - **Usage limit.** If your organization goes over the Free usage limits, its projects stay paused until you upgrade.
+
+    Your data stays intact either way. To stop projects from pausing at all, upgrade the organization to Pro. See [Pricing](/pricing).
+  </Accordion>
+
+  <Accordion title="My project is paused. How do I restart it?">
+    Open the project in the dashboard and click **Restore Project**. It comes back in a few minutes with your data intact. A couple of cases to know:
+
+    - You can restore a free project from the dashboard for up to **30 days** after it pauses. After that it's archived and you can only download the database backup and storage files (still no data loss).
+    - If it was paused because the organization hit its usage limit, **Upgrade to Pro** to restore it.
+
+    Still stuck? Ask in our [Discord](https://discord.com/invite/DvBtaEc9Jz) for the fastest response.
+  </Accordion>
+
+  <Accordion title="How do I authenticate the CLI without a browser?">
+    `npx @insforge/cli login` opens a browser to sign in. On a headless machine, a remote server, or CI, use a user API key instead. No browser needed.
+
+    The quickest way is the setup prompt from the dashboard, which signs in and links the project for you:
+
+    <Steps>
+      <Step title="Open the Install page">
+        Open your project in the dashboard and go to the **Install** page.
+      </Step>
+      <Step title="Pick your coding agent">
+        Under **Install in Agent**, click the agent you use, then open the **CLI** tab.
+      </Step>
+      <Step title="Copy the prompt">
+        Copy the setup prompt and paste it into your agent. It signs the CLI in and links the project in one step.
+      </Step>
+    </Steps>
+
+    The prompt fills in a login command scoped to your account, followed by the link command:
+
+    ```bash
+    npx @insforge/cli login --user-api-key <your-user-api-key>
+    npx @insforge/cli link --project-id <your-project-id>
+    ```
+
+    If you only need the key, for example to run the CLI in CI, open your account menu and go to **Profile → API Keys**, then create a key (set an expiry, or **Never**). Store it as a CI secret and run `login --user-api-key` with it. Add `--json` for machine-readable output.
+
+    The key grants full access to your account, so keep it secret and rotate it if it leaks.
+  </Accordion>
+
+  <Accordion title="What is FLY_API_TOKEN?">
+    It's an environment variable you only set when you self-host InsForge and want to use [Custom Compute](/core-concepts/compute/overview). Custom Compute runs your long-lived containers on [Fly.io](https://fly.io), so a self-hosted instance needs your own Fly account: set `FLY_API_TOKEN` (a Fly API token from `fly tokens create org`) and `FLY_ORG` (your Fly org slug from `fly orgs list`) in your `.env`, then restart. Both are required, and until they're set, compute endpoints return `503 COMPUTE_NOT_CONFIGURED`.
+
+    On InsForge Cloud you never touch this. Compute is managed for you, and the rest of the platform (database, auth, storage, edge functions) needs no Fly token at all.
+  </Accordion>
+
+  <Accordion title="Can this assistant help with something specific to my own project?">
+    Not really. This assistant answers from InsForge's public docs, so it can't see your project: it can't debug an error, read your data, or check your configuration. Take anything specific to your own project to your coding agent instead. Connected to InsForge through the CLI or MCP, your agent can read your live backend, schema, data, and logs and debug the problem directly. Just describe it in plain words. For a backend health and error report you can run yourself, use `npx @insforge/cli diagnose`. See [Diagnostics & advisor](/agent-native/diagnostics).
+  </Accordion>
+
+  <Accordion title="How do I get my database's Postgres connection string?">
+    Every cloud project has a direct Postgres connection string, handy for `psql`, a database GUI, an ORM (Prisma, Drizzle), or an external service like [Better Auth](/integrations/better-auth) that needs its own Postgres. Print it with the CLI:
+
+    ```bash
+    npx @insforge/cli db connection-string
+    ```
+
+    You can also grab it from the dashboard under **Project Settings → Connect → Connection String** (cloud projects only).
+
+    It returns a URL shaped like:
+
+    ```text
+    postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require
+    ```
+
+    Add `--json` to get `{ "connectionURL": "..." }` for scripts. The command works for **cloud projects only** — on a self-hosted instance Postgres is exposed directly by your `docker-compose` setup, so use the local Postgres credentials (the `DATABASE_URL` / `POSTGRES_*` values from your `.env`) instead.
+
+    The string connects as the privileged `postgres` role, so it isn't limited by row-level security and it embeds that role's password. Treat it like a secret: keep it server-side and never ship it to the browser.
+  </Accordion>
+
+  <Accordion title="How do I import or load an existing Postgres database into InsForge?">
+    Restore your existing database over your project's Postgres connection string (the same URL from the question above). Standard PostgreSQL client tools — `pg_dump`, `pg_restore`, and `psql` — connect to it directly, so an import is just a dump-then-restore. No special InsForge command is involved.
+
+    1. Dump your local (or other) database:
+
+    ```bash
+    # Custom format (recommended — smaller and supports parallel restore)
+    pg_dump -Fc your_local_db > local.dump
+
+    # ...or a plain SQL file
+    pg_dump your_local_db > local.sql
+    ```
+
+    2. Get your InsForge connection string (cloud projects only):
+
+    ```bash
+    npx @insforge/cli db connection-string
+    ```
+
+    3. Restore into InsForge:
+
+    ```bash
+    # Custom-format dump
+    pg_restore --no-owner --single-transaction -d "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" local.dump
+
+    # ...or a plain SQL file
+    psql --single-transaction "postgresql://postgres:<password>@<appkey>.<region>.database.insforge.app:5432/insforge?sslmode=require" < local.sql
+    ```
+
+    A few things to keep in mind:
+
+    - Pass `--no-owner` so restored objects are owned by the `postgres` role rather than roles that only exist in your source database.
+    - The connection string connects as the privileged `postgres` role (it bypasses row-level security), so treat it as a secret and run these commands server-side only.
+    - This works for **cloud projects only**. On a self-hosted instance, restore against your local Postgres credentials (the `DATABASE_URL` / `POSTGRES_*` values from your `.env`) instead.
+    - A restore writes into your live database and can overwrite existing objects. Take a manual backup first — see [Database backups and restore](/core-concepts/database/backups).
+    - `--single-transaction` runs the restore as one transaction, so if a statement fails (a conflicting object, a missing extension or role, a constraint error) the whole import rolls back instead of leaving the database half-restored.
+    - Imported tables do **not** get InsForge's managed access automatically. A raw restore skips the `anon` / `authenticated` grants and row-level security InsForge applies, so imported tables are **not** reachable through the REST API or SDK — and any access rules from your source dump don't carry InsForge's RLS protection — until you grant access and add RLS policies for each table (see [Database](/core-concepts/database/overview)). If you'd rather version schema changes in git, see [Database migrations](/core-concepts/database/migrations).
+  </Accordion>
+
+  <Accordion title="How do I take down or remove a deployed site?">
+    There's currently no self-serve way to take down a deployed [Site](/core-concepts/sites/overview) — there's no `deployments delete` command and no dashboard action for it. Deployed sites are hosted externally, so even deleting your project (`npx @insforge/cli projects delete --project <id>`) tears down your backend resources — database, storage, and backend branches — but does *not* remove the hosted site.
+
+    In practice this rarely matters. If you do need a deployed site taken down, ask the InsForge team in [Discord](https://discord.com/invite/DvBtaEc9Jz).
+
+    Two related actions that are *not* the same as removing a live site:
+
+    - **Cancel a build that's still running:** `npx @insforge/cli deployments cancel <id>` stops an in-progress deployment; it does not take down a site that is already live.
+    - **Replace what's live:** redeploy over the same site with `npx @insforge/cli deployments deploy ./frontend` — the newest ready deployment serves the URL.
+  </Accordion>
+</AccordionGroup>

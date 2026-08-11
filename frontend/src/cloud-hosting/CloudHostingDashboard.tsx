@@ -20,6 +20,7 @@ export function CloudHostingDashboard() {
     requestInstanceTypeChange,
     updateVersion,
     requestUserInfo,
+    updatePreferredLocale,
     requestUserApiKey,
     requestModelCredits,
     requestProjectMetrics,
@@ -51,6 +52,7 @@ export function CloudHostingDashboard() {
       onRequestInstanceTypeChange={requestInstanceTypeChange}
       onUpdateVersion={updateVersion}
       onRequestUserInfo={requestUserInfo}
+      onUpdatePreferredLocale={updatePreferredLocale}
       onRequestUserApiKey={requestUserApiKey}
       onRequestModelCredits={requestModelCredits}
       onRequestProjectMetrics={requestProjectMetrics}

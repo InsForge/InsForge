@@ -1,9 +1,57 @@
 import axios from 'axios';
+import { createHash } from 'node:crypto';
+import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import type { AppleUserInfo, OAuthUserData } from '@/types/auth.js';
 import { OAuthProvider } from './base.provider.js';
+
+const APPLE_ISSUER = 'https://appleid.apple.com';
+
+export interface AppleIdTokenVerificationOptions {
+  audiences: string[];
+  nonce?: string;
+}
+
+/**
+ * Verify an Apple identity token against an explicit server-owned audience set.
+ * Exported separately so tests can use a generated local JWK set without network access.
+ */
+export async function verifyAppleIdToken(
+  idToken: string,
+  getKey: JWTVerifyGetKey,
+  options: AppleIdTokenVerificationOptions
+): Promise<AppleUserInfo> {
+  const audiences = [...new Set(options.audiences.map((value) => value.trim()).filter(Boolean))];
+  if (!audiences.length) {
+    throw new Error('No Apple ID token audiences are configured');
+  }
+
+  const { payload } = await jwtVerify(idToken, getKey, {
+    algorithms: ['RS256'],
+    issuer: APPLE_ISSUER,
+    audience: audiences,
+  });
+
+  if (typeof payload.sub !== 'string' || !payload.sub.trim()) {
+    throw new Error('Apple ID token is missing the sub claim');
+  }
+
+  if (options.nonce !== undefined) {
+    const expectedNonce = createHash('sha256').update(options.nonce, 'utf8').digest('hex');
+    if (payload.nonce !== expectedNonce) {
+      throw new Error('Apple ID token nonce does not match');
+    }
+  }
+
+  return {
+    sub: payload.sub,
+    email: typeof payload.email === 'string' ? payload.email : '',
+    email_verified: payload.email_verified === 'true' || payload.email_verified === true,
+    is_private_email: payload.is_private_email === 'true' || payload.is_private_email === true,
+  };
+}
 
 /**
  * Apple OAuth Service
@@ -17,9 +65,10 @@ import { OAuthProvider } from './base.provider.js';
  */
 export class AppleOAuthProvider implements OAuthProvider {
   private static instance: AppleOAuthProvider;
+  private readonly appleJwks: JWTVerifyGetKey;
 
   private constructor() {
-    // No initialization needed - jose handles JWKS caching internally
+    this.appleJwks = createRemoteJWKSet(new URL(`${APPLE_ISSUER}/auth/keys`));
   }
 
   public static getInstance(): AppleOAuthProvider {
@@ -204,7 +253,10 @@ export class AppleOAuthProvider implements OAuthProvider {
   /**
    * Verify Apple ID token and extract user info
    */
-  async verifyIdToken(idToken: string): Promise<AppleUserInfo> {
+  async verifyIdToken(
+    idToken: string,
+    options?: { nonce?: string; native?: boolean }
+  ): Promise<AppleUserInfo> {
     const oAuthConfigService = OAuthConfigService.getInstance();
     const config = await oAuthConfigService.getConfigByProvider('apple');
 
@@ -213,23 +265,18 @@ export class AppleOAuthProvider implements OAuthProvider {
     }
 
     try {
-      const { createRemoteJWKSet, jwtVerify } = await import('jose');
-      const JWKS = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
+      const audiences = options?.native
+        ? [config.clientId, ...(config.nativeClientIds ?? [])]
+        : [config.clientId];
 
-      const { payload } = await jwtVerify(idToken, JWKS, {
-        issuer: 'https://appleid.apple.com',
-        audience: config.clientId,
+      return await verifyAppleIdToken(idToken, this.appleJwks, {
+        audiences: audiences.filter((value): value is string => Boolean(value)),
+        nonce: options?.nonce,
       });
-
-      return {
-        sub: String(payload.sub),
-        email: (payload.email as string) || '',
-        email_verified: payload.email_verified === 'true' || payload.email_verified === true,
-        is_private_email: payload.is_private_email === 'true' || payload.is_private_email === true,
-      };
     } catch (error) {
-      logger.error('Apple ID token verification failed:', error);
-      throw new Error(`Apple token verification failed: ${error}`);
+      const message = error instanceof Error ? error.message : 'Unknown verification error';
+      logger.error('Apple ID token verification failed', { error: message });
+      throw new Error(`Apple token verification failed: ${message}`);
     }
   }
 

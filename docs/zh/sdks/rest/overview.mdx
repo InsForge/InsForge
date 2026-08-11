@@ -1,0 +1,111 @@
+---
+title: InsForge REST API 概览
+description: 通过 HTTP 使用任何语言，通过 API 密钥、JWT 和标准 REST 约定，直接调用 InsForge 认证、数据库、存储和函数。
+---
+
+InsForge REST API 提供对所有 InsForge 服务的直接 HTTP 访问。当您需要与没有官方 SDK 的语言或平台集成时，请使用这种方式。
+
+## 基础 URL
+
+```
+https://your-app.insforge.app
+```
+
+## 认证
+
+所有 API 请求都需要通过 `Authorization` 标头进行认证：
+
+### Bearer Token
+
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+```
+
+## 快速开始
+
+```bash
+# Register a new user
+curl -X POST https://your-app.insforge.app/api/auth/users \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "securepassword123"}'
+
+# Sign in and get token
+curl -X POST https://your-app.insforge.app/api/auth/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "securepassword123"}'
+
+# Use the token for authenticated requests
+curl https://your-app.insforge.app/api/database/records/posts \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+## 响应格式
+
+### 成功响应
+
+数据直接在响应主体中返回：
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "email": "user@example.com",
+  "createdAt": "2024-01-15T10:30:00Z"
+}
+```
+
+### 错误响应
+
+```json
+{
+  "error": "ERROR_CODE",
+  "message": "Human-readable error message",
+  "statusCode": 400,
+  "nextActions": "Suggested action to resolve the error"
+}
+```
+
+## 常见 HTTP 状态码
+
+| 状态 | 描述 |
+|--------|-------------|
+| `200` | 成功 |
+| `201` | 已创建 |
+| `204` | 无内容（用于 DELETE） |
+| `400` | 错误的请求 - 输入无效 |
+| `401` | 未授权 - 令牌无效或缺失 |
+| `403` | 禁止 - 权限不足 |
+| `404` | 未找到 |
+| `409` | 冲突 - 资源已存在 |
+| `500` | 内部服务器错误 |
+
+## 特性
+
+- **数据库** - PostgREST 风格的 CRUD 操作
+- **认证** - 电子邮件/密码和 OAuth 认证
+- **存储** - 文件上传、下载和管理
+- **函数** - 调用无服务器边缘函数
+- **AI** - 聊天完成和图像生成
+- **实时** - 频道管理和消息历史（WebSocket 用于实时通信）
+
+## API 参考
+
+<CardGroup cols={2}>
+  <Card title="数据库" icon="database" href="/sdks/rest/database">
+    CRUD 操作、过滤器和查询
+  </Card>
+  <Card title="认证" icon="lock" href="/sdks/rest/auth">
+    注册、登录、OAuth 和用户管理
+  </Card>
+  <Card title="存储" icon="cloud-arrow-up" href="/sdks/rest/storage">
+    文件上传、下载和管理
+  </Card>
+  <Card title="函数" icon="bolt" href="/sdks/rest/functions">
+    调用无服务器边缘函数
+  </Card>
+  <Card title="AI" icon="brain" href="/sdks/rest/ai">
+    聊天完成和图像生成
+  </Card>
+  <Card title="实时" icon="signal-stream" href="/sdks/rest/realtime">
+    频道管理和消息历史
+  </Card>
+</CardGroup>

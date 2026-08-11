@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { LogSchema } from '@insforge/shared-schemas';
 
 interface LogDetailPanelProps {
@@ -7,6 +8,7 @@ interface LogDetailPanelProps {
 }
 
 export function LogDetailPanel({ log, onClose }: LogDetailPanelProps) {
+  const { t } = useTranslation('chrome');
   if (!log) {
     return null;
   }
@@ -19,12 +21,12 @@ export function LogDetailPanel({ log, onClose }: LogDetailPanelProps) {
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-300 dark:border-neutral-600">
         <p className="text-sm text-gray-600 dark:text-neutral-300 font-normal leading-6">
-          Log Content
+          {t('logs.logContent', { defaultValue: 'Log Content' })}
         </p>
         <button
           onClick={onClose}
           className="p-1 hover:bg-gray-200 dark:hover:bg-neutral-600 rounded transition-colors"
-          aria-label="Close panel"
+          aria-label={t('logs.closePanel', { defaultValue: 'Close panel' })}
         >
           <X className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
         </button>

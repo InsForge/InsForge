@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogBody,
@@ -28,6 +29,7 @@ function isTrustedEmbedUrl(url: string | undefined): url is string {
 }
 
 export function ReplayModal({ recordingId, onClose }: Props) {
+  const { t } = useTranslation('chrome');
   const open = !!recordingId;
   const { data, isLoading, error } = useShareToken(recordingId, open);
   const safeUrl = isTrustedEmbedUrl(data?.embedUrl) ? data?.embedUrl : null;
@@ -36,27 +38,33 @@ export function ReplayModal({ recordingId, onClose }: Props) {
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Session replay</DialogTitle>
+          <DialogTitle>
+            {t('analytics.sessionReplayTitle', { defaultValue: 'Session replay' })}
+          </DialogTitle>
           <DialogDescription className="sr-only">
-            Embedded PostHog session recording playback.
+            {t('analytics.sessionReplaySrDescription', {
+              defaultValue: 'Embedded PostHog session recording playback.',
+            })}
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
           <div className="aspect-video w-full overflow-hidden rounded bg-muted">
             {isLoading && (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Generating share link…
+                {t('analytics.generatingShareLink', {
+                  defaultValue: 'Generating share link…',
+                })}
               </div>
             )}
             {error && (
               <div className="flex h-full items-center justify-center text-sm text-destructive">
-                Failed to load replay.
+                {t('analytics.replayLoadError', { defaultValue: 'Failed to load replay.' })}
               </div>
             )}
             {safeUrl && (
               <iframe
                 src={safeUrl}
-                title="Session replay"
+                title={t('analytics.sessionReplayTitle', { defaultValue: 'Session replay' })}
                 className="h-full w-full border-0"
                 allowFullScreen
                 sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
@@ -65,7 +73,9 @@ export function ReplayModal({ recordingId, onClose }: Props) {
             )}
             {!isLoading && !error && data?.embedUrl && !safeUrl && (
               <div className="flex h-full items-center justify-center text-sm text-destructive">
-                Refusing to embed replay from untrusted origin.
+                {t('analytics.untrustedReplayOrigin', {
+                  defaultValue: 'Refusing to embed replay from untrusted origin.',
+                })}
               </div>
             )}
           </div>

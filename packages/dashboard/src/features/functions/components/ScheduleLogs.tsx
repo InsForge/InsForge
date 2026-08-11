@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DataGridEmptyState } from '#components';
 import { LogsDataGrid, LogsColumnDef } from '#features/logs/components/LogsDataGrid';
 import { useScheduleLogs } from '#features/functions/hooks/useSchedules';
@@ -11,6 +12,7 @@ interface ScheduleLogsProps {
 }
 
 export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
+  const { t } = useTranslation('chrome');
   const [currentPage, setCurrentPage] = useState(1);
   const offset = (currentPage - 1) * PAGE_SIZE;
 
@@ -23,7 +25,7 @@ export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
     const defs: LogsColumnDef[] = [
       {
         key: 'id',
-        name: 'Run ID',
+        name: t('functions.runId', { defaultValue: 'Run ID' }),
         width: 'minmax(120px, 2fr)',
         renderCell: ({ row }) => (
           <p className="text-sm text-gray-900 dark:text-white font-mono leading-6 truncate">
@@ -33,7 +35,7 @@ export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
       },
       {
         key: 'executedAt',
-        name: 'Start Time',
+        name: t('functions.startTime', { defaultValue: 'Start Time' }),
         width: 'minmax(140px, 1.5fr)',
         renderCell: ({ row }) => (
           <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 truncate">
@@ -43,7 +45,7 @@ export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
       },
       {
         key: 'endTime',
-        name: 'End Time',
+        name: t('functions.endTime', { defaultValue: 'End Time' }),
         width: 'minmax(140px, 1.5fr)',
         renderCell: ({ row }) => {
           const startTime = new Date(String(row.executedAt));
@@ -57,7 +59,7 @@ export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
       },
       {
         key: 'success',
-        name: 'Status',
+        name: t('functions.status', { defaultValue: 'Status' }),
         width: 'minmax(80px, 1fr)',
         renderCell: ({ row }) => (
           <div className="flex items-center gap-2">
@@ -65,14 +67,16 @@ export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
               className={`w-2 h-2 rounded-full shrink-0 ${row.success ? 'bg-green-600 dark:bg-green-400' : 'bg-red-600 dark:bg-red-400'}`}
             />
             <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 truncate">
-              {row.success ? 'Success' : 'Failure'}
+              {row.success
+                ? t('functions.statusSuccess', { defaultValue: 'Success' })
+                : t('functions.statusFailure', { defaultValue: 'Failure' })}
             </p>
           </div>
         ),
       },
       {
         key: 'statusCode',
-        name: 'Status Code',
+        name: t('functions.statusCode', { defaultValue: 'Status Code' }),
         width: 'minmax(70px, 1fr)',
         renderCell: ({ row }) => {
           const code = Number(row.statusCode);
@@ -91,7 +95,7 @@ export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
       },
       {
         key: 'durationMs',
-        name: 'Duration',
+        name: t('functions.duration', { defaultValue: 'Duration' }),
         width: 'minmax(70px, 1fr)',
         renderCell: ({ row }) => (
           <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
@@ -101,7 +105,7 @@ export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
       },
       {
         key: 'message',
-        name: 'Message',
+        name: t('functions.message', { defaultValue: 'Message' }),
         width: 'minmax(100px, 3fr)',
         renderCell: ({ row }) => (
           <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 truncate">
@@ -112,7 +116,7 @@ export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
     ];
 
     return defs;
-  }, []);
+  }, [t]);
 
   return (
     <div className="flex flex-col h-full">
@@ -120,7 +124,11 @@ export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
         {error ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-red-600 dark:text-red-400">
-              {error instanceof Error ? error.message : 'Failed to load execution logs'}
+              {error instanceof Error
+                ? error.message
+                : t('functions.failedToLoadExecutionLogs', {
+                    defaultValue: 'Failed to load execution logs',
+                  })}
             </p>
           </div>
         ) : (
@@ -133,7 +141,13 @@ export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
             pageSize={PAGE_SIZE}
             totalRecords={total}
             onPageChange={setCurrentPage}
-            emptyState={<DataGridEmptyState message="No execution logs found" />}
+            emptyState={
+              <DataGridEmptyState
+                message={t('functions.noExecutionLogs', {
+                  defaultValue: 'No execution logs found',
+                })}
+              />
+            }
           />
         )}
       </div>

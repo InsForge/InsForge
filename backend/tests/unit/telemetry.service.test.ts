@@ -3,7 +3,12 @@ import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Response } from 'node-fetch';
-import { TelemetryConfig, TelemetryService } from '../../src/services/telemetry/telemetry.service';
+import {
+  TelemetryConfig,
+  TelemetryService,
+  isTelemetryRuntimeDisabled,
+} from '../../src/services/telemetry/telemetry.service';
+import { FeatureUsageCollector } from '../../src/services/telemetry/feature-usage.collector';
 import logger from '../../src/utils/logger';
 
 type FetchFunction = ConstructorParameters<typeof TelemetryService>[1];
@@ -53,6 +58,26 @@ function clearRuntimeEnvironment(): void {
   delete process.env.npm_lifecycle_event;
 }
 
+const deploymentEnvKeys = [
+  'RAILWAY_ENVIRONMENT_ID',
+  'ZEABUR',
+  'SEALOS_APP_NAME',
+  'RENDER',
+  'FLY_APP_NAME',
+  'K_SERVICE',
+  'ECS_CONTAINER_METADATA_URI_V4',
+  'COOLIFY_RESOURCE_UUID',
+  'COOLIFY_FQDN',
+  'KUBERNETES_SERVICE_HOST',
+  'INSFORGE_DEPLOYMENT_METHOD',
+];
+
+function clearDeploymentEnvironment(): void {
+  for (const key of deploymentEnvKeys) {
+    delete process.env[key];
+  }
+}
+
 function getPostedBody(fetchMock: FetchFunction, callIndex = 0): Record<string, unknown> {
   const call = vi.mocked(fetchMock).mock.calls[callIndex];
   expect(call).toBeDefined();
@@ -95,6 +120,102 @@ describe('TelemetryService', () => {
     expect(installationId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     );
+  });
+
+  it('is disabled on cloud, so no collection or reporting happens there', () => {
+    delete process.env.INSFORGE_TELEMETRY_DISABLED;
+    expect(isTelemetryRuntimeDisabled()).toBe(false);
+
+    // Cloud is identified by the AWS instance profile. This gates both halves:
+    // server.ts skips registering the usage middleware, and the service never
+    // starts a heartbeat or writes an installation id.
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'insforge-cloud-profile';
+    expect(isTelemetryRuntimeDisabled()).toBe(true);
+  });
+
+  it('reports the features used on heartbeats', async () => {
+    const config = makeConfig();
+    const fetchMock = makeFetchMock();
+    const featureUsage = new FeatureUsageCollector();
+    featureUsage.record('storage');
+    featureUsage.record('database');
+    featureUsage.record('database');
+
+    await new TelemetryService(config, fetchMock, featureUsage).sendEvent('heartbeat');
+
+    const properties = getPostedBody(fetchMock).properties as Record<string, unknown>;
+    expect(properties.features_used).toEqual(['database', 'storage']);
+    expect(properties.features_used_window_ms).toEqual(expect.any(Number));
+  });
+
+  it('clears the feature list after each delivered heartbeat and omits it from instance_started', async () => {
+    const config = makeConfig();
+    const fetchMock = makeFetchMock();
+    const featureUsage = new FeatureUsageCollector();
+    const service = new TelemetryService(config, fetchMock, featureUsage);
+
+    featureUsage.record('auth');
+    await service.sendEvent('instance_started');
+    await service.sendEvent('heartbeat');
+    await service.sendEvent('heartbeat');
+
+    const started = getPostedBody(fetchMock, 0).properties as Record<string, unknown>;
+    const first = getPostedBody(fetchMock, 1).properties as Record<string, unknown>;
+    const second = getPostedBody(fetchMock, 2).properties as Record<string, unknown>;
+
+    expect(started.features_used).toBeUndefined();
+    expect(first.features_used).toEqual(['auth']);
+    expect(second.features_used).toEqual([]);
+  });
+
+  it('keeps the feature window when the heartbeat is rejected', async () => {
+    const config = makeConfig();
+    const fetchMock = makeFetchMock(500);
+    const featureUsage = new FeatureUsageCollector();
+    const service = new TelemetryService(config, fetchMock, featureUsage);
+
+    featureUsage.record('database');
+    await service.sendEvent('heartbeat');
+
+    // Rejected, so the window is retained rather than lost.
+    expect(featureUsage.snapshot().featuresUsed).toEqual(['database']);
+
+    const retryFetch = makeFetchMock();
+    await new TelemetryService(config, retryFetch, featureUsage).sendEvent('heartbeat');
+
+    // The next heartbeat carries it, and only then is it released.
+    expect((getPostedBody(retryFetch).properties as Record<string, unknown>).features_used).toEqual(
+      ['database']
+    );
+    expect(featureUsage.snapshot().featuresUsed).toEqual([]);
+  });
+
+  it('keeps the feature window when the heartbeat request throws', async () => {
+    const config = makeConfig();
+    const fetchMock = vi.fn(async () => {
+      throw new Error('network unreachable');
+    }) as unknown as FetchFunction;
+    const featureUsage = new FeatureUsageCollector();
+
+    featureUsage.record('storage');
+    await new TelemetryService(config, fetchMock, featureUsage).sendEvent('heartbeat');
+
+    expect(featureUsage.snapshot().featuresUsed).toEqual(['storage']);
+  });
+
+  it('flushes remaining feature usage on shutdown so short-lived instances still report', async () => {
+    const config = makeConfig();
+    const fetchMock = makeFetchMock();
+    const featureUsage = new FeatureUsageCollector();
+    const service = new TelemetryService(config, fetchMock, featureUsage);
+
+    featureUsage.record('functions');
+    await service.shutdown();
+
+    const properties = getPostedBody(fetchMock).properties as Record<string, unknown>;
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(properties.telemetry_event_name).toBe('heartbeat');
+    expect(properties.features_used).toEqual(['functions']);
   });
 
   it('reuses an installation id published by another process during the atomic create', async () => {
@@ -218,6 +339,79 @@ describe('TelemetryService', () => {
     }
   );
 
+  it.each([
+    {
+      name: 'platform-injected variables win over the artifact stamp',
+      setup: () => {
+        process.env.RAILWAY_ENVIRONMENT_ID = 'env-123';
+        process.env.INSFORGE_DEPLOYMENT_METHOD = 'docker';
+      },
+      expectedDeploymentMethod: 'railway',
+    },
+    {
+      name: 'the artifact stamp is normalized',
+      setup: () => {
+        process.env.INSFORGE_DEPLOYMENT_METHOD = ' Dokploy ';
+      },
+      expectedDeploymentMethod: 'dokploy',
+    },
+    {
+      name: 'unstamped containers report docker',
+      setup: () => {
+        vi.spyOn(fs, 'existsSync').mockImplementation((target) => target === '/.dockerenv');
+      },
+      expectedDeploymentMethod: 'docker',
+    },
+    {
+      name: 'anything else reports source',
+      setup: () => {
+        vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+      },
+      expectedDeploymentMethod: 'source',
+    },
+  ])('deployment method: $name', async ({ setup, expectedDeploymentMethod }) => {
+    clearDeploymentEnvironment();
+    setup();
+    const config = makeConfig();
+    const fetchMock = makeFetchMock();
+
+    await new TelemetryService(config, fetchMock).sendEvent('instance_started');
+
+    const body = getPostedBody(fetchMock);
+    expect(body.properties).toEqual(
+      expect.objectContaining({
+        deployment_method: expectedDeploymentMethod,
+      })
+    );
+  });
+
+  it.each([
+    { env: 'RAILWAY_ENVIRONMENT_ID', expected: 'railway' },
+    { env: 'ZEABUR', expected: 'zeabur' },
+    { env: 'SEALOS_APP_NAME', expected: 'sealos' },
+    { env: 'RENDER', expected: 'render' },
+    { env: 'FLY_APP_NAME', expected: 'fly' },
+    { env: 'K_SERVICE', expected: 'cloud-run' },
+    { env: 'ECS_CONTAINER_METADATA_URI_V4', expected: 'ecs' },
+    { env: 'COOLIFY_RESOURCE_UUID', expected: 'coolify' },
+    { env: 'COOLIFY_FQDN', expected: 'coolify' },
+    { env: 'KUBERNETES_SERVICE_HOST', expected: 'kubernetes' },
+  ])('deployment method: $env identifies $expected', async ({ env, expected }) => {
+    clearDeploymentEnvironment();
+    process.env[env] = 'set-by-platform';
+    const config = makeConfig();
+    const fetchMock = makeFetchMock();
+
+    await new TelemetryService(config, fetchMock).sendEvent('instance_started');
+
+    const body = getPostedBody(fetchMock);
+    expect(body.properties).toEqual(
+      expect.objectContaining({
+        deployment_method: expected,
+      })
+    );
+  });
+
   it('starts once, schedules heartbeats, and stops the heartbeat timer', async () => {
     vi.useFakeTimers();
     try {
@@ -295,6 +489,8 @@ describe('TelemetryService', () => {
           compute_configured: expect.any(Boolean),
           openrouter_configured: expect.any(Boolean),
         },
+        features_used: expect.any(Array),
+        features_used_window_ms: expect.any(Number),
       },
     });
     expect(JSON.stringify(body)).not.toContain('JWT_SECRET');

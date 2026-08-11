@@ -1,4 +1,6 @@
 import { type ReactNode, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@insforge/ui';
 import { Braces, Database, Download, HardDrive, User } from 'lucide-react';
@@ -17,33 +19,40 @@ import { DashboardPromptStepper } from './DashboardPromptStepper';
 import { ObservabilitySection } from '#features/dashboard/components/observability';
 import { BackendAdvisorSection } from '#features/dashboard/components/advisor';
 
-function formatBackupAge(iso: string | undefined): string | null {
+function formatBackupAge(iso: string | undefined, t: TFunction): string | null {
   if (!iso) {
     return null;
   }
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) {
+  const timestamp = new Date(iso).getTime();
+  if (Number.isNaN(timestamp)) {
     return null;
   }
-  const minutes = Math.floor((Date.now() - t) / 60_000);
+  const minutes = Math.floor((Date.now() - timestamp) / 60_000);
   if (minutes < 1) {
-    return 'just now';
+    return t('overview.justNow', { defaultValue: 'just now' });
   }
   if (minutes < 60) {
-    return `${minutes}min${minutes === 1 ? '' : 's'} ago`;
+    return t('overview.minsAgo', {
+      count: minutes,
+      defaultValue: `${minutes}min${minutes === 1 ? '' : 's'} ago`,
+    });
   }
   const hours = Math.floor(minutes / 60);
   if (hours < 24) {
-    return `${hours}hr${hours === 1 ? '' : 's'} ago`;
+    return t('overview.hrsAgo', {
+      count: hours,
+      defaultValue: `${hours}hr${hours === 1 ? '' : 's'} ago`,
+    });
   }
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return t('overview.daysAgoShort', { count: days, defaultValue: '{{count}}d ago' });
 }
 
 const STATUS_BADGE_CLASS =
   'flex items-center gap-1 rounded-full bg-toast px-2 py-1 text-xs font-medium leading-4 text-foreground';
 
 export function DTestConnectedDashboard() {
+  const { t } = useTranslation('chrome');
   const navigate = useNavigate();
   const isCloudProject = isInsForgeCloudProject();
   const isCloudHostingMode = useIsCloudHostingMode();
@@ -84,8 +93,8 @@ export function DTestConnectedDashboard() {
     );
 
   const projectName = isCloudProject
-    ? projectInfo.name || 'My InsForge Project'
-    : 'My InsForge Project';
+    ? projectInfo.name || t('overview.myProject', { defaultValue: 'My InsForge Project' })
+    : t('overview.myProject', { defaultValue: 'My InsForge Project' });
   const instanceType = projectInfo.instanceType?.toUpperCase();
   const showInstanceTypeBadge = isCloudProject && !!instanceType;
 
@@ -100,7 +109,7 @@ export function DTestConnectedDashboard() {
   }, [isMetadataLoading, metadataError]);
 
   const isHealthy = projectHealth === 'Healthy';
-  const lastBackupAge = formatBackupAge(lastBackupQuery.data?.createdAt);
+  const lastBackupAge = formatBackupAge(lastBackupQuery.data?.createdAt, t);
   const criticalCount = advisorLatest.data?.summary?.critical ?? 0;
 
   const tableCount = tables?.length ?? 0;
@@ -132,19 +141,32 @@ export function DTestConnectedDashboard() {
                     className={`h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-amber-400'}`}
                   />
                 </span>
-                <span className="px-1">{projectHealth}</span>
+                <span className="px-1">
+                  {projectHealth === 'Healthy'
+                    ? t('overview.healthy', { defaultValue: 'Healthy' })
+                    : projectHealth === 'Issue'
+                      ? t('overview.issue', { defaultValue: 'Issue' })
+                      : t('overview.loading', { defaultValue: 'Loading...' })}
+                </span>
               </>,
-              'View backend advisor'
+              t('overview.viewBackendAdvisor', { defaultValue: 'View backend advisor' })
             )}
             {lastBackupAge && (
               <button
                 type="button"
                 onClick={() => void navigate('/dashboard/database/backups')}
                 className={`${STATUS_BADGE_CLASS} transition-colors hover:bg-[var(--alpha-8)]`}
-                aria-label="View backup & restore"
+                aria-label={t('overview.viewBackupRestore', {
+                  defaultValue: 'View backup & restore',
+                })}
               >
                 <CloudDoneIcon className="h-5 w-5 text-primary" />
-                <span className="px-1">Last Backup {lastBackupAge}</span>
+                <span className="px-1">
+                  {t('overview.lastBackup', {
+                    age: lastBackupAge,
+                    defaultValue: 'Last Backup {{age}}',
+                  })}
+                </span>
               </button>
             )}
             {criticalCount > 0 &&
@@ -152,10 +174,18 @@ export function DTestConnectedDashboard() {
                 <>
                   <CriticalIcon className="h-5 w-5 text-destructive" />
                   <span className="px-1">
-                    {criticalCount} Critical {criticalCount === 1 ? 'Issue' : 'Issues'}
+                    {t('overview.criticalIssues', {
+                      count: criticalCount,
+                      defaultValue:
+                        criticalCount === 1
+                          ? '{{count}} Critical Issue'
+                          : '{{count}} Critical Issues',
+                    })}
                   </span>
                 </>,
-                'View critical issues in backend advisor'
+                t('overview.viewCriticalIssues', {
+                  defaultValue: 'View critical issues in backend advisor',
+                })
               )}
           </div>
         </div>
@@ -163,7 +193,9 @@ export function DTestConnectedDashboard() {
         {!hasCompletedOnboarding && !isBranch && (
           <section className="flex w-full flex-col items-center gap-6 rounded-lg border border-[var(--alpha-8)] bg-card px-6 pb-12 pt-10">
             <p className="text-xl font-medium leading-7 text-foreground">
-              Let your agent build your backend for you
+              {t('overview.letAgentBuild', {
+                defaultValue: 'Let your agent build your backend for you',
+              })}
             </p>
             <button
               type="button"
@@ -171,38 +203,49 @@ export function DTestConnectedDashboard() {
               className="flex items-center gap-1 rounded bg-emerald-300 p-2 text-sm font-medium leading-5 text-black transition-colors hover:bg-emerald-400"
             >
               <Download className="h-5 w-5" aria-hidden="true" />
-              <span className="px-1">Install InsForge</span>
+              <span className="px-1">
+                {t('overview.installInsForge', { defaultValue: 'Install InsForge' })}
+              </span>
             </button>
           </section>
         )}
 
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricCard
-            label="User"
+            label={t('overview.user', { defaultValue: 'User' })}
             value={String(totalUsers ?? 0)}
             icon={<User className="h-5 w-5" />}
             onNavigate={() => void navigate('/dashboard/authentication/users')}
           />
           <MetricCard
-            label="Database"
+            label={t('overview.database', { defaultValue: 'Database' })}
             value={`${tableCount}`}
-            subValueLeft={tableCount === 1 ? 'Table' : 'Tables'}
+            subValueLeft={t('overview.tablesUnit', {
+              count: tableCount,
+              defaultValue: tableCount === 1 ? 'Table' : 'Tables',
+            })}
             subValueRight={`${databaseSize} GB`}
             icon={<Database className="h-5 w-5" />}
             onNavigate={() => void navigate('/dashboard/database/tables')}
           />
           <MetricCard
-            label="Storage"
+            label={t('overview.storage', { defaultValue: 'Storage' })}
             value={`${bucketCount}`}
-            subValueLeft={bucketCount === 1 ? 'Bucket' : 'Buckets'}
+            subValueLeft={t('overview.bucketsUnit', {
+              count: bucketCount,
+              defaultValue: bucketCount === 1 ? 'Bucket' : 'Buckets',
+            })}
             subValueRight={`${storageSize} GB`}
             icon={<HardDrive className="h-5 w-5" />}
             onNavigate={() => void navigate('/dashboard/storage')}
           />
           <MetricCard
-            label="Edge Functions"
+            label={t('overview.edgeFunctions', { defaultValue: 'Edge Functions' })}
             value={String(functionCount)}
-            subValueLeft={functionCount === 1 ? 'Function' : 'Functions'}
+            subValueLeft={t('overview.functionsUnit', {
+              count: functionCount,
+              defaultValue: functionCount === 1 ? 'Function' : 'Functions',
+            })}
             icon={<Braces className="h-5 w-5" />}
             onNavigate={() => void navigate('/dashboard/functions/list')}
           />

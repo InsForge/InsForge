@@ -4,6 +4,7 @@ import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type TokenPayloadSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
+import logger from '../../utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
 
 const JWT_SECRET = appConfig.app.jwtSecret;
@@ -26,6 +27,11 @@ export interface RefreshTokenPayload {
 export interface RefreshTokenWithCsrf {
   refreshToken: string;
   csrfToken: string;
+}
+
+export interface CloudProjectAuthorization {
+  projectId: string;
+  userId: string;
 }
 
 /**
@@ -354,6 +360,40 @@ export class TokenManager {
   }
 
   /**
+   * Verify a cloud-signed project authorization token.
+   *
+   * This is the shared authority boundary for credentials that grant project
+   * admin access. Claims are inspected only after Cloud signature and project
+   * binding verification succeeds.
+   */
+  async verifyCloudProjectAuthorization(token: string): Promise<CloudProjectAuthorization> {
+    if (!appConfig.cloud.projectId) {
+      throw new AppError(
+        'PROJECT_ID not found in environment variables',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    const { projectId, payload } = await this.verifyCloudToken(token);
+
+    if (
+      payload.type !== 'project_authorization' ||
+      typeof payload.userId !== 'string' ||
+      payload.userId.trim().length === 0
+    ) {
+      throw new AppError(
+        'Invalid cloud project authorization token',
+        401,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+        NEXT_ACTIONS.CHECK_TOKEN
+      );
+    }
+
+    return { projectId, userId: payload.userId };
+  }
+
+  /**
    * Generate CSRF token derived from refresh-session claims using HMAC.
    */
   generateCsrfToken(payload: RefreshTokenPayload): string {
@@ -364,19 +404,29 @@ export class TokenManager {
   }
 
   /**
-   * Verify CSRF token by re-computing from refresh-session claims.
-   * Uses timing-safe comparison to prevent timing attacks
+   * Verify the X-CSRF-Token header by re-computing from refresh-session claims.
+   * Accepts the raw header value; multi-valued headers are invalid.
+   * Uses timing-safe comparison and throws 403 FORBIDDEN on mismatch.
    */
-  verifyCsrfToken(csrfHeader: string | undefined, payload: RefreshTokenPayload): boolean {
-    if (!csrfHeader) {
-      return false;
+  verifyCsrfToken(
+    csrfHeader: string | string[] | undefined,
+    payload: RefreshTokenPayload,
+    logTag: string
+  ): void {
+    const csrfToken = typeof csrfHeader === 'string' ? csrfHeader : undefined;
+    let valid = false;
+    if (csrfToken) {
+      try {
+        const expectedCsrf = this.generateCsrfToken(payload);
+        valid = crypto.timingSafeEqual(Buffer.from(csrfToken), Buffer.from(expectedCsrf));
+      } catch {
+        valid = false;
+      }
     }
 
-    try {
-      const expectedCsrf = this.generateCsrfToken(payload);
-      return crypto.timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(expectedCsrf));
-    } catch {
-      return false;
+    if (!valid) {
+      logger.warn(`[${logTag}] CSRF token validation failed`);
+      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.FORBIDDEN);
     }
   }
 

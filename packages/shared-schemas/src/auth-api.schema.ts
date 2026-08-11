@@ -30,6 +30,13 @@ export const paginationSchema = z.object({
 });
 
 /**
+ * A 6-digit numeric one-time code (email OTP, verification, reset).
+ * `label` customizes the validation message for the field it guards.
+ */
+const sixDigitCodeSchema = (label: string) =>
+  z.string().regex(/^\d{6}$/, `${label} must be a 6-digit numeric code`);
+
+/**
  * POST /api/auth/users - Create user
  * redirectTo is used only for link-based email verification and must be allowlisted.
  */
@@ -42,11 +49,72 @@ export const createUserRequestSchema = z.object({
 });
 
 /**
- * POST /api/auth/sessions - Create session
+ * POST /api/auth/sessions - Create a session with a password or email OTP.
+ * Existing password clients may omit method; it defaults to password.
  */
-export const createSessionRequestSchema = z.object({
+const passwordSessionRequestSchema = z.object({
+  method: z.literal('password'),
   email: emailSchema,
   password: passwordSchema,
+});
+
+const otpSessionRequestSchema = z.object({
+  method: z.literal('otp'),
+  email: emailSchema,
+  otp: sixDigitCodeSchema('OTP code'),
+  name: nameSchema.optional(),
+});
+
+export const createSessionRequestSchema = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return value;
+    }
+
+    // Treat an absent, null, or undefined method as the legacy password flow.
+    // A present-but-invalid method still fails the discriminated union below.
+    const record = value as Record<string, unknown>;
+    if (record.method === undefined || record.method === null) {
+      return { ...record, method: 'password' };
+    }
+
+    return value;
+  },
+  z.discriminatedUnion('method', [passwordSessionRequestSchema, otpSessionRequestSchema])
+);
+
+/**
+ * POST /api/auth/id-token - Exchange a provider ID token for an InsForge session.
+ * Apple requires the nonce that the client attached to its native authorization request.
+ */
+const googleIdTokenSignInRequestSchema = z.object({
+  provider: z.literal('google'),
+  token: z.string().min(1, 'Token is required'),
+});
+
+const appleIdTokenSignInRequestSchema = z
+  .object({
+    provider: z.literal('apple'),
+    token: z.string().min(1, 'Token is required'),
+    nonce: z
+      .string()
+      .min(1, 'Nonce is required')
+      .max(255, 'Nonce is too long')
+      .refine((nonce) => nonce.trim().length > 0, 'Nonce is required'),
+    name: nameSchema.optional(),
+  })
+  .strict();
+
+export const idTokenSignInRequestSchema = z.discriminatedUnion('provider', [
+  googleIdTokenSignInRequestSchema,
+  appleIdTokenSignInRequestSchema,
+]);
+
+/**
+ * POST /api/auth/email/send-otp - Send a sign-in OTP
+ */
+export const sendOTPRequestSchema = z.object({
+  email: emailSchema,
 });
 
 /**
@@ -109,7 +177,7 @@ export const sendVerificationEmailRequestSchema = z.object({
  */
 export const verifyEmailRequestSchema = z.object({
   email: emailSchema,
-  otp: z.string().regex(/^\d{6}$/, 'OTP code must be a 6-digit numeric code'),
+  otp: sixDigitCodeSchema('OTP code'),
 });
 
 /**
@@ -127,7 +195,7 @@ export const sendResetPasswordEmailRequestSchema = z.object({
  */
 export const exchangeResetPasswordTokenRequestSchema = z.object({
   email: emailSchema,
-  code: z.string().regex(/^\d{6}$/, 'Reset password code must be a 6-digit numeric code'),
+  code: sixDigitCodeSchema('Reset password code'),
 });
 
 /**
@@ -507,7 +575,13 @@ export const authErrorResponseSchema = z.object({
 
 // Request types for type-safe request handling
 export type CreateUserRequest = z.infer<typeof createUserRequestSchema>;
-export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
+type PasswordSessionRequest = z.infer<typeof passwordSessionRequestSchema>;
+type OTPSessionRequest = z.infer<typeof otpSessionRequestSchema>;
+export type CreateSessionRequest =
+  | (Omit<PasswordSessionRequest, 'method'> & { method?: 'password' })
+  | OTPSessionRequest;
+export type IdTokenSignInRequest = z.infer<typeof idTokenSignInRequestSchema>;
+export type SendOTPRequest = z.infer<typeof sendOTPRequestSchema>;
 export type CreateAdminSessionRequest = z.infer<typeof createAdminSessionRequestSchema>;
 export type RefreshSessionRequest = z.infer<typeof refreshSessionRequestSchema>;
 export type ListUsersRequest = z.infer<typeof listUsersRequestSchema>;

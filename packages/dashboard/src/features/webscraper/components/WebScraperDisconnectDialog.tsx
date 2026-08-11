@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Dialog,
@@ -20,17 +21,23 @@ export function WebScraperDisconnectDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation('chrome');
   const qc = useQueryClient();
   const { showToast } = useToast();
   const m = useMutation({
     mutationFn: () => webscraperService.disconnectApify(),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: webscraperQueryKeys.all });
-      showToast('Apify disconnected.', 'info');
+      showToast(t('webscraper.apifyDisconnected', { defaultValue: 'Apify disconnected.' }), 'info');
       onClose();
     },
     onError: () => {
-      showToast('Failed to disconnect Apify. Please try again.', 'error');
+      showToast(
+        t('webscraper.disconnectApifyFailed', {
+          defaultValue: 'Failed to disconnect Apify. Please try again.',
+        }),
+        'error'
+      );
     },
   });
 
@@ -38,23 +45,31 @@ export function WebScraperDisconnectDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Disconnect Apify?</DialogTitle>
+          <DialogTitle>
+            {t('webscraper.disconnectApifyTitle', { defaultValue: 'Disconnect Apify?' })}
+          </DialogTitle>
           <DialogDescription className="sr-only">
-            Remove your Apify integration from this project.
+            {t('webscraper.disconnectApifyDescription', {
+              defaultValue: 'Remove your Apify integration from this project.',
+            })}
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
           <p className="text-sm text-foreground">
-            Insforge will stop using your Apify credentials. Your Apify account itself will not be
-            deleted; you can reconnect anytime.
+            {t('webscraper.disconnectApifyBody', {
+              defaultValue:
+                'Insforge will stop using your Apify credentials. Your Apify account itself will not be deleted; you can reconnect anytime.',
+            })}
           </p>
         </DialogBody>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t('webscraper.cancel', { defaultValue: 'Cancel' })}
           </Button>
           <Button variant="destructive" disabled={m.isPending} onClick={() => m.mutate()}>
-            {m.isPending ? 'Disconnecting…' : 'Disconnect'}
+            {m.isPending
+              ? t('webscraper.disconnecting', { defaultValue: 'Disconnecting…' })
+              : t('webscraper.disconnect', { defaultValue: 'Disconnect' })}
           </Button>
         </DialogFooter>
       </DialogContent>

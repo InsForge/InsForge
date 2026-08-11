@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Database, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { ArrowLeft, Database, Pencil, Plus, Settings, Trash2 } from 'lucide-react';
 import { Link, useLocation, useMatch, useNavigate } from 'react-router-dom';
 import {
   EmptyStateIllustration,
@@ -11,6 +12,8 @@ import {
 import { ScrollArea } from '#components/radix/ScrollArea';
 import { Button, cn } from '@insforge/ui';
 import { DatabaseSchemaSelect } from '#features/database/components/DatabaseSchemaSelect';
+import { DatabaseSettingsDialog } from '#features/database/components/DatabaseSettingsDialog';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import type { DatabaseSchemaInfo } from '@insforge/shared-schemas';
 
 const DATABASE_STUDIO_SIDEBAR_BASE_ITEMS: Array<{
@@ -111,6 +114,7 @@ function DatabaseStudioSidebarItem({ label, href, sectionEnd }: DatabaseStudioSi
 const STUDIO_MENU_TRANSITION_MS = 260;
 
 export function DatabaseStudioSidebarPanel({ onBack }: DatabaseStudioSidebarPanelProps) {
+  const { t } = useTranslation('chrome');
   return (
     <aside className="h-full w-60 flex flex-col border-r border-border bg-semantic-1 flex-shrink-0">
       <div className="p-3">
@@ -120,7 +124,7 @@ export function DatabaseStudioSidebarPanel({ onBack }: DatabaseStudioSidebarPane
           onClick={onBack}
         >
           <ArrowLeft className="h-5 w-5" />
-          Back
+          {t('database.back')}
         </Button>
       </div>
 
@@ -136,7 +140,9 @@ export function DatabaseStudioSidebarPanel({ onBack }: DatabaseStudioSidebarPane
           ].map((item) => (
             <DatabaseStudioSidebarItem
               key={item.id}
-              label={item.label}
+              label={t(`database.studio.${item.id === 'backups' ? 'backupRestore' : item.id}`, {
+                defaultValue: item.label,
+              })}
               href={item.href}
               sectionEnd={item.sectionEnd}
             />
@@ -161,9 +167,14 @@ export function DatabaseSidebar({
   initialMode = 'tables',
   animateToMode,
 }: DatabaseSidebarProps) {
+  const { t } = useTranslation('chrome');
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<'tables' | 'studio'>(initialMode);
+  // The settings dialog only holds backup schedule config, which the cloud
+  // control plane owns in cloud-hosting mode.
+  const isCloudHostingMode = useIsCloudHostingMode();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const showEmptyState = tables.length === 0;
   const navigateTimerRef = useRef<number | null>(null);
 
@@ -200,7 +211,7 @@ export function DatabaseSidebar({
       ? [
           {
             id: 'create-table',
-            label: 'Create Table',
+            label: t('database.createTable'),
             icon: Plus,
             onClick: onNewTable,
           },
@@ -208,7 +219,7 @@ export function DatabaseSidebar({
       : []),
     {
       id: 'database-studio',
-      label: 'Database Studio',
+      label: t('database.databaseStudio'),
       icon: Database,
       onClick: () => {
         setMode('studio');
@@ -231,7 +242,7 @@ export function DatabaseSidebar({
     if (onEditTable) {
       actions.push({
         id: `edit-${item.id}`,
-        label: 'Edit Table',
+        label: t('database.editTable'),
         icon: Pencil,
         onClick: () => onEditTable(item.id),
       });
@@ -240,7 +251,7 @@ export function DatabaseSidebar({
     if (onDeleteTable) {
       actions.push({
         id: `delete-${item.id}`,
-        label: 'Delete Table',
+        label: t('database.deleteTable'),
         icon: Trash2,
         destructive: true,
         onClick: () => onDeleteTable(item.id),
@@ -260,7 +271,19 @@ export function DatabaseSidebar({
       >
         <div className="h-full w-1/2">
           <FeatureSidebar
-            title="Database"
+            title={t('database.paneTitle')}
+            headerButtons={
+              isCloudHostingMode
+                ? undefined
+                : [
+                    {
+                      id: 'database-settings',
+                      label: t('database.settingsTitle', { defaultValue: 'Database Settings' }),
+                      icon: Settings,
+                      onClick: () => setSettingsOpen(true),
+                    },
+                  ]
+            }
             headerContent={
               <DatabaseSchemaSelect
                 schemas={schemas}
@@ -277,7 +300,7 @@ export function DatabaseSidebar({
                 <div className="flex flex-col items-center gap-2 pt-2 text-center">
                   <EmptyStateIllustration />
                   <p className="text-sm font-medium leading-6 text-muted-foreground">
-                    No Table Yet
+                    {t('database.noTableYet')}
                   </p>
                   <div className="text-xs leading-4">
                     <button
@@ -286,16 +309,16 @@ export function DatabaseSidebar({
                       onClick={onNewTable}
                       disabled={!onNewTable}
                     >
-                      Create your first table
+                      {t('database.createFirstTableLink')}
                     </button>
-                    <p className="text-muted-foreground">to get started</p>
+                    <p className="text-muted-foreground">{t('database.toGetStarted')}</p>
                   </div>
                 </div>
               ) : undefined
             }
             itemActions={getItemActions}
             showSearch={!showEmptyState}
-            searchPlaceholder="Search tables..."
+            searchPlaceholder={t('database.searchTables', { defaultValue: 'Search tables...' })}
           />
         </div>
 
@@ -303,6 +326,12 @@ export function DatabaseSidebar({
           <DatabaseStudioSidebarPanel onBack={() => setMode('tables')} />
         </div>
       </div>
+
+      {/* Stays mounted (Radix close animation); its config query only runs
+          while open. */}
+      {!isCloudHostingMode && (
+        <DatabaseSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      )}
     </div>
   );
 }

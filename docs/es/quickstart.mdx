@@ -1,0 +1,58 @@
+---
+title: "Configuración de CLI"
+sidebarTitle: "Configuración de CLI · Recomendado"
+description: "Instale InsForge CLI, vincule un proyecto y genere tipos desde la terminal en aproximadamente cinco minutos para comenzar a construir contra su backend."
+---
+
+## Paso 1: Crear su proyecto
+
+<Card title="Ir a InsForge Cloud" icon="cloud" href="https://insforge.dev">
+  Visite [insforge.dev](https://insforge.dev) y cree una cuenta gratuita
+</Card>
+
+Una vez iniciada la sesión:
+
+<Steps>
+  <Step title="Crear proyecto">
+    Haga clic en **"Crear nuevo proyecto"**
+  </Step>
+  <Step title="Esperar backend">
+    Su backend estará listo en ~3 segundos
+  </Step>
+  <Step title="Copiar ID de proyecto">
+    Se le redirigirá a la consola del proyecto — copie el **ID del proyecto** de la URL del navegador:
+  </Step>
+</Steps>
+
+```
+https://insforge.dev/dashboard/project/<your-project-id>
+```
+
+Necesitará este ID de proyecto en el Paso 2.
+
+## Paso 2: Vincular CLI
+
+Desde el directorio de su proyecto, vincule su código local a su proyecto InsForge. Reemplace `<your-project-id>` con el ID del Paso 1.
+
+```bash
+npx @insforge/cli link --project-id <your-project-id>
+```
+
+Ejecutar a través de `npx` mantiene el CLI fuera de su ruta de instalación global. El archivo de vinculación termina en el directorio actual y le dice a los comandos posteriores a qué proyecto pertenecen.
+
+## Paso 3: Verificar instalación
+
+Envíe el siguiente aviso a su agente de codificación de IA para verificar la configuración:
+
+`Estoy usando InsForge como plataforma de backend. Lee el directorio actual, asegúrate de que las habilidades de InsForge estén instaladas y usa InsForge CLI para tareas de backend.`
+
+## Aprende más
+
+Para explorar las capacidades completas de InsForge CLI:
+
+- Consulte la [documentación del paquete npm](https://www.npmjs.com/package/@insforge/cli)
+- Ejecute el comando de ayuda integrado:
+
+```bash
+npx @insforge/cli --help
+```

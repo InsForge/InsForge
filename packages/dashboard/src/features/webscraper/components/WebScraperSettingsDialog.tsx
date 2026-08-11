@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Settings } from 'lucide-react';
 import TerminalIcon from '#assets/icons/terminal.svg?react';
 import {
@@ -19,7 +20,8 @@ import {
   MenuDialogTitle,
 } from '@insforge/ui';
 import type { ApifyConnection } from '#features/webscraper/services/webscraper.service';
-import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { ApifyTokenForm } from './ApifyTokenForm';
 import { APIFY_CONSOLE_URL, SCRAPE_PROMPT } from './shared';
 import { WebScraperDisconnectDialog } from './WebScraperDisconnectDialog';
 
@@ -29,7 +31,9 @@ interface WebScraperSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   connection: ApifyConnection | null;
-  projectId: string;
+  // Undefined on self-hosted deployments (PROJECT_ID is empty by design); only
+  // the cloud OAuth handoff below reads it.
+  projectId: string | undefined;
 }
 
 export function WebScraperSettingsDialog({
@@ -38,9 +42,12 @@ export function WebScraperSettingsDialog({
   connection,
   projectId,
 }: WebScraperSettingsDialogProps) {
+  const { t } = useTranslation('chrome');
   const [section, setSection] = useState<Section>('general');
   const [disconnecting, setDisconnecting] = useState(false);
   const { onConnectApify } = useDashboardHost();
+  // The host's own mode, not "the OAuth callback happens to be missing".
+  const isSelfHosted = !useIsCloudHostingMode();
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -49,8 +56,14 @@ export function WebScraperSettingsDialog({
     onOpenChange(nextOpen);
   };
 
-  const title = section === 'general' ? 'General' : 'Scrape Prompt';
-  const planLabel = connection?.planTier ?? connection?.plan ?? 'Unknown plan';
+  const title =
+    section === 'general'
+      ? t('webscraper.general', { defaultValue: 'General' })
+      : t('webscraper.scrapePrompt', { defaultValue: 'Scrape Prompt' });
+  const planLabel =
+    connection?.planTier ??
+    connection?.plan ??
+    t('webscraper.unknownPlan', { defaultValue: 'Unknown plan' });
 
   return (
     <>
@@ -58,7 +71,9 @@ export function WebScraperSettingsDialog({
         <MenuDialogContent>
           <MenuDialogSideNav>
             <MenuDialogSideNavHeader>
-              <MenuDialogSideNavTitle>Web Scraper Config</MenuDialogSideNavTitle>
+              <MenuDialogSideNavTitle>
+                {t('webscraper.configTitle', { defaultValue: 'Web Scraper Config' })}
+              </MenuDialogSideNavTitle>
             </MenuDialogSideNavHeader>
             <MenuDialogNav>
               <MenuDialogNavList>
@@ -67,14 +82,14 @@ export function WebScraperSettingsDialog({
                   active={section === 'general'}
                   onClick={() => setSection('general')}
                 >
-                  General
+                  {t('webscraper.general', { defaultValue: 'General' })}
                 </MenuDialogNavItem>
                 <MenuDialogNavItem
                   icon={<TerminalIcon className="h-5 w-5" />}
                   active={section === 'scrape-prompt'}
                   onClick={() => setSection('scrape-prompt')}
                 >
-                  Scrape Prompt
+                  {t('webscraper.scrapePrompt', { defaultValue: 'Scrape Prompt' })}
                 </MenuDialogNavItem>
               </MenuDialogNavList>
             </MenuDialogNav>
@@ -94,7 +109,8 @@ export function WebScraperSettingsDialog({
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex min-w-0 flex-col">
                         <p className="truncate text-base font-normal leading-7 text-foreground">
-                          {connection.apifyUsername ?? 'Apify account'}
+                          {connection.apifyUsername ??
+                            t('webscraper.apifyAccount', { defaultValue: 'Apify account' })}
                         </p>
                         <div className="flex items-center gap-2 text-sm leading-5 text-muted-foreground">
                           <span>{connection.status}</span>
@@ -111,21 +127,25 @@ export function WebScraperSettingsDialog({
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <a href={APIFY_CONSOLE_URL} target="_blank" rel="noopener noreferrer">
-                          <Button variant="secondary">View in Apify console</Button>
+                          <Button variant="secondary">
+                            {t('webscraper.viewInApifyConsole', {
+                              defaultValue: 'View in Apify console',
+                            })}
+                          </Button>
                         </a>
                         <Button
                           variant="secondary"
                           className="border-warning bg-warning/10 text-warning hover:bg-warning/20"
                           onClick={() => setDisconnecting(true)}
                         >
-                          Disconnect
+                          {t('webscraper.disconnect', { defaultValue: 'Disconnect' })}
                         </Button>
                       </div>
                     </div>
 
                     <div className="h-px w-full bg-[var(--alpha-8)]" />
 
-                    <FieldRow label="Account">
+                    <FieldRow label={t('webscraper.account', { defaultValue: 'Account' })}>
                       <p className="text-sm leading-6 text-foreground">
                         {connection.apifyUsername ?? '—'}
                       </p>
@@ -133,28 +153,34 @@ export function WebScraperSettingsDialog({
 
                     <div className="h-px w-full bg-[var(--alpha-8)]" />
 
-                    <FieldRow label="Email">
+                    <FieldRow label={t('webscraper.email', { defaultValue: 'Email' })}>
                       <p className="text-sm leading-6 text-foreground">{connection.email ?? '—'}</p>
                     </FieldRow>
 
                     <div className="h-px w-full bg-[var(--alpha-8)]" />
 
-                    <FieldRow label="Plan">
+                    <FieldRow label={t('webscraper.plan', { defaultValue: 'Plan' })}>
                       <p className="text-sm leading-6 text-foreground">{planLabel}</p>
                     </FieldRow>
 
                     <div className="h-px w-full bg-[var(--alpha-8)]" />
 
-                    <FieldRow label="Status">
+                    <FieldRow label={t('webscraper.statusLabel', { defaultValue: 'Status' })}>
                       <p className="text-sm leading-6 text-foreground">{connection.status}</p>
                     </FieldRow>
 
                     {typeof connection.dataRetentionDays === 'number' && (
                       <>
                         <div className="h-px w-full bg-[var(--alpha-8)]" />
-                        <FieldRow label="Data retention">
+                        <FieldRow
+                          label={t('webscraper.dataRetention', { defaultValue: 'Data retention' })}
+                        >
                           <p className="text-sm leading-6 text-foreground">
-                            Apify keeps datasets {connection.dataRetentionDays} days
+                            {t('webscraper.dataRetentionValue', {
+                              count: connection.dataRetentionDays,
+                              defaultValue_one: 'Apify keeps datasets {{count}} day',
+                              defaultValue_other: 'Apify keeps datasets {{count}} days',
+                            })}
                           </p>
                         </FieldRow>
                       </>
@@ -163,24 +189,43 @@ export function WebScraperSettingsDialog({
                 ) : (
                   <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-center">
                     <p className="text-sm leading-6 text-foreground">
-                      You haven&apos;t connected Apify yet.
+                      {t('webscraper.notConnectedYet', {
+                        defaultValue: "You haven't connected Apify yet.",
+                      })}
                     </p>
-                    <Button
-                      variant="primary"
-                      disabled={!onConnectApify}
-                      onClick={() => onConnectApify?.(projectId)}
-                    >
-                      Connect Apify
-                    </Button>
+                    {isSelfHosted ? (
+                      <div className="w-full max-w-md text-left">
+                        <ApifyTokenForm />
+                      </div>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        disabled={!onConnectApify}
+                        onClick={() => {
+                          // Always set on this branch: WebscraperLayout returns
+                          // early for a cloud project that has no project id.
+                          if (projectId) {
+                            onConnectApify?.(projectId);
+                          }
+                        }}
+                      >
+                        {t('webscraper.connectApify', { defaultValue: 'Connect Apify' })}
+                      </Button>
+                    )}
                   </div>
                 )
               ) : (
                 <div className="flex flex-col gap-3">
                   <p className="text-sm leading-6 text-muted-foreground">
-                    Paste this into your coding agent to start a scrape with the Apify web scraper
-                    skill. Replace the placeholder with what you want to scrape.
+                    {t('webscraper.scrapePromptHintLong', {
+                      defaultValue:
+                        'Paste this into your coding agent to start a scrape with the Apify web scraper skill. Replace the placeholder with what you want to scrape.',
+                    })}
                   </p>
-                  <CodeBlock code={SCRAPE_PROMPT} label="scrape prompt" />
+                  <CodeBlock
+                    code={SCRAPE_PROMPT}
+                    label={t('webscraper.scrapePromptLabel', { defaultValue: 'scrape prompt' })}
+                  />
                 </div>
               )}
             </MenuDialogBody>

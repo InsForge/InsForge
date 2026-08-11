@@ -6,14 +6,14 @@ description: "Connect Apify to InsForge to let your coding agent run scrapers on
 
 Use InsForge Web Scraper to give your coding agent live access to external data. Connect your own Apify account once, and your agent can run scrapers (Apify calls them actors) on demand. The dashboard shows your actors, run history, and scraped datasets without leaving InsForge.
 
-Connect Apify with one click, then paste the scrape prompt into your coding agent. The agent authenticates with your InsForge-managed Apify token, picks the right actor for the job, and returns the results.
+Connect Apify once, then paste the scrape prompt into your coding agent. The agent authenticates with your InsForge-managed Apify token, picks the right actor for the job, and returns the results.
 
 <Frame caption="Web Scraper dashboard: connected actors with their last run and total run counts.">
   <img src="/images/dashboard-webscraper.png" alt="InsForge Web Scraper dashboard showing the Actors tab with connected Apify actors, their last run times, and run counts" />
 </Frame>
 
 <Note>
-  Apify remains the source of truth for actors, runs, and datasets. InsForge surfaces a focused subset for everyday checks, then deep-links into the Apify console for anything beyond it. The Web Scraper integration is available on InsForge Cloud; self-hosted deployments return `501 Not Implemented` on these routes.
+  Apify remains the source of truth for actors, runs, and datasets. InsForge surfaces a focused subset for everyday checks, then deep-links into the Apify console for anything beyond it. The Web Scraper integration runs on InsForge Cloud and on self-hosted deployments alike; only the way you connect Apify differs.
 </Note>
 
 ```mermaid
@@ -45,9 +45,22 @@ flowchart TB
 
 ## Features
 
-### One-click Apify connection
+### Apify connection
 
-Connect Apify from the Web Scraper page in the dashboard. InsForge walks you through the Apify OAuth flow, stores credentials server-side, and keeps the access token refreshed for you. The raw token never lands in your repo or your frontend; agents and functions fetch a live token from the backend when they need one.
+Connect Apify from the Web Scraper page in the dashboard. What happens next depends on where InsForge runs.
+
+On InsForge Cloud it is one click: InsForge walks you through the Apify OAuth flow, stores the credentials server-side, and keeps the access token refreshed for you.
+
+Self-hosted deployments have no OAuth broker in front of them, so you bring your own credential instead. Create an API token in the Apify console under **Settings → Integrations**, paste it into the Web Scraper page, and InsForge stores it encrypted in your own backend's secret store. `insforge webscraper apify connect --token <token>` does the same from the CLI.
+
+Either way the token stays out of your repo and your app bundle; agents and functions fetch a live one from the backend when they need it.
+
+<Warning>
+  Self-hosted: mint a narrowly scoped Apify token rather than a full-account
+  one. `GET /api/webscraper/apify/token` returns the stored token verbatim to
+  admin callers — that is what lets the agent path log the Apify CLI in — so
+  whatever the token can do in Apify is what an InsForge admin key can do.
+</Warning>
 
 ### Scrape via your coding agent
 
@@ -77,7 +90,7 @@ Scraped results live in Apify datasets by default; nothing is written to your pr
 
 ### Settings and disconnect
 
-The Web Scraper Config dialog (the gear icon in the sidebar) shows the connected Apify account, plan, and data retention, links into the Apify console, and lets admins disconnect. Disconnecting only stops InsForge from using your Apify credentials; your Apify account, actors, and datasets stay intact, and you can reconnect anytime.
+The Web Scraper Config dialog (the gear icon in the sidebar) shows the connected Apify account, plan, and data retention, links into the Apify console, and lets admins disconnect. Disconnecting only stops InsForge from using your Apify credentials — self-hosted, it deletes the stored API token from your secret store outright. Your Apify account, actors, and datasets stay intact, and you can reconnect anytime.
 
 ## Concepts
 
@@ -109,6 +122,6 @@ The Web Scraper Config dialog (the gear icon in the sidebar) shows the connected
 
 ## Next steps
 
-- Open the Web Scraper page in the dashboard and click **Connect Apify**.
+- Open the Web Scraper page in the dashboard and click **Connect Apify** — or, self-hosted, paste your Apify API token there.
 - Paste the scrape prompt into your coding agent and tell it what you want to scrape.
 - When a scrape is worth keeping, ask your agent to land the dataset in a table via an [edge function](/core-concepts/functions/overview) or a [schedule](/core-concepts/functions/schedules).
