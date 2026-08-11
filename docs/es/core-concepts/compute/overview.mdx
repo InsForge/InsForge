@@ -66,29 +66,16 @@ En InsForge Cloud, compute está totalmente gestionado y no configuras nada. Cua
   <Tab title="Docker (tu propio host)">
     Los contenedores se ejecutan en el mismo daemon de Docker que ejecuta InsForge, como hermanos del contenedor de InsForge. No hay que registrarse en nada, ni hay factura por contenedor.
 
-    Activarlo es un acto deliberado: monta el socket de Docker en el contenedor de InsForge. En tu archivo compose, descomenta las dos líneas que ya están ahí para esto:
+    Activarlo es un acto deliberado: monta el socket de Docker en el contenedor de InsForge. En tu archivo compose, descomenta la línea que ya están ahí para esto:
 
     ```yaml
     services:
       insforge:
         volumes:
           - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:${DOCKER_SOCKET_PATH:-/var/run/docker.sock}
-        group_add: ["${DOCKER_GID:?set DOCKER_GID to your host docker group id}"]
     ```
 
-    `group_add` es obligatorio porque el socket tiene modo `660 root:docker`: sin un grupo que coincida, el backend recibe `EACCES`. El id de grupo depende del host, así que pon el valor que informe tu host en la línea `DOCKER_GID` de `.env`:
-
-    <CodeGroup>
-    ```bash Linux
-    # 993 en Amazon Linux 2023, habitualmente 999 en Debian/Ubuntu
-    getent group docker | cut -d: -f3
-    ```
-
-    ```bash Docker Desktop (macOS/Windows)
-    # El socket dentro de la VM pertenece a root:root, así que usa 0
-    echo 0
-    ```
-    </CodeGroup>
+    Esa es toda la edición. El socket es `660 root:docker` en Linux y `root:root` en Docker Desktop, y el id de grupo cambia según el host, así que el contenedor lo lee del propio socket al arrancar y se une a ese grupo antes de bajar al usuario de la aplicación. Nada que buscar y nada que configurar.
 
     Reinicia el stack. El driver se registra solo cuando el socket es accesible y escribe `Compute provider "docker" ready`.
 

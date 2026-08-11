@@ -66,29 +66,16 @@ graph TB
   <Tab title="Docker（你自己的宿主机）">
     容器跑在运行 InsForge 的同一个 Docker daemon 上，与 InsForge 容器互为兄弟容器。不需要注册任何服务，也没有按容器计费。
 
-    启用方式是一个明确的动作：把 Docker socket 挂载进 InsForge 容器。compose 文件里已经为此准备好了两行，取消注释即可：
+    启用方式是一个明确的动作：把 Docker socket 挂载进 InsForge 容器。compose 文件里已经为此准备好了一行，取消注释即可：
 
     ```yaml
     services:
       insforge:
         volumes:
           - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:${DOCKER_SOCKET_PATH:-/var/run/docker.sock}
-        group_add: ["${DOCKER_GID:?set DOCKER_GID to your host docker group id}"]
     ```
 
-    `group_add` 是必需的：socket 的权限是 `660 root:docker`，没有匹配的组，后端会拿到 `EACCES`。这个 group id 因宿主机而异，请把你的宿主机报告的值填到 `.env` 的 `DOCKER_GID` 一行：
-
-    <CodeGroup>
-    ```bash Linux
-    # Amazon Linux 2023 上是 993，Debian/Ubuntu 上常见为 999
-    getent group docker | cut -d: -f3
-    ```
-
-    ```bash Docker Desktop（macOS/Windows）
-    # VM 内的 socket 属主是 root:root，所以用 0
-    echo 0
-    ```
-    </CodeGroup>
+    这就是全部改动。socket 在 Linux 上是 `660 root:docker`，在 Docker Desktop 上是 `root:root`，group id 又因宿主机而异，所以容器会在启动时从 socket 上读出这个 group 并加入，然后再降权到应用用户。无需查询，也无需设置。
 
     重启整个 stack。socket 可访问时驱动会自行注册，并输出 `Compute provider "docker" ready`。
 

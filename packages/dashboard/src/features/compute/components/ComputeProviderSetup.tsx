@@ -14,10 +14,7 @@ interface ComputeProviderSetupProps {
 const COMPOSE_SNIPPET = `services:
   insforge:
     volumes:
-      - \${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:\${DOCKER_SOCKET_PATH:-/var/run/docker.sock}
-    group_add: ["\${DOCKER_GID:?set DOCKER_GID to your host docker group id}"]`;
-
-const GID_COMMAND = 'getent group docker | cut -d: -f3';
+      - \${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:\${DOCKER_SOCKET_PATH:-/var/run/docker.sock}`;
 
 const RESTART_COMMAND = 'docker compose up -d insforge';
 
@@ -61,8 +58,7 @@ export function ComputeProviderSetup({
           <p className="text-sm text-muted-foreground">
             {provider === 'docker'
               ? t('compute.setupDockerSummary', {
-                  defaultValue:
-                    'Run containers on the same Docker daemon as InsForge — no account and no per-container bill.',
+                  defaultValue: 'Run containers on the same Docker daemon as InsForge.',
                 })
               : t('compute.setupFlySummary', {
                   defaultValue:
@@ -78,33 +74,18 @@ export function ComputeProviderSetup({
                 <StepText
                   title={t('compute.dockerStep1', { defaultValue: 'Mount the Docker socket' })}
                   body={t('compute.dockerStep1Body', {
-                    defaultValue:
-                      'Whoever can reach the socket is root on the host, so InsForge ships with it disabled. In InsForge’s own compose file these two lines are already there, commented out; add them if you run your own.',
+                    defaultValue: 'This line is in your compose file, commented out. Uncomment it.',
                   })}
                 />
                 <Snippet label="docker-compose.yml" code={COMPOSE_SNIPPET} />
               </StepItem>
 
-              <StepItem number={2}>
-                <StepText
-                  title={t('compute.dockerStep2', {
-                    defaultValue: 'Put your host’s docker group id in .env',
-                  })}
-                  body={t('compute.dockerStep2Body', {
-                    defaultValue:
-                      'The socket is mode 660 root:docker, so the backend needs a matching group. Print the id, then write the number into .env — compose reads that file literally and will not run a command for you. On Docker Desktop the socket is owned by root inside the VM, so the id is 0.',
-                  })}
-                />
-                <Snippet label={terminalLabel} code={GID_COMMAND} />
-                <Snippet label=".env" code={'DOCKER_GID=993'} />
-              </StepItem>
-
-              <StepItem number={3} last>
+              <StepItem number={2} last>
                 <StepText
                   title={t('compute.dockerStep3', { defaultValue: 'Restart InsForge' })}
                   body={t('compute.dockerStep3Body', {
                     defaultValue:
-                      'The driver registers itself once the socket is reachable. On rootless Docker or Podman the socket is somewhere else — click the button below to set its path first.',
+                      'Docker appears here once the socket is reachable. On rootless Docker or Podman, set the socket path below first.',
                   })}
                 />
                 {/* The path is data, not prose: the single most useful diagnostic when

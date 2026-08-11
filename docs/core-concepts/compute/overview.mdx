@@ -66,29 +66,16 @@ On InsForge Cloud, compute is fully managed and you configure nothing. When you 
   <Tab title="Docker (your own host)">
     Containers run on the same Docker daemon that runs InsForge, as siblings of the InsForge container. Nothing to sign up for, and no per-container bill.
 
-    Enabling it is a single deliberate act: mount the Docker socket into the InsForge container. In your compose file, uncomment the two lines that are already there for this:
+    Enabling it is a single deliberate act: mount the Docker socket into the InsForge container. In your compose file, uncomment the line that is already there for this:
 
     ```yaml
     services:
       insforge:
         volumes:
           - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:${DOCKER_SOCKET_PATH:-/var/run/docker.sock}
-        group_add: ["${DOCKER_GID:?set DOCKER_GID to your host docker group id}"]
     ```
 
-    `group_add` is required because the socket is mode `660 root:docker` — without a matching group the backend gets `EACCES`. The group id is host-specific, so put the value your host reports on `.env`'s `DOCKER_GID` line:
-
-    <CodeGroup>
-    ```bash Linux
-    # 993 on Amazon Linux 2023, commonly 999 on Debian/Ubuntu
-    getent group docker | cut -d: -f3
-    ```
-
-    ```bash Docker Desktop (macOS/Windows)
-    # The socket inside the VM is owned by root:root, so use 0
-    echo 0
-    ```
-    </CodeGroup>
+    That is the whole edit. The socket is mode `660 root:docker` on Linux and `root:root` on Docker Desktop, and the group id differs per host, so the container reads it off the socket at startup and joins that group before dropping to the app user. Nothing to look up and nothing to set.
 
     Restart the stack. The driver registers itself when the socket is reachable and logs `Compute provider "docker" ready`.
 
