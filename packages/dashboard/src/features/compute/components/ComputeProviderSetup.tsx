@@ -82,12 +82,8 @@ export function ComputeProviderSetup({
               </StepItem>
 
               <StepItem number={2} last>
-                <StepText
-                  title={t('compute.dockerStep3', { defaultValue: 'Restart InsForge' })}
-                  body={t('compute.dockerStep3Body', {
-                    defaultValue: 'Docker shows up here once it restarts.',
-                  })}
-                />
+                {/* No body: the command below is the whole step. */}
+                <StepText title={t('compute.dockerStep3', { defaultValue: 'Restart InsForge' })} />
                 {/* The path is data, not prose: the single most useful diagnostic when
                     a mount is missing, so it reads as a value rather than a sentence. */}
                 {socketPath && (
@@ -156,11 +152,11 @@ export function ComputeProviderSetup({
   );
 }
 
-function StepText({ title, body }: { title: string; body: string }) {
+function StepText({ title, body }: { title: string; body?: string }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm font-medium leading-6 text-foreground">{title}</p>
-      <p className="text-sm leading-6 text-muted-foreground">{body}</p>
+      {body && <p className="text-sm leading-6 text-muted-foreground">{body}</p>}
     </div>
   );
 }

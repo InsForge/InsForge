@@ -844,7 +844,6 @@
     "setupDockerSummary": "在运行 InsForge 的同一个 Docker daemon 上运行容器。",
     "setupFlySummary": "用你自己的账号在 Fly.io 上运行容器，可选区域，支持缩容到零。",
     "dockerStep1Body": "在 docker-compose.yml 里，取消 insforge 服务下这个 volume 的注释：",
-    "dockerStep3Body": "重启完成后 Docker 就会出现在这里。",
     "dockerSocketLookingAt": "正在查找",
     "flyStep1Body": "用已登录你自己账号的 Fly CLI 执行：",
     "flyStep3Body": "两个值齐备后，compute 接口就会开始响应。",

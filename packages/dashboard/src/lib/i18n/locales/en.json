@@ -860,7 +860,6 @@
     "setupDockerSummary": "Run containers on the same Docker daemon that runs InsForge.",
     "setupFlySummary": "Run containers on Fly.io under your own account, with selectable regions and scale-to-zero.",
     "dockerStep1Body": "In docker-compose.yml, uncomment the volume on the insforge service:",
-    "dockerStep3Body": "Docker shows up here once it restarts.",
     "dockerSocketLookingAt": "Looking for",
     "flyStep1Body": "Run these with the Fly CLI, signed in to your own account:",
     "flyStep3Body": "Compute endpoints start answering once both values are present.",
