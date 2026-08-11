@@ -761,7 +761,7 @@
     "deleteWarningSuffix": "並銷毀其 Fly.io 資源。容器映像檔隨後會被回收，無法復原。",
     "typeToConfirmPrefix": "輸入",
     "typeToConfirmSuffix": "以確認：",
-    "crashLoopTooltip_other": "最近 60 秒內結束 {{count}} 次——容器正在反覆重啟。容器的 stdout/stderr 尚未顯示；請在本機用相同映像檔重現以查看結束原因。",
+    "crashLoopTooltip_other": "最近 60 秒內結束 {{count}} 次——容器正在反覆重啟。打開它並查看日誌，看它為什麼結束。",
     "crashLooping": "反覆當機",
     "rawTcpEndpointTooltip": "原始 TCP 端點——請使用 redis-cli、psql 或協定原生用戶端連線",
     "cpuValue": "CPU：{{value}}",
