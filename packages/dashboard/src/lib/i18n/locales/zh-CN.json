@@ -762,7 +762,7 @@
     "deleteWarningSuffix": "并销毁其 Fly.io 资源。容器镜像会在随后被回收，无法恢复。",
     "typeToConfirmPrefix": "输入",
     "typeToConfirmSuffix": "以确认：",
-    "crashLoopTooltip_other": "最近 60 秒内退出 {{count}} 次——容器正在反复重启。容器的 stdout/stderr 尚未展示；请在本地用相同镜像复现以查看退出原因。",
+    "crashLoopTooltip_other": "最近 60 秒内退出 {{count}} 次——容器正在反复重启。打开它并查看日志，看它为什么退出。",
     "crashLooping": "反复崩溃",
     "rawTcpEndpointTooltip": "原始 TCP 端点——请使用 redis-cli、psql 或协议原生客户端连接",
     "cpuValue": "CPU：{{value}}",

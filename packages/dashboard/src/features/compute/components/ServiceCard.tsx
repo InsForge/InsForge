@@ -51,15 +51,19 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
       }}
       className="w-full text-left bg-card border border-[var(--alpha-8)] rounded-lg p-4 hover:border-foreground/20 transition-colors cursor-pointer"
     >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-foreground truncate">{service.name}</h3>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        {/* min-w-0 so the name is what gives way when the badges need room; without it
+            the flex child refuses to shrink and "crash-looping" wraps mid-word. */}
+        <h3 className="min-w-0 text-sm font-medium text-foreground truncate" title={service.name}>
+          {service.name}
+        </h3>
+        <div className="flex shrink-0 items-center gap-2">
           {health?.isCrashLooping && (
             <span
-              className="flex items-center gap-1 text-xs text-destructive"
+              className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-destructive"
               title={t('compute.crashLoopTooltip', {
                 defaultValue:
-                  "{{count}} exits in the last 60s — container is restart-looping. Container stdout/stderr isn't surfaced yet; reproduce locally with the same image to see why it's exiting.",
+                  '{{count}} exits in the last 60s — the container is restart-looping. Open it and check Logs for why it exits.',
                 count: health.recentExitCount,
               })}
             >
