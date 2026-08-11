@@ -762,8 +762,6 @@
     "agentExampleDeploy": "“Despliega nginx:alpine en el puerto 80 como servicio de cómputo”",
     "agentExampleFastapi": "“Despliega esta app de FastAPI en el directorio actual”",
     "agentExampleRedis": "“Crea un contenedor de Redis para caché”",
-    "jobs": "Trabajos",
-    "comingSoon": "Próximamente",
     "nameHint": "Compatible con DNS: minúsculas, números y guiones",
     "regions": {
       "iad": "Ashburn, VA (iad)",

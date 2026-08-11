@@ -758,8 +758,6 @@
     "agentExampleDeploy": "“Deploy nginx:alpine on port 80 as a compute service”",
     "agentExampleFastapi": "“Deploy this FastAPI app in the current directory”",
     "agentExampleRedis": "“Create a Redis container for caching”",
-    "jobs": "Jobs",
-    "comingSoon": "Coming soon",
     "nameHint": "DNS-safe: lowercase, numbers, dashes",
     "regions": {
       "iad": "Ashburn, VA (iad)",

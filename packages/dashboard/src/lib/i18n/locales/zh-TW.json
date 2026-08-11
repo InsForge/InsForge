@@ -743,8 +743,6 @@
     "agentExampleDeploy": "「將 nginx:alpine 部署為運算服務，連接埠 80」",
     "agentExampleFastapi": "「部署目前目錄中的這個 FastAPI 應用程式」",
     "agentExampleRedis": "「建立一個用於快取的 Redis 容器」",
-    "jobs": "工作",
-    "comingSoon": "即將推出",
     "nameHint": "需符合 DNS 規範：小寫字母、數字、連字號",
     "regions": {
       "iad": "阿什本（維吉尼亞州）(iad)",
