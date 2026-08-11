@@ -364,13 +364,23 @@ paths:
               example:
                 message: "Hello, World!"
         '404':
-          description: Function not found or not active
+          description: |
+            Function not found or not active. Body comes from the Deno runtime and is
+            forwarded verbatim: JSON when the slug is well-formed but has no active
+            function, plain text when the path is not a valid slug at all.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
+                properties:
+                  error:
+                    type: string
               example:
                 error: "Function not found or not active"
+            text/plain:
+              schema:
+                type: string
+              example: "Not Found"
         '502':
           description: Failed to proxy to Deno runtime
           content:
@@ -415,13 +425,23 @@ paths:
               example:
                 message: "Hello, John!"
         '404':
-          description: Function not found or not active
+          description: |
+            Function not found or not active. Body comes from the Deno runtime and is
+            forwarded verbatim: JSON when the slug is well-formed but has no active
+            function, plain text when the path is not a valid slug at all.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
+                properties:
+                  error:
+                    type: string
               example:
                 error: "Function not found or not active"
+            text/plain:
+              schema:
+                type: string
+              example: "Not Found"
         '502':
           description: Failed to proxy to Deno runtime
           content:
@@ -460,6 +480,24 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '404':
+          description: |
+            Function not found or not active. Body comes from the Deno runtime and is
+            forwarded verbatim: JSON when the slug is well-formed but has no active
+            function, plain text when the path is not a valid slug at all.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: "Function not found or not active"
+            text/plain:
+              schema:
+                type: string
+              example: "Not Found"
         '502':
           description: Failed to proxy to Deno runtime
           content:
@@ -496,6 +534,24 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '404':
+          description: |
+            Function not found or not active. Body comes from the Deno runtime and is
+            forwarded verbatim: JSON when the slug is well-formed but has no active
+            function, plain text when the path is not a valid slug at all.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: "Function not found or not active"
+            text/plain:
+              schema:
+                type: string
+              example: "Not Found"
         '502':
           description: Failed to proxy to Deno runtime
           content:
@@ -525,6 +581,24 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '404':
+          description: |
+            Function not found or not active. Body comes from the Deno runtime and is
+            forwarded verbatim: JSON when the slug is well-formed but has no active
+            function, plain text when the path is not a valid slug at all.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: "Function not found or not active"
+            text/plain:
+              schema:
+                type: string
+              example: "Not Found"
         '502':
           description: Failed to proxy to Deno runtime
           content:
