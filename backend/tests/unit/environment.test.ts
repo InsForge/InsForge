@@ -33,49 +33,38 @@ describe('Environment utils', () => {
       delete process.env.PROJECT_ID;
     });
 
-    // The pair our provisioning writes on every instance.
-    it('is true when DEPLOYMENT_ID and PROJECT_ID are both set', () => {
-      process.env.DEPLOYMENT_ID = 'dep-1';
-      process.env.PROJECT_ID = 'proj-1';
+    // The one marker only our provisioning writes. AWS does not inject it — the SDK
+    // reads instance credentials from IMDS and never needs the profile's name — and no
+    // self-host artefact mentions it.
+    it('is true when the provisioning marker is present', () => {
+      process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
       expect(isCloudManagedProject()).toBe(true);
     });
 
-    // PROJECT_ID is documented as the self-hosted way to scope services, so on its own
-    // it must not mark a deployment as ours.
+    // `.env.example` ships PROJECT_ID and getProjectId() documents it as the
+    // self-hosted way to scope services.
     it('is false for PROJECT_ID alone', () => {
       process.env.PROJECT_ID = 'my-project';
       expect(isCloudManagedProject()).toBe(false);
     });
 
-    // Nothing else in the codebase reads DEPLOYMENT_ID; alone it proves nothing either.
-    it('is false for DEPLOYMENT_ID alone', () => {
-      process.env.DEPLOYMENT_ID = 'dep-1';
+    // deploy/zeabur/template.yml fills DEPLOYMENT_ID from ${ZEABUR_SERVICE_ID} and
+    // PROJECT_ID from ${ZEABUR_PROJECT_ID}, so a third-party self-host carries both.
+    // Reading that pair as ours is what this rule exists to avoid.
+    it('is false for a Zeabur-style install carrying both ids', () => {
+      process.env.DEPLOYMENT_ID = 'zeabur-service-1';
+      process.env.PROJECT_ID = 'zeabur-project-1';
       expect(isCloudManagedProject()).toBe(false);
-    });
-
-    // 'local' is the placeholder a self-host install ends up with.
-    it("is false when PROJECT_ID is 'local'", () => {
-      process.env.DEPLOYMENT_ID = 'dep-1';
-      process.env.PROJECT_ID = 'local';
-      expect(isCloudManagedProject()).toBe(false);
-    });
-
-    // Independent second signal, so this is never weaker than the old check.
-    it('is true on an instance profile alone', () => {
-      process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
-      expect(isCloudManagedProject()).toBe(true);
     });
   });
 
   // Our OAuth credentials come from the environment cloud provisioning writes, so this
   // follows the project question rather than AWS access.
   it('isOAuthSharedKeysAvailable follows isCloudManagedProject', () => {
-    delete process.env.AWS_INSTANCE_PROFILE_NAME;
-    process.env.DEPLOYMENT_ID = 'dep-1';
-    process.env.PROJECT_ID = 'proj-1';
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     expect(isOAuthSharedKeysAvailable()).toBe(true);
 
-    delete process.env.DEPLOYMENT_ID;
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
     expect(isOAuthSharedKeysAvailable()).toBe(false);
   });
 

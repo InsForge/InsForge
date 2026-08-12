@@ -118,6 +118,23 @@ vi.mock('@/providers/compute/fly.provider.js', () => ({
 import { ComputeServicesService } from '@/services/compute/services.service.js';
 import { MachineGoneError, flyAppNameFor } from '@/providers/compute/compute.provider.js';
 
+// AWS_INSTANCE_PROFILE_NAME is what marks a deployment as cloud-managed, so every test
+// starts without it and the cloud cases set it deliberately. File-level because the
+// registry suites below are separate top-level describes.
+const savedAwsProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+
+beforeEach(() => {
+  delete process.env.AWS_INSTANCE_PROFILE_NAME;
+});
+
+afterAll(() => {
+  if (savedAwsProfile === undefined) {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+  } else {
+    process.env.AWS_INSTANCE_PROFILE_NAME = savedAwsProfile;
+  }
+});
+
 describe('ComputeServicesService', () => {
   let service: ComputeServicesService;
 
@@ -2338,7 +2355,8 @@ describe('selectComputeProvider factory', () => {
     expect(selectComputeProvider()).toBe(FlyProvider.getInstance());
   });
 
-  it('returns CloudComputeProvider when PROJECT_ID is provisioned and no FLY_API_TOKEN', async () => {
+  it('returns CloudComputeProvider on a cloud-managed deployment with no FLY_API_TOKEN', async () => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     vi.doMock('@/infra/config/app.config.js', () => {
       const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
@@ -2426,6 +2444,7 @@ describe('buildComputeRegistry', () => {
   });
 
   it('COMPUTE_PROVIDER=cloud selects the cloud credential path for the fly key', async () => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     flyConfigured();
     process.env.COMPUTE_PROVIDER = 'cloud';
     const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
@@ -2501,6 +2520,7 @@ describe('buildComputeRegistry', () => {
   // customer creating containers on shared infrastructure is a tenant escape.
   // Fail closed, and say the real reason rather than blaming a missing socket.
   it('refuses the Docker driver on a cloud-managed project', async () => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     flyConfigured(); // cloud projectId + apiHost present
     process.env.COMPUTE_PROVIDER = 'docker';
     const { buildComputeRegistry } = await import('@/services/compute/services.service.js');

@@ -19,9 +19,23 @@ import { MachineGoneError } from '@/providers/compute/compute.provider.js';
 type FetchMock = MockInstance<Parameters<typeof fetch>, ReturnType<typeof fetch>>;
 
 describe('CloudComputeProvider', () => {
+  // Cloud is identified by the marker our provisioning writes; simulating a cloud
+  // project means setting it, not just filling in a project id.
+  const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+  afterAll(() => {
+    if (savedProfile === undefined) {
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    } else {
+      process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+    }
+  });
+
   let fetchMock: FetchMock;
 
   beforeEach(() => {
+    // A configured cloud provider now means the marker our provisioning writes, not
+    // merely a PROJECT_ID — a Zeabur self-host carries one of those too.
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     // createApp derives the 6PN network name from APP_KEY.
     process.env.APP_KEY = 'd9byq46t';
     fetchMock = vi.fn() as unknown as FetchMock;
@@ -187,6 +201,7 @@ describe('CloudComputeProvider machine-gone translation', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     // The COMPUTE_NOT_CONFIGURED test above leaves a throwing spy on the
     // singleton's signToken — undo it so calls here reach the real fetch.
     vi.restoreAllMocks();

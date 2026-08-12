@@ -105,12 +105,13 @@ describe('DockerProvider', () => {
   // documented in the compute routes as the self-hosted way to scope services — so a
   // self-hoster setting it is expected. Treating that alone as "cloud" silently refused
   // to register Docker on their own machine, with nothing in the UI to diagnose.
-  // The three cases that decide whether this driver may register at all.
+  // What may and may not disable this driver.
   describe('cloud detection', () => {
     const saved = {
       profile: process.env.AWS_INSTANCE_PROFILE_NAME,
       deployment: process.env.DEPLOYMENT_ID,
       project: process.env.PROJECT_ID,
+      socket: appConfig.docker.socketPath,
     };
 
     beforeEach(() => {
@@ -122,7 +123,7 @@ describe('DockerProvider', () => {
     });
 
     afterEach(() => {
-      appConfig.docker.socketPath = '/nonexistent/test.sock';
+      appConfig.docker.socketPath = saved.socket;
       for (const [key, value] of [
         ['AWS_INSTANCE_PROFILE_NAME', saved.profile],
         ['DEPLOYMENT_ID', saved.deployment],
@@ -136,33 +137,26 @@ describe('DockerProvider', () => {
       }
     });
 
-    // The regression this guard caused once: `.env.example` ships PROJECT_ID, every
-    // compose file passes it through, and getProjectId() documents it as the self-hosted
-    // way to scope services. Reading it alone as "cloud" made Docker silently absent.
-    it('registers when only PROJECT_ID is set', () => {
+    // `.env.example` ships PROJECT_ID, every compose file passes it through, and
+    // getProjectId() documents it as the self-hosted way to scope services.
+    it('registers when PROJECT_ID is set', () => {
       process.env.PROJECT_ID = 'my-project';
 
       expect(provider.isConfigured()).toBe(true);
     });
 
-    // DEPLOYMENT_ID does nothing for a self-host install, so on its own it is not
-    // evidence either.
-    it('registers when only DEPLOYMENT_ID is set', () => {
-      process.env.DEPLOYMENT_ID = 'dep-1';
+    // deploy/zeabur/template.yml fills DEPLOYMENT_ID from ${ZEABUR_SERVICE_ID} and
+    // PROJECT_ID from ${ZEABUR_PROJECT_ID}, so a third-party self-host carries both.
+    // Treating the pair as ours refused this driver on their own machine.
+    it('registers on a Zeabur-style install carrying both ids', () => {
+      process.env.DEPLOYMENT_ID = 'zeabur-service-1';
+      process.env.PROJECT_ID = 'zeabur-project-1';
 
       expect(provider.isConfigured()).toBe(true);
     });
 
-    // Cloud provisioning writes both, on every instance.
-    it('refuses when DEPLOYMENT_ID and PROJECT_ID are both set', () => {
-      process.env.DEPLOYMENT_ID = 'dep-1';
-      process.env.PROJECT_ID = 'proj-1';
-
-      expect(provider.isConfigured()).toBe(false);
-    });
-
-    // Kept as a second, independent signal so this is never less protective than the
-    // check it replaced.
+    // The one marker only our provisioning writes: AWS does not inject it, no self-host
+    // artefact mentions it, and its value is never read.
     it('refuses on an instance carrying an AWS instance profile', () => {
       process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
 
