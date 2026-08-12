@@ -99,6 +99,9 @@ const mockFlyInstance = {
   // service's naming and URL calls resolve to the same values the fixtures use.
   name: 'fly' as const,
   capabilities: { ...FLY_CAPABILITIES },
+  // Fly's only mode. A separate method rather than capabilities.ingressModes[0]
+  // because a single-host driver's default is an operator setting.
+  defaultIngress: (): 'none' | 'port' | 'host' => 'host',
   // Delegates to the real helper (rather than a naive template) so the service
   // test keeps covering the Fly app-name length guard, which moved here from
   // the service layer.
@@ -130,6 +133,7 @@ describe('ComputeServicesService', () => {
     // test body, where a failing assertion skips the restore and the leak shows up
     // as unrelated failures further down the file.
     mockFlyInstance.capabilities = { ...FLY_CAPABILITIES };
+    mockFlyInstance.defaultIngress = () => 'host';
   });
 
   afterEach(() => {
@@ -153,6 +157,10 @@ describe('ComputeServicesService', () => {
             scaleToZero: true,
             regions: true,
             ingressModes: ['host'],
+            // Resolved from the provider, not read off ingressModes[0]: a
+            // single-host driver's default is an operator setting, and a client
+            // that guessed would preselect one mode and be given another.
+            defaultIngress: 'host',
             sourceBuild: 'flyctl',
             deployTokenIssuance: false,
           },
@@ -211,6 +219,111 @@ describe('ComputeServicesService', () => {
       // The INSERT must persist false, not the schema default of true.
       expect(mockQuery.mock.calls[0][1]).toContain(false);
       expect(mockLaunchMachine.mock.calls[0][0].scaleToZero).toBe(false);
+    });
+
+    // Found while verifying the settings dialog on a real daemon: an omitted ingress
+    // used to resolve to `capabilities.ingressModes[0]`, a static list whose first
+    // entry is 'none'. That made COMPUTE_DEFAULT_INGRESS — and the stored setting
+    // that replaces it — have no effect on service creation.
+    it("applies the driver's configured default ingress when the caller omits it", async () => {
+      mockFlyInstance.capabilities = {
+        ...mockFlyInstance.capabilities,
+        ingressModes: ['none', 'port', 'host'],
+      };
+      mockFlyInstance.defaultIngress = () => 'port';
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+      mockCreateApp.mockResolvedValue({ appId: 'a' });
+      mockLaunchMachine.mockResolvedValue({ machineId: 'm1' });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+
+      await service.createService({
+        projectId: 'proj-123',
+        name: 'svc',
+        imageUrl: 'nginx',
+        port: 80,
+        cpu: 'shared-1x',
+        memory: 256,
+        region: 'iad',
+        // ingress deliberately not sent
+      });
+
+      // Both the stored row and the launch call, because a row that disagrees with
+      // the container is the failure this whole capability layer exists to prevent.
+      expect(mockQuery.mock.calls[0][1]).toContain('port');
+      expect(mockLaunchMachine.mock.calls[0][0].ingress).toBe('port');
+    });
+
+    // The old check read appConfig and lived inside buildComputeRegistry, which runs on
+    // every /api/metadata request — so an operator who set the org through the
+    // dashboard was told, on every dashboard poll, to set a value they had set. It now
+    // reads the credentials in force and runs once at startup.
+    it('warns about a token with no org, and stays quiet when both are in force', async () => {
+      const { warnIfFlyCredentialsIncomplete } =
+        await import('@/services/compute/services.service.js');
+      const logger = (await import('@/utils/logger.js')).default;
+      const { appConfig } = await import('@/infra/config/app.config.js');
+      const said = () =>
+        vi
+          .mocked(logger.warn)
+          .mock.calls.flat()
+          .some((arg) => typeof arg === 'string' && arg.includes('the org is empty'));
+
+      const original = appConfig.fly.org;
+      try {
+        appConfig.fly.org = '';
+        warnIfFlyCredentialsIncomplete();
+        expect(said()).toBe(true);
+
+        vi.mocked(logger.warn).mockClear();
+        appConfig.fly.org = 'test-org';
+        warnIfFlyCredentialsIncomplete();
+        expect(said()).toBe(false);
+      } finally {
+        // Restored even if an assertion throws: appConfig is module state shared with
+        // every sibling test, and `''` leaking would quietly change what they exercise.
+        appConfig.fly.org = original;
+      }
+    });
+
+    // Provider is the dashboard's navigation axis, so a create from Fly's page has to
+    // land on Fly even when Docker is the deployment default. Before this the service
+    // layer always used the default and the page filtered its own new service out.
+    it('creates on the provider the caller names, not the default', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+      mockCreateApp.mockResolvedValue({ appId: 'a' });
+      mockLaunchMachine.mockResolvedValue({ machineId: 'm1' });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+
+      await service.createService({
+        projectId: 'proj-123',
+        name: 'svc',
+        provider: 'fly',
+        imageUrl: 'nginx',
+        port: 80,
+        cpu: 'shared-1x',
+        memory: 256,
+        region: 'iad',
+      });
+
+      expect(mockCreateApp).toHaveBeenCalled();
+    });
+
+    // Silently swapping the driver would store a row that says one thing while the
+    // container runs somewhere else.
+    it('rejects a provider this deployment does not have', async () => {
+      await expect(
+        service.createService({
+          projectId: 'proj-123',
+          name: 'svc',
+          provider: 'docker',
+          imageUrl: 'nginx',
+          port: 80,
+          cpu: 'shared-1x',
+          memory: 256,
+          region: 'iad',
+        })
+      ).rejects.toThrow(/not configured on this deployment/i);
+      expect(mockCreateApp).not.toHaveBeenCalled();
     });
 
     // On update, an omitted field means "leave it alone". Filling it in would turn
@@ -2335,6 +2448,38 @@ describe('buildComputeRegistry', () => {
     process.env.COMPUTE_PROVIDER = 'kubernetes';
     const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
     expect(() => buildComputeRegistry()).toThrow(/Unknown COMPUTE_PROVIDER/);
+  });
+
+  // The dashboard renders this text verbatim as its not-configured empty state, so
+  // it is the entire set of instructions a self-hoster gets. Fly-only advice left
+  // them with no way to discover the Docker socket, which needs no third-party
+  // account and is the easier path.
+  it('names both providers when nothing is configured', async () => {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
+        fly: { apiToken: '', org: '', enabled: false, domain: '' },
+        docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
+        cloud: { projectId: 'local', apiHost: '' },
+        app: { jwtSecret: 'x' },
+      };
+      return { config: c, appConfig: c };
+    });
+    delete process.env.COMPUTE_PROVIDER;
+    const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
+
+    let thrown: unknown;
+    try {
+      buildComputeRegistry();
+    } catch (e) {
+      thrown = e;
+    }
+    const next = (thrown as { nextActions?: string }).nextActions ?? '';
+    expect(next).toMatch(/Docker socket/);
+    expect(next).toMatch(/uncomment the Docker socket volume/i);
+    expect(next).toMatch(/insforge-test-docker\.sock/);
+    expect(next).toMatch(/FLY_API_TOKEN/);
+    // Docker first: it is the option a self-hoster can act on without signing up.
+    expect(next.indexOf('Docker socket')).toBeLessThan(next.indexOf('FLY_API_TOKEN'));
   });
 
   // Naming a default that isn't configured is a stated intent we can't honour —

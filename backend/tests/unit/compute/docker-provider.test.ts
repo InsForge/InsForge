@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@/infra/config/app.config.js', () => {
   const c = {
+    cloud: {} as Record<string, unknown>,
+    app: { jwtSecret: 'test-secret' },
     docker: {
       socketPath: '/nonexistent/test.sock',
       publicHost: '',
@@ -41,6 +43,7 @@ vi.mock('@/providers/compute/docker.client.js', async () => {
 
 import { DockerProvider } from '@/providers/compute/docker.provider.js';
 import { MachineGoneError } from '@/providers/compute/compute.provider.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 /** An inspect payload that passes the ownership check. */
 function ownedContainer(overrides: Record<string, unknown> = {}) {
@@ -93,6 +96,47 @@ describe('DockerProvider', () => {
     } else {
       process.env.APP_KEY = oldAppKey;
     }
+    // The mocked config object is module state, so a test that changes a knob would
+    // otherwise change what every later test's daemon config says.
+    appConfig.docker.defaultIngress = 'none';
+  });
+
+  // PROJECT_ID is shipped in .env.example, passed through by every compose file, and
+  // documented in the compute routes as the self-hosted way to scope services — so a
+  // self-hoster setting it is expected. Treating that alone as "cloud" silently refused
+  // to register Docker on their own machine, with nothing in the UI to diagnose.
+  describe('cloud detection', () => {
+    beforeEach(() => {
+      // isConfigured() probes the socket path; any existing file proves presence.
+      appConfig.docker.socketPath = process.execPath;
+    });
+
+    afterEach(() => {
+      appConfig.docker.socketPath = '/nonexistent/test.sock';
+      appConfig.cloud = {};
+    });
+
+    it('still registers when PROJECT_ID is set', () => {
+      appConfig.cloud = { projectId: 'my-project', apiHost: 'https://api.insforge.dev' };
+
+      expect(provider.isConfigured()).toBe(true);
+    });
+
+    // The signal cloud provisioning always sets: the user-data script writes it
+    // unconditionally and every instance launches with an IAM instance profile.
+    it('refuses on an instance carrying an AWS instance profile', () => {
+      const original = process.env.AWS_INSTANCE_PROFILE_NAME;
+      process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+      try {
+        expect(provider.isConfigured()).toBe(false);
+      } finally {
+        if (original === undefined) {
+          delete process.env.AWS_INSTANCE_PROFILE_NAME;
+        } else {
+          process.env.AWS_INSTANCE_PROFILE_NAME = original;
+        }
+      }
+    });
   });
 
   describe('capabilities', () => {
@@ -105,6 +149,23 @@ describe('DockerProvider', () => {
         deployTokenIssuance: false,
       });
       expect(provider.name).toBe('docker');
+    });
+
+    // Not a capability: the caller-omitted default is COMPUTE_DEFAULT_INGRESS, read
+    // per call. Taking it off `ingressModes[0]` is what silently disabled that
+    // variable for every create.
+    it('reports the configured default ingress, not the first supported mode', () => {
+      expect(provider.defaultIngress()).toBe('none');
+
+      appConfig.docker.defaultIngress = 'port';
+      expect(provider.defaultIngress()).toBe('port');
+      // Still a member of the declared set, which is what the interface promises.
+      expect(provider.capabilities.ingressModes).toContain(provider.defaultIngress());
+    });
+
+    it('falls back to private-only when the configured value is not a mode it can deliver', () => {
+      appConfig.docker.defaultIngress = 'nonsense';
+      expect(provider.defaultIngress()).toBe('none');
     });
   });
 

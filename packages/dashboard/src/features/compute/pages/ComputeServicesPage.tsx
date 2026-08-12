@@ -1,31 +1,36 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Loader2,
-  ArrowLeft,
-  Plus,
-  Play,
-  Square,
-  Trash2,
-  AlertTriangle,
-  XCircle,
-} from 'lucide-react';
+import { ArrowLeft, Plus, Play, Square, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '@insforge/ui';
+import { ErrorState, LoadingState } from '#components';
 import { useComputeServices } from '#features/compute/hooks/useComputeServices';
+import { Navigate, useOutletContext, useParams } from 'react-router-dom';
+import type { ComputeOutletContext } from '#features/compute/components/ComputeLayout';
+import { ComputeProviderSetup } from '#features/compute/components/ComputeProviderSetup';
 import { ServiceCard } from '#features/compute/components/ServiceCard';
 import { ServiceEvents } from '#features/compute/components/ServiceEvents';
 import { ServiceLogs } from '#features/compute/components/ServiceLogs';
 import { CreateServiceDialog } from '#features/compute/components/CreateServiceDialog';
 import { DeleteServiceDialog } from '#features/compute/components/DeleteServiceDialog';
-import { statusColors, getReachableUrl } from '#features/compute/constants';
+import { statusColors, getReachableUrl, isComputeProviderSlug } from '#features/compute/constants';
 import type { ServiceSchema } from '@insforge/shared-schemas';
 
-export default function ComputePage() {
+export default function ComputeServicesPage() {
   const { t } = useTranslation('chrome');
+  // The provider comes from the route, so the sidebar is the switcher and the URL is
+  // shareable. The layout hands over every service; this page shows its own.
+  const { provider } = useParams();
   const {
-    services,
+    services: allServices,
+    configured,
+    openSettings,
+  } = useOutletContext<ComputeOutletContext>();
+  const services = allServices.filter((s) => s.provider === provider);
+  const providerConfigured = provider !== undefined && configured.includes(provider);
+  const {
     isLoading,
     error,
+    refetch,
     create,
     remove,
     stop,
@@ -34,10 +39,19 @@ export default function ComputePage() {
     isDeleting,
     isStopping,
     isStarting,
-  } = useComputeServices();
+  } = useComputeServices(providerConfigured);
   const [selectedService, setSelectedService] = useState<ServiceSchema | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  // Switching providers keeps this component mounted, so a service selected on one
+  // provider's page would still be open on the next — and `currentService` falls back
+  // to the stale object when the id is missing from the new list, which means its
+  // Stop/Delete buttons would act on the other provider's container.
+  useEffect(() => {
+    setSelectedService(null);
+    setDeleteTarget(null);
+  }, [provider]);
 
   // Keep selected service in sync with latest data
   const currentService = selectedService
@@ -52,11 +66,30 @@ export default function ComputePage() {
     setDeleteTarget(null);
   };
 
+  // An unknown slug in the URL is a typo or a stale bookmark, not an error worth a
+  // crash — send it back to the tab, which picks a sensible provider.
+  if (!isComputeProviderSlug(provider)) {
+    return <Navigate to="/dashboard/compute" replace />;
+  }
+
+  // This provider is not set up: show how, rather than an empty list that looks like
+  // "you have no services" when the truth is "this provider is not enabled".
+  if (!providerConfigured) {
+    return (
+      <ComputeProviderSetup
+        provider={provider}
+        // Docker has nothing to enter — it is enabled by a compose edit — so it gets
+        // the steps and no button. Fly's credentials are values, so it gets both.
+        onConfigure={provider === 'fly' && openSettings ? () => openSettings(provider) : undefined}
+      />
+    );
+  }
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
+      <LoadingState
+        message={t('compute.loadingServices', { defaultValue: 'Loading services...' })}
+      />
     );
   }
 
@@ -86,15 +119,15 @@ export default function ComputePage() {
       );
     }
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex items-center gap-2 text-destructive">
-          <XCircle className="w-5 h-5 shrink-0" />
-          <span className="text-sm">
-            {t('compute.loadServicesFailed', {
-              defaultValue: 'Failed to load services. Please refresh the page.',
-            })}
-          </span>
-        </div>
+      <div className="p-6">
+        <ErrorState
+          error={
+            error instanceof Error
+              ? error
+              : t('compute.loadServicesFailed', { defaultValue: 'Failed to load services.' })
+          }
+          onRetry={() => void refetch()}
+        />
       </div>
     );
   }
@@ -326,7 +359,7 @@ export default function ComputePage() {
                   })}
                 </p>
               </div>
-              <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
+              <Button variant="primary" onClick={() => setCreateOpen(true)}>
                 <Plus className="h-4 w-4" />
                 {t('compute.createService', { defaultValue: 'Create Service' })}
               </Button>
@@ -387,22 +420,11 @@ export default function ComputePage() {
               </div>
             )}
           </div>
-
-          {/* Jobs Section Placeholder */}
-          <div className="flex flex-col gap-2">
-            <h2 className="text-lg font-medium text-foreground">
-              {t('compute.jobs', { defaultValue: 'Jobs' })}
-            </h2>
-            <div className="bg-card border border-[var(--alpha-8)] rounded-lg p-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                {t('compute.comingSoon', { defaultValue: 'Coming soon' })}
-              </p>
-            </div>
-          </div>
         </div>
       </div>
 
       <CreateServiceDialog
+        provider={provider}
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreate={create}

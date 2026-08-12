@@ -134,6 +134,7 @@ Schemaless
 sdk
 SDKs
 select_account
+SELinux
 sellable
 Sealos
 serverless
@@ -153,6 +154,7 @@ tmpfs
 todo
 todos
 Trae
+Traefik
 transactionally
 Twilio
 twoFactor

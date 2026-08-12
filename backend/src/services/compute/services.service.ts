@@ -8,10 +8,9 @@ import { dockerConfig } from '@/providers/compute/docker.client.js';
 import {
   MachineGoneError,
   type ComputeProvider,
-  type ComputeCapabilities,
   type ComputeLogsResult,
 } from '@/providers/compute/compute.provider.js';
-import { appConfig } from '@/infra/config/app.config.js';
+import { ComputeConfigService } from '@/services/compute/compute-config.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
@@ -30,6 +29,11 @@ import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 export interface CreateServiceInput {
   projectId: string;
   name: string;
+  /**
+   * Driver to create on. Omitted, the deployment's default applies — the CLI and
+   * every pre-multi-driver caller.
+   */
+  provider?: ComputeProviderName;
   /**
    * Image URL — image-mode (any registry) or source-mode (digest-pinned
    * registry.fly.io ref produced by the CLI's flyctl remote build + push).
@@ -322,7 +326,6 @@ export function buildComputeRegistry(): ComputeRegistry {
   if (requested === 'cloud') {
     providers.set('fly', cloud);
   } else if (fly.isConfigured()) {
-    warnIfFlyOrgMissing();
     providers.set('fly', fly);
   } else if (cloud.isConfigured()) {
     providers.set('fly', cloud);
@@ -362,12 +365,18 @@ export function buildComputeRegistry(): ComputeRegistry {
   }
 
   if (providers.size === 0) {
+    // Both ways in, Docker first: it needs no third-party account, and a
+    // self-hoster reading Fly-only advice has no way to discover the option that
+    // is actually easier for them. This text reaches the dashboard verbatim as the
+    // not-configured empty state, so it is the whole of what they are told.
     throw new AppError(
       'Compute services not configured.',
       503,
       ERROR_CODES.COMPUTE_NOT_CONFIGURED,
-      'Set FLY_API_TOKEN and FLY_ORG in your .env, then restart the container. ' +
-        'See https://docs.insforge.dev/core-concepts/compute/overview for setup details.'
+      'Pick a provider and restart the container:\n' +
+        `• Your own Docker host — uncomment the Docker socket volume in your compose file and restart. Currently looking for a socket at ${dockerConfig().socketPath}.\n` +
+        '• Fly.io — set FLY_API_TOKEN and FLY_ORG in your .env.\n' +
+        'See https://docs.insforge.dev/core-concepts/compute/overview for both.'
     );
   }
 
@@ -420,9 +429,13 @@ export function getComputeMetadata(): ComputeMetadataSchema | undefined {
     return undefined;
   }
 
-  const providers: Record<string, ComputeCapabilities> = {};
+  const providers: NonNullable<ComputeMetadataSchema['providers']> = {};
   for (const [name, provider] of registry.providers) {
-    providers[name] = provider.capabilities;
+    // The caller-omitted default is resolved here rather than left to the client:
+    // for a single-host driver it is an operator setting, so a dashboard that
+    // guessed the first supported mode would preselect one thing in its create
+    // form and get another from the server.
+    providers[name] = { ...provider.capabilities, defaultIngress: provider.defaultIngress() };
   }
   return { defaultProvider: registry.defaultProvider, providers };
 }
@@ -440,20 +453,35 @@ export function selectComputeProvider(): ComputeProvider {
   return registry.providers.get(registry.defaultProvider)!;
 }
 
-function warnIfFlyOrgMissing(): void {
-  if (!appConfig.fly.org) {
-    // FLY_ORG used to default to "insforge" — our internal org. Operators who
-    // copied .env.example verbatim got opaque "unauthorized" errors from Fly.
-    // Warn loudly at provider selection time instead.
+/**
+ * Warn once, at startup, about a Fly token with no org.
+ *
+ * FLY_ORG used to default to "insforge" — our internal org — so operators who copied
+ * .env.example verbatim got opaque "unauthorized" errors from Fly. This says so in
+ * terms they can act on.
+ *
+ * Two things it deliberately does not do. It does not live in buildComputeRegistry:
+ * that runs on every /api/metadata request, so the warning would repeat on every
+ * dashboard poll. And it reads the *effective* credentials rather than appConfig,
+ * because an org set through the dashboard is stored, not in the environment — the
+ * old check told those operators to set a value they had already set.
+ *
+ * A token with no org means Fly does not register at all, so nothing downstream
+ * reports it: `isConfigured()` requires both.
+ */
+export function warnIfFlyCredentialsIncomplete(): void {
+  const { apiToken, org } = ComputeConfigService.getInstance().flyCredentials();
+  if (apiToken && !org) {
     logger.warn(
-      'Compute self-host: FLY_ORG is empty. Set FLY_ORG to your Fly org slug ' +
-        '(`fly orgs list`); compute requests will otherwise fail with auth errors from Fly.'
+      'Compute self-host: a Fly API token is set but the org is empty, so Fly is not ' +
+        'registered. Set FLY_ORG (or the org field in compute settings) to your Fly ' +
+        'org slug from `fly orgs list`.'
     );
   }
 }
 
 export class ComputeServicesService {
-  private static instance: ComputeServicesService;
+  private static instance: ComputeServicesService | undefined;
   private pool: Pool | null = null;
   private readonly registry: ComputeRegistry = buildComputeRegistry();
 
@@ -466,6 +494,19 @@ export class ComputeServicesService {
     return ComputeServicesService.instance;
   }
 
+  /**
+   * Drop the singleton so the next call rebuilds the provider registry.
+   *
+   * Called after Fly credentials are stored through the dashboard. The registry is
+   * built in a field initialiser, and construction *throws* when nothing is
+   * configured — so a deployment that had no provider has no instance to rebuild, and
+   * one that did holds a registry that predates the new credentials. Discarding it
+   * covers both, and the pool is re-acquired lazily so nothing leaks.
+   */
+  static resetForConfigChange(): void {
+    ComputeServicesService.instance = undefined;
+  }
+
   private getPool(): Pool {
     if (!this.pool) {
       this.pool = DatabaseManager.getInstance().getPool();
@@ -476,6 +517,28 @@ export class ComputeServicesService {
   /** Driver for new services. */
   private getCompute(): ComputeProvider {
     return this.registry.providers.get(this.registry.defaultProvider)!;
+  }
+
+  /**
+   * Driver a create should land on: the one the caller named, else the default.
+   *
+   * A named driver that is not configured is rejected rather than silently swapped —
+   * the caller asked for a specific place to run, and putting the container somewhere
+   * else is the kind of stored lie the capability layer exists to prevent.
+   */
+  private computeFor(provider: ComputeProviderName | undefined): ComputeProvider {
+    if (!provider) {
+      return this.getCompute();
+    }
+    const driver = this.registry.providers.get(provider);
+    if (!driver) {
+      throw new AppError(
+        `Compute provider "${provider}" is not configured on this deployment`,
+        400,
+        ERROR_CODES.COMPUTE_NOT_CONFIGURED
+      );
+    }
+    return driver;
   }
 
   /**
@@ -512,13 +575,14 @@ export class ComputeServicesService {
       // that only does public hostnames (Fly) should not fail an otherwise valid
       // deploy that asked for `none`, but it must not record a mode it is not
       // delivering either.
+      const applied = driver.defaultIngress();
       logger.info('Compute: driver cannot deliver the requested ingress; using its default', {
         driver: driver.name,
         requested: out.ingress,
-        applied: modes[0],
+        applied,
         ...context,
       });
-      out.ingress = modes[0];
+      out.ingress = applied;
     }
     if (!driver.capabilities.regions && out.region !== undefined && out.region !== LOCAL_REGION) {
       logger.info('Compute: driver has no regions; recording region as local', {
@@ -909,7 +973,7 @@ export class ComputeServicesService {
   }
 
   async createService(rawInput: CreateServiceInput): Promise<ServiceSchema> {
-    const fly = this.getCompute();
+    const fly = this.computeFor(rawInput.provider);
     const input = this.normalizeForDriver(fly, rawInput, {
       serviceName: rawInput.name,
       resolveDefaults: true,
@@ -952,9 +1016,9 @@ export class ComputeServicesService {
           input.region,
           input.protocol ?? 'http',
           input.scaleToZero ?? true,
-          // Resolved from the driver when the caller did not choose: a
-          // single-host driver defaults to private-only, Fly to its hostname.
-          input.ingress ?? fly.capabilities.ingressModes[0],
+          // Resolved from the driver when the caller did not choose: Fly always
+          // its hostname, a single-host driver whatever the operator configured.
+          input.ingress ?? fly.defaultIngress(),
           envVarsEncrypted,
           // Migration 064 drops the column default, so every insert states the
           // driver explicitly — a row that lies about its provider is exactly
@@ -989,7 +1053,7 @@ export class ComputeServicesService {
         memory: input.memory,
         envVars: input.envVars ?? {},
         region: input.region,
-        ingress: input.ingress ?? fly.capabilities.ingressModes[0],
+        ingress: input.ingress ?? fly.defaultIngress(),
         protocol: input.protocol,
         scaleToZero: input.scaleToZero,
       });
@@ -1045,7 +1109,7 @@ export class ComputeServicesService {
   }
 
   async prepareForDeploy(rawInput: CreateServiceInput): Promise<ServiceSchema> {
-    const fly = this.getCompute();
+    const fly = this.computeFor(rawInput.provider);
     const input = this.normalizeForDriver(fly, rawInput, {
       serviceName: rawInput.name,
       resolveDefaults: true,
@@ -1099,7 +1163,7 @@ export class ComputeServicesService {
           input.region,
           input.protocol ?? 'http',
           input.scaleToZero ?? true,
-          input.ingress ?? fly.capabilities.ingressModes[0],
+          input.ingress ?? fly.defaultIngress(),
           envVarsEncrypted,
           providerName(fly),
           appName,

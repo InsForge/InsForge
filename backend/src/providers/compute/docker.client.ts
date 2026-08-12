@@ -38,20 +38,33 @@ export interface DockerRawResponse {
  * deep inside provider selection; CloudComputeProvider already guards its own
  * slice the same way.
  */
-export function dockerConfig(): {
+export interface DockerConfig {
   socketPath: string;
   publicHost: string;
   domain: string;
   defaultIngress: string;
   bindAddress: string;
   isolateNetwork: boolean;
-} {
+}
+
+/**
+ * Docker settings, read from the environment on every call.
+ *
+ * Environment-only, deliberately. Enabling this driver means mounting the socket in the
+ * compose file, so anyone who can change these values is already editing that file —
+ * a second, database-side source of truth would buy the ability to change without a
+ * restart what they can set during the restart they already have to do.
+ *
+ * Read per call rather than captured once so a value is never stale relative to the
+ * process's own configuration.
+ */
+export function dockerConfig(): DockerConfig {
   const c = appConfig.docker;
   return {
-    socketPath: c?.socketPath || '/var/run/docker.sock',
-    publicHost: c?.publicHost || '',
-    domain: c?.domain || '',
-    defaultIngress: c?.defaultIngress || 'none',
+    socketPath: c?.socketPath ?? '/var/run/docker.sock',
+    publicHost: c?.publicHost ?? '',
+    domain: c?.domain ?? '',
+    defaultIngress: c?.defaultIngress ?? 'none',
     bindAddress: c?.bindAddress || '127.0.0.1',
     isolateNetwork: c?.isolateNetwork ?? false,
   };
