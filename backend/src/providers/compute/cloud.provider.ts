@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { appConfig } from '@/infra/config/app.config.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
@@ -29,6 +30,7 @@ export class CloudComputeProvider implements ComputeProvider {
 
   isConfigured(): boolean {
     return (
+      isCloudEnvironment() &&
       !!appConfig.cloud?.projectId &&
       appConfig.cloud.projectId !== 'local' &&
       !!appConfig.cloud?.apiHost &&

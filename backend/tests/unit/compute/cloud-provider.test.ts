@@ -19,6 +19,18 @@ import { MachineGoneError } from '@/providers/compute/compute.provider.js';
 type FetchMock = MockInstance<Parameters<typeof fetch>, ReturnType<typeof fetch>>;
 
 describe('CloudComputeProvider', () => {
+  const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+  beforeEach(() => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+  });
+  afterAll(() => {
+    if (savedProfile === undefined) {
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    } else {
+      process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+    }
+  });
+
   let fetchMock: FetchMock;
 
   beforeEach(() => {
@@ -187,6 +199,7 @@ describe('CloudComputeProvider machine-gone translation', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     // The COMPUTE_NOT_CONFIGURED test above leaves a throwing spy on the
     // singleton's signToken — undo it so calls here reach the real fetch.
     vi.restoreAllMocks();

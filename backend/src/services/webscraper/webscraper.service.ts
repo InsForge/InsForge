@@ -1,4 +1,5 @@
 import { appConfig } from '@/infra/config/app.config.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import type { WebscraperProvider } from '@/providers/webscraper/base.provider.js';
 import { CloudWebscraperProvider } from '@/providers/webscraper/cloud.provider.js';
 import { LocalWebscraperProvider } from '@/providers/webscraper/local.provider.js';
@@ -25,12 +26,11 @@ export class WebscraperService {
     return WebscraperService.instance;
   }
 
-  // A project id is what lets the cloud provider sign a project JWT and reach
-  // cloud-backend at all. Without one there is nothing to proxy to, so the local
-  // provider owns the request.
+  // A project id names which project; isCloudEnvironment() says whose infrastructure.
+  // Both are needed: PaaS templates set PROJECT_ID too.
   static isSelfHosted(): boolean {
     const projectId = appConfig.cloud.projectId;
-    return !projectId || projectId === 'local';
+    return !isCloudEnvironment() || !projectId || projectId === 'local';
   }
 
   private provider(): WebscraperProvider {

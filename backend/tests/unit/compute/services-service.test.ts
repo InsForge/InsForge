@@ -118,6 +118,22 @@ vi.mock('@/providers/compute/fly.provider.js', () => ({
 import { ComputeServicesService } from '@/services/compute/services.service.js';
 import { MachineGoneError, flyAppNameFor } from '@/providers/compute/compute.provider.js';
 
+// Cleared per test; the cloud cases set it. File-level: the suites below are separate
+// top-level describes.
+const savedAwsProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+
+beforeEach(() => {
+  delete process.env.AWS_INSTANCE_PROFILE_NAME;
+});
+
+afterAll(() => {
+  if (savedAwsProfile === undefined) {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+  } else {
+    process.env.AWS_INSTANCE_PROFILE_NAME = savedAwsProfile;
+  }
+});
+
 describe('ComputeServicesService', () => {
   let service: ComputeServicesService;
 
@@ -2339,6 +2355,7 @@ describe('selectComputeProvider factory', () => {
   });
 
   it('returns CloudComputeProvider when PROJECT_ID is provisioned and no FLY_API_TOKEN', async () => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     vi.doMock('@/infra/config/app.config.js', () => {
       const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
@@ -2426,6 +2443,7 @@ describe('buildComputeRegistry', () => {
   });
 
   it('COMPUTE_PROVIDER=cloud selects the cloud credential path for the fly key', async () => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     flyConfigured();
     process.env.COMPUTE_PROVIDER = 'cloud';
     const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
@@ -2500,7 +2518,25 @@ describe('buildComputeRegistry', () => {
   // are not — the operator is InsForge and the developer is a customer — so a
   // customer creating containers on shared infrastructure is a tenant escape.
   // Fail closed, and say the real reason rather than blaming a missing socket.
+  // A PaaS-supplied PROJECT_ID used to satisfy CloudComputeProvider.isConfigured(),
+  // registering a cloud driver that signs with the operator's own JWT_SECRET.
+  it('does not register the cloud driver for a self-host that sets PROJECT_ID', async () => {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
+        fly: { apiToken: '', org: '', enabled: false, domain: '' },
+        docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
+        cloud: { projectId: 'zeabur-project-1', apiHost: 'https://api.insforge.dev' },
+        app: { jwtSecret: 'x' },
+      };
+      return { config: c, appConfig: c };
+    });
+    const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
+
+    expect(() => buildComputeRegistry()).toThrow(/not configured|no compute/i);
+  });
+
   it('refuses the Docker driver on a cloud-managed project', async () => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     flyConfigured(); // cloud projectId + apiHost present
     process.env.COMPUTE_PROVIDER = 'docker';
     const { buildComputeRegistry } = await import('@/services/compute/services.service.js');
@@ -2508,6 +2544,7 @@ describe('buildComputeRegistry', () => {
   });
 
   it('never registers Docker on a cloud-managed project, socket or not', async () => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     flyConfigured();
     const { DockerProvider } = await import('@/providers/compute/docker.provider.js');
     // isConfigured is the "can I be used at all" question, so the guard lives

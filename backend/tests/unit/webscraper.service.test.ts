@@ -31,6 +31,18 @@ function makeProviders() {
 }
 
 describe('WebscraperService provider resolution', () => {
+  const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+  beforeEach(() => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+  });
+  afterAll(() => {
+    if (savedProfile === undefined) {
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    } else {
+      process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+    }
+  });
+
   beforeEach(() => vi.clearAllMocks());
 
   it('uses the cloud provider when a project id is configured', async () => {
@@ -127,5 +139,14 @@ describe('WebscraperService.setApifyToken', () => {
 
     expect(local.verifyToken).toHaveBeenCalledWith('apify_api_tok1234567890');
     expect(config.setToken).toHaveBeenCalledWith('apify_api_tok1234567890');
+  });
+
+  it('stays local for a self-host that sets PROJECT_ID', async () => {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    configMock.cloud.projectId = 'zeabur-project-1';
+
+    const { WebscraperService } = await import('@/services/webscraper/webscraper.service.js');
+
+    expect(WebscraperService.isSelfHosted()).toBe(true);
   });
 });

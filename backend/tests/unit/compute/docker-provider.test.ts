@@ -139,6 +139,49 @@ describe('DockerProvider', () => {
     });
   });
 
+  describe('cloud detection', () => {
+    const saved = {
+      profile: process.env.AWS_INSTANCE_PROFILE_NAME,
+      socket: appConfig.docker.socketPath,
+    };
+
+    beforeEach(() => {
+      appConfig.docker.socketPath = process.execPath;
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+      delete process.env.DEPLOYMENT_ID;
+      delete process.env.PROJECT_ID;
+    });
+
+    afterEach(() => {
+      appConfig.docker.socketPath = saved.socket;
+      if (saved.profile === undefined) {
+        delete process.env.AWS_INSTANCE_PROFILE_NAME;
+      } else {
+        process.env.AWS_INSTANCE_PROFILE_NAME = saved.profile;
+      }
+    });
+
+    it('registers when PROJECT_ID is set', () => {
+      process.env.PROJECT_ID = 'my-project';
+
+      expect(provider.isConfigured()).toBe(true);
+    });
+
+    // The Zeabur template sets both ids.
+    it('registers when DEPLOYMENT_ID and PROJECT_ID are both set', () => {
+      process.env.DEPLOYMENT_ID = 'zeabur-service-1';
+      process.env.PROJECT_ID = 'zeabur-project-1';
+
+      expect(provider.isConfigured()).toBe(true);
+    });
+
+    it('refuses on a cloud instance', () => {
+      process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+
+      expect(provider.isConfigured()).toBe(false);
+    });
+  });
+
   describe('capabilities', () => {
     it('declares no scale-to-zero and no regions, but all three ingress modes', () => {
       expect(provider.capabilities).toEqual({

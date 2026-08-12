@@ -34,6 +34,18 @@ function makeAxiosError(status: number): MockAxiosError {
 const { CloudWebscraperProvider } = await import('../../src/providers/webscraper/cloud.provider');
 
 describe('CloudWebscraperProvider', () => {
+  const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+  beforeEach(() => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+  });
+  afterAll(() => {
+    if (savedProfile === undefined) {
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    } else {
+      process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+    }
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });

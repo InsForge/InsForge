@@ -55,6 +55,18 @@ function makeService(deps = makeDeps()) {
 }
 
 describe('AnalyticsService', () => {
+  const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+  beforeEach(() => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+  });
+  afterAll(() => {
+    if (savedProfile === undefined) {
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    } else {
+      process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+    }
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     cloudConfig.projectId = undefined;
@@ -255,5 +267,14 @@ describe('AnalyticsService', () => {
       ]);
       expect(config.setConnection).not.toHaveBeenCalled();
     });
+  });
+
+  it('stays local for a self-host that sets PROJECT_ID', async () => {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    cloudConfig.projectId = 'zeabur-project-1';
+
+    const { AnalyticsService } = await import('@/services/analytics/analytics.service.js');
+
+    expect(AnalyticsService.isSelfHosted()).toBe(true);
   });
 });
