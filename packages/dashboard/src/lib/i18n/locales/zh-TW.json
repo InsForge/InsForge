@@ -1073,6 +1073,11 @@
     "smtpConfigUpdateFailed": "更新 SMTP 設定失敗",
     "autoConfirmDescription": "自動將電子郵件標記為已驗證，使用者無需確認即可登入。"
   },
+  "routeError": {
+    "title": "無法載入此頁面",
+    "staleAssets": "儀表板無法載入最新的頁面資源。請重新載入應用程式後再試一次。",
+    "generic": "載入此頁面時發生非預期的錯誤。請重新載入應用程式後再試一次。"
+  },
   "common": {
     "anErrorOccurred": "發生了一個錯誤",
     "cancel": "取消",

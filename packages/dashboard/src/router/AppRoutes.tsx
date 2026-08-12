@@ -1,70 +1,185 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Component, lazy, Suspense, type ErrorInfo, type ReactNode } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { LoadingState } from '@insforge/ui';
+import { ErrorState } from '#components';
 import { RequireAuth } from './RequireAuth';
+import AppLayout from '#layout/AppLayout';
 import AILayout from '#features/ai/components/AILayout';
-import AIOverviewPage from '#features/ai/pages/AIOverviewPage';
-import AIUsagePage from '#features/ai/pages/AIUsagePage';
-import AIQuickStartPage from '#features/ai/pages/AIQuickStartPage';
-import AIModelsPage from '#features/ai/pages/AIModelsPage';
 import AnalyticsLayout from '#features/analytics/components/AnalyticsLayout';
-import { TrafficPage } from '#features/analytics/pages/TrafficPage';
-import { RetentionPage } from '#features/analytics/pages/RetentionPage';
-import { SessionReplayPage } from '#features/analytics/pages/SessionReplayPage';
 import WebscraperLayout from '#features/webscraper/components/WebscraperLayout';
-import { WebscraperActorsPage } from '#features/webscraper/pages/WebscraperActorsPage';
-import { WebscraperRunsPage } from '#features/webscraper/pages/WebscraperRunsPage';
-import { WebscraperDatasetPage } from '#features/webscraper/pages/WebscraperDatasetPage';
 import AuthenticationLayout from '#features/auth/components/AuthenticationLayout';
-import AuthMethodsPage from '#features/auth/pages/AuthMethodsPage';
-import EmailPage from '#features/auth/pages/EmailPage';
-import UsersPage from '#features/auth/pages/UsersPage';
-import ComputePage from '#features/compute/pages/ComputePage';
 import DashboardLayout from '#features/dashboard/components/DashboardLayout';
-import DashboardPage from '#features/dashboard/pages/DashboardPage';
-import DTestDashboardPage from '#features/dashboard/pages/DTestDashboardPage';
-import DTestInstallPage from '#features/dashboard/pages/DTestInstallPage';
 import DatabaseLayout from '#features/database/components/DatabaseLayout';
 import SQLEditorLayout from '#features/database/components/SQLEditorLayout';
-import BackupsPage from '#features/database/pages/BackupsPage';
-import DatabaseFunctionsPage from '#features/database/pages/FunctionsPage';
-import IndexesPage from '#features/database/pages/IndexesPage';
-import MigrationsPage from '#features/database/pages/MigrationsPage';
-import PoliciesPage from '#features/database/pages/PoliciesPage';
-import SQLEditorPage from '#features/database/pages/SQLEditorPage';
-import TablesPage from '#features/database/pages/TablesPage';
-import TemplatesPage from '#features/database/pages/TemplatesPage';
-import TriggersPage from '#features/database/pages/TriggersPage';
 import DeploymentsLayout from '#features/deployments/components/DeploymentsLayout';
-import DeploymentDomainsPage from '#features/deployments/pages/DeploymentDomainsPage';
-import DeploymentEnvVarsPage from '#features/deployments/pages/DeploymentEnvVarsPage';
-import DeploymentLogsPage from '#features/deployments/pages/DeploymentLogsPage';
-import DeploymentOverviewPage from '#features/deployments/pages/DeploymentOverviewPage';
 import FunctionsLayout from '#features/functions/components/FunctionsLayout';
-import FunctionsPage from '#features/functions/pages/FunctionsPage';
-import SchedulesPage from '#features/functions/pages/SchedulesPage';
-import SecretsPage from '#features/functions/pages/SecretsPage';
-import CloudLoginPage from '#features/login/pages/CloudLoginPage';
-import LoginPage from '#features/login/pages/LoginPage';
 import LogsLayout from '#features/logs/components/LogsLayout';
-import AuditsPage from '#features/logs/pages/AuditsPage';
-import FunctionLogsPage from '#features/logs/pages/FunctionLogsPage';
-import LogsPage from '#features/logs/pages/LogsPage';
-import MCPLogsPage from '#features/logs/pages/MCPLogsPage';
 import PaymentsLayout from '#features/payments/components/PaymentsLayout';
-import CatalogPage from '#features/payments/pages/CatalogPage';
-import CustomersPage from '#features/payments/pages/CustomersPage';
-import SubscriptionsPage from '#features/payments/pages/SubscriptionsPage';
-import TransactionsPage from '#features/payments/pages/TransactionsPage';
 import RealtimeLayout from '#features/realtime/components/RealtimeLayout';
-import RealtimeChannelsPage from '#features/realtime/pages/RealtimeChannelsPage';
-import RealtimeMessagesPage from '#features/realtime/pages/RealtimeMessagesPage';
-import RealtimePermissionsPage from '#features/realtime/pages/RealtimePermissionsPage';
 import StorageLayout from '#features/storage/components/StorageLayout';
-import BucketsPage from '#features/storage/pages/BucketsPage';
 import VisualizerLayout from '#features/visualizer/components/VisualizerLayout';
-import VisualizerPage from '#features/visualizer/pages/VisualizerPage';
-import AppLayout from '#layout/AppLayout';
-import { getFeatureFlag } from '#lib/analytics/posthog';
+import { getFeatureFlag, trackEvent } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
+
+// Leaf pages stay lazy so their feature dependencies load on demand. Layouts
+// remain eager as stable routing chrome, which lets React start loading the
+// matched page without a layout -> page waterfall.
+const AIOverviewPage = lazy(() => import('#features/ai/pages/AIOverviewPage'));
+const AIUsagePage = lazy(() => import('#features/ai/pages/AIUsagePage'));
+const AIQuickStartPage = lazy(() => import('#features/ai/pages/AIQuickStartPage'));
+const AIModelsPage = lazy(() => import('#features/ai/pages/AIModelsPage'));
+const TrafficPage = lazy(() =>
+  import('#features/analytics/pages/TrafficPage').then((m) => ({ default: m.TrafficPage }))
+);
+const RetentionPage = lazy(() =>
+  import('#features/analytics/pages/RetentionPage').then((m) => ({ default: m.RetentionPage }))
+);
+const SessionReplayPage = lazy(() =>
+  import('#features/analytics/pages/SessionReplayPage').then((m) => ({
+    default: m.SessionReplayPage,
+  }))
+);
+const WebscraperActorsPage = lazy(() =>
+  import('#features/webscraper/pages/WebscraperActorsPage').then((m) => ({
+    default: m.WebscraperActorsPage,
+  }))
+);
+const WebscraperRunsPage = lazy(() =>
+  import('#features/webscraper/pages/WebscraperRunsPage').then((m) => ({
+    default: m.WebscraperRunsPage,
+  }))
+);
+const WebscraperDatasetPage = lazy(() =>
+  import('#features/webscraper/pages/WebscraperDatasetPage').then((m) => ({
+    default: m.WebscraperDatasetPage,
+  }))
+);
+const AuthMethodsPage = lazy(() => import('#features/auth/pages/AuthMethodsPage'));
+const EmailPage = lazy(() => import('#features/auth/pages/EmailPage'));
+const UsersPage = lazy(() => import('#features/auth/pages/UsersPage'));
+const ComputePage = lazy(() => import('#features/compute/pages/ComputePage'));
+const DashboardPage = lazy(() => import('#features/dashboard/pages/DashboardPage'));
+const DTestDashboardPage = lazy(() => import('#features/dashboard/pages/DTestDashboardPage'));
+const DTestInstallPage = lazy(() => import('#features/dashboard/pages/DTestInstallPage'));
+const BackupsPage = lazy(() => import('#features/database/pages/BackupsPage'));
+const DatabaseFunctionsPage = lazy(() => import('#features/database/pages/FunctionsPage'));
+const IndexesPage = lazy(() => import('#features/database/pages/IndexesPage'));
+const MigrationsPage = lazy(() => import('#features/database/pages/MigrationsPage'));
+const PoliciesPage = lazy(() => import('#features/database/pages/PoliciesPage'));
+const SQLEditorPage = lazy(() => import('#features/database/pages/SQLEditorPage'));
+const TablesPage = lazy(() => import('#features/database/pages/TablesPage'));
+const TemplatesPage = lazy(() => import('#features/database/pages/TemplatesPage'));
+const TriggersPage = lazy(() => import('#features/database/pages/TriggersPage'));
+const DeploymentDomainsPage = lazy(
+  () => import('#features/deployments/pages/DeploymentDomainsPage')
+);
+const DeploymentEnvVarsPage = lazy(
+  () => import('#features/deployments/pages/DeploymentEnvVarsPage')
+);
+const DeploymentLogsPage = lazy(() => import('#features/deployments/pages/DeploymentLogsPage'));
+const DeploymentOverviewPage = lazy(
+  () => import('#features/deployments/pages/DeploymentOverviewPage')
+);
+const FunctionsPage = lazy(() => import('#features/functions/pages/FunctionsPage'));
+const SchedulesPage = lazy(() => import('#features/functions/pages/SchedulesPage'));
+const SecretsPage = lazy(() => import('#features/functions/pages/SecretsPage'));
+const CloudLoginPage = lazy(() => import('#features/login/pages/CloudLoginPage'));
+const LoginPage = lazy(() => import('#features/login/pages/LoginPage'));
+const AuditsPage = lazy(() => import('#features/logs/pages/AuditsPage'));
+const FunctionLogsPage = lazy(() => import('#features/logs/pages/FunctionLogsPage'));
+const LogsPage = lazy(() => import('#features/logs/pages/LogsPage'));
+const MCPLogsPage = lazy(() => import('#features/logs/pages/MCPLogsPage'));
+const CatalogPage = lazy(() => import('#features/payments/pages/CatalogPage'));
+const CustomersPage = lazy(() => import('#features/payments/pages/CustomersPage'));
+const SubscriptionsPage = lazy(() => import('#features/payments/pages/SubscriptionsPage'));
+const TransactionsPage = lazy(() => import('#features/payments/pages/TransactionsPage'));
+const RealtimeChannelsPage = lazy(() => import('#features/realtime/pages/RealtimeChannelsPage'));
+const RealtimeMessagesPage = lazy(() => import('#features/realtime/pages/RealtimeMessagesPage'));
+const RealtimePermissionsPage = lazy(
+  () => import('#features/realtime/pages/RealtimePermissionsPage')
+);
+const BucketsPage = lazy(() => import('#features/storage/pages/BucketsPage'));
+const VisualizerPage = lazy(() => import('#features/visualizer/pages/VisualizerPage'));
+
+interface ChunkErrorBoundaryProps {
+  resetKey: string;
+  children: ReactNode;
+}
+
+interface ChunkErrorBoundaryState {
+  error: Error | null;
+}
+
+function isChunkLoadError(error: Error): boolean {
+  return /dynamically imported module|failed to fetch|loading chunk|importing a module script failed|unable to preload/i.test(
+    error.message
+  );
+}
+
+function RouteErrorFallback({ error }: { error: Error }) {
+  const { t } = useTranslation('chrome');
+  const isChunkError = isChunkLoadError(error);
+
+  return (
+    <div className="p-6">
+      <ErrorState
+        title={isChunkError ? t('routeError.title') : undefined}
+        error={isChunkError ? t('routeError.staleAssets') : t('routeError.generic')}
+        onRetry={() => window.location.reload()}
+      />
+    </div>
+  );
+}
+
+class ChunkErrorBoundary extends Component<ChunkErrorBoundaryProps, ChunkErrorBoundaryState> {
+  state: ChunkErrorBoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Dashboard route failed to render', error, errorInfo);
+    // Report to analytics too.
+    trackEvent('dashboard_route_error', {
+      message: error.message,
+      isChunkLoadError: isChunkLoadError(error),
+      componentStack: errorInfo.componentStack ?? undefined,
+    });
+  }
+
+  componentDidUpdate(prevProps: ChunkErrorBoundaryProps) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.error) {
+      this.setState({ error: null });
+    }
+  }
+
+  render() {
+    if (this.state.error) {
+      return <RouteErrorFallback error={this.state.error} />;
+    }
+
+    return this.props.children;
+  }
+}
+
+function RouteBoundary({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const { t } = useTranslation('chrome');
+  return (
+    <ChunkErrorBoundary resetKey={location.pathname}>
+      {/* Keyed per route so the boundary remounts on navigation: react-router
+          runs nav in a transition, where only a fresh Suspense shows a fallback. */}
+      <Suspense
+        key={location.pathname}
+        fallback={<LoadingState message={t('common.loadingEllipsis')} className="min-h-[240px]" />}
+      >
+        {children}
+      </Suspense>
+    </ChunkErrorBoundary>
+  );
+}
 
 function AuthenticatedRoutes() {
   const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
@@ -73,108 +188,111 @@ function AuthenticatedRoutes() {
 
   return (
     <AppLayout>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<DashboardLayout />}>
-          <Route index element={<DashboardHomePage />} />
-          <Route
-            path="install"
-            element={isDTest ? <DTestInstallPage /> : <Navigate to="/dashboard" replace />}
-          />
-        </Route>
-        <Route path="/dashboard/authentication" element={<AuthenticationLayout />}>
-          <Route index element={<Navigate to="users" replace />} />
-          <Route path="users" element={<UsersPage />} />
-          <Route path="auth-methods" element={<AuthMethodsPage />} />
-          <Route path="email" element={<EmailPage />} />
-        </Route>
-        <Route path="/dashboard/database" element={<DatabaseLayout />}>
-          <Route index element={<Navigate to="tables" replace />} />
-          <Route path="tables" element={<TablesPage />} />
-          <Route path="indexes" element={<IndexesPage />} />
-          <Route path="functions" element={<DatabaseFunctionsPage />} />
-          <Route path="triggers" element={<TriggersPage />} />
-          <Route path="policies" element={<PoliciesPage />} />
-          <Route path="sql-editor" element={<Navigate to="/dashboard/sql-editor" replace />} />
-          <Route path="templates" element={<TemplatesPage />} />
-          <Route path="migrations" element={<MigrationsPage />} />
-          <Route path="backups" element={<BackupsPage />} />
-        </Route>
-        <Route path="/dashboard/sql-editor" element={<SQLEditorLayout />}>
-          <Route index element={<SQLEditorPage />} />
-        </Route>
-        <Route path="/dashboard/storage" element={<StorageLayout />}>
-          <Route index element={<BucketsPage />} />
-        </Route>
-        <Route path="/dashboard/logs" element={<LogsLayout />}>
-          <Route index element={<Navigate to="MCP" replace />} />
-          <Route path="MCP" element={<MCPLogsPage />} />
-          <Route path="audits" element={<AuditsPage />} />
-          <Route path="function.logs" element={<FunctionLogsPage />} />
-          <Route path=":source" element={<LogsPage />} />
-        </Route>
-        <Route path="/dashboard/functions" element={<FunctionsLayout />}>
-          <Route index element={<Navigate to="list" replace />} />
-          <Route path="list" element={<FunctionsPage />} />
-          <Route path="secrets" element={<SecretsPage />} />
-          <Route path="schedules" element={<SchedulesPage />} />
-        </Route>
-        <Route path="/dashboard/visualizer" element={<VisualizerLayout />}>
-          <Route index element={<VisualizerPage />} />
-        </Route>
-        <Route path="/dashboard/ai" element={<AILayout />}>
-          <Route index element={<Navigate to="overview" replace />} />
-          <Route path="overview" element={<AIOverviewPage />} />
-          <Route path="usage" element={<AIUsagePage />} />
-          <Route path="quick-start" element={<AIQuickStartPage />} />
-          <Route path="models" element={<AIModelsPage />} />
-        </Route>
-        <Route path="/dashboard/payments" element={<PaymentsLayout />}>
-          <Route index element={<Navigate to="catalog" replace />} />
-          <Route path="catalog" element={<CatalogPage />} />
-          <Route path="customers" element={<CustomersPage />} />
-          <Route path="subscriptions" element={<SubscriptionsPage />} />
-          <Route path="transactions" element={<TransactionsPage />} />
-        </Route>
-        <Route path="/dashboard/realtime" element={<RealtimeLayout />}>
-          <Route index element={<Navigate to="channels" replace />} />
-          <Route path="channels" element={<RealtimeChannelsPage />} />
-          <Route path="messages" element={<RealtimeMessagesPage />} />
-          <Route path="permissions" element={<RealtimePermissionsPage />} />
-        </Route>
-        <Route path="/dashboard/deployments" element={<DeploymentsLayout />}>
-          <Route index element={<Navigate to="overview" replace />} />
-          <Route path="overview" element={<DeploymentOverviewPage />} />
-          <Route path="logs" element={<DeploymentLogsPage />} />
-          <Route path="env-vars" element={<DeploymentEnvVarsPage />} />
-          <Route path="domains" element={<DeploymentDomainsPage />} />
-        </Route>
-        <Route path="/dashboard/compute" element={<ComputePage />} />
-        {/* Analytics ships in both host modes — self-hosting connects with the
-            admin's own PostHog personal API key — so this subtree is
-            deliberately ungated, matching AppSidebar, which pushes the nav entry
-            unconditionally. A cloud-only gate here would make the nav entry fall
-            through to the catch-all below and bounce self-hosted admins back to
-            /dashboard. */}
-        <Route path="/dashboard/analytics" element={<AnalyticsLayout />}>
-          <Route index element={<Navigate to="traffic" replace />} />
-          <Route path="traffic" element={<TrafficPage />} />
-          <Route path="retention" element={<RetentionPage />} />
-          <Route path="session-replay" element={<SessionReplayPage />} />
-        </Route>
-        {/* Web Scraper ships in both host modes — self-hosting connects with the
-            admin's own Apify token — so this subtree is deliberately ungated,
-            matching AppSidebar, which pushes the nav entry unconditionally. A
-            cloud-only gate here would make the nav entry fall through to the
-            catch-all below and bounce self-hosted admins back to /dashboard. */}
-        <Route path="/dashboard/webscraper" element={<WebscraperLayout />}>
-          <Route index element={<Navigate to="actors" replace />} />
-          <Route path="actors" element={<WebscraperActorsPage />} />
-          <Route path="runs" element={<WebscraperRunsPage />} />
-          <Route path="dataset" element={<WebscraperDatasetPage />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
+      <RouteBoundary>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardLayout />}>
+            <Route index element={<DashboardHomePage />} />
+            <Route
+              path="install"
+              element={isDTest ? <DTestInstallPage /> : <Navigate to="/dashboard" replace />}
+            />
+          </Route>
+          <Route path="/dashboard/authentication" element={<AuthenticationLayout />}>
+            <Route index element={<Navigate to="users" replace />} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="auth-methods" element={<AuthMethodsPage />} />
+            <Route path="email" element={<EmailPage />} />
+          </Route>
+          <Route path="/dashboard/database" element={<DatabaseLayout />}>
+            <Route index element={<Navigate to="tables" replace />} />
+            <Route path="tables" element={<TablesPage />} />
+            <Route path="indexes" element={<IndexesPage />} />
+            <Route path="functions" element={<DatabaseFunctionsPage />} />
+            <Route path="triggers" element={<TriggersPage />} />
+            <Route path="policies" element={<PoliciesPage />} />
+            <Route path="sql-editor" element={<Navigate to="/dashboard/sql-editor" replace />} />
+            <Route path="templates" element={<TemplatesPage />} />
+            <Route path="migrations" element={<MigrationsPage />} />
+            <Route path="backups" element={<BackupsPage />} />
+          </Route>
+          <Route path="/dashboard/sql-editor" element={<SQLEditorLayout />}>
+            <Route index element={<SQLEditorPage />} />
+          </Route>
+          <Route path="/dashboard/storage" element={<StorageLayout />}>
+            <Route index element={<BucketsPage />} />
+          </Route>
+          <Route path="/dashboard/logs" element={<LogsLayout />}>
+            <Route index element={<Navigate to="MCP" replace />} />
+            <Route path="MCP" element={<MCPLogsPage />} />
+            <Route path="audits" element={<AuditsPage />} />
+            <Route path="function.logs" element={<FunctionLogsPage />} />
+            <Route path=":source" element={<LogsPage />} />
+          </Route>
+          <Route path="/dashboard/functions" element={<FunctionsLayout />}>
+            <Route index element={<Navigate to="list" replace />} />
+            <Route path="list" element={<FunctionsPage />} />
+            <Route path="secrets" element={<SecretsPage />} />
+            <Route path="schedules" element={<SchedulesPage />} />
+          </Route>
+          <Route path="/dashboard/visualizer" element={<VisualizerLayout />}>
+            <Route index element={<VisualizerPage />} />
+          </Route>
+          <Route path="/dashboard/ai" element={<AILayout />}>
+            <Route index element={<Navigate to="overview" replace />} />
+            <Route path="overview" element={<AIOverviewPage />} />
+            <Route path="usage" element={<AIUsagePage />} />
+            <Route path="quick-start" element={<AIQuickStartPage />} />
+            <Route path="models" element={<AIModelsPage />} />
+          </Route>
+          <Route path="/dashboard/payments" element={<PaymentsLayout />}>
+            <Route index element={<Navigate to="catalog" replace />} />
+            <Route path="catalog" element={<CatalogPage />} />
+            <Route path="customers" element={<CustomersPage />} />
+            <Route path="subscriptions" element={<SubscriptionsPage />} />
+            <Route path="transactions" element={<TransactionsPage />} />
+          </Route>
+          <Route path="/dashboard/realtime" element={<RealtimeLayout />}>
+            <Route index element={<Navigate to="channels" replace />} />
+            <Route path="channels" element={<RealtimeChannelsPage />} />
+            <Route path="messages" element={<RealtimeMessagesPage />} />
+            <Route path="permissions" element={<RealtimePermissionsPage />} />
+          </Route>
+          <Route path="/dashboard/deployments" element={<DeploymentsLayout />}>
+            <Route index element={<Navigate to="overview" replace />} />
+            <Route path="overview" element={<DeploymentOverviewPage />} />
+            <Route path="logs" element={<DeploymentLogsPage />} />
+            <Route path="env-vars" element={<DeploymentEnvVarsPage />} />
+            <Route path="domains" element={<DeploymentDomainsPage />} />
+          </Route>
+          <Route path="/dashboard/compute" element={<ComputePage />} />
+          {/* Analytics ships in both host modes — self-hosting connects with
+              the admin's own PostHog personal API key — so this subtree is
+              deliberately ungated, matching AppSidebar, which pushes the nav
+              entry unconditionally. A cloud-only gate here would make the nav
+              entry fall through to the catch-all below and bounce self-hosted
+              admins back to /dashboard. */}
+          <Route path="/dashboard/analytics" element={<AnalyticsLayout />}>
+            <Route index element={<Navigate to="traffic" replace />} />
+            <Route path="traffic" element={<TrafficPage />} />
+            <Route path="retention" element={<RetentionPage />} />
+            <Route path="session-replay" element={<SessionReplayPage />} />
+          </Route>
+          {/* Web Scraper ships in both host modes — self-hosting connects with
+              the admin's own Apify token — so this subtree is deliberately
+              ungated, matching AppSidebar, which pushes the nav entry
+              unconditionally. A cloud-only gate here would make the nav entry
+              fall through to the catch-all below and bounce self-hosted admins
+              back to /dashboard. */}
+          <Route path="/dashboard/webscraper" element={<WebscraperLayout />}>
+            <Route index element={<Navigate to="actors" replace />} />
+            <Route path="actors" element={<WebscraperActorsPage />} />
+            <Route path="runs" element={<WebscraperRunsPage />} />
+            <Route path="dataset" element={<WebscraperDatasetPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </RouteBoundary>
     </AppLayout>
   );
 }
@@ -182,8 +300,22 @@ function AuthenticatedRoutes() {
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/dashboard/login" element={<LoginPage />} />
-      <Route path="/cloud/login" element={<CloudLoginPage />} />
+      <Route
+        path="/dashboard/login"
+        element={
+          <RouteBoundary>
+            <LoginPage />
+          </RouteBoundary>
+        }
+      />
+      <Route
+        path="/cloud/login"
+        element={
+          <RouteBoundary>
+            <CloudLoginPage />
+          </RouteBoundary>
+        }
+      />
       <Route
         path="/*"
         element={

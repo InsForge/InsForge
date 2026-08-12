@@ -1073,6 +1073,11 @@
     "smtpConfigUpdateFailed": "更新 SMTP 配置失败",
     "autoConfirmDescription": "自动将邮箱标记为已验证，用户无需确认即可登录。"
   },
+  "routeError": {
+    "title": "无法加载此页面",
+    "staleAssets": "仪表盘无法加载最新的页面资源。请重新加载应用后重试。",
+    "generic": "加载此页面时发生意外错误。请重新加载应用后重试。"
+  },
   "common": {
     "anErrorOccurred": "发生了一个错误",
     "cancel": "取消",
