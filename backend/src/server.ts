@@ -386,10 +386,9 @@ async function initializeServer() {
         // Load stored Fly credentials before the registry is built, so a deployment
         // configured through the dashboard comes up with Fly available instead of
         // waiting for the first write to rebuild.
-        const computeConfig = ComputeConfigService.getInstance();
-        await Promise.all([computeConfig.primeSnapshot(), computeConfig.primeSettings()]);
-        // The listener is already open, so a compute request can land inside the two
-        // reads above and construct the registry from environment-only values. The
+        await ComputeConfigService.getInstance().primeSnapshot();
+        // The listener is already open, so a compute request can land inside the read
+        // above and construct the registry from environment-only values. The
         // registry is a field initialiser, so that choice would stick for the life of
         // the process: a provider configured only through the dashboard would stay
         // missing until the next write. Discard whatever was built early.

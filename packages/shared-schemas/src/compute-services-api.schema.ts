@@ -207,49 +207,21 @@ export const computeCredentialStatusSchema = z.object({
   source: z.enum(['stored', 'environment']).nullable(),
 });
 
-/**
- * Operational settings, as opposed to credentials.
- *
- * `null` means "not set here, using the environment variable" — which is different
- * from an empty string, a deliberate value meaning "advertise no URL".
- *
- * COMPUTE_BIND_ADDRESS is deliberately absent: it decides whether a published
- * container port is reachable only on loopback or from the internet, so it stays
- * behind host access rather than a dashboard session.
- */
-export const computeSettingsSchema = z.object({
-  defaultIngress: ingressModeEnum.nullable(),
-  publicHost: z.string().nullable(),
-  domain: z.string().nullable(),
-  socketPath: z.string().nullable(),
-});
-
 export const computeConfigSchema = z.object({
   flyApiToken: computeCredentialStatusSchema,
   flyOrg: computeCredentialStatusSchema,
-  /** Values in force right now, whether they came from the database or the environment. */
-  settings: computeSettingsSchema,
 });
 
-/**
- * A settings field accepts a string to set it, or null to clear it back to the
- * environment. Omitting it leaves the stored value alone — three distinct intents,
- * so `null` and "absent" cannot be collapsed.
- */
+/** At least one credential, so an empty body cannot look like a successful no-op. */
 export const updateComputeConfigSchema = z
   .object({
     flyApiToken: z.string().trim().min(1).max(512).optional(),
     flyOrg: z.string().trim().min(1).max(128).optional(),
-    defaultIngress: ingressModeEnum.nullable().optional(),
-    publicHost: z.string().trim().max(253).nullable().optional(),
-    domain: z.string().trim().max(253).nullable().optional(),
-    socketPath: z.string().trim().max(512).nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one field is required',
   });
 
 export type ComputeCredentialStatus = z.infer<typeof computeCredentialStatusSchema>;
-export type ComputeSettings = z.infer<typeof computeSettingsSchema>;
 export type ComputeConfig = z.infer<typeof computeConfigSchema>;
 export type UpdateComputeConfig = z.infer<typeof updateComputeConfigSchema>;

@@ -143,11 +143,7 @@ export function ComputeProviderSetup({
                 className="h-8 rounded px-2.5"
               >
                 <Settings className="h-4 w-4" />
-                {provider === 'docker'
-                  ? t('compute.openDockerSettings', { defaultValue: 'Open Docker settings' })
-                  : t('compute.enterFlyCredentials', {
-                      defaultValue: 'Enter Fly.io credentials',
-                    })}
+                {t('compute.enterFlyCredentials', { defaultValue: 'Enter Fly.io credentials' })}
               </Button>
             </div>
           )}

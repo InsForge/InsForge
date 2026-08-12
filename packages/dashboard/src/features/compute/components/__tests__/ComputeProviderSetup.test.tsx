@@ -10,7 +10,7 @@ describe('ComputeProviderSetup', () => {
   // Fly is two credentials. One generic screen would bury whichever the operator
   // actually wants.
   it('walks through the Docker steps, not Fly’s', () => {
-    render(<ComputeProviderSetup provider="docker" onConfigure={vi.fn()} />);
+    render(<ComputeProviderSetup provider="docker" />);
 
     expect(screen.getByText(/is not enabled yet/i)).toBeTruthy();
     expect(screen.getByText(/^Mount the Docker socket/i)).toBeTruthy();
@@ -34,7 +34,7 @@ describe('ComputeProviderSetup', () => {
   // user, so there is no group id to look up. Asking for one was the step people got
   // wrong, and a wrong value is a silent EACCES.
   it('asks for nothing but the mount', () => {
-    render(<ComputeProviderSetup provider="docker" onConfigure={vi.fn()} />);
+    render(<ComputeProviderSetup provider="docker" />);
 
     expect(screen.queryByText(/DOCKER_GID/)).toBeNull();
     expect(screen.queryByText(/group_add/)).toBeNull();
@@ -43,13 +43,7 @@ describe('ComputeProviderSetup', () => {
 
   // The socket path is the single most useful diagnostic when a mount is missing.
   it('names the socket path it is looking for when known', () => {
-    render(
-      <ComputeProviderSetup
-        provider="docker"
-        socketPath="/run/user/1000/docker.sock"
-        onConfigure={vi.fn()}
-      />
-    );
+    render(<ComputeProviderSetup provider="docker" socketPath="/run/user/1000/docker.sock" />);
 
     expect(screen.getByText(/\/run\/user\/1000\/docker\.sock/)).toBeTruthy();
   });
@@ -67,11 +61,12 @@ describe('ComputeProviderSetup', () => {
     expect(onConfigure).toHaveBeenCalledOnce();
   });
 
-  it('offers Docker its settings too, for a socket that is not at the default path', async () => {
-    const onConfigure = vi.fn();
-    render(<ComputeProviderSetup provider="docker" onConfigure={onConfigure} />);
+  // Docker is enabled by a compose edit and configured by the same file, so there is
+  // nothing to open. A button leading to a read-only tab would be furniture.
+  it('gives Docker the steps and no button', () => {
+    render(<ComputeProviderSetup provider="docker" />);
 
-    await userEvent.click(screen.getByRole('button', { name: /Open Docker settings/i }));
-    expect(onConfigure).toHaveBeenCalledOnce();
+    expect(screen.getByText(/^Mount the Docker socket/i)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /settings/i })).toBeNull();
   });
 });

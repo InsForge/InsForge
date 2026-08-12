@@ -19,7 +19,6 @@ import {
 } from '@insforge/ui';
 import { computeProviderLabel } from '#features/compute/constants';
 import { FlyCredentialsForm } from './FlyCredentialsForm';
-import { DockerSettingsForm } from './DockerSettingsForm';
 
 interface Capabilities {
   regions?: boolean;
@@ -120,11 +119,12 @@ export function ComputeSettingsDialog({
                 isDefault={activeProvider === defaultProvider}
               />
               <ProviderCapabilities caps={capabilities?.[activeProvider]} />
-              {/* Fly credentials can be stored from here; Docker cannot, because
-                  enabling it means mounting a socket into this container — a compose
-                  change no API can make from inside the container it would change. Its
-                  steps live on the provider page instead. */}
-              {activeProvider === 'fly' ? <FlyCredentialsForm /> : <DockerSettingsForm />}
+              {/* Fly credentials are values, so they can be entered here and take
+                  effect without a restart. Docker has nothing to enter: it is enabled
+                  by mounting a socket, and everything else about it is read from the
+                  same compose file and `.env` — one source of truth, not two. Its
+                  steps live on the provider page. */}
+              {activeProvider === 'fly' && <FlyCredentialsForm />}
             </div>
           </MenuDialogBody>
         </MenuDialogMain>
