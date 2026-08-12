@@ -1,6 +1,6 @@
 import express, { Router, Response, NextFunction } from 'express';
 import { appConfig } from '@/infra/config/app.config.js';
-import { isCloudManagedProject } from '@/utils/environment.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { computeWriteLimiter, computeLogsRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { ComputeServicesService } from '@/services/compute/services.service.js';
@@ -64,7 +64,7 @@ router.put(
       // project admin storing their own token here would move their containers off the
       // control plane that bills and quotas them. The dashboard already hides this on
       // cloud; the API has to say no too, or the gate is decoration.
-      if (isCloudManagedProject()) {
+      if (isCloudEnvironment()) {
         throw new AppError(
           'Compute credentials are managed by InsForge on cloud projects.',
           403,

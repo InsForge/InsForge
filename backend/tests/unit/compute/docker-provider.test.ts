@@ -116,21 +116,26 @@ describe('DockerProvider', () => {
       appConfig.cloud = {};
     });
 
-    it('still registers when PROJECT_ID is set but CLOUD_API_HOST is not', () => {
-      // The default host is not evidence of provisioning, so apiHostProvided stays false.
+    it('still registers when PROJECT_ID is set', () => {
       appConfig.cloud = { projectId: 'my-project', apiHost: 'https://api.insforge.dev' };
 
       expect(provider.isConfigured()).toBe(true);
     });
 
-    it('refuses when the host was actually supplied alongside a project id', () => {
-      appConfig.cloud = {
-        projectId: 'my-project',
-        apiHost: 'https://api.insforge.dev',
-        apiHostProvided: true,
-      };
-
-      expect(provider.isConfigured()).toBe(false);
+    // The signal cloud provisioning always sets: the user-data script writes it
+    // unconditionally and every instance launches with an IAM instance profile.
+    it('refuses on an instance carrying an AWS instance profile', () => {
+      const original = process.env.AWS_INSTANCE_PROFILE_NAME;
+      process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+      try {
+        expect(provider.isConfigured()).toBe(false);
+      } finally {
+        if (original === undefined) {
+          delete process.env.AWS_INSTANCE_PROFILE_NAME;
+        } else {
+          process.env.AWS_INSTANCE_PROFILE_NAME = original;
+        }
+      }
     });
   });
 

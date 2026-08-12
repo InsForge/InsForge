@@ -27,9 +27,6 @@ vi.mock('@/api/middlewares/rate-limiters.js', () => ({
 }));
 
 vi.mock('@/utils/environment.js', () => ({
-  // Both, because the route asks the two-signal question and other modules in the
-  // import graph ask the narrow one.
-  isCloudManagedProject: () => env.isCloud,
   isCloudEnvironment: () => env.isCloud,
 }));
 
@@ -125,8 +122,9 @@ describe('/api/compute/services/config', () => {
   // On cloud, compute runs through InsForge's own Fly account. A project admin storing
   // their own token would move their containers off the control plane that bills and
   // quotas them, so the UI hides this — and the API has to agree, or the gate is
-  // decoration.
-  it('refuses to store credentials on a cloud-managed project', async () => {
+  // decoration. The signal is the AWS instance profile, which cloud provisioning always
+  // sets; PROJECT_ID is not used, because self-hosters set that too.
+  it('refuses to store credentials on a cloud instance', async () => {
     env.isCloud = true;
 
     const res = await request(await createApp())

@@ -31,14 +31,6 @@ export interface AppConfig {
     storageBucket: string;
     instanceProfile: string;
     apiHost: string;
-    /**
-     * Whether CLOUD_API_HOST was actually supplied.
-     *
-     * `apiHost` has a default, so it cannot answer "is this a cloud-provisioned
-     * deployment" — the default makes every install look like one. Cloud provisioning
-     * always sets the variable explicitly, so its presence is the signal.
-     */
-    apiHostProvided: boolean;
     appKey: string;
     cloudFrontUrl: string | undefined;
     cloudFrontKeyPairId: string | undefined;
@@ -171,7 +163,6 @@ export function loadConfig(): AppConfig {
       storageBucket: process.env.AWS_S3_BUCKET || 'insforge-test-bucket',
       instanceProfile: process.env.AWS_INSTANCE_PROFILE_NAME || 'insforge-instance-profile',
       apiHost: process.env.CLOUD_API_HOST || 'https://api.insforge.dev',
-      apiHostProvided: !!process.env.CLOUD_API_HOST?.trim(),
       projectId: process.env.PROJECT_ID || undefined,
       appKey: process.env.APP_KEY || 'default-app-key',
       cloudFrontUrl: process.env.AWS_CLOUDFRONT_URL || undefined,
