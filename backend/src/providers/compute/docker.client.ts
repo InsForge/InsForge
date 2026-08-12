@@ -55,20 +55,13 @@ export interface DockerConfig {
  * cycle. ComputeConfigService pushes values in at startup and after every write, and
  * because every read site goes through `dockerConfig()`, they all pick it up.
  */
-let storedOverrides: Partial<DockerConfig> = {};
-
-export function setDockerConfigOverrides(overrides: Partial<DockerConfig>): void {
-  storedOverrides = overrides;
-}
-
 export function dockerConfig(): DockerConfig {
   const c = appConfig.docker;
-  const stored = storedOverrides;
   return {
-    socketPath: stored.socketPath ?? c?.socketPath ?? '/var/run/docker.sock',
-    publicHost: stored.publicHost ?? c?.publicHost ?? '',
-    domain: stored.domain ?? c?.domain ?? '',
-    defaultIngress: stored.defaultIngress ?? c?.defaultIngress ?? 'none',
+    socketPath: c?.socketPath ?? '/var/run/docker.sock',
+    publicHost: c?.publicHost ?? '',
+    domain: c?.domain ?? '',
+    defaultIngress: c?.defaultIngress ?? 'none',
     bindAddress: c?.bindAddress || '127.0.0.1',
     isolateNetwork: c?.isolateNetwork ?? false,
   };

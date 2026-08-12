@@ -69,7 +69,9 @@ export default function ComputeServicesPage() {
     return (
       <ComputeProviderSetup
         provider={provider}
-        onConfigure={openSettings && (() => openSettings(provider))}
+        // Docker has nothing to enter — it is enabled by a compose edit — so it gets
+        // the steps and no button. Fly's credentials are values, so it gets both.
+        onConfigure={provider === 'fly' && openSettings ? () => openSettings(provider) : undefined}
       />
     );
   }

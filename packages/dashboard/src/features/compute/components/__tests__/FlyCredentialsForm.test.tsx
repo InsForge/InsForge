@@ -9,12 +9,6 @@ const api = vi.hoisted(() => ({
   config: {
     flyApiToken: { configured: false, masked: null, source: null },
     flyOrg: { configured: false, masked: null, source: null },
-    settings: {
-      defaultIngress: 'none',
-      publicHost: '',
-      domain: '',
-      socketPath: '/var/run/docker.sock',
-    },
   } as ComputeConfig,
   updateConfig: vi.fn(),
 }));
@@ -47,12 +41,6 @@ describe('FlyCredentialsForm', () => {
     api.config = {
       flyApiToken: { configured: false, masked: null, source: null },
       flyOrg: { configured: false, masked: null, source: null },
-      settings: {
-        defaultIngress: 'none',
-        publicHost: '',
-        domain: '',
-        socketPath: '/var/run/docker.sock',
-      },
     };
     vi.clearAllMocks();
   });
@@ -86,12 +74,6 @@ describe('FlyCredentialsForm', () => {
     api.config = {
       flyApiToken: { configured: true, masked: 'fo1_••••••cdef', source: 'stored' },
       flyOrg: { configured: true, masked: 'my-org', source: 'environment' },
-      settings: {
-        defaultIngress: 'none',
-        publicHost: '',
-        domain: '',
-        socketPath: '/var/run/docker.sock',
-      },
     };
     renderForm();
 

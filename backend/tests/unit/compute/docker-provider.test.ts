@@ -41,7 +41,7 @@ vi.mock('@/providers/compute/docker.client.js', async () => {
 
 import { DockerProvider } from '@/providers/compute/docker.provider.js';
 import { MachineGoneError } from '@/providers/compute/compute.provider.js';
-import { setDockerConfigOverrides } from '@/providers/compute/docker.client.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 /** An inspect payload that passes the ownership check. */
 function ownedContainer(overrides: Record<string, unknown> = {}) {
@@ -94,9 +94,9 @@ describe('DockerProvider', () => {
     } else {
       process.env.APP_KEY = oldAppKey;
     }
-    // Stored settings are module state in docker.client, so a test that sets one
-    // would otherwise change what every later test's daemon config says.
-    setDockerConfigOverrides({});
+    // The mocked config object is module state, so a test that changes a knob would
+    // otherwise change what every later test's daemon config says.
+    appConfig.docker.defaultIngress = 'none';
   });
 
   describe('capabilities', () => {
@@ -111,20 +111,20 @@ describe('DockerProvider', () => {
       expect(provider.name).toBe('docker');
     });
 
-    // Not a capability: the caller-omitted default is an operator setting, so it is
-    // read per call. Taking it off `ingressModes[0]` is what silently disabled
-    // COMPUTE_DEFAULT_INGRESS, and would have disabled the dashboard setting too.
+    // Not a capability: the caller-omitted default is COMPUTE_DEFAULT_INGRESS, read
+    // per call. Taking it off `ingressModes[0]` is what silently disabled that
+    // variable for every create.
     it('reports the configured default ingress, not the first supported mode', () => {
       expect(provider.defaultIngress()).toBe('none');
 
-      setDockerConfigOverrides({ defaultIngress: 'port' });
+      appConfig.docker.defaultIngress = 'port';
       expect(provider.defaultIngress()).toBe('port');
       // Still a member of the declared set, which is what the interface promises.
       expect(provider.capabilities.ingressModes).toContain(provider.defaultIngress());
     });
 
-    it('falls back to private-only when a stored value is not a mode it can deliver', () => {
-      setDockerConfigOverrides({ defaultIngress: 'nonsense' });
+    it('falls back to private-only when the configured value is not a mode it can deliver', () => {
+      appConfig.docker.defaultIngress = 'nonsense';
       expect(provider.defaultIngress()).toBe('none');
     });
   });
