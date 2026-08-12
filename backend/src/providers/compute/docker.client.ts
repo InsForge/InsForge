@@ -48,12 +48,15 @@ export interface DockerConfig {
 }
 
 /**
- * Settings stored in the database, overriding the environment.
+ * Docker settings, read from the environment on every call.
  *
- * Held here rather than read from a service so this module keeps no dependency on
- * one — the provider imports this client, and a service import would close the
- * cycle. ComputeConfigService pushes values in at startup and after every write, and
- * because every read site goes through `dockerConfig()`, they all pick it up.
+ * Environment-only, deliberately. Enabling this driver means mounting the socket in the
+ * compose file, so anyone who can change these values is already editing that file —
+ * a second, database-side source of truth would buy the ability to change without a
+ * restart what they can set during the restart they already have to do.
+ *
+ * Read per call rather than captured once so a value is never stale relative to the
+ * process's own configuration.
  */
 export function dockerConfig(): DockerConfig {
   const c = appConfig.docker;

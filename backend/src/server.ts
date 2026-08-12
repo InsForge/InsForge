@@ -354,6 +354,14 @@ const PORT = appConfig.app.port;
 async function initializeServer() {
   try {
     const app = await createApp();
+
+    // Before the listener opens, so no request can construct the compute registry from
+    // environment-only credentials. primeSnapshot never throws — a secret-store outage
+    // leaves compute on whatever the environment provides — so this cannot stop the
+    // server from serving.
+    await ComputeConfigService.getInstance().primeSnapshot();
+    warnIfFlyCredentialsIncomplete();
+
     const server = app.listen(PORT, () => {
       logger.info(`Backend API service listening on port ${PORT}`);
     });
@@ -389,15 +397,9 @@ async function initializeServer() {
         // Load stored Fly credentials before the registry is built, so a deployment
         // configured through the dashboard comes up with Fly available instead of
         // waiting for the first write to rebuild.
-        await ComputeConfigService.getInstance().primeSnapshot();
-        // Once, here, with the credentials that are actually in force — not on every
-        // registry build, which happens per /api/metadata request.
-        warnIfFlyCredentialsIncomplete();
-        // The listener is already open, so a compute request can land inside the read
-        // above and construct the registry from environment-only values. The
-        // registry is a field initialiser, so that choice would stick for the life of
-        // the process: a provider configured only through the dashboard would stay
-        // missing until the next write. Discard whatever was built early.
+        // Credentials were primed before the listener opened, so the registry any
+        // request builds already sees them. Reset anyway: it costs nothing and keeps
+        // this correct if the priming above ever moves back off the startup path.
         ComputeServicesService.resetForConfigChange();
         await ComputeServicesService.getInstance().runStartupTasks();
       } catch (err) {

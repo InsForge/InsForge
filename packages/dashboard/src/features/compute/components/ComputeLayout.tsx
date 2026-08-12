@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { LoadingState } from '#components';
+import { ErrorState, LoadingState } from '#components';
 import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { useMetadata } from '#lib/hooks/useMetadata';
-import { COMPUTE_PROVIDERS } from '#features/compute/constants';
+import { COMPUTE_PROVIDERS, isComputeProviderSlug } from '#features/compute/constants';
 import { useComputeServices } from '#features/compute/hooks/useComputeServices';
 import { ComputeSidebar } from './ComputeSidebar';
 import { ComputeSettingsDialog } from './ComputeSettingsDialog';
@@ -47,7 +47,16 @@ export default function ComputeLayout() {
   const { t } = useTranslation('chrome');
   const { pathname } = useLocation();
   const isCloud = useIsCloudHostingMode();
-  const { metadata, isLoading: metadataLoading } = useMetadata();
+  // Last path segment when it names a provider we have a page for.
+  const viewedProvider = COMPUTE_PROVIDERS.map((p) => p.slug).find(
+    (slug) => pathname === `/dashboard/compute/${slug}`
+  );
+  const {
+    metadata,
+    isLoading: metadataLoading,
+    error: metadataError,
+    refetch: refetchMetadata,
+  } = useMetadata();
   const compute = metadata?.compute;
   const configured = compute ? Object.keys(compute.providers ?? {}) : [];
 
@@ -70,6 +79,19 @@ export default function ComputeLayout() {
           className="py-0"
           message={t('compute.loadingCompute', { defaultValue: 'Loading Compute…' })}
         />
+      </div>
+    );
+  }
+
+  // A failed metadata request is not "compute is off": without this the whole tab
+  // shows a setup guide during a backend outage, telling an operator to mount a socket
+  // they have already mounted, with nothing to retry.
+  if (metadataError) {
+    return (
+      <div className="flex h-full min-h-0 items-center justify-center p-6">
+        <div className="w-full max-w-[420px]">
+          <ErrorState error={metadataError as Error} onRetry={() => void refetchMetadata()} />
+        </div>
       </div>
     );
   }
@@ -104,9 +126,9 @@ export default function ComputeLayout() {
     // Both candidates are checked against the slugs this dashboard has pages for. An
     // unrecognised one would redirect here, get bounced back by the page's own slug
     // guard, and loop.
-    const known = configured.filter((slug) => COMPUTE_PROVIDERS.some((p) => p.slug === slug));
+    const known = configured.filter(isComputeProviderSlug);
     const landing =
-      (compute?.defaultProvider && COMPUTE_PROVIDERS.some((p) => p.slug === compute.defaultProvider)
+      (compute?.defaultProvider && isComputeProviderSlug(compute.defaultProvider)
         ? compute.defaultProvider
         : known[0]) ?? 'docker';
     return <Navigate to={`/dashboard/compute/${landing}`} replace />;
@@ -114,7 +136,9 @@ export default function ComputeLayout() {
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <ComputeSidebar onOpenSettings={() => openSettings()} />
+      {/* The provider being looked at, so the gear opens that tab rather than always
+          landing on Docker. */}
+      <ComputeSidebar onOpenSettings={() => openSettings(viewedProvider)} />
       {/* flex-col, not a plain block: the pages inside size themselves with
           `flex-1 min-h-0`, which needs a flex parent to resolve against. As a block
           this grew to content height and the `overflow-hidden` here clipped the

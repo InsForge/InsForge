@@ -36,6 +36,15 @@ export class ComputeConfigService {
    */
   private snapshot: { apiToken: string | null; org: string | null } | undefined;
 
+  /**
+   * Bumped before each read so a slow prime cannot overwrite a newer one.
+   *
+   * Two saves can overlap — each re-primes in its `finally` — and without this the
+   * one that started first could land last and put the pre-rotation credentials back.
+   * Same guard ModelGatewayConfigService uses for the same reason.
+   */
+  private snapshotEpoch = 0;
+
   constructor(private readonly secretService: SecretStore = SecretService.getInstance()) {}
 
   static getInstance(): ComputeConfigService {
@@ -55,7 +64,10 @@ export class ComputeConfigService {
     // codebase's env boundary, and going around it would mean two places that decide
     // what an empty credential is.
     return {
-      apiToken: this.snapshot?.apiToken ?? appConfig.fly.apiToken,
+      // normalize() on the environment too: the CLI prints the macaroon with its
+      // scheme, and pasting that into `.env` is as likely as pasting it into the
+      // dashboard. Only stripping stored values fixed half the problem.
+      apiToken: this.snapshot?.apiToken ?? normalize(appConfig.fly.apiToken) ?? '',
       org: this.snapshot?.org ?? appConfig.fly.org,
     };
   }
@@ -68,11 +80,16 @@ export class ComputeConfigService {
    * whole feature down.
    */
   async primeSnapshot(): Promise<void> {
+    const epoch = ++this.snapshotEpoch;
     try {
       const [apiToken, org] = await Promise.all([
         this.secretService.getSecretByKey(FLY_API_TOKEN_SECRET),
         this.secretService.getSecretByKey(FLY_ORG_SECRET),
       ]);
+      if (epoch !== this.snapshotEpoch) {
+        // A later prime already ran; its read is the fresher one.
+        return;
+      }
       this.snapshot = { apiToken: normalize(apiToken), org: normalize(org) };
     } catch (error) {
       logger.warn('Compute config: could not read stored Fly credentials; using the environment', {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Plus, Play, Square, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '@insforge/ui';
@@ -39,10 +39,19 @@ export default function ComputeServicesPage() {
     isDeleting,
     isStopping,
     isStarting,
-  } = useComputeServices();
+  } = useComputeServices(providerConfigured);
   const [selectedService, setSelectedService] = useState<ServiceSchema | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  // Switching providers keeps this component mounted, so a service selected on one
+  // provider's page would still be open on the next — and `currentService` falls back
+  // to the stale object when the id is missing from the new list, which means its
+  // Stop/Delete buttons would act on the other provider's container.
+  useEffect(() => {
+    setSelectedService(null);
+    setDeleteTarget(null);
+  }, [provider]);
 
   // Keep selected service in sync with latest data
   const currentService = selectedService

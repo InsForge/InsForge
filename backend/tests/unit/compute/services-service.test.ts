@@ -268,14 +268,21 @@ describe('ComputeServicesService', () => {
           .mock.calls.flat()
           .some((arg) => typeof arg === 'string' && arg.includes('the org is empty'));
 
-      appConfig.fly.org = '';
-      warnIfFlyCredentialsIncomplete();
-      expect(said()).toBe(true);
+      const original = appConfig.fly.org;
+      try {
+        appConfig.fly.org = '';
+        warnIfFlyCredentialsIncomplete();
+        expect(said()).toBe(true);
 
-      vi.mocked(logger.warn).mockClear();
-      appConfig.fly.org = 'test-org';
-      warnIfFlyCredentialsIncomplete();
-      expect(said()).toBe(false);
+        vi.mocked(logger.warn).mockClear();
+        appConfig.fly.org = 'test-org';
+        warnIfFlyCredentialsIncomplete();
+        expect(said()).toBe(false);
+      } finally {
+        // Restored even if an assertion throws: appConfig is module state shared with
+        // every sibling test, and `''` leaking would quietly change what they exercise.
+        appConfig.fly.org = original;
+      }
     });
 
     // Provider is the dashboard's navigation axis, so a create from Fly's page has to

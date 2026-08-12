@@ -3,7 +3,11 @@ import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ServiceSchema } from '@insforge/shared-schemas';
 
-const meta = vi.hoisted(() => ({ value: undefined as unknown, isLoading: false }));
+const meta = vi.hoisted(() => ({
+  value: undefined as unknown,
+  isLoading: false,
+  error: undefined as Error | undefined,
+}));
 const host = vi.hoisted(() => ({ isCloud: false }));
 const listed = vi.hoisted(() => ({
   services: [] as ServiceSchema[],
@@ -11,7 +15,12 @@ const listed = vi.hoisted(() => ({
 }));
 
 vi.mock('#lib/hooks/useMetadata', () => ({
-  useMetadata: () => ({ metadata: meta.value, isLoading: meta.isLoading }),
+  useMetadata: () => ({
+    metadata: meta.value,
+    isLoading: meta.isLoading,
+    error: meta.error,
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock('#lib/config/DashboardHostContext', () => ({
@@ -71,6 +80,7 @@ describe('ComputeLayout', () => {
     listed.enabledCalls = [];
     meta.value = undefined;
     meta.isLoading = false;
+    meta.error = undefined;
     host.isCloud = false;
     vi.clearAllMocks();
   });
@@ -139,6 +149,16 @@ describe('ComputeLayout', () => {
 
     expect(screen.getByTestId('provider-page')).toBeTruthy();
     expect(listed.enabledCalls.some((e) => e === true)).toBe(true);
+  });
+
+  // Metadata failing is an outage, not a missing socket. Showing the setup guide there
+  // tells an operator to do something they have already done, with nothing to retry.
+  it('shows a retryable error when metadata fails, not a setup guide', () => {
+    meta.error = new Error('Network request failed');
+    renderAt('/dashboard/compute/docker');
+
+    expect(screen.getByText(/Network request failed/i)).toBeTruthy();
+    expect(screen.queryByTestId('provider-page')).toBeNull();
   });
 
   // Docker is self-host only: the backend refuses to register it when either cloud

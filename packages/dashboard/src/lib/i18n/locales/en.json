@@ -830,8 +830,6 @@
     "providerNotConfigured": "Not configured",
     "dockerIntro": "Containers run on the same Docker daemon as InsForge, as siblings of this container. No account and no per-container bill.",
     "dockerStep1": "Mount the Docker socket",
-    "dockerStep2": "Put your host’s docker group id in .env",
-    "dockerStep2Body": "Print your host’s docker group id, then write the number into .env. On Docker Desktop, use 0.",
     "dockerStep3": "Restart InsForge",
     "dockerSocketWarning": "The Docker socket is root-equivalent on the host, so mounting it is a deliberate choice. InsForge builds every container spec itself and never forwards caller-supplied options, so a leaked API key cannot request a privileged container.",
     "flyIntro": "Containers run on Fly.io under your own account, with selectable regions and scale-to-zero.",

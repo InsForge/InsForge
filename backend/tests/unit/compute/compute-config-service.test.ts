@@ -150,4 +150,27 @@ describe('ComputeConfigService', () => {
       expect.objectContaining({ value: 'fm2_already_bare' })
     );
   });
+
+  // The org write failing after the token landed is the partial failure that matters:
+  // the error must surface, and the snapshot must describe what is actually stored
+  // rather than the pre-write state.
+  it('surfaces a partial write and still refreshes what is in force', async () => {
+    const secretStore = store();
+    secretStore.createSecret = vi.fn((input: { key: string; value: string }) => {
+      if (input.key === 'FLY_ORG') {
+        return Promise.reject(new Error('secret store unavailable'));
+      }
+      secretStore.secrets.set(input.key, input.value);
+      return Promise.resolve({ id: `id-${input.key}` });
+    });
+    const svc = new ComputeConfigService(secretStore);
+
+    await expect(
+      svc.updateConfig({ flyApiToken: 'fm2_new_token', flyOrg: 'my-org' })
+    ).rejects.toThrow(/secret store unavailable/);
+
+    // The token did land, and the snapshot reflects it.
+    expect(secretStore.secrets.get('FLY_API_TOKEN')).toBe('fm2_new_token');
+    expect(svc.flyCredentials().apiToken).toBe('fm2_new_token');
+  });
 });

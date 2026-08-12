@@ -184,7 +184,9 @@ function ProviderCapabilities({ caps }: { caps: Capabilities | undefined }) {
     ],
     [
       t('compute.capIngress', { defaultValue: 'Ingress modes' }),
-      (caps.ingressModes ?? []).join(', '),
+      (caps.ingressModes ?? [])
+        .map((mode) => t(`compute.ingressModes.${mode}`, { defaultValue: mode }))
+        .join(', '),
     ],
     [
       t('compute.capSourceBuild', { defaultValue: 'Source builds' }),

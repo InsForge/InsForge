@@ -834,8 +834,6 @@
     "providerNotConfigured": "Sin configurar",
     "dockerIntro": "Los contenedores se ejecutan en el mismo daemon de Docker que InsForge, como hermanos de este contenedor. Sin cuenta y sin factura por contenedor.",
     "dockerStep1": "Monta el socket de Docker",
-    "dockerStep2": "Pon el id del grupo docker de tu host en .env",
-    "dockerStep2Body": "Imprime el id del grupo docker de tu host y escribe el número en .env. En Docker Desktop, usa 0.",
     "dockerStep3": "Reinicia InsForge",
     "dockerSocketWarning": "El socket de Docker equivale a root en el host, así que montarlo es una decisión deliberada. InsForge construye la especificación de cada contenedor por su cuenta y nunca reenvía opciones de quien llama, así que una API key filtrada no puede pedir un contenedor privilegiado.",
     "flyIntro": "Los contenedores se ejecutan en Fly.io con tu propia cuenta, con regiones seleccionables y escalado a cero.",

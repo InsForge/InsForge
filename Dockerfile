@@ -166,6 +166,12 @@ COPY --from=build --chown=node:node /app/package.json ./package.json
 # Deliberately still root at this point. The entrypoint reads the group off a mounted
 # Docker socket — a host-specific id that cannot be baked in and should not have to be
 # supplied — then execs the command as `node`. Nothing in the app runs as root.
+#
+# The trade this makes, stated plainly: without `USER node` the image no longer enforces
+# non-root by itself, so `--entrypoint` (or a compose `entrypoint:` override) bypasses
+# the handoff and runs as root. The drop is in the entrypoint, not the image metadata.
+# This is the same shape the official postgres and redis images use for the same reason;
+# if you override the entrypoint, add `user: node` yourself.
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/insforge-entrypoint
 
 EXPOSE 7130 7131

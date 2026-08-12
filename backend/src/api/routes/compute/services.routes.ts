@@ -1,5 +1,6 @@
 import express, { Router, Response, NextFunction } from 'express';
 import { appConfig } from '@/infra/config/app.config.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { computeWriteLimiter, computeLogsRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { ComputeServicesService } from '@/services/compute/services.service.js';
@@ -59,6 +60,18 @@ router.put(
   computeWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      // Cloud-managed projects run compute through InsForge's own Fly account, so a
+      // project admin storing their own token here would move their containers off the
+      // control plane that bills and quotas them. The dashboard already hides this on
+      // cloud; the API has to say no too, or the gate is decoration.
+      if (isCloudEnvironment()) {
+        throw new AppError(
+          'Compute credentials are managed by InsForge on cloud projects.',
+          403,
+          ERROR_CODES.FORBIDDEN
+        );
+      }
+
       const validation = updateComputeConfigSchema.safeParse(req.body);
       if (!validation.success) {
         throw new AppError(
@@ -69,10 +82,14 @@ router.put(
       }
 
       const configService = ComputeConfigService.getInstance();
-      await configService.updateConfig(validation.data);
-      // Rebuild on the next call so a provider that was unconfigured a moment ago is
-      // usable now, without a container restart.
-      ComputeServicesService.resetForConfigChange();
+      try {
+        await configService.updateConfig(validation.data);
+      } finally {
+        // In a finally, not after success: a save that wrote the token and failed on the
+        // org has changed what the credentials are, so a registry built from the old
+        // ones is stale either way.
+        ComputeServicesService.resetForConfigChange();
+      }
 
       successResponse(res, await configService.getConfig());
 

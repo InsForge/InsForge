@@ -814,8 +814,6 @@
     "providerNotConfigured": "未配置",
     "dockerIntro": "容器与 InsForge 跑在同一个 Docker daemon 上，互为兄弟容器。不需要账号，也没有按容器计费。",
     "dockerStep1": "挂载 Docker socket",
-    "dockerStep2": "把宿主机 docker 组 id 写进 .env",
-    "dockerStep2Body": "打印宿主机的 docker 组 id，再把数字写进 .env。Docker Desktop 填 0。",
     "dockerStep3": "重启 InsForge",
     "dockerSocketWarning": "Docker socket 在宿主机上等同于 root，所以挂载它应当是一个有意识的决定。InsForge 自己构造每个容器的 spec，从不转发调用方提供的选项，因此即使 API key 泄漏也无法要求特权容器。",
     "flyIntro": "容器跑在你自己的 Fly.io 账号下，可选择区域并支持缩容到零。",

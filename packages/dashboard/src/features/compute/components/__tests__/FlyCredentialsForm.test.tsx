@@ -16,10 +16,10 @@ const api = vi.hoisted(() => ({
 vi.mock('#features/compute/services/compute.service', () => ({
   computeServicesApi: {
     getConfig: () => Promise.resolve(api.config),
-    updateConfig: (input: unknown) => {
-      api.updateConfig(input);
-      return Promise.resolve(api.config);
-    },
+    // Returns whatever the spy returns so a test can reject: previously it recorded the
+    // call and resolved regardless, which made a failure path impossible to exercise.
+    updateConfig: (input: unknown) =>
+      (api.updateConfig(input) as Promise<unknown> | undefined) ?? Promise.resolve(api.config),
   },
 }));
 
@@ -92,5 +92,26 @@ describe('FlyCredentialsForm', () => {
     expect(token.type).toBe('password');
     await user.click(screen.getByRole('button', { name: 'Show token' }));
     expect((screen.getByLabelText('API token') as HTMLInputElement).type).toBe('text');
+  });
+
+  // The catch exists so a failed save does not wipe a pasted token. Without a test,
+  // clearing the fields again would look like a harmless simplification.
+  it('keeps what was typed when the save fails', async () => {
+    const user = userEvent.setup();
+    api.updateConfig.mockRejectedValueOnce(new Error('Fly rejected the token'));
+    renderForm();
+
+    const token = await waitFor(
+      () => screen.getByPlaceholderText('Paste a Fly API token') as HTMLInputElement
+    );
+    await user.type(token, 'FlyV1 fm2_typed');
+    await user.type(screen.getByPlaceholderText('your-org-slug'), 'my-org');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(api.updateConfig).toHaveBeenCalledOnce());
+    expect((screen.getByPlaceholderText('Paste a Fly API token') as HTMLInputElement).value).toBe(
+      'FlyV1 fm2_typed'
+    );
+    expect((screen.getByPlaceholderText('your-org-slug') as HTMLInputElement).value).toBe('my-org');
   });
 });
