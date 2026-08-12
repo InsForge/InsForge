@@ -60,6 +60,11 @@ remember_one() {
         "{\"scope\":\"$1\",\"kind\":\"$2\",\"title\":\"$3\",\"content\":\"$4\"}"
 }
 
+# id_from_remember <remember response> -> the id it stored
+id_from_remember() {
+    echo "$1" | grep -o '"id":"[^"]*' | cut -d'"' -f4 || true
+}
+
 # ids_in_scope <scope> -> newline-separated ids
 ids_in_scope() {
     memory_post index "{\"scope\":\"$1\"}" \
@@ -85,10 +90,17 @@ fi
 
 remember_one "$SCOPE_A" "decision" "rrf k" \
     "Recall fuses the vector and keyword arms with RRF at k=60." > /dev/null
-remember_one "$SCOPE_A" "reference" "stale fact" \
-    "The job queue for this project runs on Redis." > /dev/null
-remember_one "$SCOPE_B" "fact" "other scope" \
-    "This memory belongs to a different scope entirely." > /dev/null
+
+# Test 5 asserts this specific memory stops coming back from recall, so capture
+# the id it was stored under rather than picking one out of the index — index
+# orders by updated_at DESC, which is not a promise about which row is first.
+stale_response=$(remember_one "$SCOPE_A" "reference" "stale fact" \
+    "The job queue for this project runs on Redis.")
+victim_id=$(id_from_remember "$stale_response")
+
+scope_b_response=$(remember_one "$SCOPE_B" "fact" "other scope" \
+    "This memory belongs to a different scope entirely.")
+id_b=$(id_from_remember "$scope_b_response")
 
 seeded_a=$(count_in_scope "$SCOPE_A")
 if [ "$seeded_a" -eq 3 ]; then
@@ -98,8 +110,12 @@ else
     exit_with_status
 fi
 
-victim_id=$(ids_in_scope "$SCOPE_A" | sed -n '1p')
-id_b=$(ids_in_scope "$SCOPE_B" | sed -n '1p')
+if [ -n "$victim_id" ] && [ -n "$id_b" ]; then
+    print_success "Captured the fixture ids to delete"
+else
+    print_fail "Seeding did not return an id (victim_id='$victim_id', id_b='$id_b')"
+    exit_with_status
+fi
 echo ""
 
 # 1. The scope guard ----------------------------------------------------------

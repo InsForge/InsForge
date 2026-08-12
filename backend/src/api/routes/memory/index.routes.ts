@@ -8,6 +8,7 @@ import {
   rememberRequestSchema,
   recallRequestSchema,
   forgetRequestSchema,
+  forgetResponseSchema,
   memoryIndexRequestSchema,
 } from '@insforge/shared-schemas';
 
@@ -66,7 +67,8 @@ router.post('/forget', async (req: AuthRequest, res: Response, next: NextFunctio
       );
     }
     const forgotten = await memoryService.forget(parsed.data);
-    successResponse(res, { forgotten });
+    const response = forgetResponseSchema.parse({ forgotten });
+    successResponse(res, response);
   } catch (error) {
     next(error);
   }
