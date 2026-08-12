@@ -823,6 +823,15 @@ tmpfs:
 
 #### 14.1 備份資料庫
 
+如需一步完成資料庫匯出與 `.env` 複製，請使用隨附的備份腳本：
+
+```bash
+cd ~/insforge
+./deploy/backup.sh
+```
+
+或手動匯出：
+
 ```bash
 cd ~/insforge
 source .env
@@ -982,49 +991,29 @@ docker compose up -d
 
 設定一個 cron 工作以進行每日自動備份：
 
-#### 17.1 建立備份腳本
+#### 17.1 執行備份腳本
+
+自架安裝包含 `deploy/backup.sh`（由 `deploy/setup.sh` 提供）。它會匯出 Postgres 資料庫，並將 `.env` 複製到安裝根目錄下的 `backups/` 目錄中。
 
 ```bash
-nano ~/insforge/backup.sh
+cd ~/insforge
+./deploy/backup.sh
 ```
 
+預設情況下，備份檔案會存放在 `~/insforge/backups/`，超過 14 天的檔案會被刪除。可覆寫保留天數：
+
 ```bash
-#!/bin/bash
-set -euo pipefail
-
-# InsForge Automated Backup Script
-# Run from the checkout so docker compose reads COMPOSE_FILE and
-# COMPOSE_PROJECT_NAME from .env, which also carries POSTGRES_USER / POSTGRES_DB
-cd "$HOME/insforge"
-set -a
-source .env
-set +a
-
-BACKUP_DIR="$HOME/insforge/backups"
-RETENTION_DAYS=14
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-
-trap 'echo "[$(date)] ERROR: Backup failed at line $LINENO" >&2; exit 1' ERR
-
-mkdir -p "$BACKUP_DIR"
-
-# Dump the database
-docker compose exec -T postgres \
-  pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" \
-  > "$BACKUP_DIR/db_$TIMESTAMP.sql"
-
-# Copy the environment file
-cp "$HOME/insforge/.env" "$BACKUP_DIR/env_$TIMESTAMP.bak"
-
-# Remove backups older than retention period
-find "$BACKUP_DIR" -name "db_*.sql" -mtime +$RETENTION_DAYS -delete
-find "$BACKUP_DIR" -name "env_*.bak" -mtime +$RETENTION_DAYS -delete
-
-echo "[$(date)] Backup completed successfully: db_$TIMESTAMP.sql"
+RETENTION_DAYS=30 ./deploy/backup.sh
 ```
 
+該腳本以 `umask 077` 執行，因此資料庫匯出檔案僅限執行者本人可讀。請勿改用自行撰寫的腳本：若沒有 `umask 077`，在預設的 `umask 022` 下產生的 `db_*.sql` 將是全域可讀的（`-rw-r--r--`），而該檔案包含你的全部應用資料表。
+
+還原資料庫匯出檔案：
+
 ```bash
-chmod +x ~/insforge/backup.sh
+cd ~/insforge
+set -a && source .env && set +a
+cat backups/db_YYYYMMDD_HHMMSS.sql | docker compose exec -T postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"
 ```
 
 #### 17.2 使用 Cron 排程
@@ -1033,10 +1022,10 @@ chmod +x ~/insforge/backup.sh
 crontab -e
 ```
 
-新增以下這一行，讓每天凌晨 3:00 執行備份：
+新增以下這一行，讓每天凌晨 3:00 執行備份（若你的安裝位於其他位置，請調整路徑）：
 
 ```cron
-0 3 * * * /home/deploy/insforge/backup.sh >> /home/deploy/insforge/backups/cron.log 2>&1
+0 3 * * * /home/deploy/insforge/deploy/backup.sh >> /home/deploy/insforge/backups/cron.log 2>&1
 ```
 
 #### 17.3 異地備份（建議）
@@ -1115,7 +1104,8 @@ docker stats --no-stream          # Resource usage
 
 # ── Database (source .env first for vars) ────
 source ~/insforge/.env
-docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" > backup.sql  # Backup
+./deploy/backup.sh                                                                              # Backup (db + .env)
+docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" > backup.sql  # Manual backup
 cat backup.sql | docker compose exec -T postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"  # Restore
 
 # ── Updates ───────────────────────────────────
