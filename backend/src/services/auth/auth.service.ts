@@ -32,6 +32,7 @@ import {
 import { AppError } from '@/utils/errors.js';
 import { NEXT_ACTIONS } from '@/utils/next-actions.js';
 import { EmailService } from '@/services/email/email.service.js';
+import { SmsService } from '@/services/sms/sms.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
@@ -308,7 +309,7 @@ export class AuthService {
     const user = this.transformUserRecordToSchema(dbUser);
     const accessToken = this.tokenManager.generateAccessToken({
       sub: dbUser.id,
-      email: dbUser.email,
+      email: dbUser.email ?? undefined,
       role: 'authenticated',
     });
 
@@ -464,7 +465,153 @@ export class AuthService {
     const user = this.transformUserRecordToSchema(dbUser);
     const accessToken = this.tokenManager.generateAccessToken({
       sub: dbUser.id,
-      email: dbUser.email,
+      email: dbUser.email ?? undefined,
+      role: 'authenticated',
+    });
+
+    return { user, accessToken };
+  }
+
+  /**
+   * Send a sign-in OTP over SMS.
+   *
+   * Same anti-enumeration stance as sendSignInOTP: no user lookup, identical
+   * flow for existing and unknown phone numbers. The challenge reuses the
+   * email OTP storage keyed on the E.164 phone number — phone identifiers can
+   * never collide with email identifiers, so the machinery is shared as-is.
+   */
+  async sendPhoneSignInOTP(phone: string): Promise<void> {
+    const { otp } = await AuthOTPService.getInstance().createEmailOTP(
+      phone,
+      OTPPurpose.SIGN_IN,
+      OTPType.NUMERIC_CODE,
+      { expiresInMinutes: 5 }
+    );
+
+    await SmsService.getInstance().sendSignInCode(phone, otp);
+  }
+
+  /**
+   * Verify a phone OTP and create a session.
+   *
+   * Mirrors signInWithOTP keyed on phone_number. One deliberate divergence:
+   * no password-clearing conversion. An account can only hold a phone number
+   * through this flow (there is no phone-change flow yet), and proving phone
+   * ownership must not weaken an email+password credential.
+   */
+  async signInWithPhoneOTP(
+    phone: string,
+    verificationCode: string,
+    name?: string
+  ): Promise<CreateSessionResponse> {
+    const { disableSignup } = await AuthConfigService.getInstance().getAuthConfig();
+
+    // AuthOTPService owns the transaction: the code is consumed atomically with
+    // the user creation/lookup below, and the persisted attempt counter is
+    // committed even when verification fails.
+    const outcome = await AuthOTPService.getInstance().consumeNumericOTP(
+      phone,
+      OTPPurpose.SIGN_IN,
+      verificationCode,
+      async (client): Promise<{ blocked: true } | { userId: string }> => {
+        // phone_number is stored normalized (E.164) and UNIQUE, so a direct
+        // equality lookup is enough — no case-variant handling like email.
+        let existingUser = await client.query(
+          `SELECT id, phone_verified
+           FROM auth.users
+           WHERE phone_number = $1
+           LIMIT 1
+           FOR UPDATE`,
+          [phone]
+        );
+
+        let userId: string | undefined;
+        if (!existingUser.rows.length) {
+          // The code is already consumed. Signal a blocked signup so the caller
+          // rejects after the transaction commits — keeping the send path
+          // uniform and avoiding an account-enumeration timing leak.
+          if (disableSignup) {
+            return { blocked: true };
+          }
+
+          const proposedUserId = crypto.randomUUID();
+          const profile = JSON.stringify(name ? { name } : {});
+          const createdUser = await client.query(
+            `INSERT INTO auth.users (
+               id, email, password, profile, phone_number, phone_verified, created_at, updated_at
+             )
+             VALUES ($1, NULL, NULL, $2::jsonb, $3, true, NOW(), NOW())
+             ON CONFLICT (phone_number) DO NOTHING
+             RETURNING id`,
+            [proposedUserId, profile, phone]
+          );
+
+          if (createdUser.rows.length) {
+            userId = createdUser.rows[0].id;
+          } else {
+            existingUser = await client.query(
+              `SELECT id, phone_verified
+               FROM auth.users
+               WHERE phone_number = $1
+               LIMIT 1
+               FOR UPDATE`,
+              [phone]
+            );
+          }
+        }
+
+        if (!userId && existingUser.rows.length) {
+          const dbUser = existingUser.rows[0];
+          userId = dbUser.id;
+
+          if (!dbUser.phone_verified) {
+            await client.query(
+              `UPDATE auth.users
+               SET phone_verified = true, updated_at = NOW()
+               WHERE id = $1`,
+              [userId]
+            );
+          }
+        }
+
+        if (!userId) {
+          throw new Error('User not found after concurrent OTP sign-in');
+        }
+
+        await client.query(
+          `INSERT INTO auth.user_providers (
+             user_id, provider, provider_account_id, provider_data, created_at, updated_at
+           )
+           VALUES ($1, 'phone', $2, '{"method":"otp"}'::jsonb, NOW(), NOW())
+           ON CONFLICT (provider, provider_account_id)
+           DO UPDATE SET
+             provider_data = EXCLUDED.provider_data,
+             updated_at = NOW()
+           WHERE auth.user_providers.user_id = EXCLUDED.user_id`,
+          [userId, phone]
+        );
+
+        return { userId };
+      }
+    );
+
+    if ('blocked' in outcome) {
+      throw new AppError(
+        'User signups are disabled for this project.',
+        403,
+        ERROR_CODES.AUTH_SIGNUP_DISABLED
+      );
+    }
+
+    const dbUser = await this.getUserById(outcome.userId);
+    if (!dbUser) {
+      throw new AppError('Failed to complete sign-in', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+
+    const user = this.transformUserRecordToSchema(dbUser);
+    const accessToken = this.tokenManager.generateAccessToken({
+      sub: dbUser.id,
+      email: dbUser.email ?? undefined,
       role: 'authenticated',
     });
 
@@ -575,7 +722,7 @@ export class AuthService {
     const user = this.transformUserRecordToSchema(dbUser);
     const accessToken = this.tokenManager.generateAccessToken({
       sub: dbUser.id,
-      email: dbUser.email,
+      email: dbUser.email ?? undefined,
       role: 'authenticated',
     });
 
@@ -630,7 +777,7 @@ export class AuthService {
       const user = this.transformUserRecordToSchema(dbUser);
       const accessToken = this.tokenManager.generateAccessToken({
         sub: dbUser.id,
-        email: dbUser.email,
+        email: dbUser.email ?? undefined,
         role: 'authenticated',
       });
 
@@ -906,7 +1053,7 @@ export class AuthService {
       const user = this.transformUserRecordToSchema(dbUser);
       const accessToken = this.tokenManager.generateAccessToken({
         sub: user.id,
-        email: user.email,
+        email: user.email ?? undefined,
         role: 'authenticated',
       });
 
@@ -1047,6 +1194,8 @@ export class AuthService {
         id: userId,
         email,
         emailVerified: true,
+        phone: null,
+        phoneVerified: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         profile: { name: userName, avatar_url: avatarUrl },
@@ -1397,6 +1546,8 @@ export class AuthService {
         u.profile,
         u.metadata,
         u.email_verified,
+        u.phone_number,
+        u.phone_verified,
         u.is_anonymous,
         u.created_at,
         u.updated_at,
@@ -1426,6 +1577,8 @@ export class AuthService {
         u.profile,
         u.metadata,
         u.email_verified,
+        u.phone_number,
+        u.phone_verified,
         u.is_anonymous,
         u.created_at,
         u.updated_at,
@@ -1468,6 +1621,8 @@ export class AuthService {
       id: dbUser.id,
       email: dbUser.email,
       emailVerified: dbUser.email_verified,
+      phone: dbUser.phone_number,
+      phoneVerified: dbUser.phone_verified,
       createdAt: dbUser.created_at,
       updatedAt: dbUser.updated_at,
       providers: providers,
@@ -1492,6 +1647,8 @@ export class AuthService {
         u.profile,
         u.metadata,
         u.email_verified,
+        u.phone_number,
+        u.phone_verified,
         u.is_anonymous,
         u.created_at,
         u.updated_at,
@@ -1505,8 +1662,8 @@ export class AuthService {
     const params: (string | number)[] = [];
 
     if (search) {
-      query += ` AND (u.email LIKE $1 OR u.profile->>'name' LIKE $2)`;
-      params.push(`%${search}%`, `%${search}%`);
+      query += ` AND (u.email LIKE $1 OR u.profile->>'name' LIKE $2 OR u.phone_number LIKE $3)`;
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     query += ` GROUP BY u.id ORDER BY u.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
@@ -1523,8 +1680,8 @@ export class AuthService {
       'SELECT COUNT(*) as count FROM auth.users WHERE is_anonymous = false AND is_project_admin = false';
     const countParams: string[] = [];
     if (search) {
-      countQuery += ` AND (email LIKE $1 OR profile->>'name' LIKE $2)`;
-      countParams.push(`%${search}%`, `%${search}%`);
+      countQuery += ` AND (email LIKE $1 OR profile->>'name' LIKE $2 OR phone_number LIKE $3)`;
+      countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
     const countResult = await pool.query(countQuery, countParams);
     const count = countResult.rows[0].count;

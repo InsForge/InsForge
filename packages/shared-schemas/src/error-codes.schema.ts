@@ -86,6 +86,12 @@ const emailErrorCodes = [
   'EMAIL_TEMPLATE_NOT_FOUND',
 ] as const;
 
+const smsErrorCodes = [
+  'SMS_PROVIDER_NOT_CONFIGURED',
+  'SMS_PROVIDER_CONNECTION_FAILED',
+  'SMS_SEND_FAILED',
+] as const;
+
 const deploymentErrorCodes = [
   'DEPLOYMENT_ALREADY_EXISTS',
   'DEPLOYMENT_INVALID_FILE',
@@ -144,6 +150,7 @@ const errorCodeValues = [
   ...computeErrorCodes,
   ...billingErrorCodes,
   ...emailErrorCodes,
+  ...smsErrorCodes,
   ...deploymentErrorCodes,
   ...docsErrorCodes,
   ...functionErrorCodes,

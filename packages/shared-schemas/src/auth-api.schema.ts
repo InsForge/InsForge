@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   emailSchema,
+  phoneSchema,
   passwordSchema,
   nameSchema,
   usernameSchema,
@@ -14,6 +15,8 @@ import {
   customOAuthConfigSchema,
   customOAuthKeySchema,
   smtpConfigSchema,
+  smsConfigSchema,
+  smsProviderSchema,
   emailTemplateSchema,
 } from './auth.schema.js';
 
@@ -60,13 +63,14 @@ const passwordSessionRequestSchema = z.object({
 
 const otpSessionRequestSchema = z.object({
   method: z.literal('otp'),
-  email: emailSchema,
+  email: emailSchema.optional(),
+  phone: phoneSchema.optional(),
   otp: sixDigitCodeSchema('OTP code'),
   name: nameSchema.optional(),
 });
 
 export const createSessionRequestSchema = z.preprocess(
-  (value) => {
+  (value, ctx) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return value;
     }
@@ -76,6 +80,33 @@ export const createSessionRequestSchema = z.preprocess(
     const record = value as Record<string, unknown>;
     if (record.method === undefined || record.method === null) {
       return { ...record, method: 'password' };
+    }
+
+    // The OTP arm is keyed on exactly one of email or phone. The check lives
+    // here (not a refinement on the union) so that a request missing both
+    // still reports `email: Required` alongside the arm's own field errors,
+    // preserving the pre-phone error contract for email OTP clients.
+    if (record.method === 'otp') {
+      const hasEmail = record.email !== undefined && record.email !== null;
+      const hasPhone = record.phone !== undefined && record.phone !== null;
+      if (!hasEmail && !hasPhone) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['email'], message: 'Required' });
+      } else if (hasEmail && hasPhone) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Provide exactly one of email or phone',
+        });
+      } else if (record.email === null || record.phone === null) {
+        // Clients that serialize the unused identifier as null (rather than
+        // omitting it) were accepted before phone existed — keep that working
+        // by dropping the null key before .optional() rejects it.
+        const { email, phone, ...rest } = record;
+        return {
+          ...rest,
+          ...(email === null ? {} : { email }),
+          ...(phone === null ? {} : { phone }),
+        };
+      }
     }
 
     return value;
@@ -115,6 +146,13 @@ export const idTokenSignInRequestSchema = z.discriminatedUnion('provider', [
  */
 export const sendOTPRequestSchema = z.object({
   email: emailSchema,
+});
+
+/**
+ * POST /api/auth/phone/send-otp - Send a sign-in OTP over SMS
+ */
+export const sendPhoneOTPRequestSchema = z.object({
+  phone: phoneSchema,
 });
 
 /**
@@ -537,6 +575,84 @@ export const upsertSmtpConfigRequestSchema = z
 export const getSmtpConfigResponseSchema = smtpConfigSchema;
 
 // ============================================================================
+// SMS Configuration schemas
+// ============================================================================
+
+/**
+ * PUT /api/auth/sms-config - Upsert Custom SMS configuration
+ * Mirrors upsertSmtpConfigRequestSchema: authToken is write-only and may be
+ * omitted to keep the stored credential.
+ */
+export const upsertSmsConfigRequestSchema = z
+  .object({
+    enabled: z.boolean(),
+    provider: smsProviderSchema.default('twilio'),
+    accountSid: z.string().trim().default(''),
+    authToken: z.string().min(1, 'Auth token is required').optional(),
+    fromNumber: z.string().trim().default(''),
+    messagingServiceSid: z.string().trim().default(''),
+    minIntervalSeconds: z.number().int().min(0).default(60),
+    otpMessageTemplate: z
+      .string()
+      .trim()
+      .min(1)
+      .max(320, 'Message template must be at most 320 characters')
+      .default('Your verification code is {{ code }}. It expires in 5 minutes.'),
+  })
+  .superRefine((data, ctx) => {
+    // When disabling custom SMS, allow saving without filling in provider fields —
+    // the user is opting out, so those values are irrelevant.
+    if (!data.enabled) {
+      return;
+    }
+    // A template without the placeholder would send messages with no code in
+    // them — reject for every provider, console included.
+    if (!/\{\{\s*code\s*\}\}/.test(data.otpMessageTemplate)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['otpMessageTemplate'],
+        message: 'Message template must contain the {{ code }} placeholder',
+      });
+    }
+    if (data.provider === 'console') {
+      return;
+    }
+    if (!/^AC[0-9a-fA-F]{32}$/.test(data.accountSid)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['accountSid'],
+        message: 'Account SID must be "AC" followed by 32 hex characters',
+      });
+    }
+    if (!data.fromNumber && !data.messagingServiceSid) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['fromNumber'],
+        message: 'A from number or messaging service SID is required',
+      });
+    }
+    if (data.fromNumber && !phoneSchema.safeParse(data.fromNumber).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['fromNumber'],
+        message: 'From number must be in E.164 format (e.g. +15551234567)',
+      });
+    }
+    if (data.messagingServiceSid && !/^MG[0-9a-fA-F]{32}$/.test(data.messagingServiceSid)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['messagingServiceSid'],
+        message: 'Messaging service SID must be "MG" followed by 32 hex characters',
+      });
+    }
+  });
+
+/**
+ * Response for GET /api/auth/sms-config
+ */
+export const getSmsConfigResponseSchema = smsConfigSchema;
+
+// ============================================================================
 // Email Template schemas
 // ============================================================================
 
@@ -582,6 +698,7 @@ export type CreateSessionRequest =
   | OTPSessionRequest;
 export type IdTokenSignInRequest = z.infer<typeof idTokenSignInRequestSchema>;
 export type SendOTPRequest = z.infer<typeof sendOTPRequestSchema>;
+export type SendPhoneOTPRequest = z.infer<typeof sendPhoneOTPRequestSchema>;
 export type CreateAdminSessionRequest = z.infer<typeof createAdminSessionRequestSchema>;
 export type RefreshSessionRequest = z.infer<typeof refreshSessionRequestSchema>;
 export type ListUsersRequest = z.infer<typeof listUsersRequestSchema>;
@@ -649,5 +766,7 @@ export type UpdateCustomOAuthConfigRequest = z.infer<typeof updateCustomOAuthCon
 export type ListCustomOAuthConfigsResponse = z.infer<typeof listCustomOAuthConfigsResponseSchema>;
 export type UpsertSmtpConfigRequest = z.infer<typeof upsertSmtpConfigRequestSchema>;
 export type GetSmtpConfigResponse = z.infer<typeof getSmtpConfigResponseSchema>;
+export type UpsertSmsConfigRequest = z.infer<typeof upsertSmsConfigRequestSchema>;
+export type GetSmsConfigResponse = z.infer<typeof getSmsConfigResponseSchema>;
 export type UpdateEmailTemplateRequest = z.infer<typeof updateEmailTemplateRequestSchema>;
 export type ListEmailTemplatesResponse = z.infer<typeof listEmailTemplatesResponseSchema>;

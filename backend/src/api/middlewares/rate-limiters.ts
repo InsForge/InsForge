@@ -2,7 +2,7 @@ import rateLimit from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { ERROR_CODES, emailSchema, phoneSchema } from '@insforge/shared-schemas';
 
 /**
  * Store for tracking per-email cooldowns
@@ -178,12 +178,14 @@ export const idTokenSignInRateLimiter = rateLimit({
  */
 export const perEmailCooldown = (cooldownMs: number = 60000) => {
   return (req: Request, _res: Response, next: NextFunction) => {
-    const email = req.body?.email?.toLowerCase();
-
-    if (!email) {
-      // If no email in body, let it pass (will be caught by validation)
+    // Key only values that will pass validation. Anything else falls through
+    // to the handler's 400 without touching the cooldown store, so garbage in
+    // the email field can never set (or poison) a cooldown key.
+    const parsed = emailSchema.safeParse(req.body?.email);
+    if (!parsed.success) {
       return next();
     }
+    const email = parsed.data;
 
     const now = Date.now();
     const lastRequest = emailCooldowns.get(email);
@@ -212,6 +214,75 @@ export const perEmailCooldown = (cooldownMs: number = 60000) => {
 export const sendEmailOTPLimiter = [
   sendEmailOTPRateLimiter,
   perEmailCooldown(60000), // 60 second cooldown per email
+];
+
+/**
+ * Per-IP rate limiter for SMS otp requests — same limits as the email
+ * equivalent (5 requests per 15 minutes, counting successes and failures).
+ */
+export const sendSmsOTPRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many send SMS verification requests from this IP. Please try again in 15 minutes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+  // Count all requests (both successes and failures) to prevent resource exhaustion and enumeration
+  skipSuccessfulRequests: false,
+  skipFailedRequests: false,
+});
+
+/**
+ * Enforces minimum time between requests for the same phone number.
+ * Shares the cooldown store with perEmailCooldown — E.164 keys (always
+ * `+`-prefixed) cannot collide with lowercased email keys, and sharing keeps
+ * one cleanup lifecycle.
+ */
+export const perPhoneCooldown = (cooldownMs: number = 60000) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    // Key only valid, trimmed E.164 values (see perEmailCooldown). Validated
+    // emails always contain '@' and validated phones never do, so the two
+    // key namespaces sharing this store provably cannot collide.
+    const parsed = phoneSchema.safeParse(req.body?.phone);
+    if (!parsed.success) {
+      return next();
+    }
+    const phone = parsed.data;
+
+    const now = Date.now();
+    const lastRequest = emailCooldowns.get(phone);
+
+    if (lastRequest && now - lastRequest < cooldownMs) {
+      const remainingMs = cooldownMs - (now - lastRequest);
+      const remainingSec = Math.ceil(remainingMs / 1000);
+
+      throw new AppError(
+        `Please wait ${remainingSec} seconds before requesting another code for this phone number`,
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      );
+    }
+
+    // Update last request time
+    emailCooldowns.set(phone, now);
+    next();
+  };
+};
+
+/**
+ * Combined rate limiter for sending SMS otp requests
+ * Applies both per-IP and per-phone limits
+ */
+export const sendSmsOTPLimiter = [
+  sendSmsOTPRateLimiter,
+  perPhoneCooldown(60000), // 60 second cooldown per phone number
 ];
 
 /**
