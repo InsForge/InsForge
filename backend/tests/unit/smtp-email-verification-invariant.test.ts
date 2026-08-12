@@ -29,7 +29,7 @@ vi.mock('../../src/infra/config/app.config', () => ({
 
 vi.mock('../../src/utils/environment', () => ({
   isCloudEnvironment: mockIsCloudEnvironment,
-  isCloudProject: mockIsCloudEnvironment,
+  cloudProjectId: () => (mockIsCloudEnvironment() ? 'proj-1' : null),
 }));
 
 vi.mock('../../src/utils/logger', () => ({

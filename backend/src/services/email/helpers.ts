@@ -5,12 +5,12 @@ import { AppError } from '@/utils/errors.js';
 import { NEXT_ACTIONS } from '@/utils/next-actions.js';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
-import { isCloudProject } from '@/utils/environment.js';
+import { cloudProjectId } from '@/utils/environment.js';
 
 const EMAIL_PROVIDER_CONFIGURATION_LOCK_ID = 1869573991;
 
 export function hasManagedEmailProvider(): boolean {
-  return isCloudProject() && !!appConfig.app.jwtSecret;
+  return !!cloudProjectId() && !!appConfig.app.jwtSecret;
 }
 
 export async function lockEmailProviderConfiguration(client: PoolClient): Promise<void> {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
@@ -16,7 +16,6 @@ const setTokenMock = vi.fn();
 vi.mock('../../src/services/webscraper/webscraper.service', () => ({
   WebscraperService: {
     getInstance: () => ({ setApifyToken: setTokenMock }),
-    isSelfHosted: () => !configMock.cloud.projectId || configMock.cloud.projectId === 'local',
   },
 }));
 
@@ -41,10 +40,21 @@ function app() {
   return a;
 }
 
+const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+
+afterAll(() => {
+  if (savedProfile === undefined) {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+  } else {
+    process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+  }
+});
+
 describe('webscraper config routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     configMock.cloud.projectId = undefined;
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
   });
 
   it('stores a submitted token', async () => {
@@ -68,6 +78,7 @@ describe('webscraper config routes', () => {
   });
 
   it('refuses config routes on cloud projects', async () => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     configMock.cloud.projectId = '77777777-7777-7777-7777-777777777777';
 
     const put = await request(app())

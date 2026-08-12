@@ -174,24 +174,17 @@ describe('CloudComputeProvider', () => {
     });
   });
 
-  it('surfaces COMPUTE_NOT_CONFIGURED when config is missing (not masked as CLOUD_UNAVAILABLE)', async () => {
-    const { AppError } = await import('@/utils/errors.js');
+  // The catch-all around fetch used to swallow this into COMPUTE_CLOUD_UNAVAILABLE,
+  // which reads as "the cloud is down" when the real answer is "this instance has no
+  // business calling it".
+  it('surfaces COMPUTE_NOT_CONFIGURED off cloud, not masked as CLOUD_UNAVAILABLE', async () => {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
     const provider = CloudComputeProvider.getInstance();
 
-    // Force signToken to throw COMPUTE_NOT_CONFIGURED, as it would when isConfigured() is false
-    vi.spyOn(provider as unknown as { signToken: () => string }, 'signToken').mockImplementation(
-      () => {
-        throw new AppError(
-          'Cloud compute not configured (need PROJECT_ID, CLOUD_API_HOST, JWT_SECRET)',
-          500,
-          ERROR_CODES.COMPUTE_NOT_CONFIGURED
-        );
-      }
-    );
-
-    await expect(provider.createApp({ name: 't' })).rejects.toThrow(
-      /COMPUTE_NOT_CONFIGURED|not configured/
-    );
+    await expect(provider.createApp({ name: 't' })).rejects.toMatchObject({
+      code: ERROR_CODES.COMPUTE_NOT_CONFIGURED,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

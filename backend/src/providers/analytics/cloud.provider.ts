@@ -1,7 +1,7 @@
-import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { appConfig } from '@/infra/config/app.config.js';
-import { isCloudProject } from '@/utils/environment.js';
+import { cloudProjectId } from '@/utils/environment.js';
+import { signCloudToken } from '@/utils/cloud-sign.js';
 import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
@@ -39,7 +39,7 @@ export class CloudAnalyticsProvider implements AnalyticsProvider {
   }
 
   private isEnabled(): boolean {
-    return isCloudProject();
+    return !!cloudProjectId();
   }
 
   private throwUnsupported(): never {
@@ -50,28 +50,8 @@ export class CloudAnalyticsProvider implements AnalyticsProvider {
     );
   }
 
-  private signToken(): string {
-    const projectId = appConfig.cloud.projectId;
-    const secret = appConfig.app.jwtSecret;
-    if (!projectId || projectId === 'local') {
-      throw new AppError(
-        'PROJECT_ID not configured; cannot reach cloud backend.',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-    if (!secret) {
-      throw new AppError(
-        'JWT_SECRET not configured; cannot sign cloud token.',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-    return jwt.sign({ sub: projectId }, secret, { expiresIn: '10m' });
-  }
-
   private headers() {
-    return { Authorization: `Bearer ${this.signToken()}` };
+    return { Authorization: `Bearer ${signCloudToken('Cloud analytics')}` };
   }
 
   private url(path: string): string {

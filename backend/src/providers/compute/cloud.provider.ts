@@ -1,6 +1,6 @@
-import jwt from 'jsonwebtoken';
 import { appConfig } from '@/infra/config/app.config.js';
-import { isCloudProject } from '@/utils/environment.js';
+import { cloudProjectId } from '@/utils/environment.js';
+import { signCloudToken } from '@/utils/cloud-sign.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
@@ -29,7 +29,7 @@ export class CloudComputeProvider implements ComputeProvider {
   }
 
   isConfigured(): boolean {
-    return isCloudProject() && !!appConfig.cloud?.apiHost && !!appConfig.app?.jwtSecret;
+    return !!cloudProjectId() && !!appConfig.cloud?.apiHost && !!appConfig.app?.jwtSecret;
   }
 
   // Cloud mode is Fly behind a control plane and shares Fly's app/machine
@@ -62,19 +62,6 @@ export class CloudComputeProvider implements ComputeProvider {
     return 'host';
   }
 
-  private signToken(): string {
-    if (!this.isConfigured()) {
-      throw new AppError(
-        'Cloud compute is only available on InsForge Cloud projects (needs PROJECT_ID, CLOUD_API_HOST, JWT_SECRET).',
-        500,
-        ERROR_CODES.COMPUTE_NOT_CONFIGURED
-      );
-    }
-    return jwt.sign({ sub: appConfig.cloud.projectId }, appConfig.app.jwtSecret, {
-      expiresIn: '10m',
-    });
-  }
-
   private url(path: string): string {
     return `${appConfig.cloud.apiHost}/projects/v1/${appConfig.cloud.projectId}/compute${path}`;
   }
@@ -82,7 +69,7 @@ export class CloudComputeProvider implements ComputeProvider {
   private async call<T>(method: string, path: string, body?: unknown): Promise<T | undefined> {
     // signToken throws AppError(COMPUTE_NOT_CONFIGURED) if config missing —
     // we want that to surface to the caller, not get masked as CLOUD_UNAVAILABLE.
-    const sign = this.signToken();
+    const sign = signCloudToken('Cloud compute', ERROR_CODES.COMPUTE_NOT_CONFIGURED);
 
     let response: Response;
     try {

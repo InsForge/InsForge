@@ -1,7 +1,6 @@
 import {
   isCloudEnvironment,
-  isCloudProject,
-  isOAuthSharedKeysAvailable,
+  cloudProjectId,
   isDevelopment,
   isProduction,
 } from '../../src/utils/environment';
@@ -27,14 +26,6 @@ describe('Environment utils', () => {
   it('isCloudEnvironment returns false if AWS_INSTANCE_PROFILE_NAME is missing', () => {
     delete process.env.AWS_INSTANCE_PROFILE_NAME;
     expect(isCloudEnvironment()).toBe(false);
-  });
-
-  it('isOAuthSharedKeysAvailable returns same as isCloudEnvironment', () => {
-    process.env.AWS_INSTANCE_PROFILE_NAME = 'profile';
-    expect(isOAuthSharedKeysAvailable()).toBe(true);
-
-    delete process.env.AWS_INSTANCE_PROFILE_NAME;
-    expect(isOAuthSharedKeysAvailable()).toBe(false);
   });
 
   it('isDevelopment works correctly', () => {
@@ -64,7 +55,7 @@ describe('Environment utils', () => {
 
   // A PaaS template that sets PROJECT_ID (Zeabur does) is still a self-host, so the
   // project id alone must not answer this.
-  describe('isCloudProject', () => {
+  describe('cloudProjectId', () => {
     let savedProjectId: string | undefined;
 
     beforeEach(() => {
@@ -78,20 +69,20 @@ describe('Environment utils', () => {
     });
 
     it('needs the infrastructure marker as well as a project id', () => {
-      expect(isCloudProject()).toBe(false);
+      expect(cloudProjectId()).toBeNull();
 
       process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
-      expect(isCloudProject()).toBe(true);
+      expect(cloudProjectId()).toBe('77777777-7777-7777-7777-777777777777');
     });
 
-    it('is false on our infrastructure without a usable project id', () => {
+    it('is null on our infrastructure without a usable project id', () => {
       process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
 
       appConfig.cloud.projectId = undefined;
-      expect(isCloudProject()).toBe(false);
+      expect(cloudProjectId()).toBeNull();
 
       appConfig.cloud.projectId = 'local';
-      expect(isCloudProject()).toBe(false);
+      expect(cloudProjectId()).toBeNull();
     });
   });
 });

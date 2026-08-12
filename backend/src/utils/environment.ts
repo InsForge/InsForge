@@ -13,20 +13,19 @@ export function isCloudEnvironment(): boolean {
 }
 
 /**
- * Whether this is an InsForge Cloud project: our infrastructure, with a project to act
- * for. A project id alone is not enough — PaaS templates set PROJECT_ID too.
+ * The project this instance acts for on InsForge Cloud, or null when there is none.
+ *
+ * A project id alone does not mean cloud — PaaS templates set PROJECT_ID too — so this
+ * is the only place the two facts are combined. Callers that need the id and callers
+ * choosing between a cloud and a local provider ask the same question, so they ask it
+ * the same way.
  */
-export function isCloudProject(): boolean {
+export function cloudProjectId(): string | null {
   const projectId = appConfig.cloud?.projectId;
-  return isCloudEnvironment() && !!projectId && projectId !== 'local';
-}
-
-/**
- * Check if the application can use shared OAuth keys
- * This is typically enabled in cloud environments to avoid storing secrets
- */
-export function isOAuthSharedKeysAvailable(): boolean {
-  return isCloudEnvironment();
+  if (!isCloudEnvironment() || !projectId || projectId === 'local') {
+    return null;
+  }
+  return projectId;
 }
 
 /**

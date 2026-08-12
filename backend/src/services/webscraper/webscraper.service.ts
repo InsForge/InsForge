@@ -1,4 +1,4 @@
-import { isCloudProject } from '@/utils/environment.js';
+import { cloudProjectId } from '@/utils/environment.js';
 import type { WebscraperProvider } from '@/providers/webscraper/base.provider.js';
 import { CloudWebscraperProvider } from '@/providers/webscraper/cloud.provider.js';
 import { LocalWebscraperProvider } from '@/providers/webscraper/local.provider.js';
@@ -25,12 +25,8 @@ export class WebscraperService {
     return WebscraperService.instance;
   }
 
-  static isSelfHosted(): boolean {
-    return !isCloudProject();
-  }
-
   private provider(): WebscraperProvider {
-    return WebscraperService.isSelfHosted() ? this.local : this.cloud;
+    return cloudProjectId() ? this.cloud : this.local;
   }
 
   getApifyConnection() {

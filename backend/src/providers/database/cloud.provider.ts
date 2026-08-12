@@ -1,8 +1,7 @@
-import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { z } from 'zod';
 import { appConfig } from '@/infra/config/app.config.js';
-import { isCloudProject } from '@/utils/environment.js';
+import { signCloudToken } from '@/utils/cloud-sign.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { DatabaseProvider, DatabaseConnectionInfo, DatabasePasswordInfo } from './base.provider.js';
@@ -45,36 +44,10 @@ export class CloudDatabaseProvider implements DatabaseProvider {
   }
 
   /**
-   * Generate JWT sign token for cloud API authentication
-   */
-  private generateSignToken(): string {
-    const projectId = appConfig.cloud.projectId;
-    const jwtSecret = appConfig.app.jwtSecret;
-
-    if (!isCloudProject()) {
-      throw new AppError(
-        'Cloud database credentials are only available on InsForge Cloud projects.',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
-    if (!jwtSecret) {
-      throw new AppError(
-        'JWT_SECRET is not configured. Cannot generate sign token.',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
-    return jwt.sign({ sub: projectId }, jwtSecret, { expiresIn: '10m' });
-  }
-
-  /**
    * Get database connection string from cloud backend
    */
   async getDatabaseConnectionString(): Promise<DatabaseConnectionInfo> {
-    const signToken = this.generateSignToken();
+    const signToken = signCloudToken('Cloud database access');
     const url = `${appConfig.cloud.apiHost}/projects/v1/${appConfig.cloud.projectId}/database-connection-string`;
 
     try {
@@ -118,7 +91,7 @@ export class CloudDatabaseProvider implements DatabaseProvider {
    * Get database password from cloud backend
    */
   async getDatabasePassword(): Promise<DatabasePasswordInfo> {
-    const signToken = this.generateSignToken();
+    const signToken = signCloudToken('Cloud database access');
     const url = `${appConfig.cloud.apiHost}/projects/v1/${appConfig.cloud.projectId}/database-password`;
 
     try {
