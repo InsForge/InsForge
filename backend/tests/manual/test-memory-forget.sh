@@ -17,6 +17,10 @@ SCOPE_A="test-forget-a-$$"
 SCOPE_B="test-forget-b-$$"
 GHOST_ID="99999999-9999-4999-8999-999999999999"
 
+# Every curl below carries --max-time, so a hung backend cannot stall the run,
+# and so the exit-path cleanup stays bounded while it has INT/TERM ignored.
+CURL_TIMEOUT=30
+
 # The memory routes are behind verifyApiKey, not admin JWT.
 echo "🔑 Getting API key..."
 api_key=$(get_admin_api_key)
@@ -24,7 +28,7 @@ api_key=$(get_admin_api_key)
 if [ -z "$api_key" ]; then
     admin_token=$(get_admin_token)
     if [ -n "$admin_token" ]; then
-        api_key_response=$(curl -s "$API_BASE/metadata/api-key" \
+        api_key_response=$(curl -s --max-time "$CURL_TIMEOUT" "$API_BASE/metadata/api-key" \
             -H "Authorization: Bearer $admin_token")
         api_key=$(echo "$api_key_response" | grep -o '"apiKey":"[^"]*' | cut -d'"' -f4 || true)
     fi
@@ -38,10 +42,6 @@ print_success "Got API key"
 echo ""
 
 # Helpers ---------------------------------------------------------------------
-
-# --max-time so a hung backend cannot stall the run, and so the exit-path
-# cleanup below stays bounded while it has INT/TERM ignored.
-CURL_TIMEOUT=30
 
 # memory_post <endpoint> <json> -> body on stdout
 memory_post() {
@@ -278,7 +278,7 @@ echo ""
 # 7. Auth ---------------------------------------------------------------------
 
 echo "📊 Test 7: the endpoint requires an API key..."
-noauth_status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$API_BASE/memory/forget" \
+noauth_status=$(curl -s --max-time "$CURL_TIMEOUT" -o /dev/null -w "%{http_code}" -X POST "$API_BASE/memory/forget" \
     -H "Content-Type: application/json" \
     -d "{\"scope\":\"$SCOPE_A\",\"ids\":[\"$GHOST_ID\"]}")
 
