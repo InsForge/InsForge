@@ -5,13 +5,19 @@ import type { ComputeCapabilitiesSchema } from '@insforge/shared-schemas';
 
 // The dialog reads capabilities through this hook; driving it directly keeps the
 // test about what the form offers rather than about react-query.
-const caps = vi.hoisted(() => ({ value: undefined as ComputeCapabilitiesSchema | undefined }));
+const caps = vi.hoisted(() => ({
+  value: undefined as ComputeCapabilitiesSchema | undefined,
+  askedFor: [] as (string | undefined)[],
+}));
 vi.mock('#features/compute/hooks/useComputeCapabilities', () => ({
-  useComputeCapabilities: () => ({
-    capabilities: caps.value,
-    provider: caps.value ? 'test' : undefined,
-    isLoading: false,
-  }),
+  useComputeCapabilities: (provider?: string) => {
+    caps.askedFor.push(provider);
+    return {
+      capabilities: caps.value,
+      provider: provider ?? (caps.value ? 'test' : undefined),
+      isLoading: false,
+    };
+  },
 }));
 
 // Radix's Select uses pointer-capture and scroll APIs jsdom does not implement.
@@ -52,7 +58,30 @@ async function fillAndSubmit(onCreate: ReturnType<typeof vi.fn>) {
 describe('CreateServiceDialog capability gating', () => {
   beforeEach(() => {
     caps.value = undefined;
+    caps.askedFor = [];
     vi.clearAllMocks();
+  });
+
+  // Providers coexist, and provider is the dashboard's navigation axis. Creating from
+  // Fly's page must ask Fly what it supports and tell the server to create there —
+  // otherwise the service lands on the default provider and the page that opened the
+  // dialog filters it straight out of its own list.
+  it('creates on the provider whose page it was opened from', async () => {
+    caps.value = FLY;
+    const onCreate = vi.fn().mockResolvedValue(undefined);
+    render(
+      <CreateServiceDialog
+        provider="fly"
+        open
+        onOpenChange={vi.fn()}
+        onCreate={onCreate}
+        isCreating={false}
+      />
+    );
+
+    expect(caps.askedFor).toContain('fly');
+    const payload = await fillAndSubmit(onCreate);
+    expect(payload.provider).toBe('fly');
   });
 
   // The operator's stored default, not the first mode in the list. Preselecting
@@ -62,7 +91,13 @@ describe('CreateServiceDialog capability gating', () => {
     caps.value = { ...DOCKER, defaultIngress: 'port' };
     const onCreate = vi.fn().mockResolvedValue(undefined);
     render(
-      <CreateServiceDialog open onOpenChange={vi.fn()} onCreate={onCreate} isCreating={false} />
+      <CreateServiceDialog
+        provider="test"
+        open
+        onOpenChange={vi.fn()}
+        onCreate={onCreate}
+        isCreating={false}
+      />
     );
 
     expect(screen.getByText('Published host port')).toBeTruthy();
@@ -76,7 +111,13 @@ describe('CreateServiceDialog capability gating', () => {
     caps.value = DOCKER;
     const onCreate = vi.fn().mockResolvedValue(undefined);
     render(
-      <CreateServiceDialog open onOpenChange={vi.fn()} onCreate={onCreate} isCreating={false} />
+      <CreateServiceDialog
+        provider="test"
+        open
+        onOpenChange={vi.fn()}
+        onCreate={onCreate}
+        isCreating={false}
+      />
     );
 
     const payload = await fillAndSubmit(onCreate);
@@ -89,7 +130,13 @@ describe('CreateServiceDialog capability gating', () => {
     caps.value = DOCKER;
     const onCreate = vi.fn().mockResolvedValue(undefined);
     render(
-      <CreateServiceDialog open onOpenChange={vi.fn()} onCreate={onCreate} isCreating={false} />
+      <CreateServiceDialog
+        provider="test"
+        open
+        onOpenChange={vi.fn()}
+        onCreate={onCreate}
+        isCreating={false}
+      />
     );
 
     expect(screen.queryByText('Region')).toBeNull();
@@ -104,7 +151,13 @@ describe('CreateServiceDialog capability gating', () => {
     const onCreate = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     render(
-      <CreateServiceDialog open onOpenChange={vi.fn()} onCreate={onCreate} isCreating={false} />
+      <CreateServiceDialog
+        provider="test"
+        open
+        onOpenChange={vi.fn()}
+        onCreate={onCreate}
+        isCreating={false}
+      />
     );
 
     expect(screen.getByText('Reachable from')).toBeTruthy();
@@ -131,7 +184,13 @@ describe('CreateServiceDialog capability gating', () => {
     caps.value = FLY;
     const onCreate = vi.fn().mockResolvedValue(undefined);
     render(
-      <CreateServiceDialog open onOpenChange={vi.fn()} onCreate={onCreate} isCreating={false} />
+      <CreateServiceDialog
+        provider="test"
+        open
+        onOpenChange={vi.fn()}
+        onCreate={onCreate}
+        isCreating={false}
+      />
     );
 
     expect(screen.getByText('Region')).toBeTruthy();
@@ -148,7 +207,13 @@ describe('CreateServiceDialog capability gating', () => {
     caps.value = undefined;
     const onCreate = vi.fn().mockResolvedValue(undefined);
     render(
-      <CreateServiceDialog open onOpenChange={vi.fn()} onCreate={onCreate} isCreating={false} />
+      <CreateServiceDialog
+        provider="test"
+        open
+        onOpenChange={vi.fn()}
+        onCreate={onCreate}
+        isCreating={false}
+      />
     );
 
     expect(screen.getByText('Region')).toBeTruthy();

@@ -1,9 +1,23 @@
 import { z } from 'zod';
-import { serviceSchema, cpuTierEnum, ingressModeEnum } from './compute-services.schema.js';
+import {
+  serviceSchema,
+  cpuTierEnum,
+  ingressModeEnum,
+  computeProviderEnum,
+} from './compute-services.schema.js';
 
 const envVarKeyRegex = /^[A-Z_][A-Z0-9_]*$/;
 
 export const createServiceSchema = z.object({
+  /**
+   * Which driver to create on. Omitted, the server uses its default — which is what
+   * the CLI does and what every caller did before providers could coexist.
+   *
+   * The dashboard sends it because provider is its navigation axis: creating from
+   * Fly's page must not put the service on Docker, where that page would then filter
+   * it out of its own list.
+   */
+  provider: computeProviderEnum.optional(),
   name: z
     .string()
     .min(1)

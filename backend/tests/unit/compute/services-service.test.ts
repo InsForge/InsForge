@@ -253,6 +253,47 @@ describe('ComputeServicesService', () => {
       expect(mockLaunchMachine.mock.calls[0][0].ingress).toBe('port');
     });
 
+    // Provider is the dashboard's navigation axis, so a create from Fly's page has to
+    // land on Fly even when Docker is the deployment default. Before this the service
+    // layer always used the default and the page filtered its own new service out.
+    it('creates on the provider the caller names, not the default', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+      mockCreateApp.mockResolvedValue({ appId: 'a' });
+      mockLaunchMachine.mockResolvedValue({ machineId: 'm1' });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 's1', provider: 'fly' }] });
+
+      await service.createService({
+        projectId: 'proj-123',
+        name: 'svc',
+        provider: 'fly',
+        imageUrl: 'nginx',
+        port: 80,
+        cpu: 'shared-1x',
+        memory: 256,
+        region: 'iad',
+      });
+
+      expect(mockCreateApp).toHaveBeenCalled();
+    });
+
+    // Silently swapping the driver would store a row that says one thing while the
+    // container runs somewhere else.
+    it('rejects a provider this deployment does not have', async () => {
+      await expect(
+        service.createService({
+          projectId: 'proj-123',
+          name: 'svc',
+          provider: 'docker',
+          imageUrl: 'nginx',
+          port: 80,
+          cpu: 'shared-1x',
+          memory: 256,
+          region: 'iad',
+        })
+      ).rejects.toThrow(/not configured on this deployment/i);
+      expect(mockCreateApp).not.toHaveBeenCalled();
+    });
+
     // On update, an omitted field means "leave it alone". Filling it in would turn
     // a metadata-only PATCH into a deploy change and call the provider needlessly.
     it('does not invent a scaleToZero change on an update that omits it', async () => {

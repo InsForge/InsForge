@@ -30,6 +30,11 @@ export interface CreateServiceInput {
   projectId: string;
   name: string;
   /**
+   * Driver to create on. Omitted, the deployment's default applies — the CLI and
+   * every pre-multi-driver caller.
+   */
+  provider?: ComputeProviderName;
+  /**
    * Image URL — image-mode (any registry) or source-mode (digest-pinned
    * registry.fly.io ref produced by the CLI's flyctl remote build + push).
    *
@@ -501,6 +506,28 @@ export class ComputeServicesService {
   }
 
   /**
+   * Driver a create should land on: the one the caller named, else the default.
+   *
+   * A named driver that is not configured is rejected rather than silently swapped —
+   * the caller asked for a specific place to run, and putting the container somewhere
+   * else is the kind of stored lie the capability layer exists to prevent.
+   */
+  private computeFor(provider: ComputeProviderName | undefined): ComputeProvider {
+    if (!provider) {
+      return this.getCompute();
+    }
+    const driver = this.registry.providers.get(provider);
+    if (!driver) {
+      throw new AppError(
+        `Compute provider "${provider}" is not configured on this deployment`,
+        400,
+        ERROR_CODES.COMPUTE_NOT_CONFIGURED
+      );
+    }
+    return driver;
+  }
+
+  /**
    * Coerce inputs a driver cannot honour into what it will actually do.
    *
    * The CLI defaults `--region iad` and the API defaults `scaleToZero: true`,
@@ -932,7 +959,7 @@ export class ComputeServicesService {
   }
 
   async createService(rawInput: CreateServiceInput): Promise<ServiceSchema> {
-    const fly = this.getCompute();
+    const fly = this.computeFor(rawInput.provider);
     const input = this.normalizeForDriver(fly, rawInput, {
       serviceName: rawInput.name,
       resolveDefaults: true,
@@ -1068,7 +1095,7 @@ export class ComputeServicesService {
   }
 
   async prepareForDeploy(rawInput: CreateServiceInput): Promise<ServiceSchema> {
-    const fly = this.getCompute();
+    const fly = this.computeFor(rawInput.provider);
     const input = this.normalizeForDriver(fly, rawInput, {
       serviceName: rawInput.name,
       resolveDefaults: true,

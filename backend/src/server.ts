@@ -388,6 +388,12 @@ async function initializeServer() {
         // waiting for the first write to rebuild.
         const computeConfig = ComputeConfigService.getInstance();
         await Promise.all([computeConfig.primeSnapshot(), computeConfig.primeSettings()]);
+        // The listener is already open, so a compute request can land inside the two
+        // reads above and construct the registry from environment-only values. The
+        // registry is a field initialiser, so that choice would stick for the life of
+        // the process: a provider configured only through the dashboard would stay
+        // missing until the next write. Discard whatever was built early.
+        ComputeServicesService.resetForConfigChange();
         await ComputeServicesService.getInstance().runStartupTasks();
       } catch (err) {
         logger.info('Compute startup tasks skipped', {
