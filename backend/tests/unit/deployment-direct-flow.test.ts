@@ -21,10 +21,7 @@ const { mockPool, mockClient, mockVercelProvider, mockIsCloudEnvironment } = vi.
 }));
 
 vi.mock('../../src/utils/environment.js', () => ({
-  // One flag, three names: modules ask the product question
-  // (isCloudManagedProject) or the AWS one (hasAwsInstanceProfile).
-  isCloudManagedProject: mockIsCloudEnvironment,
-  hasAwsInstanceProfile: mockIsCloudEnvironment,
+  isCloudEnvironment: mockIsCloudEnvironment,
 }));
 
 vi.mock('../../src/infra/database/database.manager.js', () => ({

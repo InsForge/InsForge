@@ -7,10 +7,7 @@ const { mockGetApiKeyWithSource, mockGetClient } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../src/utils/environment.js', () => ({
-  // One flag, three names: modules ask the product question
-  // (isCloudManagedProject) or the AWS one (hasAwsInstanceProfile).
-  isCloudManagedProject: () => false,
-  hasAwsInstanceProfile: () => false,
+  isCloudEnvironment: () => false,
 }));
 
 vi.mock('../../src/utils/logger.js', () => ({

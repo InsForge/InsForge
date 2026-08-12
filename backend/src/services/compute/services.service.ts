@@ -11,7 +11,7 @@ import {
   type ComputeLogsResult,
 } from '@/providers/compute/compute.provider.js';
 import { ComputeConfigService } from '@/services/compute/compute-config.service.js';
-import { isCloudManagedProject } from '@/utils/environment.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import {
@@ -348,7 +348,7 @@ export function buildComputeRegistry(): ComputeRegistry {
     // DockerProvider.isConfigured() fails closed on cloud-managed projects
     // regardless of whether a socket exists — see the comment there for why
     // running customer containers on shared infrastructure is a tenant escape.
-    if (cloud.isConfigured() || isCloudManagedProject()) {
+    if (cloud.isConfigured() || isCloudEnvironment()) {
       throw new AppError(
         'The Docker compute driver is self-host only and cannot run on a cloud-managed project.',
         400,

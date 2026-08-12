@@ -55,6 +55,21 @@ function makeService(deps = makeDeps()) {
 }
 
 describe('AnalyticsService', () => {
+  // A project id is only half of "this is our project": isCloudEnvironment() has to
+  // agree, or a Zeabur self-host (whose template sets PROJECT_ID) would be routed at
+  // our API. Simulating cloud therefore means setting the provisioning marker too.
+  const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+  beforeEach(() => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+  });
+  afterAll(() => {
+    if (savedProfile === undefined) {
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    } else {
+      process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+    }
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     cloudConfig.projectId = undefined;
@@ -255,5 +270,16 @@ describe('AnalyticsService', () => {
       ]);
       expect(config.setConnection).not.toHaveBeenCalled();
     });
+  });
+
+  // Same shape as the webscraper case: a PaaS-supplied PROJECT_ID is not evidence the
+  // project is ours, and routing it at our API broke PostHog for Zeabur installs.
+  it('stays local for a third-party self-host that sets PROJECT_ID', async () => {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    cloudConfig.projectId = 'zeabur-project-1';
+
+    const { AnalyticsService } = await import('@/services/analytics/analytics.service.js');
+
+    expect(AnalyticsService.isSelfHosted()).toBe(true);
   });
 });

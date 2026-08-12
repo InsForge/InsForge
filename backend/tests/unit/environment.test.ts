@@ -1,6 +1,5 @@
 import {
-  hasAwsInstanceProfile,
-  isCloudManagedProject,
+  isCloudEnvironment,
   isOAuthSharedKeysAvailable,
   isDevelopment,
   isProduction,
@@ -18,50 +17,18 @@ describe('Environment utils', () => {
     process.env = OLD_ENV;
   });
 
-  it('hasAwsInstanceProfile follows AWS_INSTANCE_PROFILE_NAME', () => {
+  it('isCloudEnvironment returns true if AWS_INSTANCE_PROFILE_NAME is set', () => {
     process.env.AWS_INSTANCE_PROFILE_NAME = 'my-profile';
-    expect(hasAwsInstanceProfile()).toBe(true);
+    expect(isCloudEnvironment()).toBe(true);
+  });
 
+  it('isCloudEnvironment returns false if AWS_INSTANCE_PROFILE_NAME is missing', () => {
     delete process.env.AWS_INSTANCE_PROFILE_NAME;
-    expect(hasAwsInstanceProfile()).toBe(false);
+    expect(isCloudEnvironment()).toBe(false);
   });
 
-  describe('isCloudManagedProject', () => {
-    beforeEach(() => {
-      delete process.env.AWS_INSTANCE_PROFILE_NAME;
-      delete process.env.DEPLOYMENT_ID;
-      delete process.env.PROJECT_ID;
-    });
-
-    // The one marker only our provisioning writes. AWS does not inject it — the SDK
-    // reads instance credentials from IMDS and never needs the profile's name — and no
-    // self-host artefact mentions it.
-    it('is true when the provisioning marker is present', () => {
-      process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
-      expect(isCloudManagedProject()).toBe(true);
-    });
-
-    // `.env.example` ships PROJECT_ID and getProjectId() documents it as the
-    // self-hosted way to scope services.
-    it('is false for PROJECT_ID alone', () => {
-      process.env.PROJECT_ID = 'my-project';
-      expect(isCloudManagedProject()).toBe(false);
-    });
-
-    // deploy/zeabur/template.yml fills DEPLOYMENT_ID from ${ZEABUR_SERVICE_ID} and
-    // PROJECT_ID from ${ZEABUR_PROJECT_ID}, so a third-party self-host carries both.
-    // Reading that pair as ours is what this rule exists to avoid.
-    it('is false for a Zeabur-style install carrying both ids', () => {
-      process.env.DEPLOYMENT_ID = 'zeabur-service-1';
-      process.env.PROJECT_ID = 'zeabur-project-1';
-      expect(isCloudManagedProject()).toBe(false);
-    });
-  });
-
-  // Our OAuth credentials come from the environment cloud provisioning writes, so this
-  // follows the project question rather than AWS access.
-  it('isOAuthSharedKeysAvailable follows isCloudManagedProject', () => {
-    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+  it('isOAuthSharedKeysAvailable returns same as isCloudEnvironment', () => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'profile';
     expect(isOAuthSharedKeysAvailable()).toBe(true);
 
     delete process.env.AWS_INSTANCE_PROFILE_NAME;

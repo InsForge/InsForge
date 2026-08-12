@@ -9,7 +9,7 @@ import {
   getBuildLogsResponseSchema,
   type GetBuildLogsResponseSchema,
 } from '@insforge/shared-schemas';
-import { hasAwsInstanceProfile } from '@/utils/environment.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import {
   DenoSubhostingProvider,
   type AppLogEntry,
@@ -36,12 +36,9 @@ export class LogService {
   async initialize(): Promise<void> {
     // Use CloudWatch if AWS credentials are available or if it's cloud environment since we provided the permissions in instance profile
     // otherwise use file-based logging
-    // hasAwsInstanceProfile, not isCloudManagedProject: reading logs from CloudWatch needs
-    // AWS credentials, and only the instance profile supplies them. A cloud-managed
-    // project without that access would pick a provider it cannot authenticate against.
     const hasAwsCredentials =
       (appConfig.storage.awsAccessKeyId && appConfig.storage.awsSecretAccessKey) ||
-      hasAwsInstanceProfile();
+      isCloudEnvironment();
 
     if (hasAwsCredentials) {
       logger.info('Using log provider: CloudWatch');

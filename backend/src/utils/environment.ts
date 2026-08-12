@@ -3,60 +3,45 @@
  */
 
 /**
- * Whether this container has an AWS instance profile attached.
+ * Whether this deployment is an InsForge-managed cloud project.
  *
- * Named for what it tests. It used to be called `isCloudEnvironment()` and was used as
- * the product's "am I cloud?" switch, which is how a tenant-isolation guard ended up
- * asking an AWS question — see `isCloudManagedProject()` below for that question.
- *
- * Keep this only where AWS access itself is the requirement: shipping logs to
- * CloudWatch needs credentials the profile provides, and nothing else about being a
- * cloud-managed project supplies them.
- */
-export function hasAwsInstanceProfile(): boolean {
-  return !!(process.env.AWS_INSTANCE_PROFILE_NAME && process.env.AWS_INSTANCE_PROFILE_NAME.trim());
-}
-
-/**
- * Whether this deployment is a cloud-managed project rather than someone's own install.
- *
- * Implemented over `hasAwsInstanceProfile()` and kept as its own function on purpose:
- * this is the question every tenant-isolation and product-mode decision should ask, and
- * having one place to ask it means a better marker can be introduced later by changing
- * this body alone.
- *
- * Why that variable is the signal, despite the AWS-sounding name:
+ * The check is `AWS_INSTANCE_PROFILE_NAME`, which reads like an AWS question but is in
+ * practice the only reliable "provisioned by us" marker, for four reasons worth writing
+ * down because two attempts to replace it made things worse:
  *
  *   - Nothing sets it automatically. AWS does not inject it — the SDK reads instance
  *     credentials from IMDS and never needs the profile's *name* — so it appears only
  *     because our provisioning writes it (`AWS_INSTANCE_PROFILE_NAME=EC2-role` in
- *     `config/user-data-scripts/default.sh`).
+ *     cloud-backend's `config/user-data-scripts/default.sh`).
  *   - No self-host artefact mentions it: not `.env.example`, not any compose file, not
- *     `deploy/zeabur/template.yml`, not the docs. It is deliberately kept out of
- *     `.env.example` — that file is copied and filled in, so listing a variable there is
- *     what turns it into something an operator sets by accident.
- *   - Its value is never read. Only presence matters, so setting it buys a self-hoster
- *     nothing even if they found it.
- *   - Every already-provisioned cloud instance has it, so no rollout or re-provisioning
- *     is needed.
+ *     `deploy/zeabur/template.yml`, not the docs. Keep it that way — `.env.example` is
+ *     copied and filled in, so listing a variable there is what turns it into one an
+ *     operator sets by accident.
+ *   - Its value is read nowhere (`appConfig.cloud.instanceProfile` is unused), so a
+ *     self-hoster gains nothing by setting it even if they find it.
+ *   - Every provisioned cloud instance already has it, so it needs no rollout.
  *
- * What was tried and rejected: PROJECT_ID, alone or paired with DEPLOYMENT_ID.
- * `.env.example` ships both, every compose file passes them through, `getProjectId()`
- * documents PROJECT_ID as the self-hosted way to scope services, and
- * `deploy/zeabur/template.yml` fills both from platform variables — so a third-party
- * self-host looks identical to one of ours.
+ * Rejected alternatives, both of which misclassified real self-hosts:
+ *
+ *   - `PROJECT_ID`: `.env.example` ships it, every compose file passes it through, and
+ *     the compute routes document it as the self-hosted way to scope services.
+ *   - `DEPLOYMENT_ID` + `PROJECT_ID`: `deploy/zeabur/template.yml` fills both from
+ *     `${ZEABUR_SERVICE_ID}` and `${ZEABUR_PROJECT_ID}`, so every Zeabur install looks
+ *     like one of ours.
+ *
+ * Anything deciding "is this ours" — tenant isolation, managed credentials, which
+ * provider serves a feature — should call this rather than inspecting ids itself.
  */
-export function isCloudManagedProject(): boolean {
-  return hasAwsInstanceProfile();
+export function isCloudEnvironment(): boolean {
+  return !!(process.env.AWS_INSTANCE_PROFILE_NAME && process.env.AWS_INSTANCE_PROFILE_NAME.trim());
 }
 
 /**
- * Whether our own OAuth credentials may be used instead of the operator supplying
- * their own. Cloud provisioning writes them into the instance's environment, so this
- * is a question about the project, not about AWS.
+ * Check if the application can use shared OAuth keys
+ * This is typically enabled in cloud environments to avoid storing secrets
  */
 export function isOAuthSharedKeysAvailable(): boolean {
-  return isCloudManagedProject();
+  return isCloudEnvironment();
 }
 
 /**

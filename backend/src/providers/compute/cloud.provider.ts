@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { appConfig } from '@/infra/config/app.config.js';
-import { isCloudManagedProject } from '@/utils/environment.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
@@ -30,13 +30,13 @@ export class CloudComputeProvider implements ComputeProvider {
 
   isConfigured(): boolean {
     return (
-      // Gated on the deployment being ours first. `apiHost` defaults to
-      // api.insforge.dev, so the three checks below are satisfied by any deployment that
-      // merely sets PROJECT_ID — including every Zeabur install, whose template fills it
-      // from ${ZEABUR_PROJECT_ID}. Those were getting this driver registered in the Fly
-      // slot, proxying to our API with a JWT signed by their own secret, and opaque auth
-      // errors back.
-      isCloudManagedProject() &&
+      // Gated on this being one of our deployments first. `apiHost` defaults to
+      // api.insforge.dev, so the checks below are satisfied by anything that merely sets
+      // PROJECT_ID — including every Zeabur install, whose template fills it from
+      // ${ZEABUR_PROJECT_ID}. Those were getting this driver registered in the Fly slot,
+      // proxying to our API with a JWT signed by their own secret, and opaque auth
+      // errors back — while `COMPUTE_PROVIDER=docker` was refused as "self-host only".
+      isCloudEnvironment() &&
       !!appConfig.cloud?.projectId &&
       appConfig.cloud.projectId !== 'local' &&
       !!appConfig.cloud?.apiHost &&

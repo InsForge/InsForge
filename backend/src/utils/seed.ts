@@ -1,5 +1,5 @@
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { isCloudManagedProject, getApiBaseUrl } from '@/utils/environment.js';
+import { isCloudEnvironment, getApiBaseUrl } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { StripeSyncService } from '@/services/payments/stripe/sync.service.js';
@@ -45,7 +45,7 @@ async function seedDefaultAuthConfig(): Promise<void> {
       ) VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT DO NOTHING`,
       [
-        isCloudManagedProject(), // Enable email verification for cloud
+        isCloudEnvironment(), // Enable email verification for cloud
         6, // password_min_length
         false, // require_number
         false, // require_lowercase
@@ -185,7 +185,7 @@ export async function seedBackend(): Promise<void> {
 
     // Self-hosted OpenRouter env values are bootstrap inputs. Seed them once so
     // runtime reads and dashboard edits share the encrypted secret store.
-    if (!isCloudManagedProject()) {
+    if (!isCloudEnvironment()) {
       await ModelGatewayConfigService.getInstance().seedApiKeyFromEnv();
     }
 
@@ -207,7 +207,7 @@ export async function seedBackend(): Promise<void> {
     }
 
     // seed default configs for cloud environment
-    if (isCloudManagedProject()) {
+    if (isCloudEnvironment()) {
       await seedDefaultOAuthConfigs();
       await seedDefaultAuthConfig();
     } else {
@@ -215,7 +215,7 @@ export async function seedBackend(): Promise<void> {
     }
 
     // Initialize reserved secrets for edge functions
-    if (!isCloudManagedProject()) {
+    if (!isCloudEnvironment()) {
       // Add INSFORGE_INTERNAL_URL for Deno-to-backend container communication
       const insforgInternalUrl = 'http://insforge:7130';
       const existingInternalUrlSecret = await secretService.getSecretByKey('INSFORGE_INTERNAL_URL');

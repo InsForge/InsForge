@@ -2,7 +2,7 @@ import winston from 'winston';
 import fs from 'fs';
 import path from 'path';
 import { appConfig } from '@/infra/config/app.config.js';
-import { hasAwsInstanceProfile } from '@/utils/environment.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 
 const logsDir = appConfig.server.logsDir;
 
@@ -23,9 +23,7 @@ const flattenErrors = (_key: string, value: unknown) =>
 // Cloud deployments ship stdout to CloudWatch via the awslogs driver and read
 // logs back through CloudWatchProvider, so writing the file there would only
 // grow the container filesystem with data nothing reads.
-// hasAwsInstanceProfile, not isCloudManagedProject: this mirrors where the awslogs
-// driver and CloudWatch are actually wired up, which comes with the instance profile.
-if (!hasAwsInstanceProfile()) {
+if (!isCloudEnvironment()) {
   try {
     fs.mkdirSync(logsDir, { recursive: true });
     transports.push(

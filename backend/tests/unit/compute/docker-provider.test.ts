@@ -105,12 +105,44 @@ describe('DockerProvider', () => {
   // documented in the compute routes as the self-hosted way to scope services — so a
   // self-hoster setting it is expected. Treating that alone as "cloud" silently refused
   // to register Docker on their own machine, with nothing in the UI to diagnose.
+  describe('cloud detection', () => {
+    beforeEach(() => {
+      // isConfigured() probes the socket path; any existing file proves presence.
+      appConfig.docker.socketPath = process.execPath;
+    });
+
+    afterEach(() => {
+      appConfig.docker.socketPath = '/nonexistent/test.sock';
+      appConfig.cloud = {};
+    });
+
+    it('still registers when PROJECT_ID is set', () => {
+      appConfig.cloud = { projectId: 'my-project', apiHost: 'https://api.insforge.dev' };
+
+      expect(provider.isConfigured()).toBe(true);
+    });
+
+    // The signal cloud provisioning always sets: the user-data script writes it
+    // unconditionally and every instance launches with an IAM instance profile.
+    it('refuses on an instance carrying an AWS instance profile', () => {
+      const original = process.env.AWS_INSTANCE_PROFILE_NAME;
+      process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+      try {
+        expect(provider.isConfigured()).toBe(false);
+      } finally {
+        if (original === undefined) {
+          delete process.env.AWS_INSTANCE_PROFILE_NAME;
+        } else {
+          process.env.AWS_INSTANCE_PROFILE_NAME = original;
+        }
+      }
+    });
+  });
+
   // What may and may not disable this driver.
   describe('cloud detection', () => {
     const saved = {
       profile: process.env.AWS_INSTANCE_PROFILE_NAME,
-      deployment: process.env.DEPLOYMENT_ID,
-      project: process.env.PROJECT_ID,
       socket: appConfig.docker.socketPath,
     };
 
@@ -124,30 +156,23 @@ describe('DockerProvider', () => {
 
     afterEach(() => {
       appConfig.docker.socketPath = saved.socket;
-      for (const [key, value] of [
-        ['AWS_INSTANCE_PROFILE_NAME', saved.profile],
-        ['DEPLOYMENT_ID', saved.deployment],
-        ['PROJECT_ID', saved.project],
-      ] as const) {
-        if (value === undefined) {
-          delete process.env[key];
-        } else {
-          process.env[key] = value;
-        }
+      if (saved.profile === undefined) {
+        delete process.env.AWS_INSTANCE_PROFILE_NAME;
+      } else {
+        process.env.AWS_INSTANCE_PROFILE_NAME = saved.profile;
       }
     });
 
-    // `.env.example` ships PROJECT_ID, every compose file passes it through, and
-    // getProjectId() documents it as the self-hosted way to scope services.
+    // `.env.example` ships PROJECT_ID and the compute routes document it as the
+    // self-hosted way to scope services, so it must not disable this driver.
     it('registers when PROJECT_ID is set', () => {
       process.env.PROJECT_ID = 'my-project';
 
       expect(provider.isConfigured()).toBe(true);
     });
 
-    // deploy/zeabur/template.yml fills DEPLOYMENT_ID from ${ZEABUR_SERVICE_ID} and
-    // PROJECT_ID from ${ZEABUR_PROJECT_ID}, so a third-party self-host carries both.
-    // Treating the pair as ours refused this driver on their own machine.
+    // deploy/zeabur/template.yml fills DEPLOYMENT_ID and PROJECT_ID from platform
+    // variables, so a third-party self-host carries both.
     it('registers on a Zeabur-style install carrying both ids', () => {
       process.env.DEPLOYMENT_ID = 'zeabur-service-1';
       process.env.PROJECT_ID = 'zeabur-project-1';
@@ -155,9 +180,8 @@ describe('DockerProvider', () => {
       expect(provider.isConfigured()).toBe(true);
     });
 
-    // The one marker only our provisioning writes: AWS does not inject it, no self-host
-    // artefact mentions it, and its value is never read.
-    it('refuses on an instance carrying an AWS instance profile', () => {
+    // The marker only our provisioning writes.
+    it('refuses on an instance carrying the provisioning marker', () => {
       process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
 
       expect(provider.isConfigured()).toBe(false);

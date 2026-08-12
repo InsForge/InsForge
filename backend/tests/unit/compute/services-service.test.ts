@@ -118,9 +118,9 @@ vi.mock('@/providers/compute/fly.provider.js', () => ({
 import { ComputeServicesService } from '@/services/compute/services.service.js';
 import { MachineGoneError, flyAppNameFor } from '@/providers/compute/compute.provider.js';
 
-// AWS_INSTANCE_PROFILE_NAME is what marks a deployment as cloud-managed, so every test
-// starts without it and the cloud cases set it deliberately. File-level because the
-// registry suites below are separate top-level describes.
+// AWS_INSTANCE_PROFILE_NAME is what marks a deployment as ours, so every test starts
+// without it and the cloud cases set it deliberately. File-level, because the selector
+// and registry suites below are separate top-level describes.
 const savedAwsProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
 
 beforeEach(() => {
@@ -2355,7 +2355,7 @@ describe('selectComputeProvider factory', () => {
     expect(selectComputeProvider()).toBe(FlyProvider.getInstance());
   });
 
-  it('returns CloudComputeProvider on a cloud-managed deployment with no FLY_API_TOKEN', async () => {
+  it('returns CloudComputeProvider when PROJECT_ID is provisioned and no FLY_API_TOKEN', async () => {
     process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     vi.doMock('@/infra/config/app.config.js', () => {
       const c = {

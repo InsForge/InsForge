@@ -31,6 +31,21 @@ function makeProviders() {
 }
 
 describe('WebscraperService provider resolution', () => {
+  // A project id is only half of "this is our project": isCloudEnvironment() has to
+  // agree, or a Zeabur self-host (whose template sets PROJECT_ID) would be routed at
+  // our API. Simulating cloud therefore means setting the provisioning marker too.
+  const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+  beforeEach(() => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+  });
+  afterAll(() => {
+    if (savedProfile === undefined) {
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    } else {
+      process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+    }
+  });
+
   beforeEach(() => vi.clearAllMocks());
 
   it('uses the cloud provider when a project id is configured', async () => {
@@ -127,5 +142,17 @@ describe('WebscraperService.setApifyToken', () => {
 
     expect(local.verifyToken).toHaveBeenCalledWith('apify_api_tok1234567890');
     expect(config.setToken).toHaveBeenCalledWith('apify_api_tok1234567890');
+  });
+
+  // deploy/zeabur/template.yml sets PROJECT_ID from ${ZEABUR_PROJECT_ID}, so a Zeabur
+  // self-host carries a real-looking project id. Routing it at our API meant its Apify
+  // calls were signed with its own JWT_SECRET and rejected.
+  it('stays local for a third-party self-host that sets PROJECT_ID', async () => {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    configMock.cloud.projectId = 'zeabur-project-1';
+
+    const { WebscraperService } = await import('@/services/webscraper/webscraper.service.js');
+
+    expect(WebscraperService.isSelfHosted()).toBe(true);
   });
 });

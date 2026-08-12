@@ -6,10 +6,7 @@ vi.mock('@/utils/environment.js', () => ({
   getApiBaseUrl: () => 'https://example.test',
   // logger.ts (pulled in transitively) gates its file transport on this;
   // report cloud so the transport is skipped and no logs/ dir is created
-  // One flag, three names: modules ask the product question
-  // (isCloudManagedProject) or the AWS one (hasAwsInstanceProfile).
-  isCloudManagedProject: () => true,
-  hasAwsInstanceProfile: () => true,
+  isCloudEnvironment: () => true,
 }));
 
 // Stub DatabaseManager so StorageService construction doesn't touch a pool.

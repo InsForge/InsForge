@@ -1,4 +1,5 @@
 import { appConfig } from '@/infra/config/app.config.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import type { WebscraperProvider } from '@/providers/webscraper/base.provider.js';
 import { CloudWebscraperProvider } from '@/providers/webscraper/cloud.provider.js';
 import { LocalWebscraperProvider } from '@/providers/webscraper/local.provider.js';
@@ -25,12 +26,18 @@ export class WebscraperService {
     return WebscraperService.instance;
   }
 
-  // A project id is what lets the cloud provider sign a project JWT and reach
-  // cloud-backend at all. Without one there is nothing to proxy to, so the local
-  // provider owns the request.
+  /**
+   * A project id is what lets the cloud provider sign a project JWT and reach
+   * cloud-backend at all, so without one the local provider owns the request.
+   *
+   * But a project id is not evidence that the project is *ours*:
+   * `deploy/zeabur/template.yml` fills PROJECT_ID from `${ZEABUR_PROJECT_ID}`, so a
+   * Zeabur self-host used to be routed at our API and get its Apify calls rejected.
+   * Both conditions have to hold.
+   */
   static isSelfHosted(): boolean {
     const projectId = appConfig.cloud.projectId;
-    return !projectId || projectId === 'local';
+    return !isCloudEnvironment() || !projectId || projectId === 'local';
   }
 
   private provider(): WebscraperProvider {

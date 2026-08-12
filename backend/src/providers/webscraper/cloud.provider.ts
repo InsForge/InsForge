@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { z } from 'zod';
 import { appConfig } from '@/infra/config/app.config.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
@@ -33,7 +34,11 @@ export class CloudWebscraperProvider implements WebscraperProvider {
   }
 
   private isEnabled(): boolean {
-    return !!appConfig.cloud.projectId && appConfig.cloud.projectId !== 'local';
+    // A project id from a PaaS template is not evidence the project is ours; see
+    // isCloudEnvironment().
+    return (
+      isCloudEnvironment() && !!appConfig.cloud.projectId && appConfig.cloud.projectId !== 'local'
+    );
   }
 
   private throwUnsupported(): never {
