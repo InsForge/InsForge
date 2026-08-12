@@ -95,6 +95,20 @@ describe('useAiEntitlement', () => {
     expect(result.current.allowed).toBe(true);
   });
 
+  it('gives up after one attempt so a hung bridge cannot stack retries', async () => {
+    // The bridge already self-terminates at 15s; react-query's default 3
+    // retries would turn that into ~a minute of spinner on the gate.
+    const attempt = vi.fn().mockRejectedValue(new Error('bridge down'));
+    hostState.mode = 'cloud-hosting';
+    hostState.onRequestInstanceInfo = attempt;
+
+    const { result } = renderHook(() => useAiEntitlement(), { wrapper });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(attempt).toHaveBeenCalledTimes(1);
+    expect(result.current.allowed).toBe(true);
+  });
+
   it('re-resolves when the project changes under a shared QueryClient', async () => {
     // The regression the project-scoped query key guards: without it the first
     // org's verdict stays fresh for the whole staleTime and is served to the

@@ -38,6 +38,11 @@ export function useAiEntitlement(): {
     queryFn: (): Promise<DashboardInstanceInfo | null> =>
       onRequestInstanceInfo ? onRequestInstanceInfo() : Promise.resolve(null),
     enabled,
+    // The bridge self-terminates at DEFAULT_TIMEOUT_MS (15s) and rejects, but
+    // react-query's default 3 retries would stack that into ~a minute of
+    // spinner on a hung parent. One attempt, then fail open — same convention
+    // as useOpenRouterKey.
+    retry: false,
     staleTime: 5 * 60 * 1000,
   });
 

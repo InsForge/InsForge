@@ -346,8 +346,8 @@ export default function AIOverviewPage() {
     );
   }
 
-  // Fail open on anything unresolved (bridge error, self-hosting): cloud still
-  // enforces the real gate.
+  // Fail open once the query has settled without a verdict (bridge error) or
+  // was never enabled (self-hosting): cloud still enforces the real gate.
   if (aiEntitlement.allowed) {
     return <AIOverviewContent />;
   }
