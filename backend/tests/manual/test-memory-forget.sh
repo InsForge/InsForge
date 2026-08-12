@@ -75,6 +75,37 @@ count_in_scope() {
     ids_in_scope "$1" | grep -c . || true
 }
 
+# Cleanup on every exit path --------------------------------------------------
+
+# test-config.sh traps EXIT/ERR/INT/TERM with handle_exit, which runs
+# cleanup_test_data — that only knows about tables, users and buckets, so
+# memories seeded below would survive an early exit_with_status. Wrap the
+# shared handler rather than replacing it: a bash trap is not additive, so
+# re-trapping without delegating would drop the harness's own cleanup.
+memory_cleanup_done=0
+cleanup_memory_scopes() {
+    if [ "$memory_cleanup_done" -eq 1 ]; then
+        return 0
+    fi
+    memory_cleanup_done=1
+    local scope remaining
+    for scope in "$SCOPE_A" "$SCOPE_B"; do
+        remaining=$(ids_in_scope "$scope" | sed 's/.*/"&"/' | paste -sd, - || true)
+        if [ -n "$remaining" ]; then
+            memory_post forget "{\"scope\":\"$scope\",\"ids\":[$remaining]}" > /dev/null || true
+        fi
+    done
+}
+
+memory_exit_handler() {
+    local exit_code=$?
+    trap - EXIT ERR INT TERM   # no re-entry while cleaning up
+    cleanup_memory_scopes
+    ( exit "$exit_code" )      # restore $? for handle_exit's own check
+    handle_exit
+}
+trap memory_exit_handler EXIT ERR INT TERM
+
 # Seed ------------------------------------------------------------------------
 
 echo "🌱 Seeding memories in two scopes..."
@@ -252,11 +283,8 @@ echo ""
 # Cleanup ---------------------------------------------------------------------
 
 echo "🧹 Removing the seeded memories..."
+cleanup_memory_scopes
 for scope in "$SCOPE_A" "$SCOPE_B"; do
-    remaining=$(ids_in_scope "$scope" | sed 's/.*/"&"/' | paste -sd, - || true)
-    if [ -n "$remaining" ]; then
-        memory_post forget "{\"scope\":\"$scope\",\"ids\":[$remaining]}" > /dev/null
-    fi
     left=$(count_in_scope "$scope")
     if [ "$left" -eq 0 ]; then
         print_success "Scope $scope emptied"
