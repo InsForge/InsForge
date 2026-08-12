@@ -105,37 +105,68 @@ describe('DockerProvider', () => {
   // documented in the compute routes as the self-hosted way to scope services — so a
   // self-hoster setting it is expected. Treating that alone as "cloud" silently refused
   // to register Docker on their own machine, with nothing in the UI to diagnose.
+  // The three cases that decide whether this driver may register at all.
   describe('cloud detection', () => {
+    const saved = {
+      profile: process.env.AWS_INSTANCE_PROFILE_NAME,
+      deployment: process.env.DEPLOYMENT_ID,
+      project: process.env.PROJECT_ID,
+    };
+
     beforeEach(() => {
       // isConfigured() probes the socket path; any existing file proves presence.
       appConfig.docker.socketPath = process.execPath;
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+      delete process.env.DEPLOYMENT_ID;
+      delete process.env.PROJECT_ID;
     });
 
     afterEach(() => {
       appConfig.docker.socketPath = '/nonexistent/test.sock';
-      appConfig.cloud = {};
+      for (const [key, value] of [
+        ['AWS_INSTANCE_PROFILE_NAME', saved.profile],
+        ['DEPLOYMENT_ID', saved.deployment],
+        ['PROJECT_ID', saved.project],
+      ] as const) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
     });
 
-    it('still registers when PROJECT_ID is set', () => {
-      appConfig.cloud = { projectId: 'my-project', apiHost: 'https://api.insforge.dev' };
+    // The regression this guard caused once: `.env.example` ships PROJECT_ID, every
+    // compose file passes it through, and getProjectId() documents it as the self-hosted
+    // way to scope services. Reading it alone as "cloud" made Docker silently absent.
+    it('registers when only PROJECT_ID is set', () => {
+      process.env.PROJECT_ID = 'my-project';
 
       expect(provider.isConfigured()).toBe(true);
     });
 
-    // The signal cloud provisioning always sets: the user-data script writes it
-    // unconditionally and every instance launches with an IAM instance profile.
+    // DEPLOYMENT_ID does nothing for a self-host install, so on its own it is not
+    // evidence either.
+    it('registers when only DEPLOYMENT_ID is set', () => {
+      process.env.DEPLOYMENT_ID = 'dep-1';
+
+      expect(provider.isConfigured()).toBe(true);
+    });
+
+    // Cloud provisioning writes both, on every instance.
+    it('refuses when DEPLOYMENT_ID and PROJECT_ID are both set', () => {
+      process.env.DEPLOYMENT_ID = 'dep-1';
+      process.env.PROJECT_ID = 'proj-1';
+
+      expect(provider.isConfigured()).toBe(false);
+    });
+
+    // Kept as a second, independent signal so this is never less protective than the
+    // check it replaced.
     it('refuses on an instance carrying an AWS instance profile', () => {
-      const original = process.env.AWS_INSTANCE_PROFILE_NAME;
       process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
-      try {
-        expect(provider.isConfigured()).toBe(false);
-      } finally {
-        if (original === undefined) {
-          delete process.env.AWS_INSTANCE_PROFILE_NAME;
-        } else {
-          process.env.AWS_INSTANCE_PROFILE_NAME = original;
-        }
-      }
+
+      expect(provider.isConfigured()).toBe(false);
     });
   });
 

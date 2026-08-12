@@ -27,6 +27,9 @@ vi.mock('@/api/middlewares/rate-limiters.js', () => ({
 }));
 
 vi.mock('@/utils/environment.js', () => ({
+  // Both: the route asks the tenant-isolation question, and other modules in its import
+  // graph ask the narrower "am I on our AWS infrastructure" one.
+  isCloudManagedProject: () => env.isCloud,
   isCloudEnvironment: () => env.isCloud,
 }));
 

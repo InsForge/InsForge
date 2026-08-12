@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { cpuTierToCores } from '@insforge/shared-schemas';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudManagedProject } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import {
   MachineGoneError,
@@ -130,7 +130,7 @@ export class DockerProvider implements ComputeProvider {
    * provisioning does not produce; that is the accepted trade rather than an oversight.
    */
   isConfigured(): boolean {
-    if (isCloudEnvironment()) {
+    if (isCloudManagedProject()) {
       return false;
     }
     return existsSync(dockerConfig().socketPath);
