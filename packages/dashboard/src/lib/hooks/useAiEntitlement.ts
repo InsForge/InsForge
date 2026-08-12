@@ -1,5 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import {
+  useDashboardHost,
+  useDashboardProject,
+  useIsCloudHostingMode,
+} from '#lib/config/DashboardHostContext';
 import type { DashboardInstanceInfo } from '#types';
 
 /**
@@ -20,13 +24,17 @@ export function useAiEntitlement(): {
   reason: AiEntitlementReason | null;
 } {
   const host = useDashboardHost();
+  const project = useDashboardProject();
   const isCloudHostingMode = useIsCloudHostingMode();
   const onRequestInstanceInfo =
     host.mode === 'cloud-hosting' ? host.onRequestInstanceInfo : undefined;
   const enabled = isCloudHostingMode && !!onRequestInstanceInfo;
 
   const query = useQuery({
-    queryKey: ['instance-info'],
+    // Scoped to the project: entitlement is an org-level answer, and switching
+    // project without remounting the QueryClient would otherwise serve the
+    // previous org's verdict for the whole staleTime.
+    queryKey: ['instance-info', project?.id ?? null],
     queryFn: (): Promise<DashboardInstanceInfo | null> =>
       onRequestInstanceInfo ? onRequestInstanceInfo() : Promise.resolve(null),
     enabled,

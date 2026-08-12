@@ -12,6 +12,7 @@ const hostState: {
 
 vi.mock('#lib/config/DashboardHostContext', () => ({
   useDashboardHost: () => hostState,
+  useDashboardProject: () => ({ id: 'project-1' }),
   useIsCloudHostingMode: () => hostState.mode === 'cloud-hosting',
 }));
 

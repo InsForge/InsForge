@@ -322,10 +322,68 @@ function ModelCreditBadge({
   );
 }
 
+/**
+ * Entitlement gate. Kept as a separate component from the body below so a
+ * denied org never mounts the AI query hooks — an early return inside one
+ * component would still have run them.
+ */
 export default function AIOverviewPage() {
   const { t } = useTranslation('chrome');
   const host = useDashboardHost();
   const aiEntitlement = useAiEntitlement();
+
+  // While the bridge is still resolving, allowed is true (fail open), so an
+  // entitled project renders immediately rather than flashing a spinner.
+  // AppSidebar mounts the same query, so by the time this route is reached the
+  // verdict is normally already cached.
+  if (aiEntitlement.allowed) {
+    return <AIOverviewContent />;
+  }
+
+  return (
+    <div className="h-full overflow-y-auto bg-[rgb(var(--semantic-1))]">
+      <div className="mx-auto flex h-full w-full max-w-[1024px] items-center justify-center px-10 py-10">
+        {aiEntitlement.reason === 'partner' ? (
+          <EmptyState
+            icon={StopCircle}
+            title={t('ai.overview.partnerUnavailableTitle', {
+              defaultValue: 'AI Model Gateway is not available for this project',
+            })}
+            description={t('ai.overview.partnerUnavailableDescription', {
+              defaultValue:
+                'This project is managed by a partner platform, which does not include the AI Model Gateway.',
+            })}
+          />
+        ) : (
+          <EmptyState
+            icon={ArrowUpCircle}
+            title={t('ai.overview.upgradeRequiredTitle', {
+              defaultValue: 'Upgrade to Pro to use the AI Model Gateway',
+            })}
+            description={t('ai.overview.upgradeRequiredDescription', {
+              defaultValue:
+                'Call frontier models through one endpoint, billed by usage. Available on paid plans.',
+            })}
+            action={
+              host.onShowUpgradeDialog
+                ? {
+                    label: t('ai.overview.upgradeRequiredAction', {
+                      defaultValue: 'Upgrade plan',
+                    }),
+                    onClick: () => host.onShowUpgradeDialog?.(),
+                  }
+                : undefined
+            }
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AIOverviewContent() {
+  const { t } = useTranslation('chrome');
+  const host = useDashboardHost();
   const [codeTab, setCodeTab] = useState<CodeTab>('sdk');
   const [selectedModelId, setSelectedModelId] = useState<
     (typeof OVERVIEW_QUICK_START_MODELS)[number]['id']
@@ -382,50 +440,6 @@ export default function AIOverviewPage() {
       // Toast feedback is handled by the mutation hook.
     }
   };
-
-  // Cloud gates AI on the org. Render the reason instead of letting every
-  // widget below fail its own way against a 403.
-  if (!aiEntitlement.allowed) {
-    return (
-      <div className="h-full overflow-y-auto bg-[rgb(var(--semantic-1))]">
-        <div className="mx-auto flex h-full w-full max-w-[1024px] items-center justify-center px-10 py-10">
-          {aiEntitlement.reason === 'partner' ? (
-            <EmptyState
-              icon={StopCircle}
-              title={t('ai.overview.partnerUnavailableTitle', {
-                defaultValue: 'AI Model Gateway is not available for this project',
-              })}
-              description={t('ai.overview.partnerUnavailableDescription', {
-                defaultValue:
-                  'This project is managed by a partner platform, which does not include the AI Model Gateway.',
-              })}
-            />
-          ) : (
-            <EmptyState
-              icon={ArrowUpCircle}
-              title={t('ai.overview.upgradeRequiredTitle', {
-                defaultValue: 'Upgrade to Pro to use the AI Model Gateway',
-              })}
-              description={t('ai.overview.upgradeRequiredDescription', {
-                defaultValue:
-                  'Call frontier models through one endpoint, billed by usage. Available on paid plans.',
-              })}
-              action={
-                host.onShowUpgradeDialog
-                  ? {
-                      label: t('ai.overview.upgradeRequiredAction', {
-                        defaultValue: 'Upgrade plan',
-                      }),
-                      onClick: () => host.onShowUpgradeDialog?.(),
-                    }
-                  : undefined
-              }
-            />
-          )}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="h-full overflow-y-auto bg-[rgb(var(--semantic-1))]">
