@@ -369,13 +369,7 @@ paths:
               example:
                 message: "Hello, World!"
         '404':
-          description: Function not found or not active
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "Function not found or not active"
+          $ref: '#/components/responses/RuntimeFunctionNotFound'
         '502':
           description: Failed to proxy to Deno runtime
           content:
@@ -420,13 +414,7 @@ paths:
               example:
                 message: "Hello, John!"
         '404':
-          description: Function not found or not active
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "Function not found or not active"
+          $ref: '#/components/responses/RuntimeFunctionNotFound'
         '502':
           description: Failed to proxy to Deno runtime
           content:
@@ -466,13 +454,7 @@ paths:
                 type: object
                 additionalProperties: true
         '404':
-          description: Function not found or not active
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "Function not found or not active"
+          $ref: '#/components/responses/RuntimeFunctionNotFound'
         '502':
           description: Failed to proxy to Deno runtime
           content:
@@ -510,13 +492,7 @@ paths:
                 type: object
                 additionalProperties: true
         '404':
-          description: Function not found or not active
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "Function not found or not active"
+          $ref: '#/components/responses/RuntimeFunctionNotFound'
         '502':
           description: Failed to proxy to Deno runtime
           content:
@@ -547,13 +523,7 @@ paths:
                 type: object
                 additionalProperties: true
         '404':
-          description: Function not found or not active
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "Function not found or not active"
+          $ref: '#/components/responses/RuntimeFunctionNotFound'
         '502':
           description: Failed to proxy to Deno runtime
           content:
@@ -648,3 +618,26 @@ components:
         pattern:
           type: string
           description: Pattern that caused validation failure (for dangerous code detection)
+
+  responses:
+    RuntimeFunctionNotFound:
+      description: |
+        Function invocation can return two runtime-driven 404 variants.
+        - application/json: Returned when the path matches the documented slug
+          pattern but no active function exists for that slug.
+        - text/plain: Returned by the runtime catch-all when the request path does
+          not match the slug route at all (non-conformant path shape).
+        Consumers should branch by Content-Type at runtime.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+          example:
+            error: "Function not found or not active"
+        text/plain:
+          schema:
+            type: string
+          example: "Not Found"
