@@ -230,6 +230,7 @@ const DateTimeCellRenderer = ({
 export interface UsersColumnLabels {
   id?: string;
   email?: string;
+  phone?: string;
   providers?: string;
   emailVerified?: string;
   created?: string;
@@ -262,8 +263,26 @@ export function createUsersColumns(
       minWidth: 160,
       sortable: true,
       renderCell: ({ row }) => (
-        <span className="truncate text-[13px] leading-[18px] text-foreground" title={row.email}>
+        <span
+          className="truncate text-[13px] leading-[18px] text-foreground"
+          title={row.email ?? undefined}
+        >
           {row.email}
+        </span>
+      ),
+    },
+    {
+      key: 'phone',
+      name: labels?.phone ?? 'Phone',
+      width: '1fr',
+      minWidth: 130,
+      sortable: true,
+      renderCell: ({ row }) => (
+        <span
+          className="truncate text-[13px] leading-[18px] text-foreground"
+          title={row.phone ?? undefined}
+        >
+          {row.phone}
         </span>
       ),
     },
@@ -321,7 +340,10 @@ const createUserSelectionCell = (unknownLabel: string) =>
     const avatarUrl = profile?.avatar_url as string | undefined;
     const rawName = profile?.name;
     const name =
-      (typeof rawName === 'string' && rawName.trim()) || row.email.split('@')[0] || unknownLabel;
+      (typeof rawName === 'string' && rawName.trim()) ||
+      row.email?.split('@')[0] ||
+      row.phone ||
+      unknownLabel;
 
     return (
       <div className="flex h-full w-full items-center gap-2 pr-2">
@@ -362,6 +384,7 @@ export function UsersDataGrid(props: UsersDataGridProps) {
       createUsersColumns(customProviderLabels, {
         id: t('auth.columnId', { defaultValue: 'ID' }),
         email: t('auth.email', { defaultValue: 'Email' }),
+        phone: t('auth.phone', { defaultValue: 'Phone' }),
         providers: t('auth.columnProviders', { defaultValue: 'Providers' }),
         emailVerified: t('auth.columnEmailVerified', { defaultValue: 'Email Verified' }),
         created: t('auth.columnCreated', { defaultValue: 'Created' }),

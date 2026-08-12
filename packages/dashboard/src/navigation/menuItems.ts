@@ -65,6 +65,11 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
         label: 'Email',
         href: '/dashboard/authentication/email',
       },
+      {
+        id: 'phone',
+        label: 'Phone',
+        href: '/dashboard/authentication/phone',
+      },
     ],
   },
   {
