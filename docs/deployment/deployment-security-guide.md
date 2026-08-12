@@ -1011,13 +1011,16 @@ cd ~/insforge
 ./deploy/backup.sh
 ```
 
-By default, backups land in `~/insforge/backups/` and files older than 14 days are removed. Override retention:
+By default, backups land in `~/insforge/backups/` and files older than 14 days are removed. Override retention, or the destination directory:
 
 ```bash
 RETENTION_DAYS=30 ./deploy/backup.sh
+BACKUP_DIR=/mnt/backups/insforge ./deploy/backup.sh
 ```
 
-Restore a database dump:
+The script runs under `umask 077`, so the database dump is readable only by the user that runs it. Don't substitute a hand-written script: without `umask 077`, the default `umask 022` leaves `db_*.sql` world-readable (`-rw-r--r--`), and that file contains every table in your application.
+
+Restore a database dump (adjust the path if you set `BACKUP_DIR`):
 
 ```bash
 cd ~/insforge
@@ -1034,7 +1037,7 @@ crontab -e
 Add this line for daily backups at 3:00 AM (adjust the path if your install lives elsewhere):
 
 ```cron
-0 3 * * * /home/deploy/insforge/deploy/backup.sh >> /home/deploy/insforge/backups/cron.log 2>&1
+0 3 * * * mkdir -p /home/deploy/insforge/backups && /home/deploy/insforge/deploy/backup.sh >> /home/deploy/insforge/backups/cron.log 2>&1
 ```
 
 #### 17.3 Off-Site Backups (Recommended)
@@ -1113,7 +1116,7 @@ docker stats --no-stream          # Resource usage
 
 # ── Database (source .env first for vars) ────
 source ~/insforge/.env
-./deploy/backup.sh                                                                              # Backup (db + .env)
+~/insforge/deploy/backup.sh                                                                     # Backup (db + .env)
 docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" > backup.sql  # Manual backup
 cat backup.sql | docker compose exec -T postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"  # Restore
 

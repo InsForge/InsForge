@@ -1002,15 +1002,16 @@ cd ~/insforge
 ./deploy/backup.sh
 ```
 
-De forma predeterminada, las copias de seguridad se guardan en `~/insforge/backups/` y los archivos con más de 14 días se eliminan. Para cambiar la retención:
+De forma predeterminada, las copias de seguridad se guardan en `~/insforge/backups/` y los archivos con más de 14 días se eliminan. Para cambiar la retención o el directorio de destino:
 
 ```bash
 RETENTION_DAYS=30 ./deploy/backup.sh
+BACKUP_DIR=/mnt/backups/insforge ./deploy/backup.sh
 ```
 
 El script se ejecuta con `umask 077`, por lo que el volcado de la base de datos solo puede leerlo el usuario que lo ejecuta. No lo sustituyas por un script propio: sin `umask 077`, con la `umask 022` predeterminada el archivo `db_*.sql` queda legible para todos los usuarios (`-rw-r--r--`), y contiene todas las tablas de tu aplicación.
 
-Restaura un volcado de la base de datos:
+Restaura un volcado de la base de datos (ajusta la ruta si has definido `BACKUP_DIR`):
 
 ```bash
 cd ~/insforge
@@ -1027,7 +1028,7 @@ crontab -e
 Añade esta línea para copias de seguridad diarias a las 3:00 a. m. (ajusta la ruta si tu instalación está en otra ubicación):
 
 ```cron
-0 3 * * * /home/deploy/insforge/deploy/backup.sh >> /home/deploy/insforge/backups/cron.log 2>&1
+0 3 * * * mkdir -p /home/deploy/insforge/backups && /home/deploy/insforge/deploy/backup.sh >> /home/deploy/insforge/backups/cron.log 2>&1
 ```
 
 #### 17.3 Copias de seguridad fuera del sitio (recomendado)
@@ -1106,7 +1107,7 @@ docker stats --no-stream          # Resource usage
 
 # ── Database (source .env first for vars) ────
 source ~/insforge/.env
-./deploy/backup.sh                                                                              # Backup (db + .env)
+~/insforge/deploy/backup.sh                                                                     # Backup (db + .env)
 docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" > backup.sql  # Manual backup
 cat backup.sql | docker compose exec -T postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"  # Restore
 

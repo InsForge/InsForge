@@ -1000,15 +1000,16 @@ cd ~/insforge
 ./deploy/backup.sh
 ```
 
-預設情況下，備份檔案會存放在 `~/insforge/backups/`，超過 14 天的檔案會被刪除。可覆寫保留天數：
+預設情況下，備份檔案會存放在 `~/insforge/backups/`，超過 14 天的檔案會被刪除。可覆寫保留天數，或變更目標目錄：
 
 ```bash
 RETENTION_DAYS=30 ./deploy/backup.sh
+BACKUP_DIR=/mnt/backups/insforge ./deploy/backup.sh
 ```
 
 該腳本以 `umask 077` 執行，因此資料庫匯出檔案僅限執行者本人可讀。請勿改用自行撰寫的腳本：若沒有 `umask 077`，在預設的 `umask 022` 下產生的 `db_*.sql` 將是全域可讀的（`-rw-r--r--`），而該檔案包含你的全部應用資料表。
 
-還原資料庫匯出檔案：
+還原資料庫匯出檔案（若你設定了 `BACKUP_DIR`，請相應調整路徑）：
 
 ```bash
 cd ~/insforge
@@ -1025,7 +1026,7 @@ crontab -e
 新增以下這一行，讓每天凌晨 3:00 執行備份（若你的安裝位於其他位置，請調整路徑）：
 
 ```cron
-0 3 * * * /home/deploy/insforge/deploy/backup.sh >> /home/deploy/insforge/backups/cron.log 2>&1
+0 3 * * * mkdir -p /home/deploy/insforge/backups && /home/deploy/insforge/deploy/backup.sh >> /home/deploy/insforge/backups/cron.log 2>&1
 ```
 
 #### 17.3 異地備份（建議）
@@ -1104,7 +1105,7 @@ docker stats --no-stream          # Resource usage
 
 # ── Database (source .env first for vars) ────
 source ~/insforge/.env
-./deploy/backup.sh                                                                              # Backup (db + .env)
+~/insforge/deploy/backup.sh                                                                     # Backup (db + .env)
 docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" > backup.sql  # Manual backup
 cat backup.sql | docker compose exec -T postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"  # Restore
 
