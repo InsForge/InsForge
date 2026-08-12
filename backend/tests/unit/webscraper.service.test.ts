@@ -30,19 +30,23 @@ function makeProviders() {
   return { cloud: make('cloud'), local: make('local') };
 }
 
-describe('WebscraperService provider resolution', () => {
-  const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
-  beforeEach(() => {
-    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
-  });
-  afterAll(() => {
-    if (savedProfile === undefined) {
-      delete process.env.AWS_INSTANCE_PROFILE_NAME;
-    } else {
-      process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
-    }
-  });
+// File-level: this file has a second top-level describe, and a hook inside the first
+// would not cover it.
+const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
 
+beforeEach(() => {
+  process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+});
+
+afterAll(() => {
+  if (savedProfile === undefined) {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+  } else {
+    process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+  }
+});
+
+describe('WebscraperService provider resolution', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('uses the cloud provider when a project id is configured', async () => {
