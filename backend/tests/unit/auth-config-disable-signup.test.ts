@@ -42,7 +42,10 @@ vi.mock('../../src/infra/security/encryption.manager', () => ({
 }));
 
 vi.mock('../../src/utils/environment', () => ({
-  isCloudEnvironment: () => false,
+  // One flag, three names: modules ask the product question
+  // (isCloudManagedProject) or the AWS one (hasAwsInstanceProfile).
+  isCloudManagedProject: () => false,
+  hasAwsInstanceProfile: () => false,
 }));
 
 import { AuthConfigService } from '../../src/services/auth/auth-config.service';

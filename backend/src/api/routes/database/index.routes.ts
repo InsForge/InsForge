@@ -12,7 +12,7 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
 import logger from '@/utils/logger.js';
 import { normalizeDatabaseSchemaName } from '@/services/database/helpers.js';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudManagedProject } from '@/utils/environment.js';
 
 const router = Router();
 const databaseService = DatabaseService.getInstance();
@@ -23,7 +23,7 @@ router.use('/records', databaseRecordsRouter);
 router.use('/rpc', databaseRpcRouter);
 router.use('/advance', databaseAdvanceRouter);
 router.use('/migrations', databaseMigrationsRouter);
-if (!isCloudEnvironment()) {
+if (!isCloudManagedProject()) {
   router.use('/backups', databaseBackupsRouter);
   // Database-module config currently only holds backup scheduling, which the
   // cloud control plane owns — so it stays self-hosting-only with backups.

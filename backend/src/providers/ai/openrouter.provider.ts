@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import jwt from 'jsonwebtoken';
 import { createHash } from 'crypto';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudManagedProject } from '@/utils/environment.js';
 import { AppError, UpstreamError } from '@/utils/errors.js';
 import { ERROR_CODES, type AIOverview } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
@@ -141,7 +141,7 @@ export class OpenRouterProvider {
    * Use this instead of getApiKey() when downstream logic depends on the source.
    */
   async getApiKeyWithSource(): Promise<ResolvedApiKey> {
-    if (isCloudEnvironment()) {
+    if (isCloudManagedProject()) {
       const apiKey = this.cloudCredentials
         ? this.cloudCredentials.apiKey
         : await this.fetchCloudApiKey();
@@ -201,7 +201,7 @@ export class OpenRouterProvider {
   }
 
   async rotateManagedApiKey(): Promise<{ apiKey: string; maskedKey: string }> {
-    if (!isCloudEnvironment()) {
+    if (!isCloudManagedProject()) {
       throw new AppError(
         'OpenRouter API key rotation is only available for InsForge Cloud-managed keys.',
         400,

@@ -26,7 +26,7 @@ import { paymentsRouter } from '@/api/routes/payments/index.routes.js';
 import { advisorRouter } from '@/api/routes/advisor/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudManagedProject } from '@/utils/environment.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
 import fetch from 'node-fetch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
@@ -316,7 +316,7 @@ export async function createApp() {
   });
 
   // Redirect root to dashboard login (only for non-insforge cloud environments)
-  if (!isCloudEnvironment()) {
+  if (!isCloudManagedProject()) {
     app.get('/', (_req: Request, res: Response) => {
       res.redirect('/dashboard/login');
     });
@@ -413,7 +413,7 @@ async function initializeServer() {
 
     // Scheduled backups are self-hosting only; the cloud control plane owns
     // backups there (the backup routes are not even mounted in cloud env).
-    if (!isCloudEnvironment()) {
+    if (!isCloudManagedProject()) {
       DatabaseBackupService.getInstance().startScheduler();
     }
   } catch (error) {

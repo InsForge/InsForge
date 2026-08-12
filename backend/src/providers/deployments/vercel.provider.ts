@@ -2,7 +2,7 @@ import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import type { Readable } from 'stream';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudManagedProject } from '@/utils/environment.js';
 import { AppError, UpstreamError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
@@ -241,7 +241,7 @@ export class VercelProvider {
    * Get Vercel credentials based on environment
    */
   async getCredentials(): Promise<VercelCredentials> {
-    if (isCloudEnvironment()) {
+    if (isCloudManagedProject()) {
       if (
         this.cloudCredentials &&
         (!this.cloudCredentials.expiresAt || new Date() < this.cloudCredentials.expiresAt)
@@ -284,7 +284,7 @@ export class VercelProvider {
    * Check if Vercel is properly configured
    */
   isConfigured(): boolean {
-    if (isCloudEnvironment()) {
+    if (isCloudManagedProject()) {
       return true;
     }
     return !!(
@@ -746,7 +746,7 @@ export class VercelProvider {
    * Returns null if not in cloud environment or no slug is set
    */
   async getSlug(): Promise<string | null> {
-    if (!isCloudEnvironment()) {
+    if (!isCloudManagedProject()) {
       return null;
     }
     const credentials = await this.getCredentials();

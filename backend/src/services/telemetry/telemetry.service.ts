@@ -4,7 +4,7 @@ import os from 'os';
 import { randomUUID } from 'crypto';
 import fetch from 'node-fetch';
 import { appConfig } from '@/infra/config/app.config.js';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudManagedProject } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { FeatureUsageCollector, type FeatureUsageSnapshot } from './feature-usage.collector.js';
 import packageJson from '../../../../package.json';
@@ -94,7 +94,7 @@ function detectRuntimeEnvironment(): TelemetryRuntimeEnvironment {
 }
 
 export function isTelemetryRuntimeDisabled(): boolean {
-  return appConfig.telemetry.disabled || isCloudEnvironment();
+  return appConfig.telemetry.disabled || isCloudManagedProject();
 }
 
 function defaultTelemetryConfig(): TelemetryConfig {
@@ -269,7 +269,7 @@ export class TelemetryService {
         telemetry_source: 'insforge_oss',
         telemetry_event_name: eventName,
         version: packageJson.version,
-        hosting_mode: isCloudEnvironment() ? 'cloud' : 'self-hosted',
+        hosting_mode: isCloudManagedProject() ? 'cloud' : 'self-hosted',
         deployment_method: detectDeploymentMethod(),
         platform: os.platform(),
         arch: os.arch(),

@@ -5,7 +5,10 @@ const mockListSecrets = vi.fn();
 const mockGetSecretByKey = vi.fn();
 
 vi.mock('../../src/utils/environment.js', () => ({
-  isCloudEnvironment: mockIsCloudEnvironment,
+  // One flag, three names: modules ask the product question
+  // (isCloudManagedProject) or the AWS one (hasAwsInstanceProfile).
+  isCloudManagedProject: mockIsCloudEnvironment,
+  hasAwsInstanceProfile: mockIsCloudEnvironment,
 }));
 
 vi.mock('../../src/services/secrets/secret.service.js', () => ({

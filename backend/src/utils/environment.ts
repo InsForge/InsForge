@@ -3,18 +3,25 @@
  */
 
 /**
- * Check if the application is running in a cloud environment
- * Currently checks for AWS instance profile, but can be extended for other cloud providers
+ * Whether this container has an AWS instance profile attached.
+ *
+ * Named for what it tests. It used to be called `isCloudEnvironment()` and was used as
+ * the product's "am I cloud?" switch, which is how a tenant-isolation guard ended up
+ * asking an AWS question — see `isCloudManagedProject()` below for that question.
+ *
+ * Keep this only where AWS access itself is the requirement: shipping logs to
+ * CloudWatch needs credentials the profile provides, and nothing else about being a
+ * cloud-managed project supplies them.
  */
-export function isCloudEnvironment(): boolean {
+export function hasAwsInstanceProfile(): boolean {
   return !!(process.env.AWS_INSTANCE_PROFILE_NAME && process.env.AWS_INSTANCE_PROFILE_NAME.trim());
 }
 
 /**
  * Whether this deployment is a cloud-managed project rather than someone's own install.
  *
- * Separate from `isCloudEnvironment()` on purpose: that one answers "am I on our AWS
- * infrastructure" and gates OAuth shared keys. This one answers "is the control plane
+ * Separate from `hasAwsInstanceProfile()` on purpose: that one answers "am I on our AWS
+ * infrastructure", which only matters where AWS access itself is required. This one answers "is the control plane
  * ours", which is the question tenant-isolation guards need — a customer must not be
  * able to run containers on a host they do not own.
  *
@@ -32,11 +39,11 @@ export function isCloudEnvironment(): boolean {
  *     self-host deployment. Requiring it alongside PROJECT_ID means a false positive
  *     takes two cloud-only variables set against the instructions next to them.
  *
- * OR'd with `isCloudEnvironment()` so this is never less protective than the check it
- * replaces, and so it already holds for instances provisioned before this existed.
+ * OR'd with `hasAwsInstanceProfile()` so this is never less protective than the check
+ * it replaces, and so it already holds for instances provisioned before this existed.
  */
 export function isCloudManagedProject(): boolean {
-  if (isCloudEnvironment()) {
+  if (hasAwsInstanceProfile()) {
     return true;
   }
   const deploymentId = process.env.DEPLOYMENT_ID?.trim();
@@ -45,11 +52,12 @@ export function isCloudManagedProject(): boolean {
 }
 
 /**
- * Check if the application can use shared OAuth keys
- * This is typically enabled in cloud environments to avoid storing secrets
+ * Whether our own OAuth credentials may be used instead of the operator supplying
+ * their own. Cloud provisioning writes them into the instance's environment, so this
+ * is a question about the project, not about AWS.
  */
 export function isOAuthSharedKeysAvailable(): boolean {
-  return isCloudEnvironment();
+  return isCloudManagedProject();
 }
 
 /**

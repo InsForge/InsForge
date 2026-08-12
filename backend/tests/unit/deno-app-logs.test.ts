@@ -65,7 +65,10 @@ vi.mock('../../src/services/secrets/secret.service', () => ({
 
 // Mock environment util
 vi.mock('../../src/utils/environment', () => ({
-  isCloudEnvironment: () => false,
+  // One flag, three names: modules ask the product question
+  // (isCloudManagedProject) or the AWS one (hasAwsInstanceProfile).
+  isCloudManagedProject: () => false,
+  hasAwsInstanceProfile: () => false,
 }));
 
 // Mock the log providers to avoid initialization issues

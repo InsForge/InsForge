@@ -13,7 +13,7 @@ import {
   ModelGatewayConfigUpdateError,
 } from '@/services/ai/model-gateway-config.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudManagedProject } from '@/utils/environment.js';
 import {
   ERROR_CODES,
   chatCompletionRequestSchema,
@@ -202,7 +202,7 @@ function parseAIProvider(value: string | undefined): AIProvider {
 }
 
 function assertSelfHostedModelGatewayConfig(): void {
-  if (isCloudEnvironment()) {
+  if (isCloudManagedProject()) {
     throw new AppError(
       'Model Gateway credentials are managed by InsForge Cloud.',
       400,

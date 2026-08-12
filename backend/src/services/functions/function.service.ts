@@ -14,7 +14,7 @@ import fetch from 'node-fetch';
 import { AppError, hasPgErrorCode } from '@/utils/errors.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudManagedProject } from '@/utils/environment.js';
 import { appConfig } from '@/infra/config/app.config.js';
 
 export class FunctionService {
@@ -831,7 +831,7 @@ export class FunctionService {
       }
 
       // Preserve OSS container-to-container routing while keeping cloud compatibility.
-      if (isCloudEnvironment() && baseUrlValue && secretMap['INSFORGE_INTERNAL_URL']) {
+      if (isCloudManagedProject() && baseUrlValue && secretMap['INSFORGE_INTERNAL_URL']) {
         secretMap['INSFORGE_INTERNAL_URL'] = baseUrlValue;
       }
 

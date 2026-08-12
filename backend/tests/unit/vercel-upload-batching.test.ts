@@ -8,7 +8,10 @@ const VERCEL_UPLOAD_TIMEOUT_MS = 120_000;
 
 // Mock dependencies so we don't hit real APIs
 vi.mock('../../src/utils/environment.js', () => ({
-  isCloudEnvironment: () => false,
+  // One flag, three names: modules ask the product question
+  // (isCloudManagedProject) or the AWS one (hasAwsInstanceProfile).
+  isCloudManagedProject: () => false,
+  hasAwsInstanceProfile: () => false,
 }));
 
 vi.mock('../../src/services/secrets/secret.service.js', () => ({

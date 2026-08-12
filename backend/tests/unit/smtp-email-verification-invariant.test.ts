@@ -28,7 +28,10 @@ vi.mock('../../src/infra/config/app.config', () => ({
 }));
 
 vi.mock('../../src/utils/environment', () => ({
-  isCloudEnvironment: mockIsCloudEnvironment,
+  // One flag, three names: modules ask the product question
+  // (isCloudManagedProject) or the AWS one (hasAwsInstanceProfile).
+  isCloudManagedProject: mockIsCloudEnvironment,
+  hasAwsInstanceProfile: mockIsCloudEnvironment,
 }));
 
 vi.mock('../../src/utils/logger', () => ({

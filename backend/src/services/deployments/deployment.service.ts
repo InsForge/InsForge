@@ -10,7 +10,7 @@ import {
 } from '@/providers/deployments/vercel.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import { AppError } from '@/utils/errors.js';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudManagedProject } from '@/utils/environment.js';
 import {
   DeploymentStatus,
   type DeploymentRecord,
@@ -104,7 +104,7 @@ export class DeploymentService {
    * `customSlug: null` means cloud + slug not set (project uses default URL).
    */
   async getConfigMetadata(): Promise<DeploymentsMetadataSchema | undefined> {
-    if (!isCloudEnvironment()) {
+    if (!isCloudManagedProject()) {
       return undefined;
     }
     try {
@@ -1295,7 +1295,7 @@ export class DeploymentService {
    * Calls cloud API: PUT /sites/v1/:projectId/slug
    */
   async updateSlug(slug: string | null): Promise<UpdateSlugResponse> {
-    if (!isCloudEnvironment()) {
+    if (!isCloudManagedProject()) {
       throw new AppError(
         'Custom slugs are only available in cloud environment.',
         503,

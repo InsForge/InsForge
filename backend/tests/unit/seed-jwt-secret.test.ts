@@ -33,7 +33,10 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
 }));
 
 vi.mock('../../src/utils/environment.js', () => ({
-  isCloudEnvironment: mockIsCloudEnvironment,
+  // One flag, three names: modules ask the product question
+  // (isCloudManagedProject) or the AWS one (hasAwsInstanceProfile).
+  isCloudManagedProject: mockIsCloudEnvironment,
+  hasAwsInstanceProfile: mockIsCloudEnvironment,
   getApiBaseUrl: mockGetApiBaseUrl,
 }));
 

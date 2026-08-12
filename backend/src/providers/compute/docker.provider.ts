@@ -57,15 +57,6 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * True when this backend belongs to a cloud-managed project.
- *
- * Both signals are checked because they answer slightly different questions and
- * either one being true is disqualifying: `isCloudEnvironment()` asks "am I
- * running on InsForge Cloud infrastructure", while a configured cloud compute
- * pair asks "is this project's control plane elsewhere". A guard that protects
- * tenant isolation should fail closed on either.
- */
 export class DockerProvider implements ComputeProvider {
   private static instance: DockerProvider;
 
@@ -119,7 +110,7 @@ export class DockerProvider implements ComputeProvider {
    * practice — but "unreachable because nobody mounted it" is a deployment
    * accident away from being wrong, and the failure would be silent.
    *
-   * The signal is `AWS_INSTANCE_PROFILE_NAME`, which cloud provisioning always sets:
+   * The signal is `isCloudManagedProject()`:
    * the user-data script writes it unconditionally and every instance is launched with
    * an IAM instance profile. PROJECT_ID is deliberately *not* part of this test.
    * `.env.example` ships the variable, every compose file passes it through, and

@@ -7,7 +7,10 @@ const environmentMock = vi.hoisted(() => ({
 }));
 
 vi.mock('../../src/utils/environment.js', () => ({
-  isCloudEnvironment: () => environmentMock.isCloud,
+  // One flag, three names: modules ask the product question
+  // (isCloudManagedProject) or the AWS one (hasAwsInstanceProfile).
+  isCloudManagedProject: () => environmentMock.isCloud,
+  hasAwsInstanceProfile: () => environmentMock.isCloud,
 }));
 
 vi.mock('../../src/utils/logger.js', () => ({
