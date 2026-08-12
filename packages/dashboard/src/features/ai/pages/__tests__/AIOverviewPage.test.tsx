@@ -330,7 +330,7 @@ describe('AIOverviewPage entitlement gate', () => {
     expect(screen.queryByRole('button', { name: /^Rotate$/ })).not.toBeInTheDocument();
   });
 
-  it('renders the real page while the entitlement is still resolving', () => {
+  it('shows neither branch while the entitlement is still resolving', () => {
     hookMocks.entitlement = { isLoading: true, allowed: true, reason: null };
 
     render(
@@ -339,9 +339,23 @@ describe('AIOverviewPage entitlement gate', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('button', { name: /^Rotate$/ })).toBeInTheDocument();
+    // Committing early would flash a gated org the paid UI and fire the very
+    // requests the gate exists to prevent.
+    expect(screen.queryByRole('button', { name: /^Rotate$/ })).not.toBeInTheDocument();
     expect(
       screen.queryByText('Upgrade to Pro to use the AI Model Gateway')
     ).not.toBeInTheDocument();
+  });
+
+  it('renders the page once an entitled verdict settles', () => {
+    hookMocks.entitlement = { isLoading: false, allowed: true, reason: null };
+
+    render(
+      <MemoryRouter>
+        <AIOverviewPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('button', { name: /^Rotate$/ })).toBeInTheDocument();
   });
 });

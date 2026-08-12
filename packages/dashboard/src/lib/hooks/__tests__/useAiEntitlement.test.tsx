@@ -10,9 +10,11 @@ const hostState: {
   onRequestInstanceInfo?: () => Promise<DashboardInstanceInfo | null>;
 } = { mode: 'cloud-hosting' };
 
+let currentProjectId = 'project-1';
+
 vi.mock('#lib/config/DashboardHostContext', () => ({
   useDashboardHost: () => hostState,
-  useDashboardProject: () => ({ id: 'project-1' }),
+  useDashboardProject: () => ({ id: currentProjectId }),
   useIsCloudHostingMode: () => hostState.mode === 'cloud-hosting',
 }));
 
@@ -34,6 +36,7 @@ function instanceInfo(overrides: Partial<DashboardInstanceInfo>): DashboardInsta
 }
 
 function setHost(info: Partial<DashboardInstanceInfo> | null, mode = 'cloud-hosting') {
+  currentProjectId = 'project-1';
   hostState.mode = mode;
   hostState.onRequestInstanceInfo =
     info === null ? undefined : () => Promise.resolve(instanceInfo(info));
@@ -90,5 +93,34 @@ describe('useAiEntitlement', () => {
     const { result } = renderHook(() => useAiEntitlement(), { wrapper });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.allowed).toBe(true);
+  });
+
+  it('re-resolves when the project changes under a shared QueryClient', async () => {
+    // The regression the project-scoped query key guards: without it the first
+    // org's verdict stays fresh for the whole staleTime and is served to the
+    // second.
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const shared = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+
+    const byProject: Record<string, Partial<DashboardInstanceInfo>> = {
+      'project-free': { planName: 'free' },
+      'project-paid': { planName: 'pro' },
+    };
+    hostState.mode = 'cloud-hosting';
+    hostState.onRequestInstanceInfo = () =>
+      Promise.resolve(instanceInfo(byProject[currentProjectId]));
+
+    currentProjectId = 'project-free';
+    const first = renderHook(() => useAiEntitlement(), { wrapper: shared });
+    await waitFor(() => expect(first.result.current.allowed).toBe(false));
+    expect(first.result.current.reason).toBe('plan');
+    first.unmount();
+
+    currentProjectId = 'project-paid';
+    const second = renderHook(() => useAiEntitlement(), { wrapper: shared });
+    await waitFor(() => expect(second.result.current.isLoading).toBe(false));
+    expect(second.result.current.allowed).toBe(true);
   });
 });

@@ -332,10 +332,22 @@ export default function AIOverviewPage() {
   const host = useDashboardHost();
   const aiEntitlement = useAiEntitlement();
 
-  // While the bridge is still resolving, allowed is true (fail open), so an
-  // entitled project renders immediately rather than flashing a spinner.
-  // AppSidebar mounts the same query, so by the time this route is reached the
-  // verdict is normally already cached.
+  // Wait for the verdict before committing to a branch. Rendering the body
+  // optimistically would show a gated org the whole paid UI — masked key field
+  // and all — and then yank it away, on top of firing the AI requests the gate
+  // exists to avoid. isLoading is only ever true when the bridge query is both
+  // enabled and in flight, so self-hosting and a warm cache still render
+  // immediately; the wait is limited to a cold load on this route.
+  if (aiEntitlement.isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[rgb(var(--semantic-1))]">
+        <Loader2 className="size-7 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Fail open on anything unresolved (bridge error, self-hosting): cloud still
+  // enforces the real gate.
   if (aiEntitlement.allowed) {
     return <AIOverviewContent />;
   }
