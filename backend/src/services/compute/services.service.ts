@@ -10,7 +10,7 @@ import {
   type ComputeProvider,
   type ComputeLogsResult,
 } from '@/providers/compute/compute.provider.js';
-import { appConfig } from '@/infra/config/app.config.js';
+import { ComputeConfigService } from '@/services/compute/compute-config.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
@@ -326,7 +326,6 @@ export function buildComputeRegistry(): ComputeRegistry {
   if (requested === 'cloud') {
     providers.set('fly', cloud);
   } else if (fly.isConfigured()) {
-    warnIfFlyOrgMissing();
     providers.set('fly', fly);
   } else if (cloud.isConfigured()) {
     providers.set('fly', cloud);
@@ -454,14 +453,29 @@ export function selectComputeProvider(): ComputeProvider {
   return registry.providers.get(registry.defaultProvider)!;
 }
 
-function warnIfFlyOrgMissing(): void {
-  if (!appConfig.fly.org) {
-    // FLY_ORG used to default to "insforge" — our internal org. Operators who
-    // copied .env.example verbatim got opaque "unauthorized" errors from Fly.
-    // Warn loudly at provider selection time instead.
+/**
+ * Warn once, at startup, about a Fly token with no org.
+ *
+ * FLY_ORG used to default to "insforge" — our internal org — so operators who copied
+ * .env.example verbatim got opaque "unauthorized" errors from Fly. This says so in
+ * terms they can act on.
+ *
+ * Two things it deliberately does not do. It does not live in buildComputeRegistry:
+ * that runs on every /api/metadata request, so the warning would repeat on every
+ * dashboard poll. And it reads the *effective* credentials rather than appConfig,
+ * because an org set through the dashboard is stored, not in the environment — the
+ * old check told those operators to set a value they had already set.
+ *
+ * A token with no org means Fly does not register at all, so nothing downstream
+ * reports it: `isConfigured()` requires both.
+ */
+export function warnIfFlyCredentialsIncomplete(): void {
+  const { apiToken, org } = ComputeConfigService.getInstance().flyCredentials();
+  if (apiToken && !org) {
     logger.warn(
-      'Compute self-host: FLY_ORG is empty. Set FLY_ORG to your Fly org slug ' +
-        '(`fly orgs list`); compute requests will otherwise fail with auth errors from Fly.'
+      'Compute self-host: a Fly API token is set but the org is empty, so Fly is not ' +
+        'registered. Set FLY_ORG (or the org field in compute settings) to your Fly ' +
+        'org slug from `fly orgs list`.'
     );
   }
 }

@@ -253,6 +253,31 @@ describe('ComputeServicesService', () => {
       expect(mockLaunchMachine.mock.calls[0][0].ingress).toBe('port');
     });
 
+    // The old check read appConfig and lived inside buildComputeRegistry, which runs on
+    // every /api/metadata request — so an operator who set the org through the
+    // dashboard was told, on every dashboard poll, to set a value they had set. It now
+    // reads the credentials in force and runs once at startup.
+    it('warns about a token with no org, and stays quiet when both are in force', async () => {
+      const { warnIfFlyCredentialsIncomplete } =
+        await import('@/services/compute/services.service.js');
+      const logger = (await import('@/utils/logger.js')).default;
+      const { appConfig } = await import('@/infra/config/app.config.js');
+      const said = () =>
+        vi
+          .mocked(logger.warn)
+          .mock.calls.flat()
+          .some((arg) => typeof arg === 'string' && arg.includes('the org is empty'));
+
+      appConfig.fly.org = '';
+      warnIfFlyCredentialsIncomplete();
+      expect(said()).toBe(true);
+
+      vi.mocked(logger.warn).mockClear();
+      appConfig.fly.org = 'test-org';
+      warnIfFlyCredentialsIncomplete();
+      expect(said()).toBe(false);
+    });
+
     // Provider is the dashboard's navigation axis, so a create from Fly's page has to
     // land on Fly even when Docker is the deployment default. Before this the service
     // layer always used the default and the page filtered its own new service out.
