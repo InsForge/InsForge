@@ -31,7 +31,12 @@ export class CloudComputeProvider implements ComputeProvider {
     return (
       !!appConfig.cloud?.projectId &&
       appConfig.cloud.projectId !== 'local' &&
-      !!appConfig.cloud?.apiHost &&
+      // Supplied, not defaulted: `apiHost` falls back to api.insforge.dev, so testing it
+      // made every deployment with a PROJECT_ID look cloud-provisioned. A self-hoster
+      // who set PROJECT_ID — which the compute routes document as the way to scope
+      // services — got this driver registered in the Fly slot, proxying to our API with
+      // a JWT signed by their own secret, and opaque auth errors back.
+      appConfig.cloud?.apiHostProvided === true &&
       !!appConfig.app?.jwtSecret
     );
   }

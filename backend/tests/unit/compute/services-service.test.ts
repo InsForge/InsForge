@@ -34,6 +34,7 @@ vi.mock('@/infra/config/app.config.js', () => {
     cloud: {
       projectId: '',
       apiHost: '',
+      apiHostProvided: false,
     },
     app: {
       jwtSecret: 'test-secret',
@@ -2325,7 +2326,7 @@ describe('selectComputeProvider factory', () => {
       const c = {
         fly: { apiToken: 'tok', org: 'o', enabled: true, domain: 'd' },
         docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
-        cloud: { projectId: 'local', apiHost: '' },
+        cloud: { projectId: 'local', apiHost: '', apiHostProvided: false },
         app: { jwtSecret: 'x' },
       };
       return {
@@ -2343,7 +2344,7 @@ describe('selectComputeProvider factory', () => {
       const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
         docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
-        cloud: { projectId: 'p', apiHost: 'https://x' },
+        cloud: { projectId: 'p', apiHost: 'https://x', apiHostProvided: true },
         app: { jwtSecret: 'x' },
       };
       return {
@@ -2361,7 +2362,7 @@ describe('selectComputeProvider factory', () => {
       const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
         docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
-        cloud: { projectId: 'local', apiHost: '' },
+        cloud: { projectId: 'local', apiHost: '', apiHostProvided: false },
         app: { jwtSecret: 'x' },
       };
       return {
@@ -2380,7 +2381,7 @@ describe('buildComputeRegistry', () => {
       const c = {
         fly: { apiToken: 'tok', org: 'o', enabled: true, domain: 'd' },
         docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
-        cloud: { projectId: 'p', apiHost: 'https://x' },
+        cloud: { projectId: 'p', apiHost: 'https://x', apiHostProvided: true },
         app: { jwtSecret: 'x' },
       };
       return { config: c, appConfig: c };
@@ -2393,7 +2394,7 @@ describe('buildComputeRegistry', () => {
       const c = {
         fly: { apiToken: 'tok', org: 'o', enabled: true, domain: 'd' },
         docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
-        cloud: { projectId: 'local', apiHost: '' },
+        cloud: { projectId: 'local', apiHost: '', apiHostProvided: false },
         app: { jwtSecret: 'x' },
       };
       return { config: c, appConfig: c };
@@ -2459,7 +2460,7 @@ describe('buildComputeRegistry', () => {
       const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
         docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
-        cloud: { projectId: 'local', apiHost: '' },
+        cloud: { projectId: 'local', apiHost: '', apiHostProvided: false },
         app: { jwtSecret: 'x' },
       };
       return { config: c, appConfig: c };
@@ -2526,7 +2527,7 @@ describe('buildComputeRegistry', () => {
       const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
         docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
-        cloud: { projectId: 'local', apiHost: '' },
+        cloud: { projectId: 'local', apiHost: '', apiHostProvided: false },
         app: { jwtSecret: 'x' },
       };
       return { config: c, appConfig: c };
@@ -2548,7 +2549,7 @@ describe('buildComputeRegistry', () => {
       const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
         docker: { socketPath: '/nonexistent/insforge-test-docker.sock' },
-        cloud: { projectId: 'p', apiHost: 'https://x' },
+        cloud: { projectId: 'p', apiHost: 'https://x', apiHostProvided: true },
         app: { jwtSecret: 'x' },
       };
       return { config: c, appConfig: c };

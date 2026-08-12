@@ -26,7 +26,14 @@ export function isCloudEnvironment(): boolean {
  */
 export function isCloudManagedProject(): boolean {
   const projectId = appConfig.cloud?.projectId;
-  const cloudProject = !!projectId && projectId !== 'local' && !!appConfig.cloud?.apiHost;
+  // PROJECT_ID alone is NOT the signal. `.env.example` ships the variable, the compose
+  // files pass it through, and the compute routes document it as the self-hosted way to
+  // scope services — so a self-hoster setting it is expected, and treating that as
+  // "cloud" would silently refuse to register Docker on their own machine with nothing
+  // to diagnose. `apiHost` cannot help either: it has a default, so it is always truthy.
+  // Cloud provisioning supplies CLOUD_API_HOST explicitly, so require that.
+  const cloudProject =
+    !!projectId && projectId !== 'local' && appConfig.cloud?.apiHostProvided === true;
   return isCloudEnvironment() || cloudProject;
 }
 

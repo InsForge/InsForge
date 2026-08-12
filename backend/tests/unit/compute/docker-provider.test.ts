@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@/infra/config/app.config.js', () => {
   const c = {
+    cloud: {} as Record<string, unknown>,
+    app: { jwtSecret: 'test-secret' },
     docker: {
       socketPath: '/nonexistent/test.sock',
       publicHost: '',
@@ -97,6 +99,39 @@ describe('DockerProvider', () => {
     // The mocked config object is module state, so a test that changes a knob would
     // otherwise change what every later test's daemon config says.
     appConfig.docker.defaultIngress = 'none';
+  });
+
+  // PROJECT_ID is shipped in .env.example, passed through by every compose file, and
+  // documented in the compute routes as the self-hosted way to scope services — so a
+  // self-hoster setting it is expected. Treating that alone as "cloud" silently refused
+  // to register Docker on their own machine, with nothing in the UI to diagnose.
+  describe('cloud detection', () => {
+    beforeEach(() => {
+      // isConfigured() probes the socket path; any existing file proves presence.
+      appConfig.docker.socketPath = process.execPath;
+    });
+
+    afterEach(() => {
+      appConfig.docker.socketPath = '/nonexistent/test.sock';
+      appConfig.cloud = {};
+    });
+
+    it('still registers when PROJECT_ID is set but CLOUD_API_HOST is not', () => {
+      // The default host is not evidence of provisioning, so apiHostProvided stays false.
+      appConfig.cloud = { projectId: 'my-project', apiHost: 'https://api.insforge.dev' };
+
+      expect(provider.isConfigured()).toBe(true);
+    });
+
+    it('refuses when the host was actually supplied alongside a project id', () => {
+      appConfig.cloud = {
+        projectId: 'my-project',
+        apiHost: 'https://api.insforge.dev',
+        apiHostProvided: true,
+      };
+
+      expect(provider.isConfigured()).toBe(false);
+    });
   });
 
   describe('capabilities', () => {
