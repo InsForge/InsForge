@@ -102,6 +102,11 @@ vi.mock('#lib/config/DashboardHostContext', () => ({
   }),
 }));
 
+// These cases all assume an entitled project; the gate has its own tests.
+vi.mock('#lib/hooks/useAiEntitlement', () => ({
+  useAiEntitlement: () => ({ isLoading: false, allowed: true, reason: null }),
+}));
+
 import AIOverviewPage from '#features/ai/pages/AIOverviewPage';
 
 describe('AIOverviewPage OpenRouter key rotation', () => {
