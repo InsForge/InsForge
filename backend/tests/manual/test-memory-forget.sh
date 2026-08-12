@@ -39,9 +39,13 @@ echo ""
 
 # Helpers ---------------------------------------------------------------------
 
+# --max-time so a hung backend cannot stall the run, and so the exit-path
+# cleanup below stays bounded while it has INT/TERM ignored.
+CURL_TIMEOUT=30
+
 # memory_post <endpoint> <json> -> body on stdout
 memory_post() {
-    curl -s -X POST "$API_BASE/memory/$1" \
+    curl -s --max-time "$CURL_TIMEOUT" -X POST "$API_BASE/memory/$1" \
         -H "Authorization: Bearer $api_key" \
         -H "Content-Type: application/json" \
         -d "$2"
@@ -49,7 +53,7 @@ memory_post() {
 
 # memory_status <endpoint> <json> -> http status on stdout
 memory_status() {
-    curl -s -o /dev/null -w "%{http_code}" -X POST "$API_BASE/memory/$1" \
+    curl -s --max-time "$CURL_TIMEOUT" -o /dev/null -w "%{http_code}" -X POST "$API_BASE/memory/$1" \
         -H "Authorization: Bearer $api_key" \
         -H "Content-Type: application/json" \
         -d "$2"
@@ -99,7 +103,12 @@ cleanup_memory_scopes() {
 
 memory_exit_handler() {
     local exit_code=$?
-    trap - EXIT ERR INT TERM   # no re-entry while cleaning up
+    # Clear EXIT/ERR so cleanup cannot re-enter this handler. Ignore INT/TERM
+    # rather than restoring their default action: the default would let a second
+    # Ctrl-C kill the shell partway through the cleanup requests, which is the
+    # leak this trap exists to prevent. curl's --max-time bounds the window.
+    trap - EXIT ERR
+    trap '' INT TERM
     cleanup_memory_scopes
     ( exit "$exit_code" )      # restore $? for handle_exit's own check
     handle_exit
