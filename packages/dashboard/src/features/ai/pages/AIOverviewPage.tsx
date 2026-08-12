@@ -5,6 +5,7 @@ import { ArrowUpCircle, Loader2, RotateCcw, StopCircle } from 'lucide-react';
 import {
   Button,
   ConfirmDialog,
+  EmptyState,
   CopyButton,
   Tab,
   Tabs,
@@ -21,6 +22,7 @@ import { useAIModelCredits } from '#features/ai/hooks/useAIModelCredits';
 import { useAIOverview } from '#features/ai/hooks/useAIOverview';
 import { useOpenRouterKey, useRotateOpenRouterKey } from '#features/ai/hooks/useOpenRouterKey';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useAiEntitlement } from '#lib/hooks/useAiEntitlement';
 import { useConfirm } from '#lib/hooks/useConfirm';
 import type { DashboardModelCreditUsage } from '#types';
 import {
@@ -320,7 +322,78 @@ function ModelCreditBadge({
   );
 }
 
+/**
+ * Entitlement gate. Kept as a separate component from the body below so a
+ * denied org never mounts the AI query hooks — an early return inside one
+ * component would still have run them.
+ */
 export default function AIOverviewPage() {
+  const { t } = useTranslation('chrome');
+  const host = useDashboardHost();
+  const aiEntitlement = useAiEntitlement();
+
+  // Wait for the verdict before committing to a branch. Rendering the body
+  // optimistically would show a gated org the whole paid UI — masked key field
+  // and all — and then yank it away, on top of firing the AI requests the gate
+  // exists to avoid. isLoading is only ever true when the bridge query is both
+  // enabled and in flight, so self-hosting and a warm cache still render
+  // immediately; the wait is limited to a cold load on this route.
+  if (aiEntitlement.isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[rgb(var(--semantic-1))]">
+        <Loader2 className="size-7 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Fail open once the query has settled without a verdict (bridge error) or
+  // was never enabled (self-hosting): cloud still enforces the real gate.
+  if (aiEntitlement.allowed) {
+    return <AIOverviewContent />;
+  }
+
+  return (
+    <div className="h-full overflow-y-auto bg-[rgb(var(--semantic-1))]">
+      <div className="mx-auto flex h-full w-full max-w-[1024px] items-center justify-center px-10 py-10">
+        {aiEntitlement.reason === 'partner' ? (
+          <EmptyState
+            icon={StopCircle}
+            title={t('ai.overview.partnerUnavailableTitle', {
+              defaultValue: 'AI Model Gateway is not available for this project',
+            })}
+            description={t('ai.overview.partnerUnavailableDescription', {
+              defaultValue:
+                'This project is managed by a partner platform, which does not include the AI Model Gateway.',
+            })}
+          />
+        ) : (
+          <EmptyState
+            icon={ArrowUpCircle}
+            title={t('ai.overview.upgradeRequiredTitle', {
+              defaultValue: 'Upgrade to Pro to use the AI Model Gateway',
+            })}
+            description={t('ai.overview.upgradeRequiredDescription', {
+              defaultValue:
+                'Call frontier models through one endpoint, billed by usage. Available on paid plans.',
+            })}
+            action={
+              host.onShowUpgradeDialog
+                ? {
+                    label: t('ai.overview.upgradeRequiredAction', {
+                      defaultValue: 'Upgrade plan',
+                    }),
+                    onClick: () => host.onShowUpgradeDialog?.(),
+                  }
+                : undefined
+            }
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AIOverviewContent() {
   const { t } = useTranslation('chrome');
   const host = useDashboardHost();
   const [codeTab, setCodeTab] = useState<CodeTab>('sdk');
