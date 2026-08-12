@@ -52,7 +52,10 @@ import {
 import { FeatureUsageCollector } from '@/services/telemetry/feature-usage.collector.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { DatabaseBackupService } from '@/services/database/database-backup.service.js';
-import { ComputeServicesService } from '@/services/compute/services.service.js';
+import {
+  ComputeServicesService,
+  warnIfFlyCredentialsIncomplete,
+} from '@/services/compute/services.service.js';
 import { ComputeConfigService } from '@/services/compute/compute-config.service.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -387,6 +390,9 @@ async function initializeServer() {
         // configured through the dashboard comes up with Fly available instead of
         // waiting for the first write to rebuild.
         await ComputeConfigService.getInstance().primeSnapshot();
+        // Once, here, with the credentials that are actually in force — not on every
+        // registry build, which happens per /api/metadata request.
+        warnIfFlyCredentialsIncomplete();
         // The listener is already open, so a compute request can land inside the read
         // above and construct the registry from environment-only values. The
         // registry is a field initialiser, so that choice would stick for the life of
