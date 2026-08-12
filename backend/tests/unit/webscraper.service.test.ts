@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 
 // `webscraper.service.ts` imports LocalWebscraperProvider and ApifyConfigService
 // eagerly, which transitively pull in SecretService -> DatabaseManager -> logger.

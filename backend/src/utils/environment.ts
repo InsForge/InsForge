@@ -1,3 +1,5 @@
+import { appConfig } from '@/infra/config/app.config.js';
+
 /**
  * Environment utility functions for checking runtime environment
  */
@@ -8,6 +10,15 @@
  */
 export function isCloudEnvironment(): boolean {
   return !!(process.env.AWS_INSTANCE_PROFILE_NAME && process.env.AWS_INSTANCE_PROFILE_NAME.trim());
+}
+
+/**
+ * Whether this is an InsForge Cloud project: our infrastructure, with a project to act
+ * for. A project id alone is not enough — PaaS templates set PROJECT_ID too.
+ */
+export function isCloudProject(): boolean {
+  const projectId = appConfig.cloud?.projectId;
+  return isCloudEnvironment() && !!projectId && projectId !== 'local';
 }
 
 /**

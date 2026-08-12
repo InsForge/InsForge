@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
+import { describe, it, expect, beforeEach, vi, type MockInstance, afterAll } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import jwt from 'jsonwebtoken';
 

@@ -1,5 +1,4 @@
-import { appConfig } from '@/infra/config/app.config.js';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudProject } from '@/utils/environment.js';
 import type { WebscraperProvider } from '@/providers/webscraper/base.provider.js';
 import { CloudWebscraperProvider } from '@/providers/webscraper/cloud.provider.js';
 import { LocalWebscraperProvider } from '@/providers/webscraper/local.provider.js';
@@ -26,11 +25,8 @@ export class WebscraperService {
     return WebscraperService.instance;
   }
 
-  // A project id names which project; isCloudEnvironment() says whose infrastructure.
-  // Both are needed: PaaS templates set PROJECT_ID too.
   static isSelfHosted(): boolean {
-    const projectId = appConfig.cloud.projectId;
-    return !isCloudEnvironment() || !projectId || projectId === 'local';
+    return !isCloudProject();
   }
 
   private provider(): WebscraperProvider {

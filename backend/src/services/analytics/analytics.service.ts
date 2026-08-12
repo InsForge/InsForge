@@ -7,8 +7,7 @@ import {
 import { CloudAnalyticsProvider } from '@/providers/analytics/cloud.provider.js';
 import { LocalAnalyticsProvider } from '@/providers/analytics/local.provider.js';
 import type { AnalyticsProvider } from '@/providers/analytics/base.provider.js';
-import { appConfig } from '@/infra/config/app.config.js';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudProject } from '@/utils/environment.js';
 import { AppError } from '@/utils/errors.js';
 import { PostHogConfigService } from './posthog-config.service.js';
 import { PostHogApiService, POSTHOG_HOST_BY_REGION } from './posthog-api.service.js';
@@ -32,8 +31,7 @@ export class AnalyticsService {
 
   // Mirrors WebscraperService.isSelfHosted().
   static isSelfHosted(): boolean {
-    const projectId = appConfig.cloud.projectId;
-    return !isCloudEnvironment() || !projectId || projectId === 'local';
+    return !isCloudProject();
   }
 
   private provider(): AnalyticsProvider {

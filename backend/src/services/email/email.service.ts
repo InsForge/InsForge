@@ -3,6 +3,8 @@ import { CloudEmailProvider } from '@/providers/email/cloud.provider.js';
 import { SmtpEmailProvider } from '@/providers/email/smtp.provider.js';
 import { SmtpConfigService, RawSmtpConfig } from '@/services/email/smtp-config.service.js';
 import { AppError } from '@/utils/errors.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
+import { NEXT_ACTIONS } from '@/utils/next-actions.js';
 import { EmailTemplate } from '@/types/email.js';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
@@ -37,6 +39,16 @@ export class EmailService {
       logger.warn('Error checking SMTP config, falling back to cloud provider', {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
+    }
+    // Off our infrastructure there is no managed provider to fall back to. On cloud the
+    // provider itself reports which of PROJECT_ID or JWT_SECRET is missing.
+    if (!isCloudEnvironment()) {
+      throw new AppError(
+        'No email provider is configured.',
+        503,
+        ERROR_CODES.INTERNAL_ERROR,
+        NEXT_ACTIONS.CONFIGURE_EMAIL_PROVIDER
+      );
     }
     return [this.cloudProvider, null];
   }

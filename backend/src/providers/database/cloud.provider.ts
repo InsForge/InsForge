@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { z } from 'zod';
 import { appConfig } from '@/infra/config/app.config.js';
+import { isCloudProject } from '@/utils/environment.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { DatabaseProvider, DatabaseConnectionInfo, DatabasePasswordInfo } from './base.provider.js';
@@ -50,9 +51,9 @@ export class CloudDatabaseProvider implements DatabaseProvider {
     const projectId = appConfig.cloud.projectId;
     const jwtSecret = appConfig.app.jwtSecret;
 
-    if (!projectId || projectId === 'local') {
+    if (!isCloudProject()) {
       throw new AppError(
-        'PROJECT_ID is not configured. Cannot access cloud API without cloud project setup.',
+        'Cloud database credentials are only available on InsForge Cloud projects.',
         500,
         ERROR_CODES.INTERNAL_ERROR
       );

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterAll } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 
 const cloudConfig = vi.hoisted(() => ({ projectId: undefined as string | undefined }));

@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { appConfig } from '@/infra/config/app.config.js';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudProject } from '@/utils/environment.js';
 import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
@@ -39,9 +39,7 @@ export class CloudAnalyticsProvider implements AnalyticsProvider {
   }
 
   private isEnabled(): boolean {
-    return (
-      isCloudEnvironment() && !!appConfig.cloud.projectId && appConfig.cloud.projectId !== 'local'
-    );
+    return isCloudProject();
   }
 
   private throwUnsupported(): never {

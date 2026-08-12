@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import type { AppError } from '@/utils/errors.js';
 
