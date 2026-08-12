@@ -1,0 +1,10 @@
+# Local-only: turns on the Docker compute provider by mounting the socket.
+# Compose loads this automatically alongside docker-compose.yml, so `docker compose
+# up -d insforge` picks it up. Delete the file to turn compute back off.
+#
+# No group_add: the dev image runs as root, so it can reach a 660 root:docker socket
+# as it is. The production image handles this in its entrypoint instead.
+services:
+  insforge:
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:${DOCKER_SOCKET_PATH:-/var/run/docker.sock}
