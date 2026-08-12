@@ -1,3 +1,5 @@
+import { appConfig } from '@/infra/config/app.config.js';
+
 /**
  * Environment utility functions for checking runtime environment
  */
@@ -8,6 +10,24 @@
  */
 export function isCloudEnvironment(): boolean {
   return !!(process.env.AWS_INSTANCE_PROFILE_NAME && process.env.AWS_INSTANCE_PROFILE_NAME.trim());
+}
+
+/**
+ * Whether this deployment's control plane is InsForge's rather than the operator's.
+ *
+ * Two independent signals, because they answer different questions: the AWS instance
+ * profile says "this is our infrastructure", and the PROJECT_ID + CLOUD_API_HOST pair
+ * says "this project's control plane is elsewhere". A cloud-proxied project need not
+ * run on an AWS instance profile, so a guard that protects tenant isolation has to
+ * fail closed on either.
+ *
+ * Lives here so the compute driver's registration guard and the config endpoint's
+ * write guard cannot drift apart — they are the same question.
+ */
+export function isCloudManagedProject(): boolean {
+  const projectId = appConfig.cloud?.projectId;
+  const cloudProject = !!projectId && projectId !== 'local' && !!appConfig.cloud?.apiHost;
+  return isCloudEnvironment() || cloudProject;
 }
 
 /**

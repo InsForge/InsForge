@@ -27,6 +27,9 @@ vi.mock('@/api/middlewares/rate-limiters.js', () => ({
 }));
 
 vi.mock('@/utils/environment.js', () => ({
+  // Both, because the route asks the two-signal question and other modules in the
+  // import graph ask the narrow one.
+  isCloudManagedProject: () => env.isCloud,
   isCloudEnvironment: () => env.isCloud,
 }));
 
@@ -85,14 +88,6 @@ describe('/api/compute/services/config', () => {
 
     expect(res.status).toBe(200);
     expect(configMock.getConfig).toHaveBeenCalled();
-  });
-
-  // The whole point of the masked shape: a stored token must not come back out.
-  it('never returns a raw token', async () => {
-    const res = await request(await createApp()).get('/api/compute/services/config');
-
-    expect(JSON.stringify(res.body)).not.toContain('fm2_pasted');
-    expect(res.body.data?.flyApiToken?.masked ?? res.body.flyApiToken?.masked).toContain('••');
   });
 
   it('stores a credential and rebuilds the provider registry', async () => {

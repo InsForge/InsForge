@@ -173,4 +173,35 @@ describe('ComputeConfigService', () => {
     expect(secretStore.secrets.get('FLY_API_TOKEN')).toBe('fm2_new_token');
     expect(svc.flyCredentials().apiToken).toBe('fm2_new_token');
   });
+
+  // The epoch guard covered the success path only, so a slow read that failed could
+  // still wipe a newer one that had succeeded — a rotation would silently fall back to
+  // the environment.
+  it('keeps a newer snapshot when an older read fails', async () => {
+    appConfig.fly.apiToken = 'env-token';
+    appConfig.fly.org = 'env-org';
+
+    let releaseSlow: (() => void) | undefined;
+    const slow = new Promise<string | null>((resolve) => {
+      releaseSlow = () => resolve('slow-token');
+    });
+    const secretStore = store({ FLY_API_TOKEN: 'fresh-token', FLY_ORG: 'fresh-org' });
+    const svc = new ComputeConfigService(secretStore);
+
+    // First prime hangs, then rejects. Second prime completes with the stored values.
+    secretStore.getSecretByKey = vi.fn(() => slow.then(() => Promise.reject(new Error('boom'))));
+    const first = svc.primeSnapshot();
+
+    secretStore.getSecretByKey = vi.fn((key: string) =>
+      Promise.resolve(secretStore.secrets.get(key) ?? null)
+    );
+    await svc.primeSnapshot();
+    expect(svc.flyCredentials().apiToken).toBe('fresh-token');
+
+    releaseSlow?.();
+    await first;
+
+    // The failed older read must not have reverted us to the environment.
+    expect(svc.flyCredentials().apiToken).toBe('fresh-token');
+  });
 });

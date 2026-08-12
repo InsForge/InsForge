@@ -2,8 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { cpuTierToCores } from '@insforge/shared-schemas';
-import { appConfig } from '@/infra/config/app.config.js';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudManagedProject } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import {
   MachineGoneError,
@@ -67,12 +66,6 @@ function escapeRegExp(value: string): string {
  * pair asks "is this project's control plane elsewhere". A guard that protects
  * tenant isolation should fail closed on either.
  */
-function isCloudManaged(): boolean {
-  const projectId = appConfig.cloud?.projectId;
-  const cloudProject = !!projectId && projectId !== 'local' && !!appConfig.cloud?.apiHost;
-  return isCloudEnvironment() || cloudProject;
-}
-
 export class DockerProvider implements ComputeProvider {
   private static instance: DockerProvider;
 
@@ -128,7 +121,7 @@ export class DockerProvider implements ComputeProvider {
    * on either cloud signal instead.
    */
   isConfigured(): boolean {
-    if (isCloudManaged()) {
+    if (isCloudManagedProject()) {
       return false;
     }
     return existsSync(dockerConfig().socketPath);

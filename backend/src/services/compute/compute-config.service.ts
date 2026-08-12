@@ -95,7 +95,12 @@ export class ComputeConfigService {
       logger.warn('Compute config: could not read stored Fly credentials; using the environment', {
         error: error instanceof Error ? error.message : String(error),
       });
-      this.snapshot = undefined;
+      // Same epoch check as the success path: a read that failed must not discard a
+      // newer one that succeeded, or a rotation would silently fall back to the
+      // environment.
+      if (epoch === this.snapshotEpoch) {
+        this.snapshot = undefined;
+      }
     }
   }
 

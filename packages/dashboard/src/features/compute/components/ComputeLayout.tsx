@@ -49,7 +49,9 @@ export default function ComputeLayout() {
   const isCloud = useIsCloudHostingMode();
   // Last path segment when it names a provider we have a page for.
   const viewedProvider = COMPUTE_PROVIDERS.map((p) => p.slug).find(
-    (slug) => pathname === `/dashboard/compute/${slug}`
+    // Trailing slash tolerated: `/dashboard/compute/fly/` is the same page, and an
+    // exact match sent the gear back to Docker there.
+    (slug) => pathname.replace(/\/+$/, '') === `/dashboard/compute/${slug}`
   );
   const {
     metadata,

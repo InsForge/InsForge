@@ -1,4 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ToastProvider } from '@insforge/ui';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ServiceSchema } from '@insforge/shared-schemas';
@@ -149,6 +152,42 @@ describe('ComputeLayout', () => {
 
     expect(screen.getByTestId('provider-page')).toBeTruthy();
     expect(listed.enabledCalls.some((e) => e === true)).toBe(true);
+  });
+
+  // The gear lives in the sidebar, which does not know the route. A trailing slash is
+  // the same page, and an exact pathname match sent the dialog back to Docker there.
+  it('opens settings on the provider being viewed, trailing slash or not', async () => {
+    meta.value = {
+      compute: { defaultProvider: 'docker', providers: { docker: {}, fly: {} } },
+    };
+    const { default: Layout } = await import('#features/compute/components/ComputeLayout');
+    for (const path of ['/dashboard/compute/fly', '/dashboard/compute/fly/']) {
+      // Providers only for this case: opening the dialog mounts the Fly credential
+      // form, which reads react-query and reports failures through the toast context.
+      const { unmount } = render(
+        <QueryClientProvider
+          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+        >
+          <ToastProvider>
+            <MemoryRouter initialEntries={[path]}>
+              <Routes>
+                <Route path="/dashboard/compute" element={<Layout />}>
+                  <Route path=":provider" element={<ProviderStub />} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </ToastProvider>
+        </QueryClientProvider>
+      );
+      await userEvent.click(screen.getByRole('button', { name: /compute settings/i }));
+      // The *heading* of the main pane, not the dialog's text: the side nav lists both
+      // providers, so matching anywhere in the dialog passes even when the wrong tab is
+      // open. Radix renders DialogTitle as a heading; the nav entries are buttons.
+      expect(
+        within(screen.getByRole('dialog')).getByRole('heading', { name: 'Fly.io' })
+      ).toBeTruthy();
+      unmount();
+    }
   });
 
   // Metadata failing is an outage, not a missing socket. Showing the setup guide there
