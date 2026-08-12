@@ -622,9 +622,12 @@ components:
   responses:
     RuntimeFunctionNotFound:
       description: |
-        Function not found or not active. Body comes from the Deno runtime and is
-        forwarded verbatim: JSON when the slug is well-formed but has no active
-        function, plain text when the path is not a valid slug at all.
+        Function invocation can return two runtime-driven 404 variants.
+        - application/json: Returned when the path matches the documented slug
+          pattern but no active function exists for that slug.
+        - text/plain: Returned by the runtime catch-all when the request path does
+          not match the slug route at all (non-conformant path shape).
+        Consumers should branch by Content-Type at runtime.
       content:
         application/json:
           schema:
