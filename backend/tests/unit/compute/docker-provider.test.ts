@@ -101,47 +101,11 @@ describe('DockerProvider', () => {
     appConfig.docker.defaultIngress = 'none';
   });
 
-  // PROJECT_ID is shipped in .env.example, passed through by every compose file, and
-  // documented in the compute routes as the self-hosted way to scope services — so a
-  // self-hoster setting it is expected. Treating that alone as "cloud" silently refused
-  // to register Docker on their own machine, with nothing in the UI to diagnose.
-  describe('cloud detection', () => {
-    beforeEach(() => {
-      // isConfigured() probes the socket path; any existing file proves presence.
-      appConfig.docker.socketPath = process.execPath;
-    });
-
-    afterEach(() => {
-      appConfig.docker.socketPath = '/nonexistent/test.sock';
-      appConfig.cloud = {};
-    });
-
-    it('still registers when PROJECT_ID is set', () => {
-      appConfig.cloud = { projectId: 'my-project', apiHost: 'https://api.insforge.dev' };
-
-      expect(provider.isConfigured()).toBe(true);
-    });
-
-    // The signal cloud provisioning always sets: the user-data script writes it
-    // unconditionally and every instance launches with an IAM instance profile.
-    it('refuses on an instance carrying an AWS instance profile', () => {
-      const original = process.env.AWS_INSTANCE_PROFILE_NAME;
-      process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
-      try {
-        expect(provider.isConfigured()).toBe(false);
-      } finally {
-        if (original === undefined) {
-          delete process.env.AWS_INSTANCE_PROFILE_NAME;
-        } else {
-          process.env.AWS_INSTANCE_PROFILE_NAME = original;
-        }
-      }
-    });
-  });
-
   describe('cloud detection', () => {
     const saved = {
       profile: process.env.AWS_INSTANCE_PROFILE_NAME,
+      deployment: process.env.DEPLOYMENT_ID,
+      project: process.env.PROJECT_ID,
       socket: appConfig.docker.socketPath,
     };
 
@@ -154,10 +118,16 @@ describe('DockerProvider', () => {
 
     afterEach(() => {
       appConfig.docker.socketPath = saved.socket;
-      if (saved.profile === undefined) {
-        delete process.env.AWS_INSTANCE_PROFILE_NAME;
-      } else {
-        process.env.AWS_INSTANCE_PROFILE_NAME = saved.profile;
+      for (const [key, value] of [
+        ['AWS_INSTANCE_PROFILE_NAME', saved.profile],
+        ['DEPLOYMENT_ID', saved.deployment],
+        ['PROJECT_ID', saved.project],
+      ] as const) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
       }
     });
 

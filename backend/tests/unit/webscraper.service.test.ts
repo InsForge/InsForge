@@ -83,6 +83,18 @@ describe('WebscraperService provider resolution', () => {
     expect(local.getConnection).toHaveBeenCalledTimes(1);
     expect(cloud.getConnection).toHaveBeenCalledTimes(1);
   });
+  // The Zeabur template sets PROJECT_ID, so a project id alone must not route at the
+  // cloud provider. Asserted through getApifyConnection() rather than isSelfHosted() so
+  // a refactor that stops consulting it cannot pass.
+  it('stays local for a self-host that sets PROJECT_ID', async () => {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    configMock.cloud.projectId = 'zeabur-project-1';
+    const { cloud, local } = makeProviders();
+    const service = new WebscraperService(cloud as never, local as never);
+
+    await expect(service.getApifyConnection()).resolves.toEqual({ tag: 'local' });
+    expect(cloud.getConnection).not.toHaveBeenCalled();
+  });
 });
 
 describe('WebscraperService.setApifyToken', () => {
@@ -139,14 +151,5 @@ describe('WebscraperService.setApifyToken', () => {
 
     expect(local.verifyToken).toHaveBeenCalledWith('apify_api_tok1234567890');
     expect(config.setToken).toHaveBeenCalledWith('apify_api_tok1234567890');
-  });
-
-  it('stays local for a self-host that sets PROJECT_ID', async () => {
-    delete process.env.AWS_INSTANCE_PROFILE_NAME;
-    configMock.cloud.projectId = 'zeabur-project-1';
-
-    const { WebscraperService } = await import('@/services/webscraper/webscraper.service.js');
-
-    expect(WebscraperService.isSelfHosted()).toBe(true);
   });
 });

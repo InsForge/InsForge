@@ -71,7 +71,7 @@ export class CloudComputeProvider implements ComputeProvider {
   private signToken(): string {
     if (!this.isConfigured()) {
       throw new AppError(
-        'Cloud compute not configured (need PROJECT_ID, CLOUD_API_HOST, JWT_SECRET)',
+        'Cloud compute is only available on InsForge Cloud projects (needs PROJECT_ID, CLOUD_API_HOST, JWT_SECRET).',
         500,
         ERROR_CODES.COMPUTE_NOT_CONFIGURED
       );

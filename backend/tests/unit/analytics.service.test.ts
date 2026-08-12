@@ -90,6 +90,19 @@ describe('AnalyticsService', () => {
       expect(local.getConnection).toHaveBeenCalledOnce();
     });
 
+    // The Zeabur template sets PROJECT_ID, so a project id alone must not route at the
+    // cloud provider.
+    it('stays local for a self-host that sets PROJECT_ID', async () => {
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+      cloudConfig.projectId = 'zeabur-project-1';
+      const { service, local, cloud } = makeService();
+
+      await service.getConnection();
+
+      expect(local.getConnection).toHaveBeenCalledOnce();
+      expect(cloud.getConnection).not.toHaveBeenCalled();
+    });
+
     it('uses the cloud provider when a real PROJECT_ID is set', async () => {
       cloudConfig.projectId = '77777777-7777-7777-7777-777777777777';
       const { service, cloud, local } = makeService();
@@ -267,14 +280,5 @@ describe('AnalyticsService', () => {
       ]);
       expect(config.setConnection).not.toHaveBeenCalled();
     });
-  });
-
-  it('stays local for a self-host that sets PROJECT_ID', async () => {
-    delete process.env.AWS_INSTANCE_PROFILE_NAME;
-    cloudConfig.projectId = 'zeabur-project-1';
-
-    const { AnalyticsService } = await import('@/services/analytics/analytics.service.js');
-
-    expect(AnalyticsService.isSelfHosted()).toBe(true);
   });
 });
