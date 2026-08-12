@@ -32,10 +32,16 @@ export function FlyCredentialsForm() {
     if (!canSave) {
       return;
     }
-    await update.mutateAsync({
-      ...(token.trim() ? { flyApiToken: token.trim() } : {}),
-      ...(org.trim() ? { flyOrg: org.trim() } : {}),
-    });
+    try {
+      await update.mutateAsync({
+        ...(token.trim() ? { flyApiToken: token.trim() } : {}),
+        ...(org.trim() ? { flyOrg: org.trim() } : {}),
+      });
+    } catch {
+      // Reported by the mutation's onError. Leaving the fields filled matters: this is
+      // a pasted token, and clearing it on failure would make the retry a re-paste.
+      return;
+    }
     setToken('');
     setOrg('');
     setRevealed(false);

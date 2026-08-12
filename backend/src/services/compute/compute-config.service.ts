@@ -159,6 +159,18 @@ export class ComputeConfigService {
    * registry and have a newly-configured Fly become usable immediately.
    */
   async updateConfig(update: UpdateComputeConfig): Promise<void> {
+    try {
+      await this.applyUpdate(update);
+    } finally {
+      // Re-read whatever actually landed, including on a partial failure: an earlier
+      // write may have succeeded, and a snapshot that still describes the pre-write
+      // state is worse than one that matches the store.
+      await this.primeSnapshot();
+      await this.primeSettings();
+    }
+  }
+
+  private async applyUpdate(update: UpdateComputeConfig): Promise<void> {
     // One listing for both writes, and it is also what tells create from update:
     // updateSecretByKey is UPDATE-only and reports false rather than inserting, so a
     // first-time save through it would quietly do nothing.
@@ -197,10 +209,7 @@ export class ComputeConfigService {
             WHERE id = TRUE`,
           values
         );
-      await this.primeSettings();
     }
-
-    await this.primeSnapshot();
   }
 
   private async upsert(

@@ -69,6 +69,7 @@ describe('ComputeLayout', () => {
   beforeEach(() => {
     listed.services = [];
     listed.enabledCalls = [];
+    meta.value = undefined;
     meta.isLoading = false;
     host.isCloud = false;
     vi.clearAllMocks();
@@ -110,6 +111,7 @@ describe('ComputeLayout', () => {
     meta.value = { version: '1' };
     renderAt('/dashboard/compute/docker');
 
+    expect(listed.enabledCalls.length).toBeGreaterThan(0);
     expect(listed.enabledCalls.every((e) => e === false)).toBe(true);
   });
 

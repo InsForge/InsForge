@@ -34,16 +34,20 @@ export function DockerSettingsForm() {
   const [domain, setDomain] = useState('');
   const [socketPath, setSocketPath] = useState('');
 
-  // Seeded once the current values arrive.
+  // Seeded once, not on every change of the query object: a refetch while someone is
+  // typing would otherwise replace what they typed with what the server still has.
+  const [seeded, setSeeded] = useState(false);
+
   useEffect(() => {
-    if (!config) {
+    if (!config || seeded) {
       return;
     }
+    setSeeded(true);
     setDefaultIngress(config.settings.defaultIngress ?? 'none');
     setPublicHost(config.settings.publicHost ?? '');
     setDomain(config.settings.domain ?? '');
     setSocketPath(config.settings.socketPath ?? '');
-  }, [config]);
+  }, [config, seeded]);
 
   const dirty =
     config !== undefined &&
@@ -53,15 +57,23 @@ export function DockerSettingsForm() {
       socketPath !== (config.settings.socketPath ?? ''));
 
   const handleSave = async () => {
-    await update.mutateAsync({
-      defaultIngress: defaultIngress as 'none' | 'port' | 'host',
-      // An empty host field is a real setting — "advertise no URL" — so it is sent as
-      // an empty string. The socket has no such reading: there is no "no socket", so
-      // blank means clear the override and use the environment again.
-      publicHost,
-      domain,
-      socketPath: socketPath.trim() ? socketPath.trim() : null,
-    });
+    // The mutation's onError already reports this; catching keeps the rejection from
+    // escaping the void call below as an unhandled promise.
+    try {
+      await update.mutateAsync({
+        defaultIngress: defaultIngress as 'none' | 'port' | 'host',
+        // An empty host field is a real setting — "advertise no URL" — so it is sent as
+        // an empty string. The socket has no such reading: there is no "no socket", so
+        // blank means clear the override and use the environment again.
+        publicHost,
+        domain,
+        socketPath: socketPath.trim() ? socketPath.trim() : null,
+      });
+      // Re-seed from whatever the server now reports.
+      setSeeded(false);
+    } catch {
+      /* reported by the mutation's onError */
+    }
   };
 
   if (isLoading) {

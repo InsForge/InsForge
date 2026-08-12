@@ -413,6 +413,7 @@ export default function ComputeServicesPage() {
       </div>
 
       <CreateServiceDialog
+        provider={provider}
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreate={create}

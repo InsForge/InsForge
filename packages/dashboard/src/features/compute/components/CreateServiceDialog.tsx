@@ -29,6 +29,12 @@ interface CreateServiceDialogProps {
   onOpenChange: (open: boolean) => void;
   onCreate: (data: CreateServiceRequestInput) => Promise<unknown>;
   isCreating: boolean;
+  /**
+   * Provider this dialog creates on — the page's own, not the deployment default.
+   * Both matter: it decides which capabilities the form offers, and it goes in the
+   * request so the service lands on the provider whose page you opened it from.
+   */
+  provider: string;
 }
 
 /**
@@ -43,9 +49,10 @@ export function CreateServiceDialog({
   onOpenChange,
   onCreate,
   isCreating,
+  provider,
 }: CreateServiceDialogProps) {
   const { t } = useTranslation('chrome');
-  const { capabilities } = useComputeCapabilities();
+  const { capabilities } = useComputeCapabilities(provider);
   const [name, setName] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [port, setPort] = useState('8080');
@@ -87,6 +94,7 @@ export function CreateServiceDialog({
   const handleSubmit = async () => {
     try {
       await onCreate({
+        provider: provider as CreateServiceRequest['provider'],
         name,
         imageUrl,
         port: Number(port),

@@ -25,12 +25,12 @@ export function useUpdateComputeConfig() {
     mutationFn: (input) => computeServicesApi.updateConfig(input),
     onSuccess: (config) => {
       queryClient.setQueryData(COMPUTE_CONFIG_QUERY_KEY, config);
-      showToast(t('compute.configSaved', { defaultValue: 'Fly credentials saved' }), 'success');
+      showToast(t('compute.configSaved', { defaultValue: 'Compute settings saved' }), 'success');
     },
     onError: (error) => {
       showToast(
         error.message ||
-          t('compute.configSaveFailed', { defaultValue: 'Failed to save Fly credentials' }),
+          t('compute.configSaveFailed', { defaultValue: 'Failed to save compute settings' }),
         'error'
       );
     },

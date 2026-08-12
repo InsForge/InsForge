@@ -101,10 +101,14 @@ export default function ComputeLayout() {
   // Land on something useful: the provider new services go to, else the first one
   // configured, else Docker — the option a self-hoster can act on without an account.
   if (pathname === '/dashboard/compute' || pathname === '/dashboard/compute/') {
+    // Both candidates are checked against the slugs this dashboard has pages for. An
+    // unrecognised one would redirect here, get bounced back by the page's own slug
+    // guard, and loop.
+    const known = configured.filter((slug) => COMPUTE_PROVIDERS.some((p) => p.slug === slug));
     const landing =
       (compute?.defaultProvider && COMPUTE_PROVIDERS.some((p) => p.slug === compute.defaultProvider)
         ? compute.defaultProvider
-        : configured[0]) ?? 'docker';
+        : known[0]) ?? 'docker';
     return <Navigate to={`/dashboard/compute/${landing}`} replace />;
   }
 
