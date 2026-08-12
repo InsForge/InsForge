@@ -271,6 +271,73 @@ La respuesta usa la misma estructura de sesión y el mismo comportamiento de `cl
 
 ---
 
+## Inicio de Sesión con OTP por Teléfono
+
+Usa este flujo sin contraseña cuando un usuario deba iniciar sesión con un código de 6 dígitos enviado a su teléfono por SMS. Requiere un proveedor de SMS configurado (consulta [SMS personalizado](/es/core-concepts/messaging/custom-sms)); los envíos se rechazan con `SMS_PROVIDER_NOT_CONFIGURED` hasta que se habilite uno.
+
+### Enviar un Código de Inicio de Sesión
+
+```
+POST /api/auth/phone/send-otp
+```
+
+#### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|-----------|-------------|
+| `phone` | string | Sí | Número de teléfono en formato E.164 (por ejemplo `+15551234567`) que recibe el código |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/phone/send-otp" \
+  -H "Content-Type: application/json" \
+  -d '{ "phone": "+15551234567" }'
+```
+
+El endpoint devuelve `202 Accepted` con un mensaje genérico. No revela si el número de teléfono ya pertenece a un usuario.
+
+### Crear una Sesión con el Código
+
+```
+POST /api/auth/sessions
+```
+
+#### Parámetros de Consulta
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|-----------|-------------|
+| `client_type` | string | No | Tipo de cliente: `web` (predeterminado), `mobile`, `desktop` o `server` |
+
+#### Cuerpo de Solicitud
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|-----------|-------------|
+| `method` | string | Sí | Debe ser `otp` |
+| `phone` | string | Sí | Número de teléfono que recibió el código. Proporciona `phone` o `email`, nunca ambos |
+| `otp` | string | Sí | Código de inicio de sesión de 6 dígitos |
+| `name` | string | No | Nombre de perfil usado solo si la verificación crea un usuario |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=server" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "otp",
+    "phone": "+15551234567",
+    "otp": "123456",
+    "name": "Ada Lovelace"
+  }'
+```
+
+La respuesta usa la misma estructura de sesión y el mismo comportamiento de `client_type` que el inicio de sesión con contraseña.
+
+<Note>
+- Los códigos caducan después de 5 minutos, solo pueden usarse una vez y se consumen después de tres intentos fallidos. La caducidad, el límite de intentos y los límites de velocidad son idénticos al OTP por correo.
+- InsForge no crea un usuario al enviar el código. Si el número es nuevo, crea un usuario con `phone_verified: true` y sin correo solo después de verificarlo correctamente.
+- Un usuario creado por teléfono tiene un correo `null`. A diferencia del OTP por correo, verificar un código por teléfono nunca elimina una contraseña almacenada.
+- Si el registro público está deshabilitado, un usuario existente todavía puede iniciar sesión. Un código válido para un número desconocido se consume y devuelve HTTP 403.
+</Note>
+
+---
+
 ## Actualizar Token
 
 Actualizar token de acceso usando token de actualización.

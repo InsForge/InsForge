@@ -271,6 +271,73 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=server
 
 ---
 
+## 手机 OTP 登录
+
+当用户需要使用通过短信发送到手机的 6 位验证码登录时，使用此免密码流程。需要先配置短信提供商（参见[自定义短信](/zh/core-concepts/messaging/custom-sms)）；在启用之前，发送请求会被拒绝并返回 `SMS_PROVIDER_NOT_CONFIGURED`。
+
+### 发送登录验证码
+
+```
+POST /api/auth/phone/send-otp
+```
+
+#### 请求体
+
+| 字段 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| `phone` | string | 是 | 接收验证码的 E.164 格式手机号（例如 `+15551234567`） |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/phone/send-otp" \
+  -H "Content-Type: application/json" \
+  -d '{ "phone": "+15551234567" }'
+```
+
+端点返回 `202 Accepted` 和通用消息。不会透露该手机号是否已属于某个用户。
+
+### 使用验证码创建会话
+
+```
+POST /api/auth/sessions
+```
+
+#### 查询参数
+
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| `client_type` | string | 否 | 客户端类型：`web`（默认）、`mobile`、`desktop` 或 `server` |
+
+#### 请求体
+
+| 字段 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| `method` | string | 是 | 必须为 `otp` |
+| `phone` | string | 是 | 接收验证码的手机号。提供 `phone` 或 `email`，不能同时提供 |
+| `otp` | string | 是 | 6 位登录验证码 |
+| `name` | string | 否 | 仅在验证创建新用户时使用的个人资料名称 |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=server" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "otp",
+    "phone": "+15551234567",
+    "otp": "123456",
+    "name": "Ada Lovelace"
+  }'
+```
+
+响应使用与密码登录相同的会话结构和 `client_type` 行为。
+
+<Note>
+- 验证码有效期为 5 分钟，只能使用一次，并会在三次失败尝试后失效。有效期、尝试次数限制和速率限制与邮箱 OTP 完全相同。
+- InsForge 不会在发送验证码时创建用户。如果手机号尚未注册，只会在验证成功后创建 `phone_verified: true` 且无邮箱的用户。
+- 通过手机登录创建的用户邮箱为 `null`。与邮箱 OTP 不同，验证手机验证码不会清除已存储的密码。
+- 如果已禁用公开注册，现有用户仍可登录。未知手机号的有效验证码会被消费，并返回 HTTP 403。
+</Note>
+
+---
+
 ## 刷新令牌
 
 使用刷新令牌刷新访问令牌。

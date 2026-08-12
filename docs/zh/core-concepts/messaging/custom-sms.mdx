@@ -1,0 +1,44 @@
+---
+title: 自定义短信
+description: 配置 Twilio，通过短信从 InsForge 发送手机登录验证码。
+---
+
+启用后，手机 OTP 登录验证码将通过您的 Twilio 账户发送。短信没有托管的兜底发送方：在配置并启用提供商之前，`POST /api/auth/phone/send-otp` 会拒绝请求并返回 `SMS_PROVIDER_NOT_CONFIGURED`。
+
+## 概念
+
+每次发送时都会解析提供商，因此保存的更改在下一次请求时生效。InsForge 在保存前会向 Twilio API 验证凭据，因此持久化的配置始终可用。身份验证令牌使用 AES-256-GCM 加密存储，API 永远不会返回它。
+
+## 使用方法
+
+在 **Authentication → Custom SMS** 中配置短信。
+
+<Steps>
+  <Step title="启用自定义短信">
+    打开 **SMS Provider** 卡片上的开关。
+  </Step>
+  <Step title="输入凭据">
+    Account SID、身份验证令牌，以及 E.164 格式的发送号码（或消息服务 SID，两者都设置时优先使用后者）。
+  </Step>
+  <Step title="保存">
+    InsForge 在持久化之前会向 Twilio API 检查凭据。错误的凭据会立即失败。
+  </Step>
+</Steps>
+
+登录消息可在同一卡片中编辑。发送时 `{{ code }}` 会被替换为 6 位验证码（与邮件模板的 `{{ token }}` 约定一致）；默认值为 `Your verification code is {{ code }}. It expires in 5 minutes.`
+
+## 开发提供商
+
+对于本地开发和测试，配置接受 `provider: "console"`（通过 `PUT /api/auth/sms-config` 设置），它会将消息记录到后端日志而不是发送。控制台提供商在生产环境中会被拒绝，无论是保存配置时还是发送时。
+
+## 注意事项
+
+- **速率限制。** **最小间隔（秒）** 限制每个号码的发送频率。冷却期内的发送返回 HTTP `429`。默认为 `60`；`0` 表示禁用。发送端点还会应用与邮箱 OTP 相同的按 IP 和按接收者限制。
+- **Twilio 试用账户。** 试用账户完全无法发送自定义消息正文——发送会失败并返回 Twilio 错误 572006（"Trial accounts can only use predefined SMS templates"），因此手机登录需要付费账户。付费账户还需注意：使用普通本地号码在美国发送可能需要 A2P 10DLC 注册。
+- **审计日志。** 保存配置会记录 `UPDATE_SMS_CONFIG`。
+
+## 更多资源
+
+- [消息传递概述](/zh/core-concepts/messaging/overview) 了解路由模型。
+- [手机 OTP 登录](/zh/sdks/rest/auth#手机-otp-登录) 了解这些消息服务的 REST 端点。
+- [Twilio Programmable Messaging](https://www.twilio.com/docs/messaging) 了解提供商侧的设置。

@@ -271,6 +271,73 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=server
 
 ---
 
+## 手機 OTP 登入
+
+當使用者需要使用透過簡訊傳送到手機的 6 位驗證碼登入時，使用此免密碼流程。需要先設定簡訊供應商（參見[自訂簡訊](/zh-Hant/core-concepts/messaging/custom-sms)）；在啟用之前，傳送請求會被拒絕並傳回 `SMS_PROVIDER_NOT_CONFIGURED`。
+
+### 傳送登入驗證碼
+
+```
+POST /api/auth/phone/send-otp
+```
+
+#### 請求主體
+
+| 欄位 | 類型 | 必填 | 描述 |
+|------|------|------|------|
+| `phone` | string | 是 | 接收驗證碼的 E.164 格式手機號碼（例如 `+15551234567`） |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/phone/send-otp" \
+  -H "Content-Type: application/json" \
+  -d '{ "phone": "+15551234567" }'
+```
+
+端點傳回 `202 Accepted` 和通用訊息。不會透露該手機號碼是否已屬於某個使用者。
+
+### 使用驗證碼建立工作階段
+
+```
+POST /api/auth/sessions
+```
+
+#### 查詢參數
+
+| 參數 | 類型 | 必填 | 描述 |
+|------|------|------|------|
+| `client_type` | string | 否 | 用戶端類型：`web`（預設）、`mobile`、`desktop` 或 `server` |
+
+#### 請求主體
+
+| 欄位 | 類型 | 必填 | 描述 |
+|------|------|------|------|
+| `method` | string | 是 | 必須為 `otp` |
+| `phone` | string | 是 | 接收驗證碼的手機號碼。提供 `phone` 或 `email`，不能同時提供 |
+| `otp` | string | 是 | 6 位登入驗證碼 |
+| `name` | string | 否 | 僅在驗證建立新使用者時使用的個人資料名稱 |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=server" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "otp",
+    "phone": "+15551234567",
+    "otp": "123456",
+    "name": "Ada Lovelace"
+  }'
+```
+
+回應使用與密碼登入相同的工作階段結構和 `client_type` 行為。
+
+<Note>
+- 驗證碼有效期為 5 分鐘，只能使用一次，並會在三次失敗嘗試後失效。有效期、嘗試次數限制和速率限制與電子郵件 OTP 完全相同。
+- InsForge 不會在傳送驗證碼時建立使用者。如果手機號碼尚未註冊，只會在驗證成功後建立 `phone_verified: true` 且無電子郵件的使用者。
+- 透過手機登入建立的使用者電子郵件為 `null`。與電子郵件 OTP 不同，驗證手機驗證碼不會清除已儲存的密碼。
+- 如果已停用公開註冊，現有使用者仍可登入。未知手機號碼的有效驗證碼會被消耗，並傳回 HTTP 403。
+</Note>
+
+---
+
 ## 刷新令牌
 
 使用刷新令牌刷新存取令牌。

@@ -1,0 +1,44 @@
+---
+title: 自訂簡訊
+description: 設定 Twilio，透過簡訊從 InsForge 傳送手機登入驗證碼。
+---
+
+啟用後，手機 OTP 登入驗證碼將透過您的 Twilio 帳戶傳送。簡訊沒有託管的後備傳送方：在設定並啟用供應商之前，`POST /api/auth/phone/send-otp` 會拒絕請求並傳回 `SMS_PROVIDER_NOT_CONFIGURED`。
+
+## 概念
+
+每次傳送時都會解析供應商，因此儲存的變更在下一次請求時生效。InsForge 在儲存前會向 Twilio API 驗證憑證，因此持久化的設定始終可用。驗證權杖使用 AES-256-GCM 加密儲存，API 永遠不會傳回它。
+
+## 使用方法
+
+在 **Authentication → Custom SMS** 中設定簡訊。
+
+<Steps>
+  <Step title="啟用自訂簡訊">
+    打開 **SMS Provider** 卡片上的開關。
+  </Step>
+  <Step title="輸入憑證">
+    Account SID、驗證權杖，以及 E.164 格式的傳送號碼（或訊息服務 SID，兩者都設定時優先使用後者）。
+  </Step>
+  <Step title="儲存">
+    InsForge 在持久化之前會向 Twilio API 檢查憑證。錯誤的憑證會立即失敗。
+  </Step>
+</Steps>
+
+登入訊息可在同一卡片中編輯。傳送時 `{{ code }}` 會被替換為 6 位驗證碼（與電子郵件範本的 `{{ token }}` 約定一致）；預設值為 `Your verification code is {{ code }}. It expires in 5 minutes.`
+
+## 開發供應商
+
+對於本機開發和測試，設定接受 `provider: "console"`（透過 `PUT /api/auth/sms-config` 設定），它會將訊息記錄到後端日誌而不是傳送。主控台供應商在正式環境中會被拒絕，無論是儲存設定時還是傳送時。
+
+## 注意事項
+
+- **速率限制。** **最小間隔（秒）** 限制每個號碼的傳送頻率。冷卻期內的傳送傳回 HTTP `429`。預設為 `60`；`0` 表示停用。傳送端點還會套用與電子郵件 OTP 相同的按 IP 和按收件者限制。
+- **Twilio 試用帳戶。** 試用帳戶完全無法傳送自訂訊息內文——傳送會失敗並傳回 Twilio 錯誤 572006（"Trial accounts can only use predefined SMS templates"），因此手機登入需要付費帳戶。付費帳戶還需注意：使用一般本地號碼在美國傳送可能需要 A2P 10DLC 註冊。
+- **稽核日誌。** 儲存設定會記錄 `UPDATE_SMS_CONFIG`。
+
+## 更多資源
+
+- [訊息傳遞概觀](/zh-Hant/core-concepts/messaging/overview) 了解路由模型。
+- [手機 OTP 登入](/zh-Hant/sdks/rest/auth#手機-otp-登入) 了解這些訊息服務的 REST 端點。
+- [Twilio Programmable Messaging](https://www.twilio.com/docs/messaging) 了解供應商側的設定。

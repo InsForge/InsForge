@@ -1,0 +1,44 @@
+---
+title: Custom SMS
+description: Configure Twilio to deliver phone sign-in codes over SMS from InsForge.
+---
+
+When enabled, phone OTP sign-in codes are sent through your Twilio account. There is no managed fallback for SMS: until a provider is configured and enabled, `POST /api/auth/phone/send-otp` rejects requests with `SMS_PROVIDER_NOT_CONFIGURED`.
+
+## Concepts
+
+Provider is resolved on every send, so saves take effect on the next request. InsForge verifies the credentials against the Twilio API before saving, so a persisted config always works. Auth tokens are encrypted at rest with AES-256-GCM and never returned by the API.
+
+## Usage
+
+Configure SMS under **Authentication → Custom SMS**.
+
+<Steps>
+  <Step title="Enable custom SMS">
+    Flip the switch on the **SMS Provider** card.
+  </Step>
+  <Step title="Enter credentials">
+    Account SID, auth token, and a from number in E.164 format (or a messaging service SID, which takes precedence when both are set).
+  </Step>
+  <Step title="Save">
+    InsForge checks the credentials against the Twilio API before persisting. Bad credentials fail fast.
+  </Step>
+</Steps>
+
+The sign-in message is editable on the same card. `{{ code }}` is replaced with the 6-digit code at send time (matching the `{{ token }}` convention of email templates); the default is `Your verification code is {{ code }}. It expires in 5 minutes.`
+
+## Development provider
+
+For local development and tests, the config accepts `provider: "console"` (set via `PUT /api/auth/sms-config`), which logs the message to the backend log instead of sending it. The console provider is refused in production, both when saving the config and at send time.
+
+## Considerations
+
+- **Rate limiting.** **Min interval (seconds)** caps per-number frequency. Sends within the cooldown return HTTP `429`. Defaults to `60`; `0` disables. The send endpoint also enforces the same per-IP and per-recipient limits as email OTP.
+- **Twilio trials.** Trial accounts cannot send custom message bodies at all — sends fail with Twilio error 572006 ("Trial accounts can only use predefined SMS templates"), so phone sign-in needs an upgraded account. Upgraded accounts should also note that US delivery from a regular local number may require A2P 10DLC registration.
+- **Audit log.** Config saves log `UPDATE_SMS_CONFIG`.
+
+## More resources
+
+- [Messaging overview](/core-concepts/messaging/overview) for the routing model.
+- [Phone OTP sign-in](/sdks/rest/auth#phone-otp-sign-in) for the REST endpoints these messages serve.
+- [Twilio Programmable Messaging](https://www.twilio.com/docs/messaging) for provider-side setup.

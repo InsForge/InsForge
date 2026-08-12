@@ -510,13 +510,16 @@ paths:
     post:
       summary: User login
       description: |
-        Authenticates with a password or email OTP and returns an access token.
+        Authenticates with a password, email OTP, or phone OTP and returns an
+        access token.
         Existing password clients may omit `method`; it defaults to `password`.
 
         With `method: otp`, InsForge verifies and consumes the 6-digit sign-in
-        code. If the email is new and public signups are enabled, it then creates
-        a verified passwordless user. If public signups are disabled, a valid
-        code for an unknown email is consumed and the request returns 403.
+        code, keyed on exactly one of `email` or `phone`. If the identifier is
+        new and public signups are enabled, it then creates a verified
+        passwordless user (phone sign-ups have a null email). If public signups
+        are disabled, a valid code for an unknown identifier is consumed and the
+        request returns 403.
 
         For web clients, this endpoint sets an httpOnly refresh token cookie.
         For mobile/desktop/server clients, it returns refreshToken in the body.
@@ -569,6 +572,32 @@ paths:
                       type: string
                       format: email
                       example: user@example.com
+                    otp:
+                      type: string
+                      pattern: '^\d{6}$'
+                      description: 6-digit sign-in code
+                      example: "123456"
+                    name:
+                      type: string
+                      minLength: 1
+                      maxLength: 100
+                      description: Profile name used only when a new user is created
+                      example: Ada Lovelace
+                - title: Phone OTP login
+                  type: object
+                  required:
+                    - method
+                    - phone
+                    - otp
+                  properties:
+                    method:
+                      type: string
+                      enum: [otp]
+                    phone:
+                      type: string
+                      pattern: '^\+[1-9]\d{6,14}$'
+                      description: E.164 phone number. Provide phone or email, never both
+                      example: "+15551234567"
                     otp:
                       type: string
                       pattern: '^\d{6}$'
@@ -975,6 +1004,51 @@ paths:
                     example: If sign-in is available for this email, we have sent a verification code.
         '400':
           description: Invalid request
+        '429':
+          description: Too many sign-in code requests
+
+  /api/auth/phone/send-otp:
+    post:
+      summary: Send an SMS sign-in OTP
+      description: |
+        Sends a 6-digit code over SMS that can be exchanged at
+        POST /api/auth/sessions with `method: otp` and `phone`.
+        The response is intentionally generic and does not reveal whether a user
+        already exists. The code expires after 5 minutes. Requires a configured
+        SMS provider; otherwise the request fails with
+        SMS_PROVIDER_NOT_CONFIGURED.
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+              properties:
+                phone:
+                  type: string
+                  pattern: '^\+[1-9]\d{6,14}$'
+                  description: E.164 phone number
+                  example: "+15551234567"
+      responses:
+        '202':
+          description: The sign-in code was accepted for delivery
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: If sign-in is available for this phone number, we have sent a verification code.
+        '400':
+          description: Invalid request, or no SMS provider is configured
         '429':
           description: Too many sign-in code requests
 
@@ -2198,6 +2272,92 @@ paths:
         '403':
           description: Forbidden - Admin only
 
+  /api/auth/sms-config:
+    get:
+      summary: Get SMS configuration
+      description: Get current SMS provider configuration (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      x-internal: true
+      responses:
+        '200':
+          description: SMS configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmsConfig'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+    put:
+      summary: Update SMS configuration
+      description: |
+        Create or update SMS provider configuration (admin only).
+        When `enabled` is true with the `twilio` provider, `accountSid` and a
+        `fromNumber` or `messagingServiceSid` are required, and the credentials
+        are verified against the Twilio API before persisting.
+        The `console` provider logs messages instead of sending them and is
+        rejected in production.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      x-internal: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enabled
+              properties:
+                enabled:
+                  type: boolean
+                  description: When true, provider credentials become required
+                provider:
+                  type: string
+                  enum: [twilio, console]
+                  default: twilio
+                accountSid:
+                  type: string
+                  description: Required when enabled is true with the twilio provider
+                authToken:
+                  type: string
+                  description: Twilio auth token (optional on update if unchanged)
+                fromNumber:
+                  type: string
+                  description: E.164 sender number. Either this or messagingServiceSid is required when enabling twilio
+                messagingServiceSid:
+                  type: string
+                  description: Used instead of fromNumber when set
+                minIntervalSeconds:
+                  type: integer
+                  minimum: 0
+                  default: 60
+                  description: Minimum interval between messages to the same number in seconds
+                otpMessageTemplate:
+                  type: string
+                  maxLength: 320
+                  description: Sign-in message body; must contain the {{ code }} placeholder when enabling
+      responses:
+        '200':
+          description: SMS configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmsConfig'
+        '400':
+          description: Invalid request, or the Twilio credential check failed
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
   /api/auth/email-templates:
     get:
       summary: Get all email templates
@@ -2340,6 +2500,14 @@ components:
         email:
           type: string
           format: email
+          nullable: true
+          description: Null for accounts created by phone sign-in
+        phone:
+          type: string
+          nullable: true
+          description: E.164 phone number, null for accounts without one
+        phoneVerified:
+          type: boolean
         profile:
           type: object
           nullable: true
@@ -2543,6 +2711,39 @@ components:
         minIntervalSeconds:
           type: integer
           minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SmsConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        enabled:
+          type: boolean
+        provider:
+          type: string
+          enum: [twilio, console]
+        accountSid:
+          type: string
+        hasAuthToken:
+          type: boolean
+          description: Whether an auth token is set (actual token is never exposed)
+        fromNumber:
+          type: string
+        messagingServiceSid:
+          type: string
+        minIntervalSeconds:
+          type: integer
+          minimum: 0
+        otpMessageTemplate:
+          type: string
+          description: Sign-in message body with the {{ code }} placeholder
         createdAt:
           type: string
           format: date-time

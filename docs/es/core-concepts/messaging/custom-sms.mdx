@@ -1,0 +1,44 @@
+---
+title: SMS personalizado
+description: Configura Twilio para entregar códigos de inicio de sesión por teléfono mediante SMS desde InsForge.
+---
+
+Cuando está habilitado, los códigos de inicio de sesión por teléfono se envían a través de tu cuenta de Twilio. No hay un remitente gestionado para SMS: hasta que un proveedor esté configurado y habilitado, `POST /api/auth/phone/send-otp` rechaza las solicitudes con `SMS_PROVIDER_NOT_CONFIGURED`.
+
+## Conceptos
+
+El proveedor se resuelve en cada envío, por lo que los cambios guardados se aplican en la siguiente solicitud. InsForge verifica las credenciales contra la API de Twilio antes de guardar, de modo que una configuración persistida siempre funciona. Los tokens de autenticación se cifran en reposo con AES-256-GCM y la API nunca los devuelve.
+
+## Uso
+
+Configura SMS en **Authentication → Custom SMS**.
+
+<Steps>
+  <Step title="Habilitar SMS personalizado">
+    Activa el interruptor en la tarjeta **SMS Provider**.
+  </Step>
+  <Step title="Ingresar credenciales">
+    Account SID, token de autenticación y un número de origen en formato E.164 (o un SID de servicio de mensajería, que tiene prioridad cuando ambos están definidos).
+  </Step>
+  <Step title="Guardar">
+    InsForge comprueba las credenciales contra la API de Twilio antes de persistirlas. Las credenciales incorrectas fallan de inmediato.
+  </Step>
+</Steps>
+
+El mensaje de inicio de sesión es editable en la misma tarjeta. `{{ code }}` se reemplaza por el código de 6 dígitos al enviar (siguiendo la convención `{{ token }}` de las plantillas de correo); el valor predeterminado es `Your verification code is {{ code }}. It expires in 5 minutes.`
+
+## Proveedor de desarrollo
+
+Para desarrollo local y pruebas, la configuración acepta `provider: "console"` (definido mediante `PUT /api/auth/sms-config`), que registra el mensaje en el log del backend en lugar de enviarlo. El proveedor de consola se rechaza en producción, tanto al guardar la configuración como al enviar.
+
+## Consideraciones
+
+- **Límite de velocidad.** **Intervalo mínimo (segundos)** limita la frecuencia por número. Los envíos dentro del período de espera devuelven HTTP `429`. El valor predeterminado es `60`; `0` lo desactiva. El endpoint de envío también aplica los mismos límites por IP y por destinatario que el OTP por correo.
+- **Cuentas de prueba de Twilio.** Las cuentas de prueba no pueden enviar cuerpos de mensaje personalizados: los envíos fallan con el error 572006 de Twilio ("Trial accounts can only use predefined SMS templates"), por lo que el inicio de sesión por teléfono requiere una cuenta de pago. Con cuentas de pago, la entrega en EE. UU. desde un número local normal puede requerir el registro A2P 10DLC.
+- **Registro de auditoría.** Guardar la configuración registra `UPDATE_SMS_CONFIG`.
+
+## Más recursos
+
+- [Descripción general de mensajería](/es/core-concepts/messaging/overview) para el modelo de enrutamiento.
+- [Inicio de sesión con OTP por teléfono](/es/sdks/rest/auth#inicio-de-sesión-con-otp-por-teléfono) para los endpoints REST que usan estos mensajes.
+- [Twilio Programmable Messaging](https://www.twilio.com/docs/messaging) para la configuración del lado del proveedor.
