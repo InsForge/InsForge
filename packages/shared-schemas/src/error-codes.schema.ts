@@ -93,6 +93,11 @@ const deploymentErrorCodes = [
   // Distinct from INTERNAL_ERROR, which the unconfigured path used to report — a client
   // cannot tell "you have not set this up" from "we broke" out of a generic 500 code.
   'DEPLOYMENT_NOT_CONFIGURED',
+  // The active driver cannot do what was asked — custom domains on the Docker driver, for
+  // instance. Distinct from DEPLOYMENT_NOT_CONFIGURED on purpose: that one means "set this
+  // up", this one means "this driver will never do it", and a client branching on the code
+  // needs to tell them apart.
+  'DEPLOYMENT_FEATURE_UNSUPPORTED',
   'DEPLOYMENT_NOT_FOUND',
   'DEPLOYMENT_UPLOAD_CANCELED',
   'DOMAIN_ALREADY_EXISTS',

@@ -396,7 +396,7 @@ describe('DockerSitesProvider source builds', () => {
     const dockerfile = await generatedDockerfile();
     expect(dockerfile).toContain('WORKDIR /app/apps/web');
     expect(dockerfile).toContain('RUN pnpm install --frozen-lockfile');
-    expect(dockerfile).toContain('cp -r /app/apps/web/dist /out');
+    expect(dockerfile).toContain('cp -r "/app/apps/web/dist" /out');
   });
 
   // Guessing which conventional directory holds the output is fine; guessing that a build
@@ -691,5 +691,56 @@ describe('DockerSitesProvider rollback and retention', () => {
     const deployment = await provider.createDeploymentWithFiles(files);
 
     expect(deployment.buildLogs).toEqual(['Step 1/3 : FROM caddy:alpine', 'Step 2/3']);
+  });
+});
+
+describe('DockerSitesProvider input hardening', () => {
+  // These land in WORKDIR and in a `RUN cp`, where a space is two shell words and `;` or
+  // `$` is syntax. A directory name is not a place to accept shell.
+  it.each(['my dist', 'dist; rm -rf /', 'dist$(whoami)', 'dist`id`'])(
+    'refuses outputDirectory %j',
+    async (dir) => {
+      okBuild();
+      dockerHappyPath();
+      const provider = DockerSitesProvider.getInstance();
+      const files = await provider.uploadFiles([
+        { path: 'package.json', content: Buffer.from('{}') },
+      ]);
+
+      await expect(
+        provider.createDeploymentWithFiles(files, {
+          projectSettings: { buildCommand: 'npm run build', outputDirectory: dir },
+        })
+      ).rejects.toThrow('must be a plain relative path');
+      expect(dockerBuild).not.toHaveBeenCalled();
+    }
+  );
+
+  // The tag is an address. Two builds whose only difference is a baked value must not
+  // share one, or the tag stops identifying what it names.
+  it('gives a different image tag when only an env value changes', async () => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+    const settings = { buildCommand: 'npm run build', outputDirectory: 'dist' };
+
+    await provider.createDeploymentWithFiles(files, {
+      projectSettings: settings,
+      envVars: [{ key: 'SITE_MESSAGE', value: 'first' }],
+    });
+    const firstTag = dockerBuild.mock.calls[0][0].tag as string;
+    dockerBuild.mockClear();
+    okBuild();
+
+    await provider.createDeploymentWithFiles(files, {
+      projectSettings: settings,
+      envVars: [{ key: 'SITE_MESSAGE', value: 'second' }],
+    });
+    const secondTag = dockerBuild.mock.calls[0][0].tag as string;
+
+    expect(firstTag).not.toBe(secondTag);
   });
 });

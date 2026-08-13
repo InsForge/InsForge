@@ -112,7 +112,12 @@ function assertSingleLine(value: string, field: string): string {
   return value;
 }
 
-/** A relative path inside the uploaded tree. Absolute or climbing paths are refused. */
+/**
+ * A relative path inside the uploaded tree. Absolute or climbing paths are refused, and so
+ * is anything outside a plain filename charset: these land in `WORKDIR` and in a `RUN cp`,
+ * where a space becomes two shell words and a `;` or `$` becomes syntax. Quoting the copy
+ * covers the space case, but a directory name is not a place to accept shell either way.
+ */
 function assertRelativePath(value: string, field: string): string {
   const normalized = path.posix.normalize(assertSingleLine(value, field).replace(/\\/g, '/'));
   if (normalized.startsWith('/') || normalized === '..' || normalized.startsWith('../')) {
@@ -122,7 +127,15 @@ function assertRelativePath(value: string, field: string): string {
       ERROR_CODES.INVALID_INPUT
     );
   }
-  return normalized.replace(/^\.\//, '').replace(/\/+$/, '');
+  const trimmed = normalized.replace(/^\.\//, '').replace(/\/+$/, '');
+  if (!/^[A-Za-z0-9._][A-Za-z0-9._/-]*$/.test(trimmed)) {
+    throw new AppError(
+      `${field} must be a plain relative path (letters, digits, dot, dash, underscore, slash).`,
+      400,
+      ERROR_CODES.INVALID_INPUT
+    );
+  }
+  return trimmed;
 }
 
 /**
@@ -346,7 +359,21 @@ export class DockerSitesProvider implements SitesProvider {
       : SERVE_ONLY_DOCKERFILE;
 
     const context = await this.buildContext(served, dockerfile);
-    const digest = createHash('sha256').update(context).digest('hex').slice(0, 12);
+    // Env values join the digest because they are baked into the artifact: without them
+    // two builds whose only difference is a value would share one tag, so the tag would
+    // stop identifying what it names. (Docker does rebuild in that case — a declared ARG's
+    // value is part of the cache key for the instructions after it, measured on the
+    // classic builder — so this is about identity, not staleness.)
+    const digest = createHash('sha256')
+      .update(context)
+      .update(
+        (options.envVars ?? [])
+          .map((envVar) => `${envVar.key}=${envVar.value}`)
+          .sort()
+          .join('\u0000')
+      )
+      .digest('hex')
+      .slice(0, 12);
     const imageTag = `insforge-site-${this.projectKey()}:${digest}`;
 
     const build = await dockerBuild({
@@ -493,8 +520,8 @@ export class DockerSitesProvider implements SitesProvider {
       // Resolved inside the build stage and copied to a fixed path, because COPY --from
       // cannot expand a shell expression.
       output
-        ? `RUN cp -r ${outputExpr} /out`
-        : `RUN out=${outputExpr}; [ -n "$out" ] || (echo "No build output found in ${DEFAULT_OUTPUT_DIRECTORIES.join(', ')}" && exit 1); cp -r "$out" /out`,
+        ? `RUN cp -r "${outputExpr}" /out`
+        : `RUN out=${outputExpr}; [ -n "$out" ] || { echo "No build output found in ${DEFAULT_OUTPUT_DIRECTORIES.join(', ')}"; exit 1; }; cp -r "$out" /out`,
       '',
       'FROM caddy:alpine',
       'COPY Caddyfile /etc/caddy/Caddyfile',
