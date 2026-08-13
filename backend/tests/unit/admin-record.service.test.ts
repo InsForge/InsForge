@@ -40,8 +40,7 @@ describe('AdminRecordService', () => {
           ],
         };
       }
-      // A search is a filtered count, which is counted exactly but capped (see
-      // estimateOrExactCount) rather than with an unbounded COUNT(*).
+      // A search is a filtered count: exact, but capped rather than unbounded.
       if (sql.includes('AS observed')) {
         return { rows: [{ observed: '2' }] };
       }
@@ -89,17 +88,15 @@ describe('AdminRecordService', () => {
       false
     );
 
-    // Regression (#1797): the data browser used to run an unbounded `COUNT(*)` over the
-    // whole filtered set on every page load and every keystroke of search, making it
-    // O(N) in table size. The filtered count must stay bounded by a LIMIT.
+    // Regression (#1797): this count used to be an unbounded COUNT(*) over the whole
+    // filtered set, run on every page load and every keystroke of search.
     const countCall = sqlCalls.find((sql) => sql.includes('AS observed'));
     expect(countCall).toMatch(/LIMIT \d+\) AS capped/);
     expect(
       sqlCalls.some((sql) => /COUNT\(\*\)::text AS total FROM "auth"\."users"/.test(sql))
     ).toBe(false);
 
-    // The read is bounded in time as well as in rows, so a pathological scan fails
-    // fast instead of holding the connection until the browser gives up.
+    // Bounded in time as well as rows, so a pathological scan fails fast.
     expect(sqlCalls.some((sql) => sql.startsWith('SET LOCAL statement_timeout'))).toBe(true);
   });
 

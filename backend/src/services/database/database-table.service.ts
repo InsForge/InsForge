@@ -425,9 +425,8 @@ export class DatabaseTableService {
       const uniqueColumns = uniqueColumnsResult.rows;
       const uniqueSet = new Set(uniqueColumns.map((u: { column_name: string }) => u.column_name));
 
-      // Row count: exact on small tables, planner estimate on large ones. An exact
-      // COUNT(*) here is a full scan paid on every table-open, on top of the one the
-      // record listing already runs -- see estimateOrExactCount.
+      // An exact COUNT(*) here is a full scan paid on every table-open, on top of the
+      // one the record listing already runs. estimateOrExactCount bounds both.
       let row_count = 0;
       let row_count_is_estimate = false;
       try {

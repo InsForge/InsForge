@@ -134,9 +134,8 @@ export class ApiClient {
 
       const contentRange = response.headers.get('content-range');
       if (contentRange && Array.isArray(responseData)) {
-        // The server counts large or filtered result sets approximately rather than
-        // running an unbounded COUNT(*); this flag tells the UI to render the total as
-        // "~N" / "N+" instead of implying an exact figure.
+        // Large or filtered result sets are counted approximately rather than with an
+        // unbounded COUNT(*); this tells the UI not to present the total as exact.
         const isEstimate = response.headers.get('x-total-is-estimate') === 'true';
         const match = contentRange.match(/(\d+)-(\d+)\/(\d+|\*)/);
         if (match) {

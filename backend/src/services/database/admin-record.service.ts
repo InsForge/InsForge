@@ -50,10 +50,8 @@ export class AdminRecordService {
     validateTableName(tableName);
 
     return this.withAdminTransaction(async (client) => {
-      // Transaction-scoped: a pathological read (deep OFFSET, unindexable search on a
-      // huge table) fails with a clear error instead of holding this connection until
-      // the browser gives up. Only this read path is bounded -- mutations keep the
-      // server default.
+      // Transaction-scoped, so a deep OFFSET or unindexable search fails fast instead of
+      // holding this connection. Only this read path is bounded; mutations are untouched.
       await client.query(`SET LOCAL statement_timeout = '${ADMIN_RECORD_STATEMENT_TIMEOUT}'`);
 
       const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);

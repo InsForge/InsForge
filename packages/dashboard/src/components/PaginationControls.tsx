@@ -7,11 +7,7 @@ export interface PaginationControlsProps {
   totalPages?: number;
   onPageChange?: (page: number) => void;
   totalRecords?: number;
-  /**
-   * Marks `totalRecords` as approximate. Large tables are counted from the query
-   * planner's statistics rather than an unbounded COUNT(*), so the figure is shown
-   * as "~N" instead of implying a precision it doesn't have.
-   */
+  /** Marks `totalRecords` as approximate, shown as "~N" rather than implying precision. */
   totalRecordsIsEstimate?: boolean;
   pageSize?: number;
   pageSizeOptions?: number[];
