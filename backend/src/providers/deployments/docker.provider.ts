@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { createWriteStream, existsSync } from 'node:fs';
-import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { createWriteStream, existsSync, statSync } from 'node:fs';
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { hostname } from 'node:os';
 import { pipeline } from 'node:stream/promises';
@@ -161,8 +161,15 @@ interface OwnedContainer {
   Labels?: Record<string, string>;
 }
 
-/** Docker's container states, mapped onto the deployment vocabulary the service records. */
-function readyStateFor(status: string): string {
+/**
+ * Docker's container states, mapped onto the deployment vocabulary the service records.
+ *
+ * A clean exit is how this driver *cancels* — `cancelDeployment` stops the container, and
+ * a superseded deployment is stopped too — so reporting every `exited` as ERROR turned
+ * every cancellation and every previous deployment into a failure. The exit code is what
+ * separates the two.
+ */
+function readyStateFor(status: string, exitCode?: number): string {
   switch (status) {
     case 'running':
       return 'READY';
@@ -170,6 +177,7 @@ function readyStateFor(status: string): string {
     case 'restarting':
       return 'BUILDING';
     case 'exited':
+      return exitCode === 0 ? 'CANCELED' : 'ERROR';
     case 'dead':
       return 'ERROR';
     case 'removing':
@@ -194,6 +202,25 @@ export class DockerSitesProvider implements SitesProvider {
 
   private static instance: DockerSitesProvider;
 
+  /**
+   * Serializes the switch — deploy and rollback both.
+   *
+   * Each one lists the containers it is replacing before creating its own, so two at once
+   * snapshot the same list and neither sees the other: under ephemeral ports both end up
+   * behind the stable alias, and under a fixed port the second fails on the binding. A
+   * promise chain is the same tool the compute driver uses to cap concurrent builds, and it
+   * covers what a self-host actually runs — one backend process against one daemon.
+   */
+  private switchQueue: Promise<unknown> = Promise.resolve();
+
+  private serialize<T>(work: () => Promise<T>): Promise<T> {
+    const next = this.switchQueue.then(work, work);
+    // Keep the chain alive when a deploy fails: an unhandled rejection here would also
+    // reject every switch queued behind it.
+    this.switchQueue = next.catch(() => undefined);
+    return next;
+  }
+
   static getInstance(): DockerSitesProvider {
     if (!DockerSitesProvider.instance) {
       DockerSitesProvider.instance = new DockerSitesProvider();
@@ -210,7 +237,13 @@ export class DockerSitesProvider implements SitesProvider {
     if (isCloudEnvironment()) {
       return false;
     }
-    return existsSync(dockerConfig().socketPath);
+    // A socket, not merely a path: a regular file at DOCKER_SOCKET_PATH would otherwise
+    // register the driver and fail on every request instead of never registering.
+    try {
+      return statSync(dockerConfig().socketPath).isSocket();
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -394,11 +427,13 @@ export class DockerSitesProvider implements SitesProvider {
 
     const containerId = await this.runContainer(imageTag, digest);
     const retained = await this.pruneOwnResources(containerId);
+    const sweptBlobs = await this.sweepStaging();
     logger.info('Docker sites: deployed', {
       imageTag,
       containerId,
       files: files.length,
       ...retained,
+      sweptBlobs,
     });
 
     return {
@@ -579,7 +614,11 @@ export class DockerSitesProvider implements SitesProvider {
    * each other's site containers. APP_KEY is per-instance and generated at setup.
    */
   private projectKey(): string {
-    return (process.env.APP_KEY || 'local').slice(0, 24);
+    // Not truncated. The shipped gateway config targets `insforge-site-{$APP_KEY}`, so any
+    // clipping here would silently stop the alias from matching the upstream — a failure
+    // Caddy accepts at load and can never recover from. The compute driver does not clip
+    // either, and Docker's own limits on names, labels and tags are far above any APP_KEY.
+    return process.env.APP_KEY || 'local';
   }
 
   /**
@@ -637,6 +676,10 @@ export class DockerSitesProvider implements SitesProvider {
    * refused. The old container is kept, not removed — that is what rollback starts.
    */
   private async runContainer(imageTag: string, digest: string): Promise<string> {
+    return this.serialize(() => this.runContainerExclusively(imageTag, digest));
+  }
+
+  private async runContainerExclusively(imageTag: string, digest: string): Promise<string> {
     const previous = await this.listOwnContainers();
     const network = await this.resolveNetwork();
     const fixedPort = appConfig.deployments.sitesPort;
@@ -725,6 +768,16 @@ export class DockerSitesProvider implements SitesProvider {
     } catch (error) {
       // A container that will not start must not be left behind looking deployable.
       await dockerRequest('DELETE', `/containers/${created.Id}?force=true`).catch(() => undefined);
+      if (stopBeforeStarting) {
+        // Under a fixed port the previous deployment was already stopped to free the port,
+        // so failing here would leave the site down until someone noticed. Put it back.
+        for (const container of previous) {
+          await dockerRequest('POST', `/containers/${container.Id}/start`).catch(() => undefined);
+        }
+        logger.warn('Docker sites: replacement failed; restarted the previous deployment', {
+          restored: previous.map((container) => container.Id),
+        });
+      }
       throw error;
     }
 
@@ -760,7 +813,7 @@ export class DockerSitesProvider implements SitesProvider {
       Id: string;
       Name: string;
       Created: string;
-      State: { Status: string; Error?: string };
+      State: { Status: string; Error?: string; ExitCode?: number };
       Config: { Image: string };
       NetworkSettings?: { Ports?: Record<string, { HostPort: string }[] | null> };
     }>('GET', `/containers/${encodeURIComponent(providerDeploymentId)}/json`);
@@ -774,7 +827,7 @@ export class DockerSitesProvider implements SitesProvider {
       id: inspected.Id,
       url: await this.endpointUrl(inspected.Id, inspected),
       state: status,
-      readyState: readyStateFor(status),
+      readyState: readyStateFor(status, inspected.State.ExitCode),
       name: inspected.Config.Image,
       createdAt: new Date(inspected.Created),
       ...(inspected.State.Error ? { error: { code: status, message: inspected.State.Error } } : {}),
@@ -789,6 +842,10 @@ export class DockerSitesProvider implements SitesProvider {
    * image is already there, which is the whole reason deployments are immutable images.
    */
   async rollbackTo(providerDeploymentId: string): Promise<ProviderDeployment> {
+    return this.serialize(() => this.rollbackToExclusively(providerDeploymentId));
+  }
+
+  private async rollbackToExclusively(providerDeploymentId: string): Promise<ProviderDeployment> {
     const owned = await this.listOwnContainers();
     const target = owned.find((container) => container.Id === providerDeploymentId);
     if (!target) {
@@ -802,15 +859,70 @@ export class DockerSitesProvider implements SitesProvider {
       );
     }
 
-    await dockerRequest('POST', `/containers/${encodeURIComponent(target.Id)}/start`);
-    for (const container of owned) {
-      if (container.Id !== target.Id) {
+    const others = owned.filter((container) => container.Id !== target.Id);
+    const fixedPort = appConfig.deployments.sitesPort;
+
+    if (fixedPort > 0) {
+      // Two containers cannot hold one host port, so starting the target first would just
+      // fail. Stop the live one, then bring the target up — and put the live one back if
+      // the target will not start, rather than leaving nothing serving.
+      for (const container of others) {
+        await dockerRequest('POST', `/containers/${container.Id}/stop?t=5`).catch(() => undefined);
+      }
+      try {
+        await dockerRequest('POST', `/containers/${encodeURIComponent(target.Id)}/start`);
+      } catch (error) {
+        for (const container of others) {
+          await dockerRequest('POST', `/containers/${container.Id}/start`).catch(() => undefined);
+        }
+        throw error;
+      }
+    } else {
+      await dockerRequest('POST', `/containers/${encodeURIComponent(target.Id)}/start`);
+      for (const container of others) {
         await dockerRequest('POST', `/containers/${container.Id}/stop?t=5`).catch(() => undefined);
       }
     }
     logger.info('Docker sites: rolled back', { containerId: target.Id });
 
     return this.getDeployment(target.Id);
+  }
+
+  /**
+   * Delete staged blobs older than a day.
+   *
+   * Staging only bridges upload and build: once an image exists the bytes live in it, and
+   * rollback starts an image rather than re-tarring. Nothing else reclaimed them, so every
+   * deployment left its files behind for good — including the files of builds that failed,
+   * which is the case most likely to repeat. A day is long enough that an upload waiting on
+   * a slow client is never swept out from under the build that follows it.
+   */
+  private async sweepStaging(maxAgeMs = 24 * 60 * 60 * 1000): Promise<number> {
+    const dir = this.stagingDir();
+    let swept = 0;
+    try {
+      const entries = await readdir(dir);
+      const cutoff = Date.now() - maxAgeMs;
+      for (const entry of entries) {
+        const full = path.join(dir, entry);
+        try {
+          const info = await stat(full);
+          if (info.isFile() && info.mtimeMs < cutoff) {
+            await rm(full, { force: true });
+            swept++;
+          }
+        } catch {
+          // Raced with another sweep or another deploy. Nothing to do.
+        }
+      }
+    } catch {
+      // No staging directory yet, which is the state before the first upload.
+      return 0;
+    }
+    if (swept > 0) {
+      logger.info('Docker sites: swept staged files', { swept, dir });
+    }
+    return swept;
   }
 
   /**

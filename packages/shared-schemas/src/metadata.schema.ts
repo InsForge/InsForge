@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { storageBucketSchema } from './storage.schema.js';
 import { realtimeChannelSchema } from './realtime.schema.js';
 import { realtimePermissionsResponseSchema } from './realtime-api.schema.js';
-import { sitesCapabilitiesSchema, sitesProviderEnum } from './deployments.schema.js';
+import { sitesCapabilitiesResponseSchema, sitesProviderEnum } from './deployments.schema.js';
 import { authConfigAdminResponseSchema } from './auth-api.schema.js';
 import { computeCapabilitiesSchema, computeProviderEnum } from './compute-services.schema.js';
 
@@ -95,7 +95,9 @@ export const computeMetadataSchema = z.object({
  */
 export const sitesMetadataSchema = z.object({
   defaultProvider: sitesProviderEnum,
-  providers: z.record(sitesProviderEnum, sitesCapabilitiesSchema),
+  // The refined variant: a default outside `ingressModes` would point clients at a mode
+  // the driver cannot serve, and validating that only at the type level validated nothing.
+  providers: z.record(sitesProviderEnum, sitesCapabilitiesResponseSchema),
 });
 
 export const appMetaDataSchema = z.object({
