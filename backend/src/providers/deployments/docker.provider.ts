@@ -50,9 +50,19 @@ const RETAINED_DEPLOYMENTS = 3;
 /**
  * Serve the uploaded files, and nothing else.
  *
- * `try_files {path} /index.html` is what makes a client-side-routed app work: a request
- * for /dashboard/settings has no file behind it, and without this it 404s instead of
- * loading the app.
+ * The `try_files` chain is ordered so both shapes of site work, and it was measured on a
+ * live deploy rather than reasoned about:
+ *
+ *   {path}              an exact file — assets, and any page requested with its extension
+ *   {path}/index.html   a directory index, which is how Next export, Astro and Hugo emit
+ *                       nested routes when trailingSlash is on
+ *   {path}.html         the sibling file the same tools emit when it is off
+ *   /index.html         the SPA fallback: a client-side route has no file at all, and
+ *                       without this /dashboard/settings would 404 instead of loading
+ *
+ * The first version stopped after `{path} /index.html`, so every subpage of a multi-page
+ * static export answered 200 with the *home page* — silently the wrong content, which is
+ * worse than a 404.
  *
  * Long cache lifetimes go on hashed asset filenames only. Everything else — `/`,
  * `/index.html`, and every client-side route — must stay revalidated or a deploy would
@@ -77,7 +87,7 @@ const CADDYFILE = `:${SITE_PORT} {
 	header @assets Cache-Control "public, max-age=31536000, immutable"
 	@html not path_regexp \\.(js|css|woff2?|png|jpe?g|gif|svg|ico|webp|avif)$
 	header @html Cache-Control "no-cache"
-	try_files {path} /index.html
+	try_files {path} {path}/index.html {path}.html /index.html
 	file_server
 }
 `;

@@ -203,7 +203,9 @@ describe('DockerSitesProvider.createDeploymentWithFiles', () => {
     ]);
     // The generated config is what makes a client-side-routed app work at all.
     const caddyfile = (await contextFiles(context)).get('Caddyfile') ?? '';
-    expect(caddyfile).toContain('try_files {path} /index.html');
+    // Both shapes: a directory index and a .html sibling before the SPA fallback, or
+    // every subpage of a multi-page export answers with the home page.
+    expect(caddyfile).toContain('try_files {path} {path}/index.html {path}.html /index.html');
     expect(caddyfile).toContain('encode zstd gzip');
     // Not `header /index.html`: that matches the requested path, so `/` — the URL
     // everybody actually visits — would carry no cache header at all.
