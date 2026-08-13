@@ -65,8 +65,9 @@ const NGINX_CONF = `server {
   }
 
   location ~* \\.(js|css|woff2?|png|jpe?g|gif|svg|ico|webp|avif)$ {
-    expires 1y;
-    add_header Cache-Control "public, immutable";
+    # One header, not two: \`expires\` emits its own Cache-Control and \`add_header\` appends
+    # a second one, which browsers merge but a CDN need not.
+    add_header Cache-Control "public, max-age=31536000, immutable";
   }
 
   location = /index.html {

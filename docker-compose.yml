@@ -162,6 +162,16 @@ services:
       - INSFORGE_DEPLOYMENT_METHOD=docker-compose
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
+      # Which driver hosts the project's site: vercel | docker | off. Empty
+      # auto-detects and prefers Vercel when its credentials are set, so mounting the
+      # socket for compute does not move an existing site to a new driver.
+      - SITES_PROVIDER=${SITES_PROVIDER:-}
+      # Base domain for `host` ingress on the Docker sites driver; falls back to
+      # COMPUTE_DOMAIN. InsForge advertises the hostname and does not route or
+      # terminate TLS — that stays your gateway's job.
+      - SITES_DOMAIN=${SITES_DOMAIN:-}
+      # Where uploaded deployment files stage before a build, keyed by content hash.
+      - SITES_STAGING_DIR=${SITES_STAGING_DIR:-}
       # ─── Custom Compute: Docker provider (opt-in) ──────────────────────────
       # Mounting the Docker socket below is what enables it: the driver registers
       # itself when the socket is reachable, so nothing runs containers on your
