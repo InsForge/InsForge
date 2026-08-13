@@ -1260,8 +1260,8 @@ export class DeploymentService {
    * A page of the running deployment's own output.
    *
    * Resolved through the row's driver, like every other row-scoped call, and refused by name
-   * when that driver has no runtime to read — a static site's only log is the request log of
-   * a file server, which is not what someone asking for logs means.
+   * when that driver cannot read what it deployed — the flag describes the driver, so a
+   * static deployment answers with the file server's own output rather than nothing.
    */
   async getRuntimeLogs(
     id: string,

@@ -604,13 +604,15 @@ paths:
     get:
       summary: Read a running deployment's output
       description: >-
-        A page of the deployment's own stdout/stderr, oldest first. Offered only by drivers
+        A page of the deployment's own stdout/stderr, oldest line first within the page.
+        Without `next_token` the page is the newest `limit` lines — a tail rather than the
+        start of the retained history. Offered only by drivers
         that report `runtimeLogs` in the `sites` capability slice of `/api/metadata`; the rest
-        answer `400` with `DEPLOYMENT_FEATURE_UNSUPPORTED`. Only a server-rendered site has
-        output of its own — a static site is served by a file server, whose log is a request
-        log rather than anything the developer wrote, so the static path reports the
-        capability as false even on a driver that can read container logs. Build output is a
-        different field, returned on the run itself.
+        answer `400` with `DEPLOYMENT_FEATURE_UNSUPPORTED`. The capability describes the
+        driver, not the deployment: a server-rendered site returns what the app itself wrote,
+        while a static one returns the file server's own output, which is a request log rather
+        than anything the developer wrote. Build output is a different field, returned on the
+        run itself.
       tags:
         - Admin
       security:
@@ -628,8 +630,9 @@ paths:
         - name: next_token
           in: query
           description: >-
-            Opaque forward cursor from a previous page. A null `nextToken` means nothing
-            further is available yet, not that the deployment has stopped.
+            Opaque forward cursor from a previous page: returns what has arrived since. An
+            empty `lines` array with the same token back means the app has written nothing
+            since — not that the deployment has stopped.
           schema:
             type: string
       responses:
