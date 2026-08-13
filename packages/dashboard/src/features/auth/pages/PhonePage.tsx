@@ -46,9 +46,11 @@ export default function PhonePage() {
               </p>
             </div>
             <div className="px-6 py-6">
-              {smsError ? (
+              {smsError && !smsConfig ? (
                 // Never render an editable form over unknown persisted state:
-                // saving the defaults could silently replace a real config.
+                // saving the defaults could silently replace a real config. A
+                // failed refetch with cached data keeps the form — that state
+                // is still known.
                 <div className="flex min-h-[120px] flex-col items-center justify-center gap-3">
                   <p className="text-sm text-muted-foreground">
                     {t('auth.smsConfigLoadFailed', {

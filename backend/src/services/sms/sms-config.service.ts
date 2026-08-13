@@ -201,8 +201,13 @@ export class SmsConfigService {
   async upsertSmsConfig(input: UpsertSmsConfigRequest): Promise<SmsConfigSchema> {
     // Verify credentials before opening the transaction: the Twilio round-trip
     // can take up to 10 seconds and must not hold the advisory lock or a pool
-    // connection. A save racing between this check and the locked write below
-    // has itself been verified, so the persisted pair is always a checked one.
+    // connection.
+    //
+    // When the request omits authToken, the pair actually verified is
+    // (input.accountSid, stored token) — keep the verified ciphertext so the
+    // locked write below can detect a concurrent save rotating the token,
+    // which would otherwise splice together a pair nobody verified.
+    let verifiedStoredTokenEncrypted: string | null = null;
     if (input.enabled) {
       if (input.provider === 'console') {
         if (isProduction()) {
@@ -213,13 +218,20 @@ export class SmsConfigService {
           );
         }
       } else {
-        const stored = await this.getPool().query(
-          'SELECT auth_token_encrypted FROM sms.config LIMIT 1'
-        );
-        await this.verifyTwilioCredentials(
-          input,
-          (stored.rows[0]?.auth_token_encrypted as string | undefined) ?? ''
-        );
+        let storedTokenEncrypted = '';
+        try {
+          const stored = await this.getPool().query(
+            'SELECT auth_token_encrypted FROM sms.config LIMIT 1'
+          );
+          storedTokenEncrypted = (stored.rows[0]?.auth_token_encrypted as string | undefined) ?? '';
+        } catch (error) {
+          logger.error('Failed to read stored SMS credentials before verification', { error });
+          throw new AppError('Failed to update SMS configuration', 500, ERROR_CODES.INTERNAL_ERROR);
+        }
+        await this.verifyTwilioCredentials(input, storedTokenEncrypted);
+        if (!input.authToken) {
+          verifiedStoredTokenEncrypted = storedTokenEncrypted;
+        }
       }
     }
 
@@ -246,6 +258,18 @@ export class SmsConfigService {
         let authTokenEncrypted = existingRow.auth_token_encrypted;
         if (input.authToken) {
           authTokenEncrypted = EncryptionManager.encrypt(input.authToken);
+        } else if (
+          verifiedStoredTokenEncrypted !== null &&
+          existingRow.auth_token_encrypted !== verifiedStoredTokenEncrypted
+        ) {
+          // The stored token rotated between the preflight verification and
+          // taking the lock; persisting now would pair input.accountSid with
+          // a token never verified against it.
+          throw new AppError(
+            'The stored SMS credentials changed while this save was being verified. Please retry.',
+            409,
+            ERROR_CODES.INVALID_INPUT
+          );
         }
 
         result = await client.query(

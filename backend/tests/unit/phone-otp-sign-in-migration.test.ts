@@ -38,17 +38,24 @@ describe('065_add-phone-otp-sign-in migration', () => {
     );
   });
 
-  it('keeps at least one identifier per user with a database constraint', () => {
+  it('keeps at least one non-blank identifier per user with a database constraint', () => {
     expect(sql).toMatch(/users_email_or_phone_present/);
-    expect(sql).toMatch(/CHECK \(email IS NOT NULL OR phone_number IS NOT NULL\)/i);
+    // Blank strings must fail the check like NULLs, and the constraint must be
+    // NOT VALID so a legacy row cannot abort the migration.
+    expect(sql).toMatch(
+      /CHECK \(NULLIF\(email, ''\) IS NOT NULL OR NULLIF\(phone_number, ''\) IS NOT NULL\)/i
+    );
+    expect(sql).toMatch(/NOT VALID/i);
   });
 
   it('hides the sms schema from the PostgREST data API', () => {
-    // The internal-schema fallback list must include sms, and the migration
-    // must resync PostgREST because CREATE SCHEMA already fired the exposure
-    // event trigger.
+    // The internal-schema fallback list must include sms, the exclusion must
+    // also hold unconditionally (a configured GUC predating this migration
+    // omits sms), and the migration must resync PostgREST because CREATE
+    // SCHEMA already fired the exposure event trigger.
     expect(sql).toMatch(/is_exposed_schema/);
     expect(sql).toContain('schedules,sms,storage');
+    expect(sql).toMatch(/AND p_schema <> 'sms'/);
     expect(sql).toMatch(/SELECT system\.sync_postgrest_exposed_schemas\(\)/);
   });
 

@@ -5,10 +5,11 @@ import logger from '@/utils/logger.js';
 import { ERROR_CODES, emailSchema, phoneSchema } from '@insforge/shared-schemas';
 
 /**
- * Store for tracking per-email cooldowns
- * Maps email -> last request timestamp
+ * Store for tracking per-identifier cooldowns, shared by the email and phone
+ * OTP paths (the key namespaces cannot collide — see createIdentifierCooldown)
+ * Maps identifier (email or phone) -> last request timestamp
  */
-const emailCooldowns = new Map<string, number>();
+const identifierCooldowns = new Map<string, number>();
 
 /**
  * Cleanup interval reference for graceful shutdown
@@ -23,9 +24,9 @@ cleanupInterval = setInterval(
     const now = Date.now();
     const fiveMinutes = 5 * 60 * 1000;
 
-    for (const [email, timestamp] of emailCooldowns.entries()) {
+    for (const [identifier, timestamp] of identifierCooldowns.entries()) {
       if (now - timestamp > fiveMinutes) {
-        emailCooldowns.delete(email);
+        identifierCooldowns.delete(identifier);
       }
     }
   },
@@ -35,12 +36,12 @@ cleanupInterval = setInterval(
 /**
  * Clean up resources for graceful shutdown
  */
-export function destroyEmailCooldownInterval(): void {
+export function destroyIdentifierCooldownInterval(): void {
   if (cleanupInterval) {
     clearInterval(cleanupInterval);
     cleanupInterval = null;
   }
-  emailCooldowns.clear();
+  identifierCooldowns.clear();
 }
 
 /**
@@ -194,7 +195,7 @@ const createIdentifierCooldown = (options: {
       const identifier = parsed.data;
 
       const now = Date.now();
-      const lastRequest = emailCooldowns.get(identifier);
+      const lastRequest = identifierCooldowns.get(identifier);
 
       if (lastRequest && now - lastRequest < cooldownMs) {
         const remainingMs = cooldownMs - (now - lastRequest);
@@ -208,7 +209,7 @@ const createIdentifierCooldown = (options: {
       }
 
       // Update last request time
-      emailCooldowns.set(identifier, now);
+      identifierCooldowns.set(identifier, now);
       next();
     };
   };

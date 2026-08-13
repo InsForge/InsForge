@@ -6,7 +6,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 import {
-  destroyEmailCooldownInterval,
+  destroyIdentifierCooldownInterval,
   perEmailCooldown,
   perPhoneCooldown,
 } from '../../src/api/middlewares/rate-limiters.js';
@@ -26,7 +26,7 @@ describe('OTP send cooldowns key only validated identifiers', () => {
   afterEach(() => {
     vi.useRealTimers();
     // Clears the shared cooldown store between tests.
-    destroyEmailCooldownInterval();
+    destroyIdentifierCooldownInterval();
   });
 
   it('applies the phone cooldown to repeated valid requests', () => {

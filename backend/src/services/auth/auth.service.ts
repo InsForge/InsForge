@@ -71,6 +71,10 @@ export class AuthService {
   private xOAuthProvider: XOAuthProvider;
   private appleOAuthProvider: AppleOAuthProvider;
 
+  // Phones with a sign-in SMS currently in flight. In-memory is fine:
+  // single-instance server (see SmsService.lastSmsSentAt).
+  private phoneOtpSendsInFlight = new Set<string>();
+
   private constructor() {
     const adminUsername = appConfig.auth.rootAdminUsername;
     const adminPassword = appConfig.auth.rootAdminPassword;
@@ -481,19 +485,34 @@ export class AuthService {
    * never collide with email identifiers, so the machinery is shared as-is.
    */
   async sendPhoneSignInOTP(phone: string): Promise<void> {
-    // Refuse doomed sends (unconfigured provider, interval cooldown) before
-    // the upsert below rotates the stored code, so a throttled retry can never
-    // invalidate a code the user already received.
-    await SmsService.getInstance().assertCanSend(phone);
+    // Serialize per phone: two concurrent requests could otherwise both pass
+    // assertCanSend, each rotate the stored code, and deliver an SMS whose
+    // code no longer matches the one verification checks.
+    if (this.phoneOtpSendsInFlight.has(phone)) {
+      throw new AppError(
+        'A verification code is already being sent to this number.',
+        429,
+        ERROR_CODES.RATE_LIMITED
+      );
+    }
+    this.phoneOtpSendsInFlight.add(phone);
+    try {
+      // Refuse doomed sends (unconfigured provider, interval cooldown) before
+      // the upsert below rotates the stored code, so a throttled retry can
+      // never invalidate a code the user already received.
+      await SmsService.getInstance().assertCanSend(phone);
 
-    const { otp } = await AuthOTPService.getInstance().createEmailOTP(
-      phone,
-      OTPPurpose.SIGN_IN,
-      OTPType.NUMERIC_CODE,
-      { expiresInMinutes: 5 }
-    );
+      const { otp } = await AuthOTPService.getInstance().createEmailOTP(
+        phone,
+        OTPPurpose.SIGN_IN,
+        OTPType.NUMERIC_CODE,
+        { expiresInMinutes: 5 }
+      );
 
-    await SmsService.getInstance().sendSignInCode(phone, otp);
+      await SmsService.getInstance().sendSignInCode(phone, otp);
+    } finally {
+      this.phoneOtpSendsInFlight.delete(phone);
+    }
   }
 
   /**

@@ -213,6 +213,34 @@ describe('AuthService phone OTP sign-in', () => {
     expect(mocks.sendSignInCode).not.toHaveBeenCalled();
   });
 
+  it('rejects a concurrent send for the same phone while one is in flight', async () => {
+    let releaseSend: () => void = () => {};
+    mocks.sendSignInCode.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseSend = resolve;
+        })
+    );
+
+    const first = authService.sendPhoneSignInOTP(PHONE);
+    await vi.waitFor(() => expect(mocks.sendSignInCode).toHaveBeenCalledTimes(1));
+
+    // The second request must fail before rotating the stored code.
+    await expect(authService.sendPhoneSignInOTP(PHONE)).rejects.toMatchObject({
+      statusCode: 429,
+      code: ERROR_CODES.RATE_LIMITED,
+    });
+    expect(mocks.createEmailOTP).toHaveBeenCalledTimes(1);
+
+    releaseSend();
+    await first;
+
+    // The slot is released once the send settles.
+    mocks.sendSignInCode.mockResolvedValue(undefined);
+    await authService.sendPhoneSignInOTP(PHONE);
+    expect(mocks.createEmailOTP).toHaveBeenCalledTimes(2);
+  });
+
   it('creates a phone-verified user without an email only after a valid OTP', async () => {
     mocks.client.query
       .mockResolvedValueOnce({ rows: [] }) // SELECT auth.users (no existing user)

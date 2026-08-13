@@ -23,7 +23,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_number ON auth.users (phone_nu
 
 -- The API guarantees every sign-up carries an identifier; this keeps the
 -- invariant where the data lives, so a direct SQL writer or a future migration
--- cannot create an account that no sign-in method can ever reach.
+-- cannot create an account that no sign-in method can ever reach. Blank
+-- strings are rejected too — an empty-string identifier is as unreachable as
+-- a NULL one. NOT VALID: enforced on every new write without failing the
+-- migration should a legacy row predate the rule.
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -32,7 +35,8 @@ BEGIN
   ) THEN
     ALTER TABLE auth.users
       ADD CONSTRAINT users_email_or_phone_present
-      CHECK (email IS NOT NULL OR phone_number IS NOT NULL);
+      CHECK (NULLIF(email, '') IS NOT NULL OR NULLIF(phone_number, '') IS NOT NULL)
+      NOT VALID;
   END IF;
 END $$;
 
@@ -92,6 +96,10 @@ AS $fn$
     p_schema IS NOT NULL
     AND p_schema NOT LIKE 'pg\_%'
     AND p_schema <> 'information_schema'
+    -- sms holds provider credentials; exclude it unconditionally so a
+    -- deployment whose insforge.internal_schemas GUC predates this migration
+    -- cannot expose it through the resync below.
+    AND p_schema <> 'sms'
     AND p_schema <> ALL (
       -- Comma-separated GUC; strip any incidental whitespace before splitting.
       string_to_array(

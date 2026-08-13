@@ -89,6 +89,34 @@ describe('TwilioSmsProvider', () => {
     expect(logged).not.toContain('hi');
   });
 
+  it('preserves retry semantics for a Twilio 429', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: () => Promise.resolve({ code: 20429, message: 'Too Many Requests' }),
+    });
+
+    await expect(new TwilioSmsProvider().send('+15551234567', 'hi', CONFIG)).rejects.toMatchObject({
+      statusCode: 429,
+      code: ERROR_CODES.SMS_SEND_FAILED,
+      message: 'Failed to send SMS',
+    });
+  });
+
+  it('maps broken stored credentials (401/403) to a 500, not a caller error', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: () => Promise.resolve({ code: 20003, message: 'Authenticate' }),
+    });
+
+    await expect(new TwilioSmsProvider().send('+15551234567', 'hi', CONFIG)).rejects.toMatchObject({
+      statusCode: 500,
+      code: ERROR_CODES.SMS_SEND_FAILED,
+      message: 'Failed to send SMS',
+    });
+  });
+
   it('maps a Twilio server error to a generic 500', async () => {
     fetchMock.mockResolvedValue({
       ok: false,

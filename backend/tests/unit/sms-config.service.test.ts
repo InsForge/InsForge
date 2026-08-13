@@ -175,6 +175,53 @@ describe('SmsConfigService', () => {
     });
   });
 
+  it('maps a preflight credential-read failure to a generic 500', async () => {
+    mocks.pool.query.mockRejectedValue(new Error('connection terminated'));
+
+    await expect(
+      service.upsertSmsConfig({
+        enabled: true,
+        provider: 'twilio',
+        accountSid: 'ACtest',
+        fromNumber: '+15550001111',
+        messagingServiceSid: '',
+        minIntervalSeconds: 60,
+        otpMessageTemplate: 'Your verification code is {{ code }}.',
+      })
+    ).rejects.toMatchObject({
+      statusCode: 500,
+      code: ERROR_CODES.INTERNAL_ERROR,
+      message: 'Failed to update SMS configuration',
+    });
+
+    // The raw database error stays in the log; no verify, no transaction.
+    expect(mocks.verifyCredentials).not.toHaveBeenCalled();
+    expect(mocks.pool.connect).not.toHaveBeenCalled();
+  });
+
+  it('rejects a token-omitting save whose stored token rotated after verification', async () => {
+    const verified = EncryptionManager.encrypt('token-at-verify-time');
+    const rotated = EncryptionManager.encrypt('token-from-concurrent-save');
+    const stored = { auth_token_encrypted: rotated };
+    mocks.pool.query.mockResolvedValue({ rows: [{ auth_token_encrypted: verified }] });
+    mocks.client.query.mockImplementation(upsertQueryImplementation(stored));
+
+    await expect(
+      service.upsertSmsConfig({
+        enabled: true,
+        provider: 'twilio',
+        accountSid: 'ACtest',
+        fromNumber: '+15550001111',
+        messagingServiceSid: '',
+        minIntervalSeconds: 60,
+        otpMessageTemplate: 'Your verification code is {{ code }}.',
+      })
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    // The concurrent save's token survives; no mixed pair was written.
+    expect(stored.auth_token_encrypted).toBe(rotated);
+  });
+
   it('disabling preserves every stored provider field', async () => {
     const stored = { auth_token_encrypted: EncryptionManager.encrypt('keep-me') };
     mocks.client.query.mockImplementation((sql: string, params?: unknown[]) => {

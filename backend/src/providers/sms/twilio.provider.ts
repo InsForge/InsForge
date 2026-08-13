@@ -67,9 +67,19 @@ export class TwilioSmsProvider implements SmsProvider {
     if (!response.ok) {
       const message = await readTwilioError(response);
       logger.error(`Failed to send SMS via Twilio: ${message}`, { status: response.status });
-      // A Twilio 4xx means the request or recipient was rejected, not a server
-      // fault; the detailed reason is admin-visible in the logs only.
-      const status = response.status >= 400 && response.status < 500 ? 400 : 500;
+      // The detailed reason is admin-visible in the logs only, but the status
+      // must keep its retry semantics: a Twilio 429 (account throttled)
+      // surfaces as 429 so clients back off, 401/403 (broken stored
+      // credentials — an operator fault, nothing the caller did) as 500, and
+      // the remaining 4xx (request or recipient rejected) as 400.
+      const status =
+        response.status === 429
+          ? 429
+          : response.status === 401 || response.status === 403
+            ? 500
+            : response.status < 500
+              ? 400
+              : 500;
       throw new AppError('Failed to send SMS', status, ERROR_CODES.SMS_SEND_FAILED);
     }
 

@@ -26,14 +26,24 @@ const createSmsFormResolver = (opts: {
   hasStoredToken: boolean;
   requiredMessage: string;
 }): typeof baseResolver => {
-  return (values, context, options) => {
+  return async (values, context, options) => {
+    const result = await baseResolver(
+      { ...values, authToken: values.authToken || undefined },
+      context,
+      options
+    );
     if (values.enabled && !values.authToken && !opts.hasStoredToken) {
-      return Promise.resolve({
+      // Merge with the base result so every field error surfaces on the same
+      // submit, not spread across two.
+      return {
         values: {},
-        errors: { authToken: { type: 'required', message: opts.requiredMessage } },
-      });
+        errors: {
+          ...result.errors,
+          authToken: { type: 'required', message: opts.requiredMessage },
+        },
+      };
     }
-    return baseResolver({ ...values, authToken: values.authToken || undefined }, context, options);
+    return result;
   };
 };
 
