@@ -111,6 +111,10 @@ export interface AppConfig {
     maxDeploymentFiles: number;
     maxDeploymentTotalBytes: number;
     maxDeploymentFileBytes: number;
+    /** Base domain for `host` ingress on the Docker sites driver. */
+    sitesDomain: string;
+    /** Where uploaded deployment bytes stage before a build, keyed by sha. */
+    sitesStagingDir: string;
   };
   ai: {
     openrouterApiKey: string | undefined;
@@ -309,6 +313,14 @@ export function loadConfig(): AppConfig {
         100 * 1024 * 1024
       ),
       maxDeploymentFileBytes: parseEnvInt(process.env.MAX_DEPLOYMENT_FILE_BYTES, 100 * 1024 * 1024),
+      // Falls back to COMPUTE_DOMAIN so an operator who already routes compute
+      // hostnames configures nothing new; sites and services can still be split by
+      // setting SITES_DOMAIN on its own.
+      sitesDomain: process.env.SITES_DOMAIN || process.env.COMPUTE_DOMAIN || '',
+      // Uploaded bytes land here, named by their sha, until a build consumes them.
+      // Alongside logsDir rather than in /tmp, so an upload survives a process restart
+      // that lands between it and the build that consumes it.
+      sitesStagingDir: process.env.SITES_STAGING_DIR || path.join(process.cwd(), 'sites-staging'),
     },
     ai: {
       openrouterApiKey: process.env.OPENROUTER_API_KEY || undefined,

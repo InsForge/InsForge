@@ -1,4 +1,7 @@
+import { dockerConfig } from '@/providers/compute/docker.client.js';
+import { DockerSitesProvider } from '@/providers/deployments/docker.provider.js';
 import { VercelProvider } from '@/providers/deployments/vercel.provider.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import type {
   DomainStore,
   EnvVarStore,
@@ -36,10 +39,10 @@ export function buildSitesRegistry(): SitesRegistry {
       'Unset SITES_PROVIDER or set it to a provider name, then restart the container.'
     );
   }
-  const known = ['', 'auto', 'vercel'];
+  const known = ['', 'auto', 'vercel', 'docker'];
   if (!known.includes(requested)) {
     throw new AppError(
-      `Unknown SITES_PROVIDER "${requested}". Expected one of: vercel, off.`,
+      `Unknown SITES_PROVIDER "${requested}". Expected one of: vercel, docker, off.`,
       503,
       ERROR_CODES.DEPLOYMENT_NOT_CONFIGURED
     );
@@ -60,18 +63,50 @@ export function buildSitesRegistry(): SitesRegistry {
     providers.set('vercel', vercel);
   }
 
+  // Docker registers itself when the socket is present — mounting it into the InsForge
+  // container *is* the operator's opt-in, the same contract as the compute driver. It
+  // registers on isConfigured() alone, never on having been requested, so a named driver
+  // that cannot run produces the explicit error below rather than obscure later failures.
+  const docker = DockerSitesProvider.getInstance();
+  if (docker.isConfigured()) {
+    providers.set('docker', docker);
+  } else if (requested === 'docker') {
+    // Two different reasons, and conflating them would send an operator chasing a socket
+    // mount that is not the problem. isConfigured() fails closed on our infrastructure
+    // whether or not a socket exists — see the driver for why hosting customer containers
+    // on shared hosts is a tenant escape.
+    if (isCloudEnvironment()) {
+      throw new AppError(
+        'The Docker sites driver is self-host only and cannot run on a cloud-managed project.',
+        400,
+        ERROR_CODES.DEPLOYMENT_NOT_CONFIGURED,
+        'Unset SITES_PROVIDER to use the managed provider.'
+      );
+    }
+    throw new AppError(
+      `SITES_PROVIDER=docker but no Docker socket at ${dockerConfig().socketPath}.`,
+      503,
+      ERROR_CODES.DEPLOYMENT_NOT_CONFIGURED,
+      'Mount the Docker socket into the InsForge container (or set DOCKER_SOCKET_PATH), then restart.'
+    );
+  }
+
   if (providers.size === 0) {
     throw new AppError(
       'No sites provider is configured.',
       503,
       ERROR_CODES.DEPLOYMENT_NOT_CONFIGURED,
-      'Set VERCEL_TOKEN, VERCEL_TEAM_ID and VERCEL_PROJECT_ID, then restart the container.'
+      'Set VERCEL_TOKEN, VERCEL_TEAM_ID and VERCEL_PROJECT_ID, or mount the Docker socket, then restart.'
     );
   }
 
-  const [first] = [...providers.keys()];
+  // Vercel wins when both are available and nothing was named: an existing self-host that
+  // mounts the socket for compute must not silently move its site to a new driver on
+  // upgrade. Docker becomes the default only when it is the only one, or when asked for.
+  const fallback = providers.has('vercel') ? 'vercel' : [...providers.keys()][0];
   const named = requested as SitesProviderName;
-  const defaultProvider = requested && requested !== 'auto' && providers.has(named) ? named : first;
+  const defaultProvider =
+    requested && requested !== 'auto' && providers.has(named) ? named : fallback;
 
   return { providers, defaultProvider };
 }
