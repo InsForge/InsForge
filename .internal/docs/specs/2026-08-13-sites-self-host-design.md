@@ -168,7 +168,9 @@ a thrown error, a missing variable. `GET /api/deployments/:id/logs` pages the co
 own stdout/stderr through the same `dockerContainerLogs` the compute driver uses — the
 paging lives in `docker.client.ts` so there is one implementation, not two. Behind a
 `runtimeLogs` capability, so a driver with nothing to read says so by name instead of
-returning an empty page that looks like silence. Ownership is checked against this
+returning an empty page that looks like silence. The flag describes the driver rather than
+the deployment: a static site answers with the file server's own output, which is a request
+log rather than the developer's. Ownership is checked against this
 project's labels first: a deployment id *is* a container id, and an unchecked one reads
 whatever else runs on the daemon.
 
@@ -220,7 +222,7 @@ Consequence to accept up front: this is a large backend diff. It stays reviewabl
 | `slug` | true | false — no shared domain to name anything in |
 | `rollback` | **false** | true |
 | `buildLogs` | **false** | true |
-| `runtimeLogs` | **false** | true for a server, false for a static site — Caddy's log is a request log, not the developer's |
+| `runtimeLogs` | **false** | true — the app's own output for a server, Caddy's for a static site |
 | `frameworkDetection` | true | false |
 | `ingressModes` | `['host']` | `['port', 'host']` |
 

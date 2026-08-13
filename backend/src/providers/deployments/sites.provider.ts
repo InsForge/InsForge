@@ -181,11 +181,13 @@ export interface SitesProvider {
   slug?: SlugStore;
 
   /**
-   * A page of the running deployment's output, oldest first. Present when
-   * `capabilities().runtimeLogs` is true.
+   * A page of the running deployment's output, oldest line first within the page. Present
+   * when `capabilities().runtimeLogs` is true.
    *
-   * `nextToken` is an opaque forward cursor: pass the previous page's token to resume, and a
-   * null token means nothing further is available yet.
+   * Without a cursor the page is the newest `limit` lines — a tail, not the start of the
+   * history, because that is what someone opening logs wants to see. `nextToken` is an
+   * opaque forward cursor: pass the previous page's token to get what has arrived since,
+   * which is an empty page while the app is quiet rather than an end-of-stream signal.
    */
   runtimeLogs?(
     providerDeploymentId: string,
