@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { createWriteStream, existsSync } from 'node:fs';
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { Readable } from 'node:stream';
@@ -256,7 +256,11 @@ export class DockerSitesProvider implements SitesProvider {
   async uploadFile(fileContent: Buffer): Promise<string> {
     const sha = createHash('sha1').update(fileContent).digest('hex');
     await this.ensureStagingDir();
-    await writeFile(this.stagedPath(sha), fileContent);
+    const target = this.stagedPath(sha);
+    const scratch = `${target}.${randomBytes(6).toString('hex')}.part`;
+    // Same reason as the streaming path: a reader must never see a half-written blob.
+    await writeFile(scratch, fileContent);
+    await rename(scratch, target);
     return sha;
   }
 
@@ -268,10 +272,23 @@ export class DockerSitesProvider implements SitesProvider {
   }): Promise<string> {
     await this.ensureStagingDir();
     const target = this.stagedPath(input.sha);
-    // The caller's stream already verifies sha and size as it passes bytes through
-    // (createValidatedFileStream), so a mismatch aborts the pipeline rather than
-    // landing a corrupt file here.
-    await pipeline(input.content, createWriteStream(target), { signal: input.signal });
+    // Write beside the final name and rename on success.
+    //
+    // The caller's stream verifies sha and size as bytes pass through, so a mismatch or a
+    // client disconnect aborts mid-write — and writing straight to the final path would
+    // leave a truncated file there. Nothing downstream would notice: buildContext only
+    // checks that the path exists, so the next deploy would tar corrupt bytes under a sha
+    // that claims otherwise. A rename is atomic on the same filesystem, so a reader either
+    // sees no file or sees a complete one. The suffix is random because two uploads of the
+    // same sha can overlap.
+    const scratch = `${target}.${randomBytes(6).toString('hex')}.part`;
+    try {
+      await pipeline(input.content, createWriteStream(scratch), { signal: input.signal });
+      await rename(scratch, target);
+    } catch (error) {
+      await rm(scratch, { force: true });
+      throw error;
+    }
     return input.sha;
   }
 
@@ -525,10 +542,16 @@ export class DockerSitesProvider implements SitesProvider {
     return trimmed;
   }
 
+  /**
+   * Namespace for labels, container names and image tags.
+   *
+   * `APP_KEY`, the same key the Docker compute driver uses, and deliberately not
+   * `PROJECT_ID`: a self-host usually has no project id, so every instance collapsed to
+   * `local` — and two InsForge instances sharing one daemon would list, stop and prune
+   * each other's site containers. APP_KEY is per-instance and generated at setup.
+   */
   private projectKey(): string {
-    const projectId = appConfig.cloud?.projectId;
-    // Same shape as the compute driver's key: short, stable, and safe in an image tag.
-    return (projectId && projectId !== 'local' ? projectId : 'local').slice(0, 12);
+    return (process.env.APP_KEY || 'local').slice(0, 24);
   }
 
   /**
@@ -540,7 +563,15 @@ export class DockerSitesProvider implements SitesProvider {
    */
   private async runContainer(imageTag: string, digest: string): Promise<string> {
     const previous = await this.listOwnContainers();
-    const name = `${CONTAINER_PREFIX}-${this.projectKey()}-${digest}`;
+    // Not the digest alone. Retention keeps previous containers on purpose, so
+    // redeploying byte-identical content — "re-run the deploy, nothing changed" — would
+    // ask Docker for a name that still exists and get a 409. The suffix makes each
+    // attempt its own container, which the deployments table needs anyway:
+    // `provider_deployment_id` is UNIQUE, so two rows cannot share one container.
+    //
+    // Random rather than a timestamp: two deploys inside the same millisecond would
+    // collide again, which is a race a clock cannot fix and a test found immediately.
+    const name = `${CONTAINER_PREFIX}-${this.projectKey()}-${digest}-${randomBytes(3).toString('hex')}`;
     // Published under both ingress modes: `host` needs somewhere for the operator's
     // gateway to proxy to, so only the address we advertise differs.
     const exposed = `${SITE_PORT}/tcp`;

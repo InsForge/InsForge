@@ -4,12 +4,17 @@ import crypto from 'crypto';
 import { Transform, type Readable, type TransformCallback } from 'stream';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import {
+  buildSitesRegistry,
   isAnySitesProviderConfigured,
   requireDomainStore,
   selectSitesProvider,
   unsupportedFeature,
 } from '@/services/deployments/sites-registry.js';
-import type { DomainConfig, SitesProvider } from '@/providers/deployments/sites.provider.js';
+import type {
+  DomainConfig,
+  SitesProvider,
+  SitesProviderName,
+} from '@/providers/deployments/sites.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import { AppError } from '@/utils/errors.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
@@ -104,6 +109,35 @@ export class DeploymentService {
    */
   private get provider(): SitesProvider {
     return selectSitesProvider();
+  }
+
+  /**
+   * The driver that made this row, not whichever one is default now.
+   *
+   * `deployments.runs.provider` records it precisely so that switching SITES_PROVIDER
+   * cannot send a Vercel deployment's id to Docker — the id means nothing to the other
+   * driver, and for rollback the other driver may not even offer it. Falls back to the
+   * active default only for rows written before this column carried the truth.
+   */
+  private providerFor(record: { provider?: string | null }): SitesProvider {
+    const active = this.provider;
+    const name = record.provider;
+    // The overwhelmingly common case, and it needs no registry lookup: the row was made
+    // by whatever is serving now. A missing name means a row older than this column
+    // carrying the truth.
+    if (!name || name === active.name) {
+      return active;
+    }
+    const owner = buildSitesRegistry().providers.get(name as SitesProviderName);
+    if (!owner) {
+      throw new AppError(
+        `This deployment was made by the ${name} driver, which is not configured here.`,
+        409,
+        ERROR_CODES.DEPLOYMENT_NOT_CONFIGURED,
+        `Set SITES_PROVIDER=${name} and its credentials to operate on it.`
+      );
+    }
+    return owner;
   }
 
   private initializeS3Provider(): void {
@@ -287,7 +321,7 @@ export class DeploymentService {
            metadata,
            created_at as "createdAt",
            updated_at as "updatedAt"`,
-        ['vercel', DeploymentStatus.WAITING, JSON.stringify({ uploadMode: 'legacy' })]
+        [this.provider.name, DeploymentStatus.WAITING, JSON.stringify({ uploadMode: 'legacy' })]
       );
 
       const deployment = result.rows[0] as DeploymentRecord;
@@ -351,7 +385,7 @@ export class DeploymentService {
              created_at as "createdAt",
              updated_at as "updatedAt"`,
           [
-            'vercel',
+            this.provider.name,
             DeploymentStatus.WAITING,
             JSON.stringify({
               uploadMode: 'direct',
@@ -1050,14 +1084,18 @@ export class DeploymentService {
    * that claimed to be READY is demoted, so the history cannot show two live deployments.
    */
   async rollbackTo(id: string): Promise<DeploymentRecord> {
-    const provider = this.provider;
-    if (!provider.rollbackTo) {
-      throw unsupportedFeature(provider.name, 'rollback');
-    }
-
     const deployment = await this.getDeploymentById(id);
     if (!deployment) {
       throw new AppError('Deployment not found.', 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
+    }
+
+    // The row's own driver: restoring a Vercel deployment through Docker is meaningless,
+    // and asking the *default* driver whether it can roll back answers about the wrong
+    // one. Read after the row exists so a bad id is still a 404 rather than a capability
+    // complaint about a deployment nobody has.
+    const provider = this.providerFor(deployment);
+    if (!provider.rollbackTo) {
+      throw unsupportedFeature(provider.name, 'rollback');
     }
     if (!deployment.providerDeploymentId) {
       throw new AppError(
@@ -1196,7 +1234,9 @@ export class DeploymentService {
       }
 
       // Fetch the latest status from the driver that made this row
-      const providerDeployment = await this.provider.getDeployment(deployment.providerDeploymentId);
+      const providerDeployment = await this.providerFor(deployment).getDeployment(
+        deployment.providerDeploymentId
+      );
 
       // The driver's own status, uppercased to match our enum
       const providerStatus = (
@@ -1297,7 +1337,7 @@ export class DeploymentService {
 
       // If deployment has a Vercel ID, cancel it on Vercel
       if (deployment.providerDeploymentId) {
-        await this.provider.cancelDeployment(deployment.providerDeploymentId);
+        await this.providerFor(deployment).cancelDeployment(deployment.providerDeploymentId);
       }
 
       if (
@@ -1625,8 +1665,11 @@ export class DeploymentService {
         | { id: string; url: string | null }
         | undefined;
 
-      // Get the custom domain URL from Vercel provider (which has the slug from cloud credentials)
-      const customDomainUrl = await requireDomainStore().url();
+      // Guarded like the slug store in getConfigMetadata: a driver that owns no domains
+      // has no custom domain URL, and demanding one made this whole response 400 for the
+      // driver this file exists to support — including `currentDeploymentId` and
+      // `defaultDomainUrl`, which are meaningful for every driver.
+      const customDomainUrl = this.provider.domains ? await this.provider.domains.url() : null;
 
       return {
         currentDeploymentId: latestReadyDeployment?.id ?? null,
