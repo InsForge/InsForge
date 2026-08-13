@@ -159,6 +159,10 @@ services:
       - SITES_DOMAIN=${SITES_DOMAIN:-}
       # Where uploaded deployment files stage before a build, keyed by content hash.
       - SITES_STAGING_DIR=${SITES_STAGING_DIR:-}
+      # Fixed host port for the live site. Empty lets Docker assign one per deploy, which
+      # keeps deploys gapless but changes the address each time. A gateway in front makes
+      # this unnecessary — see deploy/sites-gateway/Caddyfile.
+      - SITES_PORT=${SITES_PORT:-}
       # ─── Custom Compute: Docker provider (opt-in) ──────────────────────────
       # Mounting the Docker socket below is what enables it: the driver registers
       # itself when the socket is reachable, so nothing runs containers on your

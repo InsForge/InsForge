@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createWriteStream, existsSync } from 'node:fs';
 import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { hostname } from 'node:os';
 import { pipeline } from 'node:stream/promises';
 import type { Readable } from 'node:stream';
 import { pack as tarPack } from 'tar-stream';
@@ -582,6 +583,53 @@ export class DockerSitesProvider implements SitesProvider {
   }
 
   /**
+   * The project's compose network, found by inspecting our own container.
+   *
+   * Compose namespaces networks per project (`myproj_insforge-network`), so it cannot be
+   * guessed, and Docker sets the container hostname to the short container id — which is
+   * the handle on ourselves. Without a network the site still runs and still publishes a
+   * port; it just has no stable DNS name for a gateway to point at.
+   *
+   * Not cached on failure: a daemon blip during the first deploy would otherwise pin
+   * `null` for the process lifetime and leave every later container off the network — the
+   * exact thing this lookup exists to prevent. Same reasoning as the compute driver.
+   */
+  private async resolveNetwork(): Promise<string | null> {
+    if (this.ownNetwork) {
+      return this.ownNetwork;
+    }
+    try {
+      const self = await dockerRequest<{
+        NetworkSettings?: { Networks?: Record<string, unknown> };
+      }>('GET', `/containers/${encodeURIComponent(hostname())}/json`);
+      const names = Object.keys(self?.NetworkSettings?.Networks ?? {}).filter(
+        (name) => !['bridge', 'host', 'none'].includes(name)
+      );
+      this.ownNetwork = names[0] ?? null;
+      return this.ownNetwork;
+    } catch (error) {
+      // Not fatal: the backend may not be in a container at all (local dev against a host
+      // daemon). The site lands on the default bridge and keeps its published port.
+      logger.warn('Docker sites: own-container inspect failed; no stable alias', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  private ownNetwork: string | null = null;
+
+  /**
+   * The DNS name a gateway points at, stable across deploys.
+   *
+   * Container *names* change every deploy — they carry the digest so redeploys do not
+   * collide — so the handle has to be an alias instead.
+   */
+  private stableAlias(): string {
+    return `${CONTAINER_PREFIX}-${this.projectKey()}`;
+  }
+
+  /**
    * Start the new container, then stop the previous one.
    *
    * This order is the atomic switch: the new site is already answering before the old one
@@ -590,6 +638,23 @@ export class DockerSitesProvider implements SitesProvider {
    */
   private async runContainer(imageTag: string, digest: string): Promise<string> {
     const previous = await this.listOwnContainers();
+    const network = await this.resolveNetwork();
+    const fixedPort = appConfig.deployments.sitesPort;
+    // One boolean, used twice: deciding the order with `=== 0` in one place and `> 0` in
+    // the other let an unset value fall through both branches, so nothing stopped the old
+    // container at all.
+    const stopBeforeStarting = fixedPort > 0;
+
+    // With a fixed host port the switch cannot overlap — two containers cannot bind the
+    // same port — so the old one goes down first. Measured cost: ~870ms of refused
+    // connections. Without it the new container binds an ephemeral port while the old one
+    // still serves, which is gapless but changes the address every deploy. The operator
+    // picks by setting SITES_PORT, and a gateway in front makes the whole question moot.
+    if (stopBeforeStarting) {
+      for (const container of previous) {
+        await dockerRequest('POST', `/containers/${container.Id}/stop?t=5`).catch(() => undefined);
+      }
+    }
     // Not the digest alone. Retention keeps previous containers on purpose, so
     // redeploying byte-identical content — "re-run the deploy, nothing changed" — would
     // ask Docker for a name that still exists and get a 409. The suffix makes each
@@ -621,9 +686,29 @@ export class DockerSitesProvider implements SitesProvider {
             // Loopback by default, like compute: publishing to 0.0.0.0 on a reachable
             // host is a deliberate choice, not something a default should make.
             PortBindings: {
-              [exposed]: [{ HostIp: dockerConfig().bindAddress, HostPort: '' }],
+              [exposed]: [
+                {
+                  HostIp: dockerConfig().bindAddress,
+                  HostPort: fixedPort > 0 ? String(fixedPort) : '',
+                },
+              ],
             },
           },
+          ...(network
+            ? {
+                NetworkingConfig: {
+                  EndpointsConfig: {
+                    // A stable name on the project network, so a gateway config can be one
+                    // static line — `reverse_proxy insforge-site-<key>:80` — with no label
+                    // discovery plugin and no rewriting on each deploy. The alias is shared
+                    // for the moment both containers run, which round-robins between two
+                    // healthy versions rather than opening an error window; the old
+                    // container's DNS entry disappears when it stops.
+                    [network]: { Aliases: [this.stableAlias()] },
+                  },
+                },
+              }
+            : {}),
         },
       }
     );
@@ -643,8 +728,12 @@ export class DockerSitesProvider implements SitesProvider {
       throw error;
     }
 
-    for (const container of previous) {
-      await dockerRequest('POST', `/containers/${container.Id}/stop?t=5`).catch(() => undefined);
+    if (!stopBeforeStarting) {
+      // Started before stopping, which is the gapless order. With a fixed port the stops
+      // already happened above.
+      for (const container of previous) {
+        await dockerRequest('POST', `/containers/${container.Id}/stop?t=5`).catch(() => undefined);
+      }
     }
 
     return created.Id;
@@ -802,6 +891,11 @@ export class DockerSitesProvider implements SitesProvider {
 
     if (!config.publicHost) {
       return null;
+    }
+    // A fixed port is stable by definition, so there is nothing to read back.
+    const fixedPort = appConfig.deployments.sitesPort;
+    if (fixedPort > 0) {
+      return `http://${config.publicHost}:${fixedPort}`;
     }
     // Reuse the caller's inspect when it has one: the read path already fetched this.
     const details =

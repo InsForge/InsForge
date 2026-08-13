@@ -172,6 +172,10 @@ services:
       - SITES_DOMAIN=${SITES_DOMAIN:-}
       # Where uploaded deployment files stage before a build, keyed by content hash.
       - SITES_STAGING_DIR=${SITES_STAGING_DIR:-}
+      # Fixed host port for the live site. Empty lets Docker assign one per deploy, which
+      # keeps deploys gapless but changes the address each time. A gateway in front makes
+      # this unnecessary — see deploy/sites-gateway/Caddyfile.
+      - SITES_PORT=${SITES_PORT:-}
       # ─── Custom Compute: Docker provider (opt-in) ──────────────────────────
       # Mounting the Docker socket below is what enables it: the driver registers
       # itself when the socket is reachable, so nothing runs containers on your
@@ -276,6 +280,37 @@ services:
     networks:
       - insforge-network
 
+  # Optional gateway for a self-hosted site. Off unless you ask for it:
+  #
+  #   docker compose --profile sites-gateway up -d
+  #
+  # InsForge still does not route your traffic or hold your certificates — this is a
+  # ready-made config rather than a component we run for you. It reaches whichever
+  # deployment is live through the stable alias the sites driver assigns, so the
+  # Caddyfile needs no rewriting between deploys.
+  sites-gateway:
+    image: caddy:alpine
+    profiles: ['sites-gateway']
+    restart: unless-stopped
+    environment:
+      # Namespaces the alias, and must resolve to the same value the backend uses — the
+      # driver falls back to `local` when APP_KEY is unset, so this defaults the same way.
+      # Left as an empty string the upstream became `insforge-site-:80`, which Caddy
+      # accepted at load and then could never reach.
+      - APP_KEY=${APP_KEY:-local}
+      # A domain pointed at this host makes Caddy obtain a certificate itself. Unset, it
+      # answers on :80 for any host, which is what you want behind another proxy.
+      # Defaults to `:80` — see the Caddyfile for why the fallback lives here.
+      - SITES_HOSTNAME=${SITES_HOSTNAME:-:80}
+    ports:
+      - '${SITES_GATEWAY_HTTP_PORT:-8080}:80'
+      - '${SITES_GATEWAY_HTTPS_PORT:-8443}:443'
+    volumes:
+      - ./deploy/sites-gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      - sites-gateway-data:/data
+    networks:
+      - insforge-network
+
 volumes:
   postgres-data:
     driver: local
@@ -294,6 +329,9 @@ volumes:
   shared-logs:
     driver: local
   storage-data:
+    driver: local
+  # Certificates and Caddy's own state, so a gateway restart does not re-issue them.
+  sites-gateway-data:
     driver: local
 
 networks:

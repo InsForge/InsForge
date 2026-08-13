@@ -115,6 +115,8 @@ export interface AppConfig {
     sitesDomain: string;
     /** Where uploaded deployment bytes stage before a build, keyed by sha. */
     sitesStagingDir: string;
+    /** Fixed host port for the live site, or 0 to let the daemon assign one per deploy. */
+    sitesPort: number;
   };
   ai: {
     openrouterApiKey: string | undefined;
@@ -325,6 +327,11 @@ export function loadConfig(): AppConfig {
       // into the working tree, and staging in /tmp meant an upload could not survive the
       // gap between itself and the build that consumes it.
       sitesStagingDir: process.env.SITES_STAGING_DIR || path.join(storageDir, 'sites-staging'),
+      // 0 means "let the daemon pick", which is Docker's own behaviour and keeps deploys
+      // gapless because the new container can bind while the old one still serves. The
+      // cost is that the address changes every deploy, so an operator who publishes the
+      // port directly — rather than putting a gateway in front — sets this instead.
+      sitesPort: parseEnvInt(process.env.SITES_PORT, 0),
     },
     ai: {
       openrouterApiKey: process.env.OPENROUTER_API_KEY || undefined,
