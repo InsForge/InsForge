@@ -1,7 +1,10 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import '#lib/i18n';
-import { MetricChartCard } from '#features/dashboard/components/observability/MetricChartCard';
+import {
+  getMetricXAxisTimestamps,
+  MetricChartCard,
+} from '#features/dashboard/components/observability/MetricChartCard';
 
 const pts = (pairs: Array<[number, number]>) =>
   pairs.map(([timestamp, value]) => ({ timestamp, value }));
@@ -17,6 +20,20 @@ const base = {
 const svgRects = (container: HTMLElement) => [...container.querySelectorAll('svg rect')];
 
 describe('MetricChartCard rendering modes', () => {
+  it('anchors x-axis timestamps to the newest reading when data is unordered', () => {
+    expect(
+      getMetricXAxisTimestamps(
+        pts([
+          [1300, 20],
+          [1000, 10],
+          [1200, Number.NaN],
+        ]),
+        300,
+        9999
+      )
+    ).toEqual([1000, 1150, 1300]);
+  });
+
   it('barChart mode draws bars instead of the line/area, destructive above the threshold', () => {
     const { container } = render(
       <MetricChartCard

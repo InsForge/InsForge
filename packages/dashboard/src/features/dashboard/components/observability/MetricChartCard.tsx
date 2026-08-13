@@ -171,6 +171,23 @@ function formatHoverTime(ts: number, rangeSeconds: number): string {
   return `${date} ${time}`;
 }
 
+/** Return the time-window endpoints used by the chart's x-axis labels. */
+export function getMetricXAxisTimestamps(
+  data: DashboardMetricDataPoint[],
+  rangeSeconds: number,
+  nowSeconds = Math.floor(Date.now() / 1000)
+): [number, number, number] {
+  const latestTimestamp = data.reduce<number | null>((latest, point) => {
+    if (!Number.isFinite(point.value)) {
+      return latest;
+    }
+    return latest === null || point.timestamp > latest ? point.timestamp : latest;
+  }, null);
+  const end = latestTimestamp ?? nowSeconds;
+  const start = end - rangeSeconds;
+  return [start, start + Math.floor(rangeSeconds / 2), end];
+}
+
 const FIXED_PERCENT_DOMAIN: [number, number] = [0, 100];
 
 export function MetricChartCard({
@@ -218,12 +235,9 @@ export function MetricChartCard({
   );
   const gradientId = useId();
   const xAxisTicks = useMemo(() => {
-    const finite = data.filter((p) => Number.isFinite(p.value));
-    const end =
-      finite.length > 0 ? finite[finite.length - 1].timestamp : Math.floor(Date.now() / 1000);
-    const start = end - rangeSeconds;
-    const mid = start + Math.floor(rangeSeconds / 2);
-    return [start, mid, end].map((ts) => formatHoverTime(ts, rangeSeconds));
+    return getMetricXAxisTimestamps(data, rangeSeconds).map((ts) =>
+      formatHoverTime(ts, rangeSeconds)
+    );
   }, [data, rangeSeconds]);
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
