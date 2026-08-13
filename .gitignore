@@ -35,6 +35,9 @@ deno.lock
 better-auth/
 .mcp.json
 backend/logs/*
+# Uploaded deployment files staged for a site build, named by content hash.
+backend/sites-staging/
+sites-staging/
 
 # Turborepo
 .turbo

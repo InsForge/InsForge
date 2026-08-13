@@ -155,6 +155,7 @@ function parseEnvBytes(val: string | undefined, fallback: number): number {
 
 export function loadConfig(): AppConfig {
   const logsDir = process.env.LOGS_DIR || path.join(process.cwd(), 'logs');
+  const storageDir = process.env.STORAGE_DIR || path.resolve(process.cwd(), 'insforge-storage');
 
   return {
     app: {
@@ -281,7 +282,7 @@ export function loadConfig(): AppConfig {
       appKey: process.env.APP_KEY || 'local',
       parentAppKey: process.env.PARENT_APP_KEY?.trim() || undefined,
       s3Region: process.env.S3_REGION || process.env.AWS_REGION || 'us-east-2',
-      storageDir: process.env.STORAGE_DIR || path.resolve(process.cwd(), 'insforge-storage'),
+      storageDir,
       s3AccessKeyId: process.env.S3_ACCESS_KEY_ID || undefined,
       s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY || undefined,
       awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID || undefined,
@@ -318,9 +319,12 @@ export function loadConfig(): AppConfig {
       // setting SITES_DOMAIN on its own.
       sitesDomain: process.env.SITES_DOMAIN || process.env.COMPUTE_DOMAIN || '',
       // Uploaded bytes land here, named by their sha, until a build consumes them.
-      // Alongside logsDir rather than in /tmp, so an upload survives a process restart
-      // that lands between it and the build that consumes it.
-      sitesStagingDir: process.env.SITES_STAGING_DIR || path.join(process.cwd(), 'sites-staging'),
+      //
+      // Under the storage directory, which is a mounted volume in every shipped compose
+      // file: staging next to the source tree meant a dev instance wrote customer uploads
+      // into the working tree, and staging in /tmp meant an upload could not survive the
+      // gap between itself and the build that consumes it.
+      sitesStagingDir: process.env.SITES_STAGING_DIR || path.join(storageDir, 'sites-staging'),
     },
     ai: {
       openrouterApiKey: process.env.OPENROUTER_API_KEY || undefined,
