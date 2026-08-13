@@ -11,7 +11,7 @@ const configMock = {
   cloud: { projectId: 'proj-1234567890ab', apiHost: 'https://cloud.test' },
   app: { jwtSecret: 's'.repeat(32), logLevel: 'error' },
   server: { logsDir: path.join(staging, 'logs') },
-  deployments: { sitesDomain: '', sitesStagingDir: staging },
+  deployments: { sitesDomain: '', sitesStagingDir: staging, sitesPort: 0 },
   docker: { socketPath: '/nonexistent/test.sock' },
 };
 vi.mock('@/infra/config/app.config.js', () => ({ config: configMock, appConfig: configMock }));
@@ -742,5 +742,79 @@ describe('DockerSitesProvider input hardening', () => {
     const secondTag = dockerBuild.mock.calls[0][0].tag as string;
 
     expect(firstTag).not.toBe(secondTag);
+  });
+});
+
+describe('DockerSitesProvider stable address', () => {
+  // A gateway config can then be one static line, with no label-discovery plugin and no
+  // rewriting per deploy. Container names carry the digest, so the handle has to be an
+  // alias rather than the name.
+  it('gives the live container a stable alias on the project network', async () => {
+    okBuild();
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve([]);
+      }
+      if (method === 'POST' && url.startsWith('/containers/create')) {
+        return Promise.resolve({ Id: 'container-new' });
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({
+          NetworkSettings: {
+            Networks: { bridge: {}, 'insforge_insforge-network': {} },
+            Ports: { '80/tcp': [{ HostPort: '49200' }] },
+          },
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>alias</h1>') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files);
+
+    const create = dockerRequest.mock.calls.find(
+      ([method, url]) => method === 'POST' && String(url).startsWith('/containers/create')
+    );
+    const body = (create?.[2] as { body: Record<string, unknown> }).body;
+    expect(body.NetworkingConfig).toEqual({
+      EndpointsConfig: { 'insforge_insforge-network': { Aliases: ['insforge-site-appkey01'] } },
+    });
+  });
+
+  // Two containers cannot bind one host port, so the overlap that makes deploys gapless
+  // is impossible here — the operator trades ~870ms of downtime for an address that stops
+  // changing. Which order runs is the whole difference.
+  it('stops the old container first when a fixed port is configured', async () => {
+    okBuild();
+    dockerHappyPath([{ Id: 'container-old' }]);
+    configMock.deployments.sitesPort = 7134;
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>fixed</h1>') },
+    ]);
+
+    const deployment = await provider.createDeploymentWithFiles(files);
+
+    const writes = dockerRequest.mock.calls
+      .filter(([method]) => method === 'POST')
+      .map(([, url]) => url as string);
+    expect(writes[0]).toBe('/containers/container-old/stop?t=5');
+    expect(writes[1]).toContain('/containers/create');
+    expect(writes[2]).toBe('/containers/container-new/start');
+
+    const create = dockerRequest.mock.calls.find(
+      ([method, url]) => method === 'POST' && String(url).startsWith('/containers/create')
+    );
+    const body = (
+      create?.[2] as {
+        body: { HostConfig: { PortBindings: Record<string, [{ HostPort: string }]> } };
+      }
+    ).body;
+    expect(body.HostConfig.PortBindings['80/tcp'][0].HostPort).toBe('7134');
+    // Stable by definition, so nothing is read back from the daemon.
+    expect(deployment.url).toBeNull();
   });
 });
