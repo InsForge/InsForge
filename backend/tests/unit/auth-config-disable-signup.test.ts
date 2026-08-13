@@ -43,7 +43,6 @@ vi.mock('../../src/infra/security/encryption.manager', () => ({
 
 vi.mock('../../src/utils/environment', () => ({
   isCloudEnvironment: () => false,
-  cloudProjectId: () => null,
 }));
 
 import { AuthConfigService } from '../../src/services/auth/auth-config.service';

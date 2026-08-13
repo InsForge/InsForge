@@ -1,5 +1,3 @@
-import { appConfig } from '@/infra/config/app.config.js';
-
 /**
  * Environment utility functions for checking runtime environment
  */
@@ -10,22 +8,6 @@ import { appConfig } from '@/infra/config/app.config.js';
  */
 export function isCloudEnvironment(): boolean {
   return !!(process.env.AWS_INSTANCE_PROFILE_NAME && process.env.AWS_INSTANCE_PROFILE_NAME.trim());
-}
-
-/**
- * The project this instance acts for on InsForge Cloud, or null when there is none.
- *
- * A project id alone does not mean cloud — PaaS templates set PROJECT_ID too — so this
- * is the only place the two facts are combined. Callers that need the id and callers
- * choosing between a cloud and a local provider ask the same question, so they ask it
- * the same way.
- */
-export function cloudProjectId(): string | null {
-  const projectId = appConfig.cloud?.projectId;
-  if (!isCloudEnvironment() || !projectId || projectId === 'local') {
-    return null;
-  }
-  return projectId;
 }
 
 /**

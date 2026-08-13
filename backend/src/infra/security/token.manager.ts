@@ -2,7 +2,8 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
 import { AppError } from '@/utils/errors.js';
-import { ERROR_CODES, type TokenPayloadSchema } from '@insforge/shared-schemas';
+import { isCloudEnvironment } from '@/utils/environment.js';
+import { ERROR_CODES, type ErrorCode, type TokenPayloadSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import logger from '../../utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
@@ -35,15 +36,25 @@ export interface CloudProjectAuthorization {
 }
 
 /**
- * Create JWKS instance with caching and timeout configuration
- * The instance will automatically cache keys and handle refetching
+ * JWKS instance for verifying cloud-issued tokens, built on first use.
+ *
+ * Lazy because this module is now imported by everything that signs an outbound cloud
+ * request, and only verification needs the key set: at import time `new URL()` would
+ * throw on an instance whose CLOUD_API_HOST is unset. Caching and refetching are
+ * handled internally by jose once created.
  */
-const cloudApiHost = appConfig.cloud.apiHost;
-const JWKS = createRemoteJWKSet(new URL(`${cloudApiHost}/.well-known/jwks.json`), {
-  timeoutDuration: 10000, // 10 second timeout for HTTP requests
-  cooldownDuration: 30000, // 30 seconds cooldown after successful fetch
-  cacheMaxAge: 600000, // Maximum 10 minutes between refetches
-});
+let cachedJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
+
+function getCloudJwks(): ReturnType<typeof createRemoteJWKSet> {
+  if (!cachedJwks) {
+    cachedJwks = createRemoteJWKSet(new URL(`${appConfig.cloud.apiHost}/.well-known/jwks.json`), {
+      timeoutDuration: 10000, // 10 second timeout for HTTP requests
+      cooldownDuration: 30000, // 30 seconds cooldown after successful fetch
+      cacheMaxAge: 600000, // Maximum 10 minutes between refetches
+    });
+  }
+  return cachedJwks;
+}
 
 /**
  * TokenManager - Handles JWT token operations
@@ -316,15 +327,53 @@ export class TokenManager {
   }
 
   /**
-   * Verify cloud backend JWT token
-   * Validates JWT tokens from api.insforge.dev using JWKS
+   * Sign the short-lived credential our cloud-backend calls carry: `sub` is the project
+   * id, and the signature proves we hold that project's JWT_SECRET.
+   *
+   * Off our infrastructure there is no such relationship, so this refuses rather than
+   * signing a token that fails remotely with nothing an operator can act on.
+   *
+   * @param feature Subject of the off-cloud message, e.g. 'Cloud database access'.
    */
-  // Inbound only — verifies a token cloud issued, against cloud's JWKS. Outbound
-  // requests to cloud are signed by signCloudToken() in ./cloud-sign.ts.
+  signCloudToken(feature: string, errorCode: ErrorCode = ERROR_CODES.INTERNAL_ERROR): string {
+    if (!isCloudEnvironment()) {
+      throw new AppError(
+        `${feature} is only available on InsForge Cloud projects.`,
+        500,
+        errorCode
+      );
+    }
+
+    const projectId = appConfig.cloud?.projectId;
+    if (!projectId || projectId === 'local') {
+      throw new AppError(
+        'PROJECT_ID is not configured. Cannot reach the InsForge Cloud API.',
+        500,
+        errorCode
+      );
+    }
+
+    const jwtSecret = appConfig.app.jwtSecret;
+    if (!jwtSecret) {
+      throw new AppError(
+        'JWT_SECRET is not configured. Cannot generate sign token.',
+        500,
+        errorCode
+      );
+    }
+
+    return jwt.sign({ sub: projectId }, jwtSecret, { expiresIn: '10m' });
+  }
+
+  /**
+   * Verify cloud backend JWT token
+   * Validates JWT tokens from api.insforge.dev using JWKS.
+   * Inbound only — outbound requests are signed by signCloudToken above.
+   */
   async verifyCloudToken(token: string): Promise<{ projectId: string; payload: JWTPayload }> {
     try {
       // JWKS handles caching internally, no need to manage it manually
-      const { payload } = await jwtVerify(token, JWKS, {
+      const { payload } = await jwtVerify(token, getCloudJwks(), {
         algorithms: ['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512'],
       });
 

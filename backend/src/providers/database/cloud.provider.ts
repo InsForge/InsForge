@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { z } from 'zod';
 import { appConfig } from '@/infra/config/app.config.js';
-import { signCloudToken } from '@/infra/security/cloud-sign.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { DatabaseProvider, DatabaseConnectionInfo, DatabasePasswordInfo } from './base.provider.js';
@@ -47,7 +47,7 @@ export class CloudDatabaseProvider implements DatabaseProvider {
    * Get database connection string from cloud backend
    */
   async getDatabaseConnectionString(): Promise<DatabaseConnectionInfo> {
-    const signToken = signCloudToken('Cloud database access');
+    const signToken = TokenManager.getInstance().signCloudToken('Cloud database access');
     const url = `${appConfig.cloud.apiHost}/projects/v1/${appConfig.cloud.projectId}/database-connection-string`;
 
     try {
@@ -91,7 +91,7 @@ export class CloudDatabaseProvider implements DatabaseProvider {
    * Get database password from cloud backend
    */
   async getDatabasePassword(): Promise<DatabasePasswordInfo> {
-    const signToken = signCloudToken('Cloud database access');
+    const signToken = TokenManager.getInstance().signCloudToken('Cloud database access');
     const url = `${appConfig.cloud.apiHost}/projects/v1/${appConfig.cloud.projectId}/database-password`;
 
     try {

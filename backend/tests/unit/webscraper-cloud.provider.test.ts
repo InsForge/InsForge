@@ -5,7 +5,11 @@ const projectId = '77777777-7777-7777-7777-777777777777';
 const jwtSecret = 's'.repeat(32);
 
 vi.mock('../../src/infra/config/app.config', () => {
-  const c = { cloud: { projectId, apiHost }, app: { jwtSecret } };
+  const c = {
+    cloud: { projectId, apiHost },
+    app: { jwtSecret, logLevel: 'error' },
+    server: { logsDir: '/tmp/insforge-webscraper-cloud-test-logs' },
+  };
   return { config: c, appConfig: c };
 });
 

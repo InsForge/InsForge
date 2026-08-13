@@ -1,24 +1,19 @@
 import type { PoolClient } from 'pg';
-import { appConfig } from '@/infra/config/app.config.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { NEXT_ACTIONS } from '@/utils/next-actions.js';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
-import { cloudProjectId } from '@/utils/environment.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 
 const EMAIL_PROVIDER_CONFIGURATION_LOCK_ID = 1869573991;
-
-export function hasManagedEmailProvider(): boolean {
-  return !!cloudProjectId() && !!appConfig.app.jwtSecret;
-}
 
 export async function lockEmailProviderConfiguration(client: PoolClient): Promise<void> {
   await client.query('SELECT pg_advisory_xact_lock($1)', [EMAIL_PROVIDER_CONFIGURATION_LOCK_ID]);
 }
 
 export async function hasAvailableEmailProvider(client: PoolClient): Promise<boolean> {
-  if (hasManagedEmailProvider()) {
+  if (isCloudEnvironment()) {
     return true;
   }
 

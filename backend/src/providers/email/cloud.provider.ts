@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
-import { signCloudToken } from '@/infra/security/cloud-sign.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { EMAIL_TEMPLATE_TYPES, EmailTemplate } from '@/types/email.js';
 import { EmailProvider } from './base.provider.js';
@@ -35,7 +35,7 @@ export class CloudEmailProvider implements EmailProvider {
     try {
       const projectId = appConfig.cloud.projectId;
       const apiHost = appConfig.cloud.apiHost;
-      const signToken = signCloudToken('The managed email provider');
+      const signToken = TokenManager.getInstance().signCloudToken('The managed email provider');
 
       // Validate inputs
       if (!email || !name || !template) {
@@ -153,7 +153,7 @@ export class CloudEmailProvider implements EmailProvider {
     try {
       const projectId = appConfig.cloud.projectId;
       const apiHost = appConfig.cloud.apiHost;
-      const signToken = signCloudToken('The managed email provider');
+      const signToken = TokenManager.getInstance().signCloudToken('The managed email provider');
 
       const url = `${apiHost}/email/v1/${projectId}/send-on-demand`;
       const response = await axios.post(url, options, {

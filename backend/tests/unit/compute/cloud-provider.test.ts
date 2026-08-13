@@ -5,7 +5,8 @@ import jwt from 'jsonwebtoken';
 vi.mock('@/infra/config/app.config.js', () => {
   const c = {
     cloud: { apiHost: 'https://cloud.test', projectId: 'proj-1' },
-    app: { jwtSecret: 'secret-1' },
+    app: { jwtSecret: 'secret-1', logLevel: 'error' },
+    server: { logsDir: '/tmp/insforge-compute-cloud-test-logs' },
   };
   return {
     config: c,

@@ -313,7 +313,7 @@ export function buildComputeRegistry(): ComputeRegistry {
   }
   if (requested === 'cloud' && !cloud.isConfigured()) {
     throw new AppError(
-      'COMPUTE_PROVIDER=cloud is only available on InsForge Cloud projects, and needs PROJECT_ID, CLOUD_API_HOST and JWT_SECRET.',
+      'COMPUTE_PROVIDER=cloud is only available on InsForge Cloud projects.',
       503,
       ERROR_CODES.COMPUTE_NOT_CONFIGURED
     );

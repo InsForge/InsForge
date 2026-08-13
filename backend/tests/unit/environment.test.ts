@@ -1,11 +1,5 @@
-import {
-  isCloudEnvironment,
-  cloudProjectId,
-  isDevelopment,
-  isProduction,
-} from '../../src/utils/environment';
-import { appConfig } from '../../src/infra/config/app.config';
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
+import { isCloudEnvironment, isDevelopment, isProduction } from '../../src/utils/environment';
+import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 
 describe('Environment utils', () => {
   const OLD_ENV = process.env;
@@ -51,38 +45,5 @@ describe('Environment utils', () => {
 
     delete process.env.NODE_ENV;
     expect(isProduction()).toBe(false);
-  });
-
-  // A PaaS template that sets PROJECT_ID (Zeabur does) is still a self-host, so the
-  // project id alone must not answer this.
-  describe('cloudProjectId', () => {
-    let savedProjectId: string | undefined;
-
-    beforeEach(() => {
-      savedProjectId = appConfig.cloud.projectId;
-      appConfig.cloud.projectId = '77777777-7777-7777-7777-777777777777';
-      delete process.env.AWS_INSTANCE_PROFILE_NAME;
-    });
-
-    afterEach(() => {
-      appConfig.cloud.projectId = savedProjectId;
-    });
-
-    it('needs the infrastructure marker as well as a project id', () => {
-      expect(cloudProjectId()).toBeNull();
-
-      process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
-      expect(cloudProjectId()).toBe('77777777-7777-7777-7777-777777777777');
-    });
-
-    it('is null on our infrastructure without a usable project id', () => {
-      process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
-
-      appConfig.cloud.projectId = undefined;
-      expect(cloudProjectId()).toBeNull();
-
-      appConfig.cloud.projectId = 'local';
-      expect(cloudProjectId()).toBeNull();
-    });
   });
 });

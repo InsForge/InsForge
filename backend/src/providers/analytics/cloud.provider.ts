@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { appConfig } from '@/infra/config/app.config.js';
-import { cloudProjectId } from '@/utils/environment.js';
-import { signCloudToken } from '@/infra/security/cloud-sign.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
@@ -39,7 +39,7 @@ export class CloudAnalyticsProvider implements AnalyticsProvider {
   }
 
   private isEnabled(): boolean {
-    return !!cloudProjectId();
+    return isCloudEnvironment();
   }
 
   private throwUnsupported(): never {
@@ -51,7 +51,9 @@ export class CloudAnalyticsProvider implements AnalyticsProvider {
   }
 
   private headers() {
-    return { Authorization: `Bearer ${signCloudToken('Cloud analytics')}` };
+    return {
+      Authorization: `Bearer ${TokenManager.getInstance().signCloudToken('Cloud analytics')}`,
+    };
   }
 
   private url(path: string): string {

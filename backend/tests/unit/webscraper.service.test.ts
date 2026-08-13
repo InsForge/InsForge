@@ -49,7 +49,7 @@ afterAll(() => {
 describe('WebscraperService provider resolution', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('uses the cloud provider when a project id is configured', async () => {
+  it('uses the cloud provider on our infrastructure', async () => {
     configMock.cloud.projectId = '77777777-7777-7777-7777-777777777777';
     const { cloud, local } = makeProviders();
     const service = new WebscraperService(cloud as never, local as never);
@@ -58,8 +58,8 @@ describe('WebscraperService provider resolution', () => {
     expect(local.getConnection).not.toHaveBeenCalled();
   });
 
-  it('uses the local provider when no project id is configured', async () => {
-    configMock.cloud.projectId = undefined;
+  it('uses the local provider off our infrastructure', async () => {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
     const { cloud, local } = makeProviders();
     const service = new WebscraperService(cloud as never, local as never);
 
@@ -67,21 +67,13 @@ describe('WebscraperService provider resolution', () => {
     expect(cloud.getConnection).not.toHaveBeenCalled();
   });
 
-  it('treats the literal project id "local" as self-hosted', async () => {
-    configMock.cloud.projectId = 'local';
-    const { cloud, local } = makeProviders();
-    const service = new WebscraperService(cloud as never, local as never);
-
-    await expect(service.getApifyConnection()).resolves.toEqual({ tag: 'local' });
-  });
-
   it('re-resolves per call so a config change does not need a restart', async () => {
     const { cloud, local } = makeProviders();
     const service = new WebscraperService(cloud as never, local as never);
 
-    configMock.cloud.projectId = undefined;
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
     await service.getApifyConnection();
-    configMock.cloud.projectId = '77777777-7777-7777-7777-777777777777';
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
     await service.getApifyConnection();
 
     expect(local.getConnection).toHaveBeenCalledTimes(1);

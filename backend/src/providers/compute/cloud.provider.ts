@@ -1,6 +1,6 @@
 import { appConfig } from '@/infra/config/app.config.js';
-import { cloudProjectId } from '@/utils/environment.js';
-import { signCloudToken } from '@/infra/security/cloud-sign.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
@@ -29,7 +29,7 @@ export class CloudComputeProvider implements ComputeProvider {
   }
 
   isConfigured(): boolean {
-    return !!cloudProjectId() && !!appConfig.cloud?.apiHost && !!appConfig.app?.jwtSecret;
+    return isCloudEnvironment();
   }
 
   // Cloud mode is Fly behind a control plane and shares Fly's app/machine
@@ -67,9 +67,12 @@ export class CloudComputeProvider implements ComputeProvider {
   }
 
   private async call<T>(method: string, path: string, body?: unknown): Promise<T | undefined> {
-    // signToken throws AppError(COMPUTE_NOT_CONFIGURED) if config missing —
-    // we want that to surface to the caller, not get masked as CLOUD_UNAVAILABLE.
-    const sign = signCloudToken('Cloud compute', ERROR_CODES.COMPUTE_NOT_CONFIGURED);
+    // Signed outside the try below: COMPUTE_NOT_CONFIGURED has to surface to the
+    // caller, not get masked as CLOUD_UNAVAILABLE by the fetch catch-all.
+    const sign = TokenManager.getInstance().signCloudToken(
+      'Cloud compute',
+      ERROR_CODES.COMPUTE_NOT_CONFIGURED
+    );
 
     let response: Response;
     try {

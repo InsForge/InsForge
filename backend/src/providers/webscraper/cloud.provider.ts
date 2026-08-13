@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { z } from 'zod';
 import { appConfig } from '@/infra/config/app.config.js';
-import { cloudProjectId } from '@/utils/environment.js';
-import { signCloudToken } from '@/infra/security/cloud-sign.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
@@ -34,7 +34,7 @@ export class CloudWebscraperProvider implements WebscraperProvider {
   }
 
   private isEnabled(): boolean {
-    return !!cloudProjectId();
+    return isCloudEnvironment();
   }
 
   private throwUnsupported(): never {
@@ -46,7 +46,9 @@ export class CloudWebscraperProvider implements WebscraperProvider {
   }
 
   private headers() {
-    return { Authorization: `Bearer ${signCloudToken('The cloud web scraper')}` };
+    return {
+      Authorization: `Bearer ${TokenManager.getInstance().signCloudToken('The cloud web scraper')}`,
+    };
   }
 
   private url(path: string): string {

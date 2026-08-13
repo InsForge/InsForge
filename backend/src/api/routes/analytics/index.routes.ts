@@ -13,7 +13,7 @@ import { AppError } from '@/utils/errors.js';
 import { AnalyticsService } from '@/services/analytics/analytics.service.js';
 import { AgentTelemetryService } from '@/services/telemetry/agent-telemetry.service.js';
 import { successResponse } from '@/utils/response.js';
-import { cloudProjectId } from '@/utils/environment.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 
 export const analyticsRouter = Router();
 const service = AnalyticsService.getInstance();
@@ -106,7 +106,7 @@ analyticsRouter.delete(
 // so the local credential store is not theirs to write. Mirrors
 // assertSelfHostedWebscraperConfig().
 function assertSelfHostedAnalyticsConfig(): void {
-  if (cloudProjectId()) {
+  if (isCloudEnvironment()) {
     throw new AppError(
       'The PostHog connection is managed by InsForge Cloud.',
       400,

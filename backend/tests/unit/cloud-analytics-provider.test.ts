@@ -9,7 +9,8 @@ const jwtSecret = 's'.repeat(32);
 vi.mock('../../src/infra/config/app.config', () => {
   const c = {
     cloud: { projectId, apiHost },
-    app: { jwtSecret },
+    app: { jwtSecret, logLevel: 'error' },
+    server: { logsDir: '/tmp/insforge-cloud-analytics-test-logs' },
   };
   return {
     config: c,

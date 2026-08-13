@@ -7,7 +7,7 @@ import {
 import { CloudAnalyticsProvider } from '@/providers/analytics/cloud.provider.js';
 import { LocalAnalyticsProvider } from '@/providers/analytics/local.provider.js';
 import type { AnalyticsProvider } from '@/providers/analytics/base.provider.js';
-import { cloudProjectId } from '@/utils/environment.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/utils/errors.js';
 import { PostHogConfigService } from './posthog-config.service.js';
 import { PostHogApiService, POSTHOG_HOST_BY_REGION } from './posthog-api.service.js';
@@ -30,7 +30,7 @@ export class AnalyticsService {
   }
 
   private provider(): AnalyticsProvider {
-    return cloudProjectId() ? this.cloud : this.local;
+    return isCloudEnvironment() ? this.cloud : this.local;
   }
 
   getConnection() {

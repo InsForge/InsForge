@@ -3,7 +3,11 @@ import { ERROR_CODES } from '@insforge/shared-schemas';
 
 const cloudConfig = vi.hoisted(() => ({ projectId: undefined as string | undefined }));
 vi.mock('../../src/infra/config/app.config.js', () => ({
-  appConfig: { cloud: cloudConfig, app: { jwtSecret: 's'.repeat(32) } },
+  appConfig: {
+    cloud: cloudConfig,
+    app: { jwtSecret: 's'.repeat(32), logLevel: 'error' },
+    server: { logsDir: '/tmp/insforge-analytics-service-test-logs' },
+  },
   config: { cloud: cloudConfig },
 }));
 vi.mock('../../src/utils/logger.js', () => ({
@@ -73,21 +77,13 @@ describe('AnalyticsService', () => {
   });
 
   describe('provider selection', () => {
-    it('uses the local provider when PROJECT_ID is absent', async () => {
-      cloudConfig.projectId = undefined;
+    it('uses the local provider off our infrastructure', async () => {
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
       const { service, local, cloud } = makeService();
 
       await service.getConnection();
       expect(local.getConnection).toHaveBeenCalledOnce();
       expect(cloud.getConnection).not.toHaveBeenCalled();
-    });
-
-    it("treats the 'local' placeholder as self-hosted", async () => {
-      cloudConfig.projectId = 'local';
-      const { service, local } = makeService();
-
-      await service.getConnection();
-      expect(local.getConnection).toHaveBeenCalledOnce();
     });
 
     // The Zeabur template sets PROJECT_ID, so a project id alone must not route at the
@@ -103,7 +99,7 @@ describe('AnalyticsService', () => {
       expect(cloud.getConnection).not.toHaveBeenCalled();
     });
 
-    it('uses the cloud provider when a real PROJECT_ID is set', async () => {
+    it('uses the cloud provider on our infrastructure', async () => {
       cloudConfig.projectId = '77777777-7777-7777-7777-777777777777';
       const { service, cloud, local } = makeService();
 
