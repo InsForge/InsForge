@@ -470,7 +470,7 @@ async function cleanup() {
   try {
     destroyIdentifierCooldownInterval();
   } catch (error) {
-    logger.error('Error clearing email cooldown interval', {
+    logger.error('Error clearing identifier cooldown interval', {
       error: error instanceof Error ? error.message : String(error),
     });
   }

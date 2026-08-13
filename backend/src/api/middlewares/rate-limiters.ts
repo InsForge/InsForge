@@ -171,10 +171,11 @@ export const idTokenSignInRateLimiter = rateLimit({
 });
 
 /**
- * Per-email cooldown middleware
- * Prevents enumeration attacks by enforcing minimum time between requests for same email
+ * Per-identifier (email or phone) cooldown middleware factory
+ * Prevents enumeration attacks by enforcing minimum time between requests for
+ * the same identifier
  *
- * Cooldown: 60 seconds between requests for same email
+ * Cooldown: 60 seconds between requests for the same identifier
  */
 const createIdentifierCooldown = (options: {
   schema: { safeParse: (value: unknown) => { success: boolean; data?: string } };
