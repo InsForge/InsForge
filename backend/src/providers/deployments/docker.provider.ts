@@ -11,6 +11,7 @@ import {
   demuxDockerStream,
   dockerBuild,
   dockerConfig,
+  dockerContainerLogs,
   dockerRequest,
   dockerRequestRaw,
 } from '@/providers/compute/docker.client.js';
@@ -333,6 +334,8 @@ export class DockerSitesProvider implements SitesProvider {
       slug: false,
       rollback: true,
       buildLogs: true,
+      // A server writes its own output; a static site's log is a request log Caddy wrote.
+      runtimeLogs: true,
       frameworkDetection: false,
       ingressModes: ['port', 'host'],
       defaultIngress: ingress,
@@ -1235,6 +1238,28 @@ export class DockerSitesProvider implements SitesProvider {
       });
     }
     return { removedContainers, removedImages: removedImages.length };
+  }
+
+  /**
+   * A page of the deployment's own output.
+   *
+   * Ownership is checked first: a deployment id is a container id, and a caller who guessed
+   * another container's id would otherwise read a neighbouring stack's logs — which on a
+   * shared daemon means Postgres.
+   */
+  async runtimeLogs(
+    providerDeploymentId: string,
+    options?: { limit?: number; nextToken?: string }
+  ): Promise<{ lines: Array<{ timestamp: number; message: string }>; nextToken: string | null }> {
+    const owned = await this.listOwnContainers();
+    if (!owned.some((container) => container.Id === providerDeploymentId)) {
+      throw new AppError(
+        'That deployment is not on this host.',
+        404,
+        ERROR_CODES.DEPLOYMENT_NOT_FOUND
+      );
+    }
+    return dockerContainerLogs(providerDeploymentId, options);
   }
 
   /** Stopping is the cancel: the image stays, so the deployment can be started again. */

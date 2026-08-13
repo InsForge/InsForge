@@ -600,6 +600,80 @@ paths:
         '500':
           $ref: '#/components/responses/Error'
 
+  /api/deployments/{id}/logs:
+    get:
+      summary: Read a running deployment's output
+      description: >-
+        A page of the deployment's own stdout/stderr, oldest first. Offered only by drivers
+        that report `runtimeLogs` in the `sites` capability slice of `/api/metadata`; the rest
+        answer `400` with `DEPLOYMENT_FEATURE_UNSUPPORTED`. Only a server-rendered site has
+        output of its own — a static site is served by a file server, whose log is a request
+        log rather than anything the developer wrote, so the static path reports the
+        capability as false even on a driver that can read container logs. Build output is a
+        different field, returned on the run itself.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/DeploymentId'
+        - name: limit
+          in: query
+          description: Lines to return, 1-1000 (default 100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - name: next_token
+          in: query
+          description: >-
+            Opaque forward cursor from a previous page. A null `nextToken` means nothing
+            further is available yet, not that the deployment has stopped.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A page of output
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [lines, nextToken]
+                properties:
+                  lines:
+                    type: array
+                    items:
+                      type: object
+                      required: [timestamp, message]
+                      properties:
+                        timestamp:
+                          type: integer
+                          description: Unix milliseconds, from the daemon's own timestamps
+                        message:
+                          type: string
+                  nextToken:
+                    type: string
+                    nullable: true
+        '400':
+          description: >-
+            Malformed id or limit, a run that never reached the provider, or a driver with no
+            runtime to read
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          description: The run belongs to a driver that is not configured on this instance
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
   /api/deployments/{id}/cancel:
     post:
       summary: Cancel deployment

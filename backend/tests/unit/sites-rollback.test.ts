@@ -7,6 +7,7 @@ const { mockPool, mockClient, mockProvider, active } = vi.hoisted(() => {
     isConfigured: vi.fn(() => true),
     capabilities: vi.fn(() => ({ envVars: 'build-only', rollback: true, customDomains: false })),
     rollbackTo: vi.fn(),
+    runtimeLogs: vi.fn(),
   };
   return {
     mockPool: { connect: vi.fn(), query: vi.fn() },
@@ -80,6 +81,7 @@ beforeEach(() => {
   mockPool.connect.mockResolvedValue(mockClient);
   mockProvider.capabilities.mockReturnValue({ envVars: 'build-only', rollback: true } as never);
   mockProvider.rollbackTo.mockResolvedValue(RESTORED);
+  mockProvider.runtimeLogs.mockResolvedValue({ lines: [], nextToken: null });
 });
 
 describe('DeploymentService.rollbackTo', () => {
@@ -261,5 +263,52 @@ describe('DeploymentService row provenance', () => {
       String(sql).includes('INSERT INTO deployments.runs')
     );
     expect(insert?.[1]?.[0]).toBe('docker');
+  });
+});
+
+describe('DeploymentService.getRuntimeLogs', () => {
+  it("reads the row's own container through that row's driver", async () => {
+    mockPool.query.mockResolvedValueOnce({ rows: [rowFor('row-1', 'server-live')] });
+    mockProvider.runtimeLogs.mockResolvedValue({
+      lines: [{ timestamp: 1_700_000_000_000, message: 'listening' }],
+      nextToken: null,
+    });
+
+    await expect(
+      DeploymentService.getInstance().getRuntimeLogs('row-1', { limit: 50 })
+    ).resolves.toEqual({
+      lines: [{ timestamp: 1_700_000_000_000, message: 'listening' }],
+      nextToken: null,
+    });
+    // The provider id, not the row id: they are different namespaces.
+    expect(mockProvider.runtimeLogs).toHaveBeenCalledWith('server-live', { limit: 50 });
+  });
+
+  // Vercel has no runtime to read, and saying so by name beats an empty page that looks
+  // like a server producing no output.
+  it('names the driver when it cannot read runtime logs', async () => {
+    active.provider = { ...mockProvider, runtimeLogs: undefined };
+    mockPool.query.mockResolvedValueOnce({ rows: [rowFor('row-1', 'server-live')] });
+
+    await expect(DeploymentService.getInstance().getRuntimeLogs('row-1')).rejects.toThrow(
+      'The docker sites driver does not support runtime logs'
+    );
+  });
+
+  it('refuses a row that never reached the provider', async () => {
+    mockPool.query.mockResolvedValueOnce({ rows: [rowFor('row-1', null)] });
+
+    await expect(DeploymentService.getInstance().getRuntimeLogs('row-1')).rejects.toThrow(
+      'never reached the provider'
+    );
+    expect(mockProvider.runtimeLogs).not.toHaveBeenCalled();
+  });
+
+  it('reports not-found for a row that does not exist', async () => {
+    mockPool.query.mockResolvedValueOnce({ rows: [] });
+
+    await expect(DeploymentService.getInstance().getRuntimeLogs('missing')).rejects.toThrow(
+      expect.objectContaining({ statusCode: 404, code: ERROR_CODES.DEPLOYMENT_NOT_FOUND })
+    );
   });
 });

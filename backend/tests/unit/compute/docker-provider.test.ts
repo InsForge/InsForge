@@ -24,9 +24,10 @@ vi.mock('@/utils/logger.js', () => ({
 
 // vi.mock factories are hoisted above const initialization, so the spies have to
 // be created inside the factory and pulled back out via vi.hoisted.
-const { mockRequest, mockRequestRaw } = vi.hoisted(() => ({
+const { mockRequest, mockRequestRaw, mockContainerLogs } = vi.hoisted(() => ({
   mockRequest: vi.fn(),
   mockRequestRaw: vi.fn(),
+  mockContainerLogs: vi.fn(),
 }));
 
 vi.mock('@/providers/compute/docker.client.js', async () => {
@@ -38,6 +39,10 @@ vi.mock('@/providers/compute/docker.client.js', async () => {
     ...actual,
     dockerRequest: mockRequest,
     dockerRequestRaw: mockRequestRaw,
+    // Its own seam: a partial mock cannot intercept the call the real dockerContainerLogs
+    // makes to dockerRequestRaw inside its own module, so leaving it real had this suite
+    // dialling the socket.
+    dockerContainerLogs: mockContainerLogs,
   };
 });
 
@@ -70,14 +75,6 @@ function ownedContainer(overrides: Record<string, unknown> = {}) {
  */
 function imageAlreadyPresent() {
   mockRequestRaw.mockResolvedValueOnce({ status: 200, body: Buffer.from('{}') });
-}
-
-function frame(text: string): Buffer {
-  const payload = Buffer.from(text, 'utf8');
-  const header = Buffer.alloc(8);
-  header[0] = 1;
-  header.writeUInt32BE(payload.length, 4);
-  return Buffer.concat([header, payload]);
 }
 
 describe('DockerProvider', () => {
@@ -632,163 +629,28 @@ describe('DockerProvider', () => {
   });
 
   describe('getLogs', () => {
-    it('demuxes frames and returns a nanosecond watermark as the cursor', async () => {
+    // The paging itself is the client's — see docker-client.test.ts. What the provider owes
+    // is the ownership check before any output leaves the daemon, and delegation after it.
+    it('checks ownership, then delegates the page to the client', async () => {
       mockRequest.mockResolvedValueOnce(ownedContainer());
-      mockRequestRaw.mockResolvedValueOnce({
-        status: 200,
-        body: Buffer.concat([
-          frame('2026-08-06T22:51:32.781160549Z line-1\n'),
-          frame('2026-08-06T22:51:33.785353049Z line-2\n'),
-        ]),
+      mockContainerLogs.mockResolvedValueOnce({ lines: [], nextToken: null });
+
+      const result = await DockerProvider.getInstance().getLogs('svc', 'container-1', {
+        limit: 50,
       });
 
-      const result = await provider.getLogs('app', 'container-abc');
-
-      expect(result.lines).toEqual([
-        { timestamp: Date.parse('2026-08-06T22:51:32.781Z'), message: 'line-1' },
-        { timestamp: Date.parse('2026-08-06T22:51:33.785Z'), message: 'line-2' },
-      ]);
-      // Cursor carries full nanosecond precision, not the millisecond timestamp.
-      expect(result.nextToken).toBe('1786056693785353049');
-    });
-
-    // `since` accepts integer seconds only and is inclusive, so the boundary
-    // second is always re-delivered. Dedup therefore has to happen against the
-    // nanosecond watermark — filtering by second would drop genuinely new lines
-    // that share a second with the previous batch.
-    it('floors the cursor to seconds on the wire but dedupes by nanosecond', async () => {
-      mockRequest.mockResolvedValueOnce(ownedContainer());
-      mockRequestRaw.mockResolvedValueOnce({
-        status: 200,
-        body: Buffer.concat([
-          frame('2026-08-06T22:51:33.100000000Z already-seen\n'),
-          frame('2026-08-06T22:51:33.200000000Z also-seen\n'),
-          frame('2026-08-06T22:51:33.300000000Z brand-new\n'),
-        ]),
-      });
-
-      const result = await provider.getLogs('app', 'container-abc', {
-        nextToken: '1786056693200000000', // the .2 line
-      });
-
-      // Same second as the watermark, but later — must survive.
-      expect(result.lines.map((l) => l.message)).toEqual(['brand-new']);
-      expect(result.nextToken).toBe('1786056693300000000');
-
-      const url = mockRequestRaw.mock.calls[0][1] as string;
-      expect(url).toContain('since=1786056693');
-      expect(url).toContain('timestamps=1');
-    });
-
-    it('treats an unreadable cursor as absent rather than failing the request', async () => {
-      mockRequest.mockResolvedValueOnce(ownedContainer());
-      mockRequestRaw.mockResolvedValueOnce({
-        status: 200,
-        body: frame('2026-08-06T22:51:32.000000000Z hello\n'),
-      });
-      const result = await provider.getLogs('app', 'container-abc', { nextToken: 'garbage' });
-      expect(result.lines.map((l) => l.message)).toEqual(['hello']);
-      expect(mockRequestRaw.mock.calls[0][1]).not.toContain('since=');
-    });
-
-    it('returns a null cursor when there is nothing to page from', async () => {
-      mockRequest.mockResolvedValueOnce(ownedContainer());
-      mockRequestRaw.mockResolvedValueOnce({ status: 200, body: Buffer.alloc(0) });
-      const result = await provider.getLogs('app', 'container-abc');
+      expect(mockRequest).toHaveBeenCalledWith(
+        'GET',
+        expect.stringContaining('/containers/container-1/json')
+      );
+      expect(mockContainerLogs).toHaveBeenCalledWith('container-1', { limit: 50 });
       expect(result).toEqual({ lines: [], nextToken: null });
     });
 
-    // `tail` keeps the newest N. Pairing it with `since` would return the newest
-    // N of the backlog and then advance the cursor past everything older, which
-    // no later request could reach — the middle of the backlog would be gone.
-    it('asks for a tail on the first page but not when resuming from a cursor', async () => {
-      mockRequest.mockResolvedValueOnce(ownedContainer());
-      mockRequestRaw.mockResolvedValueOnce({ status: 200, body: Buffer.alloc(0) });
-      await provider.getLogs('app', 'container-abc', { limit: 50 });
-      expect(mockRequestRaw.mock.calls[0][1]).toContain('tail=50');
+    it('refuses a container it does not own', async () => {
+      mockRequest.mockResolvedValueOnce({ Config: { Labels: {} }, State: { Status: 'running' } });
 
-      mockRequest.mockResolvedValueOnce(ownedContainer());
-      mockRequestRaw.mockResolvedValueOnce({ status: 200, body: Buffer.alloc(0) });
-      await provider.getLogs('app', 'container-abc', {
-        limit: 50,
-        nextToken: '1786056693200000000',
-      });
-      const resumed = mockRequestRaw.mock.calls[1][1] as string;
-      expect(resumed).toContain('since=1786056693');
-      expect(resumed).not.toContain('tail=');
-    });
-
-    /**
-     * Mock what the daemon would actually send for a given request, so the mock
-     * cannot assert a shape the real thing never produces: `tail=N` returns the
-     * *newest* N, and `since` alone returns everything after that second.
-     */
-    function daemonLogs(lines: { nanos: string; message: string }[]) {
-      return (_method: string, url: string) => {
-        const params = new URLSearchParams(url.split('?')[1] ?? '');
-        let out = lines;
-        const since = params.get('since');
-        if (since !== null) {
-          out = out.filter((l) => BigInt(l.nanos) / 1_000_000_000n >= BigInt(since));
-        }
-        const tail = params.get('tail');
-        if (tail !== null) {
-          out = out.slice(-Number(tail));
-        }
-        const iso = (nanos: string) => {
-          const ns = BigInt(nanos);
-          const ms = new Date(Number(ns / 1_000_000n)).toISOString().replace('Z', '');
-          return `${ms.slice(0, 19)}.${String(ns % 1_000_000_000n).padStart(9, '0')}Z`;
-        };
-        return Promise.resolve({
-          status: 200,
-          body: Buffer.concat(out.map((l) => frame(`${iso(l.nanos)} ${l.message}\n`))),
-        });
-      };
-    }
-
-    // One second apart, so every `since` boundary lands on a distinct line.
-    const FIVE_LINES = Array.from({ length: 5 }, (_, i) => ({
-      nanos: String(1786056700000000000n + BigInt(i) * 1_000_000_000n),
-      message: `line-${i}`,
-    }));
-
-    // First page asks for `tail`, so the daemon hands back the newest `limit` —
-    // "most recent logs" is what a caller with no cursor wants.
-    it('returns the newest lines on a first page, per `tail` semantics', async () => {
-      mockRequest.mockResolvedValueOnce(ownedContainer());
-      mockRequestRaw.mockImplementationOnce(daemonLogs(FIVE_LINES));
-
-      const first = await provider.getLogs('app', 'container-abc', { limit: 2 });
-
-      expect(first.lines.map((l) => l.message)).toEqual(['line-3', 'line-4']);
-      expect(first.nextToken).toBe(FIVE_LINES[4].nanos);
-    });
-
-    // Resuming sends no `tail`, so the daemon returns the whole backlog and the
-    // trimming happens here. This is the only path where more lines arrive than
-    // were asked for, and the property under test is that paging reaches them all
-    // rather than jumping to the newest.
-    it('pages through a backlog larger than `limit` without skipping lines', async () => {
-      const seen: string[] = [];
-      let token: string | null = null;
-
-      // Start from before the first line so the whole backlog is "new".
-      token = String(BigInt(FIVE_LINES[0].nanos) - 1_000_000_000n);
-      for (let page = 0; page < 3; page++) {
-        mockRequest.mockResolvedValueOnce(ownedContainer());
-        mockRequestRaw.mockImplementationOnce(daemonLogs(FIVE_LINES));
-        const res = await provider.getLogs('app', 'container-abc', {
-          limit: 2,
-          nextToken: token as string,
-        });
-        seen.push(...res.lines.map((l) => l.message));
-        token = res.nextToken;
-      }
-
-      // Every line, in order, once — the failure this guards against is pages of
-      // ['line-3','line-4'] repeating while 0-2 are never delivered.
-      expect(seen).toEqual(['line-0', 'line-1', 'line-2', 'line-3', 'line-4']);
+      await expect(DockerProvider.getInstance().getLogs('svc', 'someone-elses')).rejects.toThrow();
     });
   });
 
