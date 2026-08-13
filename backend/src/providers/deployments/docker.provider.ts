@@ -7,7 +7,13 @@ import { pipeline } from 'node:stream/promises';
 import type { Readable } from 'node:stream';
 import { pack as tarPack } from 'tar-stream';
 import { appConfig } from '@/infra/config/app.config.js';
-import { dockerConfig, dockerBuild, dockerRequest } from '@/providers/compute/docker.client.js';
+import {
+  demuxDockerStream,
+  dockerBuild,
+  dockerConfig,
+  dockerRequest,
+  dockerRequestRaw,
+} from '@/providers/compute/docker.client.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
@@ -106,6 +112,31 @@ COPY site/ /srv/
 const BUILD_IMAGE = 'node:22-alpine';
 
 const DEFAULT_INSTALL_COMMAND = 'npm ci --no-audit --no-fund';
+
+/**
+ * Where a server-rendered deployment listens inside its container.
+ *
+ * The same port a static site is served on, deliberately: the shipped gateway config targets
+ * `insforge-site-<key>:80`, so a server on 3000 would leave that one static line pointing at
+ * nothing — and the advertised URL reads a published port by number too. The app is told
+ * which port to use through `PORT`, which every framework that documents a port respects.
+ * Overridable for an operator who publishes the port directly, who then owns their own
+ * gateway config anyway.
+ */
+const DEFAULT_SERVER_PORT = SITE_PORT;
+
+/**
+ * Ceilings for a server container.
+ *
+ * Not optional: the median self-host is a 2GB VPS running Postgres, PostgREST and Deno
+ * beside this, and an unbounded Node process there OOMs the database before itself. Generous
+ * enough for a Next server, and overridable per deployment.
+ */
+const DEFAULT_SERVER_MEMORY_MB = 512;
+const DEFAULT_SERVER_CPUS = 1;
+
+/** How long a freshly started server gets to answer before the deploy is called a failure. */
+const SERVER_READY_TIMEOUT_MS = 60_000;
 const DEFAULT_OUTPUT_DIRECTORIES = ['dist', 'build', 'out'];
 
 /**
@@ -162,6 +193,23 @@ function assertEnvKey(key: string): string {
     );
   }
   return key;
+}
+
+/** What a deployment's container needs beyond its image: a server has a port, env and limits. */
+interface RuntimeSpec {
+  /** Set only for a server-rendered deployment; static sites are served on SITE_PORT. */
+  serverPort?: number;
+  envVars?: Array<{ key: string; value: string }>;
+  memoryMb?: number;
+  cpus?: number;
+}
+
+/** The port inside the container, which differs only when a server was told to use another. */
+function containerPortFor(settings: {
+  startCommand?: string | null;
+  serverPort?: number | null;
+}): number {
+  return settings.startCommand?.trim() ? (settings.serverPort ?? DEFAULT_SERVER_PORT) : SITE_PORT;
 }
 
 interface OwnedContainer {
@@ -259,9 +307,11 @@ export class DockerSitesProvider implements SitesProvider {
   /**
    * Every flag here is what this driver does *today*, not what it is planned to do.
    *
-   * `envVars: 'build-only'` — values are passed to the build as build args and baked into
-   * the artifact. There is deliberately no read-back: they end up in the built files and
-   * in image history, so calling this a store would misrepresent it.
+   * `envVars: 'runtime'` — a server-rendered deployment reads them from `process.env` on
+   * every request, so they are injected as container environment and held (encrypted) for
+   * the next deploy. They are *also* passed as build args, because a build usually needs
+   * the same values; that half is baked into the artifact and into image history, which is
+   * why a secret belongs in a variable the build does not touch.
    *
    * `rollback` is true because every deployment is its own image and container, and the
    * previous ones are kept: restoring means starting one again, not rebuilding it. It
@@ -278,7 +328,7 @@ export class DockerSitesProvider implements SitesProvider {
   capabilities(): SitesCapabilities {
     const ingress = dockerConfig().defaultIngress === 'host' ? 'host' : 'port';
     return {
-      envVars: 'build-only',
+      envVars: 'runtime',
       customDomains: false,
       slug: false,
       rollback: true,
@@ -382,6 +432,17 @@ export class DockerSitesProvider implements SitesProvider {
     const settings = options.projectSettings ?? {};
     const buildCommand = settings.buildCommand?.trim();
 
+    const startCommand = settings.startCommand?.trim();
+    if (startCommand && !buildCommand) {
+      // A server has to be built before it can be started, and "upload a running app" is
+      // not a thing. Refused rather than silently starting whatever was uploaded.
+      throw new AppError(
+        'A server-rendered deployment needs a build command as well as a start command.',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
     // Two modes, and `outputDirectory` means a different thing in each. Serving mode: it
     // narrows the uploaded tree, because callers upload a whole tree today (Vercel builds
     // it) and publishing src/ as the website would be worse than refusing. Build mode: it
@@ -398,6 +459,9 @@ export class DockerSitesProvider implements SitesProvider {
           installCommand: settings.installCommand,
           outputDirectory: settings.outputDirectory,
           rootDirectory: settings.rootDirectory,
+          startCommand: settings.startCommand,
+          serverDirectory: settings.serverDirectory,
+          serverPort: settings.serverPort,
           envKeys: (options.envVars ?? []).map((envVar) => envVar.key),
         })
       : SERVE_ONLY_DOCKERFILE;
@@ -435,7 +499,10 @@ export class DockerSitesProvider implements SitesProvider {
       );
     }
 
-    const containerId = await this.runContainer(imageTag, digest);
+    const containerId = await this.runContainer(imageTag, digest, {
+      serverPort: startCommand ? (settings.serverPort ?? DEFAULT_SERVER_PORT) : undefined,
+      envVars: options.envVars,
+    });
     const retained = await this.pruneOwnResources(containerId);
     const sweptBlobs = await this.sweepStaging();
     logger.info('Docker sites: deployed', {
@@ -448,7 +515,7 @@ export class DockerSitesProvider implements SitesProvider {
 
     return {
       id: containerId,
-      url: await this.endpointUrl(containerId),
+      url: await this.endpointUrl(containerId, undefined, containerPortFor(settings)),
       state: 'running',
       readyState: 'READY',
       name: imageTag,
@@ -522,15 +589,21 @@ export class DockerSitesProvider implements SitesProvider {
   }
 
   /**
-   * A two-stage image: build the site with the caller's own commands, then serve only the
-   * output. The build stage is discarded, so node_modules and the toolchain never reach
-   * the image that runs.
+   * A two-stage image whose second stage depends on what is being deployed.
+   *
+   * Static: the build output is copied into Caddy and the toolchain is discarded.
+   * Server: the app is copied into `node:22-alpine` and started, because a server-rendered
+   * site is a process, not a directory. `startCommand` decides which — declared, since a
+   * Dockerfile's `FROM` cannot branch on what the build produced.
    */
   private buildStageDockerfile(params: {
     buildCommand: string;
     installCommand?: string | null;
     outputDirectory?: string | null;
     rootDirectory?: string | null;
+    startCommand?: string | null;
+    serverDirectory?: string | null;
+    serverPort?: number | null;
     envKeys: string[];
   }): string {
     const root = params.rootDirectory
@@ -556,22 +629,61 @@ export class DockerSitesProvider implements SitesProvider {
       ? `${workdir}/${output}`
       : `$(for d in ${DEFAULT_OUTPUT_DIRECTORIES.join(' ')}; do [ -d "$d" ] && echo "${workdir}/$d" && break; done)`;
 
-    return [
+    const start = params.startCommand?.trim()
+      ? assertSingleLine(params.startCommand.trim(), 'startCommand')
+      : '';
+
+    const buildStage = [
       `FROM ${BUILD_IMAGE} AS build`,
       `WORKDIR ${workdir}`,
       ...args,
       'COPY site/ /app/',
       `RUN ${install}`,
       `RUN ${build}`,
-      // Resolved inside the build stage and copied to a fixed path, because COPY --from
-      // cannot expand a shell expression.
-      output
-        ? `RUN cp -r "${outputExpr}" /out`
-        : `RUN out=${outputExpr}; [ -n "$out" ] || { echo "No build output found in ${DEFAULT_OUTPUT_DIRECTORIES.join(', ')}"; exit 1; }; cp -r "$out" /out`,
+    ];
+
+    if (!start) {
+      // Static: only the built output crosses into the serving stage, so node_modules and
+      // the toolchain never reach the image that runs.
+      return [
+        ...buildStage,
+        // Resolved inside the build stage and copied to a fixed path, because COPY --from
+        // cannot expand a shell expression.
+        output
+          ? `RUN cp -r "${outputExpr}" /out`
+          : `RUN out=${outputExpr}; [ -n "$out" ] || { echo "No build output found in ${DEFAULT_OUTPUT_DIRECTORIES.join(', ')}"; exit 1; }; cp -r "$out" /out`,
+        '',
+        'FROM caddy:alpine',
+        'COPY Caddyfile /etc/caddy/Caddyfile',
+        'COPY --from=build /out/ /srv/',
+        '',
+      ].join('\n');
+    }
+
+    // Server: the app is a process, so the runtime stage is Node and the whole runnable
+    // directory crosses over. `serverDirectory` is what keeps that from meaning "and all of
+    // node_modules" — a Next app built with output: 'standalone' points at `.next/standalone`.
+    const serverDir = params.serverDirectory
+      ? assertRelativePath(params.serverDirectory, 'serverDirectory')
+      : '';
+    const port = params.serverPort ?? DEFAULT_SERVER_PORT;
+    const runtimeSource = serverDir ? `${workdir}/${serverDir}` : workdir;
+
+    return [
+      ...buildStage,
+      `RUN cp -r "${runtimeSource}" /out`,
       '',
-      'FROM caddy:alpine',
-      'COPY Caddyfile /etc/caddy/Caddyfile',
-      'COPY --from=build /out/ /srv/',
+      `FROM ${BUILD_IMAGE}`,
+      'WORKDIR /app',
+      'COPY --from=build /out/ ./',
+      // The values are supplied per deployment as container env; these are the two a Node
+      // server needs regardless, and HOSTNAME matters because a server bound to localhost
+      // inside a container is unreachable from the gateway.
+      'ENV NODE_ENV=production',
+      `ENV PORT=${port}`,
+      'ENV HOSTNAME=0.0.0.0',
+      `EXPOSE ${port}`,
+      `CMD ${start}`,
       '',
     ].join('\n');
   }
@@ -685,11 +797,19 @@ export class DockerSitesProvider implements SitesProvider {
    * stops, so a reload during a deploy gets one of the two rather than a connection
    * refused. The old container is kept, not removed — that is what rollback starts.
    */
-  private async runContainer(imageTag: string, digest: string): Promise<string> {
-    return this.serialize(() => this.runContainerExclusively(imageTag, digest));
+  private async runContainer(
+    imageTag: string,
+    digest: string,
+    runtime: RuntimeSpec = {}
+  ): Promise<string> {
+    return this.serialize(() => this.runContainerExclusively(imageTag, digest, runtime));
   }
 
-  private async runContainerExclusively(imageTag: string, digest: string): Promise<string> {
+  private async runContainerExclusively(
+    imageTag: string,
+    digest: string,
+    runtime: RuntimeSpec
+  ): Promise<string> {
     const previous = await this.listOwnContainers();
     const network = await this.resolveNetwork();
     const fixedPort = appConfig.deployments.sitesPort;
@@ -717,9 +837,11 @@ export class DockerSitesProvider implements SitesProvider {
     // Random rather than a timestamp: two deploys inside the same millisecond would
     // collide again, which is a race a clock cannot fix and a test found immediately.
     const name = `${CONTAINER_PREFIX}-${this.projectKey()}-${digest}-${randomBytes(3).toString('hex')}`;
+    // A server listens where it was told to; a static site is always Caddy on SITE_PORT.
+    const containerPort = runtime.serverPort ?? SITE_PORT;
     // Published under both ingress modes: `host` needs somewhere for the operator's
     // gateway to proxy to, so only the address we advertise differs.
-    const exposed = `${SITE_PORT}/tcp`;
+    const exposed = `${containerPort}/tcp`;
 
     const created = await dockerRequest<{ Id: string; Warnings?: string[] }>(
       'POST',
@@ -734,8 +856,23 @@ export class DockerSitesProvider implements SitesProvider {
             [LABEL_DEPLOYMENT]: digest,
           },
           ExposedPorts: { [exposed]: {} },
+          // Only a server reads these at request time. A static image has nothing to read
+          // them with, so passing them would just put values in an inspect output.
+          ...(runtime.serverPort && runtime.envVars?.length
+            ? { Env: runtime.envVars.map((envVar) => `${envVar.key}=${envVar.value}`) }
+            : {}),
           HostConfig: {
             RestartPolicy: { Name: 'unless-stopped' },
+            // Ceilings, and not optional for a server: the median self-host is a 2GB VPS
+            // running Postgres beside this, where an unbounded Node process OOMs the
+            // database before itself. A static Caddy container needs no ceiling worth
+            // setting.
+            ...(runtime.serverPort
+              ? {
+                  Memory: (runtime.memoryMb ?? DEFAULT_SERVER_MEMORY_MB) * 1024 * 1024,
+                  NanoCpus: Math.round((runtime.cpus ?? DEFAULT_SERVER_CPUS) * 1e9),
+                }
+              : {}),
             // Loopback by default, like compute: publishing to 0.0.0.0 on a reachable
             // host is a deliberate choice, not something a default should make.
             PortBindings: {
@@ -775,6 +912,12 @@ export class DockerSitesProvider implements SitesProvider {
 
     try {
       await dockerRequest('POST', `/containers/${created.Id}/start`);
+      if (runtime.serverPort) {
+        // A Caddy container answers the moment it starts; a Node server takes seconds and
+        // crash-loops on a missing variable or a bad build. Switching before it serves
+        // would stop the old deployment and hand traffic to something that is not up.
+        await this.waitUntilServing(created.Id, runtime.serverPort);
+      }
     } catch (error) {
       // A container that will not start must not be left behind looking deployable.
       await dockerRequest('DELETE', `/containers/${created.Id}?force=true`).catch(() => undefined);
@@ -800,6 +943,113 @@ export class DockerSitesProvider implements SitesProvider {
     }
 
     return created.Id;
+  }
+
+  /**
+   * Wait for a server container to answer, or fail the deploy.
+   *
+   * Asked from inside the container rather than through the published port: under `host`
+   * ingress there may be no host port at all, and a request from the daemon's network
+   * proves the thing a gateway will actually reach. Any HTTP status counts — a 404 from a
+   * server that is listening is still a server that is up; what fails is a connection
+   * refused, or a container that exited.
+   */
+  private async waitUntilServing(containerId: string, port: number): Promise<void> {
+    const deadline = Date.now() + SERVER_READY_TIMEOUT_MS;
+    let lastReason = 'no attempt completed';
+
+    while (Date.now() < deadline) {
+      const inspected = await dockerRequest<{
+        State: { Status: string; ExitCode?: number; Error?: string };
+      }>('GET', `/containers/${encodeURIComponent(containerId)}/json`).catch(() => undefined);
+      const status = inspected?.State?.Status;
+      if (status === 'exited' || status === 'dead') {
+        const logs = await this.tailLogs(containerId, 20);
+        throw new AppError(
+          `The server exited before it started serving.\n\n${logs}`,
+          502,
+          ERROR_CODES.UPSTREAM_FAILURE,
+          'Check the start command and the environment variables the app needs.'
+        );
+      }
+
+      const probe = await this.execProbe(containerId, port);
+      if (probe.ok) {
+        logger.info('Docker sites: server is serving', { containerId, port });
+        return;
+      }
+      lastReason = probe.reason;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    const logs = await this.tailLogs(containerId, 20);
+    throw new AppError(
+      `The server did not answer on port ${port} within ${SERVER_READY_TIMEOUT_MS / 1000}s ` +
+        `(${lastReason}).\n\n${logs}`,
+      504,
+      ERROR_CODES.UPSTREAM_FAILURE,
+      'Make sure the app listens on the PORT it is given and binds 0.0.0.0, not localhost.'
+    );
+  }
+
+  /**
+   * One HTTP attempt from inside the container, via exec.
+   *
+   * `wget` rather than a host-side fetch because the container may publish no host port,
+   * and node:alpine ships busybox wget. Exit code 0 means it got a response.
+   */
+  private async execProbe(
+    containerId: string,
+    port: number
+  ): Promise<{ ok: boolean; reason: string }> {
+    try {
+      const created = await dockerRequest<{ Id: string }>(
+        'POST',
+        `/containers/${encodeURIComponent(containerId)}/exec`,
+        {
+          body: {
+            AttachStdout: true,
+            AttachStderr: true,
+            Cmd: ['sh', '-c', `wget -q -T 2 -O /dev/null http://127.0.0.1:${port}/ 2>&1`],
+          },
+        }
+      );
+      if (!created?.Id) {
+        return { ok: false, reason: 'could not exec a probe' };
+      }
+      await dockerRequestRaw('POST', `/exec/${created.Id}/start`, {
+        body: { Detach: false, Tty: false },
+      });
+      const result = await dockerRequest<{ ExitCode: number | null }>(
+        'GET',
+        `/exec/${created.Id}/json`
+      );
+      // busybox wget exits 1 on an HTTP error status too, which still means something is
+      // listening — but it cannot be told apart from a refused connection by exit code
+      // alone, so only a clean 0 counts as serving.
+      return result?.ExitCode === 0
+        ? { ok: true, reason: 'ok' }
+        : { ok: false, reason: `probe exit ${result?.ExitCode ?? 'unknown'}` };
+    } catch (error) {
+      return { ok: false, reason: error instanceof Error ? error.message : 'probe failed' };
+    }
+  }
+
+  /** The tail of a container's output, for an error message that can be acted on. */
+  private async tailLogs(containerId: string, lines: number): Promise<string> {
+    try {
+      const raw = await dockerRequestRaw(
+        'GET',
+        `/containers/${encodeURIComponent(containerId)}/logs?stdout=true&stderr=true&tail=${lines}`
+      );
+      const text = demuxDockerStream(raw.body)
+        .map((frame) => frame.text)
+        .join('')
+        .trim();
+      return text ? `Last ${lines} lines:\n${text}` : '(the container produced no output)';
+    } catch {
+      return '(could not read the container output)';
+    }
   }
 
   private async listOwnContainers(): Promise<OwnedContainer[]> {
@@ -1002,7 +1252,8 @@ export class DockerSitesProvider implements SitesProvider {
    */
   private async endpointUrl(
     containerId: string,
-    inspected?: { NetworkSettings?: { Ports?: Record<string, { HostPort: string }[] | null> } }
+    inspected?: { NetworkSettings?: { Ports?: Record<string, { HostPort: string }[] | null> } },
+    containerPort: number = SITE_PORT
   ): Promise<string | null> {
     const config = dockerConfig();
     const domain = appConfig.deployments.sitesDomain;
@@ -1025,7 +1276,7 @@ export class DockerSitesProvider implements SitesProvider {
       (await dockerRequest<{
         NetworkSettings: { Ports: Record<string, { HostPort: string }[] | null> };
       }>('GET', `/containers/${encodeURIComponent(containerId)}/json`));
-    const port = details?.NetworkSettings?.Ports?.[`${SITE_PORT}/tcp`]?.[0]?.HostPort;
+    const port = details?.NetworkSettings?.Ports?.[`${containerPort}/tcp`]?.[0]?.HostPort;
     return port ? `http://${config.publicHost}:${port}` : null;
   }
 }

@@ -193,14 +193,14 @@ describe('getSitesMetadata', () => {
 
   // Published to clients, so the shape is the contract: Vercel reports no build logs and
   // no rollback because neither exists in this codebase.
-  // Values reach the build as build args and are baked in, hence build-only rather than a
-  // store. rollback and buildLogs are true here and false for Vercel — every deployment is
-  // its own image, and the classic builder streams output we keep.
+  // `runtime` since server-rendered deployments read them per request and the set is held
+  // for the next deploy; rollback and buildLogs are true here and false for Vercel — every
+  // deployment is its own image, and the classic builder streams output we keep.
   it('publishes what the Docker driver can actually do', () => {
     mountDockerSocket();
 
     expect(getSitesMetadata()?.providers.docker).toEqual({
-      envVars: 'build-only',
+      envVars: 'runtime',
       customDomains: false,
       slug: false,
       rollback: true,

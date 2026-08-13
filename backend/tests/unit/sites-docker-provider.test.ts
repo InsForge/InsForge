@@ -27,10 +27,15 @@ const dockerClientConfig = {
   bindAddress: '127.0.0.1',
   isolateNetwork: false,
 };
+const dockerRequestRaw = vi.fn(async () => ({ status: 200, body: Buffer.alloc(0) }));
 vi.mock('@/providers/compute/docker.client.js', () => ({
   dockerConfig: () => dockerClientConfig,
   dockerBuild: (...args: unknown[]) => dockerBuild(...args),
   dockerRequest: (...args: unknown[]) => dockerRequest(...args),
+  // The readiness probe and the log tail go through these, and leaving them out of the mock
+  // made every server test wait out its timeout instead of failing on an assertion.
+  dockerRequestRaw: (...args: unknown[]) => dockerRequestRaw(...args),
+  demuxDockerStream: () => [],
 }));
 vi.mock('@/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -920,5 +925,196 @@ describe('DockerSitesProvider fixed-port failure paths', () => {
       const deployment = await DockerSitesProvider.getInstance().getDeployment('c1');
       expect(deployment.readyState).toBe(expected);
     }
+  });
+});
+
+describe('DockerSitesProvider server-rendered deployments', () => {
+  /** create -> start -> probe(ok) -> stop previous. */
+  function serverHappyPath(previous: { Id: string }[] = []) {
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve(previous);
+      }
+      if (method === 'POST' && url.startsWith('/containers/create')) {
+        return Promise.resolve({ Id: 'server-new' });
+      }
+      if (method === 'POST' && url.includes('/exec')) {
+        return Promise.resolve({ Id: 'exec-1' });
+      }
+      if (method === 'GET' && url.startsWith('/exec/')) {
+        return Promise.resolve({ ExitCode: 0 });
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({
+          State: { Status: 'running' },
+          NetworkSettings: { Ports: { '80/tcp': [{ HostPort: '49300' }] } },
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+  }
+
+  const serverSettings = {
+    buildCommand: 'npm run build',
+    startCommand: 'node server.js',
+    serverDirectory: '.next/standalone',
+  };
+
+  it('runs the app in Node instead of serving files from Caddy', async () => {
+    okBuild();
+    serverHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files, { projectSettings: serverSettings });
+
+    const dockerfile = await generatedDockerfile();
+    expect(dockerfile).toContain('FROM node:22-alpine AS build');
+    // The runtime stage is Node, not Caddy: a server-rendered site is a process.
+    expect(dockerfile).toContain('CMD node server.js');
+    expect(dockerfile).not.toContain('FROM caddy:alpine');
+    // Only the runnable directory crosses over, which is what keeps a standalone build small.
+    expect(dockerfile).toContain('cp -r "/app/.next/standalone" /out');
+    // A server bound to localhost inside a container is unreachable from the gateway.
+    expect(dockerfile).toContain('ENV HOSTNAME=0.0.0.0');
+    expect(dockerfile).toContain('ENV PORT=80');
+  });
+
+  // Values are read per request, so they have to be on the container, not only in the build.
+  it('injects env vars into the container and caps its resources', async () => {
+    okBuild();
+    serverHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files, {
+      projectSettings: serverSettings,
+      envVars: [{ key: 'DATABASE_URL', value: 'postgres://x' }],
+    });
+
+    const create = dockerRequest.mock.calls.find(
+      ([method, url]) => method === 'POST' && String(url).startsWith('/containers/create')
+    );
+    const body = (create?.[2] as { body: Record<string, unknown> }).body;
+    expect(body.Env).toEqual(['DATABASE_URL=postgres://x']);
+    const host = body.HostConfig as { Memory: number; NanoCpus: number };
+    // Unbounded Node beside Postgres on a 2GB VPS OOMs the database first.
+    expect(host.Memory).toBe(512 * 1024 * 1024);
+    expect(host.NanoCpus).toBe(1e9);
+  });
+
+  it('leaves a static deployment without container env or ceilings', async () => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>static</h1>') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files);
+
+    const create = dockerRequest.mock.calls.find(
+      ([method, url]) => method === 'POST' && String(url).startsWith('/containers/create')
+    );
+    const body = (create?.[2] as { body: Record<string, unknown> }).body;
+    expect(body.Env).toBeUndefined();
+    expect(body.HostConfig).not.toHaveProperty('Memory');
+  });
+
+  // Caddy answers the moment it starts; a Node server does not. Switching before it serves
+  // would stop the old deployment and hand traffic to something that is not up.
+  it('waits for the server to answer before the switch', async () => {
+    okBuild();
+    let probes = 0;
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve([{ Id: 'server-old', State: 'running', Image: 'x' }]);
+      }
+      if (method === 'POST' && url.startsWith('/containers/create')) {
+        return Promise.resolve({ Id: 'server-new' });
+      }
+      if (method === 'POST' && url.includes('/exec')) {
+        return Promise.resolve({ Id: 'exec-1' });
+      }
+      if (method === 'GET' && url.startsWith('/exec/')) {
+        // Refused twice, then serving — the shape of a Node server starting up.
+        probes++;
+        return Promise.resolve({ ExitCode: probes >= 3 ? 0 : 1 });
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({
+          State: { Status: 'running' },
+          NetworkSettings: { Ports: { '80/tcp': [{ HostPort: '49300' }] } },
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files, { projectSettings: serverSettings });
+
+    expect(probes).toBeGreaterThanOrEqual(3);
+    const writes = dockerRequest.mock.calls
+      .filter(([method]) => method === 'POST')
+      .map(([, url]) => url as string);
+    // The old one is stopped only after the probe succeeded.
+    const startIdx = writes.indexOf('/containers/server-new/start');
+    const stopIdx = writes.indexOf('/containers/server-old/stop?t=5');
+    const lastProbe = writes
+      .map((u, i) => (u.includes('/exec/') ? i : -1))
+      .filter((i) => i >= 0)
+      .pop();
+    expect(startIdx).toBeLessThan(lastProbe ?? Infinity);
+    expect(stopIdx).toBeGreaterThan(lastProbe ?? -1);
+  });
+
+  // A crash-looping app must fail the deploy with its own output, not take the site down.
+  it('fails with the container output when the server exits at once', async () => {
+    okBuild();
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve([]);
+      }
+      if (method === 'POST' && url.startsWith('/containers/create')) {
+        return Promise.resolve({ Id: 'server-doomed' });
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({ State: { Status: 'exited', ExitCode: 1 } });
+      }
+      return Promise.resolve(undefined);
+    });
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+
+    await expect(
+      provider.createDeploymentWithFiles(files, { projectSettings: serverSettings })
+    ).rejects.toThrow('exited before it started serving');
+    // And it is removed rather than left looking deployable.
+    expect(dockerRequest).toHaveBeenCalledWith('DELETE', '/containers/server-doomed?force=true');
+  });
+
+  it('refuses a start command with no build command', async () => {
+    okBuild();
+    serverHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+
+    await expect(
+      provider.createDeploymentWithFiles(files, {
+        projectSettings: { startCommand: 'node server.js' },
+      })
+    ).rejects.toThrow('needs a build command as well as a start command');
+    expect(dockerBuild).not.toHaveBeenCalled();
   });
 });

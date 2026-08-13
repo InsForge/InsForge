@@ -123,11 +123,57 @@ Guessing *which* conventional output directory holds the build (`dist`, `build`,
 
 ---
 
+## 4b. Server-rendered sites
+
+Static-only was the wrong line to draw. `docs/core-concepts/sites/overview.mdx` promises
+"React, Vue, Svelte, **Next.js**", and a `next build` without `output: 'export'` produces a
+server — so a self-host that can only serve files is a capability regression against what
+Sites already claims, not a scoping detail. Folded into this PR rather than deferred.
+
+**The container machinery already exists.** An SSR site is a container serving HTTP, which
+is what the compute Docker driver does: `launchMachine`, `updateMachine` (spec-hash decides
+in-place versus recreate), `waitForState`, `getLogs`, `getEvents`, `NanoCpus`/`Memory`. The
+sites driver reuses the same `docker.client.ts` calls rather than growing a second
+implementation.
+
+**Three things are genuinely new.**
+
+1. **A server image shape.** The serving stage becomes `node:22-alpine` running the built
+   app instead of `caddy:alpine` serving files.
+2. **Runtime env vars.** A server reads `process.env` per request, so values have to reach
+   the *container*, not just the build. That makes `envVars: 'runtime'` true for this
+   driver — and it means the values are held (encrypted, through `SecretService`) rather
+   than only baked in. Build args stay, because a build often needs the same values.
+3. **A health gate before the switch.** A Caddy container answers the moment it starts; a
+   Node server takes seconds and crash-loops on a bad build or a missing variable. Without
+   waiting for it to actually serve, "start new, stop old" would hand traffic to something
+   that is not up — a risk that does not exist on the static path.
+
+**Static or server is decided by declaration, not inference.** `startCommand` present means
+a server image; absent means static, exactly as today. That keeps `frameworkDetection:
+false` honest: the driver still does not read `package.json` to guess intent. Deciding from
+the *build output* was considered and rejected — `FROM` cannot branch on what a build
+produced, so the choice has to exist before the build runs.
+
+`serverDirectory` (default the build root) names what gets copied into the runtime image, so
+a Next app can point at `.next/standalone` for a small image while a plain `npm start` app
+copies everything. No framework is named in the driver; the Next recipe belongs in the docs.
+
+**Resource limits are not optional here.** An unbounded Node process on the 2GB VPS that is
+the median self-host will OOM Postgres before it OOMs itself. Defaults are applied and
+overridable.
+
+---
+
 ## 5. Non-goals
 
 - **Running** a gateway. A ready-made config ships at `deploy/sites-gateway/Caddyfile` behind an off-by-default compose profile, because "bring your own gateway" should not mean "work out the config yourself" — but InsForge does not run it, route traffic, or hold certificates. Consistent with compute and the dashboard.
 - TLS termination, certificate issuance, domain verification on self-host. `customDomains: false` for the Docker driver; the operator points a hostname at the published port.
-- Matching Vercel's framework matrix, or SSR of any kind, in v1.
+- Matching Vercel's framework matrix. Framework *detection* stays out: the driver serves or
+  runs what it is told to, and refuses when told nothing.
+- Next.js features that need Vercel's own infrastructure rather than a Node server: ISR
+  revalidation on a shared cache, image optimisation at the edge, and middleware running
+  before the cache. `next start` behaviour is what a container gives.
 - Preview deployments per branch or per commit.
 - Changing anything about how cloud projects deploy. Cloud stays Vercel-through-cloud-backend, byte for byte.
 

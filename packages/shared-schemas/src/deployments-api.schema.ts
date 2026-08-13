@@ -7,6 +7,23 @@ export const projectSettingsSchema = z.object({
   installCommand: z.string().nullable().optional(),
   devCommand: z.string().nullable().optional(),
   rootDirectory: z.string().nullable().optional(),
+  /**
+   * Command that starts a long-running server, e.g. `node server.js` or `npm start`.
+   *
+   * Its presence is what makes a deployment server-rendered rather than static — declared
+   * rather than inferred, because a Dockerfile's final stage cannot branch on what the
+   * build produced, and because guessing from `package.json` is the framework detection
+   * this driver deliberately does not do.
+   */
+  startCommand: z.string().nullable().optional(),
+  /**
+   * Directory copied into the runtime image, relative to the build root. Defaults to the
+   * whole build output. `.next/standalone` gives a small image for a Next app built with
+   * `output: 'standalone'`; omitting it copies everything, which is what `npm start` needs.
+   */
+  serverDirectory: z.string().nullable().optional(),
+  /** Port the server listens on inside the container. Defaults to 3000. */
+  serverPort: z.number().int().positive().nullable().optional(),
 });
 
 export const envVarSchema = z.object({

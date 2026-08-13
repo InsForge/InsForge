@@ -16,6 +16,7 @@ import type {
   SitesProviderName,
 } from '@/providers/deployments/sites.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
+import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/utils/errors.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
@@ -284,18 +285,75 @@ export class DeploymentService {
   private async applyEnvVars(
     envVars: Array<{ key: string; value: string }> | undefined
   ): Promise<Array<{ key: string; value: string }> | undefined> {
+    const provider = this.provider;
+    const mode = provider.capabilities().envVars;
+
+    if (mode === 'runtime' && !provider.envVars) {
+      // The driver holds nothing itself, so we do — otherwise a deploy that passes no
+      // variables would silently start a server without the configuration the last one
+      // had, which for an SSR app means a site that boots and then fails on every request.
+      if (envVars && envVars.length > 0) {
+        await this.storeSiteEnvVars(envVars);
+        return envVars;
+      }
+      return await this.loadSiteEnvVars();
+    }
+
     if (!envVars || envVars.length === 0) {
       return undefined;
     }
-    const provider = this.provider;
     if (provider.envVars) {
       await provider.envVars.upsert(envVars);
       return undefined;
     }
-    if (provider.capabilities().envVars === 'build-only') {
+    if (mode === 'build-only') {
       return envVars;
     }
     throw unsupportedFeature(provider.name, 'environment variables');
+  }
+
+  /**
+   * The site's environment, encrypted in the secret store under one reserved key.
+   *
+   * One row rather than one per variable: the set is replaced atomically on each deploy, and
+   * a partially-applied environment is worse than an old one. Reserved so it does not show
+   * up as a user-managed secret in the dashboard.
+   */
+  private static readonly SITE_ENV_SECRET_KEY = 'SITES_RUNTIME_ENV';
+
+  private async storeSiteEnvVars(envVars: Array<{ key: string; value: string }>): Promise<void> {
+    const secrets = SecretService.getInstance();
+    const serialized = JSON.stringify(envVars);
+    const existing = await secrets.getSecretByKey(DeploymentService.SITE_ENV_SECRET_KEY);
+    if (existing === null) {
+      await secrets.createSecret({
+        key: DeploymentService.SITE_ENV_SECRET_KEY,
+        value: serialized,
+        isReserved: true,
+      });
+      return;
+    }
+    await secrets.updateSecretByKey(DeploymentService.SITE_ENV_SECRET_KEY, { value: serialized });
+  }
+
+  private async loadSiteEnvVars(): Promise<Array<{ key: string; value: string }> | undefined> {
+    try {
+      const stored = await SecretService.getInstance().getSecretByKey(
+        DeploymentService.SITE_ENV_SECRET_KEY
+      );
+      if (!stored) {
+        return undefined;
+      }
+      const parsed: unknown = JSON.parse(stored);
+      return Array.isArray(parsed) ? (parsed as Array<{ key: string; value: string }>) : undefined;
+    } catch (error) {
+      // A deploy must not fail because the stored environment is unreadable, but starting a
+      // server without it is a different kind of surprise — so say so loudly.
+      logger.error('Could not read the stored site environment; deploying without it', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
+    }
   }
 
   private assertDeploymentServiceConfigured(): void {

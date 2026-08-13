@@ -20,8 +20,9 @@ export const sitesIngressModeEnum = z.enum(['port', 'host']);
 export const sitesCapabilitiesSchema = z.object({
   /**
    * `runtime` — the platform holds env vars for the deployed app and can list, read and
-   * delete them. `build-only` — values reach the build and are baked into the artifact,
-   * so there is nothing to read back. `none` — unsupported.
+   * delete them, and a running server sees them in `process.env`. `build-only` — values
+   * reach the build and are baked into the artifact, so there is nothing to read back.
+   * `none` — unsupported.
    */
   envVars: z.enum(['runtime', 'build-only', 'none']),
   /** The driver attaches and verifies domains itself, rather than the operator routing one. */
