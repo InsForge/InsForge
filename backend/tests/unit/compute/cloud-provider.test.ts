@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
+import { describe, it, expect, beforeEach, vi, type MockInstance, afterAll } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import jwt from 'jsonwebtoken';
 
 vi.mock('@/infra/config/app.config.js', () => {
   const c = {
     cloud: { apiHost: 'https://cloud.test', projectId: 'proj-1' },
-    app: { jwtSecret: 'secret-1' },
+    app: { jwtSecret: 'secret-1', logLevel: 'error' },
+    server: { logsDir: '/tmp/insforge-compute-cloud-test-logs' },
   };
   return {
     config: c,
@@ -17,6 +18,22 @@ import { CloudComputeProvider } from '@/providers/compute/cloud.provider.js';
 import { MachineGoneError } from '@/providers/compute/compute.provider.js';
 
 type FetchMock = MockInstance<Parameters<typeof fetch>, ReturnType<typeof fetch>>;
+
+// File-level: both suites below need the marker, and a hook inside the first one has
+// already run by the time the second starts.
+const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+
+beforeEach(() => {
+  process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+});
+
+afterAll(() => {
+  if (savedProfile === undefined) {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+  } else {
+    process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+  }
+});
 
 describe('CloudComputeProvider', () => {
   let fetchMock: FetchMock;
@@ -158,24 +175,17 @@ describe('CloudComputeProvider', () => {
     });
   });
 
-  it('surfaces COMPUTE_NOT_CONFIGURED when config is missing (not masked as CLOUD_UNAVAILABLE)', async () => {
-    const { AppError } = await import('@/utils/errors.js');
+  // The catch-all around fetch used to swallow this into COMPUTE_CLOUD_UNAVAILABLE,
+  // which reads as "the cloud is down" when the real answer is "this instance has no
+  // business calling it".
+  it('surfaces COMPUTE_NOT_CONFIGURED off cloud, not masked as CLOUD_UNAVAILABLE', async () => {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
     const provider = CloudComputeProvider.getInstance();
 
-    // Force signToken to throw COMPUTE_NOT_CONFIGURED, as it would when isConfigured() is false
-    vi.spyOn(provider as unknown as { signToken: () => string }, 'signToken').mockImplementation(
-      () => {
-        throw new AppError(
-          'Cloud compute not configured (need PROJECT_ID, CLOUD_API_HOST, JWT_SECRET)',
-          500,
-          ERROR_CODES.COMPUTE_NOT_CONFIGURED
-        );
-      }
-    );
-
-    await expect(provider.createApp({ name: 't' })).rejects.toThrow(
-      /COMPUTE_NOT_CONFIGURED|not configured/
-    );
+    await expect(provider.createApp({ name: 't' })).rejects.toMatchObject({
+      code: ERROR_CODES.COMPUTE_NOT_CONFIGURED,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
@@ -187,9 +197,6 @@ describe('CloudComputeProvider machine-gone translation', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    // The COMPUTE_NOT_CONFIGURED test above leaves a throwing spy on the
-    // singleton's signToken — undo it so calls here reach the real fetch.
-    vi.restoreAllMocks();
     fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
   });

@@ -1,5 +1,6 @@
-import jwt from 'jsonwebtoken';
 import { appConfig } from '@/infra/config/app.config.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
@@ -28,12 +29,7 @@ export class CloudComputeProvider implements ComputeProvider {
   }
 
   isConfigured(): boolean {
-    return (
-      !!appConfig.cloud?.projectId &&
-      appConfig.cloud.projectId !== 'local' &&
-      !!appConfig.cloud?.apiHost &&
-      !!appConfig.app?.jwtSecret
-    );
+    return isCloudEnvironment();
   }
 
   // Cloud mode is Fly behind a control plane and shares Fly's app/machine
@@ -66,27 +62,17 @@ export class CloudComputeProvider implements ComputeProvider {
     return 'host';
   }
 
-  private signToken(): string {
-    if (!this.isConfigured()) {
-      throw new AppError(
-        'Cloud compute not configured (need PROJECT_ID, CLOUD_API_HOST, JWT_SECRET)',
-        500,
-        ERROR_CODES.COMPUTE_NOT_CONFIGURED
-      );
-    }
-    return jwt.sign({ sub: appConfig.cloud.projectId }, appConfig.app.jwtSecret, {
-      expiresIn: '10m',
-    });
-  }
-
   private url(path: string): string {
     return `${appConfig.cloud.apiHost}/projects/v1/${appConfig.cloud.projectId}/compute${path}`;
   }
 
   private async call<T>(method: string, path: string, body?: unknown): Promise<T | undefined> {
-    // signToken throws AppError(COMPUTE_NOT_CONFIGURED) if config missing —
-    // we want that to surface to the caller, not get masked as CLOUD_UNAVAILABLE.
-    const sign = this.signToken();
+    // Signed outside the try below: COMPUTE_NOT_CONFIGURED has to surface to the
+    // caller, not get masked as CLOUD_UNAVAILABLE by the fetch catch-all.
+    const sign = TokenManager.getInstance().signCloudToken(
+      'Cloud compute',
+      ERROR_CODES.COMPUTE_NOT_CONFIGURED
+    );
 
     let response: Response;
     try {
