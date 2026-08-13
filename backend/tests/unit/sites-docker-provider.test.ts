@@ -76,7 +76,7 @@ async function generatedDockerfile(): Promise<string> {
 }
 
 function okBuild() {
-  dockerBuild.mockResolvedValue({ ok: true, logs: ['Step 1/3 : FROM nginx:alpine'] });
+  dockerBuild.mockResolvedValue({ ok: true, logs: ['Step 1/3 : FROM caddy:alpine'] });
 }
 
 /** create -> start -> (stop previous) is the whole write path. */
@@ -175,10 +175,18 @@ describe('DockerSitesProvider.createDeploymentWithFiles', () => {
     const context = dockerBuild.mock.calls[0][0].context as Buffer;
     expect(await contextEntries(context)).toEqual([
       'Dockerfile',
-      'nginx.conf',
+      'Caddyfile',
       'site/index.html',
       'site/assets/app.js',
     ]);
+    // The generated config is what makes a client-side-routed app work at all.
+    const caddyfile = (await contextFiles(context)).get('Caddyfile') ?? '';
+    expect(caddyfile).toContain('try_files {path} /index.html');
+    expect(caddyfile).toContain('encode zstd gzip');
+    // Not `header /index.html`: that matches the requested path, so `/` — the URL
+    // everybody actually visits — would carry no cache header at all.
+    expect(caddyfile).toContain('@html not path_regexp');
+    expect(caddyfile).toContain('header @html Cache-Control "no-cache"');
     expect(deployment.id).toBe('container-new');
     expect(deployment.readyState).toBe('READY');
   });
@@ -265,7 +273,7 @@ describe('DockerSitesProvider.createDeploymentWithFiles', () => {
     const context = dockerBuild.mock.calls[0][0].context as Buffer;
     expect(await contextEntries(context)).toEqual([
       'Dockerfile',
-      'nginx.conf',
+      'Caddyfile',
       'site/index.html',
       'site/assets/app.js',
     ]);
@@ -350,8 +358,8 @@ describe('DockerSitesProvider source builds', () => {
     expect(dockerfile).toContain('RUN npm ci --no-audit --no-fund');
     expect(dockerfile).toContain('RUN npm run build');
     // Serving stage starts from nginx, so node_modules never reaches what runs.
-    expect(dockerfile).toContain('FROM nginx:alpine');
-    expect(dockerfile).toContain('COPY --from=build /out/ /usr/share/nginx/html/');
+    expect(dockerfile).toContain('FROM caddy:alpine');
+    expect(dockerfile).toContain('COPY --from=build /out/ /srv/');
     // In build mode the whole tree has to reach the builder — outputDirectory names
     // where the build writes, it does not narrow the upload.
     expect(await contextEntries(dockerBuild.mock.calls[0][0].context as Buffer)).toContain(
@@ -606,10 +614,10 @@ describe('DockerSitesProvider rollback and retention', () => {
         listed++;
         return Promise.resolve(
           listed === 1
-            ? owned(['c3', 'c2', 'c1'], 'nginx:alpine')
+            ? owned(['c3', 'c2', 'c1'], 'caddy:alpine')
             : [
                 { Id: 'container-new', State: 'running', Image: 'insforge-site-proj-1234567:new' },
-                ...owned(['c3', 'c2', 'c1'], 'nginx:alpine'),
+                ...owned(['c3', 'c2', 'c1'], 'caddy:alpine'),
               ]
         );
       }
@@ -635,7 +643,7 @@ describe('DockerSitesProvider rollback and retention', () => {
   });
 
   it('returns the builder output with the deployment', async () => {
-    dockerBuild.mockResolvedValue({ ok: true, logs: ['Step 1/3 : FROM nginx:alpine', 'Step 2/3'] });
+    dockerBuild.mockResolvedValue({ ok: true, logs: ['Step 1/3 : FROM caddy:alpine', 'Step 2/3'] });
     dockerHappyPath();
     const provider = DockerSitesProvider.getInstance();
     const files = await provider.uploadFiles([
@@ -644,6 +652,6 @@ describe('DockerSitesProvider rollback and retention', () => {
 
     const deployment = await provider.createDeploymentWithFiles(files);
 
-    expect(deployment.buildLogs).toEqual(['Step 1/3 : FROM nginx:alpine', 'Step 2/3']);
+    expect(deployment.buildLogs).toEqual(['Step 1/3 : FROM caddy:alpine', 'Step 2/3']);
   });
 });
