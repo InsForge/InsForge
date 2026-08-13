@@ -3,7 +3,7 @@ title: 自定义短信
 description: 配置 Twilio，通过短信从 InsForge 发送手机登录验证码。
 ---
 
-启用后，手机 OTP 登录验证码将通过您的 Twilio 账户发送。短信没有托管的兜底发送方：在配置并启用提供商之前，`POST /api/auth/phone/send-otp` 会拒绝请求并返回 `SMS_PROVIDER_NOT_CONFIGURED`。
+启用后，手机 OTP 登录验证码将通过您的 Twilio 账户发送。关闭开关即停止发送；凭据仍会加密保存，重新启用时无需重新输入。短信没有托管的兜底发送方：在配置并启用提供商之前，`POST /api/auth/phone/send-otp` 会拒绝请求并返回 `SMS_PROVIDER_NOT_CONFIGURED`。
 
 ## 概念
 

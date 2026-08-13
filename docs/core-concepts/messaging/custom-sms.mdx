@@ -3,7 +3,7 @@ title: Custom SMS
 description: Configure Twilio to deliver phone sign-in codes over SMS from InsForge.
 ---
 
-When enabled, phone OTP sign-in codes are sent through your Twilio account. There is no managed fallback for SMS: until a provider is configured and enabled, `POST /api/auth/phone/send-otp` rejects requests with `SMS_PROVIDER_NOT_CONFIGURED`.
+When enabled, phone OTP sign-in codes are sent through your Twilio account. Toggle off to stop sending; credentials stay stored (encrypted) so re-enabling needs no re-entry. There is no managed fallback for SMS: until a provider is configured and enabled, `POST /api/auth/phone/send-otp` rejects requests with `SMS_PROVIDER_NOT_CONFIGURED`.
 
 ## Concepts
 

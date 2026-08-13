@@ -3,7 +3,7 @@ title: SMS personalizado
 description: Configura Twilio para entregar códigos de inicio de sesión por teléfono mediante SMS desde InsForge.
 ---
 
-Cuando está habilitado, los códigos de inicio de sesión por teléfono se envían a través de tu cuenta de Twilio. No hay un remitente gestionado para SMS: hasta que un proveedor esté configurado y habilitado, `POST /api/auth/phone/send-otp` rechaza las solicitudes con `SMS_PROVIDER_NOT_CONFIGURED`.
+Cuando está habilitado, los códigos de inicio de sesión por teléfono se envían a través de tu cuenta de Twilio. Al desactivarlo se deja de enviar; las credenciales permanecen almacenadas (cifradas), por lo que reactivarlo no requiere reintroducirlas. No hay un remitente gestionado para SMS: hasta que un proveedor esté configurado y habilitado, `POST /api/auth/phone/send-otp` rechaza las solicitudes con `SMS_PROVIDER_NOT_CONFIGURED`.
 
 ## Conceptos
 

@@ -3,7 +3,7 @@ title: 自訂簡訊
 description: 設定 Twilio，透過簡訊從 InsForge 傳送手機登入驗證碼。
 ---
 
-啟用後，手機 OTP 登入驗證碼將透過您的 Twilio 帳戶傳送。簡訊沒有託管的後備傳送方：在設定並啟用供應商之前，`POST /api/auth/phone/send-otp` 會拒絕請求並傳回 `SMS_PROVIDER_NOT_CONFIGURED`。
+啟用後，手機 OTP 登入驗證碼將透過您的 Twilio 帳戶傳送。關閉開關即停止傳送；憑證仍會加密儲存，重新啟用時無需重新輸入。簡訊沒有託管的後備傳送方：在設定並啟用供應商之前，`POST /api/auth/phone/send-otp` 會拒絕請求並傳回 `SMS_PROVIDER_NOT_CONFIGURED`。
 
 ## 概念
 
