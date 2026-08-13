@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
-import { VercelProvider } from '@/providers/deployments/vercel.provider.js';
+import { requireEnvVarStore } from '@/services/deployments/sites-registry.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { deploymentsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AuditService } from '@/services/logs/audit.service.js';
@@ -10,7 +10,6 @@ import { ERROR_CODES, upsertEnvVarsRequestSchema } from '@insforge/shared-schema
 
 const router = Router();
 const deploymentService = DeploymentService.getInstance();
-const vercelProvider = VercelProvider.getInstance();
 const auditService = AuditService.getInstance();
 
 /**
@@ -27,7 +26,7 @@ router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: Next
       );
     }
 
-    const envVars = await vercelProvider.envVars.list();
+    const envVars = await requireEnvVarStore().list();
     successResponse(res, { envVars });
   } catch (error) {
     next(error);
@@ -63,7 +62,7 @@ router.post(
 
       const { envVars } = validationResult.data;
 
-      await vercelProvider.envVars.upsert(envVars);
+      await requireEnvVarStore().upsert(envVars);
 
       await auditService.log({
         actor: req.hasApiKey ? 'api-key' : req.user?.id,
@@ -104,7 +103,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
 
     const { id } = req.params;
 
-    const envVar = await vercelProvider.envVars.get(id);
+    const envVar = await requireEnvVarStore().get(id);
 
     successResponse(res, { envVar });
   } catch (error) {
@@ -132,7 +131,7 @@ router.delete(
 
       const { id } = req.params;
 
-      await vercelProvider.envVars.remove(id);
+      await requireEnvVarStore().remove(id);
 
       // Log audit
       await auditService.log({
