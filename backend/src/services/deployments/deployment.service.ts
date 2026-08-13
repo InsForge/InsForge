@@ -667,7 +667,11 @@ export class DeploymentService {
       'BUILDING'
     ).toUpperCase();
 
-    const envVarKeys = await requireEnvVarStore().keys();
+    // Tolerant on purpose: this runs on every deploy, and a driver that bakes values
+    // into the artifact has no store to read back. Asking for them *explicitly* still
+    // 400s (see the two upsert paths above) — that is a request we cannot honour, while
+    // this is only a record of what was set.
+    const envVarKeys = this.provider.envVars ? await this.provider.envVars.keys() : [];
 
     const updateResult = await this.getPool().query(
       `UPDATE deployments.runs
