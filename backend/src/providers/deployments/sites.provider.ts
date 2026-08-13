@@ -37,6 +37,12 @@ export interface UploadedFileRef {
 export interface CreateDeploymentInput {
   name?: string;
   files?: UploadedFileRef[];
+  /**
+   * Values for this deployment. A driver with a runtime store (`capabilities().envVars ===
+   * 'runtime'`) has already been given them through that store and ignores these; a
+   * `build-only` driver passes them to the build, where they are baked into the artifact.
+   */
+  envVars?: Array<{ key: string; value: string }>;
   projectSettings?: {
     buildCommand?: string | null;
     outputDirectory?: string | null;

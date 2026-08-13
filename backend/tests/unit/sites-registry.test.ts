@@ -185,13 +185,13 @@ describe('getSitesMetadata', () => {
 
   // Published to clients, so the shape is the contract: Vercel reports no build logs and
   // no rollback because neither exists in this codebase.
-  // The prebuilt driver reports no env vars, no rollback and no build logs because none
-  // of those are implemented yet — each flips in the commit that adds the behaviour.
+  // Values reach the build as build args and are baked in, hence build-only rather than a
+  // store. rollback and buildLogs stay false until the commits that implement them.
   it('publishes what the Docker driver can actually do', () => {
     mountDockerSocket();
 
     expect(getSitesMetadata()?.providers.docker).toEqual({
-      envVars: 'none',
+      envVars: 'build-only',
       customDomains: false,
       slug: false,
       rollback: false,

@@ -6,8 +6,8 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import {
   isAnySitesProviderConfigured,
   requireDomainStore,
-  requireEnvVarStore,
   selectSitesProvider,
+  unsupportedFeature,
 } from '@/services/deployments/sites-registry.js';
 import type { DomainConfig, SitesProvider } from '@/providers/deployments/sites.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
@@ -198,6 +198,32 @@ export class DeploymentService {
    */
   isConfigured(): boolean {
     return isAnySitesProviderConfigured();
+  }
+
+  /**
+   * Apply env vars the way the active driver can.
+   *
+   * A driver with a runtime store keeps them and the build reads them from there. A
+   * `build-only` driver has nowhere to keep them, so they travel with the deployment and
+   * are baked into the artifact — which is why they are returned rather than stored. A
+   * driver with neither refuses, because silently dropping values a caller asked for
+   * would produce a site built without its configuration.
+   */
+  private async applyEnvVars(
+    envVars: Array<{ key: string; value: string }> | undefined
+  ): Promise<Array<{ key: string; value: string }> | undefined> {
+    if (!envVars || envVars.length === 0) {
+      return undefined;
+    }
+    const provider = this.provider;
+    if (provider.envVars) {
+      await provider.envVars.upsert(envVars);
+      return undefined;
+    }
+    if (provider.capabilities().envVars === 'build-only') {
+      return envVars;
+    }
+    throw unsupportedFeature(provider.name, 'environment variables');
   }
 
   private assertDeploymentServiceConfigured(): void {
@@ -540,9 +566,7 @@ export class DeploymentService {
 
     await this.updateDeploymentStatus(id, DeploymentStatus.UPLOADING);
 
-    if (input.envVars && input.envVars.length > 0) {
-      await requireEnvVarStore().upsert(input.envVars);
-    }
+    const buildEnvVars = await this.applyEnvVars(input.envVars);
 
     const uploadedFiles = files.map((file) => ({
       file: file.path,
@@ -550,7 +574,13 @@ export class DeploymentService {
       size: file.size,
     }));
 
-    return await this.createVercelDeploymentFromUploadedFiles(id, input, uploadedFiles, 'direct');
+    return await this.createProviderDeploymentFromUploadedFiles(
+      id,
+      input,
+      uploadedFiles,
+      'direct',
+      buildEnvVars
+    );
   }
 
   private async startLegacyDeployment(
@@ -598,16 +628,15 @@ export class DeploymentService {
       throw new AppError('No files found in source zip.', 400, ERROR_CODES.DEPLOYMENT_INVALID_FILE);
     }
 
-    if (input.envVars && input.envVars.length > 0) {
-      await requireEnvVarStore().upsert(input.envVars);
-    }
+    const buildEnvVars = await this.applyEnvVars(input.envVars);
 
     const uploadedFiles = await this.provider.uploadFiles(files);
-    const deployment = await this.createVercelDeploymentFromUploadedFiles(
+    const deployment = await this.createProviderDeploymentFromUploadedFiles(
       id,
       input,
       uploadedFiles,
-      'legacy'
+      'legacy',
+      buildEnvVars
     );
 
     await this.s3Provider.deleteObject(DEPLOYMENT_BUCKET, getDeploymentKey(id)).catch((error) => {
@@ -648,30 +677,29 @@ export class DeploymentService {
     return files;
   }
 
-  private async createVercelDeploymentFromUploadedFiles(
+  private async createProviderDeploymentFromUploadedFiles(
     id: string,
     input: StartDeploymentRequest,
     uploadedFiles: Array<{ file: string; sha: string; size: number }>,
-    uploadMode: 'direct' | 'legacy'
+    uploadMode: 'direct' | 'legacy',
+    /** Present only for a build-only driver — see applyEnvVars. */
+    buildEnvVars?: Array<{ key: string; value: string }>
   ): Promise<DeploymentRecord> {
     const totalSizeBytes = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
 
-    const vercelDeployment = await this.provider.createDeploymentWithFiles(uploadedFiles, {
+    const deployment = await this.provider.createDeploymentWithFiles(uploadedFiles, {
       projectSettings: input.projectSettings,
       meta: input.meta,
+      ...(buildEnvVars ? { envVars: buildEnvVars } : {}),
     });
 
-    const vercelStatus = (
-      vercelDeployment.readyState ||
-      vercelDeployment.state ||
-      'BUILDING'
-    ).toUpperCase();
+    const providerStatus = (deployment.readyState || deployment.state || 'BUILDING').toUpperCase();
 
-    // Tolerant on purpose: this runs on every deploy, and a driver that bakes values
-    // into the artifact has no store to read back. Asking for them *explicitly* still
-    // 400s (see the two upsert paths above) — that is a request we cannot honour, while
-    // this is only a record of what was set.
-    const envVarKeys = this.provider.envVars ? await this.provider.envVars.keys() : [];
+    // Tolerant on purpose: this runs on every deploy, and a driver that bakes values into
+    // the artifact has no store to read back — the keys it was given are recorded instead.
+    const envVarKeys = this.provider.envVars
+      ? await this.provider.envVars.keys()
+      : (buildEnvVars ?? []).map((envVar) => envVar.key);
 
     const updateResult = await this.getPool().query(
       `UPDATE deployments.runs
@@ -690,11 +718,11 @@ export class DeploymentService {
          created_at as "createdAt",
          updated_at as "updatedAt"`,
       [
-        vercelDeployment.id,
-        vercelStatus,
-        this.getDeploymentUrl(vercelDeployment.url),
+        deployment.id,
+        providerStatus,
+        this.getDeploymentUrl(deployment.url),
         JSON.stringify({
-          vercelName: vercelDeployment.name,
+          vercelName: deployment.name,
           fileCount: uploadedFiles.length,
           totalSizeBytes,
           envVarKeys,
@@ -707,8 +735,8 @@ export class DeploymentService {
 
     logger.info('Deployment started', {
       id,
-      providerDeploymentId: vercelDeployment.id,
-      status: vercelStatus,
+      providerDeploymentId: deployment.id,
+      status: providerStatus,
       uploadMode,
     });
 
@@ -1070,13 +1098,13 @@ export class DeploymentService {
         );
       }
 
-      // Fetch latest status from Vercel
-      const vercelDeployment = await this.provider.getDeployment(deployment.providerDeploymentId);
+      // Fetch the latest status from the driver that made this row
+      const providerDeployment = await this.provider.getDeployment(deployment.providerDeploymentId);
 
-      // Use Vercel's status directly (uppercase to match our enum)
-      const vercelStatus = (
-        vercelDeployment.readyState ||
-        vercelDeployment.state ||
+      // The driver's own status, uppercased to match our enum
+      const providerStatus = (
+        providerDeployment.readyState ||
+        providerDeployment.state ||
         'BUILDING'
       ).toUpperCase();
 
@@ -1095,17 +1123,17 @@ export class DeploymentService {
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         [
-          vercelStatus,
-          this.getDeploymentUrl(vercelDeployment.url),
+          providerStatus,
+          this.getDeploymentUrl(providerDeployment.url),
           JSON.stringify({
             lastSyncedAt: new Date().toISOString(),
-            ...(vercelDeployment.error && { error: vercelDeployment.error }),
+            ...(providerDeployment.error && { error: providerDeployment.error }),
           }),
           id,
         ]
       );
 
-      logger.info('Deployment synced', { id, status: vercelStatus });
+      logger.info('Deployment synced', { id, status: providerStatus });
 
       return result.rows[0] as DeploymentRecord;
     } catch (error) {
@@ -1232,11 +1260,11 @@ export class DeploymentService {
       let errorInfo: { errorCode?: string; errorMessage?: string } | undefined;
       if (status === 'ERROR') {
         try {
-          const vercelDeployment = await this.provider.getDeployment(vercelDeploymentId);
-          if (vercelDeployment.error) {
+          const providerDeployment = await this.provider.getDeployment(vercelDeploymentId);
+          if (providerDeployment.error) {
             errorInfo = {
-              errorCode: vercelDeployment.error.code,
-              errorMessage: vercelDeployment.error.message,
+              errorCode: providerDeployment.error.code,
+              errorMessage: providerDeployment.error.message,
             };
             logger.info('Fetched error details from Vercel API', {
               vercelDeploymentId,
