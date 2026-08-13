@@ -70,6 +70,22 @@ describe('webscraper config routes', () => {
     expect(setTokenMock).toHaveBeenCalledWith('apify_api_tok1234567890');
   });
 
+  // The bug this fixes: a self-host that sets PROJECT_ID (Zeabur's template does)
+  // was refused here as if it were a cloud project.
+  it('stores a token for a self-host that sets PROJECT_ID', async () => {
+    configMock.cloud.projectId = '77777777-7777-7777-7777-777777777777';
+    setTokenMock.mockResolvedValue({
+      token: { configured: true, maskedKey: 'apify_ap••••••••mnop' },
+    });
+
+    const res = await request(app())
+      .put('/webscraper/apify/config')
+      .send({ apiToken: 'apify_api_tok1234567890' });
+
+    expect(res.status).toBe(200);
+    expect(setTokenMock).toHaveBeenCalledWith('apify_api_tok1234567890');
+  });
+
   it('rejects an empty token with 400', async () => {
     const res = await request(app()).put('/webscraper/apify/config').send({ apiToken: '   ' });
 

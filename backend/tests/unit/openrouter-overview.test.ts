@@ -42,6 +42,14 @@ function resetProviderState(provider: OpenRouterProvider) {
   state.fetchPromise = null;
 }
 
+const savedProjectId = appConfig.cloud.projectId;
+const savedJwtSecret = appConfig.app.jwtSecret;
+
+afterEach(() => {
+  appConfig.cloud.projectId = savedProjectId;
+  appConfig.app.jwtSecret = savedJwtSecret;
+});
+
 describe('OpenRouterProvider.getOverview', () => {
   let provider: OpenRouterProvider;
   let fetchMock: ReturnType<typeof vi.fn>;

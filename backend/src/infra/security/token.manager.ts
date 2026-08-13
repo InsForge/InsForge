@@ -70,7 +70,11 @@ export class TokenManager {
 
   private constructor() {
     if (!appConfig.app.jwtSecret) {
-      throw new Error('JWT_SECRET environment variable is required');
+      throw new AppError(
+        'JWT_SECRET is not configured. Cannot sign or verify tokens.',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
     }
   }
 

@@ -46,7 +46,7 @@ export class EmailService {
       throw new AppError(
         'No email provider is configured.',
         503,
-        ERROR_CODES.INTERNAL_ERROR,
+        ERROR_CODES.EMAIL_PROVIDER_NOT_CONFIGURED,
         NEXT_ACTIONS.CONFIGURE_EMAIL_PROVIDER
       );
     }

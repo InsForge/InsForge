@@ -4,7 +4,7 @@ import { jwtVerify } from 'jose';
 import { AppError } from '../../src/utils/errors';
 import { appConfig } from '../../src/infra/config/app.config';
 import { ERROR_CODES } from '@insforge/shared-schemas';
-import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 
 // Mock jose.jwtVerify
 vi.mock('jose', () => ({
@@ -180,6 +180,13 @@ describe('TokenManager.verifyCloudToken', () => {
 
 describe('TokenManager.signCloudToken', () => {
   const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+  const savedProjectId = appConfig.cloud.projectId;
+  const savedSecret = appConfig.app.jwtSecret;
+
+  afterEach(() => {
+    appConfig.cloud.projectId = savedProjectId;
+    appConfig.app.jwtSecret = savedSecret;
+  });
 
   beforeEach(() => {
     process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
@@ -204,6 +211,7 @@ describe('TokenManager.signCloudToken', () => {
     };
 
     expect(decoded.sub).toBe('project_123');
+    expect(decoded).not.toHaveProperty('projectId');
     expect(decoded.exp - decoded.iat).toBe(600);
   });
 

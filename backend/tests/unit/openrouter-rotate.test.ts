@@ -37,6 +37,14 @@ function resetProviderState(provider: OpenRouterProvider) {
   state.rotationPromise = null;
 }
 
+const savedProjectId = appConfig.cloud.projectId;
+const savedJwtSecret = appConfig.app.jwtSecret;
+
+afterEach(() => {
+  appConfig.cloud.projectId = savedProjectId;
+  appConfig.app.jwtSecret = savedJwtSecret;
+});
+
 describe('OpenRouterProvider.rotateManagedApiKey', () => {
   const jwtSecret = 'test-secret-long-enough-for-signing-32chars';
   let provider: OpenRouterProvider;

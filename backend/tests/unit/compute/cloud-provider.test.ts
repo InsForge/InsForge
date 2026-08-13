@@ -197,9 +197,6 @@ describe('CloudComputeProvider machine-gone translation', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    // The COMPUTE_NOT_CONFIGURED test above leaves a throwing spy on the
-    // singleton's signToken — undo it so calls here reach the real fetch.
-    vi.restoreAllMocks();
     fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
   });
