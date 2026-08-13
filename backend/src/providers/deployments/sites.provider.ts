@@ -1,6 +1,7 @@
 import type { Readable } from 'stream';
 
 import type {
+  ProjectSettings,
   SitesCapabilitiesSchema,
   SitesProviderName as SitesProviderNameSchema,
 } from '@insforge/shared-schemas';
@@ -49,13 +50,12 @@ export interface CreateDeploymentInput {
    * `build-only` driver passes them to the build, where they are baked into the artifact.
    */
   envVars?: Array<{ key: string; value: string }>;
-  projectSettings?: {
-    buildCommand?: string | null;
-    outputDirectory?: string | null;
-    installCommand?: string | null;
-    devCommand?: string | null;
-    rootDirectory?: string | null;
-  };
+  /**
+   * Taken from the wire schema rather than restated here: this drifted once already, and a
+   * field the API accepts but the driver's type does not know about is invisible until
+   * someone traces why a setting had no effect.
+   */
+  projectSettings?: ProjectSettings;
   meta?: Record<string, string>;
 }
 
