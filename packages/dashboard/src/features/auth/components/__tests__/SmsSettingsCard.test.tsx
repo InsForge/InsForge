@@ -115,6 +115,32 @@ describe('SmsSettingsCard', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
+  it('surfaces base field errors alongside the auth token error on first enable', async () => {
+    const user = userEvent.setup();
+    render(
+      <SmsSettingsCard
+        config={{ ...ENABLED_CONFIG, enabled: false, hasAuthToken: false }}
+        isLoading={false}
+        isUpdating={false}
+        onSave={onSave}
+      />
+    );
+
+    await user.click(screen.getByRole('switch', { name: 'Enable Custom SMS' }));
+    const sidInput = screen.getByLabelText('Account SID');
+    await user.clear(sidInput);
+    await user.type(sidInput, 'ACnothex');
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    // Both errors on the same submit — the token requirement must not defer
+    // the base schema validations to a second attempt.
+    expect(await screen.findByText('Auth token is required')).toBeInTheDocument();
+    expect(
+      screen.getByText('Account SID must be "AC" followed by 32 hex characters')
+    ).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it('rejects a malformed account SID with a field error instead of saving', async () => {
     const user = userEvent.setup();
     render(

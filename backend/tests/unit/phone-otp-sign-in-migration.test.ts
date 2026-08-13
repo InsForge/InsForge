@@ -39,11 +39,13 @@ describe('065_add-phone-otp-sign-in migration', () => {
   });
 
   it('keeps at least one non-blank identifier per user with a database constraint', () => {
-    expect(sql).toMatch(/users_email_or_phone_present/);
-    // Blank strings must fail the check like NULLs, and the constraint must be
-    // NOT VALID so a legacy row cannot abort the migration.
+    // Blank and whitespace-only strings must fail the check like NULLs, and
+    // the constraint must be NOT VALID so a legacy row cannot abort the
+    // migration. Drop-then-add so an environment that ran an earlier revision
+    // of the constraint picks up the current definition.
+    expect(sql).toMatch(/DROP CONSTRAINT IF EXISTS users_email_or_phone_present/);
     expect(sql).toMatch(
-      /CHECK \(NULLIF\(email, ''\) IS NOT NULL OR NULLIF\(phone_number, ''\) IS NOT NULL\)/i
+      /CHECK \(NULLIF\(btrim\(email\), ''\) IS NOT NULL OR NULLIF\(btrim\(phone_number\), ''\) IS NOT NULL\)/i
     );
     expect(sql).toMatch(/NOT VALID/i);
   });

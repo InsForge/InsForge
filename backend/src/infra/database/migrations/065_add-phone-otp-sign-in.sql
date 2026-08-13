@@ -23,22 +23,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_number ON auth.users (phone_nu
 
 -- The API guarantees every sign-up carries an identifier; this keeps the
 -- invariant where the data lives, so a direct SQL writer or a future migration
--- cannot create an account that no sign-in method can ever reach. Blank
--- strings are rejected too — an empty-string identifier is as unreachable as
--- a NULL one. NOT VALID: enforced on every new write without failing the
--- migration should a legacy row predate the rule.
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'users_email_or_phone_present' AND conrelid = 'auth.users'::regclass
-  ) THEN
-    ALTER TABLE auth.users
-      ADD CONSTRAINT users_email_or_phone_present
-      CHECK (NULLIF(email, '') IS NOT NULL OR NULLIF(phone_number, '') IS NOT NULL)
-      NOT VALID;
-  END IF;
-END $$;
+-- cannot create an account that no sign-in method can ever reach. Blank and
+-- whitespace-only strings are rejected too — such an identifier is as
+-- unreachable as a NULL one. NOT VALID: enforced on every new write without
+-- failing the migration should a legacy row predate the rule. Drop-then-add
+-- (the convention of migrations 010/020/064) so an environment that ran an
+-- earlier revision of this constraint picks up the current definition.
+ALTER TABLE auth.users
+  DROP CONSTRAINT IF EXISTS users_email_or_phone_present;
+ALTER TABLE auth.users
+  ADD CONSTRAINT users_email_or_phone_present
+  CHECK (NULLIF(btrim(email), '') IS NOT NULL OR NULLIF(btrim(phone_number), '') IS NOT NULL)
+  NOT VALID;
 
 -- SMS provider configuration, mirroring email.config (migration 029): a
 -- singleton row holding the Twilio credentials with the auth token encrypted

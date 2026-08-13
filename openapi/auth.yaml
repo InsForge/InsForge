@@ -2360,6 +2360,11 @@ paths:
           description: Unauthorized
         '403':
           description: Forbidden - Admin only
+        '409':
+          description: >-
+            The stored auth token was changed by a concurrent save while this
+            request was being verified. Retry the request; omitting authToken
+            then verifies against the newly stored token.
 
   /api/auth/email-templates:
     get:
