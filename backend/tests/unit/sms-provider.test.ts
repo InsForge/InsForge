@@ -19,6 +19,7 @@ const CONFIG: RawSmsConfig = {
   fromNumber: '+15550001111',
   messagingServiceSid: '',
   minIntervalSeconds: 60,
+  otpMessageTemplate: 'Your verification code is {{ code }}. It expires in 5 minutes.',
 };
 
 describe('TwilioSmsProvider', () => {
@@ -67,22 +68,39 @@ describe('TwilioSmsProvider', () => {
     expect(params.get('From')).toBeNull();
   });
 
-  it('maps a Twilio error response to SMS_SEND_FAILED without leaking the body', async () => {
+  it('maps a Twilio rejection to a generic 400 without leaking provider detail', async () => {
     fetchMock.mockResolvedValue({
       ok: false,
       status: 400,
-      json: () => Promise.resolve({ code: 21211, message: "The 'To' number is not valid." }),
+      json: () => Promise.resolve({ code: 21211, message: 'The number is not valid.' }),
+    });
+
+    // Callers on the unauthenticated sign-in path get a fixed message and a
+    // client-error status; the Twilio detail goes to the log only.
+    await expect(new TwilioSmsProvider().send('+15551234567', 'hi', CONFIG)).rejects.toMatchObject({
+      statusCode: 400,
+      code: ERROR_CODES.SMS_SEND_FAILED,
+      message: 'Failed to send SMS',
+    });
+
+    const logged = vi.mocked(logger.error).mock.calls.flat().map(String).join(' ');
+    expect(logged).toContain('21211');
+    // The message body (which contains the OTP) is never logged.
+    expect(logged).not.toContain('hi');
+  });
+
+  it('maps a Twilio server error to a generic 500', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: () => Promise.resolve({ code: 20500, message: 'Service unavailable' }),
     });
 
     await expect(new TwilioSmsProvider().send('+15551234567', 'hi', CONFIG)).rejects.toMatchObject({
       statusCode: 500,
       code: ERROR_CODES.SMS_SEND_FAILED,
-      message: expect.stringContaining('21211'),
+      message: 'Failed to send SMS',
     });
-
-    // The message body (which contains the OTP) is never logged.
-    const logged = vi.mocked(logger.error).mock.calls.flat().map(String).join(' ');
-    expect(logged).not.toContain('hi');
   });
 
   it('maps a network failure to SMS_SEND_FAILED', async () => {

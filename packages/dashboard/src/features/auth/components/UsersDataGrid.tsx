@@ -264,10 +264,13 @@ export function createUsersColumns(
       sortable: true,
       renderCell: ({ row }) => (
         <span
-          className="truncate text-[13px] leading-[18px] text-foreground"
+          className={cn(
+            'truncate text-[13px] leading-[18px]',
+            row.email ? 'text-foreground' : 'text-muted-foreground'
+          )}
           title={row.email ?? undefined}
         >
-          {row.email}
+          {row.email ?? 'null'}
         </span>
       ),
     },
@@ -279,10 +282,13 @@ export function createUsersColumns(
       sortable: true,
       renderCell: ({ row }) => (
         <span
-          className="truncate text-[13px] leading-[18px] text-foreground"
+          className={cn(
+            'truncate text-[13px] leading-[18px]',
+            row.phone ? 'text-foreground' : 'text-muted-foreground'
+          )}
           title={row.phone ?? undefined}
         >
-          {row.phone}
+          {row.phone ?? 'null'}
         </span>
       ),
     },

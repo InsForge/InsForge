@@ -44,30 +44,29 @@ export function destroyEmailCooldownInterval(): void {
 }
 
 /**
- * Per-IP rate limiter for email otp requests
+ * Per-IP rate limiter factory for OTP send endpoints (email and SMS)
  * Prevents brute-force attacks, resource exhaustion, and enumeration from single IP
  *
  * Limits: 5 requests per 15 minutes per IP
  * Counts ALL requests (both successful and failed) to prevent abuse
  */
-export const sendEmailOTPRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  handler: (_req: Request, _res: Response, next: NextFunction) => {
-    next(
-      new AppError(
-        'Too many send email verification requests from this IP. Please try again in 15 minutes.',
-        429,
-        ERROR_CODES.TOO_MANY_REQUESTS
-      )
-    );
-  },
-  // Count all requests (both successes and failures) to prevent resource exhaustion and enumeration
-  skipSuccessfulRequests: false,
-  skipFailedRequests: false,
-});
+const createSendOTPRateLimiter = (message: string) =>
+  rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // Limit each IP to 5 requests per windowMs
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    handler: (_req: Request, _res: Response, next: NextFunction) => {
+      next(new AppError(message, 429, ERROR_CODES.TOO_MANY_REQUESTS));
+    },
+    // Count all requests (both successes and failures) to prevent resource exhaustion and enumeration
+    skipSuccessfulRequests: false,
+    skipFailedRequests: false,
+  });
+
+export const sendEmailOTPRateLimiter = createSendOTPRateLimiter(
+  'Too many send email verification requests from this IP. Please try again in 15 minutes.'
+);
 
 /**
  * Per-IP rate limiter for S3 access key management endpoints.
@@ -176,36 +175,50 @@ export const idTokenSignInRateLimiter = rateLimit({
  *
  * Cooldown: 60 seconds between requests for same email
  */
-export const perEmailCooldown = (cooldownMs: number = 60000) => {
-  return (req: Request, _res: Response, next: NextFunction) => {
-    // Key only values that will pass validation. Anything else falls through
-    // to the handler's 400 without touching the cooldown store, so garbage in
-    // the email field can never set (or poison) a cooldown key.
-    const parsed = emailSchema.safeParse(req.body?.email);
-    if (!parsed.success) {
-      return next();
-    }
-    const email = parsed.data;
+const createIdentifierCooldown = (options: {
+  schema: { safeParse: (value: unknown) => { success: boolean; data?: string } };
+  field: 'email' | 'phone';
+  label: string;
+}) => {
+  return (cooldownMs: number = 60000) => {
+    return (req: Request, _res: Response, next: NextFunction) => {
+      // Key only values that will pass validation. Anything else falls through
+      // to the handler's 400 without touching the cooldown store, so garbage in
+      // the field can never set (or poison) a cooldown key. Validated emails
+      // always contain '@' and validated phones never do, so the two key
+      // namespaces sharing this store provably cannot collide.
+      const parsed = options.schema.safeParse(req.body?.[options.field]);
+      if (!parsed.success || parsed.data === undefined) {
+        return next();
+      }
+      const identifier = parsed.data;
 
-    const now = Date.now();
-    const lastRequest = emailCooldowns.get(email);
+      const now = Date.now();
+      const lastRequest = emailCooldowns.get(identifier);
 
-    if (lastRequest && now - lastRequest < cooldownMs) {
-      const remainingMs = cooldownMs - (now - lastRequest);
-      const remainingSec = Math.ceil(remainingMs / 1000);
+      if (lastRequest && now - lastRequest < cooldownMs) {
+        const remainingMs = cooldownMs - (now - lastRequest);
+        const remainingSec = Math.ceil(remainingMs / 1000);
 
-      throw new AppError(
-        `Please wait ${remainingSec} seconds before requesting another code for this email`,
-        429,
-        ERROR_CODES.TOO_MANY_REQUESTS
-      );
-    }
+        throw new AppError(
+          `Please wait ${remainingSec} seconds before requesting another code for this ${options.label}`,
+          429,
+          ERROR_CODES.TOO_MANY_REQUESTS
+        );
+      }
 
-    // Update last request time
-    emailCooldowns.set(email, now);
-    next();
+      // Update last request time
+      emailCooldowns.set(identifier, now);
+      next();
+    };
   };
 };
+
+export const perEmailCooldown = createIdentifierCooldown({
+  schema: emailSchema,
+  field: 'email',
+  label: 'email',
+});
 
 /**
  * Combined rate limiter for sending email otp requests
@@ -220,61 +233,20 @@ export const sendEmailOTPLimiter = [
  * Per-IP rate limiter for SMS otp requests — same limits as the email
  * equivalent (5 requests per 15 minutes, counting successes and failures).
  */
-export const sendSmsOTPRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (_req: Request, _res: Response, next: NextFunction) => {
-    next(
-      new AppError(
-        'Too many send SMS verification requests from this IP. Please try again in 15 minutes.',
-        429,
-        ERROR_CODES.TOO_MANY_REQUESTS
-      )
-    );
-  },
-  // Count all requests (both successes and failures) to prevent resource exhaustion and enumeration
-  skipSuccessfulRequests: false,
-  skipFailedRequests: false,
-});
+export const sendSmsOTPRateLimiter = createSendOTPRateLimiter(
+  'Too many send SMS verification requests from this IP. Please try again in 15 minutes.'
+);
 
 /**
  * Enforces minimum time between requests for the same phone number.
- * Shares the cooldown store with perEmailCooldown — E.164 keys (always
- * `+`-prefixed) cannot collide with lowercased email keys, and sharing keeps
- * one cleanup lifecycle.
+ * Shares the cooldown store (and factory) with perEmailCooldown so the two
+ * paths cannot drift apart.
  */
-export const perPhoneCooldown = (cooldownMs: number = 60000) => {
-  return (req: Request, _res: Response, next: NextFunction) => {
-    // Key only valid, trimmed E.164 values (see perEmailCooldown). Validated
-    // emails always contain '@' and validated phones never do, so the two
-    // key namespaces sharing this store provably cannot collide.
-    const parsed = phoneSchema.safeParse(req.body?.phone);
-    if (!parsed.success) {
-      return next();
-    }
-    const phone = parsed.data;
-
-    const now = Date.now();
-    const lastRequest = emailCooldowns.get(phone);
-
-    if (lastRequest && now - lastRequest < cooldownMs) {
-      const remainingMs = cooldownMs - (now - lastRequest);
-      const remainingSec = Math.ceil(remainingMs / 1000);
-
-      throw new AppError(
-        `Please wait ${remainingSec} seconds before requesting another code for this phone number`,
-        429,
-        ERROR_CODES.TOO_MANY_REQUESTS
-      );
-    }
-
-    // Update last request time
-    emailCooldowns.set(phone, now);
-    next();
-  };
-};
+export const perPhoneCooldown = createIdentifierCooldown({
+  schema: phoneSchema,
+  field: 'phone',
+  label: 'phone number',
+});
 
 /**
  * Combined rate limiter for sending SMS otp requests

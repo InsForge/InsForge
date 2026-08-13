@@ -97,6 +97,24 @@ describe('SmsSettingsCard', () => {
     );
   });
 
+  it('requires an auth token on first enable when none is stored', async () => {
+    const user = userEvent.setup();
+    render(
+      <SmsSettingsCard
+        config={{ ...ENABLED_CONFIG, enabled: false, hasAuthToken: false }}
+        isLoading={false}
+        isUpdating={false}
+        onSave={onSave}
+      />
+    );
+
+    await user.click(screen.getByRole('switch', { name: 'Enable Custom SMS' }));
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    expect(await screen.findByText('Auth token is required')).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it('rejects a malformed account SID with a field error instead of saving', async () => {
     const user = userEvent.setup();
     render(

@@ -15,6 +15,9 @@ export class SmsService {
   private static instance: SmsService;
   private twilioProvider = new TwilioSmsProvider();
   private consoleProvider = new ConsoleSmsProvider();
+  // Per-instance by design: InsForge currently runs as a single-instance
+  // server (matching EmailService's in-memory interval map). If multi-instance
+  // ever lands, both maps move to a shared store together.
   private lastSmsSentAt = new Map<string, number>();
 
   private constructor() {
@@ -68,9 +71,10 @@ export class SmsService {
   private recordSmsSent(phone: string, minIntervalSeconds: number): void {
     this.lastSmsSentAt.set(phone, Date.now());
 
-    // Prune stale entries to prevent unbounded memory growth
+    // Prune stale entries to prevent unbounded memory growth. Anything older
+    // than the interval can no longer block a send, so it is safe to drop.
     if (this.lastSmsSentAt.size > 10000) {
-      const cutoff = Date.now() - minIntervalSeconds * 2000;
+      const cutoff = Date.now() - minIntervalSeconds * 1000;
       for (const [key, ts] of this.lastSmsSentAt) {
         if (ts < cutoff) {
           this.lastSmsSentAt.delete(key);
@@ -84,6 +88,17 @@ export class SmsService {
   // -------------------------------------------------------------------------
 
   /**
+   * Throw exactly what a send would throw (unconfigured provider or interval
+   * cooldown) without any side effects. Callers that rotate state before
+   * sending — the OTP upsert replaces the previously delivered code — use this
+   * so a doomed send can never invalidate a code the user already holds.
+   */
+  public async assertCanSend(to: string): Promise<void> {
+    const [, config] = await this.resolveProvider();
+    this.checkMinInterval(to, config.minIntervalSeconds);
+  }
+
+  /**
    * Send a sign-in code, rendering the configured message template.
    * `{{ code }}` is the only variable, mirroring the `{{ token }}` convention
    * of email templates.
@@ -95,7 +110,16 @@ export class SmsService {
 
     this.checkMinInterval(to, config.minIntervalSeconds);
 
-    await provider.send(to, body, config);
+    // Reserve the interval slot before awaiting the provider so concurrent
+    // sends to the same number cannot both pass the check; release it if
+    // delivery fails so a legitimate retry is not locked out.
+    this.lastSmsSentAt.set(to, Date.now());
+    try {
+      await provider.send(to, body, config);
+    } catch (error) {
+      this.lastSmsSentAt.delete(to);
+      throw error;
+    }
 
     this.recordSmsSent(to, config.minIntervalSeconds);
   }

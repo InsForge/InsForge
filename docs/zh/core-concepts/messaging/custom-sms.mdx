@@ -7,7 +7,7 @@ description: 配置 Twilio，通过短信从 InsForge 发送手机登录验证�
 
 ## 概念
 
-每次发送时都会解析提供商，因此保存的更改在下一次请求时生效。InsForge 在保存前会向 Twilio API 验证凭据，因此持久化的配置始终可用。身份验证令牌使用 AES-256-GCM 加密存储，API 永远不会返回它。
+每次发送时都会解析提供商，因此保存的更改在下一次请求时生效。InsForge 在保存时会向 Twilio API 验证凭据，因此错误的凭据在持久化之前就会被拒绝。之后 Twilio 侧的变化（令牌轮换、账户暂停、投递规则）会表现为发送失败。身份验证令牌使用 AES-256-GCM 加密存储，API 永远不会返回它。
 
 ## 使用方法
 
@@ -39,6 +39,6 @@ description: 配置 Twilio，通过短信从 InsForge 发送手机登录验证�
 
 ## 更多资源
 
-- [消息传递概述](/zh/core-concepts/messaging/overview) 了解路由模型。
-- [手机 OTP 登录](/zh/sdks/rest/auth#手机-otp-登录) 了解这些消息服务的 REST 端点。
+- [消息传递概述](/core-concepts/messaging/overview) 了解路由模型。
+- [手机 OTP 登录](/sdks/rest/auth#手机-otp-登录) 了解这些消息服务的 REST 端点。
 - [Twilio Programmable Messaging](https://www.twilio.com/docs/messaging) 了解提供商侧的设置。

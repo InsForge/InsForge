@@ -1,10 +1,10 @@
 ---
 title: "訊息傳遞概覽"
 sidebarTitle: "Overview"
-description: "透過 InsForge 託管寄件服務或自訂 SMTP 寄送交易性電子郵件，未來 SMS 與推送通知將共用相同 API 介面。"
+description: "透過 InsForge 託管寄件服務或自訂 SMTP 寄送交易性電子郵件；手機登入驗證碼現已透過簡訊傳送，推送通知將共用相同 API 介面。"
 ---
 
-InsForge Messaging 從您的專案傳送交易性通知：收據、摘要、密碼重設代碼、通知匯總、任何您本來會為其接入 SendGrid、Postmark 或 Twilio 的東西。電子郵件是第一個通道；SMS 和推送在路線圖上，將共享相同的 API 表面。
+InsForge Messaging 從您的專案傳送交易性通知：收據、摘要、密碼重設代碼、通知匯總、任何您本來會為其接入 SendGrid、Postmark 或 Twilio 的東西。電子郵件是第一個通道。簡訊已可用於手機登入驗證碼（參見[自訂簡訊](/core-concepts/messaging/custom-sms)）；通用簡訊傳送 API 和推送在路線圖上，將共享相同的 API 表面。
 
 <Note>
   **只是傳送驗證電子郵件？** 魔法連結、驗證代碼和密碼重設已內建在 [Authentication](/core-concepts/authentication/overview) 中。您只需要這個產品用於驗證之外的交易性訊息。
@@ -44,7 +44,7 @@ graph TB
     託管 SMTP 或使用您自己的提供商。範本、交付追蹤和 webhook 事件。
   </Card>
 
-  <Card title="SMS" icon="message" href="/zh-Hant/core-concepts/messaging/custom-sms">
+  <Card title="SMS" icon="message" href="/core-concepts/messaging/custom-sms">
     現已支援透過 Twilio 傳送手機登入驗證碼。參見自訂簡訊。
   </Card>
 

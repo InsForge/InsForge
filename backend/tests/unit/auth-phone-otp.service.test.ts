@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   createEmailOTP: vi.fn(),
   consumeNumericOTP: vi.fn(),
   sendSignInCode: vi.fn(),
+  assertCanSend: vi.fn(),
   getAuthConfig: vi.fn(),
   generateAccessToken: vi.fn(),
   oauthProvider: { getInstance: () => ({}) },
@@ -68,6 +69,7 @@ vi.mock('../../src/services/sms/sms.service.js', () => ({
   SmsService: {
     getInstance: () => ({
       sendSignInCode: mocks.sendSignInCode,
+      assertCanSend: mocks.assertCanSend,
     }),
   },
 }));
@@ -168,6 +170,7 @@ describe('AuthService phone OTP sign-in', () => {
       onVerified(mocks.client, { success: true, email: phone, purpose, redirectTo: null })
     );
     mocks.sendSignInCode.mockResolvedValue(undefined);
+    mocks.assertCanSend.mockResolvedValue(undefined);
     mocks.generateAccessToken.mockReturnValue('access-token');
     authService = AuthService.getInstance();
     vi.spyOn(authService, 'getUserById').mockResolvedValue(USER_RECORD);
@@ -195,15 +198,19 @@ describe('AuthService phone OTP sign-in', () => {
     expect(mocks.pool.query).not.toHaveBeenCalled();
   });
 
-  it('surfaces the provider error when SMS is disabled or unconfigured', async () => {
+  it('refuses a doomed send before rotating the stored code', async () => {
     const notConfigured = new AppError(
       'An SMS provider must be configured before phone sign-in can be used.',
       400,
       ERROR_CODES.SMS_PROVIDER_NOT_CONFIGURED
     );
-    mocks.sendSignInCode.mockRejectedValue(notConfigured);
+    mocks.assertCanSend.mockRejectedValue(notConfigured);
 
     await expect(authService.sendPhoneSignInOTP(PHONE)).rejects.toBe(notConfigured);
+
+    // The previously delivered code must survive: no new OTP was created.
+    expect(mocks.createEmailOTP).not.toHaveBeenCalled();
+    expect(mocks.sendSignInCode).not.toHaveBeenCalled();
   });
 
   it('creates a phone-verified user without an email only after a valid OTP', async () => {

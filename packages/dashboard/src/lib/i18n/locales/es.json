@@ -1193,7 +1193,9 @@
     "smsConfigUpdatedToast": "Configuración de SMS actualizada correctamente",
     "smsConfigUpdateFailed": "Error al actualizar la configuración de SMS",
     "otpMessageTemplate": "Plantilla del mensaje OTP",
-    "otpMessageTemplateDescription": "El mensaje de texto de inicio de sesión. {{ code }} se reemplaza por el código de 6 dígitos."
+    "otpMessageTemplateDescription": "El mensaje de texto de inicio de sesión. {{ code }} se reemplaza por el código de 6 dígitos.",
+    "smsAuthTokenRequired": "El token de autenticación es obligatorio",
+    "smsConfigLoadFailed": "Error al cargar la configuración de SMS."
   },
   "common": {
     "anErrorOccurred": "Se produjo un error",

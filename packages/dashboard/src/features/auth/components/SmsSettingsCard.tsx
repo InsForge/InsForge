@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,8 +18,24 @@ type SmsFormValues = z.input<typeof upsertSmsConfigRequestSchema>;
 // token when present) validates, and again on submit so the backend keeps the
 // stored credential.
 const baseResolver = zodResolver(upsertSmsConfigRequestSchema);
-const smsFormResolver: typeof baseResolver = (values, context, options) =>
-  baseResolver({ ...values, authToken: values.authToken || undefined }, context, options);
+
+// The shared schema cannot know whether a stored token exists, so the
+// first-enable requirement (token mandatory when none is stored) is enforced
+// here with a field-level error instead of a late generic backend failure.
+const createSmsFormResolver = (opts: {
+  hasStoredToken: boolean;
+  requiredMessage: string;
+}): typeof baseResolver => {
+  return (values, context, options) => {
+    if (values.enabled && !values.authToken && !opts.hasStoredToken) {
+      return Promise.resolve({
+        values: {},
+        errors: { authToken: { type: 'required', message: opts.requiredMessage } },
+      });
+    }
+    return baseResolver({ ...values, authToken: values.authToken || undefined }, context, options);
+  };
+};
 
 interface SmsSettingsCardProps {
   config: SmsConfigSchema | undefined;
@@ -95,8 +111,16 @@ function FormField({
 
 export function SmsSettingsCard({ config, isLoading, isUpdating, onSave }: SmsSettingsCardProps) {
   const { t } = useTranslation('chrome');
+  const resolver = useMemo(
+    () =>
+      createSmsFormResolver({
+        hasStoredToken: config?.hasAuthToken === true,
+        requiredMessage: t('auth.smsAuthTokenRequired', { defaultValue: 'Auth token is required' }),
+      }),
+    [config?.hasAuthToken, t]
+  );
   const form = useForm<SmsFormValues>({
-    resolver: smsFormResolver,
+    resolver,
     defaultValues,
   });
 
@@ -150,6 +174,7 @@ export function SmsSettingsCard({ config, isLoading, isUpdating, onSave }: SmsSe
           control={form.control}
           render={({ field }) => (
             <Switch
+              aria-label={t('auth.enableCustomSms', { defaultValue: 'Enable Custom SMS' })}
               checked={field.value}
               onCheckedChange={(value) => {
                 field.onChange(value);

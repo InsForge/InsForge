@@ -1169,7 +1169,9 @@
     "smsConfigUpdatedToast": "簡訊設定更新成功",
     "smsConfigUpdateFailed": "更新簡訊設定失敗",
     "otpMessageTemplate": "OTP 訊息範本",
-    "otpMessageTemplateDescription": "登入簡訊內容。{{ code }} 會被替換為 6 位驗證碼。"
+    "otpMessageTemplateDescription": "登入簡訊內容。{{ code }} 會被替換為 6 位驗證碼。",
+    "smsAuthTokenRequired": "驗證權杖為必填項",
+    "smsConfigLoadFailed": "載入簡訊設定失敗。"
   },
   "common": {
     "anErrorOccurred": "發生了一個錯誤",

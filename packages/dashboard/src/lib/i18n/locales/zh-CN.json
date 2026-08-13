@@ -1169,7 +1169,9 @@
     "smsConfigUpdatedToast": "短信配置更新成功",
     "smsConfigUpdateFailed": "更新短信配置失败",
     "otpMessageTemplate": "OTP 消息模板",
-    "otpMessageTemplateDescription": "登录短信内容。{{ code }} 会被替换为 6 位验证码。"
+    "otpMessageTemplateDescription": "登录短信内容。{{ code }} 会被替换为 6 位验证码。",
+    "smsAuthTokenRequired": "身份验证令牌为必填项",
+    "smsConfigLoadFailed": "加载短信配置失败。"
   },
   "common": {
     "anErrorOccurred": "发生了一个错误",

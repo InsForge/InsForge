@@ -59,13 +59,18 @@ export class TwilioSmsProvider implements SmsProvider {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown network error';
       logger.error(`Failed to send SMS via Twilio: ${message}`);
-      throw new AppError(`Failed to send SMS: ${message}`, 500, ERROR_CODES.SMS_SEND_FAILED);
+      // send() serves the unauthenticated sign-in path: provider detail stays
+      // in the log, callers get a fixed message.
+      throw new AppError('Failed to send SMS', 500, ERROR_CODES.SMS_SEND_FAILED);
     }
 
     if (!response.ok) {
       const message = await readTwilioError(response);
       logger.error(`Failed to send SMS via Twilio: ${message}`, { status: response.status });
-      throw new AppError(`Failed to send SMS: ${message}`, 500, ERROR_CODES.SMS_SEND_FAILED);
+      // A Twilio 4xx means the request or recipient was rejected, not a server
+      // fault; the detailed reason is admin-visible in the logs only.
+      const status = response.status >= 400 && response.status < 500 ? 400 : 500;
+      throw new AppError('Failed to send SMS', status, ERROR_CODES.SMS_SEND_FAILED);
     }
 
     logger.info('SMS sent via Twilio');

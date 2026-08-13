@@ -634,7 +634,7 @@ paths:
         '401':
           description: Invalid password credentials
         '403':
-          description: Email verification required, or public signups are disabled for a verified unknown email
+          description: Email verification required, or public signups are disabled for a verified unknown email or phone number
         '429':
           description: Too many OTP verification attempts
 
@@ -1048,9 +1048,11 @@ paths:
                     type: string
                     example: If sign-in is available for this phone number, we have sent a verification code.
         '400':
-          description: Invalid request, or no SMS provider is configured
+          description: Invalid request, no SMS provider is configured, or the provider rejected the recipient
         '429':
           description: Too many sign-in code requests
+        '500':
+          description: SMS delivery failed (provider outage or server fault)
 
   /api/auth/email/send-verification:
     post:
@@ -2328,9 +2330,10 @@ paths:
                   description: Required when enabled is true with the twilio provider
                 authToken:
                   type: string
-                  description: Twilio auth token (optional on update if unchanged)
+                  description: Twilio auth token. Required when enabling for the first time; may be omitted on later updates to keep the stored token
                 fromNumber:
                   type: string
+                  pattern: '^\+[1-9]\d{6,14}$'
                   description: E.164 sender number. Either this or messagingServiceSid is required when enabling twilio
                 messagingServiceSid:
                   type: string

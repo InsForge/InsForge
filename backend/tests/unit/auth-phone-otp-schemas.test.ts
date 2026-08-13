@@ -15,6 +15,13 @@ describe('phone OTP sign-in schemas', () => {
   });
 
   it.each([
+    ['shortest valid E.164 (7 digits)', '+1234567'],
+    ['longest valid E.164 (15 digits)', '+123456789012345'],
+  ])('accepts the %s', (_label, phone) => {
+    expect(sendPhoneOTPRequestSchema.safeParse({ phone }).success).toBe(true);
+  });
+
+  it.each([
     ['missing plus prefix', '15551234567'],
     ['letters', '+1555abc4567'],
     ['leading zero after plus', '+05551234567'],

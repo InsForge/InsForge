@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { Button } from '@insforge/ui';
 import { useSmsConfig } from '#features/auth/hooks/useSmsConfig';
 import { SmsSettingsCard } from '#features/auth/components/SmsSettingsCard';
 
@@ -8,7 +9,9 @@ export default function PhonePage() {
     config: smsConfig,
     isLoading: isSmsLoading,
     isUpdating: isSmsUpdating,
+    error: smsError,
     updateConfig: updateSmsConfig,
+    refetch: refetchSmsConfig,
   } = useSmsConfig();
 
   return (
@@ -43,12 +46,33 @@ export default function PhonePage() {
               </p>
             </div>
             <div className="px-6 py-6">
-              <SmsSettingsCard
-                config={smsConfig}
-                isLoading={isSmsLoading}
-                isUpdating={isSmsUpdating}
-                onSave={updateSmsConfig}
-              />
+              {smsError ? (
+                // Never render an editable form over unknown persisted state:
+                // saving the defaults could silently replace a real config.
+                <div className="flex min-h-[120px] flex-col items-center justify-center gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    {t('auth.smsConfigLoadFailed', {
+                      defaultValue: 'Failed to load the SMS configuration.',
+                    })}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      void refetchSmsConfig();
+                    }}
+                  >
+                    {t('auth.retry', { defaultValue: 'Retry' })}
+                  </Button>
+                </div>
+              ) : (
+                <SmsSettingsCard
+                  config={smsConfig}
+                  isLoading={isSmsLoading}
+                  isUpdating={isSmsUpdating}
+                  onSave={updateSmsConfig}
+                />
+              )}
             </div>
           </div>
         </div>

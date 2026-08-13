@@ -21,6 +21,21 @@ ALTER TABLE auth.users
 -- the email uniqueness guarantee; NULLs (email-only accounts) never conflict.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_number ON auth.users (phone_number);
 
+-- The API guarantees every sign-up carries an identifier; this keeps the
+-- invariant where the data lives, so a direct SQL writer or a future migration
+-- cannot create an account that no sign-in method can ever reach.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'users_email_or_phone_present' AND conrelid = 'auth.users'::regclass
+  ) THEN
+    ALTER TABLE auth.users
+      ADD CONSTRAINT users_email_or_phone_present
+      CHECK (email IS NOT NULL OR phone_number IS NOT NULL);
+  END IF;
+END $$;
+
 -- SMS provider configuration, mirroring email.config (migration 029): a
 -- singleton row holding the Twilio credentials with the auth token encrypted
 -- at rest. `provider` selects the delivery implementation; `console` is a
@@ -60,3 +75,46 @@ ON CONFLICT DO NOTHING;
 GRANT USAGE ON SCHEMA sms TO project_admin;
 REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA sms FROM project_admin;
 GRANT SELECT ON ALL TABLES IN SCHEMA sms TO project_admin;
+
+-- The sms schema is InsForge-internal and must never surface through the
+-- PostgREST data API. The deny-list lives in the insforge.internal_schemas GUC
+-- (postgresql.conf, updated alongside this migration) with a literal fallback
+-- inside system.is_exposed_schema (migration 056); redefine the fallback here
+-- so deployments without the GUC also hide sms, then resync so the CREATE
+-- SCHEMA above (which already fired the exposure event trigger) is corrected
+-- within this same migration.
+CREATE OR REPLACE FUNCTION system.is_exposed_schema(p_schema text)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $fn$
+  SELECT
+    p_schema IS NOT NULL
+    AND p_schema NOT LIKE 'pg\_%'
+    AND p_schema <> 'information_schema'
+    AND p_schema <> ALL (
+      -- Comma-separated GUC; strip any incidental whitespace before splitting.
+      string_to_array(
+        regexp_replace(
+          coalesce(
+            nullif(current_setting('insforge.internal_schemas', true), ''),
+            'ai,auth,compute,deployments,email,functions,memory,payments,realtime,schedules,sms,storage,system'
+          ),
+          '\s', '', 'g'
+        ),
+        ','
+      )
+    )
+    -- Extension-managed schemas are infrastructure, not developer data.
+    AND NOT EXISTS (
+      SELECT 1
+      FROM pg_depend d
+      JOIN pg_namespace n ON n.oid = d.objid
+      WHERE d.classid = 'pg_namespace'::regclass
+        AND d.refclassid = 'pg_extension'::regclass
+        AND d.deptype = 'e'
+        AND n.nspname = p_schema
+    );
+$fn$;
+
+SELECT system.sync_postgrest_exposed_schemas();

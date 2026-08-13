@@ -100,6 +100,59 @@ describe('SmsService', () => {
     expect(mocks.twilioSend).not.toHaveBeenCalled();
   });
 
+  it('assertCanSend throws without touching the provider or the interval state', async () => {
+    mocks.getRawSmsConfig.mockResolvedValue({ ...CONFIG, minIntervalSeconds: 60 });
+    const service = SmsService.getInstance();
+
+    await service.assertCanSend('+15551234567');
+    await service.sendSignInCode('+15551234567', '111111');
+
+    await expect(service.assertCanSend('+15551234567')).rejects.toMatchObject({
+      statusCode: 429,
+      code: ERROR_CODES.RATE_LIMITED,
+    });
+    expect(mocks.twilioSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('assertCanSend rejects when no provider is configured', async () => {
+    mocks.getRawSmsConfig.mockResolvedValue(null);
+
+    await expect(SmsService.getInstance().assertCanSend('+15551234567')).rejects.toMatchObject({
+      code: ERROR_CODES.SMS_PROVIDER_NOT_CONFIGURED,
+    });
+  });
+
+  it('releases the interval reservation when delivery fails', async () => {
+    mocks.getRawSmsConfig.mockResolvedValue({ ...CONFIG, minIntervalSeconds: 60 });
+    mocks.twilioSend.mockRejectedValueOnce(new Error('boom'));
+    const service = SmsService.getInstance();
+
+    await expect(service.sendSignInCode('+15551234567', '111111')).rejects.toThrow('boom');
+
+    // The failed attempt must not lock out an immediate retry.
+    await service.sendSignInCode('+15551234567', '222222');
+    expect(mocks.twilioSend).toHaveBeenCalledTimes(2);
+  });
+
+  it('blocks concurrent duplicate sends at the service layer', async () => {
+    mocks.getRawSmsConfig.mockResolvedValue({ ...CONFIG, minIntervalSeconds: 60 });
+    let release = () => {};
+    mocks.twilioSend.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (release = resolve))
+    );
+    const service = SmsService.getInstance();
+
+    const first = service.sendSignInCode('+15551234567', '111111');
+    // The reservation is taken before the provider await, so the concurrent
+    // duplicate fails fast instead of double-sending.
+    await expect(service.sendSignInCode('+15551234567', '222222')).rejects.toMatchObject({
+      statusCode: 429,
+    });
+    release();
+    await first;
+    expect(mocks.twilioSend).toHaveBeenCalledTimes(1);
+  });
+
   it('enforces the per-number minimum interval', async () => {
     mocks.getRawSmsConfig.mockResolvedValue({ ...CONFIG, minIntervalSeconds: 60 });
     const service = SmsService.getInstance();

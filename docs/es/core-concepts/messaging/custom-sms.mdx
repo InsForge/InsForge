@@ -7,7 +7,7 @@ Cuando está habilitado, los códigos de inicio de sesión por teléfono se env�
 
 ## Conceptos
 
-El proveedor se resuelve en cada envío, por lo que los cambios guardados se aplican en la siguiente solicitud. InsForge verifica las credenciales contra la API de Twilio antes de guardar, de modo que una configuración persistida siempre funciona. Los tokens de autenticación se cifran en reposo con AES-256-GCM y la API nunca los devuelve.
+El proveedor se resuelve en cada envío, por lo que los cambios guardados se aplican en la siguiente solicitud. InsForge verifica las credenciales contra la API de Twilio al guardar, de modo que las credenciales incorrectas se rechazan antes de persistir. Los cambios posteriores del lado de Twilio (tokens rotados, cuentas suspendidas, reglas de entrega) se manifiestan como fallos de envío. Los tokens de autenticación se cifran en reposo con AES-256-GCM y la API nunca los devuelve.
 
 ## Uso
 
@@ -39,6 +39,6 @@ Para desarrollo local y pruebas, la configuración acepta `provider: "console"` 
 
 ## Más recursos
 
-- [Descripción general de mensajería](/es/core-concepts/messaging/overview) para el modelo de enrutamiento.
-- [Inicio de sesión con OTP por teléfono](/es/sdks/rest/auth#inicio-de-sesión-con-otp-por-teléfono) para los endpoints REST que usan estos mensajes.
+- [Descripción general de mensajería](/core-concepts/messaging/overview) para el modelo de enrutamiento.
+- [Inicio de sesión con OTP por teléfono](/sdks/rest/auth#inicio-de-sesión-con-otp-por-teléfono) para los endpoints REST que usan estos mensajes.
 - [Twilio Programmable Messaging](https://www.twilio.com/docs/messaging) para la configuración del lado del proveedor.

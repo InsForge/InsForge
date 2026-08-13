@@ -1,10 +1,10 @@
 ---
 title: "Messaging overview"
 sidebarTitle: "Overview"
-description: "Send transactional emails from your InsForge project with the managed sender or custom SMTP. SMS and push are on the roadmap for the same API."
+description: "Send transactional emails from your InsForge project with the managed sender or custom SMTP. Phone sign-in codes ship over SMS today; push is on the roadmap for the same API."
 ---
 
-InsForge Messaging sends transactional notifications from your project: receipts, digests, password-reset codes, notification roll-ups, anything you would otherwise wire SendGrid, Postmark, or Twilio in for. Email is the first channel; SMS and push are on the roadmap and will share the same API surface.
+InsForge Messaging sends transactional notifications from your project: receipts, digests, password-reset codes, notification roll-ups, anything you would otherwise wire SendGrid, Postmark, or Twilio in for. Email is the first channel. SMS is live for phone sign-in codes via [Custom SMS](/core-concepts/messaging/custom-sms); a general SMS send API and push are on the roadmap and will share the same API surface.
 
 <Note>
   **Just sending auth emails?** Magic links, verification codes, and password resets are wired into [Authentication](/core-concepts/authentication/overview) out of the box. You only need this product for transactional messages beyond auth.

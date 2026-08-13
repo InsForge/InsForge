@@ -1189,7 +1189,9 @@
     "smsConfigUpdatedToast": "SMS configuration updated successfully",
     "smsConfigUpdateFailed": "Failed to update SMS configuration",
     "otpMessageTemplate": "OTP message template",
-    "otpMessageTemplateDescription": "The sign-in text message. {{ code }} is replaced with the 6-digit code."
+    "otpMessageTemplateDescription": "The sign-in text message. {{ code }} is replaced with the 6-digit code.",
+    "smsAuthTokenRequired": "Auth token is required",
+    "smsConfigLoadFailed": "Failed to load the SMS configuration."
   },
   "common": {
     "anErrorOccurred": "An error occurred",

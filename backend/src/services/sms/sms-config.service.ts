@@ -187,8 +187,10 @@ export class SmsConfigService {
         otpMessageTemplate: row.otpMessageTemplate,
       };
     } catch (error) {
+      // Infrastructure failures (pool exhaustion, connection loss) must not
+      // masquerade as an unconfigured provider — callers map null to a 400.
       logger.error('Failed to get raw SMS config', { error });
-      return null;
+      throw new AppError('Failed to get SMS configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -197,6 +199,30 @@ export class SmsConfigService {
   // -------------------------------------------------------------------------
 
   async upsertSmsConfig(input: UpsertSmsConfigRequest): Promise<SmsConfigSchema> {
+    // Verify credentials before opening the transaction: the Twilio round-trip
+    // can take up to 10 seconds and must not hold the advisory lock or a pool
+    // connection. A save racing between this check and the locked write below
+    // has itself been verified, so the persisted pair is always a checked one.
+    if (input.enabled) {
+      if (input.provider === 'console') {
+        if (isProduction()) {
+          throw new AppError(
+            'The console SMS provider is disabled in production',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
+      } else {
+        const stored = await this.getPool().query(
+          'SELECT auth_token_encrypted FROM sms.config LIMIT 1'
+        );
+        await this.verifyTwilioCredentials(
+          input,
+          (stored.rows[0]?.auth_token_encrypted as string | undefined) ?? ''
+        );
+      }
+    }
+
     const client = await this.getPool().connect();
     try {
       await client.query('BEGIN');
@@ -205,46 +231,43 @@ export class SmsConfigService {
 
       const existingRow = await this.lockOrCreateSingletonRow(client);
 
-      let authTokenEncrypted = existingRow.auth_token_encrypted;
-      if (input.authToken) {
-        authTokenEncrypted = EncryptionManager.encrypt(input.authToken);
-      }
-
-      // Only verify credentials when enabling — when disabling, the user is
-      // turning SMS off and the values aren't going to be used.
-      if (input.enabled) {
-        if (input.provider === 'console') {
-          if (isProduction()) {
-            throw new AppError(
-              'The console SMS provider is disabled in production',
-              400,
-              ERROR_CODES.INVALID_INPUT
-            );
-          }
-        } else {
-          await this.verifyTwilioCredentials(input, existingRow.auth_token_encrypted);
+      let result;
+      if (!input.enabled) {
+        // Disabling is an off-switch, not a reset: preserve every stored
+        // provider field so re-enabling needs no re-entry, even for minimal
+        // API requests that omit them.
+        result = await client.query(
+          `UPDATE sms.config SET enabled = false, updated_at = NOW()
+           WHERE id = $1
+           RETURNING ${SMS_CONFIG_COLUMNS}`,
+          [existingRow.id]
+        );
+      } else {
+        let authTokenEncrypted = existingRow.auth_token_encrypted;
+        if (input.authToken) {
+          authTokenEncrypted = EncryptionManager.encrypt(input.authToken);
         }
-      }
 
-      const result = await client.query(
-        `UPDATE sms.config SET
-           enabled = $1, provider = $2, account_sid = $3,
-           auth_token_encrypted = $4, from_number = $5, messaging_service_sid = $6,
-           min_interval_seconds = $7, otp_message_template = $8, updated_at = NOW()
-         WHERE id = $9
-         RETURNING ${SMS_CONFIG_COLUMNS}`,
-        [
-          input.enabled,
-          input.provider,
-          input.accountSid,
-          authTokenEncrypted,
-          input.fromNumber,
-          input.messagingServiceSid,
-          input.minIntervalSeconds ?? 60,
-          input.otpMessageTemplate,
-          existingRow.id,
-        ]
-      );
+        result = await client.query(
+          `UPDATE sms.config SET
+             enabled = $1, provider = $2, account_sid = $3,
+             auth_token_encrypted = $4, from_number = $5, messaging_service_sid = $6,
+             min_interval_seconds = $7, otp_message_template = $8, updated_at = NOW()
+           WHERE id = $9
+           RETURNING ${SMS_CONFIG_COLUMNS}`,
+          [
+            input.enabled,
+            input.provider,
+            input.accountSid,
+            authTokenEncrypted,
+            input.fromNumber,
+            input.messagingServiceSid,
+            input.minIntervalSeconds ?? 60,
+            input.otpMessageTemplate,
+            existingRow.id,
+          ]
+        );
+      }
 
       await client.query('COMMIT');
       logger.info('SMS config updated', {
@@ -254,7 +277,11 @@ export class SmsConfigService {
 
       return toSmsConfigSchema(result.rows[0]);
     } catch (error) {
-      await client.query('ROLLBACK');
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        logger.error('Failed to roll back SMS config transaction', { rollbackError });
+      }
       logger.error('Failed to upsert SMS config', { error });
       if (error instanceof AppError) {
         throw error;

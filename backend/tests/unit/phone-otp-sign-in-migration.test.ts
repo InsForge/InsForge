@@ -38,6 +38,20 @@ describe('065_add-phone-otp-sign-in migration', () => {
     );
   });
 
+  it('keeps at least one identifier per user with a database constraint', () => {
+    expect(sql).toMatch(/users_email_or_phone_present/);
+    expect(sql).toMatch(/CHECK \(email IS NOT NULL OR phone_number IS NOT NULL\)/i);
+  });
+
+  it('hides the sms schema from the PostgREST data API', () => {
+    // The internal-schema fallback list must include sms, and the migration
+    // must resync PostgREST because CREATE SCHEMA already fired the exposure
+    // event trigger.
+    expect(sql).toMatch(/is_exposed_schema/);
+    expect(sql).toContain('schedules,sms,storage');
+    expect(sql).toMatch(/SELECT system\.sync_postgrest_exposed_schemas\(\)/);
+  });
+
   it('seeds a default OTP message template with the code placeholder', () => {
     expect(sql).toMatch(/otp_message_template TEXT NOT NULL DEFAULT/i);
     expect(sql).toContain('{{ code }}');

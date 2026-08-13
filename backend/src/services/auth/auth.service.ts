@@ -481,6 +481,11 @@ export class AuthService {
    * never collide with email identifiers, so the machinery is shared as-is.
    */
   async sendPhoneSignInOTP(phone: string): Promise<void> {
+    // Refuse doomed sends (unconfigured provider, interval cooldown) before
+    // the upsert below rotates the stored code, so a throttled retry can never
+    // invalidate a code the user already received.
+    await SmsService.getInstance().assertCanSend(phone);
+
     const { otp } = await AuthOTPService.getInstance().createEmailOTP(
       phone,
       OTPPurpose.SIGN_IN,

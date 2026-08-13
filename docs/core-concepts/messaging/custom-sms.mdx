@@ -7,7 +7,7 @@ When enabled, phone OTP sign-in codes are sent through your Twilio account. Togg
 
 ## Concepts
 
-Provider is resolved on every send, so saves take effect on the next request. InsForge verifies the credentials against the Twilio API before saving, so a persisted config always works. Auth tokens are encrypted at rest with AES-256-GCM and never returned by the API.
+Provider is resolved on every send, so saves take effect on the next request. InsForge verifies the credentials against the Twilio API at save time, so bad credentials are rejected before they persist. Later changes on the Twilio side (rotated tokens, suspended accounts, delivery rules) surface as send failures. Auth tokens are encrypted at rest with AES-256-GCM and never returned by the API.
 
 ## Usage
 
