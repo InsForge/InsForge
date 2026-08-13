@@ -434,6 +434,38 @@ router.post(
 );
 
 /**
+ * Make a previous deployment live again
+ * POST /api/deployments/:id/rollback
+ *
+ * Only offered by drivers that report `rollback` in the sites capability slice; the
+ * service refuses by name for the ones that do not.
+ */
+router.post(
+  '/:id/rollback',
+  verifyAdmin,
+  deploymentsWriteLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      const deployment = await deploymentService.rollbackTo(id);
+
+      await auditService.log({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'ROLLBACK_DEPLOYMENT',
+        module: 'DEPLOYMENTS',
+        details: { id },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, deployment);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * Cancel a deployment
  * POST /api/deployments/:id/cancel
  */

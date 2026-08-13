@@ -25,6 +25,12 @@ export interface ProviderDeployment {
     code: string;
     message: string;
   };
+  /**
+   * Builder output, when the driver has any and `capabilities().buildLogs` is true.
+   * Returned rather than fetched later because the classic builder streams it once, as
+   * the build runs — there is nothing to query afterwards.
+   */
+  buildLogs?: string[];
 }
 
 /** A file the caller has already uploaded, identified the way the driver expects. */
@@ -173,4 +179,13 @@ export interface SitesProvider {
   domains?: DomainStore;
   /** Present when `capabilities().slug` is true. */
   slug?: SlugStore;
+
+  /**
+   * Make a previous deployment live again without rebuilding it. Present when
+   * `capabilities().rollback` is true.
+   *
+   * Takes the provider id of the deployment to restore and returns it in its new state,
+   * so the caller can record the same fields a fresh deployment writes.
+   */
+  rollbackTo?(providerDeploymentId: string): Promise<ProviderDeployment>;
 }

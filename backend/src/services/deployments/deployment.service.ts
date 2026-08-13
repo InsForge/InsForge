@@ -60,6 +60,31 @@ interface DeploymentFileRow {
   uploadedAt: Date | null;
 }
 
+/**
+ * Keep the tail of a build log, not all of it.
+ *
+ * A failing `npm ci` can emit megabytes, and this lands in a jsonb column on every
+ * deploy. The tail is also the useful part — the error is at the end. Storing everything
+ * would turn a noisy build into a database problem.
+ */
+const MAX_BUILD_LOG_LINES = 200;
+const MAX_BUILD_LOG_BYTES = 64 * 1024;
+
+export function truncateBuildLogs(lines: string[]): string[] {
+  const tail = lines.slice(-MAX_BUILD_LOG_LINES);
+  let bytes = 0;
+  const kept: string[] = [];
+  for (let i = tail.length - 1; i >= 0; i--) {
+    bytes += Buffer.byteLength(tail[i] ?? '', 'utf8');
+    if (bytes > MAX_BUILD_LOG_BYTES) {
+      break;
+    }
+    kept.unshift(tail[i] ?? '');
+  }
+  const dropped = lines.length - kept.length;
+  return dropped > 0 ? [`… ${dropped} earlier line(s) omitted`, ...kept] : kept;
+}
+
 export class DeploymentService {
   private static instance: DeploymentService;
   private pool: Pool | null = null;
@@ -728,6 +753,9 @@ export class DeploymentService {
           envVarKeys,
           uploadMode,
           startedAt: new Date().toISOString(),
+          ...(deployment.buildLogs?.length
+            ? { buildLogs: truncateBuildLogs(deployment.buildLogs) }
+            : {}),
         }),
         id,
       ]
@@ -1014,6 +1042,75 @@ export class DeploymentService {
   /**
    * Get deployment by database ID
    */
+  /**
+   * Make a previous deployment live again.
+   *
+   * The row keeps its own status rather than being copied into a new one: rolling back is
+   * a statement about which deployment is serving, not a new deployment. Every other row
+   * that claimed to be READY is demoted, so the history cannot show two live deployments.
+   */
+  async rollbackTo(id: string): Promise<DeploymentRecord> {
+    const provider = this.provider;
+    if (!provider.rollbackTo) {
+      throw unsupportedFeature(provider.name, 'rollback');
+    }
+
+    const deployment = await this.getDeploymentById(id);
+    if (!deployment) {
+      throw new AppError('Deployment not found.', 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
+    }
+    if (!deployment.providerDeploymentId) {
+      throw new AppError(
+        'That deployment never reached the provider, so there is nothing to restore.',
+        400,
+        ERROR_CODES.DEPLOYMENT_INVALID_FILE
+      );
+    }
+
+    const restored = await provider.rollbackTo(deployment.providerDeploymentId);
+    const status = (restored.readyState || restored.state || 'READY').toUpperCase();
+
+    const client = await this.getPool().connect();
+    try {
+      await client.query('BEGIN');
+      // Demote whatever else claimed to be live first, so no window shows two.
+      await client.query(
+        `UPDATE deployments.runs SET status = 'CANCELED' WHERE status = $1 AND id <> $2`,
+        [DeploymentStatus.READY, id]
+      );
+      const result = await client.query(
+        `UPDATE deployments.runs
+         SET status = $1,
+             url = $2,
+             metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb
+         WHERE id = $4
+         RETURNING
+           id,
+           provider_deployment_id as "providerDeploymentId",
+           provider,
+           status,
+           url,
+           metadata,
+           created_at as "createdAt",
+           updated_at as "updatedAt"`,
+        [
+          status,
+          this.getDeploymentUrl(restored.url),
+          JSON.stringify({ rolledBackAt: new Date().toISOString() }),
+          id,
+        ]
+      );
+      await client.query('COMMIT');
+      logger.info('Deployment rolled back', { id, status });
+      return result.rows[0] as DeploymentRecord;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async getDeploymentById(id: string): Promise<DeploymentRecord | null> {
     try {
       const result = await this.getPool().query(
