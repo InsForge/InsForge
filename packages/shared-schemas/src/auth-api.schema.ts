@@ -588,7 +588,9 @@ export const upsertSmsConfigRequestSchema = z
     enabled: z.boolean(),
     provider: smsProviderSchema.default('twilio'),
     accountSid: z.string().trim().default(''),
-    authToken: z.string().min(1, 'Auth token is required').optional(),
+    // Twilio auth tokens are hex — surrounding whitespace is always a paste
+    // accident, never meaningful, so trim before the length check.
+    authToken: z.string().trim().min(1, 'Auth token is required').optional(),
     fromNumber: z.string().trim().default(''),
     messagingServiceSid: z.string().trim().default(''),
     minIntervalSeconds: z.number().int().min(0).default(60),
