@@ -387,3 +387,108 @@ export function parseLogLine(text: string): { ms: number; nanos: bigint; message
 
   return { ms, nanos, message };
 }
+
+/** One line of container output, with the timestamp Docker stamped on it. */
+export interface DockerLogLine {
+  timestamp: number;
+  message: string;
+}
+
+/** A page of container output. `nextToken` is an opaque forward cursor; null when dry. */
+export interface DockerLogsPage {
+  lines: DockerLogLine[];
+  nextToken: string | null;
+}
+
+/** An opaque cursor is a nanosecond watermark; an unparseable one starts from the top. */
+export function parseLogWatermark(token: string): bigint | null {
+  try {
+    return BigInt(token);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A page of a container's output, oldest first, resumable through `nextToken`.
+ *
+ * Shared by the compute and sites drivers, and one function rather than two because of the
+ * cursor arithmetic: `since` is inclusive and takes whole seconds only, and pairing it with
+ * `tail` silently drops the middle of a backlog — `tail` keeps the *newest* N, so 500 lines
+ * since the cursor with tail=100 returns the newest 100 and then advances the cursor past
+ * the other 400, which no later request can reach. Taking everything since the cursor and
+ * returning the oldest `limit` makes the next page resume exactly where this one stopped.
+ */
+export async function dockerContainerLogs(
+  containerId: string,
+  options?: { limit?: number; nextToken?: string },
+  /**
+   * The transport, explicit so it can be replaced in a test.
+   *
+   * A module cannot mock its own internal calls — `vi.mock` of this file leaves
+   * `dockerRequestRaw` bound to the real one inside this function, which had two suites
+   * dialling a socket that does not exist. A parameter is the honest fix.
+   */
+  request: typeof dockerRequestRaw = dockerRequestRaw
+): Promise<DockerLogsPage> {
+  const limit = options?.limit ?? 100;
+  const watermark = options?.nextToken ? parseLogWatermark(options.nextToken) : null;
+
+  const params = new URLSearchParams({ stdout: '1', stderr: '1', timestamps: '1' });
+  if (watermark === null) {
+    // First page: no cursor to be consistent with, so ask for the newest `limit` lines
+    // rather than the whole retained history.
+    params.set('tail', String(limit));
+  } else {
+    // Floored to whole seconds, the only precision the parameter accepts.
+    params.set('since', String(watermark / 1_000_000_000n));
+  }
+
+  const res = await request(
+    'GET',
+    `/containers/${encodeURIComponent(containerId)}/logs?${params.toString()}`,
+    { timeoutMs: 15_000 }
+  );
+  if (res.status < 200 || res.status >= 300) {
+    throw new DockerHttpError(
+      res.status,
+      `Docker logs error (${res.status}): ${res.body.toString('utf8')}`
+    );
+  }
+
+  const entries: { line: DockerLogLine; nanos: bigint }[] = [];
+  for (const frame of demuxDockerStream(res.body)) {
+    for (const raw of frame.text.split('\n')) {
+      if (!raw.trim()) {
+        continue;
+      }
+      const parsed = parseLogLine(raw);
+      if (!parsed) {
+        continue;
+      }
+      // Inclusive `since` re-delivers everything in the boundary second.
+      if (watermark !== null && parsed.nanos <= watermark) {
+        continue;
+      }
+      entries.push({
+        line: { timestamp: parsed.ms, message: parsed.message },
+        nanos: parsed.nanos,
+      });
+    }
+  }
+
+  // Docker emits oldest-first, so trimming the tail keeps the oldest `limit` and leaves the
+  // remainder for the next page. The cursor comes from what is actually returned, never from
+  // a line that got trimmed.
+  const page = entries.length > limit ? entries.slice(0, limit) : entries;
+  let highest = watermark;
+  for (const entry of page) {
+    if (highest === null || entry.nanos > highest) {
+      highest = entry.nanos;
+    }
+  }
+  return {
+    lines: page.map((entry) => entry.line),
+    nextToken: highest === null ? null : highest.toString(),
+  };
+}

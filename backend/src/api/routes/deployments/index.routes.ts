@@ -434,6 +434,42 @@ router.post(
 );
 
 /**
+ * Read a running deployment's own output
+ * GET /api/deployments/:id/logs
+ *
+ * Offered only by drivers that report `runtimeLogs` in the sites capability slice; the rest
+ * answer 400 with DEPLOYMENT_FEATURE_UNSUPPORTED.
+ */
+router.get(
+  '/:id/logs',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const idValidation = uuidParamSchema.safeParse(req.params.id);
+      if (!idValidation.success) {
+        throw new AppError(
+          idValidation.error.issues.map((issue) => issue.message).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const limitRaw = req.query.limit;
+      const limit = typeof limitRaw === 'string' ? Number.parseInt(limitRaw, 10) : undefined;
+      if (limit !== undefined && (!Number.isFinite(limit) || limit < 1 || limit > 1000)) {
+        throw new AppError('limit must be between 1 and 1000.', 400, ERROR_CODES.INVALID_INPUT);
+      }
+      const nextToken = typeof req.query.next_token === 'string' ? req.query.next_token : undefined;
+
+      const logs = await deploymentService.getRuntimeLogs(idValidation.data, { limit, nextToken });
+      successResponse(res, logs);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * Make a previous deployment live again
  * POST /api/deployments/:id/rollback
  *

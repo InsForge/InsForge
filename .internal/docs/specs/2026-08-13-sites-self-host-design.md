@@ -163,6 +163,15 @@ copies everything. No framework is named in the driver; the Next recipe belongs 
 the median self-host will OOM Postgres before it OOMs itself. Defaults are applied and
 overridable.
 
+**A server has output worth reading**, which a file server does not: a crash-looping app,
+a thrown error, a missing variable. `GET /api/deployments/:id/logs` pages the container's
+own stdout/stderr through the same `dockerContainerLogs` the compute driver uses — the
+paging lives in `docker.client.ts` so there is one implementation, not two. Behind a
+`runtimeLogs` capability, so a driver with nothing to read says so by name instead of
+returning an empty page that looks like silence. Ownership is checked against this
+project's labels first: a deployment id *is* a container id, and an unchecked one reads
+whatever else runs on the daemon.
+
 ---
 
 ## 5. Non-goals
@@ -198,7 +207,7 @@ Out of scope, each its own PR afterwards:
 - **CLI.** `insforge sites deploy` against the Docker driver. Until it lands, the driver's `outputDirectory` handling is what makes the existing upload usable — the CLI ships a whole source tree today because Vercel builds it.
 - **Docs.** The self-host section `docs/core-concepts/sites/overview.mdx` does not have.
 
-**Built in this PR:** the seam, the registry and `SITES_PROVIDER`, the `sites` metadata slice, the Docker driver (prebuilt and source builds), rollback with `POST /api/deployments/:id/rollback`, retention, and build logs.
+**Built in this PR:** the seam, the registry and `SITES_PROVIDER`, the `sites` metadata slice, the Docker driver (prebuilt and source builds), rollback with `POST /api/deployments/:id/rollback`, retention, build logs, server-rendered sites, and runtime logs with `GET /api/deployments/:id/logs`.
 
 Consequence to accept up front: this is a large backend diff. It stays reviewable only if the driver is additive — no behaviour change on any cloud path — and every gate has a test that fails when the gate is removed.
 
@@ -211,6 +220,7 @@ Consequence to accept up front: this is a large backend diff. It stays reviewabl
 | `slug` | true | false — no shared domain to name anything in |
 | `rollback` | **false** | true |
 | `buildLogs` | **false** | true |
+| `runtimeLogs` | **false** | true for a server, false for a static site — Caddy's log is a request log, not the developer's |
 | `frameworkDetection` | true | false |
 | `ingressModes` | `['host']` | `['port', 'host']` |
 

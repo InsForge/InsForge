@@ -33,6 +33,11 @@ export const sitesCapabilitiesSchema = z.object({
   rollback: z.boolean(),
   /** Build output is retrievable after the fact. */
   buildLogs: z.boolean(),
+  /**
+   * The running deployment's own output can be read. Only a server has any — a static site
+   * is a file server whose log is a request log, and nothing the developer wrote.
+   */
+  runtimeLogs: z.boolean(),
   /** The driver infers how to build from the source tree. */
   frameworkDetection: z.boolean(),
   // At least one: a driver offering no reachable mode would advertise a deployment

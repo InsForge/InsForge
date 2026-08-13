@@ -28,7 +28,11 @@ const dockerClientConfig = {
   isolateNetwork: false,
 };
 const dockerRequestRaw = vi.fn(async () => ({ status: 200, body: Buffer.alloc(0) }));
+// Its own seam rather than a hand-rolled stream: the paging is the compute client's, tested
+// there, and a partial mock cannot intercept a module's calls to itself anyway.
+const dockerContainerLogs = vi.fn(async () => ({ lines: [], nextToken: null }));
 vi.mock('@/providers/compute/docker.client.js', () => ({
+  dockerContainerLogs: (...args: unknown[]) => dockerContainerLogs(...args),
   dockerConfig: () => dockerClientConfig,
   dockerBuild: (...args: unknown[]) => dockerBuild(...args),
   dockerRequest: (...args: unknown[]) => dockerRequest(...args),
@@ -1116,5 +1120,46 @@ describe('DockerSitesProvider server-rendered deployments', () => {
       })
     ).rejects.toThrow('needs a build command as well as a start command');
     expect(dockerBuild).not.toHaveBeenCalled();
+  });
+});
+
+describe('DockerSitesProvider.runtimeLogs', () => {
+  beforeEach(() => {
+    mountSocket();
+    dockerContainerLogs.mockResolvedValue({
+      lines: [{ timestamp: 1_700_000_000_000, message: 'ready on :80' }],
+      nextToken: '1700000000.000000001',
+    });
+  });
+
+  it('reads the deployment output through the shared client', async () => {
+    dockerRequest.mockImplementation((method: string, url: string) =>
+      Promise.resolve(
+        method === 'GET' && url.startsWith('/containers/json') ? [{ Id: 'server-live' }] : undefined
+      )
+    );
+
+    await expect(
+      DockerSitesProvider.getInstance().runtimeLogs('server-live', { limit: 20 })
+    ).resolves.toEqual({
+      lines: [{ timestamp: 1_700_000_000_000, message: 'ready on :80' }],
+      nextToken: '1700000000.000000001',
+    });
+    expect(dockerContainerLogs).toHaveBeenCalledWith('server-live', { limit: 20 });
+  });
+
+  // A deployment id is a container id. Without this, a guessed id reads whatever else runs
+  // on the daemon — on a self-host that means Postgres, and the credentials in its output.
+  it('refuses a container it does not own', async () => {
+    dockerRequest.mockImplementation((method: string, url: string) =>
+      Promise.resolve(
+        method === 'GET' && url.startsWith('/containers/json') ? [{ Id: 'server-live' }] : undefined
+      )
+    );
+
+    await expect(
+      DockerSitesProvider.getInstance().runtimeLogs('insforge-postgres')
+    ).rejects.toThrow('not on this host');
+    expect(dockerContainerLogs).not.toHaveBeenCalled();
   });
 });

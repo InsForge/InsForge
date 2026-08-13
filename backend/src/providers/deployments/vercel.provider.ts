@@ -183,6 +183,7 @@ export class VercelProvider implements SitesProvider {
       slug: true,
       rollback: false,
       buildLogs: false,
+      runtimeLogs: false,
       frameworkDetection: true,
       // Vercel gives every deployment a hostname and nothing else.
       ingressModes: ['host'],

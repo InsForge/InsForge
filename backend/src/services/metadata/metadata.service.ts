@@ -235,6 +235,7 @@ export class MetadataService {
             `slug ${caps.slug ? 'yes' : 'no'}, ` +
             `rollback ${caps.rollback ? 'yes' : 'no'}, ` +
             `build logs ${caps.buildLogs ? 'yes' : 'no'}, ` +
+            `runtime logs ${caps.runtimeLogs ? 'yes' : 'no'}, ` +
             `framework detection ${caps.frameworkDetection ? 'yes' : 'no'}, ` +
             `ingress ${caps.ingressModes.map(codeSpan).join('/')}` +
             `${caps.defaultIngress ? ` (default ${codeSpan(caps.defaultIngress)})` : ''}`

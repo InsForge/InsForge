@@ -193,6 +193,7 @@ describe('MetadataService.formatAsMarkdown', () => {
             slug: false,
             rollback: true,
             buildLogs: true,
+            runtimeLogs: true,
             frameworkDetection: false,
             ingressModes: ['port', 'host'],
             defaultIngress: 'port',
@@ -208,6 +209,7 @@ describe('MetadataService.formatAsMarkdown', () => {
     expect(md).toContain('build-only');
     expect(md).toContain('custom domains no');
     expect(md).toContain('rollback yes');
+    expect(md).toContain('runtime logs yes');
     expect(md).toContain('framework detection no');
     expect(md).toContain('(default');
   });

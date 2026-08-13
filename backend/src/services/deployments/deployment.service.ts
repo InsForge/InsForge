@@ -1256,6 +1256,35 @@ export class DeploymentService {
     }
   }
 
+  /**
+   * A page of the running deployment's own output.
+   *
+   * Resolved through the row's driver, like every other row-scoped call, and refused by name
+   * when that driver has no runtime to read — a static site's only log is the request log of
+   * a file server, which is not what someone asking for logs means.
+   */
+  async getRuntimeLogs(
+    id: string,
+    options?: { limit?: number; nextToken?: string }
+  ): Promise<{ lines: Array<{ timestamp: number; message: string }>; nextToken: string | null }> {
+    const deployment = await this.getDeploymentById(id);
+    if (!deployment) {
+      throw new AppError('Deployment not found.', 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
+    }
+    const provider = this.providerFor(deployment);
+    if (!provider.runtimeLogs) {
+      throw unsupportedFeature(provider.name, 'runtime logs');
+    }
+    if (!deployment.providerDeploymentId) {
+      throw new AppError(
+        'That deployment never reached the provider, so it has no output.',
+        400,
+        ERROR_CODES.DEPLOYMENT_INVALID_FILE
+      );
+    }
+    return await provider.runtimeLogs(deployment.providerDeploymentId, options);
+  }
+
   async getDeploymentById(id: string): Promise<DeploymentRecord | null> {
     try {
       const result = await this.getPool().query(

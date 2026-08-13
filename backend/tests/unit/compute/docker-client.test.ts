@@ -1,15 +1,21 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/infra/config/app.config.js', () => {
   const c = { docker: { socketPath: '/nonexistent/test.sock' } };
   return { config: c, appConfig: c };
 });
 
+// The transport is a parameter, so the paging logic is testable without mocking this module
+// into itself — which cannot work, since a module's internal calls bind to its own real
+// exports.
+const mockRaw = vi.fn();
+
 import {
   demuxDockerStream,
   parseLogLine,
   parseBuildStream,
   dockerConfig,
+  dockerContainerLogs,
 } from '@/providers/compute/docker.client.js';
 
 /**
@@ -169,5 +175,176 @@ describe('dockerConfig', () => {
     expect(c.bindAddress).toBe('127.0.0.1');
     expect(c.isolateNetwork).toBe(false);
     expect(c.publicHost).toBe('');
+  });
+});
+
+describe('dockerContainerLogs', () => {
+  // Call indexes are asserted below, so the transport cannot carry calls in from the test
+  // before — which is exactly what made two of these fail once they moved here.
+  beforeEach(() => {
+    mockRaw.mockReset();
+  });
+
+  it('demuxes frames and returns a nanosecond watermark as the cursor', async () => {
+    mockRaw.mockResolvedValueOnce({
+      status: 200,
+      body: Buffer.concat([
+        frame('2026-08-06T22:51:32.781160549Z line-1\n'),
+        frame('2026-08-06T22:51:33.785353049Z line-2\n'),
+      ]),
+    });
+
+    const result = await dockerContainerLogs('container-abc', undefined, mockRaw);
+
+    expect(result.lines).toEqual([
+      { timestamp: Date.parse('2026-08-06T22:51:32.781Z'), message: 'line-1' },
+      { timestamp: Date.parse('2026-08-06T22:51:33.785Z'), message: 'line-2' },
+    ]);
+    // Cursor carries full nanosecond precision, not the millisecond timestamp.
+    expect(result.nextToken).toBe('1786056693785353049');
+  });
+
+  // `since` accepts integer seconds only and is inclusive, so the boundary
+  // second is always re-delivered. Dedup therefore has to happen against the
+  // nanosecond watermark — filtering by second would drop genuinely new lines
+  // that share a second with the previous batch.
+  it('floors the cursor to seconds on the wire but dedupes by nanosecond', async () => {
+    mockRaw.mockResolvedValueOnce({
+      status: 200,
+      body: Buffer.concat([
+        frame('2026-08-06T22:51:33.100000000Z already-seen\n'),
+        frame('2026-08-06T22:51:33.200000000Z also-seen\n'),
+        frame('2026-08-06T22:51:33.300000000Z brand-new\n'),
+      ]),
+    });
+
+    const result = await dockerContainerLogs(
+      'container-abc',
+      {
+        nextToken: '1786056693200000000', // the .2 line
+      },
+      mockRaw
+    );
+
+    // Same second as the watermark, but later — must survive.
+    expect(result.lines.map((l) => l.message)).toEqual(['brand-new']);
+    expect(result.nextToken).toBe('1786056693300000000');
+
+    const url = mockRaw.mock.calls[0][1] as string;
+    expect(url).toContain('since=1786056693');
+    expect(url).toContain('timestamps=1');
+  });
+
+  it('treats an unreadable cursor as absent rather than failing the request', async () => {
+    mockRaw.mockResolvedValueOnce({
+      status: 200,
+      body: frame('2026-08-06T22:51:32.000000000Z hello\n'),
+    });
+    const result = await dockerContainerLogs('container-abc', { nextToken: 'garbage' }, mockRaw);
+    expect(result.lines.map((l) => l.message)).toEqual(['hello']);
+    expect(mockRaw.mock.calls[0][1]).not.toContain('since=');
+  });
+
+  it('returns a null cursor when there is nothing to page from', async () => {
+    mockRaw.mockResolvedValueOnce({ status: 200, body: Buffer.alloc(0) });
+    const result = await dockerContainerLogs('container-abc', undefined, mockRaw);
+    expect(result).toEqual({ lines: [], nextToken: null });
+  });
+
+  // `tail` keeps the newest N. Pairing it with `since` would return the newest
+  // N of the backlog and then advance the cursor past everything older, which
+  // no later request could reach — the middle of the backlog would be gone.
+  it('asks for a tail on the first page but not when resuming from a cursor', async () => {
+    mockRaw.mockResolvedValueOnce({ status: 200, body: Buffer.alloc(0) });
+    await dockerContainerLogs('container-abc', { limit: 50 }, mockRaw);
+    expect(mockRaw.mock.calls[0][1]).toContain('tail=50');
+
+    mockRaw.mockResolvedValueOnce({ status: 200, body: Buffer.alloc(0) });
+    await dockerContainerLogs(
+      'container-abc',
+      {
+        limit: 50,
+        nextToken: '1786056693200000000',
+      },
+      mockRaw
+    );
+    const resumed = mockRaw.mock.calls[1][1] as string;
+    expect(resumed).toContain('since=1786056693');
+    expect(resumed).not.toContain('tail=');
+  });
+
+  /**
+   * Mock what the daemon would actually send for a given request, so the mock
+   * cannot assert a shape the real thing never produces: `tail=N` returns the
+   * *newest* N, and `since` alone returns everything after that second.
+   */
+  function daemonLogs(lines: { nanos: string; message: string }[]) {
+    return (_method: string, url: string) => {
+      const params = new URLSearchParams(url.split('?')[1] ?? '');
+      let out = lines;
+      const since = params.get('since');
+      if (since !== null) {
+        out = out.filter((l) => BigInt(l.nanos) / 1_000_000_000n >= BigInt(since));
+      }
+      const tail = params.get('tail');
+      if (tail !== null) {
+        out = out.slice(-Number(tail));
+      }
+      const iso = (nanos: string) => {
+        const ns = BigInt(nanos);
+        const ms = new Date(Number(ns / 1_000_000n)).toISOString().replace('Z', '');
+        return `${ms.slice(0, 19)}.${String(ns % 1_000_000_000n).padStart(9, '0')}Z`;
+      };
+      return Promise.resolve({
+        status: 200,
+        body: Buffer.concat(out.map((l) => frame(`${iso(l.nanos)} ${l.message}\n`))),
+      });
+    };
+  }
+
+  // One second apart, so every `since` boundary lands on a distinct line.
+  const FIVE_LINES = Array.from({ length: 5 }, (_, i) => ({
+    nanos: String(1786056700000000000n + BigInt(i) * 1_000_000_000n),
+    message: `line-${i}`,
+  }));
+
+  // First page asks for `tail`, so the daemon hands back the newest `limit` —
+  // "most recent logs" is what a caller with no cursor wants.
+  it('returns the newest lines on a first page, per `tail` semantics', async () => {
+    mockRaw.mockImplementationOnce(daemonLogs(FIVE_LINES));
+
+    const first = await dockerContainerLogs('container-abc', { limit: 2 }, mockRaw);
+
+    expect(first.lines.map((l) => l.message)).toEqual(['line-3', 'line-4']);
+    expect(first.nextToken).toBe(FIVE_LINES[4].nanos);
+  });
+
+  // Resuming sends no `tail`, so the daemon returns the whole backlog and the
+  // trimming happens here. This is the only path where more lines arrive than
+  // were asked for, and the property under test is that paging reaches them all
+  // rather than jumping to the newest.
+  it('pages through a backlog larger than `limit` without skipping lines', async () => {
+    const seen: string[] = [];
+    let token: string | null = null;
+
+    // Start from before the first line so the whole backlog is "new".
+    token = String(BigInt(FIVE_LINES[0].nanos) - 1_000_000_000n);
+    for (let page = 0; page < 3; page++) {
+      mockRaw.mockImplementationOnce(daemonLogs(FIVE_LINES));
+      const res = await dockerContainerLogs(
+        'container-abc',
+        {
+          limit: 2,
+          nextToken: token as string,
+        },
+        mockRaw
+      );
+      seen.push(...res.lines.map((l) => l.message));
+      token = res.nextToken;
+    }
+
+    // Every line, in order, once — the failure this guards against is pages of
+    // ['line-3','line-4'] repeating while 0-2 are never delivered.
+    expect(seen).toEqual(['line-0', 'line-1', 'line-2', 'line-3', 'line-4']);
   });
 });

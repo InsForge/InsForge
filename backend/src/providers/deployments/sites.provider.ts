@@ -181,6 +181,18 @@ export interface SitesProvider {
   slug?: SlugStore;
 
   /**
+   * A page of the running deployment's output, oldest first. Present when
+   * `capabilities().runtimeLogs` is true.
+   *
+   * `nextToken` is an opaque forward cursor: pass the previous page's token to resume, and a
+   * null token means nothing further is available yet.
+   */
+  runtimeLogs?(
+    providerDeploymentId: string,
+    options?: { limit?: number; nextToken?: string }
+  ): Promise<{ lines: Array<{ timestamp: number; message: string }>; nextToken: string | null }>;
+
+  /**
    * Make a previous deployment live again without rebuilding it. Present when
    * `capabilities().rollback` is true.
    *
