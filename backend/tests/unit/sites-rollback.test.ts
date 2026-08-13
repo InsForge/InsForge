@@ -5,7 +5,7 @@ const { mockPool, mockClient, mockProvider, active } = vi.hoisted(() => {
   const provider = {
     name: 'docker' as const,
     isConfigured: vi.fn(() => true),
-    capabilities: vi.fn(() => ({ envVars: 'build-only', rollback: true })),
+    capabilities: vi.fn(() => ({ envVars: 'build-only', rollback: true, customDomains: false })),
     rollbackTo: vi.fn(),
   };
   return {
@@ -44,6 +44,12 @@ vi.mock('../../src/services/deployments/sites-registry.js', async (importOrigina
     ...actual,
     selectSitesProvider: () => active.provider,
     isAnySitesProviderConfigured: () => true,
+    // Only the docker driver exists on this instance, which is what makes the
+    // cross-driver refusal below reachable.
+    buildSitesRegistry: () => ({
+      providers: new Map([['docker', active.provider]]),
+      defaultProvider: 'docker',
+    }),
   };
 });
 
@@ -136,12 +142,24 @@ describe('DeploymentService.rollbackTo', () => {
 
   it('names the driver when it cannot roll back', async () => {
     active.provider = { ...mockProvider, rollbackTo: undefined };
+    mockPool.query.mockResolvedValueOnce({ rows: [rowFor('row-1', 'container-old')] });
 
     await expect(DeploymentService.getInstance().rollbackTo('row-1')).rejects.toThrow(
       'The docker sites driver does not support rollback'
     );
-    // Refused before the row is even read: an unsupported driver is not a per-row problem.
-    expect(mockPool.query).not.toHaveBeenCalled();
+  });
+
+  // The row records which driver made it, so a Vercel deployment must not be handed to
+  // Docker: the id means nothing there, and the wrong driver's capabilities answer.
+  it('refuses a row that belongs to a driver that is not configured here', async () => {
+    mockPool.query.mockResolvedValueOnce({
+      rows: [{ ...rowFor('row-1', 'dpl_vercel_1'), provider: 'vercel' }],
+    });
+
+    await expect(DeploymentService.getInstance().rollbackTo('row-1')).rejects.toThrow(
+      'made by the vercel driver, which is not configured here'
+    );
+    expect(mockProvider.rollbackTo).not.toHaveBeenCalled();
   });
 
   it('reports not-found for a row that does not exist', async () => {
@@ -180,5 +198,58 @@ describe('truncateBuildLogs', () => {
     expect(truncateBuildLogs(['Step 1/3 : FROM nginx:alpine'])).toEqual([
       'Step 1/3 : FROM nginx:alpine',
     ]);
+  });
+});
+
+describe('DeploymentService.getMetadata', () => {
+  // Shipped broken: the domain URL was fetched through requireDomainStore(), which throws
+  // for a driver that owns no domains — so the whole response 400'd on the very driver
+  // this work adds, taking currentDeploymentId and defaultDomainUrl with it. Both are
+  // meaningful for every driver: the URL comes from the driver's own endpoint.
+  it('answers without a custom domain when the driver owns no domains', async () => {
+    mockPool.query.mockResolvedValueOnce({
+      rows: [{ id: 'row-live', url: 'http://localhost:49154' }],
+    });
+
+    await expect(DeploymentService.getInstance().getMetadata()).resolves.toEqual({
+      currentDeploymentId: 'row-live',
+      defaultDomainUrl: 'http://localhost:49154',
+      customDomainUrl: null,
+    });
+  });
+
+  it('still reports the custom domain for a driver that has one', async () => {
+    active.provider = {
+      ...mockProvider,
+      domains: { url: vi.fn().mockResolvedValue('https://app.example.com') },
+    };
+    mockPool.query.mockResolvedValueOnce({ rows: [{ id: 'row-live', url: 'https://x.dev' }] });
+
+    await expect(DeploymentService.getInstance().getMetadata()).resolves.toMatchObject({
+      customDomainUrl: 'https://app.example.com',
+    });
+  });
+});
+
+describe('DeploymentService row provenance', () => {
+  // The seam rests on `deployments.runs.provider`: it is why no migration was needed and
+  // how row-scoped operations find the right driver. Both inserts hardcoded 'vercel', so
+  // every Docker deployment was recorded as a Vercel one and this test is what keeps that
+  // from coming back.
+  it('records the driver that actually made the deployment', async () => {
+    mockClient.query.mockImplementation((sql: string) =>
+      String(sql).includes('INSERT INTO deployments.runs')
+        ? Promise.resolve({ rows: [{ id: 'row-new', provider: 'docker', status: 'WAITING' }] })
+        : Promise.resolve({ rows: [] })
+    );
+
+    await DeploymentService.getInstance().createDirectDeployment({
+      files: [{ path: 'index.html', sha: 'a'.repeat(40), size: 12 }],
+    });
+
+    const insert = mockClient.query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO deployments.runs')
+    );
+    expect(insert?.[1]?.[0]).toBe('docker');
   });
 });

@@ -38,6 +38,7 @@ vi.mock('@/utils/logger.js', () => ({
 const { DockerSitesProvider } = await import('@/providers/deployments/docker.provider.js');
 
 const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+const savedAppKey = process.env.APP_KEY;
 
 /** Any existing file passes the probe — existsSync is all the driver checks. */
 function mountSocket(): void {
@@ -99,6 +100,9 @@ function dockerHappyPath(previous: { Id: string }[] = []) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Namespaces containers, images and the advertised hostname. Per-instance, so two
+  // InsForge deployments sharing one daemon cannot touch each other's site containers.
+  process.env.APP_KEY = 'appkey01';
   dockerClientConfig.socketPath = '/nonexistent/test.sock';
   dockerClientConfig.defaultIngress = 'port';
   dockerClientConfig.publicHost = '';
@@ -107,6 +111,11 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
+  if (savedAppKey === undefined) {
+    delete process.env.APP_KEY;
+  } else {
+    process.env.APP_KEY = savedAppKey;
+  }
   if (savedProfile === undefined) {
     delete process.env.AWS_INSTANCE_PROFILE_NAME;
   } else {
@@ -335,7 +344,7 @@ describe('DockerSitesProvider endpoint', () => {
 
     const deployment = await provider.createDeploymentWithFiles(files);
 
-    expect(deployment.url).toBe('https://proj-1234567.sites.example.com');
+    expect(deployment.url).toBe('https://appkey01.sites.example.com');
   });
 });
 
@@ -515,9 +524,41 @@ describe('DockerSitesProvider source builds', () => {
   });
 });
 
+describe('DockerSitesProvider redeploying identical content', () => {
+  // Retention keeps the previous containers, so a digest-only name collided with one that
+  // still existed: Docker 409, the row recorded ERROR, and the operator saw a 500 for
+  // "deploy again with no changes" — a plausible thing to do.
+  it('creates a second container rather than colliding on the name', async () => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>same bytes</h1>') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files);
+    const firstCreate = dockerRequest.mock.calls.find(
+      ([method, url]) => method === 'POST' && String(url).startsWith('/containers/create')
+    )?.[1] as string;
+    dockerRequest.mockClear();
+    dockerBuild.mockClear();
+    okBuild();
+    dockerHappyPath();
+
+    await provider.createDeploymentWithFiles(files);
+    const secondCreate = dockerRequest.mock.calls.find(
+      ([method, url]) => method === 'POST' && String(url).startsWith('/containers/create')
+    )?.[1] as string;
+
+    expect(firstCreate).not.toBe(secondCreate);
+    // Same content, so the image tag is reused and the build is a cache hit.
+    expect(dockerBuild.mock.calls[0][0].tag).toMatch(/^insforge-site-appkey01:[a-f0-9]{12}$/);
+  });
+});
+
 describe('DockerSitesProvider rollback and retention', () => {
   /** Owned containers as Docker would list them, newest first. */
-  function owned(ids: string[], image = 'insforge-site-proj-1234567:aaa') {
+  function owned(ids: string[], image = 'insforge-site-appkey01:aaa') {
     return ids.map((Id) => ({ Id, State: 'exited', Image: image }));
   }
 
@@ -532,7 +573,7 @@ describe('DockerSitesProvider rollback and retention', () => {
           Name: '/insforge-site',
           Created: '2026-08-13T00:00:00Z',
           State: { Status: 'running' },
-          Config: { Image: 'insforge-site-proj-1234567:aaa' },
+          Config: { Image: 'insforge-site-appkey01:aaa' },
           NetworkSettings: { Ports: { '80/tcp': [{ HostPort: '49155' }] } },
         });
       }
@@ -574,7 +615,7 @@ describe('DockerSitesProvider rollback and retention', () => {
           listed === 1
             ? owned(['c3', 'c2', 'c1'])
             : [
-                { Id: 'container-new', State: 'running', Image: 'insforge-site-proj-1234567:new' },
+                { Id: 'container-new', State: 'running', Image: 'insforge-site-appkey01:new' },
                 ...owned(['c3', 'c2', 'c1']),
               ]
         );
@@ -599,10 +640,7 @@ describe('DockerSitesProvider rollback and retention', () => {
       .map(([, url]) => url as string);
     // Three stay on the host — the live one plus two rollback steps — so of c3/c2/c1 only
     // the oldest goes, together with the image it was running.
-    expect(deletes).toEqual([
-      '/containers/c1?force=true',
-      '/images/insforge-site-proj-1234567%3Aaaa',
-    ]);
+    expect(deletes).toEqual(['/containers/c1?force=true', '/images/insforge-site-appkey01%3Aaaa']);
   });
 
   // Removing an image this driver did not tag would reach outside what it owns.
@@ -616,7 +654,7 @@ describe('DockerSitesProvider rollback and retention', () => {
           listed === 1
             ? owned(['c3', 'c2', 'c1'], 'caddy:alpine')
             : [
-                { Id: 'container-new', State: 'running', Image: 'insforge-site-proj-1234567:new' },
+                { Id: 'container-new', State: 'running', Image: 'insforge-site-appkey01:new' },
                 ...owned(['c3', 'c2', 'c1'], 'caddy:alpine'),
               ]
         );
