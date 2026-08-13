@@ -31,9 +31,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_number ON auth.users (phone_nu
 -- earlier revision of this constraint picks up the current definition.
 ALTER TABLE auth.users
   DROP CONSTRAINT IF EXISTS users_email_or_phone_present;
+-- regexp_replace rather than btrim: btrim's default set is the plain space
+-- only, so a tab- or newline-only identifier would still pass.
 ALTER TABLE auth.users
   ADD CONSTRAINT users_email_or_phone_present
-  CHECK (NULLIF(btrim(email), '') IS NOT NULL OR NULLIF(btrim(phone_number), '') IS NOT NULL)
+  CHECK (
+    NULLIF(regexp_replace(email, '[[:space:]]', '', 'g'), '') IS NOT NULL
+    OR NULLIF(regexp_replace(phone_number, '[[:space:]]', '', 'g'), '') IS NOT NULL
+  )
   NOT VALID;
 
 -- SMS provider configuration, mirroring email.config (migration 029): a

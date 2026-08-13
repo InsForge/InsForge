@@ -44,8 +44,11 @@ describe('065_add-phone-otp-sign-in migration', () => {
     // migration. Drop-then-add so an environment that ran an earlier revision
     // of the constraint picks up the current definition.
     expect(sql).toMatch(/DROP CONSTRAINT IF EXISTS users_email_or_phone_present/);
-    expect(sql).toMatch(
-      /CHECK \(NULLIF\(btrim\(email\), ''\) IS NOT NULL OR NULLIF\(btrim\(phone_number\), ''\) IS NOT NULL\)/i
+    // btrim would let tab/newline-only identifiers through — the check must
+    // strip the full whitespace class before testing for emptiness.
+    expect(sql).toContain("NULLIF(regexp_replace(email, '[[:space:]]', '', 'g'), '') IS NOT NULL");
+    expect(sql).toContain(
+      "NULLIF(regexp_replace(phone_number, '[[:space:]]', '', 'g'), '') IS NOT NULL"
     );
     expect(sql).toMatch(/NOT VALID/i);
   });
