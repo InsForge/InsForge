@@ -222,6 +222,27 @@ export class MetadataService {
       lines.push('');
     }
 
+    // Sites (absent when no driver can serve a deployment). Rendered for the same reason
+    // as compute: an agent reading the Markdown export should not have to fetch the JSON
+    // to learn that this instance cannot do custom domains.
+    if (metadata.sites) {
+      lines.push('## Sites');
+      lines.push(`- **Default provider**: ${codeSpan(metadata.sites.defaultProvider)}`);
+      for (const [name, caps] of Object.entries(metadata.sites.providers)) {
+        lines.push(
+          `- ${codeSpan(name)}: env vars ${codeSpan(caps.envVars)}, ` +
+            `custom domains ${caps.customDomains ? 'yes' : 'no'}, ` +
+            `slug ${caps.slug ? 'yes' : 'no'}, ` +
+            `rollback ${caps.rollback ? 'yes' : 'no'}, ` +
+            `build logs ${caps.buildLogs ? 'yes' : 'no'}, ` +
+            `framework detection ${caps.frameworkDetection ? 'yes' : 'no'}, ` +
+            `ingress ${caps.ingressModes.map(codeSpan).join('/')}` +
+            `${caps.defaultIngress ? ` (default ${codeSpan(caps.defaultIngress)})` : ''}`
+        );
+      }
+      lines.push('');
+    }
+
     return lines.join('\n');
   }
 }

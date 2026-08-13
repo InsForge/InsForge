@@ -142,7 +142,10 @@ export function unsupportedFeature(providerName: SitesProviderName, feature: str
   return new AppError(
     `The ${providerName} sites driver does not support ${feature}.`,
     400,
-    ERROR_CODES.DEPLOYMENT_NOT_CONFIGURED
+    // Not DEPLOYMENT_NOT_CONFIGURED: that means "set this up" and comes back as a 503.
+    // This is "this driver will never do it", and collapsing the two would undo the
+    // reason that code was added.
+    ERROR_CODES.DEPLOYMENT_FEATURE_UNSUPPORTED
   );
 }
 

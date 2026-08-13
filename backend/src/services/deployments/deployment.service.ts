@@ -80,11 +80,18 @@ export function truncateBuildLogs(lines: string[]): string[] {
   let bytes = 0;
   const kept: string[] = [];
   for (let i = tail.length - 1; i >= 0; i--) {
-    bytes += Buffer.byteLength(tail[i] ?? '', 'utf8');
+    const line = tail[i] ?? '';
+    bytes += Buffer.byteLength(line, 'utf8');
     if (bytes > MAX_BUILD_LOG_BYTES) {
+      // Keep the last line even when it alone blows the budget, clipped to fit. Builders
+      // emit single enormous lines — a minified bundle, a stack trace with no newlines —
+      // and that is exactly when the operator needs the text rather than a bare marker.
+      if (kept.length === 0) {
+        kept.unshift(`${line.slice(0, MAX_BUILD_LOG_BYTES)}… (line truncated)`);
+      }
       break;
     }
-    kept.unshift(tail[i] ?? '');
+    kept.unshift(line);
   }
   const dropped = lines.length - kept.length;
   return dropped > 0 ? [`… ${dropped} earlier line(s) omitted`, ...kept] : kept;
@@ -1143,6 +1150,14 @@ export class DeploymentService {
       return result.rows[0] as DeploymentRecord;
     } catch (error) {
       await client.query('ROLLBACK');
+      // The driver already switched the host — that happened before this transaction — so
+      // the database now disagrees with what is being served. Nothing else records that,
+      // and an operator chasing "why does the site show the old build" needs this line.
+      logger.error('Deployment rolled back on the host but not in the database', {
+        id,
+        providerDeploymentId: deployment.providerDeploymentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     } finally {
       client.release();

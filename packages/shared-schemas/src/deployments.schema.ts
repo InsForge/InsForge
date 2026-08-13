@@ -34,7 +34,9 @@ export const sitesCapabilitiesSchema = z.object({
   buildLogs: z.boolean(),
   /** The driver infers how to build from the source tree. */
   frameworkDetection: z.boolean(),
-  ingressModes: z.array(sitesIngressModeEnum),
+  // At least one: a driver offering no reachable mode would advertise a deployment
+  // nobody can open.
+  ingressModes: z.array(sitesIngressModeEnum).min(1),
   /** Applied when a caller names no mode. Always one of `ingressModes`. */
   defaultIngress: sitesIngressModeEnum.optional(),
 });
@@ -42,6 +44,16 @@ export const sitesCapabilitiesSchema = z.object({
 export type SitesProviderName = z.infer<typeof sitesProviderEnum>;
 export type SitesIngressMode = z.infer<typeof sitesIngressModeEnum>;
 export type SitesCapabilitiesSchema = z.infer<typeof sitesCapabilitiesSchema>;
+
+/**
+ * Same fields, plus the cross-field rule: a default the driver does not support would
+ * point every client at an ingress mode it cannot serve. Kept separate from the base
+ * object so the object stays extensible with `.extend()`.
+ */
+export const sitesCapabilitiesResponseSchema = sitesCapabilitiesSchema.refine(
+  (caps) => !caps.defaultIngress || caps.ingressModes.includes(caps.defaultIngress),
+  { message: 'defaultIngress must be one of ingressModes', path: ['defaultIngress'] }
+);
 
 /**
  * Deployment status enum schema

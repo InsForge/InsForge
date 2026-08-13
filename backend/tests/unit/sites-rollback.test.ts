@@ -194,6 +194,16 @@ describe('truncateBuildLogs', () => {
     expect(kept[0]).toMatch(/earlier line\(s\) omitted/);
   });
 
+  // The one case where the operator most needs the text: a minified bundle or a stack
+  // trace with no newlines. Returning only the marker threw away the answer.
+  it('keeps a single over-long line, clipped, rather than only the marker', () => {
+    const kept = truncateBuildLogs(['x'.repeat(200_000)]);
+
+    expect(kept.length).toBeGreaterThan(0);
+    expect(kept.at(-1)).toMatch(/line truncated\)$/);
+    expect(Buffer.byteLength(kept.at(-1) ?? '')).toBeLessThan(64 * 1024 + 64);
+  });
+
   it('passes a short log through unchanged', () => {
     expect(truncateBuildLogs(['Step 1/3 : FROM nginx:alpine'])).toEqual([
       'Step 1/3 : FROM nginx:alpine',

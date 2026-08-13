@@ -446,7 +446,18 @@ router.post(
   deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      // Validated here like the other :id routes: the service puts this straight into a
+      // query against a uuid column, so a malformed path parameter came back as a 500
+      // instead of the 400 it is.
+      const idValidation = uuidParamSchema.safeParse(req.params.id);
+      if (!idValidation.success) {
+        throw new AppError(
+          idValidation.error.issues.map((issue) => issue.message).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+      const id = idValidation.data;
 
       const deployment = await deploymentService.rollbackTo(id);
 
