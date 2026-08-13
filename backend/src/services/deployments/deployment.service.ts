@@ -3,10 +3,8 @@ import AdmZip from 'adm-zip';
 import crypto from 'crypto';
 import { Transform, type Readable, type TransformCallback } from 'stream';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import {
-  VercelProvider,
-  type VercelDomainConfig,
-} from '@/providers/deployments/vercel.provider.js';
+import { VercelProvider } from '@/providers/deployments/vercel.provider.js';
+import type { DomainConfig } from '@/providers/deployments/sites.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import { AppError } from '@/utils/errors.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
@@ -126,7 +124,7 @@ export class DeploymentService {
     return domain.endsWith('.vercel.app') || domain.endsWith('.insforge.site');
   }
 
-  private pickPreferredARecord(config: VercelDomainConfig): string | null {
+  private pickPreferredARecord(config: DomainConfig): string | null {
     const rankOneValues = (config.recommendedIPv4 ?? [])
       .filter((record) => record.rank === 1)
       .flatMap((record) => record.value ?? []);
@@ -145,7 +143,7 @@ export class DeploymentService {
       verified: boolean;
       verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
     },
-    config: VercelDomainConfig
+    config: DomainConfig
   ): CustomDomain {
     return {
       domain: domain.name,
@@ -165,9 +163,9 @@ export class DeploymentService {
   private async getCustomDomainConfigOrEmpty(
     configDomain: string,
     requestedDomain: string
-  ): Promise<VercelDomainConfig> {
+  ): Promise<DomainConfig> {
     try {
-      return await this.vercelProvider.getCustomDomainConfig(configDomain);
+      return await this.vercelProvider.domains.config(configDomain);
     } catch (error) {
       logger.warn('Vercel domain config lookup failed; continuing without DNS hints', {
         requestedDomain,
@@ -531,7 +529,7 @@ export class DeploymentService {
     await this.updateDeploymentStatus(id, DeploymentStatus.UPLOADING);
 
     if (input.envVars && input.envVars.length > 0) {
-      await this.vercelProvider.upsertEnvironmentVariables(input.envVars);
+      await this.vercelProvider.envVars.upsert(input.envVars);
     }
 
     const uploadedFiles = files.map((file) => ({
@@ -589,7 +587,7 @@ export class DeploymentService {
     }
 
     if (input.envVars && input.envVars.length > 0) {
-      await this.vercelProvider.upsertEnvironmentVariables(input.envVars);
+      await this.vercelProvider.envVars.upsert(input.envVars);
     }
 
     const uploadedFiles = await this.vercelProvider.uploadFiles(files);
@@ -657,7 +655,7 @@ export class DeploymentService {
       'BUILDING'
     ).toUpperCase();
 
-    const envVarKeys = await this.vercelProvider.getEnvironmentVariableKeys();
+    const envVarKeys = await this.vercelProvider.envVars.keys();
 
     const updateResult = await this.getPool().query(
       `UPDATE deployments.runs
@@ -1378,7 +1376,7 @@ export class DeploymentService {
   async addCustomDomain(domain: string): Promise<AddCustomDomainResponse> {
     this.assertDeploymentServiceConfigured();
 
-    const vercelData = await this.vercelProvider.addCustomDomain(domain);
+    const vercelData = await this.vercelProvider.domains.add(domain);
     const config = await this.getCustomDomainConfigOrEmpty(vercelData.name, domain);
 
     logger.info('Custom domain added', { domain, verified: vercelData.verified });
@@ -1392,7 +1390,7 @@ export class DeploymentService {
     this.assertDeploymentServiceConfigured();
 
     try {
-      const domains = (await this.vercelProvider.listCustomDomains()).filter(
+      const domains = (await this.vercelProvider.domains.list()).filter(
         (domain) => !this.isReservedHostedDomain(domain.name)
       );
       const configs = new Map(
@@ -1426,7 +1424,7 @@ export class DeploymentService {
   async removeCustomDomain(domain: string): Promise<void> {
     this.assertDeploymentServiceConfigured();
 
-    await this.vercelProvider.removeCustomDomain(domain);
+    await this.vercelProvider.domains.remove(domain);
 
     logger.info('Custom domain removed', { domain });
   }
@@ -1439,8 +1437,8 @@ export class DeploymentService {
 
     try {
       const [vercelResult, projectDomain] = await Promise.all([
-        this.vercelProvider.verifyCustomDomain(domain),
-        this.vercelProvider.getCustomDomain(domain),
+        this.vercelProvider.domains.verify(domain),
+        this.vercelProvider.domains.get(domain),
       ]);
 
       logger.info('Custom domain verification result', { domain, verified: vercelResult.verified });
@@ -1489,7 +1487,7 @@ export class DeploymentService {
         | undefined;
 
       // Get the custom domain URL from Vercel provider (which has the slug from cloud credentials)
-      const customDomainUrl = await this.vercelProvider.getCustomDomainUrl();
+      const customDomainUrl = await this.vercelProvider.domains.url();
 
       return {
         currentDeploymentId: latestReadyDeployment?.id ?? null,

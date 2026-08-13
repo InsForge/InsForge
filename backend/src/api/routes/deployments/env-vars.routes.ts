@@ -27,7 +27,7 @@ router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: Next
       );
     }
 
-    const envVars = await vercelProvider.listEnvironmentVariables();
+    const envVars = await vercelProvider.envVars.list();
     successResponse(res, { envVars });
   } catch (error) {
     next(error);
@@ -63,7 +63,7 @@ router.post(
 
       const { envVars } = validationResult.data;
 
-      await vercelProvider.upsertEnvironmentVariables(envVars);
+      await vercelProvider.envVars.upsert(envVars);
 
       await auditService.log({
         actor: req.hasApiKey ? 'api-key' : req.user?.id,
@@ -104,7 +104,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
 
     const { id } = req.params;
 
-    const envVar = await vercelProvider.getEnvironmentVariable(id);
+    const envVar = await vercelProvider.envVars.get(id);
 
     successResponse(res, { envVar });
   } catch (error) {
@@ -132,7 +132,7 @@ router.delete(
 
       const { id } = req.params;
 
-      await vercelProvider.deleteEnvironmentVariable(id);
+      await vercelProvider.envVars.remove(id);
 
       // Log audit
       await auditService.log({
