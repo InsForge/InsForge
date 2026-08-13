@@ -40,6 +40,13 @@ const SITE_PORT = 80;
 const CONTAINER_PREFIX = 'insforge-site';
 
 /**
+ * How many deployments stay on the host, the live one included. Three is two rollback
+ * steps, which is what "undo the deploy I just made" needs without letting images
+ * accumulate unbounded on a small VPS.
+ */
+const RETAINED_DEPLOYMENTS = 3;
+
+/**
  * Serve the uploaded files, and nothing else.
  *
  * `try_files ... /index.html` is what makes a client-side-routed app work: a request for
@@ -127,6 +134,13 @@ function assertEnvKey(key: string): string {
   return key;
 }
 
+interface OwnedContainer {
+  Id: string;
+  State: string;
+  Image?: string;
+  Labels?: Record<string, string>;
+}
+
 /** Docker's container states, mapped onto the deployment vocabulary the service records. */
 function readyStateFor(status: string): string {
   switch (status) {
@@ -186,9 +200,14 @@ export class DockerSitesProvider implements SitesProvider {
    * the artifact. There is deliberately no read-back: they end up in the built files and
    * in image history, so calling this a store would misrepresent it.
    *
-   * `rollback` and `buildLogs` are false for the same reason they are false for Vercel:
-   * nothing implements them yet. Each flips in the commit that adds the behaviour, so a
-   * client is never told about a button that does nothing.
+   * `rollback` is true because every deployment is its own image and container, and the
+   * previous ones are kept: restoring means starting one again, not rebuilding it. It
+   * stops being possible once retention removes that container, which is what
+   * `rollbackTo` reports.
+   *
+   * `buildLogs` is true because the classic builder streams readable progress and it is
+   * recorded with the deployment. Vercel reports false here — this driver is the first to
+   * have them.
    *
    * `frameworkDetection: false` is the honest gap against Vercel: this driver serves what
    * it is given and does not infer how to produce it.
@@ -199,8 +218,8 @@ export class DockerSitesProvider implements SitesProvider {
       envVars: 'build-only',
       customDomains: false,
       slug: false,
-      rollback: false,
-      buildLogs: false,
+      rollback: true,
+      buildLogs: true,
       frameworkDetection: false,
       ingressModes: ['port', 'host'],
       defaultIngress: ingress,
@@ -323,7 +342,13 @@ export class DockerSitesProvider implements SitesProvider {
     }
 
     const containerId = await this.runContainer(imageTag, digest);
-    logger.info('Docker sites: deployed', { imageTag, containerId, files: files.length });
+    const retained = await this.pruneOwnResources(containerId);
+    logger.info('Docker sites: deployed', {
+      imageTag,
+      containerId,
+      files: files.length,
+      ...retained,
+    });
 
     return {
       id: containerId,
@@ -332,6 +357,7 @@ export class DockerSitesProvider implements SitesProvider {
       readyState: 'READY',
       name: imageTag,
       createdAt: new Date(),
+      buildLogs: build.logs,
     };
   }
 
@@ -560,9 +586,7 @@ export class DockerSitesProvider implements SitesProvider {
     return created.Id;
   }
 
-  private async listOwnContainers(): Promise<
-    { Id: string; State: string; Labels?: Record<string, string> }[]
-  > {
+  private async listOwnContainers(): Promise<OwnedContainer[]> {
     const filters = JSON.stringify({
       label: [
         `${LABEL_MANAGED}=true`,
@@ -571,7 +595,7 @@ export class DockerSitesProvider implements SitesProvider {
       ],
     });
     return (
-      (await dockerRequest<{ Id: string; State: string; Labels?: Record<string, string> }[]>(
+      (await dockerRequest<OwnedContainer[]>(
         'GET',
         `/containers/json?all=true&filters=${encodeURIComponent(filters)}`
       )) ?? []
@@ -602,6 +626,90 @@ export class DockerSitesProvider implements SitesProvider {
       createdAt: new Date(inspected.Created),
       ...(inspected.State.Error ? { error: { code: status, message: inspected.State.Error } } : {}),
     };
+  }
+
+  /**
+   * Make a previous deployment live again.
+   *
+   * Start it first, then stop everything else — same order as a deploy, so a reload during
+   * a rollback reaches one of the two rather than nothing. No rebuild is involved: the
+   * image is already there, which is the whole reason deployments are immutable images.
+   */
+  async rollbackTo(providerDeploymentId: string): Promise<ProviderDeployment> {
+    const owned = await this.listOwnContainers();
+    const target = owned.find((container) => container.Id === providerDeploymentId);
+    if (!target) {
+      // Retention removed it, or it belonged to another project. Either way there is
+      // nothing to start, and saying so beats a Docker 404 the operator has to decode.
+      throw new AppError(
+        'That deployment is no longer on this host, so it cannot be restored.',
+        404,
+        ERROR_CODES.DEPLOYMENT_NOT_FOUND,
+        'Deploy again — retention keeps only the most recent deployments.'
+      );
+    }
+
+    await dockerRequest('POST', `/containers/${encodeURIComponent(target.Id)}/start`);
+    for (const container of owned) {
+      if (container.Id !== target.Id) {
+        await dockerRequest('POST', `/containers/${container.Id}/stop?t=5`).catch(() => undefined);
+      }
+    }
+    logger.info('Docker sites: rolled back', { containerId: target.Id });
+
+    return this.getDeployment(target.Id);
+  }
+
+  /**
+   * Keep the newest few deployments and remove the rest.
+   *
+   * Every deploy leaves behind a stopped container and an image, and nothing else reclaims
+   * them — this is the boring maintenance that becomes "the disk filled up" on a 2GB VPS
+   * six months from now. Retained rather than pruned to zero because those containers are
+   * what rollback starts.
+   *
+   * What was removed is logged. A prune that quietly deletes the deployment someone was
+   * about to roll back to reads as data loss.
+   */
+  private async pruneOwnResources(
+    liveContainerId: string,
+    keep = RETAINED_DEPLOYMENTS
+  ): Promise<{ removedContainers: number; removedImages: number }> {
+    const owned = await this.listOwnContainers();
+    // Docker lists newest first; the live one is kept regardless of where it sorts.
+    const removable = owned.filter((container) => container.Id !== liveContainerId).slice(keep - 1);
+
+    let removedContainers = 0;
+    const removedImages: string[] = [];
+    for (const container of removable) {
+      const image = container.Image;
+      const gone = await dockerRequest('DELETE', `/containers/${container.Id}?force=true`)
+        .then(() => true)
+        .catch(() => false);
+      if (!gone) {
+        continue;
+      }
+      removedContainers++;
+      if (image && image.startsWith(`insforge-site-${this.projectKey()}:`)) {
+        // Only images this driver tagged for this project, and only after its container
+        // is gone — Docker refuses an image still in use anyway.
+        const imageRemoved = await dockerRequest('DELETE', `/images/${encodeURIComponent(image)}`)
+          .then(() => true)
+          .catch(() => false);
+        if (imageRemoved) {
+          removedImages.push(image);
+        }
+      }
+    }
+
+    if (removedContainers > 0) {
+      logger.info('Docker sites: pruned old deployments', {
+        keep,
+        removedContainers,
+        removedImages,
+      });
+    }
+    return { removedContainers, removedImages: removedImages.length };
   }
 
   /** Stopping is the cancel: the image stays, so the deployment can be started again. */

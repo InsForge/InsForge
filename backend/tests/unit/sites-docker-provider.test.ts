@@ -506,3 +506,144 @@ describe('DockerSitesProvider source builds', () => {
     });
   });
 });
+
+describe('DockerSitesProvider rollback and retention', () => {
+  /** Owned containers as Docker would list them, newest first. */
+  function owned(ids: string[], image = 'insforge-site-proj-1234567:aaa') {
+    return ids.map((Id) => ({ Id, State: 'exited', Image: image }));
+  }
+
+  it('starts the target and stops everything else', async () => {
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve(owned(['container-live', 'container-old']));
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({
+          Id: 'container-old',
+          Name: '/insforge-site',
+          Created: '2026-08-13T00:00:00Z',
+          State: { Status: 'running' },
+          Config: { Image: 'insforge-site-proj-1234567:aaa' },
+          NetworkSettings: { Ports: { '80/tcp': [{ HostPort: '49155' }] } },
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    const restored = await DockerSitesProvider.getInstance().rollbackTo('container-old');
+
+    const writes = dockerRequest.mock.calls
+      .filter(([method]) => method === 'POST')
+      .map(([, url]) => url as string);
+    expect(writes[0]).toBe('/containers/container-old/start');
+    expect(writes[1]).toBe('/containers/container-live/stop?t=5');
+    expect(restored.readyState).toBe('READY');
+  });
+
+  // Retention removes old containers, so "roll back to that one" can genuinely be gone —
+  // and a Docker 404 is not something an operator should have to decode.
+  it('says the deployment is gone rather than surfacing a Docker 404', async () => {
+    dockerRequest.mockImplementation((method: string, url: string) =>
+      method === 'GET' && url.startsWith('/containers/json')
+        ? Promise.resolve(owned(['container-live']))
+        : Promise.resolve(undefined)
+    );
+
+    await expect(DockerSitesProvider.getInstance().rollbackTo('container-ancient')).rejects.toThrow(
+      'no longer on this host'
+    );
+  });
+
+  it('keeps the newest few deployments and removes the rest with their images', async () => {
+    okBuild();
+    let listed = 0;
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        listed++;
+        // First call is the pre-deploy list; after the deploy the new one is included.
+        return Promise.resolve(
+          listed === 1
+            ? owned(['c3', 'c2', 'c1'])
+            : [
+                { Id: 'container-new', State: 'running', Image: 'insforge-site-proj-1234567:new' },
+                ...owned(['c3', 'c2', 'c1']),
+              ]
+        );
+      }
+      if (method === 'POST' && url.startsWith('/containers/create')) {
+        return Promise.resolve({ Id: 'container-new' });
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({ NetworkSettings: { Ports: { '80/tcp': [{ HostPort: '1' }] } } });
+      }
+      return Promise.resolve(undefined);
+    });
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>retain</h1>') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files);
+
+    const deletes = dockerRequest.mock.calls
+      .filter(([method]) => method === 'DELETE')
+      .map(([, url]) => url as string);
+    // Three stay on the host — the live one plus two rollback steps — so of c3/c2/c1 only
+    // the oldest goes, together with the image it was running.
+    expect(deletes).toEqual([
+      '/containers/c1?force=true',
+      '/images/insforge-site-proj-1234567%3Aaaa',
+    ]);
+  });
+
+  // Removing an image this driver did not tag would reach outside what it owns.
+  it('leaves images it did not tag alone', async () => {
+    okBuild();
+    let listed = 0;
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        listed++;
+        return Promise.resolve(
+          listed === 1
+            ? owned(['c3', 'c2', 'c1'], 'nginx:alpine')
+            : [
+                { Id: 'container-new', State: 'running', Image: 'insforge-site-proj-1234567:new' },
+                ...owned(['c3', 'c2', 'c1'], 'nginx:alpine'),
+              ]
+        );
+      }
+      if (method === 'POST' && url.startsWith('/containers/create')) {
+        return Promise.resolve({ Id: 'container-new' });
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({ NetworkSettings: { Ports: { '80/tcp': [{ HostPort: '1' }] } } });
+      }
+      return Promise.resolve(undefined);
+    });
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>foreign</h1>') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files);
+
+    const deletes = dockerRequest.mock.calls
+      .filter(([method]) => method === 'DELETE')
+      .map(([, url]) => url as string);
+    expect(deletes.filter((url) => url.startsWith('/images/'))).toEqual([]);
+  });
+
+  it('returns the builder output with the deployment', async () => {
+    dockerBuild.mockResolvedValue({ ok: true, logs: ['Step 1/3 : FROM nginx:alpine', 'Step 2/3'] });
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>logs</h1>') },
+    ]);
+
+    const deployment = await provider.createDeploymentWithFiles(files);
+
+    expect(deployment.buildLogs).toEqual(['Step 1/3 : FROM nginx:alpine', 'Step 2/3']);
+  });
+});
