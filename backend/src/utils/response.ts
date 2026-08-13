@@ -49,11 +49,9 @@ export function paginatedResponse<T>(
   offset: number,
   options: { isEstimate?: boolean } = {}
 ) {
-  // An estimated total can undershoot the rows actually returned (the planner's
-  // `reltuples` is approximate, and a capped filtered count reports a lower bound).
-  // Never advertise a total smaller than what this page already proves exists, or the
-  // range would contradict itself (e.g. "60000-50000/50001").
-  const effectiveTotal = Math.max(total, offset + data.length);
+  // An estimate can undershoot the rows returned ("60000-50000/50001"). Only returned rows
+  // are evidence, so an empty page keeps `total` instead of inventing one from its offset.
+  const effectiveTotal = data.length > 0 ? Math.max(total, offset + data.length) : total;
 
   // Calculate the range for Content-Range header
   const start = offset;
@@ -64,9 +62,8 @@ export function paginatedResponse<T>(
   // Example: "Content-Range: 0-9/200" for first 10 items out of 200
   res.setHeader('Content-Range', `${start}-${end}/${effectiveTotal}`);
 
-  // `total` may be a planner estimate or a capped "at least N" (see estimateOrExactCount).
   // Content-Range stays numeric so existing clients keep working; this side-channel lets
-  // the dashboard render it as "~N" / "N+" instead of implying precision it doesn't have.
+  // the dashboard mark the total approximate instead of implying precision.
   if (options.isEstimate) {
     res.setHeader('X-Total-Is-Estimate', 'true');
   }
