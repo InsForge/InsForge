@@ -138,9 +138,9 @@ export function selectSitesProvider(): SitesProvider {
  * the request asked for something this deployment cannot do. The driver is named because
  * an operator who switched SITES_PROVIDER needs to know which one answered.
  */
-function unsupported(provider: SitesProvider, feature: string): AppError {
+export function unsupportedFeature(providerName: SitesProviderName, feature: string): AppError {
   return new AppError(
-    `The ${provider.name} sites driver does not support ${feature}.`,
+    `The ${providerName} sites driver does not support ${feature}.`,
     400,
     ERROR_CODES.DEPLOYMENT_NOT_CONFIGURED
   );
@@ -149,7 +149,7 @@ function unsupported(provider: SitesProvider, feature: string): AppError {
 export function requireEnvVarStore(): EnvVarStore {
   const provider = selectSitesProvider();
   if (!provider.envVars) {
-    throw unsupported(provider, 'environment variables');
+    throw unsupportedFeature(provider.name, 'environment variables');
   }
   return provider.envVars;
 }
@@ -157,7 +157,7 @@ export function requireEnvVarStore(): EnvVarStore {
 export function requireDomainStore(): DomainStore {
   const provider = selectSitesProvider();
   if (!provider.domains) {
-    throw unsupported(provider, 'custom domains');
+    throw unsupportedFeature(provider.name, 'custom domains');
   }
   return provider.domains;
 }

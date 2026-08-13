@@ -44,13 +44,17 @@ function mountSocket(): void {
   dockerClientConfig.socketPath = process.execPath;
 }
 
-/** Entry names inside the tar the driver handed to the builder. */
-async function contextEntries(context: Buffer): Promise<string[]> {
-  const names: string[] = [];
+/** Entries inside the tar the driver handed to the builder, name -> contents. */
+async function contextFiles(context: Buffer): Promise<Map<string, string>> {
+  const files = new Map<string, string>();
   const extract = tarExtract();
   extract.on('entry', (header, stream, next) => {
-    names.push(header.name);
-    stream.on('end', next);
+    const chunks: Buffer[] = [];
+    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+    stream.on('end', () => {
+      files.set(header.name, Buffer.concat(chunks).toString('utf8'));
+      next();
+    });
     stream.resume();
   });
   await new Promise<void>((resolve, reject) => {
@@ -58,7 +62,17 @@ async function contextEntries(context: Buffer): Promise<string[]> {
     extract.on('error', reject);
     Readable.from(context).pipe(extract);
   });
-  return names;
+  return files;
+}
+
+async function contextEntries(context: Buffer): Promise<string[]> {
+  return [...(await contextFiles(context)).keys()];
+}
+
+/** The Dockerfile the driver generated for this call. */
+async function generatedDockerfile(): Promise<string> {
+  const context = dockerBuild.mock.calls[0][0].context as Buffer;
+  return (await contextFiles(context)).get('Dockerfile') ?? '';
 }
 
 function okBuild() {
@@ -314,5 +328,181 @@ describe('DockerSitesProvider endpoint', () => {
     const deployment = await provider.createDeploymentWithFiles(files);
 
     expect(deployment.url).toBe('https://proj-1234567.sites.example.com');
+  });
+});
+
+describe('DockerSitesProvider source builds', () => {
+  it('generates a two-stage build that discards the toolchain', async () => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{"name":"app"}') },
+      { path: 'src/main.tsx', content: Buffer.from('render()') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files, {
+      projectSettings: { buildCommand: 'npm run build', outputDirectory: 'dist' },
+    });
+
+    const dockerfile = await generatedDockerfile();
+    expect(dockerfile).toContain('FROM node:22-alpine AS build');
+    expect(dockerfile).toContain('RUN npm ci --no-audit --no-fund');
+    expect(dockerfile).toContain('RUN npm run build');
+    // Serving stage starts from nginx, so node_modules never reaches what runs.
+    expect(dockerfile).toContain('FROM nginx:alpine');
+    expect(dockerfile).toContain('COPY --from=build /out/ /usr/share/nginx/html/');
+    // In build mode the whole tree has to reach the builder — outputDirectory names
+    // where the build writes, it does not narrow the upload.
+    expect(await contextEntries(dockerBuild.mock.calls[0][0].context as Buffer)).toContain(
+      'site/src/main.tsx'
+    );
+  });
+
+  it('honours a custom install command and root directory', async () => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'apps/web/package.json', content: Buffer.from('{}') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files, {
+      projectSettings: {
+        buildCommand: 'pnpm build',
+        installCommand: 'pnpm install --frozen-lockfile',
+        rootDirectory: 'apps/web',
+        outputDirectory: 'dist',
+      },
+    });
+
+    const dockerfile = await generatedDockerfile();
+    expect(dockerfile).toContain('WORKDIR /app/apps/web');
+    expect(dockerfile).toContain('RUN pnpm install --frozen-lockfile');
+    expect(dockerfile).toContain('cp -r /app/apps/web/dist /out');
+  });
+
+  // Guessing which conventional directory holds the output is fine; guessing that a build
+  // happened at all is not — hence a failure when none of them exists.
+  it('falls back to the conventional output directories and fails loudly when none exists', async () => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files, {
+      projectSettings: { buildCommand: 'npm run build' },
+    });
+
+    const dockerfile = await generatedDockerfile();
+    expect(dockerfile).toContain('for d in dist build out');
+    expect(dockerfile).toContain('exit 1');
+  });
+
+  // Values are declared per stage or the daemon drops them silently.
+  it('passes env vars as declared build args', async () => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files, {
+      projectSettings: { buildCommand: 'npm run build', outputDirectory: 'dist' },
+      envVars: [
+        { key: 'VITE_API_URL', value: 'https://api.example.com' },
+        { key: 'VITE_FLAG', value: 'on' },
+      ],
+    });
+
+    expect(await generatedDockerfile()).toContain('ARG VITE_API_URL\nARG VITE_FLAG');
+    expect(dockerBuild.mock.calls[0][0].buildArgs).toEqual({
+      VITE_API_URL: 'https://api.example.com',
+      VITE_FLAG: 'on',
+    });
+  });
+
+  // A newline would end the RUN instruction and let the value append its own Dockerfile
+  // directives — a different privilege from running a command in the build container.
+  it('refuses a build command that would inject Dockerfile directives', async () => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+
+    await expect(
+      provider.createDeploymentWithFiles(files, {
+        projectSettings: { buildCommand: 'npm run build\nUSER root\nRUN cat /etc/shadow' },
+      })
+    ).rejects.toThrow('must be a single line');
+    expect(dockerBuild).not.toHaveBeenCalled();
+  });
+
+  it('refuses paths that climb out of the uploaded tree', async () => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+
+    await expect(
+      provider.createDeploymentWithFiles(files, {
+        projectSettings: { buildCommand: 'npm run build', rootDirectory: '../../etc' },
+      })
+    ).rejects.toThrow('must be a path inside the uploaded files');
+  });
+
+  it('refuses an env var name that is not one', async () => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+
+    await expect(
+      provider.createDeploymentWithFiles(files, {
+        projectSettings: { buildCommand: 'npm run build', outputDirectory: 'dist' },
+        envVars: [{ key: 'BAD NAME; rm -rf /', value: 'x' }],
+      })
+    ).rejects.toThrow('not a usable environment variable name');
+  });
+
+  // Serving a source tree verbatim looks like a successful deploy of a broken site: the
+  // browser downloads package.json and an index.html pointing at /src/main.tsx.
+  it('refuses a source tree when no build command was given', async () => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+      { path: 'src/main.tsx', content: Buffer.from('render()') },
+    ]);
+
+    await expect(provider.createDeploymentWithFiles(files)).rejects.toThrow(
+      'look like a source tree'
+    );
+    expect(dockerBuild).not.toHaveBeenCalled();
+  });
+
+  // A built site that happens to ship its package.json is still a built site.
+  it('serves a built tree that contains an index.html alongside a manifest', async () => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+      { path: 'index.html', content: Buffer.from('<h1>built</h1>') },
+    ]);
+
+    await expect(provider.createDeploymentWithFiles(files)).resolves.toMatchObject({
+      readyState: 'READY',
+    });
   });
 });

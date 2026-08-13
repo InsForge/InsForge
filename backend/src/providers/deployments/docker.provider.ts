@@ -68,10 +68,64 @@ const NGINX_CONF = `server {
 }
 `;
 
-const DOCKERFILE = `FROM nginx:alpine
+/** Serve what was uploaded, unchanged. No build step, so nothing can go wrong in one. */
+const SERVE_ONLY_DOCKERFILE = `FROM nginx:alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY site/ /usr/share/nginx/html/
 `;
+
+/**
+ * The image the build stage runs in. Pinned rather than configurable: a site that builds
+ * against whatever the host happens to have is not reproducible, and this is the same
+ * major the backend itself targets.
+ */
+const BUILD_IMAGE = 'node:22-alpine';
+
+const DEFAULT_INSTALL_COMMAND = 'npm ci --no-audit --no-fund';
+const DEFAULT_OUTPUT_DIRECTORIES = ['dist', 'build', 'out'];
+
+/**
+ * Reject anything that could break out of the line it is interpolated into.
+ *
+ * A build command is arbitrary shell by design — that is what a build is, and the caller
+ * is a project admin. A *newline* is different: it would end the RUN instruction and let
+ * the value append its own Dockerfile directives, which is a different privilege from
+ * running a command in the build container.
+ */
+function assertSingleLine(value: string, field: string): string {
+  if (/[\r\n]/.test(value)) {
+    throw new AppError(`${field} must be a single line.`, 400, ERROR_CODES.INVALID_INPUT);
+  }
+  return value;
+}
+
+/** A relative path inside the uploaded tree. Absolute or climbing paths are refused. */
+function assertRelativePath(value: string, field: string): string {
+  const normalized = path.posix.normalize(assertSingleLine(value, field).replace(/\\/g, '/'));
+  if (normalized.startsWith('/') || normalized === '..' || normalized.startsWith('../')) {
+    throw new AppError(
+      `${field} must be a path inside the uploaded files.`,
+      400,
+      ERROR_CODES.INVALID_INPUT
+    );
+  }
+  return normalized.replace(/^\.\//, '').replace(/\/+$/, '');
+}
+
+/**
+ * Build args have to be declared per stage to be visible, and they are recorded in the
+ * image history — which is why the capability is `build-only` and not a secret store.
+ */
+function assertEnvKey(key: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+    throw new AppError(
+      `"${key}" is not a usable environment variable name.`,
+      400,
+      ERROR_CODES.INVALID_INPUT
+    );
+  }
+  return key;
+}
 
 /** Docker's container states, mapped onto the deployment vocabulary the service records. */
 function readyStateFor(status: string): string {
@@ -128,10 +182,13 @@ export class DockerSitesProvider implements SitesProvider {
   /**
    * Every flag here is what this driver does *today*, not what it is planned to do.
    *
-   * `envVars: 'none'` because only prebuilt output is accepted — there is no build of user
-   * source for values to reach. `rollback` and `buildLogs` are false for the same reason
-   * they are false for Vercel: nothing implements them yet. Each flips in the commit that
-   * adds the behaviour, so a client is never told about a button that does nothing.
+   * `envVars: 'build-only'` — values are passed to the build as build args and baked into
+   * the artifact. There is deliberately no read-back: they end up in the built files and
+   * in image history, so calling this a store would misrepresent it.
+   *
+   * `rollback` and `buildLogs` are false for the same reason they are false for Vercel:
+   * nothing implements them yet. Each flips in the commit that adds the behaviour, so a
+   * client is never told about a button that does nothing.
    *
    * `frameworkDetection: false` is the honest gap against Vercel: this driver serves what
    * it is given and does not infer how to produce it.
@@ -139,7 +196,7 @@ export class DockerSitesProvider implements SitesProvider {
   capabilities(): SitesCapabilities {
     const ingress = dockerConfig().defaultIngress === 'host' ? 'host' : 'port';
     return {
-      envVars: 'none',
+      envVars: 'build-only',
       customDomains: false,
       slug: false,
       rollback: false,
@@ -223,15 +280,40 @@ export class DockerSitesProvider implements SitesProvider {
       );
     }
 
-    // Callers upload a whole tree today because Vercel builds it. This driver serves what
-    // it is given, so without honouring outputDirectory it would publish src/ and
-    // package.json as though they were the website.
-    const served = this.selectServedFiles(files, options.projectSettings?.outputDirectory);
-    const context = await this.buildContext(served);
+    const settings = options.projectSettings ?? {};
+    const buildCommand = settings.buildCommand?.trim();
+
+    // Two modes, and `outputDirectory` means a different thing in each. Serving mode: it
+    // narrows the uploaded tree, because callers upload a whole tree today (Vercel builds
+    // it) and publishing src/ as the website would be worse than refusing. Build mode: it
+    // names where the build *writes*, so the whole tree has to reach the builder.
+    const served = buildCommand ? files : this.selectServedFiles(files, settings.outputDirectory);
+
+    if (!buildCommand) {
+      this.assertNotASourceTree(served);
+    }
+
+    const dockerfile = buildCommand
+      ? this.buildStageDockerfile({
+          buildCommand,
+          installCommand: settings.installCommand,
+          outputDirectory: settings.outputDirectory,
+          rootDirectory: settings.rootDirectory,
+          envKeys: (options.envVars ?? []).map((envVar) => envVar.key),
+        })
+      : SERVE_ONLY_DOCKERFILE;
+
+    const context = await this.buildContext(served, dockerfile);
     const digest = createHash('sha256').update(context).digest('hex').slice(0, 12);
     const imageTag = `insforge-site-${this.projectKey()}:${digest}`;
 
-    const build = await dockerBuild({ context, tag: imageTag });
+    const build = await dockerBuild({
+      context,
+      tag: imageTag,
+      buildArgs: Object.fromEntries(
+        (options.envVars ?? []).map((envVar) => [assertEnvKey(envVar.key), envVar.value])
+      ),
+    });
     if (!build.ok) {
       throw new AppError(
         build.error ?? 'Site image build failed.',
@@ -260,7 +342,7 @@ export class DockerSitesProvider implements SitesProvider {
    * involved, so the daemon needs the context as bytes. `maxDeploymentTotalBytes` already
    * caps what a caller can have uploaded, which is what bounds this.
    */
-  private async buildContext(files: UploadedFileRef[]): Promise<Buffer> {
+  private async buildContext(files: UploadedFileRef[], dockerfile: string): Promise<Buffer> {
     const pack = tarPack();
     const chunks: Buffer[] = [];
     pack.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -270,7 +352,7 @@ export class DockerSitesProvider implements SitesProvider {
       pack.on('error', reject);
     });
 
-    pack.entry({ name: 'Dockerfile' }, DOCKERFILE);
+    pack.entry({ name: 'Dockerfile' }, dockerfile);
     pack.entry({ name: 'nginx.conf' }, NGINX_CONF);
 
     for (const file of files) {
@@ -293,6 +375,83 @@ export class DockerSitesProvider implements SitesProvider {
     pack.finalize();
     await done;
     return Buffer.concat(chunks);
+  }
+
+  /**
+   * Refuse to publish something that is plainly source rather than a built site.
+   *
+   * Without this, a tree uploaded for Vercel to build gets served verbatim: the browser
+   * downloads package.json and a bare index.html that references /src/main.tsx. That
+   * reads as a successful deploy of a broken site, which is harder to diagnose than a
+   * refusal naming the two ways forward.
+   */
+  private assertNotASourceTree(files: UploadedFileRef[]): void {
+    const names = files.map((file) => this.safeEntryName(file.file));
+    const hasManifest = names.some((name) => name === 'package.json');
+    const hasEntryPoint = names.some((name) => name === 'index.html');
+    if (hasManifest && !hasEntryPoint) {
+      throw new AppError(
+        'These files look like a source tree, not a built site.',
+        400,
+        ERROR_CODES.DEPLOYMENT_INVALID_FILE,
+        'Set a build command, or deploy the directory your build writes to.'
+      );
+    }
+  }
+
+  /**
+   * A two-stage image: build the site with the caller's own commands, then serve only the
+   * output. The build stage is discarded, so node_modules and the toolchain never reach
+   * the image that runs.
+   */
+  private buildStageDockerfile(params: {
+    buildCommand: string;
+    installCommand?: string | null;
+    outputDirectory?: string | null;
+    rootDirectory?: string | null;
+    envKeys: string[];
+  }): string {
+    const root = params.rootDirectory
+      ? assertRelativePath(params.rootDirectory, 'rootDirectory')
+      : '';
+    const workdir = path.posix.join('/app', root);
+    const install = assertSingleLine(
+      params.installCommand?.trim() || DEFAULT_INSTALL_COMMAND,
+      'installCommand'
+    );
+    const build = assertSingleLine(params.buildCommand, 'buildCommand');
+    const output = params.outputDirectory
+      ? assertRelativePath(params.outputDirectory, 'outputDirectory')
+      : '';
+
+    // Declared per stage or the daemon drops them; recorded in image history, which is
+    // why this capability is build-only rather than a secret store.
+    const args = [...new Set(params.envKeys.map(assertEnvKey))].map((key) => `ARG ${key}`);
+
+    // Without an explicit output directory, take the first conventional one that exists.
+    // Guessing *which* is fine — guessing that a build happened at all would not be.
+    const outputExpr = output
+      ? `${workdir}/${output}`
+      : `$(for d in ${DEFAULT_OUTPUT_DIRECTORIES.join(' ')}; do [ -d "$d" ] && echo "${workdir}/$d" && break; done)`;
+
+    return [
+      `FROM ${BUILD_IMAGE} AS build`,
+      `WORKDIR ${workdir}`,
+      ...args,
+      'COPY site/ /app/',
+      `RUN ${install}`,
+      `RUN ${build}`,
+      // Resolved inside the build stage and copied to a fixed path, because COPY --from
+      // cannot expand a shell expression.
+      output
+        ? `RUN cp -r ${outputExpr} /out`
+        : `RUN out=${outputExpr}; [ -n "$out" ] || (echo "No build output found in ${DEFAULT_OUTPUT_DIRECTORIES.join(', ')}" && exit 1); cp -r "$out" /out`,
+      '',
+      'FROM nginx:alpine',
+      'COPY nginx.conf /etc/nginx/conf.d/default.conf',
+      'COPY --from=build /out/ /usr/share/nginx/html/',
+      '',
+    ].join('\n');
   }
 
   /**
