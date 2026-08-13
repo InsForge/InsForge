@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { decideUnfilteredCount, decideFilteredCount } from '../../src/services/database/record-count';
+import {
+  decideUnfilteredCount,
+  decideFilteredCount,
+} from '../../src/services/database/record-count';
 import { APPROX_COUNT_THRESHOLD, FILTERED_COUNT_CAP } from '../../src/utils/constants';
 
 /**

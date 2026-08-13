@@ -94,9 +94,9 @@ describe('AdminRecordService', () => {
     // O(N) in table size. The filtered count must stay bounded by a LIMIT.
     const countCall = sqlCalls.find((sql) => sql.includes('AS observed'));
     expect(countCall).toMatch(/LIMIT \d+\) AS capped/);
-    expect(sqlCalls.some((sql) => /COUNT\(\*\)::text AS total FROM "auth"\."users"/.test(sql))).toBe(
-      false
-    );
+    expect(
+      sqlCalls.some((sql) => /COUNT\(\*\)::text AS total FROM "auth"\."users"/.test(sql))
+    ).toBe(false);
 
     // The read is bounded in time as well as in rows, so a pathological scan fails
     // fast instead of holding the connection until the browser gives up.
