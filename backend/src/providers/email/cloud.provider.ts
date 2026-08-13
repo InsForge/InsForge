@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
-import { signCloudToken } from '@/utils/cloud-sign.js';
+import { signCloudToken } from '@/infra/security/cloud-sign.js';
 import { AppError } from '@/utils/errors.js';
 import { EMAIL_TEMPLATE_TYPES, EmailTemplate } from '@/types/email.js';
 import { EmailProvider } from './base.provider.js';

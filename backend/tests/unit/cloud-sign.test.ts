@@ -8,7 +8,7 @@ const configMock = {
 };
 vi.mock('@/infra/config/app.config.js', () => ({ config: configMock, appConfig: configMock }));
 
-const { signCloudToken } = await import('@/utils/cloud-sign.js');
+const { signCloudToken } = await import('@/infra/security/cloud-sign.js');
 
 const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
 

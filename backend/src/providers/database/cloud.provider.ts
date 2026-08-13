@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { z } from 'zod';
 import { appConfig } from '@/infra/config/app.config.js';
-import { signCloudToken } from '@/utils/cloud-sign.js';
+import { signCloudToken } from '@/infra/security/cloud-sign.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { DatabaseProvider, DatabaseConnectionInfo, DatabasePasswordInfo } from './base.provider.js';

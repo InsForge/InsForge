@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { appConfig } from '@/infra/config/app.config.js';
 import { cloudProjectId } from '@/utils/environment.js';
-import { signCloudToken } from '@/utils/cloud-sign.js';
+import { signCloudToken } from '@/infra/security/cloud-sign.js';
 import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,

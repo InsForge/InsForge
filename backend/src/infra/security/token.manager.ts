@@ -319,6 +319,8 @@ export class TokenManager {
    * Verify cloud backend JWT token
    * Validates JWT tokens from api.insforge.dev using JWKS
    */
+  // Inbound only — verifies a token cloud issued, against cloud's JWKS. Outbound
+  // requests to cloud are signed by signCloudToken() in ./cloud-sign.ts.
   async verifyCloudToken(token: string): Promise<{ projectId: string; payload: JWTPayload }> {
     try {
       // JWKS handles caching internally, no need to manage it manually
