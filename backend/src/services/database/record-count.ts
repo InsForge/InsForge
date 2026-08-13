@@ -3,60 +3,38 @@ import { APPROX_COUNT_THRESHOLD, FILTERED_COUNT_CAP } from '@/utils/constants.js
 
 export interface CountResult {
   total: number;
-  /**
-   * True when `total` is not an exact row count: either the planner's `reltuples`
-   * statistic, or a filtered count that stopped at {@link FILTERED_COUNT_CAP}
-   * (i.e. "at least this many"). Clients render these as "~N" / "N+".
-   */
+  /** True when `total` is a planner estimate or a capped lower bound, not an exact count. */
   isEstimate: boolean;
 }
 
+/** How an unfiltered table should be counted, given the planner's `reltuples`. */
+export type UnfilteredCountStrategy =
+  | { kind: 'estimate'; total: number }
+  | { kind: 'exact' }
+  | { kind: 'capped' };
+
 /**
- * Decides how an *unfiltered* table should be counted, given the planner's
- * `reltuples` statistic.
- *
- * `reltuples` is -1 on a never-analyzed table (PostgreSQL 14+) and 0 on older
- * versions, where 0 is also what a genuinely empty table reports. Both are
- * treated as "unknown" and fall through to the exact count — which is free on an
- * empty table and correct on an un-analyzed one, so the ambiguity costs nothing.
- *
- * Split out from the query so the branching is unit-testable without a database.
+ * `reltuples` is -1 on a never-analyzed table (PG14+) and 0 on older versions, where 0
+ * is also what an empty table reports -- both mean "size unknown", so the scan is capped.
  */
-export function decideUnfilteredCount(reltuples: number | null): CountResult | null {
+export function decideUnfilteredCount(reltuples: number | null): UnfilteredCountStrategy {
   if (reltuples === null || !Number.isFinite(reltuples) || reltuples <= 0) {
-    return null; // unknown or empty -> caller runs the exact count
+    return { kind: 'capped' };
   }
-
   if (reltuples <= APPROX_COUNT_THRESHOLD) {
-    return null; // small enough that an exact count is cheap and worth the precision
+    return { kind: 'exact' };
   }
+  return { kind: 'estimate', total: Math.round(reltuples) };
+}
 
-  return { total: Math.round(reltuples), isEstimate: true };
+/** Interprets a capped count that scanned at most `cap + 1` rows. */
+export function decideCappedCount(observed: number, cap: number): CountResult {
+  return observed > cap ? { total: cap, isEstimate: true } : { total: observed, isEstimate: false };
 }
 
 /**
- * Interprets the result of the capped filtered count. `observed` is the number of
- * matching rows seen while scanning at most `FILTERED_COUNT_CAP + 1` of them.
- */
-export function decideFilteredCount(observed: number): CountResult {
-  if (observed > FILTERED_COUNT_CAP) {
-    return { total: FILTERED_COUNT_CAP, isEstimate: true };
-  }
-  return { total: observed, isEstimate: false };
-}
-
-/**
- * Counts rows without the unbounded `COUNT(*)` full scan that the dashboard's data
- * browser used to pay on every page load and every keystroke of search.
- *
- * - Unfiltered, large table: one O(1) `pg_class` catalog lookup instead of an O(N) scan.
- * - Unfiltered, small/unknown table: exact `COUNT(*)` (cheap, and precise).
- * - Filtered: exact, but stops after {@link FILTERED_COUNT_CAP} matches. This bounds the
- *   common "search matches lots of rows" case. A search matching *few* rows still scans
- *   the table — only an index can fix that, so the statement timeout is the backstop.
- *
- * `qualifiedTableName` must already be quoted via `quoteQualifiedName`; `whereSql` is
- * either empty or a leading-space ` WHERE ...` fragment whose placeholders bind `params`.
+ * Counts rows without the unbounded `COUNT(*)` the data browser used to run on every
+ * page load. No branch here can scan more than `cap + 1` rows or read a planner stat.
  */
 export async function estimateOrExactCount(
   client: PoolClient,
@@ -71,24 +49,45 @@ export async function estimateOrExactCount(
     );
 
     const raw = estimateResult.rows[0]?.reltuples;
-    const decided = decideUnfilteredCount(raw === null || raw === undefined ? null : Number(raw));
-    if (decided) {
-      return decided;
+    const strategy = decideUnfilteredCount(raw === null || raw === undefined ? null : Number(raw));
+
+    if (strategy.kind === 'estimate') {
+      return { total: strategy.total, isEstimate: true };
     }
 
-    const exact = await client.query<{ total: string }>(
-      `SELECT COUNT(*)::text AS total FROM ${qualifiedTableName}`
+    // Known-small tables are counted exactly (cheap, and precision is worth more);
+    // unknown-size tables are capped, so a never-analyzed huge table can't be scanned.
+    if (strategy.kind === 'exact') {
+      const exact = await client.query<{ total: string }>(
+        `SELECT COUNT(*)::text AS total FROM ${qualifiedTableName}`
+      );
+      return { total: Number(exact.rows[0]?.total ?? 0), isEstimate: false };
+    }
+
+    return decideCappedCount(
+      await countUpTo(client, qualifiedTableName, '', [], APPROX_COUNT_THRESHOLD),
+      APPROX_COUNT_THRESHOLD
     );
-    return { total: Number(exact.rows[0]?.total ?? 0), isEstimate: false };
   }
 
-  // Filtered: `reltuples` says nothing about a WHERE clause, so count for real but
-  // stop one row past the cap — that single extra row is what distinguishes
-  // "exactly CAP" from "CAP or more".
-  const capped = await client.query<{ observed: string }>(
-    `SELECT COUNT(*)::text AS observed FROM (SELECT 1 FROM ${qualifiedTableName}${whereSql} LIMIT ${FILTERED_COUNT_CAP + 1}) AS capped`,
+  // `reltuples` says nothing about a WHERE, so filtered sets are counted for real but
+  // stop one row past the cap -- that extra row distinguishes "exactly cap" from "more".
+  return decideCappedCount(
+    await countUpTo(client, qualifiedTableName, whereSql, params, FILTERED_COUNT_CAP),
+    FILTERED_COUNT_CAP
+  );
+}
+
+async function countUpTo(
+  client: PoolClient,
+  qualifiedTableName: string,
+  whereSql: string,
+  params: unknown[],
+  cap: number
+): Promise<number> {
+  const result = await client.query<{ observed: string }>(
+    `SELECT COUNT(*)::text AS observed FROM (SELECT 1 FROM ${qualifiedTableName}${whereSql} LIMIT ${cap + 1}) AS capped`,
     params
   );
-
-  return decideFilteredCount(Number(capped.rows[0]?.observed ?? 0));
+  return Number(result.rows[0]?.observed ?? 0);
 }
