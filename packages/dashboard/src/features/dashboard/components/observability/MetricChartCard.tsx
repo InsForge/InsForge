@@ -178,7 +178,7 @@ export function getMetricXAxisTimestamps(
   nowSeconds = Math.floor(Date.now() / 1000)
 ): [number, number, number] {
   const latestTimestamp = data.reduce<number | null>((latest, point) => {
-    if (!Number.isFinite(point.value)) {
+    if (!Number.isFinite(point.value) || !Number.isFinite(point.timestamp)) {
       return latest;
     }
     return latest === null || point.timestamp > latest ? point.timestamp : latest;

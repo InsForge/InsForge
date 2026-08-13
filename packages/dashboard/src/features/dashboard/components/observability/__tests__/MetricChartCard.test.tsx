@@ -20,18 +20,34 @@ const base = {
 const svgRects = (container: HTMLElement) => [...container.querySelectorAll('svg rect')];
 
 describe('MetricChartCard rendering modes', () => {
-  it('anchors x-axis timestamps to the newest reading when data is unordered', () => {
+  it('anchors x-axis timestamps to the newest valid reading when data is unordered', () => {
     expect(
       getMetricXAxisTimestamps(
         pts([
-          [1300, 20],
+          [Number.NaN, 30],
           [1000, 10],
-          [1200, Number.NaN],
+          [1300, 20],
+          [1400, Number.NaN],
         ]),
         300,
         9999
       )
     ).toEqual([1000, 1150, 1300]);
+
+    expect(getMetricXAxisTimestamps([], 300, 9999)).toEqual([9699, 9849, 9999]);
+  });
+
+  it('ignores readings with non-finite timestamps', () => {
+    expect(
+      getMetricXAxisTimestamps(
+        pts([
+          [Number.NaN, 99],
+          [Number.POSITIVE_INFINITY, 100],
+        ]),
+        300,
+        9999
+      )
+    ).toEqual([9699, 9849, 9999]);
   });
 
   it('barChart mode draws bars instead of the line/area, destructive above the threshold', () => {
