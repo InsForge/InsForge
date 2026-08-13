@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { appConfig } from '../../src/infra/config/app.config.js';
 
 const environmentMock = vi.hoisted(() => ({
   isCloud: false,
@@ -15,6 +16,8 @@ vi.mock('../../src/utils/environment.js', () => ({
   isCloudEnvironment: () => environmentMock.isCloud,
 }));
 
+// The real appConfig: these tests set cloud.projectId / app.jwtSecret directly,
+// because the config singleton reads env once at import.
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
@@ -365,8 +368,8 @@ describe('OpenRouterProvider.getOverview', () => {
 
   it('loads model-level activity through the cloud backend', async () => {
     environmentMock.isCloud = true;
-    vi.stubEnv('PROJECT_ID', 'project_123');
-    vi.stubEnv('JWT_SECRET', 'test-secret-long-enough-for-signing-32chars');
+    appConfig.cloud.projectId = 'project_123';
+    appConfig.app.jwtSecret = 'test-secret-long-enough-for-signing-32chars';
     vi.stubEnv('CLOUD_API_HOST', 'https://cloud.example');
     fetchMock
       .mockResolvedValueOnce({
@@ -442,8 +445,8 @@ describe('OpenRouterProvider.getOverview', () => {
       environmentMock.isCloud = isCloud;
 
       if (isCloud) {
-        vi.stubEnv('PROJECT_ID', 'project_123');
-        vi.stubEnv('JWT_SECRET', 'test-secret-long-enough-for-signing-32chars');
+        appConfig.cloud.projectId = 'project_123';
+        appConfig.app.jwtSecret = 'test-secret-long-enough-for-signing-32chars';
         vi.stubEnv('CLOUD_API_HOST', 'https://cloud.example');
         fetchMock.mockResolvedValueOnce({
           ok: true,
