@@ -2,6 +2,19 @@ import axios from 'axios';
 import crypto from 'crypto';
 import type { Readable } from 'stream';
 import { isCloudEnvironment } from '@/utils/environment.js';
+import type {
+  CreateDeploymentInput,
+  CustomDomain,
+  DomainConfig,
+  DomainStore,
+  EnvVarStore,
+  ProjectDomain,
+  ProviderDeployment,
+  SitesCapabilities,
+  SitesProvider,
+  SitesProviderName,
+  UploadedFileRef,
+} from './sites.provider.js';
 import { AppError, UpstreamError } from '@/utils/errors.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
@@ -34,77 +47,6 @@ interface VercelCredentials {
   projectId: string;
   expiresAt: Date | null;
   slug: string | null;
-}
-
-export interface VercelDeploymentResult {
-  id: string;
-  url: string | null;
-  state: string;
-  readyState: string;
-  name: string;
-  createdAt: Date;
-  error?: {
-    code: string;
-    message: string;
-  };
-}
-
-export interface CreateDeploymentOptions {
-  name?: string;
-  files?: Array<{
-    file: string;
-    sha: string;
-    size: number;
-  }>;
-  projectSettings?: {
-    buildCommand?: string | null;
-    outputDirectory?: string | null;
-    installCommand?: string | null;
-    devCommand?: string | null;
-    rootDirectory?: string | null;
-  };
-  meta?: Record<string, string>;
-}
-
-export interface DeploymentFile {
-  path: string;
-  content: Buffer;
-  sha: string;
-  size: number;
-}
-
-export interface VercelCustomDomain {
-  id: string;
-  name: string;
-  apexName: string;
-  projectId: string;
-  verified: boolean;
-  redirect: string | null;
-  redirectStatusCode: number | null;
-  gitBranch: string | null;
-  customEnvironmentId?: string | null;
-  createdAt: number;
-  updatedAt: number;
-  verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
-}
-
-export interface VercelDomainConfig {
-  misconfigured?: boolean;
-  recommendedCNAME?: Array<{
-    rank: number;
-    value: string;
-  }>;
-  recommendedIPv4?: Array<{
-    rank: number;
-    value: string[];
-  }>;
-}
-
-export interface VercelProjectDomain {
-  name: string;
-  apexName: string;
-  verified: boolean;
-  verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
 }
 
 export interface VercelRateLimitRetryOptions {
@@ -189,7 +131,31 @@ export const DEFAULT_VERCEL_RATE_LIMIT_OPTS: VercelRateLimitRetryOptions = {
   jitterMaxMs: 250,
 };
 
-export class VercelProvider {
+export class VercelProvider implements SitesProvider {
+  readonly name: SitesProviderName = 'vercel';
+
+  /**
+   * Grouped so a caller can ask `if (!provider.envVars)` instead of probing for a method.
+   * The implementations stay below as private methods; these are the interface.
+   */
+  readonly envVars: EnvVarStore = {
+    upsert: (vars) => this.upsertEnvironmentVariables(vars),
+    keys: () => this.getEnvironmentVariableKeys(),
+    list: () => this.listEnvironmentVariables(),
+    get: (envId) => this.getEnvironmentVariable(envId),
+    remove: (envId) => this.deleteEnvironmentVariable(envId),
+  };
+
+  readonly domains: DomainStore = {
+    list: () => this.listCustomDomains(),
+    add: (domain) => this.addCustomDomain(domain),
+    remove: (domain) => this.removeCustomDomain(domain),
+    verify: (domain) => this.verifyCustomDomain(domain),
+    get: (domain) => this.getCustomDomain(domain),
+    config: (domain) => this.getCustomDomainConfig(domain),
+    url: () => this.getCustomDomainUrl(),
+  };
+
   private static instance: VercelProvider;
   private cloudCredentials: VercelCredentials | undefined;
   private fetchPromise: Promise<VercelCredentials> | null = null;
@@ -197,6 +163,25 @@ export class VercelProvider {
 
   private constructor() {
     this.secretService = SecretService.getInstance();
+  }
+
+  /**
+   * `buildLogs` and `rollback` are false because neither exists here, not because Vercel
+   * cannot do them: this provider has no logs method, and the Deployment Logs page is a
+   * history list. A driver that has them reports true and the dashboard offers them.
+   */
+  capabilities(): SitesCapabilities {
+    return {
+      envVars: 'runtime',
+      customDomains: true,
+      slug: true,
+      rollback: false,
+      buildLogs: false,
+      frameworkDetection: true,
+      // Vercel gives every deployment a hostname and nothing else.
+      ingressModes: ['host'],
+      defaultIngress: 'host',
+    };
   }
 
   static getInstance(): VercelProvider {
@@ -391,7 +376,7 @@ export class VercelProvider {
    * Create a new deployment on Vercel
    * POST /v13/deployments
    */
-  async createDeployment(options: CreateDeploymentOptions = {}): Promise<VercelDeploymentResult> {
+  async createDeployment(options: CreateDeploymentInput = {}): Promise<ProviderDeployment> {
     const credentials = await this.getCredentials();
 
     try {
@@ -443,7 +428,7 @@ export class VercelProvider {
    * Get deployment status by deployment ID
    * GET /v13/deployments/:id
    */
-  async getDeployment(deploymentId: string): Promise<VercelDeploymentResult> {
+  async getDeployment(deploymentId: string): Promise<ProviderDeployment> {
     const credentials = await this.getCredentials();
 
     try {
@@ -516,7 +501,9 @@ export class VercelProvider {
   /**
    * Upsert environment variables for the project
    */
-  async upsertEnvironmentVariables(envVars: Array<{ key: string; value: string }>): Promise<void> {
+  private async upsertEnvironmentVariables(
+    envVars: Array<{ key: string; value: string }>
+  ): Promise<void> {
     const credentials = await this.getCredentials();
 
     try {
@@ -555,7 +542,7 @@ export class VercelProvider {
   /**
    * Get all environment variable keys for the project
    */
-  async getEnvironmentVariableKeys(): Promise<string[]> {
+  private async getEnvironmentVariableKeys(): Promise<string[]> {
     const credentials = await this.getCredentials();
 
     try {
@@ -579,7 +566,7 @@ export class VercelProvider {
    * GET /v10/projects/:idOrName/env
    * https://docs.vercel.com/docs/rest-api/reference/endpoints/projects/retrieve-the-environment-variables-of-a-project-by-id-or-name
    */
-  async listEnvironmentVariables(): Promise<
+  private async listEnvironmentVariables(): Promise<
     Array<{
       id: string;
       key: string;
@@ -629,7 +616,7 @@ export class VercelProvider {
    * GET /v1/projects/:idOrName/env/:id
    * https://docs.vercel.com/docs/rest-api/reference/endpoints/projects/retrieve-the-decrypted-value-of-an-environment-variable-of-a-project-by-id
    */
-  async getEnvironmentVariable(envId: string): Promise<{
+  private async getEnvironmentVariable(envId: string): Promise<{
     id: string;
     key: string;
     value: string;
@@ -683,7 +670,7 @@ export class VercelProvider {
   /**
    * Delete an environment variable by its Vercel ID
    */
-  async deleteEnvironmentVariable(envId: string): Promise<void> {
+  private async deleteEnvironmentVariable(envId: string): Promise<void> {
     const credentials = await this.getCredentials();
 
     try {
@@ -752,7 +739,7 @@ export class VercelProvider {
    * Get the custom domain URL based on the slug
    * Returns null if no slug is set
    */
-  async getCustomDomainUrl(): Promise<string | null> {
+  private async getCustomDomainUrl(): Promise<string | null> {
     const slug = await this.getSlug();
     return slug ? `https://${slug}.insforge.site` : null;
   }
@@ -765,7 +752,7 @@ export class VercelProvider {
    * List domains associated with the configured Vercel project
    * GET /v9/projects/:id/domains
    */
-  async listCustomDomains(): Promise<VercelCustomDomain[]> {
+  private async listCustomDomains(): Promise<CustomDomain[]> {
     const credentials = await this.getCredentials();
 
     try {
@@ -781,7 +768,7 @@ export class VercelProvider {
       );
 
       const data = response.data as {
-        domains?: VercelCustomDomain[];
+        domains?: CustomDomain[];
       };
 
       const domains = data.domains ?? [];
@@ -803,7 +790,7 @@ export class VercelProvider {
    * Get DNS configuration hints for a domain on Vercel
    * GET /v6/domains/:domain/config
    */
-  async getCustomDomainConfig(domain: string): Promise<VercelDomainConfig> {
+  private async getCustomDomainConfig(domain: string): Promise<DomainConfig> {
     const credentials = await this.getCredentials();
 
     try {
@@ -818,7 +805,7 @@ export class VercelProvider {
         }
       );
 
-      return response.data as VercelDomainConfig;
+      return response.data as DomainConfig;
     } catch (error) {
       logger.error('Failed to fetch custom domain config from Vercel', {
         error: error instanceof Error ? error.message : String(error),
@@ -832,7 +819,7 @@ export class VercelProvider {
    * Get a single domain associated with the configured Vercel project
    * GET /v9/projects/:id/domains/:domain
    */
-  async getCustomDomain(domain: string): Promise<VercelProjectDomain> {
+  private async getCustomDomain(domain: string): Promise<ProjectDomain> {
     const credentials = await this.getCredentials();
 
     try {
@@ -847,7 +834,7 @@ export class VercelProvider {
         }
       );
 
-      return response.data as VercelProjectDomain;
+      return response.data as ProjectDomain;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         throw new AppError(
@@ -868,7 +855,7 @@ export class VercelProvider {
    * Add a custom domain to the Vercel project
    * POST /v10/projects/:id/domains
    */
-  async addCustomDomain(domain: string): Promise<{
+  private async addCustomDomain(domain: string): Promise<{
     name: string;
     apexName: string;
     projectId: string;
@@ -925,7 +912,7 @@ export class VercelProvider {
    * Remove a custom domain from the Vercel project
    * DELETE /v9/projects/:id/domains/:domain
    */
-  async removeCustomDomain(domain: string): Promise<void> {
+  private async removeCustomDomain(domain: string): Promise<void> {
     const credentials = await this.getCredentials();
 
     try {
@@ -959,7 +946,7 @@ export class VercelProvider {
    * Verify a custom domain's DNS configuration
    * POST /v9/projects/:id/domains/:domain/verify
    */
-  async verifyCustomDomain(domain: string): Promise<{
+  private async verifyCustomDomain(domain: string): Promise<{
     verified: boolean;
     verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
   }> {
@@ -1191,9 +1178,7 @@ export class VercelProvider {
   /**
    * Upload multiple files to Vercel with limited concurrency
    */
-  async uploadFiles(
-    files: Array<{ path: string; content: Buffer }>
-  ): Promise<Array<{ file: string; sha: string; size: number }>> {
+  async uploadFiles(files: Array<{ path: string; content: Buffer }>): Promise<UploadedFileRef[]> {
     const results: Array<{ file: string; sha: string; size: number }> = [];
 
     for (let i = 0; i < files.length; i += UPLOAD_BATCH_SIZE) {
@@ -1226,9 +1211,9 @@ export class VercelProvider {
    * Create deployment using file SHAs (files must be pre-uploaded)
    */
   async createDeploymentWithFiles(
-    files: Array<{ file: string; sha: string; size: number }>,
-    options: Omit<CreateDeploymentOptions, 'files'> = {}
-  ): Promise<VercelDeploymentResult> {
+    files: UploadedFileRef[],
+    options: Omit<CreateDeploymentInput, 'files'> = {}
+  ): Promise<ProviderDeployment> {
     const credentials = await this.getCredentials();
 
     try {
