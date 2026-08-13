@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { extract as tarExtract } from 'tar-stream';
 import { Readable } from 'node:stream';
+import { createServer } from 'node:net';
 
 const staging = await mkdtemp(path.join(tmpdir(), 'insforge-sites-'));
 
@@ -40,9 +41,16 @@ const { DockerSitesProvider } = await import('@/providers/deployments/docker.pro
 const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
 const savedAppKey = process.env.APP_KEY;
 
-/** Any existing file passes the probe — existsSync is all the driver checks. */
+/**
+ * A real unix socket, because the driver checks for one rather than for any path: a
+ * regular file at DOCKER_SOCKET_PATH would register the driver and then fail every call.
+ */
+const socketPath = path.join(staging, 'docker.sock');
+const socketServer = createServer();
+await new Promise<void>((resolve) => socketServer.listen(socketPath, resolve));
+
 function mountSocket(): void {
-  dockerClientConfig.socketPath = process.execPath;
+  dockerClientConfig.socketPath = socketPath;
 }
 
 /** Entries inside the tar the driver handed to the builder, name -> contents. */
@@ -107,10 +115,15 @@ beforeEach(() => {
   dockerClientConfig.defaultIngress = 'port';
   dockerClientConfig.publicHost = '';
   configMock.deployments.sitesDomain = '';
+  // Restored like every other toggled field: the driver branches on this for both the
+  // switch order and the port binding, so a test after the fixed-port one would silently
+  // inherit stop-before-start.
+  configMock.deployments.sitesPort = 0;
   delete process.env.AWS_INSTANCE_PROFILE_NAME;
 });
 
 afterAll(async () => {
+  socketServer.close();
   if (savedAppKey === undefined) {
     delete process.env.APP_KEY;
   } else {
@@ -816,5 +829,94 @@ describe('DockerSitesProvider stable address', () => {
     expect(body.HostConfig.PortBindings['80/tcp'][0].HostPort).toBe('7134');
     // Stable by definition, so nothing is read back from the daemon.
     expect(deployment.url).toBeNull();
+  });
+});
+
+describe('DockerSitesProvider fixed-port failure paths', () => {
+  // Two containers cannot hold one host port, so rollback under a fixed port has to stop
+  // the live one first — starting the target while it is still bound just fails.
+  it('stops the live container before starting the rollback target', async () => {
+    configMock.deployments.sitesPort = 7134;
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve([
+          { Id: 'container-live', State: 'running', Image: 'insforge-site-appkey01:new' },
+          { Id: 'container-old', State: 'exited', Image: 'insforge-site-appkey01:old' },
+        ]);
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({
+          Id: 'container-old',
+          Name: '/insforge-site',
+          Created: '2026-08-13T00:00:00Z',
+          State: { Status: 'running', ExitCode: 0 },
+          Config: { Image: 'insforge-site-appkey01:old' },
+          NetworkSettings: { Ports: { '80/tcp': [{ HostPort: '7134' }] } },
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    await DockerSitesProvider.getInstance().rollbackTo('container-old');
+
+    const writes = dockerRequest.mock.calls
+      .filter(([method]) => method === 'POST')
+      .map(([, url]) => url as string);
+    expect(writes[0]).toBe('/containers/container-live/stop?t=5');
+    expect(writes[1]).toBe('/containers/container-old/start');
+  });
+
+  // The port was freed by stopping the old container, so a replacement that will not start
+  // would otherwise leave nothing serving at all.
+  it('restarts the previous deployment when the replacement fails to start', async () => {
+    configMock.deployments.sitesPort = 7134;
+    okBuild();
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve([{ Id: 'container-old', State: 'running', Image: 'x' }]);
+      }
+      if (method === 'POST' && url.startsWith('/containers/create')) {
+        return Promise.resolve({ Id: 'container-doomed' });
+      }
+      if (url.endsWith('/containers/container-doomed/start')) {
+        return Promise.reject(new Error('port is already allocated'));
+      }
+      return Promise.resolve(undefined);
+    });
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>recover</h1>') },
+    ]);
+
+    await expect(provider.createDeploymentWithFiles(files)).rejects.toThrow(
+      'port is already allocated'
+    );
+
+    const writes = dockerRequest.mock.calls
+      .filter(([method]) => method === 'POST')
+      .map(([, url]) => url as string);
+    expect(writes).toContain('/containers/container-old/start');
+  });
+
+  // A deliberate stop is how this driver cancels, so reporting it as ERROR turned every
+  // cancellation and every superseded deployment into a failure.
+  it('reports a clean exit as CANCELED and a crash as ERROR', async () => {
+    for (const [exitCode, expected] of [
+      [0, 'CANCELED'],
+      [137, 'ERROR'],
+    ] as const) {
+      dockerRequest.mockImplementation(() =>
+        Promise.resolve({
+          Id: 'c1',
+          Name: '/insforge-site',
+          Created: '2026-08-13T00:00:00Z',
+          State: { Status: 'exited', ExitCode: exitCode },
+          Config: { Image: 'insforge-site-appkey01:x' },
+        })
+      );
+
+      const deployment = await DockerSitesProvider.getInstance().getDeployment('c1');
+      expect(deployment.readyState).toBe(expected);
+    }
   });
 });

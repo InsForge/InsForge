@@ -256,7 +256,40 @@ services:
     networks:
       - insforge-network
 
+  # Optional gateway for a self-hosted site. Off unless you ask for it:
+  #
+  #   docker compose --profile sites-gateway up -d
+  #
+  # InsForge does not route your traffic or hold your certificates — this is a ready-made
+  # config, not a component we run. It reaches whichever deployment is live through the
+  # stable alias the sites driver assigns, so the Caddyfile needs no rewriting per deploy.
+  #
+  # Publishing on 80/443 is what lets Caddy answer an ACME challenge for SITES_HOSTNAME. If
+  # you move these ports, a public certificate needs your own forwarding or a DNS challenge.
+  sites-gateway:
+    image: caddy:alpine
+    profiles: ['sites-gateway']
+    restart: unless-stopped
+    environment:
+      # Must resolve to the same value the backend uses; the driver falls back to `local`.
+      - APP_KEY=${APP_KEY:-local}
+      # A domain pointed here makes Caddy obtain a certificate itself. Defaults to `:80`,
+      # which answers for any host — see the Caddyfile for why the fallback lives here.
+      - SITES_HOSTNAME=${SITES_HOSTNAME:-:80}
+    ports:
+      - '${SITES_GATEWAY_HTTP_PORT:-80}:80'
+      - '${SITES_GATEWAY_HTTPS_PORT:-443}:443'
+    volumes:
+      - ./deploy/sites-gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      - sites-gateway-data:/data
+    networks:
+      - insforge-network
+
+
 volumes:
+  # Certificates and Caddy's own state, so a restart does not re-issue them.
+  sites-gateway-data:
+    driver: local
   postgres-data:
     driver: local
   deno_cache:

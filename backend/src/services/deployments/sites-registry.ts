@@ -42,7 +42,7 @@ export function buildSitesRegistry(): SitesRegistry {
   const known = ['', 'auto', 'vercel', 'docker'];
   if (!known.includes(requested)) {
     throw new AppError(
-      `Unknown SITES_PROVIDER "${requested}". Expected one of: vercel, docker, off.`,
+      `Unknown SITES_PROVIDER "${requested}". Expected one of: vercel, docker, auto, off.`,
       503,
       ERROR_CODES.DEPLOYMENT_NOT_CONFIGURED
     );

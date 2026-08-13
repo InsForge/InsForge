@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
+import { createServer } from 'node:net';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 const configMock = {
   cloud: { projectId: undefined as string | undefined, apiHost: 'https://cloud.test' },
@@ -34,9 +37,13 @@ const {
 const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
 const savedRequested = process.env.SITES_PROVIDER;
 
-/** Any existing file passes the socket probe — existsSync is all the driver checks. */
+/** A real unix socket: the driver checks for one, not merely for an existing path. */
+const socketPath = path.join(tmpdir(), `insforge-sites-registry-${process.pid}.sock`);
+const socketServer = createServer();
+await new Promise<void>((resolve) => socketServer.listen(socketPath, resolve));
+
 function mountDockerSocket(): void {
-  configMock.docker.socketPath = process.execPath;
+  configMock.docker.socketPath = socketPath;
 }
 
 function configureVercel(): void {
@@ -55,6 +62,7 @@ beforeEach(() => {
 });
 
 afterAll(() => {
+  socketServer.close();
   if (savedProfile === undefined) {
     delete process.env.AWS_INSTANCE_PROFILE_NAME;
   } else {

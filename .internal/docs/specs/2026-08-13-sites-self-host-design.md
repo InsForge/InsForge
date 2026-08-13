@@ -13,12 +13,12 @@ This is the Sites counterpart of the compute multi-driver work (merged: `provide
 | Fact | Evidence |
 |---|---|
 | One driver, no interface | `backend/src/providers/deployments/` contains only `vercel.provider.ts` (1273 lines, 24 public methods) |
-| Service imports it directly | `deployment.service.ts:9` imports from `vercel.provider.js`; 18 public methods, 1509 lines |
+| Service imported it directly | `deployment.service.ts` imported `vercel.provider.js` at the top; 18 public methods, 1509 lines |
 | The table is already provider-neutral | migration `019`: `provider TEXT NOT NULL DEFAULT 'vercel'`, `provider_deployment_id TEXT UNIQUE`; comment: "Designed to be provider-agnostic (Vercel, Netlify, Cloudflare, etc.)" |
 | The wire format is already neutral | `deployments.schema.ts`: `provider: z.string()`, `providerDeploymentId` — no `vercelId` leakage to fix |
 | Per-deployment file manifest exists | `deployments.files` (migration `031`): `file_path`, `sha`, `size_bytes`, `uploaded_at` per run |
-| Self-host is BYO-Vercel today | `vercel.provider.ts:286` `isConfigured()` → off-cloud it needs `appConfig.deployments.vercelToken` + team + project |
-| Three features are cloud-only | `deployment.service.ts:107` `getConfigMetadata()` and `:1297` `updateSlug()` refuse off-cloud; `vercel.provider.ts:744` `getSlug()` returns null |
+| Self-host was BYO-Vercel | `VercelProvider.isConfigured()` → off-cloud it needs `appConfig.deployments.vercelToken` + team + project |
+| Three features are cloud-only | `getConfigMetadata()` and `updateSlug()` refuse off-cloud; `getSlug()` returns null. (Line numbers deliberately omitted: this PR moves all three, and a citation that drifts is worse than none.) |
 | Sites docs have no self-host story | `docs/core-concepts/sites/overview.mdx` is Vercel-only end to end |
 
 Consequence: **no migration is needed for the seam.** Unlike compute, the persistence layer was built for this from the start.
@@ -125,7 +125,7 @@ Guessing *which* conventional output directory holds the build (`dist`, `build`,
 
 ## 5. Non-goals
 
-- Shipping or configuring nginx/Caddy. Documented as the operator's job, consistent with compute and the dashboard.
+- **Running** a gateway. A ready-made config ships at `deploy/sites-gateway/Caddyfile` behind an off-by-default compose profile, because "bring your own gateway" should not mean "work out the config yourself" — but InsForge does not run it, route traffic, or hold certificates. Consistent with compute and the dashboard.
 - TLS termination, certificate issuance, domain verification on self-host. `customDomains: false` for the Docker driver; the operator points a hostname at the published port.
 - Matching Vercel's framework matrix, or SSR of any kind, in v1.
 - Preview deployments per branch or per commit.

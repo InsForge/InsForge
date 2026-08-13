@@ -558,6 +558,48 @@ paths:
         '500':
           $ref: '#/components/responses/Error'
 
+  /api/deployments/{id}/rollback:
+    post:
+      summary: Roll back to a deployment
+      description: >-
+        Makes a previous deployment live again without rebuilding it, and demotes whichever
+        run currently claims `READY`. Offered only by drivers that report `rollback` in the
+        `sites` capability slice of `/api/metadata`; the rest answer `400` with
+        `DEPLOYMENT_FEATURE_UNSUPPORTED`. A run whose deployment never reached the provider,
+        or whose artifact retention has already removed, cannot be restored.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/DeploymentId'
+      responses:
+        '200':
+          description: The restored run, now `READY`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+        '400':
+          description: >-
+            Malformed id, a run that never reached the provider, or a driver that does not
+            support rollback
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          description: The run belongs to a driver that is not configured on this instance
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
   /api/deployments/{id}/cancel:
     post:
       summary: Cancel deployment

@@ -1,5 +1,4 @@
 import { Router, Response, NextFunction } from 'express';
-import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { requireEnvVarStore } from '@/services/deployments/sites-registry.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { deploymentsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
@@ -9,7 +8,6 @@ import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES, upsertEnvVarsRequestSchema } from '@insforge/shared-schemas';
 
 const router = Router();
-const deploymentService = DeploymentService.getInstance();
 const auditService = AuditService.getInstance();
 
 /**
@@ -18,14 +16,6 @@ const auditService = AuditService.getInstance();
  */
 router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!deploymentService.isConfigured()) {
-      throw new AppError(
-        'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
     const envVars = await requireEnvVarStore().list();
     successResponse(res, { envVars });
   } catch (error) {
@@ -43,14 +33,6 @@ router.post(
   deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      if (!deploymentService.isConfigured()) {
-        throw new AppError(
-          'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-          503,
-          ERROR_CODES.INTERNAL_ERROR
-        );
-      }
-
       const validationResult = upsertEnvVarsRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
@@ -93,14 +75,6 @@ router.post(
  */
 router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!deploymentService.isConfigured()) {
-      throw new AppError(
-        'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
     const { id } = req.params;
 
     const envVar = await requireEnvVarStore().get(id);
@@ -121,14 +95,6 @@ router.delete(
   deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      if (!deploymentService.isConfigured()) {
-        throw new AppError(
-          'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-          503,
-          ERROR_CODES.INTERNAL_ERROR
-        );
-      }
-
       const { id } = req.params;
 
       await requireEnvVarStore().remove(id);

@@ -87,7 +87,12 @@ export function truncateBuildLogs(lines: string[]): string[] {
       // emit single enormous lines — a minified bundle, a stack trace with no newlines —
       // and that is exactly when the operator needs the text rather than a bare marker.
       if (kept.length === 0) {
-        kept.unshift(`${line.slice(0, MAX_BUILD_LOG_BYTES)}… (line truncated)`);
+        // Clipped on the byte buffer, not by string index: `slice` counts UTF-16 units, so
+        // a line of multibyte output would have stored roughly twice the budget.
+        const marker = '… (line truncated)';
+        const room = MAX_BUILD_LOG_BYTES - Buffer.byteLength(marker, 'utf8');
+        const clipped = Buffer.from(line, 'utf8').subarray(0, room).toString('utf8');
+        kept.unshift(`${clipped}${marker}`);
       }
       break;
     }
@@ -135,7 +140,8 @@ export class DeploymentService {
     if (!name || name === active.name) {
       return active;
     }
-    const owner = buildSitesRegistry().providers.get(name as SitesProviderName);
+    const registry = buildSitesRegistry();
+    const owner = registry.providers.get(name as SitesProviderName);
     if (!owner) {
       throw new AppError(
         `This deployment was made by the ${name} driver, which is not configured here.`,
@@ -488,7 +494,10 @@ export class DeploymentService {
         lastFileUploadStartedAt: new Date().toISOString(),
       });
 
-      await this.provider.uploadFileStream({
+      // The row's own driver: if the default changed between creating this deployment and
+      // uploading to it, the bytes would land in a driver that will never build them while
+      // the database recorded the file as uploaded.
+      await this.providerFor(deployment).uploadFileStream({
         content: this.createValidatedFileStream(content, file.sha, file.size),
         sha: file.sha,
         size: file.size,
@@ -575,11 +584,16 @@ export class DeploymentService {
       const files = await this.getDeploymentFiles(id);
       const uploadMode = this.getUploadMode(deployment, files.length);
 
+      // Resolved once, from the row: every step of a start — uploads, the build, the URL
+      // it records — has to go to the driver that created it, not to whichever one is
+      // default by the time someone presses deploy.
+      const provider = this.providerFor(deployment);
+
       if (uploadMode === 'direct') {
-        return await this.startDirectDeployment(id, input, files);
+        return await this.startDirectDeployment(id, input, files, provider);
       }
 
-      return await this.startLegacyDeployment(id, input);
+      return await this.startLegacyDeployment(id, input, provider);
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
@@ -611,7 +625,8 @@ export class DeploymentService {
   private async startDirectDeployment(
     id: string,
     input: StartDeploymentRequest,
-    files: DeploymentFileRow[]
+    files: DeploymentFileRow[],
+    provider: SitesProvider
   ): Promise<DeploymentRecord> {
     if (files.length === 0) {
       throw new AppError(
@@ -645,13 +660,15 @@ export class DeploymentService {
       input,
       uploadedFiles,
       'direct',
+      provider,
       buildEnvVars
     );
   }
 
   private async startLegacyDeployment(
     id: string,
-    input: StartDeploymentRequest
+    input: StartDeploymentRequest,
+    provider: SitesProvider
   ): Promise<DeploymentRecord> {
     if (!this.s3Provider) {
       throw new AppError(
@@ -696,12 +713,13 @@ export class DeploymentService {
 
     const buildEnvVars = await this.applyEnvVars(input.envVars);
 
-    const uploadedFiles = await this.provider.uploadFiles(files);
+    const uploadedFiles = await provider.uploadFiles(files);
     const deployment = await this.createProviderDeploymentFromUploadedFiles(
       id,
       input,
       uploadedFiles,
       'legacy',
+      provider,
       buildEnvVars
     );
 
@@ -748,12 +766,18 @@ export class DeploymentService {
     input: StartDeploymentRequest,
     uploadedFiles: Array<{ file: string; sha: string; size: number }>,
     uploadMode: 'direct' | 'legacy',
+    /**
+     * The driver that owns this row. Passed in rather than re-read: the files were uploaded
+     * to it, so building through whichever driver happens to be default now would build
+     * from files it never received.
+     */
+    provider: SitesProvider,
     /** Present only for a build-only driver — see applyEnvVars. */
     buildEnvVars?: Array<{ key: string; value: string }>
   ): Promise<DeploymentRecord> {
     const totalSizeBytes = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
 
-    const deployment = await this.provider.createDeploymentWithFiles(uploadedFiles, {
+    const deployment = await provider.createDeploymentWithFiles(uploadedFiles, {
       projectSettings: input.projectSettings,
       meta: input.meta,
       ...(buildEnvVars ? { envVars: buildEnvVars } : {}),
@@ -763,8 +787,8 @@ export class DeploymentService {
 
     // Tolerant on purpose: this runs on every deploy, and a driver that bakes values into
     // the artifact has no store to read back — the keys it was given are recorded instead.
-    const envVarKeys = this.provider.envVars
-      ? await this.provider.envVars.keys()
+    const envVarKeys = provider.envVars
+      ? await provider.envVars.keys()
       : (buildEnvVars ?? []).map((envVar) => envVar.key);
 
     const updateResult = await this.getPool().query(
@@ -786,7 +810,7 @@ export class DeploymentService {
       [
         deployment.id,
         providerStatus,
-        this.getDeploymentUrl(deployment.url),
+        this.getDeploymentUrl(deployment.url, provider),
         JSON.stringify({
           vercelName: deployment.name,
           fileCount: uploadedFiles.length,
@@ -815,9 +839,19 @@ export class DeploymentService {
   /**
    * Get the deployment URL - uses custom domain if APP_KEY is set, otherwise falls back to provider URL
    */
-  private getDeploymentUrl(providerUrl: string | null): string | null {
+  /**
+   * The address to record for a deployment.
+   *
+   * `<APP_KEY>.insforge.site` is the shared domain our managed deploys live under, so it
+   * only applies to a driver that reports the `slug` capability — that capability *is*
+   * "this driver names sites under a domain it owns". Returning it unconditionally
+   * whenever APP_KEY was set meant a self-hosted Docker deploy recorded a cloud hostname
+   * that does not resolve for that instance, hiding the address the driver had just
+   * reported. APP_KEY is generated at setup, so that was the normal case, not an edge one.
+   */
+  private getDeploymentUrl(providerUrl: string | null, provider: SitesProvider): string | null {
     const appKey = process.env.APP_KEY;
-    if (appKey) {
+    if (appKey && provider.capabilities().slug) {
       return `https://${appKey}.insforge.site`;
     }
     return providerUrl;
@@ -1140,7 +1174,7 @@ export class DeploymentService {
            updated_at as "updatedAt"`,
         [
           status,
-          this.getDeploymentUrl(restored.url),
+          this.getDeploymentUrl(restored.url, provider),
           JSON.stringify({ rolledBackAt: new Date().toISOString() }),
           id,
         ]
@@ -1276,7 +1310,7 @@ export class DeploymentService {
            updated_at as "updatedAt"`,
         [
           providerStatus,
-          this.getDeploymentUrl(providerDeployment.url),
+          this.getDeploymentUrl(providerDeployment.url, this.providerFor(deployment)),
           JSON.stringify({
             lastSyncedAt: new Date().toISOString(),
             ...(providerDeployment.error && { error: providerDeployment.error }),
@@ -1412,7 +1446,13 @@ export class DeploymentService {
       let errorInfo: { errorCode?: string; errorMessage?: string } | undefined;
       if (status === 'ERROR') {
         try {
-          const providerDeployment = await this.provider.getDeployment(vercelDeploymentId);
+          // The row's own driver. A webhook only ever concerns the deployment it names, so
+          // asking the current default for its details would hand a Vercel id to Docker and
+          // lose the error message this block exists to capture.
+          const row = await this.getDeploymentByVercelId(vercelDeploymentId);
+          const providerDeployment = await this.providerFor(row ?? {}).getDeployment(
+            vercelDeploymentId
+          );
           if (providerDeployment.error) {
             errorInfo = {
               errorCode: providerDeployment.error.code,
@@ -1447,7 +1487,7 @@ export class DeploymentService {
            updated_at as "updatedAt"`,
         [
           status,
-          this.getDeploymentUrl(url),
+          this.getDeploymentUrl(url, this.provider),
           JSON.stringify({
             lastWebhookAt: new Date().toISOString(),
             ...webhookMetadata,
@@ -1605,6 +1645,11 @@ export class DeploymentService {
         ),
       };
     } catch (error) {
+      // A driver with no domain store already said so with a 400; wrapping it here turned
+      // "this driver cannot do custom domains" into "we broke".
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Failed to list custom domains', {
         error: error instanceof Error ? error.message : String(error),
       });
