@@ -89,6 +89,10 @@ const emailErrorCodes = [
 const deploymentErrorCodes = [
   'DEPLOYMENT_ALREADY_EXISTS',
   'DEPLOYMENT_INVALID_FILE',
+  // No sites driver can serve a deployment here: none configured, or SITES_PROVIDER=off.
+  // Distinct from INTERNAL_ERROR, which the unconfigured path used to report — a client
+  // cannot tell "you have not set this up" from "we broke" out of a generic 500 code.
+  'DEPLOYMENT_NOT_CONFIGURED',
   'DEPLOYMENT_NOT_FOUND',
   'DEPLOYMENT_UPLOAD_CANCELED',
   'DOMAIN_ALREADY_EXISTS',

@@ -1,5 +1,48 @@
 import { z } from 'zod';
 
+/** Which driver hosts a site. Persisted per row in `deployments.runs.provider`. */
+export const sitesProviderEnum = z.enum(['vercel', 'docker']);
+
+/**
+ * How a site is reachable. The compute ingress vocabulary minus `none`: a site nobody
+ * can reach is not a deployment. Kept in the same words on purpose, so one gateway
+ * config covers compute services and sites together.
+ */
+export const sitesIngressModeEnum = z.enum(['port', 'host']);
+
+/**
+ * What the active sites driver can do.
+ *
+ * Reported rather than inferred: a client that guessed from the provider name would
+ * offer buttons the driver has no implementation for. Every field is something two
+ * drivers genuinely differ on.
+ */
+export const sitesCapabilitiesSchema = z.object({
+  /**
+   * `runtime` — the platform holds env vars for the deployed app and can list, read and
+   * delete them. `build-only` — values reach the build and are baked into the artifact,
+   * so there is nothing to read back. `none` — unsupported.
+   */
+  envVars: z.enum(['runtime', 'build-only', 'none']),
+  /** The driver attaches and verifies domains itself, rather than the operator routing one. */
+  customDomains: z.boolean(),
+  /** The site gets a name under a shared domain the driver owns. */
+  slug: z.boolean(),
+  /** A previous deployment can be made live again without rebuilding it. */
+  rollback: z.boolean(),
+  /** Build output is retrievable after the fact. */
+  buildLogs: z.boolean(),
+  /** The driver infers how to build from the source tree. */
+  frameworkDetection: z.boolean(),
+  ingressModes: z.array(sitesIngressModeEnum),
+  /** Applied when a caller names no mode. Always one of `ingressModes`. */
+  defaultIngress: sitesIngressModeEnum.optional(),
+});
+
+export type SitesProviderName = z.infer<typeof sitesProviderEnum>;
+export type SitesIngressMode = z.infer<typeof sitesIngressModeEnum>;
+export type SitesCapabilitiesSchema = z.infer<typeof sitesCapabilitiesSchema>;
+
 /**
  * Deployment status enum schema
  * WAITING -> UPLOADING -> (Vercel statuses: QUEUED/BUILDING/READY/ERROR/CANCELED)

@@ -3,8 +3,13 @@ import AdmZip from 'adm-zip';
 import crypto from 'crypto';
 import { Transform, type Readable, type TransformCallback } from 'stream';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { VercelProvider } from '@/providers/deployments/vercel.provider.js';
-import type { DomainConfig } from '@/providers/deployments/sites.provider.js';
+import {
+  isAnySitesProviderConfigured,
+  requireDomainStore,
+  requireEnvVarStore,
+  selectSitesProvider,
+} from '@/services/deployments/sites-registry.js';
+import type { DomainConfig, SitesProvider } from '@/providers/deployments/sites.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import { AppError } from '@/utils/errors.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
@@ -58,12 +63,22 @@ interface DeploymentFileRow {
 export class DeploymentService {
   private static instance: DeploymentService;
   private pool: Pool | null = null;
-  private vercelProvider: VercelProvider;
   private s3Provider: S3StorageProvider | null = null;
 
   private constructor() {
-    this.vercelProvider = VercelProvider.getInstance();
     this.initializeS3Provider();
+  }
+
+  /**
+   * The active driver, resolved per call.
+   *
+   * Not held on the instance: Vercel credentials can be stored through the dashboard,
+   * and a provider captured in the constructor would predate them. Throws
+   * DEPLOYMENT_NOT_CONFIGURED when nothing can serve a deployment, which is why callers
+   * that only want to *report* availability use `isConfigured()` instead.
+   */
+  private get provider(): SitesProvider {
+    return selectSitesProvider();
   }
 
   private initializeS3Provider(): void {
@@ -106,7 +121,7 @@ export class DeploymentService {
       return undefined;
     }
     try {
-      const customSlug = await this.vercelProvider.getSlug();
+      const customSlug = this.provider.slug ? await this.provider.slug.get() : null;
       return { customSlug };
     } catch (error) {
       // Cloud slug lookup hits CLOUD_API_HOST + Vercel; transient failures
@@ -165,7 +180,7 @@ export class DeploymentService {
     requestedDomain: string
   ): Promise<DomainConfig> {
     try {
-      return await this.vercelProvider.domains.config(configDomain);
+      return await requireDomainStore().config(configDomain);
     } catch (error) {
       logger.warn('Vercel domain config lookup failed; continuing without DNS hints', {
         requestedDomain,
@@ -182,17 +197,14 @@ export class DeploymentService {
    * Self-hosted deployments use Vercel credentials from environment variables.
    */
   isConfigured(): boolean {
-    return this.vercelProvider.isConfigured();
+    return isAnySitesProviderConfigured();
   }
 
   private assertDeploymentServiceConfigured(): void {
-    if (!this.isConfigured()) {
-      throw new AppError(
-        'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
+    // Resolving the driver is the check: buildSitesRegistry() throws with the reason —
+    // nothing configured, SITES_PROVIDER=off, or a named driver that is unusable — and
+    // each of those is more actionable than one generic "not configured" message.
+    selectSitesProvider();
   }
 
   /**
@@ -384,7 +396,7 @@ export class DeploymentService {
         lastFileUploadStartedAt: new Date().toISOString(),
       });
 
-      await this.vercelProvider.uploadFileStream({
+      await this.provider.uploadFileStream({
         content: this.createValidatedFileStream(content, file.sha, file.size),
         sha: file.sha,
         size: file.size,
@@ -529,7 +541,7 @@ export class DeploymentService {
     await this.updateDeploymentStatus(id, DeploymentStatus.UPLOADING);
 
     if (input.envVars && input.envVars.length > 0) {
-      await this.vercelProvider.envVars.upsert(input.envVars);
+      await requireEnvVarStore().upsert(input.envVars);
     }
 
     const uploadedFiles = files.map((file) => ({
@@ -587,10 +599,10 @@ export class DeploymentService {
     }
 
     if (input.envVars && input.envVars.length > 0) {
-      await this.vercelProvider.envVars.upsert(input.envVars);
+      await requireEnvVarStore().upsert(input.envVars);
     }
 
-    const uploadedFiles = await this.vercelProvider.uploadFiles(files);
+    const uploadedFiles = await this.provider.uploadFiles(files);
     const deployment = await this.createVercelDeploymentFromUploadedFiles(
       id,
       input,
@@ -644,7 +656,7 @@ export class DeploymentService {
   ): Promise<DeploymentRecord> {
     const totalSizeBytes = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
 
-    const vercelDeployment = await this.vercelProvider.createDeploymentWithFiles(uploadedFiles, {
+    const vercelDeployment = await this.provider.createDeploymentWithFiles(uploadedFiles, {
       projectSettings: input.projectSettings,
       meta: input.meta,
     });
@@ -655,7 +667,7 @@ export class DeploymentService {
       'BUILDING'
     ).toUpperCase();
 
-    const envVarKeys = await this.vercelProvider.envVars.keys();
+    const envVarKeys = await requireEnvVarStore().keys();
 
     const updateResult = await this.getPool().query(
       `UPDATE deployments.runs
@@ -1055,9 +1067,7 @@ export class DeploymentService {
       }
 
       // Fetch latest status from Vercel
-      const vercelDeployment = await this.vercelProvider.getDeployment(
-        deployment.providerDeploymentId
-      );
+      const vercelDeployment = await this.provider.getDeployment(deployment.providerDeploymentId);
 
       // Use Vercel's status directly (uppercase to match our enum)
       const vercelStatus = (
@@ -1158,7 +1168,7 @@ export class DeploymentService {
 
       // If deployment has a Vercel ID, cancel it on Vercel
       if (deployment.providerDeploymentId) {
-        await this.vercelProvider.cancelDeployment(deployment.providerDeploymentId);
+        await this.provider.cancelDeployment(deployment.providerDeploymentId);
       }
 
       if (
@@ -1218,7 +1228,7 @@ export class DeploymentService {
       let errorInfo: { errorCode?: string; errorMessage?: string } | undefined;
       if (status === 'ERROR') {
         try {
-          const vercelDeployment = await this.vercelProvider.getDeployment(vercelDeploymentId);
+          const vercelDeployment = await this.provider.getDeployment(vercelDeploymentId);
           if (vercelDeployment.error) {
             errorInfo = {
               errorCode: vercelDeployment.error.code,
@@ -1346,7 +1356,7 @@ export class DeploymentService {
       const data = (await response.json()) as UpdateSlugResponse;
 
       // Update cached slug in VercelProvider so subsequent calls get the correct value
-      this.vercelProvider.updateCachedSlug(data.slug);
+      this.provider.slug?.updateCache(data.slug);
 
       logger.info('Custom domain slug updated', {
         projectId,
@@ -1376,7 +1386,7 @@ export class DeploymentService {
   async addCustomDomain(domain: string): Promise<AddCustomDomainResponse> {
     this.assertDeploymentServiceConfigured();
 
-    const vercelData = await this.vercelProvider.domains.add(domain);
+    const vercelData = await requireDomainStore().add(domain);
     const config = await this.getCustomDomainConfigOrEmpty(vercelData.name, domain);
 
     logger.info('Custom domain added', { domain, verified: vercelData.verified });
@@ -1390,7 +1400,7 @@ export class DeploymentService {
     this.assertDeploymentServiceConfigured();
 
     try {
-      const domains = (await this.vercelProvider.domains.list()).filter(
+      const domains = (await requireDomainStore().list()).filter(
         (domain) => !this.isReservedHostedDomain(domain.name)
       );
       const configs = new Map(
@@ -1424,7 +1434,7 @@ export class DeploymentService {
   async removeCustomDomain(domain: string): Promise<void> {
     this.assertDeploymentServiceConfigured();
 
-    await this.vercelProvider.domains.remove(domain);
+    await requireDomainStore().remove(domain);
 
     logger.info('Custom domain removed', { domain });
   }
@@ -1437,8 +1447,8 @@ export class DeploymentService {
 
     try {
       const [vercelResult, projectDomain] = await Promise.all([
-        this.vercelProvider.domains.verify(domain),
-        this.vercelProvider.domains.get(domain),
+        requireDomainStore().verify(domain),
+        requireDomainStore().get(domain),
       ]);
 
       logger.info('Custom domain verification result', { domain, verified: vercelResult.verified });
@@ -1487,7 +1497,7 @@ export class DeploymentService {
         | undefined;
 
       // Get the custom domain URL from Vercel provider (which has the slug from cloud credentials)
-      const customDomainUrl = await this.vercelProvider.domains.url();
+      const customDomainUrl = await requireDomainStore().url();
 
       return {
         currentDeploymentId: latestReadyDeployment?.id ?? null,

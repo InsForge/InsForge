@@ -1,46 +1,17 @@
 import type { Readable } from 'stream';
-import type { IngressMode } from '@insforge/shared-schemas';
+
+import type {
+  SitesCapabilitiesSchema,
+  SitesProviderName as SitesProviderNameSchema,
+} from '@insforge/shared-schemas';
 
 /**
- * Which driver hosts a site. Recorded per row in `deployments.runs.provider`, which has
- * been provider-neutral since migration 019.
+ * Re-exported from the wire schema rather than declared here: capabilities are
+ * published through /api/metadata, so a second definition would drift from the one
+ * clients validate against.
  */
-export type SitesProviderName = 'vercel' | 'docker';
-
-/**
- * What a sites driver can do.
- *
- * Reported rather than inferred, for the same reason ComputeCapabilities is: a client
- * that guessed from the provider name would offer buttons the active driver has no
- * implementation for. Every field here is a capability two drivers genuinely differ on
- * — anything both can always do does not belong.
- */
-export interface SitesCapabilities {
-  /**
-   * `runtime` — the platform holds env vars for the deployed app and can list, read and
-   * delete them. `build-only` — values reach the build and are baked into the artifact,
-   * so there is nothing to read back afterwards. `none` — not supported at all.
-   */
-  envVars: 'runtime' | 'build-only' | 'none';
-  /** The driver attaches and verifies domains itself, rather than the operator routing one. */
-  customDomains: boolean;
-  /** The site is reachable under a shared domain the driver assigns a name in. */
-  slug: boolean;
-  /** A previous deployment can be made live again without rebuilding it. */
-  rollback: boolean;
-  /** Build output is retrievable after the fact. */
-  buildLogs: boolean;
-  /** The driver infers how to build from the source tree. */
-  frameworkDetection: boolean;
-  /**
-   * How the site is reachable. Same vocabulary as compute, deliberately, so one gateway
-   * config covers services and sites. `none` never applies — a site nobody can reach is
-   * not a deployment — so this is a subset of the compute modes.
-   */
-  ingressModes: Exclude<IngressMode, 'none'>[];
-  /** Applied when a caller names no mode. Always one of `ingressModes`. */
-  defaultIngress?: Exclude<IngressMode, 'none'>;
-}
+export type SitesProviderName = SitesProviderNameSchema;
+export type SitesCapabilities = SitesCapabilitiesSchema;
 
 /** A deployment as the driver reports it. `id` is what lands in `provider_deployment_id`. */
 export interface ProviderDeployment {
@@ -149,6 +120,16 @@ export interface DomainStore {
 }
 
 /**
+ * A name under a domain the driver owns. Only meaningful when `capabilities().slug` is
+ * true. `updateCache` exists because the slug is settable through a path the driver does
+ * not see — the service writes it, then tells the driver so the next read is not stale.
+ */
+export interface SlugStore {
+  get(): Promise<string | null>;
+  updateCache(slug: string | null): void;
+}
+
+/**
  * What every sites driver must implement: take an uploaded file set and produce
  * something served. Everything a driver can legitimately not do hangs off a capability
  * flag rather than throwing from a method the interface claims to have.
@@ -185,5 +166,5 @@ export interface SitesProvider {
   /** Present when `capabilities().customDomains` is true. */
   domains?: DomainStore;
   /** Present when `capabilities().slug` is true. */
-  getSlug?(): Promise<string | null>;
+  slug?: SlugStore;
 }

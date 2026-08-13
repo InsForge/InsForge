@@ -13,6 +13,7 @@ import type {
   SitesCapabilities,
   SitesProvider,
   SitesProviderName,
+  SlugStore,
   UploadedFileRef,
 } from './sites.provider.js';
 import { AppError, UpstreamError } from '@/utils/errors.js';
@@ -144,6 +145,11 @@ export class VercelProvider implements SitesProvider {
     list: () => this.listEnvironmentVariables(),
     get: (envId) => this.getEnvironmentVariable(envId),
     remove: (envId) => this.deleteEnvironmentVariable(envId),
+  };
+
+  readonly slug: SlugStore = {
+    get: () => this.getSlug(),
+    updateCache: (slug) => this.updateCachedSlug(slug),
   };
 
   readonly domains: DomainStore = {
@@ -716,7 +722,7 @@ export class VercelProvider implements SitesProvider {
    * Update the cached slug after a successful slug update
    * This avoids refetching all credentials from the cloud API
    */
-  updateCachedSlug(slug: string | null): void {
+  private updateCachedSlug(slug: string | null): void {
     if (this.cloudCredentials) {
       this.cloudCredentials.slug = slug;
       logger.debug('Updated cached slug', { slug });
@@ -727,7 +733,7 @@ export class VercelProvider implements SitesProvider {
    * Get the current custom slug from cached credentials
    * Returns null if not in cloud environment or no slug is set
    */
-  async getSlug(): Promise<string | null> {
+  private async getSlug(): Promise<string | null> {
     if (!isCloudEnvironment()) {
       return null;
     }
