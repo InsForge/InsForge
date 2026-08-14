@@ -12,45 +12,28 @@ const MAX_KEYS_LIMIT = 1000;
 const DB_WINDOW = 1000;
 const MAX_DB_PAGES = 200;
 
-const CONTINUATION_VERSION = 1;
-// Marks a token as the versioned payload rather than the bare object key the
-// previous format used. NUL is the one byte that can never begin a legacy
-// token: storage.objects.key is Postgres `text`, which cannot hold U+0000, so
-// no stored key can start with it and the two formats can never be confused.
-const CONTINUATION_MARKER = 0x00;
-
-/**
- * Where the previous page stopped. `key` is the last raw object key that was
- * consumed; `prefix` is the CommonPrefix that key collapsed into, if any.
- *
- * The prefix matters because a CommonPrefix stands in for many raw keys. When a
- * page ends part-way through such a group, the cursor still points inside it, so
- * the next page would rebuild the same CommonPrefix and return it a second time.
- * Carrying it in the token lets the next page consume the rest of that group
- * without emitting anything.
- */
-interface Continuation {
-  key: string;
-  prefix?: string;
+function encodeContinuation(key: string): string {
+  return Buffer.from(key, 'utf8').toString('base64url');
 }
 
-function encodeContinuation(cursor: Continuation): string {
-  const payload =
-    cursor.prefix === undefined
-      ? { v: CONTINUATION_VERSION, k: cursor.key }
-      : { v: CONTINUATION_VERSION, k: cursor.key, p: cursor.prefix };
-  return Buffer.concat([
-    Buffer.from([CONTINUATION_MARKER]),
-    Buffer.from(JSON.stringify(payload), 'utf8'),
-  ]).toString('base64url');
+function decodeContinuation(token: string): string | undefined {
+  const key = Buffer.from(token, 'base64url').toString('utf8');
+  return key === '' ? undefined : key;
 }
 
 /**
  * The CommonPrefix a key collapses into for the given listing parameters, or
- * undefined when the key is listed on its own. This is the single definition of
- * grouping: the scan and the continuation check both go through it, so a
- * carried prefix can only ever be honoured when this request would have
- * produced it from the same key.
+ * undefined when the key is listed on its own.
+ *
+ * This is the single definition of grouping, and it is what lets a continuation
+ * token stay a bare position. A CommonPrefix stands in for many raw keys, so a
+ * page that ends part-way through such a group leaves the cursor inside it, and
+ * the next page would otherwise rebuild and return that prefix a second time.
+ * Rather than carry the prefix in the token, the next page recomputes it from
+ * the cursor key: the cursor only ever lands mid-group when the page it came
+ * from already returned that prefix, and it collapses to nothing when the page
+ * ended on a plain key. So the state cannot be inconsistent, or forged into
+ * suppressing a prefix this request would not itself rebuild from that key.
  */
 function collapsedPrefix(
   key: string,
@@ -63,30 +46,6 @@ function collapsedPrefix(
   const tail = key.slice(prefix.length);
   const idx = tail.indexOf(delimiter);
   return idx >= 0 ? prefix + tail.slice(0, idx + delimiter.length) : undefined;
-}
-
-function decodeContinuation(token: string): Continuation | undefined {
-  const raw = Buffer.from(token, 'base64url');
-  if (raw.length === 0) {
-    return undefined;
-  }
-  if (raw[0] !== CONTINUATION_MARKER) {
-    // Tokens issued before the versioned payload were the bare object key.
-    return { key: raw.toString('utf8') };
-  }
-  try {
-    const parsed = JSON.parse(raw.subarray(1).toString('utf8')) as {
-      v?: unknown;
-      k?: unknown;
-      p?: unknown;
-    };
-    if (parsed?.v === CONTINUATION_VERSION && typeof parsed.k === 'string') {
-      return { key: parsed.k, prefix: typeof parsed.p === 'string' ? parsed.p : undefined };
-    }
-  } catch {
-    // Marked but unparseable, so there is no position to resume from.
-  }
-  return undefined;
 }
 
 export async function handle(req: S3GatewayRequest, res: Response): Promise<void> {
@@ -134,32 +93,17 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
   const continuationToken = q['continuation-token'];
   const startAfter = q['start-after'];
   const resumeFrom = continuationToken ? decodeContinuation(continuationToken) : undefined;
-  // A token we cannot read carries no position. Restarting from the beginning
-  // would answer 200 with keys the caller has already processed, so say so
-  // instead, which is what S3 does for a token it does not recognise.
-  if (continuationToken && !resumeFrom) {
-    sendS3Error(res, 'InvalidArgument', 'The continuation token provided is incorrect', {
-      resource: req.path,
-      requestId: req.s3Auth.requestId,
-    });
-    return;
-  }
-  // A carried prefix describes the listing that issued it. Honour it only when
-  // the cursor key still collapses to exactly that prefix under this request's
-  // prefix and delimiter, so state that no longer applies (a changed or dropped
-  // delimiter, a changed prefix) or that never applied cannot drop an entry.
-  const suppressPrefix =
-    resumeFrom?.prefix !== undefined &&
-    collapsedPrefix(resumeFrom.key, prefix, delimiter) === resumeFrom.prefix
-      ? resumeFrom.prefix
-      : undefined;
+  // The CommonPrefix a resumed page must not repeat, recomputed from the cursor
+  // under this request's own prefix and delimiter. Only a token gets this: a
+  // caller-supplied start-after is a plain position, and S3 still lists the
+  // group its key happens to sit in.
+  const suppressPrefix = resumeFrom ? collapsedPrefix(resumeFrom, prefix, delimiter) : undefined;
 
   // Accumulate visible entries (Contents + CommonPrefixes) up to maxKeys.
-  // Track the last DB row we advanced past for continuation.
+  // Track the last DB row key we advanced past for continuation.
   const contents: Array<{ Key: string; Size: number; ETag: string; LastModified: string }> = [];
   const commonPrefixesSet = new Set<string>();
-  let cursor: Continuation | undefined =
-    resumeFrom ?? (startAfter ? { key: startAfter } : undefined);
+  let cursor: string | undefined = resumeFrom ?? (startAfter || undefined);
 
   // max-keys=0 asks for no entries at all, so there is nothing to scan and
   // nothing is left unread from the caller's point of view. Scanning anyway
@@ -171,7 +115,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
     const rows = await svc.listObjectsV2Db({
       bucket,
       prefix,
-      startAfter: cursor?.key,
+      startAfter: cursor,
       maxKeys: DB_WINDOW,
     });
     if (rows.length === 0) {
@@ -195,7 +139,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
         if (pfx !== suppressPrefix) {
           commonPrefixesSet.add(pfx);
         }
-        cursor = { key: r.key, prefix: pfx };
+        cursor = r.key;
         continue;
       }
       contents.push({
@@ -204,7 +148,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
         ETag: `"${r.etag ?? ''}"`,
         LastModified: r.lastModified.toISOString(),
       });
-      cursor = { key: r.key };
+      cursor = r.key;
     }
     if (stoppedEarly) {
       break;

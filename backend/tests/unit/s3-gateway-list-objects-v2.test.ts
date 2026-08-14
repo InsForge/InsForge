@@ -18,12 +18,9 @@ function row(key: string): DbRow {
   return { key, size: 1, etag: 'e', lastModified: new Date('2026-01-01T00:00:00.000Z') };
 }
 
-/** Builds a versioned continuation token the way the handler does. */
-function versionedToken(payload: Record<string, unknown>): string {
-  return Buffer.concat([
-    Buffer.from([0x00]),
-    Buffer.from(JSON.stringify(payload), 'utf8'),
-  ]).toString('base64url');
+/** Builds a continuation token for a cursor key, the way the handler does. */
+function keyToken(key: string): string {
+  return Buffer.from(key, 'utf8').toString('base64url');
 }
 
 /**
@@ -293,79 +290,56 @@ describe('ListObjectsV2 start-after and continuation-token', () => {
     expect(second.contents).toEqual(['b.txt']);
   });
 
-  it('ignores a carried prefix the cursor key does not sit under', async () => {
-    const inconsistent = versionedToken({ v: 1, k: 'a/1', p: 'b/' });
+  it('suppresses only the group the cursor is inside, never a later one', async () => {
+    const token = keyToken('a/1');
 
     const result = await list(['a/1', 'a/2', 'b/1'], {
       delimiter: '/',
-      'continuation-token': inconsistent,
+      'continuation-token': token,
     });
 
-    // "b/" is still listed: a token cannot suppress a prefix its cursor is not
-    // inside, so no page can be made to drop an entry it never returned.
-    expect(result.commonPrefixes).toEqual(['a/', 'b/']);
+    // "b/" is still listed. Suppression is recomputed from the cursor key, so a
+    // token cannot name a prefix its own position is not inside.
+    expect(result.commonPrefixes).toEqual(['b/']);
   });
 
-  it('ignores a carried prefix once the delimiter stops producing it', async () => {
-    // Token issued by a delimiter=/ walk, replayed against a request that
-    // groups differently. The carried state describes a listing that no longer
-    // exists, so it must not silently remove an entry from this one.
-    const issued = versionedToken({ v: 1, k: 'a/1', p: 'a/' });
+  it('suppresses nothing once the delimiter stops producing a group', async () => {
+    // A token issued by a delimiter=/ walk, replayed against a request that
+    // groups differently. The cursor no longer collapses into anything, so
+    // nothing may be dropped from this listing.
+    const token = keyToken('a/1');
 
-    const noDelimiter = await list(['a/1', 'a/2', 'b/1'], { 'continuation-token': issued });
+    const noDelimiter = await list(['a/1', 'a/2', 'b/1'], { 'continuation-token': token });
     expect(noDelimiter.contents).toEqual(['a/2', 'b/1']);
 
     const otherDelimiter = await list(['a/1', 'a/2', 'b/1'], {
       delimiter: '-',
-      'continuation-token': issued,
+      'continuation-token': token,
     });
     expect(otherDelimiter.contents).toEqual(['a/2', 'b/1']);
   });
 
-  it('accepts a legacy bare-key continuation token', async () => {
-    const legacy = Buffer.from('a.txt', 'utf8').toString('base64url');
-
-    const result = await list(['a.txt', 'b.txt', 'c.txt'], { 'continuation-token': legacy });
-
-    expect(result.contents).toEqual(['b.txt', 'c.txt']);
-  });
-
-  it('rejects a marked token it cannot read instead of restarting the walk', async () => {
-    const marked = Buffer.concat([Buffer.from([0x00]), Buffer.from('not json', 'utf8')]).toString(
-      'base64url'
-    );
-
-    const result = await list(['a.txt', 'b.txt'], { 'continuation-token': marked });
-
-    // Restarting would answer 200 with keys the caller had already processed.
-    expect(result.status).toBe(400);
-    expect(result.xml).toContain('InvalidArgument');
-    expect(result.contents).toEqual([]);
-  });
-
-  it('rejects a marked token whose payload is the wrong shape', async () => {
-    const wrongShape = versionedToken({ v: 99, k: 'a.txt' });
-
-    const result = await list(['a.txt', 'b.txt'], { 'continuation-token': wrongShape });
-
-    expect(result.status).toBe(400);
-    expect(result.xml).toContain('InvalidArgument');
-  });
-
-  it('reads a legacy token for a key shaped like the versioned payload as that key', async () => {
-    // An object key may be any text, including our own envelope. The NUL marker
-    // is what separates the formats, and Postgres text cannot hold NUL, so a
-    // stored key can never impersonate a versioned token.
-    const impostor = JSON.stringify({ v: 1, k: 'c.txt' });
-    const legacy = Buffer.from(impostor, 'utf8').toString('base64url');
-
-    // Sorted, these are: c.txt, impostor, impostor-next. Resuming after the
-    // impostor key returns one row; resuming after the embedded "c.txt" would
-    // return two and replay a key the caller had already seen.
-    const result = await list(['c.txt', impostor, `${impostor}-next`], {
-      'continuation-token': legacy,
+  it('does not suppress a group for a caller-supplied start-after', async () => {
+    // start-after is a plain position, not a resumed page, so the group its key
+    // sits in has not been returned to anyone yet.
+    const result = await list(['a/1', 'a/2', 'b/1'], {
+      delimiter: '/',
+      'start-after': 'a/1',
     });
 
+    expect(result.commonPrefixes).toEqual(['a/', 'b/']);
+  });
+
+  it('resumes from a token whose key is arbitrary text', async () => {
+    // Object keys may be any text. The token is just that key, so nothing about
+    // its content can change how it is read.
+    const awkward = '{"k":"c.txt"}';
+
+    const result = await list(['c.txt', awkward, `${awkward}-next`], {
+      'continuation-token': keyToken(awkward),
+    });
+
+    // Sorted these are c.txt, awkward, awkward-next, so only the last remains.
     expect(result.keyCount).toBe(1);
     expect(result.contents).not.toContain('c.txt');
   });
