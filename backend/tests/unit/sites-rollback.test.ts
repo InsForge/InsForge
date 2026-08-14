@@ -141,6 +141,27 @@ describe('DeploymentService.rollbackTo', () => {
     expect(statements[3]).toBe('COMMIT');
   });
 
+  // A broken connection makes ROLLBACK itself reject. Unguarded, that rejection replaced
+  // the original error and skipped the log line that is the only record of the host and the
+  // database disagreeing about what is live.
+  it('reports the original failure even when the ROLLBACK also fails', async () => {
+    mockPool.query.mockResolvedValueOnce({ rows: [rowFor('row-1', 'container-old')] });
+    mockClient.query.mockImplementation((sql: string) => {
+      if (String(sql).includes('UPDATE deployments.runs\n         SET status')) {
+        return Promise.reject(new Error('deadlock detected'));
+      }
+      if (String(sql) === 'ROLLBACK') {
+        return Promise.reject(new Error('connection terminated'));
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    await expect(DeploymentService.getInstance().rollbackTo('row-1')).rejects.toThrow(
+      'deadlock detected'
+    );
+    expect(mockClient.release).toHaveBeenCalled();
+  });
+
   it('rolls the transaction back when the update fails', async () => {
     mockPool.query.mockResolvedValueOnce({ rows: [rowFor('row-1', 'container-old')] });
     mockClient.query.mockImplementation((sql: string) => {
