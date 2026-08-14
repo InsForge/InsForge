@@ -22,8 +22,12 @@ export const projectSettingsSchema = z.object({
    * `output: 'standalone'`; omitting it copies everything, which is what `npm start` needs.
    */
   serverDirectory: z.string().nullable().optional(),
-  /** Port the server listens on inside the container. Defaults to 3000. */
-  serverPort: z.number().int().positive().nullable().optional(),
+  /**
+   * Port the server listens on inside the container. Defaults to the static site port, so
+   * one gateway line serves both shapes. Bounded because anything above 65535 is not a port
+   * and would fail at the daemon as an upstream error instead of invalid input.
+   */
+  serverPort: z.number().int().min(1).max(65535).nullable().optional(),
 });
 
 export const envVarSchema = z.object({

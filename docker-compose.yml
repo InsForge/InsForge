@@ -292,6 +292,10 @@ services:
     image: caddy:alpine
     profiles: ['sites-gateway']
     restart: unless-stopped
+    # The baseline every other service in this file carries, and this is the one that
+    # publishes host ports for inbound traffic.
+    security_opt:
+      - no-new-privileges:true
     environment:
       # Namespaces the alias, and must resolve to the same value the backend uses — the
       # driver falls back to `local` when APP_KEY is unset, so this defaults the same way.

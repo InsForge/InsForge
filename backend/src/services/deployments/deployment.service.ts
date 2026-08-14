@@ -12,6 +12,7 @@ import {
 } from '@/services/deployments/sites-registry.js';
 import type {
   DomainConfig,
+  EnvVarStore,
   SitesProvider,
   SitesProviderName,
 } from '@/providers/deployments/sites.provider.js';
@@ -283,9 +284,15 @@ export class DeploymentService {
    * would produce a site built without its configuration.
    */
   private async applyEnvVars(
-    envVars: Array<{ key: string; value: string }> | undefined
+    envVars: Array<{ key: string; value: string }> | undefined,
+    /**
+     * The driver that will build this deployment — the row's owner, not the current
+     * default. Passing the wrong one sends a Docker deployment's variables to Vercel's
+     * project API while the container that runs gets none, which is the exact confusion
+     * the seam exists to remove.
+     */
+    provider: SitesProvider
   ): Promise<Array<{ key: string; value: string }> | undefined> {
-    const provider = this.provider;
     const mode = provider.capabilities().envVars;
 
     if (mode === 'runtime' && !provider.envVars) {
@@ -326,12 +333,21 @@ export class DeploymentService {
     const serialized = JSON.stringify(envVars);
     const existing = await secrets.getSecretByKey(DeploymentService.SITE_ENV_SECRET_KEY);
     if (existing === null) {
-      await secrets.createSecret({
-        key: DeploymentService.SITE_ENV_SECRET_KEY,
-        value: serialized,
-        isReserved: true,
-      });
-      return;
+      try {
+        await secrets.createSecret({
+          key: DeploymentService.SITE_ENV_SECRET_KEY,
+          value: serialized,
+          isReserved: true,
+        });
+        return;
+      } catch (error) {
+        // Two deploys racing the first write both saw no secret, and the loser used to fail
+        // the whole deployment over a row that now exists. Falling through to the update is
+        // the same end state either way.
+        if (!(error instanceof AppError) || error.code !== ERROR_CODES.SECRET_ALREADY_EXISTS) {
+          throw error;
+        }
+      }
     }
     await secrets.updateSecretByKey(DeploymentService.SITE_ENV_SECRET_KEY, { value: serialized });
   }
@@ -354,6 +370,74 @@ export class DeploymentService {
       });
       return undefined;
     }
+  }
+
+  /**
+   * The store the environment-variable API works against.
+   *
+   * A driver that keeps variables itself hands over its own. A driver that reports
+   * `runtime` but keeps nothing — the Docker one — gets the store this service already uses
+   * on the deploy path, because otherwise `runtime` would be a capability whose management
+   * API refuses every call: a button that does nothing, which is what capability flags
+   * exist to prevent.
+   */
+  envVarStore(): EnvVarStore {
+    const provider = this.provider;
+    if (provider.envVars) {
+      return provider.envVars;
+    }
+    if (provider.capabilities().envVars === 'runtime') {
+      return this.secretEnvVarStore();
+    }
+    throw unsupportedFeature(provider.name, 'environment variables');
+  }
+
+  /**
+   * `EnvVarStore` over the one reserved secret.
+   *
+   * The key is the id. There is no separate identifier to hand out — the set is a JSON
+   * array in one secret, keys are unique within it, and inventing surrogate ids would make
+   * them change under the caller on every write.
+   */
+  private secretEnvVarStore(): EnvVarStore {
+    const load = async () => (await this.loadSiteEnvVars()) ?? [];
+    return {
+      keys: async () => (await load()).map((envVar) => envVar.key),
+      list: async () => (await load()).map((envVar) => ({ id: envVar.key, key: envVar.key })),
+      get: async (envId: string) => {
+        const found = (await load()).find((envVar) => envVar.key === envId);
+        if (!found) {
+          throw new AppError(
+            `No environment variable named ${envId}.`,
+            404,
+            ERROR_CODES.SECRET_NOT_FOUND
+          );
+        }
+        return { id: found.key, key: found.key, value: found.value };
+      },
+      // Merged, not replaced: this is the management API, where a caller sending one
+      // variable means "set this one". The deploy path replaces the whole set on purpose,
+      // since a half-applied environment is worse than the previous one.
+      upsert: async (envVars) => {
+        const merged = new Map((await load()).map((envVar) => [envVar.key, envVar.value]));
+        for (const envVar of envVars) {
+          merged.set(envVar.key, envVar.value);
+        }
+        await this.storeSiteEnvVars([...merged].map(([key, value]) => ({ key, value })));
+      },
+      remove: async (envId: string) => {
+        const existing = await load();
+        const remaining = existing.filter((envVar) => envVar.key !== envId);
+        if (remaining.length === existing.length) {
+          throw new AppError(
+            `No environment variable named ${envId}.`,
+            404,
+            ERROR_CODES.SECRET_NOT_FOUND
+          );
+        }
+        await this.storeSiteEnvVars(remaining);
+      },
+    };
   }
 
   private assertDeploymentServiceConfigured(): void {
@@ -705,7 +789,7 @@ export class DeploymentService {
 
     await this.updateDeploymentStatus(id, DeploymentStatus.UPLOADING);
 
-    const buildEnvVars = await this.applyEnvVars(input.envVars);
+    const buildEnvVars = await this.applyEnvVars(input.envVars, provider);
 
     const uploadedFiles = files.map((file) => ({
       file: file.path,
@@ -769,7 +853,7 @@ export class DeploymentService {
       throw new AppError('No files found in source zip.', 400, ERROR_CODES.DEPLOYMENT_INVALID_FILE);
     }
 
-    const buildEnvVars = await this.applyEnvVars(input.envVars);
+    const buildEnvVars = await this.applyEnvVars(input.envVars, provider);
 
     const uploadedFiles = await provider.uploadFiles(files);
     const deployment = await this.createProviderDeploymentFromUploadedFiles(
@@ -1559,6 +1643,22 @@ export class DeploymentService {
         }
       }
 
+      // Vercel is the only driver that sends webhooks, so the row this matches is a Vercel
+      // row — but reading the URL through the *current default* would rewrite it with
+      // whatever that driver advertises once an operator switches to Docker.
+      //
+      // Resolved leniently: an instance that has moved to Docker can still receive a
+      // webhook for a deployment made before the switch, and refusing it would leave that
+      // row stuck at its old status forever. Without the driver we simply do not touch the
+      // URL — the COALESCE below keeps what is already recorded.
+      let vercelProvider: SitesProvider | null = null;
+      try {
+        vercelProvider = this.providerFor({ provider: 'vercel' });
+      } catch {
+        logger.warn('Vercel webhook arrived but the vercel driver is not configured here', {
+          vercelDeploymentId,
+        });
+      }
       const result = await this.getPool().query(
         `UPDATE deployments.runs
          SET status = $1, url = COALESCE($2, url), metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb
@@ -1574,7 +1674,7 @@ export class DeploymentService {
            updated_at as "updatedAt"`,
         [
           status,
-          this.getDeploymentUrl(url, this.provider),
+          vercelProvider ? this.getDeploymentUrl(url, vercelProvider) : null,
           JSON.stringify({
             lastWebhookAt: new Date().toISOString(),
             ...webhookMetadata,

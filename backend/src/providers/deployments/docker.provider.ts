@@ -8,6 +8,7 @@ import type { Readable } from 'node:stream';
 import { pack as tarPack } from 'tar-stream';
 import { appConfig } from '@/infra/config/app.config.js';
 import {
+  DockerHttpError,
   demuxDockerStream,
   dockerBuild,
   dockerConfig,
@@ -37,6 +38,14 @@ const LABEL_MANAGED = 'insforge.managed';
 const LABEL_PROJECT = 'insforge.project';
 const LABEL_SITE = 'insforge.site';
 const LABEL_DEPLOYMENT = 'insforge.deployment';
+/**
+ * The port a server container listens on, recorded because later operations need to know
+ * two things a container cannot otherwise tell us: that this deployment is a server at all
+ * — a static one is Caddy and answers instantly — and where to reach it. Rollback has to
+ * wait for a server before stopping the live one, and the URL has to name the right port.
+ * Absent on a static deployment, and on any container built before this label existed.
+ */
+const LABEL_SERVER_PORT = 'insforge.site.server-port';
 
 /** The port the site server listens on inside the image. Nothing else runs in there. */
 const SITE_PORT = 80;
@@ -211,6 +220,16 @@ function containerPortFor(settings: {
   serverPort?: number | null;
 }): number {
   return settings.startCommand?.trim() ? (settings.serverPort ?? DEFAULT_SERVER_PORT) : SITE_PORT;
+}
+
+/** The server port recorded on a container, or null for a static deployment. */
+function serverPortOf(container: { Labels?: Record<string, string> }): number | null {
+  const raw = container.Labels?.[LABEL_SERVER_PORT];
+  if (!raw) {
+    return null;
+  }
+  const port = Number.parseInt(raw, 10);
+  return Number.isInteger(port) && port > 0 && port <= 65535 ? port : null;
 }
 
 interface OwnedContainer {
@@ -507,7 +526,16 @@ export class DockerSitesProvider implements SitesProvider {
       serverPort: startCommand ? (settings.serverPort ?? DEFAULT_SERVER_PORT) : undefined,
       envVars: options.envVars,
     });
-    const retained = await this.pruneOwnResources(containerId);
+    // Housekeeping, after the site is already serving. A failure here — the daemon
+    // refusing a list, an image still referenced — must not reject a deployment that is
+    // live: the caller would record it as ERROR while the new container answers requests,
+    // and the next deploy prunes anyway.
+    const retained = await this.pruneOwnResources(containerId).catch((error: unknown) => {
+      logger.warn('Docker sites: retention pass failed; the deployment is live regardless', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { removedContainers: 0, removedImages: 0 };
+    });
     const sweptBlobs = await this.sweepStaging();
     logger.info('Docker sites: deployed', {
       imageTag,
@@ -822,16 +850,6 @@ export class DockerSitesProvider implements SitesProvider {
     // container at all.
     const stopBeforeStarting = fixedPort > 0;
 
-    // With a fixed host port the switch cannot overlap — two containers cannot bind the
-    // same port — so the old one goes down first. Measured cost: ~870ms of refused
-    // connections. Without it the new container binds an ephemeral port while the old one
-    // still serves, which is gapless but changes the address every deploy. The operator
-    // picks by setting SITES_PORT, and a gateway in front makes the whole question moot.
-    if (stopBeforeStarting) {
-      for (const container of previous) {
-        await dockerRequest('POST', `/containers/${container.Id}/stop?t=5`).catch(() => undefined);
-      }
-    }
     // Not the digest alone. Retention keeps previous containers on purpose, so
     // redeploying byte-identical content — "re-run the deploy, nothing changed" — would
     // ask Docker for a name that still exists and get a 409. The suffix makes each
@@ -858,6 +876,7 @@ export class DockerSitesProvider implements SitesProvider {
             [LABEL_PROJECT]: this.projectKey(),
             [LABEL_SITE]: 'default',
             [LABEL_DEPLOYMENT]: digest,
+            ...(runtime.serverPort ? { [LABEL_SERVER_PORT]: String(runtime.serverPort) } : {}),
           },
           ExposedPorts: { [exposed]: {} },
           // Only a server reads these at request time. A static image has nothing to read
@@ -907,6 +926,8 @@ export class DockerSitesProvider implements SitesProvider {
       }
     );
     if (!created?.Id) {
+      // Nothing was stopped yet — the stop moved inside the try below — so there is nothing
+      // to put back here.
       throw new AppError(
         `Docker returned no container id for ${name}.`,
         502,
@@ -915,6 +936,23 @@ export class DockerSitesProvider implements SitesProvider {
     }
 
     try {
+      // With a fixed host port the switch cannot overlap — two containers cannot bind the
+      // same port — so the old one goes down first. Measured cost: ~870ms of refused
+      // connections. Without it the new container binds an ephemeral port while the old one
+      // still serves, which is gapless but changes the address every deploy. The operator
+      // picks by setting SITES_PORT, and a gateway in front makes the whole question moot.
+      //
+      // Deliberately here rather than before `create`: creating a container binds no port,
+      // so stopping earlier only widened the outage — and a create that failed (missing
+      // image, name collision, disk full) fell outside the recovery below and left the site
+      // down with nothing restarted.
+      if (stopBeforeStarting) {
+        for (const container of previous) {
+          await dockerRequest('POST', `/containers/${container.Id}/stop?t=5`).catch(
+            () => undefined
+          );
+        }
+      }
       await dockerRequest('POST', `/containers/${created.Id}/start`);
       if (runtime.serverPort) {
         // A Caddy container answers the moment it starts; a Node server takes seconds and
@@ -1014,7 +1052,16 @@ export class DockerSitesProvider implements SitesProvider {
           body: {
             AttachStdout: true,
             AttachStderr: true,
-            Cmd: ['sh', '-c', `wget -q -T 2 -O /dev/null http://127.0.0.1:${port}/ 2>&1`],
+            // `-S` prints the response line, and grep is what decides: any `HTTP/` at all
+            // means something answered, while a refused connection prints "can't connect"
+            // and nothing else. Exit code alone could not tell those apart — busybox wget
+            // exits 1 for a 404 as well as for a dead port — so an app whose `/` is a 404,
+            // a 401 or a 500 used to fail its own deploy despite being up.
+            Cmd: [
+              'sh',
+              '-c',
+              `wget -S -T 2 -O /dev/null http://127.0.0.1:${port}/ 2>&1 | grep -q 'HTTP/'`,
+            ],
           },
         }
       );
@@ -1028,9 +1075,8 @@ export class DockerSitesProvider implements SitesProvider {
         'GET',
         `/exec/${created.Id}/json`
       );
-      // busybox wget exits 1 on an HTTP error status too, which still means something is
-      // listening — but it cannot be told apart from a refused connection by exit code
-      // alone, so only a clean 0 counts as serving.
+      // 0 now means "a response arrived", whatever its status, because grep decided that
+      // rather than wget's own exit code.
       return result?.ExitCode === 0
         ? { ok: true, reason: 'ok' }
         : { ok: false, reason: `probe exit ${result?.ExitCode ?? 'unknown'}` };
@@ -1073,29 +1119,69 @@ export class DockerSitesProvider implements SitesProvider {
   }
 
   async getDeployment(providerDeploymentId: string): Promise<ProviderDeployment> {
-    const inspected = await dockerRequest<{
-      Id: string;
-      Name: string;
-      Created: string;
-      State: { Status: string; Error?: string; ExitCode?: number };
-      Config: { Image: string };
-      NetworkSettings?: { Ports?: Record<string, { HostPort: string }[] | null> };
-    }>('GET', `/containers/${encodeURIComponent(providerDeploymentId)}/json`);
-
-    if (!inspected) {
-      throw new AppError('Deployment not found.', 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
-    }
+    const inspected = await this.inspectContainer(providerDeploymentId);
 
     const status = inspected.State.Status;
     return {
       id: inspected.Id,
-      url: await this.endpointUrl(inspected.Id, inspected),
+      // The container's own port, not the static default: a server on 3000 would otherwise
+      // be looked up as `80/tcp`, come back null, and a sync or rollback would erase the
+      // URL of a deployment that is serving perfectly well.
+      url: await this.endpointUrl(
+        inspected.Id,
+        inspected,
+        serverPortOf({ Labels: inspected.Config.Labels }) ?? SITE_PORT
+      ),
       state: status,
       readyState: readyStateFor(status, inspected.State.ExitCode),
       name: inspected.Config.Image,
       createdAt: new Date(inspected.Created),
       ...(inspected.State.Error ? { error: { code: status, message: inspected.State.Error } } : {}),
     };
+  }
+
+  /**
+   * Inspect, with Docker's 404 turned into a deployment that is gone.
+   *
+   * Retention removes containers while their rows stay, so syncing an old row is the normal
+   * way to reach a container that no longer exists. `dockerRequest` throws
+   * `DockerHttpError` there — never returns undefined — so the old `if (!inspected)` guard
+   * was unreachable and the caller reported a 500 INTERNAL_ERROR for an ordinary
+   * "pruned by retention".
+   */
+  private async inspectContainer(providerDeploymentId: string): Promise<{
+    Id: string;
+    Name: string;
+    Created: string;
+    State: { Status: string; Error?: string; ExitCode?: number };
+    Config: { Image: string; Labels?: Record<string, string> };
+    NetworkSettings?: { Ports?: Record<string, { HostPort: string }[] | null> };
+  }> {
+    const inspected = await dockerRequest<{
+      Id: string;
+      Name: string;
+      Created: string;
+      State: { Status: string; Error?: string; ExitCode?: number };
+      Config: { Image: string; Labels?: Record<string, string> };
+      NetworkSettings?: { Ports?: Record<string, { HostPort: string }[] | null> };
+    }>('GET', `/containers/${encodeURIComponent(providerDeploymentId)}/json`).catch(
+      (error: unknown) => {
+        if (error instanceof DockerHttpError && error.status === 404) {
+          throw new AppError(
+            'That deployment is no longer on this host.',
+            404,
+            ERROR_CODES.DEPLOYMENT_NOT_FOUND,
+            'Retention keeps only the most recent deployments; deploy again to get a new one.'
+          );
+        }
+        throw error;
+      }
+    );
+
+    if (!inspected) {
+      throw new AppError('Deployment not found.', 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
+    }
+    return inspected;
   }
 
   /**
@@ -1126,6 +1212,11 @@ export class DockerSitesProvider implements SitesProvider {
     const others = owned.filter((container) => container.Id !== target.Id);
     const fixedPort = appConfig.deployments.sitesPort;
 
+    // A server takes seconds to answer and can crash-loop on config it no longer has, so
+    // "Docker accepted start" is not "the site is back". Static rollbacks skip this: Caddy
+    // serves as soon as it starts, and the label is absent there.
+    const serverPort = serverPortOf(target);
+
     if (fixedPort > 0) {
       // Two containers cannot hold one host port, so starting the target first would just
       // fail. Stop the live one, then bring the target up — and put the live one back if
@@ -1135,6 +1226,9 @@ export class DockerSitesProvider implements SitesProvider {
       }
       try {
         await dockerRequest('POST', `/containers/${encodeURIComponent(target.Id)}/start`);
+        if (serverPort) {
+          await this.waitUntilServing(target.Id, serverPort);
+        }
       } catch (error) {
         for (const container of others) {
           await dockerRequest('POST', `/containers/${container.Id}/start`).catch(() => undefined);
@@ -1143,6 +1237,11 @@ export class DockerSitesProvider implements SitesProvider {
       }
     } else {
       await dockerRequest('POST', `/containers/${encodeURIComponent(target.Id)}/start`);
+      if (serverPort) {
+        // Nothing has been stopped yet, so a target that will not serve leaves the current
+        // deployment untouched — the rollback simply fails.
+        await this.waitUntilServing(target.Id, serverPort);
+      }
       for (const container of others) {
         await dockerRequest('POST', `/containers/${container.Id}/stop?t=5`).catch(() => undefined);
       }
@@ -1252,19 +1351,32 @@ export class DockerSitesProvider implements SitesProvider {
     providerDeploymentId: string,
     options?: { limit?: number; nextToken?: string }
   ): Promise<{ lines: Array<{ timestamp: number; message: string }>; nextToken: string | null }> {
+    await this.assertOwnContainer(providerDeploymentId);
+    return dockerContainerLogs(providerDeploymentId, options);
+  }
+
+  /** Refuse an id this project's labels do not cover. */
+  private async assertOwnContainer(containerId: string): Promise<void> {
     const owned = await this.listOwnContainers();
-    if (!owned.some((container) => container.Id === providerDeploymentId)) {
+    if (!owned.some((container) => container.Id === containerId)) {
       throw new AppError(
         'That deployment is not on this host.',
         404,
         ERROR_CODES.DEPLOYMENT_NOT_FOUND
       );
     }
-    return dockerContainerLogs(providerDeploymentId, options);
   }
 
-  /** Stopping is the cancel: the image stays, so the deployment can be started again. */
+  /**
+   * Stopping is the cancel: the image stays, so the deployment can be started again.
+   *
+   * Ownership checked first, for the same reason `runtimeLogs` checks it — a deployment id
+   * is a container id, and an id that is not ours would stop a neighbouring container on
+   * the shared daemon. Reading the wrong logs is a leak; stopping the wrong container takes
+   * the database down.
+   */
   async cancelDeployment(providerDeploymentId: string): Promise<void> {
+    await this.assertOwnContainer(providerDeploymentId);
     await dockerRequest('POST', `/containers/${encodeURIComponent(providerDeploymentId)}/stop?t=5`);
   }
 

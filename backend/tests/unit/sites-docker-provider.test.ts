@@ -811,7 +811,11 @@ describe('DockerSitesProvider stable address', () => {
   // Two containers cannot bind one host port, so the overlap that makes deploys gapless
   // is impossible here — the operator trades ~870ms of downtime for an address that stops
   // changing. Which order runs is the whole difference.
-  it('stops the old container first when a fixed port is configured', async () => {
+  // The stop has to precede `start` — two containers cannot hold one host port — but not
+  // `create`, which binds nothing. Stopping earlier widened the outage and, worse, put the
+  // create outside the recovery path: a failure there left the site down with nothing
+  // restarted.
+  it('stops the old container between create and start when a fixed port is configured', async () => {
     okBuild();
     dockerHappyPath([{ Id: 'container-old' }]);
     configMock.deployments.sitesPort = 7134;
@@ -825,8 +829,8 @@ describe('DockerSitesProvider stable address', () => {
     const writes = dockerRequest.mock.calls
       .filter(([method]) => method === 'POST')
       .map(([, url]) => url as string);
-    expect(writes[0]).toBe('/containers/container-old/stop?t=5');
-    expect(writes[1]).toContain('/containers/create');
+    expect(writes[0]).toContain('/containers/create');
+    expect(writes[1]).toBe('/containers/container-old/stop?t=5');
     expect(writes[2]).toBe('/containers/container-new/start');
 
     const create = dockerRequest.mock.calls.find(
@@ -1071,10 +1075,14 @@ describe('DockerSitesProvider server-rendered deployments', () => {
     // The old one is stopped only after the probe succeeded.
     const startIdx = writes.indexOf('/containers/server-new/start');
     const stopIdx = writes.indexOf('/containers/server-old/stop?t=5');
+    // `.endsWith('/exec')`, not `includes('/exec/')`: the probe's exec *create* is
+    // `/containers/<id>/exec`, and `/exec/<id>/start` goes through dockerRequestRaw. With
+    // the wrong matcher this found no probe and both assertions passed on their fallbacks.
     const lastProbe = writes
-      .map((u, i) => (u.includes('/exec/') ? i : -1))
+      .map((u, i) => (u.endsWith('/exec') ? i : -1))
       .filter((i) => i >= 0)
       .pop();
+    expect(lastProbe).toBeGreaterThanOrEqual(0);
     expect(startIdx).toBeLessThan(lastProbe ?? Infinity);
     expect(stopIdx).toBeGreaterThan(lastProbe ?? -1);
   });
@@ -1104,6 +1112,179 @@ describe('DockerSitesProvider server-rendered deployments', () => {
     ).rejects.toThrow('exited before it started serving');
     // And it is removed rather than left looking deployable.
     expect(dockerRequest).toHaveBeenCalledWith('DELETE', '/containers/server-doomed?force=true');
+  });
+
+  // The readiness probe decides with grep, not with wget's exit code: busybox wget exits 1
+  // for a 404 as much as for a dead port, so an app whose `/` answers 401 or 404 — an
+  // API-only server, or one behind auth — used to fail its own deploy while serving fine.
+  it('treats any HTTP response as serving', async () => {
+    okBuild();
+    serverHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files, { projectSettings: serverSettings });
+
+    const exec = dockerRequest.mock.calls.find(
+      ([method, url]) => method === 'POST' && String(url).includes('/exec')
+    );
+    const cmd = (exec?.[2] as { body: { Cmd: string[] } }).body.Cmd.join(' ');
+    expect(cmd).toContain('wget -S');
+    expect(cmd).toContain("grep -q 'HTTP/'");
+  });
+
+  // Retention runs after the new container is already serving, so a daemon that refuses the
+  // list must not turn a live deployment into an ERROR row. The next deploy prunes anyway.
+  it('still succeeds when the retention pass fails', async () => {
+    okBuild();
+    let listed = 0;
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        listed += 1;
+        // The first list is the pre-deploy one; the second is retention's.
+        return listed > 1
+          ? Promise.reject(new Error('daemon refused the list'))
+          : Promise.resolve([]);
+      }
+      if (method === 'POST' && url.startsWith('/containers/create')) {
+        return Promise.resolve({ Id: 'container-new' });
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({
+          NetworkSettings: { Ports: { '80/tcp': [{ HostPort: '49155' }] } },
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>hi</h1>') },
+    ]);
+
+    const deployment = await provider.createDeploymentWithFiles(files);
+
+    expect(deployment.id).toBe('container-new');
+  });
+
+  // Read back through the label, not the static default. A server on 3000 looked up as
+  // `80/tcp` returns no port, so `url` came back null — and a sync or a rollback then wrote
+  // that null over the address of a deployment that was serving perfectly well.
+  it('reports the URL on the port the server actually listens on', async () => {
+    dockerClientConfig.publicHost = 'sites.example.com';
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve([]);
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({
+          Id: 'server-live',
+          Created: new Date().toISOString(),
+          State: { Status: 'running' },
+          Config: {
+            Image: 'insforge-site-appkey01:abc',
+            Labels: { 'insforge.site.server-port': '3000' },
+          },
+          NetworkSettings: {
+            Ports: { '3000/tcp': [{ HostPort: '49444' }], '80/tcp': null },
+          },
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    const deployment = await DockerSitesProvider.getInstance().getDeployment('server-live');
+
+    expect(deployment.url).toBe('http://sites.example.com:49444');
+  });
+
+  // The label is how every later operation knows this deployment is a server and where it
+  // listens — rollback's readiness gate and the URL both read it. A container cannot be
+  // asked "are you a server", and inferring it from an exposed port cannot tell Caddy on 80
+  // from a Node app on 80.
+  it('records the server port on the container', async () => {
+    okBuild();
+    serverHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files, {
+      projectSettings: { ...serverSettings, serverPort: 3000 },
+    });
+
+    const create = dockerRequest.mock.calls.find(
+      ([method, url]) => method === 'POST' && String(url).startsWith('/containers/create')
+    );
+    const labels = (create?.[2] as { body: { Labels: Record<string, string> } }).body.Labels;
+    expect(labels['insforge.site.server-port']).toBe('3000');
+  });
+
+  // A static deployment must not carry it: the probe would then run against Caddy, and a
+  // rollback would wait on something that was already answering.
+  it('leaves the label off a static deployment', async () => {
+    okBuild();
+    serverHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>hi</h1>') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files);
+
+    const create = dockerRequest.mock.calls.find(
+      ([method, url]) => method === 'POST' && String(url).startsWith('/containers/create')
+    );
+    const labels = (create?.[2] as { body: { Labels: Record<string, string> } }).body.Labels;
+    expect(labels['insforge.site.server-port']).toBeUndefined();
+  });
+
+  // Rolling back a server has the same problem a deploy does, and it was missed: "Docker
+  // accepted start" is not "the site answers". Without the gate the live deployment is
+  // stopped while the restored one is still booting — or crash-looping on config it no
+  // longer has.
+  it('waits for a restored server to answer before stopping the live one', async () => {
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve([
+          // The label is what says "server" — a static rollback has none and skips the probe.
+          { Id: 'server-old', Labels: { 'insforge.site.server-port': '80' } },
+          { Id: 'server-live', Labels: { 'insforge.site.server-port': '80' } },
+        ]);
+      }
+      if (method === 'POST' && url.includes('/exec')) {
+        return Promise.resolve({ Id: 'exec-1' });
+      }
+      if (method === 'GET' && url.startsWith('/exec/')) {
+        return Promise.resolve({ ExitCode: 0 });
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({
+          Id: 'server-old',
+          Created: new Date().toISOString(),
+          State: { Status: 'running' },
+          Config: { Image: 'insforge-site-appkey01:old', Labels: {} },
+          NetworkSettings: { Ports: { '80/tcp': [{ HostPort: '49301' }] } },
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    await DockerSitesProvider.getInstance().rollbackTo('server-old');
+
+    const writes = dockerRequest.mock.calls
+      .filter(([method]) => method === 'POST')
+      .map(([, url]) => url as string);
+    // `/containers/<id>/exec` — the exec *create*. The `/exec/<id>/start` call goes through
+    // dockerRequestRaw, so it never appears in these calls at all.
+    const lastProbe = writes
+      .map((url, index) => (url.endsWith('/exec') ? index : -1))
+      .filter((index) => index >= 0)
+      .pop();
+    expect(lastProbe).toBeGreaterThanOrEqual(0);
+    expect(writes.indexOf('/containers/server-live/stop?t=5')).toBeGreaterThan(lastProbe ?? -1);
   });
 
   it('refuses a start command with no build command', async () => {
@@ -1146,6 +1327,22 @@ describe('DockerSitesProvider.runtimeLogs', () => {
       nextToken: '1700000000.000000001',
     });
     expect(dockerContainerLogs).toHaveBeenCalledWith('server-live', { limit: 20 });
+  });
+
+  // Same reason as reading logs, worse consequence: an id that is not ours would stop a
+  // neighbouring container on the shared daemon, and on a self-host that is Postgres.
+  it('refuses to cancel a container it does not own', async () => {
+    dockerRequest.mockImplementation((method: string, url: string) =>
+      Promise.resolve(
+        method === 'GET' && url.startsWith('/containers/json') ? [{ Id: 'server-live' }] : undefined
+      )
+    );
+
+    await expect(
+      DockerSitesProvider.getInstance().cancelDeployment('insforge-postgres')
+    ).rejects.toThrow('not on this host');
+    const stops = dockerRequest.mock.calls.filter(([, url]) => String(url).includes('/stop'));
+    expect(stops).toHaveLength(0);
   });
 
   // A deployment id is a container id. Without this, a guessed id reads whatever else runs

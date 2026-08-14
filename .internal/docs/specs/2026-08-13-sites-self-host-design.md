@@ -104,14 +104,14 @@ Selection mirrors `services/compute/services.service.ts`: a registry built once,
 1. **Corrected — the bytes were not on disk.** Uploads streamed straight to Vercel; only the manifest (`path`, `sha`, `size`) was stored locally. The driver stages content addressed by sha under `SITES_STAGING_DIR`, which is the protocol the callers already speak, so a file shared by two deployments is stored once.
 2. **Corrected — the classic builder, not BuildKit.** `docker.client.ts` deliberately uses `version=1`: BuildKit resolves `FROM` through a gRPC session that a plain POST does not have, so it cannot pull base images at all (`nginx:alpine: no active sessions`). The sites driver calls `dockerBuild()` directly rather than compute's `buildFromContext()`, which tags per *service* and has no meaning here.
 3. The context is tarred in memory (`tar-stream`) and sent over the socket, so no host path is involved. A bind mount would be interpreted by the daemon on the host, where this container's paths do not exist.
-4. Serving is a generated `nginx:alpine` stage; source builds add a `node:22-alpine` stage whose output alone is copied forward, so the toolchain never reaches the image that runs.
+4. Serving is a generated `caddy:alpine` stage — see §4b for the `node:22-alpine` stage a declared start command produces instead. Source builds add a `node:22-alpine` build stage whose output alone is copied forward, so the toolchain never reaches the image that runs.
 5. Run as a labelled container, ownership-scoped the way compute does, with `port` or `host` ingress.
 
 **Why an image per deployment rather than a shared static server over a volume:** an atomic switch and a real rollback come for free. Start the new container, flip the gateway target, stop the old one — no half-written document root, and "roll back" is "start the previous image" instead of "restore files". It also reuses compute's spec-hash and image-prune machinery instead of inventing retention rules for a volume.
 
 **Cost, stated plainly:** a build per deployment, and image storage proportional to retained deployments. **Built:** retention keeps three — the live deployment plus two rollback steps — and logs what it removed. It only touches containers carrying this driver's labels for this project, and only images this driver tagged, so a shared base image or another tool's container is never a candidate.
 
-**Framework detection is where this driver cannot match Vercel.** Vercel infers the framework from `package.json` and `vercel.json`; this driver reports `frameworkDetection: false` and serves what it is given. Static output only: SSR — Next.js server rendering, streaming, middleware — is a **non-goal**.
+**Framework detection is where this driver cannot match Vercel.** Vercel infers the framework from `package.json` and `vercel.json`; this driver reports `frameworkDetection: false` and serves or runs what it is told to. Server rendering is *not* a non-goal — §4b describes the shipped path — but it is declared rather than detected: no start command means static.
 
 Three things it refuses rather than guesses, all of them cases where guessing produces something that looks like success:
 
@@ -158,6 +158,15 @@ produced, so the choice has to exist before the build runs.
 `serverDirectory` (default the build root) names what gets copied into the runtime image, so
 a Next app can point at `.next/standalone` for a small image while a plain `npm start` app
 copies everything. No framework is named in the driver; the Next recipe belongs in the docs.
+
+One trap the live run hit, which the docs PR has to state: `.next/standalone` does **not**
+contain `.next/static` or `public`. Point `serverDirectory` at it without copying those in
+and the HTML renders while every asset 404s. The build command carries the copy — the same
+two lines Next's own Dockerfile example uses:
+
+```
+npm run build && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public
+```
 
 **Resource limits are not optional here.** An unbounded Node process on the 2GB VPS that is
 the median self-host will OOM Postgres before it OOMs itself. Defaults are applied and
@@ -217,7 +226,7 @@ Consequence to accept up front: this is a large backend diff. It stays reviewabl
 
 | | `vercel` | `docker` |
 |---|---|---|
-| `envVars` | `runtime` | `build-only` — build args, baked into the artifact and visible in image history, which is why it is not called a store |
+| `envVars` | `runtime` | `runtime` — reaching the container per request and persisted encrypted, so a redeploy cannot drop config; build args stay, because a build often needs the same values |
 | `customDomains` | true | false — the operator points a hostname at the published port |
 | `slug` | true | false — no shared domain to name anything in |
 | `rollback` | **false** | true |
@@ -234,7 +243,7 @@ These were open; they are called here so the diff has a written basis. Both are 
 
 1. **One site per instance in v1.** Matches today's one-project-one-site behaviour, so no route or naming changes. Multiple sites would change the ingress and naming model and can be added later without disturbing the interface.
 2. **`SITES_DOMAIN`, defaulting to `COMPUTE_DOMAIN` when unset.** A separate variable lets sites and services live on different domains; the fallback means an operator who already configured compute configures nothing new.
-3. **Env vars on the Docker driver are `build-only`.** A runtime env store has no meaning for a static site. The capability says `build-only` rather than `none` because the values do reach the build.
+3. **Env vars on the Docker driver became `runtime` when server rendering landed.** They were `build-only` while the driver served files only — a static site has nothing to read `process.env` with. A server does, so the values are injected into the container and held encrypted through `SecretService`; the management API works against that same store, because a capability that says `runtime` must not have a management API that refuses.
 4. **The CLI needs an explicit prebuilt directory.** Today it uploads the source tree and Vercel builds it. For the prebuilt path the caller names the directory; the driver does not guess.
 5. **`tar-stream` (MIT, 32 KB) over a hand-rolled ustar writer.** Approved after due diligence. The deciding risk was ustar's 100-byte name field: a frontend build's nested paths exceed it, so a hand-rolled writer needs correct `prefix` splitting, and getting that wrong fails only for deep paths.
 6. **Capabilities are published under a `sites` key, not inside the existing `deployments` slice.** The CLI reads that slice's mere *presence* as "this backend can honour a `[deployments] subdomain` write" (`config-capabilities.ts`). Putting capabilities there would make the probe true for a driver with no slugs — the exact class of bug this work removes — and fixing the probe instead would be a cross-repo lockstep change. `deployments` keeps answering "can this take a subdomain"; `sites` answers "what can the active driver do".

@@ -135,6 +135,21 @@ function parseEnvInt(val: string | undefined, fallback: number): number {
   return parsed;
 }
 
+/** A host port, or 0 when unset or unusable. */
+function parseEnvPort(val: string | undefined): number {
+  if (!val || val.trim() === '') return 0;
+  if (!/^\d+$/.test(val.trim())) {
+    console.warn(`SITES_PORT="${val}" is not a port number; ignoring it.`);
+    return 0;
+  }
+  const parsed = Number(val.trim());
+  if (parsed < 1 || parsed > 65535) {
+    console.warn(`SITES_PORT="${val}" is outside 1-65535; ignoring it.`);
+    return 0;
+  }
+  return parsed;
+}
+
 function parseEnvBool(val: string | undefined): boolean {
   if (!val) return false;
   return ['1', 'true', 'yes', 'on'].includes(val.trim().toLowerCase());
@@ -331,7 +346,10 @@ export function loadConfig(): AppConfig {
       // gapless because the new container can bind while the old one still serves. The
       // cost is that the address changes every deploy, so an operator who publishes the
       // port directly — rather than putting a gateway in front — sets this instead.
-      sitesPort: parseEnvInt(process.env.SITES_PORT, 0),
+      // 0 means "let Docker pick". Range-checked here rather than at the daemon: parseInt
+      // accepts `80abc` and 70000, and both only fail later as an upstream error from
+      // `create` that says nothing about which variable is wrong.
+      sitesPort: parseEnvPort(process.env.SITES_PORT),
     },
     ai: {
       openrouterApiKey: process.env.OPENROUTER_API_KEY || undefined,

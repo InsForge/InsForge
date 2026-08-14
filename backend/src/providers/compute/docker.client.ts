@@ -403,7 +403,11 @@ export interface DockerLogsPage {
 /** An opaque cursor is a nanosecond watermark; an unparseable one starts from the top. */
 export function parseLogWatermark(token: string): bigint | null {
   try {
-    return BigInt(token);
+    const parsed = BigInt(token);
+    // A negative cursor would become a negative `since`, which the daemon reads as "from
+    // the beginning" — so `next_token=-1` returns the entire retained history instead of a
+    // bounded page. Treated as no cursor at all.
+    return parsed < 0n ? null : parsed;
   } catch {
     return null;
   }

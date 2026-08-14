@@ -95,51 +95,39 @@ export const s3AccessKeyManagementRateLimiter = rateLimit({
 });
 
 /**
- * Per-IP rate limiter for the compute logs endpoint.
- * Unlike the write limiters, this is a read endpoint the dashboard polls every
- * ~2s while live-tailing, so the budget is generous — it exists to cap retry
- * storms / abuse, not to throttle normal tailing (≈30 req/min) across a few
- * open tabs.
+ * A log-tailing budget: 120 requests per minute per IP.
  *
- * Limits: 120 requests per minute per IP.
+ * These are read endpoints the dashboard polls every ~2s while live-tailing, so the budget
+ * is generous — it exists to cap retry storms and abuse, not to throttle normal tailing
+ * (≈30 req/min) across a few open tabs. Each call also holds an upstream connection open,
+ * which is the other reason there is a ceiling at all.
+ *
+ * One factory, two limiters: separate counters so one endpoint cannot spend the other's
+ * budget, but a single place to tune, because two copies of a number drift.
  */
-/**
- * Sites runtime logs. Same shape and budget as the compute one below: a live tail polls
- * this every couple of seconds, and each call holds a Docker request open.
- */
-export const deploymentLogsRateLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (_req: Request, _res: Response, next: NextFunction) => {
-    next(
-      new AppError(
-        'Too many log requests from this IP. Please slow down and try again shortly.',
-        429,
-        ERROR_CODES.TOO_MANY_REQUESTS
-      )
-    );
-  },
-});
+function createLogsRateLimiter() {
+  return rateLimit({
+    windowMs: 60 * 1000,
+    max: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req: Request, _res: Response, next: NextFunction) => {
+      next(
+        new AppError(
+          'Too many log requests from this IP. Please slow down and try again shortly.',
+          429,
+          ERROR_CODES.TOO_MANY_REQUESTS
+        )
+      );
+    },
+  });
+}
 
-export const computeLogsRateLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (_req: Request, _res: Response, next: NextFunction) => {
-    next(
-      new AppError(
-        'Too many log requests from this IP. Please slow down and try again shortly.',
-        429,
-        ERROR_CODES.TOO_MANY_REQUESTS
-      )
-    );
-  },
-  skipSuccessfulRequests: false,
-  skipFailedRequests: false,
-});
+/** Compute service logs — `GET /api/compute/services/:id/logs`. */
+export const computeLogsRateLimiter = createLogsRateLimiter();
+
+/** Sites runtime logs — `GET /api/deployments/:id/logs`. */
+export const deploymentLogsRateLimiter = createLogsRateLimiter();
 
 /**
  * Per-IP rate limiter for email OTP verification attempts

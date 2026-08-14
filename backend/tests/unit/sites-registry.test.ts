@@ -30,7 +30,6 @@ const {
   getSitesMetadata,
   isAnySitesProviderConfigured,
   requireDomainStore,
-  requireEnvVarStore,
   selectSitesProvider,
 } = await import('@/services/deployments/sites-registry.js');
 
@@ -238,13 +237,12 @@ describe('capability stores', () => {
   it('hands back the stores a driver has', () => {
     configureVercel();
 
-    expect(requireEnvVarStore()).toBeDefined();
     expect(requireDomainStore()).toBeDefined();
   });
 
   // Reaching a store on an instance with no driver must not read as "unsupported" —
   // nothing is configured, which is a different fix.
   it('reports not-configured rather than unsupported when there is no driver', () => {
-    expect(() => requireEnvVarStore()).toThrow('No sites provider is configured');
+    expect(() => requireDomainStore()).toThrow('No sites provider is configured');
   });
 });
