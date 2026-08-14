@@ -1217,8 +1217,10 @@ export class DockerSitesProvider implements SitesProvider {
     }
 
     const others = owned.filter((container) => container.Id !== target.Id);
-    // Same as a deploy: `owned` includes retained stopped deployments, and only what was
-    // serving may be restarted on failure.
+    // Two different sets, and conflating them is a bug either way. *Stopping* has to cover
+    // every other container: `paused` still holds the fixed port and `restarting` will take
+    // it back. *Restoring* after a failure may only touch what was actually serving, or a
+    // superseded deployment races the live one for the port.
     const othersRunning = others.filter((container) => container.State === 'running');
     const fixedPort = appConfig.deployments.sitesPort;
 
@@ -1231,7 +1233,7 @@ export class DockerSitesProvider implements SitesProvider {
       // Two containers cannot hold one host port, so starting the target first would just
       // fail. Stop the live one, then bring the target up — and put the live one back if
       // the target will not start, rather than leaving nothing serving.
-      for (const container of othersRunning) {
+      for (const container of others) {
         await dockerRequest('POST', `/containers/${container.Id}/stop?t=5`).catch(() => undefined);
       }
       try {
@@ -1267,7 +1269,7 @@ export class DockerSitesProvider implements SitesProvider {
           throw error;
         }
       }
-      for (const container of othersRunning) {
+      for (const container of others) {
         await dockerRequest('POST', `/containers/${container.Id}/stop?t=5`).catch(() => undefined);
       }
     }

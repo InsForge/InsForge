@@ -1289,6 +1289,42 @@ describe('DockerSitesProvider server-rendered deployments', () => {
     expect(starts).not.toContain('/containers/retained-old/start');
   });
 
+  // `paused` holds the fixed port and `restarting` takes it back, so the stop loop covers
+  // every other container — while the restore-after-failure loop still only touches what was
+  // actually serving. Filtering both the same way left a paused container on the port.
+  it('stops paused and restarting containers too, but restores only the one that was serving', async () => {
+    configMock.deployments.sitesPort = 7150;
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve([
+          { Id: 'target', State: 'exited' },
+          { Id: 'was-live', State: 'running' },
+          { Id: 'stuck-paused', State: 'paused' },
+          { Id: 'flapping', State: 'restarting' },
+        ]);
+      }
+      if (method === 'POST' && url.endsWith('/start')) {
+        return url.includes('target')
+          ? Promise.reject(new Error('port already allocated'))
+          : Promise.resolve(undefined);
+      }
+      return Promise.resolve(undefined);
+    });
+
+    await expect(DockerSitesProvider.getInstance().rollbackTo('target')).rejects.toThrow(
+      'port already allocated'
+    );
+
+    const writes = dockerRequest.mock.calls
+      .filter(([method]) => method === 'POST')
+      .map(([, url]) => url as string);
+    expect(writes).toContain('/containers/stuck-paused/stop?t=5');
+    expect(writes).toContain('/containers/flapping/stop?t=5');
+    expect(writes).toContain('/containers/was-live/start');
+    expect(writes).not.toContain('/containers/stuck-paused/start');
+    expect(writes).not.toContain('/containers/flapping/start');
+  });
+
   // A rollback target that never answers must not be left running: it shares the network
   // alias with the live deployment, so the gateway would round-robin into a broken build
   // behind a site that is otherwise fine.
