@@ -133,7 +133,9 @@ export const QUICK_START_COPY: Record<
 export function getQuickStartScript(mode: QuickStartMode, model: string) {
   if (mode === 'image') {
     return `import OpenAI from 'openai';
-import 'dotenv/config';
+import { config } from 'dotenv';
+
+config({ path: ['.env.local', '.env'], quiet: true });
 
 const openai = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
@@ -154,7 +156,9 @@ console.log(message?.images?.[0]?.image_url?.url);`;
   }
 
   if (mode === 'video') {
-    return `import 'dotenv/config';
+    return `import { config } from 'dotenv';
+
+config({ path: ['.env.local', '.env'], quiet: true });
 
 const response = await fetch('https://openrouter.ai/api/v1/videos', {
   method: 'POST',
@@ -186,7 +190,9 @@ console.log(result);`;
 
   if (mode === 'embeddings') {
     return `import OpenAI from 'openai';
-import 'dotenv/config';
+import { config } from 'dotenv';
+
+config({ path: ['.env.local', '.env'], quiet: true });
 
 const openai = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
@@ -204,7 +210,9 @@ console.log('Usage:', response.usage);`;
   }
 
   return `import OpenAI from 'openai';
-import 'dotenv/config';
+import { config } from 'dotenv';
+
+config({ path: ['.env.local', '.env'], quiet: true });
 
 const openai = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
