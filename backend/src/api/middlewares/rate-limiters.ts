@@ -103,6 +103,26 @@ export const s3AccessKeyManagementRateLimiter = rateLimit({
  *
  * Limits: 120 requests per minute per IP.
  */
+/**
+ * Sites runtime logs. Same shape and budget as the compute one below: a live tail polls
+ * this every couple of seconds, and each call holds a Docker request open.
+ */
+export const deploymentLogsRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many log requests from this IP. Please slow down and try again shortly.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+});
+
 export const computeLogsRateLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,

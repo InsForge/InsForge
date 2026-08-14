@@ -151,6 +151,13 @@ paths:
                             buildLogs:
                               type: boolean
                               description: Whether builder output is retrievable after the fact.
+                            runtimeLogs:
+                              type: boolean
+                              description: >-
+                                Whether the running deployment's own output can be read through
+                                `GET /api/deployments/{id}/logs`. Describes the driver, not the
+                                deployment: a server-rendered site returns what the app wrote,
+                                a static one the file server's request log.
                             frameworkDetection:
                               type: boolean
                               description: Whether the driver infers how to build from the source tree.

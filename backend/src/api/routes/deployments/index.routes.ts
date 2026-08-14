@@ -2,7 +2,10 @@ import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
-import { deploymentsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
+import {
+  deploymentsWriteLimiter,
+  deploymentLogsRateLimiter,
+} from '@/api/middlewares/rate-limiters.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
@@ -20,6 +23,22 @@ const deploymentService = DeploymentService.getInstance();
 const auditService = AuditService.getInstance();
 const domainParamSchema = addCustomDomainRequestSchema.shape.domain;
 const uuidParamSchema = z.string().uuid();
+/**
+ * The runtime-logs query.
+ *
+ * `regex` before `coerce` on purpose: coercion alone accepts `25.7` and ` 25`, and an
+ * integer check afterwards would reject the first with a message about the coerced number
+ * rather than about what was sent.
+ */
+const runtimeLogsQuerySchema = z.object({
+  limit: z
+    .string()
+    .regex(/^\d+$/, 'limit must be a whole number')
+    .transform(Number)
+    .refine((value) => value >= 1 && value <= 1000, 'limit must be between 1 and 1000')
+    .optional(),
+  next_token: z.string().min(1).optional(),
+});
 
 // Mount sub-routers first to avoid conflicts with parameterized routes
 router.use('/env-vars', envVarsRouter);
@@ -439,10 +458,14 @@ router.post(
  *
  * Offered only by drivers that report `runtimeLogs` in the sites capability slice; the rest
  * answer 400 with DEPLOYMENT_FEATURE_UNSUPPORTED.
+ *
+ * Rate-limited for the same reason the compute logs endpoint is: this is what a live tail
+ * polls, and each call holds a Docker request open for up to 15s.
  */
 router.get(
   '/:id/logs',
   verifyAdmin,
+  deploymentLogsRateLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const idValidation = uuidParamSchema.safeParse(req.params.id);
@@ -454,12 +477,19 @@ router.get(
         );
       }
 
-      const limitRaw = req.query.limit;
-      const limit = typeof limitRaw === 'string' ? Number.parseInt(limitRaw, 10) : undefined;
-      if (limit !== undefined && (!Number.isFinite(limit) || limit < 1 || limit > 1000)) {
-        throw new AppError('limit must be between 1 and 1000.', 400, ERROR_CODES.INVALID_INPUT);
+      // Rejected rather than rounded: `limit=25.7` silently returning 25 lines is a page
+      // size the caller did not ask for, and a paging client cannot tell it happened.
+      const limitValidation = runtimeLogsQuerySchema.safeParse(req.query);
+      if (!limitValidation.success) {
+        throw new AppError(
+          limitValidation.error.issues
+            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+            .join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
       }
-      const nextToken = typeof req.query.next_token === 'string' ? req.query.next_token : undefined;
+      const { limit, next_token: nextToken } = limitValidation.data;
 
       const logs = await deploymentService.getRuntimeLogs(idValidation.data, { limit, nextToken });
       successResponse(res, logs);

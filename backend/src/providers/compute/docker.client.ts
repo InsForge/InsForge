@@ -431,7 +431,9 @@ export async function dockerContainerLogs(
    */
   request: typeof dockerRequestRaw = dockerRequestRaw
 ): Promise<DockerLogsPage> {
-  const limit = options?.limit ?? 100;
+  // Floored because `tail` is an integer on the wire: the compute route clamps a query
+  // value with Math.min/max, which leaves `5.7` intact, and Docker rejects the request.
+  const limit = Math.floor(options?.limit ?? 100);
   const watermark = options?.nextToken ? parseLogWatermark(options.nextToken) : null;
 
   const params = new URLSearchParams({ stdout: '1', stderr: '1', timestamps: '1' });
