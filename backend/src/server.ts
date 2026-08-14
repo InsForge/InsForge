@@ -51,6 +51,10 @@ import {
 } from '@/services/telemetry/telemetry.service.js';
 import { FeatureUsageCollector } from '@/services/telemetry/feature-usage.collector.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
+import messagingRouter from '@/api/routes/messaging/index.routes.js';
+import { MessagingQueueService } from '@/services/messaging/queue.service.js';
+import { EmailService } from '@/services/email/email.service.js';
+import { MessagingWorker } from '@/services/messaging/worker.service.js';
 import { DatabaseBackupService } from '@/services/database/database-backup.service.js';
 import {
   ComputeServicesService,
@@ -240,6 +244,7 @@ export async function createApp() {
   apiRouter.use('/memory', memoryRouter);
   apiRouter.use('/realtime', realtimeRouter);
   apiRouter.use('/email', emailRouter);
+  apiRouter.use('/messaging', messagingRouter);
   apiRouter.use('/deployments', deploymentsRouter);
   apiRouter.use('/schedules', schedulesRouter);
   apiRouter.use('/payments', paymentsRouter);
@@ -351,6 +356,8 @@ export async function createApp() {
 // Use PORT from config (already parsed from env, falls back to 7130)
 const PORT = appConfig.app.port;
 
+let messagingWorker: MessagingWorker | null = null;
+
 async function initializeServer() {
   try {
     const app = await createApp();
@@ -411,6 +418,12 @@ async function initializeServer() {
 
     TelemetryService.getInstance().start();
 
+    // Start MessagingWorker
+    const messagingQueueService = MessagingQueueService.getInstance();
+    const emailService = EmailService.getInstance();
+    messagingWorker = new MessagingWorker(messagingQueueService, emailService);
+    await messagingWorker.start();
+
     // Scheduled backups are self-hosting only; the cloud control plane owns
     // backups there (the backup routes are not even mounted in cloud env).
     if (!isCloudEnvironment()) {
@@ -429,6 +442,16 @@ void initializeServer();
 
 async function cleanup() {
   logger.info('Shutting down gracefully...');
+
+  if (messagingWorker) {
+    try {
+      await messagingWorker.stop();
+    } catch (error) {
+      logger.error('Error stopping MessagingWorker', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   DatabaseBackupService.getInstance().stopScheduler();
 
