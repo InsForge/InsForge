@@ -27,7 +27,13 @@
 
 	# The site container serves the built files, sets its own cache headers, and handles
 	# SPA fallback. Nothing to add here — proxying is the whole job.
-	reverse_proxy insforge-site-{$APP_KEY}:80 {
+	#
+	# The port is a variable because a server-rendered deployment can declare its own
+	# `serverPort`. It defaults to the static site port, so most operators never touch this;
+	# if you set `serverPort` in project settings, set SITES_UPSTREAM_PORT to match or every
+	# request through the gateway is a 502. As with SITES_HOSTNAME the default lives in
+	# compose, since compose passes an unset variable through as an empty string.
+	reverse_proxy insforge-site-{$APP_KEY}:{$SITES_UPSTREAM_PORT} {
 		# A deploy replaces the container behind the alias. Without this a request caught
 		# mid-switch would surface the connection error instead of retrying the one that
 		# is already up.

@@ -328,6 +328,9 @@ export class DeploymentService {
    */
   private static readonly SITE_ENV_SECRET_KEY = 'SITES_RUNTIME_ENV';
 
+  /** Serializes writes to the one secret row the site environment lives in. */
+  private envWriteQueue: Promise<void> = Promise.resolve();
+
   private async storeSiteEnvVars(envVars: Array<{ key: string; value: string }>): Promise<void> {
     const secrets = SecretService.getInstance();
     const serialized = JSON.stringify(envVars);
@@ -363,12 +366,19 @@ export class DeploymentService {
       const parsed: unknown = JSON.parse(stored);
       return Array.isArray(parsed) ? (parsed as Array<{ key: string; value: string }>) : undefined;
     } catch (error) {
-      // A deploy must not fail because the stored environment is unreadable, but starting a
-      // server without it is a different kind of surprise — so say so loudly.
-      logger.error('Could not read the stored site environment; deploying without it', {
+      // Deliberately fatal. Deploying without the stored environment starts a server whose
+      // every request fails on missing configuration, and start-new-then-stop-old means the
+      // previous deployment keeps serving while this one fails — a failed deploy is strictly
+      // better than a live site that 500s.
+      logger.error('Could not read the stored site environment', {
         error: error instanceof Error ? error.message : String(error),
       });
-      return undefined;
+      throw new AppError(
+        'The stored site environment could not be read, so this deployment would start without it.',
+        500,
+        ERROR_CODES.INTERNAL_ERROR,
+        'Re-save the environment variables, or delete the SITES_RUNTIME_ENV secret to start clean.'
+      );
     }
   }
 
@@ -401,9 +411,26 @@ export class DeploymentService {
    */
   private secretEnvVarStore(): EnvVarStore {
     const load = async () => (await this.loadSiteEnvVars()) ?? [];
+    // The merge below is read-modify-write against one secret row, so two concurrent
+    // requests would each write their own view and the later one would drop the other's
+    // variable. Serialized the same way the driver serializes container switches.
+    const serialize = <T>(work: () => Promise<T>): Promise<T> => {
+      const next = this.envWriteQueue.then(work, work);
+      this.envWriteQueue = next.then(
+        () => undefined,
+        () => undefined
+      );
+      return next;
+    };
     return {
       keys: async () => (await load()).map((envVar) => envVar.key),
-      list: async () => (await load()).map((envVar) => ({ id: envVar.key, key: envVar.key })),
+      // `encrypted` is the truth here: they live in the secret store, encrypted at rest.
+      list: async () =>
+        (await load()).map((envVar) => ({
+          id: envVar.key,
+          key: envVar.key,
+          type: 'encrypted',
+        })),
       get: async (envId: string) => {
         const found = (await load()).find((envVar) => envVar.key === envId);
         if (!found) {
@@ -413,30 +440,32 @@ export class DeploymentService {
             ERROR_CODES.SECRET_NOT_FOUND
           );
         }
-        return { id: found.key, key: found.key, value: found.value };
+        return { id: found.key, key: found.key, value: found.value, type: 'encrypted' };
       },
       // Merged, not replaced: this is the management API, where a caller sending one
       // variable means "set this one". The deploy path replaces the whole set on purpose,
       // since a half-applied environment is worse than the previous one.
-      upsert: async (envVars) => {
-        const merged = new Map((await load()).map((envVar) => [envVar.key, envVar.value]));
-        for (const envVar of envVars) {
-          merged.set(envVar.key, envVar.value);
-        }
-        await this.storeSiteEnvVars([...merged].map(([key, value]) => ({ key, value })));
-      },
-      remove: async (envId: string) => {
-        const existing = await load();
-        const remaining = existing.filter((envVar) => envVar.key !== envId);
-        if (remaining.length === existing.length) {
-          throw new AppError(
-            `No environment variable named ${envId}.`,
-            404,
-            ERROR_CODES.SECRET_NOT_FOUND
-          );
-        }
-        await this.storeSiteEnvVars(remaining);
-      },
+      upsert: (envVars) =>
+        serialize(async () => {
+          const merged = new Map((await load()).map((envVar) => [envVar.key, envVar.value]));
+          for (const envVar of envVars) {
+            merged.set(envVar.key, envVar.value);
+          }
+          await this.storeSiteEnvVars([...merged].map(([key, value]) => ({ key, value })));
+        }),
+      remove: (envId: string) =>
+        serialize(async () => {
+          const existing = await load();
+          const remaining = existing.filter((envVar) => envVar.key !== envId);
+          if (remaining.length === existing.length) {
+            throw new AppError(
+              `No environment variable named ${envId}.`,
+              404,
+              ERROR_CODES.SECRET_NOT_FOUND
+            );
+          }
+          await this.storeSiteEnvVars(remaining);
+        }),
     };
   }
 

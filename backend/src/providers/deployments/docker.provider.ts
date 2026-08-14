@@ -353,8 +353,9 @@ export class DockerSitesProvider implements SitesProvider {
       slug: false,
       rollback: true,
       buildLogs: true,
-      // Whatever the container wrote: the app's own output for a server, Caddy's for a
-      // static site.
+      // Whatever the container wrote: the app's own output for a server, Caddy's startup and
+      // errors for a static site. No access log there on purpose — one line per request into
+      // an unrotated container log fills a small VPS.
       runtimeLogs: true,
       frameworkDetection: false,
       ingressModes: ['port', 'host'],

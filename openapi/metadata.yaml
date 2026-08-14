@@ -157,7 +157,8 @@ paths:
                                 Whether the running deployment's own output can be read through
                                 `GET /api/deployments/{id}/logs`. Describes the driver, not the
                                 deployment: a server-rendered site returns what the app wrote,
-                                a static one the file server's request log.
+                                a static one Caddy's startup and errors — access logging is off,
+                                so there is no per-request log to return.
                             frameworkDetection:
                               type: boolean
                               description: Whether the driver infers how to build from the source tree.

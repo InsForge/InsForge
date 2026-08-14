@@ -1,6 +1,7 @@
 import express, { type ErrorRequestHandler } from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { projectSettingsSchema } from '@insforge/shared-schemas';
 
 const deploymentServiceMock = vi.hoisted(() => ({
   getRuntimeLogs: vi.fn(),
@@ -170,5 +171,27 @@ describe('POST /api/deployments/:id/rollback', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.message).toContain('does not support rollback');
+  });
+});
+
+describe('projectSettings.startCommand', () => {
+  // Presence is what selects a server image, and the driver trims before deciding — so a
+  // blank string meant "static" for a caller who plainly asked for a server. Rejected at the
+  // edge instead, where the message can say so.
+  it.each(['', '   ', '\t'])('rejects a blank command (%j)', (startCommand) => {
+    expect(projectSettingsSchema.safeParse({ startCommand }).success).toBe(false);
+  });
+
+  it('accepts a real command, and null for static', () => {
+    expect(projectSettingsSchema.safeParse({ startCommand: 'node server.js' }).success).toBe(true);
+    expect(projectSettingsSchema.safeParse({ startCommand: null }).success).toBe(true);
+    expect(projectSettingsSchema.safeParse({}).success).toBe(true);
+  });
+
+  // Anything above 65535 is not a port; it used to fail at the daemon as an upstream error.
+  it('bounds serverPort to the TCP range', () => {
+    expect(projectSettingsSchema.safeParse({ serverPort: 70000 }).success).toBe(false);
+    expect(projectSettingsSchema.safeParse({ serverPort: 0 }).success).toBe(false);
+    expect(projectSettingsSchema.safeParse({ serverPort: 3000 }).success).toBe(true);
   });
 });
