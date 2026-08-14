@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isIP } from 'node:net';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const migrationPath = path.resolve(
@@ -76,7 +77,10 @@ describe('outbound URL guard migration', () => {
 
     // Provide a Javascript execution model of the PL/pgSQL function to test its runtime logic
     // This allows testing the security outcomes without spinning up a Postgres instance
-    function simulate_is_dns_pinned_url(p_url: string, p_resolved_target: any) {
+    function simulate_is_dns_pinned_url(
+      p_url: string,
+      p_resolved_target: { rawUrl: string; addresses: string[] }
+    ) {
       if (!p_url.startsWith('https://') && !p_url.startsWith('http://')) return false; // mock is_safe_url
       if (
         !p_resolved_target ||
@@ -89,15 +93,15 @@ describe('outbound URL guard migration', () => {
 
       const match = p_url.toLowerCase().match(/^https?:\/\/([^/?#]+)/);
       if (!match) return false;
-      let v_authority = match[1];
-      let v_host = v_authority.startsWith('[')
+      const v_authority = match[1];
+      const v_host = v_authority.startsWith('[')
         ? v_authority.split(']')[0].replace('[', '')
         : v_authority.replace(/:[0-9]+$/, '');
 
       let v_is_literal_ip: boolean;
       try {
         // Mimic v_host::INET cast
-        if (require('node:net').isIP(v_host) === 0) throw new Error();
+        if (isIP(v_host) === 0) throw new Error();
         v_is_literal_ip = true;
       } catch {
         v_is_literal_ip = false;
