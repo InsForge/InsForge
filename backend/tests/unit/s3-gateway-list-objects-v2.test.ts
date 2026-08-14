@@ -1,6 +1,8 @@
+import crypto from 'crypto';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { Response } from 'express';
 import { StorageService } from '@/services/storage/storage.service.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import { handle } from '@/api/routes/s3-gateway/commands/list-objects-v2.js';
 
 afterEach(() => {
@@ -18,9 +20,24 @@ function row(key: string): DbRow {
   return { key, size: 1, etag: 'e', lastModified: new Date('2026-01-01T00:00:00.000Z') };
 }
 
-/** Builds a continuation token for a cursor key, the way the handler does. */
-function keyToken(key: string): string {
-  return Buffer.from(key, 'utf8').toString('base64url');
+/** Mints a continuation token the way the handler does, for the same listing. */
+function signedToken(
+  key: string,
+  scope: { bucket?: string; prefix?: string; delimiter?: string } = {}
+): string {
+  const fields = [
+    'insforge:s3:listv2:v1',
+    scope.bucket ?? 'test-bucket',
+    scope.prefix ?? '',
+    scope.delimiter ?? '',
+    key,
+  ];
+  const signature = crypto
+    .createHmac('sha256', appConfig.app.jwtSecret)
+    .update(fields.map((field) => `${Buffer.byteLength(field, 'utf8')}:${field}`).join(''))
+    .digest()
+    .subarray(0, 16);
+  return Buffer.concat([signature, Buffer.from(key, 'utf8')]).toString('base64url');
 }
 
 /**
@@ -291,7 +308,7 @@ describe('ListObjectsV2 start-after and continuation-token', () => {
   });
 
   it('suppresses only the group the cursor is inside, never a later one', async () => {
-    const token = keyToken('a/1');
+    const token = signedToken('a/1', { delimiter: '/' });
 
     const result = await list(['a/1', 'a/2', 'b/1'], {
       delimiter: '/',
@@ -301,22 +318,6 @@ describe('ListObjectsV2 start-after and continuation-token', () => {
     // "b/" is still listed. Suppression is recomputed from the cursor key, so a
     // token cannot name a prefix its own position is not inside.
     expect(result.commonPrefixes).toEqual(['b/']);
-  });
-
-  it('suppresses nothing once the delimiter stops producing a group', async () => {
-    // A token issued by a delimiter=/ walk, replayed against a request that
-    // groups differently. The cursor no longer collapses into anything, so
-    // nothing may be dropped from this listing.
-    const token = keyToken('a/1');
-
-    const noDelimiter = await list(['a/1', 'a/2', 'b/1'], { 'continuation-token': token });
-    expect(noDelimiter.contents).toEqual(['a/2', 'b/1']);
-
-    const otherDelimiter = await list(['a/1', 'a/2', 'b/1'], {
-      delimiter: '-',
-      'continuation-token': token,
-    });
-    expect(otherDelimiter.contents).toEqual(['a/2', 'b/1']);
   });
 
   it('does not suppress a group for a caller-supplied start-after', async () => {
@@ -331,16 +332,94 @@ describe('ListObjectsV2 start-after and continuation-token', () => {
   });
 
   it('resumes from a token whose key is arbitrary text', async () => {
-    // Object keys may be any text. The token is just that key, so nothing about
-    // its content can change how it is read.
+    // Object keys may be any text, and the signature covers the key verbatim.
     const awkward = '{"k":"c.txt"}';
 
     const result = await list(['c.txt', awkward, `${awkward}-next`], {
-      'continuation-token': keyToken(awkward),
+      'continuation-token': signedToken(awkward),
     });
 
     // Sorted these are c.txt, awkward, awkward-next, so only the last remains.
     expect(result.keyCount).toBe(1);
     expect(result.contents).not.toContain('c.txt');
+  });
+});
+
+describe('ListObjectsV2 continuation-token authenticity', () => {
+  it('rejects a token this server did not issue', async () => {
+    // A caller who can write their own token could otherwise pick a cursor
+    // whose group is then suppressed, dropping a folder from the listing.
+    const forged = Buffer.concat([Buffer.alloc(16, 0x11), Buffer.from('a/1', 'utf8')]).toString(
+      'base64url'
+    );
+
+    const result = await list(['a/1', 'a/2', 'b/1'], {
+      delimiter: '/',
+      'continuation-token': forged,
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.xml).toContain('InvalidArgument');
+  });
+
+  it('rejects a token that is too short to carry a signature', async () => {
+    const stub = Buffer.from('short', 'utf8').toString('base64url');
+
+    const result = await list(['a.txt'], { 'continuation-token': stub });
+
+    expect(result.status).toBe(400);
+    expect(result.xml).toContain('InvalidArgument');
+  });
+
+  it('rejects a token whose cursor key was edited after signing', async () => {
+    const token = signedToken('a/1', { delimiter: '/' });
+    const raw = Buffer.from(token, 'base64url');
+    const tampered = Buffer.concat([raw.subarray(0, 16), Buffer.from('a/9', 'utf8')]).toString(
+      'base64url'
+    );
+
+    const result = await list(['a/1', 'a/2', 'b/1'], {
+      delimiter: '/',
+      'continuation-token': tampered,
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.xml).toContain('InvalidArgument');
+  });
+
+  it('rejects a token replayed against a different listing', async () => {
+    // Same cursor, but the signature binds bucket, prefix and delimiter, so
+    // state cannot leak between listings that group differently.
+    const issued = signedToken('a/1', { delimiter: '/' });
+
+    const otherDelimiter = await list(['a/1', 'a/2', 'b/1'], {
+      delimiter: '-',
+      'continuation-token': issued,
+    });
+    expect(otherDelimiter.status).toBe(400);
+
+    const noDelimiter = await list(['a/1', 'a/2', 'b/1'], { 'continuation-token': issued });
+    expect(noDelimiter.status).toBe(400);
+
+    const otherPrefix = await list(['a/1', 'a/2'], {
+      delimiter: '/',
+      prefix: 'a',
+      'continuation-token': issued,
+    });
+    expect(otherPrefix.status).toBe(400);
+  });
+
+  it('accepts the token it issued for the same listing', async () => {
+    const first = await list(['a/1', 'a/2', 'b/1'], { delimiter: '/', 'max-keys': '1' });
+    expect(first.nextToken).toBeDefined();
+
+    const second = await list(['a/1', 'a/2', 'b/1'], {
+      delimiter: '/',
+      'max-keys': '1',
+      'continuation-token': first.nextToken as string,
+    });
+
+    expect(second.status).toBe(200);
+    expect(second.commonPrefixes).toEqual(['b/']);
   });
 });

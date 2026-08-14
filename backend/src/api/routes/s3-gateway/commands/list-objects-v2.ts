@@ -1,5 +1,7 @@
+import crypto from 'crypto';
 import { Response } from 'express';
 import { StorageService } from '@/services/storage/storage.service.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import { sendS3Error } from '../errors.js';
 import { toXml } from '../xml.js';
 import { S3GatewayRequest, getS3Bucket } from '../request.js';
@@ -12,13 +14,53 @@ const MAX_KEYS_LIMIT = 1000;
 const DB_WINDOW = 1000;
 const MAX_DB_PAGES = 200;
 
-function encodeContinuation(key: string): string {
-  return Buffer.from(key, 'utf8').toString('base64url');
+// A continuation token is the cursor key prefixed by a truncated HMAC that
+// binds it to the listing that issued it. 128 bits is well past what forging a
+// position is worth, and keeps the token short.
+const CONTINUATION_SIGNATURE_BYTES = 16;
+
+/** The listing parameters a continuation token is only valid within. */
+interface ListingScope {
+  bucket: string;
+  prefix: string;
+  delimiter: string | undefined;
 }
 
-function decodeContinuation(token: string): string | undefined {
-  const key = Buffer.from(token, 'base64url').toString('utf8');
-  return key === '' ? undefined : key;
+function continuationSignature(scope: ListingScope, key: string): Buffer {
+  // Length-prefix every field so no combination of bucket, prefix, delimiter
+  // and key can be rearranged into the same signed string. Keys and delimiters
+  // are arbitrary text, so there is no separator character safe to reserve.
+  const signed = ['insforge:s3:listv2:v1', scope.bucket, scope.prefix, scope.delimiter ?? '', key]
+    .map((field) => `${Buffer.byteLength(field, 'utf8')}:${field}`)
+    .join('');
+  return crypto
+    .createHmac('sha256', appConfig.app.jwtSecret)
+    .update(signed)
+    .digest()
+    .subarray(0, CONTINUATION_SIGNATURE_BYTES);
+}
+function encodeContinuation(scope: ListingScope, key: string): string {
+  return Buffer.concat([continuationSignature(scope, key), Buffer.from(key, 'utf8')]).toString(
+    'base64url'
+  );
+}
+
+/**
+ * The cursor key a token carries, or undefined when the token is not one this
+ * server issued for this listing. Nothing else in the request is trusted to
+ * decide where a page resumes.
+ */
+function decodeContinuation(scope: ListingScope, token: string): string | undefined {
+  const raw = Buffer.from(token, 'base64url');
+  if (raw.length <= CONTINUATION_SIGNATURE_BYTES) {
+    return undefined;
+  }
+  const claimed = raw.subarray(0, CONTINUATION_SIGNATURE_BYTES);
+  const key = raw.subarray(CONTINUATION_SIGNATURE_BYTES).toString('utf8');
+  if (!crypto.timingSafeEqual(claimed, continuationSignature(scope, key))) {
+    return undefined;
+  }
+  return key;
 }
 
 /**
@@ -90,13 +132,24 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
 
   // S3 ignores start-after whenever continuation-token is present, so the token
   // decides the starting point on its own once the caller supplies one.
+  const scope: ListingScope = { bucket, prefix, delimiter };
   const continuationToken = q['continuation-token'];
   const startAfter = q['start-after'];
-  const resumeFrom = continuationToken ? decodeContinuation(continuationToken) : undefined;
+  const resumeFrom = continuationToken ? decodeContinuation(scope, continuationToken) : undefined;
+  // A token that does not verify was not issued by this server for this
+  // listing, so it names no position we can resume from. Restarting silently
+  // would answer 200 with keys the caller has already processed.
+  if (continuationToken && resumeFrom === undefined) {
+    sendS3Error(res, 'InvalidArgument', 'The continuation token provided is incorrect', {
+      resource: req.path,
+      requestId: req.s3Auth.requestId,
+    });
+    return;
+  }
   // The CommonPrefix a resumed page must not repeat, recomputed from the cursor
-  // under this request's own prefix and delimiter. Only a token gets this: a
-  // caller-supplied start-after is a plain position, and S3 still lists the
-  // group its key happens to sit in.
+  // under this request's own prefix and delimiter. Only a verified token gets
+  // this: a caller-supplied start-after is a plain position, and S3 still lists
+  // the group its key happens to sit in.
   const suppressPrefix = resumeFrom ? collapsedPrefix(resumeFrom, prefix, delimiter) : undefined;
 
   // Accumulate visible entries (Contents + CommonPrefixes) up to maxKeys.
@@ -166,7 +219,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
   // IsTruncated and NextContinuationToken are derived together so they can
   // never disagree: a paginator that sees truncation without a token re-issues
   // the identical request forever.
-  const nextContinuation = !exhausted && cursor ? encodeContinuation(cursor) : undefined;
+  const nextContinuation = !exhausted && cursor ? encodeContinuation(scope, cursor) : undefined;
   const truncated = nextContinuation !== undefined;
 
   const xml = toXml({
