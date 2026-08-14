@@ -1,11 +1,21 @@
 import crypto from 'crypto';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Response } from 'express';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import { handle } from '@/api/routes/s3-gateway/commands/list-objects-v2.js';
 
+// appConfig is read at call time, and is loaded once at import, so the secret is
+// set on the object rather than through the environment.
+const ORIGINAL_JWT_SECRET = appConfig.app.jwtSecret;
+const TEST_JWT_SECRET = 'test-secret-long-enough-for-signing-32chars';
+
+beforeEach(() => {
+  appConfig.app.jwtSecret = TEST_JWT_SECRET;
+});
+
 afterEach(() => {
+  appConfig.app.jwtSecret = ORIGINAL_JWT_SECRET;
   vi.restoreAllMocks();
 });
 
@@ -417,7 +427,62 @@ describe('ListObjectsV2 continuation-token authenticity', () => {
   });
 });
 
+describe('ListObjectsV2 continuation tokens without a signing key', () => {
+  // JWT_SECRET is the HMAC key. An empty one is public, so signing with it would
+  // hand a forged token the trust a real signature earns.
+  const withoutSecret = () => {
+    appConfig.app.jwtSecret = '';
+  };
+
+  it('issues unsigned tokens rather than signing with an empty key', async () => {
+    withoutSecret();
+
+    const result = await list(['a.txt', 'b.txt', 'c.txt'], { 'max-keys': '1' });
+
+    expect(result.nextToken).toBeDefined();
+    expect(result.nextToken).not.toContain('.');
+  });
+
+  it('grants no suppression, so a listing is complete rather than wrong', async () => {
+    withoutSecret();
+
+    const first = await list(['a/1', 'a/2', 'b/1'], { delimiter: '/', 'max-keys': '1' });
+    const second = await list(['a/1', 'a/2', 'b/1'], {
+      delimiter: '/',
+      'max-keys': '1',
+      'continuation-token': first.nextToken as string,
+    });
+
+    // Degrades to the pre-existing duplicate, never to a missing folder.
+    expect(second.status).toBe(200);
+    expect(second.commonPrefixes).toEqual(['a/']);
+  });
+
+  it('rejects a signed token, which cannot have come from this instance', async () => {
+    const issued = signedToken('a/1', { delimiter: '/' });
+    withoutSecret();
+
+    const result = await list(['a/1', 'a/2', 'b/1'], {
+      delimiter: '/',
+      'continuation-token': issued,
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.xml).toContain('InvalidArgument');
+  });
+});
+
 describe('ListObjectsV2 unsigned continuation tokens', () => {
+  it('rejects an empty continuation-token instead of falling back to start-after', async () => {
+    const result = await list(['a.txt', 'b.txt', 'c.txt'], {
+      'continuation-token': '',
+      'start-after': 'a.txt',
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.xml).toContain('InvalidArgument');
+  });
+
   it('still resumes a walk that started before tokens were signed', async () => {
     // An upgrade must not strand a paginator mid-listing, so the position an
     // unsigned token names is honoured.

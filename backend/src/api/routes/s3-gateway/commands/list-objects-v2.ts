@@ -33,7 +33,20 @@ interface ListingScope {
   delimiter: string | undefined;
 }
 
-function continuationSignature(scope: ListingScope, key: string): Buffer {
+/**
+ * The HMAC key, or undefined when the instance has no JWT_SECRET configured.
+ *
+ * Signing with the empty string would be worse than not signing at all: the key
+ * is then public, so anyone could mint a token that verifies, and the code would
+ * grant it the trust a real signature earns. Without a secret this handler
+ * issues unsigned tokens instead, which cost only the CommonPrefix de-duplication
+ * across pages and leave the listing no worse than it is today.
+ */
+function continuationSigningKey(): string | undefined {
+  return appConfig.app.jwtSecret || undefined;
+}
+
+function continuationSignature(secret: string, scope: ListingScope, key: string): Buffer {
   // Length-prefix every field so no combination of bucket, prefix, delimiter
   // and key can be rearranged into the same signed string. Keys and delimiters
   // are arbitrary text, so there is no separator character safe to reserve.
@@ -41,15 +54,19 @@ function continuationSignature(scope: ListingScope, key: string): Buffer {
     .map((field) => `${Buffer.byteLength(field, 'utf8')}:${field}`)
     .join('');
   return crypto
-    .createHmac('sha256', appConfig.app.jwtSecret)
+    .createHmac('sha256', secret)
     .update(signed)
     .digest()
     .subarray(0, CONTINUATION_SIGNATURE_BYTES);
 }
+
 function encodeContinuation(scope: ListingScope, key: string): string {
   const payload = Buffer.from(key, 'utf8').toString('base64url');
-  const signature = continuationSignature(scope, key).toString('base64url');
-  return `${payload}${CONTINUATION_SEPARATOR}${signature}`;
+  const secret = continuationSigningKey();
+  if (!secret) {
+    return payload;
+  }
+  return `${payload}${CONTINUATION_SEPARATOR}${continuationSignature(secret, scope, key).toString('base64url')}`;
 }
 
 /**
@@ -66,16 +83,24 @@ interface ResumePoint {
 function decodeContinuation(scope: ListingScope, token: string): ResumePoint | undefined {
   const separator = token.indexOf(CONTINUATION_SEPARATOR);
   if (separator === -1) {
-    // Issued before tokens were signed. Honour the position so a listing walk
-    // that spans the upgrade still advances, but not the suppression, which
-    // depends on this server having issued the page it came from.
+    // Issued before tokens were signed, or by an instance with no signing key.
+    // Honour the position so a listing walk that spans the upgrade still
+    // advances, but not the suppression, which depends on this server having
+    // issued the page it came from.
     const key = Buffer.from(token, 'base64url').toString('utf8');
     return key === '' ? undefined : { key, verified: false };
   }
 
+  const secret = continuationSigningKey();
+  if (!secret) {
+    // Nothing to verify against, and this instance never issues signed tokens,
+    // so a signed one did not come from here.
+    return undefined;
+  }
+
   const key = Buffer.from(token.slice(0, separator), 'base64url').toString('utf8');
   const claimed = Buffer.from(token.slice(separator + 1), 'base64url');
-  const expected = continuationSignature(scope, key);
+  const expected = continuationSignature(secret, scope, key);
   if (claimed.length !== expected.length || !crypto.timingSafeEqual(claimed, expected)) {
     return undefined;
   }
@@ -154,11 +179,15 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
   const scope: ListingScope = { bucket, prefix, delimiter };
   const continuationToken = q['continuation-token'];
   const startAfter = q['start-after'];
-  const resumeFrom = continuationToken ? decodeContinuation(scope, continuationToken) : undefined;
+  // Presence, not truthiness: `continuation-token=` is a token the caller
+  // supplied and expects to resume from, so it must be rejected rather than
+  // quietly falling through to start-after.
+  const resumeFrom =
+    continuationToken !== undefined ? decodeContinuation(scope, continuationToken) : undefined;
   // A signed token that does not verify was tampered with, or belongs to a
   // different listing, so it names no position to resume from. Restarting
   // silently would answer 200 with keys the caller has already processed.
-  if (continuationToken && resumeFrom === undefined) {
+  if (continuationToken !== undefined && resumeFrom === undefined) {
     sendS3Error(res, 'InvalidArgument', 'The continuation token provided is incorrect', {
       resource: req.path,
       requestId: req.s3Auth.requestId,
