@@ -117,6 +117,10 @@ function dockerHappyPath(previous: { Id: string }[] = []) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The provider is a singleton and caches the project network on first resolve, so without
+  // this the one test that resolves a network hands every later test a NetworkingConfig it
+  // never asked for — and the suite silently depends on its own order.
+  (DockerSitesProvider.getInstance() as unknown as { ownNetwork: string | null }).ownNetwork = null;
   // Namespaces containers, images and the advertised hostname. Per-instance, so two
   // InsForge deployments sharing one daemon cannot touch each other's site containers.
   process.env.APP_KEY = 'appkey01';
@@ -582,14 +586,19 @@ describe('DockerSitesProvider redeploying identical content', () => {
 
 describe('DockerSitesProvider rollback and retention', () => {
   /** Owned containers as Docker would list them, newest first. */
-  function owned(ids: string[], image = 'insforge-site-appkey01:aaa') {
-    return ids.map((Id) => ({ Id, State: 'exited', Image: image }));
+  // `State` matters, not just the ids: retention keeps stopped deployments, so recovery has
+  // to tell "this was serving" from "this is a rollback target sitting there".
+  function owned(ids: string[], image = 'insforge-site-appkey01:aaa', state = 'exited') {
+    return ids.map((Id) => ({ Id, State: state, Image: image }));
   }
 
   it('starts the target and stops everything else', async () => {
     dockerRequest.mockImplementation((method: string, url: string) => {
       if (method === 'GET' && url.startsWith('/containers/json')) {
-        return Promise.resolve(owned(['container-live', 'container-old']));
+        return Promise.resolve([
+          ...owned(['container-live'], undefined, 'running'),
+          ...owned(['container-old']),
+        ]);
       }
       if (url.endsWith('/json')) {
         return Promise.resolve({
@@ -1241,6 +1250,82 @@ describe('DockerSitesProvider server-rendered deployments', () => {
     expect(labels['insforge.site.server-port']).toBeUndefined();
   });
 
+  // `previous` is every deployment still on the host, because retention keeps stopped ones
+  // on purpose. Restarting all of them under a fixed port is a race whose winner may be a
+  // superseded build — so recovery puts back only what was actually serving.
+  it('restores only the container that was serving when a fixed-port deploy fails', async () => {
+    okBuild();
+    configMock.deployments.sitesPort = 7140;
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve([
+          { Id: 'retained-old', State: 'exited', Image: 'insforge-site-appkey01:old' },
+          { Id: 'was-live', State: 'running', Image: 'insforge-site-appkey01:live' },
+        ]);
+      }
+      if (method === 'POST' && url.startsWith('/containers/create')) {
+        return Promise.resolve({ Id: 'container-new' });
+      }
+      if (method === 'POST' && url.endsWith('/start')) {
+        return url.includes('container-new')
+          ? Promise.reject(new Error('port already allocated'))
+          : Promise.resolve(undefined);
+      }
+      return Promise.resolve(undefined);
+    });
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>hi</h1>') },
+    ]);
+
+    await expect(provider.createDeploymentWithFiles(files)).rejects.toThrow(
+      'port already allocated'
+    );
+
+    const starts = dockerRequest.mock.calls
+      .filter(([method, url]) => method === 'POST' && String(url).endsWith('/start'))
+      .map(([, url]) => url as string);
+    expect(starts).toContain('/containers/was-live/start');
+    expect(starts).not.toContain('/containers/retained-old/start');
+  });
+
+  // A rollback target that never answers must not be left running: it shares the network
+  // alias with the live deployment, so the gateway would round-robin into a broken build
+  // behind a site that is otherwise fine.
+  it('stops a rollback target that never starts serving', async () => {
+    let probes = 0;
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve([
+          { Id: 'server-old', State: 'exited', Labels: { 'insforge.site.server-port': '80' } },
+          { Id: 'server-live', State: 'running', Labels: { 'insforge.site.server-port': '80' } },
+        ]);
+      }
+      if (method === 'POST' && url.includes('/exec')) {
+        probes += 1;
+        return Promise.resolve({ Id: `exec-${probes}` });
+      }
+      if (method === 'GET' && url.startsWith('/exec/')) {
+        return Promise.resolve({ ExitCode: 1 });
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({ State: { Status: 'running' } });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    await expect(DockerSitesProvider.getInstance().rollbackTo('server-old')).rejects.toThrow(
+      /did not answer/
+    );
+
+    const writes = dockerRequest.mock.calls
+      .filter(([method]) => method === 'POST')
+      .map(([, url]) => url as string);
+    expect(writes).toContain('/containers/server-old/stop?t=5');
+    // And the live deployment was never touched, since nothing was stopped first.
+    expect(writes).not.toContain('/containers/server-live/stop?t=5');
+  }, 90_000);
+
   // Rolling back a server has the same problem a deploy does, and it was missed: "Docker
   // accepted start" is not "the site answers". Without the gate the live deployment is
   // stopped while the restored one is still booting — or crash-looping on config it no
@@ -1250,8 +1335,8 @@ describe('DockerSitesProvider server-rendered deployments', () => {
       if (method === 'GET' && url.startsWith('/containers/json')) {
         return Promise.resolve([
           // The label is what says "server" — a static rollback has none and skips the probe.
-          { Id: 'server-old', Labels: { 'insforge.site.server-port': '80' } },
-          { Id: 'server-live', Labels: { 'insforge.site.server-port': '80' } },
+          { Id: 'server-old', State: 'exited', Labels: { 'insforge.site.server-port': '80' } },
+          { Id: 'server-live', State: 'running', Labels: { 'insforge.site.server-port': '80' } },
         ]);
       }
       if (method === 'POST' && url.includes('/exec')) {
