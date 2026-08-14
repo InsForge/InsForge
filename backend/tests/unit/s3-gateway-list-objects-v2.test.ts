@@ -18,6 +18,14 @@ function row(key: string): DbRow {
   return { key, size: 1, etag: 'e', lastModified: new Date('2026-01-01T00:00:00.000Z') };
 }
 
+/** Builds a versioned continuation token the way the handler does. */
+function versionedToken(payload: Record<string, unknown>): string {
+  return Buffer.concat([
+    Buffer.from([0x00]),
+    Buffer.from(JSON.stringify(payload), 'utf8'),
+  ]).toString('base64url');
+}
+
 /**
  * Stands in for storage.objects: keys sorted ascending, filtered by prefix and
  * an exclusive `startAfter`, windowed by `maxKeys`. This is exactly the
@@ -286,9 +294,7 @@ describe('ListObjectsV2 start-after and continuation-token', () => {
   });
 
   it('ignores a carried prefix the cursor key does not sit under', async () => {
-    const inconsistent = Buffer.from(JSON.stringify({ v: 1, k: 'a/1', p: 'b/' }), 'utf8').toString(
-      'base64url'
-    );
+    const inconsistent = versionedToken({ v: 1, k: 'a/1', p: 'b/' });
 
     const result = await list(['a/1', 'a/2', 'b/1'], {
       delimiter: '/',
@@ -306,5 +312,23 @@ describe('ListObjectsV2 start-after and continuation-token', () => {
     const result = await list(['a.txt', 'b.txt', 'c.txt'], { 'continuation-token': legacy });
 
     expect(result.contents).toEqual(['b.txt', 'c.txt']);
+  });
+
+  it('reads a legacy token for a key shaped like the versioned payload as that key', async () => {
+    // An object key may be any text, including our own envelope. The NUL marker
+    // is what separates the formats, and Postgres text cannot hold NUL, so a
+    // stored key can never impersonate a versioned token.
+    const impostor = JSON.stringify({ v: 1, k: 'c.txt' });
+    const legacy = Buffer.from(impostor, 'utf8').toString('base64url');
+
+    // Sorted, these are: c.txt, impostor, impostor-next. Resuming after the
+    // impostor key returns one row; resuming after the embedded "c.txt" would
+    // return two and replay a key the caller had already seen.
+    const result = await list(['c.txt', impostor, `${impostor}-next`], {
+      'continuation-token': legacy,
+    });
+
+    expect(result.keyCount).toBe(1);
+    expect(result.contents).not.toContain('c.txt');
   });
 });

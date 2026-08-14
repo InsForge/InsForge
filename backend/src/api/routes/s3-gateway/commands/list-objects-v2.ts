@@ -13,6 +13,11 @@ const DB_WINDOW = 1000;
 const MAX_DB_PAGES = 200;
 
 const CONTINUATION_VERSION = 1;
+// Marks a token as the versioned payload rather than the bare object key the
+// previous format used. NUL is the one byte that can never begin a legacy
+// token: storage.objects.key is Postgres `text`, which cannot hold U+0000, so
+// no stored key can start with it and the two formats can never be confused.
+const CONTINUATION_MARKER = 0x00;
 
 /**
  * Where the previous page stopped. `key` is the last raw object key that was
@@ -34,16 +39,27 @@ function encodeContinuation(cursor: Continuation): string {
     cursor.prefix === undefined
       ? { v: CONTINUATION_VERSION, k: cursor.key }
       : { v: CONTINUATION_VERSION, k: cursor.key, p: cursor.prefix };
-  return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  return Buffer.concat([
+    Buffer.from([CONTINUATION_MARKER]),
+    Buffer.from(JSON.stringify(payload), 'utf8'),
+  ]).toString('base64url');
 }
 
 function decodeContinuation(token: string): Continuation | undefined {
-  const decoded = Buffer.from(token, 'base64url').toString('utf8');
-  if (!decoded) {
+  const raw = Buffer.from(token, 'base64url');
+  if (raw.length === 0) {
     return undefined;
   }
+  if (raw[0] !== CONTINUATION_MARKER) {
+    // Tokens issued before the versioned payload were the bare object key.
+    return { key: raw.toString('utf8') };
+  }
   try {
-    const parsed = JSON.parse(decoded) as { v?: unknown; k?: unknown; p?: unknown };
+    const parsed = JSON.parse(raw.subarray(1).toString('utf8')) as {
+      v?: unknown;
+      k?: unknown;
+      p?: unknown;
+    };
     if (parsed?.v === CONTINUATION_VERSION && typeof parsed.k === 'string') {
       // Tokens come back from the caller, so only honour a carried prefix that
       // the cursor key actually sits under. That is the one shape this handler
@@ -54,10 +70,9 @@ function decodeContinuation(token: string): Continuation | undefined {
       return { key: parsed.k, prefix: carried };
     }
   } catch {
-    // Not a versioned payload, so fall through to the legacy format below.
+    // Marked but unparseable, so there is no position to resume from.
   }
-  // Tokens issued before the versioned payload were the bare object key.
-  return { key: decoded };
+  return undefined;
 }
 
 export async function handle(req: S3GatewayRequest, res: Response): Promise<void> {
