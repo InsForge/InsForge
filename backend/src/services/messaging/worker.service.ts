@@ -58,12 +58,18 @@ export class MessagingWorker {
         }
       );
       if (this.listenClient) {
+        const client = this.listenClient;
+        this.listenClient = null;
+
         try {
-          await this.listenClient.end();
-        } catch (closeErr) {
-          logger.error('Failed to close LISTEN client', { error: closeErr });
-        } finally {
-          this.listenClient = null;
+          await Promise.race([
+            client.end(),
+            new Promise<void>((_, reject) =>
+              setTimeout(() => reject(new Error('LISTEN client close timeout')), 5000)
+            ),
+          ]);
+        } catch (err) {
+          logger.error('Failed to close LISTEN client', { error: err });
         }
       }
       this.scheduleReconnect();
@@ -155,6 +161,9 @@ export class MessagingWorker {
       database: process.env.POSTGRES_DB || 'insforge',
     });
 
+    // Assign EARLY so stop() can reach and close it even during connect()
+    this.listenClient = client;
+
     client.on('notification', (msg) => {
       if (msg.channel === 'messaging_new_job') {
         this.onNotification().catch((err) => {
@@ -169,7 +178,16 @@ export class MessagingWorker {
     });
 
     await client.connect();
-    this.listenClient = client;
+
+    // Guard: if worker was stopped while connect() was in flight, close and bail
+    if (!this.isRunning) {
+      await client.end().catch(() => {});
+      if (this.listenClient === client) {
+        this.listenClient = null;
+      }
+      return;
+    }
+
     await client.query('LISTEN messaging_new_job');
   }
 
