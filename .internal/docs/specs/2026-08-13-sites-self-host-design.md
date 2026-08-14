@@ -164,7 +164,7 @@ contain `.next/static` or `public`. Point `serverDirectory` at it without copyin
 and the HTML renders while every asset 404s. The build command carries the copy — the same
 two lines Next's own Dockerfile example uses:
 
-```
+```sh
 npm run build && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public
 ```
 
