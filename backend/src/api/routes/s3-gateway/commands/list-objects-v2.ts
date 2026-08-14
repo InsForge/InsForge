@@ -12,15 +12,46 @@ const MAX_KEYS_LIMIT = 1000;
 const DB_WINDOW = 1000;
 const MAX_DB_PAGES = 200;
 
-function encodeContinuation(key: string): string {
-  return Buffer.from(key, 'utf8').toString('base64url');
+const CONTINUATION_VERSION = 1;
+
+/**
+ * Where the previous page stopped. `key` is the last raw object key that was
+ * consumed; `prefix` is the CommonPrefix that key collapsed into, if any.
+ *
+ * The prefix matters because a CommonPrefix stands in for many raw keys. When a
+ * page ends part-way through such a group, the cursor still points inside it, so
+ * the next page would rebuild the same CommonPrefix and return it a second time.
+ * Carrying it in the token lets the next page consume the rest of that group
+ * without emitting anything.
+ */
+interface Continuation {
+  key: string;
+  prefix?: string;
 }
 
-function decodeContinuation(token: string | undefined): string | undefined {
-  if (!token) {
+function encodeContinuation(cursor: Continuation): string {
+  const payload =
+    cursor.prefix === undefined
+      ? { v: CONTINUATION_VERSION, k: cursor.key }
+      : { v: CONTINUATION_VERSION, k: cursor.key, p: cursor.prefix };
+  return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+}
+
+function decodeContinuation(token: string): Continuation | undefined {
+  const decoded = Buffer.from(token, 'base64url').toString('utf8');
+  if (!decoded) {
     return undefined;
   }
-  return Buffer.from(token, 'base64url').toString('utf8');
+  try {
+    const parsed = JSON.parse(decoded) as { v?: unknown; k?: unknown; p?: unknown };
+    if (parsed?.v === CONTINUATION_VERSION && typeof parsed.k === 'string') {
+      return { key: parsed.k, prefix: typeof parsed.p === 'string' ? parsed.p : undefined };
+    }
+  } catch {
+    // Not a versioned payload, so fall through to the legacy format below.
+  }
+  // Tokens issued before the versioned payload were the bare object key.
+  return { key: decoded };
 }
 
 export async function handle(req: S3GatewayRequest, res: Response): Promise<void> {
@@ -62,21 +93,35 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
     }
     maxKeys = parsed;
   }
-  const startAfterInput = q['start-after'] ?? decodeContinuation(q['continuation-token']);
+
+  // S3 ignores start-after whenever continuation-token is present, so the token
+  // decides the starting point on its own once the caller supplies one.
+  const continuationToken = q['continuation-token'];
+  const startAfter = q['start-after'];
+  const resumeFrom = continuationToken ? decodeContinuation(continuationToken) : undefined;
+  const suppressPrefix = resumeFrom?.prefix;
 
   // Accumulate visible entries (Contents + CommonPrefixes) up to maxKeys.
-  // Track the last DB row key we advanced past for continuation.
+  // Track the last DB row we advanced past for continuation.
   const contents: Array<{ Key: string; Size: number; ETag: string; LastModified: string }> = [];
   const commonPrefixesSet = new Set<string>();
-  let cursor: string | undefined = startAfterInput;
-  let exhausted = false;
-  let truncated = false;
+  let cursor: Continuation | undefined = continuationToken
+    ? resumeFrom
+    : startAfter
+      ? { key: startAfter }
+      : undefined;
 
-  for (let page = 0; page < MAX_DB_PAGES; page++) {
+  // max-keys=0 asks for no entries at all, so there is nothing to scan and
+  // nothing is left unread from the caller's point of view. Scanning anyway
+  // stopped on the first row and reported IsTruncated=true with no token to
+  // follow, which loops SDK paginators on every non-empty bucket.
+  let exhausted = maxKeys === 0;
+
+  for (let page = 0; !exhausted && page < MAX_DB_PAGES; page++) {
     const rows = await svc.listObjectsV2Db({
       bucket,
       prefix,
-      startAfter: cursor,
+      startAfter: cursor?.key,
       maxKeys: DB_WINDOW,
     });
     if (rows.length === 0) {
@@ -86,9 +131,9 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
 
     let stoppedEarly = false;
     for (const r of rows) {
-      const visible = contents.length + commonPrefixesSet.size;
-      if (visible >= maxKeys) {
-        truncated = true;
+      // maxKeys >= 1 here, so the first row of the first page is always
+      // consumed and `cursor` is set before any early stop can happen.
+      if (contents.length + commonPrefixesSet.size >= maxKeys) {
         stoppedEarly = true;
         break;
       }
@@ -97,15 +142,13 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
         const idx = tail.indexOf(delimiter);
         if (idx >= 0) {
           const pfx = prefix + tail.slice(0, idx + delimiter.length);
-          if (!commonPrefixesSet.has(pfx)) {
-            if (visible + 1 > maxKeys) {
-              truncated = true;
-              stoppedEarly = true;
-              break;
-            }
+          // Rows still inside the CommonPrefix the previous page ended on. That
+          // prefix was already returned there, so consume them without emitting
+          // anything rather than listing the same prefix on two pages.
+          if (pfx !== suppressPrefix) {
             commonPrefixesSet.add(pfx);
           }
-          cursor = r.key;
+          cursor = { key: r.key, prefix: pfx };
           continue;
         }
       }
@@ -115,7 +158,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
         ETag: `"${r.etag ?? ''}"`,
         LastModified: r.lastModified.toISOString(),
       });
-      cursor = r.key;
+      cursor = { key: r.key };
     }
     if (stoppedEarly) {
       break;
@@ -125,11 +168,16 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
       break;
     }
   }
-  if (!exhausted && !truncated && contents.length + commonPrefixesSet.size >= maxKeys) {
-    truncated = true;
-  }
 
-  const nextContinuation = truncated && cursor ? encodeContinuation(cursor) : undefined;
+  // Anything other than a clean walk to the end of the listing leaves rows
+  // behind. That covers hitting maxKeys and also hitting MAX_DB_PAGES, which
+  // used to report a complete listing while silently dropping the tail.
+  //
+  // IsTruncated and NextContinuationToken are derived together so they can
+  // never disagree: a paginator that sees truncation without a token re-issues
+  // the identical request forever.
+  const nextContinuation = !exhausted && cursor ? encodeContinuation(cursor) : undefined;
+  const truncated = nextContinuation !== undefined;
 
   const xml = toXml({
     ListBucketResult: {
