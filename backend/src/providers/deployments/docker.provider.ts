@@ -843,6 +843,11 @@ export class DockerSitesProvider implements SitesProvider {
     runtime: RuntimeSpec
   ): Promise<string> {
     const previous = await this.listOwnContainers();
+    // Retention keeps stopped containers on purpose, so `previous` is not "the live site" —
+    // it is every deployment still on the host. Recovery must put back only what was
+    // running: starting them all under a fixed port is a race whose winner might be a
+    // superseded deployment, and the loser fails on the port anyway.
+    const wasRunning = previous.filter((container) => container.State === 'running');
     const network = await this.resolveNetwork();
     const fixedPort = appConfig.deployments.sitesPort;
     // One boolean, used twice: deciding the order with `=== 0` in one place and `> 0` in
@@ -965,12 +970,13 @@ export class DockerSitesProvider implements SitesProvider {
       await dockerRequest('DELETE', `/containers/${created.Id}?force=true`).catch(() => undefined);
       if (stopBeforeStarting) {
         // Under a fixed port the previous deployment was already stopped to free the port,
-        // so failing here would leave the site down until someone noticed. Put it back.
-        for (const container of previous) {
+        // so failing here would leave the site down until someone noticed. Put it back —
+        // only the ones that were serving, not every retained deployment.
+        for (const container of wasRunning) {
           await dockerRequest('POST', `/containers/${container.Id}/start`).catch(() => undefined);
         }
         logger.warn('Docker sites: replacement failed; restarted the previous deployment', {
-          restored: previous.map((container) => container.Id),
+          restored: wasRunning.map((container) => container.Id),
         });
       }
       throw error;
@@ -1210,6 +1216,9 @@ export class DockerSitesProvider implements SitesProvider {
     }
 
     const others = owned.filter((container) => container.Id !== target.Id);
+    // Same as a deploy: `owned` includes retained stopped deployments, and only what was
+    // serving may be restarted on failure.
+    const othersRunning = others.filter((container) => container.State === 'running');
     const fixedPort = appConfig.deployments.sitesPort;
 
     // A server takes seconds to answer and can crash-loop on config it no longer has, so
@@ -1221,7 +1230,7 @@ export class DockerSitesProvider implements SitesProvider {
       // Two containers cannot hold one host port, so starting the target first would just
       // fail. Stop the live one, then bring the target up — and put the live one back if
       // the target will not start, rather than leaving nothing serving.
-      for (const container of others) {
+      for (const container of othersRunning) {
         await dockerRequest('POST', `/containers/${container.Id}/stop?t=5`).catch(() => undefined);
       }
       try {
@@ -1230,7 +1239,12 @@ export class DockerSitesProvider implements SitesProvider {
           await this.waitUntilServing(target.Id, serverPort);
         }
       } catch (error) {
-        for (const container of others) {
+        // The target holds the port and may be crash-looping; stop it before handing the
+        // port back, or the restart below loses the race to it.
+        await dockerRequest('POST', `/containers/${encodeURIComponent(target.Id)}/stop?t=5`).catch(
+          () => undefined
+        );
+        for (const container of othersRunning) {
           await dockerRequest('POST', `/containers/${container.Id}/start`).catch(() => undefined);
         }
         throw error;
@@ -1239,10 +1253,20 @@ export class DockerSitesProvider implements SitesProvider {
       await dockerRequest('POST', `/containers/${encodeURIComponent(target.Id)}/start`);
       if (serverPort) {
         // Nothing has been stopped yet, so a target that will not serve leaves the current
-        // deployment untouched — the rollback simply fails.
-        await this.waitUntilServing(target.Id, serverPort);
+        // deployment untouched — the rollback simply fails. But it must not be left running:
+        // it shares the network alias, so the gateway would round-robin into a broken
+        // deployment behind a site that is otherwise fine.
+        try {
+          await this.waitUntilServing(target.Id, serverPort);
+        } catch (error) {
+          await dockerRequest(
+            'POST',
+            `/containers/${encodeURIComponent(target.Id)}/stop?t=5`
+          ).catch(() => undefined);
+          throw error;
+        }
       }
-      for (const container of others) {
+      for (const container of othersRunning) {
         await dockerRequest('POST', `/containers/${container.Id}/stop?t=5`).catch(() => undefined);
       }
     }

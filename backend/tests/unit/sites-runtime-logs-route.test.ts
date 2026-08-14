@@ -37,6 +37,15 @@ const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   res.status(statusCode).json({ message: error instanceof Error ? error.message : 'Error' });
 };
 
+/**
+ * One app per call, but the router module is imported once for the file.
+ *
+ * No `vi.resetModules()`: re-importing the route graph per test cost enough CPU to push the
+ * two limiter suites — which each time 120 requests against a 10s timeout — over their
+ * deadline when the full suite runs. Nothing here needs a fresh registry: the logs tests
+ * make one request each, and the three rollback tests sit far under the deployments write
+ * budget of 25/5min.
+ */
 async function createApp() {
   const { deploymentsRouter } = await import('../../src/api/routes/deployments/index.routes.js');
   const app = express();
@@ -51,9 +60,6 @@ const ID = '11111111-2222-3333-4444-555555555555';
 describe('GET /api/deployments/:id/logs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // The limiter's counter lives in the module, so without this a test's budget would
-    // depend on how many requests the tests before it made.
-    vi.resetModules();
     deploymentServiceMock.getRuntimeLogs.mockResolvedValue({ lines: [], nextToken: null });
   });
 
@@ -135,8 +141,6 @@ describe('GET /api/deployments/:id/logs', () => {
 describe('POST /api/deployments/:id/rollback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Fresh module registry per test, so the write limiter's counter does not carry over.
-    vi.resetModules();
     deploymentServiceMock.rollbackTo.mockResolvedValue({ id: 'row-1', status: 'READY' });
   });
 
