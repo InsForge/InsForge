@@ -1325,7 +1325,10 @@ export class DeploymentService {
       logger.info('Deployment rolled back', { id, status });
       return result.rows[0] as DeploymentRecord;
     } catch (error) {
-      await client.query('ROLLBACK');
+      // Swallowed like the other transaction in this file: on a broken connection the
+      // ROLLBACK itself rejects, and that rejection would replace the original error *and*
+      // skip the log line below — the only record that the host and the database disagree.
+      await client.query('ROLLBACK').catch(() => {});
       // The driver already switched the host — that happened before this transaction — so
       // the database now disagrees with what is being served. Nothing else records that,
       // and an operator chasing "why does the site show the old build" needs this line.
