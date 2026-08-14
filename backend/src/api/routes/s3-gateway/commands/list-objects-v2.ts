@@ -120,17 +120,24 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
   const continuationToken = q['continuation-token'];
   const startAfter = q['start-after'];
   const resumeFrom = continuationToken ? decodeContinuation(continuationToken) : undefined;
+  // A token we cannot read carries no position. Restarting from the beginning
+  // would answer 200 with keys the caller has already processed, so say so
+  // instead, which is what S3 does for a token it does not recognise.
+  if (continuationToken && !resumeFrom) {
+    sendS3Error(res, 'InvalidArgument', 'The continuation token provided is incorrect', {
+      resource: req.path,
+      requestId: req.s3Auth.requestId,
+    });
+    return;
+  }
   const suppressPrefix = resumeFrom?.prefix;
 
   // Accumulate visible entries (Contents + CommonPrefixes) up to maxKeys.
   // Track the last DB row we advanced past for continuation.
   const contents: Array<{ Key: string; Size: number; ETag: string; LastModified: string }> = [];
   const commonPrefixesSet = new Set<string>();
-  let cursor: Continuation | undefined = continuationToken
-    ? resumeFrom
-    : startAfter
-      ? { key: startAfter }
-      : undefined;
+  let cursor: Continuation | undefined =
+    resumeFrom ?? (startAfter ? { key: startAfter } : undefined);
 
   // max-keys=0 asks for no entries at all, so there is nothing to scan and
   // nothing is left unread from the caller's point of view. Scanning anyway

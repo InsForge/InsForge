@@ -314,6 +314,28 @@ describe('ListObjectsV2 start-after and continuation-token', () => {
     expect(result.contents).toEqual(['b.txt', 'c.txt']);
   });
 
+  it('rejects a marked token it cannot read instead of restarting the walk', async () => {
+    const marked = Buffer.concat([Buffer.from([0x00]), Buffer.from('not json', 'utf8')]).toString(
+      'base64url'
+    );
+
+    const result = await list(['a.txt', 'b.txt'], { 'continuation-token': marked });
+
+    // Restarting would answer 200 with keys the caller had already processed.
+    expect(result.status).toBe(400);
+    expect(result.xml).toContain('InvalidArgument');
+    expect(result.contents).toEqual([]);
+  });
+
+  it('rejects a marked token whose payload is the wrong shape', async () => {
+    const wrongShape = versionedToken({ v: 99, k: 'a.txt' });
+
+    const result = await list(['a.txt', 'b.txt'], { 'continuation-token': wrongShape });
+
+    expect(result.status).toBe(400);
+    expect(result.xml).toContain('InvalidArgument');
+  });
+
   it('reads a legacy token for a key shaped like the versioned payload as that key', async () => {
     // An object key may be any text, including our own envelope. The NUL marker
     // is what separates the formats, and Postgres text cannot hold NUL, so a
