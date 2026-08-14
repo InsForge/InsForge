@@ -15,6 +15,11 @@ export interface ListObjectsParams {
   offset?: number;
 }
 
+type DashboardListObjectsResponse = {
+  objects: StorageFileSchema[];
+  pagination: ListObjectsResponseSchema['pagination'];
+};
+
 export const storageService = {
   // List all buckets
   async listBuckets(): Promise<StorageBucketSchema[]> {
@@ -30,7 +35,7 @@ export const storageService = {
     bucketName: string,
     params?: ListObjectsParams,
     searchQuery?: string
-  ): Promise<ListObjectsResponseSchema> {
+  ): Promise<DashboardListObjectsResponse> {
     const searchParams = new URLSearchParams();
     if (params?.prefix) {
       searchParams.append('prefix', params.prefix);

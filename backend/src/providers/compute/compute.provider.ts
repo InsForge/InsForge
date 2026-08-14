@@ -219,8 +219,11 @@ export interface ComputeCapabilities {
    *
    * Fly allocates public IPs and a `.fly.dev` hostname for every app, so it can
    * only offer 'host'; asking it for 'none' is not something it can honour. A
-   * single-host driver can offer all three. The first entry is the driver's
-   * default when a caller does not choose.
+   * single-host driver can offer all three.
+   *
+   * This is the set the driver *can* deliver, not the one it picks by default —
+   * that is `defaultIngress()`, which for Docker is an operator setting and so
+   * cannot be read off a static list.
    */
   ingressModes: ('none' | 'port' | 'host')[];
   /**
@@ -253,6 +256,16 @@ export interface ComputeProvider {
    */
   readonly name: 'fly' | 'docker';
   readonly capabilities: ComputeCapabilities;
+  /**
+   * Mode applied when the caller does not choose one. Always a member of
+   * `capabilities.ingressModes`.
+   *
+   * A method rather than a field on `capabilities`, because for a single-host
+   * driver it is an operator setting that can change while the process runs —
+   * reading it off a static list is what made COMPUTE_DEFAULT_INGRESS have no
+   * effect on service creation.
+   */
+  defaultIngress(): 'none' | 'port' | 'host';
   /**
    * Provider-native name for the app/namespace backing a service. Fly needs a
    * globally-unique, length-capped app name; Docker only needs a locally-unique

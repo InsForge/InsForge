@@ -9,6 +9,7 @@ import {
   ERROR_CODES,
   createBucketRequestSchema,
   deleteObjectsRequestSchema,
+  listObjectsResponseSchema,
   updateBucketRequestSchema,
   updateStorageConfigRequestSchema,
   createS3AccessKeyRequestSchema,
@@ -271,20 +272,20 @@ router.get(
         !!req.hasApiKey
       );
 
-      successResponse(
-        res,
-        {
-          data: result.objects,
-          pagination: {
-            offset: offset,
-            limit: limit,
-            total: result.total,
-          },
-          nextActions:
-            'You can use PUT /api/storage/buckets/:bucketName/objects/:objectKey to create or replace a specific key, POST /api/storage/buckets/:bucketName/objects to upload with an auto-generated key, and GET /api/storage/buckets/:bucketName/objects/:objectKey to download an object.',
+      const response = {
+        data: result.objects,
+        pagination: {
+          offset: offset,
+          limit: limit,
+          total: result.total,
         },
-        200
-      );
+        nextActions:
+          'You can use PUT /api/storage/buckets/:bucketName/objects/:objectKey to create or replace a specific key, POST /api/storage/buckets/:bucketName/objects to upload with an auto-generated key, and GET /api/storage/buckets/:bucketName/objects/:objectKey to download an object.',
+      };
+
+      listObjectsResponseSchema.parse(response);
+
+      successResponse(res, response, 200);
     } catch (error) {
       next(error);
     }

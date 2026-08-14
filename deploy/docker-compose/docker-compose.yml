@@ -169,14 +169,11 @@ services:
     volumes:
       - storage-data:/insforge-storage
       - insforge-logs:/insforge-logs
-      # Uncomment to enable the Docker compute provider. `group_add` must name the
-      # host's docker group; the GID is host-specific (993 on Amazon Linux 2023,
-      # commonly 999 on Debian/Ubuntu) so it cannot be baked in:
-      #   getent group docker | cut -d: -f3
-      # The value goes on .env's DOCKER_GID line (or the exported environment).
-      # Compose does not see a bare assignment made in your shell.
+      # Uncomment to enable the Docker compute provider. The socket is
+      # root-equivalent on the host, so it is opt-in rather than on by default.
+      # Nothing else to set: the entrypoint reads the socket's group and joins it
+      # before dropping to the app user.
       # - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:${DOCKER_SOCKET_PATH:-/var/run/docker.sock}
-    # group_add: ["${DOCKER_GID:?set DOCKER_GID to your host docker group id}"]
     networks:
       - insforge-network
 

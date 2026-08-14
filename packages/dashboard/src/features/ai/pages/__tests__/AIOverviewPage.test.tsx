@@ -5,6 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AIOverview } from '@insforge/shared-schemas';
 
 const hookMocks = vi.hoisted(() => ({
+  showUpgradeDialog: vi.fn(),
+  entitlement: { isLoading: false, allowed: true, reason: null } as {
+    isLoading: boolean;
+    allowed: boolean;
+    reason: 'plan' | 'partner' | null;
+  },
   rotateOpenRouterKey: vi.fn(),
   isRotating: false,
   overviewResult: {
@@ -99,13 +105,20 @@ vi.mock('#features/ai/constants', () => {
 vi.mock('#lib/config/DashboardHostContext', () => ({
   useDashboardHost: () => ({
     mode: 'cloud-hosting',
+    onShowUpgradeDialog: hookMocks.showUpgradeDialog,
   }),
+}));
+
+vi.mock('#lib/hooks/useAiEntitlement', () => ({
+  useAiEntitlement: () => hookMocks.entitlement,
 }));
 
 import AIOverviewPage from '#features/ai/pages/AIOverviewPage';
 
 describe('AIOverviewPage OpenRouter key rotation', () => {
   beforeEach(() => {
+    hookMocks.showUpgradeDialog.mockReset();
+    hookMocks.entitlement = { isLoading: false, allowed: true, reason: null };
     hookMocks.rotateOpenRouterKey.mockReset();
     hookMocks.rotateOpenRouterKey.mockResolvedValue({
       apiKey: 'sk-or-rotated-key',
@@ -272,5 +285,77 @@ describe('AIOverviewPage OpenRouter key rotation', () => {
     );
 
     expect(screen.getByText('Unable to load usage from OpenRouter.')).toBeInTheDocument();
+  });
+});
+
+describe('AIOverviewPage entitlement gate', () => {
+  beforeEach(() => {
+    hookMocks.showUpgradeDialog.mockReset();
+    hookMocks.entitlement = { isLoading: false, allowed: true, reason: null };
+  });
+
+  it('offers an upgrade instead of the page when the org is on the free plan', async () => {
+    const user = userEvent.setup();
+    hookMocks.entitlement = { isLoading: false, allowed: false, reason: 'plan' };
+
+    render(
+      <MemoryRouter>
+        <AIOverviewPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Upgrade to Pro to use the AI Model Gateway')).toBeInTheDocument();
+    // The gated widgets must not render at all — that is what keeps their
+    // queries from firing against a 403.
+    expect(screen.queryByRole('button', { name: /^Rotate$/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Upgrade plan' }));
+    expect(hookMocks.showUpgradeDialog).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the gateway is unsupported for a partner project, with no upgrade CTA', () => {
+    hookMocks.entitlement = { isLoading: false, allowed: false, reason: 'partner' };
+
+    render(
+      <MemoryRouter>
+        <AIOverviewPage />
+      </MemoryRouter>
+    );
+
+    expect(
+      screen.getByText('AI Model Gateway is not available for this project')
+    ).toBeInTheDocument();
+    // A partner org has no upgrade path, so offering one would dead-end.
+    expect(screen.queryByRole('button', { name: 'Upgrade plan' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Rotate$/ })).not.toBeInTheDocument();
+  });
+
+  it('shows neither branch while the entitlement is still resolving', () => {
+    hookMocks.entitlement = { isLoading: true, allowed: true, reason: null };
+
+    render(
+      <MemoryRouter>
+        <AIOverviewPage />
+      </MemoryRouter>
+    );
+
+    // Committing early would flash a gated org the paid UI and fire the very
+    // requests the gate exists to prevent.
+    expect(screen.queryByRole('button', { name: /^Rotate$/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Upgrade to Pro to use the AI Model Gateway')
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the page once an entitled verdict settles', () => {
+    hookMocks.entitlement = { isLoading: false, allowed: true, reason: null };
+
+    render(
+      <MemoryRouter>
+        <AIOverviewPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('button', { name: /^Rotate$/ })).toBeInTheDocument();
   });
 });

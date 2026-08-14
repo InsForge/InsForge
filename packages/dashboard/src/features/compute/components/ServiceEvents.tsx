@@ -44,7 +44,9 @@ export function ServiceEvents({ serviceId }: ServiceEventsProps) {
             {t('compute.noEvents', { defaultValue: 'No events available.' })}
           </p>
         ) : (
-          <pre className="text-xs font-mono text-muted-foreground space-y-0.5">
+          <pre className="whitespace-pre-wrap break-all text-xs font-mono text-muted-foreground space-y-0.5">
+            {/* Wrapped, not clipped: a line is routinely wider than the panel, and
+                `pre` alone would push it past the edge with no way to scroll to it. */}
             {events.map((entry, i) => (
               <div key={i}>
                 <span className="text-foreground/60">
