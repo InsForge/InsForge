@@ -130,4 +130,33 @@ describe('ScheduleService outbound URL validation', () => {
       addresses: ['8.8.8.8'],
     });
   });
+
+  it('keeps field updates on inactive schedules inactive', async () => {
+    const service = ScheduleService.getInstance();
+    const schedule = {
+      id: '00000000-0000-0000-0000-000000000003',
+      name: 'inactive',
+      cronSchedule: '*/5 * * * *',
+      functionUrl: 'http://8.8.8.8/hook',
+      httpMethod: 'POST' as const,
+      headers: null,
+      body: null,
+      cronJobId: null,
+      lastExecutedAt: null,
+      isActive: false,
+      nextRun: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    vi.spyOn(service, 'getScheduleById').mockResolvedValue(schedule);
+    queryMock.mockResolvedValue({ rows: [{ cron_job_id: null, success: true }] });
+
+    await expect(service.updateSchedule(schedule.id, { name: 'still-inactive' })).resolves.toEqual({
+      id: schedule.id,
+      cron_job_id: null,
+    });
+
+    expect(queryMock).toHaveBeenCalledTimes(1);
+    expect(queryMock.mock.calls[0][1]?.[9]).toBe(false);
+  });
 });

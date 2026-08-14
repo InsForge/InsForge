@@ -82,6 +82,41 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+CREATE OR REPLACE FUNCTION schedules.is_dns_pinned_url(p_url TEXT, p_resolved_target JSONB)
+RETURNS BOOLEAN AS $$
+DECLARE
+  v_authority TEXT;
+  v_host TEXT;
+  v_host_ip INET;
+BEGIN
+  IF NOT schedules.is_safe_url(p_url) OR
+     p_resolved_target IS NULL OR
+     p_resolved_target->>'rawUrl' IS DISTINCT FROM p_url OR
+     jsonb_array_length(COALESCE(p_resolved_target->'addresses', '[]'::JSONB)) = 0 THEN
+    RETURN FALSE;
+  END IF;
+
+  v_authority := substring(lower(p_url) FROM '^https?://([^/?#]+)');
+  IF left(v_authority, 1) = '[' THEN
+    v_host := trim(both '[]' FROM split_part(v_authority, ']', 1) || ']');
+  ELSE
+    v_host := lower(regexp_replace(v_authority, ':([0-9]+)$', ''));
+  END IF;
+
+  BEGIN
+    v_host_ip := v_host::INET;
+  EXCEPTION WHEN OTHERS THEN
+    RETURN FALSE;
+  END;
+
+  RETURN schedules.is_safe_address(v_host) AND EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements_text(COALESCE(p_resolved_target->'addresses', '[]'::JSONB)) AS address
+    WHERE address = host(v_host_ip)
+  );
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
 DROP FUNCTION IF EXISTS schedules.upsert_job(UUID, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, JSONB, JSONB);
 DROP FUNCTION IF EXISTS schedules.upsert_job(UUID, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, JSONB);
 
@@ -126,6 +161,11 @@ BEGIN
     WHERE NOT schedules.is_safe_address(address)
   ) THEN
     RETURN QUERY SELECT NULL::BIGINT, FALSE, 'Scheduled URL resolved to unsafe network address';
+    RETURN;
+  END IF;
+
+  IF p_is_active AND NOT schedules.is_dns_pinned_url(p_function_url, v_resolved_target) THEN
+    RETURN QUERY SELECT NULL::BIGINT, FALSE, 'Scheduled URL must use a DNS-pinned literal network address';
     RETURN;
   END IF;
 
@@ -245,7 +285,17 @@ BEGIN
     RETURN;
   END IF;
 
-  v_resolved_target := v_job.resolved_target;
+  IF NOT schedules.is_dns_pinned_url(v_job.function_url, v_job.resolved_target) THEN
+    PERFORM schedules.log_job_execution(
+      v_job.id,
+      v_job.name,
+      FALSE,
+      400,
+      0,
+      'Scheduled URL cannot be executed safely by database HTTP client'
+    );
+    RETURN;
+  END IF;
 
   BEGIN
     v_decrypted_headers := schedules.decrypt_headers(v_job.encrypted_headers);
@@ -289,6 +339,7 @@ BEGIN
     FROM schedules.jobs
     WHERE NOT schedules.is_safe_url(function_url)
        OR resolved_target IS NULL
+       OR NOT schedules.is_dns_pinned_url(function_url, resolved_target)
   LOOP
     IF v_job.cron_job_id IS NOT NULL THEN
       PERFORM cron.unschedule(v_job.cron_job_id);
