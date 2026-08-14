@@ -29,28 +29,42 @@ def resolves(path):
     return os.path.exists(p + '.mdx') or os.path.exists(p + '.md')
 
 def transform(node, loc):
+    """Rebuild one node for `loc`, or return None if it should not appear.
+
+    A page with no translated file is omitted rather than emitted as the bare
+    English path. Falling back looked kinder — the entry still resolved — but it
+    put an English page in a localized sidebar with nothing to say it was not
+    translated, and check-docs-i18n-parity.sh rejects exactly that ("no silent
+    English fallback masking a missing translation"). Generator and checker
+    disagreed, so a hand-fixed docs.json was undone by the next regeneration.
+    """
     if isinstance(node, str):
         prefixed = f"{loc}/{node}"
-        # Skip prefixing a page that has no translated file yet (avoid dead nav
-        # links); fall back to the English page so the entry still resolves.
-        return prefixed if resolves(prefixed) else node
+        return prefixed if resolves(prefixed) else None
     if isinstance(node, list):
-        return [transform(x, loc) for x in node]
+        return [t for t in (transform(x, loc) for x in node) if t is not None]
     if isinstance(node, dict):
         out = {}
         for k, v in node.items():
             if k in ('tab', 'group'):
                 out[k] = LABELS[loc].get(v, v)
             elif k in ('pages', 'groups'):
-                out[k] = [transform(x, loc) for x in v]
+                out[k] = [t for t in (transform(x, loc) for x in v) if t is not None]
             else:
                 out[k] = copy.deepcopy(v)
+        # Drop a group this pass emptied, so no heading is left with nothing
+        # under it. A group that is already empty in the English tree is copied
+        # through untouched: that is the English tree's business, not ours.
+        had_children = bool(node.get('pages') or node.get('groups'))
+        if had_children and not (out.get('pages') or out.get('groups')):
+            return None
         return out
     return copy.deepcopy(node)
 
 languages = [{'language': 'en', 'default': True, 'tabs': copy.deepcopy(base_tabs)}]
 for loc in LOCALES:
-    languages.append({'language': loc, 'tabs': [transform(t, loc) for t in base_tabs]})
+    tabs = [t for t in (transform(t, loc) for t in base_tabs) if t is not None]
+    languages.append({'language': loc, 'tabs': tabs})
 
 nav_out = {'languages': languages}
 if glob is not None:
