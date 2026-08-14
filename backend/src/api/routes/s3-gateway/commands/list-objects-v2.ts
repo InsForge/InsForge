@@ -14,10 +14,17 @@ const MAX_KEYS_LIMIT = 1000;
 const DB_WINDOW = 1000;
 const MAX_DB_PAGES = 200;
 
-// A continuation token is the cursor key prefixed by a truncated HMAC that
-// binds it to the listing that issued it. 128 bits is well past what forging a
-// position is worth, and keeps the token short.
+// A continuation token is `base64url(cursor key).base64url(signature)`, where
+// the signature is a truncated HMAC binding the key to the listing that issued
+// it. 128 bits is well past what forging a position is worth, and keeps the
+// token short.
+//
+// The separator is what makes the format self-describing. base64url output
+// never contains a dot, so a token without one is unambiguously an unsigned
+// token from a release before this, and is handled as such rather than being
+// misread as a signed one.
 const CONTINUATION_SIGNATURE_BYTES = 16;
+const CONTINUATION_SEPARATOR = '.';
 
 /** The listing parameters a continuation token is only valid within. */
 interface ListingScope {
@@ -40,27 +47,39 @@ function continuationSignature(scope: ListingScope, key: string): Buffer {
     .subarray(0, CONTINUATION_SIGNATURE_BYTES);
 }
 function encodeContinuation(scope: ListingScope, key: string): string {
-  return Buffer.concat([continuationSignature(scope, key), Buffer.from(key, 'utf8')]).toString(
-    'base64url'
-  );
+  const payload = Buffer.from(key, 'utf8').toString('base64url');
+  const signature = continuationSignature(scope, key).toString('base64url');
+  return `${payload}${CONTINUATION_SEPARATOR}${signature}`;
 }
 
 /**
- * The cursor key a token carries, or undefined when the token is not one this
- * server issued for this listing. Nothing else in the request is trusted to
- * decide where a page resumes.
+ * Where a token says to resume, and whether this server can prove it issued it
+ * for this listing. Only a proven token gets to suppress a CommonPrefix; an
+ * unsigned one is treated as a plain position, which is no more than the caller
+ * could already ask for with start-after.
  */
-function decodeContinuation(scope: ListingScope, token: string): string | undefined {
-  const raw = Buffer.from(token, 'base64url');
-  if (raw.length <= CONTINUATION_SIGNATURE_BYTES) {
+interface ResumePoint {
+  key: string;
+  verified: boolean;
+}
+
+function decodeContinuation(scope: ListingScope, token: string): ResumePoint | undefined {
+  const separator = token.indexOf(CONTINUATION_SEPARATOR);
+  if (separator === -1) {
+    // Issued before tokens were signed. Honour the position so a listing walk
+    // that spans the upgrade still advances, but not the suppression, which
+    // depends on this server having issued the page it came from.
+    const key = Buffer.from(token, 'base64url').toString('utf8');
+    return key === '' ? undefined : { key, verified: false };
+  }
+
+  const key = Buffer.from(token.slice(0, separator), 'base64url').toString('utf8');
+  const claimed = Buffer.from(token.slice(separator + 1), 'base64url');
+  const expected = continuationSignature(scope, key);
+  if (claimed.length !== expected.length || !crypto.timingSafeEqual(claimed, expected)) {
     return undefined;
   }
-  const claimed = raw.subarray(0, CONTINUATION_SIGNATURE_BYTES);
-  const key = raw.subarray(CONTINUATION_SIGNATURE_BYTES).toString('utf8');
-  if (!crypto.timingSafeEqual(claimed, continuationSignature(scope, key))) {
-    return undefined;
-  }
-  return key;
+  return { key, verified: true };
 }
 
 /**
@@ -136,9 +155,9 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
   const continuationToken = q['continuation-token'];
   const startAfter = q['start-after'];
   const resumeFrom = continuationToken ? decodeContinuation(scope, continuationToken) : undefined;
-  // A token that does not verify was not issued by this server for this
-  // listing, so it names no position we can resume from. Restarting silently
-  // would answer 200 with keys the caller has already processed.
+  // A signed token that does not verify was tampered with, or belongs to a
+  // different listing, so it names no position to resume from. Restarting
+  // silently would answer 200 with keys the caller has already processed.
   if (continuationToken && resumeFrom === undefined) {
     sendS3Error(res, 'InvalidArgument', 'The continuation token provided is incorrect', {
       resource: req.path,
@@ -147,16 +166,19 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
     return;
   }
   // The CommonPrefix a resumed page must not repeat, recomputed from the cursor
-  // under this request's own prefix and delimiter. Only a verified token gets
-  // this: a caller-supplied start-after is a plain position, and S3 still lists
-  // the group its key happens to sit in.
-  const suppressPrefix = resumeFrom ? collapsedPrefix(resumeFrom, prefix, delimiter) : undefined;
+  // under this request's own prefix and delimiter. Only a verified token earns
+  // this, because choosing the cursor chooses which group disappears. A
+  // start-after, or an unsigned token, is a plain position: S3 still lists the
+  // group its key happens to sit in.
+  const suppressPrefix = resumeFrom?.verified
+    ? collapsedPrefix(resumeFrom.key, prefix, delimiter)
+    : undefined;
 
   // Accumulate visible entries (Contents + CommonPrefixes) up to maxKeys.
   // Track the last DB row key we advanced past for continuation.
   const contents: Array<{ Key: string; Size: number; ETag: string; LastModified: string }> = [];
   const commonPrefixesSet = new Set<string>();
-  let cursor: string | undefined = resumeFrom ?? (startAfter || undefined);
+  let cursor: string | undefined = resumeFrom?.key ?? (startAfter || undefined);
 
   // max-keys=0 asks for no entries at all, so there is nothing to scan and
   // nothing is left unread from the caller's point of view. Scanning anyway
