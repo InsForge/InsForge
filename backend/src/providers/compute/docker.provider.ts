@@ -58,13 +58,10 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * True when this backend belongs to a cloud-managed project.
+ * Compute provider backed by the local Docker daemon, for self-hosted instances.
  *
- * Both signals are checked because they answer slightly different questions and
- * either one being true is disqualifying: `isCloudEnvironment()` asks "am I
- * running on InsForge Cloud infrastructure", while a configured cloud compute
- * pair asks "is this project's control plane elsewhere". A guard that protects
- * tenant isolation should fail closed on either.
+ * The cloud guard that keeps this driver off cloud-managed projects lives in
+ * `isConfigured()`, which documents the signal it reads and the trade it accepts.
  */
 export class DockerProvider implements ComputeProvider {
   private static instance: DockerProvider;
