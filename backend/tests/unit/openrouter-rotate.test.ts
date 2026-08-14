@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import type { JwtPayload } from 'jsonwebtoken';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { appConfig } from '../../src/infra/config/app.config.js';
 
 const environmentMock = vi.hoisted(() => ({
   isCloud: true,
@@ -10,6 +11,8 @@ vi.mock('../../src/utils/environment.js', () => ({
   isCloudEnvironment: () => environmentMock.isCloud,
 }));
 
+// The real appConfig: these tests set cloud.projectId / app.jwtSecret directly,
+// because the config singleton reads env once at import.
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
@@ -34,6 +37,14 @@ function resetProviderState(provider: OpenRouterProvider) {
   state.rotationPromise = null;
 }
 
+const savedProjectId = appConfig.cloud.projectId;
+const savedJwtSecret = appConfig.app.jwtSecret;
+
+afterEach(() => {
+  appConfig.cloud.projectId = savedProjectId;
+  appConfig.app.jwtSecret = savedJwtSecret;
+});
+
 describe('OpenRouterProvider.rotateManagedApiKey', () => {
   const jwtSecret = 'test-secret-long-enough-for-signing-32chars';
   let provider: OpenRouterProvider;
@@ -45,8 +56,8 @@ describe('OpenRouterProvider.rotateManagedApiKey', () => {
     environmentMock.isCloud = true;
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    vi.stubEnv('PROJECT_ID', 'project_123');
-    vi.stubEnv('JWT_SECRET', jwtSecret);
+    appConfig.cloud.projectId = 'project_123';
+    appConfig.app.jwtSecret = jwtSecret;
     vi.stubEnv('CLOUD_API_HOST', 'https://cloud.example');
     provider = OpenRouterProvider.getInstance();
     resetProviderState(provider);
@@ -83,7 +94,7 @@ describe('OpenRouterProvider.rotateManagedApiKey', () => {
 
     const body = JSON.parse(String(options.body)) as { sign: string };
     const payload = jwt.verify(body.sign, jwtSecret) as JwtPayload;
-    expect(payload.projectId).toBe('project_123');
+    expect(payload.sub).toBe('project_123');
 
     await expect(provider.getMaskedApiKey()).resolves.toMatchObject({
       apiKey: rotatedKey,

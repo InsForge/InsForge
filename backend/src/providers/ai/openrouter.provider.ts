@@ -1,8 +1,9 @@
 import OpenAI from 'openai';
-import jwt from 'jsonwebtoken';
 import { createHash } from 'crypto';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError, UpstreamError } from '@/utils/errors.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import { ERROR_CODES, type AIOverview } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { ModelGatewayConfigService } from '@/services/ai/model-gateway-config.service.js';
@@ -377,7 +378,7 @@ export class OpenRouterProvider {
     data: OpenRouterActivityItem[];
     error?: string;
   }> {
-    const projectId = process.env.PROJECT_ID;
+    const projectId = appConfig.cloud.projectId;
     if (!projectId) {
       return {
         available: false,
@@ -388,7 +389,7 @@ export class OpenRouterProvider {
 
     let token: string;
     try {
-      token = this.createCloudProjectToken(projectId);
+      token = TokenManager.getInstance().signCloudToken('The cloud AI gateway');
     } catch (error) {
       return {
         available: false,
@@ -568,18 +569,6 @@ export class OpenRouterProvider {
     return date.toISOString().slice(0, 10);
   }
 
-  private createCloudProjectToken(projectId: string): string {
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new AppError(
-        'JWT_SECRET not found in environment variables',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-    return jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
-  }
-
   private applyCloudCredentials(data: CloudCredentialsResponse): string {
     if (!data.openrouter?.api_key) {
       throw new AppError(
@@ -656,7 +645,7 @@ export class OpenRouterProvider {
     // Start new fetch and store the promise
     this.fetchPromise = (async () => {
       try {
-        const projectId = process.env.PROJECT_ID;
+        const projectId = appConfig.cloud.projectId;
         if (!projectId) {
           throw new AppError(
             'PROJECT_ID not found in environment variables',
@@ -664,7 +653,7 @@ export class OpenRouterProvider {
             ERROR_CODES.INTERNAL_ERROR
           );
         }
-        const token = this.createCloudProjectToken(projectId);
+        const token = TokenManager.getInstance().signCloudToken('The cloud AI gateway');
 
         // Fetch API key from cloud service with sign token as query parameter
         const response = await fetch(
@@ -713,7 +702,7 @@ export class OpenRouterProvider {
           await this.fetchPromise.catch(() => undefined);
         }
 
-        const projectId = process.env.PROJECT_ID;
+        const projectId = appConfig.cloud.projectId;
         if (!projectId) {
           throw new AppError(
             'PROJECT_ID not found in environment variables',
@@ -721,7 +710,7 @@ export class OpenRouterProvider {
             ERROR_CODES.INTERNAL_ERROR
           );
         }
-        const token = this.createCloudProjectToken(projectId);
+        const token = TokenManager.getInstance().signCloudToken('The cloud AI gateway');
 
         const response = await fetch(
           `${process.env.CLOUD_API_HOST || 'https://api.insforge.dev'}/ai/v1/credentials/${projectId}/rotate`,

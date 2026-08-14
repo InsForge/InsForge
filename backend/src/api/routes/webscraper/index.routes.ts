@@ -3,6 +3,7 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { WebscraperService } from '@/services/webscraper/webscraper.service.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, updateApifyConfigSchema } from '@insforge/shared-schemas';
+import { isCloudEnvironment } from '@/utils/environment.js';
 
 export const webscraperRouter = Router();
 const service = WebscraperService.getInstance();
@@ -143,7 +144,7 @@ webscraperRouter.get(
 // Cloud projects get their Apify connection through OAuth on cloud-backend, so the
 // local token store is not theirs to write. Mirrors assertSelfHostedModelGatewayConfig().
 function assertSelfHostedWebscraperConfig(): void {
-  if (!WebscraperService.isSelfHosted()) {
+  if (isCloudEnvironment()) {
     throw new AppError(
       'The Apify connection is managed by InsForge Cloud.',
       400,

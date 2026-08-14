@@ -9,7 +9,8 @@ const jwtSecret = 's'.repeat(32);
 vi.mock('../../src/infra/config/app.config', () => {
   const c = {
     cloud: { projectId, apiHost },
-    app: { jwtSecret },
+    app: { jwtSecret, logLevel: 'error' },
+    server: { logsDir: '/tmp/insforge-cloud-analytics-test-logs' },
   };
   return {
     config: c,
@@ -52,6 +53,18 @@ function makeAxiosError(status: number): MockAxiosError {
 const { CloudAnalyticsProvider } = await import('../../src/providers/analytics/cloud.provider');
 
 describe('CloudAnalyticsProvider', () => {
+  const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+  beforeEach(() => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+  });
+  afterAll(() => {
+    if (savedProfile === undefined) {
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    } else {
+      process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+    }
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset singleton for each test
