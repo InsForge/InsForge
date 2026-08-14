@@ -306,6 +306,22 @@ describe('ListObjectsV2 start-after and continuation-token', () => {
     expect(result.commonPrefixes).toEqual(['a/', 'b/']);
   });
 
+  it('ignores a carried prefix once the delimiter stops producing it', async () => {
+    // Token issued by a delimiter=/ walk, replayed against a request that
+    // groups differently. The carried state describes a listing that no longer
+    // exists, so it must not silently remove an entry from this one.
+    const issued = versionedToken({ v: 1, k: 'a/1', p: 'a/' });
+
+    const noDelimiter = await list(['a/1', 'a/2', 'b/1'], { 'continuation-token': issued });
+    expect(noDelimiter.contents).toEqual(['a/2', 'b/1']);
+
+    const otherDelimiter = await list(['a/1', 'a/2', 'b/1'], {
+      delimiter: '-',
+      'continuation-token': issued,
+    });
+    expect(otherDelimiter.contents).toEqual(['a/2', 'b/1']);
+  });
+
   it('accepts a legacy bare-key continuation token', async () => {
     const legacy = Buffer.from('a.txt', 'utf8').toString('base64url');
 

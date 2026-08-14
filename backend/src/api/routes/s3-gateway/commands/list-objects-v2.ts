@@ -45,6 +45,26 @@ function encodeContinuation(cursor: Continuation): string {
   ]).toString('base64url');
 }
 
+/**
+ * The CommonPrefix a key collapses into for the given listing parameters, or
+ * undefined when the key is listed on its own. This is the single definition of
+ * grouping: the scan and the continuation check both go through it, so a
+ * carried prefix can only ever be honoured when this request would have
+ * produced it from the same key.
+ */
+function collapsedPrefix(
+  key: string,
+  prefix: string,
+  delimiter: string | undefined
+): string | undefined {
+  if (!delimiter || !key.startsWith(prefix)) {
+    return undefined;
+  }
+  const tail = key.slice(prefix.length);
+  const idx = tail.indexOf(delimiter);
+  return idx >= 0 ? prefix + tail.slice(0, idx + delimiter.length) : undefined;
+}
+
 function decodeContinuation(token: string): Continuation | undefined {
   const raw = Buffer.from(token, 'base64url');
   if (raw.length === 0) {
@@ -61,13 +81,7 @@ function decodeContinuation(token: string): Continuation | undefined {
       p?: unknown;
     };
     if (parsed?.v === CONTINUATION_VERSION && typeof parsed.k === 'string') {
-      // Tokens come back from the caller, so only honour a carried prefix that
-      // the cursor key actually sits under. That is the one shape this handler
-      // ever issues, and an inconsistent pair would otherwise suppress a
-      // CommonPrefix no earlier page had returned.
-      const carried =
-        typeof parsed.p === 'string' && parsed.k.startsWith(parsed.p) ? parsed.p : undefined;
-      return { key: parsed.k, prefix: carried };
+      return { key: parsed.k, prefix: typeof parsed.p === 'string' ? parsed.p : undefined };
     }
   } catch {
     // Marked but unparseable, so there is no position to resume from.
@@ -130,7 +144,15 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
     });
     return;
   }
-  const suppressPrefix = resumeFrom?.prefix;
+  // A carried prefix describes the listing that issued it. Honour it only when
+  // the cursor key still collapses to exactly that prefix under this request's
+  // prefix and delimiter, so state that no longer applies (a changed or dropped
+  // delimiter, a changed prefix) or that never applied cannot drop an entry.
+  const suppressPrefix =
+    resumeFrom?.prefix !== undefined &&
+    collapsedPrefix(resumeFrom.key, prefix, delimiter) === resumeFrom.prefix
+      ? resumeFrom.prefix
+      : undefined;
 
   // Accumulate visible entries (Contents + CommonPrefixes) up to maxKeys.
   // Track the last DB row we advanced past for continuation.
@@ -165,20 +187,16 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
         stoppedEarly = true;
         break;
       }
-      if (delimiter) {
-        const tail = r.key.slice(prefix.length);
-        const idx = tail.indexOf(delimiter);
-        if (idx >= 0) {
-          const pfx = prefix + tail.slice(0, idx + delimiter.length);
-          // Rows still inside the CommonPrefix the previous page ended on. That
-          // prefix was already returned there, so consume them without emitting
-          // anything rather than listing the same prefix on two pages.
-          if (pfx !== suppressPrefix) {
-            commonPrefixesSet.add(pfx);
-          }
-          cursor = { key: r.key, prefix: pfx };
-          continue;
+      const pfx = collapsedPrefix(r.key, prefix, delimiter);
+      if (pfx !== undefined) {
+        // Rows still inside the CommonPrefix the previous page ended on. That
+        // prefix was already returned there, so consume them without emitting
+        // anything rather than listing the same prefix on two pages.
+        if (pfx !== suppressPrefix) {
+          commonPrefixesSet.add(pfx);
         }
+        cursor = { key: r.key, prefix: pfx };
+        continue;
       }
       contents.push({
         Key: r.key,
