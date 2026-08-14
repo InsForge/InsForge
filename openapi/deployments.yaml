@@ -622,7 +622,9 @@ paths:
         - $ref: '#/components/parameters/DeploymentId'
         - name: limit
           in: query
-          description: Lines to return, 1-1000 (default 100)
+          description: >-
+            Lines to return, 1-1000 (default 100). A non-integer is rejected rather than
+            rounded: a page size the caller did not ask for is invisible to a paging client.
           schema:
             type: integer
             minimum: 1
@@ -673,6 +675,9 @@ paths:
           description: The run belongs to a driver that is not configured on this instance
           $ref: '#/components/responses/Error'
         '429':
+          description: >-
+            Rate-limited at 120 requests per minute per IP, the same budget as the compute
+            logs endpoint, because this is what a live tail polls
           $ref: '#/components/responses/Error'
         '500':
           $ref: '#/components/responses/Error'

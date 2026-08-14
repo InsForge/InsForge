@@ -273,6 +273,19 @@ describe('dockerContainerLogs', () => {
     expect(resumed).not.toContain('tail=');
   });
 
+  // `tail` is an integer on the wire. The compute route clamps its query value with
+  // Math.min/max, which leaves a decimal intact, and `tail=5.7` makes the daemon reject
+  // the whole request — so the page a caller asked for would come back as a 502.
+  it('floors the limit, because tail does not take a decimal', async () => {
+    mockRaw.mockResolvedValueOnce({ status: 200, body: Buffer.alloc(0) });
+    await dockerContainerLogs('container-abc', { limit: 5.7 }, mockRaw);
+    // The exact parameter value, not a substring: `tail=5` is a prefix of `tail=5.7`, so
+    // toContain passed with the floor removed — the first version of this test proved
+    // nothing.
+    const url = new URL(`http://d${mockRaw.mock.calls[0][1] as string}`);
+    expect(url.searchParams.get('tail')).toBe('5');
+  });
+
   /**
    * Mock what the daemon would actually send for a given request, so the mock
    * cannot assert a shape the real thing never produces: `tail=N` returns the
