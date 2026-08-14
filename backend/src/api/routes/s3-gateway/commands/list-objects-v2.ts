@@ -45,7 +45,13 @@ function decodeContinuation(token: string): Continuation | undefined {
   try {
     const parsed = JSON.parse(decoded) as { v?: unknown; k?: unknown; p?: unknown };
     if (parsed?.v === CONTINUATION_VERSION && typeof parsed.k === 'string') {
-      return { key: parsed.k, prefix: typeof parsed.p === 'string' ? parsed.p : undefined };
+      // Tokens come back from the caller, so only honour a carried prefix that
+      // the cursor key actually sits under. That is the one shape this handler
+      // ever issues, and an inconsistent pair would otherwise suppress a
+      // CommonPrefix no earlier page had returned.
+      const carried =
+        typeof parsed.p === 'string' && parsed.k.startsWith(parsed.p) ? parsed.p : undefined;
+      return { key: parsed.k, prefix: carried };
     }
   } catch {
     // Not a versioned payload, so fall through to the legacy format below.

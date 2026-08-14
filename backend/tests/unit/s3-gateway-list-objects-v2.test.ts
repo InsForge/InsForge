@@ -44,16 +44,17 @@ interface ListResult {
   dbCalls: number;
 }
 
-async function list(keys: string[], query: Record<string, string> = {}): Promise<ListResult> {
+/** Installs the storage stubs and hands back the listObjectsV2Db spy. */
+function stubStorage(
+  rows: (params: { prefix?: string; startAfter?: string; maxKeys: number }) => DbRow[]
+) {
   const svc = StorageService.getInstance();
   vi.spyOn(svc, 'bucketExists').mockResolvedValue(true);
-  const table = fakeTable(keys);
-  let dbCalls = 0;
-  vi.spyOn(svc, 'listObjectsV2Db').mockImplementation(async (params) => {
-    dbCalls++;
-    return table(params);
-  });
+  return vi.spyOn(svc, 'listObjectsV2Db').mockImplementation(async (params) => rows(params));
+}
 
+/** Runs one ListObjectsV2 request against whatever stubs are installed. */
+async function invoke(query: Record<string, string>): Promise<Omit<ListResult, 'dbCalls'>> {
   const status = vi.fn().mockReturnThis();
   const type = vi.fn().mockReturnThis();
   const send = vi.fn();
@@ -83,8 +84,13 @@ async function list(keys: string[], query: Record<string, string> = {}): Promise
     nextToken: capture('NextContinuationToken'),
     contents: captureAll('Key'),
     commonPrefixes: captureAll('Prefix').filter((p) => p !== (query.prefix ?? '')),
-    dbCalls,
   };
+}
+
+async function list(keys: string[], query: Record<string, string> = {}): Promise<ListResult> {
+  const table = fakeTable(keys);
+  const spy = stubStorage(table);
+  return { ...(await invoke(query)), dbCalls: spy.mock.calls.length };
 }
 
 /** Walks every page the way an SDK paginator does, and returns what it saw. */
@@ -164,34 +170,49 @@ describe('ListObjectsV2 truncation contract', () => {
   });
 
   it('reports truncation when the per-request scan cap stops the walk early', async () => {
-    const svc = StorageService.getInstance();
-    vi.spyOn(svc, 'bucketExists').mockResolvedValue(true);
     // Every window is a full page of keys inside one folder, so the visible
     // entry count never reaches maxKeys and the scan runs until the internal
     // page cap stops it with rows still unread.
     let seq = 0;
-    vi.spyOn(svc, 'listObjectsV2Db').mockImplementation(async (params) =>
+    stubStorage((params) =>
       Array.from({ length: params.maxKeys }, () => row(`folder/${String(seq++).padStart(9, '0')}`))
     );
 
-    const status = vi.fn().mockReturnThis();
-    const type = vi.fn().mockReturnThis();
-    const send = vi.fn();
-    const res = { status, type, send } as unknown as Response;
-    const req = {
-      query: { delimiter: '/' },
-      path: '/test-bucket',
-      s3Bucket: 'test-bucket',
-      s3Key: null,
-      s3Op: 'ListObjectsV2',
-      s3Auth: { requestId: 'test-req' },
-    };
+    const result = await invoke({ delimiter: '/' });
 
-    await handle(req as never, res);
+    expect(result.isTruncated).toBe(true);
+    expect(result.nextToken).toBeDefined();
+  });
 
-    const xml = send.mock.calls[0][0] as string;
-    expect(xml).toContain('<IsTruncated>true</IsTruncated>');
-    expect(xml).toContain('<NextContinuationToken>');
+  it('terminates on an empty page when the scan cap lands on the end of the data', async () => {
+    // The cap cannot tell "one more full window exists" from "the data ended on
+    // a window boundary" without another query, so it reports truncation rather
+    // than claiming a completeness it has not verified. The follow-up page must
+    // then close the walk cleanly instead of handing back another token.
+    let remainingWindows = 200;
+    let seq = 0;
+    stubStorage((params) => {
+      if (remainingWindows === 0) {
+        return [];
+      }
+      remainingWindows--;
+      return Array.from({ length: params.maxKeys }, () =>
+        row(`folder/${String(seq++).padStart(9, '0')}`)
+      );
+    });
+
+    const first = await invoke({ delimiter: '/' });
+    expect(first.isTruncated).toBe(true);
+    expect(first.commonPrefixes).toEqual(['folder/']);
+
+    const second = await invoke({
+      delimiter: '/',
+      'continuation-token': first.nextToken as string,
+    });
+
+    expect(second.keyCount).toBe(0);
+    expect(second.isTruncated).toBe(false);
+    expect(second.nextToken).toBeUndefined();
   });
 });
 
@@ -262,6 +283,21 @@ describe('ListObjectsV2 start-after and continuation-token', () => {
 
     // start-after would have resumed past c.txt and returned nothing.
     expect(second.contents).toEqual(['b.txt']);
+  });
+
+  it('ignores a carried prefix the cursor key does not sit under', async () => {
+    const inconsistent = Buffer.from(JSON.stringify({ v: 1, k: 'a/1', p: 'b/' }), 'utf8').toString(
+      'base64url'
+    );
+
+    const result = await list(['a/1', 'a/2', 'b/1'], {
+      delimiter: '/',
+      'continuation-token': inconsistent,
+    });
+
+    // "b/" is still listed: a token cannot suppress a prefix its cursor is not
+    // inside, so no page can be made to drop an entry it never returned.
+    expect(result.commonPrefixes).toEqual(['a/', 'b/']);
   });
 
   it('accepts a legacy bare-key continuation token', async () => {
