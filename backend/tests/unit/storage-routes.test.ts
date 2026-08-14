@@ -143,7 +143,10 @@ describe('Storage routes', () => {
       throw new Error('Test server did not bind to a TCP port');
     }
 
-    const response = await get(address.port, '/api/storage/buckets/photos/objects?limit=10&offset=2');
+    const response = await get(
+      address.port,
+      '/api/storage/buckets/photos/objects?limit=10&offset=2'
+    );
 
     expect(response.statusCode, response.body).toBe(200);
     expect(JSON.parse(response.body)).toEqual({
