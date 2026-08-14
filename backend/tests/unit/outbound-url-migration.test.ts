@@ -16,7 +16,7 @@ describe('outbound URL guard migration', () => {
     expect(sql).toMatch(/CREATE OR REPLACE FUNCTION schedules\.is_safe_url/i);
     expect(sql).toMatch(/CREATE OR REPLACE FUNCTION schedules\.execute_job/i);
     expect(sql).toMatch(/schedules\.is_safe_url\(v_job\.function_url\)/i);
-    expect(sql).toMatch(/CURLOPT_RESOLVE/i);
+    expect(sql).not.toMatch(/CURLOPT_RESOLVE/i);
     expect(sql).toMatch(/resolved_target JSONB/i);
     expect(sql).toMatch(/resolved_target->>'rawUrl'/i);
     expect(sql).toMatch(/CREATE OR REPLACE FUNCTION schedules\.is_safe_address/i);

@@ -135,8 +135,12 @@ BEGIN
     PERFORM cron.unschedule(v_existing_cron_id);
   END IF;
 
-  v_function_call := format('SELECT schedules.execute_job(%L::UUID)', p_job_id);
-  SELECT cron.schedule(p_cron_expression, v_function_call) INTO v_new_cron_id;
+  IF p_is_active THEN
+    v_function_call := format('SELECT schedules.execute_job(%L::UUID)', p_job_id);
+    SELECT cron.schedule(p_cron_expression, v_function_call) INTO v_new_cron_id;
+  ELSE
+    v_new_cron_id := NULL;
+  END IF;
 
   INSERT INTO schedules.jobs (
     id, name, cron_schedule, function_url, http_method, encrypted_headers, headers, body,
@@ -174,7 +178,6 @@ DECLARE
   v_status INT;
   v_decrypted_headers JSONB;
   v_final_body JSONB;
-  v_resolved_target JSONB;
   v_start_time TIMESTAMP := clock_timestamp();
   v_end_time TIMESTAMP;
   v_duration_ms BIGINT;
@@ -243,19 +246,6 @@ BEGIN
   END IF;
 
   v_resolved_target := v_job.resolved_target;
-  PERFORM http_set_curlopt(
-    'CURLOPT_RESOLVE',
-    format(
-      '%s:%s:%s',
-      v_resolved_target->>'hostname',
-      v_resolved_target->>'port',
-      CASE
-        WHEN position(':' IN v_resolved_target->'addresses'->>0) > 0
-          THEN '[' || (v_resolved_target->'addresses'->>0) || ']'
-        ELSE v_resolved_target->'addresses'->>0
-      END
-    )
-  );
 
   BEGIN
     v_decrypted_headers := schedules.decrypt_headers(v_job.encrypted_headers);
@@ -283,12 +273,10 @@ BEGIN
       v_error_message
     );
   EXCEPTION WHEN OTHERS THEN
-    PERFORM http_set_curlopt('CURLOPT_RESOLVE', '');
     v_end_time := clock_timestamp();
     v_duration_ms := EXTRACT(EPOCH FROM (v_end_time - v_start_time)) * 1000;
     PERFORM schedules.log_job_execution(v_job.id, v_job.name, FALSE, 500, v_duration_ms, SQLERRM);
   END;
-  PERFORM http_set_curlopt('CURLOPT_RESOLVE', '');
 END;
 $$ LANGUAGE plpgsql;
 

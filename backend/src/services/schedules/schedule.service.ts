@@ -330,7 +330,8 @@ export class ScheduleService {
         data.body !== undefined;
 
       const desiredIsActive = data.isActive ?? existingSchedule.isActive;
-      const needsUpsert = hasScheduleFields || (data.isActive === true && existingSchedule.isActive === false);
+      const needsUpsert =
+        hasScheduleFields || (data.isActive === true && existingSchedule.isActive === false);
 
       let cronJobId: string | null | undefined = existingSchedule.cronJobId;
 
