@@ -2,7 +2,10 @@ import express, { type ErrorRequestHandler } from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const deploymentServiceMock = vi.hoisted(() => ({ getRuntimeLogs: vi.fn() }));
+const deploymentServiceMock = vi.hoisted(() => ({
+  getRuntimeLogs: vi.fn(),
+  rollbackTo: vi.fn(),
+}));
 
 vi.mock('../../src/api/middlewares/auth.js', () => ({
   verifyAdmin: (
@@ -126,5 +129,42 @@ describe('GET /api/deployments/:id/logs', () => {
 
     expect(layer).toBeDefined();
     expect(layer?.route?.stack.map((entry) => entry.handle)).toContain(deploymentLogsRateLimiter);
+  });
+});
+
+describe('POST /api/deployments/:id/rollback', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Fresh module registry per test, so the write limiter's counter does not carry over.
+    vi.resetModules();
+    deploymentServiceMock.rollbackTo.mockResolvedValue({ id: 'row-1', status: 'READY' });
+  });
+
+  it('restores the named run', async () => {
+    const response = await request(await createApp()).post(`/api/deployments/${ID}/rollback`);
+
+    expect(response.status).toBe(200);
+    expect(deploymentServiceMock.rollbackTo).toHaveBeenCalledWith(ID);
+  });
+
+  // Without this the id reached the driver, where a Docker deployment id is a container id
+  // and an arbitrary string is a lookup against the daemon.
+  it('rejects an id that is not a uuid', async () => {
+    const response = await request(await createApp()).post('/api/deployments/not-a-uuid/rollback');
+
+    expect(response.status).toBe(400);
+    expect(deploymentServiceMock.rollbackTo).not.toHaveBeenCalled();
+  });
+
+  it('passes a driver refusal through with its own status', async () => {
+    const refusal = Object.assign(new Error('The vercel sites driver does not support rollback.'), {
+      statusCode: 400,
+    });
+    deploymentServiceMock.rollbackTo.mockRejectedValue(refusal);
+
+    const response = await request(await createApp()).post(`/api/deployments/${ID}/rollback`);
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toContain('does not support rollback');
   });
 });

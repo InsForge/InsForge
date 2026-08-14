@@ -108,6 +108,11 @@ services:
       - VERCEL_TOKEN=${VERCEL_TOKEN:-}
       - VERCEL_TEAM_ID=${VERCEL_TEAM_ID:-}
       - VERCEL_PROJECT_ID=${VERCEL_PROJECT_ID:-}
+      # Namespaces the containers and images both local drivers manage, and the network
+      # alias the sites gateway proxies to. Missing here while the gateway below read it
+      # meant an operator who set APP_KEY got a backend that did not: the driver named its
+      # alias `insforge-site-local` and the gateway looked for `insforge-site-<APP_KEY>`.
+      - APP_KEY=${APP_KEY:-}
       # OAuth Configuration
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
@@ -263,6 +268,10 @@ services:
     image: caddy:alpine
     profiles: ['sites-gateway']
     restart: unless-stopped
+    # The baseline every other service in this file carries, and this is the one that
+    # publishes host ports for inbound traffic.
+    security_opt:
+      - no-new-privileges:true
     environment:
       # Must resolve to the same value the backend uses; the driver falls back to `local`.
       - APP_KEY=${APP_KEY:-local}

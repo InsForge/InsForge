@@ -967,6 +967,33 @@ components:
         rootDirectory:
           type: string
           nullable: true
+        startCommand:
+          type: string
+          nullable: true
+          description: >-
+            Command that starts a long-running server, e.g. `node server.js`. Its presence is
+            what makes a deployment server-rendered rather than static — declared rather than
+            inferred, because a Dockerfile's final stage cannot branch on what a build
+            produced. Honoured by drivers that report `runtimeLogs`-style server support in
+            the `sites` capability slice; Vercel infers this itself and ignores it.
+        serverDirectory:
+          type: string
+          nullable: true
+          description: >-
+            Directory copied into the runtime image, relative to the build root. Defaults to
+            the whole build output. `.next/standalone` gives a small image for a Next app
+            built with `output: 'standalone'`, but that directory does not contain
+            `.next/static` or `public` — copy them into it in the build command, or the
+            assets 404 while the HTML renders.
+        serverPort:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          nullable: true
+          description: >-
+            Port the server listens on inside the container. Defaults to the static site port
+            so one gateway configuration serves both shapes. The container is given `PORT`
+            and `HOSTNAME=0.0.0.0`.
 
     EnvVarInput:
       type: object

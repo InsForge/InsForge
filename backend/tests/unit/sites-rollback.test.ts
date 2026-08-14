@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterAll, beforeEach, vi } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 
 const { mockPool, mockClient, mockProvider, active } = vi.hoisted(() => {
@@ -16,7 +16,10 @@ const { mockPool, mockClient, mockProvider, active } = vi.hoisted(() => {
     // Which driver the registry hands back. A holder rather than a spy: a spy on the
     // registry module survives clearAllMocks and leaks into the next test, which is
     // exactly how the first version of this file passed for the wrong reason.
-    active: { provider: provider as unknown },
+    //
+    // `other` is a second, non-default driver, which is what makes "did this reach the
+    // row's driver or the active one?" an answerable question.
+    active: { provider: provider as unknown, other: undefined as unknown },
   };
 });
 
@@ -47,8 +50,17 @@ vi.mock('../../src/services/deployments/sites-registry.js', async (importOrigina
     isAnySitesProviderConfigured: () => true,
     // Only the docker driver exists on this instance, which is what makes the
     // cross-driver refusal below reachable.
+    // `other` present means this instance has a second driver configured; absent is what
+    // makes the cross-driver refusal below reachable.
     buildSitesRegistry: () => ({
-      providers: new Map([['docker', active.provider]]),
+      providers: new Map(
+        active.other
+          ? [
+              ['docker', active.provider],
+              ['vercel', active.other],
+            ]
+          : [['docker', active.provider]]
+      ),
       defaultProvider: 'docker',
     }),
   };
@@ -78,8 +90,23 @@ function rowFor(id: string, providerDeploymentId: string | null) {
 beforeEach(() => {
   vi.clearAllMocks();
   active.provider = mockProvider;
+  active.other = {
+    name: 'vercel' as const,
+    isConfigured: () => true,
+    capabilities: () => ({ envVars: 'runtime', rollback: false, slug: true }),
+    envVars: { upsert: vi.fn(), keys: vi.fn(), list: vi.fn(), get: vi.fn(), remove: vi.fn() },
+    uploadFiles: vi.fn().mockResolvedValue([]),
+    createDeploymentWithFiles: vi.fn().mockResolvedValue({
+      id: 'dpl_vercel_new',
+      url: 'https://x.vercel.app',
+      state: 'READY',
+      readyState: 'READY',
+      name: 'x',
+      createdAt: new Date(),
+    }),
+  };
   mockPool.connect.mockResolvedValue(mockClient);
-  mockProvider.capabilities.mockReturnValue({ envVars: 'build-only', rollback: true } as never);
+  mockProvider.capabilities.mockReturnValue({ envVars: 'runtime', rollback: true } as never);
   mockProvider.rollbackTo.mockResolvedValue(RESTORED);
   mockProvider.runtimeLogs.mockResolvedValue({ lines: [], nextToken: null });
 });
@@ -154,6 +181,7 @@ describe('DeploymentService.rollbackTo', () => {
   // The row records which driver made it, so a Vercel deployment must not be handed to
   // Docker: the id means nothing there, and the wrong driver's capabilities answer.
   it('refuses a row that belongs to a driver that is not configured here', async () => {
+    active.other = undefined;
     mockPool.query.mockResolvedValueOnce({
       rows: [{ ...rowFor('row-1', 'dpl_vercel_1'), provider: 'vercel' }],
     });
@@ -310,5 +338,141 @@ describe('DeploymentService.getRuntimeLogs', () => {
     await expect(DeploymentService.getInstance().getRuntimeLogs('missing')).rejects.toThrow(
       expect.objectContaining({ statusCode: 404, code: ERROR_CODES.DEPLOYMENT_NOT_FOUND })
     );
+  });
+});
+
+describe('DeploymentService.envVarStore', () => {
+  // The capability said `runtime` while every env-var route went through the driver's own
+  // store — which Docker does not have — so the whole management API 400'd on the driver
+  // this work adds. A flag that promises a feature whose API refuses is the exact thing
+  // capabilities exist to prevent.
+  it('falls back to the service store for a runtime driver that keeps nothing', () => {
+    expect(DeploymentService.getInstance().envVarStore()).toBeDefined();
+  });
+
+  it('prefers the driver-s own store when it has one', () => {
+    const own = {
+      upsert: vi.fn(),
+      keys: vi.fn(),
+      list: vi.fn(),
+      get: vi.fn(),
+      remove: vi.fn(),
+    };
+    active.provider = { ...mockProvider, envVars: own };
+
+    expect(DeploymentService.getInstance().envVarStore()).toBe(own);
+  });
+
+  it('refuses by name for a driver that cannot hold them at all', () => {
+    active.provider = { ...mockProvider, capabilities: () => ({ envVars: 'none' }) };
+
+    expect(() => DeploymentService.getInstance().envVarStore()).toThrow(
+      'does not support environment variables'
+    );
+  });
+});
+
+describe('environment variables follow the row, not the default driver', () => {
+  // Both review bots flagged this, and they were right: the start path resolves the row's
+  // driver for the build but applyEnvVars read the *active* one. On an instance where the
+  // default has since changed, a Vercel deployment's values were persisted locally and the
+  // Vercel project got none — or the inverse, sending them to an API that does not own the
+  // deployment.
+  it('sends them to the driver that owns the deployment', async () => {
+    mockPool.query
+      // getDeploymentById
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'row-1',
+            provider: 'vercel',
+            status: 'WAITING',
+            providerDeploymentId: null,
+            url: null,
+            metadata: { uploadMode: 'direct' },
+          },
+        ],
+      })
+      // getDeploymentFiles
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            fileId: 'f1',
+            path: 'index.html',
+            sha: 'a'.repeat(40),
+            size: 12,
+            uploadedAt: new Date().toISOString(),
+          },
+        ],
+      })
+      .mockResolvedValue({ rows: [] });
+    mockClient.query.mockResolvedValue({ rows: [{ id: 'row-1', status: 'READY' }] });
+
+    await DeploymentService.getInstance()
+      .startDeployment('row-1', { envVars: [{ key: 'API_URL', value: 'https://api.test' }] })
+      .catch(() => undefined);
+
+    const other = active.other as { envVars: { upsert: ReturnType<typeof vi.fn> } };
+    expect(other.envVars.upsert).toHaveBeenCalledWith([
+      { key: 'API_URL', value: 'https://api.test' },
+    ]);
+  });
+});
+
+describe('DeploymentService.updateDeploymentFromWebhook', () => {
+  const savedAppKey = process.env.APP_KEY;
+  afterAll(() => {
+    if (savedAppKey === undefined) {
+      delete process.env.APP_KEY;
+    } else {
+      process.env.APP_KEY = savedAppKey;
+    }
+  });
+
+  // Only Vercel sends webhooks, so the row this matches is always a Vercel row. Reading its
+  // URL through the *current default* meant that on an instance since switched to Docker,
+  // every webhook overwrote the stable insforge.site address with the transient Vercel
+  // hostname — a URL that changes on each deploy.
+  it('computes the URL through the vercel driver even when docker is the default', async () => {
+    process.env.APP_KEY = 'appkey01';
+    mockPool.query.mockResolvedValue({
+      rows: [{ id: 'row-1', provider: 'vercel', status: 'READY', url: null, metadata: {} }],
+    });
+
+    await DeploymentService.getInstance().updateDeploymentFromWebhook(
+      'dpl_vercel_1',
+      'READY',
+      'https://transient-abc123.vercel.app',
+      {}
+    );
+
+    const update = mockPool.query.mock.calls.find(([sql]) =>
+      String(sql).includes('UPDATE deployments.runs')
+    );
+    expect(update?.[1]?.[1]).toBe('https://appkey01.insforge.site');
+  });
+
+  // An instance that has moved to Docker can still receive a webhook for a deployment made
+  // before the switch. Refusing it would leave that row stuck at its old status forever, so
+  // the status still lands and the URL is simply left alone.
+  it('still records the status when the vercel driver is gone, without touching the URL', async () => {
+    process.env.APP_KEY = 'appkey01';
+    active.other = undefined;
+    mockPool.query.mockResolvedValue({
+      rows: [{ id: 'row-1', provider: 'vercel', status: 'READY', url: null, metadata: {} }],
+    });
+
+    await DeploymentService.getInstance().updateDeploymentFromWebhook(
+      'dpl_vercel_1',
+      'READY',
+      'https://transient-abc123.vercel.app',
+      {}
+    );
+
+    const update = mockPool.query.mock.calls.find(([sql]) =>
+      String(sql).includes('UPDATE deployments.runs')
+    );
+    expect(update?.[1]?.[0]).toBe('READY');
+    expect(update?.[1]?.[1]).toBeNull();
   });
 });

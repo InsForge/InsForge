@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { requireEnvVarStore } from '@/services/deployments/sites-registry.js';
+import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { deploymentsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AuditService } from '@/services/logs/audit.service.js';
@@ -16,7 +16,7 @@ const auditService = AuditService.getInstance();
  */
 router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const envVars = await requireEnvVarStore().list();
+    const envVars = await DeploymentService.getInstance().envVarStore().list();
     successResponse(res, { envVars });
   } catch (error) {
     next(error);
@@ -44,7 +44,7 @@ router.post(
 
       const { envVars } = validationResult.data;
 
-      await requireEnvVarStore().upsert(envVars);
+      await DeploymentService.getInstance().envVarStore().upsert(envVars);
 
       await auditService.log({
         actor: req.hasApiKey ? 'api-key' : req.user?.id,
@@ -77,7 +77,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
   try {
     const { id } = req.params;
 
-    const envVar = await requireEnvVarStore().get(id);
+    const envVar = await DeploymentService.getInstance().envVarStore().get(id);
 
     successResponse(res, { envVar });
   } catch (error) {
@@ -97,7 +97,7 @@ router.delete(
     try {
       const { id } = req.params;
 
-      await requireEnvVarStore().remove(id);
+      await DeploymentService.getInstance().envVarStore().remove(id);
 
       // Log audit
       await auditService.log({

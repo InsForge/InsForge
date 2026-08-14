@@ -4,12 +4,11 @@ import { VercelProvider } from '@/providers/deployments/vercel.provider.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import type {
   DomainStore,
-  EnvVarStore,
   SitesProvider,
   SitesProviderName,
 } from '@/providers/deployments/sites.provider.js';
 import { AppError } from '@/utils/errors.js';
-import { ERROR_CODES, type SitesMetadataSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, sitesProviderEnum, type SitesMetadataSchema } from '@insforge/shared-schemas';
 
 export interface SitesRegistry {
   providers: Map<SitesProviderName, SitesProvider>;
@@ -39,7 +38,10 @@ export function buildSitesRegistry(): SitesRegistry {
       'Unset SITES_PROVIDER or set it to a provider name, then restart the container.'
     );
   }
-  const known = ['', 'auto', 'vercel', 'docker'];
+  // Derived, not copied: a driver added to the wire enum would otherwise be rejected here
+  // as unknown while the schema already accepts it. '' and 'auto' are the unset spellings,
+  // and 'off' is handled above.
+  const known: string[] = ['', 'auto', ...sitesProviderEnum.options];
   if (!known.includes(requested)) {
     throw new AppError(
       `Unknown SITES_PROVIDER "${requested}". Expected one of: vercel, docker, auto, off.`,
@@ -147,14 +149,6 @@ export function unsupportedFeature(providerName: SitesProviderName, feature: str
     // reason that code was added.
     ERROR_CODES.DEPLOYMENT_FEATURE_UNSUPPORTED
   );
-}
-
-export function requireEnvVarStore(): EnvVarStore {
-  const provider = selectSitesProvider();
-  if (!provider.envVars) {
-    throw unsupportedFeature(provider.name, 'environment variables');
-  }
-  return provider.envVars;
 }
 
 export function requireDomainStore(): DomainStore {
