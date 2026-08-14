@@ -11,12 +11,13 @@ export const updateBucketRequestSchema = z.object({
 });
 
 export const listObjectsResponseSchema = z.object({
-  objects: z.array(storageFileSchema),
+  data: z.array(storageFileSchema),
   pagination: z.object({
     offset: z.number(),
     limit: z.number(),
     total: z.number(),
   }),
+  nextActions: z.string().optional(),
 });
 
 export const deleteObjectsRequestSchema = z.object({

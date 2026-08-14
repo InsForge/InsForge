@@ -442,7 +442,7 @@ export class StorageService {
         objects: objectsResult.rows.map((obj) => ({
           ...obj,
           mimeType: obj.mime_type,
-          uploadedAt: obj.uploaded_at,
+          uploadedAt: obj.uploaded_at.toISOString(),
           url: this.buildObjectUrl(bucket, obj.key, obj.etag || obj.uploaded_at),
         })),
         total: parseInt(totalResult.rows[0].count, 10),
