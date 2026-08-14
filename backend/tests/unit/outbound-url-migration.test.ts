@@ -49,13 +49,28 @@ describe('outbound URL guard migration', () => {
   it('does not leave active database jobs for destinations it cannot pin', () => {
     expect(sql).toMatch(/p_is_active AND NOT schedules\.is_dns_pinned_url/i);
     expect(sql).toMatch(/OR NOT schedules\.is_dns_pinned_url\(function_url, resolved_target\)/i);
+
+    // The cleanup loop must actually unschedule cron entries and deactivate rows.
+    expect(sql).toMatch(/PERFORM cron\.unschedule\(v_job\.cron_job_id\)/i);
+    expect(sql).toMatch(/SET is_active = FALSE/i);
+    expect(sql).toMatch(/cron_job_id = NULL/i);
   });
 
   it('guards database HTTP execution before calling pgsql-http', () => {
-    const guardIndex = sql.indexOf('IF NOT schedules.is_dns_pinned_url(v_job.function_url, v_job.resolved_target)');
+    const guardIndex = sql.indexOf(
+      'IF NOT schedules.is_dns_pinned_url(v_job.function_url, v_job.resolved_target)'
+    );
     const httpIndex = sql.indexOf('v_http_response := http(v_http_request)');
     expect(guardIndex).toBeGreaterThan(-1);
     expect(httpIndex).toBeGreaterThan(guardIndex);
     expect(sql).not.toMatch(/v_resolved_target := v_job\.resolved_target/i);
+  });
+
+  it('accepts hostname URLs when all resolved addresses are safe', () => {
+    // is_dns_pinned_url must handle both literal IPs and DNS hostnames.
+    expect(sql).toMatch(/v_is_literal_ip/i);
+
+    // All resolved addresses must pass is_safe_address (NOT EXISTS negative check).
+    expect(sql).toMatch(/WHERE NOT schedules\.is_safe_address\(address\)/i);
   });
 });

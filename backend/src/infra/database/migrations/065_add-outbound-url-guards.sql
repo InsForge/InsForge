@@ -88,6 +88,7 @@ DECLARE
   v_authority TEXT;
   v_host TEXT;
   v_host_ip INET;
+  v_is_literal_ip BOOLEAN;
 BEGIN
   IF NOT schedules.is_safe_url(p_url) OR
      p_resolved_target IS NULL OR
@@ -103,17 +104,35 @@ BEGIN
     v_host := lower(regexp_replace(v_authority, ':([0-9]+)$', ''));
   END IF;
 
+  -- Determine whether the host is a literal IP or a DNS hostname.
   BEGIN
     v_host_ip := v_host::INET;
+    v_is_literal_ip := TRUE;
   EXCEPTION WHEN OTHERS THEN
-    RETURN FALSE;
+    v_is_literal_ip := FALSE;
   END;
 
-  RETURN schedules.is_safe_address(v_host) AND EXISTS (
+  -- Every resolved address must be safe regardless of host type.
+  IF EXISTS (
     SELECT 1
     FROM jsonb_array_elements_text(COALESCE(p_resolved_target->'addresses', '[]'::JSONB)) AS address
-    WHERE address = host(v_host_ip)
-  );
+    WHERE NOT schedules.is_safe_address(address)
+  ) THEN
+    RETURN FALSE;
+  END IF;
+
+  IF v_is_literal_ip THEN
+    -- Literal IP: the IP itself must be safe and match a resolved address.
+    RETURN schedules.is_safe_address(host(v_host_ip))
+      AND EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements_text(COALESCE(p_resolved_target->'addresses', '[]'::JSONB)) AS address
+        WHERE address = host(v_host_ip)
+      );
+  END IF;
+
+  -- Hostname: the Node service resolved it; all addresses already validated above.
+  RETURN TRUE;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
