@@ -1014,7 +1014,6 @@ const dispatch = async (req: Request): Promise<Response> => {
     return new Response(JSON.stringify({
       status: "ok",
       type: "insforge-functions",
-      functions: [],
       timestamp: new Date().toISOString(),
     }), {
       headers: { "Content-Type": "application/json" }
@@ -1080,7 +1079,6 @@ const dispatch = async (req: Request): Promise<Response> => {
       return new Response(JSON.stringify({
         status: "ok",
         type: "insforge-functions",
-        functions: Object.keys(routes),
         timestamp: new Date().toISOString(),
       }), {
         headers: { "Content-Type": "application/json" }
@@ -1094,7 +1092,6 @@ const dispatch = async (req: Request): Promise<Response> => {
     if (!slug || !routes[slug]) {
       return new Response(JSON.stringify({
         error: "Function not found",
-        available: Object.keys(routes),
       }), {
         status: 404,
         headers: { "Content-Type": "application/json" }
