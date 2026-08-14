@@ -66,11 +66,29 @@ describe('outbound URL guard migration', () => {
     expect(sql).not.toMatch(/v_resolved_target := v_job\.resolved_target/i);
   });
 
-  it('accepts hostname URLs when all resolved addresses are safe', () => {
-    // is_dns_pinned_url must handle both literal IPs and DNS hostnames.
-    expect(sql).toMatch(/v_is_literal_ip/i);
+  it('is_dns_pinned_url handles both literal IPs and DNS hostnames', () => {
+    // Extract the is_dns_pinned_url function body for structural assertions.
+    const fnStart = sql.indexOf('CREATE OR REPLACE FUNCTION schedules.is_dns_pinned_url');
+    const fnEnd = sql.indexOf('$$ LANGUAGE plpgsql IMMUTABLE;', fnStart);
+    expect(fnStart).toBeGreaterThan(-1);
+    expect(fnEnd).toBeGreaterThan(fnStart);
+    const fnBody = sql.slice(fnStart, fnEnd);
 
-    // All resolved addresses must pass is_safe_address (NOT EXISTS negative check).
-    expect(sql).toMatch(/WHERE NOT schedules\.is_safe_address\(address\)/i);
+    // Must declare and use v_is_literal_ip to branch on host type.
+    expect(fnBody).toMatch(/v_is_literal_ip\s+BOOLEAN/i);
+    expect(fnBody).toMatch(/v_is_literal_ip\s*:=\s*TRUE/i);
+    expect(fnBody).toMatch(/v_is_literal_ip\s*:=\s*FALSE/i);
+
+    // All resolved addresses must pass is_safe_address before either branch.
+    expect(fnBody).toMatch(/WHERE NOT schedules\.is_safe_address\(address\)/i);
+
+    // Hostname path: must RETURN TRUE when all addresses are safe.
+    const allSafeGateIdx = fnBody.indexOf('WHERE NOT schedules.is_safe_address(address)');
+    const returnTrueIdx = fnBody.indexOf('RETURN TRUE', allSafeGateIdx);
+    expect(returnTrueIdx).toBeGreaterThan(allSafeGateIdx);
+
+    // Literal-IP path: must still verify the IP matches a resolved address.
+    expect(fnBody).toMatch(/IF v_is_literal_ip THEN/i);
+    expect(fnBody).toMatch(/WHERE address = host\(v_host_ip\)/i);
   });
 });
