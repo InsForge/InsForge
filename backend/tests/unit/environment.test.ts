@@ -2,6 +2,7 @@ import {
   isCloudEnvironment,
   isOAuthSharedKeysAvailable,
   isDevelopment,
+  isDevelopmentOrTest,
   isProduction,
 } from '../../src/utils/environment';
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
@@ -47,6 +48,23 @@ describe('Environment utils', () => {
 
     delete process.env.NODE_ENV;
     expect(isDevelopment()).toBe(false);
+  });
+
+  it('isDevelopmentOrTest fails closed on anything but development/test', () => {
+    process.env.NODE_ENV = 'development';
+    expect(isDevelopmentOrTest()).toBe(true);
+
+    process.env.NODE_ENV = 'test';
+    expect(isDevelopmentOrTest()).toBe(true);
+
+    process.env.NODE_ENV = 'production';
+    expect(isDevelopmentOrTest()).toBe(false);
+
+    process.env.NODE_ENV = 'staging';
+    expect(isDevelopmentOrTest()).toBe(false);
+
+    delete process.env.NODE_ENV;
+    expect(isDevelopmentOrTest()).toBe(false);
   });
 
   it('isProduction works correctly', () => {

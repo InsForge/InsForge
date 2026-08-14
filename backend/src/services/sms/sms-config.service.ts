@@ -3,7 +3,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { TwilioSmsProvider } from '@/providers/sms/twilio.provider.js';
 import { AppError } from '@/utils/errors.js';
-import { isProduction } from '@/utils/environment.js';
+import { isDevelopmentOrTest } from '@/utils/environment.js';
 import {
   ERROR_CODES,
   type SmsConfigSchema,
@@ -210,9 +210,9 @@ export class SmsConfigService {
     let verifiedStoredTokenEncrypted: string | null = null;
     if (input.enabled) {
       if (input.provider === 'console') {
-        if (isProduction()) {
+        if (!isDevelopmentOrTest()) {
           throw new AppError(
-            'The console SMS provider is disabled in production',
+            'The console SMS provider is only available in development or test environments',
             400,
             ERROR_CODES.INVALID_INPUT
           );

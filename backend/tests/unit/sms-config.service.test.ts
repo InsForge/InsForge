@@ -290,27 +290,34 @@ describe('SmsConfigService', () => {
     expect(mocks.verifyCredentials).not.toHaveBeenCalled();
   });
 
-  it('rejects enabling the console provider in production', async () => {
-    const originalNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
-    try {
-      const stored = { auth_token_encrypted: '' };
-      mocks.client.query.mockImplementation(upsertQueryImplementation(stored));
+  it.each(['production', 'staging', undefined])(
+    'rejects enabling the console provider when NODE_ENV is %s',
+    async (nodeEnv) => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      if (nodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = nodeEnv;
+      }
+      try {
+        const stored = { auth_token_encrypted: '' };
+        mocks.client.query.mockImplementation(upsertQueryImplementation(stored));
 
-      await expect(
-        service.upsertSmsConfig({
-          enabled: true,
-          provider: 'console',
-          accountSid: '',
-          fromNumber: '',
-          messagingServiceSid: '',
-          minIntervalSeconds: 60,
-        })
-      ).rejects.toMatchObject({ statusCode: 400 });
-    } finally {
-      process.env.NODE_ENV = originalNodeEnv;
+        await expect(
+          service.upsertSmsConfig({
+            enabled: true,
+            provider: 'console',
+            accountSid: '',
+            fromNumber: '',
+            messagingServiceSid: '',
+            minIntervalSeconds: 60,
+          })
+        ).rejects.toMatchObject({ statusCode: 400 });
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
     }
-  });
+  );
 
   it('masks the auth token as hasAuthToken on read', async () => {
     mocks.pool.query.mockResolvedValue({

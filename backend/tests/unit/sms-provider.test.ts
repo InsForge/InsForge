@@ -178,7 +178,7 @@ describe('ConsoleSmsProvider', () => {
     process.env.NODE_ENV = originalNodeEnv;
   });
 
-  it('logs the message instead of sending it outside production', async () => {
+  it('logs the message instead of sending it in development', async () => {
     process.env.NODE_ENV = 'development';
 
     await new ConsoleSmsProvider().send('+15551234567', 'Your verification code is 123456.', {
@@ -191,14 +191,21 @@ describe('ConsoleSmsProvider', () => {
     );
   });
 
-  it('is hard-disabled in production', async () => {
-    process.env.NODE_ENV = 'production';
+  it.each(['production', 'staging', undefined])(
+    'fails closed when NODE_ENV is %s',
+    async (nodeEnv) => {
+      if (nodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = nodeEnv;
+      }
 
-    await expect(
-      new ConsoleSmsProvider().send('+15551234567', 'hi', { ...CONFIG, provider: 'console' })
-    ).rejects.toMatchObject({
-      code: ERROR_CODES.SMS_PROVIDER_NOT_CONFIGURED,
-    });
-    expect(logger.info).not.toHaveBeenCalledWith(expect.stringContaining('console-sms'));
-  });
+      await expect(
+        new ConsoleSmsProvider().send('+15551234567', 'hi', { ...CONFIG, provider: 'console' })
+      ).rejects.toMatchObject({
+        code: ERROR_CODES.SMS_PROVIDER_NOT_CONFIGURED,
+      });
+      expect(logger.info).not.toHaveBeenCalledWith(expect.stringContaining('console-sms'));
+    }
+  );
 });
