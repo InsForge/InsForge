@@ -610,9 +610,10 @@ paths:
         that report `runtimeLogs` in the `sites` capability slice of `/api/metadata`; the rest
         answer `400` with `DEPLOYMENT_FEATURE_UNSUPPORTED`. The capability describes the
         driver, not the deployment: a server-rendered site returns what the app itself wrote,
-        while a static one returns the file server's own output, which is a request log rather
-        than anything the developer wrote. Build output is a different field, returned on the
-        run itself.
+        while a static one returns Caddy's own output — startup and errors, not a request log,
+        because access logging is off by default and enabling it would grow the container log
+        without bound on a host that has no rotation configured. Build output is a different
+        field, returned on the run itself.
       tags:
         - Admin
       security:

@@ -109,8 +109,22 @@ export interface ProjectDomain {
 export interface EnvVarStore {
   upsert(envVars: Array<{ key: string; value: string }>): Promise<void>;
   keys(): Promise<string[]>;
-  list(): Promise<Array<{ id: string; key: string; target?: string[]; createdAt?: number }>>;
-  get(envId: string): Promise<{ id: string; key: string; value: string }>;
+  /**
+   * `type` is required by `deploymentEnvVarSchema` on the wire, so it belongs here rather
+   * than being added per driver — a store that omitted it produced a response the dashboard
+   * could not read.
+   */
+  list(): Promise<
+    Array<{
+      id: string;
+      key: string;
+      type?: string;
+      target?: string[];
+      createdAt?: number;
+      updatedAt?: number;
+    }>
+  >;
+  get(envId: string): Promise<{ id: string; key: string; value: string; type?: string }>;
   remove(envId: string): Promise<void>;
 }
 
@@ -185,7 +199,9 @@ export interface SitesProvider {
    * when `capabilities().runtimeLogs` is true.
    *
    * Without a cursor the page is the newest `limit` lines — a tail, not the start of the
-   * history, because that is what someone opening logs wants to see. `nextToken` is an
+   * history, because that is what someone opening logs wants to see. What a static
+   * deployment has to say is only its file server's startup and errors; access logging is
+   * deliberately off, since an unrotated container log would grow with traffic. `nextToken` is an
    * opaque forward cursor: pass the previous page's token to get what has arrived since,
    * which is an empty page while the app is quiet rather than an end-of-stream signal.
    */

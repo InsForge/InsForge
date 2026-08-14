@@ -15,7 +15,13 @@ export const projectSettingsSchema = z.object({
    * build produced, and because guessing from `package.json` is the framework detection
    * this driver deliberately does not do.
    */
-  startCommand: z.string().nullable().optional(),
+  startCommand: z
+    .string()
+    // Blank is rejected rather than accepted: the driver trims before deciding, so `"  "`
+    // meant "static" for a caller who plainly asked for a server.
+    .refine((value) => value.trim().length > 0, 'startCommand cannot be blank')
+    .nullable()
+    .optional(),
   /**
    * Directory copied into the runtime image, relative to the build root. Defaults to the
    * whole build output. `.next/standalone` gives a small image for a Next app built with

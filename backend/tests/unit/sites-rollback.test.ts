@@ -440,6 +440,47 @@ describe('environment variables follow the row, not the default driver', () => {
   });
 });
 
+describe('the service-backed env-var store', () => {
+  // `type` is required by deploymentEnvVarSchema, so a store that omitted it produced a
+  // response the dashboard cannot parse. `encrypted` is the truth: these live in the secret
+  // store.
+  it('reports the type the wire schema requires', async () => {
+    const secrets = await import('../../src/services/secrets/secret.service.js');
+    vi.spyOn(secrets.SecretService.getInstance(), 'getSecretByKey').mockResolvedValue(
+      JSON.stringify([{ key: 'API_URL', value: 'https://api.test' }])
+    );
+
+    const listed = await DeploymentService.getInstance().envVarStore().list();
+
+    expect(listed).toEqual([{ id: 'API_URL', key: 'API_URL', type: 'encrypted' }]);
+  });
+
+  // Read-modify-write against one secret row: two requests at once would each write their
+  // own view and the later would drop the other's variable.
+  it('serializes concurrent writes so neither loses the other', async () => {
+    const secrets = await import('../../src/services/secrets/secret.service.js');
+    let stored: Array<{ key: string; value: string }> = [];
+    vi.spyOn(secrets.SecretService.getInstance(), 'getSecretByKey').mockImplementation(
+      () => Promise.resolve(JSON.stringify(stored)) as never
+    );
+    vi.spyOn(secrets.SecretService.getInstance(), 'updateSecretByKey').mockImplementation(((
+      _key: string,
+      patch: { value: string }
+    ) => {
+      stored = JSON.parse(patch.value) as Array<{ key: string; value: string }>;
+      return Promise.resolve(undefined);
+    }) as never);
+
+    const store = DeploymentService.getInstance().envVarStore();
+    await Promise.all([
+      store.upsert([{ key: 'FIRST', value: '1' }]),
+      store.upsert([{ key: 'SECOND', value: '2' }]),
+    ]);
+
+    expect(stored.map((envVar) => envVar.key).sort()).toEqual(['FIRST', 'SECOND']);
+  });
+});
+
 describe('DeploymentService.updateDeploymentFromWebhook', () => {
   const savedAppKey = process.env.APP_KEY;
   afterAll(() => {

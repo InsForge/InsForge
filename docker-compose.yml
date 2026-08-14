@@ -302,10 +302,19 @@ services:
       # Left as an empty string the upstream became `insforge-site-:80`, which Caddy
       # accepted at load and then could never reach.
       - APP_KEY=${APP_KEY:-local}
-      # A domain pointed at this host makes Caddy obtain a certificate itself. Unset, it
-      # answers on :80 for any host, which is what you want behind another proxy.
-      # Defaults to `:80` — see the Caddyfile for why the fallback lives here.
+      # A domain pointed at this host makes Caddy obtain a certificate itself — but not with
+      # this file's default ports: ACME's HTTP-01 challenge and browsers both arrive on the
+      # host's 80/443, and dev publishes 8080/8443 to stay out of the way. Set
+      # SITES_GATEWAY_HTTP_PORT=80 and SITES_GATEWAY_HTTPS_PORT=443 for a real certificate,
+      # which is what the production files already default to.
+      # Unset, it answers on :80 inside the container for any host, which is what you want
+      # behind another proxy. Defaults to `:80` — see the Caddyfile for why the fallback
+      # lives here.
       - SITES_HOSTNAME=${SITES_HOSTNAME:-:80}
+      # The container port the gateway proxies to. 80 is where a static site and a
+      # server-rendered one both listen by default; set this only if a deployment
+      # declares its own `serverPort`.
+      - SITES_UPSTREAM_PORT=${SITES_UPSTREAM_PORT:-80}
     ports:
       - '${SITES_GATEWAY_HTTP_PORT:-8080}:80'
       - '${SITES_GATEWAY_HTTPS_PORT:-8443}:443'

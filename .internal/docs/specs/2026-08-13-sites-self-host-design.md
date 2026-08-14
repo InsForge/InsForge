@@ -231,7 +231,7 @@ Consequence to accept up front: this is a large backend diff. It stays reviewabl
 | `slug` | true | false — no shared domain to name anything in |
 | `rollback` | **false** | true |
 | `buildLogs` | **false** | true |
-| `runtimeLogs` | **false** | true — the app's own output for a server, Caddy's for a static site |
+| `runtimeLogs` | **false** | true — the app's own output for a server, Caddy's startup and errors for a static site (no access log: unrotated container logs grow with traffic) |
 | `frameworkDetection` | true | false |
 | `ingressModes` | `['host']` | `['port', 'host']` |
 
