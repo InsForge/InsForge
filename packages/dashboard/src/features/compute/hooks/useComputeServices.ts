@@ -1,11 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { computeServicesApi } from '#features/compute/services/compute.service';
-import type { CreateServiceRequest, UpdateServiceRequest } from '@insforge/shared-schemas';
+import type { CreateServiceRequestInput, UpdateServiceRequest } from '@insforge/shared-schemas';
 import { useToast } from '@insforge/ui';
 import { deriveHealth, type ServiceHealth } from '#features/compute/lib/health';
 
-export function useComputeServices() {
+/**
+ * @param enabled Gate the list request. Pass false once it is known that compute
+ *   is not configured: the request would only 503, and spinning on a call whose
+ *   failure is already known reads as a broken page rather than an unconfigured
+ *   feature.
+ */
+export function useComputeServices(enabled = true) {
   const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
@@ -14,14 +20,16 @@ export function useComputeServices() {
     data: services = [],
     isLoading,
     error,
+    refetch,
   } = useQuery({
     queryKey: ['compute', 'services'],
     queryFn: () => computeServicesApi.list(),
     staleTime: 30_000,
+    enabled,
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateServiceRequest) => computeServicesApi.create(data),
+    mutationFn: (data: CreateServiceRequestInput) => computeServicesApi.create(data),
     onSuccess: (svc) => {
       void queryClient.invalidateQueries({ queryKey: ['compute', 'services'] });
       showToast(
@@ -107,6 +115,9 @@ export function useComputeServices() {
 
     // Errors
     error,
+    // Exposed so a failed list can offer Try again, the way payments' pages do,
+    // instead of telling the reader to refresh the page themselves.
+    refetch,
 
     // Actions
     create: createMutation.mutateAsync,

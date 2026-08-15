@@ -1,5 +1,5 @@
-import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
+import { ComputeConfigService } from '@/services/compute/compute-config.service.js';
 import {
   MachineGoneError,
   translateMachineGone,
@@ -87,18 +87,24 @@ export class FlyProvider implements ComputeProvider {
   resolveAppName = flyAppNameFor;
   endpointUrl = flyEndpointUrl;
 
+  /** The only mode Fly has: every app gets public IPs and a hostname at create time. */
+  defaultIngress(): 'host' {
+    return 'host';
+  }
+
   // Self-hosters enable compute by setting FLY_API_TOKEN AND FLY_ORG. Both
   // are required: org alone has nothing to authenticate, token alone doesn't
   // know which org to create apps in.
   // Cloud-managed mode (CloudComputeProvider) detects itself implicitly from
   // PROJECT_ID + JWT_SECRET + CLOUD_API_HOST and bypasses this check.
   isConfigured(): boolean {
-    return !!appConfig.fly.apiToken && !!appConfig.fly.org;
+    const { apiToken, org } = ComputeConfigService.getInstance().flyCredentials();
+    return !!apiToken && !!org;
   }
 
   private headers(): Record<string, string> {
     return {
-      Authorization: `Bearer ${appConfig.fly.apiToken}`,
+      Authorization: `Bearer ${ComputeConfigService.getInstance().flyCredentials().apiToken}`,
       'Content-Type': 'application/json',
     };
   }
@@ -138,7 +144,7 @@ export class FlyProvider implements ComputeProvider {
       method: 'POST',
       body: JSON.stringify({
         app_name: params.name,
-        org_slug: appConfig.fly.org,
+        org_slug: ComputeConfigService.getInstance().flyCredentials().org,
         network: flyNetworkName(),
       }),
     });
@@ -172,7 +178,7 @@ export class FlyProvider implements ComputeProvider {
       const response = await fetch(graphqlEndpoint, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${appConfig.fly.apiToken}`,
+          Authorization: `Bearer ${ComputeConfigService.getInstance().flyCredentials().apiToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query: mutation, variables: { input: { appId, type } } }),
@@ -215,7 +221,7 @@ export class FlyProvider implements ComputeProvider {
     const response = await fetch('https://api.fly.io/graphql', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${appConfig.fly.apiToken}`,
+        Authorization: `Bearer ${ComputeConfigService.getInstance().flyCredentials().apiToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -513,7 +519,7 @@ export class FlyProvider implements ComputeProvider {
       // Fly request must not pile up and degrade API responsiveness.
       response = await fetch(url, {
         headers: {
-          Authorization: `FlyV1 ${appConfig.fly.apiToken}`,
+          Authorization: `FlyV1 ${ComputeConfigService.getInstance().flyCredentials().apiToken}`,
           'Content-Type': 'application/json',
         },
         signal: AbortSignal.timeout(15_000),

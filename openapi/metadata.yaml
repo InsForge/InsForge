@@ -141,6 +141,14 @@ paths:
                               items:
                                 type: string
                                 enum: [none, port, host]
+                            defaultIngress:
+                              type: string
+                              enum: [none, port, host]
+                              description: >-
+                                Mode applied when a request omits `ingress`. Always one of
+                                `ingressModes`. For a single-host provider it is an operator
+                                setting, so it cannot be inferred from the list. Absent on a
+                                backend older than this field.
                             sourceBuild:
                               type: string
                               enum: [none, flyctl, context-upload]
@@ -183,6 +191,7 @@ paths:
                       scaleToZero: false
                       regions: false
                       ingressModes: ["none", "port", "host"]
+                      defaultIngress: "none"
                       sourceBuild: "context-upload"
                       deployTokenIssuance: false
                 version: "2.0.0"

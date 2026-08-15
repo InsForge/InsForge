@@ -206,7 +206,9 @@ export class MetadataService {
         lines.push(
           `- ${codeSpan(name)}: regions ${caps.regions ? 'yes' : 'no'}, ` +
             `scale-to-zero ${caps.scaleToZero ? 'yes' : 'no'}, ` +
-            `ingress ${caps.ingressModes.map(codeSpan).join('/')}, ` +
+            `ingress ${caps.ingressModes.map(codeSpan).join('/')}` +
+            // Which one an agent gets if it says nothing, which is the common case.
+            `${caps.defaultIngress ? ` (default ${codeSpan(caps.defaultIngress)})` : ''}, ` +
             `source build ${codeSpan(caps.sourceBuild)}`
         );
       }

@@ -103,6 +103,7 @@ const functionErrorCodes = [
   'FUNCTION_ALREADY_EXISTS',
   'FUNCTION_DEPLOYMENT_NOT_FOUND',
   'FUNCTION_NOT_FOUND',
+  'FUNCTION_SLUG_RESERVED',
 ] as const;
 
 const scheduleErrorCodes = ['SCHEDULE_INVALID_CRON', 'SCHEDULE_NOT_FOUND'] as const;
