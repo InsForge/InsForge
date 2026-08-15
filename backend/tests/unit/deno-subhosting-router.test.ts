@@ -103,5 +103,11 @@ describe('generated Deno Subhosting router', () => {
       type: 'insforge-functions',
       timestamp: expect.any(String),
     });
+
+    const missing = await dispatch(
+      new Request('https://functions.example/not-a-function'),
+    );
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toEqual({ error: 'No functions deployed' });
   });
 });
