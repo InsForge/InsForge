@@ -52,7 +52,11 @@ import {
 import { FeatureUsageCollector } from '@/services/telemetry/feature-usage.collector.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { DatabaseBackupService } from '@/services/database/database-backup.service.js';
-import { ComputeServicesService } from '@/services/compute/services.service.js';
+import {
+  ComputeServicesService,
+  warnIfFlyCredentialsIncomplete,
+} from '@/services/compute/services.service.js';
+import { ComputeConfigService } from '@/services/compute/compute-config.service.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -350,6 +354,14 @@ const PORT = appConfig.app.port;
 async function initializeServer() {
   try {
     const app = await createApp();
+
+    // Before the listener opens, so no request can construct the compute registry from
+    // environment-only credentials. primeSnapshot never throws — a secret-store outage
+    // leaves compute on whatever the environment provides — so this cannot stop the
+    // server from serving.
+    await ComputeConfigService.getInstance().primeSnapshot();
+    warnIfFlyCredentialsIncomplete();
+
     const server = app.listen(PORT, () => {
       logger.info(`Backend API service listening on port ${PORT}`);
     });
@@ -382,6 +394,13 @@ async function initializeServer() {
     // configured at all, which is the normal case, so that is caught too.
     void (async () => {
       try {
+        // Load stored Fly credentials before the registry is built, so a deployment
+        // configured through the dashboard comes up with Fly available instead of
+        // waiting for the first write to rebuild.
+        // Credentials were primed before the listener opened, so the registry any
+        // request builds already sees them. Reset anyway: it costs nothing and keeps
+        // this correct if the priming above ever moves back off the startup path.
+        ComputeServicesService.resetForConfigChange();
         await ComputeServicesService.getInstance().runStartupTasks();
       } catch (err) {
         logger.info('Compute startup tasks skipped', {

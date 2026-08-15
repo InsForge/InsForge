@@ -660,6 +660,7 @@ export function useCloudHosting() {
               currentInstanceType:
                 typeof message.currentInstanceType === 'string' ? message.currentInstanceType : '',
               planName: typeof message.planName === 'string' ? message.planName : '',
+              isPartnerOrg: message.isPartnerOrg === true,
               computeCredits:
                 typeof message.computeCredits === 'number' ? message.computeCredits : 0,
               currentOrgComputeCost:

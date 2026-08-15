@@ -9,6 +9,7 @@ const storageMocks = vi.hoisted(() => ({
   getObjectMetadataRow: vi.fn(),
   getObject: vi.fn(),
   objectIsVisible: vi.fn(),
+  listObjects: vi.fn(),
   deleteObjects: vi.fn(),
   // Default undefined return keeps existing tests on the buffered local path.
   isS3Provider: vi.fn(),
@@ -111,6 +112,66 @@ describe('Storage routes', () => {
     server?.close();
     server = undefined;
     vi.clearAllMocks();
+  });
+
+  test('list objects route returns the shared response schema', async () => {
+    vi.resetModules();
+    storageMocks.listObjects.mockResolvedValue({
+      objects: [
+        {
+          key: 'logo.png',
+          bucket: 'photos',
+          size: 123,
+          uploadedAt: '2026-08-14T00:00:00.000Z',
+          url: 'https://example.test/logo.png',
+        },
+      ],
+      total: 1,
+    });
+
+    const { storageRouter } = await import('../../src/api/routes/storage/index.routes.js');
+    const app = express();
+    app.use('/api/storage', storageRouter);
+    app.use(routeErrorHandler);
+
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, resolve);
+    });
+    const address = server?.address();
+
+    if (!address || typeof address === 'string') {
+      throw new Error('Test server did not bind to a TCP port');
+    }
+
+    const response = await get(
+      address.port,
+      '/api/storage/buckets/photos/objects?limit=10&offset=2'
+    );
+
+    expect(response.statusCode, response.body).toBe(200);
+    expect(JSON.parse(response.body)).toEqual({
+      data: [
+        {
+          key: 'logo.png',
+          bucket: 'photos',
+          size: 123,
+          uploadedAt: '2026-08-14T00:00:00.000Z',
+          url: 'https://example.test/logo.png',
+        },
+      ],
+      pagination: { offset: 2, limit: 10, total: 1 },
+      nextActions:
+        'You can use PUT /api/storage/buckets/:bucketName/objects/:objectKey to create or replace a specific key, POST /api/storage/buckets/:bucketName/objects to upload with an auto-generated key, and GET /api/storage/buckets/:bucketName/objects/:objectKey to download an object.',
+    });
+    expect(storageMocks.listObjects).toHaveBeenCalledWith(
+      undefined,
+      'photos',
+      undefined,
+      10,
+      2,
+      undefined,
+      false
+    );
   });
 
   test('batch delete route validates body and delegates to storage service', async () => {

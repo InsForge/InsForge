@@ -39,6 +39,11 @@ export interface DashboardBackupInfo {
 export interface DashboardInstanceInfo {
   currentInstanceType: string;
   planName: string;
+  /**
+   * White-labeled partner org. Not derivable from planName — the cloud reports
+   * partner orgs as 'team', so they look identical to a real Team customer.
+   */
+  isPartnerOrg?: boolean;
   computeCredits: number;
   currentOrgComputeCost: number;
   instanceTypes: Array<{

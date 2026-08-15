@@ -37,23 +37,29 @@ function renderSection(mode: DashboardMode, response: DashboardMetricsResponse) 
 }
 
 // The advisory title is stable text around the interpolated percentage.
-const advisoryText = () => screen.queryByText(/For Postgres, that's normal/);
+const advisoryText = () => screen.queryByText(/For Postgres that's normal/);
 
 afterEach(() => {
   setDashboardBackendUrl(undefined);
 });
 
 describe('ObservabilitySection memory advisory', () => {
-  it('always shows the advisory with the latest reading and an Upgrade Instance CTA', async () => {
+  it('shows the advisory with the latest reading and an Upgrade Instance CTA at 70%+', async () => {
     setDashboardBackendUrl(CLOUD_BACKEND);
-    // no threshold: the reassurance is permanent, keyed to the same latest
-    // sample the Memory card's headline shows
-    renderSection('cloud-hosting', metricsResponse([65, 66, 67]));
+    renderSection('cloud-hosting', metricsResponse([65, 66, 72]));
 
     await waitFor(() => expect(advisoryText()).toBeInTheDocument());
     // the banner carries the same latest sample the card headline shows
-    expect(advisoryText()).toHaveTextContent('67.0%');
+    expect(advisoryText()).toHaveTextContent('72.0%');
     expect(screen.getByRole('button', { name: 'Upgrade Instance' })).toBeInTheDocument();
+  });
+
+  it('stays silent below the 70% threshold', async () => {
+    setDashboardBackendUrl(CLOUD_BACKEND);
+    renderSection('cloud-hosting', metricsResponse([65, 66, 67]));
+
+    await waitFor(() => expect(screen.getAllByText('AVG').length).toBeGreaterThan(0));
+    expect(advisoryText()).toBeNull();
   });
 
   it('stays silent when the series is empty', async () => {
