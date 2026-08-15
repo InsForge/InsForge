@@ -241,6 +241,21 @@ function rotateProviderApiKey(provider: AIProvider, openRouterProvider: OpenRout
   }
 }
 
+function handleRouteError(error: unknown,next: NextFunction,fallbackMessage: string): void {
+  if (error instanceof AppError) {
+    next(error);
+    return;
+  }
+
+  next(
+    new AppError(
+      error instanceof Error ? error.message : fallbackMessage,
+      500,
+      ERROR_CODES.INTERNAL_ERROR
+    )
+  );
+}
+
 /**
  * POST /api/ai/chat/completion
  * Send a chat message to any supported model
@@ -308,17 +323,7 @@ router.post(
       const result = await chatService.chat(messages, options);
       successResponse(res, result);
     } catch (error) {
-      if (error instanceof AppError) {
-        next(error);
-      } else {
-        next(
-          new AppError(
-            error instanceof Error ? error.message : 'Failed to generate chat',
-            500,
-            ERROR_CODES.INTERNAL_ERROR
-          )
-        );
-      }
+      handleRouteError(error, next, 'Failed to generate chat');
     }
   }
 );
@@ -345,17 +350,7 @@ router.post(
 
       successResponse(res, result);
     } catch (error) {
-      if (error instanceof AppError) {
-        next(error);
-      } else {
-        next(
-          new AppError(
-            error instanceof Error ? error.message : 'Failed to generate image',
-            500,
-            ERROR_CODES.INTERNAL_ERROR
-          )
-        );
-      }
+      handleRouteError(error, next, 'Failed to generate image');
     }
   }
 );
@@ -383,17 +378,7 @@ router.post(
 
       successResponse(res, result);
     } catch (error) {
-      if (error instanceof AppError) {
-        next(error);
-      } else {
-        next(
-          new AppError(
-            error instanceof Error ? error.message : 'Failed to generate embeddings',
-            500,
-            ERROR_CODES.INTERNAL_ERROR
-          )
-        );
-      }
+      handleRouteError(error, next, 'Failed to generate embeddings');
     }
   }
 );
