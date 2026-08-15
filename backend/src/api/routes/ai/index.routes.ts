@@ -241,7 +241,7 @@ function rotateProviderApiKey(provider: AIProvider, openRouterProvider: OpenRout
   }
 }
 
-function handleRouteError(error: unknown,next: NextFunction,fallbackMessage: string): void {
+function handleRouteError(error: unknown, next: NextFunction, fallbackMessage: string): void {
   if (error instanceof AppError) {
     next(error);
     return;
