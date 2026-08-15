@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { cpuTierToCores } from '@insforge/shared-schemas';
-import { appConfig } from '@/infra/config/app.config.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import {
@@ -67,12 +66,6 @@ function escapeRegExp(value: string): string {
  * pair asks "is this project's control plane elsewhere". A guard that protects
  * tenant isolation should fail closed on either.
  */
-function isCloudManaged(): boolean {
-  const projectId = appConfig.cloud?.projectId;
-  const cloudProject = !!projectId && projectId !== 'local' && !!appConfig.cloud?.apiHost;
-  return isCloudEnvironment() || cloudProject;
-}
-
 export class DockerProvider implements ComputeProvider {
   private static instance: DockerProvider;
 
@@ -124,11 +117,20 @@ export class DockerProvider implements ComputeProvider {
    *
    * Cloud does not mount the socket today, so this would be unreachable in
    * practice — but "unreachable because nobody mounted it" is a deployment
-   * accident away from being wrong, and the failure would be silent. Fail closed
-   * on either cloud signal instead.
+   * accident away from being wrong, and the failure would be silent.
+   *
+   * The signal is `AWS_INSTANCE_PROFILE_NAME`, which cloud provisioning always sets:
+   * the user-data script writes it unconditionally and every instance is launched with
+   * an IAM instance profile. PROJECT_ID is deliberately *not* part of this test.
+   * `.env.example` ships the variable, every compose file passes it through, and
+   * `getProjectId()` documents it as the self-hosted way to scope services — so a
+   * self-hoster setting it is expected, and reading it as "cloud" refused to register
+   * this driver on their own machine with nothing in the UI to explain why. A
+   * cloud-proxied deployment with no instance profile would slip past this, which our
+   * provisioning does not produce; that is the accepted trade rather than an oversight.
    */
   isConfigured(): boolean {
-    if (isCloudManaged()) {
+    if (isCloudEnvironment()) {
       return false;
     }
     return existsSync(dockerConfig().socketPath);
@@ -174,6 +176,14 @@ export class DockerProvider implements ComputeProvider {
 
   private projectKey(): string {
     return process.env.APP_KEY || 'local';
+  }
+
+  /**
+   * The operator's deployment-wide default, read per call because it is a stored
+   * setting they can change without restarting.
+   */
+  defaultIngress(): DockerIngress {
+    return this.ingressFor();
   }
 
   /**

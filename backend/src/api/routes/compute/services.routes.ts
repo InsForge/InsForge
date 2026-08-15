@@ -1,11 +1,18 @@
 import express, { Router, Response, NextFunction } from 'express';
 import { appConfig } from '@/infra/config/app.config.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { computeWriteLimiter, computeLogsRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { ComputeServicesService } from '@/services/compute/services.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
-import { ERROR_CODES, createServiceSchema, updateServiceSchema } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  createServiceSchema,
+  updateServiceSchema,
+  updateComputeConfigSchema,
+} from '@insforge/shared-schemas';
+import { ComputeConfigService } from '@/services/compute/compute-config.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 import logger from '@/utils/logger.js';
@@ -32,6 +39,74 @@ function bestEffortBroadcast() {
     logger.error('Socket broadcast failed (best-effort)', { error: err });
   }
 }
+
+// Fly credentials, stored rather than read from the container's environment.
+//
+// Mounted before /:id so `config` is not matched as a service id. Separate from the
+// service routes because it has to work when *no* provider is configured — which is
+// exactly when someone needs it — and ComputeServicesService throws on construction
+// in that state.
+router.get('/config', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    successResponse(res, await ComputeConfigService.getInstance().getConfig());
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put(
+  '/config',
+  verifyAdmin,
+  computeWriteLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      // Cloud-managed projects run compute through InsForge's own Fly account, so a
+      // project admin storing their own token here would move their containers off the
+      // control plane that bills and quotas them. The dashboard already hides this on
+      // cloud; the API has to say no too, or the gate is decoration.
+      if (isCloudEnvironment()) {
+        throw new AppError(
+          'Compute credentials are managed by InsForge on cloud projects.',
+          403,
+          ERROR_CODES.FORBIDDEN
+        );
+      }
+
+      const validation = updateComputeConfigSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const configService = ComputeConfigService.getInstance();
+      try {
+        await configService.updateConfig(validation.data);
+      } finally {
+        // In a finally, not after success: a save that wrote the token and failed on the
+        // org has changed what the credentials are, so a registry built from the old
+        // ones is stale either way.
+        ComputeServicesService.resetForConfigChange();
+      }
+
+      successResponse(res, await configService.getConfig());
+
+      bestEffortAudit({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'UPDATE_COMPUTE_CONFIG',
+        module: 'COMPUTE',
+        // Never the values, and not even which of the two changed beyond the field
+        // names — an audit row should not narrow a token.
+        details: { fields: Object.keys(validation.data) },
+        ip_address: req.ip,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // List services
 router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {

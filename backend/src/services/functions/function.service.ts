@@ -7,6 +7,8 @@ import {
   FunctionSchema,
   ListFunctionsResponse,
   DeploymentResult,
+  isReservedFunctionSlug,
+  reservedFunctionSlugMessage,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { Pool } from 'pg';
@@ -147,6 +149,14 @@ export class FunctionService {
   ): Promise<{ function: FunctionSchema; deployment?: DeploymentResult | null }> {
     const { name, code, description, status } = data;
     const slug = data.slug || name.toLowerCase().replace(/\s+/g, '-');
+
+    // Reject slugs the generated router serves itself. Checked here rather than
+    // only in the request schema because an omitted slug is derived from the
+    // name, so `{ name: "Health" }` reaches this point with slug "health"
+    // without ever passing through the schema's slug validation (issue #1862).
+    if (isReservedFunctionSlug(slug)) {
+      throw new AppError(reservedFunctionSlugMessage, 400, ERROR_CODES.FUNCTION_SLUG_RESERVED);
+    }
 
     // Validate only platform contract constraints; runtime security is enforced by the runtime/provider.
     this.validateCode(code);

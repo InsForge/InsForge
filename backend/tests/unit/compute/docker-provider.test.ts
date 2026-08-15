@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@/infra/config/app.config.js', () => {
   const c = {
+    cloud: {} as Record<string, unknown>,
+    app: { jwtSecret: 'test-secret' },
     docker: {
       socketPath: '/nonexistent/test.sock',
       publicHost: '',
@@ -41,6 +43,7 @@ vi.mock('@/providers/compute/docker.client.js', async () => {
 
 import { DockerProvider } from '@/providers/compute/docker.provider.js';
 import { MachineGoneError } from '@/providers/compute/compute.provider.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 /** An inspect payload that passes the ownership check. */
 function ownedContainer(overrides: Record<string, unknown> = {}) {
@@ -93,6 +96,60 @@ describe('DockerProvider', () => {
     } else {
       process.env.APP_KEY = oldAppKey;
     }
+    // The mocked config object is module state, so a test that changes a knob would
+    // otherwise change what every later test's daemon config says.
+    appConfig.docker.defaultIngress = 'none';
+  });
+
+  describe('cloud detection', () => {
+    const saved = {
+      profile: process.env.AWS_INSTANCE_PROFILE_NAME,
+      deployment: process.env.DEPLOYMENT_ID,
+      project: process.env.PROJECT_ID,
+      socket: appConfig.docker.socketPath,
+    };
+
+    beforeEach(() => {
+      appConfig.docker.socketPath = process.execPath;
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+      delete process.env.DEPLOYMENT_ID;
+      delete process.env.PROJECT_ID;
+    });
+
+    afterEach(() => {
+      appConfig.docker.socketPath = saved.socket;
+      for (const [key, value] of [
+        ['AWS_INSTANCE_PROFILE_NAME', saved.profile],
+        ['DEPLOYMENT_ID', saved.deployment],
+        ['PROJECT_ID', saved.project],
+      ] as const) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    });
+
+    it('registers when PROJECT_ID is set', () => {
+      process.env.PROJECT_ID = 'my-project';
+
+      expect(provider.isConfigured()).toBe(true);
+    });
+
+    // The Zeabur template sets both ids.
+    it('registers when DEPLOYMENT_ID and PROJECT_ID are both set', () => {
+      process.env.DEPLOYMENT_ID = 'zeabur-service-1';
+      process.env.PROJECT_ID = 'zeabur-project-1';
+
+      expect(provider.isConfigured()).toBe(true);
+    });
+
+    it('refuses on a cloud instance', () => {
+      process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+
+      expect(provider.isConfigured()).toBe(false);
+    });
   });
 
   describe('capabilities', () => {
@@ -105,6 +162,23 @@ describe('DockerProvider', () => {
         deployTokenIssuance: false,
       });
       expect(provider.name).toBe('docker');
+    });
+
+    // Not a capability: the caller-omitted default is COMPUTE_DEFAULT_INGRESS, read
+    // per call. Taking it off `ingressModes[0]` is what silently disabled that
+    // variable for every create.
+    it('reports the configured default ingress, not the first supported mode', () => {
+      expect(provider.defaultIngress()).toBe('none');
+
+      appConfig.docker.defaultIngress = 'port';
+      expect(provider.defaultIngress()).toBe('port');
+      // Still a member of the declared set, which is what the interface promises.
+      expect(provider.capabilities.ingressModes).toContain(provider.defaultIngress());
+    });
+
+    it('falls back to private-only when the configured value is not a mode it can deliver', () => {
+      appConfig.docker.defaultIngress = 'nonsense';
+      expect(provider.defaultIngress()).toBe('none');
     });
   });
 

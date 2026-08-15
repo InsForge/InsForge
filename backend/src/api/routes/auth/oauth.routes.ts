@@ -23,7 +23,7 @@ import {
   type ListOAuthConfigsResponse,
   oAuthProvidersSchema,
 } from '@insforge/shared-schemas';
-import { isOAuthSharedKeysAvailable } from '@/utils/environment.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -111,7 +111,7 @@ router.post(
       const input = validationResult.data;
 
       // Check if using shared keys when not allowed
-      if (input.useSharedKey && !isOAuthSharedKeysAvailable()) {
+      if (input.useSharedKey && !isCloudEnvironment()) {
         throw new AppError(
           'Shared OAuth keys are not enabled in this environment',
           400,
@@ -163,7 +163,7 @@ router.put(
       const input = validationResult.data;
 
       // Check if using shared keys when not allowed
-      if (input.useSharedKey && !isOAuthSharedKeysAvailable()) {
+      if (input.useSharedKey && !isCloudEnvironment()) {
         throw new AppError(
           'Shared OAuth keys are not enabled in this environment',
           400,

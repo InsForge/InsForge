@@ -97,6 +97,17 @@ export const computeCapabilitiesSchema = z.object({
   scaleToZero: z.boolean(),
   regions: z.boolean(),
   ingressModes: z.array(ingressModeEnum),
+  /**
+   * Mode applied when a caller omits `ingress`. Always one of `ingressModes`.
+   *
+   * Reported rather than inferred: for a single-host driver it is an operator
+   * setting, so a client that guessed "the first supported mode" would show one
+   * thing in its create form and get another from the server.
+   *
+   * Optional so a backend that predates it does not fail validation; a client with
+   * nothing to read falls back to its own choice.
+   */
+  defaultIngress: ingressModeEnum.optional(),
   sourceBuild: z.enum(['none', 'flyctl', 'context-upload']),
   deployTokenIssuance: z.boolean(),
 });
