@@ -36,6 +36,21 @@ graph TB
 
 把任何 Docker 镜像交给 InsForge 就能跑起来。可以指向 registry 上已构建好的镜像，也可以上传构建上下文，让 InsForge 用你的 `Dockerfile` 来构建。不需要学习额外的构建流水线。
 
+对于现成的服务——比如 Redis 缓存、nginx 代理——把服务指向一个公共镜像即可拉取并启动，不需要 `Dockerfile` 或构建步骤。使用 CLI：
+
+```bash
+npx @insforge/cli compute deploy \
+  --image redis:7-alpine \
+  --name cache \
+  --port 6379 \
+  --protocol tcp \
+  --memory 512
+```
+
+`--image` 选择镜像模式（不需要 `flyctl` 或 Docker）。像 Redis 这样的裸 TCP 服务请用 `--protocol tcp`；默认的 `--protocol http` 适用于 HTTP 服务器。用相同的 `--name` 再次运行 `compute deploy` 会就地更新已有服务。
+
+由于 Custom Compute 暂不支持持久化卷，请把 Redis 容器当作临时缓存——一旦镜像、环境变量或端口发生变更，其中保存的内容都会丢失。需要持久保留的数据请放进项目的 Postgres 或 Storage。
+
 ### 访问你的项目
 
 容器需要的凭据由你以服务的环境变量形式设置——项目 URL、API key、S3 凭据，取决于这个工作负载用到什么。InsForge 不会替你注入任何东西，因此容器能访问什么完全由你决定。
