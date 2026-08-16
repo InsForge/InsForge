@@ -848,6 +848,7 @@ export class PaystackTransactionService {
     await this.getPool().query(
       `WITH refund_totals AS (
          SELECT
+           COUNT(*) AS matching_refunds,
            COALESCE(SUM(amount) FILTER (WHERE status = 'refunded'), 0)::BIGINT AS amount_refunded,
            MAX(refunded_at) FILTER (WHERE status = 'refunded') AS refunded_at
          FROM payments.transactions
@@ -886,7 +887,16 @@ export class PaystackTransactionService {
        ),
        updated_original AS (
          UPDATE payments.transactions original
-         SET amount_refunded = refund_totals.amount_refunded,
+         -- Only recompute from refund rows when at least one refund exists.
+         -- A 'reversed' charge carries its refunded state in the charge row
+         -- itself (no type='refund' ledger row), so a refresh run with zero
+         -- matching refunds (e.g. after a delayed charge.success replay or the
+         -- out-of-order reconcile on the charge path) must never zero its
+         -- amount_refunded / refunded_at or downgrade it to succeeded.
+         SET amount_refunded = CASE
+               WHEN refund_totals.amount_refunded > 0 THEN refund_totals.amount_refunded
+               ELSE original.amount_refunded
+             END,
              status = CASE
                WHEN refund_totals.amount_refunded > 0
                  AND original.amount IS NOT NULL
@@ -894,21 +904,17 @@ export class PaystackTransactionService {
                  THEN 'refunded'
                 WHEN refund_totals.amount_refunded > 0
                   THEN 'partially_refunded'
-                 -- A reversed charge is a terminal refund (refund or chargeback)
-                 -- recorded via Paystack's status alone — it has no type='refund'
-                 -- ledger row backing it, so a later refund.failed event must not
-                 -- downgrade it back to succeeded.
-                WHEN original.status IN ('refunded', 'partially_refunded')
-                  THEN CASE
-                    WHEN COALESCE(original.raw->>'status', '') = 'reversed' THEN original.status
-                    WHEN original.failed_at IS NOT NULL THEN 'failed'
-                    ELSE 'succeeded'
-                  END
-                ELSE original.status
-              END,
+                 WHEN refund_totals.matching_refunds > 0
+                   THEN CASE
+                     WHEN COALESCE(original.raw->>'status', '') = 'reversed' THEN original.status
+                     WHEN original.failed_at IS NOT NULL THEN 'failed'
+                     ELSE 'succeeded'
+                   END
+                 ELSE original.status
+               END,
              refunded_at = CASE
                WHEN refund_totals.amount_refunded > 0 THEN refund_totals.refunded_at
-               ELSE NULL
+               ELSE original.refunded_at
              END,
              updated_at = NOW()
          FROM refund_totals
