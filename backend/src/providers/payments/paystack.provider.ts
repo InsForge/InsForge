@@ -146,6 +146,7 @@ export interface PaystackTransactionResource {
     email: string | null;
     first_name: string | null;
     last_name: string | null;
+    phone: string | null;
   } | null;
   authorization: {
     authorization_code: string | null;

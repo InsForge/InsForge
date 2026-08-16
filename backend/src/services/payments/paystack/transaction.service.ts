@@ -307,7 +307,7 @@ export class PaystackTransactionService {
       environment,
       transaction.customer,
       this.fromPaystackTimestamp(transaction.created_at),
-      { metadata }
+      { metadata, phone: transaction.customer?.phone ?? null }
     );
 
     // Reconcile refunds that arrived before this charge's first projection
@@ -888,51 +888,53 @@ export class PaystackTransactionService {
          LIMIT 1
        ),
        updated_original AS (
-         UPDATE payments.transactions original
-         -- Only recompute from refund rows when at least one refund exists.
-         -- A 'reversed' charge carries its refunded state in the charge row
-         -- itself (no type='refund' ledger row), so a refresh run with zero
-         -- matching refunds (e.g. after a delayed charge.success replay or the
-         -- out-of-order reconcile on the charge path) must never zero its
-         -- amount_refunded / refunded_at or downgrade it to succeeded.
+UPDATE payments.transactions original
+          -- Only recompute from refund rows when at least one refund exists.
+          -- Guard on the durable LEDGER status ('refunded'), never on the
+          -- mutable raw provider payload: a delayed charge.success replay
+          -- overwrites raw (raw->>'status' becomes 'success') while the
+          -- terminal-status guard keeps the ledger row 'refunded'. A reversed
+          -- charge projects to 'refunded' with amount_refunded = amount and has
+          -- no type='refund' ledger row; a fully refunded charge is also
+          -- 'refunded'. Neither must be recomputed from a later partial total or
+          -- downgraded by a failed/zero refund refresh.
 SET amount_refunded = CASE
-               WHEN COALESCE(original.raw->>'status', '') = 'reversed' THEN original.amount_refunded
-               WHEN refund_totals.amount_refunded > 0 THEN refund_totals.amount_refunded
-               ELSE original.amount_refunded
-             END,
-              status = CASE
-               -- Reversed charges carry their refunded/chargeback state in the
-               -- charge row itself (no 'type'='refund' ledger row). Guard that
-               -- terminal state BEFORE any refund-amount branch so a genuine
-               -- partial-refund webhook, a failed refund, or a zero-refund
-               -- refresh (delayed charge.success replay / out-of-order
-               -- reconcile) can never downgrade or partially roll back it.
-               WHEN COALESCE(original.raw->>'status', '') = 'reversed' THEN original.status
-               WHEN refund_totals.amount_refunded > 0
-                 AND original.amount IS NOT NULL
-                 AND refund_totals.amount_refunded >= original.amount
-                 THEN 'refunded'
+                WHEN original.status = 'refunded' THEN original.amount_refunded
+                WHEN refund_totals.amount_refunded > 0 THEN refund_totals.amount_refunded
+                ELSE original.amount_refunded
+              END,
+               status = CASE
+                -- 'refunded' is terminal in the ledger. Guard it FIRST, before
+                -- any refund-amount branch, so a genuine partial-refund webhook,
+                -- a failed refund, or a zero-refund refresh (delayed
+                -- charge.success replay / out-of-order reconcile) can never
+                -- downgrade it or partially roll it back.
+                WHEN original.status = 'refunded' THEN original.status
                 WHEN refund_totals.amount_refunded > 0
-                  THEN 'partially_refunded'
-                 -- Only recompute status from a matching refund row when the
-                 -- charge already reached a refunded state. A pending charge
-                 -- whose refund rows all failed (matching_refunds > 0 but
-                 -- amount_refunded = 0) must keep its own status, not be
-                 -- flipped to 'succeeded'/'failed' by a failed refund.
-                 WHEN refund_totals.matching_refunds > 0
-                   AND original.status IN ('refunded', 'partially_refunded')
-                   THEN CASE
-                     WHEN original.failed_at IS NOT NULL THEN 'failed'
-                     ELSE 'succeeded'
-                   END
-                 ELSE original.status
-               END,
-             refunded_at = CASE
-               WHEN COALESCE(original.raw->>'status', '') = 'reversed' THEN original.refunded_at
-               WHEN refund_totals.amount_refunded > 0 THEN refund_totals.refunded_at
-               ELSE original.refunded_at
-             END,
-             updated_at = NOW()
+                  AND original.amount IS NOT NULL
+                  AND refund_totals.amount_refunded >= original.amount
+                  THEN 'refunded'
+                 WHEN refund_totals.amount_refunded > 0
+                   THEN 'partially_refunded'
+                  -- Only recompute status from a matching refund row when the
+                  -- charge already reached a partially-refunded state. A pending
+                  -- charge whose refund rows all failed (matching_refunds > 0 but
+                  -- amount_refunded = 0) must keep its own status, not be
+                  -- flipped to 'succeeded'/'failed' by a failed refund.
+                  WHEN refund_totals.matching_refunds > 0
+                    AND original.status = 'partially_refunded'
+                    THEN CASE
+                      WHEN original.failed_at IS NOT NULL THEN 'failed'
+                      ELSE 'succeeded'
+                    END
+                  ELSE original.status
+                END,
+              refunded_at = CASE
+                WHEN original.status = 'refunded' THEN original.refunded_at
+                WHEN refund_totals.amount_refunded > 0 THEN refund_totals.refunded_at
+                ELSE original.refunded_at
+              END,
+              updated_at = NOW()
          FROM refund_totals
          WHERE original.provider = 'paystack'
            AND original.environment = $1

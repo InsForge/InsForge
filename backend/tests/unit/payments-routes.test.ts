@@ -478,9 +478,7 @@ describe('payments route schemas', () => {
     );
     expect(paystackConfigRouteSource).not.toContain('body.publicKey ?? null');
     expect(paystackConfigRouteSource).toMatch(/router\.delete\(\s*'\/config'/);
-    expect(paystackConfigRouteSource).toContain(
-      'configService.removePaystackKeys(environment)'
-    );
+    expect(paystackConfigRouteSource).toContain('configService.removePaystackKeys(environment)');
     // DELETE reflects whether keys were actually deactivated: removing keys that
     // were never configured yields a 404 PAYMENT_CONFIG_NOT_FOUND (Razorpay
     // parity), not a silent 200.

@@ -387,9 +387,15 @@ export class PaymentCustomerService {
        ON CONFLICT (provider, environment, provider_customer_id) DO UPDATE SET
          email = EXCLUDED.email,
          name = EXCLUDED.name,
-         phone = COALESCE(EXCLUDED.phone, payments.customers.phone),
-         deleted = false,
-         metadata = COALESCE(EXCLUDED.metadata, payments.customers.metadata),
+phone = COALESCE(EXCLUDED.phone, payments.customers.phone),
+          deleted = false,
+          -- Never wipe existing metadata: Paystack transactions frequently carry
+          -- no metadata, so an empty projection must leave the stored value
+          -- untouched. Only overwrite when the new payload actually has data.
+          metadata = CASE
+            WHEN EXCLUDED.metadata = '{}'::JSONB THEN payments.customers.metadata
+            ELSE EXCLUDED.metadata
+          END,
          raw = EXCLUDED.raw,
          provider_created_at = COALESCE(
            payments.customers.provider_created_at,
