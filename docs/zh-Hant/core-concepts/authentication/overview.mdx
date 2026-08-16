@@ -76,6 +76,38 @@ graph TB
 
 使用者狀態存在於專案的 Postgres 資料庫中的 `auth` 架構中。透過外鍵將 `auth.users` 連接到您的應用程式資料表，透過觸發器對身份變更做出反應，並以與備份其他所有內容相同的方式備份整個事物。
 
+## 設定內建 OAuth 提供商
+
+在 [`signInWithOAuth('github', …)`](/sdks/typescript/auth) 生效之前，必須先為專案啟用該提供商。內建的提供商鍵為 `google`、`github`、`discord`、`linkedin`、`facebook`、`instagram`、`tiktok`、`apple`、`x`、`spotify` 和 `microsoft`。下面以 GitHub 為例，其他提供商的步驟相同。
+
+**在 InsForge Cloud 上**，`google` 和 `github` 預設使用 InsForge 的共用 OAuth 應用程式，因此無需註冊自己的應用程式即可登入——在儀表板的 **Auth Methods** 下啟用該提供商即可。{/* TODO: confirm the exact Auth Methods sub-tab/toggle for enabling GitHub */} 若要改用自己的 GitHub OAuth 應用程式，請在下方提供自己的用戶端憑證並將 `useSharedKey` 設為 `false`。
+
+**自託管，或使用自己的 GitHub 應用程式：** 在 GitHub 註冊一個 OAuth 應用程式，並將其授權回呼 URL 指向你的專案：
+
+```
+https://<your-project-url>/api/auth/oauth/github/callback
+```
+
+預設請求的 scope 為 `user:email`。使用管理員 API 儲存憑證：
+
+```bash
+curl -X POST "https://<your-project-url>/api/auth/oauth/configs" \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "github",
+    "clientId": "<github-client-id>",
+    "clientSecret": "<github-client-secret>",
+    "useSharedKey": false
+  }'
+```
+
+設定欄位包括 `provider`、`clientId`、`clientSecret`、`redirectUri`、`scopes`（GitHub 預設為 `["user:email"]`）和 `useSharedKey`。在自託管實例上，你也可以在啟動時透過環境變數注入憑證——設定 `GITHUB_CLIENT_ID` 和 `GITHUB_CLIENT_SECRET`（相同的 `*_CLIENT_ID` / `*_CLIENT_SECRET` 模式同樣適用於 `GOOGLE`、`DISCORD`、`LINKEDIN`、`MICROSOFT`、`X` 和 `APPLE`）。
+
+<Note>
+  OAuth 提供商憑證只能透過儀表板或管理員 API 管理——它們**不**屬於 [config-as-code](/agent-native/config-as-code) 的範疇。啟用提供商後，在應用程式中使用 [`signInWithOAuth()`](/sdks/typescript/auth) 啟動登入流程。
+</Note>
+
 ## 使用它進行建置
 
 <CardGroup cols={2}>

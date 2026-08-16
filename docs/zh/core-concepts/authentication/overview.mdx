@@ -76,6 +76,38 @@ graph TB
 
 用户状态存在于项目的 Postgres 数据库中的 `auth` 架构中。通过外键将 `auth.users` 连接到您的应用程序表，通过触发器对身份更改做出反应，并以与备份其他所有内容相同的方式备份整个事物。
 
+## 设置内置 OAuth 提供程序
+
+在 [`signInWithOAuth('github', …)`](/sdks/typescript/auth) 生效之前，必须先为项目启用该提供程序。内置的提供程序键为 `google`、`github`、`discord`、`linkedin`、`facebook`、`instagram`、`tiktok`、`apple`、`x`、`spotify` 和 `microsoft`。下面以 GitHub 为例，其他提供程序的步骤相同。
+
+**在 InsForge Cloud 上**，`google` 和 `github` 默认使用 InsForge 的共享 OAuth 应用，因此无需注册自己的应用即可登录——在仪表板的 **Auth Methods** 下启用该提供程序即可。{/* TODO: confirm the exact Auth Methods sub-tab/toggle for enabling GitHub */} 若要改用自己的 GitHub OAuth 应用，请在下方提供自己的客户端凭据并将 `useSharedKey` 设为 `false`。
+
+**自托管，或使用自己的 GitHub 应用：** 在 GitHub 注册一个 OAuth 应用，并将其授权回调 URL 指向你的项目：
+
+```
+https://<your-project-url>/api/auth/oauth/github/callback
+```
+
+默认请求的 scope 为 `user:email`。使用管理员 API 保存凭据：
+
+```bash
+curl -X POST "https://<your-project-url>/api/auth/oauth/configs" \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "github",
+    "clientId": "<github-client-id>",
+    "clientSecret": "<github-client-secret>",
+    "useSharedKey": false
+  }'
+```
+
+配置字段包括 `provider`、`clientId`、`clientSecret`、`redirectUri`、`scopes`（GitHub 默认为 `["user:email"]`）和 `useSharedKey`。在自托管实例上，你也可以在启动时通过环境变量注入凭据——设置 `GITHUB_CLIENT_ID` 和 `GITHUB_CLIENT_SECRET`（相同的 `*_CLIENT_ID` / `*_CLIENT_SECRET` 模式同样适用于 `GOOGLE`、`DISCORD`、`LINKEDIN`、`MICROSOFT`、`X` 和 `APPLE`）。
+
+<Note>
+  OAuth 提供程序凭据只能通过仪表板或管理员 API 管理——它们**不**属于 [config-as-code](/agent-native/config-as-code) 的范畴。启用提供程序后，在应用中使用 [`signInWithOAuth()`](/sdks/typescript/auth) 启动登录流程。
+</Note>
+
 ## 使用它进行构建
 
 <CardGroup cols={2}>

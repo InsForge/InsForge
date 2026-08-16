@@ -76,6 +76,38 @@ El JWT de autenticación fluye automáticamente a través de cada llamada del SD
 
 El estado del usuario vive en la base de datos Postgres de su proyecto en el esquema `auth`. Una `auth.users` a sus tablas de aplicación mediante claves ajenas, reaccione a cambios de identidad con activadores y respalda todo de la misma manera que respalda todo lo demás.
 
+## Configurar un proveedor de OAuth integrado
+
+Antes de que [`signInWithOAuth('github', …)`](/sdks/typescript/auth) funcione, el proveedor debe estar habilitado para su proyecto. Las claves de proveedor integradas son `google`, `github`, `discord`, `linkedin`, `facebook`, `instagram`, `tiktok`, `apple`, `x`, `spotify` y `microsoft`. A continuación se usa GitHub como ejemplo; los mismos pasos sirven para cualquiera de ellos.
+
+**En InsForge Cloud**, `google` y `github` vienen preconfigurados para usar la aplicación OAuth compartida de InsForge, así que el inicio de sesión funciona sin registrar una aplicación propia: habilite el proveedor desde el panel en **Auth Methods**. {/* TODO: confirm the exact Auth Methods sub-tab/toggle for enabling GitHub */} Para usar su propia aplicación OAuth de GitHub, indique sus propias credenciales de cliente con `useSharedKey: false` (abajo).
+
+**Autohospedado, o trayendo su propia aplicación de GitHub:** registre una aplicación OAuth en GitHub y apunte su URL de callback de autorización a su proyecto:
+
+```
+https://<your-project-url>/api/auth/oauth/github/callback
+```
+
+El scope solicitado por defecto es `user:email`. Guarde las credenciales con la API de administrador:
+
+```bash
+curl -X POST "https://<your-project-url>/api/auth/oauth/configs" \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "github",
+    "clientId": "<github-client-id>",
+    "clientSecret": "<github-client-secret>",
+    "useSharedKey": false
+  }'
+```
+
+La configuración acepta `provider`, `clientId`, `clientSecret`, `redirectUri`, `scopes` (por defecto `["user:email"]` para GitHub) y `useSharedKey`. En una instancia autohospedada también puede sembrar las credenciales al arrancar mediante variables de entorno: defina `GITHUB_CLIENT_ID` y `GITHUB_CLIENT_SECRET` (el mismo patrón `*_CLIENT_ID` / `*_CLIENT_SECRET` sirve para `GOOGLE`, `DISCORD`, `LINKEDIN`, `MICROSOFT`, `X` y `APPLE`).
+
+<Note>
+  Las credenciales del proveedor de OAuth se gestionan únicamente a través del panel o de la API de administrador; **no** forman parte de [config-as-code](/agent-native/config-as-code). Una vez habilitado el proveedor, inicie el flujo desde su aplicación con [`signInWithOAuth()`](/sdks/typescript/auth).
+</Note>
+
 ## Construir con él
 
 <CardGroup cols={2}>
