@@ -75,6 +75,18 @@ graph TB
 
 按專案和按計畫的限制可以防止流氓迴圈融化交付能力。從儀表板配置，在閘道處強制執行。
 
+## 各計畫的可用性與傳送限制
+
+在 InsForge Cloud 上，託管的隨選郵件 API——用於交易型訊息的 [`emails.send()`](/sdks/typescript/email) 呼叫——**僅對付費計畫可用**。在免費計畫上，傳送會被拒絕並回傳 `On-demand email service is only available for paid plans`，因此在免費計畫上透過託管寄件服務能觸及的客戶數量為零。要從免費專案傳送交易型郵件，請升級到付費計畫，或使用自帶 SMTP 提供方的[自託管](/core-concepts/messaging/custom-smtp)實例。
+
+<Note>
+  **身份驗證郵件是獨立的。** 驗證、密碼重設、魔法連結和一次性驗證碼郵件屬於[身份驗證](/core-concepts/authentication/overview)，在免費計畫上仍會透過託管寄件服務傳送。上述僅付費計畫可用的限制只適用於交易型 Messaging API。
+</Note>
+
+在付費計畫上，傳送按小時進行限流，並在閘道處強制執行。**每個收件人都算作一封郵件**——`to`、`cc` 和 `bcc` 位址會被合併計數，這與 SES/SMTP 按每個位址計一次投遞的方式一致。當一次傳送會超過每小時上限時，API 會回傳 `Rate limit exceeded` 錯誤，並附帶距離視窗重設的分鐘數；請在視窗重設後重試，或將大批量傳送分散到多個小時。具體的每小時上限隨計畫提升——參見[定價頁面](https://insforge.dev/pricing)。
+
+自託管實例透過你自己的 [Custom SMTP](/core-concepts/messaging/custom-smtp) 提供方傳送，不受這些基於計畫的限制約束。
+
 ## 概念
 
 <CardGroup cols={2}>
