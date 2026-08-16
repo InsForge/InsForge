@@ -308,6 +308,12 @@ export class PaystackTransactionService {
       this.fromPaystackTimestamp(transaction.created_at)
     );
 
+    // Reconcile refunds that arrived before this charge's first projection
+    // (out-of-order webhooks): upsertRefundTransaction's own refresh ran before
+    // the original charge row existed, so it had nothing to update. Re-running
+    // the refresh now that the charge is on the ledger applies those refunds.
+    await this.refreshOriginalChargeRefundState(environment, transactionId, transaction.reference);
+
     return status;
   }
 
@@ -979,6 +985,11 @@ export class PaystackTransactionService {
       case 'success':
         return 'succeeded';
       case 'failed':
+        return 'failed';
+      case 'abandoned':
+        // An abandoned checkout never reached payment; projecting it as
+        // terminal `failed` keeps the shared ledger from stranding it in
+        // `pending` forever (the terminal-state guard never resolves pending).
         return 'failed';
       // A reversed charge is fully refunded (refund or chargeback); mapping
       // it to pending would be ignored by the ledger's terminal-state guard

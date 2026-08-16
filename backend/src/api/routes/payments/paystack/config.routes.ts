@@ -1,10 +1,12 @@
 import { Router, type Response, type NextFunction } from 'express';
 import { normalizePaystackError } from '@/providers/payments/paystack-errors.js';
 import { type AuthRequest } from '@/api/middlewares/auth.js';
+import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import { parseZodSchema } from '@/utils/zod.js';
 import { PaystackConfigService } from '@/services/payments/paystack/config.service.js';
 import {
+  ERROR_CODES,
   paystackEnvironmentParamsSchema,
   upsertPaystackConfigBodySchema,
 } from '@insforge/shared-schemas';
@@ -32,7 +34,14 @@ router.put('/config', async (req: AuthRequest, res: Response, next: NextFunction
 router.delete('/config', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { environment } = parseZodSchema(paystackEnvironmentParamsSchema, req.params);
-    await configService.removePaystackKeys(environment);
+    const removed = await configService.removePaystackKeys(environment);
+    if (!removed) {
+      throw new AppError(
+        `Paystack ${environment} keys are not configured`,
+        404,
+        ERROR_CODES.PAYMENT_CONFIG_NOT_FOUND
+      );
+    }
     const keys = await configService.getKeyConfig();
     successResponse(res, { keys });
   } catch (error) {

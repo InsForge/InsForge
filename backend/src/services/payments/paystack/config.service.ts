@@ -269,7 +269,7 @@ export class PaystackConfigService {
     });
   }
 
-  async removePaystackKeys(environment: PaystackEnvironment): Promise<void> {
+  async removePaystackKeys(environment: PaystackEnvironment): Promise<boolean> {
     return this.withEnvironmentLock(environment, async () => {
       const client = await this.getPool().connect();
       try {
@@ -307,6 +307,7 @@ export class PaystackConfigService {
           );
         }
         await client.query('COMMIT');
+        return removed;
       } catch (error) {
         await client.query('ROLLBACK').catch((rollbackError: unknown) => {
           logger.error('Failed to roll back Paystack key update', {
