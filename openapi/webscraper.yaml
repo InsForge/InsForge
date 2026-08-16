@@ -664,6 +664,7 @@ components:
       properties:
         datasetId:
           type: string
+          nullable: true
           description: ID of the latest Apify dataset
         items:
           type: array
