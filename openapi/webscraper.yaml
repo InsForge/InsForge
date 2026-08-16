@@ -1,0 +1,509 @@
+openapi: 3.0.3
+
+info:
+  title: Insforge Webscraper API
+  version: 1.0.0
+  description: Administrative API for managing Apify integration and accessing Apify resources
+
+paths:
+  /api/webscraper/apify/connection:
+    get:
+      summary: Get Apify connection
+      description: Returns the current Apify connection status and connection metadata
+      tags:
+        - Apify
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Apify is connected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected:
+                    type: boolean
+                  connection:
+                    $ref: '#/components/schemas/ApifyConnection'
+                required:
+                  - connected
+                  - connection
+              example:
+                connected: true
+                connection:
+                  username: "apify-user"
+                  email: "user@example.com"
+        '404':
+          description: Apify is not connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "NOT_FOUND"
+                message: "Apify is not connected"
+                statusCode: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Disconnect Apify
+      description: Disconnect the project's Apify integration
+      tags:
+        - Apify
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Apify disconnected successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to disconnect Apify
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/webscraper/apify/token:
+    get:
+      summary: Get Apify API token
+      description: Retrieve the configured Apify API token. Admin only because this endpoint returns the sensitive token value.
+      tags:
+        - Apify
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Apify API token
+          content:
+            application/json:
+              schema:
+                type: string
+              example: "apify_api_xxxxxxxxxxxxxxxxxxxx"
+        '404':
+          description: Apify is not connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "NOT_FOUND"
+                message: "Apify is not connected"
+                statusCode: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to retrieve Apify token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/webscraper/apify/runs:
+    get:
+      summary: List Apify runs
+      description: Returns recent Apify actor runs
+      tags:
+        - Apify
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of runs to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 10
+          example: 10
+      responses:
+        '200':
+          description: List of Apify runs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApifyRunsResponse'
+        '404':
+          description: Apify is not connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "NOT_FOUND"
+                message: "Apify is not connected"
+                statusCode: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to retrieve Apify runs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/webscraper/apify/actors:
+    get:
+      summary: List Apify actors
+      description: Returns recently used Apify actors
+      tags:
+        - Apify
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of actors to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+      responses:
+        '200':
+          description: List of Apify actors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApifyActorsResponse'
+        '404':
+          description: Apify is not connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "NOT_FOUND"
+                message: "Apify is not connected"
+                statusCode: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to retrieve Apify actors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/webscraper/apify/datasets:
+    get:
+      summary: List Apify datasets
+      description: Returns recently created Apify datasets
+      tags:
+        - Apify
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of datasets to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+      responses:
+        '200':
+          description: List of Apify datasets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApifyDatasetsResponse'
+        '404':
+          description: Apify is not connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "NOT_FOUND"
+                message: "Apify is not connected"
+                statusCode: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to retrieve Apify datasets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/webscraper/apify/data:
+    get:
+      summary: Get latest Apify data
+      description: Returns a preview of records from the latest Apify run dataset
+      tags:
+        - Apify
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of dataset records to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 5
+          example: 5
+      responses:
+        '200':
+          description: Latest Apify dataset records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApifyLatestDataResponse'
+        '404':
+          description: Apify is not connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "NOT_FOUND"
+                message: "Apify is not connected"
+                statusCode: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to retrieve latest Apify data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/webscraper/apify/config:
+    put:
+      summary: Configure Apify API token
+      description: >-
+        Validate and store an Apify API token for self-hosted deployments.
+        The token is verified against Apify before it is persisted.
+        This endpoint is not available in InsForge Cloud because Cloud
+        manages the Apify connection through OAuth.
+      tags:
+        - Apify
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - apiToken
+              properties:
+                apiToken:
+                  type: string
+                  minLength: 1
+                  description: Apify API token
+                  example: "apify_api_xxxxxxxxxxxxxxxxxxxx"
+      responses:
+        '200':
+          description: Apify configuration updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApifyConfig'
+              example:
+                token:
+                  configured: true
+                  maskedKey: "apify_api••••••••1234"
+        '400':
+          description: Invalid input or Apify configuration is managed by InsForge Cloud
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidInput:
+                  value:
+                    error: "INVALID_INPUT"
+                    message: "Validation error: API token is required"
+                    statusCode: 400
+                cloudEnvironment:
+                  value:
+                    error: "INVALID_INPUT"
+                    message: "The Apify connection is managed by InsForge Cloud."
+                    statusCode: 400
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to configure Apify
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ApifyConnection:
+      type: object
+      description: Apify connection metadata returned by the configured provider
+      additionalProperties: true
+      example:
+        username: "apify-user"
+        email: "user@example.com"
+
+    ApifyConfig:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: object
+          required:
+            - configured
+            - maskedKey
+          properties:
+            configured:
+              type: boolean
+              description: Whether an Apify API token is configured
+            maskedKey:
+              type: string
+              nullable: true
+              description: Masked representation of the Apify API token
+          example:
+            configured: true
+            maskedKey: "apify_api••••••••1234"
+
+    ApifyRunsResponse:
+      type: object
+      description: Apify runs response returned by the Apify provider
+      additionalProperties: true
+
+    ApifyActorsResponse:
+      type: object
+      description: Apify actors response returned by the Apify provider
+      additionalProperties: true
+
+    ApifyDatasetsResponse:
+      type: object
+      description: Apify datasets response returned by the Apify provider
+      additionalProperties: true
+
+    ApifyLatestDataResponse:
+      type: array
+      description: Records from the latest Apify dataset
+      items:
+        type: object
+        additionalProperties: true
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error code for programmatic handling
+          example: "INVALID_INPUT"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Invalid input data"
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        nextActions:
+          type: string
+          description: Suggested action to resolve the error
+          example: "Check the request body format"
