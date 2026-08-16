@@ -1,7 +1,7 @@
 openapi: 3.0.3
 
 info:
-  title: Insforge Webscraper API
+  title: InsForge Webscraper API
   version: 1.0.0
   description: Administrative API for managing Apify integration and accessing Apify resources
 
@@ -21,29 +21,28 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - connected
+                  - connection
                 properties:
                   connected:
                     type: boolean
                   connection:
                     $ref: '#/components/schemas/ApifyConnection'
-                required:
-                  - connected
-                  - connection
               example:
                 connected: true
                 connection:
-                  username: "apify-user"
-                  email: "user@example.com"
+                  apifyUsername: "apify-user"
+                  apifyEmail: "user@example.com"
+                  connectedAt: "2026-08-16T12:00:00.000Z"
         '404':
           description: Apify is not connected
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/NotConnectedError'
               example:
-                error: "NOT_FOUND"
-                message: "Apify is not connected"
-                statusCode: 404
+                error: "not_connected"
         '401':
           description: Unauthorized
           content:
@@ -52,6 +51,18 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Failed to retrieve connection from Apify
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to retrieve Apify connection
           content:
             application/json:
               schema:
@@ -100,18 +111,17 @@ paths:
           content:
             application/json:
               schema:
-                type: string
-              example: "apify_api_xxxxxxxxxxxxxxxxxxxx"
+                $ref: '#/components/schemas/ApifyTokenResponse'
+              example:
+                accessToken: "apify_api_xxxxxxxxxxxxxxxxxxxx"
         '404':
           description: Apify is not connected
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/NotConnectedError'
               example:
-                error: "NOT_FOUND"
-                message: "Apify is not connected"
-                statusCode: 404
+                error: "not_connected"
         '401':
           description: Unauthorized
           content:
@@ -120,6 +130,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Failed to retrieve Apify token from upstream provider
           content:
             application/json:
               schema:
@@ -162,11 +178,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/NotConnectedError'
               example:
-                error: "NOT_FOUND"
-                message: "Apify is not connected"
-                statusCode: 404
+                error: "not_connected"
         '401':
           description: Unauthorized
           content:
@@ -175,6 +189,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Failed to retrieve runs from Apify
           content:
             application/json:
               schema:
@@ -217,11 +237,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/NotConnectedError'
               example:
-                error: "NOT_FOUND"
-                message: "Apify is not connected"
-                statusCode: 404
+                error: "not_connected"
         '401':
           description: Unauthorized
           content:
@@ -230,6 +248,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Failed to retrieve actors from Apify
           content:
             application/json:
               schema:
@@ -272,11 +296,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/NotConnectedError'
               example:
-                error: "NOT_FOUND"
-                message: "Apify is not connected"
-                statusCode: 404
+                error: "not_connected"
         '401':
           description: Unauthorized
           content:
@@ -285,6 +307,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Failed to retrieve datasets from Apify
           content:
             application/json:
               schema:
@@ -322,16 +350,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApifyLatestDataResponse'
+              example:
+                datasetId: "abc123"
+                items:
+                  - title: "Example"
+                    url: "https://example.com"
         '404':
           description: Apify is not connected
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/NotConnectedError'
               example:
-                error: "NOT_FOUND"
-                message: "Apify is not connected"
-                statusCode: 404
+                error: "not_connected"
         '401':
           description: Unauthorized
           content:
@@ -340,6 +371,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Forbidden - Admin only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Failed to retrieve latest data from Apify
           content:
             application/json:
               schema:
@@ -368,15 +405,9 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - apiToken
-              properties:
-                apiToken:
-                  type: string
-                  minLength: 1
-                  description: Apify API token
-                  example: "apify_api_xxxxxxxxxxxxxxxxxxxx"
+              $ref: '#/components/schemas/ApifyConfigRequest'
+            example:
+              apiToken: "apify_api_xxxxxxxxxxxxxxxxxxxx"
       responses:
         '200':
           description: Apify configuration updated successfully
@@ -417,6 +448,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Failed to validate Apify token with upstream provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Failed to configure Apify
           content:
@@ -435,10 +472,51 @@ components:
     ApifyConnection:
       type: object
       description: Apify connection metadata returned by the configured provider
+      required:
+        - apifyUsername
+      properties:
+        apifyUsername:
+          type: string
+          description: Apify username associated with the connection
+        apifyEmail:
+          type: string
+          format: email
+          nullable: true
+          description: Apify account email address
+        connectedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when the Apify connection was established
       additionalProperties: true
       example:
-        username: "apify-user"
-        email: "user@example.com"
+        apifyUsername: "apify-user"
+        apifyEmail: "user@example.com"
+        connectedAt: "2026-08-16T12:00:00.000Z"
+
+    ApifyTokenResponse:
+      type: object
+      required:
+        - accessToken
+      properties:
+        accessToken:
+          type: string
+          description: Apify API access token
+      additionalProperties: false
+
+    ApifyConfigRequest:
+      type: object
+      required:
+        - apiToken
+      properties:
+        apiToken:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: '.*\S.*'
+          description: Apify API token. Must contain at least one non-whitespace character.
+          example: "apify_api_xxxxxxxxxxxxxxxxxxxx"
+      additionalProperties: false
 
     ApifyConfig:
       type: object
@@ -458,31 +536,155 @@ components:
               type: string
               nullable: true
               description: Masked representation of the Apify API token
+          additionalProperties: false
           example:
             configured: true
             maskedKey: "apify_api••••••••1234"
+      additionalProperties: false
+
+    ApifyRun:
+      type: object
+      description: Apify actor run
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: Unique Apify run ID
+        actId:
+          type: string
+          nullable: true
+          description: Apify actor ID
+        status:
+          type: string
+          description: Run status
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        defaultDatasetId:
+          type: string
+          nullable: true
+          description: Dataset generated by the run
+      additionalProperties: true
 
     ApifyRunsResponse:
       type: object
-      description: Apify runs response returned by the Apify provider
+      required:
+        - runs
+      properties:
+        runs:
+          type: array
+          description: Apify actor runs
+          items:
+            $ref: '#/components/schemas/ApifyRun'
+      additionalProperties: false
+
+    ApifyActor:
+      type: object
+      description: Apify actor
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: Unique Apify actor ID
+        name:
+          type: string
+          nullable: true
+          description: Actor name
+        username:
+          type: string
+          nullable: true
+          description: Apify username that owns the actor
+        title:
+          type: string
+          nullable: true
+          description: Actor title
       additionalProperties: true
 
     ApifyActorsResponse:
       type: object
-      description: Apify actors response returned by the Apify provider
+      required:
+        - actors
+      properties:
+        actors:
+          type: array
+          description: Apify actors
+          items:
+            $ref: '#/components/schemas/ApifyActor'
+      additionalProperties: false
+
+    ApifyDataset:
+      type: object
+      description: Apify dataset
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: Unique Apify dataset ID
+        name:
+          type: string
+          nullable: true
+          description: Dataset name
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Dataset creation timestamp
+        itemCount:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Number of records in the dataset
       additionalProperties: true
 
     ApifyDatasetsResponse:
       type: object
-      description: Apify datasets response returned by the Apify provider
-      additionalProperties: true
+      required:
+        - datasets
+      properties:
+        datasets:
+          type: array
+          description: Apify datasets
+          items:
+            $ref: '#/components/schemas/ApifyDataset'
+      additionalProperties: false
 
     ApifyLatestDataResponse:
-      type: array
-      description: Records from the latest Apify dataset
-      items:
-        type: object
-        additionalProperties: true
+      type: object
+      required:
+        - datasetId
+        - items
+      properties:
+        datasetId:
+          type: string
+          description: ID of the latest Apify dataset
+        items:
+          type: array
+          description: Records from the latest Apify dataset
+          items:
+            type: object
+            additionalProperties: true
+      additionalProperties: false
+
+    NotConnectedError:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          enum:
+            - not_connected
+          description: Indicates that Apify is not connected
+          example: "not_connected"
+      additionalProperties: false
 
     ErrorResponse:
       type: object
