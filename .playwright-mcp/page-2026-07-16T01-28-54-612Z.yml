@@ -1,0 +1,168 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]: ▮ FLEET TERMINAL
+    - generic [ref=e4]:
+      - text: DATA JUL 15, 6:28:26 PM PDT · RELOAD 5MIN ·
+      - link "FORCE" [ref=e5] [cursor=pointer]:
+        - /url: /refresh
+    - generic [ref=e6]: ayaanmacmini3.tailf27391.ts.net:8811
+  - generic [ref=e7]:
+    - generic [ref=e8]: OPEN PRS 7
+    - generic [ref=e9]: NEED ATTN 0
+    - generic [ref=e10]: MERGED TODAY 1
+    - generic [ref=e11]: PRS TODAY 2
+    - generic [ref=e12]: ISSUES TODAY 2
+  - generic [ref=e13]:
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - heading [level=2] [ref=e16]:
+          - text: InsForge/InsForge InsForge PR Pipeline · 3 OPEN
+          - generic [ref=e17]:
+            - text: SLOTS 3/3
+            - link "#1701" [ref=e18] [cursor=pointer]:
+              - /url: https://github.com/InsForge/InsForge/issues/1701
+            - link "#1685" [ref=e19] [cursor=pointer]:
+              - /url: https://github.com/InsForge/InsForge/issues/1685
+            - link "#1657" [ref=e20] [cursor=pointer]:
+              - /url: https://github.com/InsForge/InsForge/issues/1657
+        - table [ref=e21]:
+          - rowgroup [ref=e22]:
+            - row [ref=e23]:
+              - columnheader "PR" [ref=e24]
+              - columnheader "TITLE" [ref=e25]
+              - columnheader "ATTN" [ref=e26]
+              - columnheader "CI" [ref=e27]
+              - columnheader "REVIEW" [ref=e28]
+              - columnheader "UPD" [ref=e29]
+          - rowgroup [ref=e30]:
+            - row [ref=e31]:
+              - cell [ref=e32]:
+                - link "#1712" [ref=e33] [cursor=pointer]:
+                  - /url: https://github.com/InsForge/InsForge/pull/1712
+              - 'cell "fix(config): reject size env values with trailing units and normalize S3_FORCE_PATH_STYLE" [ref=e34]'
+              - cell [ref=e35]
+              - cell [ref=e38]
+              - cell "review required" [ref=e41]
+              - cell "6h" [ref=e42]
+            - row [ref=e43]:
+              - cell [ref=e44]:
+                - link "#1697" [ref=e45] [cursor=pointer]:
+                  - /url: https://github.com/InsForge/InsForge/pull/1697
+              - 'cell "docs(openapi): rewrite logs.yaml to match the logs router" [ref=e46]'
+              - cell [ref=e47]
+              - cell [ref=e50]
+              - cell "review required" [ref=e53]
+              - cell "6h" [ref=e54]
+            - row [ref=e55]:
+              - cell [ref=e56]:
+                - link "#1674" [ref=e57] [cursor=pointer]:
+                  - /url: https://github.com/InsForge/InsForge/pull/1674
+              - 'cell "feat(payments): add Paystack provider with transactions, webhooks, and config" [ref=e58]'
+              - cell [ref=e59]
+              - cell [ref=e62]
+              - cell "changes requested" [ref=e65]
+              - cell "4h" [ref=e66]
+      - generic [ref=e67]:
+        - heading "mcp-use/mcp-use mcp-use Autopilot · 4 OPEN" [level=2] [ref=e68]
+        - table [ref=e69]:
+          - rowgroup [ref=e70]:
+            - row [ref=e71]:
+              - columnheader "PR" [ref=e72]
+              - columnheader "TITLE" [ref=e73]
+              - columnheader "ATTN" [ref=e74]
+              - columnheader "CI" [ref=e75]
+              - columnheader "REVIEW" [ref=e76]
+              - columnheader "UPD" [ref=e77]
+          - rowgroup [ref=e78]:
+            - row [ref=e79]:
+              - cell [ref=e80]:
+                - link "#1869" [ref=e81] [cursor=pointer]:
+                  - /url: https://github.com/mcp-use/mcp-use/pull/1869
+              - 'cell "fix(inspector): honor PORT env var in Docker image" [ref=e82]'
+              - cell [ref=e83]
+              - cell [ref=e86]
+              - cell "review required" [ref=e89]
+              - cell "2d" [ref=e90]
+            - row [ref=e91]:
+              - cell [ref=e92]:
+                - link "#1864" [ref=e93] [cursor=pointer]:
+                  - /url: https://github.com/mcp-use/mcp-use/pull/1864
+              - 'cell "fix(docs): repair 26 dead links across READMEs, changelogs, and skills" [ref=e94]'
+              - cell [ref=e95]
+              - cell [ref=e98]
+              - cell "review required" [ref=e101]
+              - cell "3d" [ref=e102]
+            - row [ref=e103]:
+              - cell [ref=e104]:
+                - link "#1861" [ref=e105] [cursor=pointer]:
+                  - /url: https://github.com/mcp-use/mcp-use/pull/1861
+              - 'cell "docs(inspector): add self-hosting guide" [ref=e106]'
+              - cell [ref=e107]
+              - cell [ref=e110]
+              - cell "changes requested" [ref=e113]
+              - cell "7h" [ref=e114]
+            - row [ref=e115]:
+              - cell [ref=e116]:
+                - link "#1856" [ref=e117] [cursor=pointer]:
+                  - /url: https://github.com/mcp-use/mcp-use/pull/1856
+              - 'cell "feat(python): support Python 3.13 and 3.14" [ref=e118]'
+              - cell [ref=e119]
+              - cell [ref=e122]
+              - cell "review required" [ref=e125]
+              - cell "15h" [ref=e126]
+    - generic [ref=e127]:
+      - generic [ref=e128]:
+        - heading "SCHEDULED JOBS session crons expire Jul 22 — re-arm via pipeline bootstrap" [level=2] [ref=e129]
+        - table [ref=e130]:
+          - rowgroup [ref=e131]:
+            - row [ref=e132]:
+              - columnheader "JOB" [ref=e133]
+              - columnheader "CRON" [ref=e134]
+              - columnheader "NEXT" [ref=e135]
+              - columnheader "MISSION" [ref=e136]
+          - rowgroup [ref=e137]:
+            - row [ref=e138]:
+              - cell "PR TICK" [ref=e139]
+              - cell "43 10 * * *" [ref=e140]
+              - cell "T-16h 15m" [ref=e141]
+              - cell "ship 1 PR/day (InsForge primary, mcp-use fallback)" [ref=e142]
+            - row [ref=e143]:
+              - cell "ISSUE HUNT" [ref=e144]
+              - cell "7 13 * * *" [ref=e145]
+              - cell "T-18h 39m" [ref=e146]
+              - cell "file 1-2 verified issues/day" [ref=e147]
+            - row [ref=e148]:
+              - cell "REVIEW SWEEP" [ref=e149]
+              - cell "17 */6 * * *" [ref=e150]
+              - cell "T-5h 49m" [ref=e151]
+              - cell "answer every review thread, both repos" [ref=e152]
+      - generic [ref=e153]:
+        - heading "LOOP HEALTH" [level=2] [ref=e154]
+        - table [ref=e155]:
+          - rowgroup [ref=e156]:
+            - row [ref=e157]:
+              - columnheader "LOOP" [ref=e158]
+              - columnheader "STATE" [ref=e159]
+              - columnheader "LAST SWEEP" [ref=e160]
+          - rowgroup [ref=e161]:
+            - row [ref=e162]:
+              - cell "INSFORGE PR PIPELINE" [ref=e163]
+              - cell [ref=e164]
+              - 'cell "2026-07-15 ~15:15 PDT (manual tick): CLEAN — 0 unanswered threads all 7 PRs both repos; CI all green on #1674" [ref=e167]'
+            - row [ref=e168]:
+              - cell "MCP-USE AUTOPILOT" [ref=e169]
+              - cell [ref=e170]
+              - cell [ref=e173]
+      - generic [ref=e174]:
+        - heading "TODAY" [level=2] [ref=e175]
+        - paragraph [ref=e176]:
+          - text: PR SHIPPED 2 · MERGED
+          - link "#1878" [ref=e177] [cursor=pointer]:
+            - /url: https://github.com/mcp-use/mcp-use/pull/1878
+          - text: · ISSUE
+          - link "#1721" [ref=e178] [cursor=pointer]:
+            - /url: https://github.com/InsForge/InsForge/issues/1721
+          - text: · ISSUE
+          - link "#1719" [ref=e179] [cursor=pointer]:
+            - /url: https://github.com/InsForge/InsForge/issues/1719
+  - contentinfo [ref=e180]: "SOURCES: gh CLI (LIVE) + LOOP STATE FILES · CONFIG: pipeline-dashboard/config.json"
