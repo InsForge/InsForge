@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 import { AppError } from '@/utils/errors.js';
 import type { UserContext } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { PaymentCustomerService } from '@/services/payments/payment-customer.service.js';
 import { PaystackConfigService } from '@/services/payments/paystack/config.service.js';
 import {
   addBillingSubjectToProviderAttributes,
@@ -108,6 +109,7 @@ export class PaystackTransactionService {
   private static instance: PaystackTransactionService;
   private pool: Pool | null = null;
   private readonly configService = PaystackConfigService.getInstance();
+  private readonly customerService = PaymentCustomerService.getInstance();
 
   static getInstance(): PaystackTransactionService {
     if (!PaystackTransactionService.instance) {
@@ -299,6 +301,12 @@ export class PaystackTransactionService {
         { type: 'reference', id: transaction.reference },
       ],
     });
+
+    await this.customerService.upsertPaystackCustomerProjection(
+      environment,
+      transaction.customer,
+      this.fromPaystackTimestamp(transaction.created_at)
+    );
 
     return status;
   }
@@ -878,12 +886,20 @@ export class PaystackTransactionService {
                  AND original.amount IS NOT NULL
                  AND refund_totals.amount_refunded >= original.amount
                  THEN 'refunded'
-               WHEN refund_totals.amount_refunded > 0
-                 THEN 'partially_refunded'
-               WHEN original.status IN ('refunded', 'partially_refunded')
-                 THEN CASE WHEN original.failed_at IS NOT NULL THEN 'failed' ELSE 'succeeded' END
-               ELSE original.status
-             END,
+                WHEN refund_totals.amount_refunded > 0
+                  THEN 'partially_refunded'
+                 -- A reversed charge is a terminal refund (refund or chargeback)
+                 -- recorded via Paystack's status alone — it has no type='refund'
+                 -- ledger row backing it, so a later refund.failed event must not
+                 -- downgrade it back to succeeded.
+                WHEN original.status IN ('refunded', 'partially_refunded')
+                  THEN CASE
+                    WHEN COALESCE(original.raw->>'status', '') = 'reversed' THEN original.status
+                    WHEN original.failed_at IS NOT NULL THEN 'failed'
+                    ELSE 'succeeded'
+                  END
+                ELSE original.status
+              END,
              refunded_at = CASE
                WHEN refund_totals.amount_refunded > 0 THEN refund_totals.refunded_at
                ELSE NULL

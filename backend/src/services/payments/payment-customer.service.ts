@@ -327,6 +327,67 @@ export class PaymentCustomerService {
     return true;
   }
 
+  /**
+   * Project a Paystack customer (embedded on a transaction resource) into the
+   * shared payments.customers mirror so the Paystack Customers tab and
+   * /payments/paystack/:environment/customers are populated. Paystack has no
+   * standalone customer-list endpoint on this path, so the mirror is built
+   * from transaction payloads as charges land (idempotent upsert keyed on the
+   * Paystack customer_code).
+   */
+  async upsertPaystackCustomerProjection(
+    environment: 'test' | 'live',
+    customer: {
+      id: number;
+      customer_code: string;
+      email: string | null;
+      first_name: string | null;
+      last_name: string | null;
+    } | null,
+    providerCreatedAt: Date | null
+  ): Promise<boolean> {
+    if (!customer || !customer.customer_code) {
+      return false;
+    }
+
+    const name =
+      [customer.first_name, customer.last_name]
+        .filter((part): part is string => typeof part === 'string' && part.length > 0)
+        .join(' ')
+        .trim() || null;
+
+    await this.getPool().query(
+      `INSERT INTO payments.customers (
+         provider,
+         environment,
+         provider_customer_id,
+         email,
+         name,
+         phone,
+         deleted,
+         metadata,
+         raw,
+         provider_created_at,
+         synced_at
+       )
+       VALUES ('paystack', $1, $2, $3, $4, NULL, false, '{}'::JSONB, $5, $6, NOW())
+       ON CONFLICT (provider, environment, provider_customer_id) DO UPDATE SET
+         email = EXCLUDED.email,
+         name = EXCLUDED.name,
+         deleted = false,
+         raw = EXCLUDED.raw,
+         provider_created_at = COALESCE(
+           payments.customers.provider_created_at,
+           EXCLUDED.provider_created_at
+         ),
+         synced_at = NOW(),
+         updated_at = NOW()`,
+      [environment, customer.customer_code, customer.email, name, customer, providerCreatedAt]
+    );
+
+    return true;
+  }
+
   private async bulkUpsertCustomerRecords(
     client: PoolClient,
     environment: StripeEnvironment,

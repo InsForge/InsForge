@@ -45,7 +45,7 @@ describe('normalizePaystackError', () => {
     const normalized = normalizePaystackError(new PaystackApiError('Invalid key', 401));
 
     expect(normalized).toMatchObject({
-      statusCode: 401,
+      statusCode: 502,
       code: ERROR_CODES.PAYMENT_CONFIG_INVALID,
       message: 'Invalid key',
     });
@@ -55,7 +55,7 @@ describe('normalizePaystackError', () => {
     const normalized = normalizePaystackError(new PaystackApiError('Forbidden', 403));
 
     expect(normalized).toMatchObject({
-      statusCode: 403,
+      statusCode: 502,
       code: ERROR_CODES.PAYMENT_CONFIG_INVALID,
       message: 'Forbidden',
     });

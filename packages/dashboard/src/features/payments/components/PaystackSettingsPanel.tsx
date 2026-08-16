@@ -6,8 +6,8 @@ import type {
   PaystackConnectionStatus,
   PaystackKeyConfig,
 } from '@insforge/shared-schemas';
-import { usePaystackConfig } from '#features/payments/hooks/usePaystackConfig';
-import { usePaystackWebhookSetup } from '#features/payments/hooks/usePaystackWebhook';
+import { usePaystackConfig } from '#features/payments/hooks/use-paystack-config';
+import { usePaystackWebhookSetup } from '#features/payments/hooks/use-paystack-webhook';
 import {
   DialogSectionDivider,
   SettingRow,
@@ -32,9 +32,13 @@ function getPaystackKeyValue(
   environment: PaymentEnvironment,
   keyType: PaystackKeyConfig['keyType']
 ): string {
-  return (
-    keys.find((key) => key.environment === environment && key.keyType === keyType)?.value ?? ''
-  );
+  const key = keys.find((k) => k.environment === environment && k.keyType === keyType);
+  if (!key) {
+    return '';
+  }
+  // Secret keys are never returned raw: surface the masked placeholder so the
+  // panel can round-trip it unchanged (the backend preserves the stored value).
+  return keyType === 'secret_key' ? (key.maskedKey ?? '') : (key.value ?? '');
 }
 
 function getPaystackKeyValues(
@@ -302,11 +306,11 @@ function PaystackKeysTabContent({
             (key) => key.environment === environment && key.keyType === 'public_key'
           );
 
-          const hasAnyKey = Boolean(envSecretKey?.value || envPublicKey?.value);
+          const hasAnyKey = Boolean(envSecretKey?.hasKey || envPublicKey?.hasKey);
           const expectedSecretPrefix = PAYSTACK_SECRET_KEY_PREFIX_BY_ENVIRONMENT[environment];
           const expectedPublicPrefix = PAYSTACK_PUBLIC_KEY_PREFIX_BY_ENVIRONMENT[environment];
           const environmentLabel = environment === 'test' ? 'Test Mode' : 'Live Mode';
-          const savedSecretKey = envSecretKey?.value ?? '';
+          const savedSecretKey = envSecretKey?.maskedKey ?? '';
           const savedPublicKey = envPublicKey?.value ?? '';
           const hasPendingInput =
             secretKeyInputs[environment].trim() !== savedSecretKey.trim() ||
@@ -538,7 +542,7 @@ function PaystackWebhookEnvironmentSection({
 }) {
   const environmentLabel = environment === 'test' ? 'Test mode' : 'Live mode';
   const isKeyConfigured = keys.some(
-    (key) => key.environment === environment && key.keyType === 'secret_key' && Boolean(key.value)
+    (key) => key.environment === environment && key.keyType === 'secret_key' && Boolean(key.hasKey)
   );
   const setupQuery = usePaystackWebhookSetup(environment, isKeyConfigured);
   const setup = setupQuery.data ?? null;

@@ -340,7 +340,7 @@ export interface RazorpayOrderRow {
 }
 
 export interface PaystackConnectionRow {
-  id: string;
+  id?: string;
   environment: PaystackEnvironment;
   status: PaystackConnectionStatus;
   accountId: string | null;
@@ -352,9 +352,9 @@ export interface PaystackConnectionRow {
   lastSyncStatus: PaystackLatestSyncStatus | null;
   lastSyncError: string | null;
   lastSyncCounts: Record<string, number> | null;
-  raw: Record<string, unknown>;
-  createdAt: Date | string;
-  updatedAt: Date | string;
+  raw?: Record<string, unknown>;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }
 
 export type PaystackTransactionStatus =

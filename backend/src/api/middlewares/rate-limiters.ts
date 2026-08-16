@@ -489,3 +489,35 @@ export const migrationsDryRunLimiter = rateLimit({
     );
   },
 });
+
+/**
+ * Per-IP rate limiter for Paystack transaction endpoints
+ * (initialize + verify).
+ *
+ * These endpoints create or mutate payment state and fan out to the Paystack
+ * API on behalf of the caller, so a single IP should not be able to drive an
+ * unbounded number of upstream calls (each initialize creates a Paystack
+ * transaction; each verify round-trips to Paystack).
+ *
+ * Limits: 30 requests per 15 minutes per IP.
+ * Counts FAILED requests only (skipSuccessfulRequests: true) so legitimate
+ * customers retrying a transient failure are not punished, but a client
+ * stuck in a 4xx/5xx loop cannot bypass the cap.
+ */
+export const paystackTransactionRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30, // Limit each IP to 30 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many Paystack transaction requests from this IP. Please try again in 15 minutes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+  skipSuccessfulRequests: true, // Don't count successful transactions
+  skipFailedRequests: false, // Count failed attempts to prevent abuse
+});

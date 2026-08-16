@@ -29,8 +29,12 @@ export function normalizePaystackError(error: unknown): Error {
   if (status === 429) {
     return new AppError(message, 429, ERROR_CODES.RATE_LIMITED);
   }
+  // 401/403 from Paystack mean the secret key is rejected — not that the
+  // client is unauthorized. Pass 502 so the client never tries to re-auth or
+  // refresh tokens against InsForge itself; the PAYMENT_CONFIG_INVALID code
+  // still tells the dashboard the provider keys are wrong.
   if (status === 401 || status === 403) {
-    return new AppError(message, status, ERROR_CODES.PAYMENT_CONFIG_INVALID);
+    return new AppError(message, 502, ERROR_CODES.PAYMENT_CONFIG_INVALID);
   }
 
   // `UpstreamError` derives its message via `getUpstreamErrorMessage`, which

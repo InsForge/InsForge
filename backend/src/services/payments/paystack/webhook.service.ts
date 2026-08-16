@@ -365,7 +365,7 @@ export class PaystackWebhookService {
   }
 
   private getChargeEntity(payload: PaystackWebhookPayload): PaystackTransactionResource | null {
-    const { id, reference } = payload.data;
+    const { id, reference, amount, currency } = payload.data;
     if (typeof reference !== 'string' || reference.length === 0) {
       return null;
     }
@@ -373,7 +373,28 @@ export class PaystackWebhookService {
       return null;
     }
 
-    return payload.data as unknown as PaystackTransactionResource;
+    // Mirror getRefundEntity: a charge.success without a usable amount or
+    // currency must not reach upsertChargeWithClient, which calls
+    // `transaction.currency.toLowerCase()` and would 500-loop an upstream
+    // malformed event. Accept a numeric amount or a digit string.
+    const normalizedAmount =
+      typeof amount === 'number'
+        ? amount
+        : typeof amount === 'string' && /^\d+$/.test(amount.trim())
+          ? Number(amount.trim())
+          : NaN;
+    if (!Number.isSafeInteger(normalizedAmount) || normalizedAmount < 0) {
+      return null;
+    }
+
+    if (typeof currency !== 'string' || currency.length === 0) {
+      return null;
+    }
+
+    return {
+      ...(payload.data as unknown as PaystackTransactionResource),
+      amount: normalizedAmount,
+    };
   }
 
   private getRefundTransactionReference(payload: PaystackWebhookPayload): string | null {

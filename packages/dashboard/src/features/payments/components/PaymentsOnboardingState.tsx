@@ -293,7 +293,10 @@ export function PaymentsOnboardingState({
       defaultValue: step.description,
     }),
   }));
-  const alternativeProvider: PaymentProvider = provider === 'stripe' ? 'razorpay' : 'stripe';
+  const alternativeProviders = Object.keys(PROVIDER_LABELS).filter(
+    (candidate): candidate is PaymentProvider =>
+      candidate !== provider && candidate in PROVIDER_LABELS
+  );
 
   return (
     <div className="flex h-full min-h-[560px] items-start justify-center overflow-y-auto px-6 py-20">
@@ -336,10 +339,15 @@ export function PaymentsOnboardingState({
             <p className="text-xs leading-4 text-muted-foreground">
               {t('payments.orChangeProvider', { defaultValue: 'or change a payment provider' })}
             </p>
-            <PaymentProviderCard
-              provider={alternativeProvider}
-              onClick={() => onProviderChange(alternativeProvider)}
-            />
+            <div className="flex gap-2">
+              {alternativeProviders.map((alternativeProvider) => (
+                <PaymentProviderCard
+                  key={alternativeProvider}
+                  provider={alternativeProvider}
+                  onClick={() => onProviderChange(alternativeProvider)}
+                />
+              ))}
+            </div>
           </div>
         ) : null}
       </div>

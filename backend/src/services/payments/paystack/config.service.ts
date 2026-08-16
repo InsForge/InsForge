@@ -110,7 +110,19 @@ export class PaystackConfigService {
       const trimmedSecretKey = secretKey.trim();
       const trimmedPublicKey = publicKey?.trim();
 
-      validatePaystackKey(environment, trimmedSecretKey);
+      const secretKeyKey = getPaystackSecretKeyName(environment);
+      const publicKeyKey = getPaystackPublicKeyName(environment);
+
+      // The settings panel hydrates the secret key field with a masked
+      // placeholder (e.g. `sk_test_****abcd`) rather than the raw value. When a
+      // masked placeholder is submitted unchanged, keep the stored secret
+      // instead of overwriting it with the mask.
+      const existingSecretKey = await SecretService.getInstance().getSecretByKey(secretKeyKey);
+      const isMaskedSubmission = trimmedSecretKey.includes('****');
+      const effectiveSecretKey =
+        isMaskedSubmission && existingSecretKey !== null ? existingSecretKey : trimmedSecretKey;
+
+      validatePaystackKey(environment, effectiveSecretKey);
       if (trimmedPublicKey && !trimmedPublicKey.startsWith(`pk_${environment}_`)) {
         throw new AppError(
           `Paystack ${environment} public key must start with pk_${environment}_`,
@@ -119,22 +131,19 @@ export class PaystackConfigService {
         );
       }
 
-      const secretKeyKey = getPaystackSecretKeyName(environment);
-      const publicKeyKey = getPaystackPublicKeyName(environment);
-
-      const provider = new PaystackProvider({ environment, secretKey: trimmedSecretKey });
+      const provider = new PaystackProvider({ environment, secretKey: effectiveSecretKey });
       const account = await provider.retrieveAccount();
       // Paystack has no stable account identifier, so a secret key change is the
       // closest signal that the connection now points at different account data.
       // Compare fingerprints persisted on the connection row rather than the
       // active secret: removePaystackKeys deactivates the secret but keeps the
       // fingerprint, so re-adding a different key after removal still wipes.
-      const secretKeyFingerprint = fingerprintPaystackSecretKey(trimmedSecretKey);
+      const secretKeyFingerprint = fingerprintPaystackSecretKey(effectiveSecretKey);
       const storedFingerprint = await this.getStoredSecretKeyFingerprint(environment);
       const shouldClearPaymentData =
         storedFingerprint !== null && storedFingerprint !== secretKeyFingerprint;
 
-      const encryptedSecretKey = EncryptionManager.encrypt(trimmedSecretKey);
+      const encryptedSecretKey = EncryptionManager.encrypt(effectiveSecretKey);
 
       const client = await this.getPool().connect();
       try {
@@ -245,7 +254,12 @@ export class PaystackConfigService {
 
         await client.query('COMMIT');
       } catch (error) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch((rollbackError: unknown) => {
+          logger.error('Failed to roll back Paystack key update', {
+            environment,
+            error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          });
+        });
         throw error;
       } finally {
         client.release();
@@ -294,7 +308,12 @@ export class PaystackConfigService {
         }
         await client.query('COMMIT');
       } catch (error) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch((rollbackError: unknown) => {
+          logger.error('Failed to roll back Paystack key update', {
+            environment,
+            error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          });
+        });
         throw error;
       } finally {
         client.release();
@@ -340,8 +359,16 @@ export class PaystackConfigService {
       return this.buildUnconfiguredConnection(environment);
     }
 
-    const secretKey = await this.getPaystackSecretKey(environment);
-    const maskedKey = secretKey ? maskPaystackKey(secretKey) : null;
+    let maskedKey: string | null = null;
+    try {
+      const secretKey = await this.getPaystackSecretKey(environment);
+      maskedKey = secretKey ? maskPaystackKey(secretKey) : null;
+    } catch {
+      // A malformed stored key must not take down the whole status endpoint:
+      // report the connection without a masked key so getPaystackStatus can
+      // surface the environment as errored rather than rejecting outright.
+      maskedKey = null;
+    }
 
     return this.normalizeConnectionRow(row.rows[0] as PaystackConnectionRow, maskedKey);
   }
@@ -366,14 +393,30 @@ export class PaystackConfigService {
     keyType: PaystackKeyConfig['keyType'],
     secretName: string
   ): Promise<PaystackKeyConfig> {
-    // Admin-only endpoint: return the raw stored value (Stripe/Razorpay parity).
-    // The settings panel hydrates and resaves these values, so masking here
-    // would corrupt the stored keys on resave.
     const raw = await SecretService.getInstance().getSecretByKey(secretName);
+
+    if (keyType === 'secret_key') {
+      // Secret keys must never leave the backend in full. The dashboard only
+      // needs to know one is configured and what it looks like masked; on save
+      // it submits the masked placeholder unchanged and setPaystackKeys keeps
+      // the stored secret.
+      return {
+        environment,
+        keyType,
+        value: null,
+        hasKey: raw !== null,
+        maskedKey: raw ? maskPaystackKey(raw) : null,
+      };
+    }
+
+    // Public keys are safe to return raw (Stripe/Razorpay parity): the settings
+    // panel hydrates and resaves them as-is.
     return {
       environment,
       keyType,
       value: raw,
+      hasKey: raw !== null,
+      maskedKey: null,
     };
   }
 
@@ -421,16 +464,20 @@ export class PaystackConfigService {
     environment: PaystackEnvironment
   ): Promise<GetPaystackWebhookSetupResponse> {
     // The secret key doubles as the webhook HMAC key, so there is no separate
-    // webhook secret to provision — only the endpoint URL to surface.
-    await this.createPaystackProvider(environment);
-    const webhookUrl = this.getWebhookUrl(environment);
+    // webhook secret to provision — only the endpoint URL to surface. Run under
+    // the environment lock so a concurrent key change (which wipes webhook
+    // connection fields) cannot race and leave a stale webhook endpoint.
+    return this.withEnvironmentLock(environment, async () => {
+      await this.createPaystackProvider(environment);
+      const webhookUrl = this.getWebhookUrl(environment);
 
-    await this.upsertManualWebhookConnection(environment, webhookUrl);
+      await this.upsertManualWebhookConnection(environment, webhookUrl);
 
-    return {
-      connection: await this.getConnection(environment),
-      webhookUrl,
-    };
+      return {
+        connection: await this.getConnection(environment),
+        webhookUrl,
+      };
+    });
   }
 
   private getWebhookUrl(environment: PaystackEnvironment): string {

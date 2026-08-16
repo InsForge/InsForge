@@ -840,7 +840,15 @@ const initializePaystackTransactionFields = {
   currency: currencySchema,
   email: z.string().trim().email('Customer email must be a valid email address'),
   reference: z.string().trim().min(1).max(100).nullable().optional(),
-  callbackUrl: z.string().trim().url('Callback URL must be a valid URL').nullable().optional(),
+  callbackUrl: z
+    .string()
+    .trim()
+    .url('Callback URL must be a valid URL')
+    .nullable()
+    .optional()
+    .refine((value) => value === null || value === undefined || /^https?:\/\//i.test(value), {
+      message: 'Callback URL must use http or https',
+    }),
   subject: billingSubjectSchema.optional(),
   metadata: z.record(z.string()).optional(),
 };
@@ -899,7 +907,10 @@ export const verifyPaystackTransactionResponseSchema = z.object({
 export const paystackKeyConfigSchema = z.object({
   environment: paystackEnvironmentSchema,
   keyType: z.enum(['secret_key', 'public_key']),
+  // Only ever populated for public keys: secret keys are never returned raw.
   value: z.string().nullable(),
+  hasKey: z.boolean(),
+  maskedKey: z.string().nullable(),
 });
 
 export const getPaystackStatusResponseSchema = z.object({

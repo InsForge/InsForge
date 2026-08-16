@@ -1,7 +1,7 @@
 /**
  * Behavioral coverage for the Paystack ledger's terminal-state guards,
  * exercised against a real Postgres seeded with the full migration chain
- * (including 060's status-constraint management).
+ * (including 065's status-constraint management).
  *
  * The unit suite asserts the SQL text; this suite asserts the behavior the
  * SQL must deliver: a delayed charge.success arriving after a reversal must
@@ -82,7 +82,7 @@ beforeAll(async () => {
 afterAll(() => teardown());
 
 describe('paystack ledger terminal states (behavioral)', () => {
-  it('migration 060 accepts the reversed session status', async () => {
+  it('migration 065 accepts the reversed session status', async () => {
     await db.query(
       `INSERT INTO payments.paystack_transactions (environment, status, amount, currency)
        VALUES ('test', 'reversed', 1000, 'ngn')`

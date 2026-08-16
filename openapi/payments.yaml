@@ -3104,6 +3104,8 @@ components:
         - environment
         - keyType
         - value
+        - hasKey
+        - maskedKey
       properties:
         environment:
           $ref: '#/components/schemas/PaystackEnvironment'
@@ -3116,9 +3118,20 @@ components:
           type: string
           nullable: true
           description: >-
-            Raw stored key value (not masked), or null when the key is not
-            configured.
-          example: "sk_test_xxx"
+            Stored key value. Only populated for public keys: secret keys are
+            never returned raw. Null when the key is not configured or when the
+            key type is secret.
+          example: "pk_test_xxx"
+        hasKey:
+          type: boolean
+          description: Whether a value is configured for this key type.
+        maskedKey:
+          type: string
+          nullable: true
+          description: >-
+            Masked form of the configured secret key (e.g. `sk_test_****abcd`),
+            or null when the key type is public or the key is not configured.
+          example: "sk_test_****abcd"
 
     CreateStripeProductBody:
       type: object

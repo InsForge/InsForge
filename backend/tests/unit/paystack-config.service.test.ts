@@ -373,9 +373,11 @@ describe('PaystackConfigService', () => {
     }
   });
 
-  it('returns raw key config values for the admin settings panel', async () => {
-    // Raw (not masked) values are required: the settings panel hydrates and
-    // resaves these values, so masking would corrupt stored keys on resave.
+  it('returns masked secret key config with public keys raw for the admin settings panel', async () => {
+    // Secret keys must never leave the backend in full: only presence and a
+    // masked form are surfaced, while public keys remain raw. The settings
+    // panel hydrates its secret input with the masked value, so a resave
+    // submits the unchanged mask and setPaystackKeys keeps the stored secret.
     mockGetSecretByKey.mockImplementation(async (key: string) => {
       if (key === 'PAYSTACK_TEST_SECRET_KEY') {
         return 'sk_test_secret_key_1234';
@@ -389,10 +391,22 @@ describe('PaystackConfigService', () => {
     const keys = await PaystackConfigService.getInstance().getKeyConfig();
 
     expect(keys).toEqual([
-      { environment: 'test', keyType: 'secret_key', value: 'sk_test_secret_key_1234' },
-      { environment: 'test', keyType: 'public_key', value: 'pk_test_public_key_5678' },
-      { environment: 'live', keyType: 'secret_key', value: null },
-      { environment: 'live', keyType: 'public_key', value: null },
+      {
+        environment: 'test',
+        keyType: 'secret_key',
+        value: null,
+        hasKey: true,
+        maskedKey: `masked:${'sk_test_secret_key_1234'.slice(-4)}`,
+      },
+      {
+        environment: 'test',
+        keyType: 'public_key',
+        value: 'pk_test_public_key_5678',
+        hasKey: true,
+        maskedKey: null,
+      },
+      { environment: 'live', keyType: 'secret_key', value: null, hasKey: false, maskedKey: null },
+      { environment: 'live', keyType: 'public_key', value: null, hasKey: false, maskedKey: null },
     ]);
   });
 

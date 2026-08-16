@@ -3,6 +3,7 @@ import { normalizePaystackError } from '@/providers/payments/paystack-errors.js'
 import { verifyAdmin, verifyUser, type AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
+import { paystackTransactionRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { PaystackConfigService } from '@/services/payments/paystack/config.service.js';
 import { PaystackTransactionService } from '@/services/payments/paystack/transaction.service.js';
 import { PaymentCustomerService } from '@/services/payments/payment-customer.service.js';
@@ -46,6 +47,7 @@ router.get('/config', verifyAdmin, async (_req: AuthRequest, res: Response, next
 environmentRouter.post(
   '/transactions/initialize',
   verifyUser,
+  paystackTransactionRateLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const environment = getPaymentEnvironment(req.params);
@@ -74,6 +76,7 @@ environmentRouter.post(
 environmentRouter.post(
   '/transactions/verify',
   verifyUser,
+  paystackTransactionRateLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const environment = getPaymentEnvironment(req.params);
