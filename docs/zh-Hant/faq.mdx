@@ -285,4 +285,34 @@ description: "InsForge 常見問題：解說資料庫呼叫、Edge Function 與 
     - **取消還在跑的建置：** `npx @insforge/cli deployments cancel <id>` 會終止一個進行中的部署；它不會下線一個已經上線的站點。
     - **替換目前上線的內容：** 用 `npx @insforge/cli deployments deploy ./frontend` 在同一個站點上重新部署——最新一次 ready 的部署會接管這個 URL。
   </Accordion>
+
+  <Accordion title="可以把後端 API 掛到自己的自訂網域（比如 `api.example.com`）上嗎？">
+    可以。在 InsForge Cloud 上，project 的後端 API（預設的 `https://<appkey>.<region>.insforge.app` 位址）可以用自訂網域對外提供。這和 [Sites](/core-concepts/sites/overview) 的自訂網域是兩回事——後者是給你部署的前端用的。
+
+    用 CLI 設定網域。這需要組織的 **Administrator（管理員）** 角色：
+
+    ```bash
+    npx @insforge/cli projects update --project <id> --domain api.example.com
+    ```
+
+    或者直接呼叫 Cloud 管理 API：
+
+    ```bash
+    PUT /projects/v1/{projectId}
+    { "customizedDomain": "api.example.com" }
+    ```
+
+    網域至少要 4 個字元。設定後，InsForge 會把你的自訂網域作為 project 的正規 URL 回傳（`https://api.example.com`）。用下面的指令確認是否生效：
+
+    ```bash
+    npx @insforge/cli projects get --project <id>
+    ```
+
+    設定了自訂網域時，它會印出一行 `Domain:`。
+
+    在 project 上設好網域只是其中一步：你還需要在自己的 DNS 服務商那裡加一條把該主機名指向 InsForge 的記錄，並為它簽發 TLS 憑證。如果設好之後網域解析不了、或憑證遲遲沒就緒，請到 [Discord](https://discord.com/invite/DvBtaEc9Jz) 聯繫 InsForge 團隊。
+    {/* TODO: confirm the exact DNS record/target and the TLS provisioning/verification step for cloud backend custom domains — not present in the CLI/API code. */}
+
+    自己自架 InsForge？那反向代理和 TLS 都由你自己掌控——參見[自架指南](/deployment/deploy-to-aws-ec2)。
+  </Accordion>
 </AccordionGroup>

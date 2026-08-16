@@ -285,4 +285,34 @@ description: "InsForge 常见问题：数据库调用、Edge Function 与 Custom
     - **取消还在跑的构建：** `npx @insforge/cli deployments cancel <id>` 会终止一个进行中的部署；它不会下线一个已经上线的站点。
     - **替换当前上线的内容：** 用 `npx @insforge/cli deployments deploy ./frontend` 在同一个站点上重新部署——最新一次 ready 的部署会接管这个 URL。
   </Accordion>
+
+  <Accordion title="可以把后端 API 挂到自己的自定义域名（比如 `api.example.com`）上吗？">
+    可以。在 InsForge Cloud 上，project 的后端 API（默认的 `https://<appkey>.<region>.insforge.app` 地址）可以用自定义域名对外提供。这和 [Sites](/core-concepts/sites/overview) 的自定义域名是两回事——后者是给你部署的前端用的。
+
+    用 CLI 设置域名。这需要组织的 **Administrator（管理员）** 角色：
+
+    ```bash
+    npx @insforge/cli projects update --project <id> --domain api.example.com
+    ```
+
+    或者直接调用 Cloud 管理 API：
+
+    ```bash
+    PUT /projects/v1/{projectId}
+    { "customizedDomain": "api.example.com" }
+    ```
+
+    域名至少要 4 个字符。设置后，InsForge 会把你的自定义域名作为 project 的规范 URL 返回（`https://api.example.com`）。用下面的命令确认是否生效：
+
+    ```bash
+    npx @insforge/cli projects get --project <id>
+    ```
+
+    配置了自定义域名时，它会打印一行 `Domain:`。
+
+    在 project 上设好域名只是其中一步：你还需要在自己的 DNS 服务商那里加一条把该主机名指向 InsForge 的记录，并为它签发 TLS 证书。如果设好之后域名解析不了、或证书迟迟没就绪，请到 [Discord](https://discord.com/invite/DvBtaEc9Jz) 联系 InsForge 团队。
+    {/* TODO: confirm the exact DNS record/target and the TLS provisioning/verification step for cloud backend custom domains — not present in the CLI/API code. */}
+
+    自己自托管 InsForge？那反向代理和 TLS 都由你自己掌控——参见[自托管指南](/deployment/deploy-to-aws-ec2)。
+  </Accordion>
 </AccordionGroup>

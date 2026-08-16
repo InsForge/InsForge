@@ -285,4 +285,34 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     - **Cancelar una compilación en curso:** `npx @insforge/cli deployments cancel <id>` detiene un despliegue en progreso; no da de baja un sitio que ya está en vivo.
     - **Reemplazar lo que está en vivo:** vuelve a desplegar sobre el mismo sitio con `npx @insforge/cli deployments deploy ./frontend` — el despliegue ready más reciente sirve la URL.
   </Accordion>
+
+  <Accordion title="¿Puedo poner la API de mi backend en mi propio dominio personalizado (como `api.example.com`)?">
+    Sí. En InsForge Cloud, la API de backend de un proyecto (la URL por defecto `https://<appkey>.<region>.insforge.app`) puede servirse desde un dominio personalizado. Esto es distinto del dominio personalizado de [Sites](/core-concepts/sites/overview), que es para tu frontend desplegado.
+
+    Configura el dominio con la CLI. Esto requiere el rol **Administrator** de la organización:
+
+    ```bash
+    npx @insforge/cli projects update --project <id> --domain api.example.com
+    ```
+
+    O llama directamente a la API de administración de Cloud:
+
+    ```bash
+    PUT /projects/v1/{projectId}
+    { "customizedDomain": "api.example.com" }
+    ```
+
+    El dominio debe tener al menos 4 caracteres. Una vez configurado, InsForge devuelve tu dominio personalizado como la URL canónica del proyecto (`https://api.example.com`). Confírmalo con:
+
+    ```bash
+    npx @insforge/cli projects get --project <id>
+    ```
+
+    que imprime una línea `Domain:` cuando hay un dominio personalizado configurado.
+
+    Configurar el dominio en el proyecto no es todo: además necesitas un registro DNS en tu proveedor que apunte el hostname a InsForge, y se aprovisiona un certificado TLS para él. Si el dominio no resuelve o el certificado no aparece después de configurarlo, escríbele al equipo de InsForge en [Discord](https://discord.com/invite/DvBtaEc9Jz).
+    {/* TODO: confirm the exact DNS record/target and the TLS provisioning/verification step for cloud backend custom domains — not present in the CLI/API code. */}
+
+    ¿Estás autoalojando InsForge? Entonces tú controlas el proxy inverso y el TLS — consulta las [guías de autoalojamiento](/deployment/deploy-to-aws-ec2).
+  </Accordion>
 </AccordionGroup>

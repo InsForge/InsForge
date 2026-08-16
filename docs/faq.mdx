@@ -285,4 +285,34 @@ description: "Answers to common InsForge questions on database calls, edge funct
     - **Cancel a build that's still running:** `npx @insforge/cli deployments cancel <id>` stops an in-progress deployment; it does not take down a site that is already live.
     - **Replace what's live:** redeploy over the same site with `npx @insforge/cli deployments deploy ./frontend` — the newest ready deployment serves the URL.
   </Accordion>
+
+  <Accordion title="Can I put my backend API on my own custom domain (like `api.example.com`)?">
+    Yes. On InsForge Cloud a project's backend API (the default `https://<appkey>.<region>.insforge.app` URL) can be served from a custom domain. This is separate from a [Sites](/core-concepts/sites/overview) custom domain, which is for your deployed frontend.
+
+    Set the domain with the CLI. This requires the organization **Administrator** role:
+
+    ```bash
+    npx @insforge/cli projects update --project <id> --domain api.example.com
+    ```
+
+    Or call the Cloud admin API directly:
+
+    ```bash
+    PUT /projects/v1/{projectId}
+    { "customizedDomain": "api.example.com" }
+    ```
+
+    The domain must be at least 4 characters. Once it's set, InsForge returns your custom domain as the project's canonical URL (`https://api.example.com`). Confirm it landed with:
+
+    ```bash
+    npx @insforge/cli projects get --project <id>
+    ```
+
+    which prints a `Domain:` line when a custom domain is configured.
+
+    Setting the domain on the project is not the whole story: you still need a DNS record at your provider that points the hostname at InsForge, and a TLS certificate is provisioned for it. If the domain doesn't resolve or the certificate hasn't come up after you set it, ask the InsForge team in [Discord](https://discord.com/invite/DvBtaEc9Jz).
+    {/* TODO: confirm the exact DNS record/target and the TLS provisioning/verification step for cloud backend custom domains — not present in the CLI/API code. */}
+
+    Self-hosting InsForge instead? You control the reverse proxy and TLS yourself — see the [self-hosting guides](/deployment/deploy-to-aws-ec2).
+  </Accordion>
 </AccordionGroup>
