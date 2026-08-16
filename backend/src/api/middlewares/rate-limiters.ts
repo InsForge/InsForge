@@ -500,9 +500,10 @@ export const migrationsDryRunLimiter = rateLimit({
  * transaction; each verify round-trips to Paystack).
  *
  * Limits: 30 requests per 15 minutes per IP.
- * Counts FAILED requests only (skipSuccessfulRequests: true) so legitimate
- * customers retrying a transient failure are not punished, but a client
- * stuck in a 4xx/5xx loop cannot bypass the cap.
+ * Both successful AND failed requests consume the quota: skipping successes
+ * would let an authenticated IP drive an unbounded number of upstream calls
+ * and ledger writes. Retries are capped too — clients must slow down rather
+ * than loop, which is the intended abuse protection.
  */
 export const paystackTransactionRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -518,6 +519,6 @@ export const paystackTransactionRateLimiter = rateLimit({
       )
     );
   },
-  skipSuccessfulRequests: true, // Don't count successful transactions
+  skipSuccessfulRequests: false, // Count successful transactions to cap upstream calls
   skipFailedRequests: false, // Count failed attempts to prevent abuse
 });

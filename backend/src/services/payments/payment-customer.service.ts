@@ -336,6 +336,7 @@ export class PaymentCustomerService {
    * Paystack customer_code).
    */
   async upsertPaystackCustomerProjection(
+    client: Pool | PoolClient,
     environment: 'test' | 'live',
     customer: {
       id: number;
@@ -344,7 +345,11 @@ export class PaymentCustomerService {
       first_name: string | null;
       last_name: string | null;
     } | null,
-    providerCreatedAt: Date | null
+    providerCreatedAt: Date | null,
+    options: {
+      phone?: string | null;
+      metadata?: Record<string, unknown> | string | null;
+    } = {}
   ): Promise<boolean> {
     if (!customer || !customer.customer_code) {
       return false;
@@ -356,7 +361,15 @@ export class PaymentCustomerService {
         .join(' ')
         .trim() || null;
 
-    await this.getPool().query(
+    const { phone = null, metadata = null } = options;
+    const metadataJson =
+      metadata === null || metadata === ''
+        ? '{}'
+        : typeof metadata === 'string'
+          ? metadata
+          : JSON.stringify(metadata);
+
+    await client.query(
       `INSERT INTO payments.customers (
          provider,
          environment,
@@ -370,11 +383,13 @@ export class PaymentCustomerService {
          provider_created_at,
          synced_at
        )
-       VALUES ('paystack', $1, $2, $3, $4, NULL, false, '{}'::JSONB, $5, $6, NOW())
+       VALUES ('paystack', $1, $2, $3, $4, $5, false, $6::JSONB, $7, $8, NOW())
        ON CONFLICT (provider, environment, provider_customer_id) DO UPDATE SET
          email = EXCLUDED.email,
          name = EXCLUDED.name,
+         phone = COALESCE(EXCLUDED.phone, payments.customers.phone),
          deleted = false,
+         metadata = COALESCE(EXCLUDED.metadata, payments.customers.metadata),
          raw = EXCLUDED.raw,
          provider_created_at = COALESCE(
            payments.customers.provider_created_at,
@@ -382,7 +397,16 @@ export class PaymentCustomerService {
          ),
          synced_at = NOW(),
          updated_at = NOW()`,
-      [environment, customer.customer_code, customer.email, name, customer, providerCreatedAt]
+      [
+        environment,
+        customer.customer_code,
+        customer.email,
+        name,
+        phone,
+        metadataJson,
+        customer,
+        providerCreatedAt,
+      ]
     );
 
     return true;

@@ -480,6 +480,34 @@ describe('PaystackTransactionService', () => {
     expect(params[13]).toBeNull();
   });
 
+  it('maps an abandoned charge to a terminal failed ledger row', async () => {
+    // Paystack marks abandoned checkouts as `abandoned` (customer left the
+    // gateway). Projecting it as pending would strand the shared ledger row in
+    // a non-terminal state forever (the terminal-state guard never resolves
+    // pending), so the charge maps to `failed` with a failed_payment type.
+    const transaction = buildProviderTransaction({ status: 'abandoned' });
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // bound-row subject lookup
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }); // ledger upsert
+
+    const result = await PaystackTransactionService.getInstance().upsertChargeTransaction(
+      'test',
+      transaction,
+      { subjectFallback: { type: 'team', id: 'team_123' } }
+    );
+
+    const upsertCall = mockPoolQuery.mock.calls.find(([sql]) =>
+      /INSERT INTO payments\.transactions/i.test(String(sql))
+    );
+    expect(upsertCall).toBeDefined();
+    const params = upsertCall?.[1] as unknown[];
+    expect(params[5]).toBe('failed_payment'); // type ($6)
+    expect(params[6]).toBe('failed'); // ledger status ($7)
+    expect(params[16]).toBeNull(); // paidAt ($17) — never paid
+    expect(params[12]).toBe(500000); // amount ($13) preserved
+    expect(result).toBe('failed');
+  });
+
   it('falls back to the reference as durable identity when the provider id exceeds safe integers', async () => {
     // Paystack ids are unsigned 64-bit: JSON.parse rounds values above
     // Number.MAX_SAFE_INTEGER, so the rounded id must not become identity.

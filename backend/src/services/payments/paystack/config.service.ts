@@ -118,7 +118,13 @@ export class PaystackConfigService {
       // masked placeholder is submitted unchanged, keep the stored secret
       // instead of overwriting it with the mask.
       const existingSecretKey = await SecretService.getInstance().getSecretByKey(secretKeyKey);
-      const isMaskedSubmission = trimmedSecretKey.includes('****');
+      // Only treat the submission as the "unchanged" masked placeholder when it
+      // matches the EXACT masked form of the stored key. A partially edited
+      // masked value (e.g. a rotated suffix) must be treated as a real new key,
+      // otherwise credential rotation silently fails and the old secret stays
+      // active.
+      const isMaskedSubmission =
+        existingSecretKey !== null && trimmedSecretKey === maskPaystackKey(existingSecretKey);
       const effectiveSecretKey =
         isMaskedSubmission && existingSecretKey !== null ? existingSecretKey : trimmedSecretKey;
 
@@ -364,11 +370,20 @@ export class PaystackConfigService {
     try {
       const secretKey = await this.getPaystackSecretKey(environment);
       maskedKey = secretKey ? maskPaystackKey(secretKey) : null;
-    } catch {
-      // A malformed stored key must not take down the whole status endpoint:
-      // report the connection without a masked key so getPaystackStatus can
-      // surface the environment as errored rather than rejecting outright.
-      maskedKey = null;
+    } catch (error) {
+      // A stored key that can't be decrypted or doesn't validate means the
+      // integration is broken, not healthy. Surface it as an explicit error
+      // status so the settings panel doesn't report a dead key as connected.
+      const failure =
+        error instanceof Error
+          ? error.message
+          : 'Paystack secret key is stored but cannot be read or validated.';
+      return {
+        ...this.normalizeConnectionRow(row.rows[0] as PaystackConnectionRow, null),
+        status: 'error',
+        lastSyncStatus: 'failed',
+        lastSyncError: failure,
+      };
     }
 
     return this.normalizeConnectionRow(row.rows[0] as PaystackConnectionRow, maskedKey);
