@@ -146,6 +146,9 @@ beforeEach(() => {
   // InsForge deployments sharing one daemon cannot touch each other's site containers.
   process.env.APP_KEY = 'appkey01';
   dockerClientConfig.socketPath = '/nonexistent/test.sock';
+  // Reset in the hook rather than at the end of the test that sets it: a failing assertion
+  // there would leave isolation on and quietly change what every later test asserts.
+  dockerClientConfig.isolateNetwork = false;
   dockerClientConfig.defaultIngress = 'port';
   dockerClientConfig.publicHost = '';
   configMock.deployments.sitesDomain = '';
@@ -1601,7 +1604,6 @@ describe('DockerSitesProvider.runtimeLogs', () => {
     expect(
       (create?.[2] as { body: Record<string, unknown> }).body.NetworkingConfig
     ).toBeUndefined();
-    dockerClientConfig.isolateNetwork = false;
   });
 
   // A deployment id is a container id, and this was the last id-taking method without the
@@ -1618,6 +1620,24 @@ describe('DockerSitesProvider.runtimeLogs', () => {
     await expect(
       DockerSitesProvider.getInstance().getDeployment('insforge-postgres')
     ).rejects.toThrow('not on this host');
+  });
+
+  // Container `Env` overrides the image's `ENV`, so a deployment carrying `PORT=3000` made the
+  // server listen where the readiness probe does not look — the deploy then failed after the
+  // full timeout, naming a port the app was never told to use.
+  it.each(['PORT', 'HOSTNAME', 'NODE_ENV'])('refuses %s, which the driver owns', async (key) => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>hi</h1>') },
+    ]);
+
+    // Refused for a static deploy too: the values reach the container either way now, and a
+    // site that later declares a start command would inherit the shadowed port.
+    await expect(
+      provider.createDeploymentWithFiles(files, { envVars: [{ key, value: '3000' }] })
+    ).rejects.toThrow('set by the sites driver');
   });
 
   // A failed build is the normal failure of a source deploy, and its output is the only

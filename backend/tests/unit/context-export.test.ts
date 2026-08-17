@@ -211,7 +211,9 @@ describe('MetadataService.formatAsMarkdown', () => {
     expect(md).toContain('rollback yes');
     expect(md).toContain('runtime logs yes');
     expect(md).toContain('framework detection no');
-    expect(md).toContain('(default');
+    // The whole rendering, not just that the word appears: the point of this line is that an
+    // agent reading the export can see which ingress mode is the default and how it is spelled.
+    expect(md).toContain('ingress `port`/`host` (default `port`)');
   });
 
   it('renders database hint when present', () => {

@@ -198,6 +198,17 @@ function assertRelativePath(value: string, field: string): string {
 }
 
 /**
+ * Variables the runtime image sets itself, which a caller must not shadow.
+ *
+ * A container's `Env` overrides the image's `ENV`, so a deployment carrying `PORT=3000` made
+ * the server listen somewhere the readiness probe does not look: the deploy then failed after
+ * the full timeout with "did not answer on port 80", naming a port the app was never told to
+ * use. Refused by name instead, because the driver owns these — the probe and the shipped
+ * gateway both depend on them.
+ */
+const DRIVER_OWNED_ENV_KEYS = new Set(['PORT', 'HOSTNAME', 'NODE_ENV']);
+
+/**
  * Build args have to be declared per stage to be visible, and they are recorded in the
  * image history — which is why the capability is `build-only` and not a secret store.
  */
@@ -207,6 +218,14 @@ function assertEnvKey(key: string): string {
       `"${key}" is not a usable environment variable name.`,
       400,
       ERROR_CODES.INVALID_INPUT
+    );
+  }
+  if (DRIVER_OWNED_ENV_KEYS.has(key)) {
+    throw new AppError(
+      `"${key}" is set by the sites driver and cannot be overridden.`,
+      400,
+      ERROR_CODES.INVALID_INPUT,
+      'Use serverPort in project settings to choose the port the server listens on.'
     );
   }
   return key;
@@ -401,9 +420,16 @@ export class DockerSitesProvider implements SitesProvider {
     await this.ensureStagingDir();
     const target = this.stagedPath(sha);
     const scratch = `${target}.${randomBytes(6).toString('hex')}.part`;
-    // Same reason as the streaming path: a reader must never see a half-written blob.
-    await writeFile(scratch, fileContent);
-    await rename(scratch, target);
+    // Same reason as the streaming path: a reader must never see a half-written blob — and the
+    // same cleanup, which this path was missing. A write that fails on a full disk left its
+    // scratch file behind for the sweep to find a day later.
+    try {
+      await writeFile(scratch, fileContent);
+      await rename(scratch, target);
+    } catch (error) {
+      await rm(scratch, { force: true }).catch(() => undefined);
+      throw error;
+    }
     return sha;
   }
 
@@ -528,6 +554,10 @@ export class DockerSitesProvider implements SitesProvider {
       ),
     });
     if (!build.ok) {
+      // A failed deploy swept nothing, so its staged blobs waited for the next *successful*
+      // one — and a deploy that keeps failing never gets there. Housekeeping belongs on both
+      // exits.
+      await this.sweepStaging().catch(() => 0);
       // The tail of the build goes into the message, because that is the only channel the
       // caller gets on a failure: `build.logs` is discarded with the rest of this call, and
       // the metadata write that records logs on success is never reached. Without it the
@@ -555,6 +585,7 @@ export class DockerSitesProvider implements SitesProvider {
       await dockerRequest('DELETE', `/images/${encodeURIComponent(imageTag)}?force=false`).catch(
         () => undefined
       );
+      await this.sweepStaging().catch(() => 0);
       throw error;
     }
     // Housekeeping, after the site is already serving. A failure here — the daemon

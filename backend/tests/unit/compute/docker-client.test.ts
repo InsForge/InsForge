@@ -22,6 +22,8 @@ import {
   dockerConfig,
   dockerContainerLogs,
   dockerRequest,
+  dockerRequestRaw,
+  parseLogWatermark,
 } from '@/providers/compute/docker.client.js';
 
 /**
@@ -401,6 +403,35 @@ describe('dockerRequest status handling', () => {
     }
   });
 
+  // Resuming from a cursor sends `since` with no ceiling, so the daemon replays everything
+  // written since — buffered whole, on a host the driver itself describes as a 2GB VPS.
+  it('stops reading once maxBytes is reached', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'insforge-docker-client-'));
+    const socket = path.join(dir, 'docker.sock');
+    const server = createHttpServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
+      // Far more than the ceiling, written in chunks so the read can stop mid-stream.
+      for (let i = 0; i < 40; i += 1) {
+        res.write(Buffer.alloc(64 * 1024, 0x61));
+      }
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(socket, resolve));
+    const previous = configMock.docker.socketPath;
+    configMock.docker.socketPath = socket;
+    try {
+      const res = await dockerRequestRaw('GET', '/containers/abc/logs', {
+        maxBytes: 128 * 1024,
+      });
+      expect(res.body.length).toBeGreaterThanOrEqual(128 * 1024);
+      expect(res.body.length).toBeLessThan(40 * 64 * 1024);
+    } finally {
+      configMock.docker.socketPath = previous;
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('still throws for a real failure status', async () => {
     const stop = await serving(409, '{"message":"conflict"}');
     try {
@@ -410,5 +441,16 @@ describe('dockerRequest status handling', () => {
     } finally {
       await stop();
     }
+  });
+});
+
+describe('parseLogWatermark', () => {
+  // A negative cursor becomes a negative `since`, which the daemon reads as "from the
+  // beginning" — so `next_token=-1` returned the entire retained history instead of a page.
+  it('rejects a negative cursor', () => {
+    expect(parseLogWatermark('-1')).toBeNull();
+    expect(parseLogWatermark('0')).toBe(0n);
+    expect(parseLogWatermark('1786056693200000000')).toBe(1786056693200000000n);
+    expect(parseLogWatermark('not-a-number')).toBeNull();
   });
 });

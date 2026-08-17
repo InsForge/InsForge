@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { createServer } from 'node:net';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -36,10 +37,22 @@ const {
 const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
 const savedRequested = process.env.SITES_PROVIDER;
 
-/** A real unix socket: the driver checks for one, not merely for an existing path. */
-const socketPath = path.join(tmpdir(), `insforge-sites-registry-${process.pid}.sock`);
+/**
+ * A real unix socket: the driver checks for one, not merely for an existing path.
+ *
+ * In its own directory, and removed afterwards. A pid-derived name in the shared tmpdir
+ * survives a killed run and gets reused by whatever process next lands on that pid — and
+ * `listen` on an existing socket path fails, so the next run would die at import.
+ */
+const socketDir = await mkdtemp(path.join(tmpdir(), 'insforge-sites-registry-'));
+const socketPath = path.join(socketDir, 'docker.sock');
 const socketServer = createServer();
 await new Promise<void>((resolve) => socketServer.listen(socketPath, resolve));
+
+afterAll(async () => {
+  await new Promise<void>((resolve) => socketServer.close(() => resolve()));
+  await rm(socketDir, { recursive: true, force: true });
+});
 
 function mountDockerSocket(): void {
   configMock.docker.socketPath = socketPath;
@@ -247,8 +260,17 @@ describe('getSitesMetadata', () => {
 });
 
 describe('capability stores', () => {
-  it('hands back the stores a driver has', () => {
+  // Presence tracks the capability, so off-cloud Vercel has no domain store to hand back and
+  // the routes refuse by name instead of reaching an API that will not honour them.
+  it('refuses the domain store off-cloud, where the capability is false', () => {
     configureVercel();
+
+    expect(() => requireDomainStore()).toThrow('does not support custom domains');
+  });
+
+  it('hands it back on a cloud project, where the capability is true', () => {
+    configureVercel();
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'insforge-instance-profile';
 
     expect(requireDomainStore()).toBeDefined();
   });

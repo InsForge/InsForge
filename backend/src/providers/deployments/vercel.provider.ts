@@ -172,20 +172,40 @@ export class VercelProvider implements SitesProvider {
     remove: (envId) => this.deleteEnvironmentVariable(envId),
   };
 
-  readonly slug: SlugStore = {
-    get: () => this.getSlug(),
-    updateCache: (slug) => this.updateCachedSlug(slug),
-  };
+  /**
+   * Getters, not fields, so presence tracks the capability.
+   *
+   * The interface says a store is present only when its capability is true, and callers rely
+   * on that — `requireDomainStore()` checks for the store, not the flag. Slugs and domains are
+   * cloud-only here (`getSlug()` returns null off-cloud and `updateSlug()` refuses with 503),
+   * so a self-host holding Vercel credentials published `customDomains: false` while its
+   * domain routes still reached Vercel. Absent is the honest answer, and it makes the routes
+   * refuse by name.
+   */
+  get slug(): SlugStore | undefined {
+    if (!isCloudEnvironment()) {
+      return undefined;
+    }
+    return {
+      get: () => this.getSlug(),
+      updateCache: (slug) => this.updateCachedSlug(slug),
+    };
+  }
 
-  readonly domains: DomainStore = {
-    list: () => this.listCustomDomains(),
-    add: (domain) => this.addCustomDomain(domain),
-    remove: (domain) => this.removeCustomDomain(domain),
-    verify: (domain) => this.verifyCustomDomain(domain),
-    get: (domain) => this.getCustomDomain(domain),
-    config: (domain) => this.getCustomDomainConfig(domain),
-    url: () => this.getCustomDomainUrl(),
-  };
+  get domains(): DomainStore | undefined {
+    if (!isCloudEnvironment()) {
+      return undefined;
+    }
+    return {
+      list: () => this.listCustomDomains(),
+      add: (domain) => this.addCustomDomain(domain),
+      remove: (domain) => this.removeCustomDomain(domain),
+      verify: (domain) => this.verifyCustomDomain(domain),
+      get: (domain) => this.getCustomDomain(domain),
+      config: (domain) => this.getCustomDomainConfig(domain),
+      url: () => this.getCustomDomainUrl(),
+    };
+  }
 
   private static instance: VercelProvider;
   private cloudCredentials: VercelCredentials | undefined;

@@ -32,7 +32,12 @@ vi.mock('../../src/infra/config/app.config.js', () => {
     cloud: { projectId: undefined, apiHost: 'https://cloud.test' },
     app: { jwtSecret: 's'.repeat(32), logLevel: 'error' },
     server: { logsDir: '/tmp/insforge-sites-rollback-logs' },
-    deployments: { sitesDomain: '', sitesStagingDir: '/tmp/insforge-sites-rollback-staging' },
+    deployments: {
+      sitesDomain: '',
+      sitesStagingDir: '/tmp/insforge-sites-rollback-staging',
+      // Small on purpose: the zip test allocates past this, and the real limit is 100MB.
+      maxDeploymentTotalBytes: 4096,
+    },
     storage: {},
     docker: { socketPath: '/nonexistent/test.sock' },
   };
@@ -632,6 +637,54 @@ describe('a deploy that fails at the provider', () => {
     expect(errorWrite).toBeDefined();
   });
 
+  // Recording ERROR must not make the failure permanent: a transient upstream 502 would then
+  // be unrecoverable, where before it left the row UPLOADING and retryable by accident.
+  it('lets a failed deployment be started again', async () => {
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'row-1',
+            provider: 'docker',
+            status: 'ERROR',
+            providerDeploymentId: null,
+            url: null,
+            metadata: { uploadMode: 'direct' },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            fileId: 'f1',
+            path: 'index.html',
+            sha: 'a'.repeat(40),
+            size: 12,
+            uploadedAt: new Date().toISOString(),
+          },
+        ],
+      })
+      .mockResolvedValue({ rows: [] });
+    const createDeploymentWithFiles = vi.fn().mockResolvedValue({
+      id: 'container-new',
+      url: null,
+      state: 'running',
+      readyState: 'READY',
+      name: 'insforge-site-local:abc',
+      createdAt: new Date(),
+    });
+    active.provider = {
+      ...mockProvider,
+      uploadFiles: vi.fn().mockResolvedValue([]),
+      createDeploymentWithFiles,
+    };
+    mockClient.query.mockResolvedValue({ rows: [{ id: 'row-1', status: 'READY' }] });
+
+    await DeploymentService.getInstance().startDeployment('row-1');
+
+    expect(createDeploymentWithFiles).toHaveBeenCalled();
+  });
+
   // A 4xx is the caller's own request — files not uploaded, no build command. Marking the row
   // ERROR would make the corrected retry fail with "not ready to start".
   it('leaves the row retryable when the driver refuses the request', async () => {
@@ -743,5 +796,51 @@ describe('the deploy-path environment write', () => {
     ]);
 
     expect(stored.map((envVar) => envVar.key).sort()).toEqual(['FROM_DASHBOARD', 'FROM_DEPLOY']);
+  });
+});
+
+describe('a zip that expands past the size limit', () => {
+  // The upload is capped, but a zip is compressed: the cap bounds the archive, not what it
+  // expands to. Every entry is read into memory, and the Docker driver then builds a second
+  // full copy as a tar.
+  it('is refused before anything is allocated', async () => {
+    const service = DeploymentService.getInstance() as unknown as {
+      extractFilesFromZip: (buffer: Buffer) => unknown;
+      getMaxDeploymentTotalBytes: () => number;
+    };
+    const limit = service.getMaxDeploymentTotalBytes();
+    const AdmZip = (await import('adm-zip')).default;
+    const zip = new AdmZip();
+    // Highly compressible, so the archive stays small while the contents do not.
+    zip.addFile('big.bin', Buffer.alloc(limit + 1024, 0));
+
+    expect(() => service.extractFilesFromZip(zip.toBuffer())).toThrow(/expands/);
+  });
+
+  it('lets an ordinary archive through', async () => {
+    const service = DeploymentService.getInstance() as unknown as {
+      extractFilesFromZip: (buffer: Buffer) => Array<{ path: string }>;
+    };
+    const AdmZip = (await import('adm-zip')).default;
+    const zip = new AdmZip();
+    zip.addFile('index.html', Buffer.from('<h1>hi</h1>'));
+
+    expect(service.extractFilesFromZip(zip.toBuffer()).map((f) => f.path)).toEqual(['index.html']);
+  });
+});
+
+describe('providerFor when the default driver is unusable', () => {
+  // The getter throws when the *default* is unconfigured, which stranded every row-scoped
+  // operation — rollback and logs for a perfectly healthy Docker deployment — because Vercel
+  // credentials had gone stale.
+  it('still reaches the driver the row names', async () => {
+    noDriver.configured = false;
+    mockPool.query.mockResolvedValueOnce({ rows: [rowFor('row-1', 'server-live')] });
+    mockProvider.runtimeLogs.mockResolvedValue({ lines: [], nextToken: null });
+
+    await expect(DeploymentService.getInstance().getRuntimeLogs('row-1')).resolves.toEqual({
+      lines: [],
+      nextToken: null,
+    });
   });
 });

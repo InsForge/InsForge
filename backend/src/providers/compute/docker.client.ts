@@ -89,6 +89,16 @@ export function dockerRequestRaw(
     rawBody?: Buffer;
     contentType?: string;
     timeoutMs?: number;
+    /**
+     * Stop reading after this many bytes and return what arrived.
+     *
+     * For the logs endpoint, where `since` has no upper bound: a container that wrote a large
+     * backlog since the caller's cursor would otherwise be buffered whole, on a host the
+     * driver itself describes as a 2GB VPS. Truncating is safe for that caller because the
+     * cursor only ever advances over lines it actually returned — the next page resumes at the
+     * cut.
+     */
+    maxBytes?: number;
   } = {}
 ): Promise<DockerRawResponse> {
   const payload =
@@ -110,9 +120,32 @@ export function dockerRequestRaw(
       },
       (res) => {
         const chunks: Buffer[] = [];
-        res.on('data', (c: Buffer) => chunks.push(c));
-        res.on('end', () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks) }));
-        res.on('error', reject);
+        let size = 0;
+        let truncated = false;
+        res.on('data', (c: Buffer) => {
+          if (truncated) {
+            return;
+          }
+          chunks.push(c);
+          size += c.length;
+          if (options.maxBytes !== undefined && size >= options.maxBytes) {
+            truncated = true;
+            // `destroy` rather than `pause`: the caller has all it can use, and leaving the
+            // socket open on a live-tailing endpoint keeps the daemon streaming into nothing.
+            res.destroy();
+            resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks) });
+          }
+        });
+        res.on('end', () => {
+          if (!truncated) {
+            resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks) });
+          }
+        });
+        res.on('error', (error) => {
+          if (!truncated) {
+            reject(error);
+          }
+        });
       }
     );
 
@@ -410,6 +443,12 @@ export interface DockerLogsPage {
 }
 
 /** An opaque cursor is a nanosecond watermark; an unparseable one starts from the top. */
+/**
+ * How much of a log backlog one page may read. 4 MB is far more than any 1000-line page needs
+ * and small enough to be irrelevant next to the process heap.
+ */
+const LOGS_READ_MAX_BYTES = 4 * 1024 * 1024;
+
 export function parseLogWatermark(token: string): bigint | null {
   try {
     const parsed = BigInt(token);
@@ -462,7 +501,10 @@ export async function dockerContainerLogs(
   const res = await request(
     'GET',
     `/containers/${encodeURIComponent(containerId)}/logs?${params.toString()}`,
-    { timeoutMs: 15_000 }
+    // Bounded: resuming from a cursor sends `since` with no ceiling, so the daemon replays
+    // everything written since. The page itself is already capped at `limit` below; this caps
+    // what has to be held in memory to compute it.
+    { timeoutMs: 15_000, maxBytes: LOGS_READ_MAX_BYTES }
   );
   if (res.status < 200 || res.status >= 300) {
     throw new DockerHttpError(

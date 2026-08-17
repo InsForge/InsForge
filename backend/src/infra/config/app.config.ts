@@ -137,7 +137,13 @@ function parseEnvInt(val: string | undefined, fallback: number): number {
 
 /** A host port, or 0 when unset or unusable. */
 function parseEnvPort(val: string | undefined): number {
-  if (!val || val.trim() === '') return 0;
+  if (!val) return 0;
+  if (val.trim() === '') {
+    // Distinct from unset: someone wrote something, and it is not a port. Silence here reads
+    // as "my fixed port is being ignored and nothing told me why".
+    console.warn('SITES_PORT is set to whitespace; ignoring it.');
+    return 0;
+  }
   if (!/^\d+$/.test(val.trim())) {
     console.warn(`SITES_PORT="${val}" is not a port number; ignoring it.`);
     return 0;

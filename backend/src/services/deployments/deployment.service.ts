@@ -135,17 +135,17 @@ export class DeploymentService {
    * active default only for rows written before this column carried the truth.
    */
   private providerFor(record: { provider?: string | null }): SitesProvider {
-    const active = this.provider;
     const name = record.provider;
-    // The overwhelmingly common case, and it needs no registry lookup: the row was made
-    // by whatever is serving now. A missing name means a row older than this column
-    // carrying the truth.
-    if (!name || name === active.name) {
-      return active;
-    }
-    const registry = buildSitesRegistry();
-    const owner = registry.providers.get(name as SitesProviderName);
-    if (!owner) {
+    // Resolved from the registry first, not from `this.provider`: that getter throws when the
+    // *default* driver is unusable, which stranded every row-scoped operation — including
+    // rollback and logs for a perfectly healthy Docker deployment — because Vercel credentials
+    // had gone stale. A row that names its driver does not need the default to exist.
+    if (name) {
+      const registry = buildSitesRegistry();
+      const owner = registry.providers.get(name as SitesProviderName);
+      if (owner) {
+        return owner;
+      }
       throw new AppError(
         `This deployment was made by the ${name} driver, which is not configured here.`,
         409,
@@ -153,7 +153,9 @@ export class DeploymentService {
         `Set SITES_PROVIDER=${name} and its credentials to operate on it.`
       );
     }
-    return owner;
+    // No name means a row older than this column. Whatever is serving now is the best guess,
+    // and this is the only branch that needs the default to exist at all.
+    return this.provider;
   }
 
   private initializeS3Provider(): void {
@@ -747,9 +749,15 @@ export class DeploymentService {
         throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
 
+      // ERROR is startable too. Recording a failed deploy as ERROR is what makes it readable
+      // and what preserves the build output — but if that also made the row unstartable, a
+      // transient upstream 502 would be permanent, where before it left the row UPLOADING and
+      // retryable by accident. The files are still registered, so retrying in place is exactly
+      // what a caller wants.
       if (
         deployment.status !== DeploymentStatus.WAITING &&
-        deployment.status !== DeploymentStatus.UPLOADING
+        deployment.status !== DeploymentStatus.UPLOADING &&
+        deployment.status !== DeploymentStatus.ERROR
       ) {
         throw new AppError(
           `Deployment is not ready to start. Current status: ${deployment.status}`,
@@ -927,7 +935,26 @@ export class DeploymentService {
     const zip = new AdmZip(zipBuffer);
     const entries = zip.getEntries();
     const files: Array<{ path: string; content: Buffer }> = [];
+    const maxTotalBytes = this.getMaxDeploymentTotalBytes();
 
+    // The upload is capped, but a zip is compressed: the cap bounds the archive, not what it
+    // expands to. Every entry is read into memory here, and the Docker driver then builds a
+    // second full copy as a tar — so an archive that fits the upload limit could still take
+    // the process out. Checked against the declared sizes, before anything is allocated.
+    const declaredTotal = entries.reduce(
+      (total, entry) => (entry.isDirectory ? total : total + entry.header.size),
+      0
+    );
+    if (declaredTotal > maxTotalBytes) {
+      throw new AppError(
+        `The source archive expands to ${declaredTotal} bytes, over the ${maxTotalBytes}-byte limit.`,
+        400,
+        ERROR_CODES.DEPLOYMENT_INVALID_FILE,
+        'Build the site first and deploy the output directory, or raise the deployment size limit.'
+      );
+    }
+
+    let extracted = 0;
     for (const entry of entries) {
       if (entry.isDirectory) {
         continue;
@@ -942,9 +969,22 @@ export class DeploymentService {
         filePath = filePath.substring(2);
       }
 
+      const content = entry.getData();
+      // The declared sizes are the archive's own claim; this is what actually landed. A zip
+      // that under-reports is the whole point of the trick.
+      extracted += content.length;
+      if (extracted > maxTotalBytes) {
+        throw new AppError(
+          `The source archive expands past the ${maxTotalBytes}-byte limit.`,
+          400,
+          ERROR_CODES.DEPLOYMENT_INVALID_FILE,
+          'Build the site first and deploy the output directory, or raise the deployment size limit.'
+        );
+      }
+
       files.push({
         path: this.normalizeDeploymentFilePath(filePath),
-        content: entry.getData(),
+        content,
       });
     }
 
@@ -1677,9 +1717,17 @@ export class DeploymentService {
           // asking the current default for its details would hand a Vercel id to Docker and
           // lose the error message this block exists to capture.
           const row = await this.getDeploymentByVercelId(vercelDeploymentId);
-          const providerDeployment = await this.providerFor(row ?? {}).getDeployment(
-            vercelDeploymentId
-          );
+          if (!row) {
+            // No row means nothing to enrich, and `providerFor({})` would fall back to the
+            // active default — handing a Vercel id to Docker, which is the mismatch the line
+            // above says this avoids.
+            throw new AppError(
+              `No deployment matches ${vercelDeploymentId}.`,
+              404,
+              ERROR_CODES.DEPLOYMENT_NOT_FOUND
+            );
+          }
+          const providerDeployment = await this.providerFor(row).getDeployment(vercelDeploymentId);
           if (providerDeployment.error) {
             errorInfo = {
               errorCode: providerDeployment.error.code,
@@ -1993,7 +2041,17 @@ export class DeploymentService {
       // fetched on the dashboard home. The custom domain is the only part that needs a
       // driver; the deployment id and default URL come from the row.
       const activeProvider = isAnySitesProviderConfigured() ? this.provider : null;
-      const customDomainUrl = activeProvider?.domains ? await activeProvider.domains.url() : null;
+      // And the lookup itself is tolerated: it is one upstream call, and letting it fail the
+      // response would lose `currentDeploymentId` and `defaultDomainUrl` — which come from the
+      // row and are what the dashboard home actually needs.
+      const customDomainUrl = activeProvider?.domains
+        ? await activeProvider.domains.url().catch((error: unknown) => {
+            logger.warn('Could not read the custom domain URL', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+            return null;
+          })
+        : null;
 
       return {
         currentDeploymentId: latestReadyDeployment?.id ?? null,
