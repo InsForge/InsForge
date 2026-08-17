@@ -101,6 +101,53 @@ describe('SQL execution guards', () => {
     expect(checkSqlExecutionGuards("SELECT set_config('app.safe', 'value', false)")).not.toBeNull();
   });
 
+  it('still blocks set_config hidden in a function or DO body', () => {
+    // Bodies are opaque to the parser, so a text scan remains the only check
+    // available there. Without it a SECURITY DEFINER function is an escalation
+    // path: the body runs as the definer.
+    expect(
+      checkSqlExecutionGuards(
+        "CREATE FUNCTION esc() RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN PERFORM set_config('role', 'postgres', false); END $$"
+      )
+    ).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards(
+        "DO $$ BEGIN PERFORM set_config('role', 'postgres', false); END $$"
+      )
+    ).not.toBeNull();
+  });
+
+  it('does not treat the characters "set_config" as a call outside executable code', () => {
+    // Previously a /\bset_config\b/i scan ran over the whole query text, so any
+    // occurrence was rejected — including ones that cannot change anything.
+    expect(checkSqlExecutionGuards('-- deliberately avoid set_config here\nSELECT 1')).toBeNull();
+    expect(checkSqlExecutionGuards('/* set_config */ SELECT 1')).toBeNull();
+    expect(checkSqlExecutionGuards("SELECT 'set_config'")).toBeNull();
+    expect(checkSqlExecutionGuards('SELECT set_config FROM audit_log')).toBeNull();
+    expect(checkSqlExecutionGuards('SELECT id AS set_config FROM audit_log')).toBeNull();
+    expect(checkSqlExecutionGuards('CREATE TABLE t (set_config text)')).toBeNull();
+  });
+
+  it('allows SECURITY DEFINER helpers to pin search_path', () => {
+    // The documented RLS pattern. A function's SET clause is part of
+    // CreateFunctionStmt/AlterFunctionStmt, not a VariableSetStmt, so it is not
+    // a session-level change.
+    expect(
+      checkSqlExecutionGuards(
+        "CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$ SELECT nullif(current_setting('request.jwt.claims', true)::json->>'sub', '')::uuid $$"
+      )
+    ).toBeNull();
+    expect(
+      checkSqlExecutionGuards('ALTER FUNCTION auth.uid() SET search_path = pg_catalog, public')
+    ).toBeNull();
+  });
+
+  it('names set_config as the cause instead of reporting it generically', () => {
+    expect(checkSqlExecutionGuards("SELECT set_config('role', 'postgres', false)")).toContain(
+      'set_config'
+    );
+  });
+
   it('blocks role management statements but allows object grants', () => {
     expect(checkSqlExecutionGuards('CREATE ROLE app_owner')).not.toBeNull();
     expect(
