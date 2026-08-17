@@ -13,6 +13,7 @@ import {
 } from '@insforge/shared-schemas';
 import { successResponse } from '@/utils/response.js';
 import crypto from 'crypto';
+import logger from '@/utils/logger.js';
 
 const router = Router();
 const secretService = SecretService.getInstance();
@@ -111,49 +112,52 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       });
       result = strictResult;
       strictDisposition = strictResult.disposition;
-    } else {
-      // Preserve the legacy create-or-reactivate behavior for existing clients.
-      const secrets = await secretService.listSecrets();
-      const secret = secrets.find((s) => s.key === key);
 
-      if (secret && secret?.isActive) {
-        throw new AppError(`Secret already exists: ${key}`, 409, ERROR_CODES.SECRET_ALREADY_EXISTS);
-      } else if (secret && !secret?.isActive && secret?.id) {
-        const success = await secretService.updateSecret(secret?.id, {
-          value,
-          isActive: true,
-          isReserved: isReserved || false,
-          expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      let audit;
+      try {
+        audit = await auditService.log({
+          actor: req.hasApiKey ? 'api-key' : req.user?.id,
+          action: 'CREATE_SECRET',
+          module: 'SECRETS',
+          details: { key, id: result.id, disposition: strictDisposition, operationId },
+          ip_address: req.ip,
         });
-        if (!success) {
-          throw new AppError(`Failed to create secret: ${key}`, 500, ERROR_CODES.INTERNAL_ERROR);
+      } catch (auditError) {
+        // Strict create must not leave a committed secret without a durable
+        // audit/operation receipt (#1758). Compensate by hard-deleting the
+        // just-created non-reserved row when possible, then fail closed.
+        let cleanedUp = false;
+        try {
+          cleanedUp = await secretService.deleteSecret(result.id);
+        } catch (cleanupError) {
+          logger.error('Strict create audit failed and cleanup failed', {
+            key,
+            id: result.id,
+            operationId,
+            auditError:
+              auditError instanceof Error ? auditError.message : 'unknown',
+            cleanupError:
+              cleanupError instanceof Error ? cleanupError.message : 'unknown',
+          });
         }
-        result = { id: secret.id };
-      } else {
-        result = await secretService.createSecret({
-          key,
-          value,
-          isReserved: isReserved || false,
-          expiresAt: expiresAt ? new Date(expiresAt) : undefined,
-        });
+        if (!cleanedUp) {
+          logger.error('Strict create audit failed; secret may remain without audit', {
+            key,
+            id: result.id,
+            operationId,
+          });
+        }
+        throw new AppError(
+          `Failed to record audit for strict secret create: ${key}`,
+          500,
+          ERROR_CODES.INTERNAL_ERROR,
+          cleanedUp
+            ? 'The secret insert was rolled back after audit failure.'
+            : 'The secret insert may remain; contact support with the operationId before retrying.'
+        );
       }
-    }
 
-    // Log audit
-    const audit = await auditService.log({
-      actor: req.hasApiKey ? 'api-key' : req.user?.id,
-      action: 'CREATE_SECRET',
-      module: 'SECRETS',
-      details: isStrictCreate
-        ? { key, id: result.id, disposition: strictDisposition, operationId }
-        : { key, id: result.id },
-      ip_address: req.ip,
-    });
-
-    // Trigger redeployment with new secret
-    triggerSecretsRedeployment();
-
-    if (isStrictCreate) {
+      triggerSecretsRedeployment();
       return successResponse(
         res,
         {
@@ -167,6 +171,44 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
         201
       );
     }
+
+    // Preserve the legacy create-or-reactivate behavior for existing clients.
+    const secrets = await secretService.listSecrets();
+    const secret = secrets.find((s) => s.key === key);
+
+    if (secret && secret?.isActive) {
+      throw new AppError(`Secret already exists: ${key}`, 409, ERROR_CODES.SECRET_ALREADY_EXISTS);
+    } else if (secret && !secret?.isActive && secret?.id) {
+      const success = await secretService.updateSecret(secret?.id, {
+        value,
+        isActive: true,
+        isReserved: isReserved || false,
+        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      });
+      if (!success) {
+        throw new AppError(`Failed to create secret: ${key}`, 500, ERROR_CODES.INTERNAL_ERROR);
+      }
+      result = { id: secret.id };
+    } else {
+      result = await secretService.createSecret({
+        key,
+        value,
+        isReserved: isReserved || false,
+        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      });
+    }
+
+    // Log audit
+    const audit = await auditService.log({
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
+      action: 'CREATE_SECRET',
+      module: 'SECRETS',
+      details: { key, id: result.id },
+      ip_address: req.ip,
+    });
+
+    // Trigger redeployment with new secret
+    triggerSecretsRedeployment();
 
     successResponse(
       res,

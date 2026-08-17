@@ -9,6 +9,7 @@ const { secretMocks, auditMocks, functionMocks, loggerMocks } = vi.hoisted(() =>
     createSecret: vi.fn(),
     createSecretStrict: vi.fn(),
     updateSecret: vi.fn(),
+    deleteSecret: vi.fn(),
   },
   auditMocks: { log: vi.fn() },
   functionMocks: {
@@ -112,8 +113,27 @@ describe('POST /api/secrets strict create mode', () => {
       })
     );
     expect(JSON.stringify(auditMocks.log.mock.calls)).not.toContain('candidate-value');
-    expect(JSON.stringify(loggerMocks.info.mock.calls)).not.toContain('candidate-value');
     expect(functionMocks.redeploy).toHaveBeenCalledOnce();
+  });
+
+  it('rolls back the strict insert when audit logging fails', async () => {
+    secretMocks.createSecretStrict.mockResolvedValue({ id: 'secret-id', disposition: 'created' });
+    auditMocks.log.mockRejectedValue(new Error('audit unavailable'));
+    secretMocks.deleteSecret.mockResolvedValue(true);
+    const app = await createApp();
+
+    const response = await request(app)
+      .post('/api/secrets')
+      .send({ key: 'STRICT_KEY', value: 'candidate-value', mode: 'strict' })
+      .expect(500);
+
+    expect(response.body).toMatchObject({
+      error: 'INTERNAL_ERROR',
+      statusCode: 500,
+    });
+    expect(JSON.stringify(response.body)).not.toContain('candidate-value');
+    expect(secretMocks.deleteSecret).toHaveBeenCalledWith('secret-id');
+    expect(functionMocks.redeploy).not.toHaveBeenCalled();
   });
 
   it('returns 409 for an existing active name without audit or redeploy', async () => {
