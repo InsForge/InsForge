@@ -18,12 +18,37 @@ import type {
 } from './sites.provider.js';
 import { AppError, UpstreamError } from '@/utils/errors.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { ERROR_CODES, type ProjectSettings } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
 
 const VERCEL_UPLOAD_TIMEOUT_MS = 120_000;
+
+/**
+ * The subset of `projectSettings` Vercel's deployment API accepts.
+ *
+ * `startCommand`, `serverDirectory` and `serverPort` describe how a *container* runs a
+ * server; Vercel decides that itself from the framework it detects. They were reaching
+ * `POST /v13/deployments` verbatim, inside a body Vercel validates — and the field
+ * documentation already promised the opposite ("Vercel infers this itself and ignores it").
+ * Allow-listed rather than deleted by name, so the next driver-specific setting cannot leak
+ * the same way.
+ */
+function vercelProjectSettings(
+  settings: ProjectSettings | undefined
+): Partial<ProjectSettings> | undefined {
+  if (!settings) {
+    return undefined;
+  }
+  const { buildCommand, outputDirectory, installCommand, devCommand, rootDirectory } = settings;
+  const forVercel = { buildCommand, outputDirectory, installCommand, devCommand, rootDirectory };
+  // Undefined keys are dropped so the body stays byte-identical to what it was before the
+  // driver-specific fields existed.
+  return Object.fromEntries(
+    Object.entries(forVercel).filter(([, value]) => value !== undefined)
+  ) as Partial<ProjectSettings>;
+}
 
 // Rate-limit retry configuration for Vercel file uploads
 const UPLOAD_MAX_RETRIES = 3;
@@ -396,7 +421,7 @@ export class VercelProvider implements SitesProvider {
               target: 'production',
               project: credentials.projectId,
               files: options.files,
-              projectSettings: options.projectSettings,
+              projectSettings: vercelProjectSettings(options.projectSettings),
               meta: options.meta,
             },
             { headers: { Authorization: `Bearer ${credentials.token}` } }
@@ -1231,7 +1256,7 @@ export class VercelProvider implements SitesProvider {
           target: 'production',
           project: credentials.projectId,
           files: files,
-          projectSettings: options.projectSettings,
+          projectSettings: vercelProjectSettings(options.projectSettings),
           meta: options.meta,
         },
         { headers: { Authorization: `Bearer ${credentials.token}` } }
