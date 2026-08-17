@@ -1,21 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/infra/config/app.config.js', () => {
-  const c = { docker: { socketPath: '/nonexistent/test.sock' } };
-  return { config: c, appConfig: c };
-});
+// Hoisted and mutable so a test can point the real transport at a real socket. `dockerRequest`
+// calls `dockerRequestRaw` inside its own module, so it cannot be mocked from here — the only
+// honest way to test its status handling is to answer it over a socket.
+const configMock = vi.hoisted(() => ({ docker: { socketPath: '/nonexistent/test.sock' } }));
+vi.mock('@/infra/config/app.config.js', () => ({ config: configMock, appConfig: configMock }));
 
 // The transport is a parameter, so the paging logic is testable without mocking this module
 // into itself — which cannot work, since a module's internal calls bind to its own real
 // exports.
 const mockRaw = vi.fn();
 
+import { createServer as createHttpServer } from 'node:http';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import {
   demuxDockerStream,
   parseLogLine,
   parseBuildStream,
   dockerConfig,
   dockerContainerLogs,
+  dockerRequest,
 } from '@/providers/compute/docker.client.js';
 
 /**
@@ -359,5 +365,50 @@ describe('dockerContainerLogs', () => {
     // Every line, in order, once — the failure this guards against is pages of
     // ['line-3','line-4'] repeating while 0-2 are never delivered.
     expect(seen).toEqual(['line-0', 'line-1', 'line-2', 'line-3', 'line-4']);
+  });
+});
+
+describe('dockerRequest status handling', () => {
+  /** A one-shot HTTP server on a unix socket that answers with a fixed status. */
+  async function serving(status: number, body: string) {
+    const dir = await mkdtemp(path.join(tmpdir(), 'insforge-docker-client-'));
+    const socket = path.join(dir, 'docker.sock');
+    const server = createHttpServer((_req, res) => {
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(body);
+    });
+    await new Promise<void>((resolve) => server.listen(socket, resolve));
+    const previous = configMock.docker.socketPath;
+    configMock.docker.socketPath = socket;
+    return async () => {
+      configMock.docker.socketPath = previous;
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(dir, { recursive: true, force: true });
+    };
+  }
+
+  // Confirmed against a real daemon: `POST /containers/<running>/start` and
+  // `POST /containers/<stopped>/stop` both answer 304 with a message body. Treating that as
+  // an error made rollback to the already-live deployment throw — and its recovery path then
+  // stopped that container with nothing left to restart, taking the site down on what should
+  // have been a no-op.
+  it('treats 304 as a no-op, not an error', async () => {
+    const stop = await serving(304, '{"message":"container already started"}');
+    try {
+      await expect(dockerRequest('POST', '/containers/abc/start')).resolves.toBeUndefined();
+    } finally {
+      await stop();
+    }
+  });
+
+  it('still throws for a real failure status', async () => {
+    const stop = await serving(409, '{"message":"conflict"}');
+    try {
+      await expect(dockerRequest('POST', '/containers/abc/start')).rejects.toThrow(
+        /Docker API error \(409\): conflict/
+      );
+    } finally {
+      await stop();
+    }
   });
 });
