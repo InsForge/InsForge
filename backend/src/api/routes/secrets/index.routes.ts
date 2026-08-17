@@ -12,6 +12,8 @@ import {
   type RotateApiKeyResponse,
 } from '@insforge/shared-schemas';
 import { successResponse } from '@/utils/response.js';
+import crypto from 'crypto';
+import logger from '@/utils/logger.js';
 
 const router = Router();
 const secretService = SecretService.getInstance();
@@ -72,7 +74,7 @@ router.get('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
  */
 router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { key, value, isReserved, expiresAt } = req.body;
+    const { key, value, isReserved, expiresAt, mode } = req.body;
 
     // Validate input
     if (!key || !value) {
@@ -88,11 +90,93 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       );
     }
 
-    // Check if secret already exists
-    const secrets = await secretService.listSecrets();
-    const secret = secrets.find((s) => s.key === key);
+    if (mode !== undefined && mode !== 'strict') {
+      throw new AppError(
+        'Invalid create mode. Omit mode for legacy behavior or use strict.',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
 
     let result: { id: string };
+    let strictDisposition: 'created' | undefined;
+    const isStrictCreate = mode === 'strict';
+    const operationId = isStrictCreate ? crypto.randomUUID() : undefined;
+
+    if (isStrictCreate) {
+      const strictResult = await secretService.createSecretStrict({
+        key,
+        value,
+        isReserved: isReserved || false,
+        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      });
+      result = strictResult;
+      strictDisposition = strictResult.disposition;
+
+      let audit;
+      try {
+        audit = await auditService.log({
+          actor: req.hasApiKey ? 'api-key' : req.user?.id,
+          action: 'CREATE_SECRET',
+          module: 'SECRETS',
+          details: { key, id: result.id, disposition: strictDisposition, operationId },
+          ip_address: req.ip,
+        });
+      } catch (auditError) {
+        // Strict create must not leave a committed secret without a durable
+        // audit/operation receipt (#1758). Compensate by hard-deleting the
+        // just-created non-reserved row when possible, then fail closed.
+        let cleanedUp = false;
+        try {
+          // allowReserved: compensation must clear the row we just inserted,
+          // including reserved names (ordinary deleteSecret refuses those).
+          cleanedUp = await secretService.deleteSecret(result.id, undefined, {
+            allowReserved: true,
+          });
+        } catch (cleanupError) {
+          logger.error('Strict create audit failed and cleanup failed', {
+            key,
+            id: result.id,
+            operationId,
+            auditError: auditError instanceof Error ? auditError.message : 'unknown',
+            cleanupError: cleanupError instanceof Error ? cleanupError.message : 'unknown',
+          });
+        }
+        if (!cleanedUp) {
+          logger.error('Strict create audit failed; secret may remain without audit', {
+            key,
+            id: result.id,
+            operationId,
+          });
+        }
+        throw new AppError(
+          `Failed to record audit for strict secret create: ${key}`,
+          500,
+          ERROR_CODES.INTERNAL_ERROR,
+          cleanedUp
+            ? 'The secret insert was rolled back after audit failure.'
+            : `The secret insert may remain; contact support with operationId=${operationId} before retrying.`
+        );
+      }
+
+      triggerSecretsRedeployment();
+      return successResponse(
+        res,
+        {
+          success: true,
+          message: `Secret ${key} has been created successfully`,
+          id: result.id,
+          disposition: strictDisposition,
+          operationId,
+          auditId: audit.id,
+        },
+        201
+      );
+    }
+
+    // Preserve the legacy create-or-reactivate behavior for existing clients.
+    const secrets = await secretService.listSecrets();
+    const secret = secrets.find((s) => s.key === key);
 
     if (secret && secret?.isActive) {
       throw new AppError(`Secret already exists: ${key}`, 409, ERROR_CODES.SECRET_ALREADY_EXISTS);
@@ -116,7 +200,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       });
     }
 
-    // Log audit
+    // Log audit (legacy path does not return auditId)
     await auditService.log({
       actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'CREATE_SECRET',

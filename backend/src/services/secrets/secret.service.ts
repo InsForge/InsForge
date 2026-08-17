@@ -7,9 +7,14 @@ import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { SecretSchema, CreateSecretRequest, ERROR_CODES } from '@insforge/shared-schemas';
 import { appConfig } from '@/infra/config/app.config.js';
 
-export interface CreateSecretInput extends CreateSecretRequest {
+export interface CreateSecretInput extends Omit<CreateSecretRequest, 'mode'> {
   isReserved?: boolean;
   expiresAt?: Date;
+}
+
+export interface StrictCreateSecretResult {
+  id: string;
+  disposition: 'created';
 }
 
 export interface UpdateSecretInput {
@@ -108,6 +113,53 @@ export class SecretService {
           `A secret named ${input.key} already exists in this project. Update or delete it in the Secrets tab, or use a different name.`
         );
       }
+      throw new Error('Failed to create secret');
+    }
+  }
+
+  /**
+   * Create a secret only when its key has never been used.
+   *
+   * Unlike createSecret(), this method intentionally does not revive an
+   * inactive row. The single INSERT relies on UNIQUE(key), so active rows,
+   * tombstoned rows, and concurrent creators all share the same atomic
+   * create-if-absent boundary.
+   */
+  async createSecretStrict(
+    input: CreateSecretInput,
+    client?: PoolClient
+  ): Promise<StrictCreateSecretResult> {
+    try {
+      const encryptedValue = EncryptionManager.encrypt(input.value);
+      const executor = client ?? this.getPool();
+      const result = await executor.query(
+        `INSERT INTO system.secrets (key, value_ciphertext, is_reserved, expires_at)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (key) DO NOTHING
+         RETURNING id`,
+        [input.key, encryptedValue, input.isReserved || false, input.expiresAt || null]
+      );
+
+      if (!result.rows.length) {
+        throw new AppError(
+          `Secret already exists: ${input.key}`,
+          409,
+          ERROR_CODES.SECRET_ALREADY_EXISTS,
+          `A secret named ${input.key} already exists in this project. Strict create never reactivates or replaces an existing name.`
+        );
+      }
+
+      logger.info('Secret created in strict mode', {
+        id: result.rows[0].id,
+        key: input.key,
+        disposition: 'created',
+      });
+      return { id: result.rows[0].id, disposition: 'created' };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      logger.error('Failed to create secret in strict mode', { error, key: input.key });
       throw new Error('Failed to create secret');
     }
   }
@@ -371,21 +423,32 @@ export class SecretService {
   }
 
   /**
-   * Delete a secret
+   * Delete a secret.
+   *
+   * `allowReserved` is only for compensating a just-created strict insert when
+   * audit/receipt recording fails — never for ordinary admin delete.
    */
-  async deleteSecret(id: string, client?: PoolClient): Promise<boolean> {
+  async deleteSecret(
+    id: string,
+    client?: PoolClient,
+    options?: { allowReserved?: boolean }
+  ): Promise<boolean> {
     try {
-      // Optimized: Single query with WHERE clause to prevent deleting reserved secrets
       const executor = client ?? this.getPool();
+      const allowReserved = options?.allowReserved === true;
+      // Default path refuses reserved rows; compensation may hard-delete the
+      // row we just inserted in this request (including reserved).
       const result = await executor.query(
-        'DELETE FROM system.secrets WHERE id = $1 AND is_reserved = false',
+        allowReserved
+          ? 'DELETE FROM system.secrets WHERE id = $1'
+          : 'DELETE FROM system.secrets WHERE id = $1 AND is_reserved = false',
         [id]
       );
 
       const success = (result.rowCount ?? 0) > 0;
       if (success) {
-        logger.info('Secret deleted', { id });
-      } else {
+        logger.info('Secret deleted', { id, allowReserved });
+      } else if (!allowReserved) {
         // Check if it exists but is reserved
         const checkResult = await executor.query(
           'SELECT is_reserved FROM system.secrets WHERE id = $1',
