@@ -118,13 +118,13 @@ export interface EnvVarStore {
     Array<{
       id: string;
       key: string;
-      type?: string;
+      type: string;
       target?: string[];
       createdAt?: number;
       updatedAt?: number;
     }>
   >;
-  get(envId: string): Promise<{ id: string; key: string; value: string; type?: string }>;
+  get(envId: string): Promise<{ id: string; key: string; value: string; type: string }>;
   remove(envId: string): Promise<void>;
 }
 

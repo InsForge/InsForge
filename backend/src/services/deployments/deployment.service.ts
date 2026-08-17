@@ -34,6 +34,7 @@ import {
   type CreateDirectDeploymentRequest,
   type CreateDirectDeploymentResponse,
   type DeploymentManifestFile,
+  type RuntimeLogsResponse,
   type UploadDeploymentFileResponse,
   type StartDeploymentRequest,
   type UpdateSlugResponse,
@@ -1405,7 +1406,7 @@ export class DeploymentService {
   async getRuntimeLogs(
     id: string,
     options?: { limit?: number; nextToken?: string }
-  ): Promise<{ lines: Array<{ timestamp: number; message: string }>; nextToken: string | null }> {
+  ): Promise<RuntimeLogsResponse> {
     const deployment = await this.getDeploymentById(id);
     if (!deployment) {
       throw new AppError('Deployment not found.', 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);

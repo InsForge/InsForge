@@ -145,8 +145,15 @@ const DEFAULT_SERVER_PORT = SITE_PORT;
 const DEFAULT_SERVER_MEMORY_MB = 512;
 const DEFAULT_SERVER_CPUS = 1;
 
-/** How long a freshly started server gets to answer before the deploy is called a failure. */
-const SERVER_READY_TIMEOUT_MS = 60_000;
+/**
+ * How long a freshly started server gets to answer before the deploy is called a failure.
+ *
+ * Overridable so a test can exercise the timeout path without waiting a real minute — one
+ * such test was 95% of this suite's runtime.
+ */
+const SERVER_READY_TIMEOUT_MS = Number(process.env.SITES_SERVER_READY_TIMEOUT_MS) || 60_000;
+/** Gap between readiness attempts. Overridable for the same reason as the timeout. */
+const SERVER_PROBE_INTERVAL_MS = Number(process.env.SITES_SERVER_PROBE_INTERVAL_MS) || 1_000;
 const DEFAULT_OUTPUT_DIRECTORIES = ['dist', 'build', 'out'];
 
 /**
@@ -803,7 +810,14 @@ export class DockerSitesProvider implements SitesProvider {
    * `APP_KEY`, the same key the Docker compute driver uses, and deliberately not
    * `PROJECT_ID`: a self-host usually has no project id, so every instance collapsed to
    * `local` — and two InsForge instances sharing one daemon would list, stop and prune
-   * each other's site containers. APP_KEY is per-instance and generated at setup.
+   * each other's site containers.
+   *
+   * Stated precisely, because an earlier version of this comment claimed more than the
+   * shipped path delivers: `setup.sh` does not generate `APP_KEY` and `.env.example` ships
+   * it empty, so a stock self-host *is* `local` and gets no isolation from a second stock
+   * instance on the same daemon. Setting it is what buys the namespacing; generating one by
+   * default would relabel the containers of every existing install, so it belongs in its own
+   * change.
    */
   private projectKey(): string {
     // Not truncated. The shipped gateway config targets `insforge-site-{$APP_KEY}`, so any
@@ -1076,7 +1090,7 @@ export class DockerSitesProvider implements SitesProvider {
         return;
       }
       lastReason = probe.reason;
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, SERVER_PROBE_INTERVAL_MS));
     }
 
     const logs = await this.tailLogs(containerId, 20);

@@ -114,6 +114,11 @@ services:
       DENO_RUNTIME_URL: http://deno:7133
       LOGS_DIR: /insforge-logs
       STORAGE_DIR: /insforge-storage
+      # Namespaces the containers and images the local drivers manage, and the network
+      # alias a sites gateway would proxy to. The drivers read `APP_KEY || 'local'`, so
+      # leaving it empty is the same as `local` — but if it is set on the host, the
+      # backend has to see the same value.
+      APP_KEY: ${APP_KEY:-}
       # Which driver hosts the project's site: vercel | docker | off. Empty
       # auto-detects and prefers Vercel when its credentials are set, so mounting the
       # socket for compute does not move an existing site to a new driver.

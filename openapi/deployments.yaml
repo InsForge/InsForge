@@ -585,7 +585,10 @@ paths:
           description: >-
             Malformed id, a run that never reached the provider, or a driver that does not
             support rollback
-          $ref: '#/components/responses/Error'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
         '403':
@@ -593,12 +596,23 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
         '409':
-          description: The run belongs to a driver that is not configured on this instance
-          $ref: '#/components/responses/Error'
+          description: >-
+            The run belongs to a driver that is not configured on this instance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
           $ref: '#/components/responses/Error'
         '500':
           $ref: '#/components/responses/Error'
+        '503':
+          description: >-
+            No sites driver is configured, or `SITES_PROVIDER` names one that is unusable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/deployments/{id}/logs:
     get:
@@ -665,7 +679,10 @@ paths:
           description: >-
             Malformed id or limit, a run that never reached the provider, or a driver with no
             runtime to read
-          $ref: '#/components/responses/Error'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
         '403':
@@ -673,15 +690,29 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
         '409':
-          description: The run belongs to a driver that is not configured on this instance
-          $ref: '#/components/responses/Error'
+          description: >-
+            The run belongs to a driver that is not configured on this instance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
           description: >-
-            Rate-limited at 120 requests per minute per IP, the same budget as the compute
-            logs endpoint, because this is what a live tail polls
-          $ref: '#/components/responses/Error'
+            Rate-limited at 120 requests per minute per IP, the same budget as the compute logs
+            endpoint, because this is what a live tail polls
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/Error'
+        '503':
+          description: >-
+            No sites driver is configured, or `SITES_PROVIDER` names one that is unusable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/deployments/{id}/cancel:
     post:
