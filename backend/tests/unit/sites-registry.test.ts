@@ -246,3 +246,35 @@ describe('capability stores', () => {
     expect(() => requireDomainStore()).toThrow('No sites provider is configured');
   });
 });
+
+describe('what reaches Vercel from projectSettings', () => {
+  // The three server-rendering fields describe how a *container* runs an app; Vercel decides
+  // that from the framework it detects, and its deployment API validates the body. They were
+  // being forwarded verbatim, while the field documentation promised they were ignored.
+  it('sends only the settings Vercel accepts', async () => {
+    const axios = (await import('axios')).default;
+    const post = vi.spyOn(axios, 'post').mockResolvedValue({
+      data: { id: 'dpl_1', url: 'x.vercel.app', readyState: 'READY', name: 'x', createdAt: 1 },
+    } as never);
+    configureVercel();
+
+    await selectSitesProvider()
+      .createDeploymentWithFiles([], {
+        projectSettings: {
+          buildCommand: 'npm run build',
+          outputDirectory: 'dist',
+          startCommand: 'node server.js',
+          serverDirectory: '.next/standalone',
+          serverPort: 3000,
+        },
+      })
+      .catch(() => undefined);
+
+    const body = post.mock.calls[0]?.[1] as { projectSettings?: Record<string, unknown> };
+    expect(body.projectSettings).toEqual({
+      buildCommand: 'npm run build',
+      outputDirectory: 'dist',
+    });
+    post.mockRestore();
+  });
+});
