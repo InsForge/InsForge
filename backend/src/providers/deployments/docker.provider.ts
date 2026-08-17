@@ -286,8 +286,13 @@ export class DockerSitesProvider implements SitesProvider {
    * Each one lists the containers it is replacing before creating its own, so two at once
    * snapshot the same list and neither sees the other: under ephemeral ports both end up
    * behind the stable alias, and under a fixed port the second fails on the binding. A
-   * promise chain is the same tool the compute driver uses to cap concurrent builds, and it
-   * covers what a self-host actually runs — one backend process against one daemon.
+   * promise chain covers what a self-host actually runs — one backend process against one
+   * daemon.
+   *
+   * Only the switch, not the build: `dockerBuild` runs outside this queue, so two deploys
+   * can build at once. That is deliberate — a build is minutes and serializing them would
+   * make a second deploy look hung — but it is not the concurrency cap compute has, and this
+   * comment used to claim otherwise.
    */
   private switchQueue: Promise<unknown> = Promise.resolve();
 
@@ -529,10 +534,22 @@ export class DockerSitesProvider implements SitesProvider {
       );
     }
 
-    const containerId = await this.runContainer(imageTag, digest, {
-      serverPort: startCommand ? (settings.serverPort ?? DEFAULT_SERVER_PORT) : undefined,
-      envVars: options.envVars,
-    });
+    let containerId: string;
+    try {
+      containerId = await this.runContainer(imageTag, digest, {
+        serverPort: startCommand ? (settings.serverPort ?? DEFAULT_SERVER_PORT) : undefined,
+        envVars: options.envVars,
+      });
+    } catch (error) {
+      // Retention walks containers, so an image whose container never started is invisible to
+      // it — every failed start used to leak one image for good. The tag is ours and nothing
+      // references it, so removing it here is safe; a tag still in use answers 409, which is
+      // swallowed.
+      await dockerRequest('DELETE', `/images/${encodeURIComponent(imageTag)}?force=false`).catch(
+        () => undefined
+      );
+      throw error;
+    }
     // Housekeeping, after the site is already serving. A failure here — the daemon
     // refusing a list, an image still referenced — must not reject a deployment that is
     // live: the caller would record it as ERROR while the new container answers requests,
@@ -570,6 +587,16 @@ export class DockerSitesProvider implements SitesProvider {
    * involved, so the daemon needs the context as bytes. `maxDeploymentTotalBytes` already
    * caps what a caller can have uploaded, which is what bounds this.
    */
+  /**
+   * A fixed timestamp for every tar entry.
+   *
+   * `tar-stream` stamps `mtime = new Date()` when a header omits it, so the same files tarred
+   * a second apart produced different bytes — and therefore a different digest and image tag,
+   * which is what the "content-addressed" naming and the identical-redeploy reasoning both
+   * assume. Zero rather than a real time, so the context is reproducible.
+   */
+  private static readonly TAR_MTIME = new Date(0);
+
   private async buildContext(files: UploadedFileRef[], dockerfile: string): Promise<Buffer> {
     const pack = tarPack();
     const chunks: Buffer[] = [];
@@ -580,8 +607,9 @@ export class DockerSitesProvider implements SitesProvider {
       pack.on('error', reject);
     });
 
-    pack.entry({ name: 'Dockerfile' }, dockerfile);
-    pack.entry({ name: 'Caddyfile' }, CADDYFILE);
+    const mtime = DockerSitesProvider.TAR_MTIME;
+    pack.entry({ name: 'Dockerfile', mtime }, dockerfile);
+    pack.entry({ name: 'Caddyfile', mtime }, CADDYFILE);
 
     for (const file of files) {
       const staged = this.stagedPath(file.sha);
@@ -597,7 +625,10 @@ export class DockerSitesProvider implements SitesProvider {
       // Under site/ so the Dockerfile can COPY the tree without the config files.
       // Leading slashes and .. are stripped: the manifest is caller-supplied, and a
       // path that climbed out would write into the image root.
-      pack.entry({ name: path.posix.join('site', this.safeEntryName(file.file)), size }, content);
+      pack.entry(
+        { name: path.posix.join('site', this.safeEntryName(file.file)), size, mtime },
+        content
+      );
     }
 
     pack.finalize();
@@ -798,6 +829,14 @@ export class DockerSitesProvider implements SitesProvider {
     if (this.ownNetwork) {
       return this.ownNetwork;
     }
+    // The same flag compute honours, for a stronger reason: a server-rendered deployment runs
+    // the developer's own code and its whole npm tree, and the project network carries
+    // Postgres, PostgREST and the backend. An operator who asked for isolation gets it here
+    // too — the site then keeps its published port, and the shipped gateway has to be pointed
+    // at that port rather than at the alias.
+    if (dockerConfig().isolateNetwork) {
+      return null;
+    }
     try {
       const self = await dockerRequest<{
         NetworkSettings?: { Networks?: Record<string, unknown> };
@@ -891,9 +930,12 @@ export class DockerSitesProvider implements SitesProvider {
             ...(runtime.serverPort ? { [LABEL_SERVER_PORT]: String(runtime.serverPort) } : {}),
           },
           ExposedPorts: { [exposed]: {} },
-          // Only a server reads these at request time. A static image has nothing to read
-          // them with, so passing them would just put values in an inspect output.
-          ...(runtime.serverPort && runtime.envVars?.length
+          // Passed for both shapes, so `envVars: 'runtime'` is true of the driver rather than
+          // of one deployment. A static container has nothing to read them with, but the
+          // values are already build args in this image's history, so putting them in the
+          // container environment exposes nothing new — and it means a site that starts as
+          // static and later declares a start command does not silently lose its config.
+          ...(runtime.envVars?.length
             ? { Env: runtime.envVars.map((envVar) => `${envVar.key}=${envVar.value}`) }
             : {}),
           HostConfig: {
@@ -1132,6 +1174,11 @@ export class DockerSitesProvider implements SitesProvider {
   }
 
   async getDeployment(providerDeploymentId: string): Promise<ProviderDeployment> {
+    // The last id-taking method without this check, and it is reachable with a caller-supplied
+    // string: the webhook path resolves a provider from an unmatched row and hands it whatever
+    // id the payload named. Without it, inspecting `insforge-postgres` returns that container's
+    // image, state and error text.
+    await this.assertOwnContainer(providerDeploymentId);
     const inspected = await this.inspectContainer(providerDeploymentId);
 
     const status = inspected.State.Status;
