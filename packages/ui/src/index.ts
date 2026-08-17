@@ -97,6 +97,9 @@ export { Tabs, Tab } from './components';
 export { EmptyState, type EmptyStateProps } from './components';
 export { LoadingState, type LoadingStateProps } from './components';
 export { Skeleton } from './components';
+export { Popover, PopoverTrigger, PopoverAnchor, PopoverContent } from './components';
+export { Calendar } from './components';
+export { ClockColumn } from './components';
 
 // Utilities
 export { cn } from './lib';
