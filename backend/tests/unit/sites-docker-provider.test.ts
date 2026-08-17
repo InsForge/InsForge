@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import path from 'node:path';
 import { extract as tarExtract } from 'tar-stream';
 import { Readable } from 'node:stream';
@@ -85,6 +85,23 @@ async function contextFiles(context: Buffer): Promise<Map<string, string>> {
 
 async function contextEntries(context: Buffer): Promise<string[]> {
   return [...(await contextFiles(context)).keys()];
+}
+
+/** Entry headers from the tar the driver handed to the builder, name -> header. */
+async function contextHeaders(context: Buffer): Promise<Map<string, { mtime?: Date }>> {
+  const headers = new Map<string, { mtime?: Date }>();
+  const extract = tarExtract();
+  extract.on('entry', (header, stream, next) => {
+    headers.set(header.name, { mtime: header.mtime });
+    stream.on('end', () => next());
+    stream.resume();
+  });
+  await new Promise<void>((resolve, reject) => {
+    extract.on('finish', resolve);
+    extract.on('error', reject);
+    Readable.from(context).pipe(extract);
+  });
+  return headers;
 }
 
 /** The Dockerfile the driver generated for this call. */
@@ -965,14 +982,20 @@ describe('DockerSitesProvider fixed-port failure paths', () => {
       [0, 'CANCELED'],
       [137, 'ERROR'],
     ] as const) {
-      dockerRequest.mockImplementation(() =>
-        Promise.resolve({
-          Id: 'c1',
-          Name: '/insforge-site',
-          Created: '2026-08-13T00:00:00Z',
-          State: { Status: 'exited', ExitCode: exitCode },
-          Config: { Image: 'insforge-site-appkey01:x' },
-        })
+      dockerRequest.mockImplementation((method: string, url: string) =>
+        Promise.resolve(
+          // A container the driver can inspect is one the daemon lists for this project —
+          // `getDeployment` checks ownership first, like every other id-taking method.
+          method === 'GET' && url.startsWith('/containers/json')
+            ? [{ Id: 'c1', State: 'exited' }]
+            : {
+                Id: 'c1',
+                Name: '/insforge-site',
+                Created: '2026-08-13T00:00:00Z',
+                State: { Status: 'exited', ExitCode: exitCode },
+                Config: { Image: 'insforge-site-appkey01:x' },
+              }
+        )
       );
 
       const deployment = await DockerSitesProvider.getInstance().getDeployment('c1');
@@ -1220,7 +1243,7 @@ describe('DockerSitesProvider server-rendered deployments', () => {
     dockerClientConfig.publicHost = 'sites.example.com';
     dockerRequest.mockImplementation((method: string, url: string) => {
       if (method === 'GET' && url.startsWith('/containers/json')) {
-        return Promise.resolve([]);
+        return Promise.resolve([{ Id: 'server-live', State: 'running' }]);
       }
       if (url.endsWith('/json')) {
         return Promise.resolve({
@@ -1484,6 +1507,109 @@ describe('DockerSitesProvider.runtimeLogs', () => {
       nextToken: '1700000000.000000001',
     });
     expect(dockerContainerLogs).toHaveBeenCalledWith('server-live', { limit: 20 });
+  });
+
+  // The image tag is a digest of the build context, and the driver's naming and its
+  // identical-redeploy reasoning both assume that digest is content-addressed. tar-stream
+  // stamps `mtime = new Date()` when a header omits it, so the same files tarred a second
+  // apart produced different bytes and a different tag.
+  it('stamps a fixed mtime so the context is reproducible', async () => {
+    okBuild();
+    dockerHappyPath();
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>hi</h1>') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files);
+
+    const headers = await contextHeaders(dockerBuild.mock.calls[0][0].context as Buffer);
+    expect([...headers.values()].every((header) => header.mtime?.getTime() === 0)).toBe(true);
+  });
+
+  // Retention walks containers, so an image whose container never started is invisible to it:
+  // every failed start leaked one image for good.
+  it('removes the image when the container will not start', async () => {
+    okBuild();
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve([]);
+      }
+      if (method === 'POST' && url.startsWith('/containers/create')) {
+        return Promise.resolve({ Id: 'container-doomed' });
+      }
+      if (method === 'POST' && url.endsWith('/start')) {
+        return Promise.reject(new Error('no space left on device'));
+      }
+      return Promise.resolve(undefined);
+    });
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>hi</h1>') },
+    ]);
+
+    await expect(provider.createDeploymentWithFiles(files)).rejects.toThrow('no space left');
+
+    const deletes = dockerRequest.mock.calls
+      .filter(([method]) => method === 'DELETE')
+      .map(([, url]) => url as string);
+    expect(deletes.some((url) => url.startsWith('/images/insforge-site-appkey01'))).toBe(true);
+  });
+
+  // The same flag compute honours. A server-rendered deployment runs the developer's own code
+  // and its whole npm tree; the project network carries Postgres and the backend.
+  it('keeps the site off the project network when isolation is asked for', async () => {
+    okBuild();
+    dockerClientConfig.isolateNetwork = true;
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve([]);
+      }
+      if (method === 'POST' && url.startsWith('/containers/create')) {
+        return Promise.resolve({ Id: 'container-new' });
+      }
+      // The backend's own container, which is where the project network comes from. Without
+      // the isolation guard this is exactly what gets attached to the site.
+      if (url.includes(hostname()) && url.endsWith('/json')) {
+        return Promise.resolve({ NetworkSettings: { Networks: { insforge_default: {} } } });
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({
+          NetworkSettings: { Ports: { '80/tcp': [{ HostPort: '49160' }] } },
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'index.html', content: Buffer.from('<h1>hi</h1>') },
+    ]);
+
+    await provider.createDeploymentWithFiles(files);
+
+    const create = dockerRequest.mock.calls.find(
+      ([method, url]) => method === 'POST' && String(url).startsWith('/containers/create')
+    );
+    expect(
+      (create?.[2] as { body: Record<string, unknown> }).body.NetworkingConfig
+    ).toBeUndefined();
+    dockerClientConfig.isolateNetwork = false;
+  });
+
+  // A deployment id is a container id, and this was the last id-taking method without the
+  // check — reachable with a caller-supplied string through the webhook path.
+  it('refuses to inspect a container it does not own', async () => {
+    dockerRequest.mockImplementation((method: string, url: string) =>
+      Promise.resolve(
+        method === 'GET' && url.startsWith('/containers/json')
+          ? [{ Id: 'server-live', State: 'running' }]
+          : undefined
+      )
+    );
+
+    await expect(
+      DockerSitesProvider.getInstance().getDeployment('insforge-postgres')
+    ).rejects.toThrow('not on this host');
   });
 
   // A failed build is the normal failure of a source deploy, and its output is the only
