@@ -71,6 +71,10 @@ export interface SitesProvider {
   domains?: DomainStore;
   slug?: SlugStore;        // get + updateCache, together
   rollbackTo?(providerDeploymentId: string): Promise<ProviderDeployment>;
+  runtimeLogs?(
+    providerDeploymentId: string,
+    options?: { limit?: number; nextToken?: string }
+  ): Promise<RuntimeLogsResponse>;
 }
 ```
 
@@ -85,6 +89,7 @@ export interface SitesCapabilities {
   slug: boolean;
   rollback: boolean;
   buildLogs: boolean;
+  runtimeLogs: boolean;
   frameworkDetection: boolean;
   ingressModes: IngressMode[];   // reused from compute
   defaultIngress?: IngressMode;

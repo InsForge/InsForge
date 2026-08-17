@@ -11,6 +11,11 @@
 #
 #   docker compose --profile sites-gateway up -d
 #
+# Two variables decide whether this works unedited: SITES_HOSTNAME (the domain, or `:80`) and
+# SITES_UPSTREAM_PORT (the container port, 80 unless a deployment declares its own
+# `serverPort`). Both are defaulted in compose. Anything else — a second site, a path prefix,
+# auth in front — is your own config from here.
+#
 # Set SITES_HOSTNAME to a domain pointed at this host and Caddy obtains a certificate on
 # its own. Leave it unset and the gateway answers on :80 for anything, which is what you
 # want behind another proxy or on a private network.

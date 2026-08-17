@@ -113,9 +113,13 @@ services:
       # meant an operator who set APP_KEY got a backend that did not: the driver named its
       # alias `insforge-site-local` and the gateway looked for `insforge-site-<APP_KEY>`.
       #
-      # The empty fallback and the gateway's `:-local` agree only because the drivers read
-      # this as `APP_KEY || 'local'`. Set the variable and both sides use it; leave it unset
-      # and both end up at `local`.
+      # The empty fallback and the gateway's `:-local` agree only because both local drivers
+      # read this as `APP_KEY || 'local'`. Set the variable and both sides use it; leave it
+      # unset and both end up at `local`.
+      #
+      # Not a single fallback, though: `cloud.appKey` reads the same variable with a different
+      # default (`default-app-key`) and uses it as the Deno Subhosting slug, which is why this
+      # line passes the raw value through rather than defaulting it to `local` here.
       - APP_KEY=${APP_KEY:-}
       # OAuth Configuration
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}

@@ -565,8 +565,9 @@ paths:
         Makes a previous deployment live again without rebuilding it, and demotes whichever
         run currently claims `READY`. Offered only by drivers that report `rollback` in the
         `sites` capability slice of `/api/metadata`; the rest answer `400` with
-        `DEPLOYMENT_FEATURE_UNSUPPORTED`. A run whose deployment never reached the provider,
-        or whose artifact retention has already removed, cannot be restored.
+        `DEPLOYMENT_FEATURE_UNSUPPORTED`. Two runs cannot be restored: one that never reached
+        the provider, and one whose artifact retention has already removed — on the Docker
+        driver, retention keeps the live deployment plus two rollback steps.
       tags:
         - Admin
       security:
@@ -1006,8 +1007,10 @@ components:
             Command that starts a long-running server, e.g. `node server.js`. Its presence is
             what makes a deployment server-rendered rather than static — declared rather than
             inferred, because a Dockerfile's final stage cannot branch on what a build
-            produced. Honoured by drivers that report `runtimeLogs`-style server support in
-            the `sites` capability slice; Vercel infers this itself and ignores it.
+            produced. Honoured by drivers that run a server themselves, which today means the
+            Docker driver; Vercel decides this from the framework it detects and ignores the
+            field. Unrelated to the `runtimeLogs` capability, which says whether a running
+            deployment's output can be read back — a driver could do either without the other.
         serverDirectory:
           type: string
           nullable: true

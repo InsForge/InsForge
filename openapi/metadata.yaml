@@ -114,8 +114,11 @@ paths:
                   sites:
                     type: object
                     description: >-
-                      Optional; absent when no sites driver is configured, which is how a
-                      client detects that this instance cannot host a site. Deliberately
+                      Optional; absent whenever no *usable* sites driver is available — none
+                      configured, `SITES_PROVIDER=off`, or a named driver whose prerequisites
+                      are missing (no Vercel credentials, no Docker socket). A client reads
+                      absence as "this instance cannot host a site" without needing to know
+                      which of those it was. Deliberately
                       separate from `deployments` above: that slice's presence answers "can
                       this backend honour a subdomain", while this one answers "what can the
                       active driver do".
@@ -137,6 +140,10 @@ paths:
                                 `runtime` — the platform stores values and they can be listed,
                                 read and deleted. `build-only` — values reach the build and are
                                 baked into the artifact, so there is nothing to read back.
+                                `none` — the driver cannot carry environment variables at all,
+                                and every environment-variable route answers `400`
+                                `DEPLOYMENT_FEATURE_UNSUPPORTED`. A client should hide the
+                                feature for `none` rather than offering a form that refuses.
                             customDomains:
                               type: boolean
                               description: >-

@@ -35,9 +35,10 @@ deno.lock
 better-auth/
 .mcp.json
 backend/logs/*
-# Uploaded deployment files staged for a site build, named by content hash. Default is
-# `<STORAGE_DIR>/sites-staging`, which the storage ignore above already covers; these two
-# only matter if SITES_STAGING_DIR is pointed inside the repo.
+# Uploaded deployment files staged for a site build, named by content hash. The default lives
+# under STORAGE_DIR, which on every shipped stack is a Docker volume outside the repo — these
+# two entries only matter when STORAGE_DIR or SITES_STAGING_DIR is pointed inside a checkout,
+# which is what local development against a host daemon does.
 backend/sites-staging/
 sites-staging/
 
