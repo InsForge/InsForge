@@ -111,9 +111,7 @@ describe('SQL execution guards', () => {
       )
     ).not.toBeNull();
     expect(
-      checkSqlExecutionGuards(
-        "DO $$ BEGIN PERFORM set_config('role', 'postgres', false); END $$"
-      )
+      checkSqlExecutionGuards("DO $$ BEGIN PERFORM set_config('role', 'postgres', false); END $$")
     ).not.toBeNull();
   });
 
