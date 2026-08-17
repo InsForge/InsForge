@@ -516,10 +516,16 @@ export class DockerSitesProvider implements SitesProvider {
       ),
     });
     if (!build.ok) {
+      // The tail of the build goes into the message, because that is the only channel the
+      // caller gets on a failure: `build.logs` is discarded with the rest of this call, and
+      // the metadata write that records logs on success is never reached. Without it the
+      // operator is told "build failed" and nothing else.
+      const tail = build.logs?.length ? `\n\n${build.logs.slice(-20).join('\n')}` : '';
       throw new AppError(
-        build.error ?? 'Site image build failed.',
+        `${build.error ?? 'Site image build failed.'}${tail}`,
         502,
-        ERROR_CODES.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE,
+        'Check the build command and the build output above.'
       );
     }
 

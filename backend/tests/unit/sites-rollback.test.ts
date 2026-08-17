@@ -1,7 +1,8 @@
 import { describe, it, expect, afterAll, beforeEach, vi } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
+import { AppError, UpstreamError } from '../../src/utils/errors.js';
 
-const { mockPool, mockClient, mockProvider, active } = vi.hoisted(() => {
+const { mockPool, mockClient, mockProvider, active, noDriver } = vi.hoisted(() => {
   const provider = {
     name: 'docker' as const,
     isConfigured: vi.fn(() => true),
@@ -20,6 +21,9 @@ const { mockPool, mockClient, mockProvider, active } = vi.hoisted(() => {
     // `other` is a second, non-default driver, which is what makes "did this reach the
     // row's driver or the active one?" an answerable question.
     active: { provider: provider as unknown, other: undefined as unknown },
+    // Whether this instance has any sites driver at all — the case where reading
+    // `this.provider` throws.
+    noDriver: { configured: true },
   };
 });
 
@@ -46,10 +50,28 @@ vi.mock('../../src/services/deployments/sites-registry.js', async (importOrigina
     await importOriginal<typeof import('../../src/services/deployments/sites-registry.js')>();
   return {
     ...actual,
-    selectSitesProvider: () => active.provider,
-    isAnySitesProviderConfigured: () => true,
-    // Only the docker driver exists on this instance, which is what makes the
-    // cross-driver refusal below reachable.
+    // Throws when nothing is configured, exactly as the real one does — otherwise a test
+    // cannot tell a guarded provider read from an unguarded one.
+    selectSitesProvider: () => {
+      if (!noDriver.configured) {
+        throw new AppError(
+          'No sites provider is configured.',
+          503,
+          ERROR_CODES.DEPLOYMENT_NOT_CONFIGURED
+        );
+      }
+      return active.provider;
+    },
+    isAnySitesProviderConfigured: () => noDriver.configured,
+    // Mocked as well as `selectSitesProvider`: the real `requireDomainStore` calls the real
+    // `selectSitesProvider` inside its own module, where this mock cannot reach it.
+    requireDomainStore: () => {
+      const provider = active.provider as { name: string; domains?: unknown };
+      if (!provider.domains) {
+        throw actual.unsupportedFeature(provider.name, 'custom domains');
+      }
+      return provider.domains;
+    },
     // `other` present means this instance has a second driver configured; absent is what
     // makes the cross-driver refusal below reachable.
     buildSitesRegistry: () => ({
@@ -90,6 +112,7 @@ function rowFor(id: string, providerDeploymentId: string | null) {
 beforeEach(() => {
   vi.clearAllMocks();
   active.provider = mockProvider;
+  noDriver.configured = true;
   active.other = {
     name: 'vercel' as const,
     isConfigured: () => true,
@@ -122,6 +145,24 @@ describe('DeploymentService.rollbackTo', () => {
 
     expect(mockProvider.rollbackTo).toHaveBeenCalledWith('container-old');
     expect(result.status).toBe('READY');
+  });
+
+  // Scoped to the row's driver: on an instance with both, demoting every READY row marks a
+  // Vercel deployment CANCELED while Vercel keeps serving it, and getMetadata() reads the
+  // latest READY row to decide what is live.
+  it('demotes only rows made by the same driver', async () => {
+    mockPool.query.mockResolvedValueOnce({ rows: [rowFor('row-1', 'container-old')] });
+    mockClient.query.mockResolvedValue({
+      rows: [{ ...rowFor('row-1', 'container-old'), status: 'READY' }],
+    });
+
+    await DeploymentService.getInstance().rollbackTo('row-1');
+
+    const demote = mockClient.query.mock.calls.find(([sql]) =>
+      String(sql).includes("SET status = 'CANCELED'")
+    );
+    expect(String(demote?.[0])).toContain('provider = $3');
+    expect(demote?.[1]?.[2]).toBe('docker');
   });
 
   // Two rows both claiming READY would make the history lie about what is serving.
@@ -536,5 +577,171 @@ describe('DeploymentService.updateDeploymentFromWebhook', () => {
     );
     expect(update?.[1]?.[0]).toBe('READY');
     expect(update?.[1]?.[1]).toBeNull();
+  });
+});
+
+describe('a deploy that fails at the provider', () => {
+  function stageStartableRow() {
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'row-1',
+            provider: 'docker',
+            status: 'WAITING',
+            providerDeploymentId: null,
+            url: null,
+            metadata: { uploadMode: 'direct' },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            fileId: 'f1',
+            path: 'index.html',
+            sha: 'a'.repeat(40),
+            size: 12,
+            uploadedAt: new Date().toISOString(),
+          },
+        ],
+      })
+      .mockResolvedValue({ rows: [] });
+  }
+
+  // The row is set to UPLOADING on the way in. Rethrowing an AppError without touching it
+  // left the run mid-flight forever, and threw away the message — which for the Docker
+  // driver is where the build output lives.
+  it('records ERROR and keeps the message when the driver fails', async () => {
+    stageStartableRow();
+    active.provider = {
+      ...mockProvider,
+      uploadFiles: vi.fn().mockResolvedValue([]),
+      createDeploymentWithFiles: vi
+        .fn()
+        .mockRejectedValue(new AppError('build failed\n\nerror TS2322', 502, 'UPSTREAM_FAILURE')),
+    };
+
+    await expect(DeploymentService.getInstance().startDeployment('row-1')).rejects.toThrow(
+      'error TS2322'
+    );
+
+    const errorWrite = mockPool.query.mock.calls
+      .concat(mockClient.query.mock.calls)
+      .find(([, params]) => JSON.stringify(params ?? []).includes('error TS2322'));
+    expect(errorWrite).toBeDefined();
+  });
+
+  // A 4xx is the caller's own request — files not uploaded, no build command. Marking the row
+  // ERROR would make the corrected retry fail with "not ready to start".
+  it('leaves the row retryable when the driver refuses the request', async () => {
+    stageStartableRow();
+    active.provider = {
+      ...mockProvider,
+      uploadFiles: vi.fn().mockResolvedValue([]),
+      createDeploymentWithFiles: vi
+        .fn()
+        .mockRejectedValue(new AppError('needs a build command', 400, 'INVALID_INPUT')),
+    };
+
+    await expect(DeploymentService.getInstance().startDeployment('row-1')).rejects.toThrow(
+      'needs a build command'
+    );
+
+    const statusWrites = mockPool.query.mock.calls
+      .concat(mockClient.query.mock.calls)
+      .filter(([sql]) => String(sql).includes('SET status'))
+      .map(([, params]) => JSON.stringify(params ?? []));
+    expect(statusWrites.some((params) => params.includes('ERROR'))).toBe(false);
+  });
+});
+
+describe('errors from the deployment provider', () => {
+  // `UpstreamError` carries the status the provider returned. Vercel answers 401 when the
+  // stored token is stale — and the dashboard client treats any 401 as a dead session, so it
+  // clears tokens and logs the admin out. Before this PR added a rethrow here, everything
+  // became a 500; the leak is new, so it stops here.
+  it('does not pass an upstream 401 through as our own', async () => {
+    active.provider = {
+      ...mockProvider,
+      domains: {
+        list: vi.fn().mockRejectedValue(new UpstreamError({ response: { status: 401 } }, 'nope')),
+        url: vi.fn(),
+        add: vi.fn(),
+        remove: vi.fn(),
+        verify: vi.fn(),
+        get: vi.fn(),
+        config: vi.fn(),
+      },
+    };
+
+    await expect(DeploymentService.getInstance().listCustomDomains()).rejects.toThrow(
+      expect.objectContaining({ statusCode: 502 })
+    );
+  });
+
+  // A driver that owns no domains still says so with its own 400.
+  it('keeps a driver refusal as the 400 it is', async () => {
+    active.provider = { ...mockProvider, domains: undefined };
+
+    await expect(DeploymentService.getInstance().listCustomDomains()).rejects.toThrow(
+      expect.objectContaining({ statusCode: 400 })
+    );
+  });
+});
+
+describe('DeploymentService.getMetadata with no driver configured', () => {
+  // A documented 200 endpoint, fetched on the dashboard home. Reading `this.provider`
+  // unguarded turned it into a 503 for any instance without a sites driver — the deployment
+  // id and default URL come from the row and need no driver at all.
+  it('answers with nulls rather than 503', async () => {
+    noDriver.configured = false;
+    mockPool.query.mockResolvedValueOnce({ rows: [] });
+
+    await expect(DeploymentService.getInstance().getMetadata()).resolves.toEqual({
+      currentDeploymentId: null,
+      defaultDomainUrl: null,
+      customDomainUrl: null,
+    });
+  });
+});
+
+describe('the deploy-path environment write', () => {
+  // The deploy write went straight to the secret row while the management API went through a
+  // queue, so a dashboard save racing a deploy lost one of the two. Asserted on the outcome
+  // rather than on overlap: one serialized write reads the row twice, so a naive "two reads
+  // in flight" check flags itself.
+  it('shares the queue with the management API, so neither write is lost', async () => {
+    const secrets = await import('../../src/services/secrets/secret.service.js');
+    let stored: Array<{ key: string; value: string }> = [];
+    vi.spyOn(secrets.SecretService.getInstance(), 'getSecretByKey').mockImplementation((() =>
+      Promise.resolve(JSON.stringify(stored))) as never);
+    // A write that takes a moment, which is what makes the ordering observable at all: with an
+    // instantly-resolving mock both orderings produce the same result, and the test cannot tell
+    // a queued write from an unqueued one.
+    vi.spyOn(secrets.SecretService.getInstance(), 'updateSecretByKey').mockImplementation(
+      ((_key: string, patch: { value: string }) =>
+        new Promise((resolve) =>
+          setTimeout(() => {
+            stored = JSON.parse(patch.value) as Array<{ key: string; value: string }>;
+            resolve(undefined);
+          }, 10)
+        )) as never
+    );
+
+    const service = DeploymentService.getInstance();
+    const store = service.envVarStore();
+    // Deploy queued first, dashboard second. The deploy replaces the whole set on purpose,
+    // so the only question is whether the dashboard's read-modify-write sees that write or a
+    // snapshot from before it. Unqueued, its `load()` runs immediately, sees an empty set, and
+    // its write drops the deploy's variable.
+    await Promise.all([
+      (
+        service as unknown as { applyEnvVars: (v: unknown, p: unknown) => Promise<unknown> }
+      ).applyEnvVars([{ key: 'FROM_DEPLOY', value: '2' }], active.provider),
+      store.upsert([{ key: 'FROM_DASHBOARD', value: '1' }]),
+    ]);
+
+    expect(stored.map((envVar) => envVar.key).sort()).toEqual(['FROM_DASHBOARD', 'FROM_DEPLOY']);
   });
 });

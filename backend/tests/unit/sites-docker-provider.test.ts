@@ -1486,6 +1486,28 @@ describe('DockerSitesProvider.runtimeLogs', () => {
     expect(dockerContainerLogs).toHaveBeenCalledWith('server-live', { limit: 20 });
   });
 
+  // A failed build is the normal failure of a source deploy, and its output is the only
+  // thing that tells the developer why. `build.logs` is discarded with the call, and the
+  // metadata write that records logs on success is never reached — so the tail travels in
+  // the error message.
+  it('carries the build output in the failure', async () => {
+    dockerBuild.mockResolvedValue({
+      ok: false,
+      error: 'Docker build failed',
+      logs: ['Step 3/6 : RUN npm run build', "src/app.tsx(3,7): error TS2322: Type 'number'"],
+    });
+    const provider = DockerSitesProvider.getInstance();
+    const files = await provider.uploadFiles([
+      { path: 'package.json', content: Buffer.from('{}') },
+    ]);
+
+    await expect(
+      provider.createDeploymentWithFiles(files, {
+        projectSettings: { buildCommand: 'npm run build' },
+      })
+    ).rejects.toThrow(/error TS2322/);
+  });
+
   // Cancelling a deployment the switch already stopped is the common case — the daemon
   // answers 304, and when that counted as an error the caller got a 500 and the row was never
   // marked CANCELED.

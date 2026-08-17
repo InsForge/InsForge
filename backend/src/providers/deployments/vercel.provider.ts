@@ -202,10 +202,16 @@ export class VercelProvider implements SitesProvider {
    * history list. A driver that has them reports true and the dashboard offers them.
    */
   capabilities(): SitesCapabilities {
+    // Slugs and domains are cloud-only: `getSlug()` returns null off-cloud and `updateSlug()`
+    // refuses with 503 "only available in cloud environment", because both live in the
+    // InsForge Cloud API rather than in Vercel. Reporting them as available on a self-host
+    // that happens to hold Vercel credentials is the exact failure this slice exists to
+    // prevent — a client offering a button whose endpoint refuses.
+    const cloudManaged = isCloudEnvironment();
     return {
       envVars: 'runtime',
-      customDomains: true,
-      slug: true,
+      customDomains: cloudManaged,
+      slug: cloudManaged,
       rollback: false,
       buildLogs: false,
       runtimeLogs: false,

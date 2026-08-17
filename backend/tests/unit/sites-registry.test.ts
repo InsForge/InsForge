@@ -211,7 +211,10 @@ describe('getSitesMetadata', () => {
     });
   });
 
-  it('publishes the active driver capabilities', () => {
+  // Off-cloud, slugs and custom domains are not Vercel's to give: both live in the InsForge
+  // Cloud API, `getSlug()` returns null and `updateSlug()` refuses with 503. Publishing them
+  // as available is the "button whose endpoint refuses" this slice exists to prevent.
+  it('publishes the active driver capabilities, without the cloud-only ones', () => {
     configureVercel();
 
     expect(getSitesMetadata()).toEqual({
@@ -219,8 +222,8 @@ describe('getSitesMetadata', () => {
       providers: {
         vercel: {
           envVars: 'runtime',
-          customDomains: true,
-          slug: true,
+          customDomains: false,
+          slug: false,
           rollback: false,
           buildLogs: false,
           runtimeLogs: false,
@@ -229,6 +232,16 @@ describe('getSitesMetadata', () => {
           defaultIngress: 'host',
         },
       },
+    });
+  });
+
+  it('publishes them on a cloud project, where those endpoints work', () => {
+    configureVercel();
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'insforge-instance-profile';
+
+    expect(getSitesMetadata()?.providers.vercel).toMatchObject({
+      customDomains: true,
+      slug: true,
     });
   });
 });
