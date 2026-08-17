@@ -1,6 +1,7 @@
 import { Pool, type PoolClient } from 'pg';
 import AdmZip from 'adm-zip';
 import crypto from 'crypto';
+import { inflateRawSync } from 'node:zlib';
 import { Transform, type Readable, type TransformCallback } from 'stream';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import {
@@ -141,7 +142,10 @@ export class DeploymentService {
     // rollback and logs for a perfectly healthy Docker deployment — because Vercel credentials
     // had gone stale. A row that names its driver does not need the default to exist.
     if (name) {
-      const registry = buildSitesRegistry();
+      // Not enforcing the configured default: this call only needs the driver the row names, and
+      // an unusable default (stale Vercel credentials, `SITES_PROVIDER=off`) would otherwise
+      // throw here and strand a healthy Docker deployment's rollback and logs.
+      const registry = buildSitesRegistry({ enforceRequested: false });
       const owner = registry.providers.get(name as SitesProviderName);
       if (owner) {
         return owner;
@@ -754,6 +758,9 @@ export class DeploymentService {
       // transient upstream 502 would be permanent, where before it left the row UPLOADING and
       // retryable by accident. The files are still registered, so retrying in place is exactly
       // what a caller wants.
+      //
+      // Bounded by staging retention on the Docker driver: blobs are swept after a day, so a
+      // retry later than that fails with "was never uploaded" and the caller re-uploads.
       if (
         deployment.status !== DeploymentStatus.WAITING &&
         deployment.status !== DeploymentStatus.UPLOADING &&
@@ -969,18 +976,12 @@ export class DeploymentService {
         filePath = filePath.substring(2);
       }
 
-      const content = entry.getData();
-      // The declared sizes are the archive's own claim; this is what actually landed. A zip
-      // that under-reports is the whole point of the trick.
+      // Bounded *during* decompression, not after it. `getData()` inflates the whole entry
+      // first, so an archive that under-reports its sizes — the whole point of the trick — got
+      // one full allocation before any check could see it. zlib's own `maxOutputLength` stops
+      // at the ceiling and throws instead.
+      const content = this.inflateEntryWithin(entry, maxTotalBytes - extracted);
       extracted += content.length;
-      if (extracted > maxTotalBytes) {
-        throw new AppError(
-          `The source archive expands past the ${maxTotalBytes}-byte limit.`,
-          400,
-          ERROR_CODES.DEPLOYMENT_INVALID_FILE,
-          'Build the site first and deploy the output directory, or raise the deployment size limit.'
-        );
-      }
 
       files.push({
         path: this.normalizeDeploymentFilePath(filePath),
@@ -989,6 +990,50 @@ export class DeploymentService {
     }
 
     return files;
+  }
+
+  /**
+   * One zip entry, decompressed with a hard output ceiling.
+   *
+   * Stored entries (method 0) are already bounded by the archive itself, which the upload cap
+   * covers. Deflated ones go through zlib with `maxOutputLength`, which throws
+   * ERR_BUFFER_TOO_LARGE rather than allocating past the budget.
+   */
+  private inflateEntryWithin(
+    entry: {
+      header: { method: number; size: number };
+      getData: () => Buffer;
+      getCompressedData: () => Buffer;
+    },
+    remainingBytes: number
+  ): Buffer {
+    const budget = Math.max(remainingBytes, 0);
+    if (entry.header.method === 0) {
+      const stored = entry.getData();
+      if (stored.length > budget) {
+        throw this.archiveTooLarge();
+      }
+      return stored;
+    }
+    try {
+      // +1 so a file that exactly fills the budget still succeeds and the caller's own check
+      // decides, rather than zlib throwing on the boundary.
+      return inflateRawSync(entry.getCompressedData(), { maxOutputLength: budget + 1 });
+    } catch (error) {
+      if (error instanceof Error && (error as { code?: string }).code === 'ERR_BUFFER_TOO_LARGE') {
+        throw this.archiveTooLarge();
+      }
+      throw error;
+    }
+  }
+
+  private archiveTooLarge(): AppError {
+    return new AppError(
+      `The source archive expands past the ${this.getMaxDeploymentTotalBytes()}-byte limit.`,
+      400,
+      ERROR_CODES.DEPLOYMENT_INVALID_FILE,
+      'Build the site first and deploy the output directory, or raise the deployment size limit.'
+    );
   }
 
   private async createProviderDeploymentFromUploadedFiles(

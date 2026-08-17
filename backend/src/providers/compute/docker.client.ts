@@ -24,6 +24,8 @@ export class DockerHttpError extends Error {
 }
 
 export interface DockerRawResponse {
+  /** True when the read stopped at `maxBytes` and the rest of the response was discarded. */
+  truncated?: boolean;
   status: number;
   body: Buffer;
 }
@@ -90,15 +92,16 @@ export function dockerRequestRaw(
     contentType?: string;
     timeoutMs?: number;
     /**
-     * Stop reading after this many bytes and return what arrived.
+     * Stop reading as soon as this says the caller has enough, and resolve with what arrived.
      *
-     * For the logs endpoint, where `since` has no upper bound: a container that wrote a large
-     * backlog since the caller's cursor would otherwise be buffered whole, on a host the
-     * driver itself describes as a 2GB VPS. Truncating is safe for that caller because the
-     * cursor only ever advances over lines it actually returned — the next page resumes at the
-     * cut.
+     * A byte cap cannot be the pagination boundary. `since` floors to whole seconds, so a
+     * resumed page re-reads that second's already-delivered lines first; if that replay alone
+     * exceeded the cap, every call read the same bytes, stopped at the same place, filtered the
+     * same lines and returned an empty page with an unchanged cursor — everything after that
+     * point unreachable. Letting the caller decide bounds the read by what it actually needs
+     * (`limit` new lines) instead, which cannot stall and cannot skip.
      */
-    maxBytes?: number;
+    stopWhen?: (accumulated: Buffer) => boolean;
   } = {}
 ): Promise<DockerRawResponse> {
   const payload =
@@ -121,6 +124,7 @@ export function dockerRequestRaw(
       (res) => {
         const chunks: Buffer[] = [];
         let size = 0;
+        let checkedAt = 0;
         let truncated = false;
         res.on('data', (c: Buffer) => {
           if (truncated) {
@@ -128,12 +132,18 @@ export function dockerRequestRaw(
           }
           chunks.push(c);
           size += c.length;
-          if (options.maxBytes !== undefined && size >= options.maxBytes) {
-            truncated = true;
-            // `destroy` rather than `pause`: the caller has all it can use, and leaving the
-            // socket open on a live-tailing endpoint keeps the daemon streaming into nothing.
-            res.destroy();
-            resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks) });
+          // Throttled: the predicate parses what has arrived, and running it per chunk would
+          // make the read quadratic in the number of chunks.
+          if (options.stopWhen && size - checkedAt >= STOP_CHECK_INTERVAL_BYTES) {
+            checkedAt = size;
+            const accumulated = Buffer.concat(chunks);
+            if (options.stopWhen(accumulated)) {
+              truncated = true;
+              // `destroy` rather than `pause`: the caller has all it can use, and leaving the
+              // socket open on a live-tailing endpoint keeps the daemon streaming into nothing.
+              res.destroy();
+              resolve({ status: res.statusCode ?? 0, body: accumulated, truncated: true });
+            }
           }
         });
         res.on('end', () => {
@@ -443,11 +453,28 @@ export interface DockerLogsPage {
 }
 
 /** An opaque cursor is a nanosecond watermark; an unparseable one starts from the top. */
+/** How often `stopWhen` runs, in bytes read. Small enough to stop promptly, large enough that
+ * parsing the accumulated buffer stays cheap. */
+const STOP_CHECK_INTERVAL_BYTES = 256 * 1024;
+
 /**
- * How much of a log backlog one page may read. 4 MB is far more than any 1000-line page needs
- * and small enough to be irrelevant next to the process heap.
+ * How many lines newer than `watermark` are in a partial response.
+ *
+ * Only complete frames count: a frame cut by the end of the buffer is this read's boundary, not
+ * a line, and counting it would let the read stop one line short.
  */
-const LOGS_READ_MAX_BYTES = 4 * 1024 * 1024;
+function countNewLines(accumulated: Buffer, watermark: bigint | null): number {
+  let count = 0;
+  for (const frame of demuxDockerStream(accumulated)) {
+    for (const raw of frame.text.split('\n')) {
+      const parsed = raw.trim() ? parseLogLine(raw) : null;
+      if (parsed && (watermark === null || parsed.nanos > watermark)) {
+        count += 1;
+      }
+    }
+  }
+  return count;
+}
 
 export function parseLogWatermark(token: string): bigint | null {
   try {
@@ -501,10 +528,13 @@ export async function dockerContainerLogs(
   const res = await request(
     'GET',
     `/containers/${encodeURIComponent(containerId)}/logs?${params.toString()}`,
-    // Bounded: resuming from a cursor sends `since` with no ceiling, so the daemon replays
-    // everything written since. The page itself is already capped at `limit` below; this caps
-    // what has to be held in memory to compute it.
-    { timeoutMs: 15_000, maxBytes: LOGS_READ_MAX_BYTES }
+    // Bounded by need, not by bytes: resuming sends `since` with no ceiling, so the daemon
+    // replays that second and then everything after it. Stop once `limit` lines newer than the
+    // cursor have arrived — the rest is the next page's business.
+    {
+      timeoutMs: 15_000,
+      stopWhen: (accumulated) => countNewLines(accumulated, watermark) > limit,
+    }
   );
   if (res.status < 200 || res.status >= 300) {
     throw new DockerHttpError(
@@ -514,6 +544,9 @@ export async function dockerContainerLogs(
   }
 
   const entries: { line: DockerLogLine; nanos: bigint }[] = [];
+  // The newest timestamp anywhere in this read, including lines filtered out as already
+  // delivered. Only used when the read was truncated — see the cursor decision below.
+  let seenHighest: bigint | null = null;
   for (const frame of demuxDockerStream(res.body)) {
     for (const raw of frame.text.split('\n')) {
       if (!raw.trim()) {
@@ -522,6 +555,9 @@ export async function dockerContainerLogs(
       const parsed = parseLogLine(raw);
       if (!parsed) {
         continue;
+      }
+      if (seenHighest === null || parsed.nanos > seenHighest) {
+        seenHighest = parsed.nanos;
       }
       // Inclusive `since` re-delivers everything in the boundary second.
       if (watermark !== null && parsed.nanos <= watermark) {
@@ -543,6 +579,15 @@ export async function dockerContainerLogs(
     if (highest === null || entry.nanos > highest) {
       highest = entry.nanos;
     }
+  }
+  // A truncated read that yielded no new lines would otherwise return the same cursor forever:
+  // `since` floors to the watermark's second, so the next call re-reads the same prefix, stops
+  // at the same byte, and filters the same already-delivered lines. Everything after that
+  // point becomes unreachable. Advancing over what this read *saw* — all of it already
+  // delivered — guarantees the next call starts past the prefix. Lines beyond the cut carry
+  // higher timestamps, so nothing is skipped.
+  if (page.length === 0 && res.truncated && seenHighest !== null) {
+    highest = highest === null || seenHighest > highest ? seenHighest : highest;
   }
   return {
     lines: page.map((entry) => entry.line),

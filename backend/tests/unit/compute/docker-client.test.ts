@@ -403,28 +403,37 @@ describe('dockerRequest status handling', () => {
     }
   });
 
-  // Resuming from a cursor sends `since` with no ceiling, so the daemon replays everything
-  // written since — buffered whole, on a host the driver itself describes as a 2GB VPS.
-  it('stops reading once maxBytes is reached', async () => {
+  // The read stops when the caller says it has enough, not at a byte count: a byte cap cannot
+  // be the pagination boundary, because `since` floors to whole seconds and a replay prefix
+  // larger than the cap makes every call read the same bytes and return an empty page forever.
+  it('stops reading when the caller says it has enough', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'insforge-docker-client-'));
     const socket = path.join(dir, 'docker.sock');
+    let written = 0;
     const server = createHttpServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
-      // Far more than the ceiling, written in chunks so the read can stop mid-stream.
-      for (let i = 0; i < 40; i += 1) {
-        res.write(Buffer.alloc(64 * 1024, 0x61));
-      }
-      res.end();
+      const send = () => {
+        // More than the stop-check interval each time, so the predicate runs.
+        res.write(Buffer.alloc(512 * 1024, 0x61));
+        written += 512 * 1024;
+        if (written < 8 * 1024 * 1024) {
+          setImmediate(send);
+        } else {
+          res.end();
+        }
+      };
+      send();
     });
     await new Promise<void>((resolve) => server.listen(socket, resolve));
     const previous = configMock.docker.socketPath;
     configMock.docker.socketPath = socket;
     try {
       const res = await dockerRequestRaw('GET', '/containers/abc/logs', {
-        maxBytes: 128 * 1024,
+        // Stop at the first check, whatever arrived.
+        stopWhen: () => true,
       });
-      expect(res.body.length).toBeGreaterThanOrEqual(128 * 1024);
-      expect(res.body.length).toBeLessThan(40 * 64 * 1024);
+      expect(res.truncated).toBe(true);
+      expect(res.body.length).toBeLessThan(8 * 1024 * 1024);
     } finally {
       configMock.docker.socketPath = previous;
       await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -441,6 +450,97 @@ describe('dockerRequest status handling', () => {
     } finally {
       await stop();
     }
+  });
+});
+
+describe('a resumed page reads only as far as it needs', () => {
+  // The replay of the boundary second comes first, then the new lines. The read must stop after
+  // `limit` new ones — not at a byte count, which a large replay would hit first, returning an
+  // empty page with an unchanged cursor and making everything after it unreachable.
+  it('stops once limit new lines have arrived', async () => {
+    const watermark = 1786056693200000000n;
+    // Full nanosecond precision, which is the point: a millisecond-only timestamp makes lines a
+    // microsecond apart parse as identical, and the first version of this test filtered every
+    // "new" line for exactly that reason.
+    const at = (nanos: bigint) => {
+      const seconds = nanos / 1000000000n;
+      const fraction = (nanos % 1000000000n).toString().padStart(9, '0');
+      const iso = new Date(Number(seconds) * 1000).toISOString().replace('.000Z', '');
+      return `${iso}.${fraction}Z line-${nanos}`;
+    };
+    // Two already-delivered lines, then five newer ones.
+    const body = [
+      at(watermark - 2000n),
+      at(watermark - 1000n),
+      at(watermark + 1000n),
+      at(watermark + 2000n),
+      at(watermark + 3000n),
+      at(watermark + 4000n),
+      at(watermark + 5000n),
+    ].join('\n');
+    let sawPredicate = false;
+    const transport = vi.fn(
+      async (_method: string, _path: string, options?: { stopWhen?: (b: Buffer) => boolean }) => {
+        const buffer = frame(body);
+        if (options?.stopWhen) {
+          sawPredicate = true;
+          // The predicate is what bounds the read; assert it counts only lines past the cursor.
+          expect(options.stopWhen(buffer)).toBe(true);
+        }
+        return { status: 200, body: buffer };
+      }
+    );
+
+    const result = await dockerContainerLogs(
+      'container-abc',
+      { limit: 3, nextToken: watermark.toString() },
+      transport as never
+    );
+
+    expect(sawPredicate).toBe(true);
+    expect(result.lines).toHaveLength(3);
+    // The cursor is the last line actually returned, so the two it did not return come next.
+    expect(result.nextToken).toBe((watermark + 3000n).toString());
+  });
+
+  // The predicate must count only lines past the cursor. Counting the replay as well would stop
+  // the read while the caller still needs new lines — which is how the byte-cap version stalled,
+  // just with a different trigger.
+  it('does not count already-delivered lines towards the limit', async () => {
+    const watermark = 1786056693200000000n;
+    const at = (nanos: bigint) => {
+      const seconds = nanos / 1000000000n;
+      const fraction = (nanos % 1000000000n).toString().padStart(9, '0');
+      const iso = new Date(Number(seconds) * 1000).toISOString().replace('.000Z', '');
+      return `${iso}.${fraction}Z line-${nanos}`;
+    };
+    // Five already delivered, two new, asking for three.
+    const body = [
+      at(watermark - 5000n),
+      at(watermark - 4000n),
+      at(watermark - 3000n),
+      at(watermark - 2000n),
+      at(watermark - 1000n),
+      at(watermark + 1000n),
+      at(watermark + 2000n),
+    ].join('\n');
+    let verdict: boolean | undefined;
+    const transport = vi.fn(
+      async (_method: string, _path: string, options?: { stopWhen?: (b: Buffer) => boolean }) => {
+        const buffer = frame(body);
+        verdict = options?.stopWhen?.(buffer);
+        return { status: 200, body: buffer };
+      }
+    );
+
+    await dockerContainerLogs(
+      'container-abc',
+      { limit: 3, nextToken: watermark.toString() },
+      transport as never
+    );
+
+    // Seven lines in the buffer, but only two are past the cursor — so it keeps reading.
+    expect(verdict).toBe(false);
   });
 });
 

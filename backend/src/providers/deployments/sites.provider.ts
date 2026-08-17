@@ -2,6 +2,7 @@ import type { Readable } from 'stream';
 
 import type {
   ProjectSettings,
+  RuntimeLogsResponse,
   SitesCapabilitiesSchema,
   SitesProviderName as SitesProviderNameSchema,
 } from '@insforge/shared-schemas';
@@ -106,6 +107,16 @@ export interface ProjectDomain {
  * `capabilities().envVars === 'runtime'`; a driver that bakes values into the artifact
  * has nothing to list or delete afterwards and omits this.
  */
+/**
+ * Where a driver keeps environment variables.
+ *
+ * One caveat on the "present when the capability says so" rule below: a driver may report
+ * `runtime` and still omit this, in which case the *service* supplies a store backed by the
+ * encrypted secret table. The Docker driver does exactly that — it has nowhere of its own to
+ * keep values, but a server-rendered deployment reads them per request, so `runtime` is the
+ * honest capability. Callers should reach the store through `DeploymentService.envVarStore()`
+ * rather than off the provider.
+ */
 export interface EnvVarStore {
   upsert(envVars: Array<{ key: string; value: string }>): Promise<void>;
   keys(): Promise<string[]>;
@@ -208,7 +219,7 @@ export interface SitesProvider {
   runtimeLogs?(
     providerDeploymentId: string,
     options?: { limit?: number; nextToken?: string }
-  ): Promise<{ lines: Array<{ timestamp: number; message: string }>; nextToken: string | null }>;
+  ): Promise<RuntimeLogsResponse>;
 
   /**
    * Make a previous deployment live again without rebuilding it. Present when

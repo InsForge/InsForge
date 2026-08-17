@@ -74,7 +74,8 @@ beforeEach(() => {
 });
 
 afterAll(() => {
-  socketServer.close();
+  // The socket is closed by the hook that created it, above — closing it twice hits an
+  // already-closed server.
   if (savedProfile === undefined) {
     delete process.env.AWS_INSTANCE_PROFILE_NAME;
   } else {
@@ -311,5 +312,28 @@ describe('what reaches Vercel from projectSettings', () => {
       outputDirectory: 'dist',
     });
     post.mockRestore();
+  });
+});
+
+describe('buildSitesRegistry({ enforceRequested: false })', () => {
+  // Row-scoped operations ask only "which drivers work here". A deployment made by a working
+  // Docker driver must stay operable when SITES_PROVIDER names Vercel and its credentials have
+  // since gone stale — enforcing the default first threw before the row's driver was consulted.
+  it('lists the working drivers even when the configured default is unusable', () => {
+    process.env.SITES_PROVIDER = 'vercel';
+    mountDockerSocket();
+
+    expect(() => buildSitesRegistry()).toThrow('no Vercel credentials');
+    expect([...buildSitesRegistry({ enforceRequested: false }).providers.keys()]).toEqual([
+      'docker',
+    ]);
+  });
+
+  it('still refuses when nothing at all works', () => {
+    process.env.SITES_PROVIDER = 'vercel';
+
+    expect(() => buildSitesRegistry({ enforceRequested: false })).toThrow(
+      'No sites provider is configured'
+    );
   });
 });

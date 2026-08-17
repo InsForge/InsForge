@@ -1379,6 +1379,12 @@ export class DockerSitesProvider implements SitesProvider {
   /**
    * Delete staged blobs older than a day.
    *
+   * The one interaction to know about: an ERROR row stays startable, so a deploy can be retried
+   * in place — but its staged inputs are gone once they pass the age below, and the retry then
+   * fails with "was never uploaded" and has to re-upload. Tracking which blobs a retryable row
+   * still needs would mean teaching this driver about `deployments.files`, which is the service's
+   * table; a day is long enough that the retry is a fresh upload anyway.
+   *
    * Staging only bridges upload and build: once an image exists the bytes live in it, and
    * rollback starts an image rather than re-tarring. Nothing else reclaimed them, so every
    * deployment left its files behind for good — including the files of builds that failed,

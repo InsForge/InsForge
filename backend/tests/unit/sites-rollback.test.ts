@@ -817,6 +817,30 @@ describe('a zip that expands past the size limit', () => {
     expect(() => service.extractFilesFromZip(zip.toBuffer())).toThrow(/expands/);
   });
 
+  // The declared sizes are the archive's own claim. An entry that lies gets one full
+  // allocation before any check sees it — unless the decompression itself is bounded.
+  it('is refused even when the entry understates its size', async () => {
+    const service = DeploymentService.getInstance() as unknown as {
+      extractFilesFromZip: (buffer: Buffer) => unknown;
+      getMaxDeploymentTotalBytes: () => number;
+    };
+    const limit = service.getMaxDeploymentTotalBytes();
+    const AdmZip = (await import('adm-zip')).default;
+    const zip = new AdmZip();
+    zip.addFile('big.bin', Buffer.alloc(limit * 4, 0));
+    const buffer = zip.toBuffer();
+    // Rewrite both uncompressed-size fields to 1 byte: the local header and the central
+    // directory. AdmZip reads the central directory, and the pre-check trusts it.
+    const lie = Buffer.from(buffer);
+    for (let i = 0; i + 4 <= lie.length; i += 1) {
+      if (lie.readUInt32LE(i) === limit * 4) {
+        lie.writeUInt32LE(1, i);
+      }
+    }
+
+    expect(() => service.extractFilesFromZip(lie)).toThrow(/expands/);
+  });
+
   it('lets an ordinary archive through', async () => {
     const service = DeploymentService.getInstance() as unknown as {
       extractFilesFromZip: (buffer: Buffer) => Array<{ path: string }>;

@@ -27,10 +27,15 @@ export interface SitesRegistry {
  * here rather than 500-ing on the first deploy, and a driver registers on
  * `isConfigured()` alone, never on having been requested.
  */
-export function buildSitesRegistry(): SitesRegistry {
+export function buildSitesRegistry(options: { enforceRequested?: boolean } = {}): SitesRegistry {
+  // `enforceRequested: false` asks only "which drivers work here", skipping the complaints about
+  // the configured *default*. Row-scoped operations need that: a deployment made by a working
+  // Docker driver must stay operable when `SITES_PROVIDER=vercel` and Vercel's credentials have
+  // since gone stale, which otherwise threw before the row's own driver was ever looked up.
+  const enforceRequested = options.enforceRequested !== false;
   const requested = (process.env.SITES_PROVIDER || '').trim().toLowerCase();
 
-  if (requested === 'off') {
+  if (requested === 'off' && enforceRequested) {
     throw new AppError(
       'Sites are disabled (SITES_PROVIDER=off).',
       503,
@@ -53,7 +58,7 @@ export function buildSitesRegistry(): SitesRegistry {
   const providers = new Map<SitesProviderName, SitesProvider>();
   const vercel = VercelProvider.getInstance();
 
-  if (requested === 'vercel' && !vercel.isConfigured()) {
+  if (requested === 'vercel' && enforceRequested && !vercel.isConfigured()) {
     throw new AppError(
       'SITES_PROVIDER=vercel but no Vercel credentials are available.',
       503,
@@ -72,7 +77,7 @@ export function buildSitesRegistry(): SitesRegistry {
   const docker = DockerSitesProvider.getInstance();
   if (docker.isConfigured()) {
     providers.set('docker', docker);
-  } else if (requested === 'docker') {
+  } else if (requested === 'docker' && enforceRequested) {
     // Two different reasons, and conflating them would send an operator chasing a socket
     // mount that is not the problem. isConfigured() fails closed on our infrastructure
     // whether or not a socket exists — see the driver for why hosting customer containers

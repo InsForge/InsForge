@@ -135,7 +135,14 @@ function parseEnvInt(val: string | undefined, fallback: number): number {
   return parsed;
 }
 
-/** A host port, or 0 when unset or unusable. */
+/**
+ * A host port, or 0 when unset or unusable.
+ *
+ * `console.warn` rather than the project logger: this runs while the config object is being
+ * built, and the logger reads that config. The sibling `parseEnv*` helpers stay silent, which
+ * is why this is the only one that writes to the console — a fixed port being ignored is worth
+ * a line, since the symptom is "my site is not on the port I chose".
+ */
 function parseEnvPort(val: string | undefined): number {
   if (!val) return 0;
   if (val.trim() === '') {

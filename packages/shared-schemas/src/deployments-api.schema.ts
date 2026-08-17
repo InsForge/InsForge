@@ -205,7 +205,24 @@ export const getEnvVarResponseSchema = z.object({
  * Request to create or update an environment variable
  */
 export const upsertEnvVarRequestSchema = z.object({
-  key: z.string().trim().min(1, 'key is required'),
+  /**
+   * A shell-legal variable name, and not one a driver sets itself.
+   *
+   * Validated here rather than only at deploy time. The Docker driver rejects both classes
+   * when it builds — a name outside this charset cannot be an `ARG`, and `PORT`/`HOSTNAME`/
+   * `NODE_ENV` would shadow what the runtime image sets — but a value stored through the
+   * management API failed nothing until the *next* deploy, which then failed every time with
+   * an error pointing at the build rather than at the entry that caused it.
+   */
+  key: z
+    .string()
+    .trim()
+    .min(1, 'key is required')
+    .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'key must be a valid environment variable name')
+    .refine(
+      (key) => !['PORT', 'HOSTNAME', 'NODE_ENV'].includes(key),
+      'this name is set by the deployment runtime and cannot be overridden'
+    ),
   value: z.string(),
 });
 
