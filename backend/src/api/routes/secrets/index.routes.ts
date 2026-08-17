@@ -134,10 +134,8 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
             key,
             id: result.id,
             operationId,
-            auditError:
-              auditError instanceof Error ? auditError.message : 'unknown',
-            cleanupError:
-              cleanupError instanceof Error ? cleanupError.message : 'unknown',
+            auditError: auditError instanceof Error ? auditError.message : 'unknown',
+            cleanupError: cleanupError instanceof Error ? cleanupError.message : 'unknown',
           });
         }
         if (!cleanedUp) {
@@ -198,8 +196,8 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       });
     }
 
-    // Log audit
-    const audit = await auditService.log({
+    // Log audit (legacy path does not return auditId)
+    await auditService.log({
       actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'CREATE_SECRET',
       module: 'SECRETS',
