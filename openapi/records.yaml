@@ -445,6 +445,14 @@ components:
         Error body produced by PostgREST and forwarded unchanged by the proxy.
         These operations do not reshape upstream failures, so the fields are
         PostgREST's, not the platform `ErrorResponse` used elsewhere.
+
+        `code` and `message` are required so this schema cannot match a platform
+        `ErrorResponse`: without them every object would validate here, which
+        makes the `oneOf` on 400 match two alternatives and a strict validator
+        reject a legitimate response.
+      required:
+        - code
+        - message
       properties:
         code:
           type: string
