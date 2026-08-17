@@ -1,5 +1,5 @@
 import { DayPicker, type DayPickerProps } from 'react-day-picker';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 
 import { cn } from '../lib/utils';
 
@@ -14,7 +14,9 @@ function Calendar({ className, classNames, ...props }: DayPickerProps) {
     <DayPicker
       className={cn('w-fit', className)}
       classNames={{
-        months: 'relative',
+        // flex+gap so numberOfMonths > 1 lays out side by side instead of stacking flush; relative
+        // because the single shared nav is absolutely positioned across the whole set.
+        months: 'relative flex gap-4',
         month: 'flex flex-col gap-2',
         month_caption: 'flex h-8 items-center justify-center',
         caption_label: 'text-sm font-medium text-foreground',
@@ -41,12 +43,14 @@ function Calendar({ className, classNames, ...props }: DayPickerProps) {
         ...classNames,
       }}
       components={{
-        Chevron: ({ orientation, className: chevronClass }) =>
-          orientation === 'left' ? (
-            <ChevronLeft className={cn('size-4', chevronClass)} />
-          ) : (
-            <ChevronRight className={cn('size-4', chevronClass)} />
-          ),
+        // All four orientations: nav asks for left/right, but a dropdown caption asks for down,
+        // and folding every non-left case into ChevronRight points those the wrong way.
+        Chevron: ({ orientation = 'down', className: chevronClass }) => {
+          const Icon = { left: ChevronLeft, right: ChevronRight, up: ChevronUp, down: ChevronDown }[
+            orientation
+          ];
+          return <Icon className={cn('size-4', chevronClass)} />;
+        },
       }}
       {...props}
     />

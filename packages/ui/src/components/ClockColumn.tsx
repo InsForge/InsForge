@@ -1,3 +1,5 @@
+import * as React from 'react';
+
 import { cn } from '../lib/utils';
 
 /**
@@ -16,9 +18,14 @@ function ClockColumn({
   selected: string;
   onPick: (value: string) => void;
 }) {
-  // The current row is rarely near the top of 24, let alone 60.
-  const scrollSelectedIntoView = (el: HTMLButtonElement | null) =>
-    el?.scrollIntoView({ block: 'center' });
+  const selectedRef = React.useRef<HTMLButtonElement | null>(null);
+
+  // The current row is rarely near the top of 24, let alone 60. Keyed on the selection, not done in
+  // a callback ref: a ref recreated each render detaches and reattaches on every parent render,
+  // which would yank the column back to the selected row while someone is scrolling it.
+  React.useEffect(() => {
+    selectedRef.current?.scrollIntoView({ block: 'center' });
+  }, [selected]);
 
   return (
     <div className="flex max-h-64 flex-col gap-0.5 overflow-y-auto">
@@ -28,7 +35,9 @@ function ClockColumn({
           <button
             key={option}
             type="button"
-            ref={isSelected ? scrollSelectedIntoView : undefined}
+            // Colour alone does not tell assistive tech which row is current.
+            aria-pressed={isSelected}
+            ref={isSelected ? selectedRef : undefined}
             onClick={() => onPick(option)}
             className={cn(
               'rounded px-2 py-1 text-sm tabular-nums transition-colors',

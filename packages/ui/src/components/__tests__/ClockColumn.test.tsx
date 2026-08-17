@@ -20,24 +20,25 @@ describe('ClockColumn', () => {
     expect(onPick).toHaveBeenCalledWith('02');
   });
 
-  it('marks only the selected unit, and scrolls it into view', () => {
+  it('exposes the selection to assistive tech, not only in colour', () => {
+    render(<ClockColumn options={['00', '01', '02']} selected="01" onPick={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: '01', pressed: true })).toBeTruthy();
+    expect(screen.getAllByRole('button', { pressed: false })).toHaveLength(2);
+  });
+
+  it('marks the selected unit and scrolls it into view', () => {
     render(<ClockColumn options={['00', '01', '02']} selected="01" onPick={vi.fn()} />);
 
     // The selected row is the one carrying the inverted fill.
-    const selected = screen.getByRole('button', { name: '01' });
-    const other = screen.getByRole('button', { name: '00' });
-    expect(selected.className).toContain('var(--foreground)');
-    expect(other.className).not.toContain('var(--foreground)');
+    expect(screen.getByRole('button', { name: '01' }).className).toContain('var(--foreground)');
+    expect(screen.getByRole('button', { name: '00' }).className).not.toContain('var(--foreground)');
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
 
   it('marks nothing when the selection is not among the options', () => {
     render(<ClockColumn options={['00', '01']} selected="" onPick={vi.fn()} />);
 
-    for (const unit of ['00', '01']) {
-      expect(screen.getByRole('button', { name: unit }).className).not.toContain(
-        'var(--foreground)'
-      );
-    }
+    expect(screen.queryByRole('button', { pressed: true })).toBeNull();
   });
 });
