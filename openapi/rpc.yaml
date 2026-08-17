@@ -82,8 +82,12 @@ paths:
                   value: 42
         '400':
           description: |
-            Either the function name was rejected here, or PostgREST rejected
-            the arguments. The two cases return different bodies.
+            Either the function name was rejected here, or PostgREST rejected the
+            request itself. The two cases return different bodies.
+
+            Note that an argument-name mismatch is NOT a 400: PostgREST cannot
+            resolve the signature, so it reports `PGRST202` as a 404. See that
+            response below.
           content:
             application/json:
               schema:
@@ -99,12 +103,12 @@ paths:
                     statusCode: 400
                     nextActions: "The function name cannot contain double quotes or control characters (tabs, newlines, etc.)"
                 postgrest_rejected:
-                  summary: Arguments rejected by PostgREST, body forwarded verbatim
+                  summary: Request body rejected by PostgREST, body forwarded verbatim
                   value:
-                    code: "PGRST202"
-                    message: "Could not find the function public.search_posts(trm) in the schema cache"
+                    code: "PGRST102"
+                    message: "Empty or invalid json"
                     details: null
-                    hint: "Perhaps you meant to call public.search_posts(term)"
+                    hint: null
         '401':
           description: Missing or invalid credentials
           content:
@@ -181,8 +185,12 @@ paths:
                 description: Whatever the function returns
         '400':
           description: |
-            Either the function name was rejected here, or PostgREST rejected
-            the arguments. The two cases return different bodies.
+            Either the function name was rejected here, or PostgREST rejected the
+            request itself. The two cases return different bodies.
+
+            Note that an argument-name mismatch is NOT a 400: PostgREST cannot
+            resolve the signature, so it reports `PGRST202` as a 404. See that
+            response below.
           content:
             application/json:
               schema:
