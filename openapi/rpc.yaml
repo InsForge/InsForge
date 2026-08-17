@@ -117,19 +117,38 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: |
-            The JWT is valid but carries a role this proxy will not forward as.
-            Anything other than `project_admin`, `authenticated` or `anon`, for
-            example a role minted by hand, is refused before PostgREST is
-            contacted, so the body is the platform envelope rather than
-            PostgREST's.
+            Like the 400, this status has two bodies, because either layer can
+            refuse.
+
+            The proxy refuses first when the JWT is valid but carries a role it
+            will not forward as: anything other than `project_admin`,
+            `authenticated` or `anon`, for example a role minted by hand. That is
+            rejected before PostgREST is contacted, so the body is the platform
+            envelope.
+
+            PostgREST refuses when the resolved database role may not execute the
+            function, or when a policy denies it. That body is forwarded
+            unchanged, so it is PostgREST's.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "AUTH_UNAUTHORIZED"
-                message: "Invalid user role claim"
-                statusCode: 403
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/PostgrestError'
+              examples:
+                proxy_refused_role:
+                  summary: Role refused by this proxy before PostgREST is contacted
+                  value:
+                    error: "AUTH_UNAUTHORIZED"
+                    message: "Invalid user role claim"
+                    statusCode: 403
+                postgrest_denied:
+                  summary: Denied by PostgREST, body forwarded verbatim
+                  value:
+                    code: "42501"
+                    message: "permission denied for function search_posts"
+                    details: null
+                    hint: null
         '404':
           description: |
             Function not found in the target schema. Reported by PostgREST and
@@ -205,19 +224,38 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: |
-            The JWT is valid but carries a role this proxy will not forward as.
-            Anything other than `project_admin`, `authenticated` or `anon`, for
-            example a role minted by hand, is refused before PostgREST is
-            contacted, so the body is the platform envelope rather than
-            PostgREST's.
+            Like the 400, this status has two bodies, because either layer can
+            refuse.
+
+            The proxy refuses first when the JWT is valid but carries a role it
+            will not forward as: anything other than `project_admin`,
+            `authenticated` or `anon`, for example a role minted by hand. That is
+            rejected before PostgREST is contacted, so the body is the platform
+            envelope.
+
+            PostgREST refuses when the resolved database role may not execute the
+            function, or when a policy denies it. That body is forwarded
+            unchanged, so it is PostgREST's.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "AUTH_UNAUTHORIZED"
-                message: "Invalid user role claim"
-                statusCode: 403
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/PostgrestError'
+              examples:
+                proxy_refused_role:
+                  summary: Role refused by this proxy before PostgREST is contacted
+                  value:
+                    error: "AUTH_UNAUTHORIZED"
+                    message: "Invalid user role claim"
+                    statusCode: 403
+                postgrest_denied:
+                  summary: Denied by PostgREST, body forwarded verbatim
+                  value:
+                    code: "42501"
+                    message: "permission denied for function search_posts"
+                    details: null
+                    hint: null
         '404':
           description: |
             Function not found in the target schema. Reported by PostgREST and
