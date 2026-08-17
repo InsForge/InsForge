@@ -119,9 +119,10 @@ paths:
                 localValidation:
                   summary: Rejected by the platform before PostgREST is called
                   value:
-                    error: INVALID_INPUT
-                    message: Invalid table name
+                    error: DATABASE_VALIDATION_ERROR
+                    message: 'Invalid table name: cannot contain quotes or control characters'
                     statusCode: 400
+                    nextActions: The table name cannot contain double quotes or control characters (tabs, newlines, etc.)
                 postgrestRejection:
                   summary: Rejected by PostgREST, body forwarded unchanged
                   value:
@@ -210,9 +211,10 @@ paths:
                 localValidation:
                   summary: Rejected by the platform before PostgREST is called
                   value:
-                    error: INVALID_INPUT
-                    message: Invalid table name
+                    error: DATABASE_VALIDATION_ERROR
+                    message: 'Invalid table name: cannot contain quotes or control characters'
                     statusCode: 400
+                    nextActions: The table name cannot contain double quotes or control characters (tabs, newlines, etc.)
                 postgrestRejection:
                   summary: Rejected by PostgREST, body forwarded unchanged
                   value:
@@ -324,9 +326,10 @@ paths:
                 localValidation:
                   summary: Rejected by the platform before PostgREST is called
                   value:
-                    error: INVALID_INPUT
-                    message: Invalid table name
+                    error: DATABASE_VALIDATION_ERROR
+                    message: 'Invalid table name: cannot contain quotes or control characters'
                     statusCode: 400
+                    nextActions: The table name cannot contain double quotes or control characters (tabs, newlines, etc.)
                 postgrestRejection:
                   summary: Rejected by PostgREST, body forwarded unchanged
                   value:
@@ -418,9 +421,10 @@ paths:
                 localValidation:
                   summary: Rejected by the platform before PostgREST is called
                   value:
-                    error: INVALID_INPUT
-                    message: Invalid table name
+                    error: DATABASE_VALIDATION_ERROR
+                    message: 'Invalid table name: cannot contain quotes or control characters'
                     statusCode: 400
+                    nextActions: The table name cannot contain double quotes or control characters (tabs, newlines, etc.)
                 postgrestRejection:
                   summary: Rejected by PostgREST, body forwarded unchanged
                   value:
