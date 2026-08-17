@@ -98,16 +98,37 @@ paths:
                 details: null
                 hint: null
         '400':
-          description: Invalid filter or query. Body is PostgREST's, forwarded unchanged.
+          description: |
+            Two different bodies share this status, because two different layers
+            can reject the request.
+
+            The platform validates the table name and the `?schema=` selection
+            before PostgREST is contacted (`validateTableName`, and the schema
+            resolution in `services/database/helpers.ts`), and those rejections
+            are the platform's own `ErrorResponse` envelope.
+
+            Anything PostgREST rejects itself, such as a malformed filter, is
+            forwarded unchanged as PostgREST's error body.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PostgrestError'
-              example:
-                code: PGRST100
-                message: "unexpected 'z' expecting digit"
-                details: 'unexpected "z" expecting digit'
-                hint: null
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/PostgrestError'
+              examples:
+                localValidation:
+                  summary: Rejected by the platform before PostgREST is called
+                  value:
+                    error: INVALID_INPUT
+                    message: Invalid table name
+                    statusCode: 400
+                postgrestRejection:
+                  summary: Rejected by PostgREST, body forwarded unchanged
+                  value:
+                    code: PGRST100
+                    message: "unexpected 'z' expecting digit"
+                    details: 'unexpected "z" expecting digit'
+                    hint: null
     post:
       summary: Create Records
       description: Create one or more records. Request body MUST be an array.
@@ -168,16 +189,37 @@ paths:
                       createdAt: "2025-07-18T05:37:24.338Z"
                       updatedAt: "2025-07-18T05:37:24.338Z"
         '400':
-          description: Invalid filter or query. Body is PostgREST's, forwarded unchanged.
+          description: |
+            Two different bodies share this status, because two different layers
+            can reject the request.
+
+            The platform validates the table name and the `?schema=` selection
+            before PostgREST is contacted (`validateTableName`, and the schema
+            resolution in `services/database/helpers.ts`), and those rejections
+            are the platform's own `ErrorResponse` envelope.
+
+            Anything PostgREST rejects itself, such as a malformed filter, is
+            forwarded unchanged as PostgREST's error body.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PostgrestError'
-              example:
-                code: PGRST100
-                message: "unexpected 'z' expecting digit"
-                details: 'unexpected "z" expecting digit'
-                hint: null
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/PostgrestError'
+              examples:
+                localValidation:
+                  summary: Rejected by the platform before PostgREST is called
+                  value:
+                    error: INVALID_INPUT
+                    message: Invalid table name
+                    statusCode: 400
+                postgrestRejection:
+                  summary: Rejected by PostgREST, body forwarded unchanged
+                  value:
+                    code: PGRST100
+                    message: "unexpected 'z' expecting digit"
+                    details: 'unexpected "z" expecting digit'
+                    hint: null
         '404':
           description: Table not found. Body is PostgREST's, forwarded unchanged.
           content:
@@ -261,16 +303,37 @@ paths:
                 details: null
                 hint: null
         '400':
-          description: Invalid filter or query. Body is PostgREST's, forwarded unchanged.
+          description: |
+            Two different bodies share this status, because two different layers
+            can reject the request.
+
+            The platform validates the table name and the `?schema=` selection
+            before PostgREST is contacted (`validateTableName`, and the schema
+            resolution in `services/database/helpers.ts`), and those rejections
+            are the platform's own `ErrorResponse` envelope.
+
+            Anything PostgREST rejects itself, such as a malformed filter, is
+            forwarded unchanged as PostgREST's error body.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PostgrestError'
-              example:
-                code: PGRST100
-                message: "unexpected 'z' expecting digit"
-                details: 'unexpected "z" expecting digit'
-                hint: null
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/PostgrestError'
+              examples:
+                localValidation:
+                  summary: Rejected by the platform before PostgREST is called
+                  value:
+                    error: INVALID_INPUT
+                    message: Invalid table name
+                    statusCode: 400
+                postgrestRejection:
+                  summary: Rejected by PostgREST, body forwarded unchanged
+                  value:
+                    code: PGRST100
+                    message: "unexpected 'z' expecting digit"
+                    details: 'unexpected "z" expecting digit'
+                    hint: null
     delete:
       summary: Delete Records
       description: Delete records matching query filters
@@ -334,16 +397,37 @@ paths:
                 details: null
                 hint: null
         '400':
-          description: Invalid filter or query. Body is PostgREST's, forwarded unchanged.
+          description: |
+            Two different bodies share this status, because two different layers
+            can reject the request.
+
+            The platform validates the table name and the `?schema=` selection
+            before PostgREST is contacted (`validateTableName`, and the schema
+            resolution in `services/database/helpers.ts`), and those rejections
+            are the platform's own `ErrorResponse` envelope.
+
+            Anything PostgREST rejects itself, such as a malformed filter, is
+            forwarded unchanged as PostgREST's error body.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PostgrestError'
-              example:
-                code: PGRST100
-                message: "unexpected 'z' expecting digit"
-                details: 'unexpected "z" expecting digit'
-                hint: null
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/PostgrestError'
+              examples:
+                localValidation:
+                  summary: Rejected by the platform before PostgREST is called
+                  value:
+                    error: INVALID_INPUT
+                    message: Invalid table name
+                    statusCode: 400
+                postgrestRejection:
+                  summary: Rejected by PostgREST, body forwarded unchanged
+                  value:
+                    code: PGRST100
+                    message: "unexpected 'z' expecting digit"
+                    details: 'unexpected "z" expecting digit'
+                    hint: null
 components:
   securitySchemes:
     bearerAuth:
