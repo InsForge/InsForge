@@ -18,7 +18,7 @@ import type {
 } from '@/providers/deployments/sites.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { AppError } from '@/utils/errors.js';
+import { AppError, UpstreamError } from '@/utils/errors.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import {
@@ -300,7 +300,9 @@ export class DeploymentService {
       // variables would silently start a server without the configuration the last one
       // had, which for an SSR app means a site that boots and then fails on every request.
       if (envVars && envVars.length > 0) {
-        await this.storeSiteEnvVars(envVars);
+        // Through the same queue the management API uses: this is a read-modify-write against
+        // one secret row, and a dashboard save racing a deploy otherwise loses one of them.
+        await this.serializeEnvWrite(() => this.storeSiteEnvVars(envVars));
         return envVars;
       }
       return await this.loadSiteEnvVars();
@@ -330,6 +332,16 @@ export class DeploymentService {
 
   /** Serializes writes to the one secret row the site environment lives in. */
   private envWriteQueue: Promise<void> = Promise.resolve();
+
+  /** Run `work` after every write already queued, whatever their outcome. */
+  private serializeEnvWrite<T>(work: () => Promise<T>): Promise<T> {
+    const next = this.envWriteQueue.then(work, work);
+    this.envWriteQueue = next.then(
+      () => undefined,
+      () => undefined
+    );
+    return next;
+  }
 
   private async storeSiteEnvVars(envVars: Array<{ key: string; value: string }>): Promise<void> {
     const secrets = SecretService.getInstance();
@@ -414,14 +426,7 @@ export class DeploymentService {
     // The merge below is read-modify-write against one secret row, so two concurrent
     // requests would each write their own view and the later one would drop the other's
     // variable. Serialized the same way the driver serializes container switches.
-    const serialize = <T>(work: () => Promise<T>): Promise<T> => {
-      const next = this.envWriteQueue.then(work, work);
-      this.envWriteQueue = next.then(
-        () => undefined,
-        () => undefined
-      );
-      return next;
-    };
+    const serialize = <T>(work: () => Promise<T>): Promise<T> => this.serializeEnvWrite(work);
     return {
       keys: async () => (await load()).map((envVar) => envVar.key),
       // `encrypted` is the truth here: they live in the secret store, encrypted at rest.
@@ -767,6 +772,19 @@ export class DeploymentService {
       return await this.startLegacyDeployment(id, input, provider);
     } catch (error) {
       if (error instanceof AppError) {
+        // A 5xx means the deploy itself failed — a build that did not compile, a container
+        // that would not start, an upstream refusal. The row was set to UPLOADING on the way
+        // in, so returning without touching it left the run mid-flight forever and threw
+        // away the message, which for the Docker driver carries the build output.
+        //
+        // A 4xx is the caller's own request (files not uploaded yet, no build command
+        // declared, wrong status). Those stay retryable: marking the row ERROR would make
+        // `startDeployment` refuse the corrected retry.
+        if (error.statusCode >= 500) {
+          await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
+            error: error.message,
+          }).catch(() => {});
+        }
         throw error;
       }
       logger.error('Failed to start deployment', {
@@ -1324,9 +1342,14 @@ export class DeploymentService {
     try {
       await client.query('BEGIN');
       // Demote whatever else claimed to be live first, so no window shows two.
+      // Scoped to this row's driver: on an instance with both, demoting every READY row would
+      // mark a Vercel deployment CANCELED while Vercel keeps serving it — and `getMetadata()`
+      // reads the latest READY row to decide what is live.
       await client.query(
-        `UPDATE deployments.runs SET status = 'CANCELED' WHERE status = $1 AND id <> $2`,
-        [DeploymentStatus.READY, id]
+        `UPDATE deployments.runs
+            SET status = 'CANCELED'
+          WHERE status = $1 AND id <> $2 AND provider = $3`,
+        [DeploymentStatus.READY, id, deployment.provider ?? provider.name]
       );
       const result = await client.query(
         `UPDATE deployments.runs
@@ -1866,6 +1889,22 @@ export class DeploymentService {
     } catch (error) {
       // A driver with no domain store already said so with a 400; wrapping it here turned
       // "this driver cannot do custom domains" into "we broke".
+      //
+      // Upstream statuses do not pass through, though: `UpstreamError` carries the status
+      // Vercel returned, and a 401 for a stale stored token would reach the dashboard as our
+      // own 401 — which its client reads as a dead session and logs the admin out. Before
+      // this rethrow existed everything here became a 500, so that path is new.
+      if (
+        error instanceof UpstreamError &&
+        (error.statusCode === 401 || error.statusCode === 403)
+      ) {
+        throw new AppError(
+          `The deployment provider rejected the request: ${error.message}`,
+          502,
+          ERROR_CODES.UPSTREAM_FAILURE,
+          'Check the provider credentials configured for this project.'
+        );
+      }
       if (error instanceof AppError) {
         throw error;
       }
@@ -1948,7 +1987,12 @@ export class DeploymentService {
       // has no custom domain URL, and demanding one made this whole response 400 for the
       // driver this file exists to support — including `currentDeploymentId` and
       // `defaultDomainUrl`, which are meaningful for every driver.
-      const customDomainUrl = this.provider.domains ? await this.provider.domains.url() : null;
+      // `this.provider` throws when no driver is configured, which turned a documented 200
+      // into a 503 for an instance that simply has no sites driver — and this endpoint is
+      // fetched on the dashboard home. The custom domain is the only part that needs a
+      // driver; the deployment id and default URL come from the row.
+      const activeProvider = isAnySitesProviderConfigured() ? this.provider : null;
+      const customDomainUrl = activeProvider?.domains ? await activeProvider.domains.url() : null;
 
       return {
         currentDeploymentId: latestReadyDeployment?.id ?? null,
