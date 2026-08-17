@@ -123,6 +123,25 @@ export const uploadDeploymentFileResponseSchema = deploymentManifestFileSchema.e
  * Request to start a deployment after either legacy zip upload or direct file uploads.
  * Creates the actual Vercel deployment after source files are available.
  */
+/**
+ * A page of a deployment's own output.
+ *
+ * Mirrors `computeLogsResponseSchema`: same shape, same cursor semantics. Declared here so
+ * the response has a schema at all — it existed only in OpenAPI and as an inline return
+ * type, which is the one surface this seam is supposed to keep in agreement.
+ */
+export const runtimeLogLineSchema = z.object({
+  /** Unix milliseconds, from the daemon's own timestamps. */
+  timestamp: z.number(),
+  message: z.string(),
+});
+
+export const runtimeLogsResponseSchema = z.object({
+  lines: z.array(runtimeLogLineSchema),
+  /** Opaque forward cursor; null means nothing further has arrived yet. */
+  nextToken: z.string().nullable(),
+});
+
 export const startDeploymentRequestSchema = z.object({
   projectSettings: projectSettingsSchema.optional(),
   envVars: z.array(envVarSchema).optional(),
@@ -288,6 +307,7 @@ export type CreateDirectDeploymentRequest = z.infer<typeof createDirectDeploymen
 export type CreateDirectDeploymentResponse = z.infer<typeof createDirectDeploymentResponseSchema>;
 export type UploadDeploymentFileResponse = z.infer<typeof uploadDeploymentFileResponseSchema>;
 export type StartDeploymentRequest = z.infer<typeof startDeploymentRequestSchema>;
+export type RuntimeLogsResponse = z.infer<typeof runtimeLogsResponseSchema>;
 export type StartDeploymentResponse = z.infer<typeof startDeploymentResponseSchema>;
 export type ListDeploymentsResponse = z.infer<typeof listDeploymentsResponseSchema>;
 export type DeploymentEnvVar = z.infer<typeof deploymentEnvVarSchema>;

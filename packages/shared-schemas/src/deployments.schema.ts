@@ -36,7 +36,8 @@ export const sitesCapabilitiesSchema = z.object({
   /**
    * The running deployment's own output can be read. Describes the driver rather than one
    * deployment: a server-rendered site answers with what the app itself wrote, a static one
-   * with the file server's request log.
+   * with the file server's own startup and errors — access logging is off, so there is no
+   * per-request log to return.
    */
   runtimeLogs: z.boolean(),
   /** The driver infers how to build from the source tree. */

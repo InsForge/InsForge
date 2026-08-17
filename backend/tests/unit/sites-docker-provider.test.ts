@@ -7,6 +7,10 @@ import { Readable } from 'node:stream';
 import { createServer } from 'node:net';
 
 const staging = await mkdtemp(path.join(tmpdir(), 'insforge-sites-'));
+// The readiness timeout, shortened for the one test that has to wait it out. At the real
+// 60s that single test was 95% of this suite's runtime.
+process.env.SITES_SERVER_READY_TIMEOUT_MS = '500';
+process.env.SITES_SERVER_PROBE_INTERVAL_MS = '10';
 
 const configMock = {
   cloud: { projectId: 'proj-1234567890ab', apiHost: 'https://cloud.test' },
@@ -411,7 +415,7 @@ describe('DockerSitesProvider source builds', () => {
     expect(dockerfile).toContain('FROM node:22-alpine AS build');
     expect(dockerfile).toContain('RUN npm ci --no-audit --no-fund');
     expect(dockerfile).toContain('RUN npm run build');
-    // Serving stage starts from nginx, so node_modules never reaches what runs.
+    // Serving stage starts from Caddy, so node_modules never reaches what runs.
     expect(dockerfile).toContain('FROM caddy:alpine');
     expect(dockerfile).toContain('COPY --from=build /out/ /srv/');
     // In build mode the whole tree has to reach the builder — outputDirectory names
@@ -1150,9 +1154,13 @@ describe('DockerSitesProvider server-rendered deployments', () => {
       .map((u, i) => (u.endsWith('/exec') ? i : -1))
       .filter((i) => i >= 0)
       .pop();
+    // Each index asserted present before it is compared: `indexOf` returns -1 for a call that
+    // never happened, and -1 satisfies `toBeLessThan`, so an absent start used to pass.
     expect(lastProbe).toBeGreaterThanOrEqual(0);
-    expect(startIdx).toBeLessThan(lastProbe ?? Infinity);
-    expect(stopIdx).toBeGreaterThan(lastProbe ?? -1);
+    expect(startIdx).toBeGreaterThanOrEqual(0);
+    expect(stopIdx).toBeGreaterThanOrEqual(0);
+    expect(startIdx).toBeLessThan(lastProbe as number);
+    expect(stopIdx).toBeGreaterThan(lastProbe as number);
   });
 
   // A crash-looping app must fail the deploy with its own output, not take the site down.
@@ -1419,7 +1427,7 @@ describe('DockerSitesProvider server-rendered deployments', () => {
     expect(writes).toContain('/containers/server-old/stop?t=5');
     // And the live deployment was never touched, since nothing was stopped first.
     expect(writes).not.toContain('/containers/server-live/stop?t=5');
-  }, 90_000);
+  });
 
   // Rolling back a server has the same problem a deploy does, and it was missed: "Docker
   // accepted start" is not "the site answers". Without the gate the live deployment is
