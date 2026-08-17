@@ -423,21 +423,32 @@ export class SecretService {
   }
 
   /**
-   * Delete a secret
+   * Delete a secret.
+   *
+   * `allowReserved` is only for compensating a just-created strict insert when
+   * audit/receipt recording fails — never for ordinary admin delete.
    */
-  async deleteSecret(id: string, client?: PoolClient): Promise<boolean> {
+  async deleteSecret(
+    id: string,
+    client?: PoolClient,
+    options?: { allowReserved?: boolean }
+  ): Promise<boolean> {
     try {
-      // Optimized: Single query with WHERE clause to prevent deleting reserved secrets
       const executor = client ?? this.getPool();
+      const allowReserved = options?.allowReserved === true;
+      // Default path refuses reserved rows; compensation may hard-delete the
+      // row we just inserted in this request (including reserved).
       const result = await executor.query(
-        'DELETE FROM system.secrets WHERE id = $1 AND is_reserved = false',
+        allowReserved
+          ? 'DELETE FROM system.secrets WHERE id = $1'
+          : 'DELETE FROM system.secrets WHERE id = $1 AND is_reserved = false',
         [id]
       );
 
       const success = (result.rowCount ?? 0) > 0;
       if (success) {
-        logger.info('Secret deleted', { id });
-      } else {
+        logger.info('Secret deleted', { id, allowReserved });
+      } else if (!allowReserved) {
         // Check if it exists but is reserved
         const checkResult = await executor.query(
           'SELECT is_reserved FROM system.secrets WHERE id = $1',

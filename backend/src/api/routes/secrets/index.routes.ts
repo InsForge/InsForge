@@ -128,7 +128,11 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
         // just-created non-reserved row when possible, then fail closed.
         let cleanedUp = false;
         try {
-          cleanedUp = await secretService.deleteSecret(result.id);
+          // allowReserved: compensation must clear the row we just inserted,
+          // including reserved names (ordinary deleteSecret refuses those).
+          cleanedUp = await secretService.deleteSecret(result.id, undefined, {
+            allowReserved: true,
+          });
         } catch (cleanupError) {
           logger.error('Strict create audit failed and cleanup failed', {
             key,
@@ -151,7 +155,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
           ERROR_CODES.INTERNAL_ERROR,
           cleanedUp
             ? 'The secret insert was rolled back after audit failure.'
-            : 'The secret insert may remain; contact support with the operationId before retrying.'
+            : `The secret insert may remain; contact support with operationId=${operationId} before retrying.`
         );
       }
 

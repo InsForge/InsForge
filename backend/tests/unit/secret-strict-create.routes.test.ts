@@ -132,7 +132,32 @@ describe('POST /api/secrets strict create mode', () => {
       statusCode: 500,
     });
     expect(JSON.stringify(response.body)).not.toContain('candidate-value');
-    expect(secretMocks.deleteSecret).toHaveBeenCalledWith('secret-id');
+    expect(secretMocks.deleteSecret).toHaveBeenCalledWith('secret-id', undefined, {
+      allowReserved: true,
+    });
+    expect(functionMocks.redeploy).not.toHaveBeenCalled();
+  });
+
+  it('rolls back a reserved strict insert when audit logging fails', async () => {
+    secretMocks.createSecretStrict.mockResolvedValue({ id: 'reserved-id', disposition: 'created' });
+    auditMocks.log.mockRejectedValue(new Error('audit unavailable'));
+    secretMocks.deleteSecret.mockResolvedValue(true);
+    const app = await createApp();
+
+    const response = await request(app)
+      .post('/api/secrets')
+      .send({
+        key: 'RESERVED_KEY',
+        value: 'candidate-value',
+        mode: 'strict',
+        isReserved: true,
+      })
+      .expect(500);
+
+    expect(secretMocks.deleteSecret).toHaveBeenCalledWith('reserved-id', undefined, {
+      allowReserved: true,
+    });
+    expect(JSON.stringify(response.body)).not.toContain('candidate-value');
     expect(functionMocks.redeploy).not.toHaveBeenCalled();
   });
 
