@@ -106,8 +106,8 @@ paths:
                   summary: Request body rejected by PostgREST, body forwarded verbatim
                   value:
                     code: "PGRST102"
-                    message: "Empty or invalid json"
-                    details: null
+                    message: "Failed to parse request body"
+                    details: "Empty or invalid json"
                     hint: null
         '401':
           description: Missing or invalid credentials
