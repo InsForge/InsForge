@@ -68,7 +68,9 @@ def main():
         base_tabs = nav['tabs']
         glob = nav.get('global')
     else:
-        en = next(l for l in nav['languages'] if l.get('default') or l['language'] == 'en')
+        en = next(
+            lang for lang in nav['languages'] if lang.get('default') or lang['language'] == 'en'
+        )
         # strip the en/ prefix back off (en uses bare paths already, so just copy)
         base_tabs = copy.deepcopy(en['tabs'])
         glob = nav.get('global')
@@ -90,7 +92,8 @@ def selftest():
     real_resolves = resolves
     # Only these translated pages exist.
     present = {'zh/kept', 'zh/nested/kept'}
-    resolves = lambda path: path in present
+    def resolves(path):
+        return path in present
     try:
         tabs = [
             {'tab': 'T', 'groups': [
