@@ -121,7 +121,7 @@ function buildSparkline(
   plotRange: [number, number] = [0, SPARKLINE_WIDTH]
 ): SparklineGeometry {
   const finite = data
-    .filter((p) => Number.isFinite(p.value))
+    .filter((p) => Number.isFinite(p.value) && Number.isFinite(p.timestamp))
     .sort((a, b) => a.timestamp - b.timestamp);
   if (finite.length < 2) {
     return { line: '', area: '', points: [], min: null, max: null };
