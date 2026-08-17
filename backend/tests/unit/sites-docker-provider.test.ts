@@ -592,6 +592,42 @@ describe('DockerSitesProvider rollback and retention', () => {
     return ids.map((Id) => ({ Id, State: state, Image: image }));
   }
 
+  // Rolling back to the deployment that is already live, or double-submitting a rollback.
+  // Docker answers 304 to `start` on a running container; when that counted as an error the
+  // recovery path stopped the target and had nothing to restart, so an operation that should
+  // be a no-op took the site down.
+  it('survives a rollback to the deployment that is already live', async () => {
+    configMock.deployments.sitesPort = 7160;
+    dockerRequest.mockImplementation((method: string, url: string) => {
+      if (method === 'GET' && url.startsWith('/containers/json')) {
+        return Promise.resolve([
+          { Id: 'container-live', State: 'running', Image: 'insforge-site-appkey01:aaa' },
+          { Id: 'container-old', State: 'exited', Image: 'insforge-site-appkey01:old' },
+        ]);
+      }
+      if (url.endsWith('/json')) {
+        return Promise.resolve({
+          Id: 'container-live',
+          Created: new Date().toISOString(),
+          State: { Status: 'running' },
+          Config: { Image: 'insforge-site-appkey01:aaa', Labels: {} },
+          NetworkSettings: { Ports: { '80/tcp': [{ HostPort: '7160' }] } },
+        });
+      }
+      // The real daemon returns 304 here, which dockerRequest now resolves as undefined.
+      return Promise.resolve(undefined);
+    });
+
+    const restored = await DockerSitesProvider.getInstance().rollbackTo('container-live');
+
+    expect(restored.readyState).toBe('READY');
+    const stops = dockerRequest.mock.calls
+      .filter(([method, url]) => method === 'POST' && String(url).includes('/stop'))
+      .map(([, url]) => url as string);
+    // The live container must not be among the things this stopped.
+    expect(stops).not.toContain('/containers/container-live/stop?t=5');
+  });
+
   it('starts the target and stops everything else', async () => {
     dockerRequest.mockImplementation((method: string, url: string) => {
       if (method === 'GET' && url.startsWith('/containers/json')) {
@@ -1448,6 +1484,24 @@ describe('DockerSitesProvider.runtimeLogs', () => {
       nextToken: '1700000000.000000001',
     });
     expect(dockerContainerLogs).toHaveBeenCalledWith('server-live', { limit: 20 });
+  });
+
+  // Cancelling a deployment the switch already stopped is the common case — the daemon
+  // answers 304, and when that counted as an error the caller got a 500 and the row was never
+  // marked CANCELED.
+  it('cancels a deployment that is already stopped', async () => {
+    dockerRequest.mockImplementation((method: string, url: string) =>
+      Promise.resolve(
+        method === 'GET' && url.startsWith('/containers/json')
+          ? [{ Id: 'container-old', State: 'exited' }]
+          : undefined
+      )
+    );
+
+    await expect(
+      DockerSitesProvider.getInstance().cancelDeployment('container-old')
+    ).resolves.toBeUndefined();
+    expect(dockerRequest).toHaveBeenCalledWith('POST', '/containers/container-old/stop?t=5');
   });
 
   // Same reason as reading logs, worse consequence: an id that is not ours would stop a

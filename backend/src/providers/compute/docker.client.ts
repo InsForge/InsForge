@@ -138,6 +138,15 @@ export async function dockerRequest<T>(
   const res = await dockerRequestRaw(method, path, options);
   const text = res.body.toString('utf8');
 
+  // 304 is the Docker API saying "already in that state" — start on a running container,
+  // stop on a stopped one. Verified against Engine 29: both return 304 with a message body.
+  // Treating it as an error made two idempotent operations fail: rolling back to the
+  // deployment that was already live threw, and the recovery path then stopped it and had
+  // nothing to restart, so the site went down. A no-op is exactly what the caller wanted.
+  if (res.status === 304) {
+    return undefined;
+  }
+
   if (res.status < 200 || res.status >= 300) {
     // Docker error bodies are `{"message":"..."}`; fall back to the raw text.
     let message = text;
