@@ -94,9 +94,10 @@ paths:
                 rejected_name:
                   summary: Function name rejected by this service
                   value:
-                    error: "INVALID_INPUT"
-                    message: "Invalid function name: search posts"
+                    error: "DATABASE_VALIDATION_ERROR"
+                    message: "Invalid function name: cannot contain quotes or control characters"
                     statusCode: 400
+                    nextActions: "The function name cannot contain double quotes or control characters (tabs, newlines, etc.)"
                 postgrest_rejected:
                   summary: Arguments rejected by PostgREST, body forwarded verbatim
                   value:
@@ -110,6 +111,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: |
+            The JWT is valid but carries a role this proxy will not forward as.
+            Anything other than `project_admin`, `authenticated` or `anon`, for
+            example a role minted by hand, is refused before PostgREST is
+            contacted, so the body is the platform envelope rather than
+            PostgREST's.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "AUTH_UNAUTHORIZED"
+                message: "Invalid user role claim"
+                statusCode: 403
         '404':
           description: |
             Function not found in the target schema. Reported by PostgREST and
@@ -179,6 +195,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: |
+            The JWT is valid but carries a role this proxy will not forward as.
+            Anything other than `project_admin`, `authenticated` or `anon`, for
+            example a role minted by hand, is refused before PostgREST is
+            contacted, so the body is the platform envelope rather than
+            PostgREST's.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "AUTH_UNAUTHORIZED"
+                message: "Invalid user role claim"
+                statusCode: 403
         '404':
           description: |
             Function not found in the target schema. Reported by PostgREST and
@@ -201,6 +232,9 @@ components:
   schemas:
     PostgrestError:
       type: object
+      required:
+        - code
+        - message
       description: |
         Error body produced by PostgREST and forwarded unchanged by the proxy.
         Upstream failures are not reshaped, so the fields are PostgREST's, not
