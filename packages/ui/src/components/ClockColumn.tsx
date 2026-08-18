@@ -23,9 +23,14 @@ function ClockColumn({
   // The current row is rarely near the top of 24, let alone 60. Keyed on the selection, not done in
   // a callback ref: a ref recreated each render detaches and reattaches on every parent render,
   // which would yank the column back to the selected row while someone is scrolling it.
+  //
+  // Keyed on the row's INDEX as well, not on `options` itself: options arriving late or reordered
+  // move the selected row without changing `selected`, while the array's identity changes on every
+  // render for any caller building the list inline — which would bring the yanking straight back.
+  const selectedIndex = options.indexOf(selected);
   React.useEffect(() => {
     selectedRef.current?.scrollIntoView({ block: 'center' });
-  }, [selected]);
+  }, [selected, selectedIndex]);
 
   return (
     <div className="flex max-h-64 flex-col gap-0.5 overflow-y-auto">
