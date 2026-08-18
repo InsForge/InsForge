@@ -117,38 +117,27 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: |
-            Like the 400, this status has two bodies, because either layer can
-            refuse.
+            Raised by the proxy when the JWT is valid but carries a role it will
+            not forward as: anything other than `project_admin`, `authenticated`
+            or `anon`, for example a role minted by hand. It is rejected before
+            PostgREST is contacted, so the body is the platform envelope.
 
-            The proxy refuses first when the JWT is valid but carries a role it
-            will not forward as: anything other than `project_admin`,
-            `authenticated` or `anon`, for example a role minted by hand. That is
-            rejected before PostgREST is contacted, so the body is the platform
-            envelope.
-
-            PostgREST refuses when the resolved database role may not execute the
-            function, or when a policy denies it. That body is forwarded
-            unchanged, so it is PostgREST's.
+            Only that case is documented here. `handleProxyError` forwards any
+            upstream status and body verbatim, so if PostgREST itself returned a
+            403 the body would be PostgREST's instead, and this would need to be
+            a `oneOf` like the 400. Whether it does is unresolved: PostgreSQL
+            raises `42501` for a function the role may not execute, and reviewers
+            disagreed about whether PostgREST maps that to 401 or 403. Rather
+            than document an unverified branch, this records only the case
+            traceable in the code.
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/ErrorResponse'
-                  - $ref: '#/components/schemas/PostgrestError'
-              examples:
-                proxy_refused_role:
-                  summary: Role refused by this proxy before PostgREST is contacted
-                  value:
-                    error: "AUTH_UNAUTHORIZED"
-                    message: "Invalid user role claim"
-                    statusCode: 403
-                postgrest_denied:
-                  summary: Denied by PostgREST, body forwarded verbatim
-                  value:
-                    code: "42501"
-                    message: "permission denied for function search_posts"
-                    details: null
-                    hint: null
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "AUTH_UNAUTHORIZED"
+                message: "Invalid user role claim"
+                statusCode: 403
         '404':
           description: |
             Function not found in the target schema. Reported by PostgREST and
@@ -224,38 +213,27 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: |
-            Like the 400, this status has two bodies, because either layer can
-            refuse.
+            Raised by the proxy when the JWT is valid but carries a role it will
+            not forward as: anything other than `project_admin`, `authenticated`
+            or `anon`, for example a role minted by hand. It is rejected before
+            PostgREST is contacted, so the body is the platform envelope.
 
-            The proxy refuses first when the JWT is valid but carries a role it
-            will not forward as: anything other than `project_admin`,
-            `authenticated` or `anon`, for example a role minted by hand. That is
-            rejected before PostgREST is contacted, so the body is the platform
-            envelope.
-
-            PostgREST refuses when the resolved database role may not execute the
-            function, or when a policy denies it. That body is forwarded
-            unchanged, so it is PostgREST's.
+            Only that case is documented here. `handleProxyError` forwards any
+            upstream status and body verbatim, so if PostgREST itself returned a
+            403 the body would be PostgREST's instead, and this would need to be
+            a `oneOf` like the 400. Whether it does is unresolved: PostgreSQL
+            raises `42501` for a function the role may not execute, and reviewers
+            disagreed about whether PostgREST maps that to 401 or 403. Rather
+            than document an unverified branch, this records only the case
+            traceable in the code.
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/ErrorResponse'
-                  - $ref: '#/components/schemas/PostgrestError'
-              examples:
-                proxy_refused_role:
-                  summary: Role refused by this proxy before PostgREST is contacted
-                  value:
-                    error: "AUTH_UNAUTHORIZED"
-                    message: "Invalid user role claim"
-                    statusCode: 403
-                postgrest_denied:
-                  summary: Denied by PostgREST, body forwarded verbatim
-                  value:
-                    code: "42501"
-                    message: "permission denied for function search_posts"
-                    details: null
-                    hint: null
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "AUTH_UNAUTHORIZED"
+                message: "Invalid user role claim"
+                statusCode: 403
         '404':
           description: |
             Function not found in the target schema. Reported by PostgREST and
