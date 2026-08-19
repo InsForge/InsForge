@@ -1,0 +1,56 @@
+# Gateway for a self-hosted InsForge site.
+#
+# InsForge does not run this for you — routing and TLS stay yours, the same position the
+# compute docs take. This file exists so that "bring your own gateway" does not mean
+# "work out the config yourself".
+#
+# What makes it one static line: the sites driver gives whichever container is live a
+# stable alias on the project network, `insforge-site-<APP_KEY>`. Container names carry
+# the deployment digest and change every deploy; the alias does not, so nothing here
+# needs rewriting or a label-discovery plugin.
+#
+#   docker compose --profile sites-gateway up -d
+#
+# Two variables decide whether this works unedited: SITES_HOSTNAME (the domain, or `:80`) and
+# SITES_UPSTREAM_PORT (the container port, 80 unless a deployment declares its own
+# `serverPort`). Both are defaulted in compose. Anything else — a second site, a path prefix,
+# auth in front — is your own config from here.
+#
+# Set SITES_HOSTNAME to a domain pointed at this host and Caddy obtains a certificate on
+# its own. Leave it unset and the gateway answers on :80 for anything, which is what you
+# want behind another proxy or on a private network.
+#
+# The site address is the bare placeholder, and the compose file defaults the *variable*
+# to `:80` rather than relying on a Caddyfile default: compose passes the variable through
+# as an empty string when it is unset, and `{$VAR:fallback}` only falls back when the
+# variable is absent entirely. Empty left this line as a bare `{`, which Caddy read as a
+# global options block — "unrecognized global option: encode", from a config that looked
+# fine until it ran.
+
+{$SITES_HOSTNAME} {
+	encode zstd gzip
+
+	# The site container serves the built files, sets its own cache headers, and handles
+	# SPA fallback. Nothing to add here — proxying is the whole job.
+	#
+	# The port is a variable because a server-rendered deployment can declare its own
+	# `serverPort`. It defaults to the static site port, so most operators never touch this;
+	# if you set `serverPort` in project settings, set SITES_UPSTREAM_PORT to match or every
+	# request through the gateway is a 502. As with SITES_HOSTNAME the default lives in
+	# compose, since compose passes an unset variable through as an empty string.
+	reverse_proxy insforge-site-{$APP_KEY}:{$SITES_UPSTREAM_PORT} {
+		# A deploy replaces the container behind the alias. Without this a request caught
+		# mid-switch would surface the connection error instead of retrying the one that
+		# is already up.
+		lb_try_duration 5s
+		lb_try_interval 250ms
+	}
+
+	header {
+		# The site is static and already versioned by filename; these are the headers a
+		# gateway is the right place to set.
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}

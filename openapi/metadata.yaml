@@ -111,6 +111,76 @@ paths:
                       customSlug:
                         type: string
                         nullable: true
+                  sites:
+                    type: object
+                    description: >-
+                      Optional; absent whenever no *usable* sites driver is available — none
+                      configured, `SITES_PROVIDER=off`, or a named driver whose prerequisites
+                      are missing (no Vercel credentials, no Docker socket). A client reads
+                      absence as "this instance cannot host a site" without needing to know
+                      which of those it was. Deliberately
+                      separate from `deployments` above: that slice's presence answers "can
+                      this backend honour a subdomain", while this one answers "what can the
+                      active driver do".
+                    properties:
+                      defaultProvider:
+                        type: string
+                        enum: [vercel, docker]
+                        description: Driver new deployments go to.
+                      providers:
+                        type: object
+                        description: Keyed by driver name; only configured drivers appear.
+                        additionalProperties:
+                          type: object
+                          properties:
+                            envVars:
+                              type: string
+                              enum: [runtime, build-only, none]
+                              description: >-
+                                `runtime` — the platform stores values and they can be listed,
+                                read and deleted. `build-only` — values reach the build and are
+                                baked into the artifact, so there is nothing to read back.
+                                `none` — the driver cannot carry environment variables at all,
+                                and every environment-variable route answers `400`
+                                `DEPLOYMENT_FEATURE_UNSUPPORTED`. A client should hide the
+                                feature for `none` rather than offering a form that refuses.
+                            customDomains:
+                              type: boolean
+                              description: >-
+                                Whether the driver attaches and verifies domains itself. False
+                                means the operator points a hostname at their own gateway.
+                            slug:
+                              type: boolean
+                              description: Whether the site gets a name under a domain the driver owns.
+                            rollback:
+                              type: boolean
+                              description: Whether a previous deployment can be made live without rebuilding.
+                            buildLogs:
+                              type: boolean
+                              description: Whether builder output is retrievable after the fact.
+                            runtimeLogs:
+                              type: boolean
+                              description: >-
+                                Whether the running deployment's own output can be read through
+                                `GET /api/deployments/{id}/logs`. Describes the driver, not the
+                                deployment: a server-rendered site returns what the app wrote,
+                                a static one Caddy's startup and errors — access logging is off,
+                                so there is no per-request log to return.
+                            frameworkDetection:
+                              type: boolean
+                              description: Whether the driver infers how to build from the source tree.
+                            ingressModes:
+                              type: array
+                              description: >-
+                                How the site is reachable. The compute vocabulary minus `none`,
+                                since a site nobody can reach is not a deployment.
+                              items:
+                                type: string
+                                enum: [port, host]
+                            defaultIngress:
+                              type: string
+                              enum: [port, host]
+                              description: Applied when a caller names no mode. Always one of `ingressModes`.
                   compute:
                     type: object
                     description: >-

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { storageBucketSchema } from './storage.schema.js';
 import { realtimeChannelSchema } from './realtime.schema.js';
 import { realtimePermissionsResponseSchema } from './realtime-api.schema.js';
+import { sitesCapabilitiesResponseSchema, sitesProviderEnum } from './deployments.schema.js';
 import { authConfigAdminResponseSchema } from './auth-api.schema.js';
 import { computeCapabilitiesSchema, computeProviderEnum } from './compute-services.schema.js';
 
@@ -82,6 +83,23 @@ export const computeMetadataSchema = z.object({
   providers: z.record(computeProviderEnum, computeCapabilitiesSchema),
 });
 
+/**
+ * Sites slice for the admin metadata response.
+ *
+ * Deliberately a separate key from `deployments`, which is cloud-only and whose mere
+ * presence the CLI uses to decide whether a `[deployments] subdomain` write can be
+ * honoured (`config-capabilities.ts`). Publishing capabilities under that key would
+ * make the probe true for a self-host driver that has no slugs, so the two stay apart:
+ * `deployments` answers "can this backend take a subdomain", `sites` answers "what can
+ * the active driver do".
+ */
+export const sitesMetadataSchema = z.object({
+  defaultProvider: sitesProviderEnum,
+  // The refined variant: a default outside `ingressModes` would point clients at a mode
+  // the driver cannot serve, and validating that only at the type level validated nothing.
+  providers: z.record(sitesProviderEnum, sitesCapabilitiesResponseSchema),
+});
+
 export const appMetaDataSchema = z.object({
   auth: authMetadataSchema,
   database: databaseMetadataSchema,
@@ -90,6 +108,8 @@ export const appMetaDataSchema = z.object({
   realtime: realtimeMetadataSchema.optional(),
   deployments: deploymentsMetadataSchema.optional(),
   compute: computeMetadataSchema.optional(),
+  // Absent when no sites driver is configured — same presence signal as compute.
+  sites: sitesMetadataSchema.optional(),
   version: z.string().optional(),
 });
 
@@ -101,6 +121,7 @@ export type EdgeFunctionMetadataSchema = z.infer<typeof edgeFunctionMetadataSche
 export type RealtimeMetadataSchema = z.infer<typeof realtimeMetadataSchema>;
 export type DeploymentsMetadataSchema = z.infer<typeof deploymentsMetadataSchema>;
 export type ComputeMetadataSchema = z.infer<typeof computeMetadataSchema>;
+export type SitesMetadataSchema = z.infer<typeof sitesMetadataSchema>;
 export type AppMetadataSchema = z.infer<typeof appMetaDataSchema>;
 
 // Database connection schemas

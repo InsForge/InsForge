@@ -7,6 +7,33 @@ export const projectSettingsSchema = z.object({
   installCommand: z.string().nullable().optional(),
   devCommand: z.string().nullable().optional(),
   rootDirectory: z.string().nullable().optional(),
+  /**
+   * Command that starts a long-running server, e.g. `node server.js` or `npm start`.
+   *
+   * Its presence is what makes a deployment server-rendered rather than static — declared
+   * rather than inferred, because a Dockerfile's final stage cannot branch on what the
+   * build produced, and because guessing from `package.json` is the framework detection
+   * this driver deliberately does not do.
+   */
+  startCommand: z
+    .string()
+    // Blank is rejected rather than accepted: the driver trims before deciding, so `"  "`
+    // meant "static" for a caller who plainly asked for a server.
+    .refine((value) => value.trim().length > 0, 'startCommand cannot be blank')
+    .nullable()
+    .optional(),
+  /**
+   * Directory copied into the runtime image, relative to the build root. Defaults to the
+   * whole build output. `.next/standalone` gives a small image for a Next app built with
+   * `output: 'standalone'`; omitting it copies everything, which is what `npm start` needs.
+   */
+  serverDirectory: z.string().nullable().optional(),
+  /**
+   * Port the server listens on inside the container. Defaults to the static site port, so
+   * one gateway line serves both shapes. Bounded because anything above 65535 is not a port
+   * and would fail at the daemon as an upstream error instead of invalid input.
+   */
+  serverPort: z.number().int().min(1).max(65535).nullable().optional(),
 });
 
 export const envVarSchema = z.object({
@@ -96,6 +123,25 @@ export const uploadDeploymentFileResponseSchema = deploymentManifestFileSchema.e
  * Request to start a deployment after either legacy zip upload or direct file uploads.
  * Creates the actual Vercel deployment after source files are available.
  */
+/**
+ * A page of a deployment's own output.
+ *
+ * Mirrors `computeLogsResponseSchema`: same shape, same cursor semantics. Declared here so
+ * the response has a schema at all — it existed only in OpenAPI and as an inline return
+ * type, which is the one surface this seam is supposed to keep in agreement.
+ */
+export const runtimeLogLineSchema = z.object({
+  /** Unix milliseconds, from the daemon's own timestamps. */
+  timestamp: z.number(),
+  message: z.string(),
+});
+
+export const runtimeLogsResponseSchema = z.object({
+  lines: z.array(runtimeLogLineSchema),
+  /** Opaque forward cursor; null means nothing further has arrived yet. */
+  nextToken: z.string().nullable(),
+});
+
 export const startDeploymentRequestSchema = z.object({
   projectSettings: projectSettingsSchema.optional(),
   envVars: z.array(envVarSchema).optional(),
@@ -159,7 +205,24 @@ export const getEnvVarResponseSchema = z.object({
  * Request to create or update an environment variable
  */
 export const upsertEnvVarRequestSchema = z.object({
-  key: z.string().trim().min(1, 'key is required'),
+  /**
+   * A shell-legal variable name, and not one a driver sets itself.
+   *
+   * Validated here rather than only at deploy time. The Docker driver rejects both classes
+   * when it builds — a name outside this charset cannot be an `ARG`, and `PORT`/`HOSTNAME`/
+   * `NODE_ENV` would shadow what the runtime image sets — but a value stored through the
+   * management API failed nothing until the *next* deploy, which then failed every time with
+   * an error pointing at the build rather than at the entry that caused it.
+   */
+  key: z
+    .string()
+    .trim()
+    .min(1, 'key is required')
+    .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'key must be a valid environment variable name')
+    .refine(
+      (key) => !['PORT', 'HOSTNAME', 'NODE_ENV'].includes(key),
+      'this name is set by the deployment runtime and cannot be overridden'
+    ),
   value: z.string(),
 });
 
@@ -261,6 +324,7 @@ export type CreateDirectDeploymentRequest = z.infer<typeof createDirectDeploymen
 export type CreateDirectDeploymentResponse = z.infer<typeof createDirectDeploymentResponseSchema>;
 export type UploadDeploymentFileResponse = z.infer<typeof uploadDeploymentFileResponseSchema>;
 export type StartDeploymentRequest = z.infer<typeof startDeploymentRequestSchema>;
+export type RuntimeLogsResponse = z.infer<typeof runtimeLogsResponseSchema>;
 export type StartDeploymentResponse = z.infer<typeof startDeploymentResponseSchema>;
 export type ListDeploymentsResponse = z.infer<typeof listDeploymentsResponseSchema>;
 export type DeploymentEnvVar = z.infer<typeof deploymentEnvVarSchema>;

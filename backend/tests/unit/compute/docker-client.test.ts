@@ -1,15 +1,29 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/infra/config/app.config.js', () => {
-  const c = { docker: { socketPath: '/nonexistent/test.sock' } };
-  return { config: c, appConfig: c };
-});
+// Hoisted and mutable so a test can point the real transport at a real socket. `dockerRequest`
+// calls `dockerRequestRaw` inside its own module, so it cannot be mocked from here — the only
+// honest way to test its status handling is to answer it over a socket.
+const configMock = vi.hoisted(() => ({ docker: { socketPath: '/nonexistent/test.sock' } }));
+vi.mock('@/infra/config/app.config.js', () => ({ config: configMock, appConfig: configMock }));
 
+// The transport is a parameter, so the paging logic is testable without mocking this module
+// into itself — which cannot work, since a module's internal calls bind to its own real
+// exports.
+const mockRaw = vi.fn();
+
+import { createServer as createHttpServer } from 'node:http';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import {
   demuxDockerStream,
   parseLogLine,
   parseBuildStream,
   dockerConfig,
+  dockerContainerLogs,
+  dockerRequest,
+  dockerRequestRaw,
+  parseLogWatermark,
 } from '@/providers/compute/docker.client.js';
 
 /**
@@ -169,5 +183,374 @@ describe('dockerConfig', () => {
     expect(c.bindAddress).toBe('127.0.0.1');
     expect(c.isolateNetwork).toBe(false);
     expect(c.publicHost).toBe('');
+  });
+});
+
+describe('dockerContainerLogs', () => {
+  // Call indexes are asserted below, so the transport cannot carry calls in from the test
+  // before — which is exactly what made two of these fail once they moved here.
+  beforeEach(() => {
+    mockRaw.mockReset();
+  });
+
+  it('demuxes frames and returns a nanosecond watermark as the cursor', async () => {
+    mockRaw.mockResolvedValueOnce({
+      status: 200,
+      body: Buffer.concat([
+        frame('2026-08-06T22:51:32.781160549Z line-1\n'),
+        frame('2026-08-06T22:51:33.785353049Z line-2\n'),
+      ]),
+    });
+
+    const result = await dockerContainerLogs('container-abc', undefined, mockRaw);
+
+    expect(result.lines).toEqual([
+      { timestamp: Date.parse('2026-08-06T22:51:32.781Z'), message: 'line-1' },
+      { timestamp: Date.parse('2026-08-06T22:51:33.785Z'), message: 'line-2' },
+    ]);
+    // Cursor carries full nanosecond precision, not the millisecond timestamp.
+    expect(result.nextToken).toBe('1786056693785353049');
+  });
+
+  // `since` accepts integer seconds only and is inclusive, so the boundary
+  // second is always re-delivered. Dedup therefore has to happen against the
+  // nanosecond watermark — filtering by second would drop genuinely new lines
+  // that share a second with the previous batch.
+  it('floors the cursor to seconds on the wire but dedupes by nanosecond', async () => {
+    mockRaw.mockResolvedValueOnce({
+      status: 200,
+      body: Buffer.concat([
+        frame('2026-08-06T22:51:33.100000000Z already-seen\n'),
+        frame('2026-08-06T22:51:33.200000000Z also-seen\n'),
+        frame('2026-08-06T22:51:33.300000000Z brand-new\n'),
+      ]),
+    });
+
+    const result = await dockerContainerLogs(
+      'container-abc',
+      {
+        nextToken: '1786056693200000000', // the .2 line
+      },
+      mockRaw
+    );
+
+    // Same second as the watermark, but later — must survive.
+    expect(result.lines.map((l) => l.message)).toEqual(['brand-new']);
+    expect(result.nextToken).toBe('1786056693300000000');
+
+    const url = mockRaw.mock.calls[0][1] as string;
+    expect(url).toContain('since=1786056693');
+    expect(url).toContain('timestamps=1');
+  });
+
+  it('treats an unreadable cursor as absent rather than failing the request', async () => {
+    mockRaw.mockResolvedValueOnce({
+      status: 200,
+      body: frame('2026-08-06T22:51:32.000000000Z hello\n'),
+    });
+    const result = await dockerContainerLogs('container-abc', { nextToken: 'garbage' }, mockRaw);
+    expect(result.lines.map((l) => l.message)).toEqual(['hello']);
+    expect(mockRaw.mock.calls[0][1]).not.toContain('since=');
+  });
+
+  it('returns a null cursor when there is nothing to page from', async () => {
+    mockRaw.mockResolvedValueOnce({ status: 200, body: Buffer.alloc(0) });
+    const result = await dockerContainerLogs('container-abc', undefined, mockRaw);
+    expect(result).toEqual({ lines: [], nextToken: null });
+  });
+
+  // `tail` keeps the newest N. Pairing it with `since` would return the newest
+  // N of the backlog and then advance the cursor past everything older, which
+  // no later request could reach — the middle of the backlog would be gone.
+  it('asks for a tail on the first page but not when resuming from a cursor', async () => {
+    mockRaw.mockResolvedValueOnce({ status: 200, body: Buffer.alloc(0) });
+    await dockerContainerLogs('container-abc', { limit: 50 }, mockRaw);
+    expect(mockRaw.mock.calls[0][1]).toContain('tail=50');
+
+    mockRaw.mockResolvedValueOnce({ status: 200, body: Buffer.alloc(0) });
+    await dockerContainerLogs(
+      'container-abc',
+      {
+        limit: 50,
+        nextToken: '1786056693200000000',
+      },
+      mockRaw
+    );
+    const resumed = mockRaw.mock.calls[1][1] as string;
+    expect(resumed).toContain('since=1786056693');
+    expect(resumed).not.toContain('tail=');
+  });
+
+  // `tail` is an integer on the wire. The compute route clamps its query value with
+  // Math.min/max, which leaves a decimal intact, and `tail=5.7` makes the daemon reject
+  // the whole request — so the page a caller asked for would come back as a 502.
+  it('floors the limit, because tail does not take a decimal', async () => {
+    mockRaw.mockResolvedValueOnce({ status: 200, body: Buffer.alloc(0) });
+    await dockerContainerLogs('container-abc', { limit: 5.7 }, mockRaw);
+    // The exact parameter value, not a substring: `tail=5` is a prefix of `tail=5.7`, so
+    // toContain passed with the floor removed — the first version of this test proved
+    // nothing.
+    const url = new URL(`http://d${mockRaw.mock.calls[0][1] as string}`);
+    expect(url.searchParams.get('tail')).toBe('5');
+  });
+
+  /**
+   * Mock what the daemon would actually send for a given request, so the mock
+   * cannot assert a shape the real thing never produces: `tail=N` returns the
+   * *newest* N, and `since` alone returns everything after that second.
+   */
+  function daemonLogs(lines: { nanos: string; message: string }[]) {
+    return (_method: string, url: string) => {
+      const params = new URLSearchParams(url.split('?')[1] ?? '');
+      let out = lines;
+      const since = params.get('since');
+      if (since !== null) {
+        out = out.filter((l) => BigInt(l.nanos) / 1_000_000_000n >= BigInt(since));
+      }
+      const tail = params.get('tail');
+      if (tail !== null) {
+        out = out.slice(-Number(tail));
+      }
+      const iso = (nanos: string) => {
+        const ns = BigInt(nanos);
+        const ms = new Date(Number(ns / 1_000_000n)).toISOString().replace('Z', '');
+        return `${ms.slice(0, 19)}.${String(ns % 1_000_000_000n).padStart(9, '0')}Z`;
+      };
+      return Promise.resolve({
+        status: 200,
+        body: Buffer.concat(out.map((l) => frame(`${iso(l.nanos)} ${l.message}\n`))),
+      });
+    };
+  }
+
+  // One second apart, so every `since` boundary lands on a distinct line.
+  const FIVE_LINES = Array.from({ length: 5 }, (_, i) => ({
+    nanos: String(1786056700000000000n + BigInt(i) * 1_000_000_000n),
+    message: `line-${i}`,
+  }));
+
+  // First page asks for `tail`, so the daemon hands back the newest `limit` —
+  // "most recent logs" is what a caller with no cursor wants.
+  it('returns the newest lines on a first page, per `tail` semantics', async () => {
+    mockRaw.mockImplementationOnce(daemonLogs(FIVE_LINES));
+
+    const first = await dockerContainerLogs('container-abc', { limit: 2 }, mockRaw);
+
+    expect(first.lines.map((l) => l.message)).toEqual(['line-3', 'line-4']);
+    expect(first.nextToken).toBe(FIVE_LINES[4].nanos);
+  });
+
+  // Resuming sends no `tail`, so the daemon returns the whole backlog and the
+  // trimming happens here. This is the only path where more lines arrive than
+  // were asked for, and the property under test is that paging reaches them all
+  // rather than jumping to the newest.
+  it('pages through a backlog larger than `limit` without skipping lines', async () => {
+    const seen: string[] = [];
+    let token: string | null = null;
+
+    // Start from before the first line so the whole backlog is "new".
+    token = String(BigInt(FIVE_LINES[0].nanos) - 1_000_000_000n);
+    for (let page = 0; page < 3; page++) {
+      mockRaw.mockImplementationOnce(daemonLogs(FIVE_LINES));
+      const res = await dockerContainerLogs(
+        'container-abc',
+        {
+          limit: 2,
+          nextToken: token as string,
+        },
+        mockRaw
+      );
+      seen.push(...res.lines.map((l) => l.message));
+      token = res.nextToken;
+    }
+
+    // Every line, in order, once — the failure this guards against is pages of
+    // ['line-3','line-4'] repeating while 0-2 are never delivered.
+    expect(seen).toEqual(['line-0', 'line-1', 'line-2', 'line-3', 'line-4']);
+  });
+});
+
+describe('dockerRequest status handling', () => {
+  /** A one-shot HTTP server on a unix socket that answers with a fixed status. */
+  async function serving(status: number, body: string) {
+    const dir = await mkdtemp(path.join(tmpdir(), 'insforge-docker-client-'));
+    const socket = path.join(dir, 'docker.sock');
+    const server = createHttpServer((_req, res) => {
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(body);
+    });
+    await new Promise<void>((resolve) => server.listen(socket, resolve));
+    const previous = configMock.docker.socketPath;
+    configMock.docker.socketPath = socket;
+    return async () => {
+      configMock.docker.socketPath = previous;
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(dir, { recursive: true, force: true });
+    };
+  }
+
+  // Confirmed against a real daemon: `POST /containers/<running>/start` and
+  // `POST /containers/<stopped>/stop` both answer 304 with a message body. Treating that as
+  // an error made rollback to the already-live deployment throw — and its recovery path then
+  // stopped that container with nothing left to restart, taking the site down on what should
+  // have been a no-op.
+  it('treats 304 as a no-op, not an error', async () => {
+    const stop = await serving(304, '{"message":"container already started"}');
+    try {
+      await expect(dockerRequest('POST', '/containers/abc/start')).resolves.toBeUndefined();
+    } finally {
+      await stop();
+    }
+  });
+
+  // The read stops when the caller says it has enough, not at a byte count: a byte cap cannot
+  // be the pagination boundary, because `since` floors to whole seconds and a replay prefix
+  // larger than the cap makes every call read the same bytes and return an empty page forever.
+  it('stops reading when the caller says it has enough', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'insforge-docker-client-'));
+    const socket = path.join(dir, 'docker.sock');
+    let written = 0;
+    const server = createHttpServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
+      const send = () => {
+        // More than the stop-check interval each time, so the predicate runs.
+        res.write(Buffer.alloc(512 * 1024, 0x61));
+        written += 512 * 1024;
+        if (written < 8 * 1024 * 1024) {
+          setImmediate(send);
+        } else {
+          res.end();
+        }
+      };
+      send();
+    });
+    await new Promise<void>((resolve) => server.listen(socket, resolve));
+    const previous = configMock.docker.socketPath;
+    configMock.docker.socketPath = socket;
+    try {
+      const res = await dockerRequestRaw('GET', '/containers/abc/logs', {
+        // Stop at the first check, whatever arrived.
+        stopWhen: () => true,
+      });
+      expect(res.truncated).toBe(true);
+      expect(res.body.length).toBeLessThan(8 * 1024 * 1024);
+    } finally {
+      configMock.docker.socketPath = previous;
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('still throws for a real failure status', async () => {
+    const stop = await serving(409, '{"message":"conflict"}');
+    try {
+      await expect(dockerRequest('POST', '/containers/abc/start')).rejects.toThrow(
+        /Docker API error \(409\): conflict/
+      );
+    } finally {
+      await stop();
+    }
+  });
+});
+
+describe('a resumed page reads only as far as it needs', () => {
+  // The replay of the boundary second comes first, then the new lines. The read must stop after
+  // `limit` new ones — not at a byte count, which a large replay would hit first, returning an
+  // empty page with an unchanged cursor and making everything after it unreachable.
+  it('stops once limit new lines have arrived', async () => {
+    const watermark = 1786056693200000000n;
+    // Full nanosecond precision, which is the point: a millisecond-only timestamp makes lines a
+    // microsecond apart parse as identical, and the first version of this test filtered every
+    // "new" line for exactly that reason.
+    const at = (nanos: bigint) => {
+      const seconds = nanos / 1000000000n;
+      const fraction = (nanos % 1000000000n).toString().padStart(9, '0');
+      const iso = new Date(Number(seconds) * 1000).toISOString().replace('.000Z', '');
+      return `${iso}.${fraction}Z line-${nanos}`;
+    };
+    // Two already-delivered lines, then five newer ones.
+    const body = [
+      at(watermark - 2000n),
+      at(watermark - 1000n),
+      at(watermark + 1000n),
+      at(watermark + 2000n),
+      at(watermark + 3000n),
+      at(watermark + 4000n),
+      at(watermark + 5000n),
+    ].join('\n');
+    let sawPredicate = false;
+    const transport = vi.fn(
+      async (_method: string, _path: string, options?: { stopWhen?: (b: Buffer) => boolean }) => {
+        const buffer = frame(body);
+        if (options?.stopWhen) {
+          sawPredicate = true;
+          // The predicate is what bounds the read; assert it counts only lines past the cursor.
+          expect(options.stopWhen(buffer)).toBe(true);
+        }
+        return { status: 200, body: buffer };
+      }
+    );
+
+    const result = await dockerContainerLogs(
+      'container-abc',
+      { limit: 3, nextToken: watermark.toString() },
+      transport as never
+    );
+
+    expect(sawPredicate).toBe(true);
+    expect(result.lines).toHaveLength(3);
+    // The cursor is the last line actually returned, so the two it did not return come next.
+    expect(result.nextToken).toBe((watermark + 3000n).toString());
+  });
+
+  // The predicate must count only lines past the cursor. Counting the replay as well would stop
+  // the read while the caller still needs new lines — which is how the byte-cap version stalled,
+  // just with a different trigger.
+  it('does not count already-delivered lines towards the limit', async () => {
+    const watermark = 1786056693200000000n;
+    const at = (nanos: bigint) => {
+      const seconds = nanos / 1000000000n;
+      const fraction = (nanos % 1000000000n).toString().padStart(9, '0');
+      const iso = new Date(Number(seconds) * 1000).toISOString().replace('.000Z', '');
+      return `${iso}.${fraction}Z line-${nanos}`;
+    };
+    // Five already delivered, two new, asking for three.
+    const body = [
+      at(watermark - 5000n),
+      at(watermark - 4000n),
+      at(watermark - 3000n),
+      at(watermark - 2000n),
+      at(watermark - 1000n),
+      at(watermark + 1000n),
+      at(watermark + 2000n),
+    ].join('\n');
+    let verdict: boolean | undefined;
+    const transport = vi.fn(
+      async (_method: string, _path: string, options?: { stopWhen?: (b: Buffer) => boolean }) => {
+        const buffer = frame(body);
+        verdict = options?.stopWhen?.(buffer);
+        return { status: 200, body: buffer };
+      }
+    );
+
+    await dockerContainerLogs(
+      'container-abc',
+      { limit: 3, nextToken: watermark.toString() },
+      transport as never
+    );
+
+    // Seven lines in the buffer, but only two are past the cursor — so it keeps reading.
+    expect(verdict).toBe(false);
+  });
+});
+
+describe('parseLogWatermark', () => {
+  // A negative cursor becomes a negative `since`, which the daemon reads as "from the
+  // beginning" — so `next_token=-1` returned the entire retained history instead of a page.
+  it('rejects a negative cursor', () => {
+    expect(parseLogWatermark('-1')).toBeNull();
+    expect(parseLogWatermark('0')).toBe(0n);
+    expect(parseLogWatermark('1786056693200000000')).toBe(1786056693200000000n);
+    expect(parseLogWatermark('not-a-number')).toBeNull();
   });
 });

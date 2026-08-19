@@ -1,0 +1,339 @@
+import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
+import { ERROR_CODES } from '@insforge/shared-schemas';
+import { createServer } from 'node:net';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+const configMock = {
+  cloud: { projectId: undefined as string | undefined, apiHost: 'https://cloud.test' },
+  app: { jwtSecret: 's'.repeat(32), logLevel: 'error' },
+  server: { logsDir: '/tmp/insforge-sites-registry-test-logs' },
+  deployments: {
+    vercelToken: undefined as string | undefined,
+    vercelTeamId: undefined as string | undefined,
+    vercelProjectId: undefined as string | undefined,
+  },
+  storage: { s3Bucket: undefined, appKey: undefined },
+  // A path that does not exist, so the Docker driver stays unregistered unless a test
+  // points this at a real file. Reading the host's real socket would make these results
+  // depend on whether the developer runs Docker Desktop.
+  docker: {
+    socketPath: '/nonexistent/test.sock',
+    bindAddress: '127.0.0.1',
+    defaultIngress: 'none',
+  },
+};
+vi.mock('@/infra/config/app.config.js', () => ({ config: configMock, appConfig: configMock }));
+
+const {
+  buildSitesRegistry,
+  getSitesMetadata,
+  isAnySitesProviderConfigured,
+  requireDomainStore,
+  selectSitesProvider,
+} = await import('@/services/deployments/sites-registry.js');
+
+const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+const savedRequested = process.env.SITES_PROVIDER;
+
+/**
+ * A real unix socket: the driver checks for one, not merely for an existing path.
+ *
+ * In its own directory, and removed afterwards. A pid-derived name in the shared tmpdir
+ * survives a killed run and gets reused by whatever process next lands on that pid — and
+ * `listen` on an existing socket path fails, so the next run would die at import.
+ */
+const socketDir = await mkdtemp(path.join(tmpdir(), 'insforge-sites-registry-'));
+const socketPath = path.join(socketDir, 'docker.sock');
+const socketServer = createServer();
+await new Promise<void>((resolve) => socketServer.listen(socketPath, resolve));
+
+afterAll(async () => {
+  await new Promise<void>((resolve) => socketServer.close(() => resolve()));
+  await rm(socketDir, { recursive: true, force: true });
+});
+
+function mountDockerSocket(): void {
+  configMock.docker.socketPath = socketPath;
+}
+
+function configureVercel(): void {
+  configMock.deployments.vercelToken = 'vercel-token';
+  configMock.deployments.vercelTeamId = 'team_1';
+  configMock.deployments.vercelProjectId = 'prj_1';
+}
+
+beforeEach(() => {
+  configMock.docker.socketPath = '/nonexistent/test.sock';
+  delete process.env.AWS_INSTANCE_PROFILE_NAME;
+  delete process.env.SITES_PROVIDER;
+  configMock.deployments.vercelToken = undefined;
+  configMock.deployments.vercelTeamId = undefined;
+  configMock.deployments.vercelProjectId = undefined;
+});
+
+afterAll(() => {
+  // The socket is closed by the hook that created it, above — closing it twice hits an
+  // already-closed server.
+  if (savedProfile === undefined) {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+  } else {
+    process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+  }
+  if (savedRequested === undefined) {
+    delete process.env.SITES_PROVIDER;
+  } else {
+    process.env.SITES_PROVIDER = savedRequested;
+  }
+});
+
+describe('buildSitesRegistry', () => {
+  it('registers the Vercel driver when credentials are present', () => {
+    configureVercel();
+
+    const registry = buildSitesRegistry();
+
+    expect([...registry.providers.keys()]).toEqual(['vercel']);
+    expect(registry.defaultProvider).toBe('vercel');
+    expect(selectSitesProvider().name).toBe('vercel');
+  });
+
+  it('throws with the reason when nothing is configured', () => {
+    expect(() => buildSitesRegistry()).toThrow(
+      expect.objectContaining({ code: ERROR_CODES.DEPLOYMENT_NOT_CONFIGURED, statusCode: 503 })
+    );
+    expect(() => buildSitesRegistry()).toThrow('No sites provider is configured');
+  });
+
+  // A named driver that cannot run must fail here rather than on the first deploy, and
+  // the message has to name what is missing — the operator set the variable on purpose.
+  it('throws when the requested driver is unusable, naming the missing credentials', () => {
+    process.env.SITES_PROVIDER = 'vercel';
+
+    expect(() => buildSitesRegistry()).toThrow('SITES_PROVIDER=vercel');
+    expect(() => buildSitesRegistry()).toThrow(
+      expect.objectContaining({ nextActions: expect.stringContaining('VERCEL_TOKEN') })
+    );
+  });
+
+  it('disables sites entirely on off', () => {
+    configureVercel();
+    process.env.SITES_PROVIDER = 'off';
+
+    expect(() => buildSitesRegistry()).toThrow('Sites are disabled');
+  });
+
+  it('rejects an unknown value instead of silently falling back', () => {
+    configureVercel();
+    process.env.SITES_PROVIDER = 'netlify';
+
+    expect(() => buildSitesRegistry()).toThrow('Unknown SITES_PROVIDER "netlify"');
+  });
+
+  // Mounting the socket is the opt-in, so the driver appears without being named.
+  it('registers Docker when the socket is present', () => {
+    mountDockerSocket();
+
+    const registry = buildSitesRegistry();
+
+    expect([...registry.providers.keys()]).toEqual(['docker']);
+    expect(registry.defaultProvider).toBe('docker');
+  });
+
+  // An instance that mounts the socket for compute must not silently move its site to a
+  // new driver on upgrade.
+  it('keeps Vercel as the default when both are available', () => {
+    configureVercel();
+    mountDockerSocket();
+
+    const registry = buildSitesRegistry();
+
+    expect([...registry.providers.keys()]).toEqual(['vercel', 'docker']);
+    expect(registry.defaultProvider).toBe('vercel');
+  });
+
+  it('honours SITES_PROVIDER=docker when both are available', () => {
+    configureVercel();
+    mountDockerSocket();
+    process.env.SITES_PROVIDER = 'docker';
+
+    expect(buildSitesRegistry().defaultProvider).toBe('docker');
+  });
+
+  // Running customer containers on shared infrastructure is a tenant escape, so the
+  // driver fails closed on cloud whether or not a socket is reachable — and the message
+  // must not send the operator chasing a socket mount that is not the problem.
+  it('refuses Docker on a cloud-managed project, naming the real reason', () => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+    mountDockerSocket();
+    process.env.SITES_PROVIDER = 'docker';
+
+    expect(() => buildSitesRegistry()).toThrow('self-host only');
+    expect(() => buildSitesRegistry()).toThrow(
+      expect.objectContaining({ statusCode: 400, code: ERROR_CODES.DEPLOYMENT_NOT_CONFIGURED })
+    );
+  });
+
+  it('names the socket path when Docker was asked for and is absent', () => {
+    process.env.SITES_PROVIDER = 'docker';
+
+    expect(() => buildSitesRegistry()).toThrow('/nonexistent/test.sock');
+  });
+
+  it('ignores case and surrounding whitespace', () => {
+    configureVercel();
+    process.env.SITES_PROVIDER = '  VERCEL ';
+
+    expect(buildSitesRegistry().defaultProvider).toBe('vercel');
+  });
+});
+
+describe('isAnySitesProviderConfigured', () => {
+  // Callers use this to *report* availability, so it has to answer rather than throw.
+  it('answers false instead of throwing when unconfigured', () => {
+    expect(isAnySitesProviderConfigured()).toBe(false);
+
+    configureVercel();
+    expect(isAnySitesProviderConfigured()).toBe(true);
+  });
+});
+
+describe('getSitesMetadata', () => {
+  it('is absent when no driver can serve a deployment', () => {
+    expect(getSitesMetadata()).toBeUndefined();
+  });
+
+  // Published to clients, so the shape is the contract: Vercel reports no build logs and
+  // no rollback because neither exists in this codebase.
+  // `runtime` since server-rendered deployments read them per request and the set is held
+  // for the next deploy; rollback and buildLogs are true here and false for Vercel — every
+  // deployment is its own image, and the classic builder streams output we keep.
+  it('publishes what the Docker driver can actually do', () => {
+    mountDockerSocket();
+
+    expect(getSitesMetadata()?.providers.docker).toEqual({
+      envVars: 'runtime',
+      customDomains: false,
+      slug: false,
+      rollback: true,
+      buildLogs: true,
+      runtimeLogs: true,
+      frameworkDetection: false,
+      ingressModes: ['port', 'host'],
+      defaultIngress: 'port',
+    });
+  });
+
+  // Off-cloud, slugs and custom domains are not Vercel's to give: both live in the InsForge
+  // Cloud API, `getSlug()` returns null and `updateSlug()` refuses with 503. Publishing them
+  // as available is the "button whose endpoint refuses" this slice exists to prevent.
+  it('publishes the active driver capabilities, without the cloud-only ones', () => {
+    configureVercel();
+
+    expect(getSitesMetadata()).toEqual({
+      defaultProvider: 'vercel',
+      providers: {
+        vercel: {
+          envVars: 'runtime',
+          customDomains: false,
+          slug: false,
+          rollback: false,
+          buildLogs: false,
+          runtimeLogs: false,
+          frameworkDetection: true,
+          ingressModes: ['host'],
+          defaultIngress: 'host',
+        },
+      },
+    });
+  });
+
+  it('publishes them on a cloud project, where those endpoints work', () => {
+    configureVercel();
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'insforge-instance-profile';
+
+    expect(getSitesMetadata()?.providers.vercel).toMatchObject({
+      customDomains: true,
+      slug: true,
+    });
+  });
+});
+
+describe('capability stores', () => {
+  // Presence tracks the capability, so off-cloud Vercel has no domain store to hand back and
+  // the routes refuse by name instead of reaching an API that will not honour them.
+  it('refuses the domain store off-cloud, where the capability is false', () => {
+    configureVercel();
+
+    expect(() => requireDomainStore()).toThrow('does not support custom domains');
+  });
+
+  it('hands it back on a cloud project, where the capability is true', () => {
+    configureVercel();
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'insforge-instance-profile';
+
+    expect(requireDomainStore()).toBeDefined();
+  });
+
+  // Reaching a store on an instance with no driver must not read as "unsupported" —
+  // nothing is configured, which is a different fix.
+  it('reports not-configured rather than unsupported when there is no driver', () => {
+    expect(() => requireDomainStore()).toThrow('No sites provider is configured');
+  });
+});
+
+describe('what reaches Vercel from projectSettings', () => {
+  // The three server-rendering fields describe how a *container* runs an app; Vercel decides
+  // that from the framework it detects, and its deployment API validates the body. They were
+  // being forwarded verbatim, while the field documentation promised they were ignored.
+  it('sends only the settings Vercel accepts', async () => {
+    const axios = (await import('axios')).default;
+    const post = vi.spyOn(axios, 'post').mockResolvedValue({
+      data: { id: 'dpl_1', url: 'x.vercel.app', readyState: 'READY', name: 'x', createdAt: 1 },
+    } as never);
+    configureVercel();
+
+    await selectSitesProvider()
+      .createDeploymentWithFiles([], {
+        projectSettings: {
+          buildCommand: 'npm run build',
+          outputDirectory: 'dist',
+          startCommand: 'node server.js',
+          serverDirectory: '.next/standalone',
+          serverPort: 3000,
+        },
+      })
+      .catch(() => undefined);
+
+    const body = post.mock.calls[0]?.[1] as { projectSettings?: Record<string, unknown> };
+    expect(body.projectSettings).toEqual({
+      buildCommand: 'npm run build',
+      outputDirectory: 'dist',
+    });
+    post.mockRestore();
+  });
+});
+
+describe('buildSitesRegistry({ enforceRequested: false })', () => {
+  // Row-scoped operations ask only "which drivers work here". A deployment made by a working
+  // Docker driver must stay operable when SITES_PROVIDER names Vercel and its credentials have
+  // since gone stale — enforcing the default first threw before the row's driver was consulted.
+  it('lists the working drivers even when the configured default is unusable', () => {
+    process.env.SITES_PROVIDER = 'vercel';
+    mountDockerSocket();
+
+    expect(() => buildSitesRegistry()).toThrow('no Vercel credentials');
+    expect([...buildSitesRegistry({ enforceRequested: false }).providers.keys()]).toEqual([
+      'docker',
+    ]);
+  });
+
+  it('still refuses when nothing at all works', () => {
+    process.env.SITES_PROVIDER = 'vercel';
+
+    expect(() => buildSitesRegistry({ enforceRequested: false })).toThrow(
+      'No sites provider is configured'
+    );
+  });
+});

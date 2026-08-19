@@ -558,6 +558,163 @@ paths:
         '500':
           $ref: '#/components/responses/Error'
 
+  /api/deployments/{id}/rollback:
+    post:
+      summary: Roll back to a deployment
+      description: >-
+        Makes a previous deployment live again without rebuilding it, and demotes whichever
+        run currently claims `READY`. Offered only by drivers that report `rollback` in the
+        `sites` capability slice of `/api/metadata`; the rest answer `400` with
+        `DEPLOYMENT_FEATURE_UNSUPPORTED`. Two runs cannot be restored: one that never reached
+        the provider, and one whose artifact retention has already removed — on the Docker
+        driver, retention keeps the live deployment plus two rollback steps.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/DeploymentId'
+      responses:
+        '200':
+          description: The restored run, now `READY`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+        '400':
+          description: >-
+            Malformed id, a run that never reached the provider, or a driver that does not
+            support rollback
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          description: >-
+            The run belongs to a driver that is not configured on this instance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          description: >-
+            No sites driver is configured, or `SITES_PROVIDER` names one that is unusable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/deployments/{id}/logs:
+    get:
+      summary: Read a running deployment's output
+      description: >-
+        A page of the deployment's own stdout/stderr, oldest line first within the page.
+        Without `next_token` the page is the newest `limit` lines — a tail rather than the
+        start of the retained history. Offered only by drivers
+        that report `runtimeLogs` in the `sites` capability slice of `/api/metadata`; the rest
+        answer `400` with `DEPLOYMENT_FEATURE_UNSUPPORTED`. The capability describes the
+        driver, not the deployment: a server-rendered site returns what the app itself wrote,
+        while a static one returns Caddy's own output — startup and errors, not a request log,
+        because access logging is off by default and enabling it would grow the container log
+        without bound on a host that has no rotation configured. Build output is a different
+        field, returned on the run itself.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/DeploymentId'
+        - name: limit
+          in: query
+          description: >-
+            Lines to return, 1-1000 (default 100). A non-integer is rejected rather than
+            rounded: a page size the caller did not ask for is invisible to a paging client.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - name: next_token
+          in: query
+          description: >-
+            Opaque forward cursor from a previous page: returns what has arrived since. An
+            empty `lines` array with the same token back means the app has written nothing
+            since — not that the deployment has stopped.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A page of output
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [lines, nextToken]
+                properties:
+                  lines:
+                    type: array
+                    items:
+                      type: object
+                      required: [timestamp, message]
+                      properties:
+                        timestamp:
+                          type: integer
+                          description: Unix milliseconds, from the daemon's own timestamps
+                        message:
+                          type: string
+                  nextToken:
+                    type: string
+                    nullable: true
+        '400':
+          description: >-
+            Malformed id or limit, a run that never reached the provider, or a driver with no
+            runtime to read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          description: >-
+            The run belongs to a driver that is not configured on this instance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: >-
+            Rate-limited at 120 requests per minute per IP, the same budget as the compute logs
+            endpoint, because this is what a live tail polls
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          description: >-
+            No sites driver is configured, or `SITES_PROVIDER` names one that is unusable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/deployments/{id}/cancel:
     post:
       summary: Cancel deployment
@@ -843,6 +1000,35 @@ components:
         rootDirectory:
           type: string
           nullable: true
+        startCommand:
+          type: string
+          nullable: true
+          description: >-
+            Command that starts a long-running server, e.g. `node server.js`. Its presence is
+            what makes a deployment server-rendered rather than static — declared rather than
+            inferred, because a Dockerfile's final stage cannot branch on what a build
+            produced. Honoured by drivers that run a server themselves, which today means the
+            Docker driver; Vercel decides this from the framework it detects and ignores the
+            field. Unrelated to the `runtimeLogs` capability, which says whether a running
+            deployment's output can be read back — a driver could do either without the other.
+        serverDirectory:
+          type: string
+          nullable: true
+          description: >-
+            Directory copied into the runtime image, relative to the build root. Defaults to
+            the whole build output. `.next/standalone` gives a small image for a Next app
+            built with `output: 'standalone'`, but that directory does not contain
+            `.next/static` or `public` — copy them into it in the build command, or the
+            assets 404 while the HTML renders.
+        serverPort:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          nullable: true
+          description: >-
+            Port the server listens on inside the container. Defaults to the static site port
+            so one gateway configuration serves both shapes. The container is given `PORT`
+            and `HOSTNAME=0.0.0.0`.
 
     EnvVarInput:
       type: object

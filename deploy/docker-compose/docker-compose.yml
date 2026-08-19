@@ -108,6 +108,19 @@ services:
       - VERCEL_TOKEN=${VERCEL_TOKEN:-}
       - VERCEL_TEAM_ID=${VERCEL_TEAM_ID:-}
       - VERCEL_PROJECT_ID=${VERCEL_PROJECT_ID:-}
+      # Namespaces the containers and images both local drivers manage, and the network
+      # alias the sites gateway proxies to. Missing here while the gateway below read it
+      # meant an operator who set APP_KEY got a backend that did not: the driver named its
+      # alias `insforge-site-local` and the gateway looked for `insforge-site-<APP_KEY>`.
+      #
+      # The empty fallback and the gateway's `:-local` agree only because both local drivers
+      # read this as `APP_KEY || 'local'`. Set the variable and both sides use it; leave it
+      # unset and both end up at `local`.
+      #
+      # Not a single fallback, though: `cloud.appKey` reads the same variable with a different
+      # default (`default-app-key`) and uses it as the Deno Subhosting slug, which is why this
+      # line passes the raw value through rather than defaulting it to `local` here.
+      - APP_KEY=${APP_KEY:-}
       # OAuth Configuration
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
@@ -142,6 +155,20 @@ services:
       # (required when the S3 endpoint is not reachable by browsers).
       - S3_USE_PRESIGNED_URLS=${S3_USE_PRESIGNED_URLS:-}
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-}
+      # Which driver hosts the project's site: vercel | docker | off. Empty
+      # auto-detects and prefers Vercel when its credentials are set, so mounting the
+      # socket for compute does not move an existing site to a new driver.
+      - SITES_PROVIDER=${SITES_PROVIDER:-}
+      # Base domain for `host` ingress on the Docker sites driver; falls back to
+      # COMPUTE_DOMAIN. InsForge advertises the hostname and does not route or
+      # terminate TLS — that stays your gateway's job.
+      - SITES_DOMAIN=${SITES_DOMAIN:-}
+      # Where uploaded deployment files stage before a build, keyed by content hash.
+      - SITES_STAGING_DIR=${SITES_STAGING_DIR:-}
+      # Fixed host port for the live site. Empty lets Docker assign one per deploy, which
+      # keeps deploys gapless but changes the address each time. A gateway in front makes
+      # this unnecessary — see deploy/sites-gateway/Caddyfile.
+      - SITES_PORT=${SITES_PORT:-}
       # ─── Custom Compute: Docker provider (opt-in) ────────────────────────
       # Uncommenting the socket mount in `volumes` below is what enables it.
       # See .env.example for what each of these does.
@@ -235,7 +262,50 @@ services:
     networks:
       - insforge-network
 
+  # Optional gateway for a self-hosted site. Off unless you ask for it:
+  #
+  #   docker compose --profile sites-gateway up -d
+  #
+  # InsForge does not route your traffic or hold your certificates — this is a ready-made
+  # config, not a component we run. It reaches whichever deployment is live through the
+  # stable alias the sites driver assigns, so the Caddyfile needs no rewriting per deploy.
+  #
+  # Publishing on 80/443 is what lets Caddy answer an ACME challenge for SITES_HOSTNAME. If
+  # you move these ports, a public certificate needs your own forwarding or a DNS challenge.
+  sites-gateway:
+    image: caddy:alpine
+    profiles: ['sites-gateway']
+    restart: unless-stopped
+    # This file sets no security_opt elsewhere, but the repo's own compose files do, and this
+    # is the service publishing host ports for inbound traffic — so it gets the baseline
+    # rather than inheriting the gap.
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      # Must resolve to the same value the backend uses. `local` here matches the driver's
+      # own `APP_KEY || 'local'`, which is what an empty value on the backend resolves to.
+      - APP_KEY=${APP_KEY:-local}
+      # A domain pointed here makes Caddy obtain a certificate itself. Defaults to `:80`,
+      # which answers for any host — see the Caddyfile for why the fallback lives here.
+      - SITES_HOSTNAME=${SITES_HOSTNAME:-:80}
+      # The container port the gateway proxies to. 80 is where a static site and a
+      # server-rendered one both listen by default; set this only if a deployment
+      # declares its own `serverPort`.
+      - SITES_UPSTREAM_PORT=${SITES_UPSTREAM_PORT:-80}
+    ports:
+      - '${SITES_GATEWAY_HTTP_PORT:-80}:80'
+      - '${SITES_GATEWAY_HTTPS_PORT:-443}:443'
+    volumes:
+      - ../sites-gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      - sites-gateway-data:/data
+    networks:
+      - insforge-network
+
+
 volumes:
+  # Certificates and Caddy's own state, so a restart does not re-issue them.
+  sites-gateway-data:
+    driver: local
   postgres-data:
     driver: local
   deno_cache:
