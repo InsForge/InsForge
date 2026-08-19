@@ -698,7 +698,10 @@ USING ((select auth.uid()) = user_id)
               CASE
                 WHEN octet_length('idx_' || c.relname || '_' || a.attname) <= 63
                   THEN 'idx_' || c.relname || '_' || a.attname
-                ELSE 'idx_' || md5(c.relname || '.' || a.attname)
+                -- Length-delimited, because an identifier may itself contain a
+                -- dot: without it, table "a.b" column "c" and table "a" column
+                -- "b.c" digest the same and the second remediation fails.
+                ELSE 'idx_' || md5(length(c.relname)::text || ':' || c.relname || ':' || a.attname)
               END,
               n.nspname, c.relname, a.attname) AS remediation
           FROM policy_columns pc
