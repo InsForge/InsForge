@@ -61,4 +61,19 @@ describe('AuditService', () => {
     ]);
     expect(result.actor).toBe('');
   });
+
+  it('applies LIMIT 0 when limit is explicitly 0, instead of returning all rows', async () => {
+    mockPool.query
+      .mockResolvedValueOnce({ rows: [{ count: '5' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await AuditService.getInstance().query({ limit: 0 });
+
+    expect(mockPool.query).toHaveBeenCalledTimes(2);
+
+    const [dataSql, dataParams] = mockPool.query.mock.calls[1];
+    expect(dataSql).toContain('LIMIT');
+    expect(dataParams).toContain(0);
+    expect(result.records).toEqual([]);
+  });
 });
