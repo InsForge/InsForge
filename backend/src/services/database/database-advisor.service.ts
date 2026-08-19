@@ -651,9 +651,14 @@ USING ((select auth.uid()) = user_id)
             -- a string literal, and it never has to embed an arbitrary
             -- identifier into a regular expression, which errors the whole rule
             -- out when the name carries regex punctuation.
-            SELECT DISTINCT
+            -- One row per (table, column), not per policy: several policies
+            -- commonly filter on the same column, and a finding is identified
+            -- by its affected_object, so emitting it twice would duplicate the
+            -- entry and hand back a second CREATE INDEX that fails on the name
+            -- the first one already took. min() picks a stable policy to name.
+            SELECT
               pol.polrelid AS table_oid,
-              pol.polname AS policy_name,
+              min(pol.polname) AS policy_name,
               d.refobjsubid AS attnum
             FROM pg_catalog.pg_policy pol
             JOIN pg_catalog.pg_depend d
@@ -664,6 +669,7 @@ USING ((select auth.uid()) = user_id)
               -- on columns elsewhere, and an index there would not help this scan.
               AND d.refobjid = pol.polrelid
               AND d.refobjsubid > 0
+            GROUP BY pol.polrelid, d.refobjsubid
           ),
           table_indices AS (
             SELECT

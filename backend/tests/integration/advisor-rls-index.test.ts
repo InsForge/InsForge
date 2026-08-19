@@ -91,6 +91,32 @@ beforeAll(async () => {
     CREATE POLICY imports_reviewer ON public.imports FOR INSERT
       WITH CHECK (reviewer = gen_random_uuid());
     CREATE POLICY imports_status ON public.imports FOR DELETE USING (id::text = 'status');
+
+    -- A second policy on a column imports_reviewer already covers, to check the
+    -- finding is emitted once per column rather than once per policy.
+    CREATE POLICY imports_reviewer_read ON public.imports FOR SELECT
+      USING (reviewer = gen_random_uuid());
+
+    -- A policy whose subquery reads a column of a different table. Postgres
+    -- records that dependency too, and the attnum is only meaningful relative to
+    -- the table it came from, so a dependency that is not filtered to the
+    -- policy's own table lands on whatever column happens to share that attnum.
+    --
+    -- The attnums are chosen to make that visible: lookup.tenant is attnum 3,
+    -- and attnum 3 on scoped is "unrelated", a column no policy reads.
+    CREATE TABLE public.lookup (join_key uuid, filler uuid, tenant uuid);
+    CREATE TABLE public.scoped (
+      id        uuid PRIMARY KEY,
+      lookup_id uuid NOT NULL,
+      unrelated uuid
+    );
+    ALTER TABLE public.scoped ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY scoped_via_lookup ON public.scoped USING (
+      EXISTS (
+        SELECT 1 FROM public.lookup l
+         WHERE l.join_key = lookup_id AND l.tenant = gen_random_uuid()
+      )
+    );
   `);
 }, 180_000);
 
@@ -134,5 +160,27 @@ describe('advisor missing-rls-index column resolution', () => {
 
     // imports_status filters on id; "status" is just the literal it compares to.
     expect(findings.map((f) => f.affectedObject)).not.toContain('public.imports.status');
+  }, 90_000);
+
+  it('reports a column once even when several policies filter on it', async () => {
+    const findings = await scanForRlsFindings();
+    const forReviewer = findings.filter((f) => f.affectedObject === 'public.imports.reviewer');
+
+    // Two policies read reviewer. A second identical finding would also hand
+    // back a CREATE INDEX that fails on the name the first one took.
+    expect(forReviewer).toHaveLength(1);
+  }, 90_000);
+
+  it('does not report columns a policy only touches through another table', async () => {
+    const findings = await scanForRlsFindings();
+    const objects = findings.map((f) => f.affectedObject);
+
+    // Without the own-table filter, lookup.tenant's attnum 3 is applied to
+    // scoped, producing a finding for "unrelated", which no policy reads.
+    expect(objects).not.toContain('public.scoped.unrelated');
+    // Nothing is attributed to the other table either.
+    expect(objects.filter((o) => o.startsWith('public.lookup.'))).toEqual([]);
+    // The column the policy really filters on is still reported.
+    expect(objects).toContain('public.scoped.lookup_id');
   }, 90_000);
 });
