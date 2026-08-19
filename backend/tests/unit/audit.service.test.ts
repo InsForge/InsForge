@@ -76,4 +76,22 @@ describe('AuditService', () => {
     expect(dataParams).toContain(0);
     expect(result.records).toEqual([]);
   });
+
+  it.each([
+    ['NaN', NaN],
+    ['Infinity', Infinity],
+  ])(
+    'omits the LIMIT clause instead of binding a non-finite limit (%s)',
+    async (_label, limit) => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ count: '5' }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await AuditService.getInstance().query({ limit });
+
+      const [dataSql, dataParams] = mockPool.query.mock.calls[1];
+      expect(dataSql).not.toContain('LIMIT');
+      expect(dataParams).not.toContain(limit);
+    }
+  );
 });

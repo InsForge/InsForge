@@ -11,6 +11,11 @@ const router = Router();
 // All logs routes require admin authentication
 router.use(verifyAdmin);
 
+function parseAuditLimit(raw: unknown): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 100;
+}
+
 // GET /logs/audits - List audit logs
 router.get('/audits', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -20,7 +25,7 @@ router.get('/audits', async (req: AuthRequest, res: Response, next: NextFunction
 
     // Build query parameters for audit service
     const queryParams = {
-      limit: Number(limit),
+      limit: parseAuditLimit(limit),
       offset: Number(offset),
       ...(actor && typeof actor === 'string' && { actor }),
       ...(action && typeof action === 'string' && { action }),
