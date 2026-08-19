@@ -88,15 +88,6 @@ export class ApiClient {
       const response = await fetch(url, config);
 
       if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch {
-          const error: ApiError = new Error(`HTTP ${response.status}: ${response.statusText}`);
-          error.response = { data: null, status: response.status };
-          throw error;
-        }
-
         if (response.status === 401 && !skipRefresh && !isRetry) {
           // Queue behind existing refresh or start a new one
           if (!this.refreshPromise && this.onRefreshAccessToken) {
@@ -111,6 +102,15 @@ export class ApiClient {
           }
           this.clearTokens();
           this.onAuthError?.();
+        }
+
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          const error: ApiError = new Error(`HTTP ${response.status}: ${response.statusText}`);
+          error.response = { data: null, status: response.status };
+          throw error;
         }
 
         if (errorData.error && errorData.message) {
