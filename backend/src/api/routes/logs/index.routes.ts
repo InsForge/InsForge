@@ -16,7 +16,7 @@ function parseAuditLimit(raw: unknown): number {
     return 100;
   }
   const n = Number(raw);
-  return Number.isInteger(n) && n >= 0 ? n : 100;
+  return Number.isSafeInteger(n) && n >= 0 ? n : 100;
 }
 
 // GET /logs/audits - List audit logs

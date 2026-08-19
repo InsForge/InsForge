@@ -82,6 +82,7 @@ describe('AuditService', () => {
     ['Infinity', Infinity],
     ['a fractional value', 1.5],
     ['a negative value', -1],
+    ['a value beyond Number.MAX_SAFE_INTEGER', 1e20],
   ])(
     'omits the LIMIT clause instead of binding an invalid limit (%s)',
     async (_label, limit) => {

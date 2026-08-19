@@ -58,6 +58,7 @@ describe('GET /logs/audits limit parsing', () => {
     ['a fractional value', '1.5'],
     ['a non-numeric value', 'abc'],
     ['a negative value', '-5'],
+    ['a value beyond Number.MAX_SAFE_INTEGER', '100000000000000000000'],
   ])('falls back to the default limit of 100 for %s', async (_label, rawLimit) => {
     await request(app()).get('/logs/audits').query({ limit: rawLimit });
 
