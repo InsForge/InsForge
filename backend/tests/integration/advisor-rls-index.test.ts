@@ -117,6 +117,20 @@ beforeAll(async () => {
          WHERE l.join_key = lookup_id AND l.tenant = gen_random_uuid()
       )
     );
+
+    -- Two columns on one table whose "idx_<table>_<column>" names agree well
+    -- past Postgres' 63-byte identifier limit, so a truncated name would
+    -- collide and the second recommendation would fail as already existing.
+    CREATE TABLE public.long_names (
+      id uuid PRIMARY KEY,
+      a_very_long_column_name_that_keeps_going_and_going_and_going_one uuid,
+      a_very_long_column_name_that_keeps_going_and_going_and_going_two uuid
+    );
+    ALTER TABLE public.long_names ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY long_names_p ON public.long_names USING (
+      a_very_long_column_name_that_keeps_going_and_going_and_going_one = gen_random_uuid()
+      AND a_very_long_column_name_that_keeps_going_and_going_and_going_two = gen_random_uuid()
+    );
   `);
 }, 180_000);
 
@@ -169,6 +183,26 @@ describe('advisor missing-rls-index column resolution', () => {
     // Two policies read reviewer. A second identical finding would also hand
     // back a CREATE INDEX that fails on the name the first one took.
     expect(forReviewer).toHaveLength(1);
+  }, 90_000);
+
+  it('recommends index names that stay unique past the identifier limit', async () => {
+    const findings = await scanForRlsFindings();
+    const longOnes = findings.filter((f) => f.affectedObject.startsWith('public.long_names.'));
+
+    expect(longOnes).toHaveLength(2);
+    const names = longOnes.map(
+      (f) => /CREATE INDEX CONCURRENTLY (\S+) ON/.exec(f.recommendation)?.[1]
+    );
+    expect(new Set(names).size).toBe(2);
+
+    // Both recommendations have to actually run; a truncated collision would
+    // fail the second one.
+    for (const f of longOnes) {
+      await query(f.recommendation.replace('CONCURRENTLY ', ''));
+    }
+
+    const after = await scanForRlsFindings();
+    expect(after.filter((f) => f.affectedObject.startsWith('public.long_names.'))).toEqual([]);
   }, 90_000);
 
   it('does not report columns a policy only touches through another table', async () => {

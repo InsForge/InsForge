@@ -688,8 +688,19 @@ USING ((select auth.uid()) = user_id)
             format($d$Policy %I on %I.%I filters on column %I but no index exists for it. RLS conditions are evaluated on every query — without an index this forces sequential scans on the entire table.$d$, pc.policy_name, n.nspname, c.relname, a.attname) AS detail,
             -- %I on the whole name: a table or column that needs quoting would
             -- otherwise produce an index name that is not valid SQL.
+            --
+            -- Postgres truncates identifiers at 63 bytes, so two long columns on
+            -- one table can collapse to the same index name, and the second
+            -- recommendation then fails as already existing. Past that length the
+            -- readable name is being mangled anyway, so fall back to a digest.
+            -- Names that fit are left exactly as they were.
             format($r$CREATE INDEX CONCURRENTLY %I ON %I.%I (%I);$r$,
-              'idx_' || c.relname || '_' || a.attname, n.nspname, c.relname, a.attname) AS remediation
+              CASE
+                WHEN octet_length('idx_' || c.relname || '_' || a.attname) <= 63
+                  THEN 'idx_' || c.relname || '_' || a.attname
+                ELSE 'idx_' || md5(c.relname || '.' || a.attname)
+              END,
+              n.nspname, c.relname, a.attname) AS remediation
           FROM policy_columns pc
           JOIN pg_catalog.pg_class c ON c.oid = pc.table_oid
           JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
