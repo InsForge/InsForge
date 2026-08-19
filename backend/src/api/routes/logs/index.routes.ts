@@ -12,9 +12,6 @@ const router = Router();
 router.use(verifyAdmin);
 
 function parseAuditLimit(raw: unknown): number {
-  if (raw === undefined || raw === null) {
-    return 100;
-  }
   const str = String(raw).trim();
   if (str === '') {
     return 100;
