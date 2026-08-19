@@ -98,6 +98,23 @@ beforeAll(async () => {
     ALTER TABLE public.rls_ok ENABLE ROW LEVEL SECURITY;
     CREATE POLICY rls_ok_p ON public.rls_ok USING (policy_col = gen_random_uuid());
     CREATE INDEX rls_ok_key ON public.rls_ok (policy_col);
+
+    -- Payload-only shapes reserved for the "clears once covered" case. It is
+    -- the one test that adds an index, so it gets its own tables: mutating the
+    -- shapes above would make the earlier assertions depend on running first.
+    CREATE TABLE public.fk_fix_parent (a uuid, b uuid, UNIQUE (a, b));
+    CREATE TABLE public.fk_fix_child (
+      id uuid PRIMARY KEY,
+      a  uuid NOT NULL,
+      b  uuid NOT NULL,
+      CONSTRAINT fk_fix_child_fkey FOREIGN KEY (a, b) REFERENCES public.fk_fix_parent (a, b)
+    );
+    CREATE INDEX fk_fix_child_payload ON public.fk_fix_child (a) INCLUDE (b);
+
+    CREATE TABLE public.rls_fix (id uuid PRIMARY KEY, other_col uuid, policy_col uuid);
+    ALTER TABLE public.rls_fix ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY rls_fix_p ON public.rls_fix USING (policy_col = gen_random_uuid());
+    CREATE INDEX rls_fix_idx ON public.rls_fix (other_col) INCLUDE (policy_col);
   `);
 }, 180_000);
 
@@ -133,12 +150,19 @@ describe('advisor index coverage ignores INCLUDE payload columns', () => {
   }, 90_000);
 
   it('clears the payload cases once a real key index is added', async () => {
+    // Own tables, so the index this adds cannot change what the payload-only
+    // cases above observe, in whatever order they run.
+    expect(await scanFor('missing-fk-index')).toContain('public.fk_fix_child.fk_fix_child_fkey');
+    expect(await scanFor('missing-rls-index')).toContain('public.rls_fix.policy_col');
+
     await query(`
-      CREATE INDEX fk_child_key ON public.fk_child (a, b);
-      CREATE INDEX rls_payload_key ON public.rls_payload (policy_col);
+      CREATE INDEX fk_fix_child_key ON public.fk_fix_child (a, b);
+      CREATE INDEX rls_fix_key ON public.rls_fix (policy_col);
     `);
 
-    expect(await scanFor('missing-fk-index')).not.toContain('public.fk_child.fk_child_fkey');
-    expect(await scanFor('missing-rls-index')).not.toContain('public.rls_payload.policy_col');
+    expect(await scanFor('missing-fk-index')).not.toContain(
+      'public.fk_fix_child.fk_fix_child_fkey'
+    );
+    expect(await scanFor('missing-rls-index')).not.toContain('public.rls_fix.policy_col');
   }, 90_000);
 });
