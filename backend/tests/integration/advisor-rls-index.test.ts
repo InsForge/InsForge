@@ -118,18 +118,19 @@ beforeAll(async () => {
       )
     );
 
-    -- Two columns on one table whose "idx_<table>_<column>" names agree well
-    -- past Postgres' 63-byte identifier limit, so a truncated name would
-    -- collide and the second recommendation would fail as already existing.
+    -- Two columns on one table. Each name is comfortably inside Postgres'
+    -- 63-byte identifier limit, but "idx_long_names_<column>" is 68 bytes and
+    -- the two agree well past the cut, so a truncated index name would collide
+    -- and the second recommendation would fail as already existing.
     CREATE TABLE public.long_names (
       id uuid PRIMARY KEY,
-      a_very_long_column_name_that_keeps_going_and_going_and_going_one uuid,
-      a_very_long_column_name_that_keeps_going_and_going_and_going_two uuid
+      policy_col_long_enough_to_overflow_the_index_name_one uuid,
+      policy_col_long_enough_to_overflow_the_index_name_two uuid
     );
     ALTER TABLE public.long_names ENABLE ROW LEVEL SECURITY;
     CREATE POLICY long_names_p ON public.long_names USING (
-      a_very_long_column_name_that_keeps_going_and_going_and_going_one = gen_random_uuid()
-      AND a_very_long_column_name_that_keeps_going_and_going_and_going_two = gen_random_uuid()
+      policy_col_long_enough_to_overflow_the_index_name_one = gen_random_uuid()
+      AND policy_col_long_enough_to_overflow_the_index_name_two = gen_random_uuid()
     );
   `);
 }, 180_000);
