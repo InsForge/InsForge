@@ -33,44 +33,47 @@ describe('ApiClient CSRF cookie handling', () => {
   });
 });
 
-it('refreshes an expired token when the 401 response is not JSON', async () => {
-  const fetchMock = vi
-    .fn()
-    .mockResolvedValueOnce(
-      new Response('<html>Unauthorized</html>', {
-        status: 401,
-        headers: { 'Content-Type': 'text/html' },
-      })
-    )
-    .mockResolvedValueOnce(
-      new Response(JSON.stringify({ success: true }), {
-        status: 200,
-      })
-    );
-
-  vi.stubGlobal('fetch', fetchMock);
-
-  const client = new ApiClient();
-  client.setAccessToken('expired-token');
-  client.setRefreshAccessTokenHandler(async () => {
-    client.setAccessToken('fresh-token');
-    return true;
-  });
-
-  const result = await client.request('/dashboard/test');
-
-  expect(result).toEqual({ success: true });
-  expect(fetchMock).toHaveBeenCalledTimes(2);
-  expect(fetchMock.mock.calls[1]?.[1]).toEqual(
-    expect.objectContaining({
-      headers: { Authorization: 'Bearer fresh-token' },
-    })
-  );
-});
-
 describe('ApiClient authentication refresh', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('refreshes an expired token when the 401 response is not JSON', async () => {
+    const unauthorizedResponse = new Response('<html>Unauthorized</html>', {
+      status: 401,
+      headers: { 'Content-Type': 'text/html' },
+    });
+
+    const cancelSpy = vi.spyOn(unauthorizedResponse.body!, 'cancel');
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(unauthorizedResponse)
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true }), {
+          status: 200,
+        })
+      );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new ApiClient();
+    client.setAccessToken('expired-token');
+    client.setRefreshAccessTokenHandler(async () => {
+      client.setAccessToken('fresh-token');
+      return true;
+    });
+
+    const result = await client.request('/dashboard/test');
+
+    expect(result).toEqual({ success: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer fresh-token' },
+      })
+    );
+    expect(cancelSpy).toHaveBeenCalledTimes(1);
   });
 
   it('refreshes an expired token when the 401 response has an empty body', async () => {

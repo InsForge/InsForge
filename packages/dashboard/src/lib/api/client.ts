@@ -98,6 +98,7 @@ export class ApiClient {
 
           const refreshed = await this.refreshPromise;
           if (refreshed) {
+            await response.body?.cancel();
             return makeRequest(true);
           }
           this.clearTokens();
