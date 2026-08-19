@@ -12,8 +12,11 @@ const router = Router();
 router.use(verifyAdmin);
 
 function parseAuditLimit(raw: unknown): number {
+  if (typeof raw === 'string' && raw.trim() === '') {
+    return 100;
+  }
   const n = Number(raw);
-  return Number.isFinite(n) && n >= 0 ? n : 100;
+  return Number.isInteger(n) && n >= 0 ? n : 100;
 }
 
 // GET /logs/audits - List audit logs

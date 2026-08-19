@@ -80,8 +80,10 @@ describe('AuditService', () => {
   it.each([
     ['NaN', NaN],
     ['Infinity', Infinity],
+    ['a fractional value', 1.5],
+    ['a negative value', -1],
   ])(
-    'omits the LIMIT clause instead of binding a non-finite limit (%s)',
+    'omits the LIMIT clause instead of binding an invalid limit (%s)',
     async (_label, limit) => {
       mockPool.query
         .mockResolvedValueOnce({ rows: [{ count: '5' }] })
