@@ -643,28 +643,27 @@ USING ((select auth.uid()) = user_id)
             )
         `,
         'missing-rls-index': `
-          WITH table_cols AS (
-            SELECT
-              n.nspname AS schema_name,
-              c.relname AS table_name,
-              c.oid AS table_oid,
-              a.attname AS column_name,
-              a.attnum
-            FROM pg_catalog.pg_attribute a
-            JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
-            JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
-            WHERE c.relkind = 'r'
-              AND a.attnum > 0
-              AND NOT a.attisdropped
-              AND n.nspname NOT IN (${ADVISOR_EXCLUDED_SCHEMAS})
-          ),
-          policies AS (
-            SELECT
-              polrelid AS table_oid,
-              polname AS policy_name,
-              pg_get_expr(polqual, polrelid) AS qual,
-              pg_get_expr(polwithcheck, polrelid) AS with_check
-            FROM pg_catalog.pg_policy
+          WITH policy_columns AS (
+            -- Postgres already records exactly which columns a policy expression
+            -- touches, across both USING and WITH CHECK. Reading that dependency
+            -- is exact where pattern-matching the rendered expression text is
+            -- not: it cannot be fooled by a column name that only appears inside
+            -- a string literal, and it never has to embed an arbitrary
+            -- identifier into a regular expression, which errors the whole rule
+            -- out when the name carries regex punctuation.
+            SELECT DISTINCT
+              pol.polrelid AS table_oid,
+              pol.polname AS policy_name,
+              d.refobjsubid AS attnum
+            FROM pg_catalog.pg_policy pol
+            JOIN pg_catalog.pg_depend d
+              ON d.classid = 'pg_catalog.pg_policy'::regclass
+              AND d.objid = pol.oid
+              AND d.refclassid = 'pg_catalog.pg_class'::regclass
+              -- Columns of the policy own table only; a subquery may also depend
+              -- on columns elsewhere, and an index there would not help this scan.
+              AND d.refobjid = pol.polrelid
+              AND d.refobjsubid > 0
           ),
           table_indices AS (
             SELECT
@@ -674,22 +673,28 @@ USING ((select auth.uid()) = user_id)
             WHERE indisvalid
           )
           SELECT
-            (tc.schema_name || '.' || tc.table_name || '.' || tc.column_name) AS affected_object,
+            (n.nspname || '.' || c.relname || '.' || a.attname) AS affected_object,
             'missing-rls-index' AS rule_id,
             'warning' AS severity,
             'performance' AS category,
             'RLS policy column missing index' AS title,
             'A column referenced in an RLS policy lacks an index, forcing sequential scans on every query.' AS description,
-            format($d$Policy %I on %I.%I filters on column %I but no index exists for it. RLS conditions are evaluated on every query — without an index this forces sequential scans on the entire table.$d$, p.policy_name, tc.schema_name, tc.table_name, tc.column_name) AS detail,
-            format($r$CREATE INDEX CONCURRENTLY idx_%s_%s ON %I.%I (%I);$r$, tc.table_name, tc.column_name, tc.schema_name, tc.table_name, tc.column_name) AS remediation
-          FROM table_cols tc
-          JOIN policies p ON tc.table_oid = p.table_oid
-          LEFT JOIN table_indices ti ON tc.table_oid = ti.table_oid AND tc.attnum = ANY(ti.col_attnums)
+            format($d$Policy %I on %I.%I filters on column %I but no index exists for it. RLS conditions are evaluated on every query — without an index this forces sequential scans on the entire table.$d$, pc.policy_name, n.nspname, c.relname, a.attname) AS detail,
+            -- %I on the whole name: a table or column that needs quoting would
+            -- otherwise produce an index name that is not valid SQL.
+            format($r$CREATE INDEX CONCURRENTLY %I ON %I.%I (%I);$r$,
+              'idx_' || c.relname || '_' || a.attname, n.nspname, c.relname, a.attname) AS remediation
+          FROM policy_columns pc
+          JOIN pg_catalog.pg_class c ON c.oid = pc.table_oid
+          JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+          JOIN pg_catalog.pg_attribute a
+            ON a.attrelid = pc.table_oid AND a.attnum = pc.attnum
+          LEFT JOIN table_indices ti
+            ON ti.table_oid = pc.table_oid AND pc.attnum = ANY(ti.col_attnums)
           WHERE ti.table_oid IS NULL
-            AND (
-              p.qual ~ ('\\m' || tc.column_name || '\\M')
-              OR p.with_check ~ ('\\m' || tc.column_name || '\\M')
-            )
+            AND c.relkind = 'r'
+            AND NOT a.attisdropped
+            AND n.nspname NOT IN (${ADVISOR_EXCLUDED_SCHEMAS})
         `,
         'dead-tuples': `
           SELECT
