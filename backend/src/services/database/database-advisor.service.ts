@@ -452,11 +452,21 @@ CREATE POLICY "allow_insert" ON %I.%I FOR INSERT TO authenticated WITH CHECK (au
             'performance' AS category,
             'Foreign key column missing index' AS title,
             'A foreign key column has no covering index. JOINs require full table scans, and deleting or updating rows in the referenced table scans the whole referencing table.' AS description,
+            -- Column order is load-bearing. The join below compares conkey to the
+            -- index prefix as an array, so it only clears when an index leads with
+            -- the FK columns in declaration order. Ordering by conkey ordinality
+            -- keeps the printed columns in that same order; a plain pg_attribute
+            -- scan returns attnum order, which for a FK declared out of column
+            -- order names an index that never satisfies the check.
             format($d$Column %s on table %I.%I is a foreign key (%s) but has no index. JOINs require full table scans, and deleting or updating rows in the referenced table requires scanning the entire referencing table — potentially acquiring locks that block writes.$d$,
-              (SELECT string_agg(quote_ident(a.attname), ', ') FROM pg_attribute a WHERE a.attrelid = fk.table_oid AND a.attnum = ANY(fk.col_attnums)),
+              (SELECT string_agg(quote_ident(a.attname), ', ' ORDER BY k.ord)
+                 FROM unnest(fk.col_attnums) WITH ORDINALITY AS k(attnum, ord)
+                 JOIN pg_catalog.pg_attribute a ON a.attrelid = fk.table_oid AND a.attnum = k.attnum),
               fk.schema_name, fk.table_name, fk.fkey_name) AS detail,
             format($r$CREATE INDEX CONCURRENTLY ON %I.%I (%s);$r$, fk.schema_name, fk.table_name,
-              (SELECT string_agg(quote_ident(a.attname), ', ') FROM pg_attribute a WHERE a.attrelid = fk.table_oid AND a.attnum = ANY(fk.col_attnums))
+              (SELECT string_agg(quote_ident(a.attname), ', ' ORDER BY k.ord)
+                 FROM unnest(fk.col_attnums) WITH ORDINALITY AS k(attnum, ord)
+                 JOIN pg_catalog.pg_attribute a ON a.attrelid = fk.table_oid AND a.attnum = k.attnum)
             ) AS remediation
           FROM foreign_keys fk
           LEFT JOIN index_ idx ON fk.table_oid = idx.table_oid
