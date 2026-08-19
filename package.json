@@ -62,7 +62,7 @@
   "license": "Apache-2.0",
   "overrides": {
     "express": "^4.22.0",
-    "undici": "7.28.0",
+    "undici": "7.29.0",
     "fast-xml-parser": "^5.7.0",
     "handlebars": "^4.7.9",
     "path-to-regexp": "0.1.13",
@@ -76,12 +76,12 @@
     "ws": "^8.21.0",
     "qs": "^6.15.2",
     "minimatch@10": {
-      "brace-expansion": "^5.0.6"
+      "brace-expansion": "^5.0.9"
     },
     "shell-quote": "1.10.0",
     "form-data": "4.0.6",
     "@opentelemetry/core": "2.9.0",
-    "js-yaml": "5.2.1",
+    "js-yaml": "5.2.3",
     "@babel/core": "7.29.7",
     "tsup": {
       ".": "^8.5.1",
