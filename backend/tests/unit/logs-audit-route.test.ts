@@ -65,7 +65,7 @@ describe('GET /logs/audits limit parsing', () => {
     expect(queryMock).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
   });
 
-  it('omits limit from the query when not supplied at all', async () => {
+  it('defaults limit to 100 when not supplied at all', async () => {
     await request(app()).get('/logs/audits');
 
     expect(queryMock).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
