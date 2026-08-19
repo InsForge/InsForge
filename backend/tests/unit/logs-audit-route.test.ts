@@ -70,4 +70,16 @@ describe('GET /logs/audits limit parsing', () => {
 
     expect(queryMock).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
   });
+
+  it('falls back to the default limit of 100 for an array-wrapped blank value (limit[]=)', async () => {
+    await request(app()).get('/logs/audits?limit[]=');
+
+    expect(queryMock).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
+  });
+
+  it('falls back to the default limit of 100 when limit is repeated', async () => {
+    await request(app()).get('/logs/audits?limit=5&limit=6');
+
+    expect(queryMock).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
+  });
 });

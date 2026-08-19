@@ -12,10 +12,14 @@ const router = Router();
 router.use(verifyAdmin);
 
 function parseAuditLimit(raw: unknown): number {
-  if (typeof raw === 'string' && raw.trim() === '') {
+  if (raw === undefined || raw === null) {
     return 100;
   }
-  const n = Number(raw);
+  const str = String(raw).trim();
+  if (str === '') {
+    return 100;
+  }
+  const n = Number(str);
   return Number.isSafeInteger(n) && n >= 0 ? n : 100;
 }
 
