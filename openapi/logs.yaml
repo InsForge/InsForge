@@ -61,10 +61,12 @@ paths:
           description: All matching audit logs were returned
           headers:
             Content-Range:
+              required: true
               schema:
                 type: string
               description: 'Range and total, e.g. `0-9/10`'
             Preference-Applied:
+              required: true
               schema:
                 type: string
               description: Always `count=exact`
@@ -78,10 +80,12 @@ paths:
           description: A page of audit logs, with more available
           headers:
             Content-Range:
+              required: true
               schema:
                 type: string
               description: 'Range and total, e.g. `0-99/1234`'
             Preference-Applied:
+              required: true
               schema:
                 type: string
               description: Always `count=exact`
@@ -319,9 +323,11 @@ paths:
           description: All matching log entries were returned
           headers:
             Content-Range:
+              required: true
               schema:
                 type: string
             Preference-Applied:
+              required: true
               schema:
                 type: string
           content:
@@ -334,9 +340,11 @@ paths:
           description: A page of matching log entries, with more available
           headers:
             Content-Range:
+              required: true
               schema:
                 type: string
             Preference-Applied:
+              required: true
               schema:
                 type: string
           content:
