@@ -274,6 +274,14 @@ paths:
       description: |
         Paginates through `paginatedResponse`, so responses use 206 with
         `Content-Range` when the page is a subset and 200 when it is not.
+
+        How far that contract holds depends on the configured log provider.
+        The local provider slices the full result set, so `offset` and the
+        total in `Content-Range` behave as expected. The CloudWatch provider
+        cannot express offset in an Insights query: it ignores `offset` and
+        reports the length of the returned page as the total. Paging past
+        the first page there repeats results, so treat this endpoint as
+        single-page unless the deployment uses the local provider.
       tags:
         - Admin
       security:
@@ -301,6 +309,7 @@ paths:
           schema:
             type: integer
             default: 0
+          description: Ignored by the CloudWatch provider; see the description above
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
