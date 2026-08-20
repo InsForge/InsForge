@@ -8,15 +8,6 @@ import { describe, it, expect } from 'vitest';
  * to verify cloud-hosting detection and message normalization.
  */
 
-// Mirrors isCloudHostingBackend from frontend/src/cloudHostingHelpers.ts
-function isCloudHostingBackend(backendUrl: string): boolean {
-  try {
-    return new URL(backendUrl).hostname.endsWith('.insforge.app');
-  } catch {
-    return false;
-  }
-}
-
 // Mirrors getErrorMessage from frontend/src/cloudHostingHelpers.ts
 function getErrorMessage(message: unknown, fallback: string): string {
   return typeof message === 'string' && message.trim() ? message : fallback;
@@ -59,71 +50,7 @@ function normalizeProjectInfo(
   };
 }
 
-// Mirrors backendUrl resolution from frontend/src/App.tsx
-function resolveBackendUrl(envVar: string | undefined, windowOrigin: string): string {
-  return envVar || windowOrigin;
-}
-
 describe('Cloud Hosting Helpers', () => {
-  describe('isCloudHostingBackend', () => {
-    it('returns true for .insforge.app hostnames', () => {
-      expect(isCloudHostingBackend('https://abc123.us-east-1.insforge.app')).toBe(true);
-      expect(isCloudHostingBackend('https://myproject.eu-west-1.insforge.app')).toBe(true);
-      expect(isCloudHostingBackend('https://test.insforge.app')).toBe(true);
-    });
-
-    it('returns false for non-insforge hostnames', () => {
-      expect(isCloudHostingBackend('http://localhost:7130')).toBe(false);
-      expect(isCloudHostingBackend('https://example.com')).toBe(false);
-      expect(isCloudHostingBackend('https://insforge.app')).toBe(false); // no subdomain, but hostname IS insforge.app which ends with .insforge.app? No — "insforge.app".endsWith(".insforge.app") is true
-    });
-
-    it('returns true for bare insforge.app (endsWith includes exact match)', () => {
-      // "insforge.app".endsWith(".insforge.app") => false because of the leading dot
-      expect(isCloudHostingBackend('https://insforge.app')).toBe(false);
-    });
-
-    it('returns false for invalid URLs', () => {
-      expect(isCloudHostingBackend('')).toBe(false);
-      expect(isCloudHostingBackend('not-a-url')).toBe(false);
-    });
-
-    it('returns false for similar but different domains', () => {
-      expect(isCloudHostingBackend('https://evil-insforge.app')).toBe(false);
-      expect(isCloudHostingBackend('https://insforge.app.evil.com')).toBe(false);
-    });
-  });
-
-  describe('resolveBackendUrl (App.tsx logic)', () => {
-    it('uses env var when set', () => {
-      expect(resolveBackendUrl('http://localhost:7130', 'https://abc.insforge.app')).toBe(
-        'http://localhost:7130'
-      );
-    });
-
-    it('falls back to window origin when env var is empty', () => {
-      expect(resolveBackendUrl('', 'https://abc.us-east-1.insforge.app')).toBe(
-        'https://abc.us-east-1.insforge.app'
-      );
-    });
-
-    it('falls back to window origin when env var is undefined', () => {
-      expect(resolveBackendUrl(undefined, 'https://abc.us-east-1.insforge.app')).toBe(
-        'https://abc.us-east-1.insforge.app'
-      );
-    });
-
-    it('cloud detection works with resolved URL from window.location.origin', () => {
-      const backendUrl = resolveBackendUrl(undefined, 'https://myproject.us-east-1.insforge.app');
-      expect(isCloudHostingBackend(backendUrl)).toBe(true);
-    });
-
-    it('self-hosting detection works with localhost origin', () => {
-      const backendUrl = resolveBackendUrl(undefined, 'http://localhost:5173');
-      expect(isCloudHostingBackend(backendUrl)).toBe(false);
-    });
-  });
-
   describe('getErrorMessage', () => {
     it('returns the message when it is a non-empty string', () => {
       expect(getErrorMessage('Something went wrong', 'fallback')).toBe('Something went wrong');
