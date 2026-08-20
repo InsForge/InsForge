@@ -108,6 +108,10 @@ paths:
 
     delete:
       summary: Clear audit logs
+      description: |
+        Retention-based cleanup. Deletes every audit log older than
+        `days_to_keep` days and answers with `deleted`, the number of rows
+        removed. There is no dry run, and the deletion is not reversible.
       tags:
         - Admin
       security:
@@ -193,6 +197,11 @@ paths:
   /api/logs/audits/stats:
     get:
       summary: Audit log summary
+      description: |
+        Aggregates the audit log over the last `days` days. `totalLogs`,
+        `uniqueActors` and `uniqueModules` are counts across that window,
+        `actionsByModule` is the per-module action count keyed by module
+        name, and `recentActivity` carries the most recent entries in full.
       tags:
         - Admin
       security:
