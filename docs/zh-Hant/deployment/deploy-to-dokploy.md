@@ -77,7 +77,7 @@ VITE_API_BASE_URL=https://insforge.example.com
 
 ## 儲存
 
-物件儲存預設落在 Docker 卷上的容器檔案系統。Dokploy 只接受單一 compose 檔案，因此 MinIO 與 RustFS 的 overlay 無法使用；可行的兩種方案請見 [Self-Hosted Storage](./self-host-storage.mdx)。
+物件儲存預設落在 Docker 卷上的容器檔案系統。Dokploy 只接受單一 compose 檔案，因此 MinIO 與 RustFS 的 overlay 無法使用；可行的兩種方案請見 [Self-Hosted Storage](/deployment/self-host-storage)。
 
 ## 為什麼 Postgres 是建置而非拉取
 
