@@ -122,8 +122,8 @@ describe('MemoryService.remember — reconcile', () => {
     const updateCall = poolQueryMock.mock.calls.find(([sql]) =>
       String(sql).includes('UPDATE memory.memories')
     );
-    expect(String(updateCall![0])).toContain('embedding_model');
-    expect(updateCall![1] as unknown[]).toContain(insertedModel);
+    expect(String(updateCall![0])).toContain('embedding_model = $5');
+    expect((updateCall![1] as unknown[])[4]).toBe(insertedModel);
   });
 });
 
