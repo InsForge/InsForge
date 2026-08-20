@@ -586,6 +586,6 @@ components:
         statusCode:
           type: integer
           description: HTTP status code
-        nextAction:
+        nextActions:
           type: string
           description: Suggested action to resolve the error
