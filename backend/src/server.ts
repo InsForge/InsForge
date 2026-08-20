@@ -27,6 +27,7 @@ import { advisorRouter } from '@/api/routes/advisor/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
+import { buildHealthPayload } from '@/utils/health.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
 import fetch from 'node-fetch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
@@ -217,13 +218,7 @@ export async function createApp() {
   apiRouter.get('/.well-known/jwks.json', jwksHandler);
 
   apiRouter.get('/health', (_req: Request, res: Response) => {
-    const version = packageJson.version;
-    res.json({
-      status: 'ok',
-      version,
-      service: 'Insforge OSS Backend',
-      timestamp: new Date().toISOString(),
-    });
+    res.json(buildHealthPayload(packageJson.version));
   });
 
   // Mount all routes
