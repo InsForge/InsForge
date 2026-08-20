@@ -426,11 +426,18 @@ export class CloudWatchProvider extends BaseLogProvider {
     query: string,
     sourceName?: string,
     limit: number = 100,
-    _offset = 0 // CloudWatch doesn't support offset-based pagination
+    offset: number = 0 // CloudWatch doesn't support offset-based pagination
   ): Promise<{
     logs: (LogSchema & { source: string })[];
     total: number;
   }> {
+    if (!Number.isFinite(offset) || offset !== 0) {
+      throw new AppError(
+        'CloudWatch log search does not support offset-based pagination',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
     if (!this.cwLogGroup || !this.cwClient) {
       throw new AppError(
         'AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY not found in environment variables',
