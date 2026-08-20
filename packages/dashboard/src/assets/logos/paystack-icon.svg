@@ -1,0 +1,14 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_paystack_icon)">
+<rect width="512" height="512" fill="#09A5DB"/>
+<rect x="120" y="132" width="272" height="40" rx="20" fill="white"/>
+<rect x="120" y="200" width="212" height="40" rx="20" fill="white"/>
+<rect x="120" y="268" width="272" height="40" rx="20" fill="white"/>
+<rect x="120" y="336" width="164" height="40" rx="20" fill="white"/>
+</g>
+<defs>
+<clipPath id="clip0_paystack_icon">
+<rect width="512" height="512" rx="64" fill="white"/>
+</clipPath>
+</defs>
+</svg>

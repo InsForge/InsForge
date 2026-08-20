@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type {
+  PaystackConnection,
   RazorpayConnection,
   PaymentEnvironment,
   PaymentProvider,
@@ -11,7 +12,12 @@ import type {
 } from '@insforge/shared-schemas';
 import { stripeService } from '#features/payments/services/stripe.service';
 import { razorpayService } from '#features/payments/services/razorpay.service';
-import { razorpayQueryKeys, stripeQueryKeys } from '#features/payments/queryKeys';
+import { paystackService } from '#features/payments/services/paystack.service';
+import {
+  paystackQueryKeys,
+  razorpayQueryKeys,
+  stripeQueryKeys,
+} from '#features/payments/queryKeys';
 import type { CatalogPrice, CatalogProduct } from '#features/payments/types/catalog';
 
 const RAZORPAY_RECURRING_INTERVAL_MAP: Record<string, string> = {
@@ -119,6 +125,7 @@ function toRazorpayDisplayPrice(plan: RazorpayPlan): CatalogPrice {
 export function usePaymentCatalog(provider: PaymentProvider, environment: PaymentEnvironment) {
   const isStripeProvider = provider === 'stripe';
   const isRazorpayProvider = provider === 'razorpay';
+  const isPaystackProvider = provider === 'paystack';
 
   const {
     data: statusData,
@@ -146,6 +153,19 @@ export function usePaymentCatalog(provider: PaymentProvider, environment: Paymen
     staleTime: 30 * 1000,
   });
 
+  const {
+    data: paystackStatusData,
+    isLoading: isLoadingPaystackStatus,
+    error: paystackStatusError,
+    refetch: refetchPaystackStatus,
+    isFetching: isFetchingPaystackStatus,
+  } = useQuery({
+    queryKey: paystackQueryKeys.status,
+    queryFn: () => paystackService.getStatus(),
+    enabled: isPaystackProvider,
+    staleTime: 30 * 1000,
+  });
+
   const connections = useMemo(
     () => (isStripeProvider ? (statusData?.connections ?? []) : []),
     [isStripeProvider, statusData]
@@ -153,6 +173,10 @@ export function usePaymentCatalog(provider: PaymentProvider, environment: Paymen
   const razorpayConnections = useMemo(
     () => (isRazorpayProvider ? (razorpayStatusData?.razorpayConnections ?? []) : []),
     [isRazorpayProvider, razorpayStatusData]
+  );
+  const paystackConnections = useMemo(
+    () => (isPaystackProvider ? (paystackStatusData?.paystackConnections ?? []) : []),
+    [isPaystackProvider, paystackStatusData]
   );
 
   const activeConnection = useMemo(
@@ -165,9 +189,19 @@ export function usePaymentCatalog(provider: PaymentProvider, environment: Paymen
     [environment, razorpayConnections]
   );
 
+  const activePaystackConnection = useMemo<PaystackConnection | null>(
+    () => paystackConnections.find((connection) => connection.environment === environment) ?? null,
+    [environment, paystackConnections]
+  );
+
   const hasStripeKey = !!activeConnection?.maskedKey;
   const hasRazorpayKey = !!activeRazorpayConnection?.maskedKey;
-  const hasActiveKey = isStripeProvider ? hasStripeKey : hasRazorpayKey;
+  const hasPaystackKey = !!activePaystackConnection?.maskedKey;
+  const hasActiveKey = isStripeProvider
+    ? hasStripeKey
+    : isRazorpayProvider
+      ? hasRazorpayKey
+      : hasPaystackKey;
 
   const {
     data: catalogData,
@@ -222,34 +256,46 @@ export function usePaymentCatalog(provider: PaymentProvider, environment: Paymen
   return {
     connections,
     razorpayConnections,
+    paystackConnections,
     activeConnection,
     activeRazorpayConnection,
+    activePaystackConnection,
     hasActiveKey,
+    // Paystack has no catalog endpoints (phase 1), so its catalog is always empty.
     products: hasActiveKey
       ? isStripeProvider
         ? stripeDisplayCatalog.products
-        : razorpayDisplayCatalog.products
+        : isRazorpayProvider
+          ? razorpayDisplayCatalog.products
+          : []
       : [],
     prices: hasActiveKey
       ? isStripeProvider
         ? stripeDisplayCatalog.prices
-        : razorpayDisplayCatalog.prices
+        : isRazorpayProvider
+          ? razorpayDisplayCatalog.prices
+          : []
       : [],
     isLoading:
       (isStripeProvider && (isLoadingStatus || (hasStripeKey && isLoadingCatalog))) ||
       (isRazorpayProvider &&
-        (isLoadingRazorpayStatus || (hasRazorpayKey && isLoadingRazorpayCatalog))),
+        (isLoadingRazorpayStatus || (hasRazorpayKey && isLoadingRazorpayCatalog))) ||
+      (isPaystackProvider && isLoadingPaystackStatus),
     isRefreshing:
       (isStripeProvider && (isFetchingStatus || (hasStripeKey && isFetchingCatalog))) ||
       (isRazorpayProvider &&
-        (isFetchingRazorpayStatus || (hasRazorpayKey && isFetchingRazorpayCatalog))),
+        (isFetchingRazorpayStatus || (hasRazorpayKey && isFetchingRazorpayCatalog))) ||
+      (isPaystackProvider && isFetchingPaystackStatus),
     error: isStripeProvider
       ? (statusError ?? catalogError)
-      : (razorpayStatusError ?? razorpayCatalogError),
+      : isRazorpayProvider
+        ? (razorpayStatusError ?? razorpayCatalogError)
+        : paystackStatusError,
     refetch: () =>
       Promise.all([
         isStripeProvider ? refetchStatus() : null,
         isRazorpayProvider ? refetchRazorpayStatus() : null,
+        isPaystackProvider ? refetchPaystackStatus() : null,
         isStripeProvider && hasStripeKey ? refetchCatalog() : null,
         isRazorpayProvider && hasRazorpayKey ? refetchRazorpayCatalog() : null,
       ]),

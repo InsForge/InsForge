@@ -4,6 +4,15 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// `--dir <path>` selects a top-level run directory (e.g. `npm run
+// test:integration` uses `--dir tests/integration`). When no directory is
+// given, unit runs must still exclude the integration suite (real Postgres),
+// so default to excluding it and only lift the exclusion when the run
+// explicitly targets it.
+const dirFlagIndex = process.argv.indexOf('--dir');
+const isIntegrationRun =
+  dirFlagIndex !== -1 && process.argv[dirFlagIndex + 1] === 'tests/integration';
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -15,7 +24,9 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: ['./tests/setup.ts'],
-    exclude: [...configDefaults.exclude, 'tests/integration/**'],
+    exclude: isIntegrationRun
+      ? configDefaults.exclude
+      : [...configDefaults.exclude, 'tests/integration/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
