@@ -171,6 +171,256 @@ paths:
                   count: 47
                   lastActivity: "2024-01-21T09:58:00Z"
 
+  /api/logs/audits/stats:
+    get:
+      summary: Audit log summary
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 7
+          description: Size of the window the summary covers
+      responses:
+        '200':
+          description: Audit activity over the window
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - totalLogs
+                  - uniqueActors
+                  - uniqueModules
+                  - actionsByModule
+                  - recentActivity
+                properties:
+                  totalLogs:
+                    type: integer
+                  uniqueActors:
+                    type: integer
+                  uniqueModules:
+                    type: integer
+                  actionsByModule:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                    description: Action count keyed by module
+                  recentActivity:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLog'
+
+  /api/logs/sources:
+    get:
+      summary: List log sources
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Available log sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - id
+                    - name
+                    - token
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    token:
+                      type: string
+
+  /api/logs/search:
+    get:
+      summary: Search logs
+      description: |
+        Paginates through `paginatedResponse`, so responses use 206 with
+        `Content-Range` when the page is a subset and 200 when it is not.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: source
+          in: query
+          schema:
+            type: string
+          description: Restrict the search to one source
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: All matching log entries were returned
+          headers:
+            Content-Range:
+              schema:
+                type: string
+            Preference-Applied:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogEntry'
+        '206':
+          description: A page of matching log entries, with more available
+          headers:
+            Content-Range:
+              schema:
+                type: string
+            Preference-Applied:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogEntry'
+        '400':
+          description: The q parameter is missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: 'INVALID_INPUT'
+                message: 'Search query parameter (q) is required'
+                statusCode: 400
+
+  /api/logs/functions/build-logs:
+    get:
+      summary: Function build logs
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: deployment_id
+          in: query
+          schema:
+            type: string
+          description: Defaults to the latest deployment when omitted
+      responses:
+        '200':
+          description: Build logs for the deployment
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - deploymentId
+                  - status
+                  - logs
+                  - createdAt
+                properties:
+                  deploymentId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, success, failed]
+                  logs:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - level
+                        - message
+                      properties:
+                        level:
+                          type: string
+                        message:
+                          type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+        '404':
+          description: Deno Deploy is not configured, or no deployment was found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: 'LOG_NOT_FOUND'
+                message: 'Build logs not available. Deno Deploy may not be configured or no deployments found.'
+                statusCode: 404
+
+  /api/logs/{source}:
+    get:
+      summary: Logs from one source
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: source
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: before_timestamp
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Return entries older than this timestamp
+      responses:
+        '200':
+          description: Log entries for the source
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - logs
+                  - total
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LogEntry'
+                  total:
+                    type: integer
+
 components:
   securitySchemes:
     bearerAuth:
@@ -215,6 +465,26 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    LogEntry:
+      type: object
+      required:
+        - id
+        - eventMessage
+        - timestamp
+        - body
+      properties:
+        id:
+          type: string
+        eventMessage:
+          type: string
+        timestamp:
+          type: string
+        body:
+          type: object
+          additionalProperties: true
+        source:
+          type: string
 
     ErrorResponse:
       type: object
