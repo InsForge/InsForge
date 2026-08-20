@@ -1,54 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import { getErrorMessage, normalizeProjectInfo } from '../../../frontend/src/cloud-hosting/helpers';
 
 /**
- * Tests for the cloud hosting detection and helper logic
- * used in frontend/src/cloudHostingHelpers.ts and frontend/src/App.tsx
- *
- * These test the pure logic extracted from the frontend helpers
- * to verify cloud-hosting detection and message normalization.
+ * Covers the pure helpers behind the cloud-hosting postMessage bridge, as
+ * imported from the module that ships them. The suite previously defined its
+ * own copies, so it passed no matter what the real helpers did.
  */
-
-// Mirrors getErrorMessage from frontend/src/cloudHostingHelpers.ts
-function getErrorMessage(message: unknown, fallback: string): string {
-  return typeof message === 'string' && message.trim() ? message : fallback;
-}
-
-// Mirrors normalizeProjectInfo from frontend/src/cloudHostingHelpers.ts
-function normalizeProjectInfo(
-  previous: { id: string; name: string; region: string; instanceType: string } | undefined,
-  backendUrl: string,
-  message: { type: string; [key: string]: unknown }
-) {
-  const previousInfo = previous ?? {
-    id: backendUrl,
-    name: 'Project',
-    region: '',
-    instanceType: '',
-  };
-
-  return {
-    id: typeof message.id === 'string' && message.id ? message.id : previousInfo.id,
-    name: typeof message.name === 'string' && message.name ? message.name : previousInfo.name,
-    region:
-      typeof message.region === 'string' && message.region ? message.region : previousInfo.region,
-    instanceType:
-      typeof message.instanceType === 'string' && message.instanceType
-        ? message.instanceType
-        : previousInfo.instanceType,
-    latestVersion:
-      typeof message.latestVersion === 'string' || message.latestVersion === null
-        ? (message.latestVersion as string | null)
-        : (previous as Record<string, unknown>)?.latestVersion,
-    currentVersion:
-      typeof message.currentVersion === 'string' || message.currentVersion === null
-        ? (message.currentVersion as string | null)
-        : (previous as Record<string, unknown>)?.currentVersion,
-    status:
-      typeof message.status === 'string' && message.status
-        ? message.status
-        : (previous as Record<string, unknown>)?.status,
-  };
-}
 
 describe('Cloud Hosting Helpers', () => {
   describe('getErrorMessage', () => {
