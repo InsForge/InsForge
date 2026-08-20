@@ -424,7 +424,18 @@ CREATE POLICY "allow_insert" ON %I.%I FOR INSERT TO authenticated WITH CHECK (au
               cl.relname AS table_name,
               cl.oid AS table_oid,
               ct.conname AS fkey_name,
-              ct.conkey AS col_attnums
+              ct.conkey AS col_attnums,
+              -- Column order is load-bearing. The join below compares conkey to
+              -- the index prefix as an array, so a finding only clears when an
+              -- index leads with the FK columns in declaration order. Ordering by
+              -- conkey ordinality keeps the printed columns in that same order; a
+              -- plain pg_attribute scan returns attnum order, which for a FK
+              -- declared out of column order names an index that never satisfies
+              -- the check. Built once so detail and remediation cannot drift.
+              (SELECT string_agg(quote_ident(a.attname), ', ' ORDER BY k.ord)
+                 FROM unnest(ct.conkey) WITH ORDINALITY AS k(attnum, ord)
+                 JOIN pg_catalog.pg_attribute a
+                   ON a.attrelid = cl.oid AND a.attnum = k.attnum) AS col_names
             FROM pg_catalog.pg_constraint ct
             JOIN pg_catalog.pg_class cl ON ct.conrelid = cl.oid
             JOIN pg_catalog.pg_namespace ns ON cl.relnamespace = ns.oid
@@ -453,10 +464,10 @@ CREATE POLICY "allow_insert" ON %I.%I FOR INSERT TO authenticated WITH CHECK (au
             'Foreign key column missing index' AS title,
             'A foreign key column has no covering index. JOINs require full table scans, and deleting or updating rows in the referenced table scans the whole referencing table.' AS description,
             format($d$Column %s on table %I.%I is a foreign key (%s) but has no index. JOINs require full table scans, and deleting or updating rows in the referenced table requires scanning the entire referencing table — potentially acquiring locks that block writes.$d$,
-              (SELECT string_agg(quote_ident(a.attname), ', ') FROM pg_attribute a WHERE a.attrelid = fk.table_oid AND a.attnum = ANY(fk.col_attnums)),
+              fk.col_names,
               fk.schema_name, fk.table_name, fk.fkey_name) AS detail,
             format($r$CREATE INDEX CONCURRENTLY ON %I.%I (%s);$r$, fk.schema_name, fk.table_name,
-              (SELECT string_agg(quote_ident(a.attname), ', ') FROM pg_attribute a WHERE a.attrelid = fk.table_oid AND a.attnum = ANY(fk.col_attnums))
+              fk.col_names
             ) AS remediation
           FROM foreign_keys fk
           LEFT JOIN index_ idx ON fk.table_oid = idx.table_oid
