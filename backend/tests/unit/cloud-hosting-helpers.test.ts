@@ -100,5 +100,50 @@ describe('Cloud Hosting Helpers', () => {
       });
       expect(result.latestVersion).toBe('2.0.3');
     });
+
+    it('takes isBranch from the message when it is a boolean', () => {
+      const result = normalizeProjectInfo(undefined, 'https://x.insforge.app', {
+        type: 'PROJECT_INFO',
+        isBranch: true,
+      });
+
+      expect(result.isBranch).toBe(true);
+    });
+
+    it('keeps the previous isBranch when the message omits it', () => {
+      const previous = {
+        id: 'proj-1',
+        name: 'Project',
+        region: 'us-east-1',
+        instanceType: 'small',
+        isBranch: true,
+      };
+
+      const result = normalizeProjectInfo(previous, 'https://x.insforge.app', {
+        type: 'PROJECT_INFO',
+        name: 'Renamed',
+      });
+
+      // A partial message must not silently demote a branch project.
+      expect(result.isBranch).toBe(true);
+      expect(result.name).toBe('Renamed');
+    });
+
+    it('ignores a non-boolean isBranch rather than coercing it', () => {
+      const previous = {
+        id: 'proj-1',
+        name: 'Project',
+        region: '',
+        instanceType: '',
+        isBranch: false,
+      };
+
+      const result = normalizeProjectInfo(previous, 'https://x.insforge.app', {
+        type: 'PROJECT_INFO',
+        isBranch: 'true',
+      });
+
+      expect(result.isBranch).toBe(false);
+    });
   });
 });
