@@ -55,6 +55,8 @@ paths:
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: All matching audit logs were returned
           headers:
@@ -117,6 +119,8 @@ paths:
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Audit logs cleared
           content:
@@ -149,6 +153,8 @@ paths:
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Statistics for each log source
           content:
@@ -195,6 +201,8 @@ paths:
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Audit activity over the window
           content:
@@ -235,6 +243,8 @@ paths:
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Available log sources
           content:
@@ -291,6 +301,8 @@ paths:
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: All matching log entries were returned
           headers:
@@ -349,6 +361,8 @@ paths:
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Build logs for the deployment
           content:
@@ -420,6 +434,8 @@ paths:
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Log entries for the source
           content:
@@ -439,6 +455,17 @@ paths:
 
 components:
   responses:
+    Forbidden:
+      description: Authenticated, but the token is not a project_admin
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: 'AUTH_UNAUTHORIZED'
+            message: 'Admin access required'
+            statusCode: 403
+
     Unauthorized:
       description: Missing or invalid admin credentials
       content:
