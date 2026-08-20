@@ -32,6 +32,19 @@ describe('buildDiskBreakdown', () => {
     expect(breakdown!.system[0].value).toBe(0);
   });
 
+  it('ignores used samples with non-finite timestamps', () => {
+    const breakdown = buildDiskBreakdown(
+      pts([[1000, 30]]),
+      pts([[1000, 20]]),
+      pts([
+        [NaN, 999],
+        [1000, 100],
+      ])
+    );
+
+    expect(breakdown!.system[0].value).toBe(50);
+  });
+
   it('drops samples with no nearby used reading instead of fabricating System as zero', () => {
     const breakdown = buildDiskBreakdown(
       pts([

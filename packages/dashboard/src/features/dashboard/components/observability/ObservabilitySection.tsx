@@ -132,7 +132,7 @@ export function buildDiskBreakdown(
   const nearestUsed = (ts: number): number | null => {
     let best: DashboardMetricDataPoint | null = null;
     for (const point of used) {
-      if (!Number.isFinite(point.value)) {
+      if (!Number.isFinite(point.value) || !Number.isFinite(point.timestamp)) {
         continue;
       }
       if (!best || Math.abs(point.timestamp - ts) < Math.abs(best.timestamp - ts)) {
