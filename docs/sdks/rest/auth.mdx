@@ -271,6 +271,73 @@ The response uses the same session shape and `client_type` behavior as password 
 
 ---
 
+## Phone OTP Sign In
+
+Use this passwordless flow when a user should sign in with a 6-digit code sent to their phone over SMS. It requires a configured SMS provider (see [Custom SMS](/core-concepts/messaging/custom-sms)); sends are rejected with `SMS_PROVIDER_NOT_CONFIGURED` until one is enabled.
+
+### Send a Sign-In Code
+
+```
+POST /api/auth/phone/send-otp
+```
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `phone` | string | Yes | Phone number in E.164 format (for example `+15551234567`) that receives the sign-in code |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/phone/send-otp" \
+  -H "Content-Type: application/json" \
+  -d '{ "phone": "+15551234567" }'
+```
+
+The endpoint returns `202 Accepted` with a generic message. It does not reveal whether the phone number already belongs to a user.
+
+### Create a Session with the Code
+
+```
+POST /api/auth/sessions
+```
+
+#### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `method` | string | Yes | Must be `otp` |
+| `phone` | string | Yes | Phone number that received the code. Provide `phone` or `email`, never both |
+| `otp` | string | Yes | 6-digit sign-in code |
+| `name` | string | No | Profile name used only if verification creates a new user |
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=server" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "otp",
+    "phone": "+15551234567",
+    "otp": "123456",
+    "name": "Ada Lovelace"
+  }'
+```
+
+The response uses the same session shape and `client_type` behavior as password sign-in.
+
+<Note>
+- Codes expire after 5 minutes, can be used once, and are consumed after three failed attempts. Expiry, attempt limits, and rate limits are identical to email OTP.
+- InsForge does not create a user when the code is sent. If the phone number is new, a user with `phone_verified: true` and no email is created only after successful verification.
+- A user created by phone sign-in has a `null` email. Unlike email OTP, verifying a phone code never clears a stored password.
+- If public signups are disabled, an existing user can still sign in. A valid code for an unknown phone number is consumed and returns HTTP 403.
+</Note>
+
+---
+
 ## Refresh Token
 
 Refresh access token using refresh token.
