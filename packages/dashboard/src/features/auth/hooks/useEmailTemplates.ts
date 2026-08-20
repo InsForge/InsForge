@@ -13,6 +13,7 @@ export function useEmailTemplates() {
   const { data, isLoading, error, refetch } = useQuery<ListEmailTemplatesResponse>({
     queryKey: ['email-templates'],
     queryFn: () => emailTemplateService.getTemplates(),
+    retry: false,
   });
 
   // Mutation to update an email template
