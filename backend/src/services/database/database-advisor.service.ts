@@ -643,28 +643,33 @@ USING ((select auth.uid()) = user_id)
             )
         `,
         'missing-rls-index': `
-          WITH table_cols AS (
+          WITH policy_columns AS (
+            -- Postgres already records exactly which columns a policy expression
+            -- touches, across both USING and WITH CHECK. Reading that dependency
+            -- is exact where pattern-matching the rendered expression text is
+            -- not: it cannot be fooled by a column name that only appears inside
+            -- a string literal, and it never has to embed an arbitrary
+            -- identifier into a regular expression, which errors the whole rule
+            -- out when the name carries regex punctuation.
+            -- One row per (table, column), not per policy: several policies
+            -- commonly filter on the same column, and a finding is identified
+            -- by its affected_object, so emitting it twice would duplicate the
+            -- entry and hand back a second CREATE INDEX that fails on the name
+            -- the first one already took. min() picks a stable policy to name.
             SELECT
-              n.nspname AS schema_name,
-              c.relname AS table_name,
-              c.oid AS table_oid,
-              a.attname AS column_name,
-              a.attnum
-            FROM pg_catalog.pg_attribute a
-            JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
-            JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
-            WHERE c.relkind = 'r'
-              AND a.attnum > 0
-              AND NOT a.attisdropped
-              AND n.nspname NOT IN (${ADVISOR_EXCLUDED_SCHEMAS})
-          ),
-          policies AS (
-            SELECT
-              polrelid AS table_oid,
-              polname AS policy_name,
-              pg_get_expr(polqual, polrelid) AS qual,
-              pg_get_expr(polwithcheck, polrelid) AS with_check
-            FROM pg_catalog.pg_policy
+              pol.polrelid AS table_oid,
+              min(pol.polname) AS policy_name,
+              d.refobjsubid AS attnum
+            FROM pg_catalog.pg_policy pol
+            JOIN pg_catalog.pg_depend d
+              ON d.classid = 'pg_catalog.pg_policy'::regclass
+              AND d.objid = pol.oid
+              AND d.refclassid = 'pg_catalog.pg_class'::regclass
+              -- Columns of the policy own table only; a subquery may also depend
+              -- on columns elsewhere, and an index there would not help this scan.
+              AND d.refobjid = pol.polrelid
+              AND d.refobjsubid > 0
+            GROUP BY pol.polrelid, d.refobjsubid
           ),
           table_indices AS (
             SELECT
@@ -674,22 +679,42 @@ USING ((select auth.uid()) = user_id)
             WHERE indisvalid
           )
           SELECT
-            (tc.schema_name || '.' || tc.table_name || '.' || tc.column_name) AS affected_object,
+            (n.nspname || '.' || c.relname || '.' || a.attname) AS affected_object,
             'missing-rls-index' AS rule_id,
             'warning' AS severity,
             'performance' AS category,
             'RLS policy column missing index' AS title,
             'A column referenced in an RLS policy lacks an index, forcing sequential scans on every query.' AS description,
-            format($d$Policy %I on %I.%I filters on column %I but no index exists for it. RLS conditions are evaluated on every query — without an index this forces sequential scans on the entire table.$d$, p.policy_name, tc.schema_name, tc.table_name, tc.column_name) AS detail,
-            format($r$CREATE INDEX CONCURRENTLY idx_%s_%s ON %I.%I (%I);$r$, tc.table_name, tc.column_name, tc.schema_name, tc.table_name, tc.column_name) AS remediation
-          FROM table_cols tc
-          JOIN policies p ON tc.table_oid = p.table_oid
-          LEFT JOIN table_indices ti ON tc.table_oid = ti.table_oid AND tc.attnum = ANY(ti.col_attnums)
+            format($d$Policy %I on %I.%I filters on column %I but no index exists for it. RLS conditions are evaluated on every query — without an index this forces sequential scans on the entire table.$d$, pc.policy_name, n.nspname, c.relname, a.attname) AS detail,
+            -- %I on the whole name: a table or column that needs quoting would
+            -- otherwise produce an index name that is not valid SQL.
+            --
+            -- Postgres truncates identifiers at 63 bytes, so two long columns on
+            -- one table can collapse to the same index name, and the second
+            -- recommendation then fails as already existing. Past that length the
+            -- readable name is being mangled anyway, so fall back to a digest.
+            -- Names that fit are left exactly as they were.
+            format($r$CREATE INDEX CONCURRENTLY %I ON %I.%I (%I);$r$,
+              CASE
+                WHEN octet_length('idx_' || c.relname || '_' || a.attname) <= 63
+                  THEN 'idx_' || c.relname || '_' || a.attname
+                -- Length-delimited, because an identifier may itself contain a
+                -- dot: without it, table "a.b" column "c" and table "a" column
+                -- "b.c" digest the same and the second remediation fails.
+                ELSE 'idx_' || md5(length(c.relname)::text || ':' || c.relname || ':' || a.attname)
+              END,
+              n.nspname, c.relname, a.attname) AS remediation
+          FROM policy_columns pc
+          JOIN pg_catalog.pg_class c ON c.oid = pc.table_oid
+          JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+          JOIN pg_catalog.pg_attribute a
+            ON a.attrelid = pc.table_oid AND a.attnum = pc.attnum
+          LEFT JOIN table_indices ti
+            ON ti.table_oid = pc.table_oid AND pc.attnum = ANY(ti.col_attnums)
           WHERE ti.table_oid IS NULL
-            AND (
-              p.qual ~ ('\\m' || tc.column_name || '\\M')
-              OR p.with_check ~ ('\\m' || tc.column_name || '\\M')
-            )
+            AND c.relkind = 'r'
+            AND NOT a.attisdropped
+            AND n.nspname NOT IN (${ADVISOR_EXCLUDED_SCHEMAS})
         `,
         'dead-tuples': `
           SELECT
