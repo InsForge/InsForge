@@ -24,17 +24,17 @@ export default function DTestInstallPage() {
   const { hasCompletedOnboarding, isLoading } = useMcpUsage();
   const [selectedClient, setSelectedClient] = useState<ClientId | null>(null);
 
-  // Auto-jump back to dashboard once onboarding flips false → true (e.g. an
-  // MCP call lands while the user is mid-install).
-  const prevOnboarding = useRef(hasCompletedOnboarding);
+  // Redirect when onboarding transitions from incomplete → complete
+  // while the user is on the install page.
+  const wasOnboardedOnPreviousRender = useRef(hasCompletedOnboarding);
   useEffect(() => {
     if (isLoading) {
       return;
     }
-    if (!prevOnboarding.current && hasCompletedOnboarding) {
+    if (!wasOnboardedOnPreviousRender.current && hasCompletedOnboarding) {
       void navigate('/dashboard', { replace: true });
     }
-    prevOnboarding.current = hasCompletedOnboarding;
+    wasOnboardedOnPreviousRender.current = hasCompletedOnboarding;
   }, [hasCompletedOnboarding, isLoading, navigate]);
 
   if (isLoading) {
