@@ -75,6 +75,18 @@ Send events (`accepted`, `delivered`, `bounced`, `complained`) are recorded per 
 
 Per-project and per-plan limits keep stray loops from melting deliverability. Configurable from the dashboard, enforced at the gateway.
 
+## Availability and sending limits by plan
+
+On InsForge Cloud the managed on-demand email API — the [`emails.send()`](/sdks/typescript/email) call for transactional messages — is available on **paid plans only**. On the Free plan a send is rejected with `On-demand email service is only available for paid plans`, so the number of customers you can reach through the managed sender on Free is zero. To send transactional email from a Free project, upgrade to a paid plan, or run a [self-hosted](/core-concepts/messaging/custom-smtp) instance with your own SMTP provider.
+
+<Note>
+  **Authentication emails are separate.** Verification, password-reset, magic-link, and one-time-code emails belong to [Authentication](/core-concepts/authentication/overview) and keep sending on the Free plan through the managed sender. The paid-only limit above applies only to the transactional Messaging API.
+</Note>
+
+On paid plans, sends are rate-limited per hour and enforced at the gateway. **Every recipient counts as one email** — the `to`, `cc`, and `bcc` addresses are summed, matching how SES/SMTP bill one delivery per address. When a send would exceed the hourly cap the API returns a `Rate limit exceeded` error with the number of minutes until the window resets; retry after it clears or spread large batches across multiple hours. The exact hourly cap scales with your plan — see the [pricing page](https://insforge.dev/pricing).
+
+Self-hosted instances send through your own [Custom SMTP](/core-concepts/messaging/custom-smtp) provider and are not subject to these plan-based limits.
+
 ## Concepts
 
 <CardGroup cols={2}>

@@ -78,6 +78,38 @@ User state lives in your project's Postgres database in the `auth` schema. Join 
 
 When you add a user from the dashboard, the Auto-confirm toggle sets `email_verified` on the new row. Enable it to mark the email as verified at creation, so the user can sign in without confirming it.
 
+## Set up a built-in OAuth provider
+
+Before [`signInWithOAuth('github', …)`](/sdks/typescript/auth) works, the provider has to be enabled for your project. The built-in provider keys are `google`, `github`, `discord`, `linkedin`, `facebook`, `instagram`, `tiktok`, `apple`, `x`, `spotify`, and `microsoft`. GitHub is used as the example below; the same steps apply to any of them.
+
+**On InsForge Cloud**, `google` and `github` are seeded to use InsForge's shared OAuth app, so sign-in works without registering an app of your own — enable the provider from the dashboard under **Auth Methods**. {/* TODO: confirm the exact Auth Methods sub-tab/toggle for enabling GitHub */} To use your own GitHub OAuth app instead, supply your own client credentials with `useSharedKey: false` (below).
+
+**Self-hosted, or bringing your own GitHub app:** register an OAuth app with GitHub and point its authorization callback URL at your project:
+
+```
+https://<your-project-url>/api/auth/oauth/github/callback
+```
+
+The default scope requested is `user:email`. Save the credentials with the admin API:
+
+```bash
+curl -X POST "https://<your-project-url>/api/auth/oauth/configs" \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "github",
+    "clientId": "<github-client-id>",
+    "clientSecret": "<github-client-secret>",
+    "useSharedKey": false
+  }'
+```
+
+The config accepts `provider`, `clientId`, `clientSecret`, `redirectUri`, `scopes` (defaults to `["user:email"]` for GitHub), and `useSharedKey`. On a self-hosted instance you can also seed credentials at startup from environment variables — set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (the same `*_CLIENT_ID` / `*_CLIENT_SECRET` pattern works for `GOOGLE`, `DISCORD`, `LINKEDIN`, `MICROSOFT`, `X`, and `APPLE`).
+
+<Note>
+  OAuth provider credentials are managed through the dashboard or the admin API only — they are **not** part of [config-as-code](/agent-native/config-as-code). Once the provider is enabled, start the flow from your app with [`signInWithOAuth()`](/sdks/typescript/auth).
+</Note>
+
 ## Build with it
 
 <CardGroup cols={2}>

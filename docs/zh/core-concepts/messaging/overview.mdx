@@ -75,6 +75,18 @@ graph TB
 
 按项目和按计划的限制可以防止流氓循环融化交付能力。从仪表板配置，在网关处强制执行。
 
+## 各计划的可用性与发送限制
+
+在 InsForge Cloud 上，托管的按需邮件 API——用于事务性消息的 [`emails.send()`](/sdks/typescript/email) 调用——**仅对付费计划可用**。在免费计划上，发送会被拒绝并返回 `On-demand email service is only available for paid plans`，因此在免费计划上通过托管发件服务能触达的客户数量为零。要从免费项目发送事务性邮件，请升级到付费计划，或使用自带 SMTP 提供方的[自托管](/core-concepts/messaging/custom-smtp)实例。
+
+<Note>
+  **身份验证邮件是独立的。** 验证、密码重置、魔法链接和一次性验证码邮件属于[身份验证](/core-concepts/authentication/overview)，在免费计划上仍会通过托管发件服务发送。上述仅付费计划可用的限制只适用于事务性 Messaging API。
+</Note>
+
+在付费计划上，发送按小时进行限流，并在网关处强制执行。**每个收件人都算作一封邮件**——`to`、`cc` 和 `bcc` 地址会被合并计数，这与 SES/SMTP 按每个地址计一次投递的方式一致。当一次发送会超过每小时上限时，API 会返回 `Rate limit exceeded` 错误，并附带距离窗口重置的分钟数；请在窗口重置后重试，或将大批量发送分散到多个小时。具体的每小时上限随计划提升——参见[定价页面](https://insforge.dev/pricing)。
+
+自托管实例通过你自己的 [Custom SMTP](/core-concepts/messaging/custom-smtp) 提供方发送，不受这些基于计划的限制约束。
+
 ## 概念
 
 <CardGroup cols={2}>

@@ -75,6 +75,18 @@ Los eventos de envío (`accepted`, `delivered`, `bounced`, `complained`) se regi
 
 Los límites por proyecto y por plan evitan que los bucles extraviados destruyan la capacidad de entrega. Configurable desde el panel, aplicado en la puerta de enlace.
 
+## Disponibilidad y límites de envío por plan
+
+En InsForge Cloud, la API gestionada de correo bajo demanda —la llamada [`emails.send()`](/sdks/typescript/email) para mensajes transaccionales— está disponible **solo en planes de pago**. En el plan Free un envío se rechaza con `On-demand email service is only available for paid plans`, por lo que el número de clientes que puede alcanzar a través del remitente gestionado en Free es cero. Para enviar correo transaccional desde un proyecto Free, actualice a un plan de pago o ejecute una instancia [autohospedada](/core-concepts/messaging/custom-smtp) con su propio proveedor SMTP.
+
+<Note>
+  **Los correos de autenticación son independientes.** Los correos de verificación, restablecimiento de contraseña, enlace mágico y código de un solo uso pertenecen a [Autenticación](/core-concepts/authentication/overview) y siguen enviándose en el plan Free a través del remitente gestionado. El límite de solo planes de pago anterior aplica únicamente a la API transaccional de Messaging.
+</Note>
+
+En los planes de pago, los envíos tienen un límite de velocidad por hora aplicado en la puerta de enlace. **Cada destinatario cuenta como un correo**: las direcciones de `to`, `cc` y `bcc` se suman, igual que SES/SMTP facturan una entrega por dirección. Cuando un envío superaría el tope por hora, la API devuelve un error `Rate limit exceeded` con la cantidad de minutos hasta que se reinicia la ventana; reintente cuando se libere o reparta los envíos grandes en varias horas. El tope exacto por hora escala con su plan; consulte la [página de precios](https://insforge.dev/pricing).
+
+Las instancias autohospedadas envían a través de su propio proveedor [Custom SMTP](/core-concepts/messaging/custom-smtp) y no están sujetas a estos límites basados en el plan.
+
 ## Conceptos
 
 <CardGroup cols={2}>
