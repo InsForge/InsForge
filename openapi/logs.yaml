@@ -133,7 +133,10 @@ paths:
 
   /api/logs/stats:
     get:
-      summary: Get logs statistics
+      summary: Per-source log statistics
+      description: |
+        One entry per system log source. This is not the audit-log summary;
+        that lives at `/api/logs/audits/stats`.
       tags:
         - Admin
       security:
@@ -141,53 +144,32 @@ paths:
         - apiKey: []
       responses:
         '200':
-          description: Logs statistics
+          description: Statistics for each log source
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  actionStats:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        action:
-                          type: string
-                        count:
-                          type: integer
-                  tableStats:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        table_name:
-                          type: string
-                        count:
-                          type: integer
-                  recentActivity:
-                    type: integer
-                    description: Count of logs in last 24 hours
-                  totalLogs:
-                    type: integer
-                    description: Total number of logs
+                type: array
+                items:
+                  type: object
+                  required:
+                    - source
+                    - count
+                    - lastActivity
+                  properties:
+                    source:
+                      type: string
+                    count:
+                      type: integer
+                    lastActivity:
+                      type: string
+                      format: date-time
               example:
-                actionStats:
-                  - action: "INSERT"
-                    count: 245
-                  - action: "UPDATE"
-                    count: 189
-                  - action: "DELETE"
-                    count: 34
-                  - action: "LOGIN"
-                    count: 567
-                tableStats:
-                  - table_name: "posts"
-                    count: 156
-                  - table_name: "comments"
-                    count: 223
-                recentActivity: 47
-                totalLogs: 1035
+                - source: "postgres"
+                  count: 1035
+                  lastActivity: "2024-01-21T10:31:00Z"
+                - source: "deno-relay"
+                  count: 47
+                  lastActivity: "2024-01-21T09:58:00Z"
 
 components:
   securitySchemes:
