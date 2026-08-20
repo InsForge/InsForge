@@ -53,6 +53,8 @@ paths:
             type: string
             format: date-time
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: All matching audit logs were returned
           headers:
@@ -113,6 +115,8 @@ paths:
             default: 90
           description: Audit logs older than this many days are deleted
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Audit logs cleared
           content:
@@ -143,6 +147,8 @@ paths:
         - bearerAuth: []
         - apiKey: []
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Statistics for each log source
           content:
@@ -187,6 +193,8 @@ paths:
             default: 7
           description: Size of the window the summary covers
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Audit activity over the window
           content:
@@ -225,6 +233,8 @@ paths:
         - bearerAuth: []
         - apiKey: []
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Available log sources
           content:
@@ -279,6 +289,8 @@ paths:
             type: integer
             default: 0
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: All matching log entries were returned
           headers:
@@ -335,6 +347,8 @@ paths:
             type: string
           description: Defaults to the latest deployment when omitted
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Build logs for the deployment
           content:
@@ -404,6 +418,8 @@ paths:
             format: date-time
           description: Return entries older than this timestamp
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Log entries for the source
           content:
@@ -422,6 +438,18 @@ paths:
                     type: integer
 
 components:
+  responses:
+    Unauthorized:
+      description: Missing or invalid admin credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: 'AUTH_INVALID_CREDENTIALS'
+            message: 'Unauthorized'
+            statusCode: 401
+
   securitySchemes:
     bearerAuth:
       type: http
