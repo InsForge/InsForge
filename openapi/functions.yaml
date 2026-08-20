@@ -622,12 +622,14 @@ components:
   responses:
     RuntimeFunctionNotFound:
       description: |
-        Function invocation can return two runtime-driven 404 variants.
-        - application/json: Returned when the path matches the documented slug
-          pattern but no active function exists for that slug.
-        - text/plain: Returned by the runtime catch-all when the request path does
-          not match the slug route at all (non-conformant path shape).
-        Consumers should branch by Content-Type at runtime.
+        Function invocation can return three runtime-driven 404 variants, and the
+        body is whatever the runtime produces, forwarded unchanged.
+        - application/json, cloud (Deno Subhosting): {"error":"Function not found"}
+        - application/json, self-hosted local runtime: {"error":"Function not found or not active"}
+        - text/plain: returned by the local runtime catch-all when the path does
+          not match the slug route at all.
+        Branch on Content-Type to separate text from JSON, and do NOT match on the
+        JSON message; it differs by deployment mode.
       content:
         application/json:
           schema:
@@ -635,8 +637,15 @@ components:
             properties:
               error:
                 type: string
-          example:
-            error: "Function not found or not active"
+          examples:
+            selfHosted:
+              summary: Self-hosted local runtime
+              value:
+                error: "Function not found or not active"
+            cloud:
+              summary: Cloud (Deno Subhosting) runtime
+              value:
+                error: "Function not found"
         text/plain:
           schema:
             type: string
