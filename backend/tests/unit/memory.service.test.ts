@@ -34,6 +34,7 @@ function installPool() {
     if (sql.includes('UPDATE memory.memories')) return { rows: [] };
     if (sql.includes('WITH q AS')) return { rows: [] }; // recall (overridden per-test)
     if (sql.includes('ORDER BY updated_at DESC')) return { rows: [] }; // index
+    if (sql.includes('DELETE FROM memory.memories')) return { rows: [] }; // forget
     return { rows: similarRows }; // findSimilar
   });
 }
@@ -168,5 +169,34 @@ describe('MemoryService.recall / index', () => {
     expect(res).toEqual([
       { id: 'i1', kind: 'decision', title: 'D', updated_at: '2026-02-02T00:00:00.000Z' },
     ]);
+  });
+});
+
+describe('MemoryService.forget', () => {
+  const idA = '11111111-1111-4111-8111-111111111111';
+  const idB = '22222222-2222-4222-8222-222222222222';
+
+  it('deletes within the scope and echoes the ids actually removed', async () => {
+    poolQueryMock.mockImplementationOnce(async () => ({ rows: [{ id: idA }, { id: idB }] }));
+    const res = await service.forget({ scope: 's', ids: [idA, idB] });
+    expect(res).toEqual([idA, idB]);
+  });
+
+  it('scopes the delete, so an id belonging to another scope removes nothing', async () => {
+    const res = await service.forget({ scope: 'other', ids: [idA] });
+    expect(res).toEqual([]);
+    const del = poolQueryMock.mock.calls.find(([sql]) =>
+      String(sql).includes('DELETE FROM memory.memories')
+    );
+    expect(del).toBeDefined();
+    // The scope predicate is the guard against a stale or hallucinated id, so
+    // assert it is in the statement rather than only that the row count was 0.
+    expect(String(del![0])).toContain('WHERE scope = $1');
+    expect(del![1]).toEqual(['other', [idA]]);
+  });
+
+  it('reports an unknown id as absent rather than failing the call', async () => {
+    poolQueryMock.mockImplementationOnce(async () => ({ rows: [{ id: idA }] }));
+    await expect(service.forget({ scope: 's', ids: [idA, idB] })).resolves.toEqual([idA]);
   });
 });
