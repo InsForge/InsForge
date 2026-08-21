@@ -33,6 +33,48 @@ describe('ApiClient CSRF cookie handling', () => {
   });
 });
 
+describe('ApiClient pagination parsing', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('parses a normal start-end/total Content-Range header', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('[1,2,3]', {
+        status: 206,
+        headers: { 'content-range': '0-2/10' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new ApiClient();
+
+    const result = await client.request('/logs/audits');
+
+    expect(result).toEqual({
+      data: [1, 2, 3],
+      pagination: { offset: 0, limit: 3, total: 10 },
+    });
+  });
+
+  it('parses the */total empty-page Content-Range header without losing the total', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('[]', {
+        status: 206,
+        headers: { 'content-range': '*/5' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new ApiClient();
+
+    const result = await client.request('/logs/audits');
+
+    expect(result).toEqual({
+      data: [],
+      pagination: { offset: 0, limit: 0, total: 5 },
+    });
+  });
+});
+
 describe('ApiClient streaming requests', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
