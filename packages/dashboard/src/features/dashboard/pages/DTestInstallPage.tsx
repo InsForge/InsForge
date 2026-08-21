@@ -24,8 +24,8 @@ export default function DTestInstallPage() {
   const { hasCompletedOnboarding, isLoading } = useMcpUsage();
   const [selectedClient, setSelectedClient] = useState<ClientId | null>(null);
 
-  // Redirect when onboarding transitions from incomplete → complete
-  // while the user is on the install page.
+  // Redirect when onboarding transitions incomplete → complete while the user
+  // is on the install page (e.g. an MCP call lands while they are mid-install).
   const wasOnboardedOnPreviousRender = useRef(hasCompletedOnboarding);
   useEffect(() => {
     if (isLoading) {
