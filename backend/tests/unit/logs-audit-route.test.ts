@@ -83,3 +83,19 @@ describe('GET /logs/audits limit parsing', () => {
     expect(queryMock).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
   });
 });
+
+describe('GET /logs/audits?limit=0 response', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns zero rows with a well-formed Content-Range header and the real total', async () => {
+    queryMock.mockResolvedValue({ records: [], total: 5 });
+
+    const res = await request(app()).get('/logs/audits').query({ limit: '0' });
+
+    expect(res.status).toBe(206);
+    expect(res.body).toEqual([]);
+    expect(res.headers['content-range']).toBe('*/5');
+  });
+});
