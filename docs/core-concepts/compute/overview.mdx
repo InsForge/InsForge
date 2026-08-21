@@ -36,6 +36,21 @@ graph TB
 
 Push any Docker image to InsForge and it runs. Point at a pre-built image on a registry, or upload a build context and let InsForge build it from your `Dockerfile`. No proprietary build pipeline to learn.
 
+For a stock service — a Redis cache, an nginx proxy — point a service at a public image and it is pulled and started, with no `Dockerfile` or build step. From the CLI:
+
+```bash
+npx @insforge/cli compute deploy \
+  --image redis:7-alpine \
+  --name cache \
+  --port 6379 \
+  --protocol tcp \
+  --memory 512
+```
+
+`--image` selects image mode (no `flyctl` or Docker needed). Use `--protocol tcp` for raw-TCP services like Redis; the default `--protocol http` suits HTTP servers. Re-running `compute deploy` with the same `--name` updates the existing service in place.
+
+Because Custom Compute has no persistent volumes yet, treat a Redis container as an ephemeral cache — anything it holds is discarded when the image, environment variables, or port change. Keep durable data in your project's Postgres or Storage.
+
 ### Reaching your project
 
 Set the credentials your container needs as environment variables on the service — the project URL, an API key, S3 credentials, whatever the workload uses. Nothing is injected for you, so you decide exactly what the container can reach.
