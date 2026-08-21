@@ -309,6 +309,32 @@ export default function TablesPage() {
     !!selectedTable && !!schemaData
   );
 
+  // Totals are approximate for large or capped counts. The marker has to describe the
+  // number actually shown, so it is read off whichever count wins the max below.
+  const recordTotals = (() => {
+    const listTotal = recordsData?.pagination?.total ?? 0;
+    const listIsEstimate = recordsData?.pagination?.isEstimate ?? false;
+
+    if (searchQuery.trim()) {
+      return {
+        total: recordsData?.pagination?.total ?? recordsData?.records.length ?? 0,
+        isEstimate: listIsEstimate,
+      };
+    }
+
+    const schemaTotal = schemaData?.recordCount ?? 0;
+    const schemaIsEstimate = schemaData?.recordCountIsEstimate ?? false;
+
+    if (listTotal === schemaTotal) {
+      // Equal totals: stay conservative and mark it approximate if either source is.
+      return { total: schemaTotal, isEstimate: listIsEstimate || schemaIsEstimate };
+    }
+
+    return listTotal > schemaTotal
+      ? { total: listTotal, isEstimate: listIsEstimate }
+      : { total: schemaTotal, isEstimate: schemaIsEstimate };
+  })();
+
   // Combine schema and records data
   const tableData =
     selectedTable && schemaData && recordsData
@@ -316,9 +342,8 @@ export default function TablesPage() {
           name: selectedTable,
           schema: schemaData,
           records: recordsData.records,
-          totalRecords: searchQuery.trim()
-            ? (recordsData.pagination?.total ?? recordsData.records.length)
-            : Math.max(schemaData.recordCount ?? 0, recordsData.pagination?.total ?? 0),
+          totalRecords: recordTotals.total,
+          totalRecordsIsEstimate: recordTotals.isEstimate,
         }
       : null;
 
@@ -767,6 +792,7 @@ export default function TablesPage() {
                   pageSize={pageSize}
                   pageSizeOptions={pageSizeOptions}
                   totalRecords={tableData?.totalRecords || 0}
+                  totalRecordsIsEstimate={tableData?.totalRecordsIsEstimate ?? false}
                   paginationRecordLabel={t('database.recordsRecordLabel', {
                     defaultValue: 'records',
                   })}

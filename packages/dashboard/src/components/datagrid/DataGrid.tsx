@@ -39,6 +39,8 @@ export interface DataGridProps<TRow extends DataGridRowType = DataGridRow> {
   pageSize?: number;
   pageSizeOptions?: number[];
   totalRecords?: number;
+  /** Renders `totalRecords` as approximate ("~N") — see PaginationControls. */
+  totalRecordsIsEstimate?: boolean;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
   emptyState?: React.ReactNode;
@@ -84,6 +86,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   pageSize,
   pageSizeOptions,
   totalRecords,
+  totalRecordsIsEstimate,
   onPageChange,
   onPageSizeChange,
   emptyState,
@@ -372,6 +375,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
           totalPages={totalPages}
           onPageChange={onPageChange}
           totalRecords={totalRecords}
+          totalRecordsIsEstimate={totalRecordsIsEstimate}
           pageSize={pageSize}
           pageSizeOptions={pageSizeOptions}
           recordLabel={paginationRecordLabel}

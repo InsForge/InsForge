@@ -99,7 +99,9 @@ router.get(
         filterValue,
       });
 
-      paginatedResponse(res, response.records, response.total, offset);
+      paginatedResponse(res, response.records, response.total, offset, {
+        isEstimate: response.isEstimate,
+      });
     } catch (error) {
       next(error);
     }

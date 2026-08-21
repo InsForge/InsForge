@@ -7,6 +7,8 @@ export interface PaginationControlsProps {
   totalPages?: number;
   onPageChange?: (page: number) => void;
   totalRecords?: number;
+  /** Marks `totalRecords` as approximate, shown as "~N" rather than implying precision. */
+  totalRecordsIsEstimate?: boolean;
   pageSize?: number;
   pageSizeOptions?: number[];
   recordLabel?: string;
@@ -19,6 +21,7 @@ export function PaginationControls({
   totalPages = 1,
   onPageChange,
   totalRecords = 0,
+  totalRecordsIsEstimate = false,
   pageSize = 50,
   pageSizeOptions,
   recordLabel,
@@ -31,6 +34,10 @@ export function PaginationControls({
   const startRecord = totalRecords === 0 ? 0 : (normalizedCurrentPage - 1) * pageSize + 1;
   const endRecord =
     totalRecords === 0 ? 0 : Math.min(normalizedCurrentPage * pageSize, totalRecords);
+  const totalDisplay =
+    totalRecordsIsEstimate && totalRecords > 0
+      ? `~${totalRecords.toLocaleString()}`
+      : totalRecords.toLocaleString();
 
   return (
     <Pagination
@@ -46,7 +53,7 @@ export function PaginationControls({
       summaryText={t('common.paginationSummary', {
         start: startRecord,
         end: endRecord,
-        total: totalRecords,
+        total: totalDisplay,
         label,
         defaultValue: 'Showing {{start}} to {{end}} of {{total}} {{label}}',
       })}
