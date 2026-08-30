@@ -60,6 +60,8 @@ graph TB
 
 Postgres RLS 策略在行级别强制执行访问。策略读取身份验证 JWT，因此相同的规则适用于 REST 查询、SDK 调用、实时订阅和存储请求。
 
+新表默认**开启** RLS；在创建时传 `rlsEnabled: false` 可以关闭。使用管理 API Key（`ik_...`）发出的请求会绕过 RLS。要为已有的表切换 RLS，用 `npx @insforge/cli db query` 或迁移运行 SQL——`ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;`（或 `DISABLE`）。在没有任何策略的表上启用 RLS，会拒绝 `anon` 和 `authenticated` 的所有访问，直到你添加一条策略。策略示例见 [FAQ](/faq)。
+
 ## 概念
 
 <CardGroup cols={2}>

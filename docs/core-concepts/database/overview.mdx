@@ -60,6 +60,8 @@ Native vector search for embeddings, with HNSW and IVFFlat indexes. See [pgvecto
 
 Postgres RLS policies enforce access at the row level. Policies read the auth JWT, so the same rule applies to REST queries, SDK calls, realtime subscriptions, and storage requests.
 
+New tables have RLS **on** by default; pass `rlsEnabled: false` at creation to opt out. Requests made with the admin API Key (`ik_...`) bypass RLS. To toggle it on an existing table, run SQL — `ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;` (or `DISABLE`) — with `npx @insforge/cli db query` or a migration. Enabling RLS on a table with no policy denies all access to `anon` and `authenticated` until you add one. See the [FAQ](/faq) for policy examples.
+
 ## Concepts
 
 <CardGroup cols={2}>
