@@ -76,7 +76,24 @@ npx @insforge/cli deployments cancel deployment_123
 
 ### 網域
 
-每個就緒的部署都會取得一個預設 URL，格式為 `https://<appkey>.insforge.site`。您也可以在 `https://<slug>.insforge.site` 設定一個由 InsForge 管理的 slug。若要使用自訂網域，請在儀表板中新增該網域，並依其提供的 DNS 記錄進行設定，通常子網域會使用 CNAME。
+每個就緒的部署都會取得一個預設 URL，格式為 `https://<appkey>.insforge.site`。您也可以在 `https://<slug>.insforge.site` 設定一個由 InsForge 管理的 slug。若要使用自訂網域，請在儀表板中新增該網域，並依其提供的 DNS 記錄進行設定。
+
+要發布哪筆路由記錄，取決於你指向的是子網域還是根（apex）網域：
+
+- **子網域**（例如 `app.example.com`）：新增 InsForge 提供的 **CNAME** 記錄。
+- **根網域 / apex 網域**（例如 `example.com`）：根網域無法使用 CNAME，因此 InsForge 會提供一筆要發布在根網域上的 **A 記錄**。
+
+InsForge 可能還會提供一筆或多筆**驗證記錄**——你需要新增這些獨立的記錄來證明你擁有該網域。每筆記錄包含 `type`、`domain`（記錄名稱）與 `value`。對於根網域，這筆所有權記錄通常是一筆 **CNAME**（即「驗證 CNAME」），它與實際路由流量的 A 記錄不同。請新增 InsForge 提供的每一筆記錄；網域驗證通過後即開始為你的網站提供服務。
+
+你也可以使用 CLI 而非儀表板來管理這一切：
+
+```bash
+npx @insforge/cli domains attach example.com
+npx @insforge/cli domains status example.com
+npx @insforge/cli domains verify example.com
+```
+
+如果你的網域託管在 Cloudflare 上，`npx @insforge/cli domains dns sync example.com` 會為你寫入所需的記錄。
 
 ## 以此進行部署
 

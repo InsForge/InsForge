@@ -76,7 +76,24 @@ npx @insforge/cli deployments cancel deployment_123
 
 ### 域
 
-每个就绪的部署都获得一个默认 URL `https://<appkey>.insforge.site`。您也可以在 `https://<slug>.insforge.site` 设置一个 InsForge 管理的 slug。对于自定义域，在仪表板中添加域并配置它返回的 DNS 记录，通常是子域的 CNAME。
+每个就绪的部署都获得一个默认 URL `https://<appkey>.insforge.site`。您也可以在 `https://<slug>.insforge.site` 设置一个 InsForge 管理的 slug。对于自定义域，在仪表板中添加域并配置它返回的 DNS 记录。
+
+要发布哪条路由记录，取决于你指向的是子域还是根（apex）域：
+
+- **子域**（例如 `app.example.com`）：添加 InsForge 返回的 **CNAME** 记录。
+- **根域 / apex 域**（例如 `example.com`）：根域无法使用 CNAME，因此 InsForge 会返回一条要发布在根域上的 **A 记录**。
+
+InsForge 可能还会返回一条或多条**验证记录**——你需要添加这些单独的记录来证明你拥有该域。每条记录包含 `type`、`domain`（记录名称）和 `value`。对于根域，这条所有权记录通常是一条 **CNAME**（即“验证 CNAME”），它与实际路由流量的 A 记录不同。请添加 InsForge 返回的每一条记录；域验证通过后即开始为你的站点提供服务。
+
+你也可以用 CLI 而非仪表板来管理这一切：
+
+```bash
+npx @insforge/cli domains attach example.com
+npx @insforge/cli domains status example.com
+npx @insforge/cli domains verify example.com
+```
+
+如果你的域托管在 Cloudflare 上，`npx @insforge/cli domains dns sync example.com` 会为你写入所需的记录。
 
 ## 使用它进行部署
 
