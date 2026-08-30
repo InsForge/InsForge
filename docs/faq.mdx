@@ -285,4 +285,20 @@ description: "Answers to common InsForge questions on database calls, edge funct
     - **Cancel a build that's still running:** `npx @insforge/cli deployments cancel <id>` stops an in-progress deployment; it does not take down a site that is already live.
     - **Replace what's live:** redeploy over the same site with `npx @insforge/cli deployments deploy ./frontend` — the newest ready deployment serves the URL.
   </Accordion>
+
+  <Accordion title="How do I put my backend project API on a custom domain like `api.example.com`?">
+    By default your Cloud project's backend API is served at `https://<appkey>.<region>.insforge.app`. You can point it at a domain you own (for example `api.example.com`). This is a project-level setting, and it is **not** the same as a [Site](/core-concepts/sites/overview) custom domain — a Site domain fronts a deployed frontend, this one fronts the backend API.
+
+    Set the domain with the CLI:
+
+    ```bash
+    npx @insforge/cli projects update --domain api.example.com
+    ```
+
+    This targets the linked project; pass `--project <id>` to choose another. `projects update` is the same command that renames a project or resizes storage, and it maps to the platform API `PUT /projects/v1/{projectId}` with `{ "customizedDomain": "api.example.com" }`. Once it takes effect, your project answers at `https://api.example.com`, and `npx @insforge/cli projects get` shows the domain.
+
+    You still have to create a DNS record at your registrar that points the domain at InsForge, and InsForge issues the TLS certificate for it. Setting `--domain` records the hostname and routes traffic once DNS resolves — it does not create the DNS record for you. The exact DNS record to add, any verification step, certificate issuance, and how `www` versus the apex domain and `http`→`https` are handled are managed by InsForge infrastructure and are not exposed through the CLI. {/* TODO: confirm exact DNS record type/target, verification step, www/apex and http→https behavior, and dashboard location */}
+
+    For the precise DNS target, or if you hit a TLS or verification problem, ask the InsForge team in [Discord](https://discord.com/invite/DvBtaEc9Jz).
+  </Accordion>
 </AccordionGroup>

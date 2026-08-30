@@ -285,4 +285,20 @@ description: "InsForge 常见问题：数据库调用、Edge Function 与 Custom
     - **取消还在跑的构建：** `npx @insforge/cli deployments cancel <id>` 会终止一个进行中的部署；它不会下线一个已经上线的站点。
     - **替换当前上线的内容：** 用 `npx @insforge/cli deployments deploy ./frontend` 在同一个站点上重新部署——最新一次 ready 的部署会接管这个 URL。
   </Accordion>
+
+  <Accordion title="怎么把后端项目 API 绑定到自己的自定义域名（比如 `api.example.com`）？">
+    默认情况下，你的 Cloud 项目后端 API 通过 `https://<appkey>.<region>.insforge.app` 提供服务。你可以把它指向自己拥有的域名（例如 `api.example.com`）。这是一个项目级别的设置，和 [Site](/core-concepts/sites/overview) 的自定义域名**不是**一回事——Site 域名指向的是已部署的前端，而这里指向的是后端 API。
+
+    用 CLI 设置域名：
+
+    ```bash
+    npx @insforge/cli projects update --domain api.example.com
+    ```
+
+    该命令默认作用于已 link 的项目；加 `--project <id>` 可指定其他项目。`projects update` 就是用来重命名项目、调整 Storage 容量的同一个命令，它对应平台 API `PUT /projects/v1/{projectId}`，请求体为 `{ "customizedDomain": "api.example.com" }`。生效后，你的项目会在 `https://api.example.com` 上响应，`npx @insforge/cli projects get` 也会显示该域名。
+
+    你仍然需要在自己的域名注册商处添加一条把域名指向 InsForge 的 DNS 记录，TLS 证书由 InsForge 签发。设置 `--domain` 只是记录该主机名，并在 DNS 解析生效后把流量路由过去——它**不会**替你创建 DNS 记录。具体要添加哪条 DNS 记录、是否需要验证步骤、证书签发，以及 `www` 与裸域（apex）、`http`→`https` 如何处理，都由 InsForge 基础设施管理，CLI 并不暴露这些细节。{/* TODO: confirm exact DNS record type/target, verification step, www/apex and http→https behavior, and dashboard location */}
+
+    如果需要确切的 DNS 指向目标，或遇到 TLS、验证方面的问题，请到 [Discord](https://discord.com/invite/DvBtaEc9Jz) 联系 InsForge 团队。
+  </Accordion>
 </AccordionGroup>
