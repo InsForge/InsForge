@@ -80,7 +80,24 @@ npx @insforge/cli deployments cancel deployment_123
 
 ### Domains
 
-Every ready deployment gets a default URL at `https://<appkey>.insforge.site`. You can also set an InsForge-managed slug at `https://<slug>.insforge.site`. For a custom domain, add the domain in the dashboard and configure the DNS record it returns, usually a CNAME for subdomains.
+Every ready deployment gets a default URL at `https://<appkey>.insforge.site`. You can also set an InsForge-managed slug at `https://<slug>.insforge.site`. For a custom domain, add the domain in the dashboard and configure the DNS records it returns.
+
+Which routing record you publish depends on whether you point a subdomain or a root (apex) domain:
+
+- **Subdomain** (for example `app.example.com`): add the **CNAME** record InsForge returns.
+- **Root/apex domain** (for example `example.com`): a root domain can't use a CNAME, so InsForge returns an **A record** to publish at the apex instead.
+
+InsForge may also return one or more **verification records** — separate entries you add to prove you own the domain. Each has a `type`, a `domain` (the record name), and a `value`. For a root domain this ownership record is often a **CNAME** (the "validation CNAME"), which is distinct from the A record that actually routes traffic. Add every record InsForge returns; the domain starts serving your site once it verifies.
+
+You can manage all of this from the CLI instead of the dashboard:
+
+```bash
+npx @insforge/cli domains attach example.com
+npx @insforge/cli domains status example.com
+npx @insforge/cli domains verify example.com
+```
+
+If your domain is on Cloudflare, `npx @insforge/cli domains dns sync example.com` writes the required records for you.
 
 ## Deploy with it
 

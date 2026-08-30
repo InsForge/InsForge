@@ -76,7 +76,24 @@ npx @insforge/cli deployments cancel deployment_123
 
 ### Dominios
 
-Cada implementación lista obtiene una URL predeterminada en `https://<appkey>.insforge.site`. También puedes configurar un slug gestionado por InsForge en `https://<slug>.insforge.site`. Para un dominio personalizado, agrega el dominio en el panel y configura el registro DNS que este devuelve, normalmente un CNAME para subdominios.
+Cada implementación lista obtiene una URL predeterminada en `https://<appkey>.insforge.site`. También puedes configurar un slug gestionado por InsForge en `https://<slug>.insforge.site`. Para un dominio personalizado, agrega el dominio en el panel y configura los registros DNS que este devuelve.
+
+Qué registro de enrutamiento publicas depende de si apuntas un subdominio o un dominio raíz (apex):
+
+- **Subdominio** (por ejemplo `app.example.com`): agrega el registro **CNAME** que InsForge devuelve.
+- **Dominio raíz/apex** (por ejemplo `example.com`): un dominio raíz no puede usar un CNAME, por lo que InsForge devuelve un **registro A** para publicar en el apex.
+
+InsForge también puede devolver uno o más **registros de verificación**: entradas separadas que agregas para demostrar que eres el propietario del dominio. Cada una tiene un `type`, un `domain` (el nombre del registro) y un `value`. Para un dominio raíz, este registro de propiedad suele ser un **CNAME** (el «CNAME de validación»), distinto del registro A que en realidad enruta el tráfico. Agrega todos los registros que InsForge devuelve; el dominio empieza a servir tu sitio una vez que se verifica.
+
+Puedes gestionar todo esto desde el CLI en lugar del panel:
+
+```bash
+npx @insforge/cli domains attach example.com
+npx @insforge/cli domains status example.com
+npx @insforge/cli domains verify example.com
+```
+
+Si tu dominio está en Cloudflare, `npx @insforge/cli domains dns sync example.com` escribe los registros necesarios por ti.
 
 ## Impleméntalo
 

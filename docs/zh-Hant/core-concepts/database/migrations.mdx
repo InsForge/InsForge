@@ -45,6 +45,14 @@ npx @insforge/cli db migrations list
 
 選擇加入後，透過檔案路由所有架構變更。臨時儀表板編輯會在 git 和 `system.custom_migrations` 之間造成漂移。
 
+## 還原變更
+
+工作流程是僅向前的：沒有 `down` 或回滾指令。若要復原某個變更，請編寫一個反向的前向遷移（例如，用 `drop table` 還原 `create table`），然後用 `db migrations up` 應用它。
+
+在還原之前查看某次遷移的具體操作，可執行 `db migrations list` 或呼叫 `GET /api/database/migrations`（需要管理員身分驗證）。每筆記錄會回傳其 `version`、`name`、已執行的 `statements` 以及 `createdAt` 時間戳。
+
+如果你需要將整個資料庫還原到較早的時間點，而不是還原單個變更，請改為還原[資料庫備份](/core-concepts/database/backups)。
+
 ## 更多資源
 
 - [Database branching](/agent-native/branching) 在副本上排練遷移。

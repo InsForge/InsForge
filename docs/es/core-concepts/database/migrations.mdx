@@ -45,6 +45,14 @@ Adoptar migraciones en un proyecto existente: ejecute `db migrations fetch` prim
 
 Una vez que opte por participar, rute todos los cambios de esquema a través de archivos. Las ediciones ad hoc del panel causan una desviación entre git y `system.custom_migrations`.
 
+## Revertir un cambio
+
+El flujo de trabajo es de solo avance: no hay un comando `down` ni de reversión (rollback). Para deshacer un cambio, escriba una nueva migración hacia adelante que lo revierta (por ejemplo, `drop table` para revertir un `create table`) y aplíquela con `db migrations up`.
+
+Para ver exactamente qué hizo una migración anterior antes de revertirla, ejecute `db migrations list` o llame a `GET /api/database/migrations` (con autenticación de administrador). Cada entrada devuelve su `version`, `name`, las `statements` ejecutadas y una marca de tiempo `createdAt`.
+
+Si necesita devolver toda la base de datos a un punto anterior en lugar de revertir un solo cambio, restaure una [copia de seguridad de la base de datos](/core-concepts/database/backups) en su lugar.
+
 ## Más recursos
 
 - [Database branching](/agent-native/branching) para ensayar una migración en una copia.

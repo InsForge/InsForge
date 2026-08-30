@@ -45,6 +45,14 @@ npx @insforge/cli db migrations list
 
 选择加入后，通过文件路由所有架构变更。临时仪表盘编辑会在 git 和 `system.custom_migrations` 之间造成漂移。
 
+## 还原变更
+
+工作流是仅向前的：没有 `down` 或回滚命令。要撤销某个变更，请编写一个反向的前向迁移（例如，用 `drop table` 还原 `create table`），然后用 `db migrations up` 应用它。
+
+在还原之前查看某次迁移的具体操作，可运行 `db migrations list` 或调用 `GET /api/database/migrations`（需要管理员身份验证）。每条记录返回其 `version`、`name`、已执行的 `statements` 以及 `createdAt` 时间戳。
+
+如果你需要将整个数据库恢复到较早的时间点，而不是还原单个变更，请改为还原[数据库备份](/core-concepts/database/backups)。
+
 ## 更多资源
 
 - [Database branching](/agent-native/branching) 在副本上排练迁移。

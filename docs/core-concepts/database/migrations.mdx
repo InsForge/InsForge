@@ -45,6 +45,14 @@ Adopting migrations on an existing project: run `db migrations fetch` first to m
 
 Once you opt in, route all schema changes through files. Ad hoc dashboard edits cause drift between git and `system.custom_migrations`.
 
+## Reverting a change
+
+The workflow is forward-only: there is no `down` or rollback command. To undo a change, write a new forward migration that reverses it (for example, `drop table` to reverse a `create table`), then apply it with `db migrations up`.
+
+To see exactly what a past migration did before you reverse it, run `db migrations list` or call `GET /api/database/migrations` (admin authentication). Each entry returns its `version`, `name`, the executed `statements`, and a `createdAt` timestamp.
+
+If you need to return the whole database to an earlier point rather than reverse a single change, restore a [database backup](/core-concepts/database/backups) instead.
+
 ## More resources
 
 - [Database branching](/agent-native/branching) to rehearse a migration on a copy.
