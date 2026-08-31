@@ -431,10 +431,11 @@ export class ChatCompletionService {
 
         // Check if this chunk contains usage data
         if (chunk.usage) {
-          // Accumulate tokens instead of replacing
-          tokenUsage.promptTokens += chunk.usage.prompt_tokens || 0;
-          tokenUsage.completionTokens += chunk.usage.completion_tokens || 0;
-          tokenUsage.totalTokens += chunk.usage.total_tokens || 0;
+          // Usage is cumulative in streaming, so we replace instead of accumulate
+          tokenUsage.promptTokens = chunk.usage.prompt_tokens ?? tokenUsage.promptTokens;
+          tokenUsage.completionTokens =
+            chunk.usage.completion_tokens ?? tokenUsage.completionTokens;
+          tokenUsage.totalTokens = chunk.usage.total_tokens ?? tokenUsage.totalTokens;
 
           // Yield the accumulated usage
           yield { tokenUsage: { ...tokenUsage } };

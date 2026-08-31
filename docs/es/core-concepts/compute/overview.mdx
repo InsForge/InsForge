@@ -36,6 +36,21 @@ graph TB
 
 Entrega cualquier imagen de Docker a InsForge y se ejecuta. Apunta a una imagen ya construida en un registry, o sube un contexto de construcción y deja que InsForge la construya desde tu `Dockerfile`. No hay que aprender ningún pipeline propietario.
 
+Para un servicio estándar —una caché Redis, un proxy nginx— apunta un servicio a una imagen pública y se descarga y arranca, sin `Dockerfile` ni paso de construcción. Desde la CLI:
+
+```bash
+npx @insforge/cli compute deploy \
+  --image redis:7-alpine \
+  --name cache \
+  --port 6379 \
+  --protocol tcp \
+  --memory 512
+```
+
+`--image` selecciona el modo imagen (sin necesidad de `flyctl` ni Docker). Usa `--protocol tcp` para servicios de TCP en crudo como Redis; el `--protocol http` por defecto sirve para servidores HTTP. Volver a ejecutar `compute deploy` con el mismo `--name` actualiza el servicio existente en el sitio.
+
+Como Custom Compute todavía no tiene volúmenes persistentes, trata un contenedor de Redis como una caché efímera: todo lo que contenga se descarta cuando cambian la imagen, las variables de entorno o el puerto. Guarda los datos duraderos en el Postgres o el Storage de tu proyecto.
+
 ### Acceder a tu proyecto
 
 Las credenciales que necesite tu contenedor las defines tú como variables de entorno del servicio: la URL del proyecto, una API key, credenciales de S3, lo que use esa carga de trabajo. InsForge no inyecta nada por ti, así que tú decides exactamente a qué puede llegar el contenedor.
