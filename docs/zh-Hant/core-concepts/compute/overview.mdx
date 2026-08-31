@@ -36,6 +36,21 @@ graph TB
 
 把任何 Docker 映像交給 InsForge 就能執行。可以指向 registry 上已建置好的映像，也可以上傳建置內容，讓 InsForge 依您的 `Dockerfile` 建置。不需要學習額外的建置流程。
 
+對於現成的服務——例如 Redis 快取、nginx 代理——把服務指向一個公開映像即可拉取並啟動，不需要 `Dockerfile` 或建置步驟。使用 CLI：
+
+```bash
+npx @insforge/cli compute deploy \
+  --image redis:7-alpine \
+  --name cache \
+  --port 6379 \
+  --protocol tcp \
+  --memory 512
+```
+
+`--image` 會選擇映像模式（不需要 `flyctl` 或 Docker）。像 Redis 這種裸 TCP 服務請用 `--protocol tcp`；預設的 `--protocol http` 適用於 HTTP 伺服器。用相同的 `--name` 再次執行 `compute deploy` 會就地更新既有服務。
+
+由於 Custom Compute 尚不支援永久磁碟區，請把 Redis 容器當作暫時性快取——一旦映像、環境變數或連接埠變更，其中保存的內容都會遺失。需要永久保留的資料請放進專案的 Postgres 或 Storage。
+
 ### 存取您的專案
 
 容器需要的認證由您以服務的環境變數設定——專案 URL、API key、S3 認證，取決於這個工作負載會用到什麼。InsForge 不會替您注入任何內容，因此容器能存取什麼完全由您決定。

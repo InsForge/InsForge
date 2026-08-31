@@ -45,6 +45,26 @@ Adopting migrations on an existing project: run `db migrations fetch` first to m
 
 Once you opt in, route all schema changes through files. Ad hoc dashboard edits cause drift between git and `system.custom_migrations`.
 
+## Non-transactional statements
+
+Because the CLI runs each migration file inside a single transaction (the same reason `BEGIN`/`COMMIT`/`ROLLBACK` are rejected), a few PostgreSQL commands that **cannot run inside a transaction block** will fail in a migration with an error like `CREATE INDEX CONCURRENTLY cannot run inside a transaction block`. The common ones are:
+
+- `CREATE INDEX CONCURRENTLY` — use a plain `CREATE INDEX` in a migration when a brief write lock is acceptable, or run the concurrent build outside a migration (below).
+- `VACUUM` — routine vacuuming is handled by PostgreSQL autovacuum, so you rarely need to run this yourself.
+- `REINDEX ... CONCURRENTLY`, `ALTER TYPE ... ADD VALUE` (on older PostgreSQL), and similar commands.
+
+Run these outside a migration with the CLI's unrestricted raw-SQL path, which executes the statement **without** wrapping it in a transaction:
+
+```bash
+npx @insforge/cli db query --unrestricted "CREATE INDEX CONCURRENTLY idx_orders_customer ON public.orders (customer_id)"
+```
+
+Plain `npx @insforge/cli db query` (without `--unrestricted`) wraps your statement in a transaction, so it hits the same error — use `--unrestricted` for non-transactional commands.
+
+<Note>
+  Both `db query` paths enforce a 30-second `statement_timeout`, so `CREATE INDEX CONCURRENTLY` or `VACUUM` on a large table may time out.
+</Note>
+
 ## More resources
 
 - [Database branching](/agent-native/branching) to rehearse a migration on a copy.
