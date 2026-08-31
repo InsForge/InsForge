@@ -1,6 +1,6 @@
 ---
 title: S3 兼容网关
-description: 通过 /storage/v1/s3 端点使用任意 AWS SigV4 客户端访问 InsForge Storage，兼容 S3 协议，便于迁移现有工具链，仅限云项目。
+description: "InsForge Storage 在 /storage/v1/s3 端点实现 AWS S3 协议：使用 SigV4 签名的长期访问密钥与路径样式 URL，任意 S3 客户端可直接上传同步文件并即时出现在 REST API 与仪表板，便于迁移现有工具链，仅限云项目使用。"
 ---
 
 InsForge Storage 在 `/storage/v1/s3` 处使用 [AWS S3 协议](https://docs.aws.amazon.com/AmazonS3/latest/API/Welcome.html)。仅限云项目。

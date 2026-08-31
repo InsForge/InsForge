@@ -1,7 +1,7 @@
 ---
 title: "後端分支"
 sidebarTitle: "Branching"
-description: "建立 InsForge 後端的隔離分支複本，安全測試 Postgres 結構描述、設定與遷移變更後再合併回主環境，適合代理協作。"
+description: "建立 InsForge 後端的隔離分支，各分支擁有獨立的 Postgres、驗證設定、儲存與排程，以 full 或 schema-only 模式建立，透過 CLI 預覽合併 SQL、重設或刪除，安全演練危險的結構描述變更與 RLS 重寫後再合併回父專案。InsForge OSS 2.1.0 起提供。"
 ---
 
 分支是一個子專案，具有自己的 Postgres、身份驗證設定、儲存體、邊界函數、電子郵件範本、即時通道和排程。在準備好時合併回去或重設並重試。可在 InsForge OSS 2.1.0+ 上使用。
