@@ -50,6 +50,10 @@ await insforge.database.from('documents').insert({
 });
 ```
 
+<Note>
+  `OPENROUTER_API_KEY` is your own OpenRouter key. On Pro and Enterprise, `npx @insforge/cli ai setup` provisions one and writes it to your env file. Free plans don't include AI model credits, so create a key at [openrouter.ai/keys](https://openrouter.ai/keys) and set it yourself.
+</Note>
+
 Query by cosine distance (`<=>`). L2 (`<->`) and inner product (`<#>`) are also available.
 
 ```sql

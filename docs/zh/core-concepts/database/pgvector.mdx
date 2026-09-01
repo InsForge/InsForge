@@ -50,6 +50,10 @@ await insforge.database.from('documents').insert({
 });
 ```
 
+<Note>
+  `OPENROUTER_API_KEY` 是你自己的 OpenRouter 密钥。在专业版和企业版上，`npx @insforge/cli ai setup` 会为你预配一个并写入环境文件。免费计划不包含 AI 模型积分，因此请在 [openrouter.ai/keys](https://openrouter.ai/keys) 创建密钥并自行配置。
+</Note>
+
 按余弦距离查询 (`<=>`). L2 (`<->`) 和内积 (`<#>`) 也可用。
 
 ```sql
