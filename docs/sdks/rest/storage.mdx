@@ -106,7 +106,7 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
   When `method` is `"direct"`, `uploadUrl` points to an InsForge route protected
   by authentication. You **must** include your `Authorization: Bearer <token>`
   header when PUTting to it — the same token used to call `/upload-strategy`.
-  Omitting it returns `401 PUBLISH_CREDENTIAL_INVALID`.
+  Omitting it returns `AUTH_INVALID_CREDENTIALS`.
 </Warning>
 
 ---
