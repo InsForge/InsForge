@@ -91,7 +91,7 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
 }
 ```
 
-#### Response (Local Storage)
+#### Response (`method: "direct"` — Local Storage or S3 proxy mode)
 
 ```json
 {
@@ -102,13 +102,42 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
 }
 ```
 
+<Warning>
+  When `method` is `"direct"`, `uploadUrl` points to an InsForge route protected
+  by authentication. You **must** include your `Authorization: Bearer <token>`
+  header when PUTting to it — the same token used to call `/upload-strategy`.
+  Omitting it returns `401 PUBLISH_CREDENTIAL_INVALID`.
+</Warning>
+
 ---
 
 ### Step 2: Upload File
 
 Upload the file to the specified URL using the provided method.
-- **Local Storage**: Use a PUT request to `uploadUrl` with `multipart/form-data` and a `file` field.
-- **S3-Compatible**: Use a POST request to `uploadUrl` with `multipart/form-data` and a `file` field. Include all fields from the `fields` object in the request.
+
+- **`method: "direct"` (Local Storage or S3 proxy mode)** — `uploadUrl` is an InsForge route.
+  Use a `PUT` request with `multipart/form-data`. **You must forward your `Authorization` header**
+  — the same token used to call `/upload-strategy`.
+
+  ```bash
+  curl -X PUT "<uploadUrl>" \
+    -H "Authorization: Bearer your-jwt-token" \
+    -F "file=@/path/to/file.jpg"
+  ```
+- **`method: "presigned"` (S3-Compatible)** — `uploadUrl` is a direct S3 URL.
+  Use a `POST` request. Include every key-value from `fields` as form fields **before** `file`.
+  Do **not** add an `Authorization` header.
+  ```bash
+  curl -X POST "<uploadUrl>" \
+    -F "bucket=<fields.bucket>" \
+    -F "key=<fields.key>" \
+    -F "X-Amz-Algorithm=<fields.X-Amz-Algorithm>" \
+    -F "X-Amz-Credential=<fields.X-Amz-Credential>" \
+    -F "Policy=<fields.Policy>" \
+    -F "X-Amz-Signature=<fields.X-Amz-Signature>" \
+    -F "file=@/path/to/file.jpg"
+  ```
+  Then call **Step 3** to confirm.
 
 ### Step 3: Confirm Presigned Upload (S3 Only)
 
