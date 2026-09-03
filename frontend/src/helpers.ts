@@ -23,13 +23,10 @@ let backendReportedCloud: boolean | null = null;
  * hold the shell forever.
  */
 export async function probeCloudHosting(): Promise<void> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-
   try {
     const response = await fetch('/api/health', {
       headers: { Accept: 'application/json' },
-      signal: controller.signal,
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     });
     if (!response.ok) {
       return;
@@ -45,8 +42,6 @@ export async function probeCloudHosting(): Promise<void> {
     }
   } catch {
     // Keep the hostname fallback below.
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
