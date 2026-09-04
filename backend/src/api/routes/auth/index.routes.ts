@@ -15,6 +15,7 @@ import customOAuthRouter from './custom-oauth.routes.js';
 import {
   idTokenSignInRateLimiter,
   sendEmailOTPLimiter,
+  sendSmsOTPLimiter,
   verifyOTPLimiter,
   verifyOTPRateLimiter,
 } from '@/api/middlewares/rate-limiters.js';
@@ -31,6 +32,7 @@ import {
   createUserRequestSchema,
   createSessionRequestSchema,
   sendOTPRequestSchema,
+  sendPhoneOTPRequestSchema,
   refreshSessionRequestSchema,
   deleteUsersRequestSchema,
   listUsersRequestSchema,
@@ -53,10 +55,12 @@ import {
   type GetAuthConfigResponse,
   updateAuthConfigRequestSchema,
   upsertSmtpConfigRequestSchema,
+  upsertSmsConfigRequestSchema,
   updateEmailTemplateRequestSchema,
   idTokenSignInRequestSchema,
 } from '@insforge/shared-schemas';
 import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
+import { SmsConfigService } from '@/services/sms/sms-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';
 import { EMAIL_TEMPLATE_TYPES, type EmailTemplate } from '@/types/email.js';
 import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
@@ -77,6 +81,7 @@ const authConfigService = AuthConfigService.getInstance();
 const authOTPService = AuthOTPService.getInstance();
 const auditService = AuditService.getInstance();
 const smtpConfigService = SmtpConfigService.getInstance();
+const smsConfigService = SmsConfigService.getInstance();
 const emailTemplateService = EmailTemplateService.getInstance();
 
 const emailLinkRequestSchema = z.object({
@@ -436,10 +441,23 @@ router.post(
       }
 
       const credentials = validationResult.data;
-      const result: CreateSessionResponse =
-        credentials.method === 'otp'
-          ? await authService.signInWithOTP(credentials.email, credentials.otp, credentials.name)
-          : await authService.login(credentials.email, credentials.password);
+      let result: CreateSessionResponse;
+      if (credentials.method === 'otp') {
+        // The schema guarantees exactly one of email/phone on the OTP arm.
+        result = credentials.phone
+          ? await authService.signInWithPhoneOTP(
+              credentials.phone,
+              credentials.otp,
+              credentials.name
+            )
+          : await authService.signInWithOTP(
+              credentials.email ?? '',
+              credentials.otp,
+              credentials.name
+            );
+      } else {
+        result = await authService.login(credentials.email, credentials.password);
+      }
 
       // Set refresh token based on client type
       const tokenManager = TokenManager.getInstance();
@@ -582,7 +600,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     // Generate new access token
     const newAccessToken = tokenManager.generateAccessToken({
       sub: user.id,
-      email: user.email,
+      email: user.email ?? undefined,
       role: roleSchema.enum.authenticated,
     });
 
@@ -831,6 +849,38 @@ router.post(
         {
           success: true,
           message: 'If sign-in is available for this email, we have sent a verification code.',
+        },
+        202
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /api/auth/phone/send-otp - Send a 6-digit SMS OTP for session creation
+router.post(
+  '/phone/send-otp',
+  sendSmsOTPLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = sendPhoneOTPRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      await authService.sendPhoneSignInOTP(validationResult.data.phone);
+
+      successResponse(
+        res,
+        {
+          success: true,
+          message:
+            'If sign-in is available for this phone number, we have sent a verification code.',
         },
         202
       );
@@ -1134,6 +1184,57 @@ router.put(
         details: {
           enabled: input.enabled,
           host: input.host,
+        },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// SMS Configuration Routes
+// GET /api/auth/sms-config - Get SMS configuration (admin only)
+router.get(
+  '/sms-config',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const config = await smsConfigService.getSmsConfig();
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /api/auth/sms-config - Update SMS configuration (admin only)
+router.put(
+  '/sms-config',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = upsertSmsConfigRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const input = validationResult.data;
+      const config = await smsConfigService.upsertSmsConfig(input);
+
+      await auditService.log({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'UPDATE_SMS_CONFIG',
+        module: 'SMS',
+        details: {
+          enabled: input.enabled,
+          provider: input.provider,
         },
         ip_address: req.ip,
       });

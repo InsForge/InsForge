@@ -13,6 +13,15 @@ export const userIdSchema = z.string().uuid('Invalid user ID format');
 
 export const emailSchema = z.string().email('Invalid email format').toLowerCase().trim();
 
+/**
+ * E.164 phone number (+ then 7-15 digits, no leading zero). Stored as-is;
+ * unlike emails there is no case to normalize, so validation is the whole job.
+ */
+export const phoneSchema = z
+  .string()
+  .trim()
+  .regex(/^\+[1-9]\d{6,14}$/, 'Phone number must be in E.164 format (e.g. +15551234567)');
+
 export const passwordSchema = z.string();
 
 export const nameSchema = z
@@ -51,8 +60,10 @@ export const profileSchema = z
  */
 export const userSchema = z.object({
   id: userIdSchema,
-  email: emailSchema,
+  email: emailSchema.nullable(), // Null for phone-only accounts; every user has email or phone
   emailVerified: z.boolean(),
+  phone: phoneSchema.nullable(), // Null for email-only accounts
+  phoneVerified: z.boolean(),
   providers: z.array(z.string()).optional(),
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp
@@ -161,6 +172,25 @@ export const smtpConfigSchema = z.object({
   updatedAt: z.string(),
 });
 
+// SMS provider names. `console` logs the message instead of sending it and is
+// for development only — the backend refuses to use it in production.
+export const smsProviderSchema = z.enum(['twilio', 'console']);
+
+// Custom SMS configuration schema (mirrors smtpConfigSchema)
+export const smsConfigSchema = z.object({
+  id: z.string().uuid(),
+  enabled: z.boolean(),
+  provider: smsProviderSchema,
+  accountSid: z.string(),
+  hasAuthToken: z.boolean(), // Never expose actual auth token
+  fromNumber: z.string(),
+  messagingServiceSid: z.string(),
+  minIntervalSeconds: z.number().int().min(0),
+  otpMessageTemplate: z.string(), // Sign-in code SMS body; {{ code }} is substituted at send time
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 // Email template schema
 export const emailTemplateSchema = z.object({
   id: z.string().uuid(),
@@ -226,4 +256,7 @@ export const customOAuthConfigSchema = z.object({
 export type CustomOAuthKeySchema = z.infer<typeof customOAuthKeySchema>;
 export type CustomOAuthConfigSchema = z.infer<typeof customOAuthConfigSchema>;
 export type SmtpConfigSchema = z.infer<typeof smtpConfigSchema>;
+export type SmsProviderSchema = z.infer<typeof smsProviderSchema>;
+export type SmsConfigSchema = z.infer<typeof smsConfigSchema>;
+export type PhoneSchema = z.infer<typeof phoneSchema>;
 export type EmailTemplateSchema = z.infer<typeof emailTemplateSchema>;

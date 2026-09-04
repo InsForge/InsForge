@@ -1,10 +1,10 @@
 ---
 title: "消息传递概览"
 sidebarTitle: "Overview"
-description: "通过 InsForge 托管发件服务或自定义 SMTP 从项目发送事务性电子邮件，SMS 与推送通知已在路线图上并将共用同一发送 API 与模板系统。"
+description: "通过 InsForge 托管发件服务或自定义 SMTP 从项目发送事务性电子邮件；手机登录验证码现已通过短信发送，推送通知在路线图上并将共用同一发送 API。"
 ---
 
-InsForge Messaging 从您的项目发送事务性通知：收据、摘要、密码重置代码、通知汇总、任何您本来会为其接入 SendGrid、Postmark 或 Twilio 的东西。电子邮件是第一个渠道；SMS 和推送在路线图上，将共享相同的 API 表面。
+InsForge Messaging 从您的项目发送事务性通知：收据、摘要、密码重置代码、通知汇总、任何您本来会为其接入 SendGrid、Postmark 或 Twilio 的东西。电子邮件是第一个渠道。短信已可用于手机登录验证码（参见[自定义短信](/core-concepts/messaging/custom-sms)）；通用短信发送 API 和推送在路线图上，将共享相同的 API 表面。
 
 <Note>
   **只是发送身份验证电子邮件？** 魔法链接、验证代码和密码重置已内置在 [Authentication](/core-concepts/authentication/overview) 中。您只需要这个产品用于身份验证之外的事务性消息。
@@ -44,8 +44,8 @@ graph TB
     托管 SMTP 或使用您自己的提供商。模板、交付跟踪和 webhook 事件。
   </Card>
 
-  <Card title="SMS" icon="message">
-    即将推出。相同的 API，后端使用 Twilio 或 Sinch。
+  <Card title="SMS" icon="message" href="/core-concepts/messaging/custom-sms">
+    现已支持通过 Twilio 发送手机登录验证码。参见自定义短信。
   </Card>
 
   <Card title="Push" icon="bell">

@@ -2,10 +2,12 @@
 
 export interface UserRecord {
   id: string;
-  email: string;
+  email: string | null;
   profile: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
   email_verified: boolean;
+  phone_number: string | null;
+  phone_verified: boolean;
   is_anonymous: boolean;
   created_at: string;
   updated_at: string;

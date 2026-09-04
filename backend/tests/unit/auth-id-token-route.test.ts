@@ -27,6 +27,7 @@ vi.mock('@/api/middlewares/rate-limiters.js', () => ({
     next();
   },
   sendEmailOTPLimiter: [(_req: Request, _res: Response, next: NextFunction) => next()],
+  sendSmsOTPLimiter: [(_req: Request, _res: Response, next: NextFunction) => next()],
   verifyOTPLimiter: [(_req: Request, _res: Response, next: NextFunction) => next()],
   verifyOTPRateLimiter: (_req: Request, _res: Response, next: NextFunction) => next(),
 }));

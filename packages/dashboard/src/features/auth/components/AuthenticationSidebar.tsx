@@ -28,6 +28,11 @@ export function AuthenticationSidebar() {
       label: t('auth.customSmtp', { defaultValue: 'Custom SMTP' }),
       href: '/dashboard/authentication/email',
     },
+    {
+      id: 'phone',
+      label: t('auth.customSms', { defaultValue: 'Custom SMS' }),
+      href: '/dashboard/authentication/phone',
+    },
   ];
 
   const headerButtons: FeatureSidebarHeaderButton[] = [

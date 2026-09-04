@@ -25,7 +25,7 @@ import { s3GatewayRouter } from '@/api/routes/s3-gateway/index.routes.js';
 import { paymentsRouter } from '@/api/routes/payments/index.routes.js';
 import { advisorRouter } from '@/api/routes/advisor/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
-import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
+import { destroyIdentifierCooldownInterval } from '@/api/middlewares/rate-limiters.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
 import fetch from 'node-fetch';
@@ -468,9 +468,9 @@ async function cleanup() {
   }
 
   try {
-    destroyEmailCooldownInterval();
+    destroyIdentifierCooldownInterval();
   } catch (error) {
-    logger.error('Error clearing email cooldown interval', {
+    logger.error('Error clearing identifier cooldown interval', {
       error: error instanceof Error ? error.message : String(error),
     });
   }

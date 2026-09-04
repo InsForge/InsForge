@@ -25,3 +25,12 @@ export function isDevelopment(): boolean {
 export function isProduction(): boolean {
   return process.env.NODE_ENV === 'production';
 }
+
+/**
+ * Fail-closed check for development-only features: true only when NODE_ENV is
+ * explicitly a recognized non-production environment. Unset, 'staging', or any
+ * other value returns false.
+ */
+export function isDevelopmentOrTest(): boolean {
+  return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+}

@@ -103,7 +103,8 @@
                     "group": "Messaging",
                     "pages": [
                       "core-concepts/messaging/overview",
-                      "core-concepts/messaging/custom-smtp"
+                      "core-concepts/messaging/custom-smtp",
+                      "core-concepts/messaging/custom-sms"
                     ]
                   },
                   {
@@ -432,7 +433,8 @@
                     "group": "消息",
                     "pages": [
                       "zh/core-concepts/messaging/overview",
-                      "zh/core-concepts/messaging/custom-smtp"
+                      "zh/core-concepts/messaging/custom-smtp",
+                      "zh/core-concepts/messaging/custom-sms"
                     ]
                   },
                   {
@@ -760,7 +762,8 @@
                     "group": "訊息",
                     "pages": [
                       "zh-Hant/core-concepts/messaging/overview",
-                      "zh-Hant/core-concepts/messaging/custom-smtp"
+                      "zh-Hant/core-concepts/messaging/custom-smtp",
+                      "zh-Hant/core-concepts/messaging/custom-sms"
                     ]
                   },
                   {
@@ -1088,7 +1091,8 @@
                     "group": "Mensajería",
                     "pages": [
                       "es/core-concepts/messaging/overview",
-                      "es/core-concepts/messaging/custom-smtp"
+                      "es/core-concepts/messaging/custom-smtp",
+                      "es/core-concepts/messaging/custom-sms"
                     ]
                   },
                   {
