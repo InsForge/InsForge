@@ -5,6 +5,9 @@ import winston from 'winston';
 
 const logsDir = path.join(__dirname, 'test-logger-logs');
 
+const VOLUME_OWNERSHIP_CHOWN =
+  'docker run --rm -v <stack>_insforge-logs:/a -v <stack>_storage-data:/b alpine chown -R 1000:1000 /a /b';
+
 vi.mock('../../src/infra/config/app.config', () => ({
   appConfig: {
     app: { logLevel: 'info' },
@@ -14,10 +17,29 @@ vi.mock('../../src/infra/config/app.config', () => ({
 
 const originalProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
 
-async function importLogger() {
+async function importLoggerModule() {
   vi.resetModules();
-  const { logger } = await import('../../src/utils/logger.ts');
+  return import('../../src/utils/logger.ts');
+}
+
+async function importLogger() {
+  const { logger } = await importLoggerModule();
   return logger;
+}
+
+function stderrText(spy: ReturnType<typeof vi.spyOn>): string {
+  return spy.mock.calls.map((call) => String(call[0])).join('');
+}
+
+async function withUnwritableLogsDir<T>(fn: () => Promise<T>): Promise<T> {
+  await fs.mkdir(logsDir, { recursive: true });
+  await fs.chmod(logsDir, 0o555);
+  try {
+    return await fn();
+  } finally {
+    await fs.chmod(logsDir, 0o700);
+    await fs.rm(logsDir, { recursive: true, force: true });
+  }
 }
 
 describe('logger transports', () => {
@@ -26,7 +48,13 @@ describe('logger transports', () => {
   });
 
   afterEach(async () => {
+    try {
+      await fs.chmod(logsDir, 0o700);
+    } catch {
+      // Directory may not exist yet.
+    }
     await fs.rm(logsDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
   });
 
   afterAll(() => {
@@ -94,5 +122,71 @@ describe('logger transports', () => {
     expect(logger.transports.some((t) => t instanceof winston.transports.File)).toBe(false);
     expect(logger.transports.some((t) => t instanceof winston.transports.Console)).toBe(true);
     await expect(fs.access(logsDir)).rejects.toThrow();
+  });
+
+  it('does not attach a File transport when LOGS_DIR is unwritable', async () => {
+    await withUnwritableLogsDir(async () => {
+      const logger = await importLogger();
+      expect(logger.transports.some((t) => t instanceof winston.transports.File)).toBe(false);
+    });
+  });
+
+  it('does not hang when logging to an unwritable LOGS_DIR', async () => {
+    await withUnwritableLogsDir(async () => {
+      const logger = await importLogger();
+      expect(logger.transports.some((t) => t instanceof winston.transports.File)).toBe(false);
+
+      const started = Date.now();
+      logger.info('should not hang');
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('log write exceeded 2000ms')), 2000);
+        logger.once('finish', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+        logger.end();
+      });
+      expect(Date.now() - started).toBeLessThanOrEqual(2000);
+    });
+  }, 2500);
+
+  it('prints the Alpine chown command when LOGS_DIR is unwritable', async () => {
+    const writeSpy = vi.spyOn(process.stderr, 'write');
+    await withUnwritableLogsDir(async () => {
+      const mod = await importLoggerModule();
+      expect(mod.VOLUME_OWNERSHIP_CHOWN).toBe(VOLUME_OWNERSHIP_CHOWN);
+      expect(stderrText(writeSpy)).toContain(VOLUME_OWNERSHIP_CHOWN);
+    });
+  });
+
+  it('calls injected exit(1) and omits File when vitest is false', async () => {
+    const { createSelfHostFileTransport } = await importLoggerModule();
+    await fs.mkdir(logsDir, { recursive: true });
+    await fs.chmod(logsDir, 0o555);
+    try {
+      const exit = vi.fn();
+      const transport = createSelfHostFileTransport({
+        logsDir,
+        vitest: false,
+        exit,
+      });
+      expect(transport).toBeUndefined();
+      expect(exit).toHaveBeenCalledTimes(1);
+      expect(exit).toHaveBeenCalledWith(1);
+    } finally {
+      await fs.chmod(logsDir, 0o700);
+    }
+  });
+
+  it('omits File, prints chown, and does not exit when VITEST is set', async () => {
+    expect(process.env.VITEST).toBeTruthy();
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    const writeSpy = vi.spyOn(process.stderr, 'write');
+    await withUnwritableLogsDir(async () => {
+      const logger = await importLogger();
+      expect(logger.transports.some((t) => t instanceof winston.transports.File)).toBe(false);
+      expect(exitSpy).not.toHaveBeenCalled();
+      expect(stderrText(writeSpy)).toContain(VOLUME_OWNERSHIP_CHOWN);
+    });
   });
 });

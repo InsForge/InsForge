@@ -674,7 +674,7 @@ sudo ufw status
 
 InsForge's Docker image already follows non-root best practices:
 
-- The production Dockerfile sets `USER node` (UID 1000), so the application process inside the container runs as a non-root user.
+- The image entrypoint runs `exec su-exec node`, so the application process inside the container runs as UID 1000 (`node`). The production Dockerfile does not set `USER node` for that drop: the container starts as root so it can join the Docker socket group, then hands off with `su-exec`.
 - System-level Docker operations are managed by the `deploy` user (created in [Step 2.3](#23-create-a-deploy-user-non-root)), which has access to the Docker socket via the `docker` group.
 
 **Verify the container user:**
@@ -929,6 +929,14 @@ docker compose ps
 curl http://localhost:7130/api/health
 
 # Check the version in the response
+```
+
+#### 15.5 Volume ownership after upgrading from 1.x
+
+Volumes written as root on 1.x are not writable by the 2.x process (UID 1000). Fix ownership, replacing `<stack>` with your Compose project name:
+
+```bash
+docker run --rm -v <stack>_insforge-logs:/a -v <stack>_storage-data:/b alpine chown -R 1000:1000 /a /b
 ```
 
 ### 16. Rollback Procedure

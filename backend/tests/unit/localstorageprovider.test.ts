@@ -12,6 +12,38 @@ vi.mock('fs/promises', async () => {
   };
 });
 
+describe('LocalStorageProvider - initialize writability', () => {
+  const baseDir = path.join(__dirname, 'test-storage-init-probe');
+
+  afterEach(async () => {
+    try {
+      await fs.chmod(baseDir, 0o700);
+    } catch {
+      // Directory may not exist yet.
+    }
+    await fs.rm(baseDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('rejects when the storage directory exists and is not writable', async () => {
+    await fs.mkdir(baseDir, { recursive: true });
+    await fs.chmod(baseDir, 0o555);
+    const provider = new LocalStorageProvider(baseDir);
+    await expect(provider.initialize()).rejects.toThrow(/STORAGE_DIR/);
+  });
+
+  it('writes and unlinks a probe file when the storage directory is writable', async () => {
+    const writeSpy = vi.spyOn(fs, 'writeFile');
+    const unlinkSpy = vi.spyOn(fs, 'unlink');
+    const provider = new LocalStorageProvider(baseDir);
+    await expect(provider.initialize()).resolves.toBeUndefined();
+    const probePath = path.join(baseDir, '.insforge-write-probe');
+    expect(writeSpy).toHaveBeenCalledWith(probePath, expect.anything());
+    expect(unlinkSpy).toHaveBeenCalledWith(probePath);
+    await expect(fs.access(probePath)).rejects.toThrow();
+  });
+});
+
 describe('LocalStorageProvider - deleteBucket', () => {
   const baseDir = path.join(__dirname, 'test-storage');
   let provider: LocalStorageProvider;

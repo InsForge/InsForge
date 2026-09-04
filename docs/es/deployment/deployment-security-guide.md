@@ -665,7 +665,7 @@ sudo ufw status
 
 La imagen Docker de InsForge ya sigue las buenas prácticas de no root:
 
-- El Dockerfile de producción establece `USER node` (UID 1000), por lo que el proceso de la aplicación dentro del contenedor se ejecuta como un usuario no root.
+- El entrypoint de la imagen ejecuta `exec su-exec node`, por lo que el proceso de la aplicación dentro del contenedor se ejecuta como UID 1000 (`node`). El Dockerfile de producción no establece `USER node` para ese cambio de usuario: el contenedor arranca como root para unirse al grupo del socket de Docker y luego cede el proceso con `su-exec`.
 - Las operaciones de Docker a nivel de sistema están gestionadas por el usuario `deploy` (creado en el [Paso 2.3](#23-create-a-deploy-user-non-root)), que tiene acceso al socket de Docker a través del grupo `docker`.
 
 **Verifica el usuario del contenedor:**
@@ -911,6 +911,14 @@ docker compose ps
 curl http://localhost:7130/api/health
 
 # Check the version in the response
+```
+
+#### 15.5 Propiedad de volúmenes al actualizar desde 1.x
+
+Los volúmenes escritos como root en 1.x no son escribibles por el proceso 2.x (UID 1000). Corrige la propiedad, sustituyendo `<stack>` por el nombre de tu proyecto de Compose:
+
+```bash
+docker run --rm -v <stack>_insforge-logs:/a -v <stack>_storage-data:/b alpine chown -R 1000:1000 /a /b
 ```
 
 ### 16. Procedimiento de reversión
