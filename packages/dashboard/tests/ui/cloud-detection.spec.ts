@@ -36,10 +36,16 @@ test('a custom-domain deployment follows the backend when it reports cloud', asy
 
   await page.goto('/dashboard');
 
-  // The self-hosting shell sends unauthenticated visitors to /dashboard/login.
-  // Honouring `cloud: true` must route them into the cloud shell instead, which
-  // is the whole point of the fix — on this origin the hostname says otherwise.
-  await expect(page).not.toHaveURL(/\/dashboard\/login$/);
+  // Assert the destination positively rather than "not /dashboard/login": a negative URL check
+  // also passes in the moment before the redirect fires, so it can go green for the wrong reason.
+  // Reaching /cloud/login is the observable proof that the cloud shell mounted — on this origin
+  // the hostname alone would have sent an unauthenticated visitor to the self-hosting login.
+  //
+  // The generous timeout is the point rather than a workaround: the cloud shell sits on /dashboard
+  // requesting an authorization code that no parent or opener can supply here, and only gives up
+  // after DEFAULT_TIMEOUT_MS (15s). Asserting a bound we know covers that is honest; asserting the
+  // faster negative was what let this pass before the redirect had happened at all.
+  await expect(page).toHaveURL(/\/cloud\/login$/, { timeout: 25_000 });
 });
 
 test('a backend that reports no cloud flag falls back to the hostname', async ({ page }) => {
@@ -54,16 +60,17 @@ test('a backend that reports no cloud flag falls back to the hostname', async ({
   await expect(page.getByRole('heading', { name: 'Insforge Admin' })).toBeVisible();
 });
 
-test('an unreachable health endpoint still mounts the shell', async ({ page }) => {
+test('an unreachable health endpoint degrades to the hostname answer', async ({ page }) => {
   await mockLoggedOutApi(page);
   await page.route('**/api/health', (route) => route.abort());
 
   await page.goto('/dashboard');
 
-  // The probe swallows its own failures and the render is in `finally`, so a
-  // dead endpoint must degrade to the previous behaviour rather than leaving
-  // `#root` empty — a blank page would be the worst outcome of gating the
-  // first render on a network call.
+  // A dead endpoint must leave the shell exactly as it was before this change rather than blocking
+  // the first render. Worth naming what this does NOT cover: `probeCloudHosting` catches its own
+  // failures, so an aborted request never rejects and never reaches `main.tsx`. The `finally` there
+  // guards a future edit that lets one escape, and there is no seam to drive that from a UI test
+  // without adding one for the test's benefit alone.
   await expect(page).toHaveURL(/\/dashboard\/login$/);
   await expect(page.getByRole('heading', { name: 'Insforge Admin' })).toBeVisible();
 });

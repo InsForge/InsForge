@@ -22,11 +22,31 @@ let backendReportedCloud: boolean | null = null;
  * render waits on this, and a backend that hangs rather than refuses must not
  * hold the shell forever.
  */
+/**
+ * A signal that aborts after `PROBE_TIMEOUT_MS`.
+ *
+ * `AbortSignal.timeout` is the concise form but is unsupported on older browsers, where it throws.
+ * That throw is caught below, so nothing breaks — but the probe would be skipped and the shell
+ * would fall back to the hostname guess, which is the exact bug this exists to fix, silently and
+ * only for those users. The manual controller works everywhere, so it is the fallback.
+ */
+function timeoutSignal(): AbortSignal | undefined {
+  if ('function' === typeof AbortSignal.timeout) {
+    return AbortSignal.timeout(PROBE_TIMEOUT_MS);
+  }
+  if ('undefined' === typeof AbortController) {
+    return undefined;
+  }
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  return controller.signal;
+}
+
 export async function probeCloudHosting(): Promise<void> {
   try {
     const response = await fetch('/api/health', {
       headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      signal: timeoutSignal(),
     });
     if (!response.ok) {
       return;
