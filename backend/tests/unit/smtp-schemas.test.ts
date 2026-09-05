@@ -153,6 +153,16 @@ describe('Email Template Request Schema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts bodyHtml containing script tags', () => {
+    const input = {
+      templateType: 'email-verification-code',
+      subject: 'Verify',
+      bodyHtml: '<p>Your code: {{ token }}</p><script>alert(1)</script>',
+    };
+    const result = updateEmailTemplateRequestSchema.safeParse(input);
+    expect(result.success).toBe(true);
+  });
+
   it('rejects empty subject', () => {
     const result = updateEmailTemplateRequestSchema.safeParse({
       subject: '',
@@ -210,6 +220,21 @@ describe('Email Template Schema', () => {
       templateType: 'email-verification-code',
       subject: 'Verify your email',
       bodyHtml: '<p>Code: {{ token }}</p>',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts bodyHtml containing script tags', () => {
+    const input = {
+      templateType: 'email-verification-code',
+      subject: 'Update',
+      bodyHtml: '<p>Code: {{ token }}</p><script src="malicious.js"></script>',
+    };
+    const result = emailTemplateSchema.safeParse({
+      ...input,
+      id: '11111111-1111-4111-8111-111111111111',
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     });
