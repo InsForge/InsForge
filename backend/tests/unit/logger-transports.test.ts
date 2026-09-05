@@ -242,10 +242,7 @@ describe('logger transports', () => {
         exit,
       });
       expect(transport).toBeUndefined();
-      expect(writeSyncSpy).toHaveBeenCalledWith(
-        2,
-        expect.stringContaining(VOLUME_OWNERSHIP_CHOWN)
-      );
+      expect(writeSyncSpy).toHaveBeenCalledWith(2, expect.stringContaining(VOLUME_OWNERSHIP_CHOWN));
       expect(exit).toHaveBeenCalledTimes(1);
       expect(exit).toHaveBeenCalledWith(1);
     } finally {
