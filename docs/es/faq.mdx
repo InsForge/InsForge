@@ -285,4 +285,20 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     - **Cancelar una compilación en curso:** `npx @insforge/cli deployments cancel <id>` detiene un despliegue en progreso; no da de baja un sitio que ya está en vivo.
     - **Reemplazar lo que está en vivo:** vuelve a desplegar sobre el mismo sitio con `npx @insforge/cli deployments deploy ./frontend` — el despliegue ready más reciente sirve la URL.
   </Accordion>
+
+  <Accordion title="¿Cómo pongo la API de backend de mi proyecto en un dominio propio como `api.example.com`?">
+    Por defecto, la API de backend de tu proyecto Cloud se sirve en `https://<appkey>.<region>.insforge.app`. Puedes apuntarla a un dominio propio (por ejemplo `api.example.com`). Es una configuración a nivel de proyecto y **no** es lo mismo que un dominio personalizado de [Site](/core-concepts/sites/overview): un dominio de Site sirve un frontend desplegado, mientras que este sirve la API de backend.
+
+    Configura el dominio con la CLI:
+
+    ```bash
+    npx @insforge/cli projects update --domain api.example.com
+    ```
+
+    Esto actúa sobre el proyecto vinculado; pasa `--project <id>` para elegir otro. `projects update` es el mismo comando que renombra un proyecto o cambia el tamaño de Storage, y corresponde a la API de plataforma `PUT /projects/v1/{projectId}` con el cuerpo `{ "customizedDomain": "api.example.com" }`. Una vez que surte efecto, tu proyecto responde en `https://api.example.com`, y `npx @insforge/cli projects get` muestra el dominio.
+
+    Aun así tienes que crear un registro DNS en tu registrador que apunte el dominio a InsForge, e InsForge emite el certificado TLS. Configurar `--domain` solo registra el hostname y enruta el tráfico una vez que el DNS resuelve — **no** crea el registro DNS por ti. El registro DNS exacto a añadir, cualquier paso de verificación, la emisión del certificado, y cómo se manejan `www` frente al dominio raíz (apex) y `http`→`https` los gestiona la infraestructura de InsForge y no se exponen a través de la CLI. {/* TODO: confirm exact DNS record type/target, verification step, www/apex and http→https behavior, and dashboard location */}
+
+    Para conocer el destino DNS exacto, o si tienes un problema de TLS o de verificación, escríbele al equipo de InsForge en [Discord](https://discord.com/invite/DvBtaEc9Jz).
+  </Accordion>
 </AccordionGroup>

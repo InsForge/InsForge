@@ -285,4 +285,20 @@ description: "InsForge 常見問題：解說資料庫呼叫、Edge Function 與 
     - **取消還在跑的建置：** `npx @insforge/cli deployments cancel <id>` 會終止一個進行中的部署；它不會下線一個已經上線的站點。
     - **替換目前上線的內容：** 用 `npx @insforge/cli deployments deploy ./frontend` 在同一個站點上重新部署——最新一次 ready 的部署會接管這個 URL。
   </Accordion>
+
+  <Accordion title="怎麼把後端專案 API 綁定到自己的自訂網域（例如 `api.example.com`）？">
+    預設情況下，你的 Cloud 專案後端 API 透過 `https://<appkey>.<region>.insforge.app` 提供服務。你可以把它指向自己擁有的網域（例如 `api.example.com`）。這是一個專案層級的設定，和 [Site](/core-concepts/sites/overview) 的自訂網域**不是**同一回事——Site 網域指向的是已部署的前端，而這裡指向的是後端 API。
+
+    用 CLI 設定網域：
+
+    ```bash
+    npx @insforge/cli projects update --domain api.example.com
+    ```
+
+    該指令預設作用於已 link 的專案；加 `--project <id>` 可指定其他專案。`projects update` 就是用來重新命名專案、調整 Storage 容量的同一個指令，它對應平台 API `PUT /projects/v1/{projectId}`，請求主體為 `{ "customizedDomain": "api.example.com" }`。生效後，你的專案會在 `https://api.example.com` 上回應，`npx @insforge/cli projects get` 也會顯示該網域。
+
+    你仍然需要在自己的網域註冊商處新增一筆把網域指向 InsForge 的 DNS 記錄，TLS 憑證由 InsForge 簽發。設定 `--domain` 只是記錄該主機名稱，並在 DNS 解析生效後把流量路由過去——它**不會**替你建立 DNS 記錄。具體要新增哪筆 DNS 記錄、是否需要驗證步驟、憑證簽發，以及 `www` 與裸網域（apex）、`http`→`https` 如何處理，都由 InsForge 基礎設施管理，CLI 並不會暴露這些細節。{/* TODO: confirm exact DNS record type/target, verification step, www/apex and http→https behavior, and dashboard location */}
+
+    如果需要確切的 DNS 指向目標，或遇到 TLS、驗證方面的問題，請到 [Discord](https://discord.com/invite/DvBtaEc9Jz) 聯繫 InsForge 團隊。
+  </Accordion>
 </AccordionGroup>
