@@ -17,7 +17,7 @@ import { useAiEntitlement } from '#lib/hooks/useAiEntitlement';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from '@insforge/ui';
 import { ProjectSettingsMenuDialog } from '#features/dashboard/components';
 import { LanguageSelect } from '#components';
-import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 import { useTranslation } from 'react-i18next';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
@@ -35,8 +35,8 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const host = useDashboardHost();
   const { t } = useTranslation('chrome');
   const { mode: hostMode, onOpenWhatsNew } = host;
-  const isDTest =
-    getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT) === FEATURE_FLAG_VARIANTS.D_TEST;
+  const dashboardVariant = useFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
+  const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;
   const isDTestCloud = isDTest && host.mode === 'cloud-hosting';
   const aiEntitlement = useAiEntitlement();
   const hideAiTab = aiEntitlement.reason === 'partner';
