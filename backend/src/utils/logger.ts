@@ -29,11 +29,18 @@ export function createSelfHostFileTransport(options: {
 }): winston.transports.FileTransportInstance | undefined {
   const { logsDir: dir, vitest, exit } = options;
 
+  const jsonlPath = path.join(dir, 'insforge.logs.jsonl');
+
   try {
     fs.mkdirSync(dir, { recursive: true });
-    fs.accessSync(dir, fs.constants.W_OK);
+    const fd = fs.openSync(jsonlPath, 'a');
+    fs.closeSync(fd);
   } catch {
-    process.stderr.write(`${VOLUME_OWNERSHIP_CHOWN}\n`);
+    try {
+      fs.writeSync(2, `${VOLUME_OWNERSHIP_CHOWN}\n`);
+    } catch {
+      // EPIPE must not skip the injected exit below.
+    }
     if (!vitest) {
       exit(1);
     }
@@ -41,7 +48,7 @@ export function createSelfHostFileTransport(options: {
   }
 
   return new winston.transports.File({
-    filename: path.join(dir, 'insforge.logs.jsonl'),
+    filename: jsonlPath,
     // Rotate so the file cannot grow unbounded; LocalFileProvider only
     // reads the base file, which `tailable` keeps as the newest one.
     maxsize: 20 * 1024 * 1024,

@@ -920,6 +920,12 @@ curl http://localhost:7130/api/health
 docker run --rm -v <stack>_insforge-logs:/a -v <stack>_storage-data:/b alpine chown -R 1000:1000 /a /b
 ```
 
+完成 chown 後重啟，讓行程能夠寫入這些卷：
+
+```bash
+docker compose up -d
+```
+
 ### 16. 回復流程
 
 若更新造成問題，請依照以下步驟進行回復：

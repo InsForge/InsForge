@@ -919,6 +919,12 @@ curl http://localhost:7130/api/health
 docker run --rm -v <stack>_insforge-logs:/a -v <stack>_storage-data:/b alpine chown -R 1000:1000 /a /b
 ```
 
+完成 chown 后重启，让进程能够写入这些卷：
+
+```bash
+docker compose up -d
+```
+
 ### 16. 回滚流程
 
 如果更新导致了问题，请按照以下步骤进行回退：

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import fs from 'fs/promises';
+import nodeFs from 'fs';
 import * as path from 'path';
 import winston from 'winston';
 
@@ -27,8 +28,11 @@ async function importLogger() {
   return logger;
 }
 
-function stderrText(spy: ReturnType<typeof vi.spyOn>): string {
-  return spy.mock.calls.map((call) => String(call[0])).join('');
+function recipeFromWriteSync(spy: ReturnType<typeof vi.spyOn>): string {
+  return spy.mock.calls
+    .filter((call) => call[0] === 2)
+    .map((call) => String(call[1]))
+    .join('');
 }
 
 async function withUnwritableLogsDir<T>(fn: () => Promise<T>): Promise<T> {
@@ -116,11 +120,13 @@ describe('logger transports', () => {
 
   it('does not add a file transport in cloud environments', async () => {
     process.env.AWS_INSTANCE_PROFILE_NAME = 'insforge-instance-profile';
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 
     const logger = await importLogger();
 
     expect(logger.transports.some((t) => t instanceof winston.transports.File)).toBe(false);
     expect(logger.transports.some((t) => t instanceof winston.transports.Console)).toBe(true);
+    expect(exitSpy).not.toHaveBeenCalled();
     await expect(fs.access(logsDir)).rejects.toThrow();
   });
 
@@ -151,19 +157,19 @@ describe('logger transports', () => {
   }, 2500);
 
   it('prints the Alpine chown command when LOGS_DIR is unwritable', async () => {
-    const writeSpy = vi.spyOn(process.stderr, 'write');
+    const writeSyncSpy = vi.spyOn(nodeFs, 'writeSync');
     await withUnwritableLogsDir(async () => {
       const mod = await importLoggerModule();
       expect(mod.VOLUME_OWNERSHIP_CHOWN).toBe(VOLUME_OWNERSHIP_CHOWN);
-      expect(stderrText(writeSpy)).toContain(VOLUME_OWNERSHIP_CHOWN);
+      expect(recipeFromWriteSync(writeSyncSpy)).toContain(VOLUME_OWNERSHIP_CHOWN);
     });
   });
 
   it('calls injected exit(1) and omits File when vitest is false', async () => {
-    const { createSelfHostFileTransport } = await importLoggerModule();
     await fs.mkdir(logsDir, { recursive: true });
     await fs.chmod(logsDir, 0o555);
     try {
+      const { createSelfHostFileTransport } = await importLoggerModule();
       const exit = vi.fn();
       const transport = createSelfHostFileTransport({
         logsDir,
@@ -181,12 +187,69 @@ describe('logger transports', () => {
   it('omits File, prints chown, and does not exit when VITEST is set', async () => {
     expect(process.env.VITEST).toBeTruthy();
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
-    const writeSpy = vi.spyOn(process.stderr, 'write');
+    const writeSyncSpy = vi.spyOn(nodeFs, 'writeSync');
     await withUnwritableLogsDir(async () => {
       const logger = await importLogger();
       expect(logger.transports.some((t) => t instanceof winston.transports.File)).toBe(false);
       expect(exitSpy).not.toHaveBeenCalled();
-      expect(stderrText(writeSpy)).toContain(VOLUME_OWNERSHIP_CHOWN);
+      expect(recipeFromWriteSync(writeSyncSpy)).toContain(VOLUME_OWNERSHIP_CHOWN);
     });
+  });
+
+  it('fails loud when insforge.logs.jsonl is 0444 in a writable directory', async () => {
+    await fs.mkdir(logsDir, { recursive: true });
+    const jsonl = path.join(logsDir, 'insforge.logs.jsonl');
+    await fs.writeFile(jsonl, '');
+    await fs.chmod(jsonl, 0o444);
+    const writeSyncSpy = vi.spyOn(nodeFs, 'writeSync');
+    try {
+      const started = Date.now();
+      const { logger, createSelfHostFileTransport } = await importLoggerModule();
+      expect(logger.transports.some((t) => t instanceof winston.transports.File)).toBe(false);
+
+      const exit = vi.fn();
+      const transport = createSelfHostFileTransport({
+        logsDir,
+        vitest: false,
+        exit,
+      });
+      expect(transport).toBeUndefined();
+      expect(Date.now() - started).toBeLessThanOrEqual(2000);
+      expect(recipeFromWriteSync(writeSyncSpy)).toContain(VOLUME_OWNERSHIP_CHOWN);
+      expect(exit).toHaveBeenCalledTimes(1);
+      expect(exit).toHaveBeenCalledWith(1);
+    } finally {
+      await fs.chmod(jsonl, 0o644);
+      await fs.chmod(logsDir, 0o700);
+    }
+  }, 2500);
+
+  it('still exits when writeSync to fd 2 throws EPIPE', async () => {
+    await fs.mkdir(logsDir, { recursive: true });
+    await fs.chmod(logsDir, 0o555);
+    const writeSyncSpy = vi.spyOn(nodeFs, 'writeSync').mockImplementation((fd) => {
+      if (fd === 2) {
+        throw Object.assign(new Error('write EPIPE'), { code: 'EPIPE' });
+      }
+      return 0;
+    });
+    try {
+      const { createSelfHostFileTransport } = await importLoggerModule();
+      const exit = vi.fn();
+      const transport = createSelfHostFileTransport({
+        logsDir,
+        vitest: false,
+        exit,
+      });
+      expect(transport).toBeUndefined();
+      expect(writeSyncSpy).toHaveBeenCalledWith(
+        2,
+        expect.stringContaining(VOLUME_OWNERSHIP_CHOWN)
+      );
+      expect(exit).toHaveBeenCalledTimes(1);
+      expect(exit).toHaveBeenCalledWith(1);
+    } finally {
+      await fs.chmod(logsDir, 0o700);
+    }
   });
 });

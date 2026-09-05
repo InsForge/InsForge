@@ -921,6 +921,12 @@ Los volúmenes escritos como root en 1.x no son escribibles por el proceso 2.x (
 docker run --rm -v <stack>_insforge-logs:/a -v <stack>_storage-data:/b alpine chown -R 1000:1000 /a /b
 ```
 
+Después del chown, reinicia para que el proceso pueda escribir en los volúmenes:
+
+```bash
+docker compose up -d
+```
+
 ### 16. Procedimiento de reversión
 
 Si una actualización causa problemas, sigue estos pasos para revertirla:

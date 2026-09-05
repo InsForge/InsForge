@@ -32,15 +32,48 @@ describe('LocalStorageProvider - initialize writability', () => {
     await expect(provider.initialize()).rejects.toThrow(/STORAGE_DIR/);
   });
 
-  it('writes and unlinks a probe file when the storage directory is writable', async () => {
+  it('writes and unlinks a unique wx probe when the storage directory is writable', async () => {
     const writeSpy = vi.spyOn(fs, 'writeFile');
     const unlinkSpy = vi.spyOn(fs, 'unlink');
     const provider = new LocalStorageProvider(baseDir);
     await expect(provider.initialize()).resolves.toBeUndefined();
-    const probePath = path.join(baseDir, '.insforge-write-probe');
-    expect(writeSpy).toHaveBeenCalledWith(probePath, expect.anything());
+
+    expect(writeSpy).toHaveBeenCalledWith(
+      expect.stringMatching(
+        new RegExp(`\\.insforge-write-probe\\.${process.pid}\\.[0-9a-f-]{36}$`)
+      ),
+      '',
+      { flag: 'wx' }
+    );
+    const probePath = String(writeSpy.mock.calls[0][0]);
     expect(unlinkSpy).toHaveBeenCalledWith(probePath);
     await expect(fs.access(probePath)).rejects.toThrow();
+
+    const leftovers = (await fs.readdir(baseDir)).filter((name) =>
+      name.startsWith('.insforge-write-probe.')
+    );
+    expect(leftovers).toEqual([]);
+  });
+
+  it('does not truncate a pre-existing .insforge-write-probe file', async () => {
+    await fs.mkdir(baseDir, { recursive: true });
+    const sentinelPath = path.join(baseDir, '.insforge-write-probe');
+    const sentinel = Buffer.from('do-not-clobber');
+    await fs.writeFile(sentinelPath, sentinel);
+    const provider = new LocalStorageProvider(baseDir);
+    await expect(provider.initialize()).resolves.toBeUndefined();
+    expect(await fs.readFile(sentinelPath)).toEqual(sentinel);
+  });
+
+  it('resolves when the unique probe is created but unlink fails', async () => {
+    const writeSpy = vi.spyOn(fs, 'writeFile');
+    vi.spyOn(fs, 'unlink').mockRejectedValueOnce(
+      Object.assign(new Error('EACCES'), { code: 'EACCES' })
+    );
+    const provider = new LocalStorageProvider(baseDir);
+    await expect(provider.initialize()).resolves.toBeUndefined();
+    const probePath = String(writeSpy.mock.calls[0][0]);
+    expect(probePath).toContain(`.insforge-write-probe.${process.pid}.`);
   });
 });
 

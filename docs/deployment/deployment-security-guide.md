@@ -939,6 +939,12 @@ Volumes written as root on 1.x are not writable by the 2.x process (UID 1000). F
 docker run --rm -v <stack>_insforge-logs:/a -v <stack>_storage-data:/b alpine chown -R 1000:1000 /a /b
 ```
 
+Then restart so the process can write the volumes:
+
+```bash
+docker compose up -d
+```
+
 ### 16. Rollback Procedure
 
 If an update causes issues, follow these steps to revert:
