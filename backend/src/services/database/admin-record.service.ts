@@ -3,9 +3,10 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { ERROR_CODES, type AdminTableRecordPrimaryKey } from '@insforge/shared-schemas';
 import type { PoolClient } from 'pg';
 import type { DatabaseRecord } from '@/types/database.js';
-import { TEXT_LIKE_DATA_TYPES } from '@/utils/constants.js';
+import { ADMIN_RECORD_STATEMENT_TIMEOUT, TEXT_LIKE_DATA_TYPES } from '@/utils/constants.js';
 import { escapeSqlLikePattern, validateTableName } from '@/utils/validations.js';
 import { quoteIdentifier, quoteQualifiedName } from './helpers.js';
+import { estimateOrExactCount } from './record-count.js';
 import { withAdminContext } from './user-context.service.js';
 
 interface SortClause {
@@ -45,18 +46,25 @@ export class AdminRecordService {
     schemaName: string,
     tableName: string,
     options: ListTableRecordsOptions
-  ): Promise<{ records: DatabaseRecord[]; total: number }> {
+  ): Promise<{ records: DatabaseRecord[]; total: number; isEstimate: boolean }> {
     validateTableName(tableName);
 
     return this.withAdminTransaction(async (client) => {
+      // Transaction-scoped, so a deep OFFSET or unindexable search fails fast instead of
+      // holding this connection. Only this read path is bounded; mutations are untouched.
+      await client.query(`SET LOCAL statement_timeout = '${ADMIN_RECORD_STATEMENT_TIMEOUT}'`);
+
       const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
       const { whereSql, params } = this.buildWhereClause(metadata, options);
       const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
       const orderBySql = this.buildOrderByClause(metadata, options.sort);
 
-      const countResult = await client.query<{
-        total: string;
-      }>(`SELECT COUNT(*)::text AS total FROM ${qualifiedTableName}${whereSql}`, params);
+      const { total, isEstimate } = await estimateOrExactCount(
+        client,
+        qualifiedTableName,
+        whereSql,
+        params
+      );
 
       const dataParams = [...params, options.limit, options.offset];
       const limitPlaceholder = `$${params.length + 1}`;
@@ -68,7 +76,8 @@ export class AdminRecordService {
 
       return {
         records: recordsResult.rows,
-        total: Number(countResult.rows[0]?.total ?? 0),
+        total,
+        isEstimate,
       };
     });
   }
