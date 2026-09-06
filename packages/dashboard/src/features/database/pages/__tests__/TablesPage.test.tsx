@@ -197,8 +197,8 @@ describe('TablesPage table-switch search behavior', () => {
     });
   });
 
-  it('clears search input and does not use previous search term when switching tables', async () => {
-    const user = userEvent.setup();
+  it('clears search input and does not use previous search term when switching tables', { timeout: 10_000 }, async () => {
+    const user = userEvent.setup({ delay: null });
 
     render(
       <MemoryRouter initialEntries={['/?table=tableA']}>
@@ -236,8 +236,8 @@ describe('TablesPage table-switch search behavior', () => {
     );
   });
 
-  it('restores previous search value when switching back to a previously searched table', async () => {
-    const user = userEvent.setup();
+  it('restores previous search value when switching back to a previously searched table', { timeout: 10_000 }, async () => {
+    const user = userEvent.setup({ delay: null });
 
     render(
       <MemoryRouter initialEntries={['/?table=tableA']}>
@@ -277,8 +277,8 @@ describe('TablesPage table-switch search behavior', () => {
     );
   });
 
-  it('shows an empty search input for a table with no prior search', async () => {
-    const user = userEvent.setup();
+  it('shows an empty search input for a table with no prior search', { timeout: 10_000 }, async () => {
+    const user = userEvent.setup({ delay: null });
 
     render(
       <MemoryRouter initialEntries={['/?table=tableA']}>

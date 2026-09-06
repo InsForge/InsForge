@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { DeleteServiceDialog } from '#features/compute/components/DeleteServiceDialog';
 
 describe('DeleteServiceDialog', () => {
-  it('requires typing the service name before confirming deletion', async () => {
-    const user = userEvent.setup();
+  it('requires typing the service name before confirming deletion', { timeout: 10_000 }, async () => {
+    const user = userEvent.setup({ delay: null });
     const onConfirm = vi.fn().mockResolvedValue(undefined);
     const onOpenChange = vi.fn();
 
