@@ -24,6 +24,7 @@ A dashboard is built for a human pointer; a CLI is built for anything that can w
 | Config as code | `config plan`, `config apply`, `config export` |
 | Branching | `branch create`, `branch merge`, `branch reset`, `branch delete` |
 | Build | `functions`, `storage`, `deployments`, `secrets`, `schedules`, `ai` |
+| Memory | `memory list`, `memory remember`, `memory recall` |
 | Diagnose | `diagnose`, `diagnose advisor`, `diagnose db`, `diagnose logs`, `metadata` |
 
 Run `npx @insforge/cli help <command>` for the flags on any of these.
@@ -45,6 +46,26 @@ npx @insforge/cli secrets get ANON_KEY  # decrypted value of one key
 ```
 
 Use `secrets add`, `secrets update`, and `secrets delete` for your own keys, and `secrets rotate api-key` or `secrets rotate anon-key` to reissue a project key with an optional grace period. The API key and anon key are also in the dashboard: click **Install** and open **API Keys**.
+
+## Agent memory
+
+The `memory` commands manage durable project memory across agent sessions, backed by PostgreSQL and `pgvector`:
+
+| Command | What it does | Model Gateway required? |
+|---------|--------------|-------------------------|
+| `memory list` | Lists stored memory titles and timestamps in the project scope | No (direct relational query) |
+| `memory remember` | Stores an atomic memory or extracts durable facts from a task transcript | Yes (generates embeddings and reconciles duplicates) |
+| `memory recall` | Hybrid semantic and keyword search across stored memories | Yes (generates query embeddings for vector search) |
+
+```bash
+npx @insforge/cli memory list
+npx @insforge/cli memory remember --title "Database conventions" --content "UUID v4 primary keys with timestamptz"
+npx @insforge/cli memory recall "database conventions"
+```
+
+<Note>
+  **Model Gateway prerequisite**: `memory remember` and `memory recall` require an AI provider to generate vector embeddings for `pgvector` storage and semantic search, as well as to reconcile duplicate memories. On cloud projects, this is pre-configured. On self-hosted instances, configure the [Model Gateway](/core-concepts/ai/overview) in the dashboard or set `OPENROUTER_API_KEY` in your `.env` before storing or recalling memories. `memory list` does not require an AI provider because it queries stored memory metadata directly from PostgreSQL.
+</Note>
 
 ## Upgrading and deleting a project
 
