@@ -57,6 +57,14 @@ Storage policies read the same auth JWT as database queries. The same user who c
 
 Group objects into buckets with separate access policies. Public buckets serve files directly over HTTPS; private buckets require a signed URL or an authenticated request.
 
+<Warning>
+  Deleting a bucket is permanent. It cascade-deletes every object the bucket
+  contains, and there is no trash, soft-delete, or restore — neither self-serve
+  nor through support. Download anything you need first, and reserve the delete
+  action (`DELETE /api/storage/buckets/{bucketName}`, the `delete-bucket` MCP
+  tool, or the SDK) for buckets you are certain you no longer need.
+</Warning>
+
 ### Direct uploads
 
 Browser and mobile clients upload straight to storage with a presigned URL. The backend never proxies bytes.
