@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { AppError } from '@/utils/errors.js';
 import { appConfig } from '@/infra/config/app.config.js';
@@ -15,6 +16,18 @@ const MAX_IDENTITY_TOKEN_LIFETIME_MS = 10 * 60 * 1000;
 // re-derived when the callback lands.
 function sharedOAuthFlowId(state: string): string {
   return crypto.createHash('sha256').update(state).digest('hex');
+}
+
+function validateJwtSecret(): string {
+  const jwtSecret = appConfig.app.jwtSecret;
+  if (!jwtSecret) {
+    throw new AppError(
+      'JWT_SECRET environment variable is not configured.',
+      500,
+      ERROR_CODES.INTERNAL_ERROR
+    );
+  }
+  return jwtSecret;
 }
 
 /**
@@ -36,8 +49,10 @@ export function buildSharedOAuthInitQuery(redirectUri: string, state: string): s
 /**
  * Verifies the identity the cloud OAuth proxy asserts on a shared-provider callback.
  *
- * The assertion travels through the user's browser, so none of it is identity until
- * the cloud signature, the project binding and the flow binding all hold.
+ * The assertion travels through the user's browser, so none of it is identity until the
+ * signature, the project binding and the flow binding all hold. It is signed with this
+ * project's JWT_SECRET rather than the cloud JWKS key, which every instance accepts as
+ * cloud-backend authority.
  */
 export class SharedOAuthService {
   private static instance: SharedOAuthService;
@@ -51,18 +66,28 @@ export class SharedOAuthService {
     return SharedOAuthService.instance;
   }
 
-  public async verifyIdentityToken(
+  public verifyIdentityToken(
     token: string,
     context: { provider: string; state: string }
-  ): Promise<Record<string, unknown>> {
-    const { payload } = await TokenManager.getInstance().verifyCloudToken(token);
-
-    if (payload.type !== IDENTITY_TOKEN_TYPE) {
-      throw this.reject('Cloud token is not a shared OAuth identity assertion', context.provider);
+  ): Record<string, unknown> {
+    let payload: jwt.JwtPayload;
+    try {
+      payload = jwt.verify(token, validateJwtSecret(), {
+        algorithms: ['HS256'],
+      }) as jwt.JwtPayload;
+    } catch {
+      throw this.reject('Shared OAuth identity assertion is not signed for us', context.provider);
     }
 
-    // verifyCloudToken only compares project ids when PROJECT_ID is set; an assertion
-    // minted for another project must not be accepted just because ours is unset
+    if (payload.type !== IDENTITY_TOKEN_TYPE) {
+      throw this.reject('Signed token is not a shared OAuth identity assertion', context.provider);
+    }
+
+    // An assertion that carried a subject would also verify as one of our access tokens
+    if (payload.sub !== undefined) {
+      throw this.reject('Shared OAuth identity assertion carries a subject', context.provider);
+    }
+
     if (!appConfig.cloud.projectId || payload.projectId !== appConfig.cloud.projectId) {
       throw this.reject('Shared OAuth identity is for a different project', context.provider);
     }

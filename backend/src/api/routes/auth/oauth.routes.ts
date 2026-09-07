@@ -403,7 +403,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
         );
       }
 
-      const identity = await sharedOAuthService.verifyIdentityToken(token, {
+      const identity = sharedOAuthService.verifyIdentityToken(token, {
         provider: validatedProvider,
         state,
       });

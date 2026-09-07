@@ -1,38 +1,45 @@
 /**
  * The shared-OAuth callback used to accept a base64 `payload` query parameter as
  * identity, so anyone could mint a session for any email. These pin the checks that
- * replaced it: cloud signature, project binding, flow binding, single use.
+ * replaced it: the assertion is signed with this project's own secret, for this
+ * project, this provider and this login attempt, and it is usable once.
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
-const verifyCloudToken = vi.fn();
 const signCloudToken = vi.fn(() => 'project-sign-token');
 
 vi.mock('../../src/infra/security/token.manager.js', () => ({
-  TokenManager: { getInstance: () => ({ verifyCloudToken, signCloudToken }) },
+  TokenManager: { getInstance: () => ({ signCloudToken }) },
 }));
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 const PROJECT_ID = 'project-under-test';
+const JWT_SECRET = 'this-projects-jwt-secret';
 const STATE = 'state-jwt-for-this-login-attempt';
 const FLOW_ID = crypto.createHash('sha256').update(STATE).digest('hex');
+const IDENTITY = { providerId: '42', email: 'victim@example.com', name: 'Victim' };
 
-function assertion(overrides: Record<string, unknown> = {}) {
-  return {
-    payload: {
+function assertion(overrides: Record<string, unknown> = {}, secret = JWT_SECRET) {
+  const now = Math.floor(Date.now() / 1000);
+  return jwt.sign(
+    {
       type: 'shared_oauth_identity',
       projectId: PROJECT_ID,
       provider: 'github',
       sid: FLOW_ID,
+      identity: IDENTITY,
       jti: crypto.randomUUID(),
-      exp: Math.floor(Date.now() / 1000) + 120,
-      identity: { providerId: '42', email: 'victim@example.com', name: 'Victim' },
+      iat: now,
+      exp: now + 120,
       ...overrides,
     },
-  };
+    secret,
+    { algorithm: 'HS256' }
+  );
 }
 
 async function getService() {
@@ -40,100 +47,118 @@ async function getService() {
   return SharedOAuthService.getInstance();
 }
 
+const context = { provider: 'github', state: STATE };
+
 describe('SharedOAuthService.verifyIdentityToken', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
     vi.stubEnv('PROJECT_ID', PROJECT_ID);
+    vi.stubEnv('JWT_SECRET', JWT_SECRET);
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('returns the identity when the cloud assertion is valid', async () => {
-    verifyCloudToken.mockResolvedValue(assertion());
+  it('returns the identity when the assertion is valid', async () => {
     const service = await getService();
 
-    await expect(
-      service.verifyIdentityToken('cloud-token', { provider: 'github', state: STATE })
-    ).resolves.toEqual({ providerId: '42', email: 'victim@example.com', name: 'Victim' });
+    expect(service.verifyIdentityToken(assertion(), context)).toEqual(IDENTITY);
   });
 
-  it('rejects a token the cloud did not sign', async () => {
-    verifyCloudToken.mockRejectedValue(new Error('signature verification failed'));
+  it('rejects an identity the caller built themselves', async () => {
     const service = await getService();
+    const forged = Buffer.from(JSON.stringify(IDENTITY)).toString('base64');
 
-    await expect(
-      service.verifyIdentityToken('forged', { provider: 'github', state: STATE })
-    ).rejects.toThrow('signature verification failed');
+    expect(() => service.verifyIdentityToken(forged, context)).toThrowError(
+      expect.objectContaining({ statusCode: 401 })
+    );
   });
 
-  it('rejects a cloud token minted for something other than a shared OAuth login', async () => {
-    verifyCloudToken.mockResolvedValue(assertion({ type: 'project_authorization' }));
+  it('rejects an assertion signed with a secret that is not ours', async () => {
     const service = await getService();
 
-    await expect(
-      service.verifyIdentityToken('cloud-token', { provider: 'github', state: STATE })
-    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(() =>
+      service.verifyIdentityToken(assertion({}, 'another-secret'), context)
+    ).toThrowError(expect.objectContaining({ statusCode: 401 }));
+  });
+
+  it('rejects a token minted for something other than a shared OAuth login', async () => {
+    const service = await getService();
+
+    expect(() =>
+      service.verifyIdentityToken(assertion({ type: 'project_authorization' }), context)
+    ).toThrowError(expect.objectContaining({ statusCode: 401 }));
+  });
+
+  it('rejects an assertion carrying a subject, which would also pass as an access token', async () => {
+    const service = await getService();
+
+    expect(() =>
+      service.verifyIdentityToken(assertion({ sub: 'some-user-id' }), context)
+    ).toThrowError(expect.objectContaining({ statusCode: 401 }));
   });
 
   it('rejects an assertion issued for a different project', async () => {
-    verifyCloudToken.mockResolvedValue(assertion({ projectId: 'someone-elses-project' }));
     const service = await getService();
 
-    await expect(
-      service.verifyIdentityToken('cloud-token', { provider: 'github', state: STATE })
-    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(() =>
+      service.verifyIdentityToken(assertion({ projectId: 'someone-elses-project' }), context)
+    ).toThrowError(expect.objectContaining({ statusCode: 401 }));
   });
 
   it('rejects an assertion issued for a different provider', async () => {
-    verifyCloudToken.mockResolvedValue(assertion({ provider: 'google' }));
     const service = await getService();
 
-    await expect(
-      service.verifyIdentityToken('cloud-token', { provider: 'github', state: STATE })
-    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(() =>
+      service.verifyIdentityToken(assertion({ provider: 'google' }), context)
+    ).toThrowError(expect.objectContaining({ statusCode: 401 }));
   });
 
   it('rejects an assertion issued for a different login attempt', async () => {
-    verifyCloudToken.mockResolvedValue(assertion());
     const service = await getService();
 
-    await expect(
-      service.verifyIdentityToken('cloud-token', { provider: 'github', state: 'another-state' })
-    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(() =>
+      service.verifyIdentityToken(assertion(), { provider: 'github', state: 'another-state' })
+    ).toThrowError(expect.objectContaining({ statusCode: 401 }));
   });
 
   it('rejects an assertion carrying no identity', async () => {
-    verifyCloudToken.mockResolvedValue(assertion({ identity: undefined }));
     const service = await getService();
 
-    await expect(
-      service.verifyIdentityToken('cloud-token', { provider: 'github', state: STATE })
-    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(() => service.verifyIdentityToken(assertion({ identity: 0 }), context)).toThrowError(
+      expect.objectContaining({ statusCode: 401 })
+    );
   });
 
   it('rejects an assertion whose lifetime runs far past the flow it belongs to', async () => {
-    verifyCloudToken.mockResolvedValue(
-      assertion({ exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60 })
-    );
     const service = await getService();
+    const exp = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
 
-    await expect(
-      service.verifyIdentityToken('cloud-token', { provider: 'github', state: STATE })
-    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(() => service.verifyIdentityToken(assertion({ exp }), context)).toThrowError(
+      expect.objectContaining({ statusCode: 401 })
+    );
+  });
+
+  it('rejects an expired assertion', async () => {
+    const service = await getService();
+    const exp = Math.floor(Date.now() / 1000) - 1;
+
+    expect(() => service.verifyIdentityToken(assertion({ exp }), context)).toThrowError(
+      expect.objectContaining({ statusCode: 401 })
+    );
   });
 
   it('rejects a replay of an assertion it already accepted', async () => {
-    verifyCloudToken.mockResolvedValue(assertion({ jti: 'fixed-jti' }));
     const service = await getService();
+    const token = assertion();
 
-    await service.verifyIdentityToken('cloud-token', { provider: 'github', state: STATE });
+    service.verifyIdentityToken(token, context);
 
-    await expect(
-      service.verifyIdentityToken('cloud-token', { provider: 'github', state: STATE })
-    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(() => service.verifyIdentityToken(token, context)).toThrowError(
+      expect.objectContaining({ statusCode: 401 })
+    );
   });
 });
 

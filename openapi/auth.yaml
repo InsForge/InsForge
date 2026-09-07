@@ -1663,7 +1663,7 @@ paths:
           in: query
           schema:
             type: string
-          description: Cloud-signed identity assertion for this project and login attempt
+          description: Identity assertion the cloud signed with this project's JWT secret, bound to this login attempt
       responses:
         '302':
           description: Redirect to application with access token or error
