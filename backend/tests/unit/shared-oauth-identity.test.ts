@@ -110,6 +110,17 @@ describe('SharedOAuthService.verifyIdentityToken', () => {
     ).rejects.toMatchObject({ statusCode: 401 });
   });
 
+  it('rejects an assertion whose lifetime runs far past the flow it belongs to', async () => {
+    verifyCloudToken.mockResolvedValue(
+      assertion({ exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60 })
+    );
+    const service = await getService();
+
+    await expect(
+      service.verifyIdentityToken('cloud-token', { provider: 'github', state: STATE })
+    ).rejects.toMatchObject({ statusCode: 401 });
+  });
+
   it('rejects a replay of an assertion it already accepted', async () => {
     verifyCloudToken.mockResolvedValue(assertion({ jti: 'fixed-jti' }));
     const service = await getService();

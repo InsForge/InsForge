@@ -7,6 +7,10 @@ import logger from '@/utils/logger.js';
 
 const IDENTITY_TOKEN_TYPE = 'shared_oauth_identity';
 
+// Longest assertion lifetime we honour. The cloud signs two minutes; this bounds both
+// the replay window and the consumed-token map without clock skew rejecting honest ones.
+const MAX_IDENTITY_TOKEN_LIFETIME_MS = 10 * 60 * 1000;
+
 // Binds a cloud identity assertion to one OAuth attempt: sent when the flow starts,
 // re-derived when the callback lands.
 function sharedOAuthFlowId(state: string): string {
@@ -91,8 +95,13 @@ export class SharedOAuthService {
     }
 
     const now = Date.now();
-    for (const [seen, expiresAt] of this.consumedTokens) {
-      if (expiresAt <= now) {
+    const expiresAt = exp * 1000;
+    if (expiresAt > now + MAX_IDENTITY_TOKEN_LIFETIME_MS) {
+      throw this.reject('Shared OAuth identity assertion outlives its flow', provider);
+    }
+
+    for (const [seen, seenExpiresAt] of this.consumedTokens) {
+      if (seenExpiresAt <= now) {
         this.consumedTokens.delete(seen);
       }
     }
@@ -101,7 +110,7 @@ export class SharedOAuthService {
       throw this.reject('Shared OAuth identity assertion was already used', provider);
     }
 
-    this.consumedTokens.set(jti, exp * 1000);
+    this.consumedTokens.set(jti, expiresAt);
   }
 
   private reject(message: string, provider: string): AppError {
