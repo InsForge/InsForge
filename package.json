@@ -61,6 +61,8 @@
   "author": "InsForge",
   "license": "Apache-2.0",
   "overrides": {
+    "@humanfs/node": "^0.16.8",
+    "browserslist": "^4.28.7",
     "express": "^4.22.0",
     "undici": "7.29.0",
     "fast-xml-parser": "^5.7.0",
