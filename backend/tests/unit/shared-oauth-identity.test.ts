@@ -3,7 +3,7 @@
  * identity, so anyone could mint a session for any email. These pin the checks that
  * replaced it: cloud signature, project binding, flow binding, single use.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import crypto from 'crypto';
 
 const verifyCloudToken = vi.fn();
@@ -45,6 +45,10 @@ describe('SharedOAuthService.verifyIdentityToken', () => {
     vi.resetModules();
     vi.clearAllMocks();
     vi.stubEnv('PROJECT_ID', PROJECT_ID);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns the identity when the cloud assertion is valid', async () => {
@@ -138,6 +142,10 @@ describe('buildSharedOAuthInitQuery', () => {
     vi.resetModules();
     vi.clearAllMocks();
     vi.stubEnv('PROJECT_ID', PROJECT_ID);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('binds the cloud flow to this project and this login attempt', async () => {

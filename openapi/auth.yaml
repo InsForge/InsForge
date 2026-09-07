@@ -1659,11 +1659,11 @@ paths:
           schema:
             type: string
           description: Error message
-        - name: payload
+        - name: token
           in: query
           schema:
             type: string
-          description: Base64 encoded user payload
+          description: Cloud-signed identity assertion for this project and login attempt
       responses:
         '302':
           description: Redirect to application with access token or error
