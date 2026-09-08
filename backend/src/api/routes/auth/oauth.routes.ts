@@ -3,6 +3,7 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
+import { SharedOAuthService } from '@/services/auth/shared-oauth.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
@@ -30,6 +31,7 @@ const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
 const oAuthConfigService = OAuthConfigService.getInstance();
 const oAuthPKCEService = OAuthPKCEService.getInstance();
+const sharedOAuthService = SharedOAuthService.getInstance();
 const auditService = AuditService.getInstance();
 
 // Helper function to validate JWT_SECRET
@@ -316,7 +318,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
 
   try {
     const { state } = req.params;
-    const { success, error, payload } = req.query;
+    const { success, error, token } = req.query;
 
     if (!state) {
       logger.warn('Shared OAuth callback called without state parameter');
@@ -351,6 +353,19 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       );
     }
     const validatedProvider = providerValidation.data;
+
+    const oauthConfig = await oAuthConfigService.getConfigByProvider(validatedProvider);
+    if (!oauthConfig?.useSharedKey) {
+      logger.warn('Shared callback used by a provider that is not on shared keys', {
+        provider: validatedProvider,
+      });
+      throw new AppError(
+        `${validatedProvider} is not configured to use InsForge shared OAuth keys`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
     if (!redirectUri) {
       throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
     }
@@ -380,16 +395,21 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     }
 
     try {
-      if (!payload) {
-        throw new AppError('No payload provided in callback', 400, ERROR_CODES.INVALID_INPUT);
+      if (typeof token !== 'string' || !token) {
+        throw new AppError(
+          'No identity token provided in callback',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
       }
 
-      const payloadData = JSON.parse(
-        Buffer.from(payload as string, 'base64').toString('utf8')
-      ) as Record<string, unknown>;
+      const identity = sharedOAuthService.verifyIdentityToken(token, {
+        provider: validatedProvider,
+        state,
+      });
 
-      // Handle shared callback - transforms payload and creates/finds user
-      const result = await authService.handleSharedCallback(validatedProvider, payloadData);
+      // Handle shared callback - transforms identity and creates/finds user
+      const result = await authService.handleSharedCallback(validatedProvider, identity);
 
       // Create exchange code for PKCE flow (instead of exposing tokens in URL)
       // Only store minimal data - user and token are fetched fresh on exchange

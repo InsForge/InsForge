@@ -2,6 +2,7 @@ import axios from 'axios';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
+import { buildSharedOAuthInitQuery } from '@/services/auth/shared-oauth.service.js';
 import { OAuthProvider } from './base.provider.js';
 import type { MicrosoftUserInfo, OAuthUserData } from '@/types/auth.js';
 
@@ -50,7 +51,7 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
       let sharedAuthUrl: string;
       try {
         const response = await axios.get(
-          `${cloudBaseUrl}/auth/v1/shared/microsoft?redirect_uri=${encodeURIComponent(redirectUri)}`,
+          `${cloudBaseUrl}/auth/v1/shared/microsoft?${buildSharedOAuthInitQuery(redirectUri, state)}`,
           {
             headers: {
               'Content-Type': 'application/json',
