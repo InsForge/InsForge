@@ -8,6 +8,7 @@ import { StorageService } from '@/services/storage/storage.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { RealtimeChannelService } from '@/services/realtime/realtime-channel.service.js';
 import { getComputeMetadata } from '@/services/compute/services.service.js';
+import { getSitesMetadata } from '@/services/deployments/sites-registry.js';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import type { AppMetadataSchema } from '@insforge/shared-schemas';
@@ -41,9 +42,10 @@ export class MetadataService {
       deploymentService.getConfigMetadata(),
     ]);
 
-    // Synchronous and database-free (it reads the in-memory driver registry), so
-    // it stays out of the Promise.all above.
+    // Synchronous and database-free (they read the in-memory driver registries), so
+    // they stay out of the Promise.all above.
     const compute = getComputeMetadata();
+    const sites = getSitesMetadata();
 
     const version = process.env.npm_package_version || '1.0.0';
 
@@ -62,6 +64,11 @@ export class MetadataService {
       // Absent when no compute provider is configured — same presence/absence
       // capability signal as the deployments slice above.
       ...(compute ? { compute } : {}),
+      // What the active sites driver can do. Separate from `deployments` above, which
+      // is cloud-only and whose presence the CLI reads as "this backend can take a
+      // subdomain" — publishing capabilities there would make that true for a driver
+      // that has no slugs.
+      ...(sites ? { sites } : {}),
       version,
     };
   }
@@ -210,6 +217,28 @@ export class MetadataService {
             // Which one an agent gets if it says nothing, which is the common case.
             `${caps.defaultIngress ? ` (default ${codeSpan(caps.defaultIngress)})` : ''}, ` +
             `source build ${codeSpan(caps.sourceBuild)}`
+        );
+      }
+      lines.push('');
+    }
+
+    // Sites (absent when no driver can serve a deployment). Rendered for the same reason
+    // as compute: an agent reading the Markdown export should not have to fetch the JSON
+    // to learn that this instance cannot do custom domains.
+    if (metadata.sites) {
+      lines.push('## Sites');
+      lines.push(`- **Default provider**: ${codeSpan(metadata.sites.defaultProvider)}`);
+      for (const [name, caps] of Object.entries(metadata.sites.providers)) {
+        lines.push(
+          `- ${codeSpan(name)}: env vars ${codeSpan(caps.envVars)}, ` +
+            `custom domains ${caps.customDomains ? 'yes' : 'no'}, ` +
+            `slug ${caps.slug ? 'yes' : 'no'}, ` +
+            `rollback ${caps.rollback ? 'yes' : 'no'}, ` +
+            `build logs ${caps.buildLogs ? 'yes' : 'no'}, ` +
+            `runtime logs ${caps.runtimeLogs ? 'yes' : 'no'}, ` +
+            `framework detection ${caps.frameworkDetection ? 'yes' : 'no'}, ` +
+            `ingress ${caps.ingressModes.map(codeSpan).join('/')}` +
+            `${caps.defaultIngress ? ` (default ${codeSpan(caps.defaultIngress)})` : ''}`
         );
       }
       lines.push('');

@@ -10,7 +10,6 @@ import {
   type ComputeProvider,
   type ComputeCapabilities,
   type ComputeEvent,
-  type ComputeLogLine,
   type ComputeLogsResult,
   type LaunchMachineParams,
   type MachineSummary,
@@ -19,11 +18,10 @@ import {
 import {
   DockerHttpError,
   dockerBuild,
-  demuxDockerStream,
+  dockerContainerLogs,
   dockerConfig,
   dockerRequest,
   dockerRequestRaw,
-  parseLogLine,
 } from './docker.client.js';
 
 /** Labels every managed container carries. Scoping reads and writes to these is
@@ -848,88 +846,9 @@ export class DockerProvider implements ComputeProvider {
   ): Promise<ComputeLogsResult> {
     await this.machineScoped(appId, machineId, () => this.assertOwned(machineId));
 
-    const limit = options?.limit ?? 100;
-    const watermark = options?.nextToken ? this.parseWatermark(options.nextToken) : null;
-
-    const params = new URLSearchParams({
-      stdout: '1',
-      stderr: '1',
-      timestamps: '1',
-    });
-    if (watermark === null) {
-      // First page: no cursor to be consistent with, so ask for the newest
-      // `limit` lines instead of the whole retained history.
-      params.set('tail', String(limit));
-    } else {
-      // Floor to whole seconds — the only precision the parameter accepts.
-      params.set('since', String(watermark / 1_000_000_000n));
-      // No `tail` when resuming. `tail` keeps the *newest* N, so pairing it with
-      // `since` drops the middle of a backlog: 500 lines since the cursor with
-      // tail=100 returns the newest 100 and the cursor then advances past the
-      // other 400, which no later request can reach. Taking everything since the
-      // cursor and returning the oldest `limit` (below) makes the next page
-      // resume exactly where this one stopped, so a paging caller sees them all.
-      // The response is then only as large as what the container logged since
-      // the last poll.
-    }
-
-    const res = await dockerRequestRaw(
-      'GET',
-      `/containers/${encodeURIComponent(machineId)}/logs?${params.toString()}`,
-      { timeoutMs: 15_000 }
-    );
-    if (res.status < 200 || res.status >= 300) {
-      throw new DockerHttpError(
-        res.status,
-        `Docker logs error (${res.status}): ${res.body.toString('utf8')}`
-      );
-    }
-
-    const entries: { line: ComputeLogLine; nanos: bigint }[] = [];
-    for (const frame of demuxDockerStream(res.body)) {
-      for (const raw of frame.text.split('\n')) {
-        if (!raw.trim()) {
-          continue;
-        }
-        const parsed = parseLogLine(raw);
-        if (!parsed) {
-          continue;
-        }
-        // Inclusive `since` re-delivers everything in the boundary second.
-        if (watermark !== null && parsed.nanos <= watermark) {
-          continue;
-        }
-        entries.push({
-          line: { timestamp: parsed.ms, message: parsed.message },
-          nanos: parsed.nanos,
-        });
-      }
-    }
-
-    // Docker emits oldest-first, so trimming the tail keeps the oldest `limit`
-    // and leaves the remainder for the next page. The cursor is taken from what
-    // is actually returned — never from a line that got trimmed.
-    const page = entries.length > limit ? entries.slice(0, limit) : entries;
-    let highest = watermark;
-    for (const entry of page) {
-      if (highest === null || entry.nanos > highest) {
-        highest = entry.nanos;
-      }
-    }
-    return {
-      lines: page.map((entry) => entry.line),
-      nextToken: highest === null ? null : highest.toString(),
-    };
-  }
-
-  private parseWatermark(token: string): bigint | null {
-    try {
-      return BigInt(token);
-    } catch {
-      // A cursor we cannot read is treated as absent — better to re-deliver a
-      // window than to fail the request.
-      return null;
-    }
+    // The cursor arithmetic lives in the client, because the sites driver needs the same
+    // page semantics and rediscovering `since` versus `tail` per driver is how they drift.
+    return dockerContainerLogs(machineId, options);
   }
 
   /**

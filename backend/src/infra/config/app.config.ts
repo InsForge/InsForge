@@ -111,6 +111,12 @@ export interface AppConfig {
     maxDeploymentFiles: number;
     maxDeploymentTotalBytes: number;
     maxDeploymentFileBytes: number;
+    /** Base domain for `host` ingress on the Docker sites driver. */
+    sitesDomain: string;
+    /** Where uploaded deployment bytes stage before a build, keyed by sha. */
+    sitesStagingDir: string;
+    /** Fixed host port for the live site, or 0 to let the daemon assign one per deploy. */
+    sitesPort: number;
   };
   ai: {
     openrouterApiKey: string | undefined;
@@ -125,6 +131,34 @@ function parseEnvInt(val: string | undefined, fallback: number): number {
   const parsed = parseInt(val, 10);
   if (isNaN(parsed) || parsed <= 0 || !Number.isSafeInteger(parsed)) {
     return fallback;
+  }
+  return parsed;
+}
+
+/**
+ * A host port, or 0 when unset or unusable.
+ *
+ * `console.warn` rather than the project logger: this runs while the config object is being
+ * built, and the logger reads that config. The sibling `parseEnv*` helpers stay silent, which
+ * is why this is the only one that writes to the console — a fixed port being ignored is worth
+ * a line, since the symptom is "my site is not on the port I chose".
+ */
+function parseEnvPort(val: string | undefined): number {
+  if (!val) return 0;
+  if (val.trim() === '') {
+    // Distinct from unset: someone wrote something, and it is not a port. Silence here reads
+    // as "my fixed port is being ignored and nothing told me why".
+    console.warn('SITES_PORT is set to whitespace; ignoring it.');
+    return 0;
+  }
+  if (!/^\d+$/.test(val.trim())) {
+    console.warn(`SITES_PORT="${val}" is not a port number; ignoring it.`);
+    return 0;
+  }
+  const parsed = Number(val.trim());
+  if (parsed < 1 || parsed > 65535) {
+    console.warn(`SITES_PORT="${val}" is outside 1-65535; ignoring it.`);
+    return 0;
   }
   return parsed;
 }
@@ -151,6 +185,7 @@ function parseEnvBytes(val: string | undefined, fallback: number): number {
 
 export function loadConfig(): AppConfig {
   const logsDir = process.env.LOGS_DIR || path.join(process.cwd(), 'logs');
+  const storageDir = process.env.STORAGE_DIR || path.resolve(process.cwd(), 'insforge-storage');
 
   return {
     app: {
@@ -277,7 +312,7 @@ export function loadConfig(): AppConfig {
       appKey: process.env.APP_KEY || 'local',
       parentAppKey: process.env.PARENT_APP_KEY?.trim() || undefined,
       s3Region: process.env.S3_REGION || process.env.AWS_REGION || 'us-east-2',
-      storageDir: process.env.STORAGE_DIR || path.resolve(process.cwd(), 'insforge-storage'),
+      storageDir,
       s3AccessKeyId: process.env.S3_ACCESS_KEY_ID || undefined,
       s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY || undefined,
       awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID || undefined,
@@ -309,6 +344,25 @@ export function loadConfig(): AppConfig {
         100 * 1024 * 1024
       ),
       maxDeploymentFileBytes: parseEnvInt(process.env.MAX_DEPLOYMENT_FILE_BYTES, 100 * 1024 * 1024),
+      // Falls back to COMPUTE_DOMAIN so an operator who already routes compute
+      // hostnames configures nothing new; sites and services can still be split by
+      // setting SITES_DOMAIN on its own.
+      sitesDomain: process.env.SITES_DOMAIN || process.env.COMPUTE_DOMAIN || '',
+      // Uploaded bytes land here, named by their sha, until a build consumes them.
+      //
+      // Under the storage directory, which is a mounted volume in every shipped compose
+      // file: staging next to the source tree meant a dev instance wrote customer uploads
+      // into the working tree, and staging in /tmp meant an upload could not survive the
+      // gap between itself and the build that consumes it.
+      sitesStagingDir: process.env.SITES_STAGING_DIR || path.join(storageDir, 'sites-staging'),
+      // 0 means "let the daemon pick", which is Docker's own behaviour and keeps deploys
+      // gapless because the new container can bind while the old one still serves. The
+      // cost is that the address changes every deploy, so an operator who publishes the
+      // port directly — rather than putting a gateway in front — sets this instead.
+      // 0 means "let Docker pick". Range-checked here rather than at the daemon: parseInt
+      // accepts `80abc` and 70000, and both only fail later as an upstream error from
+      // `create` that says nothing about which variable is wrong.
+      sitesPort: parseEnvPort(process.env.SITES_PORT),
     },
     ai: {
       openrouterApiKey: process.env.OPENROUTER_API_KEY || undefined,

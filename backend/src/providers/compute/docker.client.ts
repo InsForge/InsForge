@@ -24,6 +24,8 @@ export class DockerHttpError extends Error {
 }
 
 export interface DockerRawResponse {
+  /** True when the read stopped at `maxBytes` and the rest of the response was discarded. */
+  truncated?: boolean;
   status: number;
   body: Buffer;
 }
@@ -89,6 +91,17 @@ export function dockerRequestRaw(
     rawBody?: Buffer;
     contentType?: string;
     timeoutMs?: number;
+    /**
+     * Stop reading as soon as this says the caller has enough, and resolve with what arrived.
+     *
+     * A byte cap cannot be the pagination boundary. `since` floors to whole seconds, so a
+     * resumed page re-reads that second's already-delivered lines first; if that replay alone
+     * exceeded the cap, every call read the same bytes, stopped at the same place, filtered the
+     * same lines and returned an empty page with an unchanged cursor — everything after that
+     * point unreachable. Letting the caller decide bounds the read by what it actually needs
+     * (`limit` new lines) instead, which cannot stall and cannot skip.
+     */
+    stopWhen?: (accumulated: Buffer) => boolean;
   } = {}
 ): Promise<DockerRawResponse> {
   const payload =
@@ -110,9 +123,39 @@ export function dockerRequestRaw(
       },
       (res) => {
         const chunks: Buffer[] = [];
-        res.on('data', (c: Buffer) => chunks.push(c));
-        res.on('end', () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks) }));
-        res.on('error', reject);
+        let size = 0;
+        let checkedAt = 0;
+        let truncated = false;
+        res.on('data', (c: Buffer) => {
+          if (truncated) {
+            return;
+          }
+          chunks.push(c);
+          size += c.length;
+          // Throttled: the predicate parses what has arrived, and running it per chunk would
+          // make the read quadratic in the number of chunks.
+          if (options.stopWhen && size - checkedAt >= STOP_CHECK_INTERVAL_BYTES) {
+            checkedAt = size;
+            const accumulated = Buffer.concat(chunks);
+            if (options.stopWhen(accumulated)) {
+              truncated = true;
+              // `destroy` rather than `pause`: the caller has all it can use, and leaving the
+              // socket open on a live-tailing endpoint keeps the daemon streaming into nothing.
+              res.destroy();
+              resolve({ status: res.statusCode ?? 0, body: accumulated, truncated: true });
+            }
+          }
+        });
+        res.on('end', () => {
+          if (!truncated) {
+            resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks) });
+          }
+        });
+        res.on('error', (error) => {
+          if (!truncated) {
+            reject(error);
+          }
+        });
       }
     );
 
@@ -137,6 +180,15 @@ export async function dockerRequest<T>(
 ): Promise<T | undefined> {
   const res = await dockerRequestRaw(method, path, options);
   const text = res.body.toString('utf8');
+
+  // 304 is the Docker API saying "already in that state" — start on a running container,
+  // stop on a stopped one. Verified against Engine 29: both return 304 with a message body.
+  // Treating it as an error made two idempotent operations fail: rolling back to the
+  // deployment that was already live threw, and the recovery path then stopped it and had
+  // nothing to restart, so the site went down. A no-op is exactly what the caller wanted.
+  if (res.status === 304) {
+    return undefined;
+  }
 
   if (res.status < 200 || res.status >= 300) {
     // Docker error bodies are `{"message":"..."}`; fall back to the raw text.
@@ -386,4 +438,159 @@ export function parseLogLine(text: string): { ms: number; nanos: bigint; message
   }
 
   return { ms, nanos, message };
+}
+
+/** One line of container output, with the timestamp Docker stamped on it. */
+export interface DockerLogLine {
+  timestamp: number;
+  message: string;
+}
+
+/** A page of container output. `nextToken` is an opaque forward cursor; null when dry. */
+export interface DockerLogsPage {
+  lines: DockerLogLine[];
+  nextToken: string | null;
+}
+
+/** An opaque cursor is a nanosecond watermark; an unparseable one starts from the top. */
+/** How often `stopWhen` runs, in bytes read. Small enough to stop promptly, large enough that
+ * parsing the accumulated buffer stays cheap. */
+const STOP_CHECK_INTERVAL_BYTES = 256 * 1024;
+
+/**
+ * How many lines newer than `watermark` are in a partial response.
+ *
+ * Only complete frames count: a frame cut by the end of the buffer is this read's boundary, not
+ * a line, and counting it would let the read stop one line short.
+ */
+function countNewLines(accumulated: Buffer, watermark: bigint | null): number {
+  let count = 0;
+  for (const frame of demuxDockerStream(accumulated)) {
+    for (const raw of frame.text.split('\n')) {
+      const parsed = raw.trim() ? parseLogLine(raw) : null;
+      if (parsed && (watermark === null || parsed.nanos > watermark)) {
+        count += 1;
+      }
+    }
+  }
+  return count;
+}
+
+export function parseLogWatermark(token: string): bigint | null {
+  try {
+    const parsed = BigInt(token);
+    // A negative cursor would become a negative `since`, which the daemon reads as "from
+    // the beginning" — so `next_token=-1` returns the entire retained history instead of a
+    // bounded page. Treated as no cursor at all.
+    return parsed < 0n ? null : parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A page of a container's output, oldest first, resumable through `nextToken`.
+ *
+ * Shared by the compute and sites drivers, and one function rather than two because of the
+ * cursor arithmetic: `since` is inclusive and takes whole seconds only, and pairing it with
+ * `tail` silently drops the middle of a backlog — `tail` keeps the *newest* N, so 500 lines
+ * since the cursor with tail=100 returns the newest 100 and then advances the cursor past
+ * the other 400, which no later request can reach. Taking everything since the cursor and
+ * returning the oldest `limit` makes the next page resume exactly where this one stopped.
+ */
+export async function dockerContainerLogs(
+  containerId: string,
+  options?: { limit?: number; nextToken?: string },
+  /**
+   * The transport, explicit so it can be replaced in a test.
+   *
+   * A module cannot mock its own internal calls — `vi.mock` of this file leaves
+   * `dockerRequestRaw` bound to the real one inside this function, which had two suites
+   * dialling a socket that does not exist. A parameter is the honest fix.
+   */
+  request: typeof dockerRequestRaw = dockerRequestRaw
+): Promise<DockerLogsPage> {
+  // Floored because `tail` is an integer on the wire: the compute route clamps a query
+  // value with Math.min/max, which leaves `5.7` intact, and Docker rejects the request.
+  const limit = Math.floor(options?.limit ?? 100);
+  const watermark = options?.nextToken ? parseLogWatermark(options.nextToken) : null;
+
+  const params = new URLSearchParams({ stdout: '1', stderr: '1', timestamps: '1' });
+  if (watermark === null) {
+    // First page: no cursor to be consistent with, so ask for the newest `limit` lines
+    // rather than the whole retained history.
+    params.set('tail', String(limit));
+  } else {
+    // Floored to whole seconds, the only precision the parameter accepts.
+    params.set('since', String(watermark / 1_000_000_000n));
+  }
+
+  const res = await request(
+    'GET',
+    `/containers/${encodeURIComponent(containerId)}/logs?${params.toString()}`,
+    // Bounded by need, not by bytes: resuming sends `since` with no ceiling, so the daemon
+    // replays that second and then everything after it. Stop once `limit` lines newer than the
+    // cursor have arrived — the rest is the next page's business.
+    {
+      timeoutMs: 15_000,
+      stopWhen: (accumulated) => countNewLines(accumulated, watermark) > limit,
+    }
+  );
+  if (res.status < 200 || res.status >= 300) {
+    throw new DockerHttpError(
+      res.status,
+      `Docker logs error (${res.status}): ${res.body.toString('utf8')}`
+    );
+  }
+
+  const entries: { line: DockerLogLine; nanos: bigint }[] = [];
+  // The newest timestamp anywhere in this read, including lines filtered out as already
+  // delivered. Only used when the read was truncated — see the cursor decision below.
+  let seenHighest: bigint | null = null;
+  for (const frame of demuxDockerStream(res.body)) {
+    for (const raw of frame.text.split('\n')) {
+      if (!raw.trim()) {
+        continue;
+      }
+      const parsed = parseLogLine(raw);
+      if (!parsed) {
+        continue;
+      }
+      if (seenHighest === null || parsed.nanos > seenHighest) {
+        seenHighest = parsed.nanos;
+      }
+      // Inclusive `since` re-delivers everything in the boundary second.
+      if (watermark !== null && parsed.nanos <= watermark) {
+        continue;
+      }
+      entries.push({
+        line: { timestamp: parsed.ms, message: parsed.message },
+        nanos: parsed.nanos,
+      });
+    }
+  }
+
+  // Docker emits oldest-first, so trimming the tail keeps the oldest `limit` and leaves the
+  // remainder for the next page. The cursor comes from what is actually returned, never from
+  // a line that got trimmed.
+  const page = entries.length > limit ? entries.slice(0, limit) : entries;
+  let highest = watermark;
+  for (const entry of page) {
+    if (highest === null || entry.nanos > highest) {
+      highest = entry.nanos;
+    }
+  }
+  // A truncated read that yielded no new lines would otherwise return the same cursor forever:
+  // `since` floors to the watermark's second, so the next call re-reads the same prefix, stops
+  // at the same byte, and filters the same already-delivered lines. Everything after that
+  // point becomes unreachable. Advancing over what this read *saw* — all of it already
+  // delivered — guarantees the next call starts past the prefix. Lines beyond the cut carry
+  // higher timestamps, so nothing is skipped.
+  if (page.length === 0 && res.truncated && seenHighest !== null) {
+    highest = highest === null || seenHighest > highest ? seenHighest : highest;
+  }
+  return {
+    lines: page.map((entry) => entry.line),
+    nextToken: highest === null ? null : highest.toString(),
+  };
 }
