@@ -1,7 +1,7 @@
 ---
 title: "診斷和顧問"
 sidebarTitle: "Diagnostics & advisor"
-description: "執行 npx @insforge/cli diagnose 讓 AI 代理讀取 InsForge 後端健康報告：顧問安全掃描、資料庫健康、實例指標與聚合錯誤日誌，每項發現附補救 SQL，代理可自行套用修復、重新掃描確認，並用 --ai 取得純文字分析解讀。維持專案穩定運作。"
+description: "執行 @insforge/cli diagnose 取得 InsForge 健康報告：顧問安全掃描、資料庫健康、實例指標與錯誤日誌，每項發現附補救 SQL。"
 ---
 
 當出現問題時，代理不應該猜測。`npx @insforge/cli diagnose` 將後端自身的信號轉變為代理可以直接取得和處理的東西：顧問發現有補救方案、資料庫健康檢查、實例指標和聚合錯誤日誌。每個發現都帶有修復，所以"什麼是錯"和"做什麼"一起到達。代理自己拉取所有這個，沒有儀表板在迴圈中，這就是讓它關閉安全漏洞的原因，比如一個寬鬆的 RLS 原則，然後他們洩露資料。
