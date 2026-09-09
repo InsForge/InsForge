@@ -1,18 +1,21 @@
 import { useTranslation } from 'react-i18next';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn } from '@insforge/ui';
 import type { PaymentProvider } from '@insforge/shared-schemas';
+import PaystackIcon from '#assets/logos/paystack-icon.svg';
 import RazorpayIcon from '#assets/logos/razorpay-icon.png';
 import StripeIcon from '#assets/logos/stripe-icon.svg';
 
 export const PAYMENT_PROVIDER_LABELS: Record<PaymentProvider, string> = {
   stripe: 'Stripe',
   razorpay: 'Razorpay',
+  paystack: 'Paystack',
 };
 
-const PAYMENT_PROVIDERS: PaymentProvider[] = ['stripe', 'razorpay'];
+const PAYMENT_PROVIDERS: PaymentProvider[] = ['stripe', 'razorpay', 'paystack'];
 const PAYMENT_PROVIDER_ICONS: Record<PaymentProvider, string> = {
   stripe: StripeIcon,
   razorpay: RazorpayIcon,
+  paystack: PaystackIcon,
 };
 
 interface PaymentProviderSelectProps {

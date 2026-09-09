@@ -327,6 +327,97 @@ export class PaymentCustomerService {
     return true;
   }
 
+  /**
+   * Project a Paystack customer (embedded on a transaction resource) into the
+   * shared payments.customers mirror so the Paystack Customers tab and
+   * /payments/paystack/:environment/customers are populated. Paystack has no
+   * standalone customer-list endpoint on this path, so the mirror is built
+   * from transaction payloads as charges land (idempotent upsert keyed on the
+   * Paystack customer_code).
+   */
+  async upsertPaystackCustomerProjection(
+    client: Pool | PoolClient,
+    environment: 'test' | 'live',
+    customer: {
+      id: number;
+      customer_code: string;
+      email: string | null;
+      first_name: string | null;
+      last_name: string | null;
+    } | null,
+    providerCreatedAt: Date | null,
+    options: {
+      phone?: string | null;
+      metadata?: Record<string, unknown> | string | null;
+    } = {}
+  ): Promise<boolean> {
+    if (!customer || !customer.customer_code) {
+      return false;
+    }
+
+    const name =
+      [customer.first_name, customer.last_name]
+        .filter((part): part is string => typeof part === 'string' && part.length > 0)
+        .join(' ')
+        .trim() || null;
+
+    const { phone = null, metadata = null } = options;
+    const metadataJson =
+      metadata === null || metadata === ''
+        ? '{}'
+        : typeof metadata === 'string'
+          ? metadata
+          : JSON.stringify(metadata);
+
+    await client.query(
+      `INSERT INTO payments.customers (
+         provider,
+         environment,
+         provider_customer_id,
+         email,
+         name,
+         phone,
+         deleted,
+         metadata,
+         raw,
+         provider_created_at,
+         synced_at
+       )
+       VALUES ('paystack', $1, $2, $3, $4, $5, false, $6::JSONB, $7, $8, NOW())
+       ON CONFLICT (provider, environment, provider_customer_id) DO UPDATE SET
+         email = EXCLUDED.email,
+         name = EXCLUDED.name,
+phone = COALESCE(EXCLUDED.phone, payments.customers.phone),
+          deleted = false,
+          -- Never wipe existing metadata: Paystack transactions frequently carry
+          -- no metadata, so an empty projection must leave the stored value
+          -- untouched. Only overwrite when the new payload actually has data.
+          metadata = CASE
+            WHEN EXCLUDED.metadata = '{}'::JSONB THEN payments.customers.metadata
+            ELSE EXCLUDED.metadata
+          END,
+         raw = EXCLUDED.raw,
+         provider_created_at = COALESCE(
+           payments.customers.provider_created_at,
+           EXCLUDED.provider_created_at
+         ),
+         synced_at = NOW(),
+         updated_at = NOW()`,
+      [
+        environment,
+        customer.customer_code,
+        customer.email,
+        name,
+        phone,
+        metadataJson,
+        customer,
+        providerCreatedAt,
+      ]
+    );
+
+    return true;
+  }
+
   private async bulkUpsertCustomerRecords(
     client: PoolClient,
     environment: StripeEnvironment,

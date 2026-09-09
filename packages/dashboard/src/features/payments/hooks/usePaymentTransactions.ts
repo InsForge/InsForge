@@ -3,17 +3,24 @@ import { useQuery } from '@tanstack/react-query';
 import type {
   PaymentEnvironment,
   PaymentProvider,
+  PaystackConnection,
   RazorpayConnection,
 } from '@insforge/shared-schemas';
 import { stripeService } from '#features/payments/services/stripe.service';
 import { razorpayService } from '#features/payments/services/razorpay.service';
-import { razorpayQueryKeys, stripeQueryKeys } from '#features/payments/queryKeys';
+import { paystackService } from '#features/payments/services/paystack.service';
+import {
+  paystackQueryKeys,
+  razorpayQueryKeys,
+  stripeQueryKeys,
+} from '#features/payments/queryKeys';
 
 const TRANSACTIONS_LIMIT = 100;
 
 export function usePaymentTransactions(provider: PaymentProvider, environment: PaymentEnvironment) {
   const isStripeProvider = provider === 'stripe';
   const isRazorpayProvider = provider === 'razorpay';
+  const isPaystackProvider = provider === 'paystack';
 
   const {
     data: statusData,
@@ -41,6 +48,19 @@ export function usePaymentTransactions(provider: PaymentProvider, environment: P
     staleTime: 30 * 1000,
   });
 
+  const {
+    data: paystackStatusData,
+    isLoading: isLoadingPaystackStatus,
+    error: paystackStatusError,
+    refetch: refetchPaystackStatus,
+    isFetching: isFetchingPaystackStatus,
+  } = useQuery({
+    queryKey: paystackQueryKeys.status,
+    queryFn: () => paystackService.getStatus(),
+    enabled: isPaystackProvider,
+    staleTime: 30 * 1000,
+  });
+
   const connections = useMemo(
     () => (isStripeProvider ? (statusData?.connections ?? []) : []),
     [isStripeProvider, statusData]
@@ -48,6 +68,10 @@ export function usePaymentTransactions(provider: PaymentProvider, environment: P
   const razorpayConnections = useMemo(
     () => (isRazorpayProvider ? (razorpayStatusData?.razorpayConnections ?? []) : []),
     [isRazorpayProvider, razorpayStatusData]
+  );
+  const paystackConnections = useMemo(
+    () => (isPaystackProvider ? (paystackStatusData?.paystackConnections ?? []) : []),
+    [isPaystackProvider, paystackStatusData]
   );
 
   const activeConnection = useMemo(
@@ -60,9 +84,19 @@ export function usePaymentTransactions(provider: PaymentProvider, environment: P
     [environment, razorpayConnections]
   );
 
+  const activePaystackConnection = useMemo<PaystackConnection | null>(
+    () => paystackConnections.find((connection) => connection.environment === environment) ?? null,
+    [environment, paystackConnections]
+  );
+
   const hasStripeKey = !!activeConnection?.maskedKey;
   const hasRazorpayKey = !!activeRazorpayConnection?.maskedKey;
-  const hasActiveKey = isStripeProvider ? hasStripeKey : hasRazorpayKey;
+  const hasPaystackKey = !!activePaystackConnection?.maskedKey;
+  const hasActiveKey = isStripeProvider
+    ? hasStripeKey
+    : isRazorpayProvider
+      ? hasRazorpayKey
+      : hasPaystackKey;
 
   const {
     data: stripeTransactionsData,
@@ -98,34 +132,63 @@ export function usePaymentTransactions(provider: PaymentProvider, environment: P
     staleTime: 30 * 1000,
   });
 
+  const {
+    data: paystackTransactionsData,
+    isLoading: isLoadingPaystackTransactions,
+    error: paystackTransactionsError,
+    refetch: refetchPaystackTransactions,
+    isFetching: isFetchingPaystackTransactions,
+  } = useQuery({
+    queryKey: paystackQueryKeys.transactionsByEnvironment(environment),
+    queryFn: () =>
+      paystackService.listTransactions({
+        environment,
+        limit: TRANSACTIONS_LIMIT,
+      }),
+    enabled: isPaystackProvider && hasPaystackKey,
+    staleTime: 30 * 1000,
+  });
+
   return {
     connections,
     razorpayConnections,
+    paystackConnections,
     activeConnection,
     activeRazorpayConnection,
+    activePaystackConnection,
     hasActiveKey,
     transactions: hasActiveKey
       ? isStripeProvider
         ? (stripeTransactionsData?.transactions ?? [])
-        : (razorpayTransactionsData?.transactions ?? [])
+        : isRazorpayProvider
+          ? (razorpayTransactionsData?.transactions ?? [])
+          : (paystackTransactionsData?.transactions ?? [])
       : [],
     isLoading:
       (isStripeProvider && (isLoadingStatus || (hasStripeKey && isLoadingStripeTransactions))) ||
       (isRazorpayProvider &&
-        (isLoadingRazorpayStatus || (hasRazorpayKey && isLoadingRazorpayTransactions))),
+        (isLoadingRazorpayStatus || (hasRazorpayKey && isLoadingRazorpayTransactions))) ||
+      (isPaystackProvider &&
+        (isLoadingPaystackStatus || (hasPaystackKey && isLoadingPaystackTransactions))),
     isRefreshing:
       (isStripeProvider && (isFetchingStatus || (hasStripeKey && isFetchingStripeTransactions))) ||
       (isRazorpayProvider &&
-        (isFetchingRazorpayStatus || (hasRazorpayKey && isFetchingRazorpayTransactions))),
+        (isFetchingRazorpayStatus || (hasRazorpayKey && isFetchingRazorpayTransactions))) ||
+      (isPaystackProvider &&
+        (isFetchingPaystackStatus || (hasPaystackKey && isFetchingPaystackTransactions))),
     error: isStripeProvider
       ? (statusError ?? stripeTransactionsError)
-      : (razorpayStatusError ?? razorpayTransactionsError),
+      : isRazorpayProvider
+        ? (razorpayStatusError ?? razorpayTransactionsError)
+        : (paystackStatusError ?? paystackTransactionsError),
     refetch: () =>
       Promise.all([
         isStripeProvider ? refetchStatus() : null,
         isRazorpayProvider ? refetchRazorpayStatus() : null,
+        isPaystackProvider ? refetchPaystackStatus() : null,
         isStripeProvider && hasStripeKey ? refetchStripeTransactions() : null,
         isRazorpayProvider && hasRazorpayKey ? refetchRazorpayTransactions() : null,
+        isPaystackProvider && hasPaystackKey ? refetchPaystackTransactions() : null,
       ]),
   };
 }
