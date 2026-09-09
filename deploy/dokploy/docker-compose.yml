@@ -187,7 +187,7 @@ services:
     command: >
       sh -c "
         deno cache --no-lock functions/server.ts &&
-        deno run --no-lock --unstable-worker-options --allow-net --allow-env --allow-read=./functions/worker-template.js functions/server.ts
+        deno run --no-lock --unstable-worker-options --allow-net --allow-env --allow-read=./functions/worker-template.js,./functions/handler-format.js functions/server.ts
       "
     restart: unless-stopped
     depends_on:
