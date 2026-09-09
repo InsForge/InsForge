@@ -673,6 +673,22 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql" \
 }
 ```
 
+### Example: change a value in a table
+
+`INSERT`, `UPDATE`, and `DELETE` run here too — this is one way to change a value directly in a table from the REST API when the [Update Records](#update-records) endpoint isn't enough. System tables and `auth.users` stay blocked, so this works on your own tables in `public`. For schema changes, prefer a [migration](#create-database-migration) instead.
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "UPDATE posts SET published = $1 WHERE id = $2",
+    "params": [false, "248373e1-0aea-45ce-8844-5ef259203749"]
+  }'
+```
+
+The response `command` field reflects the statement type (for example `UPDATE`) and `rowCount` is the number of rows changed.
+
 ---
 
 ## Execute Raw SQL (Relaxed Mode)
