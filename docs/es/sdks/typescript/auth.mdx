@@ -148,6 +148,75 @@ if (data) {
 
 ---
 
+## signInWithOtp()
+
+Envía un código de inicio de sesión de seis dígitos sin contraseña a una dirección de correo electrónico. Completa el flujo con `verifyOtp()`. La respuesta es intencionalmente genérica exista o no la cuenta, para evitar la enumeración de cuentas.
+
+### Parámetros
+
+- `email` (string, required) - Dirección de correo electrónico que recibe el código de inicio de sesión
+
+### Devoluciones
+
+```typescript
+{
+  data: { success: boolean, message: string } | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.auth.signInWithOtp({
+  email: 'user@example.com',
+});
+```
+
+---
+
+## verifyOtp()
+
+Verifica un código de inicio de sesión enviado por correo y crea una sesión. Si el correo es nuevo, se crea un usuario verificado sin contraseña; `name` establece el nombre de perfil solo en esa primera creación.
+
+<Note>
+Los códigos caducan a los 5 minutos, se usan una sola vez y se consumen tras tres intentos fallidos. Si los registros públicos están deshabilitados, un código válido para un correo desconocido se consume y devuelve un error. No existe OTP por teléfono/SMS; los códigos de inicio de sesión se entregan únicamente por correo electrónico.
+</Note>
+
+### Parámetros
+
+- `email` (string, required) - Dirección de correo electrónico que recibió el código
+- `otp` (string, required) - Código de inicio de sesión de seis dígitos
+- `name` (string, optional) - Nombre de perfil, usado solo si la verificación crea un usuario nuevo
+
+### Devoluciones
+
+```typescript
+{
+  data: {
+    user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
+    accessToken: string,
+    csrfToken?: string | null
+  } | null,
+  error: Error | null
+}
+```
+
+### Ejemplo
+
+```javascript
+const { data, error } = await insforge.auth.verifyOtp({
+  email: 'user@example.com',
+  otp: '123456',
+});
+
+if (data) {
+  console.log('Signed in as:', data.user.email);
+}
+```
+
+---
+
 ## signInWithOAuth()
 
 Inicia el flujo de autenticación OAuth con proveedores configurados (proveedores integrados como Google/GitHub, más cualquier clave de proveedor personalizado configurado desde el panel).
