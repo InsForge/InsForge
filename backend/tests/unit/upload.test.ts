@@ -21,7 +21,11 @@ vi.mock('@/infra/config/app.config.js', () => {
 
 import { Readable } from 'node:stream';
 
-import { getMaxFileSize, upload } from '../../src/api/middlewares/upload';
+import {
+  getMaxFileSize,
+  upload,
+  dynamicUploadSingle,
+} from '../../src/api/middlewares/upload';
 
 const DEFAULT_50MB = 50 * 1024 * 1024;
 
@@ -101,6 +105,54 @@ describe('multer fieldArrayIndexLimit (GHSA-535w-7cp7-47q4)', () => {
 
   // Negative control: without this, a guard that rejected everything would pass.
   it('accepts a field name with an index inside the limit', async () => {
+    const err = await run('a[5]');
+    expect(err).toBeUndefined();
+  });
+});
+
+/**
+ * The static `upload` instance above is not what the storage routes use --
+ * they go through `dynamicUploadSingle`, which builds its own multer instance
+ * per request. A limit set on only one of the two would leave the user-facing
+ * path exposed while the suite stayed green, so the production path gets its
+ * own test rather than inheriting confidence from the static one.
+ */
+describe('dynamicUploadSingle honours fieldArrayIndexLimit', () => {
+  const BOUNDARY = '----insforgeDynamicUploadBoundary';
+
+  const multipartReq = (fieldName: string) => {
+    const body = Buffer.from(
+      `--${BOUNDARY}\r\n` +
+        `Content-Disposition: form-data; name="${fieldName}"\r\n\r\n` +
+        `x\r\n` +
+        `--${BOUNDARY}--\r\n`,
+      'utf8'
+    );
+    const req = Readable.from([body]) as Readable & { headers: Record<string, string> };
+    req.headers = {
+      'content-type': `multipart/form-data; boundary=${BOUNDARY}`,
+      'content-length': String(body.length),
+    };
+    return req;
+  };
+
+  // The storage config lookup is unavailable here; the middleware is expected
+  // to fall back to the env limit, which is the path this test exercises.
+  const run = (fieldName: string): Promise<unknown> =>
+    new Promise((resolve) => {
+      /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+      void dynamicUploadSingle('file')(multipartReq(fieldName) as any, {} as any, (err: unknown) =>
+        resolve(err)
+      );
+    });
+
+  it('rejects an oversized array index on the dynamic uploader too', async () => {
+    const err = (await run('a[999999999]')) as { code?: string } | undefined;
+    expect(err).toBeDefined();
+    expect(err?.code).toBe('LIMIT_FIELD_ARRAY_INDEX');
+  });
+
+  it('accepts an in-range index on the dynamic uploader', async () => {
     const err = await run('a[5]');
     expect(err).toBeUndefined();
   });
