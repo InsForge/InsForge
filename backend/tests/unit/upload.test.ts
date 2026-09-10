@@ -108,6 +108,18 @@ describe('multer fieldArrayIndexLimit (GHSA-535w-7cp7-47q4)', () => {
     const err = await run('a[5]');
     expect(err).toBeUndefined();
   });
+
+  // Pin the CONFIGURED boundary, not just "small passes, huge fails" -- these
+  // two fail if MAX_FIELD_ARRAY_INDEX is ever changed without intent.
+  it('accepts exactly the configured limit (index 100)', async () => {
+    const err = await run('a[100]');
+    expect(err).toBeUndefined();
+  });
+
+  it('rejects one past the configured limit (index 101)', async () => {
+    const err = (await run('a[101]')) as { code?: string } | undefined;
+    expect(err?.code).toBe('LIMIT_FIELD_ARRAY_INDEX');
+  });
 });
 
 /**
@@ -155,5 +167,15 @@ describe('dynamicUploadSingle honours fieldArrayIndexLimit', () => {
   it('accepts an in-range index on the dynamic uploader', async () => {
     const err = await run('a[5]');
     expect(err).toBeUndefined();
+  });
+
+  it('accepts exactly the configured limit on the dynamic uploader', async () => {
+    const err = await run('a[100]');
+    expect(err).toBeUndefined();
+  });
+
+  it('rejects one past the configured limit on the dynamic uploader', async () => {
+    const err = (await run('a[101]')) as { code?: string } | undefined;
+    expect(err?.code).toBe('LIMIT_FIELD_ARRAY_INDEX');
   });
 });
