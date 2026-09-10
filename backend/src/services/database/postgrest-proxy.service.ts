@@ -1,4 +1,6 @@
 import axios, { AxiosResponse } from 'axios';
+import { Agent as NodeHttpAgent } from 'node:http';
+import { Agent as NodeHttpsAgent } from 'node:https';
 import { HttpAgent, HttpsAgent } from 'agentkeepalive';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
@@ -41,6 +43,21 @@ const httpsAgent = new HttpsAgent({
   timeout: 10000,
   freeSocketTimeout,
 });
+
+// Agents used only for the one stale-socket replay (see the forward loop).
+// The replay is issued in the same event-loop turn as the reset that
+// triggered it, so the pool has not yet processed the `close` events for the
+// sibling sockets that went idle alongside the dead one — drawing from it
+// would hand the replay another socket from the same stale batch. These
+// agents never pool, so the replay always gets a fresh TCP connection.
+//
+// Replay connections are counted separately from the pooled agents, and a
+// batch of sockets going stale under concurrent load yields one replay per
+// in-flight request — so they carry the same maxSockets cap to keep that
+// burst bounded (worst case, briefly, twice the pool toward PostgREST).
+// Each replay exists only on the failure path and closes with its response.
+const replayHttpAgent = new NodeHttpAgent({ keepAlive: false, maxSockets, timeout: 10000 });
+const replayHttpsAgent = new NodeHttpsAgent({ keepAlive: false, maxSockets, timeout: 10000 });
 
 const postgrestAxios = axios.create({
   httpAgent,
@@ -293,10 +310,19 @@ export class PostgrestProxyService {
     // replay regardless of method; a second reset falls through to the
     // method-based policy so writes cannot ping-pong on repeated resets.
     let staleSocketRetryUsed = false;
+    // The one attempt that bypasses the keep-alive pool: the replay directly
+    // after a stale-socket reset (see replayHttpAgent). Later backoff
+    // attempts have had time to see the stale sockets close, so they go back
+    // to the pool.
+    let freshConnectionAttempt = 0;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        response = await postgrestAxios(axiosConfig);
+        response = await postgrestAxios(
+          attempt === freshConnectionAttempt
+            ? { ...axiosConfig, httpAgent: replayHttpAgent, httpsAgent: replayHttpsAgent }
+            : axiosConfig
+        );
         break;
       } catch (error) {
         lastError = error;
@@ -308,6 +334,7 @@ export class PostgrestProxyService {
           !staleSocketRetryUsed && PostgrestProxyService.isStaleSocketReset(error);
         if (staleSocketRetry) {
           staleSocketRetryUsed = true;
+          freshConnectionAttempt = attempt + 1;
         } else if (!PostgrestProxyService.isRetryableError(error, request.method)) {
           throw error;
         }
