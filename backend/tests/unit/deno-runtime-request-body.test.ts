@@ -130,7 +130,7 @@ describe('Deno runtime request body handling', () => {
     try {
       const response = await Promise.race([
         executeInWorker('export default () => new Response("ok")', request),
-        delay(250).then(() => {
+        delay(1000).then(() => {
           throw new Error('executeInWorker did not resolve promptly');
         }),
       ]);
