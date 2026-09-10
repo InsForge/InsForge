@@ -44,7 +44,7 @@
     "@aws-sdk/s3-request-presigner": "^3.879.0",
     "@databases/split-sql-query": "^1.0.4",
     "@databases/sql": "^3.3.0",
-    "@types/multer": "^1.4.13",
+    "@types/multer": "^2.2.0",
     "@types/pg": "^8.15.4",
     "adm-zip": "^0.6.0",
     "agentkeepalive": "^4.6.0",
