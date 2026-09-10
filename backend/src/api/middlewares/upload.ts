@@ -10,6 +10,16 @@ import { appConfig } from '@/infra/config/app.config.js';
 // Constants
 const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
+// Largest numeric array index accepted inside a multipart field name, e.g. the
+// 3 in `a[3]`. multer defaults this to Infinity, and the check in
+// make-middleware.js only runs when the key is explicitly present, so the
+// 2.3.0 upgrade alone does NOT close GHSA-535w-7cp7-47q4 -- the advisory
+// requires the version AND this limit. Without it a crafted field name like
+// `a[999999999]` makes body parsing allocate and spin, which is synchronous
+// CPU exhaustion. Nothing here uses array-indexed field names (uploads are
+// .single()), so this is far above real usage and purely a ceiling.
+const MAX_FIELD_ARRAY_INDEX = 100;
+
 /**
  * Returns the configured max file size in bytes.
  * Uses the MAX_FILE_SIZE environment variable if set, otherwise defaults to 50 MB.
@@ -22,6 +32,7 @@ export const upload = multer({
   limits: {
     fileSize: getMaxFileSize(),
     files: appConfig.server.maxFilesPerField,
+    fieldArrayIndexLimit: MAX_FIELD_ARRAY_INDEX,
   },
 });
 
@@ -50,6 +61,7 @@ export const dynamicUploadSingle =
       limits: {
         fileSize: maxSize,
         files: appConfig.server.maxFilesPerField,
+        fieldArrayIndexLimit: MAX_FIELD_ARRAY_INDEX,
       },
     }).single(fieldName);
     uploader(req, res, next);
