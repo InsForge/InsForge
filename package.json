@@ -83,7 +83,7 @@
     "shell-quote": "1.10.0",
     "form-data": "4.0.6",
     "@opentelemetry/core": "2.9.0",
-    "js-yaml": "5.2.3",
+    "js-yaml": "^4.3.2",
     "@babel/core": "7.29.7",
     "tsup": {
       ".": "^8.5.1",

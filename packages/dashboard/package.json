@@ -96,7 +96,7 @@
     "typescript": "^5.8.3",
     "vite": "^8.1.5",
     "vite-plugin-svgr": "^4.3.0",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.11"
   },
   "peerDependencies": {
     "react": "^19.0.0",
