@@ -21,11 +21,7 @@ vi.mock('@/infra/config/app.config.js', () => {
 
 import { Readable } from 'node:stream';
 
-import {
-  getMaxFileSize,
-  upload,
-  dynamicUploadSingle,
-} from '../../src/api/middlewares/upload';
+import { getMaxFileSize, upload, dynamicUploadSingle } from '../../src/api/middlewares/upload';
 
 const DEFAULT_50MB = 50 * 1024 * 1024;
 
