@@ -13,7 +13,8 @@ const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 // Largest numeric array index accepted inside a multipart field name, e.g. the
 // 3 in `a[3]`. multer defaults this to Infinity, and the check in
 // make-middleware.js only runs when the key is explicitly present, so the
-// 2.3.0 upgrade alone does NOT close GHSA-535w-7cp7-47q4 -- the advisory
+// 2.3.0 upgrade alone does NOT close GHSA-535w-7cp7-47q4 (CVE-2026-82333,
+// oversized array index) -- that advisory
 // requires the version AND this limit. Without it a crafted field name like
 // `a[999999999]` makes body parsing allocate and spin, which is synchronous
 // CPU exhaustion. Nothing here uses array-indexed field names (uploads are

@@ -21,6 +21,8 @@ vi.mock('@/infra/config/app.config.js', () => {
 
 import { Readable } from 'node:stream';
 
+import type { Request, Response, NextFunction } from 'express';
+
 import { getMaxFileSize, upload, dynamicUploadSingle } from '../../src/api/middlewares/upload';
 
 const DEFAULT_50MB = 50 * 1024 * 1024;
@@ -58,7 +60,17 @@ describe('getMaxFileSize', () => {
 });
 
 /**
- * Regression test for GHSA-535w-7cp7-47q4 (CVE-2026-77037).
+ * Regression test for GHSA-535w-7cp7-47q4 (CVE-2026-82333) -- "DoS via
+ * oversized array index in field names".
+ *
+ * Note there are TWO multer advisories that both land on 2.3.0, and the first
+ * draft of this comment mixed their identifiers:
+ *   GHSA-qfvm-cv95-jqjf / CVE-2026-77037  fd leak on aborted uploads. What
+ *                                         Dependabot flagged. Fixed by the
+ *                                         version bump alone.
+ *   GHSA-535w-7cp7-47q4 / CVE-2026-82333  oversized array index. Needs 2.3.0
+ *                                         AND fieldArrayIndexLimit, which is
+ *                                         what this test guards.
  *
  * Upgrading multer to 2.3.0 is necessary but NOT sufficient: the array-index
  * guard in make-middleware.js only runs when `fieldArrayIndexLimit` is an own
@@ -89,8 +101,11 @@ describe('multer fieldArrayIndexLimit (GHSA-535w-7cp7-47q4)', () => {
 
   const run = (fieldName: string): Promise<unknown> =>
     new Promise((resolve) => {
-      /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-      upload.none()(multipartReq(fieldName) as any, {} as any, (err: unknown) => resolve(err));
+      upload.none()(
+        multipartReq(fieldName) as unknown as Request,
+        {} as unknown as Response,
+        ((err: unknown) => resolve(err)) as NextFunction
+      );
     });
 
   it('rejects a field name whose array index exceeds the limit', async () => {
@@ -148,9 +163,10 @@ describe('dynamicUploadSingle honours fieldArrayIndexLimit', () => {
   // to fall back to the env limit, which is the path this test exercises.
   const run = (fieldName: string): Promise<unknown> =>
     new Promise((resolve) => {
-      /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-      void dynamicUploadSingle('file')(multipartReq(fieldName) as any, {} as any, (err: unknown) =>
-        resolve(err)
+      void dynamicUploadSingle('file')(
+        multipartReq(fieldName) as unknown as Request,
+        {} as unknown as Response,
+        ((err: unknown) => resolve(err)) as NextFunction
       );
     });
 
