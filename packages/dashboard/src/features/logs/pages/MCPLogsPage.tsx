@@ -4,7 +4,7 @@ import { DataGridEmptyState, EmptyState, TableHeader } from '#components';
 import { LogsDataGrid, type LogsColumnDef } from '#features/logs/components';
 import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
 import type { McpUsageRecord } from '#features/logs/services/usage.service';
-import { formatTime } from '#lib/utils/utils';
+import { formatTime, formatUtcTime } from '#lib/utils/utils';
 import { usePageSize } from '#lib/hooks/usePageSize';
 
 export default function MCPLogsPage() {
@@ -45,7 +45,10 @@ export default function MCPLogsPage() {
         name: t('logs.time', { defaultValue: 'Time' }),
         width: '260px',
         renderCell: ({ row }) => (
-          <p className="truncate text-[13px] font-normal leading-[18px] text-[rgb(var(--foreground))]">
+          <p
+            className="truncate text-[13px] font-normal leading-[18px] text-[rgb(var(--foreground))]"
+            title={formatUtcTime(String(row.created_at ?? ''))}
+          >
             {formatTime(String(row.created_at ?? ''))}
           </p>
         ),

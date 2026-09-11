@@ -4,6 +4,7 @@ import { Info } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '#components';
 import type { DashboardMetricDataPoint } from '#types';
 import { aggregateMetricSeries } from '#features/dashboard/utils/aggregateMetricSeries';
+import { formatUtcTime } from '#lib/utils/utils';
 
 export interface MetricChartCardProps {
   title: string;
@@ -425,7 +426,10 @@ export function MetricChartCard({
             {isLoading ? '—' : renderValue(aggregates.latest)}
           </p>
           {!isLoading && latestTimestamp !== null && (
-            <p className="text-xs leading-4 text-muted-foreground">
+            <p
+              className="text-xs leading-4 text-muted-foreground"
+              title={formatUtcTime(latestTimestamp * 1000)}
+            >
               {new Date(latestTimestamp * 1000).toLocaleString(undefined, {
                 month: 'short',
                 day: 'numeric',

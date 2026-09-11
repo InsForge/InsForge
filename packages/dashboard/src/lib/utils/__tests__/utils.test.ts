@@ -5,7 +5,9 @@ import {
   compareVersions,
   convertValueForColumn,
   formatDate,
+  formatLocalLogTime,
   formatTime,
+  formatUtcTime,
   formatValueForDisplay,
   isEmptyValue,
 } from '#lib/utils/utils';
@@ -45,6 +47,26 @@ describe('formatDate', () => {
   it('formats valid ISO dates and preserves invalid input', () => {
     expect(formatDate('2026-05-17T12:30:00')).toBe('May 17, 2026');
     expect(formatDate('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('formatUtcTime', () => {
+  it('renders UTC regardless of the viewer timezone, from strings or epoch ms', () => {
+    expect(formatUtcTime('2026-05-17T12:30:00Z')).toBe('2026-05-17 12:30:00 UTC');
+    expect(formatUtcTime(Date.UTC(2026, 4, 17, 12, 30, 0))).toBe('2026-05-17 12:30:00 UTC');
+    expect(formatUtcTime('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('formatLocalLogTime', () => {
+  it('renders the compact log shape in local time and preserves invalid input', () => {
+    const epoch = Date.UTC(2026, 4, 17, 12, 30, 0);
+    // Expected value computed with the same local-timezone conversion the
+    // helper performs, so the test passes in any TZ while still asserting
+    // the epoch-ms and string inputs agree.
+    expect(formatLocalLogTime(epoch)).toBe(formatLocalLogTime('2026-05-17T12:30:00Z'));
+    expect(formatLocalLogTime(epoch)).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    expect(formatLocalLogTime('not-a-date')).toBe('not-a-date');
   });
 });
 
