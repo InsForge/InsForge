@@ -179,7 +179,8 @@
                   "deployment/deploy-to-containarium",
                   "deployment/deploy-to-coolify",
                   "deployment/deploy-to-dokploy",
-                  "deployment/deploy-to-google-cloud-compute-engine"
+                  "deployment/deploy-to-google-cloud-compute-engine",
+                  "deployment/deploy-to-hetzner"
                 ]
               },
               {

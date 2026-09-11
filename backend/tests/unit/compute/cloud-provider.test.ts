@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
+import { describe, it, expect, beforeEach, vi, type MockInstance, afterAll } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import jwt from 'jsonwebtoken';
 
 vi.mock('@/infra/config/app.config.js', () => {
   const c = {
     cloud: { apiHost: 'https://cloud.test', projectId: 'proj-1' },
-    app: { jwtSecret: 'secret-1' },
+    app: { jwtSecret: 'secret-1', logLevel: 'error' },
+    server: { logsDir: '/tmp/insforge-compute-cloud-test-logs' },
   };
   return {
     config: c,
@@ -18,10 +19,28 @@ import { MachineGoneError } from '@/providers/compute/compute.provider.js';
 
 type FetchMock = MockInstance<Parameters<typeof fetch>, ReturnType<typeof fetch>>;
 
+// File-level: both suites below need the marker, and a hook inside the first one has
+// already run by the time the second starts.
+const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+
+beforeEach(() => {
+  process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+});
+
+afterAll(() => {
+  if (savedProfile === undefined) {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+  } else {
+    process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+  }
+});
+
 describe('CloudComputeProvider', () => {
   let fetchMock: FetchMock;
 
   beforeEach(() => {
+    // createApp derives the 6PN network name from APP_KEY.
+    process.env.APP_KEY = 'd9byq46t';
     fetchMock = vi.fn() as unknown as FetchMock;
     global.fetch = fetchMock as unknown as typeof fetch;
   });
@@ -33,11 +52,7 @@ describe('CloudComputeProvider', () => {
     } as Response);
 
     const provider = CloudComputeProvider.getInstance();
-    const result = await provider.createApp({
-      name: 'test',
-      network: 'test',
-      org: 'unused-in-cloud-mode',
-    });
+    const result = await provider.createApp({ name: 'test' });
 
     const call = fetchMock.mock.calls[0];
     expect(call[0]).toBe('https://cloud.test/projects/v1/proj-1/compute/apps');
@@ -48,52 +63,29 @@ describe('CloudComputeProvider', () => {
   });
 
   // Regression: live e2e on prod (project 2163e1eb-...) showed Fly 422
-  // "Validation failed: Name not a valid network name" because the caller
-  // (services.service.ts) used to pass `${projectId}-network` (~44 chars)
-  // which exceeded Fly's network-name validator on stricter orgs. The
-  // service now uses APP_KEY (~8 chars) — these tests pin the wire format.
-  it('createApp forwards network when caller passes a (short) value', async () => {
+  // "Validation failed: Name not a valid network name" because the caller used
+  // to pass `${projectId}-network` (~44 chars), which exceeded Fly's
+  // network-name validator on stricter orgs. The network name is now derived
+  // inside the provider from APP_KEY (~8 chars) rather than passed in — this
+  // pins the wire format so it stays byte-identical to what the service sent.
+  it('createApp derives the network name from APP_KEY', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       text: async () => JSON.stringify({ appId: 'ifc-proj-test' }),
     } as Response);
 
     const provider = CloudComputeProvider.getInstance();
-    await provider.createApp({
-      name: 'test',
-      network: 'd9byq46t',
-      org: 'unused-in-cloud-mode',
-    });
+    await provider.createApp({ name: 'test' });
 
     const call = fetchMock.mock.calls[0];
     const sentBody = JSON.parse((call[1] as RequestInit).body as string);
-    expect(sentBody).toEqual({ name: 'test', network: 'd9byq46t' });
-  });
-
-  it('createApp omits network field when caller does not pass one', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      text: async () => JSON.stringify({ appId: 'ifc-proj-test' }),
-    } as Response);
-
-    const provider = CloudComputeProvider.getInstance();
-    await provider.createApp({
-      name: 'test',
-      org: 'unused-in-cloud-mode',
-    });
-
-    const call = fetchMock.mock.calls[0];
-    const sentBody = JSON.parse((call[1] as RequestInit).body as string);
-    expect(sentBody).toEqual({ name: 'test' });
-    expect('network' in sentBody).toBe(false);
+    expect(sentBody).toEqual({ name: 'test', network: 'n-d9byq46t' });
   });
 
   it('throws COMPUTE_CLOUD_UNAVAILABLE on network error', async () => {
     fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
     const provider = CloudComputeProvider.getInstance();
-    await expect(provider.createApp({ name: 't', network: 't', org: 'o' })).rejects.toThrow(
-      /COMPUTE_CLOUD_UNAVAILABLE/
-    );
+    await expect(provider.createApp({ name: 't' })).rejects.toThrow(/COMPUTE_CLOUD_UNAVAILABLE/);
   });
 
   it('throws AppError when cloud returns non-2xx with body', async () => {
@@ -107,7 +99,7 @@ describe('CloudComputeProvider', () => {
         }),
     } as Response);
     const provider = CloudComputeProvider.getInstance();
-    await expect(provider.createApp({ name: 't', network: 't', org: 'o' })).rejects.toThrow(
+    await expect(provider.createApp({ name: 't' })).rejects.toThrow(
       new RegExp(`limit reached|${ERROR_CODES.COMPUTE_QUOTA_EXCEEDED}`)
     );
   });
@@ -178,29 +170,22 @@ describe('CloudComputeProvider', () => {
     const abortError = new DOMException('The operation was aborted', 'AbortError');
     fetchMock.mockRejectedValue(abortError);
     const provider = CloudComputeProvider.getInstance();
-    await expect(provider.createApp({ name: 't', network: 't', org: 'o' })).rejects.toMatchObject({
+    await expect(provider.createApp({ name: 't' })).rejects.toMatchObject({
       code: 'COMPUTE_CLOUD_UNAVAILABLE',
     });
   });
 
-  it('surfaces COMPUTE_NOT_CONFIGURED when config is missing (not masked as CLOUD_UNAVAILABLE)', async () => {
-    const { AppError } = await import('@/utils/errors.js');
+  // The catch-all around fetch used to swallow this into COMPUTE_CLOUD_UNAVAILABLE,
+  // which reads as "the cloud is down" when the real answer is "this instance has no
+  // business calling it".
+  it('surfaces COMPUTE_NOT_CONFIGURED off cloud, not masked as CLOUD_UNAVAILABLE', async () => {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
     const provider = CloudComputeProvider.getInstance();
 
-    // Force signToken to throw COMPUTE_NOT_CONFIGURED, as it would when isConfigured() is false
-    vi.spyOn(provider as unknown as { signToken: () => string }, 'signToken').mockImplementation(
-      () => {
-        throw new AppError(
-          'Cloud compute not configured (need PROJECT_ID, CLOUD_API_HOST, JWT_SECRET)',
-          500,
-          ERROR_CODES.COMPUTE_NOT_CONFIGURED
-        );
-      }
-    );
-
-    await expect(provider.createApp({ name: 't', network: 't', org: 'o' })).rejects.toThrow(
-      /COMPUTE_NOT_CONFIGURED|not configured/
-    );
+    await expect(provider.createApp({ name: 't' })).rejects.toMatchObject({
+      code: ERROR_CODES.COMPUTE_NOT_CONFIGURED,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
@@ -212,9 +197,6 @@ describe('CloudComputeProvider machine-gone translation', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    // The COMPUTE_NOT_CONFIGURED test above leaves a throwing spy on the
-    // singleton's signToken — undo it so calls here reach the real fetch.
-    vi.restoreAllMocks();
     fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
   });

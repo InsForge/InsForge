@@ -3,6 +3,7 @@ import { storageBucketSchema } from './storage.schema.js';
 import { realtimeChannelSchema } from './realtime.schema.js';
 import { realtimePermissionsResponseSchema } from './realtime-api.schema.js';
 import { authConfigAdminResponseSchema } from './auth-api.schema.js';
+import { computeCapabilitiesSchema, computeProviderEnum } from './compute-services.schema.js';
 
 // Admin metadata for /api/metadata/auth (gated behind verifyAdmin). Identical
 // shape to the canonical admin auth response — public response in
@@ -55,6 +56,32 @@ export const deploymentsMetadataSchema = z.object({
   customSlug: z.string().nullable(),
 });
 
+/**
+ * Compute slice for the admin metadata response.
+ *
+ * Omitted entirely when no compute provider is configured, so presence/absence is
+ * the coarse "is compute available here" signal — the same mechanism the
+ * deployments slice uses, which lets a caller gate a whole feature without first
+ * making a request that would 503.
+ *
+ * When present it carries content rather than just existing, because two things
+ * are not derivable by a caller that already knows the provider enum:
+ *
+ *   - `defaultProvider`, and which providers are active, depend on the operator's
+ *     environment (is a Docker socket mounted, are Fly credentials set).
+ *   - Capabilities are not frozen per provider name. `sourceBuild` for Docker
+ *     changed from 'none' to 'context-upload' when server-side builds landed, and
+ *     `deployTokenIssuance` differs for the *same* provider name — false on
+ *     self-hosted Fly, true on cloud-managed. A caller-side constant table keyed
+ *     by provider cannot express either, and would be silently wrong across a
+ *     version skew, which is routine when an operator's backend and a developer's
+ *     CLI upgrade on different schedules.
+ */
+export const computeMetadataSchema = z.object({
+  defaultProvider: computeProviderEnum,
+  providers: z.record(computeProviderEnum, computeCapabilitiesSchema),
+});
+
 export const appMetaDataSchema = z.object({
   auth: authMetadataSchema,
   database: databaseMetadataSchema,
@@ -62,6 +89,7 @@ export const appMetaDataSchema = z.object({
   functions: z.array(edgeFunctionMetadataSchema),
   realtime: realtimeMetadataSchema.optional(),
   deployments: deploymentsMetadataSchema.optional(),
+  compute: computeMetadataSchema.optional(),
   version: z.string().optional(),
 });
 
@@ -72,6 +100,7 @@ export type StorageMetadataSchema = z.infer<typeof storageMetadataSchema>;
 export type EdgeFunctionMetadataSchema = z.infer<typeof edgeFunctionMetadataSchema>;
 export type RealtimeMetadataSchema = z.infer<typeof realtimeMetadataSchema>;
 export type DeploymentsMetadataSchema = z.infer<typeof deploymentsMetadataSchema>;
+export type ComputeMetadataSchema = z.infer<typeof computeMetadataSchema>;
 export type AppMetadataSchema = z.infer<typeof appMetaDataSchema>;
 
 // Database connection schemas

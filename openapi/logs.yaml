@@ -4,9 +4,13 @@ info:
   version: 1.0.0
 
 paths:
-  /api/logs:
+  /api/logs/audits:
     get:
-      summary: List activity logs
+      summary: List audit logs
+      description: |
+        Paginated activity log. Responses use the PostgREST-style contract from
+        `paginatedResponse`: `206 Partial Content` with a `Content-Range` header
+        when the page is a subset, `200` when it returns everything.
       tags:
         - Admin
       security:
@@ -23,181 +27,485 @@ paths:
           schema:
             type: integer
             default: 0
+        - name: actor
+          in: query
+          schema:
+            type: string
+          description: Filter by the actor that performed the action
         - name: action
           in: query
           schema:
             type: string
-            enum: [INSERT, UPDATE, DELETE, LOGIN]
-          description: Filter by action type
-        - name: table
+          description: Filter by action name
+        - name: module
           in: query
           schema:
             type: string
+          description: Filter by the module the action belongs to
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
-          description: List of logs with pagination
+          description: All matching audit logs were returned
           headers:
-            X-Total-Count:
+            Content-Range:
+              required: true
               schema:
-                type: integer
-              description: Total number of logs
-            X-Page:
+                type: string
+              description: 'Range and total, e.g. `0-9/10`'
+            Preference-Applied:
+              required: true
               schema:
-                type: integer
-              description: Current page number
-            X-Page-Size:
-              schema:
-                type: integer
-              description: Number of items per page
-            X-Total-Pages:
-              schema:
-                type: integer
-              description: Total number of pages
+                type: string
+              description: Always `count=exact`
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  type: object
-                  properties:
-                    id:
-                      type: string
-                    timestamp:
-                      type: string
-                      format: date-time
-                    action:
-                      type: string
-                      enum: [INSERT, UPDATE, DELETE, LOGIN]
-                    table:
-                      type: string
-                      nullable: true
-                    record_id:
-                      type: string
-                      nullable: true
-                    user_id:
-                      type: string
-                    details:
-                      type: object
-                      nullable: true
+                  $ref: '#/components/schemas/AuditLog'
+        '206':
+          description: A page of audit logs, with more available
+          headers:
+            Content-Range:
+              required: true
+              schema:
+                type: string
+              description: 'Range and total, e.g. `0-99/1234`'
+            Preference-Applied:
+              required: true
+              schema:
+                type: string
+              description: Always `count=exact`
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditLog'
               example:
-                - id: "log-123"
-                  timestamp: "2024-01-21T10:30:00Z"
-                  action: "INSERT"
-                  table: "posts"
-                  record_id: "post-456"
-                  user_id: "user-789"
+                - id: "audit-123"
+                  actor: "admin@example.com"
+                  action: "START_DEPLOYMENT"
+                  module: "DEPLOYMENTS"
                   details:
-                    title: "New Post"
-                    author: "John Doe"
-                - id: "log-124"
-                  timestamp: "2024-01-21T10:31:00Z"
-                  action: "LOGIN"
-                  table: null
-                  record_id: null
-                  user_id: "user-789"
-                  details:
-                    ip: "192.168.1.1"
-                    user_agent: "Mozilla/5.0..."
+                    id: "dep-456"
+                  ipAddress: "192.168.1.1"
+                  createdAt: "2024-01-21T10:30:00Z"
+                  updatedAt: "2024-01-21T10:30:00Z"
 
     delete:
-      summary: Clear logs
+      summary: Clear audit logs
+      description: |
+        Retention-based cleanup. Deletes every audit log older than
+        `days_to_keep` days and answers with `deleted`, the number of rows
+        removed. There is no dry run, and the deletion is not reversible.
       tags:
         - Admin
       security:
         - bearerAuth: []
         - apiKey: []
       parameters:
-        - name: before
+        - name: days_to_keep
           in: query
           schema:
-            type: string
-            format: date-time
+            type: integer
+            default: 90
+          description: Audit logs older than this many days are deleted
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
-          description: Logs cleared
+          description: Audit logs cleared
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - message
+                  - deleted
                 properties:
                   message:
                     type: string
-                  deleted_count:
+                  deleted:
                     type: integer
               example:
-                message: "Logs cleared successfully"
-                deleted_count: 150
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "INVALID_DATE"
-                message: "Invalid date format for 'before' parameter"
-                statusCode: 400
-                nextAction: "Use ISO 8601 date format (YYYY-MM-DDTHH:mm:ssZ)"
+                message: "Audit logs cleared successfully"
+                deleted: 150
 
   /api/logs/stats:
     get:
-      summary: Get logs statistics
+      summary: Get per-source log statistics
+      description: |
+        One entry per system log source. This is not the audit-log summary;
+        that lives at `/api/logs/audits/stats`.
       tags:
         - Admin
       security:
         - bearerAuth: []
         - apiKey: []
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
-          description: Logs statistics
+          description: Statistics for each log source
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - source
+                    - count
+                    - lastActivity
+                  properties:
+                    source:
+                      type: string
+                    count:
+                      type: integer
+                    lastActivity:
+                      type: string
+                      description: |
+                        ISO 8601 timestamp of the most recent entry, or an
+                        empty string when the source has no activity to
+                        report. Not marked format: date-time for that reason.
+              example:
+                - source: "postgres"
+                  count: 1035
+                  lastActivity: "2024-01-21T10:31:00Z"
+                - source: "deno-relay"
+                  count: 47
+                  lastActivity: "2024-01-21T09:58:00Z"
+
+  /api/logs/audits/stats:
+    get:
+      summary: Get audit log summary
+      description: |
+        Aggregates the audit log over the last `days` days. `totalLogs`,
+        `uniqueActors` and `uniqueModules` are counts across that window,
+        `actionsByModule` is the per-module action count keyed by module
+        name, and `recentActivity` carries the most recent entries in full.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 7
+          description: Size of the window the summary covers
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: Audit activity over the window
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - totalLogs
+                  - uniqueActors
+                  - uniqueModules
+                  - actionsByModule
+                  - recentActivity
                 properties:
-                  actionStats:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        action:
-                          type: string
-                        count:
-                          type: integer
-                  tableStats:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        table_name:
-                          type: string
-                        count:
-                          type: integer
-                  recentActivity:
-                    type: integer
-                    description: Count of logs in last 24 hours
                   totalLogs:
                     type: integer
-                    description: Total number of logs
+                  uniqueActors:
+                    type: integer
+                  uniqueModules:
+                    type: integer
+                  actionsByModule:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                    description: Action count keyed by module
+                  recentActivity:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLog'
+
+  /api/logs/sources:
+    get:
+      summary: List log sources
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: Available log sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - id
+                    - name
+                    - token
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    token:
+                      type: string
+
+  /api/logs/search:
+    get:
+      summary: Search logs
+      description: |
+        Paginates through `paginatedResponse`, so responses use 206 with
+        `Content-Range` when the page is a subset and 200 when it is not.
+
+        How far that contract holds depends on the configured log provider.
+        The local provider slices the full result set, so `offset` and the
+        total in `Content-Range` behave as expected. The CloudWatch provider
+        cannot express offset in an Insights query: it ignores `offset` and
+        reports the length of the returned page as the total. Paging past
+        the first page there repeats results, so treat this endpoint as
+        single-page unless the deployment uses the local provider.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: source
+          in: query
+          schema:
+            type: string
+          description: Restrict the search to one source
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Ignored by the CloudWatch provider; see the description above
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: All matching log entries were returned
+          headers:
+            Content-Range:
+              required: true
+              schema:
+                type: string
+            Preference-Applied:
+              required: true
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogEntry'
+        '206':
+          description: A page of matching log entries, with more available
+          headers:
+            Content-Range:
+              required: true
+              schema:
+                type: string
+            Preference-Applied:
+              required: true
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogEntry'
+        '400':
+          description: The q parameter is missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
               example:
-                actionStats:
-                  - action: "INSERT"
-                    count: 245
-                  - action: "UPDATE"
-                    count: 189
-                  - action: "DELETE"
-                    count: 34
-                  - action: "LOGIN"
-                    count: 567
-                tableStats:
-                  - table_name: "posts"
-                    count: 156
-                  - table_name: "comments"
-                    count: 223
-                recentActivity: 47
-                totalLogs: 1035
+                error: 'INVALID_INPUT'
+                message: 'Search query parameter (q) is required'
+                statusCode: 400
+
+  /api/logs/functions/build-logs:
+    get:
+      summary: Get function build logs
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: deployment_id
+          in: query
+          schema:
+            type: string
+          description: Defaults to the latest deployment when omitted
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: Build logs for the deployment
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - deploymentId
+                  - status
+                  - logs
+                  - createdAt
+                properties:
+                  deploymentId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, success, failed]
+                  logs:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - level
+                        - message
+                      properties:
+                        level:
+                          type: string
+                        message:
+                          type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+        '404':
+          description: Deno Deploy is not configured, or no deployment was found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: 'LOG_NOT_FOUND'
+                message: 'Build logs not available. Deno Deploy may not be configured or no deployments found.'
+                statusCode: 404
+
+  /api/logs/{source}:
+    get:
+      summary: Get logs from one source
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: source
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: before_timestamp
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Return entries older than this timestamp
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: Log entries for the source
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - logs
+                  - total
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LogEntry'
+                  total:
+                    type: integer
 
 components:
+  responses:
+    Forbidden:
+      description: Authenticated, but the token is not a project_admin
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: 'AUTH_UNAUTHORIZED'
+            message: 'Admin access required'
+            statusCode: 403
+
+    Unauthorized:
+      description: Missing or invalid admin credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: 'AUTH_INVALID_CREDENTIALS'
+            message: 'Unauthorized'
+            statusCode: 401
+
   securitySchemes:
     bearerAuth:
       type: http
@@ -206,8 +514,62 @@ components:
       type: apiKey
       in: header
       name: x-api-key
-  
+
   schemas:
+    AuditLog:
+      type: object
+      required:
+        - id
+        - actor
+        - action
+        - module
+        - details
+        - ipAddress
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        actor:
+          type: string
+        action:
+          type: string
+        module:
+          type: string
+        details:
+          type: object
+          nullable: true
+          additionalProperties: true
+        ipAddress:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    LogEntry:
+      type: object
+      required:
+        - id
+        - eventMessage
+        - timestamp
+        - body
+      properties:
+        id:
+          type: string
+        eventMessage:
+          type: string
+        timestamp:
+          type: string
+        body:
+          type: object
+          additionalProperties: true
+        source:
+          type: string
+
     ErrorResponse:
       type: object
       required:
@@ -224,6 +586,6 @@ components:
         statusCode:
           type: integer
           description: HTTP status code
-        nextAction:
+        nextActions:
           type: string
           description: Suggested action to resolve the error

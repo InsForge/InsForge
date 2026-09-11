@@ -90,6 +90,41 @@ describe('MemoryService.remember — reconcile', () => {
       true
     );
   });
+
+  it('re-labels embedding_model on UPDATE, matching what INSERT records', async () => {
+    // The UPDATE re-embeds, so it must carry the model label with the vector —
+    // otherwise a model change leaves new vectors under the old model's name.
+    const addRes = await service.remember({ scope: 's', kind: 'fact', title: 't', content: 'c' });
+    expect(addRes[0].action).toBe('ADD');
+    const insertCall = poolQueryMock.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO memory.memories')
+    );
+    const insertedModel = (insertCall![1] as unknown[])[5];
+    expect(typeof insertedModel).toBe('string');
+
+    vi.clearAllMocks();
+    embedMock.mockResolvedValue({ data: [{ embedding: [0.1, 0.2, 0.3] }] });
+    installPool();
+
+    const matchId = '22222222-2222-4222-8222-222222222222';
+    similarRows = [{ id: matchId, kind: 'fact', title: 'old', content: 'old', similarity: 0.8 }];
+    chatMock.mockResolvedValue({
+      text: `{"action":"UPDATE","target_id":"${matchId}","title":"new","content":"new merged"}`,
+    });
+    const updateRes = await service.remember({
+      scope: 's',
+      kind: 'fact',
+      title: 't',
+      content: 'c',
+    });
+    expect(updateRes[0].action).toBe('UPDATE');
+
+    const updateCall = poolQueryMock.mock.calls.find(([sql]) =>
+      String(sql).includes('UPDATE memory.memories')
+    );
+    expect(String(updateCall![0])).toContain('embedding_model = $5');
+    expect((updateCall![1] as unknown[])[4]).toBe(insertedModel);
+  });
 });
 
 describe('MemoryService.remember — extraction sanitization & failure isolation', () => {

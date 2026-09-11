@@ -8,6 +8,7 @@ import { isCloudEnvironment } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { FeatureUsageCollector, type FeatureUsageSnapshot } from './feature-usage.collector.js';
 import packageJson from '../../../../package.json';
+import { getComputeMetadata } from '@/services/compute/services.service.js';
 
 export type TelemetryEventName = 'instance_started' | 'heartbeat';
 type TelemetryRuntimeEnvironment = 'production' | 'development' | 'test' | 'ci' | 'unknown';
@@ -285,7 +286,10 @@ export class TelemetryService {
           functions_configured: Boolean(
             appConfig.denoSubhosting.token && appConfig.denoSubhosting.organizationId
           ),
-          compute_configured: Boolean(appConfig.fly.apiToken && appConfig.fly.org),
+          // Whether *any* driver is usable, from the same source the providers read:
+          // this used to test appConfig.fly, which reports false for credentials stored
+          // through the dashboard and ignores Docker entirely.
+          compute_configured: getComputeMetadata() !== undefined,
           openrouter_configured: Boolean(appConfig.ai.openrouterApiKey),
         },
         ...(usage

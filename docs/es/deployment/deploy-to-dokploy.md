@@ -1,6 +1,6 @@
 ---
 title: "Autoalojar InsForge en Dokploy"
-description: "Despliega el backend de InsForge en Dokploy como aplicación Compose, con la imagen de Postgres construida desde el repositorio para que su configuración siempre coincida con la versión."
+description: "Autoaloja InsForge en Dokploy como aplicación Compose, con la imagen de Postgres construida desde el repositorio para coincidir con la versión desplegada."
 ---
 
 # Autoalojar InsForge en Dokploy

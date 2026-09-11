@@ -11,9 +11,9 @@ import {
   type UpsertSmtpConfigRequest,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import {
   emailProviderNotConfiguredError,
-  hasManagedEmailProvider,
   lockEmailProviderConfiguration,
 } from '@/services/email/helpers.js';
 // ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ export class SmtpConfigService {
 
       const existingRow = await this.lockOrCreateSingletonRow(client);
 
-      if (!input.enabled && !hasManagedEmailProvider()) {
+      if (!input.enabled && !isCloudEnvironment()) {
         const authConfigResult = await client.query(
           `SELECT require_email_verification
            FROM auth.config

@@ -1,6 +1,6 @@
 import { EmailService } from '../../src/services/email/email.service';
 import { AppError } from '../../src/utils/errors';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, afterAll } from 'vitest';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 
@@ -28,6 +28,21 @@ vi.mock('../../src/infra/config/app.config', () => {
     config: c,
     appConfig: c,
   };
+});
+
+// isCloudProject() needs our infrastructure marker as well as a project id.
+const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+
+beforeEach(() => {
+  process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+});
+
+afterAll(() => {
+  if (savedProfile === undefined) {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+  } else {
+    process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+  }
 });
 
 describe('EmailService', () => {
@@ -372,5 +387,19 @@ describe('EmailService', () => {
         expiresIn: '10m',
       });
     });
+  });
+
+  // A self-host with a PROJECT_ID and no SMTP used to reach the cloud signer and fail
+  // against our API. Naming the missing SMTP config is the actionable version.
+  it('reports missing SMTP rather than reaching the cloud signer off-cloud', async () => {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    const { appConfig } = await import('../../src/infra/config/app.config');
+    appConfig.cloud.projectId = 'zeabur-project-1';
+
+    await expect(
+      emailService.sendWithTemplate('user@example.com', 'John', 'email-verification-code', {
+        token: '123456',
+      })
+    ).rejects.toThrow('No email provider is configured');
   });
 });

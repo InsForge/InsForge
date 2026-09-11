@@ -833,6 +833,15 @@ By default the backend allows all origins. It reflects the request's `Origin` he
 
 #### 14.1 Back Up the Database
 
+For a database dump and `.env` copy in one step, use the shipped backup script:
+
+```bash
+cd ~/insforge
+./deploy/backup.sh
+```
+
+Or dump manually:
+
 ```bash
 cd ~/insforge
 source .env
@@ -933,25 +942,30 @@ cd ~/insforge
 docker compose down
 ```
 
-#### 16.2 Restore the Previous Docker Compose File
+#### 16.2 Pin the Previous Version
 
-```bash
-# If you saved the old file
-mv docker-compose.yml.old docker-compose.yml
-```
+1. Write `pin.yml` next to your `.env`, naming the version 14.3 recorded:
 
-#### 16.3 Pin to a Specific Image Version
+   ```yaml
+   services:
+     insforge:
+       image: ghcr.io/insforge/insforge-oss:v2.2.9
+   ```
 
-Edit `docker-compose.yml` and replace `latest` tags with the previous version:
+2. Append it to `COMPOSE_FILE` in `.env`, keeping the entries already there:
 
-```yaml
-# Example: pin to a known-good version (replace with your previous tag)
-image: ghcr.io/insforge/insforge-oss:v1.5.0
-```
+   ```env
+   COMPOSE_FILE=deploy/docker-compose/docker-compose.yml:pin.yml
+   ```
 
-> Note: the current `deploy/docker-compose` pins `v1.5.0`, and the project is now on the 2.x line. Pin to whatever version you were running before the update.
+3. `docker compose up -d`
 
-#### 16.4 Restore the Database (If Needed)
+4. Remove `:pin.yml` once you are back on a good release.
+
+Until you do, section 15's update pulls new images and keeps running the pinned
+one.
+
+#### 16.3 Restore the Database (If Needed)
 
 Only restore the database if the update included a database migration that caused issues:
 
@@ -974,7 +988,7 @@ cat backup_YYYYMMDD_HHMMSS.sql | \
 docker compose up -d
 ```
 
-#### 16.5 Restore Environment File (If Changed)
+#### 16.4 Restore Environment File (If Changed)
 
 ```bash
 cp .env.backup_YYYYMMDD .env
@@ -986,51 +1000,29 @@ docker compose up -d
 
 ### 17. Automated Backups
 
-Set up a cron job for daily automated backups:
+Set up a cron job for daily automated backups.
 
-#### 17.1 Create a Backup Script
+#### 17.1 Run the Backup Script
+
+Self-host installs include `deploy/backup.sh` (delivered by `deploy/setup.sh`). It dumps Postgres and copies `.env` into a `backups/` directory under your install root.
 
 ```bash
-nano ~/insforge/backup.sh
+cd ~/insforge
+./deploy/backup.sh
 ```
 
+By default, backups land in `~/insforge/backups/` and files older than 14 days are removed. Override retention:
+
 ```bash
-#!/bin/bash
-set -euo pipefail
-
-# InsForge Automated Backup Script
-# Run from the checkout so docker compose reads COMPOSE_FILE and
-# COMPOSE_PROJECT_NAME from .env, which also carries POSTGRES_USER / POSTGRES_DB
-cd "$HOME/insforge"
-set -a
-source .env
-set +a
-
-BACKUP_DIR="$HOME/insforge/backups"
-RETENTION_DAYS=14
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-
-trap 'echo "[$(date)] ERROR: Backup failed at line $LINENO" >&2; exit 1' ERR
-
-mkdir -p "$BACKUP_DIR"
-
-# Dump the database
-docker compose exec -T postgres \
-  pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" \
-  > "$BACKUP_DIR/db_$TIMESTAMP.sql"
-
-# Copy the environment file
-cp "$HOME/insforge/.env" "$BACKUP_DIR/env_$TIMESTAMP.bak"
-
-# Remove backups older than retention period
-find "$BACKUP_DIR" -name "db_*.sql" -mtime +$RETENTION_DAYS -delete
-find "$BACKUP_DIR" -name "env_*.bak" -mtime +$RETENTION_DAYS -delete
-
-echo "[$(date)] Backup completed successfully: db_$TIMESTAMP.sql"
+RETENTION_DAYS=30 ./deploy/backup.sh
 ```
 
+Restore a database dump:
+
 ```bash
-chmod +x ~/insforge/backup.sh
+cd ~/insforge
+set -a && source .env && set +a
+cat backups/db_YYYYMMDD_HHMMSS.sql | docker compose exec -T postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"
 ```
 
 #### 17.2 Schedule with Cron
@@ -1039,10 +1031,10 @@ chmod +x ~/insforge/backup.sh
 crontab -e
 ```
 
-Add this line for daily backups at 3:00 AM:
+Add this line for daily backups at 3:00 AM (adjust the path if your install lives elsewhere):
 
 ```cron
-0 3 * * * /home/deploy/insforge/backup.sh >> /home/deploy/insforge/backups/cron.log 2>&1
+0 3 * * * /home/deploy/insforge/deploy/backup.sh >> /home/deploy/insforge/backups/cron.log 2>&1
 ```
 
 #### 17.3 Off-Site Backups (Recommended)
@@ -1121,7 +1113,8 @@ docker stats --no-stream          # Resource usage
 
 # ── Database (source .env first for vars) ────
 source ~/insforge/.env
-docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" > backup.sql  # Backup
+./deploy/backup.sh                                                                              # Backup (db + .env)
+docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" > backup.sql  # Manual backup
 cat backup.sql | docker compose exec -T postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"  # Restore
 
 # ── Updates ───────────────────────────────────

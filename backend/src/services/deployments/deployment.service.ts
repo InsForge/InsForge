@@ -1,6 +1,5 @@
 import { Pool, type PoolClient } from 'pg';
 import AdmZip from 'adm-zip';
-import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { Transform, type Readable, type TransformCallback } from 'stream';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
@@ -10,6 +9,7 @@ import {
 } from '@/providers/deployments/vercel.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import { AppError } from '@/utils/errors.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import {
   DeploymentStatus,
@@ -1312,17 +1312,8 @@ export class DeploymentService {
       );
     }
 
-    const jwtSecret = appConfig.app.jwtSecret;
-    if (!jwtSecret) {
-      throw new AppError(
-        'JWT_SECRET not found in environment variables',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
     try {
-      const signature = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
+      const signature = TokenManager.getInstance().signCloudToken('Custom deployment slugs');
       const cloudApiHost = appConfig.cloud.apiHost;
 
       const response = await fetch(`${cloudApiHost}/sites/v1/${projectId}/slug`, {

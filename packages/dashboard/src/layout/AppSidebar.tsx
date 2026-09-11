@@ -13,6 +13,7 @@ import {
 import { Link, useLocation, matchPath } from 'react-router-dom';
 import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { isInsForgeCloudProject } from '#lib/utils/utils';
+import { useAiEntitlement } from '#lib/hooks/useAiEntitlement';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from '@insforge/ui';
 import { ProjectSettingsMenuDialog } from '#features/dashboard/components';
 import { LanguageSelect } from '#components';
@@ -37,12 +38,18 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const isDTest =
     getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT) === FEATURE_FLAG_VARIANTS.D_TEST;
   const isDTestCloud = isDTest && host.mode === 'cloud-hosting';
+  const aiEntitlement = useAiEntitlement();
+  const hideAiTab = aiEntitlement.reason === 'partner';
 
   // Cloud-only addition: Deployments inserted after AI.
   // Analytics and Web Scraper ship in both modes — self-hosting connects each
   // with its own credential (a PostHog personal API key / an Apify token).
   const mainMenuItems = useMemo(() => {
-    const items = dashboardStaticMenuItems.map((item) => ({ ...item }));
+    // Partner orgs have no AI entitlement at all, so the tab is dropped rather
+    // than left to dead-end on the page's not-supported state.
+    const items = dashboardStaticMenuItems
+      .filter((item) => item.id !== 'ai' || !hideAiTab)
+      .map((item) => ({ ...item }));
 
     if (isCloud) {
       const aiItemIndex = items.findIndex((item) => item.id === 'ai');
@@ -59,7 +66,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
     items.push({ ...dashboardWebscraperMenuItem });
 
     return items;
-  }, [isCloud]);
+  }, [isCloud, hideAiTab]);
 
   // d_test + cloud-hosting prepends Install + Doc above Settings in the
   // bottom nav. Other shells just show Settings.

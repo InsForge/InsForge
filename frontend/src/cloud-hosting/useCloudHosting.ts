@@ -22,6 +22,8 @@ const VALID_METRIC_NAMES: readonly DashboardMetricName[] = [
   'disk_usage',
   'disk_used',
   'disk_total',
+  'disk_database',
+  'disk_wal',
   'network_in',
   'network_out',
 ] as const;
@@ -658,6 +660,7 @@ export function useCloudHosting() {
               currentInstanceType:
                 typeof message.currentInstanceType === 'string' ? message.currentInstanceType : '',
               planName: typeof message.planName === 'string' ? message.planName : '',
+              isPartnerOrg: message.isPartnerOrg === true,
               computeCredits:
                 typeof message.computeCredits === 'number' ? message.computeCredits : 0,
               currentOrgComputeCost:

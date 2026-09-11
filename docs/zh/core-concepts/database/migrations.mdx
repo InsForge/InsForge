@@ -45,6 +45,26 @@ npx @insforge/cli db migrations list
 
 选择加入后，通过文件路由所有架构变更。临时仪表盘编辑会在 git 和 `system.custom_migrations` 之间造成漂移。
 
+## 非事务性语句
+
+由于 CLI 会把每个迁移文件放在单个事务内运行（这也是 `BEGIN`/`COMMIT`/`ROLLBACK` 被拒绝的原因），少数**不能在事务块内运行**的 PostgreSQL 命令会在迁移中失败，报出类似 `CREATE INDEX CONCURRENTLY cannot run inside a transaction block` 的错误。常见的有：
+
+- `CREATE INDEX CONCURRENTLY` — 如果可以接受短暂的写锁，就在迁移中使用普通的 `CREATE INDEX`；或在迁移之外运行并发构建（见下文）。
+- `VACUUM` — 常规 vacuum 由 PostgreSQL autovacuum 处理，你很少需要自己运行。
+- `REINDEX ... CONCURRENTLY`、`ALTER TYPE ... ADD VALUE`（在较旧的 PostgreSQL 上）等类似命令。
+
+请使用 CLI 的 unrestricted 原始 SQL 路径在迁移之外运行这些命令，它会执行语句而**不**将其包裹在事务中：
+
+```bash
+npx @insforge/cli db query --unrestricted "CREATE INDEX CONCURRENTLY idx_orders_customer ON public.orders (customer_id)"
+```
+
+普通的 `npx @insforge/cli db query`（不带 `--unrestricted`）会把语句包裹在事务里，因此会遇到同样的错误——对于非事务性命令请使用 `--unrestricted`。
+
+<Note>
+  两种 `db query` 路径都强制执行 30 秒的 `statement_timeout`，因此在大表上运行 `CREATE INDEX CONCURRENTLY` 或 `VACUUM` 可能会超时。
+</Note>
+
 ## 更多资源
 
 - [Database branching](/agent-native/branching) 在副本上排练迁移。

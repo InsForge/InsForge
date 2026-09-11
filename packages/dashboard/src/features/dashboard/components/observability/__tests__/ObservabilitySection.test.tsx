@@ -37,29 +37,29 @@ function renderSection(mode: DashboardMode, response: DashboardMetricsResponse) 
 }
 
 // The advisory title is stable text around the interpolated percentage.
-const advisoryText = () => screen.queryByText(/For Postgres, that's normal/);
+const advisoryText = () => screen.queryByText(/For Postgres that's normal/);
 
 afterEach(() => {
   setDashboardBackendUrl(undefined);
 });
 
 describe('ObservabilitySection memory advisory', () => {
-  it('shows the advisory with an Upgrade Instance CTA from 75% average on a cloud project', async () => {
+  it('shows the advisory with the latest reading and an Upgrade Instance CTA at 70%+', async () => {
     setDashboardBackendUrl(CLOUD_BACKEND);
-    renderSection('cloud-hosting', metricsResponse([70, 75, 80]));
+    renderSection('cloud-hosting', metricsResponse([65, 66, 72]));
 
     await waitFor(() => expect(advisoryText()).toBeInTheDocument());
+    // the banner carries the same latest sample the card headline shows
+    expect(advisoryText()).toHaveTextContent('72.0%');
     expect(screen.getByRole('button', { name: 'Upgrade Instance' })).toBeInTheDocument();
   });
 
-  it('stays silent below the 75% threshold', async () => {
+  it('stays silent below the 70% threshold', async () => {
     setDashboardBackendUrl(CLOUD_BACKEND);
     renderSection('cloud-hosting', metricsResponse([65, 66, 67]));
 
-    // Wait for the cards to render off the resolved query, then assert absence.
     await waitFor(() => expect(screen.getAllByText('AVG').length).toBeGreaterThan(0));
     expect(advisoryText()).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Upgrade Instance' })).toBeNull();
   });
 
   it('stays silent when the series is empty', async () => {
@@ -74,7 +74,7 @@ describe('ObservabilitySection memory advisory', () => {
     // cloud-hosting mode but a non-insforge.app backend: the Compute tab the
     // CTA opens would fall back to Project Information, so no button.
     setDashboardBackendUrl('https://localhost:7130');
-    renderSection('cloud-hosting', metricsResponse([80, 82, 84]));
+    renderSection('cloud-hosting', metricsResponse([70, 72, 84]));
 
     await waitFor(() => expect(advisoryText()).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Upgrade Instance' })).toBeNull();

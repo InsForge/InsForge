@@ -238,7 +238,7 @@ describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check
       key: 'alice/cat.jpg',
       size: 42,
       mimeType: 'image/jpeg',
-      uploadedAt,
+      uploadedAt: uploadedAt.toISOString(),
     });
     expect(calls.map((c) => c.sql)).toEqual([
       'SELECT * FROM storage.objects WHERE bucket = $1 ORDER BY key LIMIT $2 OFFSET $3',

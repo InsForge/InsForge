@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, afterAll } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   post: vi.fn(),
@@ -38,6 +38,21 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 import { CloudEmailProvider } from '../../src/providers/email/cloud.provider.js';
+
+// isCloudProject() needs our infrastructure marker as well as a project id.
+const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+
+beforeEach(() => {
+  process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+});
+
+afterAll(() => {
+  if (savedProfile === undefined) {
+    delete process.env.AWS_INSTANCE_PROFILE_NAME;
+  } else {
+    process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+  }
+});
 
 describe('CloudEmailProvider request-otp support', () => {
   beforeEach(() => {

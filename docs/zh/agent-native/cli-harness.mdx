@@ -19,7 +19,7 @@ description: "InsForge CLI 是代理的双手：一个终端接口涵盖架构�
 | 区域 | 命令 |
 |------|----------|
 | 身份验证和上下文 | `login`, `logout`, `whoami`, `current`, `list` |
-| 项目 | `create`, `link` |
+| 项目 | `create`, `link`, `projects update-version`, `projects delete` |
 | 架构 | `db migrations new`, `db migrations up`, `db migrations list` |
 | 代码配置 | `config plan`, `config apply`, `config export` |
 | 分支 | `branch create`, `branch merge`, `branch reset`, `branch delete` |
@@ -27,6 +27,19 @@ description: "InsForge CLI 是代理的双手：一个终端接口涵盖架构�
 | 诊断 | `diagnose`, `diagnose advisor`, `diagnose db`, `diagnose logs`, `metadata` |
 
 运行 `npx @insforge/cli help <command>` 以获取任何这些命令的标志。
+
+## 升级和删除项目
+
+```bash
+npx @insforge/cli projects update-version
+npx @insforge/cli projects delete --project <id>
+```
+
+`projects update-version` 将项目迁移到最新的 InsForge 后端版本。默认针对已链接的项目；传递 `--project <id>` 以选择其他项目。该命令会重启实例，因此预期会有短暂停机。添加 `--wait` 以阻塞直到更新完成。
+
+`projects delete` 会永久删除项目：其数据库、存储以及所有其他资源，包括其后端分支。这里 `--project` 是必需的，且永远不会回退到已链接的项目，因此游离的环境值不会把删除指向错误的项目。两个命令在执行前都会确认，但仅在交互模式下：`--yes` 和 `--json` 都会跳过提示，所以 `projects delete --project <id> --json` 会立即删除。删除不可逆。切勿在此传递 `--yes`，并在命令运行前让人工核实确切的项目 ID。
+
+要改为从仪表板执行其中任一操作，两者都位于 **Settings → General**。
 
 ## 典型代理运行
 

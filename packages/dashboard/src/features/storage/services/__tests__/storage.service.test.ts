@@ -58,6 +58,34 @@ describe('storageService', () => {
     expect(apiClientMock.request).not.toHaveBeenCalled();
   });
 
+  it('maps the API list response to the dashboard object list', async () => {
+    apiClientMock.request.mockResolvedValue({
+      data: [
+        {
+          key: 'logo.png',
+          bucket: 'photos',
+          size: 123,
+          uploadedAt: '2026-08-14T00:00:00.000Z',
+          url: 'https://example.test/logo.png',
+        },
+      ],
+      pagination: { offset: 0, limit: 100, total: 1 },
+    });
+
+    await expect(storageService.listObjects('photos')).resolves.toEqual({
+      objects: [
+        {
+          key: 'logo.png',
+          bucket: 'photos',
+          size: 123,
+          uploadedAt: '2026-08-14T00:00:00.000Z',
+          url: 'https://example.test/logo.png',
+        },
+      ],
+      pagination: { offset: 0, limit: 100, total: 1 },
+    });
+  });
+
   it('chunks deletes into batches of 1000 objects', async () => {
     apiClientMock.request
       .mockResolvedValueOnce({

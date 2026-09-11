@@ -8,8 +8,9 @@ import {
   DropdownMenuSeparator,
 } from '@insforge/ui';
 import type { ServiceSchema } from '@insforge/shared-schemas';
-import { statusColors, getReachableUrl } from '#features/compute/constants';
+import { statusColors, getReachableUrl, INGRESS_MODES } from '#features/compute/constants';
 import { useServiceHealth } from '#features/compute/hooks/useComputeServices';
+import { useComputeCapabilities } from '#features/compute/hooks/useComputeCapabilities';
 
 interface ServiceCardProps {
   service: ServiceSchema;
@@ -21,7 +22,17 @@ interface ServiceCardProps {
 
 export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: ServiceCardProps) {
   const { t } = useTranslation('chrome');
+  // This service's own provider, not the deployment default. Providers coexist and
+  // the backend routes per row, so a Docker service in a Fly-default deployment
+  // would otherwise show the meaningless region `local`, and a Fly service in a
+  // Docker-default deployment would hide the region it genuinely has.
+  const { capabilities } = useComputeCapabilities(service.provider);
+  const showRegion = capabilities ? capabilities.regions : true;
   const reachableUrl = getReachableUrl(service);
+  // Same table the create dialog uses, so the card cannot say `port` where the
+  // form said "Published host port".
+  const ingressLabel =
+    INGRESS_MODES.find((m) => m.value === service.ingress)?.label ?? service.ingress;
   // Only poll Fly events for services that could plausibly be crash-looping —
   // a stopped/failed/destroying machine has nothing to loop on, and these
   // calls hit Fly's per-org rate limit.
@@ -40,15 +51,19 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
       }}
       className="w-full text-left bg-card border border-[var(--alpha-8)] rounded-lg p-4 hover:border-foreground/20 transition-colors cursor-pointer"
     >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-foreground truncate">{service.name}</h3>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        {/* min-w-0 so the name is what gives way when the badges need room; without it
+            the flex child refuses to shrink and "crash-looping" wraps mid-word. */}
+        <h3 className="min-w-0 text-sm font-medium text-foreground truncate" title={service.name}>
+          {service.name}
+        </h3>
+        <div className="flex shrink-0 items-center gap-2">
           {health?.isCrashLooping && (
             <span
-              className="flex items-center gap-1 text-xs text-destructive"
+              className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-destructive"
               title={t('compute.crashLoopTooltip', {
                 defaultValue:
-                  "{{count}} exits in the last 60s — container is restart-looping. Container stdout/stderr isn't surfaced yet; reproduce locally with the same image to see why it's exiting.",
+                  '{{count}} exits in the last 60s — the container is restart-looping. Open it and check Logs for why it exits.',
                 count: health.recentExitCount,
               })}
             >
@@ -105,15 +120,18 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1 text-xs text-primary hover:underline mb-3"
+            className="inline-flex max-w-full items-center gap-1 text-xs text-primary hover:underline mb-3"
+            title={reachableUrl.display}
           >
-            <ExternalLink className="h-3 w-3" />
-            {reachableUrl.display}
+            <ExternalLink className="h-3 w-3 shrink-0" />
+            {/* Truncated like the image URL above it: a `host`-ingress hostname is
+                longer than a card is wide, and the full value is in the tooltip. */}
+            <span className="truncate">{reachableUrl.display}</span>
           </a>
         ) : (
           <code
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center text-xs text-foreground bg-[var(--alpha-8)] px-2 py-0.5 rounded mb-3 font-mono"
+            className="inline-flex max-w-full items-center truncate text-xs text-foreground bg-[var(--alpha-8)] px-2 py-0.5 rounded mb-3 font-mono"
             title={t('compute.rawTcpEndpointTooltip', {
               defaultValue:
                 'Raw TCP endpoint — connect with redis-cli, psql, or your protocol-native client',
@@ -131,7 +149,15 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
             value: service.memory,
           })}
         </span>
-        <span>{service.region}</span>
+        {/* A single-host driver reports region 'local', which tells the reader
+            nothing. Show what actually varies between services instead. */}
+        {showRegion ? (
+          <span>{service.region}</span>
+        ) : (
+          <span>
+            {t(`compute.ingressModes.${service.ingress}`, { defaultValue: ingressLabel })}
+          </span>
+        )}
       </div>
     </div>
   );

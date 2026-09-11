@@ -1,9 +1,23 @@
 import { z } from 'zod';
-import { serviceSchema, cpuTierEnum } from './compute-services.schema.js';
+import {
+  serviceSchema,
+  cpuTierEnum,
+  ingressModeEnum,
+  computeProviderEnum,
+} from './compute-services.schema.js';
 
 const envVarKeyRegex = /^[A-Z_][A-Z0-9_]*$/;
 
 export const createServiceSchema = z.object({
+  /**
+   * Which driver to create on. Omitted, the server uses its default — which is what
+   * the CLI does and what every caller did before providers could coexist.
+   *
+   * The dashboard sends it because provider is its navigation axis: creating from
+   * Fly's page must not put the service on Docker, where that page would then filter
+   * it out of its own list.
+   */
+  provider: computeProviderEnum.optional(),
   name: z
     .string()
     .min(1)
@@ -47,6 +61,14 @@ export const createServiceSchema = z.object({
    * sending `'http'` at every fallback site downstream.
    */
   protocol: z.enum(['http', 'tcp']).optional(),
+  /**
+   * How the service should be reachable. Omitted, the server picks the active
+   * driver's default (see ComputeCapabilities.ingressModes) — which for a
+   * single-host driver is `none`, since most compute takes no inbound traffic.
+   * A driver that cannot honour the requested mode coerces it and logs the
+   * substitution rather than failing an otherwise valid deploy.
+   */
+  ingress: ingressModeEnum.optional(),
   /**
    * Scale-to-zero. `true` (default) is the existing behaviour — Fly stops the
    * machine when idle and cold-starts it on the next request. `false` keeps
@@ -112,6 +134,8 @@ export const updateServiceSchema = z
       })
       .optional(),
     region: z.string().optional(),
+    /** Ingress — same semantics as createServiceSchema.ingress. */
+    ingress: ingressModeEnum.optional(),
     /**
      * Edge protocol — same semantics as createServiceSchema.protocol. Optional
      * on update; omitting it leaves the existing service's protocol in place.
@@ -152,6 +176,52 @@ export const computeLogsResponseSchema = z.object({
 
 export type CreateServiceRequest = z.infer<typeof createServiceSchema>;
 export type UpdateServiceRequest = z.infer<typeof updateServiceSchema>;
+
+/**
+ * What a *caller* sends, as opposed to what the server has after parsing.
+ *
+ * Fields with a `.default()` — `region`, `cpu`, `memory` — are required on the
+ * inferred output type but optional on the wire. A client that deliberately omits
+ * one (the dashboard drops `region` when the provider has no regions, so the
+ * stored row does not claim a choice the user never made) needs this shape.
+ */
+export type CreateServiceRequestInput = z.input<typeof createServiceSchema>;
 export type ListServicesResponse = z.infer<typeof listServicesResponseSchema>;
 export type ComputeLogLine = z.infer<typeof computeLogLineSchema>;
 export type ComputeLogsResponse = z.infer<typeof computeLogsResponseSchema>;
+
+/**
+ * Whether a credential is set, and a masked hint of it — never the value.
+ *
+ * Same shape as modelGatewayCredentialStatusSchema, for the same reason: the dialog
+ * needs to say "configured" and show enough to recognise which key is stored, and
+ * nothing should hand a Fly token back over the wire once it is saved.
+ */
+export const computeCredentialStatusSchema = z.object({
+  configured: z.boolean(),
+  masked: z.string().nullable(),
+  /**
+   * Where the value came from. `environment` means it is in the container's env and
+   * this dialog cannot change it; saving here stores one that takes precedence.
+   */
+  source: z.enum(['stored', 'environment']).nullable(),
+});
+
+export const computeConfigSchema = z.object({
+  flyApiToken: computeCredentialStatusSchema,
+  flyOrg: computeCredentialStatusSchema,
+});
+
+/** At least one credential, so an empty body cannot look like a successful no-op. */
+export const updateComputeConfigSchema = z
+  .object({
+    flyApiToken: z.string().trim().min(1).max(512).optional(),
+    flyOrg: z.string().trim().min(1).max(128).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field is required',
+  });
+
+export type ComputeCredentialStatus = z.infer<typeof computeCredentialStatusSchema>;
+export type ComputeConfig = z.infer<typeof computeConfigSchema>;
+export type UpdateComputeConfig = z.infer<typeof updateComputeConfigSchema>;

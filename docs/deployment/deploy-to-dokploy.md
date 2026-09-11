@@ -1,6 +1,6 @@
 ---
 title: "Self-Host InsForge on Dokploy"
-description: "Deploy the InsForge backend on Dokploy as a Compose application, with the Postgres image built from the repository so its configuration always matches the release."
+description: "Self-host InsForge on Dokploy as a Compose application, with the Postgres image built from the repo so its config always matches the release."
 ---
 
 # Self-Host InsForge on Dokploy

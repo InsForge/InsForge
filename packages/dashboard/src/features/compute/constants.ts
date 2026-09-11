@@ -19,6 +19,17 @@ export const CPU_TIERS = [
 
 export const MEMORY_OPTIONS = [256, 512, 1024, 2048, 4096, 8192] as const;
 
+/**
+ * Ingress modes, shown only when the configured provider offers more than one
+ * (see useComputeCapabilities). `none` leads because most compute takes no
+ * inbound traffic, and it is the backend's default too.
+ */
+export const INGRESS_MODES = [
+  { value: 'none', label: 'Private (internal network only)' },
+  { value: 'port', label: 'Published host port' },
+  { value: 'host', label: 'Hostname (routed by your gateway)' },
+] as const;
+
 export const REGIONS = [
   { value: 'iad', label: 'Ashburn, VA (iad)' },
   { value: 'sin', label: 'Singapore (sin)' },
@@ -57,4 +68,26 @@ export function getReachableUrl(service: ServiceSchema): ServiceEndpoint | null 
     return { display: `${host}:${service.port}`, href: null };
   }
   return { display: service.endpointUrl, href: service.endpointUrl };
+}
+
+/**
+ * The providers the compute tab navigates between, in sidebar order.
+ *
+ * Both are listed whether or not they are configured: a self-hoster who cannot see
+ * Docker in the nav has no way to discover that it is an option, which is exactly the
+ * confusion this replaced. Selecting an unconfigured one shows how to enable it.
+ */
+export const COMPUTE_PROVIDERS = [
+  { slug: 'docker', label: 'Docker' },
+  { slug: 'fly', label: 'Fly.io' },
+] as const;
+
+export type ComputeProviderSlug = (typeof COMPUTE_PROVIDERS)[number]['slug'];
+
+export function isComputeProviderSlug(value: string | undefined): value is ComputeProviderSlug {
+  return COMPUTE_PROVIDERS.some((p) => p.slug === value);
+}
+
+export function computeProviderLabel(slug: string): string {
+  return COMPUTE_PROVIDERS.find((p) => p.slug === slug)?.label ?? slug;
 }

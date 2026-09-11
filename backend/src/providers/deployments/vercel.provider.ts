@@ -1,9 +1,9 @@
 import axios from 'axios';
-import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import type { Readable } from 'stream';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError, UpstreamError } from '@/utils/errors.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
@@ -310,12 +310,7 @@ export class VercelProvider {
           throw new Error('PROJECT_ID not found in environment variables');
         }
 
-        const jwtSecret = appConfig.app.jwtSecret;
-        if (!jwtSecret) {
-          throw new Error('JWT_SECRET not found in environment variables');
-        }
-
-        const signature = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
+        const signature = TokenManager.getInstance().signCloudToken('Cloud deploy credentials');
 
         const response = await fetch(
           `${appConfig.cloud.apiHost}/sites/v1/credentials/${projectId}?sign=${signature}`

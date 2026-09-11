@@ -1,9 +1,13 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterAll } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 
 const cloudConfig = vi.hoisted(() => ({ projectId: undefined as string | undefined }));
 vi.mock('../../src/infra/config/app.config.js', () => ({
-  appConfig: { cloud: cloudConfig, app: { jwtSecret: 's'.repeat(32) } },
+  appConfig: {
+    cloud: cloudConfig,
+    app: { jwtSecret: 's'.repeat(32), logLevel: 'error' },
+    server: { logsDir: '/tmp/insforge-analytics-service-test-logs' },
+  },
   config: { cloud: cloudConfig },
 }));
 vi.mock('../../src/utils/logger.js', () => ({
@@ -55,14 +59,26 @@ function makeService(deps = makeDeps()) {
 }
 
 describe('AnalyticsService', () => {
+  const savedProfile = process.env.AWS_INSTANCE_PROFILE_NAME;
+  beforeEach(() => {
+    process.env.AWS_INSTANCE_PROFILE_NAME = 'EC2-role';
+  });
+  afterAll(() => {
+    if (savedProfile === undefined) {
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+    } else {
+      process.env.AWS_INSTANCE_PROFILE_NAME = savedProfile;
+    }
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     cloudConfig.projectId = undefined;
   });
 
   describe('provider selection', () => {
-    it('uses the local provider when PROJECT_ID is absent', async () => {
-      cloudConfig.projectId = undefined;
+    it('uses the local provider off our infrastructure', async () => {
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
       const { service, local, cloud } = makeService();
 
       await service.getConnection();
@@ -70,15 +86,20 @@ describe('AnalyticsService', () => {
       expect(cloud.getConnection).not.toHaveBeenCalled();
     });
 
-    it("treats the 'local' placeholder as self-hosted", async () => {
-      cloudConfig.projectId = 'local';
-      const { service, local } = makeService();
+    // The Zeabur template sets PROJECT_ID, so a project id alone must not route at the
+    // cloud provider.
+    it('stays local for a self-host that sets PROJECT_ID', async () => {
+      delete process.env.AWS_INSTANCE_PROFILE_NAME;
+      cloudConfig.projectId = 'zeabur-project-1';
+      const { service, local, cloud } = makeService();
 
       await service.getConnection();
+
       expect(local.getConnection).toHaveBeenCalledOnce();
+      expect(cloud.getConnection).not.toHaveBeenCalled();
     });
 
-    it('uses the cloud provider when a real PROJECT_ID is set', async () => {
+    it('uses the cloud provider on our infrastructure', async () => {
       cloudConfig.projectId = '77777777-7777-7777-7777-777777777777';
       const { service, cloud, local } = makeService();
 
