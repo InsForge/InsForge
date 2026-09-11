@@ -1,6 +1,6 @@
 ---
 title: "資料庫遷移"
-description: "使用 InsForge CLI 建立、追蹤與套用資料庫遷移，將 Postgres 結構描述變更納入 git 版控並安全部署至生產。"
+description: "以 @insforge/cli 管理資料庫遷移：new 建立時間戳 SQL 檔、up 在交易內套用、list 檢視歷史，僅前向流程可納入 git 版控。"
 ---
 
 遷移是 `migrations/` 中應用於 `@insforge/cli` 的版本化 SQL 檔案。每次成功執行都記錄在 `system.custom_migrations` 中。工作流程是僅向前的。
