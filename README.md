@@ -88,7 +88,7 @@ graph TB
     linkStyle default stroke:#30363d,stroke-width:1px
 ```
 
-### Core Products
+### Core products
 - **Authentication**: User management, authentication, and sessions
 - **Database**: Postgres relational database
 - **Storage**: S3-compatible file storage
@@ -98,7 +98,7 @@ graph TB
 - **Site Deployment**: Site build and deployment
 
 
-## ⭐️ Star the Repository
+## ⭐️ Star the repository
 
 <p align="center">
   <img src="assets/insforge-star.gif" alt="Star InsForge" width="100%">
@@ -182,7 +182,7 @@ To verify the connection, send the following prompt to your agent:
 I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to learn about InsForge instructions.
 ```
 
-#### 4. Running Multiple Projects
+#### 4. Run multiple projects
 
 Give each project its own directory:
 
@@ -226,7 +226,7 @@ cd ~/project2 && docker compose up -d
 `docker compose ps`, `logs -f`, and `down` operate on whichever directory you
 run them from.
 
-#### 5. Storage Backends (Optional)
+#### 5. Storage backends (optional)
 
 InsForge stores files on the local filesystem by default. Backing storage with an S3-compatible store also enables the S3-compatible gateway at `/storage/v1/s3` (use `aws` CLI, rclone, or any AWS SDK against your InsForge Storage).
 
@@ -252,9 +252,9 @@ Or bring your own S3-compatible store (AWS S3, MinIO, RustFS, Wasabi, R2, Tencen
 
 See the [self-hosted storage guide](https://docs.insforge.dev/deployment/self-host-storage) for provider notes, presigned vs. proxy mode, and upgrade tips.
 
-### One-click Deployment
+### One-click deployment
 
-In addition to running InsForge locally, you can also launch InsForge using a pre-configured setup. This allows you to get up and running quickly with InsForge without installing Docker on your local machine.
+In addition to running InsForge locally, you can launch InsForge using a pre-configured setup. This lets you get up and running quickly without installing Docker on your local machine.
 
 | Railway | Zeabur | Sealos | RepoCloud |
 | --- | --- | --- | --- |
@@ -268,7 +268,7 @@ In addition to running InsForge locally, you can also launch InsForge using a pr
 **Support**: If you need any help or support, we're responsive on our [Discord channel](https://discord.com/invite/MPxwj5xVvW), and also feel free to email us [info@insforge.dev](mailto:info@insforge.dev) too!
 
 
-## Documentation & Support
+## Documentation & support
 
 ### Documentation
 - **[Official Docs](https://docs.insforge.dev/introduction)** - Comprehensive guides and API references
