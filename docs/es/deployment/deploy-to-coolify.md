@@ -72,7 +72,7 @@ Revisa el diff de `.env.example` antes de actualizar: una versión que añada un
 
 ## Almacenamiento
 
-El almacenamiento de objetos usa por defecto el sistema de archivos del contenedor en un volumen de Docker. Para S3, MinIO o RustFS, consulta [Self-Hosted Storage](./self-host-storage.mdx) y define las variables `S3_*` en el entorno de Coolify; el archivo compose las pasa al contenedor.
+El almacenamiento de objetos usa por defecto el sistema de archivos del contenedor en un volumen de Docker. Para S3, MinIO o RustFS, consulta [Self-Hosted Storage](/deployment/self-host-storage) y define las variables `S3_*` en el entorno de Coolify; el archivo compose las pasa al contenedor.
 
 ## Por qué Postgres se construye en lugar de descargarse
 

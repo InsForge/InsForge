@@ -72,7 +72,7 @@ VITE_API_BASE_URL=https://insforge.example.com
 
 ## 存储
 
-对象存储默认落在 Docker 卷上的容器文件系统里。要用 S3、MinIO 或 RustFS，请参见 [Self-Hosted Storage](./self-host-storage.mdx)，并在 Coolify 的环境变量里设置 `S3_*`——compose 文件会把它们透传进去。
+对象存储默认落在 Docker 卷上的容器文件系统里。要用 S3、MinIO 或 RustFS，请参见 [Self-Hosted Storage](/deployment/self-host-storage)，并在 Coolify 的环境变量里设置 `S3_*`——compose 文件会把它们透传进去。
 
 ## 为什么 Postgres 是构建而不是拉取
 

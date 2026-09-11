@@ -72,7 +72,7 @@ VITE_API_BASE_URL=https://insforge.example.com
 
 ## 儲存
 
-物件儲存預設落在 Docker 卷上的容器檔案系統。若要使用 S3、MinIO 或 RustFS，請參見 [Self-Hosted Storage](./self-host-storage.mdx)，並在 Coolify 的環境變數中設定 `S3_*`——compose 檔案會將其傳遞進去。
+物件儲存預設落在 Docker 卷上的容器檔案系統。若要使用 S3、MinIO 或 RustFS，請參見 [Self-Hosted Storage](/deployment/self-host-storage)，並在 Coolify 的環境變數中設定 `S3_*`——compose 檔案會將其傳遞進去。
 
 ## 為什麼 Postgres 是建置而非拉取
 
