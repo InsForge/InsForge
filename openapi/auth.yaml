@@ -1659,11 +1659,11 @@ paths:
           schema:
             type: string
           description: Error message
-        - name: payload
+        - name: token
           in: query
           schema:
             type: string
-          description: Base64 encoded user payload
+          description: Identity assertion the cloud signed with this project's JWT secret, bound to this login attempt
       responses:
         '302':
           description: Redirect to application with access token or error

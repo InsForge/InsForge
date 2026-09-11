@@ -10,6 +10,38 @@ import { appConfig } from '@/infra/config/app.config.js';
 // Constants
 const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
+// Largest numeric array index accepted inside a multipart field name, e.g. the
+// 3 in `a[3]`. multer defaults this to Infinity, and the check in
+// make-middleware.js only runs when the key is explicitly present, so the
+// 2.3.0 upgrade alone does NOT close GHSA-535w-7cp7-47q4 (CVE-2026-82333,
+// oversized array index) -- that advisory
+// requires the version AND this limit. Without it a crafted field name like
+// `a[999999999]` makes body parsing allocate and spin, which is synchronous
+// CPU exhaustion. Nothing here uses array-indexed field names (uploads are
+// .single()), so this is far above real usage and purely a ceiling.
+const MAX_FIELD_ARRAY_INDEX = 100;
+
+/**
+ * multer 2.3.0 reads `fieldArrayIndexLimit` at runtime, but @types/multer 2.2.0
+ * does not declare it yet (it has fieldNestingDepth and stops there), and
+ * multer's Options['limits'] is an inline anonymous type rather than a named
+ * interface -- so it cannot be reached with `declare module`. Widening it here
+ * and passing the RESULT keeps both call sites type-checked: excess-property
+ * checking applies to fresh object literals, not to a typed value.
+ *
+ * Also makes the two uploaders share one definition, so a limit can no longer
+ * be set on one and forgotten on the other.
+ */
+type UploadLimits = NonNullable<multer.Options['limits']> & {
+  fieldArrayIndexLimit?: number;
+};
+
+const uploadLimits = (fileSize: number): UploadLimits => ({
+  fileSize,
+  files: appConfig.server.maxFilesPerField,
+  fieldArrayIndexLimit: MAX_FIELD_ARRAY_INDEX,
+});
+
 /**
  * Returns the configured max file size in bytes.
  * Uses the MAX_FILE_SIZE environment variable if set, otherwise defaults to 50 MB.
@@ -19,10 +51,7 @@ export const getMaxFileSize = (): number => appConfig.server.maxFileSize ?? DEFA
 // Create multer instance with memory storage (static, env-based — used by non-storage routes)
 export const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: getMaxFileSize(),
-    files: appConfig.server.maxFilesPerField,
-  },
+  limits: uploadLimits(getMaxFileSize()),
 });
 
 /**
@@ -47,10 +76,7 @@ export const dynamicUploadSingle =
 
     const uploader = multer({
       storage: multer.memoryStorage(),
-      limits: {
-        fileSize: maxSize,
-        files: appConfig.server.maxFilesPerField,
-      },
+      limits: uploadLimits(maxSize),
     }).single(fieldName);
     uploader(req, res, next);
   };

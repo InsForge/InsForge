@@ -1,6 +1,6 @@
 {
   "name": "@insforge/ui",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "author": "InsForge",
   "description": "React UI component library, design tokens, and Tailwind preset for InsForge apps",
   "license": "Apache-2.0",
@@ -83,6 +83,6 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "jsdom": "^29.1.1",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.11"
   }
 }
