@@ -44,7 +44,7 @@
     "@aws-sdk/s3-request-presigner": "^3.879.0",
     "@databases/split-sql-query": "^1.0.4",
     "@databases/sql": "^3.3.0",
-    "@types/multer": "^1.4.13",
+    "@types/multer": "^2.2.0",
     "@types/pg": "^8.15.4",
     "adm-zip": "^0.6.0",
     "agentkeepalive": "^4.6.0",
@@ -53,7 +53,7 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "cron-parser": "^5.4.0",
-    "csv-parse": "^6.1.0",
+    "csv-parse": "^7.0.2",
     "dotenv": "^16.4.5",
     "express": "^4.22.0",
     "express-rate-limit": "^7.1.5",
@@ -63,10 +63,10 @@
     "jsonwebtoken": "^9.0.2",
     "libpg-query": "^17.6.0",
     "lru-cache": "^11.3.5",
-    "multer": "^2.2.0",
+    "multer": "^2.3.0",
     "node-fetch": "^3.3.2",
     "node-pg-migrate": "^8.0.3",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "^9.1.1",
     "openai": "^5.19.1",
     "pg": "^8.16.3",
     "pg-format": "^1.0.4",
@@ -97,6 +97,6 @@
     "tsup": "^8.5.1",
     "tsx": "^4.23.1",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.11"
   }
 }

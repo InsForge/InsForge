@@ -1,6 +1,6 @@
 {
   "name": "insforge",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "InsForge - Open source backend-as-a-service with PostgreSQL and MCP integration",
   "type": "module",
   "workspaces": [
@@ -61,6 +61,8 @@
   "author": "InsForge",
   "license": "Apache-2.0",
   "overrides": {
+    "@humanfs/node": "^0.16.8",
+    "browserslist": "^4.28.7",
     "express": "^4.22.0",
     "undici": "7.29.0",
     "fast-xml-parser": "^5.7.0",
@@ -74,14 +76,14 @@
     "uuid": "^14.0.0",
     "axios": "1.18.1",
     "ws": "^8.21.0",
-    "qs": "^6.15.2",
+    "qs": "^6.16.0",
     "minimatch@10": {
       "brace-expansion": "^5.0.9"
     },
     "shell-quote": "1.10.0",
     "form-data": "4.0.6",
     "@opentelemetry/core": "2.9.0",
-    "js-yaml": "5.2.3",
+    "js-yaml": "^4.3.2",
     "@babel/core": "7.29.7",
     "tsup": {
       ".": "^8.5.1",
