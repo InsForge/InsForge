@@ -53,13 +53,13 @@ Because the CLI runs each migration file inside a single transaction (the same r
 - `VACUUM` — routine vacuuming is handled by PostgreSQL autovacuum, so you rarely need to run this yourself.
 - `REINDEX ... CONCURRENTLY`, `ALTER TYPE ... ADD VALUE` (on older PostgreSQL), and similar commands.
 
-Run these outside a migration with the CLI's unrestricted raw-SQL path, which executes the statement **without** wrapping it in a transaction:
+Run these outside a migration with `db query`, which sends the statement on its own rather than inside a transaction:
 
 ```bash
-npx @insforge/cli db query --unrestricted "CREATE INDEX CONCURRENTLY idx_orders_customer ON public.orders (customer_id)"
+npx @insforge/cli db query "CREATE INDEX CONCURRENTLY idx_orders_customer ON public.orders (customer_id)"
 ```
 
-Plain `npx @insforge/cli db query` (without `--unrestricted`) wraps your statement in a transaction, so it hits the same error — use `--unrestricted` for non-transactional commands.
+`--unrestricted` is a privilege switch, not a transaction one: it runs the statement as the database owner instead of `project_admin`, which is what you need for system tables or objects `project_admin` does not own. Add it when ownership requires it, not to escape a transaction.
 
 <Note>
   Both `db query` paths enforce a 30-second `statement_timeout`, so `CREATE INDEX CONCURRENTLY` or `VACUUM` on a large table may time out.
