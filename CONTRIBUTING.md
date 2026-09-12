@@ -129,7 +129,7 @@ All contributions must include appropriate tests. Follow these guidelines:
 5. Update documentation as needed
 6. Keep your PR focused on a single feature or bug fix
 7. Be responsive to code review feedback
-8. **After you address review comments, re-request a review from your assigned reviewer** (use the 🔁 button next to their name in the Reviewers section). This is how the reviewer is notified that your changes are ready for another look — without it, your PR may sit unnoticed.
+8. **After you address review comments, re-request a review from your assigned reviewer.** If you have write access, use the 🔁 button next to their name in the Reviewers section. If you are working from a fork and do not see that control, leave a short comment on the PR instead (for example, "Addressed the review, ready for another look") — the reviewer will be notified via the comment thread. Without either signal, your PR may sit unnoticed.
 
 ## Code Style
 
