@@ -57,7 +57,10 @@ describe('convertSqlTypeToColumnType', () => {
     });
   });
 
-  it('returns first 8 chars for unknown types', () => {
-    expect(convertSqlTypeToColumnType('customtype')).toBe('customty');
+  it('returns full type name for unknown/extension types', () => {
+    expect(convertSqlTypeToColumnType('customtype')).toBe('customtype');
+    expect(convertSqlTypeToColumnType('geography')).toBe('geography');
+    expect(convertSqlTypeToColumnType('order_status')).toBe('order_status');
+    expect(convertSqlTypeToColumnType('vector')).toBe('vector');
   });
 });
