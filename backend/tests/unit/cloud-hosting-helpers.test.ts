@@ -1,129 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import { getErrorMessage, normalizeProjectInfo } from '../../../frontend/src/cloud-hosting/helpers';
 
 /**
- * Tests for the cloud hosting detection and helper logic
- * used in frontend/src/cloudHostingHelpers.ts and frontend/src/App.tsx
- *
- * These test the pure logic extracted from the frontend helpers
- * to verify cloud-hosting detection and message normalization.
+ * Covers the pure helpers behind the cloud-hosting postMessage bridge, as
+ * imported from the module that ships them. The suite previously defined its
+ * own copies, so it passed no matter what the real helpers did.
  */
 
-// Mirrors isCloudHostingBackend from frontend/src/cloudHostingHelpers.ts
-function isCloudHostingBackend(backendUrl: string): boolean {
-  try {
-    return new URL(backendUrl).hostname.endsWith('.insforge.app');
-  } catch {
-    return false;
-  }
-}
-
-// Mirrors getErrorMessage from frontend/src/cloudHostingHelpers.ts
-function getErrorMessage(message: unknown, fallback: string): string {
-  return typeof message === 'string' && message.trim() ? message : fallback;
-}
-
-// Mirrors normalizeProjectInfo from frontend/src/cloudHostingHelpers.ts
-function normalizeProjectInfo(
-  previous: { id: string; name: string; region: string; instanceType: string } | undefined,
-  backendUrl: string,
-  message: { type: string; [key: string]: unknown }
-) {
-  const previousInfo = previous ?? {
-    id: backendUrl,
-    name: 'Project',
-    region: '',
-    instanceType: '',
-  };
-
-  return {
-    id: typeof message.id === 'string' && message.id ? message.id : previousInfo.id,
-    name: typeof message.name === 'string' && message.name ? message.name : previousInfo.name,
-    region:
-      typeof message.region === 'string' && message.region ? message.region : previousInfo.region,
-    instanceType:
-      typeof message.instanceType === 'string' && message.instanceType
-        ? message.instanceType
-        : previousInfo.instanceType,
-    latestVersion:
-      typeof message.latestVersion === 'string' || message.latestVersion === null
-        ? (message.latestVersion as string | null)
-        : (previous as Record<string, unknown>)?.latestVersion,
-    currentVersion:
-      typeof message.currentVersion === 'string' || message.currentVersion === null
-        ? (message.currentVersion as string | null)
-        : (previous as Record<string, unknown>)?.currentVersion,
-    status:
-      typeof message.status === 'string' && message.status
-        ? message.status
-        : (previous as Record<string, unknown>)?.status,
-  };
-}
-
-// Mirrors backendUrl resolution from frontend/src/App.tsx
-function resolveBackendUrl(envVar: string | undefined, windowOrigin: string): string {
-  return envVar || windowOrigin;
-}
-
 describe('Cloud Hosting Helpers', () => {
-  describe('isCloudHostingBackend', () => {
-    it('returns true for .insforge.app hostnames', () => {
-      expect(isCloudHostingBackend('https://abc123.us-east-1.insforge.app')).toBe(true);
-      expect(isCloudHostingBackend('https://myproject.eu-west-1.insforge.app')).toBe(true);
-      expect(isCloudHostingBackend('https://test.insforge.app')).toBe(true);
-    });
-
-    it('returns false for non-insforge hostnames', () => {
-      expect(isCloudHostingBackend('http://localhost:7130')).toBe(false);
-      expect(isCloudHostingBackend('https://example.com')).toBe(false);
-      expect(isCloudHostingBackend('https://insforge.app')).toBe(false); // no subdomain, but hostname IS insforge.app which ends with .insforge.app? No — "insforge.app".endsWith(".insforge.app") is true
-    });
-
-    it('returns true for bare insforge.app (endsWith includes exact match)', () => {
-      // "insforge.app".endsWith(".insforge.app") => false because of the leading dot
-      expect(isCloudHostingBackend('https://insforge.app')).toBe(false);
-    });
-
-    it('returns false for invalid URLs', () => {
-      expect(isCloudHostingBackend('')).toBe(false);
-      expect(isCloudHostingBackend('not-a-url')).toBe(false);
-    });
-
-    it('returns false for similar but different domains', () => {
-      expect(isCloudHostingBackend('https://evil-insforge.app')).toBe(false);
-      expect(isCloudHostingBackend('https://insforge.app.evil.com')).toBe(false);
-    });
-  });
-
-  describe('resolveBackendUrl (App.tsx logic)', () => {
-    it('uses env var when set', () => {
-      expect(resolveBackendUrl('http://localhost:7130', 'https://abc.insforge.app')).toBe(
-        'http://localhost:7130'
-      );
-    });
-
-    it('falls back to window origin when env var is empty', () => {
-      expect(resolveBackendUrl('', 'https://abc.us-east-1.insforge.app')).toBe(
-        'https://abc.us-east-1.insforge.app'
-      );
-    });
-
-    it('falls back to window origin when env var is undefined', () => {
-      expect(resolveBackendUrl(undefined, 'https://abc.us-east-1.insforge.app')).toBe(
-        'https://abc.us-east-1.insforge.app'
-      );
-    });
-
-    it('cloud detection works with resolved URL from window.location.origin', () => {
-      const backendUrl = resolveBackendUrl(undefined, 'https://myproject.us-east-1.insforge.app');
-      expect(isCloudHostingBackend(backendUrl)).toBe(true);
-    });
-
-    it('self-hosting detection works with localhost origin', () => {
-      const backendUrl = resolveBackendUrl(undefined, 'http://localhost:5173');
-      expect(isCloudHostingBackend(backendUrl)).toBe(false);
-    });
-  });
-
   describe('getErrorMessage', () => {
     it('returns the message when it is a non-empty string', () => {
       expect(getErrorMessage('Something went wrong', 'fallback')).toBe('Something went wrong');
@@ -215,6 +99,51 @@ describe('Cloud Hosting Helpers', () => {
         latestVersion: '2.0.3',
       });
       expect(result.latestVersion).toBe('2.0.3');
+    });
+
+    it('takes isBranch from the message when it is a boolean', () => {
+      const result = normalizeProjectInfo(undefined, 'https://x.insforge.app', {
+        type: 'PROJECT_INFO',
+        isBranch: true,
+      });
+
+      expect(result.isBranch).toBe(true);
+    });
+
+    it('keeps the previous isBranch when the message omits it', () => {
+      const previous = {
+        id: 'proj-1',
+        name: 'Project',
+        region: 'us-east-1',
+        instanceType: 'small',
+        isBranch: true,
+      };
+
+      const result = normalizeProjectInfo(previous, 'https://x.insforge.app', {
+        type: 'PROJECT_INFO',
+        name: 'Renamed',
+      });
+
+      // A partial message must not silently demote a branch project.
+      expect(result.isBranch).toBe(true);
+      expect(result.name).toBe('Renamed');
+    });
+
+    it('ignores a non-boolean isBranch rather than coercing it', () => {
+      const previous = {
+        id: 'proj-1',
+        name: 'Project',
+        region: '',
+        instanceType: '',
+        isBranch: false,
+      };
+
+      const result = normalizeProjectInfo(previous, 'https://x.insforge.app', {
+        type: 'PROJECT_INFO',
+        isBranch: 'true',
+      });
+
+      expect(result.isBranch).toBe(false);
     });
   });
 });
