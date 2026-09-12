@@ -144,6 +144,15 @@ export class ApiClient {
             pagination: { offset: start, limit: end - start + 1, total },
           };
         }
+        // Empty-page form (RFC 7233 unsatisfied range): "*/total" or "*/*"
+        const emptyMatch = contentRange.match(/^\*\/(\d+|\*)$/);
+        if (emptyMatch) {
+          const total = emptyMatch[1] === '*' ? responseData.length : parseInt(emptyMatch[1]);
+          return {
+            data: responseData,
+            pagination: { offset: 0, limit: 0, total },
+          };
+        }
         return {
           data: responseData,
           pagination: { offset: 0, limit: 0, total: 0 },

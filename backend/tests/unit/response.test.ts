@@ -55,4 +55,27 @@ describe('Response Utilities', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
   });
+
+  it('paginatedResponse uses the */total form for an empty page of a non-empty total', () => {
+    const data: number[] = [];
+    const total = 5;
+    const offset = 0;
+
+    paginatedResponse(res as Response, data, total, offset);
+
+    expect(res.setHeader).toHaveBeenCalledWith('Content-Range', '*/5');
+    expect(res.status).toHaveBeenCalledWith(206);
+    expect(res.json).toHaveBeenCalledWith([]);
+  });
+
+  it('paginatedResponse uses the */0 form when there are no rows at all', () => {
+    const data: number[] = [];
+    const total = 0;
+    const offset = 0;
+
+    paginatedResponse(res as Response, data, total, offset);
+
+    expect(res.setHeader).toHaveBeenCalledWith('Content-Range', '*/0');
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
 });
