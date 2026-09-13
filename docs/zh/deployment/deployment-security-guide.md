@@ -663,7 +663,7 @@ sudo ufw status
 
 InsForge 的 Docker 镜像已经遵循了非 root 的最佳实践：
 
-- 生产环境 Dockerfile 设置了 `USER node`（UID 1000），因此容器内的应用进程以非 root 用户运行。
+- 镜像 entrypoint 使用 `exec su-exec node`，因此容器内的应用进程以 UID 1000（`node`）运行。生产环境 Dockerfile 并不靠 `USER node` 完成这次降权：容器先以 root 启动以便加入 Docker socket 的组，再通过 `su-exec` 交接。
 - 系统级的 Docker 操作由 `deploy` 用户（在[第 2.3 步](#23-create-a-deploy-user-non-root)中创建）管理，该用户通过 `docker` 组获得对 Docker 套接字的访问权限。
 
 **验证容器用户：**
@@ -909,6 +909,20 @@ docker compose ps
 curl http://localhost:7130/api/health
 
 # Check the version in the response
+```
+
+#### 15.5 从 1.x 升级后的卷所有权
+
+1.x 上以 root 写入的卷，2.x 进程（UID 1000）无法写入。修复所有权，将 `<stack>` 替换为你的 Compose 项目名：
+
+```bash
+docker run --rm -v <stack>_insforge-logs:/a -v <stack>_storage-data:/b alpine chown -R 1000:1000 /a /b
+```
+
+完成 chown 后重启，让进程能够写入这些卷：
+
+```bash
+docker compose up -d
 ```
 
 ### 16. 回滚流程
