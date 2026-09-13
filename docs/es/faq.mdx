@@ -203,6 +203,8 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
 
     Si solo necesitas la key, por ejemplo para ejecutar la CLI en CI, abre el menú de tu cuenta y ve a **Profile → API Keys**, luego crea una key (ponle una caducidad, o **Never**). Guárdala como secreto de CI y ejecuta `login --user-api-key` con ella. Añade `--json` para una salida legible por máquina.
 
+    El valor que genera el dashboard empieza por `uak_`. Ese prefijo identifica una **user API key** (un token personal que autentica como tu cuenta), distinta de la `ik_` API Key de un proyecto. Por eso, un token que empieza por `uak_` es una user API key que creas aquí, no algo que generas por proyecto.
+
     La key da acceso completo a tu cuenta, así que mantenla en secreto y rótala si se filtra.
   </Accordion>
 

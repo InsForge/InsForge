@@ -203,6 +203,8 @@ description: "InsForge 常见问题：数据库调用、Edge Function 与 Custom
 
     如果你只需要那把 key（比如在 CI 里跑 CLI），打开账号菜单，进入 **Profile → API Keys**，创建一把 key（设个有效期，或选 **Never**）。把它存成 CI secret，再用它跑 `login --user-api-key`。加上 `--json` 可以得到机器可读的输出。
 
+    dashboard 生成的值以 `uak_` 开头。这个前缀表示它是一把**用户 API key（user API key）**——即以你账号身份进行认证的个人令牌，和项目的 `ik_` API Key 不同。所以，凡是以 `uak_` 开头的令牌，都是你在这里创建的用户 API key，而不是按项目生成的 key。
+
     这把 key 拥有你账号的完整权限，所以要保密，一旦泄露就轮换掉。
   </Accordion>
 
