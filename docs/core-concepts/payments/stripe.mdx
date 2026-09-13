@@ -34,6 +34,23 @@ npx @insforge/cli payments stripe webhooks configure --environment test
 
 After a key is connected, InsForge validates the account, stores the key in the secret store, tries to create the managed Stripe webhook endpoint, and runs sync for Products, Prices, Customers, and Subscriptions.
 
+### Set the secret key via the admin API
+
+The dashboard and CLI both call the same admin endpoint. You can also call it directly with an admin API Key (`ik_...`):
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/payments/stripe/test/config" \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{ "secretKey": "sk_test_xxx" }'
+```
+
+- `PUT /api/payments/stripe/{environment}/config`, where `{environment}` is `test` or `live`. Admin only.
+- The request body is `{ "secretKey": "..." }`. The key prefix must match the environment (`sk_test_...` for `test`, `sk_live_...` for `live`).
+- On success InsForge validates the key against your Stripe account, stores it encrypted in the secret store, tries to (re)create the managed webhook endpoint, and runs the initial sync for Products, Prices, Customers, and Subscriptions. If the connected Stripe account changed, previously mirrored payment data is cleared first.
+
+To read the connection status and a masked key, call `GET /api/payments/stripe/status`.
+
 ## Checkout
 
 Create Checkout Sessions from frontend code with the current InsForge user token.
