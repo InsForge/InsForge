@@ -9,6 +9,9 @@ export type StripeEnvironment = z.infer<typeof stripeEnvironmentSchema>;
 export const razorpayEnvironmentSchema = paymentEnvironmentSchema;
 export type RazorpayEnvironment = z.infer<typeof razorpayEnvironmentSchema>;
 
+export const paystackEnvironmentSchema = paymentEnvironmentSchema;
+export type PaystackEnvironment = z.infer<typeof paystackEnvironmentSchema>;
+
 export const stripeConnectionStatusSchema = z.enum(['unconfigured', 'connected', 'error']);
 export type StripeConnectionStatus = z.infer<typeof stripeConnectionStatusSchema>;
 
@@ -32,7 +35,7 @@ export const stripeConnectionSchema = z.object({
 });
 export type StripeConnection = z.infer<typeof stripeConnectionSchema>;
 
-export const paymentProviderSchema = z.enum(['stripe', 'razorpay']);
+export const paymentProviderSchema = z.enum(['stripe', 'razorpay', 'paystack']);
 export type PaymentProvider = z.infer<typeof paymentProviderSchema>;
 
 export const stripeProductSchema = z.object({
@@ -167,6 +170,37 @@ export const razorpayOrderSchema = z.object({
   updatedAt: z.string(),
 });
 export type RazorpayOrder = z.infer<typeof razorpayOrderSchema>;
+
+export const paystackTransactionStatusSchema = z.enum([
+  'initialized',
+  'pending',
+  'success',
+  'failed',
+  'abandoned',
+  'reversed',
+]);
+export type PaystackTransactionStatus = z.infer<typeof paystackTransactionStatusSchema>;
+
+export const paystackTransactionSchema = z.object({
+  id: z.string(),
+  environment: paystackEnvironmentSchema,
+  status: paystackTransactionStatusSchema,
+  subjectType: z.string().nullable(),
+  subjectId: z.string().nullable(),
+  customerEmail: z.string().nullable(),
+  reference: z.string().nullable(),
+  accessCode: z.string().nullable(),
+  authorizationUrl: z.string().nullable(),
+  amount: z.number(),
+  currency: z.string(),
+  verifiedTransactionId: z.string().nullable(),
+  verifiedAt: z.string().nullable(),
+  metadata: z.record(z.string()),
+  lastError: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type PaystackTransaction = z.infer<typeof paystackTransactionSchema>;
 
 export const customerPortalSessionStatusSchema = z.enum(['initialized', 'created', 'failed']);
 export type CustomerPortalSessionStatus = z.infer<typeof customerPortalSessionStatusSchema>;
@@ -370,6 +404,28 @@ export const razorpayConnectionSchema = z.object({
   lastSyncCounts: z.record(z.number()),
 });
 export type RazorpayConnection = z.infer<typeof razorpayConnectionSchema>;
+
+export const paystackConnectionStatusSchema = z.enum(['unconfigured', 'connected', 'error']);
+export type PaystackConnectionStatus = z.infer<typeof paystackConnectionStatusSchema>;
+
+export const paystackLatestSyncStatusSchema = z.enum(['succeeded', 'failed']);
+export type PaystackLatestSyncStatus = z.infer<typeof paystackLatestSyncStatusSchema>;
+
+export const paystackConnectionSchema = z.object({
+  environment: paystackEnvironmentSchema,
+  status: paystackConnectionStatusSchema,
+  accountId: z.string().nullable(),
+  accountEmail: z.string().nullable(),
+  accountLivemode: z.boolean().nullable(),
+  webhookEndpointUrl: z.string().nullable(),
+  webhookConfiguredAt: z.string().nullable(),
+  maskedKey: z.string().nullable(),
+  lastSyncedAt: z.string().nullable(),
+  lastSyncStatus: paystackLatestSyncStatusSchema.nullable(),
+  lastSyncError: z.string().nullable(),
+  lastSyncCounts: z.record(z.number()),
+});
+export type PaystackConnection = z.infer<typeof paystackConnectionSchema>;
 
 export const razorpayItemSchema = z.object({
   environment: razorpayEnvironmentSchema,
