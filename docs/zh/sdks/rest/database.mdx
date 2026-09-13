@@ -673,6 +673,22 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql" \
 }
 ```
 
+### 示例：修改表中的某个值
+
+`INSERT`、`UPDATE` 和 `DELETE` 同样可以在这里执行——当“更新记录”接口无法满足需求时，这是通过 REST API 直接修改表中某个值的一种方式。系统表和 `auth.users` 仍然被禁止访问，因此该操作适用于你在 `public` 模式下自己的表。如需修改表结构，请改用迁移（migration）。
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "UPDATE posts SET published = $1 WHERE id = $2",
+    "params": [false, "248373e1-0aea-45ce-8844-5ef259203749"]
+  }'
+```
+
+响应中的 `command` 字段会反映语句类型（例如 `UPDATE`），`rowCount` 则是被修改的行数。
+
 ---
 
 ## 执行原始 SQL（宽松模式）
