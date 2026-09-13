@@ -76,6 +76,41 @@ El JWT de autenticación fluye automáticamente a través de cada llamada del SD
 
 El estado del usuario vive en la base de datos Postgres de su proyecto en el esquema `auth`. Una `auth.users` a sus tablas de aplicación mediante claves ajenas, reaccione a cambios de identidad con activadores y respalda todo de la misma manera que respalda todo lo demás.
 
+## Configurar un proveedor OAuth integrado
+
+Los proveedores integrados —Google, GitHub, Apple, Microsoft, GitLab, Discord y más— se configuran por proyecto. Usando **GitHub** como ejemplo:
+
+<Steps>
+  <Step title="Registrar una app OAuth con el proveedor">
+    En la consola de desarrollador del proveedor (para GitHub, [Developer settings → OAuth Apps](https://github.com/settings/developers)), cree una nueva app OAuth. Establezca la **Authorization callback URL** con el endpoint de callback de su proyecto:
+
+    ```
+    <project-api-url>/api/auth/oauth/github/callback
+    ```
+
+    El proveedor emite entonces un **Client ID** y un **Client Secret**.
+  </Step>
+  <Step title="Habilitar el proveedor en InsForge">
+    En el panel de InsForge, abra **Auth Methods**, habilite **GitHub** y pegue el **Client ID** y el **Client Secret** del paso anterior. Si no define scopes personalizados, GitHub usa `user:email` de forma predeterminada para que InsForge pueda leer la dirección de correo de la cuenta.
+    {/* TODO: confirm dashboard location — exact per-provider toggle under Auth Methods not verifiable from code */}
+  </Step>
+  <Step title="Iniciar sesión de usuarios desde su app">
+    Llame a `signInWithOAuth()` con `'github'` como clave de proveedor:
+
+    ```typescript
+    await insforge.auth.signInWithOAuth('github', {
+      redirectTo: 'http://localhost:3000/dashboard',
+    });
+    ```
+
+    La misma llamada funciona para cualquier proveedor habilitado: cambie `'github'` por `'google'`, `'apple'`, etc. Consulte la [referencia de `signInWithOAuth`](/sdks/typescript/auth) para ver todas las opciones.
+  </Step>
+</Steps>
+
+<Note>
+  ¿Prefiere configurar los proveedores mediante código? La API de configuración OAuth de administrador (`POST /api/auth/oauth/configs`, requiere clave de administrador) almacena los mismos campos que escribe el panel: `provider`, `clientId`, `clientSecret` y `scopes`.
+</Note>
+
 ## Construir con él
 
 <CardGroup cols={2}>
