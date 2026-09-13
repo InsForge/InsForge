@@ -203,6 +203,8 @@ description: "Answers to common InsForge questions on database calls, edge funct
 
     If you only need the key, for example to run the CLI in CI, open your account menu and go to **Profile → API Keys**, then create a key (set an expiry, or **Never**). Store it as a CI secret and run `login --user-api-key` with it. Add `--json` for machine-readable output.
 
+    The value the dashboard generates starts with `uak_`. That prefix marks a **user API key** — a personal token that authenticates as your account — which is different from a project's `ik_` API Key. So a token beginning with `uak_` is a user API key you create here, not something you generate per project.
+
     The key grants full access to your account, so keep it secret and rotate it if it leaks.
   </Accordion>
 
