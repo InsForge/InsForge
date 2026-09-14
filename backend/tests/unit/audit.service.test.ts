@@ -77,32 +77,30 @@ describe('AuditService', () => {
   });
 
   it('omits the LIMIT clause and returns unrestricted results when limit is undefined', async () => {
-    mockPool.query
-      .mockResolvedValueOnce({ rows: [{ count: '2' }] })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'audit-1',
-            actor: 'user-1',
-            action: 'CREATE_TABLE',
-            module: 'DATABASE',
-            details: null,
-            ip_address: null,
-            created_at: new Date('2026-01-01T00:00:00Z'),
-            updated_at: new Date('2026-01-01T00:00:00Z'),
-          },
-          {
-            id: 'audit-2',
-            actor: 'user-2',
-            action: 'DELETE_TABLE',
-            module: 'DATABASE',
-            details: null,
-            ip_address: null,
-            created_at: new Date('2026-01-02T00:00:00Z'),
-            updated_at: new Date('2026-01-02T00:00:00Z'),
-          },
-        ],
-      });
+    mockPool.query.mockResolvedValueOnce({ rows: [{ count: '2' }] }).mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'audit-1',
+          actor: 'user-1',
+          action: 'CREATE_TABLE',
+          module: 'DATABASE',
+          details: null,
+          ip_address: null,
+          created_at: new Date('2026-01-01T00:00:00Z'),
+          updated_at: new Date('2026-01-01T00:00:00Z'),
+        },
+        {
+          id: 'audit-2',
+          actor: 'user-2',
+          action: 'DELETE_TABLE',
+          module: 'DATABASE',
+          details: null,
+          ip_address: null,
+          created_at: new Date('2026-01-02T00:00:00Z'),
+          updated_at: new Date('2026-01-02T00:00:00Z'),
+        },
+      ],
+    });
 
     const result = await AuditService.getInstance().query({});
 
@@ -114,32 +112,30 @@ describe('AuditService', () => {
   });
 
   it('omits the LIMIT clause when limit is NaN, matching the pre-existing behavior', async () => {
-    mockPool.query
-      .mockResolvedValueOnce({ rows: [{ count: '2' }] })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'audit-1',
-            actor: 'user-1',
-            action: 'CREATE_TABLE',
-            module: 'DATABASE',
-            details: null,
-            ip_address: null,
-            created_at: new Date('2026-01-01T00:00:00Z'),
-            updated_at: new Date('2026-01-01T00:00:00Z'),
-          },
-          {
-            id: 'audit-2',
-            actor: 'user-2',
-            action: 'DELETE_TABLE',
-            module: 'DATABASE',
-            details: null,
-            ip_address: null,
-            created_at: new Date('2026-01-02T00:00:00Z'),
-            updated_at: new Date('2026-01-02T00:00:00Z'),
-          },
-        ],
-      });
+    mockPool.query.mockResolvedValueOnce({ rows: [{ count: '2' }] }).mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'audit-1',
+          actor: 'user-1',
+          action: 'CREATE_TABLE',
+          module: 'DATABASE',
+          details: null,
+          ip_address: null,
+          created_at: new Date('2026-01-01T00:00:00Z'),
+          updated_at: new Date('2026-01-01T00:00:00Z'),
+        },
+        {
+          id: 'audit-2',
+          actor: 'user-2',
+          action: 'DELETE_TABLE',
+          module: 'DATABASE',
+          details: null,
+          ip_address: null,
+          created_at: new Date('2026-01-02T00:00:00Z'),
+          updated_at: new Date('2026-01-02T00:00:00Z'),
+        },
+      ],
+    });
 
     const result = await AuditService.getInstance().query({ limit: Number('abc') });
 
@@ -151,22 +147,20 @@ describe('AuditService', () => {
   });
 
   it('applies LIMIT for a normal positive limit value', async () => {
-    mockPool.query
-      .mockResolvedValueOnce({ rows: [{ count: '1' }] })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'audit-1',
-            actor: 'user-1',
-            action: 'CREATE_TABLE',
-            module: 'DATABASE',
-            details: null,
-            ip_address: null,
-            created_at: new Date('2026-01-01T00:00:00Z'),
-            updated_at: new Date('2026-01-01T00:00:00Z'),
-          },
-        ],
-      });
+    mockPool.query.mockResolvedValueOnce({ rows: [{ count: '1' }] }).mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'audit-1',
+          actor: 'user-1',
+          action: 'CREATE_TABLE',
+          module: 'DATABASE',
+          details: null,
+          ip_address: null,
+          created_at: new Date('2026-01-01T00:00:00Z'),
+          updated_at: new Date('2026-01-01T00:00:00Z'),
+        },
+      ],
+    });
 
     const result = await AuditService.getInstance().query({ limit: 10 });
 
