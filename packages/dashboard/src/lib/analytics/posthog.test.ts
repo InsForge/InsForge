@@ -17,11 +17,28 @@ describe('PostHog session replay privacy', () => {
 
     await import('#lib/analytics/posthog');
 
+    const { maskReplayAttribute } = await import('#lib/analytics/replay-privacy');
+
     expect(init).toHaveBeenCalledTimes(1);
     const [, options] = init.mock.calls[0];
     expect(options.session_recording).toMatchObject({
       maskTextSelector: '*',
       maskAllInputs: true,
+      maskAttributeFn: maskReplayAttribute,
+    });
+    // maskAllElementAttributes wins over maskAttributeFn and wipes class/style, so it must stay off
+    expect(options.session_recording.maskAllElementAttributes).toBeUndefined();
+  });
+
+  it('masks text and attributes in autocaptured events', async () => {
+    vi.stubEnv('VITE_PUBLIC_POSTHOG_KEY', 'phc_test');
+
+    await import('#lib/analytics/posthog');
+
+    const [, options] = init.mock.calls[0];
+    expect(options).toMatchObject({
+      mask_all_text: true,
+      mask_all_element_attributes: true,
     });
   });
 
