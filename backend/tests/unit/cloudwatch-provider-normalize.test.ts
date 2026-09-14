@@ -326,3 +326,13 @@ describe('CloudWatchProvider.parseRawLine - keyword fallback', () => {
     expect((out.metadata as { level: string }).level).toBe('info');
   });
 });
+
+describe('CloudWatchProvider.searchLogs', () => {
+  it.each([10, -10, NaN, Infinity, -Infinity])('rejects unsupported offset %s', async (offset) => {
+    await expect(provider.searchLogs('error', undefined, 10, offset)).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'INVALID_INPUT',
+      message: 'CloudWatch log search does not support offset-based pagination',
+    });
+  });
+});
