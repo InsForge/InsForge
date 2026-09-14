@@ -107,8 +107,9 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-s
 ### Step 2: Upload File
 
 Upload the file to the specified URL using the provided method.
-- **Local Storage**: Use a PUT request to `uploadUrl` with `multipart/form-data` and a `file` field.
-- **S3-Compatible**: Use a POST request to `uploadUrl` with `multipart/form-data` and a `file` field. Include all fields from the `fields` object in the request.
+
+- **Direct** (`method: "direct"`): Use a PUT request to `uploadUrl` with `multipart/form-data`, a `file` field, and the `Authorization: Bearer <your-jwt-token>` header. Direct uploads are handled by the InsForge API and require authentication.
+- **Presigned** (`method: "presigned"`): Use a POST request to `uploadUrl` with `multipart/form-data`, the `file` field, and all fields from the `fields` object. Do not send the InsForge `Authorization` header to the presigned storage URL.
 
 ### Step 3: Confirm Presigned Upload (S3 Only)
 
