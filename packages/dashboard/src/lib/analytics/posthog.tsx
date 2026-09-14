@@ -10,6 +10,12 @@ if (POSTHOG_KEY) {
       capture_exceptions: true,
       debug: import.meta.env.DEV,
       session_recording: {
+        // Mask all rendered text and every input so customer data shown in the
+        // dashboard (table rows, query results, users, logs, file contents) is
+        // never captured. posthog-js masks in the browser, before anything is
+        // sent. maskTextSelector: '*' is the supported way to mask all text.
+        maskTextSelector: '*',
+        maskAllInputs: true,
         recordCrossOriginIframes: true,
       },
     });
