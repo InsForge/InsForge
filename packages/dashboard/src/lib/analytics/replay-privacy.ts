@@ -89,7 +89,9 @@ const KEEP_EXACT = new Set([
   'x2',
   'y2',
   'points',
-  // rrweb-generated layout metadata (never application strings)
+  // rrweb-generated metadata (never application strings). `_cssText` carries the
+  // inlined stylesheets; masking it renders every replay unstyled.
+  '_csstext',
   'rr_width',
   'rr_height',
   'rr_left',
@@ -103,8 +105,18 @@ const KEEP_EXACT = new Set([
   'rr_open_mode',
 ]);
 
-export function maskReplayAttribute(name: string, value: string): string {
-  if (!value || KEEP_EXACT.has(name.toLowerCase())) {
+// A stylesheet <link>'s href is an asset URL, and replays need it when rrweb
+// can't inline the sheet. Every other href stays masked.
+function isStylesheetLinkHref(name: string, element?: Element): boolean {
+  return (
+    name.toLowerCase() === 'href' &&
+    element?.tagName?.toLowerCase() === 'link' &&
+    (element.getAttribute('rel') ?? '').toLowerCase().split(/\s+/).includes('stylesheet')
+  );
+}
+
+export function maskReplayAttribute(name: string, value: string, element?: Element): string {
+  if (!value || KEEP_EXACT.has(name.toLowerCase()) || isStylesheetLinkHref(name, element)) {
     return value;
   }
   return '*'.repeat(value.length);

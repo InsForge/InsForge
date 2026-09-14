@@ -24,6 +24,9 @@ if (POSTHOG_KEY) {
         // Text masking doesn't reach attributes, and cells repeat their value in
         // title/alt. Fail closed: only layout and UI-state attributes keep values.
         maskAttributeFn: maskReplayAttribute,
+        // Pinned: when true it overrides maskAttributeFn, and an unset client value
+        // would let a PostHog project setting switch the allowlist off.
+        maskAllElementAttributes: false,
         recordCrossOriginIframes: true,
       },
     });

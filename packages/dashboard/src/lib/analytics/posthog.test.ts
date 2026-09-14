@@ -26,8 +26,9 @@ describe('PostHog session replay privacy', () => {
       maskAllInputs: true,
       maskAttributeFn: maskReplayAttribute,
     });
-    // maskAllElementAttributes wins over maskAttributeFn and wipes class/style, so it must stay off
-    expect(options.session_recording.maskAllElementAttributes).toBeUndefined();
+    // maskAllElementAttributes wins over maskAttributeFn and wipes class/style. It is pinned
+    // to false (not left unset) so a remote project setting can't override the allowlist.
+    expect(options.session_recording.maskAllElementAttributes).toBe(false);
   });
 
   it('masks text and attributes in autocaptured events', async () => {
