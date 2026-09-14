@@ -10,10 +10,10 @@
  */
 
 const KEEP_EXACT = new Set([
-  // styling and structure
+  // styling and structure. Not `id`/`for`: ids are often built from customer
+  // data (column names, provider ids), so ids and every id reference are masked.
   'class',
   'style',
-  'id',
   'role',
   'type',
   'dir',
@@ -29,10 +29,9 @@ const KEEP_EXACT = new Set([
   'selected',
   'open',
   'draggable',
-  'for',
   'rel',
   'target',
-  // accessibility state and relationships (ids, indexes, booleans; never labels)
+  // accessibility state (indexes and booleans only; never labels or id references)
   'aria-hidden',
   'aria-expanded',
   'aria-selected',
@@ -42,9 +41,6 @@ const KEEP_EXACT = new Set([
   'aria-current',
   'aria-orientation',
   'aria-haspopup',
-  'aria-controls',
-  'aria-labelledby',
-  'aria-describedby',
   'aria-modal',
   'aria-live',
   'aria-busy',

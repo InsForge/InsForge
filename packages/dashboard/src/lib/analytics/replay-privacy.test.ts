@@ -13,6 +13,11 @@ describe('maskReplayAttribute', () => {
     ['value', '555-0100'],
     ['data-row-value', 'jane.doe@example.com'],
     ['rr_src', 'blob:https://example.test/preview'],
+    ['id', 'patient_email-source'],
+    ['for', 'patients-diagnosis'],
+    ['aria-controls', 'sub_1PqRstUvWxYz'],
+    ['aria-labelledby', 'patients-diagnosis-label'],
+    ['aria-describedby', 'sub_1PqRstUvWxYz-details'],
     ['some-future-attribute', 'customer data'],
   ])('masks %s', (name, value) => {
     const masked = maskReplayAttribute(name, value);
