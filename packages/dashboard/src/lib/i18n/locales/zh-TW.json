@@ -2178,5 +2178,8 @@
     "webhooksAudience": "Webhook 受眾",
     "webhooksDelivered": "Webhook 已送達",
     "withCheck": "With Check"
-  }
+  },
+  "auth.customSmtpProvider": "Custom SMTP provider",
+  "auth.defaultTemplatesReadOnlyDescription": "You are currently using the InsForge default email provider. To customize the appearance and content of your authentication emails, you must configure a",
+  "auth.defaultTemplatesReadOnlyTitle": "Default templates are read-only"
 }

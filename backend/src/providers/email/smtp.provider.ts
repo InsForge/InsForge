@@ -51,7 +51,7 @@ export class SmtpEmailProvider implements EmailProvider {
       } else {
         safeValue = escapeHtml(value);
       }
-      const pattern = new RegExp(`\\{\\{\\s*${escapeRegex(key)}\\s*\\}\\}`, 'g');
+      const pattern = new RegExp(`{{\\s*${escapeRegex(key)}\\s*}}`, 'g');
       rendered = rendered.replace(pattern, safeValue);
     }
     return rendered;
@@ -109,8 +109,15 @@ export class SmtpEmailProvider implements EmailProvider {
     const config = await this.getRequiredConfig();
     const emailTemplate = await EmailTemplateService.getInstance().getTemplate(template);
 
-    // System variables (name, email) override user-supplied to prevent spoofing
-    const allVariables: Record<string, string> = { ...variables, name, email };
+    // Map system variables to template variables
+    const allVariables: Record<string, string> = {
+      token: variables?.token || '',
+      link: variables?.link || '',
+      email: email,
+      display_name: name,
+      name: name, // Backwards compatibility for existing templates
+      app_name: process.env.APP_NAME || 'InsForge',
+    };
 
     await this.send(
       config,
