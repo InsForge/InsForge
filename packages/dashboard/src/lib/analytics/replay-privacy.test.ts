@@ -42,7 +42,10 @@ describe('maskReplayAttribute', () => {
   });
 
   const fakeElement = (tagName: string, rel?: string) =>
-    ({ tagName, getAttribute: (attr: string) => (attr === 'rel' ? (rel ?? null) : null) }) as unknown as Element;
+    ({
+      tagName,
+      getAttribute: (attr: string) => (attr === 'rel' ? (rel ?? null) : null),
+    }) as unknown as Element;
 
   it('keeps the href of a stylesheet link so replays can load CSS', () => {
     const href = '/assets/index-B2_jdCWA.css';
