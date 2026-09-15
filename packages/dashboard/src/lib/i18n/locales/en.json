@@ -288,6 +288,7 @@
     "createNewBackup": "Create a new backup",
     "createNewTable": "Create New Table",
     "createTable": "Create Table",
+    "createTableDraftNotSaved": "Your draft could not be saved in this browser. Refreshing the page will lose your changes.",
     "cronExpressionLabel": "Cron expression",
     "cronOncePerHour": "Backups can run at most once per hour.",
     "csvImportFailed": "CSV import failed due to validation errors. Please check the file.",
