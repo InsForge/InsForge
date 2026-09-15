@@ -172,10 +172,14 @@ export function TableForm({
   });
 
   // Every change saves the draft again, so a refused save is reported once, until one works.
+  // A form with nothing typed has no draft to lose, so it neither warns nor clears the failure.
   const draftSaveFailedRef = useRef(false);
   const saveDraft = useCallback(
     (scope: string, values: TableFormSchema, nextForeignKeys: TableFormForeignKeySchema[]) => {
       const saved = saveCreateTableDraft(scope, schemaName, values, nextForeignKeys);
+      if (!hasCreateTableInput(values, nextForeignKeys)) {
+        return;
+      }
       if (!saved && !draftSaveFailedRef.current) {
         showToast(
           t('database.createTableDraftNotSaved', {

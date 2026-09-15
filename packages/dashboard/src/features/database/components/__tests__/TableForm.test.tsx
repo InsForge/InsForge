@@ -150,6 +150,27 @@ describe('TableForm create drafts', () => {
     expect(toastMocks.showToast).toHaveBeenCalledTimes(1);
   });
 
+  it('does not warn about a form with nothing typed when storage is unavailable', async () => {
+    const refuse = () => {
+      throw new Error('SecurityError');
+    };
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(refuse);
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(refuse);
+    const user = userEvent.setup();
+    renderTableForm({ draftScope: 'project-1' });
+
+    await user.click(screen.getByRole('button', { name: 'Add Column' }));
+    expect(toastMocks.showToast).not.toHaveBeenCalled();
+
+    await user.type(tableNameInput(), 'posts');
+    expect(toastMocks.showToast).toHaveBeenCalledTimes(1);
+
+    // Emptying the form does not count as a save that worked, so typing again stays quiet.
+    await user.clear(tableNameInput());
+    await user.type(tableNameInput(), 'orders');
+    expect(toastMocks.showToast).toHaveBeenCalledTimes(1);
+  });
+
   it('restores a draft that only holds a foreign key without deleting it first', () => {
     saveCreateTableDraft(
       'project-1',
