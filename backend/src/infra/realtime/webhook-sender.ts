@@ -1,6 +1,12 @@
 import axios, { AxiosError } from 'axios';
 import logger from '@/utils/logger.js';
 import type { WebhookMessage } from '@insforge/shared-schemas';
+import {
+  assertSafeOutboundUrl,
+  createOutboundAgents,
+  getOutboundRequestLimits,
+  OutboundUrlPolicyError,
+} from '@/infra/network/outbound-url-policy.js';
 
 export interface WebhookResult {
   url: string;
@@ -13,7 +19,6 @@ export interface WebhookResult {
  * WebhookSender - Handles HTTP delivery of realtime messages to webhook endpoints
  */
 export class WebhookSender {
-  private readonly timeout = 10000; // 10 seconds
   private readonly maxRetries = 2;
 
   /**
@@ -29,11 +34,20 @@ export class WebhookSender {
    */
   private async send(url: string, message: WebhookMessage): Promise<WebhookResult> {
     let lastError: string | undefined;
+    const limits = getOutboundRequestLimits();
+    const { httpAgent, httpsAgent } = createOutboundAgents();
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
+        await assertSafeOutboundUrl(url);
         const response = await axios.post(url, message.payload, {
-          timeout: this.timeout,
+          timeout: limits.timeoutMs,
+          maxContentLength: limits.maxResponseBytes,
+          maxBodyLength: limits.maxRequestBytes,
+          maxRedirects: limits.maxRedirects,
+          signal: AbortSignal.timeout(limits.timeoutMs),
+          httpAgent,
+          httpsAgent,
           headers: {
             'Content-Type': 'application/json',
             'X-InsForge-Event': message.eventName,
@@ -49,6 +63,35 @@ export class WebhookSender {
         };
       } catch (error) {
         const axiosError = error as AxiosError;
+        const policyError =
+          error instanceof OutboundUrlPolicyError
+            ? error
+            : axiosError.cause instanceof OutboundUrlPolicyError
+              ? axiosError.cause
+              : null;
+        if (
+          policyError ||
+          (axiosError.cause &&
+            typeof axiosError.cause === 'object' &&
+            'code' in axiosError.cause &&
+            axiosError.cause.code === 'ERR_OUTBOUND_POLICY')
+        ) {
+          let origin = url;
+          try {
+            origin = new URL(url).origin;
+          } catch {
+            // The URL policy already reports malformed URLs.
+          }
+          logger.warn('Webhook delivery blocked by outbound URL policy', {
+            reason: policyError?.reason || 'private or reserved network address',
+            origin,
+          });
+          return {
+            url,
+            success: false,
+            error: policyError?.reason || 'private or reserved network address',
+          };
+        }
         lastError = axiosError.message;
 
         if (axiosError.response) {
