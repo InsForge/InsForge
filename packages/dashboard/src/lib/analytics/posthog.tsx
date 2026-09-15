@@ -86,6 +86,10 @@ export const getFeatureFlag = (featureFlag: string): string | boolean | undefine
   return posthog.getFeatureFlag(featureFlag);
 };
 
+// PostHog never calls back when the flags request is quota limited or does not return,
+// so stop waiting after the same 5 seconds identifyUser allows.
+const FEATURE_FLAGS_WAIT_MS = 5000;
+
 // A flag that is not set and flags that have not loaded yet both read as undefined.
 // This tells them apart. Without a PostHog key there is nothing to wait for.
 export const useFeatureFlagsReady = (): boolean => {
@@ -94,14 +98,17 @@ export const useFeatureFlagsReady = (): boolean => {
   );
 
   useEffect(() => {
-    if (!POSTHOG_KEY) {
+    if (!POSTHOG_KEY || ready) {
       return;
     }
-    if (posthog.featureFlags?.hasLoadedFlags) {
-      setReady(true);
-    }
-    return posthog.onFeatureFlags(() => setReady(true));
-  }, []);
+    const timeout = setTimeout(() => setReady(true), FEATURE_FLAGS_WAIT_MS);
+    // Fires straight away if flags loaded after the initial render.
+    const unsubscribe = posthog.onFeatureFlags(() => setReady(true));
+    return () => {
+      clearTimeout(timeout);
+      unsubscribe();
+    };
+  }, [ready]);
 
   return ready;
 };

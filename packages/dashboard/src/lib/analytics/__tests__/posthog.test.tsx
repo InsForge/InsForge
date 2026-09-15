@@ -102,4 +102,23 @@ describe('feature flag hooks', () => {
 
     expect(result.current).toBe(true);
   });
+
+  // A quota-limited flags response never reaches onFeatureFlags.
+  it('useFeatureFlagsReady stops waiting when flags never load', async () => {
+    const { useFeatureFlagsReady } = await import('#lib/analytics/posthog');
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() => useFeatureFlagsReady());
+      expect(result.current).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+
+      expect(result.current).toBe(true);
+      expect(mocks.hasSubscriber()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
