@@ -21,8 +21,9 @@ const createTableDraftSchema = z.object({
 
 export type CreateTableDraft = z.infer<typeof createTableDraftSchema>;
 
-const getDraftKey = (schemaName: string) =>
-  `${LOCAL_STORAGE_KEY_PREFIXES.createTableDraft}-${schemaName}`;
+// Cloud serves every project from the same origin, so a schema name alone is not unique.
+const getDraftKey = (projectId: string | undefined, schemaName: string) =>
+  `${LOCAL_STORAGE_KEY_PREFIXES.createTableDraft}-${projectId ?? 'default'}-${schemaName}`;
 
 // The untouched form (system columns plus one empty row) is not worth restoring.
 const hasUserInput = (draft: CreateTableDraft) =>
@@ -30,25 +31,32 @@ const hasUserInput = (draft: CreateTableDraft) =>
   draft.foreignKeys.length > 0 ||
   draft.columns.some((column) => !column.isSystemColumn && column.columnName.trim() !== '');
 
-export function loadCreateTableDraft(schemaName: string): CreateTableDraft | null {
-  const result = createTableDraftSchema.safeParse(getLocalStorageJSON(getDraftKey(schemaName)));
+export function loadCreateTableDraft(
+  projectId: string | undefined,
+  schemaName: string
+): CreateTableDraft | null {
+  const result = createTableDraftSchema.safeParse(
+    getLocalStorageJSON(getDraftKey(projectId, schemaName))
+  );
   return result.success && hasUserInput(result.data) ? result.data : null;
 }
 
 export function saveCreateTableDraft(
+  projectId: string | undefined,
   schemaName: string,
   values: TableFormSchema,
   foreignKeys: TableFormForeignKeySchema[]
 ) {
+  const key = getDraftKey(projectId, schemaName);
   const draft = { tableName: values.tableName, columns: values.columns, foreignKeys };
 
   if (hasUserInput(draft)) {
-    setLocalStorageJSON(getDraftKey(schemaName), draft);
+    setLocalStorageJSON(key, draft);
   } else {
-    removeLocalStorageItem(getDraftKey(schemaName));
+    removeLocalStorageItem(key);
   }
 }
 
-export function clearCreateTableDraft(schemaName: string) {
-  removeLocalStorageItem(getDraftKey(schemaName));
+export function clearCreateTableDraft(projectId: string | undefined, schemaName: string) {
+  removeLocalStorageItem(getDraftKey(projectId, schemaName));
 }

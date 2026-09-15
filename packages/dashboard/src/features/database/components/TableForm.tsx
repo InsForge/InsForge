@@ -23,6 +23,7 @@ import {
   loadCreateTableDraft,
   saveCreateTableDraft,
 } from '#features/database/utils/createTableDraft';
+import { useDashboardProject } from '#lib/config/DashboardHostContext';
 
 const newColumn: TableFormColumnSchema = {
   columnName: '',
@@ -93,6 +94,7 @@ export function TableForm({
   const [foreignKeysDirty, setForeignKeysDirty] = useState(false);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const projectId = useDashboardProject()?.id;
 
   const form = useForm({
     resolver: zodResolver(tableFormSchema),
@@ -143,7 +145,7 @@ export function TableForm({
       });
       setForeignKeys(existingForeignKeys);
     } else {
-      const draft = open && mode === 'create' ? loadCreateTableDraft(schemaName) : null;
+      const draft = open && mode === 'create' ? loadCreateTableDraft(projectId, schemaName) : null;
       form.reset({
         tableName: '',
         columns: createDefaultColumns(),
@@ -158,7 +160,7 @@ export function TableForm({
       }
       setForeignKeys(draft?.foreignKeys ?? []);
     }
-  }, [editTable, form, mode, open, schemaName]);
+  }, [editTable, form, mode, open, projectId, schemaName]);
 
   // Save the create form as it is filled in, so a refresh or a discarded tab does not
   // lose it. The draft is cleared after the table is created or the form is closed.
@@ -167,11 +169,12 @@ export function TableForm({
       return;
     }
 
-    const saveDraft = () => saveCreateTableDraft(schemaName, form.getValues(), foreignKeys);
+    const saveDraft = () =>
+      saveCreateTableDraft(projectId, schemaName, form.getValues(), foreignKeys);
     saveDraft();
     const subscription = form.watch(saveDraft);
     return () => subscription.unsubscribe();
-  }, [foreignKeys, form, mode, open, schemaName]);
+  }, [foreignKeys, form, mode, open, projectId, schemaName]);
 
   useEffect(() => {
     setFormIsDirty(form.formState.isDirty);
@@ -233,7 +236,7 @@ export function TableForm({
         'success'
       );
 
-      clearCreateTableDraft(schemaName);
+      clearCreateTableDraft(projectId, schemaName);
       form.reset();
       setError(null);
       setForeignKeys([]);

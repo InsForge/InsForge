@@ -14,6 +14,7 @@ import { TablesEmptyState } from '#features/database/components/TablesEmptyState
 import { TemplatePreview } from '#features/database/components/TemplatePreview';
 import { DATABASE_TEMPLATES, DatabaseTemplate } from '#features/database/templates';
 import { clearCreateTableDraft } from '#features/database/utils/createTableDraft';
+import { useDashboardProject } from '#lib/config/DashboardHostContext';
 import {
   Button,
   ConfirmDialog,
@@ -53,6 +54,7 @@ export default function TablesPage() {
   const { t } = useTranslation('chrome');
   const location = useLocation();
   const { selectedSchema, setSelectedSchema } = useDatabaseSchemaSelection();
+  const projectId = useDashboardProject()?.id;
   const [searchParams, setSearchParams] = useSearchParams();
   const shouldSlideBackToTables =
     (location.state as { slideFromStudio?: boolean } | null)?.slideFromStudio === true;
@@ -356,7 +358,7 @@ export default function TablesPage() {
   // A create-table draft should survive a refresh, not a deliberate close.
   const discardCreateTableDraft = () => {
     if (!editingTable) {
-      clearCreateTableDraft(selectedSchema);
+      clearCreateTableDraft(projectId, selectedSchema);
     }
   };
 
