@@ -86,9 +86,10 @@ export const getFeatureFlag = (featureFlag: string): string | boolean | undefine
   return posthog.getFeatureFlag(featureFlag);
 };
 
-// PostHog never calls back when the flags request is quota limited or does not return,
-// so stop waiting after the same 5 seconds identifyUser allows.
-const FEATURE_FLAGS_WAIT_MS = 5000;
+// posthog-js abandons a slow flags request after feature_flag_request_timeout_ms and still
+// calls back, so every real answer lands inside that window. Only a quota-limited response
+// skips the callback entirely, and that is what waiting a little past the timeout catches.
+const FEATURE_FLAGS_WAIT_MARGIN_MS = 2000;
 
 // A flag that is not set and flags that have not loaded yet both read as undefined.
 // This tells them apart. Without a PostHog key there is nothing to wait for.
@@ -101,7 +102,8 @@ export const useFeatureFlagsReady = (): boolean => {
     if (!POSTHOG_KEY || ready) {
       return;
     }
-    const timeout = setTimeout(() => setReady(true), FEATURE_FLAGS_WAIT_MS);
+    const waitMs = posthog.config.feature_flag_request_timeout_ms + FEATURE_FLAGS_WAIT_MARGIN_MS;
+    const timeout = setTimeout(() => setReady(true), waitMs);
     // Fires straight away if flags loaded after the initial render.
     const unsubscribe = posthog.onFeatureFlags(() => setReady(true));
     return () => {

@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => {
     },
     posthog: {
       init: vi.fn(),
+      config: { feature_flag_request_timeout_ms: 3000 },
       getFeatureFlag: vi.fn((key: string) => currentFlags[key]),
       onFeatureFlags: vi.fn((cb: () => void) => {
         flagCallback = cb;
@@ -128,18 +129,23 @@ describe('feature flag hooks', () => {
     expect(result.current).toBe(true);
   });
 
-  // A quota-limited flags response never reaches onFeatureFlags.
-  it('useFeatureFlagsReady stops waiting when flags never load', async () => {
+  // A quota-limited flags response never reaches onFeatureFlags, so readiness has to time out,
+  // but not before PostHog itself would have given up on a slow request.
+  it('useFeatureFlagsReady stops waiting only after the PostHog request timeout', async () => {
     const { useFeatureFlagsReady } = await import('#lib/analytics/posthog');
     vi.useFakeTimers();
     try {
       const { result } = renderHook(() => useFeatureFlagsReady());
+
+      // The mocked 3s request timeout plus the 2s margin.
+      act(() => {
+        vi.advanceTimersByTime(4999);
+      });
       expect(result.current).toBe(false);
 
       act(() => {
-        vi.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(1);
       });
-
       expect(result.current).toBe(true);
       expect(mocks.hasSubscriber()).toBe(false);
     } finally {
