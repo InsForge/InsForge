@@ -143,6 +143,18 @@ describe('createTableDraft', () => {
     expect(store.size).toBe(0);
   });
 
+  it('reports a refused write and drops the older draft so a refresh cannot restore it', () => {
+    const columns = [idColumn, newColumn('title')];
+    expect(saveCreateTableDraft(SCOPE, 'public', { tableName: 'posts', columns }, [])).toBe(true);
+
+    vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+
+    expect(saveCreateTableDraft(SCOPE, 'public', { tableName: 'orders', columns }, [])).toBe(false);
+    expect(loadCreateTableDraft(SCOPE, 'public')).toBeNull();
+  });
+
   it('ignores a stored value that is not a valid draft', () => {
     const key = `${LOCAL_STORAGE_KEY_PREFIXES.createTableDraft}:${SCOPE}:public`;
 

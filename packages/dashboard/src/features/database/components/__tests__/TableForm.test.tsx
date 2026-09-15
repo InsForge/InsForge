@@ -9,13 +9,17 @@ import {
   saveCreateTableDraft,
 } from '#features/database/utils/createTableDraft';
 
+const toastMocks = vi.hoisted(() => ({
+  showToast: vi.fn(),
+}));
+
 vi.mock('@insforge/ui', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@insforge/ui')>();
 
   return {
     ...actual,
     useToast: () => ({
-      showToast: vi.fn(),
+      showToast: toastMocks.showToast,
     }),
   };
 });
@@ -119,10 +123,31 @@ function tableNameInput() {
 describe('TableForm create drafts', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    toastMocks.showToast.mockClear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('warns once while storage refuses the draft, then saves it once storage works', async () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    const user = userEvent.setup();
+    renderTableForm({ draftScope: 'project-1' });
+
+    await user.type(tableNameInput(), 'post');
+
+    expect(toastMocks.showToast).toHaveBeenCalledTimes(1);
+    expect(toastMocks.showToast).toHaveBeenCalledWith(expect.any(String), 'warn');
+    expect(loadCreateTableDraft('project-1', SCHEMA)).toBeNull();
+
+    setItem.mockRestore();
+    await user.type(tableNameInput(), 's');
+
+    expect(loadCreateTableDraft('project-1', SCHEMA)?.tableName).toBe('posts');
+    expect(toastMocks.showToast).toHaveBeenCalledTimes(1);
   });
 
   it('restores a draft that only holds a foreign key without deleting it first', () => {

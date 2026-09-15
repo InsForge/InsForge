@@ -53,19 +53,27 @@ export function loadCreateTableDraft(scope: string, schemaName: string): CreateT
   return result.success && hasUserInput(result.data) ? result.data : null;
 }
 
+// Returns false when the browser refused the write. The older draft is removed then, so a
+// refresh cannot restore input that no longer matches the form.
 export function saveCreateTableDraft(
   scope: string,
   schemaName: string,
   values: TableFormSchema,
   foreignKeys: TableFormForeignKeySchema[]
-) {
+): boolean {
   const key = getDraftKey(scope, schemaName);
 
-  if (hasCreateTableInput(values, foreignKeys)) {
-    setLocalStorageJSON(key, { tableName: values.tableName, columns: values.columns, foreignKeys });
-  } else {
-    removeLocalStorageItem(key);
+  if (!hasCreateTableInput(values, foreignKeys)) {
+    return removeLocalStorageItem(key);
   }
+
+  const draft = { tableName: values.tableName, columns: values.columns, foreignKeys };
+  if (setLocalStorageJSON(key, draft)) {
+    return true;
+  }
+
+  removeLocalStorageItem(key);
+  return false;
 }
 
 export function clearCreateTableDraft(scope: string, schemaName: string) {
