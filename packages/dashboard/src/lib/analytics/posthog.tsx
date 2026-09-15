@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import posthog from 'posthog-js';
 import { PostHogProvider } from 'posthog-js/react';
 
@@ -115,15 +115,15 @@ export const useFeatureFlagsReady = (): boolean => {
 
 // Use in render instead of getFeatureFlag, which only reads the value once.
 export const useFeatureFlag = (featureFlag: string): string | boolean | undefined => {
-  const [value, setValue] = useState(() => getFeatureFlag(featureFlag));
+  const [, rerender] = useReducer((count: number) => count + 1, 0);
 
   useEffect(() => {
     if (!POSTHOG_KEY) {
       return;
     }
-    setValue(getFeatureFlag(featureFlag));
-    return posthog.onFeatureFlags(() => setValue(getFeatureFlag(featureFlag)));
-  }, [featureFlag]);
+    return posthog.onFeatureFlags(() => rerender());
+  }, []);
 
-  return value;
+  // Read during render, so a changed key never returns the previous key's value.
+  return getFeatureFlag(featureFlag);
 };

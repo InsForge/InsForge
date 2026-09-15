@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => {
@@ -27,6 +27,10 @@ const mocks = vi.hoisted(() => {
       getFeatureFlag: vi.fn((key: string) => currentFlags[key]),
       onFeatureFlags: vi.fn((cb: () => void) => {
         flagCallback = cb;
+        // Like posthog-js, call back straight away when flags are already loaded.
+        if (hasLoadedFlags) {
+          cb();
+        }
         return () => {
           if (flagCallback === cb) {
             flagCallback = null;
@@ -57,6 +61,10 @@ describe('feature flag hooks', () => {
     vi.stubEnv('VITE_PUBLIC_POSTHOG_KEY', 'phc_test');
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('useFeatureFlag updates when PostHog fires onFeatureFlags', async () => {
     mocks.setFlags({});
     const { useFeatureFlag } = await import('#lib/analytics/posthog');
@@ -70,6 +78,23 @@ describe('feature flag hooks', () => {
     });
 
     expect(result.current).toBe('d_test');
+  });
+
+  it("useFeatureFlag never returns the previous key's value after the key changes", async () => {
+    mocks.setFlags({ first: 'a', second: 'b' });
+    const { useFeatureFlag } = await import('#lib/analytics/posthog');
+    const seen: Array<[string, string | boolean | undefined]> = [];
+    const { rerender } = renderHook(
+      ({ flag }) => {
+        seen.push([flag, useFeatureFlag(flag)]);
+      },
+      { initialProps: { flag: 'first' } }
+    );
+
+    rerender({ flag: 'second' });
+
+    expect(seen.filter(([flag]) => flag === 'second').map(([, value]) => value)).not.toContain('a');
+    expect(seen[seen.length - 1]).toEqual(['second', 'b']);
   });
 
   it('useFeatureFlag unsubscribes on unmount', async () => {

@@ -38,6 +38,7 @@ function ConnectOverlayBridge({ hostMode, onOpenDialog }: ConnectOverlayBridgePr
 
   useEffect(() => {
     if (hostMode !== 'cloud-hosting') {
+      pendingConnectRef.current = false;
       return;
     }
 
@@ -69,12 +70,12 @@ function ConnectOverlayBridge({ hostMode, onOpenDialog }: ConnectOverlayBridgePr
   }, [hostMode, flagsReady, openConnect]);
 
   useEffect(() => {
-    if (!flagsReady || !pendingConnectRef.current) {
+    if (hostMode !== 'cloud-hosting' || !flagsReady || !pendingConnectRef.current) {
       return;
     }
     pendingConnectRef.current = false;
     openConnect();
-  }, [flagsReady, openConnect]);
+  }, [hostMode, flagsReady, openConnect]);
 
   return null;
 }
