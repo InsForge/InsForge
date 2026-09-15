@@ -16,6 +16,11 @@ vi.mock('#features/database/hooks/useDatabaseSchemaSelection', () => ({
   }),
 }));
 
+vi.mock('#lib/config/DashboardHostContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/config/DashboardHostContext')>()),
+  useIsCloudHostingMode: () => false,
+}));
+
 vi.mock('#features/database/hooks/useDatabase', () => ({
   useDatabaseSchemas: () => ({
     schemas: [{ name: 'public', isProtected: false }],

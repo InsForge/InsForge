@@ -23,7 +23,6 @@ import {
   loadCreateTableDraft,
   saveCreateTableDraft,
 } from '#features/database/utils/createTableDraft';
-import { useDashboardProject } from '#lib/config/DashboardHostContext';
 
 const newColumn: TableFormColumnSchema = {
   columnName: '',
@@ -75,6 +74,8 @@ interface TableFormProps {
   mode?: 'create' | 'edit';
   editTable?: TableSchema;
   setFormIsDirty: (dirty: boolean) => void;
+  // Where create drafts are kept. Undefined while that is not known yet, which turns drafts off.
+  draftScope?: string;
 }
 
 export function TableForm({
@@ -85,6 +86,7 @@ export function TableForm({
   mode = 'create',
   editTable,
   setFormIsDirty,
+  draftScope,
 }: TableFormProps) {
   const { t } = useTranslation('chrome');
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +96,6 @@ export function TableForm({
   const [foreignKeysDirty, setForeignKeysDirty] = useState(false);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-  const projectId = useDashboardProject()?.id;
 
   const form = useForm({
     resolver: zodResolver(tableFormSchema),
@@ -145,40 +146,51 @@ export function TableForm({
       });
       setForeignKeys(existingForeignKeys);
     } else {
-      const draft = open && mode === 'create' ? loadCreateTableDraft(projectId, schemaName) : null;
       form.reset({
         tableName: '',
         columns: createDefaultColumns(),
       });
-      if (draft) {
-        // Keep the empty form as the baseline so restored work still counts as unsaved.
-        form.reset(
-          { tableName: draft.tableName, columns: draft.columns },
-          { keepDefaultValues: true }
-        );
-        setForeignKeysDirty(draft.foreignKeys.length > 0);
-      }
-      setForeignKeys(draft?.foreignKeys ?? []);
+      setForeignKeys([]);
     }
-  }, [editTable, form, mode, open, projectId, schemaName]);
+  }, [editTable, form, mode, open, schemaName]);
+
+  // Restore a saved create draft. The scope can arrive after the form has opened, so never
+  // overwrite a form the user has already started filling in.
+  useEffect(() => {
+    if (!open || mode !== 'create' || draftScope === undefined) {
+      return;
+    }
+    if (form.formState.isDirty || foreignKeysDirty) {
+      return;
+    }
+
+    const draft = loadCreateTableDraft(draftScope, schemaName);
+    if (!draft) {
+      return;
+    }
+    // Keep the empty form as the baseline so restored work still counts as unsaved.
+    form.reset({ tableName: draft.tableName, columns: draft.columns }, { keepDefaultValues: true });
+    setForeignKeys(draft.foreignKeys);
+    setForeignKeysDirty(draft.foreignKeys.length > 0);
+  }, [draftScope, foreignKeysDirty, form, mode, open, schemaName]);
 
   // Save the create form as it is filled in, so a refresh or a discarded tab does not
   // lose it. The draft is cleared after the table is created or the form is closed.
   useEffect(() => {
-    if (!open || mode !== 'create') {
+    if (!open || mode !== 'create' || draftScope === undefined) {
       return;
     }
 
     const saveDraft = () =>
-      saveCreateTableDraft(projectId, schemaName, form.getValues(), foreignKeys);
+      saveCreateTableDraft(draftScope, schemaName, form.getValues(), foreignKeys);
     saveDraft();
     const subscription = form.watch(saveDraft);
     return () => subscription.unsubscribe();
-  }, [foreignKeys, form, mode, open, projectId, schemaName]);
+  }, [draftScope, foreignKeys, form, mode, open, schemaName]);
 
   useEffect(() => {
-    setFormIsDirty(form.formState.isDirty);
-  }, [form.formState.isDirty, setFormIsDirty]);
+    setFormIsDirty(form.formState.isDirty || foreignKeysDirty);
+  }, [foreignKeysDirty, form.formState.isDirty, setFormIsDirty]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -241,7 +253,9 @@ export function TableForm({
       setForeignKeys([]);
       setForeignKeysDirty(false);
       // Clear last: form.reset() re-saves through the watcher with the old foreign keys.
-      clearCreateTableDraft(projectId, schemaName);
+      if (draftScope !== undefined) {
+        clearCreateTableDraft(draftScope, schemaName);
+      }
       onSuccess?.(data.tableName);
     },
     onError: (err) => {

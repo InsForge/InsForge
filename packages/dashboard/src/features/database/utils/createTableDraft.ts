@@ -22,9 +22,10 @@ const createTableDraftSchema = z.object({
 
 export type CreateTableDraft = z.infer<typeof createTableDraftSchema>;
 
-// Cloud serves every project from the same origin, so a schema name alone is not unique.
-const getDraftKey = (projectId: string | undefined, schemaName: string) =>
-  `${LOCAL_STORAGE_KEY_PREFIXES.createTableDraft}-${projectId ?? 'default'}-${schemaName}`;
+// `scope` keeps projects that share an origin apart. Both parts are encoded, so neither
+// can contain the separator.
+const getDraftKey = (scope: string, schemaName: string) =>
+  `${LOCAL_STORAGE_KEY_PREFIXES.createTableDraft}:${encodeURIComponent(scope)}:${encodeURIComponent(schemaName)}`;
 
 // A row the form added that nobody has touched: no name and every setting at its default.
 const isUntouchedColumn = (column: CreateTableDraft['columns'][number]) =>
@@ -40,23 +41,20 @@ const hasUserInput = (draft: CreateTableDraft) =>
   draft.foreignKeys.length > 0 ||
   draft.columns.some((column) => !column.isSystemColumn && !isUntouchedColumn(column));
 
-export function loadCreateTableDraft(
-  projectId: string | undefined,
-  schemaName: string
-): CreateTableDraft | null {
+export function loadCreateTableDraft(scope: string, schemaName: string): CreateTableDraft | null {
   const result = createTableDraftSchema.safeParse(
-    getLocalStorageJSON(getDraftKey(projectId, schemaName))
+    getLocalStorageJSON(getDraftKey(scope, schemaName))
   );
   return result.success && hasUserInput(result.data) ? result.data : null;
 }
 
 export function saveCreateTableDraft(
-  projectId: string | undefined,
+  scope: string,
   schemaName: string,
   values: TableFormSchema,
   foreignKeys: TableFormForeignKeySchema[]
 ) {
-  const key = getDraftKey(projectId, schemaName);
+  const key = getDraftKey(scope, schemaName);
   const draft = { tableName: values.tableName, columns: values.columns, foreignKeys };
 
   if (hasUserInput(draft)) {
@@ -66,6 +64,6 @@ export function saveCreateTableDraft(
   }
 }
 
-export function clearCreateTableDraft(projectId: string | undefined, schemaName: string) {
-  removeLocalStorageItem(getDraftKey(projectId, schemaName));
+export function clearCreateTableDraft(scope: string, schemaName: string) {
+  removeLocalStorageItem(getDraftKey(scope, schemaName));
 }

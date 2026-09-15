@@ -8,7 +8,7 @@ import {
   saveCreateTableDraft,
 } from '#features/database/utils/createTableDraft';
 
-const PROJECT = 'project-1';
+const SCOPE = 'project-1';
 
 const idColumn: TableFormColumnSchema = {
   columnName: 'id',
@@ -62,14 +62,14 @@ describe('createTableDraft', () => {
       onUpdate: 'NO ACTION',
     };
 
-    saveCreateTableDraft(PROJECT, 'public', { tableName: 'posts', columns }, [foreignKey]);
+    saveCreateTableDraft(SCOPE, 'public', { tableName: 'posts', columns }, [foreignKey]);
 
-    expect(loadCreateTableDraft(PROJECT, 'public')).toEqual({
+    expect(loadCreateTableDraft(SCOPE, 'public')).toEqual({
       tableName: 'posts',
       columns,
       foreignKeys: [foreignKey],
     });
-    expect(loadCreateTableDraft(PROJECT, 'analytics')).toBeNull();
+    expect(loadCreateTableDraft(SCOPE, 'analytics')).toBeNull();
   });
 
   it('keeps drafts for different projects apart', () => {
@@ -80,58 +80,68 @@ describe('createTableDraft', () => {
 
     expect(loadCreateTableDraft('project-1', 'public')?.tableName).toBe('posts');
     expect(loadCreateTableDraft('project-2', 'public')?.tableName).toBe('events');
-    expect(loadCreateTableDraft(undefined, 'public')).toBeNull();
+    expect(loadCreateTableDraft('default', 'public')).toBeNull();
+  });
+
+  it('does not confuse a scope and schema that split at a different hyphen', () => {
+    const columns = [idColumn, newColumn('title')];
+
+    saveCreateTableDraft('a-b', 'c', { tableName: 'first', columns }, []);
+    saveCreateTableDraft('a', 'b-c', { tableName: 'second', columns }, []);
+
+    expect(loadCreateTableDraft('a-b', 'c')?.tableName).toBe('first');
+    expect(loadCreateTableDraft('a', 'b-c')?.tableName).toBe('second');
   });
 
   it('keeps a new column row that has no name yet', () => {
     const columns = [idColumn, newColumn('title'), newColumn('')];
 
-    saveCreateTableDraft(PROJECT, 'public', { tableName: 'posts', columns }, []);
+    saveCreateTableDraft(SCOPE, 'public', { tableName: 'posts', columns }, []);
 
-    expect(loadCreateTableDraft(PROJECT, 'public')?.columns).toEqual(columns);
+    expect(loadCreateTableDraft(SCOPE, 'public')?.columns).toEqual(columns);
   });
 
   it('keeps an unnamed column whose settings were changed', () => {
     const columns = [idColumn, { ...newColumn(''), isNullable: false, isUnique: true }];
 
-    saveCreateTableDraft(PROJECT, 'public', { tableName: '', columns }, []);
+    saveCreateTableDraft(SCOPE, 'public', { tableName: '', columns }, []);
 
-    expect(loadCreateTableDraft(PROJECT, 'public')?.columns).toEqual(columns);
+    expect(loadCreateTableDraft(SCOPE, 'public')?.columns).toEqual(columns);
   });
 
   it('does not store a form that has not been filled in', () => {
-    saveCreateTableDraft(PROJECT, 'public', emptyForm, []);
+    saveCreateTableDraft(SCOPE, 'public', emptyForm, []);
 
     expect(store.size).toBe(0);
   });
 
   it('removes the stored draft when the form is emptied again', () => {
     const columns = [idColumn, newColumn('title')];
-    saveCreateTableDraft(PROJECT, 'public', { tableName: 'posts', columns }, []);
+    saveCreateTableDraft(SCOPE, 'public', { tableName: 'posts', columns }, []);
 
-    saveCreateTableDraft(PROJECT, 'public', emptyForm, []);
+    saveCreateTableDraft(SCOPE, 'public', emptyForm, []);
 
-    expect(loadCreateTableDraft(PROJECT, 'public')).toBeNull();
+    expect(loadCreateTableDraft(SCOPE, 'public')).toBeNull();
     expect(store.size).toBe(0);
   });
 
   it('ignores a stored value that is not a valid draft', () => {
-    const key = `${LOCAL_STORAGE_KEY_PREFIXES.createTableDraft}-${PROJECT}-public`;
+    const key = `${LOCAL_STORAGE_KEY_PREFIXES.createTableDraft}:${SCOPE}:public`;
 
     store.set(key, '{not json');
-    expect(loadCreateTableDraft(PROJECT, 'public')).toBeNull();
+    expect(loadCreateTableDraft(SCOPE, 'public')).toBeNull();
 
     store.set(key, JSON.stringify({ tableName: 12, columns: 'nope' }));
-    expect(loadCreateTableDraft(PROJECT, 'public')).toBeNull();
+    expect(loadCreateTableDraft(SCOPE, 'public')).toBeNull();
   });
 
   it('clears only the schema it is given', () => {
-    saveCreateTableDraft(PROJECT, 'public', { tableName: 'posts', columns: [idColumn] }, []);
-    saveCreateTableDraft(PROJECT, 'analytics', { tableName: 'events', columns: [idColumn] }, []);
+    saveCreateTableDraft(SCOPE, 'public', { tableName: 'posts', columns: [idColumn] }, []);
+    saveCreateTableDraft(SCOPE, 'analytics', { tableName: 'events', columns: [idColumn] }, []);
 
-    clearCreateTableDraft(PROJECT, 'public');
+    clearCreateTableDraft(SCOPE, 'public');
 
-    expect(loadCreateTableDraft(PROJECT, 'public')).toBeNull();
-    expect(loadCreateTableDraft(PROJECT, 'analytics')?.tableName).toBe('events');
+    expect(loadCreateTableDraft(SCOPE, 'public')).toBeNull();
+    expect(loadCreateTableDraft(SCOPE, 'analytics')?.tableName).toBe('events');
   });
 });
