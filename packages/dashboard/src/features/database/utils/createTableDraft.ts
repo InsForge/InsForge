@@ -41,6 +41,11 @@ const hasUserInput = (draft: CreateTableDraft) =>
   draft.foreignKeys.length > 0 ||
   draft.columns.some((column) => !column.isSystemColumn && !isUntouchedColumn(column));
 
+export const hasCreateTableInput = (
+  values: TableFormSchema,
+  foreignKeys: TableFormForeignKeySchema[]
+) => hasUserInput({ tableName: values.tableName, columns: values.columns, foreignKeys });
+
 export function loadCreateTableDraft(scope: string, schemaName: string): CreateTableDraft | null {
   const result = createTableDraftSchema.safeParse(
     getLocalStorageJSON(getDraftKey(scope, schemaName))
@@ -55,10 +60,9 @@ export function saveCreateTableDraft(
   foreignKeys: TableFormForeignKeySchema[]
 ) {
   const key = getDraftKey(scope, schemaName);
-  const draft = { tableName: values.tableName, columns: values.columns, foreignKeys };
 
-  if (hasUserInput(draft)) {
-    setLocalStorageJSON(key, draft);
+  if (hasCreateTableInput(values, foreignKeys)) {
+    setLocalStorageJSON(key, { tableName: values.tableName, columns: values.columns, foreignKeys });
   } else {
     removeLocalStorageItem(key);
   }

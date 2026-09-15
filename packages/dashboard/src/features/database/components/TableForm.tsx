@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,6 +20,7 @@ import { parseDatabaseTableReference, SYSTEM_FIELDS } from '#features/database/h
 import { databaseTableQueryKeys } from '#features/database/queryKeys';
 import {
   clearCreateTableDraft,
+  hasCreateTableInput,
   loadCreateTableDraft,
   saveCreateTableDraft,
 } from '#features/database/utils/createTableDraft';
@@ -105,6 +106,11 @@ export function TableForm({
     },
   });
 
+  // The scope and schema a draft was last restored for, and whether the create form opened
+  // before its scope was known.
+  const restoredForRef = useRef<{ scope: string; schemaName: string } | null>(null);
+  const waitedForScopeRef = useRef(false);
+
   // Reset form when switching between modes or when editTable changes
   useEffect(() => {
     // Clear error when effect runs
@@ -145,48 +151,16 @@ export function TableForm({
         };
       });
       setForeignKeys(existingForeignKeys);
+      setForeignKeysDirty(false);
     } else {
       form.reset({
         tableName: '',
         columns: createDefaultColumns(),
       });
       setForeignKeys([]);
+      setForeignKeysDirty(false);
     }
   }, [editTable, form, mode, open, schemaName]);
-
-  // Restore a saved create draft. The scope can arrive after the form has opened, so never
-  // overwrite a form the user has already started filling in.
-  useEffect(() => {
-    if (!open || mode !== 'create' || draftScope === undefined) {
-      return;
-    }
-    if (form.formState.isDirty || foreignKeysDirty) {
-      return;
-    }
-
-    const draft = loadCreateTableDraft(draftScope, schemaName);
-    if (!draft) {
-      return;
-    }
-    // Keep the empty form as the baseline so restored work still counts as unsaved.
-    form.reset({ tableName: draft.tableName, columns: draft.columns }, { keepDefaultValues: true });
-    setForeignKeys(draft.foreignKeys);
-    setForeignKeysDirty(draft.foreignKeys.length > 0);
-  }, [draftScope, foreignKeysDirty, form, mode, open, schemaName]);
-
-  // Save the create form as it is filled in, so a refresh or a discarded tab does not
-  // lose it. The draft is cleared after the table is created or the form is closed.
-  useEffect(() => {
-    if (!open || mode !== 'create' || draftScope === undefined) {
-      return;
-    }
-
-    const saveDraft = () =>
-      saveCreateTableDraft(draftScope, schemaName, form.getValues(), foreignKeys);
-    saveDraft();
-    const subscription = form.watch(saveDraft);
-    return () => subscription.unsubscribe();
-  }, [draftScope, foreignKeys, form, mode, open, schemaName]);
 
   useEffect(() => {
     setFormIsDirty(form.formState.isDirty || foreignKeysDirty);
@@ -196,6 +170,57 @@ export function TableForm({
     control: form.control,
     name: 'columns',
   });
+
+  // Restore a saved create draft, once per scope and schema. If the form opened before its
+  // scope was known, whatever was typed in the meantime belongs to that scope and is kept.
+  // Otherwise the scope's own draft (or an empty form) replaces the values, so input from one
+  // project is never carried into another.
+  useEffect(() => {
+    if (!open || mode !== 'create') {
+      restoredForRef.current = null;
+      waitedForScopeRef.current = false;
+      return;
+    }
+    if (draftScope === undefined) {
+      waitedForScopeRef.current = true;
+      return;
+    }
+    const restoredFor = restoredForRef.current;
+    if (restoredFor?.scope === draftScope && restoredFor.schemaName === schemaName) {
+      return;
+    }
+    restoredForRef.current = { scope: draftScope, schemaName };
+
+    const values = form.getValues();
+    if (!restoredFor && waitedForScopeRef.current && hasCreateTableInput(values, foreignKeys)) {
+      saveCreateTableDraft(draftScope, schemaName, values, foreignKeys);
+      return;
+    }
+
+    const draft = loadCreateTableDraft(draftScope, schemaName);
+    // Keep the empty form as the baseline so restored work still counts as unsaved.
+    form.reset(
+      { tableName: draft?.tableName ?? '', columns: draft?.columns ?? createDefaultColumns() },
+      { keepDefaultValues: true }
+    );
+    setForeignKeys(draft?.foreignKeys ?? []);
+    setForeignKeysDirty(Boolean(draft?.foreignKeys.length));
+  }, [draftScope, foreignKeys, form, mode, open, schemaName]);
+
+  // Save the create form as it is filled in, so a refresh or a discarded tab does not lose it.
+  // Foreign keys are not form fields, so their handlers save them directly.
+  // Keep this below useFieldArray, whose own effect reports the columns on mount. A watcher
+  // subscribed before that report would save it with the foreign keys from before the restore.
+  useEffect(() => {
+    if (!open || mode !== 'create' || draftScope === undefined) {
+      return;
+    }
+
+    const subscription = form.watch(() =>
+      saveCreateTableDraft(draftScope, schemaName, form.getValues(), foreignKeys)
+    );
+    return () => subscription.unsubscribe();
+  }, [draftScope, foreignKeys, form, mode, open, schemaName]);
 
   const sortedFields = useMemo(() => {
     return [...fields].sort((a, b) => {
@@ -438,19 +463,28 @@ export function TableForm({
     append({ ...newColumn });
   };
 
+  // The draft watcher only sees form fields, so foreign key changes are saved here.
+  const saveDraftForeignKeys = (nextForeignKeys: TableFormForeignKeySchema[]) => {
+    if (open && mode === 'create' && draftScope !== undefined) {
+      saveCreateTableDraft(draftScope, schemaName, form.getValues(), nextForeignKeys);
+    }
+  };
+
   const handleAddForeignKey = (fk: TableFormForeignKeySchema) => {
     if (editingForeignKey) {
       // Update existing foreign key (matched by stable uid, not source column).
-      setForeignKeys(
-        foreignKeys.map((existingFk) =>
-          existingFk.uid === editingForeignKey ? { ...fk, uid: existingFk.uid } : existingFk
-        )
+      const nextForeignKeys = foreignKeys.map((existingFk) =>
+        existingFk.uid === editingForeignKey ? { ...fk, uid: existingFk.uid } : existingFk
       );
+      setForeignKeys(nextForeignKeys);
+      saveDraftForeignKeys(nextForeignKeys);
       setEditingForeignKey(undefined);
       setForeignKeysDirty(true);
     } else {
       // Add new foreign key with a fresh client-side identity.
-      setForeignKeys([...foreignKeys, { ...fk, uid: crypto.randomUUID() }]);
+      const nextForeignKeys = [...foreignKeys, { ...fk, uid: crypto.randomUUID() }];
+      setForeignKeys(nextForeignKeys);
+      saveDraftForeignKeys(nextForeignKeys);
     }
     setForeignKeysDirty(true);
   };
@@ -461,7 +495,9 @@ export function TableForm({
     if (!foreignKeys.some((fk) => fk.uid === uid)) {
       return;
     }
-    setForeignKeys(foreignKeys.filter((fk) => fk.uid !== uid));
+    const nextForeignKeys = foreignKeys.filter((fk) => fk.uid !== uid);
+    setForeignKeys(nextForeignKeys);
+    saveDraftForeignKeys(nextForeignKeys);
     setForeignKeysDirty(true);
   };
 

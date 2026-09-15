@@ -579,6 +579,7 @@ export default function TablesPage() {
         {showTableForm ? (
           // Show TableForm replacing entire main content area
           <TableForm
+            key={editingTable ? `edit:${editingTable}` : 'create'}
             schemaName={selectedSchema}
             draftScope={createTableDraftScope}
             open={showTableForm}

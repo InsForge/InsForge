@@ -4,6 +4,7 @@ import type { TableFormColumnSchema, TableFormForeignKeySchema } from '#features
 import { LOCAL_STORAGE_KEY_PREFIXES } from '#lib/utils/constants';
 import {
   clearCreateTableDraft,
+  hasCreateTableInput,
   loadCreateTableDraft,
   saveCreateTableDraft,
 } from '#features/database/utils/createTableDraft';
@@ -107,6 +108,23 @@ describe('createTableDraft', () => {
     saveCreateTableDraft(SCOPE, 'public', { tableName: '', columns }, []);
 
     expect(loadCreateTableDraft(SCOPE, 'public')?.columns).toEqual(columns);
+  });
+
+  it('treats added rows nobody touched as no input', () => {
+    const foreignKey: TableFormForeignKeySchema = {
+      columnName: 'author_id',
+      referenceTable: 'users',
+      referenceColumns: [{ sourceColumn: 'author_id', referenceColumn: 'id' }],
+      onDelete: 'NO ACTION',
+      onUpdate: 'NO ACTION',
+    };
+    const blankRows = { tableName: '', columns: [idColumn, newColumn(''), newColumn('')] };
+
+    expect(hasCreateTableInput(blankRows, [])).toBe(false);
+    expect(
+      hasCreateTableInput({ tableName: '', columns: [idColumn, newColumn('title')] }, [])
+    ).toBe(true);
+    expect(hasCreateTableInput(blankRows, [foreignKey])).toBe(true);
   });
 
   it('does not store a form that has not been filled in', () => {
