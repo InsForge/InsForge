@@ -91,6 +91,14 @@ describe('createTableDraft', () => {
     expect(loadCreateTableDraft(PROJECT, 'public')?.columns).toEqual(columns);
   });
 
+  it('keeps an unnamed column whose settings were changed', () => {
+    const columns = [idColumn, { ...newColumn(''), isNullable: false, isUnique: true }];
+
+    saveCreateTableDraft(PROJECT, 'public', { tableName: '', columns }, []);
+
+    expect(loadCreateTableDraft(PROJECT, 'public')?.columns).toEqual(columns);
+  });
+
   it('does not store a form that has not been filled in', () => {
     saveCreateTableDraft(PROJECT, 'public', emptyForm, []);
 

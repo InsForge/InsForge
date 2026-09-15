@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ColumnType } from '@insforge/shared-schemas';
 import {
   tableFormColumnSchema,
   tableFormForeignKeySchema,
@@ -25,11 +26,19 @@ export type CreateTableDraft = z.infer<typeof createTableDraftSchema>;
 const getDraftKey = (projectId: string | undefined, schemaName: string) =>
   `${LOCAL_STORAGE_KEY_PREFIXES.createTableDraft}-${projectId ?? 'default'}-${schemaName}`;
 
+// A row the form added that nobody has touched: no name and every setting at its default.
+const isUntouchedColumn = (column: CreateTableDraft['columns'][number]) =>
+  column.columnName.trim() === '' &&
+  column.type === ColumnType.STRING &&
+  !column.defaultValue &&
+  column.isNullable &&
+  !column.isUnique;
+
 // The untouched form (system columns plus one empty row) is not worth restoring.
 const hasUserInput = (draft: CreateTableDraft) =>
   draft.tableName.trim() !== '' ||
   draft.foreignKeys.length > 0 ||
-  draft.columns.some((column) => !column.isSystemColumn && column.columnName.trim() !== '');
+  draft.columns.some((column) => !column.isSystemColumn && !isUntouchedColumn(column));
 
 export function loadCreateTableDraft(
   projectId: string | undefined,

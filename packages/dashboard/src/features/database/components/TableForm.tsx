@@ -236,11 +236,12 @@ export function TableForm({
         'success'
       );
 
-      clearCreateTableDraft(projectId, schemaName);
       form.reset();
       setError(null);
       setForeignKeys([]);
       setForeignKeysDirty(false);
+      // Clear last: form.reset() re-saves through the watcher with the old foreign keys.
+      clearCreateTableDraft(projectId, schemaName);
       onSuccess?.(data.tableName);
     },
     onError: (err) => {
