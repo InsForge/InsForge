@@ -13,6 +13,7 @@ import { TableForm } from '#features/database/components/TableForm';
 import { TablesEmptyState } from '#features/database/components/TablesEmptyState';
 import { TemplatePreview } from '#features/database/components/TemplatePreview';
 import { DATABASE_TEMPLATES, DatabaseTemplate } from '#features/database/templates';
+import { clearCreateTableDraft } from '#features/database/utils/createTableDraft';
 import {
   Button,
   ConfirmDialog,
@@ -352,6 +353,13 @@ export default function TablesPage() {
     }
   };
 
+  // A create-table draft should survive a refresh, not a deliberate close.
+  const discardCreateTableDraft = () => {
+    if (!editingTable) {
+      clearCreateTableDraft(selectedSchema);
+    }
+  };
+
   const handleTableFormClose = async (): Promise<boolean> => {
     if (isTableFormDirty) {
       const confirmOptions = {
@@ -366,6 +374,7 @@ export default function TablesPage() {
 
       const shouldDiscard = await confirm(confirmOptions);
       if (shouldDiscard) {
+        discardCreateTableDraft();
         setShowTableForm(false);
         setEditingTable(null);
         return true;
@@ -373,6 +382,7 @@ export default function TablesPage() {
         return false;
       }
     } else {
+      discardCreateTableDraft();
       setShowTableForm(false);
       return true;
     }

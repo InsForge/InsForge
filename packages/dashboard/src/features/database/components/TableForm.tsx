@@ -18,6 +18,11 @@ import { ForeignKeyPopover } from './ForeignKeyPopover';
 import { ColumnType, TableSchema, UpdateTableSchemaRequest } from '@insforge/shared-schemas';
 import { parseDatabaseTableReference, SYSTEM_FIELDS } from '#features/database/helpers';
 import { databaseTableQueryKeys } from '#features/database/queryKeys';
+import {
+  clearCreateTableDraft,
+  loadCreateTableDraft,
+  saveCreateTableDraft,
+} from '#features/database/utils/createTableDraft';
 
 const newColumn: TableFormColumnSchema = {
   columnName: '',
@@ -28,6 +33,38 @@ const newColumn: TableFormColumnSchema = {
   isSystemColumn: false,
   isNewColumn: true,
 };
+
+const createDefaultColumns = (): TableFormColumnSchema[] => [
+  {
+    columnName: 'id',
+    type: ColumnType.UUID,
+    defaultValue: 'gen_random_uuid()',
+    isPrimaryKey: true,
+    isNullable: false,
+    isUnique: true,
+    isSystemColumn: true,
+    isNewColumn: false,
+  },
+  {
+    columnName: 'created_at',
+    type: ColumnType.DATETIME,
+    defaultValue: 'CURRENT_TIMESTAMP',
+    isNullable: true,
+    isUnique: false,
+    isSystemColumn: true,
+    isNewColumn: false,
+  },
+  {
+    columnName: 'updated_at',
+    type: ColumnType.DATETIME,
+    defaultValue: 'CURRENT_TIMESTAMP',
+    isNullable: true,
+    isUnique: false,
+    isSystemColumn: true,
+    isNewColumn: false,
+  },
+  { ...newColumn },
+];
 
 interface TableFormProps {
   schemaName: string;
@@ -61,42 +98,7 @@ export function TableForm({
     resolver: zodResolver(tableFormSchema),
     defaultValues: {
       tableName: '',
-      columns:
-        mode === 'create'
-          ? [
-              {
-                columnName: 'id',
-                type: ColumnType.UUID,
-                defaultValue: 'gen_random_uuid()',
-                isPrimaryKey: true,
-                isNullable: false,
-                isUnique: true,
-                isSystemColumn: true,
-                isNewColumn: false,
-              },
-              {
-                columnName: 'created_at',
-                type: ColumnType.DATETIME,
-                defaultValue: 'CURRENT_TIMESTAMP',
-                isNullable: true,
-                isUnique: false,
-                isSystemColumn: true,
-                isNewColumn: false,
-              },
-              {
-                columnName: 'updated_at',
-                type: ColumnType.DATETIME,
-                defaultValue: 'CURRENT_TIMESTAMP',
-                isNullable: true,
-                isUnique: false,
-                isSystemColumn: true,
-                isNewColumn: false,
-              },
-              {
-                ...newColumn,
-              },
-            ]
-          : [{ ...newColumn }],
+      columns: mode === 'create' ? createDefaultColumns() : [{ ...newColumn }],
     },
   });
 
@@ -141,43 +143,35 @@ export function TableForm({
       });
       setForeignKeys(existingForeignKeys);
     } else {
+      const draft = open && mode === 'create' ? loadCreateTableDraft(schemaName) : null;
       form.reset({
         tableName: '',
-        columns: [
-          {
-            columnName: 'id',
-            type: ColumnType.UUID,
-            defaultValue: 'gen_random_uuid()',
-            isPrimaryKey: true,
-            isNullable: false,
-            isUnique: true,
-            isSystemColumn: true,
-            isNewColumn: false,
-          },
-          {
-            columnName: 'created_at',
-            type: ColumnType.DATETIME,
-            defaultValue: 'CURRENT_TIMESTAMP',
-            isNullable: true,
-            isUnique: false,
-            isSystemColumn: true,
-            isNewColumn: false,
-          },
-          {
-            columnName: 'updated_at',
-            type: ColumnType.DATETIME,
-            defaultValue: 'CURRENT_TIMESTAMP',
-            isNullable: true,
-            isUnique: false,
-            isSystemColumn: true,
-            isNewColumn: false,
-          },
-          { ...newColumn },
-        ],
+        columns: createDefaultColumns(),
       });
-      setForeignKeys([]);
+      if (draft) {
+        // Keep the empty form as the baseline so restored work still counts as unsaved.
+        form.reset(
+          { tableName: draft.tableName, columns: draft.columns },
+          { keepDefaultValues: true }
+        );
+        setForeignKeysDirty(draft.foreignKeys.length > 0);
+      }
+      setForeignKeys(draft?.foreignKeys ?? []);
     }
   }, [editTable, form, mode, open, schemaName]);
+
+  // Save the create form as it is filled in, so a refresh or a discarded tab does not
+  // lose it. The draft is cleared after the table is created or the form is closed.
+  useEffect(() => {
+    if (!open || mode !== 'create') {
+      return;
+    }
+
+    const saveDraft = () => saveCreateTableDraft(schemaName, form.getValues(), foreignKeys);
+    saveDraft();
+    const subscription = form.watch(saveDraft);
+    return () => subscription.unsubscribe();
+  }, [foreignKeys, form, mode, open, schemaName]);
 
   useEffect(() => {
     setFormIsDirty(form.formState.isDirty);
@@ -239,6 +233,7 @@ export function TableForm({
         'success'
       );
 
+      clearCreateTableDraft(schemaName);
       form.reset();
       setError(null);
       setForeignKeys([]);
