@@ -14,7 +14,7 @@ import { useTheme } from '#lib/contexts/ThemeContext';
 import { useAuth } from '#lib/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useOpenConnectDialog } from './ConnectDialogContext';
-import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 import { githubService } from '#features/dashboard/services/github.service';
 
@@ -29,7 +29,7 @@ export default function AppHeader() {
   const { resolvedTheme } = useTheme();
   const { logout } = useAuth();
   const openConnectDialog = useOpenConnectDialog();
-  const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
+  const dashboardVariant = useFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;

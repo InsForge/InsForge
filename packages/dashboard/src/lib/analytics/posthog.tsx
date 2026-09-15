@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import posthog from 'posthog-js';
 import { PostHogProvider } from 'posthog-js/react';
 
@@ -83,4 +84,39 @@ export const getFeatureFlag = (featureFlag: string): string | boolean | undefine
     return undefined;
   }
   return posthog.getFeatureFlag(featureFlag);
+};
+
+// A flag that is not set and flags that have not loaded yet both read as undefined.
+// This tells them apart. Without a PostHog key there is nothing to wait for.
+export const useFeatureFlagsReady = (): boolean => {
+  const [ready, setReady] = useState(
+    () => !POSTHOG_KEY || posthog.featureFlags?.hasLoadedFlags === true
+  );
+
+  useEffect(() => {
+    if (!POSTHOG_KEY) {
+      return;
+    }
+    if (posthog.featureFlags?.hasLoadedFlags) {
+      setReady(true);
+    }
+    return posthog.onFeatureFlags(() => setReady(true));
+  }, []);
+
+  return ready;
+};
+
+// Use in render instead of getFeatureFlag, which only reads the value once.
+export const useFeatureFlag = (featureFlag: string): string | boolean | undefined => {
+  const [value, setValue] = useState(() => getFeatureFlag(featureFlag));
+
+  useEffect(() => {
+    if (!POSTHOG_KEY) {
+      return;
+    }
+    setValue(getFeatureFlag(featureFlag));
+    return posthog.onFeatureFlags(() => setValue(getFeatureFlag(featureFlag)));
+  }, [featureFlag]);
+
+  return value;
 };

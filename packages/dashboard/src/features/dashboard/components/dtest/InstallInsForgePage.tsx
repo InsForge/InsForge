@@ -10,7 +10,7 @@ import {
   DIRECT_CONNECT_IDS,
   type ClientId,
 } from './clientRegistry';
-import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS } from '#lib/analytics/constants';
 
 interface InstallInsForgePageProps {
@@ -20,7 +20,7 @@ interface InstallInsForgePageProps {
 
 export function InstallInsForgePage({ onSelectClient, onDismiss }: InstallInsForgePageProps) {
   const { t } = useTranslation('chrome');
-  const mcpVsCliVariant = getFeatureFlag(FEATURE_FLAGS.MCP_VS_CLI);
+  const mcpVsCliVariant = useFeatureFlag(FEATURE_FLAGS.MCP_VS_CLI);
   const gridEntries = CODING_AGENT_GRID_IDS.map((id) => CLIENT_ENTRIES[id]).filter((entry) => {
     const tabs = entry.tabs ?? DEFAULT_AGENT_TABS;
     if (mcpVsCliVariant === 'mcp') {

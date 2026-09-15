@@ -64,12 +64,15 @@ import BucketsPage from '#features/storage/pages/BucketsPage';
 import VisualizerLayout from '#features/visualizer/components/VisualizerLayout';
 import VisualizerPage from '#features/visualizer/pages/VisualizerPage';
 import AppLayout from '#layout/AppLayout';
-import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useFeatureFlag, useFeatureFlagsReady } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 
 function AuthenticatedRoutes() {
-  const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
+  const flagsReady = useFeatureFlagsReady();
+  const dashboardVariant = useFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
   const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;
+  // The index route can switch once flags load. The install route has to wait: redirecting
+  // before the variant is known sends D_TEST users away from it on a hard refresh.
   const DashboardHomePage = isDTest ? DTestDashboardPage : DashboardPage;
 
   return (
@@ -80,7 +83,13 @@ function AuthenticatedRoutes() {
           <Route index element={<DashboardHomePage />} />
           <Route
             path="install"
-            element={isDTest ? <DTestInstallPage /> : <Navigate to="/dashboard" replace />}
+            element={
+              !flagsReady ? null : isDTest ? (
+                <DTestInstallPage />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            }
           />
         </Route>
         <Route path="/dashboard/authentication" element={<AuthenticationLayout />}>
