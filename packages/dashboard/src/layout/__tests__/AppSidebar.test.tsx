@@ -25,6 +25,8 @@ vi.mock('#lib/utils/utils', async (importOriginal) => ({
 
 vi.mock('#lib/analytics/posthog', () => ({
   getFeatureFlag: () => undefined,
+  useFeatureFlag: () => undefined,
+  useFeatureFlagsReady: () => true,
 }));
 
 // Heavy children that pull in API/context of their own and are irrelevant here.
