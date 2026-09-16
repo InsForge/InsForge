@@ -5,7 +5,7 @@
  * Issue #1405 — Phase 2: OAuth Error Standardization.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { ERROR_CODES, sharedKeyOAuthProviders } from '@insforge/shared-schemas';
 
 // ---------------------------------------------------------------------------
 // Minimal mocks for all AuthService dependencies
@@ -181,14 +181,31 @@ describe('AuthService — unsupported OAuth provider branches (Issue #1405 Phase
       );
     });
 
-    // #2053: the cloud never proxied X, so it is no longer routed here
-    it('throws AppError(501, AUTH_UNSUPPORTED_PROVIDER) for x', async () => {
+    // #2053: only the providers the cloud proxies on shared keys are routed here.
+    // X used to be, against a cloud endpoint that does not exist.
+    it.each(['x', 'instagram', 'tiktok', 'spotify'] as const)(
+      'throws AppError(501, AUTH_UNSUPPORTED_PROVIDER) for %s',
+      async (provider) => {
+        const authService = await getAuthService();
+        await expect(authService.handleSharedCallback(provider, {})).rejects.toMatchObject({
+          statusCode: 501,
+          code: ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER,
+          name: 'AppError',
+        });
+      }
+    );
+
+    it.each([...sharedKeyOAuthProviders])('routes %s to its provider', async (provider) => {
       const authService = await getAuthService();
-      await expect(authService.handleSharedCallback('x', {})).rejects.toMatchObject({
-        statusCode: 501,
-        code: ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER,
-        name: 'AppError',
-      });
+
+      // The providers and the user lookup are mocked, so only the routing decision is
+      // under test: the call must not fall through to the unsupported-provider branch.
+      const outcome = await authService
+        .handleSharedCallback(provider, {})
+        .then(() => 'routed')
+        .catch((error: unknown) => (error as { code?: string }).code ?? 'routed');
+
+      expect(outcome).not.toBe(ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER);
     });
   });
 });

@@ -118,6 +118,24 @@ describe('OAuth config shared-key provider guard', () => {
     expect(configServiceMock.updateConfig).not.toHaveBeenCalled();
   });
 
+  it('rejects a mixed-case x path, which the config lookup would have matched', async () => {
+    const response = await request(await createApp())
+      .put('/api/auth/oauth/X/config')
+      .send({ useSharedKey: true });
+
+    expect(response.status).toBe(400);
+    expect(configServiceMock.updateConfig).not.toHaveBeenCalled();
+  });
+
+  it('accepts a mixed-case path for a provider the cloud proxies', async () => {
+    const response = await request(await createApp())
+      .put('/api/auth/oauth/Google/config')
+      .send({ useSharedKey: true });
+
+    expect(response.status).toBe(200);
+    expect(configServiceMock.updateConfig).toHaveBeenCalled();
+  });
+
   it('still accepts a provider the cloud proxies', async () => {
     const response = await request(await createApp())
       .post('/api/auth/oauth/configs')

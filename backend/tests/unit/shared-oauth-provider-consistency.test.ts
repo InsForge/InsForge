@@ -1,53 +1,135 @@
 /**
  * #2051 hardened the shared OAuth callback but updated seven of the eight providers
- * that post to it, leaving X on the pre-hardening init query (#2053). These assert the
- * sets instead of X specifically, so a provider added to the shared callback without
- * the bound init query, or left off the shared-key list, fails here.
+ * that post to it, leaving X on the pre-hardening init query (#2053). These drive the
+ * real init call for every shared-key provider and assert the project and flow bindings
+ * the callback requires, so a provider that reaches the shared callback without them
+ * fails here rather than at a user's login.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import crypto from 'crypto';
 import { readdirSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { sharedKeyOAuthProviders, isSharedKeyOAuthProvider } from '@insforge/shared-schemas';
 
-const providerDir = resolve(__dirname, '../../src/providers/oauth');
+const STATE = 'state-under-test';
 
-const providerSources = readdirSync(providerDir)
-  .filter((file) => file.endsWith('.provider.ts'))
-  .filter((file) => !['base.provider.ts', 'custom.provider.ts'].includes(file))
-  .map((file) => ({
-    provider: file.replace('.provider.ts', ''),
-    source: readFileSync(resolve(providerDir, file), 'utf-8'),
-  }));
+const mocks = vi.hoisted(() => ({
+  projectId: 'project-under-test',
+  getConfigByProvider: vi.fn(),
+  axiosGet: vi.fn(),
+  signCloudToken: vi.fn(() => 'project-sign-token'),
+}));
 
-const providersMatching = (predicate: (source: string) => boolean): string[] =>
-  providerSources
-    .filter(({ source }) => predicate(source))
-    .map(({ provider }) => provider)
+const PROJECT_ID = mocks.projectId;
+
+vi.mock('../../src/services/auth/oauth-config.service.js', () => ({
+  OAuthConfigService: {
+    getInstance: () => ({
+      getConfigByProvider: mocks.getConfigByProvider,
+      getClientSecretByProvider: vi.fn(),
+    }),
+  },
+}));
+vi.mock('../../src/infra/security/token.manager.js', () => ({
+  TokenManager: { getInstance: () => ({ signCloudToken: mocks.signCloudToken }) },
+}));
+vi.mock('../../src/infra/config/app.config.js', () => ({
+  appConfig: {
+    app: { jwtSecret: 'test-secret' },
+    cloud: { projectId: mocks.projectId, apiHost: 'https://api.insforge.test' },
+  },
+}));
+vi.mock('../../src/utils/environment.js', () => ({
+  getApiBaseUrl: () => 'http://localhost:7130',
+}));
+vi.mock('../../src/utils/logger.js', () => ({
+  default: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+}));
+vi.mock('axios', () => ({
+  default: { get: mocks.axiosGet, post: vi.fn(), isAxiosError: vi.fn() },
+}));
+
+import {
+  AppleOAuthProvider,
+  DiscordOAuthProvider,
+  FacebookOAuthProvider,
+  GitHubOAuthProvider,
+  GoogleOAuthProvider,
+  LinkedInOAuthProvider,
+  MicrosoftOAuthProvider,
+} from '../../src/providers/oauth/index.js';
+
+interface SharedKeyProvider {
+  generateOAuthUrl(state?: string, additionalParams?: Record<string, string>): Promise<string>;
+}
+
+const providerInstances: Record<string, () => SharedKeyProvider> = {
+  google: () => GoogleOAuthProvider.getInstance(),
+  github: () => GitHubOAuthProvider.getInstance(),
+  discord: () => DiscordOAuthProvider.getInstance(),
+  linkedin: () => LinkedInOAuthProvider.getInstance(),
+  facebook: () => FacebookOAuthProvider.getInstance(),
+  apple: () => AppleOAuthProvider.getInstance(),
+  microsoft: () => MicrosoftOAuthProvider.getInstance(),
+};
+
+describe('shared-key OAuth providers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getConfigByProvider.mockResolvedValue({ useSharedKey: true });
+    mocks.axiosGet.mockResolvedValue({
+      data: { auth_url: 'https://provider.example/authorize?client_id=shared' },
+    });
+    mocks.signCloudToken.mockReturnValue('project-sign-token');
+  });
+
+  it('has an instance for every provider on the shared-key list', () => {
+    expect(Object.keys(providerInstances).sort()).toEqual([...sharedKeyOAuthProviders].sort());
+  });
+
+  it.each([...sharedKeyOAuthProviders])(
+    'binds the %s init request to this project and login attempt',
+    async (provider) => {
+      await providerInstances[provider]().generateOAuthUrl(STATE);
+
+      expect(mocks.axiosGet).toHaveBeenCalledTimes(1);
+      const initUrl = new URL(mocks.axiosGet.mock.calls[0][0] as string);
+
+      expect(initUrl.searchParams.get('redirect_uri')).toBe(
+        `http://localhost:7130/api/auth/oauth/shared/callback/${STATE}`
+      );
+      expect(initUrl.searchParams.get('project_id')).toBe(PROJECT_ID);
+      expect(initUrl.searchParams.get('sign')).toBe('project-sign-token');
+      expect(initUrl.searchParams.get('flow_id')).toBe(
+        crypto.createHash('sha256').update(STATE).digest('hex')
+      );
+    }
+  );
+
+  it.each([...sharedKeyOAuthProviders])(
+    'returns the authorization url the cloud issued for %s',
+    async (provider) => {
+      const authUrl = await providerInstances[provider]().generateOAuthUrl(STATE);
+
+      expect(authUrl).toContain('https://provider.example/authorize');
+    }
+  );
+});
+
+describe('shared callback reach', () => {
+  const providerDir = resolve(__dirname, '../../src/providers/oauth');
+
+  const providersPostingToSharedCallback = readdirSync(providerDir)
+    .filter((file) => file.endsWith('.provider.ts'))
+    .filter((file) => !['base.provider.ts', 'custom.provider.ts'].includes(file))
+    .filter((file) => readFileSync(resolve(providerDir, file), 'utf-8').includes('shared/callback'))
+    .map((file) => file.replace('.provider.ts', ''))
     .sort();
 
-const expectedSharedProviders = [...sharedKeyOAuthProviders].sort();
-
-describe('shared OAuth provider consistency', () => {
-  it('reads every first-party provider', () => {
-    expect(providerSources.length).toBeGreaterThanOrEqual(expectedSharedProviders.length);
-  });
-
-  it('limits the shared callback to providers on the shared-key list', () => {
-    expect(providersMatching((source) => source.includes('shared/callback'))).toEqual(
-      expectedSharedProviders
-    );
-  });
-
-  it('sends the project-bound init query from every shared-key provider', () => {
-    expect(providersMatching((source) => source.includes('buildSharedOAuthInitQuery'))).toEqual(
-      expectedSharedProviders
-    );
-  });
-
-  it('implements handleSharedCallback only on shared-key providers', () => {
-    expect(providersMatching((source) => source.includes('handleSharedCallback('))).toEqual(
-      expectedSharedProviders
-    );
+  // The bindings above are only enforceable for providers the cloud proxies, so no
+  // other provider may send users to the shared callback.
+  it('is limited to providers on the shared-key list', () => {
+    expect(providersPostingToSharedCallback).toEqual([...sharedKeyOAuthProviders].sort());
   });
 
   it('keeps X off the shared-key list', () => {
@@ -55,22 +137,8 @@ describe('shared OAuth provider consistency', () => {
     expect(isSharedKeyOAuthProvider('google')).toBe(true);
   });
 
-  it('routes shared callbacks in AuthService for exactly the shared-key providers', () => {
-    const authServiceSource = readFileSync(
-      resolve(__dirname, '../../src/services/auth/auth.service.ts'),
-      'utf-8'
-    );
-    const sharedCallbackSwitch = authServiceSource.slice(
-      authServiceSource.indexOf('async handleSharedCallback(')
-    );
-    const routed = [
-      ...sharedCallbackSwitch
-        .slice(0, sharedCallbackSwitch.indexOf('default:'))
-        .matchAll(/case '([a-z]+)':/g),
-    ]
-      .map((match) => match[1])
-      .sort();
-
-    expect(routed).toEqual(expectedSharedProviders);
+  it('matches the shared-key list case-insensitively, as config lookups do', () => {
+    expect(isSharedKeyOAuthProvider('Google')).toBe(true);
+    expect(isSharedKeyOAuthProvider('X')).toBe(false);
   });
 });

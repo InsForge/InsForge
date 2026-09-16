@@ -100,8 +100,12 @@ export const sharedKeyOAuthProviders = [
   'microsoft',
 ] as const satisfies readonly OAuthProvidersSchema[];
 
+/**
+ * Whether the cloud can run this provider on shared keys. Compared case-insensitively,
+ * because OAuth configs are stored and looked up that way.
+ */
 export function isSharedKeyOAuthProvider(provider: string): boolean {
-  return (sharedKeyOAuthProviders as readonly string[]).includes(provider);
+  return (sharedKeyOAuthProviders as readonly string[]).includes(provider.toLowerCase());
 }
 
 export const oAuthStateSchema = z.object({

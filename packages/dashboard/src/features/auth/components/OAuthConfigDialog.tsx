@@ -156,7 +156,10 @@ export function OAuthConfigDialog({
         clientId: providerConfig.clientId || '',
         nativeClientIds: providerConfig.nativeClientIds || [],
         clientSecret: providerConfig.clientSecret || '',
-        useSharedKey: providerConfig.useSharedKey || false,
+        // A stored config can still carry the flag for a provider the cloud never
+        // proxied. Dropping it here shows the credential fields, so the admin can
+        // repair the config instead of resubmitting a value the backend rejects.
+        useSharedKey: Boolean(isSharedKeysAvailable && providerConfig.useSharedKey),
       });
     }
   }, [form, isLoadingProvider, isOpen, isSharedKeysAvailable, mode, provider, providerConfig]);
