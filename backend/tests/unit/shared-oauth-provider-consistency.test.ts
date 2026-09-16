@@ -11,7 +11,10 @@ import { readdirSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { sharedKeyOAuthProviders, isSharedKeyOAuthProvider } from '@insforge/shared-schemas';
 
-const STATE = 'state-under-test';
+// Deliberately carries characters that percent-encode: microsoft.provider.ts encodes the
+// state into the callback path while the other six inline it raw, and both must still
+// name the same login attempt.
+const STATE = 'state under+test/2053';
 
 const mocks = vi.hoisted(() => ({
   projectId: 'project-under-test',
@@ -95,9 +98,13 @@ describe('shared-key OAuth providers', () => {
       expect(mocks.axiosGet).toHaveBeenCalledTimes(1);
       const initUrl = new URL(mocks.axiosGet.mock.calls[0][0] as string);
 
-      expect(initUrl.searchParams.get('redirect_uri')).toBe(
-        `http://localhost:7130/api/auth/oauth/shared/callback/${STATE}`
-      );
+      const redirectUri = initUrl.searchParams.get('redirect_uri') ?? '';
+      const callbackPrefix = 'http://localhost:7130/api/auth/oauth/shared/callback/';
+
+      expect(redirectUri.startsWith(callbackPrefix)).toBe(true);
+      // Express decodes the path parameter, so either spelling reaches the callback as
+      // the state that flow_id below is derived from
+      expect(decodeURIComponent(redirectUri.slice(callbackPrefix.length))).toBe(STATE);
       expect(initUrl.searchParams.get('project_id')).toBe(PROJECT_ID);
       expect(initUrl.searchParams.get('sign')).toBe('project-sign-token');
       expect(initUrl.searchParams.get('flow_id')).toBe(
