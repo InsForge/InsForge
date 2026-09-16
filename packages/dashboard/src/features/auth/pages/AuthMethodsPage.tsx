@@ -19,7 +19,11 @@ import {
   DropdownMenuTrigger,
   ConfirmDialog,
 } from '@insforge/ui';
-import type { OAuthProvidersSchema, CustomOAuthConfigSchema } from '@insforge/shared-schemas';
+import {
+  isSharedKeyOAuthProvider,
+  type OAuthProvidersSchema,
+  type CustomOAuthConfigSchema,
+} from '@insforge/shared-schemas';
 import { oauthProviders, type OAuthProviderInfo } from '#features/auth/helpers';
 
 export default function AuthMethodsPage() {
@@ -240,7 +244,7 @@ export default function AuthMethodsPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                {config.useSharedKey && (
+                {config.useSharedKey && isSharedKeyOAuthProvider(provider.id) && (
                   <Badge className="h-5 rounded bg-[var(--alpha-8)] px-2 py-0 text-xs font-medium leading-4 text-muted-foreground">
                     {t('auth.sharedKeys', { defaultValue: 'Shared Keys' })}
                   </Badge>
