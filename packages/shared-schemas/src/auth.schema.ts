@@ -82,6 +82,28 @@ export const oAuthProvidersSchema = z.enum([
   'microsoft',
 ]);
 
+/**
+ * Providers InsForge Cloud can run on its own shared OAuth keys.
+ *
+ * Every provider listed here must send `buildSharedOAuthInitQuery` on init, because the
+ * shared callback only accepts an identity assertion bound to this project and attempt.
+ * A provider missing from this list has no cloud endpoint behind it, so `useSharedKey`
+ * is rejected when the config is saved rather than failing later at login.
+ */
+export const sharedKeyOAuthProviders = [
+  'google',
+  'github',
+  'discord',
+  'linkedin',
+  'facebook',
+  'apple',
+  'microsoft',
+] as const satisfies readonly OAuthProvidersSchema[];
+
+export function isSharedKeyOAuthProvider(provider: string): boolean {
+  return (sharedKeyOAuthProviders as readonly string[]).includes(provider);
+}
+
 export const oAuthStateSchema = z.object({
   provider: oAuthProvidersSchema,
   redirectUri: z.string().url().optional(),

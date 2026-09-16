@@ -18,9 +18,9 @@ import {
 } from '@insforge/ui';
 import WarningIcon from '#assets/icons/warning.svg';
 import {
+  isSharedKeyOAuthProvider,
   oAuthConfigSchema,
   OAuthConfigSchema,
-  OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
 import { type OAuthProviderInfo } from '#features/auth/helpers';
 import { SecretInput } from './SecretInput';
@@ -119,17 +119,8 @@ export function OAuthConfigDialog({
   const [isClientSecretVisible, setIsClientSecretVisible] = useState(false);
 
   // Our Cloud only support shared keys of these OAuth Providers for now
-  const sharedKeyProviders: readonly OAuthProvidersSchema[] = [
-    'google',
-    'github',
-    'discord',
-    'linkedin',
-    'facebook',
-    'apple',
-    'microsoft',
-  ] satisfies readonly OAuthProvidersSchema[];
   const isSharedKeysAvailable =
-    isInsForgeCloudProject() && provider?.id && sharedKeyProviders.includes(provider.id);
+    isInsForgeCloudProject() && provider?.id && isSharedKeyOAuthProvider(provider.id);
 
   // Use useFormState hook for better reactivity
   const { isDirty } = useFormState({

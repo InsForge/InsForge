@@ -180,5 +180,15 @@ describe('AuthService — unsupported OAuth provider branches (Issue #1405 Phase
         "OAuth provider 'unknown' is not supported for shared callback."
       );
     });
+
+    // #2053: the cloud never proxied X, so it is no longer routed here
+    it('throws AppError(501, AUTH_UNSUPPORTED_PROVIDER) for x', async () => {
+      const authService = await getAuthService();
+      await expect(authService.handleSharedCallback('x', {})).rejects.toMatchObject({
+        statusCode: 501,
+        code: ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER,
+        name: 'AppError',
+      });
+    });
   });
 });

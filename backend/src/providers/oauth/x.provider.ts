@@ -5,7 +5,8 @@ import logger from '@/utils/logger.js';
 import { OAuthProvider } from './base.provider.js';
 import axios from 'axios';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
-import { appConfig } from '@/infra/config/app.config.js';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 export class XOAuthProvider implements OAuthProvider {
   private static instance: XOAuthProvider;
@@ -39,6 +40,16 @@ export class XOAuthProvider implements OAuthProvider {
       throw new Error('X OAuth not configured');
     }
 
+    // The cloud never proxied X, so a config carrying this flag has no working login.
+    // Fail here with a clear message instead of at the shared callback.
+    if (config.useSharedKey) {
+      throw new AppError(
+        'X does not support InsForge shared OAuth keys. Configure a client ID and secret instead.',
+        400,
+        ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
+      );
+    }
+
     const selfBaseUrl = getApiBaseUrl();
 
     if (!state) {
@@ -48,31 +59,6 @@ export class XOAuthProvider implements OAuthProvider {
     setTimeout(() => {
       this.verifierCodes.delete(state);
     }, 600000);
-
-    if (config?.useSharedKey) {
-      // Use shared keys if configured
-      const cloudBasedUrl = appConfig.cloud.apiHost;
-      const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
-      const response = await axios.get(
-        `${cloudBasedUrl}/oauth/twitter?redirect_uri=${encodeURIComponent(redirectUri)}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      const sharedAuthUrl = response.data.auth_url || response.data.url;
-      if (!sharedAuthUrl) {
-        throw new Error('Shared X OAuth did not return an authorization URL');
-      }
-      const authUrl = new URL(sharedAuthUrl);
-      Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
-        if (!authUrl.searchParams.has(key)) {
-          authUrl.searchParams.set(key, value);
-        }
-      });
-      return authUrl.toString();
-    }
 
     logger.debug('X OAuth Config (fresh from DB):', {
       clientId: config.clientId ? 'SET' : 'NOT SET',
@@ -194,28 +180,6 @@ export class XOAuthProvider implements OAuthProvider {
       userName,
       avatarUrl: xUserInfo.profile_image_url || '',
       identityData: xUserInfo,
-    };
-  }
-
-  /**
-   * Handle shared callback payload transformation
-   */
-  handleSharedCallback(payloadData: Record<string, unknown>): OAuthUserData {
-    const providerId = String(payloadData.providerId ?? '');
-    const username = String(payloadData.username ?? '');
-    const name = String(payloadData.name ?? '');
-    const profileImageUrl = String(payloadData.profile_image_url ?? '');
-
-    const userName = username || name || `user${providerId.substring(0, 8)}`;
-    const email = `${userName}@users.noreply.x.local`;
-
-    return {
-      provider: 'x',
-      providerId,
-      email,
-      userName,
-      avatarUrl: profileImageUrl,
-      identityData: payloadData,
     };
   }
 }
