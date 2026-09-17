@@ -123,6 +123,9 @@ export interface AppConfig {
 
 function parseEnvInt(val: string | undefined, fallback: number): number {
   if (!val) return fallback;
+  // Whole-string match: parseInt alone accepts a numeric prefix, so a typo
+  // like "80oops" would silently become 80 instead of the fallback.
+  if (!/^\d+$/.test(val.trim())) return fallback;
   const parsed = parseInt(val, 10);
   if (isNaN(parsed) || parsed <= 0 || !Number.isSafeInteger(parsed)) {
     return fallback;

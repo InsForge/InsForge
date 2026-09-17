@@ -398,7 +398,7 @@ describe('config.database', () => {
   });
 
   it('falls back to defaults for invalid PostgREST pool sizes', () => {
-    process.env.POSTGRES_POOL_MAX = '0';
+    process.env.POSTGRES_POOL_MAX = '80oops';
     process.env.POSTGREST_MAX_SOCKETS = 'not-a-number';
     process.env.POSTGREST_MAX_FREE_SOCKETS = '-3';
     process.env.POSTGREST_FREE_SOCKET_TIMEOUT_MS = '0';
