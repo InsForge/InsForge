@@ -457,12 +457,45 @@ export class StorageService {
     return withUserContext(this.getPool(), ctx, listVisibleObjects);
   }
 
+  // Bucket visibility is consulted on every object download (auth gate,
+  // download strategy, proxy stream). Cache it briefly so public downloads
+  // don't cost a DB round trip each, and keep the last known value to serve
+  // when the DB is unreachable — typically a project Postgres that is out of
+  // connection slots. Bucket writes in this process invalidate the entry.
+  private static readonly BUCKET_VISIBILITY_TTL_MS = 30_000;
+  private static readonly BUCKET_VISIBILITY_STALE_MAX_MS = 5 * 60_000;
+  private bucketVisibilityCache = new Map<string, { isPublic: boolean; fetchedAt: number }>();
+
   async isBucketPublic(bucket: string): Promise<boolean> {
-    const result = await this.getPool().query(
-      'SELECT public FROM storage.buckets WHERE name = $1',
-      [bucket]
-    );
-    return result.rows[0]?.public || false;
+    const now = Date.now();
+    const cached = this.bucketVisibilityCache.get(bucket);
+    if (cached && now - cached.fetchedAt < StorageService.BUCKET_VISIBILITY_TTL_MS) {
+      return cached.isPublic;
+    }
+
+    try {
+      const result = await this.getPool().query(
+        'SELECT public FROM storage.buckets WHERE name = $1',
+        [bucket]
+      );
+      const isPublic = result.rows[0]?.public || false;
+      this.bucketVisibilityCache.set(bucket, { isPublic, fetchedAt: now });
+      return isPublic;
+    } catch (error) {
+      if (cached && now - cached.fetchedAt < StorageService.BUCKET_VISIBILITY_STALE_MAX_MS) {
+        logger.warn('Bucket visibility lookup failed; serving last known value', {
+          bucket,
+          ageMs: now - cached.fetchedAt,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return cached.isPublic;
+      }
+      throw error;
+    }
+  }
+
+  private invalidateBucketVisibility(bucket: string): void {
+    this.bucketVisibilityCache.delete(bucket);
   }
 
   async updateBucketVisibility(bucket: string, isPublic: boolean): Promise<void> {
@@ -477,6 +510,7 @@ export class StorageService {
         'UPDATE storage.buckets SET public = $1, updated_at = CURRENT_TIMESTAMP WHERE name = $2',
         [isPublic, bucket]
       );
+      this.invalidateBucketVisibility(bucket);
 
       // Update storage metadata
       // Metadata is now updated on-demand
@@ -512,6 +546,7 @@ export class StorageService {
         bucket,
         isPublic,
       ]);
+      this.invalidateBucketVisibility(bucket);
 
       // Update storage metadata
       // Metadata is now updated on-demand
@@ -533,6 +568,7 @@ export class StorageService {
       // If provider.deleteBucket fails after this point, all objects are cascade-deleted
       // from the database but files remain orphaned in storage.
       await client.query('DELETE FROM storage.buckets WHERE name = $1', [bucket]);
+      this.invalidateBucketVisibility(bucket);
 
       // Delete bucket using backend (handles all files)
       await this.provider.deleteBucket(bucket);
