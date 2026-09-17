@@ -359,12 +359,31 @@ export class SecretService {
   }
 
   /**
-   * Check if a secret value matches the stored value
+   * A credential could not be checked because the database lookup itself
+   * failed (pool exhausted, Postgres refusing connections, ...). That is an
+   * infrastructure fault, not a bad credential: answering 401 sends callers
+   * off to regenerate keys that were valid all along. Surface it as 503.
+   */
+  private credentialCheckUnavailable(logMessage: string, error: unknown): AppError {
+    logger.error(logMessage, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return new AppError(
+      'Unable to verify credentials right now, please retry',
+      503,
+      ERROR_CODES.AUTH_UNAVAILABLE
+    );
+  }
+
+  /**
+   * Check if a secret value matches the stored value.
+   * Returns false for not-found / mismatch; throws 503 when the lookup fails.
    */
   async checkSecretByKey(key: string, value: string): Promise<boolean> {
+    let result: { rows: { value_ciphertext: string }[] };
     try {
       // Optimized: Single query that retrieves and updates in one operation
-      const result = await this.getPool().query(
+      result = await this.getPool().query(
         `UPDATE system.secrets
          SET last_used_at = NOW()
          WHERE key = $1
@@ -373,7 +392,11 @@ export class SecretService {
          RETURNING value_ciphertext`,
         [key]
       );
+    } catch (error) {
+      throw this.credentialCheckUnavailable('Failed to check secret', error);
+    }
 
+    try {
       if (!result.rows.length) {
         logger.warn('Secret not found for verification', { key });
         return false;
@@ -395,7 +418,10 @@ export class SecretService {
 
       return matches;
     } catch (error) {
-      logger.error('Failed to check secret', { error, key });
+      logger.error('Failed to compare secret value', {
+        error: error instanceof Error ? error.message : String(error),
+        key,
+      });
       return false;
     }
   }
@@ -541,8 +567,7 @@ export class SecretService {
       );
       rows = result.rows;
     } catch (error) {
-      logger.error('Failed to query grace-period API keys', { error });
-      return false;
+      throw this.credentialCheckUnavailable('Failed to query grace-period API keys', error);
     }
 
     const valueBuffer = Buffer.from(apiKey);
@@ -706,8 +731,14 @@ export class SecretService {
       try {
         cache = await this.loadAnonKeys();
       } catch (error) {
-        logger.error('Failed to load anon keys for verification', { error });
-        return false;
+        // Prefer the expired cache over failing the request: anon keys only
+        // change on rotation, which invalidates the cache in this process.
+        if (!cache) {
+          throw this.credentialCheckUnavailable('Failed to load anon keys for verification', error);
+        }
+        logger.warn('Failed to refresh anon keys; serving cached keys', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
