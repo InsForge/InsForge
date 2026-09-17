@@ -73,6 +73,7 @@ export interface AppConfig {
     user: string;
     password: string;
     dir: string;
+    poolMax: number;
     postgrestBaseUrl: string;
     postgrestMaxSockets: number;
     postgrestMaxFreeSockets: number;
@@ -252,6 +253,11 @@ export function loadConfig(): AppConfig {
       user: process.env.POSTGRES_USER || 'postgres',
       password: process.env.POSTGRES_PASSWORD || 'postgres',
       dir: process.env.DATABASE_DIR || path.join(__dirname, '../../data'),
+      // Max connections in the backend's own pg pool. Size it to the instance:
+      // backend pool + PostgREST pool (PGRST_DB_POOL) + direct client connections
+      // must fit under Postgres max_connections, or lookups start failing with
+      // "too many clients already" under bursty load on small instances.
+      poolMax: parseEnvInt(process.env.POSTGRES_POOL_MAX, 20),
       postgrestBaseUrl: process.env.POSTGREST_BASE_URL || 'http://localhost:5430',
       // HTTP agent pool for the PostgREST proxy. Keep max sockets aligned with
       // PostgREST's own db pool (PGRST_DB_POOL): sockets beyond it only move
