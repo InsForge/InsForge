@@ -30,6 +30,8 @@ interface AnonKeyCache {
 // database per request. Single-instance server, so no cross-instance
 // invalidation is needed; rotation invalidates the cache directly.
 const ANON_KEY_CACHE_TTL_MS = 60 * 1000;
+// Back-off between refresh attempts while serving an expired anon key cache.
+const ANON_KEY_REFRESH_RETRY_MS = 5 * 1000;
 
 // Old anon keys are embedded in deployed frontends and mobile binaries that
 // may sit in app-store review, so the default grace period is much longer
@@ -41,6 +43,7 @@ export class SecretService {
   private pool: Pool | null = null;
   private anonKeyCache: AnonKeyCache | null = null;
   private anonKeyLoadPromise: Promise<AnonKeyCache> | null = null;
+  private anonKeyRefreshRetryAt = 0;
 
   private constructor() {
     // Encryption is now handled by the shared EncryptionManager
@@ -713,6 +716,7 @@ export class SecretService {
    */
   invalidateAnonKeyCache(): void {
     this.anonKeyCache = null;
+    this.anonKeyRefreshRetryAt = 0;
   }
 
   /**
@@ -727,15 +731,25 @@ export class SecretService {
     }
 
     let cache = this.anonKeyCache;
-    if (!cache || Date.now() - cache.loadedAt > ANON_KEY_CACHE_TTL_MS) {
+    const isFresh = cache !== null && Date.now() - cache.loadedAt <= ANON_KEY_CACHE_TTL_MS;
+    // While a failed refresh is backing off, keep serving the expired cache
+    // instead of sending every anonymous request to a database that is down.
+    const coolingDown = cache !== null && Date.now() < this.anonKeyRefreshRetryAt;
+    if (!cache || (!isFresh && !coolingDown)) {
       try {
         cache = await this.loadAnonKeys();
+        this.anonKeyRefreshRetryAt = 0;
       } catch (error) {
-        // Prefer the expired cache over failing the request: anon keys only
-        // change on rotation, which invalidates the cache in this process.
+        // Re-read rather than reuse the copy captured above: a rotation during
+        // the failed refresh invalidates the cache, and pre-rotation keys must
+        // not be served in its place.
+        cache = this.anonKeyCache;
         if (!cache) {
           throw this.credentialCheckUnavailable('Failed to load anon keys for verification', error);
         }
+        // Prefer the expired cache over failing the request: anon keys only
+        // change on rotation, which invalidates the cache in this process.
+        this.anonKeyRefreshRetryAt = Date.now() + ANON_KEY_REFRESH_RETRY_MS;
         logger.warn('Failed to refresh anon keys; serving cached keys', {
           error: error instanceof Error ? error.message : String(error),
         });
