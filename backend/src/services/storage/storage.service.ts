@@ -463,39 +463,92 @@ export class StorageService {
   // when the DB is unreachable — typically a project Postgres that is out of
   // connection slots. Bucket writes in this process invalidate the entry.
   private static readonly BUCKET_VISIBILITY_TTL_MS = 30_000;
-  private static readonly BUCKET_VISIBILITY_STALE_MAX_MS = 5 * 60_000;
+  // Oldest value that may still be served when the lookup fails. Kept short:
+  // it only has to bridge a burst of refused connections, and it bounds how
+  // long a visibility change made outside this process could go unnoticed.
+  private static readonly BUCKET_VISIBILITY_STALE_MAX_MS = 60_000;
+  private static readonly BUCKET_VISIBILITY_MAX_ENTRIES = 1_000;
   private bucketVisibilityCache = new Map<string, { isPublic: boolean; fetchedAt: number }>();
+  private bucketVisibilityInflight = new Map<string, Promise<boolean>>();
+  // Bumped on every bucket write. A lookup that started before the write must
+  // not put what it read back into the cache (e.g. re-caching "public" right
+  // after the bucket was made private).
+  private bucketVisibilityEpoch = 0;
 
   async isBucketPublic(bucket: string): Promise<boolean> {
-    const now = Date.now();
     const cached = this.bucketVisibilityCache.get(bucket);
-    if (cached && now - cached.fetchedAt < StorageService.BUCKET_VISIBILITY_TTL_MS) {
+    if (cached && Date.now() - cached.fetchedAt < StorageService.BUCKET_VISIBILITY_TTL_MS) {
       return cached.isPublic;
     }
 
+    // Coalesce concurrent misses: a page of N images must cost one lookup,
+    // not N, or the cache adds to connection pressure every time it expires.
+    const inflight = this.bucketVisibilityInflight.get(bucket);
+    if (inflight) {
+      return inflight;
+    }
+    const lookup = this.lookupBucketVisibility(bucket).finally(() => {
+      if (this.bucketVisibilityInflight.get(bucket) === lookup) {
+        this.bucketVisibilityInflight.delete(bucket);
+      }
+    });
+    this.bucketVisibilityInflight.set(bucket, lookup);
+    return lookup;
+  }
+
+  private async lookupBucketVisibility(bucket: string): Promise<boolean> {
+    const epoch = this.bucketVisibilityEpoch;
+    const startedAt = Date.now();
     try {
       const result = await this.getPool().query(
         'SELECT public FROM storage.buckets WHERE name = $1',
         [bucket]
       );
-      const isPublic = result.rows[0]?.public || false;
-      this.bucketVisibilityCache.set(bucket, { isPublic, fetchedAt: now });
+      const row = result.rows[0];
+      const isPublic = row?.public || false;
+      // Only buckets that exist are cached. The download routes are
+      // unauthenticated, so caching misses would let any caller grow this map
+      // with made-up names.
+      if (row && epoch === this.bucketVisibilityEpoch) {
+        this.cacheBucketVisibility(bucket, isPublic, startedAt);
+      }
       return isPublic;
     } catch (error) {
-      if (cached && now - cached.fetchedAt < StorageService.BUCKET_VISIBILITY_STALE_MAX_MS) {
+      const stale = this.bucketVisibilityCache.get(bucket);
+      if (
+        stale &&
+        epoch === this.bucketVisibilityEpoch &&
+        Date.now() - stale.fetchedAt < StorageService.BUCKET_VISIBILITY_STALE_MAX_MS
+      ) {
         logger.warn('Bucket visibility lookup failed; serving last known value', {
           bucket,
-          ageMs: now - cached.fetchedAt,
+          ageMs: Date.now() - stale.fetchedAt,
           error: error instanceof Error ? error.message : String(error),
         });
-        return cached.isPublic;
+        return stale.isPublic;
       }
       throw error;
     }
   }
 
+  private cacheBucketVisibility(bucket: string, isPublic: boolean, fetchedAt: number): void {
+    const cache = this.bucketVisibilityCache;
+    if (!cache.has(bucket) && cache.size >= StorageService.BUCKET_VISIBILITY_MAX_ENTRIES) {
+      // Map iterates in insertion order, so the first key is the oldest entry.
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) {
+        cache.delete(oldest);
+      }
+    }
+    cache.set(bucket, { isPublic, fetchedAt });
+  }
+
   private invalidateBucketVisibility(bucket: string): void {
+    this.bucketVisibilityEpoch += 1;
     this.bucketVisibilityCache.delete(bucket);
+    // Later callers must start a fresh lookup rather than join one that began
+    // before this write.
+    this.bucketVisibilityInflight.delete(bucket);
   }
 
   async updateBucketVisibility(bucket: string, isPublic: boolean): Promise<void> {

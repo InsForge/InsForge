@@ -132,4 +132,58 @@ describe('StorageService.isBucketPublic — cached visibility lookup', () => {
     expect(await svc.isBucketPublic('avatars')).toBe(false);
     expect(visibilityQueries()).toHaveLength(2);
   });
+
+  it('coalesces concurrent misses into one lookup', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    queryResults = [{ rows: [{ public: true }], rowCount: 1 }];
+
+    const results = await Promise.all(
+      Array.from({ length: 25 }, () => svc.isBucketPublic('avatars'))
+    );
+
+    expect(results.every((r) => r === true)).toBe(true);
+    expect(visibilityQueries()).toHaveLength(1);
+  });
+
+  it('does not cache buckets that do not exist', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+
+    expect(await svc.isBucketPublic('made-up-1')).toBe(false);
+    expect(await svc.isBucketPublic('made-up-1')).toBe(false);
+    // No row → nothing cached → each call looks it up again.
+    expect(visibilityQueries()).toHaveLength(2);
+  });
+
+  it('does not re-cache a value read before a concurrent visibility change', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+
+    // First lookup is held open so the bucket can be made private while it is
+    // still in flight.
+    let release!: (value: { rows: unknown[]; rowCount: number }) => void;
+    const held = new Promise<{ rows: unknown[]; rowCount: number }>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(mockPool.query).mockImplementationOnce(((sql: string, params?: unknown[]) => {
+      calls.push({ sql, params });
+      return held;
+    }) as never);
+
+    const inFlight = svc.isBucketPublic('avatars');
+
+    queryResults = [
+      { rows: [{ exists: true }], rowCount: 1 }, // bucketExists
+      { rows: [], rowCount: 1 }, // UPDATE → private
+      { rows: [{ public: false }], rowCount: 1 }, // fresh lookup after the change
+    ];
+    await svc.updateBucketVisibility('avatars', false);
+
+    release({ rows: [{ public: true }], rowCount: 1 }); // the pre-change read lands late
+    await inFlight;
+
+    // The late "public" must not have been cached.
+    expect(await svc.isBucketPublic('avatars')).toBe(false);
+  });
 });
