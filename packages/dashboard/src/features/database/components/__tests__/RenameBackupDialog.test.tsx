@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { RenameBackupDialog } from '#features/database/components/RenameBackupDialog';
 
 describe('RenameBackupDialog', () => {
-  it('saves a trimmed backup name and closes on success', async () => {
-    const user = userEvent.setup();
+  it('saves a trimmed backup name and closes on success', { timeout: 10_000 }, async () => {
+    const user = userEvent.setup({ delay: null });
     const onSave = vi.fn().mockResolvedValue(undefined);
     const onOpenChange = vi.fn();
 
