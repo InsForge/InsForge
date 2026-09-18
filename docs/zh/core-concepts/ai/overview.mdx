@@ -1,12 +1,12 @@
 ---
 title: "模型网关"
 sidebarTitle: "Overview"
-description: "通过 InsForge 模型网关调用 OpenAI、Anthropic、Google 等任意 LLM，仅需一个托管密钥，具备按项目配额、用量分析与统一 API。"
+description: "从 InsForge 预配 OpenRouter 密钥，使用 OpenAI SDK 调用聊天、流式和嵌入模型，并在仪表盘中跟踪支出与各模型用量。"
 ---
 
-使用模型网关通过一个 OpenAI 兼容的端点调用聊天、流式和嵌入模型。InsForge 保有提供商密钥，跟踪每个项目的使用情况，并通过 [OpenRouter](https://openrouter.ai) 路由流量，因此您的应用代码永远不会直接看到 Anthropic、OpenAI 或 Mistral 凭证。
+使用模型网关为您的项目预配 OpenRouter 密钥、浏览模型目录并跟踪支出和各模型用量。您的应用使用该密钥直接调用 [OpenRouter](https://openrouter.ai)，因此一次集成即可访问来自 Anthropic、OpenAI、Mistral、Google 和数十个其他提供商的聊天、流式和嵌入模型。
 
-<Frame caption="一个 OpenAI 兼容的端点，具有按提供商访问、随时可复制的代码和使用跟踪。">
+<Frame caption="仪表盘中的模型网关页面：当前密钥、按提供商访问、随时可复制的代码和使用图表。">
   <img src="/images/model-gateway-overview.png" alt="InsForge 仪表盘模型网关概览，显示代码示例、提供商芯片和使用图表" />
 </Frame>
 
@@ -38,23 +38,23 @@ graph TB
 
 ### OpenAI 兼容的 API
 
-将任何 OpenAI SDK 或 `openai` 兼容的库指向 `https://<project>.insforge.dev/v1`，它就能工作。`/v1/chat/completions`、`/v1/embeddings` 和 `/v1/models` 都表现得像上游规范。
+将仪表盘中预配的密钥复制到仅服务器端的 `OPENROUTER_API_KEY` 中，然后将任何 OpenAI SDK 或 `openai` 兼容的库指向 `https://openrouter.ai/api/v1`。[TypeScript SDK](/sdks/typescript/ai) 和 [REST](/sdks/rest/ai) 参考中提供了可用的代码片段。
+
+<Warning>
+  预配的密钥是服务器端凭证。请将 OpenRouter 调用置于后端路由、服务器操作或边缘函数之后，切勿将该密钥打包进浏览器代码。
+</Warning>
 
 ### 流式处理
 
-用于聊天完成的服务器发送事件。使用流式端点的方式与 OpenAI 相同；网关在令牌从提供商到达时转发它们。
+用于聊天完成的服务器发送事件。像使用 OpenAI 那样设置 `stream: true`，令牌会随提供商生成而到达。
 
 ### 嵌入
 
 从 OpenRouter 支持的任何嵌入模型生成密集向量。使用 [pgvector](/core-concepts/database/pgvector) 将结果存储在 Postgres 中以进行语义搜索。
 
-### 按项目配额
+### 支出与用量
 
-每个项目都有自己的速率限制和支出上限。达到它时，网关返回干净的 429，而不是将提供商配额状态泄漏到您的应用中。
-
-### 使用跟踪
-
-每个请求都用模型、令牌计数和成本进行记录。从仪表盘、CLI 或 MCP 查询使用情况 — 账单自动与 OpenRouter 的发票对账。
+仪表盘中的模型网关页面从 OpenRouter 读取您密钥的活动数据：总支出，每日、每周和每月用量，剩余额度及其重置日期，以及按模型的明细。
 
 ### 多提供商路由
 
