@@ -6,7 +6,7 @@ import { convertToCSV, getExportFilename } from '#lib/utils/data-export';
 
 interface AdminRecordListResponse {
   data: { [key: string]: ConvertedValue }[];
-  pagination: { offset: number; limit: number; total: number };
+  pagination: { offset: number; limit: number; total: number; isEstimate?: boolean };
 }
 
 export class RecordService {
