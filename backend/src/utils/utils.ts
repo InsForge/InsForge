@@ -36,6 +36,7 @@ export const convertSqlTypeToColumnType = (sqlType: string): ColumnType | string
       return ColumnType.UUID;
     case 'timestamptz':
     case 'timestamp with time zone':
+    case 'timestamp without time zone':
       return ColumnType.DATETIME;
     case 'date':
       return ColumnType.DATE;
