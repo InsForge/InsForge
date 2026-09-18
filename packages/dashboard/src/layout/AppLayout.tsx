@@ -8,7 +8,7 @@ import { ConnectDialog } from '#features/dashboard/components/connect';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { cn } from '@insforge/ui';
 import { ConnectDialogProvider } from './ConnectDialogContext';
-import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 import { DTestConnectTip } from '#features/dashboard/components/dtest/DTestConnectTip';
 
@@ -21,6 +21,7 @@ interface ConnectOverlayBridgeProps {
 
 function ConnectOverlayBridge({ hostMode, onOpenDialog }: ConnectOverlayBridgeProps) {
   const navigate = useNavigate();
+  const dashboardVariant = useFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
 
   useEffect(() => {
     if (hostMode !== 'cloud-hosting') {
@@ -42,7 +43,7 @@ function ConnectOverlayBridge({ hostMode, onOpenDialog }: ConnectOverlayBridgePr
         return;
       }
 
-      if (getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT) === FEATURE_FLAG_VARIANTS.D_TEST) {
+      if (dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST) {
         void navigate('/dashboard/install');
       } else {
         onOpenDialog();
@@ -51,7 +52,7 @@ function ConnectOverlayBridge({ hostMode, onOpenDialog }: ConnectOverlayBridgePr
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [hostMode, navigate, onOpenDialog]);
+  }, [hostMode, navigate, onOpenDialog, dashboardVariant]);
 
   return null;
 }
