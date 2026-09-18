@@ -17,6 +17,7 @@ import {
   Download,
   BookOpen,
   CreditCard,
+  Blocks,
   Megaphone,
 } from 'lucide-react';
 
@@ -115,6 +116,13 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     label: 'Payments',
     href: '/dashboard/payments',
     icon: CreditCard,
+    sectionEnd: true,
+  },
+  {
+    id: 'integrations',
+    label: 'Integrations',
+    href: '/dashboard/integrations',
+    icon: Blocks,
     sectionEnd: true,
   },
   {
