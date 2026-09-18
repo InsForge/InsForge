@@ -162,6 +162,27 @@ Examples:
     }));
   }
 
+  // Remove memories by explicit id. The scope predicate is the guard, not a
+  // filter: recall() and index() only ever hand a caller ids from its own
+  // scope, so an id from anywhere else is either stale or invented and must
+  // not delete a row. Returns the ids actually removed, so an unknown id is
+  // reported as absent rather than as an error — the caller can retry a
+  // partly-applied call without special-casing it.
+  async forget(params: { scope: string; ids: string[] }): Promise<string[]> {
+    const pool = this.dbManager.getPool();
+    const result = await pool.query(
+      `DELETE FROM memory.memories WHERE scope = $1 AND id = ANY($2::uuid[]) RETURNING id`,
+      [params.scope, params.ids]
+    );
+    const forgotten = result.rows.map((r) => String(r.id));
+    logger.debug('memory.forget', {
+      scope: params.scope,
+      requested: params.ids.length,
+      forgotten: forgotten.length,
+    });
+    return forgotten;
+  }
+
   private async findSimilar(
     scope: string,
     embedding: number[],
