@@ -41,7 +41,12 @@ const LABEL_SPEC = 'insforge.spec';
 type ContainerInspect = {
   Id: string;
   Name: string;
-  State: { Status: string; ExitCode: number; Running: boolean };
+  State: {
+    Status: string;
+    ExitCode: number;
+    Running: boolean;
+    Health?: { Status: 'starting' | 'healthy' | 'unhealthy' | string };
+  };
   Config: { Image: string; Labels?: Record<string, string> };
   HostConfig?: { NanoCpus?: number; Memory?: number };
   NetworkSettings: {
@@ -441,38 +446,64 @@ export class DockerProvider implements ComputeProvider {
         scaleToZero: params.scaleToZero,
       });
 
-      // Readiness Gate: Verify staging container is running before destructive cutover.
+      // Readiness Gate: Verify raw Docker status is strictly 'running' and health is not 'unhealthy'.
       // Docker POST /start returns HTTP 204 immediately when process starts. If entrypoint crashes right after,
-      // state will be non-running ('exited'/'stopped'/'dead'/'failed').
-      const { state } = await this.getMachineStatus(stagingName, launched.machineId);
-      if (state !== 'running') {
+      // state will be non-running ('exited'/'stopped'/'dead'/'failed'/'restarting').
+      // Catch inspection failures so transient errors do not leak untracked staging containers.
+      try {
+        const inspect = await this.assertOwned(launched.machineId);
+        const status = inspect.State?.Status;
+        const health = inspect.State?.Health?.Status;
+
+        if (status !== 'running' || health === 'unhealthy') {
+          throw new Error(
+            `Staging container failed readiness check (status: ${status}${health ? `, health: ${health}` : ''})`
+          );
+        }
+      } catch (err) {
         await dockerRequest(
           'DELETE',
           `/containers/${encodeURIComponent(launched.machineId)}?force=true`
         ).catch(() => undefined);
-        throw new Error(`Staging container failed readiness check (state: ${state})`);
+        throw err;
       }
 
       // Teardown superseded container once replacement is verified up and healthy.
-      await dockerRequest('POST', `/containers/${encodeURIComponent(params.machineId)}/stop`).catch(
-        () => undefined
-      );
-      await dockerRequest(
-        'DELETE',
-        `/containers/${encodeURIComponent(params.machineId)}?force=true`
-      ).catch(() => undefined);
+      try {
+        await dockerRequest(
+          'POST',
+          `/containers/${encodeURIComponent(params.machineId)}/stop`
+        ).catch(() => undefined);
+        await dockerRequest(
+          'DELETE',
+          `/containers/${encodeURIComponent(params.machineId)}?force=true`
+        );
+      } catch (err) {
+        await dockerRequest(
+          'DELETE',
+          `/containers/${encodeURIComponent(launched.machineId)}?force=true`
+        ).catch(() => undefined);
+        throw new Error(
+          `Failed to remove superseded container ${params.machineId}: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
 
-      // Atomic rename of staging container to primary application name.
-      await dockerRequest(
-        'POST',
-        `/containers/${encodeURIComponent(launched.machineId)}/rename?name=${encodeURIComponent(primaryName)}`
-      ).catch((err) => {
-        logger.warn('Docker compute: rename of staging container failed', {
-          stagingId: launched.machineId,
-          primaryName,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
+      // Atomic rename of staging container to primary application name (Promotion).
+      // If rename fails (e.g. name conflict), remove staging container and throw so success is never reported on failed promotion.
+      try {
+        await dockerRequest(
+          'POST',
+          `/containers/${encodeURIComponent(launched.machineId)}/rename?name=${encodeURIComponent(primaryName)}`
+        );
+      } catch (err) {
+        await dockerRequest(
+          'DELETE',
+          `/containers/${encodeURIComponent(launched.machineId)}?force=true`
+        ).catch(() => undefined);
+        throw new Error(
+          `Failed to promote staging container to ${primaryName}: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
 
       logger.info('Docker compute: recreated container to apply a spec change', {
         name: primaryName,

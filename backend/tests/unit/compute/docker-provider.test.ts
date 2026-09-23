@@ -557,12 +557,89 @@ describe('DockerProvider', () => {
           machineId: 'container-abc',
           image: 'nginx:1.27-alpine',
         })
-      ).rejects.toThrow('Staging container failed readiness check (state: stopped)');
+      ).rejects.toThrow('Staging container failed readiness check (status: exited)');
 
       const paths = mockRequest.mock.calls.map((c) => `${c[0]} ${c[1]}`);
       expect(paths).not.toContain('POST /containers/container-abc/stop');
       expect(paths).not.toContain('DELETE /containers/container-abc?force=true');
       expect(paths).toContain('DELETE /containers/container-crashed?force=true');
+    });
+
+    it('cleans up staging container when readiness inspection throws an error', async () => {
+      const oldSpec = await hashFor(baseSpec);
+      mockRequest
+        .mockResolvedValueOnce(
+          ownedContainer({
+            Name: '/insforge-testkey1-api',
+            Config: {
+              Image: 'nginx:alpine',
+              Labels: {
+                'insforge.managed': 'true',
+                'insforge.project': 'testkey1',
+                'insforge.spec': oldSpec,
+              },
+            },
+          })
+        )
+        .mockResolvedValueOnce({ Id: 'container-inspect-fail' }) // create staging succeeds
+        .mockResolvedValueOnce(undefined) // start staging succeeds
+        .mockRejectedValueOnce(new Error('socket connection reset')) // readiness inspection throws
+        .mockResolvedValueOnce(undefined); // delete staging
+
+      imageAlreadyPresent();
+
+      await expect(
+        provider.updateMachine({
+          ...baseSpec,
+          machineId: 'container-abc',
+          image: 'nginx:1.27-alpine',
+        })
+      ).rejects.toThrow('socket connection reset');
+
+      const paths = mockRequest.mock.calls.map((c) => `${c[0]} ${c[1]}`);
+      expect(paths).not.toContain('POST /containers/container-abc/stop');
+      expect(paths).not.toContain('DELETE /containers/container-abc?force=true');
+      expect(paths).toContain('DELETE /containers/container-inspect-fail?force=true');
+    });
+
+    it('cleans up staging container and rejects when promotion rename fails', async () => {
+      const oldSpec = await hashFor(baseSpec);
+      mockRequest
+        .mockResolvedValueOnce(
+          ownedContainer({
+            Name: '/insforge-testkey1-api',
+            Config: {
+              Image: 'nginx:alpine',
+              Labels: {
+                'insforge.managed': 'true',
+                'insforge.project': 'testkey1',
+                'insforge.spec': oldSpec,
+              },
+            },
+          })
+        )
+        .mockResolvedValueOnce({ Id: 'container-new' }) // create staging
+        .mockResolvedValueOnce(undefined) // start staging
+        .mockResolvedValueOnce(
+          ownedContainer({ Id: 'container-new', State: { Status: 'running' } })
+        ) // readiness check
+        .mockResolvedValueOnce(undefined) // stop old
+        .mockResolvedValueOnce(undefined) // remove old
+        .mockRejectedValueOnce(new Error('name conflict')) // rename fails
+        .mockResolvedValueOnce(undefined); // cleanup staging
+
+      imageAlreadyPresent();
+
+      await expect(
+        provider.updateMachine({
+          ...baseSpec,
+          machineId: 'container-abc',
+          image: 'nginx:1.27-alpine',
+        })
+      ).rejects.toThrow('Failed to promote staging container to insforge-testkey1-api');
+
+      const paths = mockRequest.mock.calls.map((c) => `${c[0]} ${c[1]}`);
+      expect(paths).toContain('DELETE /containers/container-new?force=true');
     });
 
     // Removing an env var is invisible if you only check that the requested ones
