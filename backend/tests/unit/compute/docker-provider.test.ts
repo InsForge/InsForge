@@ -454,7 +454,9 @@ describe('DockerProvider', () => {
         )
         .mockResolvedValueOnce({ Id: 'container-new' }) // create staging
         .mockResolvedValueOnce(undefined) // start staging
-        .mockResolvedValueOnce(ownedContainer({ Id: 'container-new', State: { Status: 'running' } })) // readiness check
+        .mockResolvedValueOnce(
+          ownedContainer({ Id: 'container-new', State: { Status: 'running' } })
+        ) // readiness check
         .mockResolvedValueOnce(undefined) // stop old
         .mockResolvedValueOnce(undefined) // remove old
         .mockResolvedValueOnce(undefined); // rename staging
@@ -540,7 +542,10 @@ describe('DockerProvider', () => {
         .mockResolvedValueOnce({ Id: 'container-crashed' }) // create staging succeeds
         .mockResolvedValueOnce(undefined) // start staging returns 204
         .mockResolvedValueOnce(
-          ownedContainer({ Id: 'container-crashed', State: { Status: 'exited', ExitCode: 1, Running: false } })
+          ownedContainer({
+            Id: 'container-crashed',
+            State: { Status: 'exited', ExitCode: 1, Running: false },
+          })
         ) // readiness check returns exited
         .mockResolvedValueOnce(undefined); // delete staging
 
@@ -579,7 +584,9 @@ describe('DockerProvider', () => {
         )
         .mockResolvedValueOnce({ Id: 'container-new' })
         .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(ownedContainer({ Id: 'container-new', State: { Status: 'running' } }))
+        .mockResolvedValueOnce(
+          ownedContainer({ Id: 'container-new', State: { Status: 'running' } })
+        )
         .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce(undefined);
