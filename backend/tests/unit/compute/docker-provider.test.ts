@@ -436,7 +436,7 @@ describe('DockerProvider', () => {
     // The bug this guards: Docker cannot swap a running container's image, so
     // applying only cpu/memory would report success while the old image keeps
     // serving and the database records the new one.
-    it('recreates the container when the image changes, and reports the new id', async () => {
+    it('recreates the container when the image changes using staged blue-green strategy, and reports the new id', async () => {
       const oldSpec = await hashFor(baseSpec);
       mockRequest
         .mockResolvedValueOnce(
@@ -452,10 +452,11 @@ describe('DockerProvider', () => {
             },
           })
         )
-        .mockResolvedValueOnce(undefined) // stop
-        .mockResolvedValueOnce(undefined) // remove
-        .mockResolvedValueOnce({ Id: 'container-new' }) // create
-        .mockResolvedValueOnce(undefined); // start
+        .mockResolvedValueOnce({ Id: 'container-new' }) // create staging
+        .mockResolvedValueOnce(undefined) // start staging
+        .mockResolvedValueOnce(undefined) // stop old
+        .mockResolvedValueOnce(undefined) // remove old
+        .mockResolvedValueOnce(undefined); // rename staging
       imageAlreadyPresent();
 
       const result = await provider.updateMachine({
@@ -466,15 +467,56 @@ describe('DockerProvider', () => {
 
       expect(result).toEqual({ machineId: 'container-new', endpointUrl: null });
       const paths = mockRequest.mock.calls.map((c) => `${c[0]} ${c[1]}`);
-      expect(paths).toEqual([
-        'GET /containers/container-abc/json',
-        'POST /containers/container-abc/stop',
-        'DELETE /containers/container-abc?force=true',
-        'POST /containers/create?name=insforge-testkey1-api',
-        'POST /containers/container-new/start',
-      ]);
-      // Replacement runs the requested image, under the original name.
-      expect(mockRequest.mock.calls[3][2].body.Image).toBe('nginx:1.27-alpine');
+      expect(paths[0]).toBe('GET /containers/container-abc/json');
+      expect(paths[1]).toMatch(/^POST \/containers\/create\?name=insforge-testkey1-api-stage-\d+$/);
+      expect(paths[2]).toBe('POST /containers/container-new/start');
+      expect(paths[3]).toBe('POST /containers/container-abc/stop');
+      expect(paths[4]).toBe('DELETE /containers/container-abc?force=true');
+      expect(paths[5]).toBe('POST /containers/container-new/rename?name=insforge-testkey1-api');
+
+      // Replacement runs requested image and carries logical service name.
+      expect(mockRequest.mock.calls[1][2].body.Image).toBe('nginx:1.27-alpine');
+      expect(mockRequest.mock.calls[1][2].body.Labels['insforge.service']).toBe(
+        'insforge-testkey1-api'
+      );
+    });
+
+    it('preserves old container untouched if staging launch fails (zero downtime)', async () => {
+      const oldSpec = await hashFor(baseSpec);
+      mockRequest
+        .mockResolvedValueOnce(
+          ownedContainer({
+            Name: '/insforge-testkey1-api',
+            Config: {
+              Image: 'nginx:alpine',
+              Labels: {
+                'insforge.managed': 'true',
+                'insforge.project': 'testkey1',
+                'insforge.spec': oldSpec,
+              },
+            },
+          })
+        )
+        .mockResolvedValueOnce({ Id: 'container-doomed' }) // create staging succeeds
+        .mockRejectedValueOnce(new Error('container entrypoint crashed')) // start staging fails
+        .mockResolvedValueOnce(undefined); // cleanup doomed staging container
+
+      imageAlreadyPresent();
+
+      await expect(
+        provider.updateMachine({
+          ...baseSpec,
+          machineId: 'container-abc',
+          image: 'nginx:1.27-alpine',
+        })
+      ).rejects.toThrow('container entrypoint crashed');
+
+      const paths = mockRequest.mock.calls.map((c) => `${c[0]} ${c[1]}`);
+      // Must NOT contain stop or delete for the old container-abc
+      expect(paths).not.toContain('POST /containers/container-abc/stop');
+      expect(paths).not.toContain('DELETE /containers/container-abc?force=true');
+      // Must clean up the broken staging container
+      expect(paths).toContain('DELETE /containers/container-doomed?force=true');
     });
 
     // Removing an env var is invisible if you only check that the requested ones
@@ -494,9 +536,10 @@ describe('DockerProvider', () => {
             },
           })
         )
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce({ Id: 'container-new' })
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce(undefined);
       imageAlreadyPresent();
 

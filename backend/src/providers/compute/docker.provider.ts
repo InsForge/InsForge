@@ -313,8 +313,9 @@ export class DockerProvider implements ComputeProvider {
   async launchMachine(
     params: LaunchMachineParams
   ): Promise<{ machineId: string; endpointUrl: string | null }> {
+    const serviceName = params.serviceName ?? params.appId;
     // Must precede create — see ensureImage.
-    await this.ensureImage(params.image, params.appId);
+    await this.ensureImage(params.image, serviceName);
 
     const network = await this.resolveNetwork();
     const ingress = this.ingressFor(params.ingress);
@@ -325,7 +326,7 @@ export class DockerProvider implements ComputeProvider {
       Labels: {
         [LABEL_MANAGED]: 'true',
         [LABEL_PROJECT]: this.projectKey(),
-        [LABEL_SERVICE]: params.appId,
+        [LABEL_SERVICE]: serviceName,
         [LABEL_SPEC]: this.specHash(params),
       },
       Env: Object.entries(params.envVars ?? {}).map(([k, v]) => `${k}=${v}`),
@@ -419,21 +420,16 @@ export class DockerProvider implements ComputeProvider {
         return {};
       }
 
-      // Recreate under the same name. Stop and remove first because the name is
-      // taken; if creating the replacement then fails, the row is left pointing
-      // at a removed container, which the existing MachineGoneError healing turns
-      // into a clean relaunch on the next request.
-      const name = (current.Name ?? '').replace(/^\//, '') || params.appId;
-      await dockerRequest('POST', `/containers/${encodeURIComponent(params.machineId)}/stop`).catch(
-        () => undefined
-      );
-      await dockerRequest(
-        'DELETE',
-        `/containers/${encodeURIComponent(params.machineId)}?force=true`
-      );
+      // Recreate using a Create-Before-Destroy (Staged Blue-Green) pattern.
+      // Launch the replacement container under a temporary staging identifier alongside
+      // the existing workload. If pulling the image, creating the container, or starting
+      // it fails, the original container is untouched and remains online serving live traffic.
+      const primaryName = (current.Name ?? '').replace(/^\//, '') || params.appId;
+      const stagingName = `${primaryName}-stage-${Date.now()}`;
 
       const launched = await this.launchMachine({
-        appId: name,
+        appId: stagingName,
+        serviceName: primaryName,
         image: params.image,
         port: params.port,
         cpu: params.cpu,
@@ -444,14 +440,36 @@ export class DockerProvider implements ComputeProvider {
         protocol: params.protocol,
         scaleToZero: params.scaleToZero,
       });
+
+      // Teardown superseded container once replacement is up and healthy.
+      await dockerRequest('POST', `/containers/${encodeURIComponent(params.machineId)}/stop`).catch(
+        () => undefined
+      );
+      await dockerRequest(
+        'DELETE',
+        `/containers/${encodeURIComponent(params.machineId)}?force=true`
+      ).catch(() => undefined);
+
+      // Atomic rename of staging container to primary application name.
+      await dockerRequest(
+        'POST',
+        `/containers/${encodeURIComponent(launched.machineId)}/rename?name=${encodeURIComponent(primaryName)}`
+      );
+
+      const endpointUrl = await this.resolvePublishedUrl(
+        launched.machineId,
+        params.port,
+        params.ingress
+      );
+
       logger.info('Docker compute: recreated container to apply a spec change', {
-        name,
+        name: primaryName,
         previous: params.machineId.slice(0, 12),
         replacement: launched.machineId.slice(0, 12),
       });
       // The replacement's published port is newly assigned, so the URL has to
       // travel with the new id.
-      return { machineId: launched.machineId, endpointUrl: launched.endpointUrl };
+      return { machineId: launched.machineId, endpointUrl };
     });
   }
 
