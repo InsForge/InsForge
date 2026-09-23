@@ -441,7 +441,19 @@ export class DockerProvider implements ComputeProvider {
         scaleToZero: params.scaleToZero,
       });
 
-      // Teardown superseded container once replacement is up and healthy.
+      // Readiness Gate: Verify staging container is running before destructive cutover.
+      // Docker POST /start returns HTTP 204 immediately when process starts. If entrypoint crashes right after,
+      // state will be non-running ('exited'/'stopped'/'dead'/'failed').
+      const { state } = await this.getMachineStatus(stagingName, launched.machineId);
+      if (state !== 'running') {
+        await dockerRequest(
+          'DELETE',
+          `/containers/${encodeURIComponent(launched.machineId)}?force=true`
+        ).catch(() => undefined);
+        throw new Error(`Staging container failed readiness check (state: ${state})`);
+      }
+
+      // Teardown superseded container once replacement is verified up and healthy.
       await dockerRequest('POST', `/containers/${encodeURIComponent(params.machineId)}/stop`).catch(
         () => undefined
       );
@@ -454,22 +466,22 @@ export class DockerProvider implements ComputeProvider {
       await dockerRequest(
         'POST',
         `/containers/${encodeURIComponent(launched.machineId)}/rename?name=${encodeURIComponent(primaryName)}`
-      );
-
-      const endpointUrl = await this.resolvePublishedUrl(
-        launched.machineId,
-        params.port,
-        params.ingress
-      );
+      ).catch((err) => {
+        logger.warn('Docker compute: rename of staging container failed', {
+          stagingId: launched.machineId,
+          primaryName,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
 
       logger.info('Docker compute: recreated container to apply a spec change', {
         name: primaryName,
         previous: params.machineId.slice(0, 12),
         replacement: launched.machineId.slice(0, 12),
       });
-      // The replacement's published port is newly assigned, so the URL has to
-      // travel with the new id.
-      return { machineId: launched.machineId, endpointUrl };
+
+      // Return pre-resolved endpointUrl from launchMachine to avoid post-cutover inspect failure
+      return { machineId: launched.machineId, endpointUrl: launched.endpointUrl };
     });
   }
 

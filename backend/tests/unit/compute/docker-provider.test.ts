@@ -454,6 +454,7 @@ describe('DockerProvider', () => {
         )
         .mockResolvedValueOnce({ Id: 'container-new' }) // create staging
         .mockResolvedValueOnce(undefined) // start staging
+        .mockResolvedValueOnce(ownedContainer({ Id: 'container-new', State: { Status: 'running' } })) // readiness check
         .mockResolvedValueOnce(undefined) // stop old
         .mockResolvedValueOnce(undefined) // remove old
         .mockResolvedValueOnce(undefined); // rename staging
@@ -470,9 +471,10 @@ describe('DockerProvider', () => {
       expect(paths[0]).toBe('GET /containers/container-abc/json');
       expect(paths[1]).toMatch(/^POST \/containers\/create\?name=insforge-testkey1-api-stage-\d+$/);
       expect(paths[2]).toBe('POST /containers/container-new/start');
-      expect(paths[3]).toBe('POST /containers/container-abc/stop');
-      expect(paths[4]).toBe('DELETE /containers/container-abc?force=true');
-      expect(paths[5]).toBe('POST /containers/container-new/rename?name=insforge-testkey1-api');
+      expect(paths[3]).toBe('GET /containers/container-new/json');
+      expect(paths[4]).toBe('POST /containers/container-abc/stop');
+      expect(paths[5]).toBe('DELETE /containers/container-abc?force=true');
+      expect(paths[6]).toBe('POST /containers/container-new/rename?name=insforge-testkey1-api');
 
       // Replacement runs requested image and carries logical service name.
       expect(mockRequest.mock.calls[1][2].body.Image).toBe('nginx:1.27-alpine');
@@ -519,6 +521,45 @@ describe('DockerProvider', () => {
       expect(paths).toContain('DELETE /containers/container-doomed?force=true');
     });
 
+    it('aborts cutover if staging container exits/fails readiness check right after start', async () => {
+      const oldSpec = await hashFor(baseSpec);
+      mockRequest
+        .mockResolvedValueOnce(
+          ownedContainer({
+            Name: '/insforge-testkey1-api',
+            Config: {
+              Image: 'nginx:alpine',
+              Labels: {
+                'insforge.managed': 'true',
+                'insforge.project': 'testkey1',
+                'insforge.spec': oldSpec,
+              },
+            },
+          })
+        )
+        .mockResolvedValueOnce({ Id: 'container-crashed' }) // create staging succeeds
+        .mockResolvedValueOnce(undefined) // start staging returns 204
+        .mockResolvedValueOnce(
+          ownedContainer({ Id: 'container-crashed', State: { Status: 'exited', ExitCode: 1, Running: false } })
+        ) // readiness check returns exited
+        .mockResolvedValueOnce(undefined); // delete staging
+
+      imageAlreadyPresent();
+
+      await expect(
+        provider.updateMachine({
+          ...baseSpec,
+          machineId: 'container-abc',
+          image: 'nginx:1.27-alpine',
+        })
+      ).rejects.toThrow('Staging container failed readiness check (state: stopped)');
+
+      const paths = mockRequest.mock.calls.map((c) => `${c[0]} ${c[1]}`);
+      expect(paths).not.toContain('POST /containers/container-abc/stop');
+      expect(paths).not.toContain('DELETE /containers/container-abc?force=true');
+      expect(paths).toContain('DELETE /containers/container-crashed?force=true');
+    });
+
     // Removing an env var is invisible if you only check that the requested ones
     // are present, which is why the decision is hash-based.
     it('recreates when an env var is removed', async () => {
@@ -538,6 +579,7 @@ describe('DockerProvider', () => {
         )
         .mockResolvedValueOnce({ Id: 'container-new' })
         .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(ownedContainer({ Id: 'container-new', State: { Status: 'running' } }))
         .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce(undefined);
