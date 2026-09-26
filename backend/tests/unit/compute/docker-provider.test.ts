@@ -456,10 +456,11 @@ describe('DockerProvider', () => {
         .mockResolvedValueOnce(undefined) // start staging
         .mockResolvedValueOnce(
           ownedContainer({ Id: 'container-new', State: { Status: 'running' } })
-        ) // readiness check
-        .mockResolvedValueOnce(undefined) // stop old
-        .mockResolvedValueOnce(undefined) // remove old
-        .mockResolvedValueOnce(undefined); // rename staging
+        ) // readiness check (no HEALTHCHECK — passes immediately)
+        .mockResolvedValueOnce(undefined) // rename old → retire
+        .mockResolvedValueOnce(undefined) // rename staging → primary
+        .mockResolvedValueOnce(undefined) // stop retired
+        .mockResolvedValueOnce(undefined); // delete retired
       imageAlreadyPresent();
 
       const result = await provider.updateMachine({
@@ -474,9 +475,11 @@ describe('DockerProvider', () => {
       expect(paths[1]).toMatch(/^POST \/containers\/create\?name=insforge-testkey1-api-stage-\d+$/);
       expect(paths[2]).toBe('POST /containers/container-new/start');
       expect(paths[3]).toBe('GET /containers/container-new/json');
-      expect(paths[4]).toBe('POST /containers/container-abc/stop');
-      expect(paths[5]).toBe('DELETE /containers/container-abc?force=true');
-      expect(paths[6]).toBe('POST /containers/container-new/rename?name=insforge-testkey1-api');
+      // Rename-swap: old renamed to retire, staging renamed to primary, then old torn down.
+      expect(paths[4]).toMatch(/^POST \/containers\/container-abc\/rename\?name=insforge-testkey1-api-retire-\d+$/);
+      expect(paths[5]).toBe('POST /containers/container-new/rename?name=insforge-testkey1-api');
+      expect(paths[6]).toBe('POST /containers/container-abc/stop');
+      expect(paths[7]).toBe('DELETE /containers/container-abc?force=true');
 
       // Replacement runs requested image and carries logical service name.
       expect(mockRequest.mock.calls[1][2].body.Image).toBe('nginx:1.27-alpine');
@@ -602,7 +605,168 @@ describe('DockerProvider', () => {
       expect(paths).toContain('DELETE /containers/container-inspect-fail?force=true');
     });
 
-    it('cleans up staging container and rejects when promotion rename fails', async () => {
+    it('polls until health check resolves from starting to healthy before cutover', async () => {
+      const oldSpec = await hashFor(baseSpec);
+      mockRequest
+        .mockResolvedValueOnce(
+          ownedContainer({
+            Name: '/insforge-testkey1-api',
+            Config: {
+              Image: 'nginx:alpine',
+              Labels: {
+                'insforge.managed': 'true',
+                'insforge.project': 'testkey1',
+                'insforge.spec': oldSpec,
+              },
+            },
+          })
+        )
+        .mockResolvedValueOnce({ Id: 'container-new' }) // create staging
+        .mockResolvedValueOnce(undefined) // start staging
+        // First readiness poll: health is 'starting' — must not proceed yet.
+        .mockResolvedValueOnce(
+          ownedContainer({
+            Id: 'container-new',
+            State: { Status: 'running', Health: { Status: 'starting' } },
+          })
+        )
+        // Second readiness poll: health resolves to 'healthy' — proceed.
+        .mockResolvedValueOnce(
+          ownedContainer({
+            Id: 'container-new',
+            State: { Status: 'running', Health: { Status: 'healthy' } },
+          })
+        )
+        .mockResolvedValueOnce(undefined) // rename old → retire
+        .mockResolvedValueOnce(undefined) // rename staging → primary
+        .mockResolvedValueOnce(undefined) // stop retired
+        .mockResolvedValueOnce(undefined); // delete retired
+      imageAlreadyPresent();
+
+      vi.useFakeTimers();
+      const promise = provider.updateMachine({
+        ...baseSpec,
+        machineId: 'container-abc',
+        image: 'nginx:1.27-alpine',
+      });
+      // Advance past the poll delay so awaitStagingReady re-inspects.
+      await vi.advanceTimersByTimeAsync(1_500);
+      vi.useRealTimers();
+
+      const result = await promise;
+      expect(result).toEqual({ machineId: 'container-new', endpointUrl: null });
+      // Two readiness inspections: starting, then healthy.
+      const inspects = mockRequest.mock.calls.filter(
+        (c) => c[0] === 'GET' && c[1] === '/containers/container-new/json'
+      );
+      expect(inspects).toHaveLength(2);
+    });
+
+    it('aborts cutover when health transitions from starting to unhealthy', async () => {
+      const oldSpec = await hashFor(baseSpec);
+      mockRequest
+        .mockResolvedValueOnce(
+          ownedContainer({
+            Name: '/insforge-testkey1-api',
+            Config: {
+              Image: 'nginx:alpine',
+              Labels: {
+                'insforge.managed': 'true',
+                'insforge.project': 'testkey1',
+                'insforge.spec': oldSpec,
+              },
+            },
+          })
+        )
+        .mockResolvedValueOnce({ Id: 'container-sick' }) // create staging
+        .mockResolvedValueOnce(undefined) // start staging
+        // First poll: starting
+        .mockResolvedValueOnce(
+          ownedContainer({
+            Id: 'container-sick',
+            State: { Status: 'running', Health: { Status: 'starting' } },
+          })
+        )
+        // Second poll: unhealthy — fail
+        .mockResolvedValueOnce(
+          ownedContainer({
+            Id: 'container-sick',
+            State: { Status: 'running', Health: { Status: 'unhealthy' } },
+          })
+        )
+        .mockResolvedValueOnce(undefined); // cleanup staging
+      imageAlreadyPresent();
+
+      vi.useFakeTimers();
+      const promise = provider.updateMachine({
+        ...baseSpec,
+        machineId: 'container-abc',
+        image: 'nginx:1.27-alpine',
+      });
+      // Attach a no-op catch to prevent Node's unhandled-rejection warning while
+      // fake timers drive the polling loop to completion.
+      promise.catch(() => {});
+      await vi.advanceTimersByTimeAsync(1_500);
+      vi.useRealTimers();
+
+      await expect(promise).rejects.toThrow(
+        'Staging container failed readiness check (status: running, health: unhealthy)'
+      );
+      const paths = mockRequest.mock.calls.map((c) => `${c[0]} ${c[1]}`);
+      expect(paths).not.toContain('POST /containers/container-abc/stop');
+      expect(paths).toContain('DELETE /containers/container-sick?force=true');
+    });
+
+    it('times out when health check stays in starting state and preserves old container', async () => {
+      const oldSpec = await hashFor(baseSpec);
+      mockRequest
+        .mockResolvedValueOnce(
+          ownedContainer({
+            Name: '/insforge-testkey1-api',
+            Config: {
+              Image: 'nginx:alpine',
+              Labels: {
+                'insforge.managed': 'true',
+                'insforge.project': 'testkey1',
+                'insforge.spec': oldSpec,
+              },
+            },
+          })
+        )
+        .mockResolvedValueOnce({ Id: 'container-slow' }) // create staging
+        .mockResolvedValueOnce(undefined) // start staging
+        // All polls return 'starting' — never resolves.
+        .mockResolvedValue(
+          ownedContainer({
+            Id: 'container-slow',
+            State: { Status: 'running', Health: { Status: 'starting' } },
+          })
+        );
+      // The default mockResolvedValue will also handle the delete cleanup call,
+      // but we need to override for that specific pattern. Since the delete returns
+      // an object rather than undefined, that's fine — the .catch() swallows it.
+      imageAlreadyPresent();
+
+      vi.useFakeTimers();
+      const promise = provider.updateMachine({
+        ...baseSpec,
+        machineId: 'container-abc',
+        image: 'nginx:1.27-alpine',
+      });
+      promise.catch(() => {});
+      // Advance past the 30s timeout.
+      await vi.advanceTimersByTimeAsync(35_000);
+      vi.useRealTimers();
+
+      await expect(promise).rejects.toThrow(
+        /health check did not resolve within 30000ms/
+      );
+      const paths = mockRequest.mock.calls.map((c) => `${c[0]} ${c[1]}`);
+      expect(paths).not.toContain('POST /containers/container-abc/stop');
+      expect(paths).toContain('DELETE /containers/container-slow?force=true');
+    });
+
+    it('preserves service when old container cannot be retired (rename to retire fails)', async () => {
       const oldSpec = await hashFor(baseSpec);
       mockRequest
         .mockResolvedValueOnce(
@@ -623,9 +787,51 @@ describe('DockerProvider', () => {
         .mockResolvedValueOnce(
           ownedContainer({ Id: 'container-new', State: { Status: 'running' } })
         ) // readiness check
-        .mockResolvedValueOnce(undefined) // stop old
-        .mockResolvedValueOnce(undefined) // remove old
-        .mockRejectedValueOnce(new Error('name conflict')) // rename fails
+        .mockRejectedValueOnce(new Error('daemon error')) // rename old → retire (fails)
+        .mockResolvedValueOnce(undefined); // cleanup staging
+
+      imageAlreadyPresent();
+
+      await expect(
+        provider.updateMachine({
+          ...baseSpec,
+          machineId: 'container-abc',
+          image: 'nginx:1.27-alpine',
+        })
+      ).rejects.toThrow('Failed to retire old container container-abc');
+
+      const paths = mockRequest.mock.calls.map((c) => `${c[0]} ${c[1]}`);
+      // Old container must NOT be stopped or deleted — it is still serving under the primary name.
+      expect(paths).not.toContain('POST /containers/container-abc/stop');
+      expect(paths).not.toContain('DELETE /containers/container-abc?force=true');
+      // Staging must be cleaned up.
+      expect(paths).toContain('DELETE /containers/container-new?force=true');
+    });
+
+    it('restores old container and cleans up staging when promotion rename fails', async () => {
+      const oldSpec = await hashFor(baseSpec);
+      mockRequest
+        .mockResolvedValueOnce(
+          ownedContainer({
+            Name: '/insforge-testkey1-api',
+            Config: {
+              Image: 'nginx:alpine',
+              Labels: {
+                'insforge.managed': 'true',
+                'insforge.project': 'testkey1',
+                'insforge.spec': oldSpec,
+              },
+            },
+          })
+        )
+        .mockResolvedValueOnce({ Id: 'container-new' }) // create staging
+        .mockResolvedValueOnce(undefined) // start staging
+        .mockResolvedValueOnce(
+          ownedContainer({ Id: 'container-new', State: { Status: 'running' } })
+        ) // readiness check
+        .mockResolvedValueOnce(undefined) // rename old → retire (succeeds)
+        .mockRejectedValueOnce(new Error('name conflict')) // rename staging → primary (fails)
+        .mockResolvedValueOnce(undefined) // restore old → primary
         .mockResolvedValueOnce(undefined); // cleanup staging
 
       imageAlreadyPresent();
@@ -639,7 +845,14 @@ describe('DockerProvider', () => {
       ).rejects.toThrow('Failed to promote staging container to insforge-testkey1-api');
 
       const paths = mockRequest.mock.calls.map((c) => `${c[0]} ${c[1]}`);
+      // The old container must be restored to its primary name — service stays online.
+      expect(paths).toContainEqual(
+        expect.stringMatching(/^POST \/containers\/container-abc\/rename\?name=insforge-testkey1-api$/)
+      );
+      // Staging must be cleaned up.
       expect(paths).toContain('DELETE /containers/container-new?force=true');
+      // The old container must NOT be deleted.
+      expect(paths).not.toContain('DELETE /containers/container-abc?force=true');
     });
 
     // Removing an env var is invisible if you only check that the requested ones
@@ -659,14 +872,15 @@ describe('DockerProvider', () => {
             },
           })
         )
-        .mockResolvedValueOnce({ Id: 'container-new' })
-        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce({ Id: 'container-new' }) // create staging
+        .mockResolvedValueOnce(undefined) // start staging
         .mockResolvedValueOnce(
           ownedContainer({ Id: 'container-new', State: { Status: 'running' } })
-        )
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(undefined);
+        ) // readiness
+        .mockResolvedValueOnce(undefined) // rename old → retire
+        .mockResolvedValueOnce(undefined) // rename staging → primary
+        .mockResolvedValueOnce(undefined) // stop retired
+        .mockResolvedValueOnce(undefined); // delete retired
       imageAlreadyPresent();
 
       const result = await provider.updateMachine({

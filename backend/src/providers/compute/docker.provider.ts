@@ -446,20 +446,14 @@ export class DockerProvider implements ComputeProvider {
         scaleToZero: params.scaleToZero,
       });
 
-      // Readiness Gate: Verify raw Docker status is strictly 'running' and health is not 'unhealthy'.
-      // Docker POST /start returns HTTP 204 immediately when process starts. If entrypoint crashes right after,
-      // state will be non-running ('exited'/'stopped'/'dead'/'failed'/'restarting').
-      // Catch inspection failures so transient errors do not leak untracked staging containers.
+      // Readiness Gate: verify the staging container is genuinely running and healthy
+      // before touching the original. Docker POST /start returns 204 immediately when
+      // the process starts; if the entrypoint crashes right after, state flips to
+      // 'exited'/'dead'. When the image defines a HEALTHCHECK, the initial status is
+      // 'starting' — accepting that would destroy the original before the first probe
+      // completes. Poll until health resolves or a timeout expires.
       try {
-        const inspect = await this.assertOwned(launched.machineId);
-        const status = inspect.State?.Status;
-        const health = inspect.State?.Health?.Status;
-
-        if (status !== 'running' || health === 'unhealthy') {
-          throw new Error(
-            `Staging container failed readiness check (status: ${status}${health ? `, health: ${health}` : ''})`
-          );
-        }
+        await this.awaitStagingReady(launched.machineId);
       } catch (err) {
         await dockerRequest(
           'DELETE',
@@ -468,34 +462,44 @@ export class DockerProvider implements ComputeProvider {
         throw err;
       }
 
-      // Teardown superseded container once replacement is verified up and healthy.
+      // Promotion via rename-swap: the old container is never destroyed until the
+      // staging container successfully assumes the primary name. If any step fails,
+      // the old container is restored under its original name so the service stays
+      // online.
+      const retireName = `${primaryName}-retire-${Date.now()}`;
+
+      // Step 1: Move the old container out of the way by renaming to a retire name.
+      // This frees the primary name for the staging container without deleting anything.
       try {
         await dockerRequest(
           'POST',
-          `/containers/${encodeURIComponent(params.machineId)}/stop`
-        ).catch(() => undefined);
-        await dockerRequest(
-          'DELETE',
-          `/containers/${encodeURIComponent(params.machineId)}?force=true`
+          `/containers/${encodeURIComponent(params.machineId)}/rename?name=${encodeURIComponent(retireName)}`
         );
       } catch (err) {
+        // Old container could not be renamed — it is still running under the primary
+        // name. Clean up staging and surface the error; service remains online.
         await dockerRequest(
           'DELETE',
           `/containers/${encodeURIComponent(launched.machineId)}?force=true`
         ).catch(() => undefined);
         throw new Error(
-          `Failed to remove superseded container ${params.machineId}: ${err instanceof Error ? err.message : String(err)}`
+          `Failed to retire old container ${params.machineId}: ${err instanceof Error ? err.message : String(err)}`
         );
       }
 
-      // Atomic rename of staging container to primary application name (Promotion).
-      // If rename fails (e.g. name conflict), remove staging container and throw so success is never reported on failed promotion.
+      // Step 2: Promote staging container to the primary name.
       try {
         await dockerRequest(
           'POST',
           `/containers/${encodeURIComponent(launched.machineId)}/rename?name=${encodeURIComponent(primaryName)}`
         );
       } catch (err) {
+        // Promotion failed — restore the old container to its original name so the
+        // service remains available, then clean up staging.
+        await dockerRequest(
+          'POST',
+          `/containers/${encodeURIComponent(params.machineId)}/rename?name=${encodeURIComponent(primaryName)}`
+        ).catch(() => undefined);
         await dockerRequest(
           'DELETE',
           `/containers/${encodeURIComponent(launched.machineId)}?force=true`
@@ -504,6 +508,18 @@ export class DockerProvider implements ComputeProvider {
           `Failed to promote staging container to ${primaryName}: ${err instanceof Error ? err.message : String(err)}`
         );
       }
+
+      // Step 3: Tear down the retired container. It is now safely renamed and the
+      // staging container owns the primary name. A failure here is non-fatal — the
+      // retired container is just an orphan that stop/force-remove will clean up.
+      await dockerRequest(
+        'POST',
+        `/containers/${encodeURIComponent(params.machineId)}/stop`
+      ).catch(() => undefined);
+      await dockerRequest(
+        'DELETE',
+        `/containers/${encodeURIComponent(params.machineId)}?force=true`
+      ).catch(() => undefined);
 
       logger.info('Docker compute: recreated container to apply a spec change', {
         name: primaryName,
@@ -542,6 +558,63 @@ export class DockerProvider implements ComputeProvider {
       )
       .digest('hex')
       .slice(0, 16);
+  }
+
+  /**
+   * Wait until the staging container is genuinely ready to serve traffic.
+   *
+   * When the image defines a HEALTHCHECK, the initial health status is `starting`.
+   * Accepting that would delete the original container before the first probe
+   * completes — if the probe then fails, nothing is running. This method polls
+   * until health resolves to `healthy` (pass) or `unhealthy` (fail), with a
+   * bounded timeout so a hung health check does not block the deploy forever.
+   *
+   * Without a HEALTHCHECK the only signal Docker provides is the container
+   * status. `running` is accepted immediately because there is no further
+   * readiness probe to wait for.
+   */
+  private async awaitStagingReady(
+    machineId: string,
+    timeoutMs = 30_000
+  ): Promise<void> {
+    const start = Date.now();
+    const pollMs = 1_000;
+
+    while (true) {
+      const inspect = await this.assertOwned(machineId);
+      const status = inspect.State?.Status;
+      const health = inspect.State?.Health?.Status;
+
+      // Container exited or is otherwise not running — immediate fail.
+      if (status !== 'running') {
+        throw new Error(
+          `Staging container failed readiness check (status: ${status}${health ? `, health: ${health}` : ''})`
+        );
+      }
+
+      // No HEALTHCHECK defined — `running` is the best signal Docker offers.
+      if (!health) {
+        return;
+      }
+
+      // Health check resolved.
+      if (health === 'healthy') {
+        return;
+      }
+      if (health === 'unhealthy') {
+        throw new Error(
+          `Staging container failed readiness check (status: ${status}, health: ${health})`
+        );
+      }
+
+      // health === 'starting': the first probe has not completed yet. Poll.
+      if (Date.now() - start >= timeoutMs) {
+        throw new Error(
+          `Staging container health check did not resolve within ${timeoutMs}ms (last health: ${health})`
+        );
+      }
+      await new Promise((r) => setTimeout(r, pollMs));
+    }
   }
 
   async stopMachine(appId: string, machineId: string): Promise<void> {
