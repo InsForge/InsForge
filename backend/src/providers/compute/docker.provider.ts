@@ -512,10 +512,9 @@ export class DockerProvider implements ComputeProvider {
       // Step 3: Tear down the retired container. It is now safely renamed and the
       // staging container owns the primary name. A failure here is non-fatal — the
       // retired container is just an orphan that stop/force-remove will clean up.
-      await dockerRequest(
-        'POST',
-        `/containers/${encodeURIComponent(params.machineId)}/stop`
-      ).catch(() => undefined);
+      await dockerRequest('POST', `/containers/${encodeURIComponent(params.machineId)}/stop`).catch(
+        () => undefined
+      );
       await dockerRequest(
         'DELETE',
         `/containers/${encodeURIComponent(params.machineId)}?force=true`
@@ -573,10 +572,7 @@ export class DockerProvider implements ComputeProvider {
    * status. `running` is accepted immediately because there is no further
    * readiness probe to wait for.
    */
-  private async awaitStagingReady(
-    machineId: string,
-    timeoutMs = 30_000
-  ): Promise<void> {
+  private async awaitStagingReady(machineId: string, timeoutMs = 30_000): Promise<void> {
     const start = Date.now();
     const pollMs = 1_000;
 
