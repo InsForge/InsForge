@@ -5,6 +5,8 @@ import { ERROR_CODES } from '@insforge/shared-schemas';
 
 export interface LaunchMachineParams {
   appId: string;
+  /** Logical service name when different from container name/appId (e.g. during staged updates). */
+  serviceName?: string;
   /**
    * Image URL — image-mode (any registry) or source-mode (digest-pinned
    * registry.fly.io ref produced by the CLI's `flyctl deploy --build-only --push`).
