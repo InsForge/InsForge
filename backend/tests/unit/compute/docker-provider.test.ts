@@ -476,7 +476,9 @@ describe('DockerProvider', () => {
       expect(paths[2]).toBe('POST /containers/container-new/start');
       expect(paths[3]).toBe('GET /containers/container-new/json');
       // Rename-swap: old renamed to retire, staging renamed to primary, then old torn down.
-      expect(paths[4]).toMatch(/^POST \/containers\/container-abc\/rename\?name=insforge-testkey1-api-retire-\d+$/);
+      expect(paths[4]).toMatch(
+        /^POST \/containers\/container-abc\/rename\?name=insforge-testkey1-api-retire-\d+$/
+      );
       expect(paths[5]).toBe('POST /containers/container-new/rename?name=insforge-testkey1-api');
       expect(paths[6]).toBe('POST /containers/container-abc/stop');
       expect(paths[7]).toBe('DELETE /containers/container-abc?force=true');
@@ -758,9 +760,7 @@ describe('DockerProvider', () => {
       await vi.advanceTimersByTimeAsync(35_000);
       vi.useRealTimers();
 
-      await expect(promise).rejects.toThrow(
-        /health check did not resolve within 30000ms/
-      );
+      await expect(promise).rejects.toThrow(/health check did not resolve within 30000ms/);
       const paths = mockRequest.mock.calls.map((c) => `${c[0]} ${c[1]}`);
       expect(paths).not.toContain('POST /containers/container-abc/stop');
       expect(paths).toContain('DELETE /containers/container-slow?force=true');
@@ -847,7 +847,9 @@ describe('DockerProvider', () => {
       const paths = mockRequest.mock.calls.map((c) => `${c[0]} ${c[1]}`);
       // The old container must be restored to its primary name — service stays online.
       expect(paths).toContainEqual(
-        expect.stringMatching(/^POST \/containers\/container-abc\/rename\?name=insforge-testkey1-api$/)
+        expect.stringMatching(
+          /^POST \/containers\/container-abc\/rename\?name=insforge-testkey1-api$/
+        )
       );
       // Staging must be cleaned up.
       expect(paths).toContain('DELETE /containers/container-new?force=true');
