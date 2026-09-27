@@ -145,6 +145,8 @@ describe('MetadataService.formatAsMarkdown', () => {
     // Compute likewise: absence of the slice is how a client learns compute is off,
     // so the markdown must not imply otherwise.
     expect(md).not.toContain('## Compute');
+    // Same signal for sites: no driver configured, no section.
+    expect(md).not.toContain('## Sites');
   });
 
   // The JSON response gained a compute slice; the markdown export is the same
@@ -175,6 +177,43 @@ describe('MetadataService.formatAsMarkdown', () => {
     expect(md).toContain('regions no');
     expect(md).toContain('scale-to-zero no');
     expect(md).toContain('context-upload');
+  });
+
+  // Same reasoning as the compute slice: an agent reading the Markdown export should not
+  // have to fetch the JSON to learn this instance cannot do custom domains.
+  it('renders the sites slice with per-provider capabilities', () => {
+    const withSites: AppMetadataSchema = {
+      ...sampleMetadata,
+      sites: {
+        defaultProvider: 'docker',
+        providers: {
+          docker: {
+            envVars: 'build-only',
+            customDomains: false,
+            slug: false,
+            rollback: true,
+            buildLogs: true,
+            runtimeLogs: true,
+            frameworkDetection: false,
+            ingressModes: ['port', 'host'],
+            defaultIngress: 'port',
+          },
+        },
+      },
+    };
+
+    const md = metadataService.formatAsMarkdown(withSites);
+
+    expect(md).toContain('## Sites');
+    expect(md).toContain('docker');
+    expect(md).toContain('build-only');
+    expect(md).toContain('custom domains no');
+    expect(md).toContain('rollback yes');
+    expect(md).toContain('runtime logs yes');
+    expect(md).toContain('framework detection no');
+    // The whole rendering, not just that the word appears: the point of this line is that an
+    // agent reading the export can see which ingress mode is the default and how it is spelled.
+    expect(md).toContain('ingress `port`/`host` (default `port`)');
   });
 
   it('renders database hint when present', () => {

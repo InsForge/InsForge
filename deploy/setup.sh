@@ -61,7 +61,8 @@ deploy/backup.sh
 deploy/docker-compose/docker-compose.yml
 deploy/docker-init/db/db-init.sql
 deploy/docker-init/db/jwt.sql
-deploy/docker-init/db/postgresql.conf'
+deploy/docker-init/db/postgresql.conf
+deploy/sites-gateway/Caddyfile'
 
 # No git, or asked not to use it: fetch each file straight from the ref. 34KB in
 # total, against 47MB for the repository tarball, and precise where a tar glob

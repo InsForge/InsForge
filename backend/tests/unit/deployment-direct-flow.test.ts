@@ -14,8 +14,12 @@ const { mockPool, mockClient, mockVercelProvider, mockIsCloudEnvironment } = vi.
   mockVercelProvider: {
     isConfigured: vi.fn(() => true),
     uploadFileStream: vi.fn(),
-    listCustomDomains: vi.fn(),
-    getCustomDomainConfig: vi.fn(),
+    // Grouped the way SitesProvider exposes them: a driver without domains omits the
+    // whole store, so the service has to reach it through `domains`.
+    domains: {
+      list: vi.fn(),
+      config: vi.fn(),
+    },
   },
   mockIsCloudEnvironment: vi.fn(() => true),
 }));
@@ -70,7 +74,7 @@ describe('DeploymentService direct deployment flow', () => {
 
   it('lists user-owned custom domains outside cloud when Vercel credentials are configured', async () => {
     mockIsCloudEnvironment.mockReturnValue(false);
-    mockVercelProvider.listCustomDomains.mockResolvedValueOnce([
+    mockVercelProvider.domains.list.mockResolvedValueOnce([
       {
         id: 'domain-id',
         name: 'app.example.com',
@@ -98,7 +102,7 @@ describe('DeploymentService direct deployment flow', () => {
         verification: [],
       },
     ]);
-    mockVercelProvider.getCustomDomainConfig.mockResolvedValueOnce({
+    mockVercelProvider.domains.config.mockResolvedValueOnce({
       recommendedCNAME: [{ rank: 1, value: 'cname.vercel-dns.com' }],
     });
 

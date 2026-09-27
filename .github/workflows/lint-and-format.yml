@@ -65,6 +65,11 @@ jobs:
           CHANGED_SPECS: ${{ steps.changed-openapi.outputs.all_changed_files }}
         run: |
           while IFS= read -r spec; do
+            # The action emits a trailing backslash on every line but the last when more
+            # than one spec changes, so the name arrived as `deployments.yaml\` and the
+            # validator opened nothing. Only reachable from a PR touching two specs at
+            # once, which is why it sat unnoticed until now.
+            spec="${spec%\\}"
             [ -n "$spec" ] || continue
             echo "Validating $spec"
             npx --yes @apidevtools/swagger-cli@4.0.4 validate "$spec"

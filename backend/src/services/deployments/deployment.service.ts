@@ -1,14 +1,25 @@
 import { Pool, type PoolClient } from 'pg';
 import AdmZip from 'adm-zip';
 import crypto from 'crypto';
+import { inflateRawSync } from 'node:zlib';
 import { Transform, type Readable, type TransformCallback } from 'stream';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import {
-  VercelProvider,
-  type VercelDomainConfig,
-} from '@/providers/deployments/vercel.provider.js';
+  buildSitesRegistry,
+  isAnySitesProviderConfigured,
+  requireDomainStore,
+  selectSitesProvider,
+  unsupportedFeature,
+} from '@/services/deployments/sites-registry.js';
+import type {
+  DomainConfig,
+  EnvVarStore,
+  SitesProvider,
+  SitesProviderName,
+} from '@/providers/deployments/sites.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
-import { AppError } from '@/utils/errors.js';
+import { SecretService } from '@/services/secrets/secret.service.js';
+import { AppError, UpstreamError } from '@/utils/errors.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import {
@@ -24,6 +35,7 @@ import {
   type CreateDirectDeploymentRequest,
   type CreateDirectDeploymentResponse,
   type DeploymentManifestFile,
+  type RuntimeLogsResponse,
   type UploadDeploymentFileResponse,
   type StartDeploymentRequest,
   type UpdateSlugResponse,
@@ -57,15 +69,97 @@ interface DeploymentFileRow {
   uploadedAt: Date | null;
 }
 
+/**
+ * Keep the tail of a build log, not all of it.
+ *
+ * A failing `npm ci` can emit megabytes, and this lands in a jsonb column on every
+ * deploy. The tail is also the useful part — the error is at the end. Storing everything
+ * would turn a noisy build into a database problem.
+ */
+const MAX_BUILD_LOG_LINES = 200;
+const MAX_BUILD_LOG_BYTES = 64 * 1024;
+
+export function truncateBuildLogs(lines: string[]): string[] {
+  const tail = lines.slice(-MAX_BUILD_LOG_LINES);
+  let bytes = 0;
+  const kept: string[] = [];
+  for (let i = tail.length - 1; i >= 0; i--) {
+    const line = tail[i] ?? '';
+    bytes += Buffer.byteLength(line, 'utf8');
+    if (bytes > MAX_BUILD_LOG_BYTES) {
+      // Keep the last line even when it alone blows the budget, clipped to fit. Builders
+      // emit single enormous lines — a minified bundle, a stack trace with no newlines —
+      // and that is exactly when the operator needs the text rather than a bare marker.
+      if (kept.length === 0) {
+        // Clipped on the byte buffer, not by string index: `slice` counts UTF-16 units, so
+        // a line of multibyte output would have stored roughly twice the budget.
+        const marker = '… (line truncated)';
+        const room = MAX_BUILD_LOG_BYTES - Buffer.byteLength(marker, 'utf8');
+        const clipped = Buffer.from(line, 'utf8').subarray(0, room).toString('utf8');
+        kept.unshift(`${clipped}${marker}`);
+      }
+      break;
+    }
+    kept.unshift(line);
+  }
+  const dropped = lines.length - kept.length;
+  return dropped > 0 ? [`… ${dropped} earlier line(s) omitted`, ...kept] : kept;
+}
+
 export class DeploymentService {
   private static instance: DeploymentService;
   private pool: Pool | null = null;
-  private vercelProvider: VercelProvider;
   private s3Provider: S3StorageProvider | null = null;
 
   private constructor() {
-    this.vercelProvider = VercelProvider.getInstance();
     this.initializeS3Provider();
+  }
+
+  /**
+   * The active driver, resolved per call.
+   *
+   * Not held on the instance: Vercel credentials can be stored through the dashboard,
+   * and a provider captured in the constructor would predate them. Throws
+   * DEPLOYMENT_NOT_CONFIGURED when nothing can serve a deployment, which is why callers
+   * that only want to *report* availability use `isConfigured()` instead.
+   */
+  private get provider(): SitesProvider {
+    return selectSitesProvider();
+  }
+
+  /**
+   * The driver that made this row, not whichever one is default now.
+   *
+   * `deployments.runs.provider` records it precisely so that switching SITES_PROVIDER
+   * cannot send a Vercel deployment's id to Docker — the id means nothing to the other
+   * driver, and for rollback the other driver may not even offer it. Falls back to the
+   * active default only for rows written before this column carried the truth.
+   */
+  private providerFor(record: { provider?: string | null }): SitesProvider {
+    const name = record.provider;
+    // Resolved from the registry first, not from `this.provider`: that getter throws when the
+    // *default* driver is unusable, which stranded every row-scoped operation — including
+    // rollback and logs for a perfectly healthy Docker deployment — because Vercel credentials
+    // had gone stale. A row that names its driver does not need the default to exist.
+    if (name) {
+      // Not enforcing the configured default: this call only needs the driver the row names, and
+      // an unusable default (stale Vercel credentials, `SITES_PROVIDER=off`) would otherwise
+      // throw here and strand a healthy Docker deployment's rollback and logs.
+      const registry = buildSitesRegistry({ enforceRequested: false });
+      const owner = registry.providers.get(name as SitesProviderName);
+      if (owner) {
+        return owner;
+      }
+      throw new AppError(
+        `This deployment was made by the ${name} driver, which is not configured here.`,
+        409,
+        ERROR_CODES.DEPLOYMENT_NOT_CONFIGURED,
+        `Set SITES_PROVIDER=${name} and its credentials to operate on it.`
+      );
+    }
+    // No name means a row older than this column. Whatever is serving now is the best guess,
+    // and this is the only branch that needs the default to exist at all.
+    return this.provider;
   }
 
   private initializeS3Provider(): void {
@@ -108,7 +202,7 @@ export class DeploymentService {
       return undefined;
     }
     try {
-      const customSlug = await this.vercelProvider.getSlug();
+      const customSlug = this.provider.slug ? await this.provider.slug.get() : null;
       return { customSlug };
     } catch (error) {
       // Cloud slug lookup hits CLOUD_API_HOST + Vercel; transient failures
@@ -126,7 +220,7 @@ export class DeploymentService {
     return domain.endsWith('.vercel.app') || domain.endsWith('.insforge.site');
   }
 
-  private pickPreferredARecord(config: VercelDomainConfig): string | null {
+  private pickPreferredARecord(config: DomainConfig): string | null {
     const rankOneValues = (config.recommendedIPv4 ?? [])
       .filter((record) => record.rank === 1)
       .flatMap((record) => record.value ?? []);
@@ -145,7 +239,7 @@ export class DeploymentService {
       verified: boolean;
       verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
     },
-    config: VercelDomainConfig
+    config: DomainConfig
   ): CustomDomain {
     return {
       domain: domain.name,
@@ -165,9 +259,9 @@ export class DeploymentService {
   private async getCustomDomainConfigOrEmpty(
     configDomain: string,
     requestedDomain: string
-  ): Promise<VercelDomainConfig> {
+  ): Promise<DomainConfig> {
     try {
-      return await this.vercelProvider.getCustomDomainConfig(configDomain);
+      return await requireDomainStore().config(configDomain);
     } catch (error) {
       logger.warn('Vercel domain config lookup failed; continuing without DNS hints', {
         requestedDomain,
@@ -184,17 +278,214 @@ export class DeploymentService {
    * Self-hosted deployments use Vercel credentials from environment variables.
    */
   isConfigured(): boolean {
-    return this.vercelProvider.isConfigured();
+    return isAnySitesProviderConfigured();
+  }
+
+  /**
+   * Apply env vars the way the active driver can.
+   *
+   * A driver with a runtime store keeps them and the build reads them from there. A
+   * `build-only` driver has nowhere to keep them, so they travel with the deployment and
+   * are baked into the artifact — which is why they are returned rather than stored. A
+   * driver with neither refuses, because silently dropping values a caller asked for
+   * would produce a site built without its configuration.
+   */
+  private async applyEnvVars(
+    envVars: Array<{ key: string; value: string }> | undefined,
+    /**
+     * The driver that will build this deployment — the row's owner, not the current
+     * default. Passing the wrong one sends a Docker deployment's variables to Vercel's
+     * project API while the container that runs gets none, which is the exact confusion
+     * the seam exists to remove.
+     */
+    provider: SitesProvider
+  ): Promise<Array<{ key: string; value: string }> | undefined> {
+    const mode = provider.capabilities().envVars;
+
+    if (mode === 'runtime' && !provider.envVars) {
+      // The driver holds nothing itself, so we do — otherwise a deploy that passes no
+      // variables would silently start a server without the configuration the last one
+      // had, which for an SSR app means a site that boots and then fails on every request.
+      if (envVars && envVars.length > 0) {
+        // Through the same queue the management API uses: this is a read-modify-write against
+        // one secret row, and a dashboard save racing a deploy otherwise loses one of them.
+        await this.serializeEnvWrite(() => this.storeSiteEnvVars(envVars));
+        return envVars;
+      }
+      return await this.loadSiteEnvVars();
+    }
+
+    if (!envVars || envVars.length === 0) {
+      return undefined;
+    }
+    if (provider.envVars) {
+      await provider.envVars.upsert(envVars);
+      return undefined;
+    }
+    if (mode === 'build-only') {
+      return envVars;
+    }
+    throw unsupportedFeature(provider.name, 'environment variables');
+  }
+
+  /**
+   * The site's environment, encrypted in the secret store under one reserved key.
+   *
+   * One row rather than one per variable: the set is replaced atomically on each deploy, and
+   * a partially-applied environment is worse than an old one. Reserved so it does not show
+   * up as a user-managed secret in the dashboard.
+   */
+  private static readonly SITE_ENV_SECRET_KEY = 'SITES_RUNTIME_ENV';
+
+  /** Serializes writes to the one secret row the site environment lives in. */
+  private envWriteQueue: Promise<void> = Promise.resolve();
+
+  /** Run `work` after every write already queued, whatever their outcome. */
+  private serializeEnvWrite<T>(work: () => Promise<T>): Promise<T> {
+    const next = this.envWriteQueue.then(work, work);
+    this.envWriteQueue = next.then(
+      () => undefined,
+      () => undefined
+    );
+    return next;
+  }
+
+  private async storeSiteEnvVars(envVars: Array<{ key: string; value: string }>): Promise<void> {
+    const secrets = SecretService.getInstance();
+    const serialized = JSON.stringify(envVars);
+    const existing = await secrets.getSecretByKey(DeploymentService.SITE_ENV_SECRET_KEY);
+    if (existing === null) {
+      try {
+        await secrets.createSecret({
+          key: DeploymentService.SITE_ENV_SECRET_KEY,
+          value: serialized,
+          isReserved: true,
+        });
+        return;
+      } catch (error) {
+        // Two deploys racing the first write both saw no secret, and the loser used to fail
+        // the whole deployment over a row that now exists. Falling through to the update is
+        // the same end state either way.
+        if (!(error instanceof AppError) || error.code !== ERROR_CODES.SECRET_ALREADY_EXISTS) {
+          throw error;
+        }
+      }
+    }
+    await secrets.updateSecretByKey(DeploymentService.SITE_ENV_SECRET_KEY, { value: serialized });
+  }
+
+  private async loadSiteEnvVars(): Promise<Array<{ key: string; value: string }> | undefined> {
+    try {
+      const stored = await SecretService.getInstance().getSecretByKey(
+        DeploymentService.SITE_ENV_SECRET_KEY
+      );
+      if (!stored) {
+        return undefined;
+      }
+      const parsed: unknown = JSON.parse(stored);
+      return Array.isArray(parsed) ? (parsed as Array<{ key: string; value: string }>) : undefined;
+    } catch (error) {
+      // Deliberately fatal. Deploying without the stored environment starts a server whose
+      // every request fails on missing configuration, and start-new-then-stop-old means the
+      // previous deployment keeps serving while this one fails — a failed deploy is strictly
+      // better than a live site that 500s.
+      logger.error('Could not read the stored site environment', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new AppError(
+        'The stored site environment could not be read, so this deployment would start without it.',
+        500,
+        ERROR_CODES.INTERNAL_ERROR,
+        'Re-save the environment variables, or delete the SITES_RUNTIME_ENV secret to start clean.'
+      );
+    }
+  }
+
+  /**
+   * The store the environment-variable API works against.
+   *
+   * A driver that keeps variables itself hands over its own. A driver that reports
+   * `runtime` but keeps nothing — the Docker one — gets the store this service already uses
+   * on the deploy path, because otherwise `runtime` would be a capability whose management
+   * API refuses every call: a button that does nothing, which is what capability flags
+   * exist to prevent.
+   */
+  envVarStore(): EnvVarStore {
+    const provider = this.provider;
+    if (provider.envVars) {
+      return provider.envVars;
+    }
+    if (provider.capabilities().envVars === 'runtime') {
+      return this.secretEnvVarStore();
+    }
+    throw unsupportedFeature(provider.name, 'environment variables');
+  }
+
+  /**
+   * `EnvVarStore` over the one reserved secret.
+   *
+   * The key is the id. There is no separate identifier to hand out — the set is a JSON
+   * array in one secret, keys are unique within it, and inventing surrogate ids would make
+   * them change under the caller on every write.
+   */
+  private secretEnvVarStore(): EnvVarStore {
+    const load = async () => (await this.loadSiteEnvVars()) ?? [];
+    // The merge below is read-modify-write against one secret row, so two concurrent
+    // requests would each write their own view and the later one would drop the other's
+    // variable. Serialized the same way the driver serializes container switches.
+    const serialize = <T>(work: () => Promise<T>): Promise<T> => this.serializeEnvWrite(work);
+    return {
+      keys: async () => (await load()).map((envVar) => envVar.key),
+      // `encrypted` is the truth here: they live in the secret store, encrypted at rest.
+      list: async () =>
+        (await load()).map((envVar) => ({
+          id: envVar.key,
+          key: envVar.key,
+          type: 'encrypted',
+        })),
+      get: async (envId: string) => {
+        const found = (await load()).find((envVar) => envVar.key === envId);
+        if (!found) {
+          throw new AppError(
+            `No environment variable named ${envId}.`,
+            404,
+            ERROR_CODES.SECRET_NOT_FOUND
+          );
+        }
+        return { id: found.key, key: found.key, value: found.value, type: 'encrypted' };
+      },
+      // Merged, not replaced: this is the management API, where a caller sending one
+      // variable means "set this one". The deploy path replaces the whole set on purpose,
+      // since a half-applied environment is worse than the previous one.
+      upsert: (envVars) =>
+        serialize(async () => {
+          const merged = new Map((await load()).map((envVar) => [envVar.key, envVar.value]));
+          for (const envVar of envVars) {
+            merged.set(envVar.key, envVar.value);
+          }
+          await this.storeSiteEnvVars([...merged].map(([key, value]) => ({ key, value })));
+        }),
+      remove: (envId: string) =>
+        serialize(async () => {
+          const existing = await load();
+          const remaining = existing.filter((envVar) => envVar.key !== envId);
+          if (remaining.length === existing.length) {
+            throw new AppError(
+              `No environment variable named ${envId}.`,
+              404,
+              ERROR_CODES.SECRET_NOT_FOUND
+            );
+          }
+          await this.storeSiteEnvVars(remaining);
+        }),
+    };
   }
 
   private assertDeploymentServiceConfigured(): void {
-    if (!this.isConfigured()) {
-      throw new AppError(
-        'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
+    // Resolving the driver is the check: buildSitesRegistry() throws with the reason —
+    // nothing configured, SITES_PROVIDER=off, or a named driver that is unusable — and
+    // each of those is more actionable than one generic "not configured" message.
+    selectSitesProvider();
   }
 
   /**
@@ -226,7 +517,7 @@ export class DeploymentService {
            metadata,
            created_at as "createdAt",
            updated_at as "updatedAt"`,
-        ['vercel', DeploymentStatus.WAITING, JSON.stringify({ uploadMode: 'legacy' })]
+        [this.provider.name, DeploymentStatus.WAITING, JSON.stringify({ uploadMode: 'legacy' })]
       );
 
       const deployment = result.rows[0] as DeploymentRecord;
@@ -290,7 +581,7 @@ export class DeploymentService {
              created_at as "createdAt",
              updated_at as "updatedAt"`,
           [
-            'vercel',
+            this.provider.name,
             DeploymentStatus.WAITING,
             JSON.stringify({
               uploadMode: 'direct',
@@ -386,7 +677,10 @@ export class DeploymentService {
         lastFileUploadStartedAt: new Date().toISOString(),
       });
 
-      await this.vercelProvider.uploadFileStream({
+      // The row's own driver: if the default changed between creating this deployment and
+      // uploading to it, the bytes would land in a driver that will never build them while
+      // the database recorded the file as uploaded.
+      await this.providerFor(deployment).uploadFileStream({
         content: this.createValidatedFileStream(content, file.sha, file.size),
         sha: file.sha,
         size: file.size,
@@ -459,9 +753,18 @@ export class DeploymentService {
         throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
 
+      // ERROR is startable too. Recording a failed deploy as ERROR is what makes it readable
+      // and what preserves the build output — but if that also made the row unstartable, a
+      // transient upstream 502 would be permanent, where before it left the row UPLOADING and
+      // retryable by accident. The files are still registered, so retrying in place is exactly
+      // what a caller wants.
+      //
+      // Bounded by staging retention on the Docker driver: blobs are swept after a day, so a
+      // retry later than that fails with "was never uploaded" and the caller re-uploads.
       if (
         deployment.status !== DeploymentStatus.WAITING &&
-        deployment.status !== DeploymentStatus.UPLOADING
+        deployment.status !== DeploymentStatus.UPLOADING &&
+        deployment.status !== DeploymentStatus.ERROR
       ) {
         throw new AppError(
           `Deployment is not ready to start. Current status: ${deployment.status}`,
@@ -473,13 +776,31 @@ export class DeploymentService {
       const files = await this.getDeploymentFiles(id);
       const uploadMode = this.getUploadMode(deployment, files.length);
 
+      // Resolved once, from the row: every step of a start — uploads, the build, the URL
+      // it records — has to go to the driver that created it, not to whichever one is
+      // default by the time someone presses deploy.
+      const provider = this.providerFor(deployment);
+
       if (uploadMode === 'direct') {
-        return await this.startDirectDeployment(id, input, files);
+        return await this.startDirectDeployment(id, input, files, provider);
       }
 
-      return await this.startLegacyDeployment(id, input);
+      return await this.startLegacyDeployment(id, input, provider);
     } catch (error) {
       if (error instanceof AppError) {
+        // A 5xx means the deploy itself failed — a build that did not compile, a container
+        // that would not start, an upstream refusal. The row was set to UPLOADING on the way
+        // in, so returning without touching it left the run mid-flight forever and threw
+        // away the message, which for the Docker driver carries the build output.
+        //
+        // A 4xx is the caller's own request (files not uploaded yet, no build command
+        // declared, wrong status). Those stay retryable: marking the row ERROR would make
+        // `startDeployment` refuse the corrected retry.
+        if (error.statusCode >= 500) {
+          await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
+            error: error.message,
+          }).catch(() => {});
+        }
         throw error;
       }
       logger.error('Failed to start deployment', {
@@ -509,7 +830,8 @@ export class DeploymentService {
   private async startDirectDeployment(
     id: string,
     input: StartDeploymentRequest,
-    files: DeploymentFileRow[]
+    files: DeploymentFileRow[],
+    provider: SitesProvider
   ): Promise<DeploymentRecord> {
     if (files.length === 0) {
       throw new AppError(
@@ -530,9 +852,7 @@ export class DeploymentService {
 
     await this.updateDeploymentStatus(id, DeploymentStatus.UPLOADING);
 
-    if (input.envVars && input.envVars.length > 0) {
-      await this.vercelProvider.upsertEnvironmentVariables(input.envVars);
-    }
+    const buildEnvVars = await this.applyEnvVars(input.envVars, provider);
 
     const uploadedFiles = files.map((file) => ({
       file: file.path,
@@ -540,12 +860,20 @@ export class DeploymentService {
       size: file.size,
     }));
 
-    return await this.createVercelDeploymentFromUploadedFiles(id, input, uploadedFiles, 'direct');
+    return await this.createProviderDeploymentFromUploadedFiles(
+      id,
+      input,
+      uploadedFiles,
+      'direct',
+      provider,
+      buildEnvVars
+    );
   }
 
   private async startLegacyDeployment(
     id: string,
-    input: StartDeploymentRequest
+    input: StartDeploymentRequest,
+    provider: SitesProvider
   ): Promise<DeploymentRecord> {
     if (!this.s3Provider) {
       throw new AppError(
@@ -588,16 +916,16 @@ export class DeploymentService {
       throw new AppError('No files found in source zip.', 400, ERROR_CODES.DEPLOYMENT_INVALID_FILE);
     }
 
-    if (input.envVars && input.envVars.length > 0) {
-      await this.vercelProvider.upsertEnvironmentVariables(input.envVars);
-    }
+    const buildEnvVars = await this.applyEnvVars(input.envVars, provider);
 
-    const uploadedFiles = await this.vercelProvider.uploadFiles(files);
-    const deployment = await this.createVercelDeploymentFromUploadedFiles(
+    const uploadedFiles = await provider.uploadFiles(files);
+    const deployment = await this.createProviderDeploymentFromUploadedFiles(
       id,
       input,
       uploadedFiles,
-      'legacy'
+      'legacy',
+      provider,
+      buildEnvVars
     );
 
     await this.s3Provider.deleteObject(DEPLOYMENT_BUCKET, getDeploymentKey(id)).catch((error) => {
@@ -614,7 +942,26 @@ export class DeploymentService {
     const zip = new AdmZip(zipBuffer);
     const entries = zip.getEntries();
     const files: Array<{ path: string; content: Buffer }> = [];
+    const maxTotalBytes = this.getMaxDeploymentTotalBytes();
 
+    // The upload is capped, but a zip is compressed: the cap bounds the archive, not what it
+    // expands to. Every entry is read into memory here, and the Docker driver then builds a
+    // second full copy as a tar — so an archive that fits the upload limit could still take
+    // the process out. Checked against the declared sizes, before anything is allocated.
+    const declaredTotal = entries.reduce(
+      (total, entry) => (entry.isDirectory ? total : total + entry.header.size),
+      0
+    );
+    if (declaredTotal > maxTotalBytes) {
+      throw new AppError(
+        `The source archive expands to ${declaredTotal} bytes, over the ${maxTotalBytes}-byte limit.`,
+        400,
+        ERROR_CODES.DEPLOYMENT_INVALID_FILE,
+        'Build the site first and deploy the output directory, or raise the deployment size limit.'
+      );
+    }
+
+    let extracted = 0;
     for (const entry of entries) {
       if (entry.isDirectory) {
         continue;
@@ -629,35 +976,95 @@ export class DeploymentService {
         filePath = filePath.substring(2);
       }
 
+      // Bounded *during* decompression, not after it. `getData()` inflates the whole entry
+      // first, so an archive that under-reports its sizes — the whole point of the trick — got
+      // one full allocation before any check could see it. zlib's own `maxOutputLength` stops
+      // at the ceiling and throws instead.
+      const content = this.inflateEntryWithin(entry, maxTotalBytes - extracted);
+      extracted += content.length;
+
       files.push({
         path: this.normalizeDeploymentFilePath(filePath),
-        content: entry.getData(),
+        content,
       });
     }
 
     return files;
   }
 
-  private async createVercelDeploymentFromUploadedFiles(
+  /**
+   * One zip entry, decompressed with a hard output ceiling.
+   *
+   * Stored entries (method 0) are already bounded by the archive itself, which the upload cap
+   * covers. Deflated ones go through zlib with `maxOutputLength`, which throws
+   * ERR_BUFFER_TOO_LARGE rather than allocating past the budget.
+   */
+  private inflateEntryWithin(
+    entry: {
+      header: { method: number; size: number };
+      getData: () => Buffer;
+      getCompressedData: () => Buffer;
+    },
+    remainingBytes: number
+  ): Buffer {
+    const budget = Math.max(remainingBytes, 0);
+    if (entry.header.method === 0) {
+      const stored = entry.getData();
+      if (stored.length > budget) {
+        throw this.archiveTooLarge();
+      }
+      return stored;
+    }
+    try {
+      // +1 so a file that exactly fills the budget still succeeds and the caller's own check
+      // decides, rather than zlib throwing on the boundary.
+      return inflateRawSync(entry.getCompressedData(), { maxOutputLength: budget + 1 });
+    } catch (error) {
+      if (error instanceof Error && (error as { code?: string }).code === 'ERR_BUFFER_TOO_LARGE') {
+        throw this.archiveTooLarge();
+      }
+      throw error;
+    }
+  }
+
+  private archiveTooLarge(): AppError {
+    return new AppError(
+      `The source archive expands past the ${this.getMaxDeploymentTotalBytes()}-byte limit.`,
+      400,
+      ERROR_CODES.DEPLOYMENT_INVALID_FILE,
+      'Build the site first and deploy the output directory, or raise the deployment size limit.'
+    );
+  }
+
+  private async createProviderDeploymentFromUploadedFiles(
     id: string,
     input: StartDeploymentRequest,
     uploadedFiles: Array<{ file: string; sha: string; size: number }>,
-    uploadMode: 'direct' | 'legacy'
+    uploadMode: 'direct' | 'legacy',
+    /**
+     * The driver that owns this row. Passed in rather than re-read: the files were uploaded
+     * to it, so building through whichever driver happens to be default now would build
+     * from files it never received.
+     */
+    provider: SitesProvider,
+    /** Present only for a build-only driver — see applyEnvVars. */
+    buildEnvVars?: Array<{ key: string; value: string }>
   ): Promise<DeploymentRecord> {
     const totalSizeBytes = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
 
-    const vercelDeployment = await this.vercelProvider.createDeploymentWithFiles(uploadedFiles, {
+    const deployment = await provider.createDeploymentWithFiles(uploadedFiles, {
       projectSettings: input.projectSettings,
       meta: input.meta,
+      ...(buildEnvVars ? { envVars: buildEnvVars } : {}),
     });
 
-    const vercelStatus = (
-      vercelDeployment.readyState ||
-      vercelDeployment.state ||
-      'BUILDING'
-    ).toUpperCase();
+    const providerStatus = (deployment.readyState || deployment.state || 'BUILDING').toUpperCase();
 
-    const envVarKeys = await this.vercelProvider.getEnvironmentVariableKeys();
+    // Tolerant on purpose: this runs on every deploy, and a driver that bakes values into
+    // the artifact has no store to read back — the keys it was given are recorded instead.
+    const envVarKeys = provider.envVars
+      ? await provider.envVars.keys()
+      : (buildEnvVars ?? []).map((envVar) => envVar.key);
 
     const updateResult = await this.getPool().query(
       `UPDATE deployments.runs
@@ -676,16 +1083,19 @@ export class DeploymentService {
          created_at as "createdAt",
          updated_at as "updatedAt"`,
       [
-        vercelDeployment.id,
-        vercelStatus,
-        this.getDeploymentUrl(vercelDeployment.url),
+        deployment.id,
+        providerStatus,
+        this.getDeploymentUrl(deployment.url, provider),
         JSON.stringify({
-          vercelName: vercelDeployment.name,
+          vercelName: deployment.name,
           fileCount: uploadedFiles.length,
           totalSizeBytes,
           envVarKeys,
           uploadMode,
           startedAt: new Date().toISOString(),
+          ...(deployment.buildLogs?.length
+            ? { buildLogs: truncateBuildLogs(deployment.buildLogs) }
+            : {}),
         }),
         id,
       ]
@@ -693,8 +1103,8 @@ export class DeploymentService {
 
     logger.info('Deployment started', {
       id,
-      providerDeploymentId: vercelDeployment.id,
-      status: vercelStatus,
+      providerDeploymentId: deployment.id,
+      status: providerStatus,
       uploadMode,
     });
 
@@ -704,9 +1114,19 @@ export class DeploymentService {
   /**
    * Get the deployment URL - uses custom domain if APP_KEY is set, otherwise falls back to provider URL
    */
-  private getDeploymentUrl(providerUrl: string | null): string | null {
+  /**
+   * The address to record for a deployment.
+   *
+   * `<APP_KEY>.insforge.site` is the shared domain our managed deploys live under, so it
+   * only applies to a driver that reports the `slug` capability — that capability *is*
+   * "this driver names sites under a domain it owns". Returning it unconditionally
+   * whenever APP_KEY was set meant a self-hosted Docker deploy recorded a cloud hostname
+   * that does not resolve for that instance, hiding the address the driver had just
+   * reported. APP_KEY is generated at setup, so that was the normal case, not an edge one.
+   */
+  private getDeploymentUrl(providerUrl: string | null, provider: SitesProvider): string | null {
     const appKey = process.env.APP_KEY;
-    if (appKey) {
+    if (appKey && provider.capabilities().slug) {
       return `https://${appKey}.insforge.site`;
     }
     return providerUrl;
@@ -972,6 +1392,124 @@ export class DeploymentService {
   /**
    * Get deployment by database ID
    */
+  /**
+   * Make a previous deployment live again.
+   *
+   * The row keeps its own status rather than being copied into a new one: rolling back is
+   * a statement about which deployment is serving, not a new deployment. Every other row
+   * that claimed to be READY is demoted, so the history cannot show two live deployments.
+   */
+  async rollbackTo(id: string): Promise<DeploymentRecord> {
+    const deployment = await this.getDeploymentById(id);
+    if (!deployment) {
+      throw new AppError('Deployment not found.', 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
+    }
+
+    // The row's own driver: restoring a Vercel deployment through Docker is meaningless,
+    // and asking the *default* driver whether it can roll back answers about the wrong
+    // one. Read after the row exists so a bad id is still a 404 rather than a capability
+    // complaint about a deployment nobody has.
+    const provider = this.providerFor(deployment);
+    if (!provider.rollbackTo) {
+      throw unsupportedFeature(provider.name, 'rollback');
+    }
+    if (!deployment.providerDeploymentId) {
+      throw new AppError(
+        'That deployment never reached the provider, so there is nothing to restore.',
+        400,
+        ERROR_CODES.DEPLOYMENT_INVALID_FILE
+      );
+    }
+
+    const restored = await provider.rollbackTo(deployment.providerDeploymentId);
+    const status = (restored.readyState || restored.state || 'READY').toUpperCase();
+
+    const client = await this.getPool().connect();
+    try {
+      await client.query('BEGIN');
+      // Demote whatever else claimed to be live first, so no window shows two.
+      // Scoped to this row's driver: on an instance with both, demoting every READY row would
+      // mark a Vercel deployment CANCELED while Vercel keeps serving it — and `getMetadata()`
+      // reads the latest READY row to decide what is live.
+      await client.query(
+        `UPDATE deployments.runs
+            SET status = 'CANCELED'
+          WHERE status = $1 AND id <> $2 AND provider = $3`,
+        [DeploymentStatus.READY, id, deployment.provider ?? provider.name]
+      );
+      const result = await client.query(
+        `UPDATE deployments.runs
+         SET status = $1,
+             url = $2,
+             metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb
+         WHERE id = $4
+         RETURNING
+           id,
+           provider_deployment_id as "providerDeploymentId",
+           provider,
+           status,
+           url,
+           metadata,
+           created_at as "createdAt",
+           updated_at as "updatedAt"`,
+        [
+          status,
+          this.getDeploymentUrl(restored.url, provider),
+          JSON.stringify({ rolledBackAt: new Date().toISOString() }),
+          id,
+        ]
+      );
+      await client.query('COMMIT');
+      logger.info('Deployment rolled back', { id, status });
+      return result.rows[0] as DeploymentRecord;
+    } catch (error) {
+      // Swallowed like the other transaction in this file: on a broken connection the
+      // ROLLBACK itself rejects, and that rejection would replace the original error *and*
+      // skip the log line below — the only record that the host and the database disagree.
+      await client.query('ROLLBACK').catch(() => {});
+      // The driver already switched the host — that happened before this transaction — so
+      // the database now disagrees with what is being served. Nothing else records that,
+      // and an operator chasing "why does the site show the old build" needs this line.
+      logger.error('Deployment rolled back on the host but not in the database', {
+        id,
+        providerDeploymentId: deployment.providerDeploymentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * A page of the running deployment's own output.
+   *
+   * Resolved through the row's driver, like every other row-scoped call, and refused by name
+   * when that driver cannot read what it deployed — the flag describes the driver, so a
+   * static deployment answers with the file server's own output rather than nothing.
+   */
+  async getRuntimeLogs(
+    id: string,
+    options?: { limit?: number; nextToken?: string }
+  ): Promise<RuntimeLogsResponse> {
+    const deployment = await this.getDeploymentById(id);
+    if (!deployment) {
+      throw new AppError('Deployment not found.', 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
+    }
+    const provider = this.providerFor(deployment);
+    if (!provider.runtimeLogs) {
+      throw unsupportedFeature(provider.name, 'runtime logs');
+    }
+    if (!deployment.providerDeploymentId) {
+      throw new AppError(
+        'That deployment never reached the provider, so it has no output.',
+        400,
+        ERROR_CODES.DEPLOYMENT_INVALID_FILE
+      );
+    }
+    return await provider.runtimeLogs(deployment.providerDeploymentId, options);
+  }
+
   async getDeploymentById(id: string): Promise<DeploymentRecord | null> {
     try {
       const result = await this.getPool().query(
@@ -1056,15 +1594,15 @@ export class DeploymentService {
         );
       }
 
-      // Fetch latest status from Vercel
-      const vercelDeployment = await this.vercelProvider.getDeployment(
+      // Fetch the latest status from the driver that made this row
+      const providerDeployment = await this.providerFor(deployment).getDeployment(
         deployment.providerDeploymentId
       );
 
-      // Use Vercel's status directly (uppercase to match our enum)
-      const vercelStatus = (
-        vercelDeployment.readyState ||
-        vercelDeployment.state ||
+      // The driver's own status, uppercased to match our enum
+      const providerStatus = (
+        providerDeployment.readyState ||
+        providerDeployment.state ||
         'BUILDING'
       ).toUpperCase();
 
@@ -1083,17 +1621,17 @@ export class DeploymentService {
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         [
-          vercelStatus,
-          this.getDeploymentUrl(vercelDeployment.url),
+          providerStatus,
+          this.getDeploymentUrl(providerDeployment.url, this.providerFor(deployment)),
           JSON.stringify({
             lastSyncedAt: new Date().toISOString(),
-            ...(vercelDeployment.error && { error: vercelDeployment.error }),
+            ...(providerDeployment.error && { error: providerDeployment.error }),
           }),
           id,
         ]
       );
 
-      logger.info('Deployment synced', { id, status: vercelStatus });
+      logger.info('Deployment synced', { id, status: providerStatus });
 
       return result.rows[0] as DeploymentRecord;
     } catch (error) {
@@ -1160,7 +1698,7 @@ export class DeploymentService {
 
       // If deployment has a Vercel ID, cancel it on Vercel
       if (deployment.providerDeploymentId) {
-        await this.vercelProvider.cancelDeployment(deployment.providerDeploymentId);
+        await this.providerFor(deployment).cancelDeployment(deployment.providerDeploymentId);
       }
 
       if (
@@ -1220,11 +1758,25 @@ export class DeploymentService {
       let errorInfo: { errorCode?: string; errorMessage?: string } | undefined;
       if (status === 'ERROR') {
         try {
-          const vercelDeployment = await this.vercelProvider.getDeployment(vercelDeploymentId);
-          if (vercelDeployment.error) {
+          // The row's own driver. A webhook only ever concerns the deployment it names, so
+          // asking the current default for its details would hand a Vercel id to Docker and
+          // lose the error message this block exists to capture.
+          const row = await this.getDeploymentByVercelId(vercelDeploymentId);
+          if (!row) {
+            // No row means nothing to enrich, and `providerFor({})` would fall back to the
+            // active default — handing a Vercel id to Docker, which is the mismatch the line
+            // above says this avoids.
+            throw new AppError(
+              `No deployment matches ${vercelDeploymentId}.`,
+              404,
+              ERROR_CODES.DEPLOYMENT_NOT_FOUND
+            );
+          }
+          const providerDeployment = await this.providerFor(row).getDeployment(vercelDeploymentId);
+          if (providerDeployment.error) {
             errorInfo = {
-              errorCode: vercelDeployment.error.code,
-              errorMessage: vercelDeployment.error.message,
+              errorCode: providerDeployment.error.code,
+              errorMessage: providerDeployment.error.message,
             };
             logger.info('Fetched error details from Vercel API', {
               vercelDeploymentId,
@@ -1240,6 +1792,22 @@ export class DeploymentService {
         }
       }
 
+      // Vercel is the only driver that sends webhooks, so the row this matches is a Vercel
+      // row — but reading the URL through the *current default* would rewrite it with
+      // whatever that driver advertises once an operator switches to Docker.
+      //
+      // Resolved leniently: an instance that has moved to Docker can still receive a
+      // webhook for a deployment made before the switch, and refusing it would leave that
+      // row stuck at its old status forever. Without the driver we simply do not touch the
+      // URL — the COALESCE below keeps what is already recorded.
+      let vercelProvider: SitesProvider | null = null;
+      try {
+        vercelProvider = this.providerFor({ provider: 'vercel' });
+      } catch {
+        logger.warn('Vercel webhook arrived but the vercel driver is not configured here', {
+          vercelDeploymentId,
+        });
+      }
       const result = await this.getPool().query(
         `UPDATE deployments.runs
          SET status = $1, url = COALESCE($2, url), metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb
@@ -1255,7 +1823,7 @@ export class DeploymentService {
            updated_at as "updatedAt"`,
         [
           status,
-          this.getDeploymentUrl(url),
+          vercelProvider ? this.getDeploymentUrl(url, vercelProvider) : null,
           JSON.stringify({
             lastWebhookAt: new Date().toISOString(),
             ...webhookMetadata,
@@ -1348,7 +1916,7 @@ export class DeploymentService {
       const data = (await response.json()) as UpdateSlugResponse;
 
       // Update cached slug in VercelProvider so subsequent calls get the correct value
-      this.vercelProvider.updateCachedSlug(data.slug);
+      this.provider.slug?.updateCache(data.slug);
 
       logger.info('Custom domain slug updated', {
         projectId,
@@ -1378,7 +1946,7 @@ export class DeploymentService {
   async addCustomDomain(domain: string): Promise<AddCustomDomainResponse> {
     this.assertDeploymentServiceConfigured();
 
-    const vercelData = await this.vercelProvider.addCustomDomain(domain);
+    const vercelData = await requireDomainStore().add(domain);
     const config = await this.getCustomDomainConfigOrEmpty(vercelData.name, domain);
 
     logger.info('Custom domain added', { domain, verified: vercelData.verified });
@@ -1392,7 +1960,7 @@ export class DeploymentService {
     this.assertDeploymentServiceConfigured();
 
     try {
-      const domains = (await this.vercelProvider.listCustomDomains()).filter(
+      const domains = (await requireDomainStore().list()).filter(
         (domain) => !this.isReservedHostedDomain(domain.name)
       );
       const configs = new Map(
@@ -1413,6 +1981,27 @@ export class DeploymentService {
         ),
       };
     } catch (error) {
+      // A driver with no domain store already said so with a 400; wrapping it here turned
+      // "this driver cannot do custom domains" into "we broke".
+      //
+      // Upstream statuses do not pass through, though: `UpstreamError` carries the status
+      // Vercel returned, and a 401 for a stale stored token would reach the dashboard as our
+      // own 401 — which its client reads as a dead session and logs the admin out. Before
+      // this rethrow existed everything here became a 500, so that path is new.
+      if (
+        error instanceof UpstreamError &&
+        (error.statusCode === 401 || error.statusCode === 403)
+      ) {
+        throw new AppError(
+          `The deployment provider rejected the request: ${error.message}`,
+          502,
+          ERROR_CODES.UPSTREAM_FAILURE,
+          'Check the provider credentials configured for this project.'
+        );
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Failed to list custom domains', {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -1426,7 +2015,7 @@ export class DeploymentService {
   async removeCustomDomain(domain: string): Promise<void> {
     this.assertDeploymentServiceConfigured();
 
-    await this.vercelProvider.removeCustomDomain(domain);
+    await requireDomainStore().remove(domain);
 
     logger.info('Custom domain removed', { domain });
   }
@@ -1439,8 +2028,8 @@ export class DeploymentService {
 
     try {
       const [vercelResult, projectDomain] = await Promise.all([
-        this.vercelProvider.verifyCustomDomain(domain),
-        this.vercelProvider.getCustomDomain(domain),
+        requireDomainStore().verify(domain),
+        requireDomainStore().get(domain),
       ]);
 
       logger.info('Custom domain verification result', { domain, verified: vercelResult.verified });
@@ -1488,8 +2077,26 @@ export class DeploymentService {
         | { id: string; url: string | null }
         | undefined;
 
-      // Get the custom domain URL from Vercel provider (which has the slug from cloud credentials)
-      const customDomainUrl = await this.vercelProvider.getCustomDomainUrl();
+      // Guarded like the slug store in getConfigMetadata: a driver that owns no domains
+      // has no custom domain URL, and demanding one made this whole response 400 for the
+      // driver this file exists to support — including `currentDeploymentId` and
+      // `defaultDomainUrl`, which are meaningful for every driver.
+      // `this.provider` throws when no driver is configured, which turned a documented 200
+      // into a 503 for an instance that simply has no sites driver — and this endpoint is
+      // fetched on the dashboard home. The custom domain is the only part that needs a
+      // driver; the deployment id and default URL come from the row.
+      const activeProvider = isAnySitesProviderConfigured() ? this.provider : null;
+      // And the lookup itself is tolerated: it is one upstream call, and letting it fail the
+      // response would lose `currentDeploymentId` and `defaultDomainUrl` — which come from the
+      // row and are what the dashboard home actually needs.
+      const customDomainUrl = activeProvider?.domains
+        ? await activeProvider.domains.url().catch((error: unknown) => {
+            logger.warn('Could not read the custom domain URL', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+            return null;
+          })
+        : null;
 
       return {
         currentDeploymentId: latestReadyDeployment?.id ?? null,
