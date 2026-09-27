@@ -48,10 +48,7 @@ describe('OAuthPKCEService', () => {
   };
 
   const codeVerifier = 'dBjftJeZ4CVP-m502K_6KAkrWEZKEt_zUksnCG94EdM';
-  const validCodeChallenge = crypto
-    .createHash('sha256')
-    .update(codeVerifier)
-    .digest('base64url');
+  const validCodeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -73,6 +70,7 @@ describe('OAuthPKCEService', () => {
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (OAuthPKCEService as any).instance = undefined;
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -95,6 +93,25 @@ describe('OAuthPKCEService', () => {
       email: mockUser.email,
       role: 'authenticated',
     });
+  });
+
+  it('verifies code_challenge using crypto.timingSafeEqual with Buffers', async () => {
+    const timingSafeEqualSpy = vi.spyOn(crypto, 'timingSafeEqual');
+
+    const code = service.createCode({
+      userId: mockUser.id,
+      provider: 'google',
+      codeChallenge: validCodeChallenge,
+    });
+
+    await service.exchangeCode(code, codeVerifier);
+
+    expect(timingSafeEqualSpy).toHaveBeenCalledTimes(1);
+    const [computedBuf, storedBuf] = timingSafeEqualSpy.mock.calls[0];
+    expect(Buffer.isBuffer(computedBuf)).toBe(true);
+    expect(Buffer.isBuffer(storedBuf)).toBe(true);
+    expect(computedBuf.equals(Buffer.from(validCodeChallenge))).toBe(true);
+    expect(storedBuf.equals(Buffer.from(validCodeChallenge))).toBe(true);
   });
 
   it('rejects exchange when the code is not found or already used (single-use token)', async () => {
@@ -218,7 +235,9 @@ describe('OAuthPKCEService', () => {
     const midChar = validCodeChallenge[midIndex];
     const modifiedMidChar = midChar === 'a' ? 'b' : 'a';
     const nearMissChallenge =
-      validCodeChallenge.slice(0, midIndex) + modifiedMidChar + validCodeChallenge.slice(midIndex + 1);
+      validCodeChallenge.slice(0, midIndex) +
+      modifiedMidChar +
+      validCodeChallenge.slice(midIndex + 1);
 
     expect(nearMissChallenge.length).toBe(validCodeChallenge.length);
     expect(nearMissChallenge).not.toBe(validCodeChallenge);
