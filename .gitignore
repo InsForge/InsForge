@@ -39,3 +39,9 @@ backend/logs/*
 # Turborepo
 .turbo
 .gstack/
+
+# Local agent tooling (SDD / Gentle AI / Scryer / CodeGraph)
+.atl/
+.scryer/
+.cursor/
+.codegraph/
