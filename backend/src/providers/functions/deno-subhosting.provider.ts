@@ -1058,6 +1058,12 @@ ${routes}
 const MAX_DEPTH = 8;
 const depthStore = new AsyncLocalStorage<number>();
 
+// Log only a media type. Header parameters may contain user-provided values.
+const safeContentType = (value: string | null): string | null => {
+  const mediaType = value?.split(";", 1)[0].trim().toLowerCase();
+  return mediaType && /^[a-z0-9.+-]+\\/[a-z0-9.+-]+$/.test(mediaType) ? mediaType : null;
+};
+
 const dispatch = async (req: Request): Promise<Response> => {
   const currentDepth = depthStore.getStore() ?? 0;
   if (currentDepth >= MAX_DEPTH) {
@@ -1098,44 +1104,63 @@ const dispatch = async (req: Request): Promise<Response> => {
       });
     }
 
+    // A server-generated ID lets callers correlate an invocation with its log
+    // without trusting a client-supplied ID or retaining the request body.
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
+    let status = 500;
+    let responseContentType: string | null = null;
+    let errorName: string | undefined;
+
     // Execute function
     try {
       const handler = routes[slug];
 
+      const requestHeaders = new Headers(req.headers);
+      requestHeaders.set("x-insforge-request-id", requestId);
+
       // If there's a subpath, create modified request
       const subpath = pathParts.slice(1).join("/");
-      let funcReq = req;
+      let funcReq = new Request(req, { headers: requestHeaders });
       if (subpath) {
         const newUrl = new URL(req.url);
         newUrl.pathname = "/" + subpath;
-        funcReq = new Request(newUrl.toString(), req);
+        funcReq = new Request(newUrl.toString(), funcReq);
       }
 
-      const startTime = Date.now();
       const response = await handler(funcReq);
-      const duration = Date.now() - startTime;
-
-      // Structured JSON log — matches InsForge backend log format:
-      // { timestamp, slug, method, status, duration }. Captured by the
-      // Deno Deploy platform from stdout and surfaced as app logs.
-      console.log(JSON.stringify({
-        timestamp: new Date().toISOString(),
-        slug,
-        method: req.method,
-        status: response.status,
-        duration: duration + "ms",
-      }));
+      status = response.status;
+      responseContentType = safeContentType(response.headers.get("content-type"));
+      // Some platform Responses have immutable headers; preserve those as-is.
+      try { response.headers.set("x-insforge-request-id", requestId); } catch { /* immutable */ }
 
       return response;
     } catch (error) {
-      console.error("Function error:", error);
+      errorName = error instanceof TypeError ? "TypeError" : "Error";
+      responseContentType = "application/json";
       return new Response(JSON.stringify({
         error: "Function execution failed",
         message: (error as Error).message,
       }), {
         status: 500,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json", "x-insforge-request-id": requestId }
       });
+    } finally {
+      // Request/response bodies, query strings, and credential headers are never logged.
+      // Deno Deploy captures this structured line and exposes it through function.logs.
+      console.log(JSON.stringify({
+        event: "function.invocation",
+        timestamp: new Date().toISOString(),
+        level: status >= 500 ? "error" : "info",
+        requestId,
+        slug,
+        method: req.method,
+        status,
+        durationMs: Date.now() - startTime,
+        request: { contentType: safeContentType(req.headers.get("content-type")) },
+        response: { contentType: responseContentType },
+        ...(errorName ? { error: { name: errorName } } : {}),
+      }));
     }
   });
 };
