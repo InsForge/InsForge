@@ -994,7 +994,7 @@
     "disableSignupsLabel": "停用新使用者註冊",
     "disableSignupsDescription": "開啟後將拒絕公開註冊，只有現有使用者可以登入。專案管理員仍可透過儀表板或 API 建立使用者。",
     "allowedRedirectUrlsLabel": "允許的重新導向 URL",
-    "allowedRedirectUrlsDescription": "驗證流程允許的重新導向目的地。留空表示允許所有 URL。",
+    "allowedRedirectUrlsDescription": "新增應用程式的完整回呼 URL（包含路徑），或使用 https://app.example.com/** 等模式。應用程式改用自訂網域後，請更新此清單。留空表示允許所有 URL。",
     "invalidUrl": "無效的 URL",
     "addUrl": "新增 URL",
     "emailVerificationProviderRequired": "電子郵件驗證設定需要 InsForge Cloud 或已啟用的自訂 SMTP。",
