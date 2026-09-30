@@ -29,6 +29,8 @@ create table documents (
 
 在服务器端生成嵌入并插入。
 
+`OPENROUTER_API_KEY` 是 InsForge 为 [Model Gateway](/core-concepts/ai/overview) 配置的密钥。请从仪表板（Model Gateway → API Key）复制活动密钥，将其存储到仅限服务器的 `OPENROUTER_API_KEY` 环境变量中，切勿在浏览器代码中暴露它。
+
 ```typescript
 import OpenAI from 'openai';
 import { createClient } from '@insforge/sdk';
