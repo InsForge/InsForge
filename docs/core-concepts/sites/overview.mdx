@@ -58,6 +58,18 @@ npx @insforge/cli deployments deploy ./frontend
 
 Deploy React, Vue, Svelte, Next.js, static sites, and other frontend projects. InsForge sends the source files to Vercel, where framework detection and project files such as `package.json` and `vercel.json` decide how the app builds.
 
+### Function regions
+
+Server-side code such as Next.js API routes and server-rendered pages runs in the Vercel project's default region, which is `iad1` (Washington, D.C.) unless it has been changed. Put your functions near your users or your database by listing region IDs in `vercel.json`:
+
+```json
+{
+  "regions": ["sin1"]
+}
+```
+
+The setting only moves server-side code; static assets are always served from Vercel's global CDN. See [Vercel's region list](https://vercel.com/docs/regions#region-list) for the available IDs.
+
 ### Environment variables
 
 Manage provider environment variables from the dashboard. Use public prefixes such as `VITE_` or `NEXT_PUBLIC_` only for values that are safe to expose in browser code.
