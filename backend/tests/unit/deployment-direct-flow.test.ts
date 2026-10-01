@@ -429,7 +429,7 @@ describe('DeploymentService direct deployment flow', () => {
       uploadedAt,
     });
 
-    const uploadFile = async (path: string, content: Buffer) => {
+    const uploadFile = async (path: string, content: Buffer, { drain = true } = {}) => {
       mockPool.query.mockImplementation(async (sql: string) => {
         if (sql.includes('FROM deployments.runs')) return { rows: [runRow({})] };
         if (sql.includes('UPDATE deployments.files'))
@@ -439,8 +439,10 @@ describe('DeploymentService direct deployment flow', () => {
       });
       mockVercelProvider.uploadFileStream.mockImplementationOnce(
         async (input: { content: Readable; sha: string }) => {
-          for await (const chunk of input.content) {
-            void chunk;
+          if (drain) {
+            for await (const chunk of input.content) {
+              void chunk;
+            }
           }
           return input.sha;
         }
@@ -495,6 +497,16 @@ describe('DeploymentService direct deployment flow', () => {
       expect(queryIndex('vercelConfigRegions')).toBeLessThan(
         queryIndex('UPDATE deployments.files')
       );
+    });
+
+    it('records regions when Vercel accepts vercel.json without reading the body', async () => {
+      await uploadFile('vercel.json', Buffer.from('{"regions":["sin1"]}'), { drain: false });
+
+      expect(recordRegionsCall()?.[1]).toEqual([
+        deploymentId,
+        'vercel.json',
+        JSON.stringify(['sin1']),
+      ]);
     });
 
     it('records nothing when vercel.json has no usable regions', async () => {

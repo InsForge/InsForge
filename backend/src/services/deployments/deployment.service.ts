@@ -2,6 +2,7 @@ import { Pool, type PoolClient } from 'pg';
 import AdmZip from 'adm-zip';
 import crypto from 'crypto';
 import { Transform, type Readable, type TransformCallback } from 'stream';
+import { finished } from 'stream/promises';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import {
   VercelProvider,
@@ -417,22 +418,28 @@ export class DeploymentService {
         lastFileUploadStartedAt: new Date().toISOString(),
       });
 
+      const capturesConfig = isVercelConfigPath(file.path);
       const vercelConfig: { content: Buffer | null } = { content: null };
+      const validatedStream = this.createValidatedFileStream(
+        content,
+        file.sha,
+        file.size,
+        capturesConfig
+          ? (validated) => {
+              vercelConfig.content = validated;
+            }
+          : undefined
+      );
       await this.vercelProvider.uploadFileStream({
-        content: this.createValidatedFileStream(
-          content,
-          file.sha,
-          file.size,
-          isVercelConfigPath(file.path)
-            ? (validated) => {
-                vercelConfig.content = validated;
-              }
-            : undefined
-        ),
+        content: validatedStream,
         sha: file.sha,
         size: file.size,
         signal: options.signal,
       });
+      if (capturesConfig) {
+        // Vercel can answer 409 for a known digest before reading the body, so drain it here.
+        await finished(validatedStream.resume(), { readable: false });
+      }
 
       const configRegions = vercelConfig.content
         ? parseVercelConfigRegions(vercelConfig.content)
