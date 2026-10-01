@@ -53,7 +53,7 @@ Important:
 - `sourceDirectory` must be an absolute path.
 - Upload app source files, not only `dist`, unless the project is intentionally a plain static site.
 - Include framework files needed by Vercel, such as `package.json`, lock file, framework config, and `vercel.json` when needed.
-- Server functions run in Vercel's `iad1` (Washington, D.C.) by default. To run them elsewhere, set `regions` in `vercel.json` at the app root, for example `{ "regions": ["sin1"] }`, or pass `regions` to `POST /api/deployments/:id/start`, which takes precedence.
+- Server functions run in the Vercel project's default region, usually `iad1` (Washington, D.C.). To run them elsewhere, set `regions` in `vercel.json` at the app root, for example `{ "regions": ["sin1"] }`.
 - Prefix browser-exposed variables correctly, for example `VITE_` for Vite and `NEXT_PUBLIC_` for Next.js.
 - Do not put service-role keys, admin tokens, or private provider keys in browser-exposed variables.
 - Tailwind projects should stay on Tailwind CSS 3.4 unless the app already supports v4.

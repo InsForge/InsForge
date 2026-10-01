@@ -43,7 +43,6 @@ export interface VercelDeploymentResult {
   readyState: string;
   name: string;
   createdAt: Date;
-  regions?: string[];
   error?: {
     code: string;
     message: string;
@@ -408,7 +407,6 @@ export class VercelProvider {
               files: options.files,
               projectSettings: options.projectSettings,
               meta: options.meta,
-              regions: options.regions,
             },
             { headers: { Authorization: `Bearer ${credentials.token}` } }
           ),
@@ -430,7 +428,6 @@ export class VercelProvider {
         readyState: deployment.readyState,
         name: deployment.name,
         createdAt: new Date(deployment.createdAt),
-        regions: deployment.regions,
       };
     } catch (error) {
       if (error instanceof AppError) {
@@ -1266,7 +1263,6 @@ export class VercelProvider {
         readyState: deployment.readyState,
         name: deployment.name,
         createdAt: new Date(deployment.createdAt),
-        regions: deployment.regions,
       };
     } catch (error) {
       logger.error('Failed to create Vercel deployment with files', {

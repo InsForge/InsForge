@@ -58,15 +58,15 @@ const getVercelConfigPath = (rootDirectory?: string | null) => {
   return root === '' || root === '.' ? VERCEL_CONFIG_FILE : `${root}/${VERCEL_CONFIG_FILE}`;
 };
 
-const parseVercelConfigRegions = (content: Buffer): string[] | null => {
+const parseVercelConfigRegions = (content: Buffer): string[] | undefined => {
   let config: unknown;
   try {
     config = JSON.parse(content.toString('utf8'));
   } catch {
-    return null;
+    return undefined;
   }
   if (typeof config !== 'object' || config === null || !('regions' in config)) {
-    return null;
+    return undefined;
   }
   const { regions } = config;
   if (
@@ -74,7 +74,7 @@ const parseVercelConfigRegions = (content: Buffer): string[] | null => {
     regions.length === 0 ||
     !regions.every((region): region is string => typeof region === 'string')
   ) {
-    return null;
+    return undefined;
   }
   return regions;
 };
@@ -434,6 +434,13 @@ export class DeploymentService {
         signal: options.signal,
       });
 
+      const configRegions = vercelConfig.content
+        ? parseVercelConfigRegions(vercelConfig.content)
+        : undefined;
+      if (configRegions) {
+        await this.recordVercelConfigRegions(id, file.path, configRegions);
+      }
+
       const updateResult = await this.getPool().query<DeploymentFileRow>(
         `UPDATE deployments.files
          SET uploaded_at = NOW()
@@ -455,13 +462,6 @@ export class DeploymentService {
           500,
           ERROR_CODES.INTERNAL_ERROR
         );
-      }
-
-      const configRegions = vercelConfig.content
-        ? parseVercelConfigRegions(vercelConfig.content)
-        : null;
-      if (configRegions) {
-        await this.recordVercelConfigRegions(id, uploadedFile.path, configRegions);
       }
 
       await this.updateDeploymentStatus(id, DeploymentStatus.UPLOADING, {
@@ -522,12 +522,12 @@ export class DeploymentService {
       const uploadMode = this.getUploadMode(deployment, files.length);
 
       if (uploadMode === 'direct') {
-        return await this.startDirectDeployment(
-          id,
-          input,
-          files,
-          this.getRecordedVercelConfigRegions(deployment, input)
-        );
+        const recorded = deployment.metadata?.vercelConfigRegions as
+          | Record<string, string[]>
+          | undefined;
+        const regions =
+          input.regions ?? recorded?.[getVercelConfigPath(input.projectSettings?.rootDirectory)];
+        return await this.startDirectDeployment(id, { ...input, regions }, files);
       }
 
       return await this.startLegacyDeployment(id, input);
@@ -559,25 +559,10 @@ export class DeploymentService {
     return registeredFileCount > 0 ? 'direct' : 'legacy';
   }
 
-  private getRecordedVercelConfigRegions(
-    deployment: DeploymentRecord,
-    input: StartDeploymentRequest
-  ): string[] | null {
-    const recorded = deployment.metadata?.vercelConfigRegions;
-    if (typeof recorded !== 'object' || recorded === null) {
-      return null;
-    }
-    const regions = (recorded as Record<string, unknown>)[
-      getVercelConfigPath(input.projectSettings?.rootDirectory)
-    ];
-    return Array.isArray(regions) ? (regions as string[]) : null;
-  }
-
   private async startDirectDeployment(
     id: string,
     input: StartDeploymentRequest,
-    files: DeploymentFileRow[],
-    configRegions: string[] | null
+    files: DeploymentFileRow[]
   ): Promise<DeploymentRecord> {
     if (files.length === 0) {
       throw new AppError(
@@ -608,13 +593,7 @@ export class DeploymentService {
       size: file.size,
     }));
 
-    return await this.createVercelDeploymentFromUploadedFiles(
-      id,
-      input,
-      uploadedFiles,
-      'direct',
-      configRegions
-    );
+    return await this.createVercelDeploymentFromUploadedFiles(id, input, uploadedFiles, 'direct');
   }
 
   private async startLegacyDeployment(
@@ -668,15 +647,15 @@ export class DeploymentService {
 
     const configPath = getVercelConfigPath(input.projectSettings?.rootDirectory);
     const configFile = files.find((file) => file.path === configPath);
-    const configRegions = configFile ? parseVercelConfigRegions(configFile.content) : null;
+    const regions =
+      input.regions ?? (configFile ? parseVercelConfigRegions(configFile.content) : undefined);
 
     const uploadedFiles = await this.vercelProvider.uploadFiles(files);
     const deployment = await this.createVercelDeploymentFromUploadedFiles(
       id,
-      input,
+      { ...input, regions },
       uploadedFiles,
-      'legacy',
-      configRegions
+      'legacy'
     );
 
     await this.s3Provider.deleteObject(DEPLOYMENT_BUCKET, getDeploymentKey(id)).catch((error) => {
@@ -721,8 +700,7 @@ export class DeploymentService {
     id: string,
     input: StartDeploymentRequest,
     uploadedFiles: Array<{ file: string; sha: string; size: number }>,
-    uploadMode: 'direct' | 'legacy',
-    configRegions: string[] | null
+    uploadMode: 'direct' | 'legacy'
   ): Promise<DeploymentRecord> {
     const totalSizeBytes = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
 
@@ -730,7 +708,7 @@ export class DeploymentService {
     const vercelDeployment = await this.vercelProvider.createDeploymentWithFiles(uploadedFiles, {
       projectSettings: input.projectSettings,
       meta: input.meta,
-      regions: input.regions ?? configRegions ?? undefined,
+      regions: input.regions,
     });
 
     const vercelStatus = (
@@ -767,7 +745,6 @@ export class DeploymentService {
           totalSizeBytes,
           envVarKeys,
           uploadMode,
-          regions: vercelDeployment.regions,
           startedAt: new Date().toISOString(),
         }),
         id,

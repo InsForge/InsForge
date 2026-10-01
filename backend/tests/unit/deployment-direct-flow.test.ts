@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import AdmZip from 'adm-zip';
 import { createHash } from 'crypto';
 import { Readable } from 'stream';
 
@@ -14,6 +15,7 @@ const { mockPool, mockClient, mockVercelProvider, mockIsCloudEnvironment } = vi.
   mockVercelProvider: {
     isConfigured: vi.fn(() => true),
     uploadFileStream: vi.fn(),
+    uploadFiles: vi.fn(),
     createDeploymentWithFiles: vi.fn(),
     getEnvironmentVariableKeys: vi.fn(),
     listCustomDomains: vi.fn(),
@@ -46,7 +48,7 @@ vi.mock('../../src/providers/storage/s3.provider.js', () => ({
 
 import { DeploymentService } from '../../src/services/deployments/deployment.service';
 import { DeploymentStatus } from '../../src/types/deployments';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { ERROR_CODES, type StartDeploymentRequest } from '@insforge/shared-schemas';
 
 describe('DeploymentService direct deployment flow', () => {
   beforeEach(() => {
@@ -428,12 +430,13 @@ describe('DeploymentService direct deployment flow', () => {
     });
 
     const uploadFile = async (path: string, content: Buffer) => {
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [runRow({})] })
-        .mockResolvedValueOnce({ rows: [fileRow(path, content, null)] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [fileRow(path, content, new Date())] })
-        .mockResolvedValue({ rows: [] });
+      mockPool.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('FROM deployments.runs')) return { rows: [runRow({})] };
+        if (sql.includes('UPDATE deployments.files'))
+          return { rows: [fileRow(path, content, new Date())] };
+        if (sql.includes('FROM deployments.files')) return { rows: [fileRow(path, content, null)] };
+        return { rows: [] };
+      });
       mockVercelProvider.uploadFileStream.mockImplementationOnce(
         async (input: { content: Readable; sha: string }) => {
           for await (const chunk of input.content) {
@@ -449,19 +452,12 @@ describe('DeploymentService direct deployment flow', () => {
       );
     };
 
-    const recordRegionsCall = () =>
-      mockPool.query.mock.calls.find((call) => String(call[0]).includes('vercelConfigRegions'));
+    const queryIndex = (fragment: string) =>
+      mockPool.query.mock.calls.findIndex((call) => String(call[0]).includes(fragment));
 
-    const startWithRecorded = async (
-      vercelConfigRegions: Record<string, string[]>,
-      input: Parameters<DeploymentService['startDeployment']>[1] = {}
-    ) => {
-      const content = Buffer.from('x');
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [runRow({ vercelConfigRegions })] })
-        .mockResolvedValueOnce({ rows: [fileRow('index.html', content, new Date())] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [runRow({})] });
+    const recordRegionsCall = () => mockPool.query.mock.calls[queryIndex('vercelConfigRegions')];
+
+    const mockVercelCreate = () => {
       mockVercelProvider.createDeploymentWithFiles.mockResolvedValueOnce({
         id: 'dpl_1',
         url: null,
@@ -469,14 +465,26 @@ describe('DeploymentService direct deployment flow', () => {
         readyState: 'BUILDING',
         name: 'deployment',
         createdAt: new Date(),
-        regions: ['sin1'],
       });
       mockVercelProvider.getEnvironmentVariableKeys.mockResolvedValueOnce([]);
+    };
+
+    const startWithRecorded = async (
+      vercelConfigRegions: Record<string, string[]>,
+      input: StartDeploymentRequest = {}
+    ) => {
+      const content = Buffer.from('x');
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [runRow({ vercelConfigRegions })] })
+        .mockResolvedValueOnce({ rows: [fileRow('index.html', content, new Date())] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [runRow({})] });
+      mockVercelCreate();
       await DeploymentService.getInstance().startDeployment(deploymentId, input);
       return mockVercelProvider.createDeploymentWithFiles.mock.calls[0][1];
     };
 
-    it('records regions from an uploaded vercel.json by path', async () => {
+    it('records regions from an uploaded vercel.json by path before marking it uploaded', async () => {
       await uploadFile('apps/web/vercel.json', Buffer.from('{"regions":["sin1","bom1"]}'));
 
       expect(recordRegionsCall()?.[1]).toEqual([
@@ -484,23 +492,30 @@ describe('DeploymentService direct deployment flow', () => {
         'apps/web/vercel.json',
         JSON.stringify(['sin1', 'bom1']),
       ]);
+      expect(queryIndex('vercelConfigRegions')).toBeLessThan(
+        queryIndex('UPDATE deployments.files')
+      );
     });
 
     it('records nothing when vercel.json has no usable regions', async () => {
-      await uploadFile('vercel.json', Buffer.from('{"rewrites":[]}'));
-      await uploadFile('vercel.json', Buffer.from('{not json'));
+      for (const config of ['{"rewrites":[]}', '{not json', '{"regions":[]}', '{"regions":[1]}']) {
+        await uploadFile('vercel.json', Buffer.from(config));
+      }
 
       expect(recordRegionsCall()).toBeUndefined();
     });
 
     it('does not inspect files other than vercel.json', async () => {
-      await uploadFile('src/vercel.json.bak', Buffer.from('{"regions":["sin1"]}'));
+      await uploadFile('src/myvercel.json', Buffer.from('{"regions":["sin1"]}'));
 
       expect(recordRegionsCall()).toBeUndefined();
     });
 
     it('forwards the root vercel.json regions when starting', async () => {
-      const options = await startWithRecorded({ 'vercel.json': ['sin1'] });
+      const options = await startWithRecorded(
+        { 'vercel.json': ['sin1'] },
+        { projectSettings: { rootDirectory: '.' } }
+      );
 
       expect(options).toMatchObject({ regions: ['sin1'] });
     });
@@ -524,6 +539,31 @@ describe('DeploymentService direct deployment flow', () => {
       const options = await startWithRecorded({});
 
       expect(options?.regions).toBeUndefined();
+    });
+
+    it('forwards vercel.json regions from a legacy zip upload', async () => {
+      const zip = new AdmZip();
+      zip.addFile('vercel.json', Buffer.from('{"regions":["sin1"]}'));
+      const service = DeploymentService.getInstance();
+      // @ts-expect-error injecting the S3 provider that legacy deployments read the zip from
+      service.s3Provider = {
+        verifyObjectExists: vi.fn().mockResolvedValue({ exists: true }),
+        getObject: vi.fn().mockResolvedValue(zip.toBuffer()),
+        deleteObject: vi.fn().mockResolvedValue(undefined),
+      };
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [runRow({ uploadMode: 'legacy' })] })
+        .mockResolvedValue({ rows: [runRow({})] });
+      mockVercelProvider.uploadFiles.mockResolvedValueOnce([
+        { file: 'vercel.json', sha: 'a'.repeat(40), size: 20 },
+      ]);
+      mockVercelCreate();
+
+      await service.startDeployment(deploymentId);
+
+      expect(mockVercelProvider.createDeploymentWithFiles.mock.calls[0][1]).toMatchObject({
+        regions: ['sin1'],
+      });
     });
   });
 });
