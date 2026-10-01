@@ -136,16 +136,39 @@ describe('GitHub OAuth with a custom application domain (#1855)', () => {
     expect(mocks.generateOAuthUrl).not.toHaveBeenCalled();
   });
 
-  it('rejects a lookalike domain even when the request Origin is that domain', async () => {
+  it('rejects a callback path when the allowlist contains only its origin', async () => {
+    mocks.query.mockResolvedValue({
+      rows: [{ allowedRedirectUrls: ['https://app.customer.example'] }],
+    });
+
     const response = await request(app)
       .get('/api/auth/oauth/github')
-      .set('Origin', 'https://app.customer.example.attacker.example')
-      .query({
-        redirect_uri: 'https://app.customer.example.attacker.example/auth/callback',
-        code_challenge: CODE_CHALLENGE,
-      });
+      .query({ redirect_uri: REDIRECT_URI, code_challenge: CODE_CHALLENGE });
 
     expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: ERROR_CODES.INVALID_INPUT,
+      message: `${REDIRECT_URI} is not in the allowed redirect URLs`,
+    });
+    expect(mocks.generateOAuthUrl).not.toHaveBeenCalled();
+  });
+
+  it('rejects a lookalike domain despite an allowed custom-domain path wildcard', async () => {
+    mocks.query.mockResolvedValue({
+      rows: [{ allowedRedirectUrls: ['https://app.customer.example/**'] }],
+    });
+
+    const response = await request(app).get('/api/auth/oauth/github').query({
+      redirect_uri: 'https://app.customer.example.attacker.example/auth/callback',
+      code_challenge: CODE_CHALLENGE,
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: ERROR_CODES.INVALID_INPUT,
+      message:
+        'https://app.customer.example.attacker.example/auth/callback is not in the allowed redirect URLs',
+    });
     expect(mocks.generateOAuthUrl).not.toHaveBeenCalled();
   });
 
