@@ -163,6 +163,10 @@ COPY --from=build --chown=node:node /app/packages/shared-schemas/src ./packages/
 COPY --from=build --chown=node:node /app/backend/package.json ./backend/package.json
 COPY --from=build --chown=node:node /app/package.json ./package.json
 
+# The runner ships only the root node_modules, so a backend dependency npm nested under backend/ is missing at startup.
+COPY docker/check-runtime-deps.mjs /tmp/check-runtime-deps.mjs
+RUN cd /app/dist && node --input-type=module -e "$(cat /tmp/check-runtime-deps.mjs)" && rm /tmp/check-runtime-deps.mjs
+
 # Deliberately still root at this point. The entrypoint reads the group off a mounted
 # Docker socket — a host-specific id that cannot be baked in and should not have to be
 # supplied — then execs the command as `node`. Nothing in the app runs as root.
