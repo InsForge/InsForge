@@ -48,6 +48,37 @@ export type {
 const DEPLOYMENT_BUCKET = '_deployments';
 const getDeploymentKey = (id: string) => `${id}.zip`;
 
+const VERCEL_CONFIG_FILE = 'vercel.json';
+
+const isVercelConfigPath = (filePath: string) =>
+  filePath === VERCEL_CONFIG_FILE || filePath.endsWith(`/${VERCEL_CONFIG_FILE}`);
+
+const getVercelConfigPath = (rootDirectory?: string | null) => {
+  const root = (rootDirectory ?? '').replace(/^(\.\/)+/, '').replace(/\/+$/, '');
+  return root === '' || root === '.' ? VERCEL_CONFIG_FILE : `${root}/${VERCEL_CONFIG_FILE}`;
+};
+
+const parseVercelConfigRegions = (content: Buffer): string[] | null => {
+  let config: unknown;
+  try {
+    config = JSON.parse(content.toString('utf8'));
+  } catch {
+    return null;
+  }
+  if (typeof config !== 'object' || config === null || !('regions' in config)) {
+    return null;
+  }
+  const { regions } = config;
+  if (
+    !Array.isArray(regions) ||
+    regions.length === 0 ||
+    !regions.every((region): region is string => typeof region === 'string')
+  ) {
+    return null;
+  }
+  return regions;
+};
+
 interface DeploymentFileRow {
   fileId: string;
   deploymentId: string;
@@ -386,8 +417,18 @@ export class DeploymentService {
         lastFileUploadStartedAt: new Date().toISOString(),
       });
 
+      const vercelConfig: { content: Buffer | null } = { content: null };
       await this.vercelProvider.uploadFileStream({
-        content: this.createValidatedFileStream(content, file.sha, file.size),
+        content: this.createValidatedFileStream(
+          content,
+          file.sha,
+          file.size,
+          isVercelConfigPath(file.path)
+            ? (validated) => {
+                vercelConfig.content = validated;
+              }
+            : undefined
+        ),
         sha: file.sha,
         size: file.size,
         signal: options.signal,
@@ -414,6 +455,13 @@ export class DeploymentService {
           500,
           ERROR_CODES.INTERNAL_ERROR
         );
+      }
+
+      const configRegions = vercelConfig.content
+        ? parseVercelConfigRegions(vercelConfig.content)
+        : null;
+      if (configRegions) {
+        await this.recordVercelConfigRegions(id, uploadedFile.path, configRegions);
       }
 
       await this.updateDeploymentStatus(id, DeploymentStatus.UPLOADING, {
@@ -474,7 +522,12 @@ export class DeploymentService {
       const uploadMode = this.getUploadMode(deployment, files.length);
 
       if (uploadMode === 'direct') {
-        return await this.startDirectDeployment(id, input, files);
+        return await this.startDirectDeployment(
+          id,
+          input,
+          files,
+          this.getRecordedVercelConfigRegions(deployment, input)
+        );
       }
 
       return await this.startLegacyDeployment(id, input);
@@ -506,10 +559,25 @@ export class DeploymentService {
     return registeredFileCount > 0 ? 'direct' : 'legacy';
   }
 
+  private getRecordedVercelConfigRegions(
+    deployment: DeploymentRecord,
+    input: StartDeploymentRequest
+  ): string[] | null {
+    const recorded = deployment.metadata?.vercelConfigRegions;
+    if (typeof recorded !== 'object' || recorded === null) {
+      return null;
+    }
+    const regions = (recorded as Record<string, unknown>)[
+      getVercelConfigPath(input.projectSettings?.rootDirectory)
+    ];
+    return Array.isArray(regions) ? (regions as string[]) : null;
+  }
+
   private async startDirectDeployment(
     id: string,
     input: StartDeploymentRequest,
-    files: DeploymentFileRow[]
+    files: DeploymentFileRow[],
+    configRegions: string[] | null
   ): Promise<DeploymentRecord> {
     if (files.length === 0) {
       throw new AppError(
@@ -540,7 +608,13 @@ export class DeploymentService {
       size: file.size,
     }));
 
-    return await this.createVercelDeploymentFromUploadedFiles(id, input, uploadedFiles, 'direct');
+    return await this.createVercelDeploymentFromUploadedFiles(
+      id,
+      input,
+      uploadedFiles,
+      'direct',
+      configRegions
+    );
   }
 
   private async startLegacyDeployment(
@@ -592,12 +666,17 @@ export class DeploymentService {
       await this.vercelProvider.upsertEnvironmentVariables(input.envVars);
     }
 
+    const configPath = getVercelConfigPath(input.projectSettings?.rootDirectory);
+    const configFile = files.find((file) => file.path === configPath);
+    const configRegions = configFile ? parseVercelConfigRegions(configFile.content) : null;
+
     const uploadedFiles = await this.vercelProvider.uploadFiles(files);
     const deployment = await this.createVercelDeploymentFromUploadedFiles(
       id,
       input,
       uploadedFiles,
-      'legacy'
+      'legacy',
+      configRegions
     );
 
     await this.s3Provider.deleteObject(DEPLOYMENT_BUCKET, getDeploymentKey(id)).catch((error) => {
@@ -642,13 +721,16 @@ export class DeploymentService {
     id: string,
     input: StartDeploymentRequest,
     uploadedFiles: Array<{ file: string; sha: string; size: number }>,
-    uploadMode: 'direct' | 'legacy'
+    uploadMode: 'direct' | 'legacy',
+    configRegions: string[] | null
   ): Promise<DeploymentRecord> {
     const totalSizeBytes = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
 
+    // API deployments ignore vercel.json `regions`; Vercel only reads them from the request.
     const vercelDeployment = await this.vercelProvider.createDeploymentWithFiles(uploadedFiles, {
       projectSettings: input.projectSettings,
       meta: input.meta,
+      regions: input.regions ?? configRegions ?? undefined,
     });
 
     const vercelStatus = (
@@ -685,6 +767,7 @@ export class DeploymentService {
           totalSizeBytes,
           envVarKeys,
           uploadMode,
+          regions: vercelDeployment.regions,
           startedAt: new Date().toISOString(),
         }),
         id,
@@ -851,8 +934,13 @@ export class DeploymentService {
     };
   }
 
-  private createFileValidationTransform(expectedSha: string, expectedSize: number): Transform {
+  private createFileValidationTransform(
+    expectedSha: string,
+    expectedSize: number,
+    onValidated?: (content: Buffer) => void
+  ): Transform {
     const hash = crypto.createHash('sha1');
+    const captured: Buffer[] = [];
     let receivedBytes = 0;
 
     return new Transform({
@@ -871,6 +959,9 @@ export class DeploymentService {
         }
 
         hash.update(chunk);
+        if (onValidated) {
+          captured.push(chunk);
+        }
         callback(null, chunk);
       },
       flush(callback: TransformCallback) {
@@ -897,6 +988,7 @@ export class DeploymentService {
           return;
         }
 
+        onValidated?.(Buffer.concat(captured));
         callback();
       },
     });
@@ -905,9 +997,26 @@ export class DeploymentService {
   private createValidatedFileStream(
     content: Readable,
     expectedSha: string,
-    expectedSize: number
+    expectedSize: number,
+    onValidated?: (content: Buffer) => void
   ): Readable {
-    return content.pipe(this.createFileValidationTransform(expectedSha, expectedSize));
+    return content.pipe(this.createFileValidationTransform(expectedSha, expectedSize, onValidated));
+  }
+
+  private async recordVercelConfigRegions(
+    id: string,
+    configPath: string,
+    regions: string[]
+  ): Promise<void> {
+    await this.getPool().query(
+      `UPDATE deployments.runs
+       SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
+         'vercelConfigRegions',
+         COALESCE(metadata->'vercelConfigRegions', '{}'::jsonb) || jsonb_build_object($2::text, $3::jsonb)
+       )
+       WHERE id = $1`,
+      [id, configPath, JSON.stringify(regions)]
+    );
   }
 
   private async getDeploymentFileById(

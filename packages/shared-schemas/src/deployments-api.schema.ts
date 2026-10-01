@@ -100,6 +100,14 @@ export const startDeploymentRequestSchema = z.object({
   projectSettings: projectSettingsSchema.optional(),
   envVars: z.array(envVarSchema).optional(),
   meta: z.record(z.string()).optional(),
+  /**
+   * Vercel region IDs (for example `sin1`) the deployment's functions run in.
+   * Takes precedence over `regions` in the uploaded `vercel.json`.
+   */
+  regions: z
+    .array(z.string().regex(/^[a-z]{3}\d$/, 'region must be a Vercel region ID such as sin1'))
+    .min(1)
+    .optional(),
 });
 
 /**
