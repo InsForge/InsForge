@@ -438,7 +438,7 @@ export class DeploymentService {
       });
       if (capturesConfig) {
         // Vercel can answer 409 for a known digest before reading the body, so drain it here.
-        await finished(validatedStream.resume(), { readable: false });
+        await finished(validatedStream.resume(), { readable: false, signal: options.signal });
       }
 
       const configRegions = vercelConfig.content

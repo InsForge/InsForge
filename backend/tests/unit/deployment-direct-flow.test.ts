@@ -509,6 +509,30 @@ describe('DeploymentService direct deployment flow', () => {
       ]);
     });
 
+    it('stops waiting for an unread vercel.json when the client disconnects', async () => {
+      const content = Buffer.from('{"regions":["sin1"]}');
+      mockPool.query.mockResolvedValueOnce({ rows: [runRow({})] }).mockResolvedValue({
+        rows: [fileRow('vercel.json', content, null)],
+      });
+      mockVercelProvider.uploadFileStream.mockImplementationOnce(
+        async (input: { sha: string }) => input.sha
+      );
+      const disconnect = new AbortController();
+      const neverEnds = new Readable({ read() {} });
+      neverEnds.push(content.subarray(0, 4));
+
+      const upload = DeploymentService.getInstance().uploadDeploymentFileContent(
+        deploymentId,
+        fileId,
+        neverEnds,
+        { signal: disconnect.signal }
+      );
+      disconnect.abort();
+
+      await expect(upload).rejects.toThrow();
+      expect(recordRegionsCall()).toBeUndefined();
+    });
+
     it('records nothing when vercel.json has no usable regions', async () => {
       for (const config of ['{"rewrites":[]}', '{not json', '{"regions":[]}', '{"regions":[1]}']) {
         await uploadFile('vercel.json', Buffer.from(config));
