@@ -17,4 +17,5 @@ export const LOCAL_STORAGE_KEYS = {
 
 export const LOCAL_STORAGE_KEY_PREFIXES = {
   pageSize: 'insforge-page-size',
+  createTableDraft: 'insforge-create-table-draft',
 } as const;
