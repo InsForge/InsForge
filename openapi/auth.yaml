@@ -1371,6 +1371,8 @@ paths:
                     type: string
                 useSharedKey:
                   type: boolean
+                  description: >-
+                    Use InsForge Cloud shared OAuth keys instead of project credentials. Supported for google, github, discord, linkedin, facebook, apple and microsoft only; any other provider is rejected with 400 AUTH_OAUTH_CONFIG_ERROR.
       responses:
         '200':
           description: OAuth configuration created
@@ -1379,7 +1381,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/OAuthConfig'
         '400':
-          description: Invalid request
+          description: Invalid request, or useSharedKey requested for a provider without shared-key support
         '401':
           description: Unauthorized
         '403':
@@ -1460,6 +1462,8 @@ paths:
                     type: string
                 useSharedKey:
                   type: boolean
+                  description: >-
+                    Use InsForge Cloud shared OAuth keys instead of project credentials. Supported for google, github, discord, linkedin, facebook, apple and microsoft only; any other provider is rejected with 400 AUTH_OAUTH_CONFIG_ERROR.
       responses:
         '200':
           description: Configuration updated
@@ -1639,7 +1643,10 @@ paths:
   /api/auth/oauth/shared/callback/{state}:
     get:
       summary: Shared OAuth callback handler
-      description: Handles OAuth callbacks from InsForge Cloud shared OAuth
+      description: >-
+        Handles OAuth callbacks from InsForge Cloud shared OAuth. Accepted only for a
+        provider that supports shared keys and is configured to use them; any other
+        provider is rejected with 400 AUTH_OAUTH_CONFIG_ERROR.
       tags:
         - Client
       parameters:
@@ -1672,6 +1679,8 @@ paths:
               schema:
                 type: string
                 format: uri
+        '400':
+          description: Invalid state, or the provider is not configured for InsForge shared OAuth keys
 
   /api/auth/oauth/{provider}/callback:
     get:
