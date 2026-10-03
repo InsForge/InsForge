@@ -50,16 +50,33 @@ const enforceSafeMimeType = async (file: Express.Multer.File) => {
 // deprecated alias for older SDKs); both are read paths.
 const conditionalDownloadAuth = async (req: Request, res: Response, next: NextFunction) => {
   if (req.params.bucketName) {
+    let isPublic: boolean;
     try {
       const storageService = StorageService.getInstance();
-      const isPublic = await storageService.isBucketPublic(req.params.bucketName);
+      isPublic = await storageService.isBucketPublic(req.params.bucketName);
+    } catch (error) {
+      // The visibility lookup itself failed — in practice the project's
+      // Postgres refusing connections. Falling through to verifyUser here
+      // would answer an anonymous request on a PUBLIC bucket with 401 "No
+      // token provided", masking an infrastructure fault as an auth error.
+      // Report it as what it is and let clients retry.
+      logger.error('Bucket visibility lookup failed', {
+        bucket: req.params.bucketName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      res.setHeader('Retry-After', '5');
+      return next(
+        new AppError(
+          'Storage is temporarily unavailable, please retry',
+          503,
+          ERROR_CODES.STORAGE_UNAVAILABLE
+        )
+      );
+    }
 
-      if (isPublic) {
-        // Public bucket - skip authentication
-        return next();
-      }
-    } catch {
-      // If error checking bucket, continue with auth requirement
+    if (isPublic) {
+      // Public bucket - skip authentication
+      return next();
     }
   }
 
