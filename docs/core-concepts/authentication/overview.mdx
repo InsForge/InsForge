@@ -78,6 +78,41 @@ User state lives in your project's Postgres database in the `auth` schema. Join 
 
 When you add a user from the dashboard, the Auto-confirm toggle sets `email_verified` on the new row. Enable it to mark the email as verified at creation, so the user can sign in without confirming it.
 
+## Set up a built-in OAuth provider
+
+Built-in providers — Google, GitHub, Apple, Microsoft, GitLab, Discord, and more — are configured per project. Using **GitHub** as the example:
+
+<Steps>
+  <Step title="Register an OAuth app with the provider">
+    In your provider's developer console (for GitHub, [Developer settings → OAuth Apps](https://github.com/settings/developers)), create a new OAuth app. Set the **Authorization callback URL** to your project's callback endpoint:
+
+    ```
+    <project-api-url>/api/auth/oauth/github/callback
+    ```
+
+    The provider then issues a **Client ID** and **Client Secret**.
+  </Step>
+  <Step title="Enable the provider in InsForge">
+    In the InsForge dashboard, open **Auth Methods**, enable **GitHub**, and paste the **Client ID** and **Client Secret** from the previous step. If you don't set custom scopes, GitHub defaults to `user:email` so InsForge can read the account's email address.
+    {/* TODO: confirm dashboard location — exact per-provider toggle under Auth Methods not verifiable from code */}
+  </Step>
+  <Step title="Sign users in from your app">
+    Call `signInWithOAuth()` with `'github'` as the provider key:
+
+    ```typescript
+    await insforge.auth.signInWithOAuth('github', {
+      redirectTo: 'http://localhost:3000/dashboard',
+    });
+    ```
+
+    The same call works for any enabled provider — swap `'github'` for `'google'`, `'apple'`, and so on. See the [`signInWithOAuth` reference](/sdks/typescript/auth) for the full option list.
+  </Step>
+</Steps>
+
+<Note>
+  Prefer to configure providers programmatically? The admin OAuth config API (`POST /api/auth/oauth/configs`, admin key required) stores the same `provider`, `clientId`, `clientSecret`, and `scopes` fields that the dashboard writes.
+</Note>
+
 ## Build with it
 
 <CardGroup cols={2}>
