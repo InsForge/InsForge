@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { useLayoutEffect } from 'react';
 
 type FlagCallback = (
   flags: string[],
@@ -277,6 +278,36 @@ describe('feature flag hooks', () => {
     const { result } = renderHook(() => useFeatureFlagsStatus());
 
     expect(result.current).toBe('unavailable');
+
+    act(() => {
+      mocks.setFlags({ 'dashboard-v4-experiment': 'd_test' });
+      mocks.fireFlags();
+    });
+
+    expect(result.current).toBe('loaded');
+  });
+
+  // A hook that renders as pending can see the request fail before its passive effect
+  // subscribes. The immediate callback then replays the failure with no errorsLoading, and it
+  // must not read as `loaded`.
+  it('useFeatureFlagsStatus treats a failure between render and subscribe as unavailable', async () => {
+    const { useFeatureFlagsStatus } = await import('#lib/analytics/posthog');
+    const moduleListeners = mocks.subscriberCount();
+    const seen: string[] = [];
+    const { result } = renderHook(() => {
+      const status = useFeatureFlagsStatus();
+      seen.push(status);
+      // Layout effects run after render and before passive effects subscribe.
+      useLayoutEffect(() => {
+        mocks.fireFlagsError();
+      }, []);
+      return status;
+    });
+
+    expect(seen[0]).toBe('pending');
+    expect(seen).not.toContain('loaded');
+    expect(result.current).toBe('unavailable');
+    expect(mocks.subscriberCount()).toBe(moduleListeners + 1);
 
     act(() => {
       mocks.setFlags({ 'dashboard-v4-experiment': 'd_test' });
