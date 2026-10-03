@@ -46,7 +46,7 @@
     "@databases/sql": "^3.3.0",
     "@types/multer": "^2.2.0",
     "@types/pg": "^8.15.4",
-    "adm-zip": "^0.6.0",
+    "adm-zip": "^0.6.1",
     "agentkeepalive": "^4.6.0",
     "axios": "^1.18.1",
     "bcryptjs": "^3.0.2",
