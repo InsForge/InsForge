@@ -26,6 +26,20 @@ export class LocalStorageProvider implements StorageProvider {
 
   async initialize(): Promise<void> {
     await fs.mkdir(this.baseDir, { recursive: true });
+    const probePath = path.join(
+      this.baseDir,
+      `.insforge-write-probe.${process.pid}.${crypto.randomUUID()}`
+    );
+    try {
+      await fs.writeFile(probePath, '', { flag: 'wx' });
+    } catch {
+      throw new Error(`STORAGE_DIR is not writable: ${this.baseDir}`);
+    }
+    try {
+      await fs.unlink(probePath);
+    } catch {
+      // Leftover unique probe must not fail initialize.
+    }
   }
 
   private getValidatedPath(bucket: string, ...parts: string[]): string {
