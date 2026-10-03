@@ -290,6 +290,21 @@ export default defineConfig(
       'prettier/prettier': 'error',
     },
   },
+  // On-demand Node eval scripts (not TypeScript, not CI)
+  {
+    files: ['backend/src/services/memory/eval/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        ...globals.es2021,
+      },
+    },
+    rules: {
+      'no-console': 'off',
+    },
+  },
   // Global ignores
   {
     ignores: [
