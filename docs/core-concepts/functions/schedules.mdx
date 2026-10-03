@@ -9,6 +9,12 @@ Schedules invoke functions on a recurring cron expression. [pg_cron](https://git
 
 A schedule is a cron expression, a target URL, and headers. On creation, `${{secrets.KEY}}` placeholders in headers are resolved and encrypted with `pgcrypto`. At each tick, `execute_job()` decrypts headers, calls the function, and writes status and duration to `schedules.job_logs`.
 
+InsForge validates schedule targets before they are stored. Only HTTP(S) URLs without embedded credentials are accepted, and loopback, private, link-local, metadata, multicast, and reserved network destinations are rejected by default. This protects the database-backed scheduler from being used to reach internal services. Self-hosted installations that intentionally call private services can configure `OUTBOUND_ALLOW_PRIVATE_NETWORKS=true` and should restrict `OUTBOUND_ALLOWED_HOSTS` to the required domains.
+
+Scheduled calls use a database-level five-minute timeout and a five-second connection timeout. The `OUTBOUND_*` request limits configure realtime webhook delivery; scheduled calls pin the DNS result captured when the schedule is created or its URL is changed.
+
+Existing schedules created before DNS pinning are disabled during the migration because their destinations cannot be safely pinned automatically. Saving a schedule, including a rename or other non-URL edit, causes InsForge to resolve and pin its effective URL before re-enabling it.
+
 ## Usage
 
 Standard 5-field cron (no seconds). Reference secrets in headers instead of hardcoding keys.
