@@ -148,6 +148,75 @@ if (data) {
 
 ---
 
+## signInWithOtp()
+
+Send a passwordless six-digit sign-in code to an email address. Complete the flow with `verifyOtp()`. The response is intentionally generic whether or not an account exists, to avoid account enumeration.
+
+### Parameters
+
+- `email` (string, required) - Email address that receives the sign-in code
+
+### Returns
+
+```typescript
+{
+  data: { success: boolean, message: string } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.auth.signInWithOtp({
+  email: 'user@example.com',
+});
+```
+
+---
+
+## verifyOtp()
+
+Verify an email sign-in code and create a session. If the email is new, a verified passwordless user is created; `name` sets the display name only on that first-time creation.
+
+<Note>
+Codes expire after 5 minutes, can be used once, and are consumed after three failed attempts. If public signups are disabled, a valid code for an unknown email is consumed and returns an error. There is no phone/SMS OTP; sign-in codes are delivered by email only.
+</Note>
+
+### Parameters
+
+- `email` (string, required) - Email address that received the code
+- `otp` (string, required) - Six-digit sign-in code
+- `name` (string, optional) - Profile name, used only if verification creates a new user
+
+### Returns
+
+```typescript
+{
+  data: {
+    user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
+    accessToken: string,
+    csrfToken?: string | null
+  } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.auth.verifyOtp({
+  email: 'user@example.com',
+  otp: '123456',
+});
+
+if (data) {
+  console.log('Signed in as:', data.user.email);
+}
+```
+
+---
+
 ## signInWithOAuth()
 
 Start OAuth authentication flow with configured providers (built-in providers like Google/GitHub, plus any custom provider key configured from the dashboard).
