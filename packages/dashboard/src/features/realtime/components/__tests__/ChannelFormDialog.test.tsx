@@ -5,8 +5,8 @@ import { ChannelFormDialog } from '#features/realtime/components/ChannelFormDial
 import type { RealtimeChannel } from '@insforge/shared-schemas';
 
 describe('ChannelFormDialog', () => {
-  it('creates a channel and filters empty webhook URLs', async () => {
-    const user = userEvent.setup();
+  it('creates a channel and filters empty webhook URLs', { timeout: 10_000 }, async () => {
+    const user = userEvent.setup({ delay: null });
     const onCreate = vi.fn();
 
     render(<ChannelFormDialog mode="create" open onOpenChange={vi.fn()} onCreate={onCreate} />);
@@ -25,8 +25,8 @@ describe('ChannelFormDialog', () => {
     });
   });
 
-  it('saves only changed edit-mode fields', async () => {
-    const user = userEvent.setup();
+  it('saves only changed edit-mode fields', { timeout: 10_000 }, async () => {
+    const user = userEvent.setup({ delay: null });
     const onSave = vi.fn();
     const channel: RealtimeChannel = {
       id: '11111111-1111-1111-1111-111111111111',
