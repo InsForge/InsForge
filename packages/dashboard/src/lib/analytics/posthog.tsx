@@ -1,5 +1,6 @@
 import posthog from 'posthog-js';
 import { PostHogProvider } from 'posthog-js/react';
+import { maskReplayAttribute } from '#lib/analytics/replay-privacy';
 
 const POSTHOG_KEY = import.meta.env.VITE_PUBLIC_POSTHOG_KEY || '';
 
@@ -9,7 +10,23 @@ if (POSTHOG_KEY) {
       api_host: 'https://us.i.posthog.com',
       capture_exceptions: true,
       debug: import.meta.env.DEV,
+      // Autocapture is a separate egress path from session replay: keep clicked
+      // elements' text and attributes (which can hold customer data) out of events.
+      mask_all_text: true,
+      mask_all_element_attributes: true,
       session_recording: {
+        // Mask all rendered text and every input so customer data shown in the
+        // dashboard (table rows, query results, users, logs, file contents) is
+        // never captured. posthog-js masks in the browser, before anything is
+        // sent. maskTextSelector: '*' is the supported way to mask all text.
+        maskTextSelector: '*',
+        maskAllInputs: true,
+        // Text masking doesn't reach attributes, and cells repeat their value in
+        // title/alt. Fail closed: only layout and UI-state attributes keep values.
+        maskAttributeFn: maskReplayAttribute,
+        // Pinned: when true it overrides maskAttributeFn, and an unset client value
+        // would let a PostHog project setting switch the allowlist off.
+        maskAllElementAttributes: false,
         recordCrossOriginIframes: true,
       },
     });
