@@ -673,6 +673,22 @@ curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql" \
 }
 ```
 
+### Ejemplo: cambiar un valor en una tabla
+
+`INSERT`, `UPDATE` y `DELETE` también se ejecutan aquí: es una forma de cambiar un valor directamente en una tabla desde la API REST cuando el endpoint «Actualizar registros» no es suficiente. Las tablas del sistema y `auth.users` siguen bloqueadas, por lo que esto funciona en tus propias tablas del esquema `public`. Para cambios de esquema, usa mejor una migración.
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "UPDATE posts SET published = $1 WHERE id = $2",
+    "params": [false, "248373e1-0aea-45ce-8844-5ef259203749"]
+  }'
+```
+
+El campo `command` de la respuesta refleja el tipo de sentencia (por ejemplo, `UPDATE`) y `rowCount` es el número de filas modificadas.
+
 ---
 
 ## Ejecutar SQL sin procesar (modo relajado)
