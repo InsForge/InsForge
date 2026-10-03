@@ -234,7 +234,21 @@ async function executeInWorker(code: string, request: Request): Promise<Response
     };
 
     // Prepare request data
-    const body = request.body ? await request.text() : null;
+    let body: string | null;
+    try {
+      body = request.body ? await request.text() : null;
+    } catch {
+      clearTimeout(timeout);
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      resolve(
+        new Response(JSON.stringify({ error: 'Invalid request body' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      return;
+    }
     const requestData = {
       url: request.url,
       method: request.method,
