@@ -115,6 +115,7 @@ vi.mock('#features/database/components/DatabaseSidebar', () => ({
       <button onClick={() => props.onTableSelect?.('tableA')}>Switch to Table A</button>
       <button onClick={() => props.onTableSelect?.('tableB')}>Switch to Table B</button>
       <button onClick={() => props.onNewTable?.()}>New Table</button>
+      <button onClick={() => props.onEditTable?.('tableA')}>Edit Table A</button>
       <button onClick={() => props.onEditTable?.('tableB')}>Edit Table B</button>
     </div>
   ),
@@ -365,17 +366,18 @@ describe('TablesPage editing a table while the table form is open', () => {
     }));
   });
 
-  // Opens the create form with unsaved changes, plus the draft a real form would have stored.
-  async function openChangedCreateForm() {
+  function renderPage() {
     const user = userEvent.setup();
     render(
       <MemoryRouter initialEntries={['/?table=tableA']}>
         <TablesPage />
       </MemoryRouter>
     );
+    return user;
+  }
 
-    await user.click(screen.getByRole('button', { name: 'New Table' }));
-    await user.click(screen.getByRole('button', { name: 'Change the form' }));
+  // The draft a real create form would have stored for this schema.
+  function storePostsDraft() {
     saveCreateTableDraft(
       'default',
       'public',
@@ -394,7 +396,14 @@ describe('TablesPage editing a table while the table form is open', () => {
       },
       []
     );
+  }
 
+  // Opens the create form with unsaved changes, plus the draft a real form would have stored.
+  async function openChangedCreateForm() {
+    const user = renderPage();
+    await user.click(screen.getByRole('button', { name: 'New Table' }));
+    await user.click(screen.getByRole('button', { name: 'Change the form' }));
+    storePostsDraft();
     return user;
   }
 
@@ -420,6 +429,38 @@ describe('TablesPage editing a table while the table form is open', () => {
 
     expect(confirmMocks.confirm).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('table-form')).toHaveAttribute('data-mode', 'create');
+    expect(loadCreateTableDraft('default', 'public')?.tableName).toBe('posts');
+  });
+
+  it('opens the table to edit without asking when the create form has no changes', async () => {
+    const user = renderPage();
+    await user.click(screen.getByRole('button', { name: 'New Table' }));
+
+    await user.click(screen.getByRole('button', { name: 'Edit Table B' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('table-form')).toHaveAttribute('data-mode', 'edit')
+    );
+    expect(confirmMocks.confirm).not.toHaveBeenCalled();
+    expect(screen.getByTestId('table-form')).toHaveAttribute('data-edit-table', 'tableB');
+  });
+
+  // Discarding an edit form is not a deliberate close of the create form, so the
+  // create draft stored for this schema has to survive it.
+  it('leaves the create draft alone when discarding a changed edit form for another table', async () => {
+    confirmMocks.confirm.mockResolvedValue(true);
+    storePostsDraft();
+    const user = renderPage();
+    await user.click(screen.getByRole('button', { name: 'Edit Table A' }));
+    await user.click(screen.getByRole('button', { name: 'Change the form' }));
+
+    await user.click(screen.getByRole('button', { name: 'Edit Table B' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('table-form')).toHaveAttribute('data-edit-table', 'tableB')
+    );
+    expect(confirmMocks.confirm).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('table-form')).toHaveAttribute('data-mode', 'edit');
     expect(loadCreateTableDraft('default', 'public')?.tableName).toBe('posts');
   });
 });
