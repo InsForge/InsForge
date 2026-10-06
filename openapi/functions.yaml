@@ -20,26 +20,46 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/FunctionMetadata'
+                type: object
+                required:
+                  - functions
+                  - runtime
+                properties:
+                  functions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FunctionMetadata'
+                  runtime:
+                    type: object
+                    required:
+                      - status
+                    properties:
+                      status:
+                        type: string
+                        enum: ["running", "unavailable"]
+                  deploymentUrl:
+                    type: string
+                    nullable: true
               example:
-                - id: "123e4567-e89b-12d3-a456-426614174000"
-                  slug: "hello-world"
-                  name: "Hello World Function"
-                  description: "Returns a greeting message"
-                  status: "active"
-                  created_at: "2024-01-21T10:30:00Z"
-                  updated_at: "2024-01-21T10:35:00Z"
-                  deployed_at: "2024-01-21T10:35:00Z"
-                - id: "223e4567-e89b-12d3-a456-426614174001"
-                  slug: "process-webhook"
-                  name: "Webhook Processor"
-                  description: "Processes incoming webhooks"
-                  status: "draft"
-                  created_at: "2024-01-22T14:20:00Z"
-                  updated_at: "2024-01-22T14:20:00Z"
-                  deployed_at: null
+                functions:
+                  - id: "123e4567-e89b-12d3-a456-426614174000"
+                    slug: "hello-world"
+                    name: "Hello World Function"
+                    description: "Returns a greeting message"
+                    status: "active"
+                    createdAt: "2024-01-21T10:30:00Z"
+                    updatedAt: "2024-01-21T10:35:00Z"
+                    deployedAt: "2024-01-21T10:35:00Z"
+                  - id: "223e4567-e89b-12d3-a456-426614174001"
+                    slug: "process-webhook"
+                    name: "Webhook Processor"
+                    description: "Processes incoming webhooks"
+                    status: "draft"
+                    createdAt: "2024-01-22T14:20:00Z"
+                    updatedAt: "2024-01-22T14:20:00Z"
+                    deployedAt: null
+                runtime:
+                  status: "running"
         '401':
           description: Unauthorized
         '403':
@@ -120,7 +140,7 @@ paths:
                   name: "Hello World Function"
                   description: "Returns a greeting message"
                   status: "active"
-                  created_at: "2024-01-21T10:30:00Z"
+                  createdAt: "2024-01-21T10:30:00Z"
         '400':
           description: Invalid request
           content:
@@ -195,9 +215,9 @@ paths:
                     );
                   }
                 status: "active"
-                created_at: "2024-01-21T10:30:00Z"
-                updated_at: "2024-01-21T10:35:00Z"
-                deployed_at: "2024-01-21T10:35:00Z"
+                createdAt: "2024-01-21T10:30:00Z"
+                updatedAt: "2024-01-21T10:35:00Z"
+                deployedAt: "2024-01-21T10:35:00Z"
         '404':
           description: Function not found
           content:
@@ -252,7 +272,7 @@ paths:
                   description: Updated description
                 status:
                   type: string
-                  enum: ["draft", "active", "error"]
+                  enum: ["draft", "active"]
                   description: Function status
       responses:
         '200':
@@ -274,7 +294,7 @@ paths:
                   name: "Hello World Function v2"
                   description: "Returns a greeting message"
                   status: "active"
-                  updated_at: "2024-01-21T11:00:00Z"
+                  updatedAt: "2024-01-21T11:00:00Z"
         '400':
           description: Invalid request
           content:
@@ -566,15 +586,15 @@ components:
           type: string
           enum: ["draft", "active", "error"]
           description: Current status of the function
-        created_at:
+        createdAt:
           type: string
           format: date-time
           description: When the function was created
-        updated_at:
+        updatedAt:
           type: string
           format: date-time
           description: When the function was last updated
-        deployed_at:
+        deployedAt:
           type: string
           format: date-time
           nullable: true
@@ -583,9 +603,11 @@ components:
         - id
         - slug
         - name
+        - description
         - status
-        - created_at
-        - updated_at
+        - createdAt
+        - updatedAt
+        - deployedAt
 
     FunctionDetails:
       allOf:

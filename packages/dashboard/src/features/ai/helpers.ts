@@ -189,14 +189,6 @@ export function toModelOption(model: AIModelSchema): ModelOption {
 export type SortField = 'inputPrice' | 'outputPrice' | 'released';
 export type SortDirection = 'asc' | 'desc';
 
-// Format credits display
-export const formatCredits = (remaining: number): string => {
-  if (remaining >= 1000) {
-    return `${(remaining / 1000).toFixed(1)}K`;
-  }
-  return remaining.toFixed(2);
-};
-
 // Format price per million tokens
 export const formatPrice = (price?: number): string => {
   if (price === undefined) {
