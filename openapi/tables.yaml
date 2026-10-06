@@ -109,7 +109,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error: "INVALID_FIELD_TYPE"
-                message: "Invalid field type: 'text'. Valid types are: string, integer, float, boolean, datetime, uuid, json, file"
+                message: "Invalid field type: 'text'. Valid types are: string, date, datetime, integer, float, boolean, uuid, json"
                 statusCode: 422
                 nextActions: "Use one of the valid field types"
 
