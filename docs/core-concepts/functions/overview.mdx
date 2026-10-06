@@ -60,7 +60,9 @@ npx @insforge/cli secrets get STRIPE_SECRET_KEY
 
 ### Logs
 
-Structured logs are captured per invocation, queryable by status, duration, and function name. The InsForge MCP `get-function-logs` tool lets your agent diagnose failures without leaving the editor.
+Each invocation writes a structured log with the function name, HTTP method and status, duration, and a server-generated request ID. The ID is also passed to the function in the `x-insforge-request-id` request header so you can include it in your own log messages. The dashboard's Function Logs page lets you filter loaded logs by function, status, request ID, and time range; use **Load older logs** to search further back.
+
+For request and response metadata, invocation logs retain only media types. They do not store request or response bodies, query strings, authorization headers, or other header values. Request replay is not available yet.
 
 ### Deno standard library
 
