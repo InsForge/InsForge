@@ -2,7 +2,6 @@ import multer from 'multer';
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
-import { ProcessedFormData } from '@/types/storage.js';
 import { StorageConfigService } from '@/services/storage/storage-config.service.js';
 import logger from '@/utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
@@ -116,22 +115,3 @@ export const handleUploadError = (
 
   next();
 };
-
-/**
- * Extracts fields and files from a multipart form-data request
- * processed by multer and returns them as a structured object.
- */
-export function processFormData(req: Request): ProcessedFormData {
-  const fields = req.body || {};
-  const files: Record<string, Express.Multer.File[]> = {};
-
-  if (req.files) {
-    if (Array.isArray(req.files)) {
-      files['files'] = req.files;
-    } else {
-      Object.assign(files, req.files);
-    }
-  }
-
-  return { fields, files };
-}

@@ -3,7 +3,6 @@ import {
   GetAuditLogsResponse,
   ClearAuditLogsResponse,
   GetAuditLogsRequest,
-  GetAuditLogStatsResponse,
 } from '@insforge/shared-schemas';
 
 export class AuditService {
@@ -34,16 +33,6 @@ export class AuditService {
     }
 
     return apiClient.request(`/logs/audits?${params.toString()}`, {
-      headers: apiClient.withAccessToken(),
-    });
-  }
-
-  async getAuditLogStats(days = 7): Promise<GetAuditLogStatsResponse> {
-    const params = new URLSearchParams({
-      days: days.toString(),
-    });
-
-    return apiClient.request(`/logs/audits/stats?${params.toString()}`, {
       headers: apiClient.withAccessToken(),
     });
   }
