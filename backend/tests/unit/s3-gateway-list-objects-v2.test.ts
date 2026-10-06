@@ -56,9 +56,9 @@ function legacyToken(key: string): string {
 }
 
 /**
- * Stands in for storage.objects: keys sorted ascending, filtered by prefix and
- * an exclusive `startAfter`, windowed by `maxKeys`. This is exactly the
- * contract of StorageService.listObjectsV2Db.
+ * Stands in for storage.objects: keys sorted ascending in byte order, filtered
+ * by prefix and an exclusive `startAfter`, windowed by `maxKeys`. This is
+ * exactly the contract of StorageService.listObjectsV2Db.
  */
 function fakeTable(keys: string[]) {
   const sorted = [...keys].sort();
@@ -504,5 +504,29 @@ describe('ListObjectsV2 unsigned continuation tokens', () => {
 
     expect(result.status).toBe(200);
     expect(result.commonPrefixes).toEqual(['a/', 'b/']);
+  });
+});
+
+describe('StorageService.listObjectsV2Db ordering', () => {
+  it('compares and orders keys in byte order, not the database collation', async () => {
+    // The handler relies on keys sharing a CommonPrefix being contiguous, and
+    // S3 lists keys in UTF-8 byte order. Under a linguistic collation such as
+    // en_US.utf8 (the bundled Postgres default) punctuation is ignored, so
+    // "a-c" sorts between "a/b" and "a/d" and "a/" is listed on two pages.
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const svc = StorageService.getInstance();
+    vi.spyOn(svc as never, 'getPool' as never).mockReturnValue({ query } as never);
+
+    await svc.listObjectsV2Db({
+      bucket: 'test-bucket',
+      prefix: 'a',
+      startAfter: 'a/b',
+      maxKeys: 10,
+    });
+
+    const sql = (query.mock.calls[0][0] as string).replace(/\s+/g, ' ');
+    expect(sql).toContain('key COLLATE "C" LIKE $2');
+    expect(sql).toContain('key COLLATE "C" > $3');
+    expect(sql).toContain('ORDER BY key COLLATE "C"');
   });
 });
