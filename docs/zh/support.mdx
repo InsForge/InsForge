@@ -1,0 +1,47 @@
+---
+title: "支持与反馈"
+description: "如何获取帮助、使用 InsForge CLI 报告 Bug 或请求功能、联系 InsForge 团队，以及为什么仪表板中没有支持工单历史记录。"
+---
+
+当您需要帮助、遇到 InsForge 本身的 Bug，或想向团队反馈时，请查看本页。
+
+## 获取帮助
+
+在 [InsForge Discord](https://discord.com/invite/DvBtaEc9Jz) 中提问——这是联系团队和其他开发者最快的方式。
+
+## 报告 Bug 或请求功能
+
+使用 CLI `feedback` 命令报告 InsForge 侧的问题——Bug（包括文档与实际行为不一致）、缺失的功能或开发体验上的摩擦。这用于反馈 InsForge 本身的问题（后端、某个 SDK、CLI、Agent 技能或文档），而不是您正在构建的应用。提交前，邮箱、令牌、密钥和用户名会在本地被脱敏处理，且无需登录。
+
+```bash
+# 交互式：会提示补齐仍需要的必填字段
+npx @insforge/cli feedback
+
+# 非交互式（Agent / CI）
+npx @insforge/cli feedback \
+  --type bug \
+  --component sdk \
+  --language js \
+  --title "verifyOtp rejects a valid code" \
+  --detail "Steps, expected vs actual, and anything else useful"
+```
+
+- `--type` — `bug`、`feature-request`、`friction` 或 `other`
+- `--component` — `backend`、`sdk`、`cli`、`skills`、`docs` 或 `other`
+- `--language` — 当 `--component sdk` 时必填（例如 `js`、`python`、`swift`、`kotlin`、`rest-api`）
+- `--title` 和 `--detail` — 摘要和描述（使用 `--file <path>` 从文件加载描述内容）
+- `--severity` — `blocker`、`major` 或 `minor`（默认为 `minor`）
+
+`--type`、`--component`、`--title` 和 `--detail` 为必填项；不带这些参数运行命令时会进入交互式提示。传入 `--json` 可获得结构化结果。
+
+## 联系团队
+
+已登录用户可以从仪表板向 InsForge 团队发送支持请求。{/* TODO: confirm dashboard location */} 请附上您做了什么、期望的结果，以及有帮助的截图。
+
+某些账号或数据问题无法自行解决。例如，[删除存储桶是永久性操作](/zh/core-concepts/storage/overview#buckets)——它会级联删除所有对象，且没有恢复机制，即使通过技术支持也无法恢复。遇到此类情况时，请在 [Discord](https://discord.com/invite/DvBtaEc9Jz) 上联系我们。
+
+## 跟踪您的请求
+
+<Note>
+  仪表板和 API 中都没有查看您已提交的反馈和支持请求的入口——不存在工单历史列表。请自行保留您所发送内容的副本，并在同一个 [Discord](https://discord.com/invite/DvBtaEc9Jz) 帖子中跟进。
+</Note>
