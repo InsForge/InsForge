@@ -60,6 +60,57 @@ graph TB
 
 透過變更請求中的模型名稱，在 Anthropic、OpenAI、Mistral、Llama、Gemini 和數十個其他提供商之間切換。應用程式代碼不會改變。
 
+## 選擇模型
+
+透過將每個請求的 `model` 欄位設定為 `provider/model` 格式的 OpenRouter 模型 ID 來選擇模型 — 例如 `openai/gpt-4o`、`anthropic/claude-3.5-haiku` 或 `google/gemini-2.5-flash-image`。切換提供商或模型只需改動一行；請求中的其他內容都不變。
+
+在儀表板的模型目錄或 [OpenRouter 的模型頁面](https://openrouter.ai/models) 中瀏覽可用模型。自架部署還可以透過管理 API 使用 `GET /api/ai/models` 列出目錄。
+
+## 提供商金鑰
+
+如何提供 OpenRouter 金鑰取決於 InsForge 的執行位置。無論哪種方式，都要將金鑰保留在伺服器端 — 切勿將其打包進瀏覽器套件中。
+
+**InsForge Cloud（託管）。** InsForge 為每個項目配置並管理 OpenRouter 金鑰 — 您無需使用自己的金鑰。從 InsForge 儀表板{/* TODO: confirm dashboard location */}複製活動金鑰，將其儲存在 `OPENROUTER_API_KEY` 中，然後從受信任的伺服器端程式碼呼叫 OpenRouter。在 Cloud 上透過管理 API 設定自訂金鑰會被拒絕，並傳回 `Model Gateway credentials are managed by InsForge Cloud.`
+
+**自架（使用自己的金鑰）。** 從 [openrouter.ai](https://openrouter.ai) 取得金鑰，並透過以下任一方式提供：
+
+- 在啟動後端之前將其設定在環境中：
+
+  ```bash
+  OPENROUTER_API_KEY=sk-or-...
+  ```
+
+- 或在執行時透過管理 API 儲存（需要管理員驗證 — 您項目的 API Key）：
+
+  ```bash
+  curl -X PUT "$PROJECT_URL/api/ai/config" \
+    -H "Authorization: Bearer $API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{ "apiKey": "sk-or-..." }'
+  ```
+
+檢查配置（傳回的金鑰會被遮蔽）或讀回活動金鑰：
+
+```bash
+# 狀態：{ "apiKey": { "configured": true, "maskedKey": "sk-or-v1••••••••abcd" }, ... }
+curl "$PROJECT_URL/api/ai/config" -H "Authorization: Bearer $API_KEY"
+
+# 此實例的活動 OpenRouter 金鑰
+curl "$PROJECT_URL/api/ai/openrouter/api-key" -H "Authorization: Bearer $API_KEY"
+```
+
+使用 `POST /api/ai/openrouter/api-key/rotate` 輪換金鑰。`/api/ai/config` 和 `/api/ai/openrouter/*` 端點僅適用於自架；在 Cloud 上它們會傳回上述託管憑證錯誤。
+
+## 查看用量與額度
+
+每個請求都會用模型、令牌計數和成本進行記錄。要查看目前計費週期內的用量 — 包括 AI 模型額度 — 執行 CLI：
+
+```bash
+npx @insforge/cli usage
+```
+
+它會列印您的組織和方案、用量摘要表（包含 `ai_credits` 列）以及按項目細分的狀態、資料庫、儲存和出站流量。用量也可在儀表板{/* TODO: confirm dashboard location */}和 MCP 中查看。關於每個方案包含的額度，請參閱 [定價](/pricing)。
+
 ## 使用它進行建置
 
 <CardGroup cols={2}>
