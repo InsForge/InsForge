@@ -117,7 +117,7 @@ export class AuditService {
       let dataSql = `SELECT * FROM system.audit_logs ${whereClause} ORDER BY created_at DESC`;
       const dataParams = [...params];
 
-      if (query.limit) {
+      if (query.limit !== undefined && Number.isSafeInteger(query.limit) && query.limit >= 0) {
         dataSql += ` LIMIT $${paramIndex++}`;
         dataParams.push(query.limit);
       }
