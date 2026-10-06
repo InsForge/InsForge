@@ -310,7 +310,7 @@ paths:
                   example: user@example.com
                 password:
                   type: string
-                  description: Password meeting configured requirements (check /api/auth/email/config for current requirements)
+                  description: Password meeting configured requirements (check /api/auth/public-config for current requirements)
                   example: securepassword123
                 name:
                   type: string

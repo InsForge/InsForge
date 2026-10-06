@@ -40,7 +40,7 @@ Before you start development, ensure you have the following:
 2. Clone your fork locally:
    ```bash
    git clone https://github.com/InsForge/InsForge.git
-   cd insforge
+   cd InsForge
    ```
 3. Install Docker
 4. Open Docker App

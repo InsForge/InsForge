@@ -42,11 +42,6 @@ export interface ApifyDataset {
   actId: string | null;
 }
 
-export interface ApifyLatestData {
-  datasetId: string | null;
-  items: unknown[];
-}
-
 function is404(err: unknown): boolean {
   return (err as { response?: { status?: number } })?.response?.status === 404;
 }
@@ -114,23 +109,6 @@ export const webscraperService = {
     } catch (err: unknown) {
       if (is404(err)) {
         return [];
-      }
-      throw err;
-    }
-  },
-
-  async getApifyLatestData(limit = 5): Promise<ApifyLatestData> {
-    try {
-      const res = await apiClient.request(`/webscraper/apify/data?limit=${limit}`, {
-        headers: apiClient.withAccessToken({}),
-      });
-      return {
-        datasetId: res?.datasetId ?? null,
-        items: res?.items ?? [],
-      };
-    } catch (err: unknown) {
-      if (is404(err)) {
-        return { datasetId: null, items: [] };
       }
       throw err;
     }

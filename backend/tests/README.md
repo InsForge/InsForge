@@ -5,7 +5,7 @@ This directory contains all test scripts for the Insforge backend.
 ## Prerequisites
 
 - Backend server running on `http://localhost:7130`
-- Root admin credentials: `root` / `change-this-password`
+- Root admin credentials: `admin` / `change-this-password`
 - API key for storage operations
 
 ## Environment Variables
@@ -39,8 +39,6 @@ Tests for local Docker deployment with local file storage:
 - `test-database-router.sh` - Database CRUD operations
 - `test-e2e.sh` - End-to-end workflows
 - `test-public-bucket.sh` - Local storage bucket tests
-- `test-config.sh` - Configuration management
-- `test-oauth-config.sh` - OAuth configuration
 - `comprehensive-curl-tests.sh` - Comprehensive API tests
 
 ### Cloud Tests (`./cloud/`)
