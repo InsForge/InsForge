@@ -71,7 +71,7 @@
     "date-fns": "^4.1.0",
     "i18next": "^26.3.6",
     "lucide-react": "^0.536.0",
-    "posthog-js": "^1.404.1",
+    "posthog-js": "^1.433.2",
     "react-data-grid": "7.0.0-beta.47",
     "react-hook-form": "^7.61.1",
     "react-i18next": "^17.0.9",
