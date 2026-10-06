@@ -129,7 +129,10 @@ All contributions must include appropriate tests. Follow these guidelines:
 5. Update documentation as needed
 6. Keep your PR focused on a single feature or bug fix
 7. Be responsive to code review feedback
-8. **After you address review comments, re-request a review from your assigned reviewer** (use the 🔁 button next to their name in the Reviewers section). This is how the reviewer is notified that your changes are ready for another look — without it, your PR may sit unnoticed.
+8. **After addressing review feedback, re-request review from the reviewer:**
+   - Use the 🔁 button beside their name in the Reviewers section. It appears after they submit a review and works for fork authors in GitHub's web UI (API or CLI requests for the same action may fail).
+   - If they have not submitted a review, the original request is still pending.
+   - If the button is missing after a submitted review, tag the reviewer in a PR comment and attach a screenshot.
 
 ## Code Style
 
@@ -145,5 +148,3 @@ All contributions must include appropriate tests. Follow these guidelines:
 Please review the documentation asset guidelines before adding images, videos, SVGs, or other media files to the repository:
 
 - [Documentation Asset Guidelines](docs/asset-guidelines.md)
-
-
