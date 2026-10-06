@@ -603,9 +603,11 @@ components:
         - id
         - slug
         - name
+        - description
         - status
         - createdAt
         - updatedAt
+        - deployedAt
 
     FunctionDetails:
       allOf:

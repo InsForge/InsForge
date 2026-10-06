@@ -50,8 +50,8 @@ export function useUpdateApifyConfig() {
     mutationFn: (apiToken: string) => webscraperService.updateApifyConfig(apiToken),
     onSuccess: () => {
       // Every webscraper query is derived from the stored token, not just the
-      // connection: actors, runs, datasets and the data preview are all read
-      // from Apify with it. Invalidating the connection alone left the rest
+      // connection: actors, runs and datasets are all read from Apify with it.
+      // Invalidating the connection alone left the rest
       // serving the previous account's results for their 30s staleTime.
       void queryClient.invalidateQueries({ queryKey: webscraperQueryKeys.all });
     },

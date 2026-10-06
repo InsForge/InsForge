@@ -22,7 +22,6 @@ export const useClearAuditLogs = () => {
     mutationFn: (daysToKeep?: number) => auditService.clearAuditLogs(daysToKeep),
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
-      void queryClient.invalidateQueries({ queryKey: ['audit-log-stats'] });
       showToast(
         t('logs.clearedAuditLogs', {
           count: data.deleted,

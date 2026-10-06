@@ -155,9 +155,17 @@ paths:
                   bucketName:
                     type: string
                     example: avatars
+                  isPublic:
+                    type: boolean
+                    example: true
+                  nextActions:
+                    type: string
+                    description: Access summary plus the object endpoints to use next
               example:
                 message: "Bucket created successfully"
                 bucketName: "avatars"
+                isPublic: true
+                nextActions: "This is a PUBLIC bucket - objects can be accessed without authentication. You can use /api/storage/buckets/:bucketName/objects/:objectKey to upload an object to the bucket, and /api/storage/buckets/:bucketName/objects to list the objects in the bucket."
         '400':
           description: Invalid bucket name
           content:
