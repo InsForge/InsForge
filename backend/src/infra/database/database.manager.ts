@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { DatabaseMetadataSchema } from '@insforge/shared-schemas';
-import pgFormat from 'pg-format';
 import { buildQualifiedTableKey, DEFAULT_DATABASE_SCHEMA } from '@/services/database/helpers.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
@@ -170,30 +169,27 @@ export class DatabaseManager {
     if (missingOrExpired.length > 0) {
       const client = await this.pool.connect();
       try {
-        const unionQuery = missingOrExpired
-          .map((tableName) =>
-            pgFormat(
-              'SELECT %L as table_name, COUNT(*) as count FROM %I.%I',
-              tableName,
-              'public',
-              tableName
-            )
-          )
-          .join(' UNION ALL ');
+        const catalogEstimateQuery = `
+          SELECT relname AS table_name, GREATEST(0, COALESCE(reltuples::bigint, 0)) AS count
+          FROM pg_class
+          JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
+          WHERE nspname = 'public' AND relkind IN ('r', 'p') AND relname = ANY($1::text[])
+        `;
 
-        const queryResult = await client.query(unionQuery);
+        const queryResult = await client.query(catalogEstimateQuery, [missingOrExpired]);
         const nowAfterQuery = Date.now();
 
         // 1. Resolve all database counts into the request-local map first
         for (const row of queryResult.rows) {
           const cacheKey = buildQualifiedTableKey(row.table_name, 'public');
-          requestCounts.set(cacheKey, Number(row.count));
+          const count = Math.max(0, Math.round(Number(row.count)));
+          requestCounts.set(cacheKey, count);
         }
 
         // 2. Perform all cache mutations second
-        for (const row of queryResult.rows) {
-          const cacheKey = buildQualifiedTableKey(row.table_name, 'public');
-          const count = requestCounts.get(cacheKey) ?? Number(row.count);
+        for (const tableName of missingOrExpired) {
+          const cacheKey = buildQualifiedTableKey(tableName, 'public');
+          const count = requestCounts.get(cacheKey) ?? 0;
           DatabaseManager.setBoundedCache(
             DatabaseManager.tableCountCache,
             DatabaseManager.MAX_TABLE_COUNT_CACHE_SIZE,
@@ -202,7 +198,7 @@ export class DatabaseManager {
           );
         }
       } catch (error) {
-        logger.error('Failed to batch query exact table counts:', { error });
+        logger.error('Failed to batch query table count estimates from catalog:', { error });
       } finally {
         client.release();
       }
