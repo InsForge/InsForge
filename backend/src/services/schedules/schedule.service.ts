@@ -3,6 +3,11 @@ import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/utils/errors.js';
 import {
+  resolveSafeOutboundUrl,
+  OutboundUrlPolicyError,
+  type ResolvedOutboundUrl,
+} from '@/infra/network/outbound-url-policy.js';
+import {
   ERROR_CODES,
   type CreateScheduleRequest,
   type UpdateScheduleRequest,
@@ -259,13 +264,14 @@ export class ScheduleService {
   async createSchedule(data: CreateScheduleRequest) {
     try {
       this.validateCronExpression(data.cronSchedule);
+      const resolvedTarget = await this.validateOutboundScheduleUrl(data.functionUrl);
 
       const scheduleId = randomUUID();
       const headersTemplate = data.headers || {};
       const resolvedHeaders = data.headers ? await this.resolveHeaderSecrets(data.headers) : {};
       const sql = `
         SELECT * FROM schedules.upsert_job(
-          $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB, $8::JSONB
+          $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB, $8::JSONB, $9::JSONB
         )
       `;
       const values = [
@@ -277,6 +283,7 @@ export class ScheduleService {
         headersTemplate,
         resolvedHeaders,
         data.body || {},
+        resolvedTarget,
       ];
       const result = await this.getPool().query(sql, values);
       const jobResult = (result.rows && result.rows[0]) as
@@ -322,12 +329,19 @@ export class ScheduleService {
         data.headers !== undefined ||
         data.body !== undefined;
 
+      const desiredIsActive = data.isActive ?? existingSchedule.isActive;
+      const needsUpsert =
+        hasScheduleFields || (data.isActive === true && existingSchedule.isActive === false);
+
       let cronJobId: string | null | undefined = existingSchedule.cronJobId;
 
       // Update schedule fields if any provided
-      if (hasScheduleFields) {
+      if (needsUpsert) {
         const cronSchedule = data.cronSchedule ?? existingSchedule.cronSchedule;
         this.validateCronExpression(cronSchedule);
+        const resolvedTarget = await this.validateOutboundScheduleUrl(
+          data.functionUrl ?? existingSchedule.functionUrl
+        );
 
         const headersTemplate = data.headers ?? existingSchedule.headers ?? {};
         const resolvedHeaders = data.headers
@@ -336,7 +350,7 @@ export class ScheduleService {
 
         const sql = `
           SELECT * FROM schedules.upsert_job(
-            $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB, $8::JSONB
+            $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB, $8::JSONB, $9::JSONB, $10::BOOLEAN
           )
         `;
         const values = [
@@ -348,6 +362,8 @@ export class ScheduleService {
           headersTemplate,
           resolvedHeaders,
           data.body ?? existingSchedule.body ?? {},
+          resolvedTarget,
+          desiredIsActive,
         ];
         const result = await this.getPool().query(sql, values);
         const jobResult = (result.rows && result.rows[0]) as
@@ -368,12 +384,14 @@ export class ScheduleService {
         cronJobId = jobResult.cron_job_id;
       }
 
-      // Handle isActive toggle if provided
-      if (data.isActive !== undefined && data.isActive !== existingSchedule.isActive) {
-        const toggleSql = data.isActive
-          ? 'SELECT * FROM schedules.enable_job($1::UUID)'
-          : 'SELECT * FROM schedules.disable_job($1::UUID)';
-        await this.getPool().query(toggleSql, [id]);
+      // Handle pure deactivation (no field changes, just toggling off)
+      if (
+        data.isActive !== undefined &&
+        data.isActive === false &&
+        existingSchedule.isActive === true &&
+        !hasScheduleFields
+      ) {
+        await this.getPool().query('SELECT * FROM schedules.disable_job($1::UUID)', [id]);
       }
 
       logger.info('Successfully updated schedule', { scheduleId: id });
@@ -381,6 +399,39 @@ export class ScheduleService {
     } catch (error) {
       logger.error('Error in updateSchedule service', { scheduleId: id, error });
       throw error;
+    }
+  }
+
+  private async validateOutboundScheduleUrl(functionUrl: string): Promise<ResolvedOutboundUrl> {
+    try {
+      return await resolveSafeOutboundUrl(functionUrl);
+    } catch (error) {
+      if (error instanceof OutboundUrlPolicyError) {
+        throw new AppError(`Invalid schedule URL: ${error.reason}`, 400, ERROR_CODES.INVALID_INPUT);
+      }
+      const errorCode =
+        typeof error === 'object' && error !== null && 'code' in error
+          ? String(error.code)
+          : undefined;
+      let origin = functionUrl;
+      try {
+        origin = new URL(functionUrl).origin;
+      } catch {
+        // The policy already reports malformed URLs.
+      }
+      logger.error('Failed to resolve schedule URL during outbound policy validation', {
+        origin,
+        errorCode,
+        error,
+      });
+      if (errorCode && !['ENOTFOUND', 'EAI_NONAME', 'EINVAL'].includes(errorCode)) {
+        throw error;
+      }
+      throw new AppError(
+        'Schedule URL hostname could not be resolved.',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
   }
 

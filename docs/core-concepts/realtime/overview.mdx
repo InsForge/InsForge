@@ -11,7 +11,9 @@ Use InsForge Realtime when your app needs to update without a page refresh. Clie
 </Frame>
 
 <Note>
-  **Need server-side code to run after a database change?** Put that business logic in an [Edge Function](/core-concepts/functions/overview) and invoke it from a database trigger. Use Realtime when the change should be delivered to connected clients or configured webhook endpoints.
+  **Need server-side code to run after a database change?** Put that business logic in an [Edge
+  Function](/core-concepts/functions/overview) and invoke it from a database trigger. Use Realtime
+  when the change should be delivered to connected clients or configured webhook endpoints.
 </Note>
 
 ```mermaid
@@ -102,13 +104,15 @@ Clients can publish messages to channels they have already joined. Use this for 
 ```typescript
 await insforge.realtime.publish(`chat:${roomId}`, 'typing', {
   userId,
-  isTyping: true
+  isTyping: true,
 });
 ```
 
 ### Webhooks
 
 Attach webhook URLs to a channel when another service should receive each message. InsForge posts the event payload to every configured URL, includes headers for the event name, channel, and message ID, retries transient network failures, and records webhook delivery counts in message history.
+
+Webhook destinations are validated before delivery. URLs must use HTTP(S) without embedded credentials, and private, loopback, link-local, metadata, multicast, and reserved network addresses are blocked by default. Redirects are not followed by default. For controlled self-hosted networks, configure `OUTBOUND_ALLOW_PRIVATE_NETWORKS=true` together with a narrow `OUTBOUND_ALLOWED_HOSTS` allowlist.
 
 ### Presence
 
@@ -167,13 +171,13 @@ Every delivered event is recorded with WebSocket and webhook delivery counts. Th
     Subscribe to channels, publish events, and track presence from Node, browser, and edge.
   </Card>
 
-  <Card title="Swift SDK" icon="swift" href="/sdks/swift/realtime">
-    Native Swift realtime client for iOS and macOS.
-  </Card>
+<Card title="Swift SDK" icon="swift" href="/sdks/swift/realtime">
+  Native Swift realtime client for iOS and macOS.
+</Card>
 
-  <Card title="Kotlin SDK" icon="android" href="/sdks/kotlin/realtime">
-    Coroutines-first realtime client for Android and JVM.
-  </Card>
+<Card title="Kotlin SDK" icon="android" href="/sdks/kotlin/realtime">
+  Coroutines-first realtime client for Android and JVM.
+</Card>
 
   <Card title="REST and WebSocket API" icon="code" href="/sdks/rest/realtime">
     Use the raw Socket.IO contract from any language.
