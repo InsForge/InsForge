@@ -2,6 +2,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ColumnType } from '@insforge/shared-schemas';
+import {
+  loadCreateTableDraft,
+  saveCreateTableDraft,
+} from '#features/database/utils/createTableDraft';
 
 const hookMocks = vi.hoisted(() => ({
   useTableRecords: vi.fn(),
@@ -14,6 +19,11 @@ vi.mock('#features/database/hooks/useDatabaseSchemaSelection', () => ({
     selectedSchema: 'public',
     setSelectedSchema: hookMocks.setSelectedSchema,
   }),
+}));
+
+vi.mock('#lib/config/DashboardHostContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/config/DashboardHostContext')>()),
+  useIsCloudHostingMode: () => false,
 }));
 
 vi.mock('#features/database/hooks/useDatabase', () => ({
@@ -80,9 +90,13 @@ vi.mock('#lib/hooks/usePageSize', () => ({
   }),
 }));
 
+const confirmMocks = vi.hoisted(() => ({
+  confirm: vi.fn(),
+}));
+
 vi.mock('#lib/hooks/useConfirm', () => ({
   useConfirm: () => ({
-    confirm: vi.fn(),
+    confirm: confirmMocks.confirm,
     confirmDialogProps: {},
   }),
 }));
@@ -92,10 +106,17 @@ const toastMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('#features/database/components/DatabaseSidebar', () => ({
-  DatabaseSidebar: (props: { onTableSelect?: (tableName: string) => void }) => (
+  DatabaseSidebar: (props: {
+    onTableSelect?: (tableName: string) => void;
+    onNewTable?: () => void;
+    onEditTable?: (tableName: string) => void;
+  }) => (
     <div data-testid="database-sidebar">
       <button onClick={() => props.onTableSelect?.('tableA')}>Switch to Table A</button>
       <button onClick={() => props.onTableSelect?.('tableB')}>Switch to Table B</button>
+      <button onClick={() => props.onNewTable?.()}>New Table</button>
+      <button onClick={() => props.onEditTable?.('tableA')}>Edit Table A</button>
+      <button onClick={() => props.onEditTable?.('tableB')}>Edit Table B</button>
     </div>
   ),
 }));
@@ -108,8 +129,21 @@ vi.mock('#features/database/components/RecordFormDialog', () => ({
   RecordFormDialog: () => null,
 }));
 
+// Shows which form is open and for which table, and lets a test mark it as changed.
 vi.mock('#features/database/components/TableForm', () => ({
-  TableForm: () => null,
+  TableForm: (props: {
+    mode?: 'create' | 'edit';
+    editTable?: { tableName?: string };
+    setFormIsDirty: (dirty: boolean) => void;
+  }) => (
+    <div
+      data-testid="table-form"
+      data-mode={props.mode}
+      data-edit-table={props.editTable?.tableName ?? ''}
+    >
+      <button onClick={() => props.setFormIsDirty(true)}>Change the form</button>
+    </div>
+  ),
 }));
 
 vi.mock('#features/database/components/TablesEmptyState', () => ({
@@ -297,5 +331,136 @@ describe('TablesPage table-switch search behavior', () => {
 
     // Table B should show empty search
     expect(screen.getByTestId('search-value-display')).toHaveTextContent('');
+  });
+});
+
+describe('TablesPage editing a table while the table form is open', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+
+    hookMocks.useTableRecords.mockReturnValue({
+      data: { records: [], pagination: { total: 0 } },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    // Each schema carries the name it was fetched for, so the form shows which table it edits.
+    hookMocks.useTableSchema.mockImplementation((tableName: string) => ({
+      data: {
+        tableName,
+        columns: [
+          {
+            columnName: 'id',
+            type: 'int4',
+            isPrimaryKey: true,
+            isNullable: false,
+            defaultValue: null,
+          },
+        ],
+        recordCount: 0,
+      },
+      isLoading: false,
+      error: null,
+    }));
+  });
+
+  function renderPage() {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/?table=tableA']}>
+        <TablesPage />
+      </MemoryRouter>
+    );
+    return user;
+  }
+
+  // The draft a real create form would have stored for this schema.
+  function storePostsDraft() {
+    saveCreateTableDraft(
+      'default',
+      'public',
+      {
+        tableName: 'posts',
+        columns: [
+          {
+            columnName: 'title',
+            type: ColumnType.STRING,
+            isNullable: true,
+            isUnique: false,
+            isSystemColumn: false,
+            isNewColumn: true,
+          },
+        ],
+      },
+      []
+    );
+  }
+
+  // Opens the create form with unsaved changes, plus the draft a real form would have stored.
+  async function openChangedCreateForm() {
+    const user = renderPage();
+    await user.click(screen.getByRole('button', { name: 'New Table' }));
+    await user.click(screen.getByRole('button', { name: 'Change the form' }));
+    storePostsDraft();
+    return user;
+  }
+
+  it('discards the create form and its draft, then opens the table to edit', async () => {
+    confirmMocks.confirm.mockResolvedValue(true);
+    const user = await openChangedCreateForm();
+
+    await user.click(screen.getByRole('button', { name: 'Edit Table B' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('table-form')).toHaveAttribute('data-mode', 'edit')
+    );
+    expect(confirmMocks.confirm).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('table-form')).toHaveAttribute('data-edit-table', 'tableB');
+    expect(loadCreateTableDraft('default', 'public')).toBeNull();
+  });
+
+  it('keeps the create form and its draft when leaving it is cancelled', async () => {
+    confirmMocks.confirm.mockResolvedValue(false);
+    const user = await openChangedCreateForm();
+
+    await user.click(screen.getByRole('button', { name: 'Edit Table B' }));
+
+    expect(confirmMocks.confirm).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('table-form')).toHaveAttribute('data-mode', 'create');
+    expect(loadCreateTableDraft('default', 'public')?.tableName).toBe('posts');
+  });
+
+  it('opens the table to edit without asking when the create form has no changes', async () => {
+    const user = renderPage();
+    await user.click(screen.getByRole('button', { name: 'New Table' }));
+
+    await user.click(screen.getByRole('button', { name: 'Edit Table B' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('table-form')).toHaveAttribute('data-mode', 'edit')
+    );
+    expect(confirmMocks.confirm).not.toHaveBeenCalled();
+    expect(screen.getByTestId('table-form')).toHaveAttribute('data-edit-table', 'tableB');
+  });
+
+  // Discarding an edit form is not a deliberate close of the create form, so the
+  // create draft stored for this schema has to survive it.
+  it('leaves the create draft alone when discarding a changed edit form for another table', async () => {
+    confirmMocks.confirm.mockResolvedValue(true);
+    storePostsDraft();
+    const user = renderPage();
+    await user.click(screen.getByRole('button', { name: 'Edit Table A' }));
+    await user.click(screen.getByRole('button', { name: 'Change the form' }));
+
+    await user.click(screen.getByRole('button', { name: 'Edit Table B' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('table-form')).toHaveAttribute('data-edit-table', 'tableB')
+    );
+    expect(confirmMocks.confirm).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('table-form')).toHaveAttribute('data-mode', 'edit');
+    expect(loadCreateTableDraft('default', 'public')?.tableName).toBe('posts');
   });
 });
