@@ -33,10 +33,11 @@ function row(key: string): DbRow {
 /** Mints a continuation token the way the handler does, for the same listing. */
 function signedToken(
   key: string,
-  scope: { bucket?: string; prefix?: string; delimiter?: string } = {}
+  scope: { bucket?: string; prefix?: string; delimiter?: string } = {},
+  version = 'v2'
 ): string {
   const fields = [
-    'insforge:s3:listv2:v1',
+    `insforge:s3:listv2:${version}`,
     scope.bucket ?? 'test-bucket',
     scope.prefix ?? '',
     scope.delimiter ?? '',
@@ -424,6 +425,21 @@ describe('ListObjectsV2 continuation-token authenticity', () => {
       'continuation-token': issued,
     });
     expect(otherPrefix.status).toBe(400);
+  });
+
+  it('rejects a token signed before listings moved to byte order', async () => {
+    // v1 cursors were positions in the database collation order. Resuming one
+    // under byte order can skip keys that sort after it in one order but
+    // before it in the other, so the caller has to restart the listing.
+    const issuedBeforeUpgrade = signedToken('a/1', { delimiter: '/' }, 'v1');
+
+    const result = await list(['a/1', 'a/2', 'b/1'], {
+      delimiter: '/',
+      'continuation-token': issuedBeforeUpgrade,
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.xml).toContain('InvalidArgument');
   });
 });
 
