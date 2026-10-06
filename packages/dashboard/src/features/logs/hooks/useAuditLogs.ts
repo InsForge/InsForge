@@ -13,15 +13,6 @@ export const useAuditLogs = (filters?: Partial<GetAuditLogsRequest>) => {
   });
 };
 
-export const useAuditLogStats = (days = 7) => {
-  return useQuery({
-    queryKey: ['audit-log-stats', days],
-    queryFn: () => auditService.getAuditLogStats(days),
-    staleTime: 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
-};
-
 export const useClearAuditLogs = () => {
   const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
@@ -31,7 +22,6 @@ export const useClearAuditLogs = () => {
     mutationFn: (daysToKeep?: number) => auditService.clearAuditLogs(daysToKeep),
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
-      void queryClient.invalidateQueries({ queryKey: ['audit-log-stats'] });
       showToast(
         t('logs.clearedAuditLogs', {
           count: data.deleted,
