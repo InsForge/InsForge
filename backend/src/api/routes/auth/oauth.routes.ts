@@ -23,6 +23,7 @@ import {
   oAuthCodeExchangeRequestSchema,
   type ListOAuthConfigsResponse,
   oAuthProvidersSchema,
+  isSharedKeyOAuthProvider,
 } from '@insforge/shared-schemas';
 import { isCloudEnvironment } from '@/utils/environment.js';
 
@@ -48,6 +49,20 @@ const validateJwtSecret = (): string => {
 };
 
 // OAuth Configuration Management Routes (must come before wildcard routes)
+/**
+ * Shared keys only exist for the providers the cloud proxies. Saving the flag for any
+ * other provider would leave a config whose every login fails at the shared callback.
+ */
+const validateSharedKeySupport = (provider: string): void => {
+  if (!isSharedKeyOAuthProvider(provider)) {
+    throw new AppError(
+      `${provider} does not support InsForge shared OAuth keys. Configure a client ID and secret instead.`,
+      400,
+      ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
+    );
+  }
+};
+
 // GET /api/auth/oauth/configs - List all OAuth configurations (admin only)
 router.get('/configs', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -121,6 +136,10 @@ router.post(
         );
       }
 
+      if (input.useSharedKey) {
+        validateSharedKeySupport(input.provider);
+      }
+
       const config = await oAuthConfigService.createConfig(input);
 
       await auditService.log({
@@ -171,6 +190,10 @@ router.put(
           400,
           ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
         );
+      }
+
+      if (input.useSharedKey) {
+        validateSharedKeySupport(provider);
       }
 
       const config = await oAuthConfigService.updateConfig(provider, input);
@@ -353,6 +376,9 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       );
     }
     const validatedProvider = providerValidation.data;
+
+    // A stale config row can still carry the flag for a provider the cloud never proxied
+    validateSharedKeySupport(validatedProvider);
 
     const oauthConfig = await oAuthConfigService.getConfigByProvider(validatedProvider);
     if (!oauthConfig?.useSharedKey) {
