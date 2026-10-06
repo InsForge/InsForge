@@ -5,9 +5,9 @@ import { fileURLToPath } from 'url';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.resolve(currentDir, '../../src/infra/database/migrations');
-const migrationFile = '065_storage-objects-key-byte-order-index.sql';
+const migrationFile = '066_storage-objects-key-byte-order-index.sql';
 
-describe('065_storage-objects-key-byte-order-index migration', () => {
+describe('066_storage-objects-key-byte-order-index migration', () => {
   it('indexes storage.objects keys in byte order for ListObjectsV2', () => {
     const migrationPath = path.join(migrationsDir, migrationFile);
     expect(fs.existsSync(migrationPath)).toBe(true);

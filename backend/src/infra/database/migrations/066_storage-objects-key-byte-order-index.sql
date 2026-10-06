@@ -1,4 +1,4 @@
--- Migration 065: Index storage.objects keys in byte order for S3 ListObjectsV2.
+-- Migration 066: Index storage.objects keys in byte order for S3 ListObjectsV2.
 --
 -- S3 lists keys in UTF-8 byte order, so the S3 gateway sorts and pages with
 -- key COLLATE "C". The primary key on (bucket, key) uses the database default
