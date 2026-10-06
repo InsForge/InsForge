@@ -7,7 +7,9 @@ export interface MetricAggregates {
 }
 
 export function aggregateMetricSeries(data: DashboardMetricDataPoint[]): MetricAggregates {
-  const finite = data.filter((point) => Number.isFinite(point.value));
+  const finite = data.filter(
+    (point) => Number.isFinite(point.value) && Number.isFinite(point.timestamp)
+  );
   if (finite.length === 0) {
     return { avg: null, max: null, latest: null };
   }
