@@ -54,6 +54,8 @@ jobs:
         with:
           files: openapi/**/*.yaml
           separator: "\n"
+          # safe_output escapes the separator newline onto the end of every path but the last.
+          safe_output: false
 
       - name: Validate changed OpenAPI specs
         if: steps.changed-openapi.outputs.any_changed == 'true'
