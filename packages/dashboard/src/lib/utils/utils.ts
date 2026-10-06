@@ -177,6 +177,34 @@ export function formatTime(timestamp: string): string {
 }
 
 /**
+ * Formats a timestamp as UTC, for hover tooltips on timestamps that display
+ * in the viewer's local time (Supabase/Render convention: local shown, UTC on hover)
+ * @param timestamp - ISO timestamp string or epoch milliseconds
+ * @returns UTC string (e.g., "2025-01-15 15:30:00 UTC"), or the input stringified if unparseable
+ */
+export function formatUtcTime(timestamp: string | number | Date): string {
+  const date = typeof timestamp === 'string' ? parseISO(timestamp) : new Date(timestamp);
+  if (!isValid(date)) {
+    return String(timestamp);
+  }
+  return `${date.toISOString().replace('T', ' ').slice(0, 19)} UTC`;
+}
+
+/**
+ * Formats a timestamp in the viewer's local time using the compact log-line
+ * shape (e.g., "2025-01-15 15:30:00"); pair with formatUtcTime as the hover title
+ * @param timestamp - ISO timestamp string or epoch milliseconds
+ * @returns Local-time string, or the input stringified if unparseable
+ */
+export function formatLocalLogTime(timestamp: string | number | Date): string {
+  const date = typeof timestamp === 'string' ? parseISO(timestamp) : new Date(timestamp);
+  if (!isValid(date)) {
+    return String(timestamp);
+  }
+  return format(date, 'yyyy-MM-dd HH:mm:ss');
+}
+
+/**
  * Formats a timestamp string to a date-only format
  * @param timestamp - ISO timestamp string
  * @returns Formatted date string (e.g., "Jan 15, 2025")
