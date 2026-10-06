@@ -72,7 +72,7 @@
     "pg-format": "^1.0.4",
     "picomatch": "^4.0.4",
     "razorpay": "^2.9.6",
-    "socket.io": "^4.8.1",
+    "socket.io": "^4.8.4",
     "stripe": "^22.1.0",
     "typescript": "^5.3.3",
     "winston": "^3.17.0",
