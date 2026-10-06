@@ -34,6 +34,23 @@ npx @insforge/cli payments stripe webhooks configure --environment test
 
 連接密鑰後，InsForge 驗證帳戶、在祕密儲存中儲存密鑰、嘗試建立託管的 Stripe webhook 端點，並為 Products、Prices、Customers 和 Subscriptions 執行同步。
 
+### 透過管理 API 設定密鑰
+
+Dashboard 和 CLI 都呼叫同一個管理端點。你也可以用管理 API Key（`ik_...`）直接呼叫它：
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/payments/stripe/test/config" \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{ "secretKey": "sk_test_xxx" }'
+```
+
+- `PUT /api/payments/stripe/{environment}/config`，其中 `{environment}` 為 `test` 或 `live`。僅限管理員。
+- 請求主體為 `{ "secretKey": "..." }`。密鑰前綴必須與環境相符（`test` 用 `sk_test_...`，`live` 用 `sk_live_...`）。
+- 成功後，InsForge 會對照你的 Stripe 帳戶驗證密鑰、加密儲存到祕密儲存、嘗試（重新）建立託管的 webhook 端點，並為 Products、Prices、Customers 和 Subscriptions 執行首次同步。如果連接的 Stripe 帳戶發生變化，會先清除先前鏡像的支付資料。
+
+要讀取連接狀態和遮罩後的密鑰，呼叫 `GET /api/payments/stripe/status`。
+
 ## Checkout
 
 從前端程式碼使用目前 InsForge 使用者令牌建立 Checkout Sessions。
