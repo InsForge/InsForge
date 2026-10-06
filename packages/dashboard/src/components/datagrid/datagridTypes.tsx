@@ -19,12 +19,6 @@ export type ConvertedValue =
   | string[]; // Array of strings (e.g., providers)
 
 /**
- * User input values - these are the types of values users enter in forms and cell editors
- * All user inputs need to be converted to ConvertedValue
- */
-export type UserInputValue = string | number | boolean | null;
-
-/**
  * Display values - these are always strings formatted for UI display
  * Used by cell renderers and form display components
  */

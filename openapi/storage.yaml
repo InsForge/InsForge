@@ -89,19 +89,32 @@ paths:
         - apiKey: []
       responses:
         '200':
-          description: List of bucket names
+          description: List of buckets
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  buckets:
-                    type: array
-                    items:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - name
+                    - public
+                    - createdAt
+                  properties:
+                    name:
                       type: string
-                    example: ["avatars", "documents", "uploads"]
+                    public:
+                      type: boolean
+                    createdAt:
+                      type: string
+                      format: date-time
               example:
-                buckets: ["avatars", "documents", "uploads", "public", "private"]
+                - name: "avatars"
+                  public: true
+                  createdAt: "2024-01-21T10:30:00Z"
+                - name: "documents"
+                  public: false
+                  createdAt: "2024-01-22T14:20:00Z"
 
     post:
       summary: Create New Bucket
@@ -144,7 +157,7 @@ paths:
                     example: avatars
               example:
                 message: "Bucket created successfully"
-                bucket: "avatars"
+                bucketName: "avatars"
         '400':
           description: Invalid bucket name
           content:

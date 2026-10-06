@@ -9,12 +9,6 @@ import X from '#assets/logos/x.svg?react';
 import Apple from '#assets/logos/apple.svg?react';
 import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
 
-export enum AuthTab {
-  USERS = 'users',
-  AUTH_METHODS = 'auth-methods',
-  CONFIGURATION = 'configuration',
-}
-
 export interface OAuthProviderInfo {
   id: OAuthProvidersSchema;
   name: string;
