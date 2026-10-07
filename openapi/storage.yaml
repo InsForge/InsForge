@@ -419,11 +419,11 @@ paths:
                 $ref: '#/components/schemas/StoredFile'
               example:
                 bucket: "avatars"
-                key: "image-1737546841234-a3f2b1.jpg"
+                key: "image-1737546841234-550e8400-e29b-41d4-a716-446655440000.jpg"
                 size: 102400
                 mimeType: "image/jpeg"
                 uploadedAt: "2024-01-21T10:30:00Z"
-                url: "/api/storage/buckets/avatars/objects/image-1737546841234-a3f2b1.jpg"
+                url: "/api/storage/buckets/avatars/objects/image-1737546841234-550e8400-e29b-41d4-a716-446655440000.jpg"
         '400':
           description: Invalid bucket name or file
           content:

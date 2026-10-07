@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import path from 'path';
 import { Pool, PoolClient } from 'pg';
 import { AppError } from '@/utils/errors.js';
@@ -132,13 +133,13 @@ export class StorageService {
   }
 
   /**
-   * Generate a unique object key with timestamp and random string
+   * Generate a unique object key with timestamp and cryptographically secure UUID
    * @param originalFilename - The original filename from the upload
    * @returns Generated unique key
    */
   generateObjectKey(originalFilename: string): string {
     const timestamp = Date.now();
-    const randomStr = Math.random().toString(36).substring(2, 8);
+    const randomStr = crypto.randomUUID();
     const fileExt = originalFilename ? path.extname(originalFilename) : '';
     const baseName = originalFilename ? path.basename(originalFilename, fileExt) : 'file';
     const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9-_]/g, '-').substring(0, 32);
