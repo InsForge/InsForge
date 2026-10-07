@@ -1,12 +1,12 @@
 ---
 title: "Model Gateway"
 sidebarTitle: "Overview"
-description: "Call any LLM through one OpenAI-compatible endpoint, with InsForge-managed provider keys, OpenRouter routing, and per-project usage tracking and quotas."
+description: "Provision an OpenRouter key from InsForge, call chat, streaming, and embedding models with the OpenAI SDK, and follow spend and per-model usage from the dashboard."
 ---
 
-Use the Model Gateway to call chat, streaming, and embedding models through one OpenAI-compatible endpoint. InsForge holds the provider keys, tracks usage per project, and routes traffic through [OpenRouter](https://openrouter.ai), so your application code never sees Anthropic, OpenAI, or Mistral credentials directly.
+Use the Model Gateway to provision an OpenRouter key for your project, browse the model catalog, and follow spend and per-model usage. Your application calls [OpenRouter](https://openrouter.ai) directly with that key, so one integration reaches chat, streaming, and embedding models from Anthropic, OpenAI, Mistral, Google, and dozens of other providers.
 
-<Frame caption="One OpenAI-compatible endpoint with per-provider access, ready-to-copy code, and usage tracking.">
+<Frame caption="The Model Gateway page in the dashboard: the active key, per-provider access, ready-to-copy code, and usage charts.">
   <img src="/images/model-gateway-overview.png" alt="InsForge dashboard Model Gateway overview showing code samples, provider chips, and usage charts" />
 </Frame>
 
@@ -38,23 +38,23 @@ graph TB
 
 ### OpenAI-compatible API
 
-Point any OpenAI SDK or `openai`-compatible library at `https://<project>.insforge.dev/v1` and it works. `/v1/chat/completions`, `/v1/embeddings`, and `/v1/models` all behave like the upstream spec.
+Copy the provisioned key from the dashboard into a server-only `OPENROUTER_API_KEY`, then point any OpenAI SDK or `openai`-compatible library at `https://openrouter.ai/api/v1`. The [TypeScript SDK](/sdks/typescript/ai) and [REST](/sdks/rest/ai) references have working snippets.
+
+<Warning>
+  The provisioned key is a server-side credential. Keep OpenRouter calls behind a backend route, server action, or Edge Function, and never ship the key in a browser bundle.
+</Warning>
 
 ### Streaming
 
-Server-sent events for chat completions. Use the streaming endpoint the same way you would with OpenAI; the gateway forwards tokens as they arrive from the provider.
+Server-sent events for chat completions. Set `stream: true` the way you would with OpenAI, and tokens arrive as the provider produces them.
 
 ### Embeddings
 
 Generate dense vectors from any embedding model OpenRouter supports. Store the result in Postgres with [pgvector](/core-concepts/database/pgvector) for semantic search.
 
-### Per-project quotas
+### Spend and usage
 
-Each project carries its own rate limit and spend cap. Hit it, and the gateway returns a clean 429 instead of leaking provider quota state into your app.
-
-### Usage tracking
-
-Every request is logged with model, token count, and cost. Query usage from the dashboard, CLI, or MCP — billing reconciles to OpenRouter's invoice automatically.
+The Model Gateway page in the dashboard reads your key's activity from OpenRouter: total spend, daily, weekly, and monthly usage, remaining credit and its reset date, and a per-model breakdown.
 
 ### Multi-provider routing
 
