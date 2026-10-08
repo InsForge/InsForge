@@ -199,6 +199,8 @@ curl -X PUT "https://your-app.insforge.app/api/storage/buckets/avatars/objects/u
 
 Upload a file with an auto-generated unique key.
 
+Generated keys are limited to 255 UTF-8 bytes. The sanitized filename base is shortened first, preserving the extension, timestamp, and secure random suffix. If the extension still cannot fit after removing the base, it is shortened without splitting Unicode characters.
+
 ```
 POST /api/storage/buckets/{bucketName}/objects
 ```
@@ -216,11 +218,11 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/uploads/objects"
 ```json
 {
   "bucket": "uploads",
-  "key": "document-1737546841234-a3f2b1.pdf",
+  "key": "document-1737546841234-AAECAwQFBgcICQoLDA0ODw.pdf",
   "size": 204800,
   "mimeType": "application/pdf",
   "uploadedAt": "2024-01-21T10:30:00Z",
-  "url": "/api/storage/buckets/uploads/objects/document-1737546841234-a3f2b1.pdf"
+  "url": "/api/storage/buckets/uploads/objects/document-1737546841234-AAECAwQFBgcICQoLDA0ODw.pdf"
 }
 ```
 
