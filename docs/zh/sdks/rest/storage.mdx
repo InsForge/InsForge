@@ -199,6 +199,8 @@ curl -X PUT "https://your-app.insforge.app/api/storage/buckets/avatars/objects/u
 
 使用自动生成的唯一密钥上传文件。
 
+自动生成的对象键最多占用 255 个 UTF-8 字节。系统优先缩短经过处理的文件名主体，保留扩展名、时间戳和安全随机后缀。如果移除文件名主体后扩展名仍然过长，则会缩短扩展名，但不会截断 Unicode 字符。
+
 ```
 POST /api/storage/buckets/{bucketName}/objects
 ```

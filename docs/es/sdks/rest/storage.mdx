@@ -199,6 +199,8 @@ curl -X PUT "https://your-app.insforge.app/api/storage/buckets/avatars/objects/u
 
 Carga un archivo con una clave única generada automáticamente.
 
+Las claves generadas tienen un límite de 255 bytes UTF-8. Primero se acorta el nombre base del archivo saneado, conservando la extensión, la marca de tiempo y el sufijo aleatorio seguro. Si la extensión aún no cabe después de eliminar el nombre base, se acorta sin dividir caracteres Unicode.
+
 ```
 POST /api/storage/buckets/{bucketName}/objects
 ```

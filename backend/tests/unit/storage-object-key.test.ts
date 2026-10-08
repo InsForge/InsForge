@@ -75,6 +75,61 @@ describe('StorageService.generateObjectKey', () => {
     expect(Buffer.byteLength(key, 'utf8')).toBeLessThanOrEqual(255);
   });
 
+  it.each([
+    [185, 32],
+    [186, 31],
+    [190, 27],
+    [217, 0],
+  ])(
+    'preserves a %i-character extension by limiting the base to %i bytes',
+    (length, baseLength) => {
+      const extension = `.${'x'.repeat(length)}`;
+      const key = service.generateObjectKey(`${'a'.repeat(32)}${extension}`);
+
+      expect(key).toBe(`${'a'.repeat(baseLength)}-${TIMESTAMP}-${RANDOM_SUFFIX}${extension}`);
+      expect(Buffer.byteLength(key, 'utf8')).toBe(255);
+    }
+  );
+
+  it.each([
+    ['é', 95, 27],
+    ['😀', 48, 25],
+  ])(
+    'preserves a multibyte %s extension by shortening only the base',
+    (character, count, baseLength) => {
+      const extension = `.${character.repeat(count)}`;
+      const key = service.generateObjectKey(`${'a'.repeat(32)}${extension}`);
+
+      expect(key).toBe(`${'a'.repeat(baseLength)}-${TIMESTAMP}-${RANDOM_SUFFIX}${extension}`);
+      expect(Buffer.byteLength(key, 'utf8')).toBe(255);
+    }
+  );
+
+  it('trims the extension only when it cannot fit even with an empty base', () => {
+    const key = service.generateObjectKey(`a.${'x'.repeat(218)}`);
+
+    expect(key).toBe(`-${TIMESTAMP}-${RANDOM_SUFFIX}.${'x'.repeat(217)}`);
+    expect(Buffer.byteLength(key, 'utf8')).toBe(255);
+  });
+
+  it('does not split Unicode characters when an oversized extension must be trimmed', () => {
+    const key = service.generateObjectKey(`a.${'😀'.repeat(55)}`);
+
+    expect(key).toBe(`-${TIMESTAMP}-${RANDOM_SUFFIX}.${'😀'.repeat(54)}`);
+    expect(Buffer.byteLength(key, 'utf8')).toBe(254);
+    expect(Buffer.from(key, 'utf8').toString('utf8')).toBe(key);
+  });
+
+  it('calculates the budget using the actual timestamp length', () => {
+    const timestamp = 10_000_000_000_000;
+    vi.mocked(Date.now).mockReturnValue(timestamp);
+    const extension = `.${'x'.repeat(190)}`;
+    const key = service.generateObjectKey(`${'a'.repeat(32)}${extension}`);
+
+    expect(key).toBe(`${'a'.repeat(26)}-${timestamp}-${RANDOM_SUFFIX}${extension}`);
+    expect(Buffer.byteLength(key, 'utf8')).toBe(255);
+  });
+
   it('does not rely on Math.random', () => {
     vi.spyOn(Math, 'random').mockImplementation(() => {
       throw new Error('Math.random must not be used for object keys');

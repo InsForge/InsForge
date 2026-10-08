@@ -199,6 +199,8 @@ curl -X PUT "https://your-app.insforge.app/api/storage/buckets/avatars/objects/u
 
 使用自動產生的唯一金鑰上傳檔案。
 
+自動產生的物件鍵最多占用 255 個 UTF-8 位元組。系統優先縮短經過處理的檔名主體，保留副檔名、時間戳記和安全隨機後綴。如果移除檔名主體後副檔名仍然過長，則會縮短副檔名，但不會截斷 Unicode 字元。
+
 ```
 POST /api/storage/buckets/{bucketName}/objects
 ```

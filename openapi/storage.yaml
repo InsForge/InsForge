@@ -385,6 +385,7 @@ paths:
 
     post:
       summary: Upload Object with Auto-Generated Key
+      description: Generated keys are limited to 255 UTF-8 bytes by shortening the sanitized filename base first. The extension is preserved unless it cannot fit even with an empty base, in which case it is shortened without splitting Unicode characters. The timestamp and secure random suffix are preserved.
       tags:
         - Client
       security:

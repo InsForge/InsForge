@@ -24,6 +24,9 @@ import { getApiBaseUrl } from '@/utils/environment.js';
 import { appConfig } from '@/infra/config/app.config.js';
 
 const DEFAULT_LIST_LIMIT = 100;
+const MAX_GENERATED_OBJECT_KEY_BYTES = 255;
+const GENERATED_OBJECT_KEY_RANDOM_BYTES = 16;
+const MAX_GENERATED_OBJECT_KEY_BASE_LENGTH = 32;
 const GIGABYTE_IN_BYTES = 1024 * 1024 * 1024;
 const PUBLIC_BUCKET_EXPIRY = 0; // Public buckets don't expire
 const PRIVATE_BUCKET_EXPIRY = 3600; // Private buckets expire in 1 hour
@@ -139,13 +142,38 @@ export class StorageService {
    */
   generateObjectKey(originalFilename: string): string {
     const timestamp = Date.now();
-    const randomStr = crypto.randomBytes(16).toString('base64url');
+    const randomStr = crypto.randomBytes(GENERATED_OBJECT_KEY_RANDOM_BYTES).toString('base64url');
     const fileExt = originalFilename ? path.extname(originalFilename) : '';
     const baseName = originalFilename ? path.basename(originalFilename, fileExt) : 'file';
-    const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9-_]/g, '-').substring(0, 32);
-    const objectKey = `${sanitizedBaseName}-${timestamp}-${randomStr}${fileExt}`;
+    const sanitizedBaseName = baseName
+      .replace(/[^a-zA-Z0-9-_]/g, '-')
+      .substring(0, MAX_GENERATED_OBJECT_KEY_BASE_LENGTH);
+    const uniqueSuffix = `-${timestamp}-${randomStr}`;
+    const baseBudget = Math.max(
+      0,
+      MAX_GENERATED_OBJECT_KEY_BYTES - Buffer.byteLength(`${uniqueSuffix}${fileExt}`, 'utf8')
+    );
+    // The sanitized base is ASCII, so each character occupies one byte.
+    const keyPrefix = `${sanitizedBaseName.substring(0, baseBudget)}${uniqueSuffix}`;
+    const extensionBudget = MAX_GENERATED_OBJECT_KEY_BYTES - Buffer.byteLength(keyPrefix, 'utf8');
 
-    return objectKey;
+    if (Buffer.byteLength(fileExt, 'utf8') <= extensionBudget) {
+      return `${keyPrefix}${fileExt}`;
+    }
+
+    // Only trim the extension if removing the entire base is insufficient.
+    let boundedExtension = '';
+    let extensionBytes = 0;
+    for (const character of fileExt) {
+      const characterBytes = Buffer.byteLength(character, 'utf8');
+      if (extensionBytes + characterBytes > extensionBudget) {
+        break;
+      }
+      boundedExtension += character;
+      extensionBytes += characterBytes;
+    }
+
+    return `${keyPrefix}${boundedExtension}`;
   }
 
   async putObject(
