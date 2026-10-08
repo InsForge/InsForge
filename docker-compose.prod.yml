@@ -66,6 +66,9 @@ services:
       - "127.0.0.1:${AUTH_PORT:-7131}:7131"
     environment:
       - PORT=7130
+      # The backend port is published directly, so there is no trusted proxy in
+      # front of it. Set TRUST_PROXY to the number of proxies if you add one.
+      - TRUST_PROXY=${TRUST_PROXY:-0}
       - PROJECT_ROOT=/app
       - API_BASE_URL=${API_BASE_URL:-}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
