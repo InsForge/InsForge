@@ -146,6 +146,54 @@ export const verifyOTPRateLimiter = rateLimit({
 });
 
 /**
+ * Per-IP rate limiter for password sign-in attempts
+ * Prevents brute-force password guessing
+ *
+ * Limits: 10 failed attempts per 15 minutes per IP
+ */
+export const passwordSignInRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many sign-in attempts from this IP. Please try again in 15 minutes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+  skipSuccessfulRequests: true, // Don't count successful sign-ins
+  skipFailedRequests: false, // Count failed attempts to prevent brute force
+});
+
+/**
+ * Per-IP rate limiter for admin password sign-in attempts
+ * Kept separate from the user limiter so one cannot exhaust the other's budget
+ *
+ * Limits: 10 failed attempts per 15 minutes per IP
+ */
+export const adminSignInRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many admin sign-in attempts from this IP. Please try again in 15 minutes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+  skipSuccessfulRequests: true,
+  skipFailedRequests: false,
+});
+
+/**
  * Per-IP rate limiter for native provider ID-token exchanges.
  * These unauthenticated requests perform cryptographic token verification and
  * may fetch provider signing keys, so count both successful and failed calls.
