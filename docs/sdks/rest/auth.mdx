@@ -425,6 +425,13 @@ Update the current user's profile.
 PATCH /api/auth/profiles/current
 ```
 
+<Warning>
+  The entire profile object, including any custom fields you add, is
+  publicly readable by anyone via `GET /api/auth/profiles/{userId}` with no
+  authentication required. Do not store sensitive or private data in this
+  field.
+</Warning>
+
 ### Request Body
 
 | Field | Type | Required | Description |
@@ -461,7 +468,9 @@ curl -X PATCH "https://your-app.insforge.app/api/auth/profiles/current" \
 
 ## Get User Profile
 
-Get public profile information for a user by ID.
+Get public profile information for a user by ID. This endpoint requires no
+authentication and returns the full profile object as set via `PATCH
+/api/auth/profiles/current`, including any custom fields.
 
 ```
 GET /api/auth/profiles/{userId}
