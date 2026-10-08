@@ -228,6 +228,37 @@ describe('password sign-in rate limiting', () => {
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({ accessToken: 'admin-access-token' });
     });
+
+    it('does not count successful sign-ins against the limit', async () => {
+      const ip = '10.0.1.3';
+
+      for (let i = 0; i < MAX_ATTEMPTS + 2; i++) {
+        const response = await request(app)
+          .post('/api/auth/admin/sessions')
+          .set('X-Forwarded-For', ip)
+          .send(credentials);
+        expect(response.status).toBe(200);
+      }
+    });
+
+    it('keeps a separate budget from user sign-in on the same IP', async () => {
+      const ip = '10.0.1.4';
+      mocks.login.mockRejectedValue(new AppError('Invalid credentials', 401, 'AUTH_UNAUTHORIZED'));
+
+      for (let i = 0; i < MAX_ATTEMPTS + 1; i++) {
+        await request(app)
+          .post('/api/auth/sessions')
+          .set('X-Forwarded-For', ip)
+          .send({ method: 'password', email: 'user@example.com', password: 'secret123' });
+      }
+
+      const response = await request(app)
+        .post('/api/auth/admin/sessions')
+        .set('X-Forwarded-For', ip)
+        .send(credentials);
+
+      expect(response.status).toBe(200);
+    });
   });
 
   describe('INSFORGE_DISABLE_WRITE_RATE_LIMIT bypass', () => {
