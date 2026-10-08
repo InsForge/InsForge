@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import { AppError } from '../../src/utils/errors.js';
@@ -227,6 +227,39 @@ describe('password sign-in rate limiting', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({ accessToken: 'admin-access-token' });
+    });
+  });
+
+  describe('INSFORGE_DISABLE_WRITE_RATE_LIMIT bypass', () => {
+    const ORIGINAL = process.env.INSFORGE_DISABLE_WRITE_RATE_LIMIT;
+
+    afterEach(() => {
+      if (ORIGINAL === undefined) {
+        delete process.env.INSFORGE_DISABLE_WRITE_RATE_LIMIT;
+      } else {
+        process.env.INSFORGE_DISABLE_WRITE_RATE_LIMIT = ORIGINAL;
+      }
+    });
+
+    it('skips both limiters when set to "1"', async () => {
+      process.env.INSFORGE_DISABLE_WRITE_RATE_LIMIT = '1';
+      mocks.login.mockRejectedValue(new AppError('Invalid credentials', 401, 'AUTH_UNAUTHORIZED'));
+      mocks.adminLogin.mockImplementation(() => {
+        throw new AppError('Invalid admin credentials', 401, 'AUTH_UNAUTHORIZED');
+      });
+
+      for (let i = 0; i < MAX_ATTEMPTS + 2; i++) {
+        await request(app)
+          .post('/api/auth/sessions')
+          .set('X-Forwarded-For', '10.0.2.1')
+          .send({ method: 'password', email: 'user@example.com', password: 'secret123' })
+          .expect(401);
+        await request(app)
+          .post('/api/auth/admin/sessions')
+          .set('X-Forwarded-For', '10.0.2.1')
+          .send({ username: 'admin@example.com', password: 'secret123' })
+          .expect(401);
+      }
     });
   });
 });
