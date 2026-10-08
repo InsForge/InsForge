@@ -150,12 +150,14 @@ export const verifyOTPRateLimiter = rateLimit({
  * Prevents brute-force password guessing
  *
  * Limits: 10 failed attempts per 15 minutes per IP
+ * Bypassed when INSFORGE_DISABLE_WRITE_RATE_LIMIT=1 (e2e runs)
  */
 export const passwordSignInRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isWriteRateLimitDisabled(),
   handler: (_req: Request, _res: Response, next: NextFunction) => {
     next(
       new AppError(
@@ -174,12 +176,14 @@ export const passwordSignInRateLimiter = rateLimit({
  * Kept separate from the user limiter so one cannot exhaust the other's budget
  *
  * Limits: 10 failed attempts per 15 minutes per IP
+ * Bypassed when INSFORGE_DISABLE_WRITE_RATE_LIMIT=1 (e2e runs)
  */
 export const adminSignInRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isWriteRateLimitDisabled(),
   handler: (_req: Request, _res: Response, next: NextFunction) => {
     next(
       new AppError(
