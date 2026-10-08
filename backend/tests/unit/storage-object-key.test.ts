@@ -13,8 +13,9 @@ vi.mock('@/infra/database/database.manager.js', () => ({
 import { StorageService } from '@/services/storage/storage.service.js';
 
 const TIMESTAMP = 1737546841234;
-const UUID = '550e8400-e29b-41d4-a716-446655440000';
-const SECOND_UUID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+const RANDOM_BYTES = Buffer.from('000102030405060708090a0b0c0d0e0f', 'hex');
+const RANDOM_SUFFIX = 'AAECAwQFBgcICQoLDA0ODw';
+const SECOND_RANDOM_BYTES = Buffer.alloc(16, 255);
 
 describe('StorageService.generateObjectKey', () => {
   let service: StorageService;
@@ -22,24 +23,33 @@ describe('StorageService.generateObjectKey', () => {
   beforeEach(() => {
     service = StorageService.getInstance();
     vi.spyOn(Date, 'now').mockReturnValue(TIMESTAMP);
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(UUID);
+    vi.spyOn(crypto, 'randomBytes').mockImplementation(() => RANDOM_BYTES);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('includes the full UUID from the cryptographically secure generator', () => {
-    expect(service.generateObjectKey('photo.jpg')).toBe(`photo-${TIMESTAMP}-${UUID}.jpg`);
-    expect(crypto.randomUUID).toHaveBeenCalledOnce();
+  it('encodes all 16 secure random bytes as a 22-character URL-safe suffix', () => {
+    const key = service.generateObjectKey('photo.jpg');
+    const suffix = key.slice(`photo-${TIMESTAMP}-`.length, -'.jpg'.length);
+
+    expect(key).toBe(`photo-${TIMESTAMP}-${RANDOM_SUFFIX}.jpg`);
+    expect(suffix).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(Buffer.from(suffix, 'base64url')).toEqual(RANDOM_BYTES);
+    expect(crypto.randomBytes).toHaveBeenCalledExactlyOnceWith(16);
   });
 
   it('generates different keys for the same filename and millisecond', () => {
-    vi.mocked(crypto.randomUUID).mockReturnValueOnce(UUID).mockReturnValueOnce(SECOND_UUID);
+    vi.mocked(crypto.randomBytes)
+      .mockImplementationOnce(() => RANDOM_BYTES)
+      .mockImplementationOnce(() => SECOND_RANDOM_BYTES);
 
-    expect(service.generateObjectKey('photo.jpg')).toBe(`photo-${TIMESTAMP}-${UUID}.jpg`);
-    expect(service.generateObjectKey('photo.jpg')).toBe(`photo-${TIMESTAMP}-${SECOND_UUID}.jpg`);
-    expect(crypto.randomUUID).toHaveBeenCalledTimes(2);
+    expect(service.generateObjectKey('photo.jpg')).toBe(`photo-${TIMESTAMP}-${RANDOM_SUFFIX}.jpg`);
+    const secondKey = service.generateObjectKey('photo.jpg');
+    expect(secondKey).toBe(`photo-${TIMESTAMP}-${SECOND_RANDOM_BYTES.toString('base64url')}.jpg`);
+    expect(secondKey).toMatch(/^photo-\d+-[A-Za-z0-9_-]{22}\.jpg$/);
+    expect(crypto.randomBytes).toHaveBeenCalledTimes(2);
   });
 
   it.each([
@@ -51,7 +61,18 @@ describe('StorageService.generateObjectKey', () => {
     ['README', 'README', ''],
     ['', 'file', ''],
   ])('preserves filename handling for %j', (filename, base, extension) => {
-    expect(service.generateObjectKey(filename)).toBe(`${base}-${TIMESTAMP}-${UUID}${extension}`);
+    expect(service.generateObjectKey(filename)).toBe(
+      `${base}-${TIMESTAMP}-${RANDOM_SUFFIX}${extension}`
+    );
+  });
+
+  it('preserves a 210-character extension while fitting the local filename limit', () => {
+    const extension = `.${'x'.repeat(210)}`;
+    const key = service.generateObjectKey(`a${extension}`);
+
+    expect(key).toBe(`a-${TIMESTAMP}-${RANDOM_SUFFIX}${extension}`);
+    expect(Buffer.byteLength(key, 'utf8')).toBe(249);
+    expect(Buffer.byteLength(key, 'utf8')).toBeLessThanOrEqual(255);
   });
 
   it('does not rely on Math.random', () => {
@@ -59,13 +80,13 @@ describe('StorageService.generateObjectKey', () => {
       throw new Error('Math.random must not be used for object keys');
     });
 
-    expect(service.generateObjectKey('photo.jpg')).toBe(`photo-${TIMESTAMP}-${UUID}.jpg`);
+    expect(service.generateObjectKey('photo.jpg')).toBe(`photo-${TIMESTAMP}-${RANDOM_SUFFIX}.jpg`);
     expect(Math.random).not.toHaveBeenCalled();
   });
 
   it('propagates secure generator failures instead of using a weak fallback', () => {
     const error = new Error('Secure random generation failed');
-    vi.mocked(crypto.randomUUID).mockImplementation(() => {
+    vi.mocked(crypto.randomBytes).mockImplementation(() => {
       throw error;
     });
 

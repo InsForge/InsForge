@@ -133,13 +133,13 @@ export class StorageService {
   }
 
   /**
-   * Generate a unique object key with timestamp and cryptographically secure UUID
+   * Generate a unique object key with timestamp and a secure Base64URL suffix
    * @param originalFilename - The original filename from the upload
    * @returns Generated unique key
    */
   generateObjectKey(originalFilename: string): string {
     const timestamp = Date.now();
-    const randomStr = crypto.randomUUID();
+    const randomStr = crypto.randomBytes(16).toString('base64url');
     const fileExt = originalFilename ? path.extname(originalFilename) : '';
     const baseName = originalFilename ? path.basename(originalFilename, fileExt) : 'file';
     const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9-_]/g, '-').substring(0, 32);
