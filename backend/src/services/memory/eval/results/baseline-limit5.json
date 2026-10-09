@@ -1,0 +1,144 @@
+{
+  "generatedAt": "2026-08-08T02:02:07.975Z",
+  "scope": "eval",
+  "limit": 5,
+  "corpusSize": 28,
+  "queries": {
+    "positive": 16,
+    "negative": 2
+  },
+  "rows": [
+    {
+      "threshold": 0,
+      "precision": 0.23750000000000002,
+      "recall": 0.9270833333333333,
+      "f1": 0.36607142857142855,
+      "mrr": 0.9270833333333333,
+      "f1Lexical": 0.3630952380952382,
+      "f1Semantic": 0.36904761904761907,
+      "mrrSemantic": 0.8541666666666667,
+      "noise": 5
+    },
+    {
+      "threshold": 0.2,
+      "precision": 0.24583333333333335,
+      "recall": 0.9270833333333333,
+      "f1": 0.37648809523809523,
+      "mrr": 0.9270833333333333,
+      "f1Lexical": 0.3839285714285715,
+      "f1Semantic": 0.36904761904761907,
+      "mrrSemantic": 0.8541666666666667,
+      "noise": 2.5
+    },
+    {
+      "threshold": 0.3,
+      "precision": 0.4833333333333334,
+      "recall": 0.90625,
+      "f1": 0.5586309523809524,
+      "mrr": 0.9270833333333333,
+      "f1Lexical": 0.6714285714285715,
+      "f1Semantic": 0.44583333333333336,
+      "mrrSemantic": 0.8541666666666667,
+      "noise": 1
+    },
+    {
+      "threshold": 0.35,
+      "precision": 0.6718749999999999,
+      "recall": 0.90625,
+      "f1": 0.7166666666666667,
+      "mrr": 0.9270833333333333,
+      "f1Lexical": 0.7791666666666667,
+      "f1Semantic": 0.6541666666666667,
+      "mrrSemantic": 0.8541666666666667,
+      "noise": 0
+    },
+    {
+      "threshold": 0.4,
+      "precision": 0.7291666666666666,
+      "recall": 0.7291666666666666,
+      "f1": 0.7250000000000001,
+      "mrr": 0.75,
+      "f1Lexical": 0.975,
+      "f1Semantic": 0.475,
+      "mrrSemantic": 0.5,
+      "noise": 0
+    },
+    {
+      "threshold": 0.45,
+      "precision": 0.5416666666666667,
+      "recall": 0.5625,
+      "f1": 0.55,
+      "mrr": 0.5625,
+      "f1Lexical": 0.975,
+      "f1Semantic": 0.125,
+      "mrrSemantic": 0.125,
+      "noise": 0
+    },
+    {
+      "threshold": 0.5,
+      "precision": 0.4791666666666667,
+      "recall": 0.5,
+      "f1": 0.4875,
+      "mrr": 0.5,
+      "f1Lexical": 0.975,
+      "f1Semantic": 0,
+      "mrrSemantic": 0,
+      "noise": 0
+    },
+    {
+      "threshold": 0.55,
+      "precision": 0.5,
+      "recall": 0.5,
+      "f1": 0.5,
+      "mrr": 0.5,
+      "f1Lexical": 1,
+      "f1Semantic": 0,
+      "mrrSemantic": 0,
+      "noise": 0
+    },
+    {
+      "threshold": 0.6,
+      "precision": 0.5,
+      "recall": 0.5,
+      "f1": 0.5,
+      "mrr": 0.5,
+      "f1Lexical": 1,
+      "f1Semantic": 0,
+      "mrrSemantic": 0,
+      "noise": 0
+    },
+    {
+      "threshold": 0.7,
+      "precision": 0.4375,
+      "recall": 0.4375,
+      "f1": 0.4375,
+      "mrr": 0.4375,
+      "f1Lexical": 0.875,
+      "f1Semantic": 0,
+      "mrrSemantic": 0,
+      "noise": 0
+    },
+    {
+      "threshold": 0.8,
+      "precision": 0.375,
+      "recall": 0.375,
+      "f1": 0.375,
+      "mrr": 0.375,
+      "f1Lexical": 0.75,
+      "f1Semantic": 0,
+      "mrrSemantic": 0,
+      "noise": 0
+    },
+    {
+      "threshold": 1,
+      "precision": 0.375,
+      "recall": 0.375,
+      "f1": 0.375,
+      "mrr": 0.375,
+      "f1Lexical": 0.75,
+      "f1Semantic": 0,
+      "mrrSemantic": 0,
+      "noise": 0
+    }
+  ]
+}
