@@ -1,5 +1,4 @@
 import express, { Request, Response, NextFunction } from 'express';
-import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -25,6 +24,12 @@ import { s3GatewayRouter } from '@/api/routes/s3-gateway/index.routes.js';
 import { paymentsRouter } from '@/api/routes/payments/index.routes.js';
 import { advisorRouter } from '@/api/routes/advisor/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
+import { corsMiddleware } from '@/api/middlewares/cors.js';
+import { helmetMiddleware } from '@/api/middlewares/helmet.js';
+import {
+  frameAncestorsMiddleware,
+  warmPartnerOriginsCache,
+} from '@/api/middlewares/frame-ancestors.js';
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
@@ -85,19 +90,21 @@ export async function createApp() {
   // Initialize SQL parser WASM module
   await initSqlParser();
 
+  // Warm the frame-ancestors partner-origin cache before accepting
+  // connections, so the first real request (which may be the partner's own
+  // dashboard-embedding iframe load) doesn't race the background refresh
+  // and get stuck with a 'self'-only policy it can never recover from.
+  await warmPartnerOriginsCache();
+
   const app = express();
 
   // Enable trust proxy setting for rate limiting behind proxies/load balancers.
   app.set('trust proxy', appConfig.server.trustProxy);
 
   // Basic middleware
-  app.use(
-    cors({
-      origin: true, // Allow all origins (matches Better Auth's trustedOrigins: ['*'])
-      credentials: true, // Allow cookies/credentials
-      exposedHeaders: ['Content-Range', 'Preference-Applied'],
-    })
-  );
+  app.use(helmetMiddleware);
+  app.use(frameAncestorsMiddleware);
+  app.use(corsMiddleware);
   app.use(cookieParser()); // Parse cookies for refresh token handling
   app.use((req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
@@ -294,21 +301,35 @@ export async function createApp() {
       // - connection: hop-by-hop header
       // - content-encoding: node-fetch already decompresses the response,
       //   so we must not tell the client it's still compressed
+      // - access-control-allow-origin/-credentials: an edge function's own
+      //   CORS headers (several example functions set these) must not
+      //   override what corsMiddleware already decided for this request's
+      //   actual Origin — forwarding them would let any function reopen the
+      //   allowlist this PR exists to enforce, on this one legacy route.
       const responseHeaders: Record<string, string> = {};
       for (const [key, value] of response.headers.entries()) {
         if (
-          ['transfer-encoding', 'content-length', 'connection', 'content-encoding'].includes(key)
+          [
+            'transfer-encoding',
+            'content-length',
+            'connection',
+            'content-encoding',
+            'access-control-allow-origin',
+            'access-control-allow-credentials',
+          ].includes(key)
         ) {
           continue;
         }
         responseHeaders[key] = value;
       }
 
-      res
-        .status(response.status)
-        .set(responseHeaders)
-        .set('Access-Control-Allow-Origin', '*')
-        .send(responseBody);
+      // No explicit Access-Control-Allow-Origin here: this used to hardcode
+      // `*`, silently overriding whatever `corsMiddleware` (mounted above)
+      // had already decided for the request's actual Origin — bypassing a
+      // configured allowlist for this one legacy route. Leaving the header
+      // corsMiddleware already set on the response keeps this route
+      // consistent with the rest of the API.
+      res.status(response.status).set(responseHeaders).send(responseBody);
     } catch (error) {
       logger.error('Failed to proxy function', { slug, error: String(error) });
       res.status(502).json({ error: error instanceof Error ? error.message : String(error) });

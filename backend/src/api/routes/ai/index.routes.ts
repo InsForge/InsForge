@@ -269,10 +269,35 @@ router.post(
         res.setHeader('Connection', 'keep-alive');
 
         // Create and process the stream
+        let aborted = false;
+        let streamGenerator: ReturnType<typeof chatService.streamChat> | undefined;
+        const abortController = new AbortController();
+        const onClientClose = () => {
+          aborted = true;
+          // This is the cancellation that actually matters: `streamChat`
+          // passes this signal straight to the OpenAI SDK call, which aborts
+          // the in-flight upstream fetch. Calling `.return()` on the outer
+          // generator is NOT enough on its own — a plain async generator
+          // suspended awaiting its inner `for await` (i.e. waiting on the
+          // next upstream chunk, the common case) can't be preempted by
+          // `.return()`; that only takes effect once the pending read
+          // settles, by which point the upstream request has already run to
+          // completion regardless (verified empirically: a nested-generator
+          // `.return()` while the inner iterable's `.next()` is in flight
+          // does not propagate to the inner iterable until it resolves on
+          // its own). Aborting the underlying fetch is what stops it.
+          abortController.abort();
+          void streamGenerator?.return(undefined);
+        };
+        res.on('close', onClientClose);
+
         try {
-          const streamGenerator = chatService.streamChat(messages, options);
+          streamGenerator = chatService.streamChat(messages, options, abortController.signal);
 
           for await (const data of streamGenerator) {
+            if (aborted) {
+              break;
+            }
             if (data.chunk) {
               res.write(`data: ${JSON.stringify({ chunk: data.chunk })}\n\n`);
             }
@@ -287,20 +312,28 @@ router.post(
             }
           }
 
-          // Send completion signal
-          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+          if (!aborted) {
+            // Send completion signal
+            res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+          }
         } catch (streamError) {
           // If error occurs during streaming, send it in SSE format
           logger.error('Stream error during chat completion', {
             error: streamError instanceof Error ? streamError.message : String(streamError),
             stack: streamError instanceof Error ? streamError.stack : undefined,
           });
-          res.write(
-            `data: ${JSON.stringify({ error: true, message: streamError instanceof Error ? streamError.message : String(streamError) })}\n\n`
-          );
+          if (!aborted) {
+            res.write(
+              `data: ${JSON.stringify({ error: true, message: streamError instanceof Error ? streamError.message : String(streamError) })}\n\n`
+            );
+          }
+        } finally {
+          res.off('close', onClientClose);
         }
 
-        res.end();
+        if (!aborted) {
+          res.end();
+        }
         return;
       }
 
