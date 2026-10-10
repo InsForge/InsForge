@@ -35,6 +35,7 @@ import { StorageService } from '@/services/storage/storage.service.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
 import { seedBackend } from '@/utils/seed.js';
+import { assertNoDefaultSecrets } from '@/utils/secret-validation.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
@@ -353,6 +354,9 @@ const PORT = appConfig.app.port;
 
 async function initializeServer() {
   try {
+    // Fail fast, before the listener opens, if critical secrets are still
+    // publicly known defaults — see utils/secret-validation.ts.
+    assertNoDefaultSecrets();
     const app = await createApp();
 
     // Before the listener opens, so no request can construct the compute registry from

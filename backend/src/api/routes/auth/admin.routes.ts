@@ -16,13 +16,17 @@ import {
   type CreateAdminSessionResponse,
   type GetCurrentAdminSessionResponse,
 } from '@insforge/shared-schemas';
+import { adminLoginRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import logger from '@/utils/logger.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
 
 // POST /api/auth/admin/sessions/exchange - Exchange authorization code for admin session
-router.post('/sessions/exchange', async (req: Request, res: Response, next: NextFunction) => {
+router.post(
+  '/sessions/exchange',
+  adminLoginRateLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = exchangeAdminSessionRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -57,7 +61,10 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
 });
 
 // POST /api/auth/admin/sessions - Create admin session (web only)
-router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
+router.post(
+  '/sessions',
+  adminLoginRateLimiter,
+  (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
     if (!validationResult.success) {

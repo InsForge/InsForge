@@ -2,7 +2,7 @@ services:
   postgres:
     image: ghcr.io/insforge/postgres:v15.13.4
 
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:?JWT_SECRET must be set to a strong random value — generate one with: openssl rand -hex 32}}'
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
@@ -40,7 +40,7 @@ services:
       PGRST_DB_ANON_ROLE: anon
       # Keep in sync with the backend's POSTGREST_MAX_SOCKETS (default 50)
       PGRST_DB_POOL: ${PGRST_DB_POOL:-50}
-      PGRST_JWT_SECRET: ${JWT_SECRET:-dev-secret-please-change-in-production}
+      PGRST_JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set to a strong random value — generate one with: openssl rand -hex 32}
     ports:
       - "127.0.0.1:${POSTGREST_PORT:-5430}:3000"
     depends_on:
@@ -68,10 +68,10 @@ services:
       - PORT=7130
       - PROJECT_ROOT=/app
       - API_BASE_URL=${API_BASE_URL:-}
-      - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set to a strong random value — generate one with: openssl rand -hex 32}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - ROOT_ADMIN_USERNAME=${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
-      - ROOT_ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}
+      - ROOT_ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:?ROOT_ADMIN_PASSWORD must be set — the old default (change-this-password) is publicly known}
       - ADMIN_EMAIL=${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
       - ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
@@ -227,7 +227,7 @@ services:
       - WORKER_TIMEOUT_MS=${WORKER_TIMEOUT_MS:-60000}
       # Encryption keys for decrypting function secrets
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set to a strong random value — generate one with: openssl rand -hex 32}
     volumes:
       - ./functions:/app/functions
       - deno_cache:/deno-dir

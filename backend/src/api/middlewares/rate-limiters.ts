@@ -234,9 +234,8 @@ export const verifyOTPLimiter = [verifyOTPRateLimiter];
  * (see DEFAULT_WRITE_ENDPOINT_LIMITS) are generous for human-driven CRUD;
  * CI loops are expected to deploy once per commit and stay well below them.
  *
- * Operators can override per-category budgets at runtime by publishing a JSON
- * file at INSFORGE_WRITE_RATE_LIMIT_CONFIG_URL (default
- * https://config.insforge.dev/resource-rate-limits.json):
+ * Operators can override per-category budgets at runtime by uploading a JSON
+ * file to the AWS_CONFIG_BUCKET at key `resource-rate-limits.json`:
  *   { "functions": 20, "deployments": 40, "compute": 15 }
  * The file is fetched on startup and refreshed on a periodic timer
  * (default 1 hour; tune via INSFORGE_WRITE_RATE_LIMIT_REFRESH_MS, set to 0
@@ -474,6 +473,32 @@ function createWriteEndpointLimiter(category: WriteLimiterCategory) {
 export const functionsWriteLimiter = createWriteEndpointLimiter('functions');
 export const deploymentsWriteLimiter = createWriteEndpointLimiter('deployments');
 export const computeWriteLimiter = createWriteEndpointLimiter('compute');
+
+/**
+ * Per-IP rate limiter for admin session creation (dashboard login and the
+ * authorization-code exchange). This is the highest-privilege credential
+ * endpoint on an exposed instance, yet it previously had no limiter at all —
+ * the ordinary user login was throttled while the admin login was not.
+ *
+ * Limits: 5 attempts per 15 minutes per IP, counting every attempt.
+ */
+export const adminLoginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many admin login attempts from this IP. Please try again in 15 minutes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+  skipSuccessfulRequests: false,
+  skipFailedRequests: false,
+});
 
 export const migrationsDryRunLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
