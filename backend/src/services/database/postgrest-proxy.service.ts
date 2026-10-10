@@ -278,6 +278,8 @@ export class PostgrestProxyService {
         ...request.headers,
         host: undefined,
         'content-length': undefined,
+        // a forwarded `Connection: close` makes PostgREST drop a socket the agent still pools
+        connection: undefined,
       },
     };
 
