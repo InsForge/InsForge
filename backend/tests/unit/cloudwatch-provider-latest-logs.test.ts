@@ -58,7 +58,7 @@ describe('CloudWatchProvider.getLogsBySource latest logs', () => {
     vi.useRealTimers();
   });
 
-  it('returns the newest events when the last 24h hold more than the page cap', async () => {
+  it('returns the newest events when the last 24h hold far more than one sweep returns', async () => {
     // above the provider's 50,000-event safety cap even after it overshoots by a page
     const count = 80000;
     const step = Math.floor((24 * 60 * 60 * 1000) / count);
@@ -74,7 +74,8 @@ describe('CloudWatchProvider.getLogsBySource latest logs', () => {
 
   it('widens the window for sparse logs without duplicating a boundary event', async () => {
     const events = [
-      event(NOW - 3 * 60 * 60 * 1000),
+      event(NOW - 12 * 60 * 60 * 1000),
+      event(NOW - 5 * 60 * 1000 - 1),
       event(NOW - 5 * 60 * 1000),
       event(NOW - 2 * 60 * 1000),
     ];
@@ -83,5 +84,24 @@ describe('CloudWatchProvider.getLogsBySource latest logs', () => {
     const result = await provider.getLogsBySource('insforge.logs', 100);
 
     expect(result.logs.map((l) => l.id)).toEqual(events.map((e) => e.eventId));
+  });
+  it('keeps the newest events of a window that overflows a single sweep', async () => {
+    const burst = Array.from({ length: 100000 }, (_, i) => event(NOW - 55 * 60 * 1000 + i * 27));
+    const recent = Array.from({ length: 50 }, (_, i) => event(NOW - 4 * 60 * 1000 + i * 1000));
+    const events = [...burst, ...recent];
+
+    const { provider } = providerWith(events);
+    const result = await provider.getLogsBySource('insforge.logs', 200);
+
+    expect(result.logs.map((l) => l.id)).toEqual(events.slice(-200).map((e) => e.eventId));
+  });
+
+  it('falls back to the default limit when limit is not a positive integer', async () => {
+    const events = Array.from({ length: 300 }, (_, i) => event(NOW - (300 - i) * 1000));
+
+    const { provider } = providerWith(events);
+    const result = await provider.getLogsBySource('insforge.logs', 0);
+
+    expect(result.logs.map((l) => l.id)).toEqual(events.slice(-100).map((e) => e.eventId));
   });
 });
