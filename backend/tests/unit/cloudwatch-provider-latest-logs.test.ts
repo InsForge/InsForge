@@ -58,8 +58,7 @@ describe('CloudWatchProvider.getLogsBySource latest logs', () => {
     vi.useRealTimers();
   });
 
-  it('returns the newest events when the last 24h hold far more than one sweep returns', async () => {
-    // above the provider's 50,000-event safety cap even after it overshoots by a page
+  it('stops at the newest window that already holds `limit` events', async () => {
     const count = 80000;
     const step = Math.floor((24 * 60 * 60 * 1000) / count);
     const events = Array.from({ length: count }, (_, i) => event(NOW - (count - 1 - i) * step));
@@ -67,7 +66,6 @@ describe('CloudWatchProvider.getLogsBySource latest logs', () => {
     const { provider, filterCalls } = providerWith(events);
     const result = await provider.getLogsBySource('insforge.logs', 100);
 
-    expect(result.logs).toHaveLength(100);
     expect(result.logs.map((l) => l.id)).toEqual(events.slice(-100).map((e) => e.eventId));
     expect(filterCalls.every((c) => (c.startTime ?? 0) >= NOW - 5 * 60 * 1000)).toBe(true);
   });
@@ -103,5 +101,18 @@ describe('CloudWatchProvider.getLogsBySource latest logs', () => {
     const result = await provider.getLogsBySource('insforge.logs', 0);
 
     expect(result.logs.map((l) => l.id)).toEqual(events.slice(-100).map((e) => e.eventId));
+  });
+
+  it('returns only fully read windows when the page budget runs out', async () => {
+    const older = Array.from({ length: 250000 }, (_, i) =>
+      event(NOW - 24 * 60 * 60 * 1000 + 1 + i * 250)
+    );
+    const recent = [event(NOW - 3 * 60 * 1000), event(NOW - 60 * 1000)];
+
+    const { provider, filterCalls } = providerWith([...older, ...recent]);
+    const result = await provider.getLogsBySource('insforge.logs', 100);
+
+    expect(result.logs.map((l) => l.id)).toEqual(recent.map((e) => e.eventId));
+    expect(filterCalls.length).toBeLessThanOrEqual(20);
   });
 });

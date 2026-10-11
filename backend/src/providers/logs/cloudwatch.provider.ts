@@ -13,13 +13,16 @@ import { BaseLogProvider } from './base.provider.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-schemas';
 
-// Do not collapse into one 24h sweep: FilterLogEvents pages oldest-first, so the newest events come last.
+// Narrow windows first: one 24h sweep pages oldest-first through the whole day before reaching the newest events.
 const LATEST_LOG_WINDOWS_MS = [
   5 * 60 * 1000,
   60 * 60 * 1000,
   6 * 60 * 60 * 1000,
   24 * 60 * 60 * 1000,
 ];
+// FilterLogEvents' 5 TPS quota is account-wide, so one request must not page through a whole day.
+const LATEST_LOG_MAX_PAGES = 20;
+const LATEST_LOG_MAX_EVENTS = 10000;
 
 export class CloudWatchProvider extends BaseLogProvider {
   private cwClient: CloudWatchLogsClient | null = null;
@@ -144,17 +147,25 @@ export class CloudWatchProvider extends BaseLogProvider {
     if (!beforeTimestamp) {
       // Case 1: Get the most recent logs - use reliable approach instead of Insights
       // CloudWatch Insights can be inconsistent, so use FilterLogEvents with pagination
-      // limit arrives unvalidated from the query string; 0 or NaN would keep every event in memory
-      const keep = Number.isInteger(limit) && limit > 0 ? limit : 100;
+      // limit arrives unvalidated from the query string; bound it so one request cannot hold a day of events
+      const keep =
+        Number.isInteger(limit) && limit > 0 ? Math.min(limit, LATEST_LOG_MAX_EVENTS) : 100;
       let collected: FilteredLogEvent[] = [];
       let windowEnd = endMs;
+      let pagesLeft = LATEST_LOG_MAX_PAGES;
 
       for (const windowMs of LATEST_LOG_WINDOWS_MS) {
         const windowStart = endMs - windowMs;
         let windowEvents: FilteredLogEvent[] = [];
         let nextToken: string | undefined;
+        let complete = true;
 
         do {
+          if (pagesLeft === 0) {
+            complete = false;
+            break;
+          }
+          pagesLeft--;
           const fle = await client.send(
             new FilterLogEventsCommand({
               logGroupName: logGroup,
@@ -165,11 +176,15 @@ export class CloudWatchProvider extends BaseLogProvider {
             })
           );
 
-          // Only this window's newest `keep` can be returned, since older windows come later
+          // do not drop the slice: a busy window would otherwise hold every page in memory
           windowEvents = windowEvents.concat(fle.events || []).slice(-keep);
           nextToken = fle.nextToken;
         } while (nextToken);
 
+        // a window cut short holds its oldest events, not its newest, so it must not be used
+        if (!complete) {
+          break;
+        }
         collected = windowEvents.concat(collected);
         // endTime is inclusive, so the next window stops short of this one's start
         windowEnd = windowStart - 1;
@@ -178,7 +193,6 @@ export class CloudWatchProvider extends BaseLogProvider {
         }
       }
 
-      // Get the most recent 'limit' events (events are in chronological order)
       events = collected.slice(-keep);
     } else {
       // Case 2: Get logs before the specified timestamp (pagination)
