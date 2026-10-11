@@ -2,27 +2,17 @@ import {
   CloudWatchLogsClient,
   DescribeLogStreamsCommand,
   FilterLogEventsCommand,
+  GetLogEventsCommand,
   StartQueryCommand,
   GetQueryResultsCommand,
   CreateLogGroupCommand,
   ResourceAlreadyExistsException,
-  type FilteredLogEvent,
+  type OutputLogEvent,
 } from '@aws-sdk/client-cloudwatch-logs';
 import logger from '@/utils/logger.js';
 import { BaseLogProvider } from './base.provider.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-schemas';
-
-// Narrow windows first: one 24h sweep pages oldest-first through the whole day before reaching the newest events.
-const LATEST_LOG_WINDOWS_MS = [
-  5 * 60 * 1000,
-  60 * 60 * 1000,
-  6 * 60 * 60 * 1000,
-  24 * 60 * 60 * 1000,
-];
-// FilterLogEvents' 5 TPS quota is account-wide, so one request must not page through a whole day.
-const LATEST_LOG_MAX_PAGES = 20;
-const LATEST_LOG_MAX_EVENTS = 10000;
 
 export class CloudWatchProvider extends BaseLogProvider {
   private cwClient: CloudWatchLogsClient | null = null;
@@ -130,9 +120,6 @@ export class CloudWatchProvider extends BaseLogProvider {
       .map((s) => s.logStreamName || '')
       .filter((name) => (suffix ? name.includes(suffix) : true));
 
-    // Use beforeTimestamp as the end time, default to now
-    const endMs = beforeTimestamp ? Date.parse(beforeTimestamp) : Date.now();
-
     // For getLogsBySource, we need to handle two cases:
     // 1. No beforeTimestamp: get the most recent logs
     // 2. With beforeTimestamp: get logs before that timestamp
@@ -145,55 +132,48 @@ export class CloudWatchProvider extends BaseLogProvider {
     }>;
 
     if (!beforeTimestamp) {
-      // Case 1: Get the most recent logs - use reliable approach instead of Insights
-      // CloudWatch Insights can be inconsistent, so use FilterLogEvents with pagination
-      // limit arrives unvalidated from the query string; bound it so one request cannot hold a day of events
-      const keep =
-        Number.isInteger(limit) && limit > 0 ? Math.min(limit, LATEST_LOG_MAX_EVENTS) : 100;
-      let collected: FilteredLogEvent[] = [];
-      let windowEnd = endMs;
-      let pagesLeft = LATEST_LOG_MAX_PAGES;
+      // Case 1: GetLogEvents reads a stream newest-first; FilterLogEvents can only page oldest-first
+      // limit arrives unvalidated from the query string, and GetLogEvents rejects more than 10,000
+      const keep = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 10000) : 100;
+      const latest: typeof events = [];
 
-      for (const windowMs of LATEST_LOG_WINDOWS_MS) {
-        const windowStart = endMs - windowMs;
-        let windowEvents: FilteredLogEvent[] = [];
+      for (const logStreamName of streams) {
+        let streamEvents: OutputLogEvent[] = [];
         let nextToken: string | undefined;
-        let complete = true;
-
-        do {
-          if (pagesLeft === 0) {
-            complete = false;
-            break;
-          }
-          pagesLeft--;
-          const fle = await client.send(
-            new FilterLogEventsCommand({
+        // pages can come back short or empty before the stream is exhausted; a repeated token means its start
+        for (let page = 0; page < 5 && streamEvents.length < keep; page++) {
+          const gle = await client.send(
+            new GetLogEventsCommand({
               logGroupName: logGroup,
-              logStreamNames: streams.length ? streams.slice(0, 100) : undefined,
-              startTime: windowStart,
-              endTime: windowEnd,
+              logStreamName,
+              startFromHead: false,
+              limit: keep,
               nextToken,
             })
           );
-
-          // do not drop the slice: a busy window would otherwise hold every page in memory
-          windowEvents = windowEvents.concat(fle.events || []).slice(-keep);
-          nextToken = fle.nextToken;
-        } while (nextToken);
-
-        // a window cut short holds its oldest events, not its newest, so it must not be used
-        if (!complete) {
-          break;
+          streamEvents = (gle.events || []).concat(streamEvents);
+          if (!gle.nextBackwardToken || gle.nextBackwardToken === nextToken) {
+            break;
+          }
+          nextToken = gle.nextBackwardToken;
         }
-        collected = windowEvents.concat(collected);
-        // endTime is inclusive, so the next window stops short of this one's start
-        windowEnd = windowStart - 1;
-        if (collected.length >= keep) {
-          break;
+
+        // GetLogEvents has no eventId, and several lines often share a millisecond
+        const seen = new Map<number | undefined, number>();
+        for (const e of streamEvents.slice(-keep)) {
+          const n = seen.get(e.timestamp) ?? 0;
+          seen.set(e.timestamp, n + 1);
+          latest.push({
+            eventId: `${logStreamName}-${e.timestamp}-${n}`,
+            timestamp: e.timestamp,
+            message: e.message,
+            logStreamName,
+          });
         }
       }
 
-      events = collected.slice(-keep);
+      latest.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+      events = latest.slice(-keep);
     } else {
       // Case 2: Get logs before the specified timestamp (pagination)
       // Use CloudWatch Insights for efficient timestamp-based pagination
@@ -339,9 +319,8 @@ export class CloudWatchProvider extends BaseLogProvider {
 
       if (sourceStreams.length) {
         try {
-          // Use EXACTLY the same approach as getLogsBySource to get consistent results
           const endMs = Date.now();
-          const startMs = endMs - 24 * 60 * 60 * 1000; // Look back 24 hours (same as getLogsBySource)
+          const startMs = endMs - 24 * 60 * 60 * 1000;
 
           // Use CloudWatch Insights to efficiently get the latest timestamp
           try {

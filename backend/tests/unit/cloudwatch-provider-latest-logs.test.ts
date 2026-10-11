@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   DescribeLogStreamsCommand,
-  FilterLogEventsCommand,
-  type FilteredLogEvent,
+  GetLogEventsCommand,
+  type OutputLogEvent,
 } from '@aws-sdk/client-cloudwatch-logs';
 import { CloudWatchProvider } from '../../src/providers/logs/cloudwatch.provider';
 
@@ -12,107 +12,111 @@ vi.mock('../../src/utils/logger', () => ({
 
 const NOW = Date.parse('2026-10-11T09:00:00.000Z');
 const STREAM = 'p-us-east-2-insforge-vector';
-const PAGE_SIZE = 10000;
 
-// Serves FilterLogEvents like CloudWatch: inclusive time range, oldest first, paginated.
-function providerWith(events: FilteredLogEvent[]) {
-  const filterCalls: Array<{ startTime?: number; endTime?: number }> = [];
+// Serves GetLogEvents like CloudWatch with startFromHead=false: each page is the newest events before
+// the token, oldest first, at most `pageSize` long; at the stream's start the token sent comes back.
+function providerWith(streams: Record<string, OutputLogEvent[]>, pageSize = Infinity) {
+  const getCalls: Array<{ logStreamName?: string; limit?: number; startFromHead?: boolean }> = [];
   const send = vi.fn(async (cmd: unknown) => {
     if (cmd instanceof DescribeLogStreamsCommand) {
-      return { logStreams: [{ logStreamName: STREAM }] };
+      return { logStreams: Object.keys(streams).map((logStreamName) => ({ logStreamName })) };
     }
-    if (cmd instanceof FilterLogEventsCommand) {
-      filterCalls.push({ startTime: cmd.input.startTime, endTime: cmd.input.endTime });
-      const { startTime = 0, endTime = Infinity, nextToken } = cmd.input;
-      const inRange = events.filter(
-        (e) => (e.timestamp ?? 0) >= startTime && (e.timestamp ?? 0) <= endTime
-      );
-      const offset = nextToken ? Number(nextToken) : 0;
-      const page = inRange.slice(offset, offset + PAGE_SIZE);
-      const next = offset + PAGE_SIZE < inRange.length ? String(offset + PAGE_SIZE) : undefined;
-      return { events: page, nextToken: next };
+    if (cmd instanceof GetLogEventsCommand) {
+      const { logStreamName = '', limit = 10000, startFromHead, nextToken } = cmd.input;
+      getCalls.push({ logStreamName, limit, startFromHead });
+      const all = streams[logStreamName] ?? [];
+      const end = nextToken ? Number(nextToken.slice(2)) : all.length;
+      const start = Math.max(0, end - Math.min(limit, pageSize));
+      const nextBackwardToken = start === end && nextToken ? nextToken : `b/${start}`;
+      return { events: all.slice(start, end), nextBackwardToken };
     }
     throw new Error(`unexpected command ${String(cmd)}`);
   });
   const provider = new CloudWatchProvider();
   Object.assign(provider, { cwClient: { send }, cwLogGroup: '/insforge/test' });
-  return { provider, filterCalls };
+  return { provider, getCalls };
 }
 
-function event(timestamp: number): FilteredLogEvent {
-  return {
-    eventId: String(timestamp),
-    timestamp,
-    logStreamName: STREAM,
-    message: JSON.stringify({ level: 'info', message: `at ${timestamp}` }),
-  };
+function event(timestamp: number, message = `at ${timestamp}`): OutputLogEvent {
+  return { timestamp, message: JSON.stringify({ level: 'info', message }) };
 }
+
+const times = (logs: Array<{ timestamp: string }>) => logs.map((l) => Date.parse(l.timestamp));
 
 describe('CloudWatchProvider.getLogsBySource latest logs', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(NOW);
-  });
+  it('returns the newest events of a busy stream in one newest-first read', async () => {
+    const events = Array.from({ length: 80000 }, (_, i) => event(NOW - (80000 - i) * 1000));
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('stops at the newest window that already holds `limit` events', async () => {
-    const count = 80000;
-    const step = Math.floor((24 * 60 * 60 * 1000) / count);
-    const events = Array.from({ length: count }, (_, i) => event(NOW - (count - 1 - i) * step));
-
-    const { provider, filterCalls } = providerWith(events);
+    const { provider, getCalls } = providerWith({ [STREAM]: events });
     const result = await provider.getLogsBySource('insforge.logs', 100);
 
-    expect(result.logs.map((l) => l.id)).toEqual(events.slice(-100).map((e) => e.eventId));
-    expect(filterCalls.every((c) => (c.startTime ?? 0) >= NOW - 5 * 60 * 1000)).toBe(true);
+    expect(times(result.logs)).toEqual(events.slice(-100).map((e) => e.timestamp));
+    expect(getCalls).toEqual([{ logStreamName: STREAM, limit: 100, startFromHead: false }]);
   });
 
-  it('widens the window for sparse logs without duplicating a boundary event', async () => {
-    const events = [
-      event(NOW - 12 * 60 * 60 * 1000),
-      event(NOW - 5 * 60 * 1000 - 1),
-      event(NOW - 5 * 60 * 1000),
-      event(NOW - 2 * 60 * 1000),
-    ];
+  it('keeps paging backward when CloudWatch returns short pages', async () => {
+    const events = Array.from({ length: 500 }, (_, i) => event(NOW - (500 - i) * 1000));
 
-    const { provider } = providerWith(events);
-    const result = await provider.getLogsBySource('insforge.logs', 100);
-
-    expect(result.logs.map((l) => l.id)).toEqual(events.map((e) => e.eventId));
-  });
-  it('keeps the newest events of a window that overflows a single sweep', async () => {
-    const burst = Array.from({ length: 100000 }, (_, i) => event(NOW - 55 * 60 * 1000 + i * 27));
-    const recent = Array.from({ length: 50 }, (_, i) => event(NOW - 4 * 60 * 1000 + i * 1000));
-    const events = [...burst, ...recent];
-
-    const { provider } = providerWith(events);
+    const { provider } = providerWith({ [STREAM]: events }, 120);
     const result = await provider.getLogsBySource('insforge.logs', 200);
 
-    expect(result.logs.map((l) => l.id)).toEqual(events.slice(-200).map((e) => e.eventId));
+    expect(times(result.logs)).toEqual(events.slice(-200).map((e) => e.timestamp));
   });
 
-  it('falls back to the default limit when limit is not a positive integer', async () => {
-    const events = Array.from({ length: 300 }, (_, i) => event(NOW - (300 - i) * 1000));
-
-    const { provider } = providerWith(events);
-    const result = await provider.getLogsBySource('insforge.logs', 0);
-
-    expect(result.logs.map((l) => l.id)).toEqual(events.slice(-100).map((e) => e.eventId));
-  });
-
-  it('returns only fully read windows when the page budget runs out', async () => {
-    const older = Array.from({ length: 250000 }, (_, i) =>
-      event(NOW - 24 * 60 * 60 * 1000 + 1 + i * 250)
-    );
-    const recent = [event(NOW - 3 * 60 * 1000), event(NOW - 60 * 1000)];
-
-    const { provider, filterCalls } = providerWith([...older, ...recent]);
+  it('stops at the start of a stream once CloudWatch repeats the token', async () => {
+    const { provider, getCalls } = providerWith({ [STREAM]: [event(NOW)] });
     const result = await provider.getLogsBySource('insforge.logs', 100);
 
-    expect(result.logs.map((l) => l.id)).toEqual(recent.map((e) => e.eventId));
-    expect(filterCalls.length).toBeLessThanOrEqual(20);
+    expect(times(result.logs)).toEqual([NOW]);
+    expect(getCalls).toHaveLength(2);
+  });
+
+  it('gives up on a stream after five empty pages with fresh tokens', async () => {
+    const { provider } = providerWith({ [STREAM]: [] });
+    let token = 0;
+    const send = vi.fn(async (cmd: unknown) =>
+      cmd instanceof DescribeLogStreamsCommand
+        ? { logStreams: [{ logStreamName: STREAM }] }
+        : { events: [], nextBackwardToken: `t${token++}` }
+    );
+    Object.assign(provider, { cwClient: { send } });
+
+    const result = await provider.getLogsBySource('insforge.logs', 100);
+
+    expect(result.logs).toEqual([]);
+    expect(token).toBe(5);
+  });
+
+  it('merges matching streams in time order and keeps the newest overall', async () => {
+    const { provider } = providerWith({
+      'old-host-insforge-vector': [event(NOW - 4000), event(NOW - 2000)],
+      [STREAM]: [event(NOW - 3000), event(NOW - 1000)],
+      'p-us-east-2-postgres-vector': [event(NOW)],
+    });
+    const result = await provider.getLogsBySource('insforge.logs', 3);
+
+    expect(times(result.logs)).toEqual([NOW - 3000, NOW - 2000, NOW - 1000]);
+  });
+
+  it('gives lines that share a millisecond distinct ids, within and across streams', async () => {
+    const { provider } = providerWith({
+      [STREAM]: [event(NOW, 'secret check'), event(NOW, 'HTTP Request')],
+      'old-host-insforge-vector': [event(NOW, 'other host')],
+    });
+    const result = await provider.getLogsBySource('insforge.logs', 100);
+
+    expect(new Set(result.logs.map((l) => l.id)).size).toBe(3);
+  });
+
+  it('clamps limit to what GetLogEvents accepts', async () => {
+    const { provider, getCalls } = providerWith({ [STREAM]: [event(NOW)] });
+
+    await provider.getLogsBySource('insforge.logs', 0);
+    const defaulted = getCalls.splice(0).map((c) => c.limit);
+    await provider.getLogsBySource('insforge.logs', 50000);
+    const capped = getCalls.map((c) => c.limit);
+
+    expect(new Set(defaulted)).toEqual(new Set([100]));
+    expect(new Set(capped)).toEqual(new Set([10000]));
   });
 });
