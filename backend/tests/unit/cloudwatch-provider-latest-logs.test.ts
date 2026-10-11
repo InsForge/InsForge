@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   DescribeLogStreamsCommand,
   FilterLogEventsCommand,
@@ -56,6 +56,16 @@ function event(timestamp: number): FilteredLogEvent {
 const ids = (events: FilteredLogEvent[]) => events.map((e) => e.eventId);
 
 describe('CloudWatchProvider.getLogsBySource latest logs', () => {
+  // the provider reads the last 24h relative to Date.now(), so the fixtures need a pinned clock
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns the newest events of a busy group oldest-first, in one newest-first read', async () => {
     const events = Array.from({ length: 80000 }, (_, i) => event(NOW - (80000 - i) * 1000));
 
