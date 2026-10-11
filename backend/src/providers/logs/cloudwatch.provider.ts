@@ -6,11 +6,21 @@ import {
   GetQueryResultsCommand,
   CreateLogGroupCommand,
   ResourceAlreadyExistsException,
+  type FilteredLogEvent,
 } from '@aws-sdk/client-cloudwatch-logs';
 import logger from '@/utils/logger.js';
 import { BaseLogProvider } from './base.provider.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-schemas';
+
+// Do not collapse into one 24h sweep: FilterLogEvents pages oldest-first, so a busy
+// group hits the page cap before it reaches the newest events.
+const LATEST_LOG_WINDOWS_MS = [
+  5 * 60 * 1000,
+  60 * 60 * 1000,
+  6 * 60 * 60 * 1000,
+  24 * 60 * 60 * 1000,
+];
 
 export class CloudWatchProvider extends BaseLogProvider {
   private cwClient: CloudWatchLogsClient | null = null;
@@ -124,7 +134,7 @@ export class CloudWatchProvider extends BaseLogProvider {
     const startMs = endMs - 24 * 60 * 60 * 1000;
 
     // For getLogsBySource, we need to handle two cases:
-    // 1. No beforeTimestamp: get the most recent logs (need to fetch all to find the newest)
+    // 1. No beforeTimestamp: get the most recent logs
     // 2. With beforeTimestamp: get logs before that timestamp
 
     let events: Array<{
@@ -137,37 +147,45 @@ export class CloudWatchProvider extends BaseLogProvider {
     if (!beforeTimestamp) {
       // Case 1: Get the most recent logs - use reliable approach instead of Insights
       // CloudWatch Insights can be inconsistent, so use FilterLogEvents with pagination
-      const allEvents: Array<{
-        eventId?: string;
-        timestamp?: number;
-        message?: string;
-        logStreamName?: string;
-      }> = [];
-      let nextToken: string | undefined;
+      let collected: FilteredLogEvent[] = [];
+      let windowEnd = endMs;
 
-      do {
-        const fle = await client.send(
-          new FilterLogEventsCommand({
-            logGroupName: logGroup,
-            logStreamNames: streams.length ? streams.slice(0, 100) : undefined,
-            startTime: startMs,
-            endTime: endMs,
-            nextToken,
-          })
-        );
+      for (const windowMs of LATEST_LOG_WINDOWS_MS) {
+        const windowStart = Math.max(endMs - windowMs, startMs);
+        const windowEvents: FilteredLogEvent[] = [];
+        let nextToken: string | undefined;
 
-        const pageEvents = fle.events || [];
-        allEvents.push(...pageEvents);
-        nextToken = fle.nextToken;
+        do {
+          const fle = await client.send(
+            new FilterLogEventsCommand({
+              logGroupName: logGroup,
+              logStreamNames: streams.length ? streams.slice(0, 100) : undefined,
+              startTime: windowStart,
+              endTime: windowEnd,
+              nextToken,
+            })
+          );
 
-        // Safety break to avoid infinite loops
-        if (allEvents.length > 50000) {
+          const pageEvents = fle.events || [];
+          windowEvents.push(...pageEvents);
+          nextToken = fle.nextToken;
+
+          // Safety break to avoid infinite loops
+          if (windowEvents.length > 50000) {
+            break;
+          }
+        } while (nextToken);
+
+        collected = windowEvents.concat(collected);
+        // endTime is inclusive, so the next window stops short of this one's start
+        windowEnd = windowStart - 1;
+        if (collected.length >= limit) {
           break;
         }
-      } while (nextToken);
+      }
 
       // Get the most recent 'limit' events (events are in chronological order)
-      events = allEvents.slice(-limit);
+      events = collected.slice(-limit);
     } else {
       // Case 2: Get logs before the specified timestamp (pagination)
       // Use CloudWatch Insights for efficient timestamp-based pagination
