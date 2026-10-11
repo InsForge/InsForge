@@ -44,6 +44,16 @@ graph TB
 
 定義資料表，您立即取得 REST 端點加上類型化的 SDK 用戶端。沒有程式碼產生步驟。驗證 JWT 透過 RLS 範圍化每個查詢。
 
+### 架構視覺化（關聯模型）
+
+一眼看清整個資料模型。儀表板的 **Visualizer（視覺化）** 會繪製專案的實體關聯圖（ERD）：每個資料表及其欄位、您的儲存貯體、auth 使用者節點，以及以連線形式繪製在相關資料表之間的外鍵關聯。{/* TODO: confirm dashboard location / sidebar label for the Visualizer view */}
+
+偏好使用終端機或 agent？相同的架構（包括每個資料表的外鍵）也可以在不使用圖表的情況下取得：
+
+- CLI：`npx @insforge/cli metadata --json` 回傳完整的後端中繼資料（資料表、儲存貯體、函式等）。
+- REST：`GET /api/database/tables/{table}/schema` 回傳單一資料表的結構，包括其 `foreignKeys`。
+- MCP：`get-table-schema` 工具回傳資料表的詳細架構（欄位、約束、索引和外鍵）。
+
 ### 遷移
 
 追蹤和應用有序的 SQL 變更。[Migrations](/core-concepts/database/migrations) 在您的存放庫中作為普通 `.sql` 檔案提供，使用 `npx @insforge/cli db migrations up --all` 或透過 MCP 工具應用。
