@@ -80,6 +80,9 @@ export const tableSchema = z.object({
   // Foreign keys are table-level, one entry per constraint.
   foreignKeys: z.array(foreignKeySchema).optional(),
   recordCount: z.number().optional(),
+  // True when `recordCount` is approximate: large tables are counted from the planner's
+  // statistics to avoid a full scan on every table-open.
+  recordCountIsEstimate: z.boolean().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });

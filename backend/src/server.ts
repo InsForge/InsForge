@@ -95,7 +95,9 @@ export async function createApp() {
     cors({
       origin: true, // Allow all origins (matches Better Auth's trustedOrigins: ['*'])
       credentials: true, // Allow cookies/credentials
-      exposedHeaders: ['Content-Range', 'Preference-Applied'],
+      // Without X-Total-Is-Estimate here, a cross-origin dashboard cannot read it and
+      // renders every approximate total as an exact count.
+      exposedHeaders: ['Content-Range', 'Preference-Applied', 'X-Total-Is-Estimate'],
     })
   );
   app.use(cookieParser()); // Parse cookies for refresh token handling
