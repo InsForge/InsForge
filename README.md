@@ -1,4 +1,6 @@
 <div align="center">
+
+[![Deploy to Railyard](https://app.railyard.run/deploy/badge)](https://app.railyard.run/deploy?repo=https://github.com/InsForge/InsForge)
   <a href="https://insforge.dev">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
