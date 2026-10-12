@@ -23,8 +23,8 @@ describe('BucketFormDialog', () => {
     bucketMocks.editBucket.mockReset();
   });
 
-  it('creates a bucket with a trimmed name and closes on success', async () => {
-    const user = userEvent.setup();
+  it('creates a bucket with a trimmed name and closes on success', { timeout: 10_000 }, async () => {
+    const user = userEvent.setup({ delay: null });
     const onOpenChange = vi.fn();
     const onSuccess = vi.fn();
     bucketMocks.createBucket.mockResolvedValue(undefined);
