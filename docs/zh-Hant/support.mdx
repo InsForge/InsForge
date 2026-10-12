@@ -1,0 +1,47 @@
+---
+title: "支援與意見回饋"
+description: "如何取得協助、使用 InsForge CLI 回報 Bug 或請求功能、聯絡 InsForge 團隊，以及為什麼儀表板中沒有支援工單歷史紀錄。"
+---
+
+當您需要協助、遇到 InsForge 本身的 Bug，或想向團隊提供意見回饋時，請查看本頁。
+
+## 取得協助
+
+在 [InsForge Discord](https://discord.com/invite/DvBtaEc9Jz) 中提問——這是聯絡團隊和其他開發者最快的方式。
+
+## 回報 Bug 或請求功能
+
+使用 CLI `feedback` 指令回報 InsForge 側的問題——Bug（包括文件與實際行為不一致）、缺少的功能或開發體驗上的摩擦。這用於回報 InsForge 本身的問題（後端、某個 SDK、CLI、Agent 技能或文件），而不是您正在建構的應用。提交前，電子郵件、權杖、密鑰和使用者名稱會在本地被去識別化處理，且無需登入。
+
+```bash
+# 互動式：會提示補齊仍需要的必填欄位
+npx @insforge/cli feedback
+
+# 非互動式（Agent / CI）
+npx @insforge/cli feedback \
+  --type bug \
+  --component sdk \
+  --language js \
+  --title "verifyOtp rejects a valid code" \
+  --detail "Steps, expected vs actual, and anything else useful"
+```
+
+- `--type` — `bug`、`feature-request`、`friction` 或 `other`
+- `--component` — `backend`、`sdk`、`cli`、`skills`、`docs` 或 `other`
+- `--language` — 當 `--component sdk` 時必填（例如 `js`、`python`、`swift`、`kotlin`、`rest-api`）
+- `--title` 和 `--detail` — 摘要和描述（使用 `--file <path>` 從檔案載入描述內容）
+- `--severity` — `blocker`、`major` 或 `minor`（預設為 `minor`）
+
+`--type`、`--component`、`--title` 和 `--detail` 為必填項；不帶這些參數執行指令時會進入互動式提示。傳入 `--json` 可取得結構化結果。
+
+## 聯絡團隊
+
+已登入使用者可以從儀表板向 InsForge 團隊傳送支援請求。{/* TODO: confirm dashboard location */} 請附上您做了什麼、期望的結果，以及有幫助的截圖。
+
+某些帳號或資料問題無法自行解決。例如，[刪除儲存貯體是永久性操作](/zh-Hant/core-concepts/storage/overview#buckets)——它會級聯刪除所有物件，且沒有還原機制，即使透過技術支援也無法還原。遇到此類情況時，請在 [Discord](https://discord.com/invite/DvBtaEc9Jz) 上聯絡我們。
+
+## 追蹤您的請求
+
+<Note>
+  儀表板和 API 中都沒有檢視您已提交的意見回饋和支援請求的入口——不存在工單歷史列表。請自行保留您所傳送內容的副本，並在同一個 [Discord](https://discord.com/invite/DvBtaEc9Jz) 貼文中跟進。
+</Note>
