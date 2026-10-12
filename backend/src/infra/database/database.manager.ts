@@ -56,6 +56,14 @@ export class DatabaseManager {
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
     });
+
+    // pg emits 'error' on the pool when an IDLE client's connection drops
+    // (e.g. Postgres restart). Without this listener that event is an
+    // unhandled 'error' and crashes the process; the pool already discards
+    // the broken client and creates a fresh one on next checkout.
+    this.pool.on('error', (error) => {
+      logger.error('Postgres pool idle client error', { error: error.message });
+    });
   }
 
   static async getColumnTypeMap(
