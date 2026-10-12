@@ -43,14 +43,19 @@ export function errorResponse(
 
 // Pagination response helper - returns data with PostgREST-style pagination headers
 export function paginatedResponse<T>(res: Response, data: T[], total: number, offset: number) {
-  // Calculate the range for Content-Range header
-  const start = offset;
-  const end = Math.min(offset + data.length - 1, total - 1);
-
   // Set PostgREST-style pagination headers
   // Format: "Content-Range: start-end/total"
   // Example: "Content-Range: 0-9/200" for first 10 items out of 200
-  res.setHeader('Content-Range', `${start}-${end}/${total}`);
+  // For an empty page (limit=0, or offset past the end), there's no valid
+  // start-end range to report, so use the RFC 7233 unsatisfied-range form
+  // "*/total" that PostgREST itself falls back to in the same situation.
+  if (data.length === 0) {
+    res.setHeader('Content-Range', `*/${total}`);
+  } else {
+    const start = offset;
+    const end = Math.min(offset + data.length - 1, total - 1);
+    res.setHeader('Content-Range', `${start}-${end}/${total}`);
+  }
 
   // Also set Prefer header to indicate preference was applied
   res.setHeader('Preference-Applied', 'count=exact');
