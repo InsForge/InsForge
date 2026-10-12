@@ -24,7 +24,13 @@ let workerTemplateCode: string | null = null;
 async function getWorkerTemplateCode(): Promise<string> {
   if (!workerTemplateCode) {
     const currentDir = dirname(fromFileUrl(import.meta.url));
-    workerTemplateCode = await Deno.readTextFile(join(currentDir, 'worker-template.js'));
+    // handler-format.js is prepended so its `normalizeHandlerFormat` function
+    // is available as a global inside worker-template.js (see comment there).
+    const [handlerFormatCode, templateCode] = await Promise.all([
+      Deno.readTextFile(join(currentDir, 'handler-format.js')),
+      Deno.readTextFile(join(currentDir, 'worker-template.js')),
+    ]);
+    workerTemplateCode = `${handlerFormatCode}\n${templateCode}`;
   }
   return workerTemplateCode;
 }
