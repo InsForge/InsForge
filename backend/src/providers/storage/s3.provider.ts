@@ -50,6 +50,8 @@ function isS3NotFound(err: unknown): boolean {
 
 const ONE_HOUR_IN_SECONDS = 3600;
 const SEVEN_DAYS_IN_SECONDS = 604800;
+// keep well under SEVEN_DAYS: a public signed URL must outlive the window it is reused for
+const SIGNING_WINDOW_MS = 86_400_000;
 const MAX_DELETE_OBJECTS_PER_REQUEST = 1000;
 
 /**
@@ -503,8 +505,14 @@ export class S3StorageProvider implements StorageProvider {
             // Convert escaped newlines to actual newlines in the private key
             const formattedPrivateKey = cloudFrontPrivateKey.replace(/\\n/g, '\n');
 
-            // dateLessThan can be string | number | Date - using Date object directly
-            const dateLessThan = new Date(Date.now() + actualExpiresIn * 1000);
+            // A public versioned URL changes only with its content, so pin its expiry
+            // to a window: every request in the window gets the same, browser-cacheable URL.
+            const windowStart = Math.floor(Date.now() / SIGNING_WINDOW_MS) * SIGNING_WINDOW_MS;
+            const dateLessThan = new Date(
+              isPublic && version
+                ? windowStart + SEVEN_DAYS_IN_SECONDS * 1000
+                : Date.now() + actualExpiresIn * 1000
+            );
 
             const signedUrl = getCloudFrontSignedUrl({
               url: urlToSign,
