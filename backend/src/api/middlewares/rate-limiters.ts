@@ -487,6 +487,9 @@ export const adminLoginRateLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  // Same CI opt-out the write limiters honor: e2e suites log in as admin
+  // many times from one IP and would otherwise trip the 5/15min budget.
+  skip: () => isWriteRateLimitDisabled(),
   handler: (_req: Request, _res: Response, next: NextFunction) => {
     next(
       new AppError(
