@@ -321,6 +321,7 @@ describe('S3StorageProvider — branch fallback', () => {
     });
 
     afterEach(() => {
+      vi.useRealTimers();
       for (const [k, v] of Object.entries(savedEnv)) {
         if (v === undefined) delete process.env[k];
         else process.env[k] = v;
@@ -353,6 +354,40 @@ describe('S3StorageProvider — branch fallback', () => {
       const url = new URL(strategy.url);
       expect(url.searchParams.get('v')).toBeNull();
       expect(url.searchParams.get('Signature')).not.toBeNull();
+    });
+
+    it('returns the same URL for a public object all UTC day', async () => {
+      const p = makeProvider();
+      vi.useFakeTimers({ now: new Date('2026-10-12T00:00:01Z') });
+      const first = await p.getDownloadStrategy('photos', 'a.txt', 0, true, 'etag-abc');
+      vi.setSystemTime(new Date('2026-10-12T23:59:59Z'));
+      const second = await p.getDownloadStrategy('photos', 'a.txt', 0, true, 'etag-abc');
+
+      expect(second.url).toBe(first.url);
+      expect(first.expiresAt).toEqual(new Date('2026-10-20T00:00:00Z'));
+      expect(new URL(first.url).searchParams.get('Expires')).toBe(
+        String(Date.parse('2026-10-20T00:00:00Z') / 1000)
+      );
+    });
+
+    it('keeps the per-request expiry for private objects', async () => {
+      vi.useFakeTimers({ now: new Date('2026-10-12T12:00:00Z') });
+      const strategy = await makeProvider().getDownloadStrategy(
+        'photos',
+        'a.txt',
+        3600,
+        false,
+        'etag-abc'
+      );
+
+      expect(strategy.expiresAt).toEqual(new Date('2026-10-12T13:00:00Z'));
+    });
+
+    it('keeps the per-request expiry for public objects without a version stamp', async () => {
+      vi.useFakeTimers({ now: new Date('2026-10-12T12:00:00Z') });
+      const strategy = await makeProvider().getDownloadStrategy('photos', 'a.txt', 0, true, null);
+
+      expect(strategy.expiresAt).toEqual(new Date('2026-10-19T12:00:00Z'));
     });
 
     it('URL-encodes version values with reserved characters', async () => {
