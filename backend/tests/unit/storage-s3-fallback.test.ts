@@ -364,9 +364,9 @@ describe('S3StorageProvider — branch fallback', () => {
       const second = await p.getDownloadStrategy('photos', 'a.txt', 0, true, 'etag-abc');
 
       expect(second.url).toBe(first.url);
-      expect(first.expiresAt).toEqual(new Date('2026-10-19T00:00:00Z'));
+      expect(first.expiresAt).toEqual(new Date('2026-10-20T00:00:00Z'));
       expect(new URL(first.url).searchParams.get('Expires')).toBe(
-        String(Date.parse('2026-10-19T00:00:00Z') / 1000)
+        String(Date.parse('2026-10-20T00:00:00Z') / 1000)
       );
     });
 

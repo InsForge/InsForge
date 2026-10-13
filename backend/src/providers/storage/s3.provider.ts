@@ -50,7 +50,6 @@ function isS3NotFound(err: unknown): boolean {
 
 const ONE_HOUR_IN_SECONDS = 3600;
 const SEVEN_DAYS_IN_SECONDS = 604800;
-// keep well under SEVEN_DAYS_IN_SECONDS: a public signed URL must outlive the window it is reused for
 const SIGNING_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_DELETE_OBJECTS_PER_REQUEST = 1000;
 
@@ -509,7 +508,7 @@ export class S3StorageProvider implements StorageProvider {
             const windowStart = Math.floor(Date.now() / SIGNING_WINDOW_MS) * SIGNING_WINDOW_MS;
             const dateLessThan = new Date(
               isPublic && version
-                ? windowStart + SEVEN_DAYS_IN_SECONDS * 1000
+                ? windowStart + SIGNING_WINDOW_MS + SEVEN_DAYS_IN_SECONDS * 1000
                 : Date.now() + actualExpiresIn * 1000
             );
 
