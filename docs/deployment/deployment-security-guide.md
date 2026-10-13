@@ -674,7 +674,7 @@ sudo ufw status
 
 InsForge's Docker image already follows non-root best practices:
 
-- The production image starts as root only so its entrypoint (`docker/entrypoint.sh`) can join the mounted Docker socket's group, then hands off to the `node` user (UID 1000), so the application process inside the container runs as a non-root user. The Dockerfile has no `USER node` instruction, so overriding the entrypoint bypasses this handoff; add `user: node` yourself in that case. Pinning `user:` also skips the socket-group step, so if Docker compute is enabled, add the socket's host GID (`stat -c '%g' /var/run/docker.sock`) under `group_add` as well.
+- The production image starts as root only so its entrypoint (`docker/entrypoint.sh`) can join the mounted Docker socket's group. It then hands off to the `node` user (UID 1000), so the application process inside the container runs as a non-root user. The Dockerfile has no `USER node` instruction, so overriding the entrypoint bypasses this handoff; add `user: node` yourself in that case. Pinning `user:` also skips the socket-group step. If Docker compute is enabled, add the socket's host GID (`stat -c '%g' /var/run/docker.sock`) under `group_add` as well.
 - System-level Docker operations are managed by the `deploy` user (created in [Step 2.3](#23-create-a-deploy-user-non-root)), which has access to the Docker socket via the `docker` group.
 
 **Verify the container user:**
