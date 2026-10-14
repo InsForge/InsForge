@@ -13,6 +13,8 @@ import { TableForm } from '#features/database/components/TableForm';
 import { TablesEmptyState } from '#features/database/components/TablesEmptyState';
 import { TemplatePreview } from '#features/database/components/TemplatePreview';
 import { DATABASE_TEMPLATES, DatabaseTemplate } from '#features/database/templates';
+import { clearCreateTableDraft } from '#features/database/utils/createTableDraft';
+import { useDashboardProject, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import {
   Button,
   ConfirmDialog,
@@ -52,6 +54,11 @@ export default function TablesPage() {
   const { t } = useTranslation('chrome');
   const location = useLocation();
   const { selectedSchema, setSelectedSchema } = useDatabaseSchemaSelection();
+  const isCloudHosting = useIsCloudHostingMode();
+  const dashboardProject = useDashboardProject();
+  // Cloud serves every project from one origin, so create drafts are kept per project. The
+  // host can send the project after the page loads, and drafts stay off until it does.
+  const createTableDraftScope = isCloudHosting ? dashboardProject?.id : 'default';
   const [searchParams, setSearchParams] = useSearchParams();
   const shouldSlideBackToTables =
     (location.state as { slideFromStudio?: boolean } | null)?.slideFromStudio === true;
@@ -352,6 +359,13 @@ export default function TablesPage() {
     }
   };
 
+  // A create-table draft should survive a refresh, not a deliberate close.
+  const discardCreateTableDraft = () => {
+    if (!editingTable && createTableDraftScope !== undefined) {
+      clearCreateTableDraft(createTableDraftScope, selectedSchema);
+    }
+  };
+
   const handleTableFormClose = async (): Promise<boolean> => {
     if (isTableFormDirty) {
       const confirmOptions = {
@@ -366,6 +380,7 @@ export default function TablesPage() {
 
       const shouldDiscard = await confirm(confirmOptions);
       if (shouldDiscard) {
+        discardCreateTableDraft();
         setShowTableForm(false);
         setEditingTable(null);
         return true;
@@ -373,6 +388,7 @@ export default function TablesPage() {
         return false;
       }
     } else {
+      discardCreateTableDraft();
       setShowTableForm(false);
       return true;
     }
@@ -409,9 +425,22 @@ export default function TablesPage() {
   };
 
   const handleEditTable = (tableName: string) => {
-    selectTable(tableName);
-    setEditingTable(tableName);
-    setShowTableForm(true);
+    const openEditForm = () => {
+      selectTable(tableName);
+      setEditingTable(tableName);
+      setShowTableForm(true);
+    };
+
+    // Same as switching tables: an open form has to be closed (and its draft discarded) first.
+    if (showTableForm) {
+      void handleTableFormClose().then((discarded) => {
+        if (discarded) {
+          openEditForm();
+        }
+      });
+    } else {
+      openEditForm();
+    }
   };
 
   const handleDeleteTable = async (tableName: string) => {
@@ -550,7 +579,9 @@ export default function TablesPage() {
         {showTableForm ? (
           // Show TableForm replacing entire main content area
           <TableForm
+            key={editingTable ? `edit:${editingTable}` : 'create'}
             schemaName={selectedSchema}
+            draftScope={createTableDraftScope}
             open={showTableForm}
             onOpenChange={(open) => {
               if (!open) {
