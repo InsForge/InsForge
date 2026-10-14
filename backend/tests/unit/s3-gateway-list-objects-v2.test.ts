@@ -33,10 +33,11 @@ function row(key: string): DbRow {
 /** Mints a continuation token the way the handler does, for the same listing. */
 function signedToken(
   key: string,
-  scope: { bucket?: string; prefix?: string; delimiter?: string } = {}
+  scope: { bucket?: string; prefix?: string; delimiter?: string } = {},
+  version = 'v2'
 ): string {
   const fields = [
-    'insforge:s3:listv2:v1',
+    `insforge:s3:listv2:${version}`,
     scope.bucket ?? 'test-bucket',
     scope.prefix ?? '',
     scope.delimiter ?? '',
@@ -56,9 +57,9 @@ function legacyToken(key: string): string {
 }
 
 /**
- * Stands in for storage.objects: keys sorted ascending, filtered by prefix and
- * an exclusive `startAfter`, windowed by `maxKeys`. This is exactly the
- * contract of StorageService.listObjectsV2Db.
+ * Stands in for storage.objects: keys sorted ascending in byte order, filtered
+ * by prefix and an exclusive `startAfter`, windowed by `maxKeys`. This is
+ * exactly the contract of StorageService.listObjectsV2Db.
  */
 function fakeTable(keys: string[]) {
   const sorted = [...keys].sort();
@@ -425,6 +426,21 @@ describe('ListObjectsV2 continuation-token authenticity', () => {
     });
     expect(otherPrefix.status).toBe(400);
   });
+
+  it('rejects a token signed before listings moved to byte order', async () => {
+    // v1 cursors were positions in the database collation order. Resuming one
+    // under byte order can skip keys that sort after it in one order but
+    // before it in the other, so the caller has to restart the listing.
+    const issuedBeforeUpgrade = signedToken('a/1', { delimiter: '/' }, 'v1');
+
+    const result = await list(['a/1', 'a/2', 'b/1'], {
+      delimiter: '/',
+      'continuation-token': issuedBeforeUpgrade,
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.xml).toContain('InvalidArgument');
+  });
 });
 
 describe('ListObjectsV2 continuation tokens without a signing key', () => {
@@ -504,5 +520,29 @@ describe('ListObjectsV2 unsigned continuation tokens', () => {
 
     expect(result.status).toBe(200);
     expect(result.commonPrefixes).toEqual(['a/', 'b/']);
+  });
+});
+
+describe('StorageService.listObjectsV2Db ordering', () => {
+  it('compares and orders keys in byte order, not the database collation', async () => {
+    // The handler relies on keys sharing a CommonPrefix being contiguous, and
+    // S3 lists keys in UTF-8 byte order. Under a linguistic collation such as
+    // en_US.utf8 (the bundled Postgres default) punctuation is ignored, so
+    // "a-c" sorts between "a/b" and "a/d" and "a/" is listed on two pages.
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const svc = StorageService.getInstance();
+    vi.spyOn(svc as never, 'getPool' as never).mockReturnValue({ query } as never);
+
+    await svc.listObjectsV2Db({
+      bucket: 'test-bucket',
+      prefix: 'a',
+      startAfter: 'a/b',
+      maxKeys: 10,
+    });
+
+    const sql = (query.mock.calls[0][0] as string).replace(/\s+/g, ' ');
+    expect(sql).toContain('key COLLATE "C" LIKE $2');
+    expect(sql).toContain('key COLLATE "C" > $3');
+    expect(sql).toContain('ORDER BY key COLLATE "C"');
   });
 });
