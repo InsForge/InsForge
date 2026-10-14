@@ -16,74 +16,83 @@ import {
   type CreateAdminSessionResponse,
   type GetCurrentAdminSessionResponse,
 } from '@insforge/shared-schemas';
+import { adminLoginRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import logger from '@/utils/logger.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
 
 // POST /api/auth/admin/sessions/exchange - Exchange authorization code for admin session
-router.post('/sessions/exchange', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const validationResult = exchangeAdminSessionRequestSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      throw new AppError(
-        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
+router.post(
+  '/sessions/exchange',
+  adminLoginRateLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = exchangeAdminSessionRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const { code } = validationResult.data;
+      const result: CreateAdminSessionResponse =
+        await authService.adminLoginWithAuthorizationCode(code);
+
+      // Set refresh token as httpOnly cookie + CSRF token for web clients
+      const tokenManager = TokenManager.getInstance();
+      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+        result.admin.sub,
+        'admin'
       );
-    }
+      setAdminRefreshTokenCookie(res, refreshToken);
 
-    const { code } = validationResult.data;
-    const result: CreateAdminSessionResponse =
-      await authService.adminLoginWithAuthorizationCode(code);
-
-    // Set refresh token as httpOnly cookie + CSRF token for web clients
-    const tokenManager = TokenManager.getInstance();
-    const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-      result.admin.sub,
-      'admin'
-    );
-    setAdminRefreshTokenCookie(res, refreshToken);
-
-    successResponse(res, { ...result, csrfToken });
-  } catch (error) {
-    if (error instanceof AppError) {
-      next(error);
-    } else {
-      logger.error('[Auth:AdminSessionExchange] Failed to exchange admin session', { error });
-      next(new AppError('Failed to exchange admin session', 500, ERROR_CODES.INTERNAL_ERROR));
+      successResponse(res, { ...result, csrfToken });
+    } catch (error) {
+      if (error instanceof AppError) {
+        next(error);
+      } else {
+        logger.error('[Auth:AdminSessionExchange] Failed to exchange admin session', { error });
+        next(new AppError('Failed to exchange admin session', 500, ERROR_CODES.INTERNAL_ERROR));
+      }
     }
   }
-});
+);
 
 // POST /api/auth/admin/sessions - Create admin session (web only)
-router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      throw new AppError(
-        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
+router.post(
+  '/sessions',
+  adminLoginRateLimiter,
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const { username, password } = validationResult.data;
+      const result: CreateAdminSessionResponse = authService.adminLogin(username, password);
+
+      // Set refresh token as httpOnly cookie + CSRF token for web clients
+      const tokenManager = TokenManager.getInstance();
+      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+        result.admin.sub,
+        'admin'
       );
+      setAdminRefreshTokenCookie(res, refreshToken);
+
+      successResponse(res, { ...result, csrfToken });
+    } catch (error) {
+      next(error);
     }
-
-    const { username, password } = validationResult.data;
-    const result: CreateAdminSessionResponse = authService.adminLogin(username, password);
-
-    // Set refresh token as httpOnly cookie + CSRF token for web clients
-    const tokenManager = TokenManager.getInstance();
-    const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-      result.admin.sub,
-      'admin'
-    );
-    setAdminRefreshTokenCookie(res, refreshToken);
-
-    successResponse(res, { ...result, csrfToken });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // GET /api/auth/admin/sessions/current - Get current dashboard admin session
 router.get(
