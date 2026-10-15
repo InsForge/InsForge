@@ -64,6 +64,8 @@ Send a one-time link or six-digit code to the user's email. Passwordless sign-in
 
 First-class support for Google, GitHub, Apple, Microsoft, GitLab, Discord, and more. Add custom OAuth 2.0 / OIDC providers (Keycloak, Okta, Auth0, your own IdP) by URL without writing provider-specific code.
 
+If your app uses a custom domain, add its full OAuth `redirectTo` URL to **Authentication → Settings → Allowed Redirect URLs**. Include the path, such as `https://app.example.com/auth/callback`, or use a pattern such as `https://app.example.com/**` when the app has several callback paths. A listed origin alone does not cover paths beneath it. The InsForge API may still use your project's `.insforge.app` host; the allowed redirect URL is the destination in your app, not the API host. Keep the provider's callback URL pointed at the InsForge API endpoint configured for your project.
+
 ### OAuth server mode
 
 Run InsForge itself as an OAuth 2.0 / OIDC identity provider for your own downstream apps. See the [OAuth Server guide](/oauth-server) for the full setup.

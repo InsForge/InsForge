@@ -159,6 +159,10 @@ Start OAuth authentication flow with configured providers (built-in providers li
 - `additionalParams` (`Record<string, string>`, optional) - Provider-specific OAuth hints such as Google's `prompt=select_account`
 - `skipBrowserRedirect` (boolean, optional) - If true, returns OAuth URL without auto-redirecting (for server-rendered or mobile flows)
 
+The exact `redirectTo` URL must be in **Authentication → Settings → Allowed Redirect URLs** when that list is configured. After moving your app to a custom domain, replace or add its full callback URL, including the path. For several callback paths on one domain, you can allow `https://app.example.com/**`. An entry containing only `https://app.example.com` does not match `https://app.example.com/auth/callback`.
+
+If the OAuth start request returns HTTP 400, inspect the response body in your browser's Network panel. A `code_challenge` error means the request did not include a valid PKCE challenge; `is not in the allowed redirect URLs` means the app callback URL does not match the configured list. The request may go to your project's `.insforge.app` API host even while the app runs at a custom domain. Add the app's `redirectTo` URL, not the API host, to the list.
+
 ### Returns
 
 ```typescript

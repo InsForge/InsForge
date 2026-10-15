@@ -1018,7 +1018,7 @@
     "disableSignupsLabel": "Deshabilitar registros de nuevos usuarios",
     "disableSignupsDescription": "Al activarlo, se rechaza el registro público y solo los usuarios existentes pueden iniciar sesión. Los administradores del proyecto aún pueden crear usuarios desde el panel o la API.",
     "allowedRedirectUrlsLabel": "URL de redirección permitidas",
-    "allowedRedirectUrlsDescription": "Destinos de redirección permitidos para los flujos de autenticación. Déjalo vacío para permitir todas las URL.",
+    "allowedRedirectUrlsDescription": "Añade la URL de retorno completa de tu aplicación, incluida la ruta, o un patrón como https://app.example.com/**. Actualiza esta lista si tu aplicación pasa a un dominio personalizado. Déjalo vacío para permitir todas las URL.",
     "invalidUrl": "URL no válida",
     "addUrl": "Agregar URL",
     "emailVerificationProviderRequired": "La configuración de verificación de correo requiere InsForge Cloud o un SMTP personalizado habilitado.",

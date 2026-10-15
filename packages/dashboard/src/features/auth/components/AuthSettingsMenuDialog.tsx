@@ -329,7 +329,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                       })}
                       description={t('auth.allowedRedirectUrlsDescription', {
                         defaultValue:
-                          'Allowed redirect destinations for auth flows. Leave empty to allow all URLs.',
+                          'Add the full app callback URL, including its path, or a pattern like https://app.example.com/**. Update this list when your app moves to a custom domain. Leave empty to allow all URLs.',
                       })}
                     >
                       <div className="flex flex-col gap-2">
@@ -345,7 +345,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                                   onChange={(e) =>
                                     handleAllowedRedirectUrlChange(index, e.target.value)
                                   }
-                                  placeholder="https://example.com"
+                                  placeholder="https://app.example.com/auth/callback"
                                   className={itemError ? 'border-destructive' : ''}
                                 />
                                 {allowedRedirectUrls.length > 0 && (
