@@ -119,6 +119,9 @@ All contributions must include appropriate tests. Follow these guidelines:
 - Update existing tests if your changes affect their behavior
 - Follow the existing test patterns and structure
 - Test across different environments when applicable
+- Import the code under test; never re-implement it in the test file. A copy is
+  correct only on the day it is written, and the suite goes green forever after
+  the real code changes. If the logic is awkward to import, export it.
 
 ## Pull Request Process
 
