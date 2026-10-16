@@ -59,6 +59,7 @@
     "express-rate-limit": "^7.1.5",
     "file-type": "^21.3.4",
     "google-auth-library": "^10.1.0",
+    "helmet": "^8.3.0",
     "jose": "^6.1.0",
     "jsonwebtoken": "^9.0.2",
     "libpg-query": "^17.6.0",
