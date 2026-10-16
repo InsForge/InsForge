@@ -151,51 +151,32 @@ export const verifyOTPRateLimiter = rateLimit({
  *
  * Limits: 10 failed attempts per 15 minutes per IP
  * Bypassed when INSFORGE_DISABLE_WRITE_RATE_LIMIT=1 (e2e runs)
- */
-export const passwordSignInRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => isWriteRateLimitDisabled(),
-  handler: (_req: Request, _res: Response, next: NextFunction) => {
-    next(
-      new AppError(
-        'Too many sign-in attempts from this IP. Please try again in 15 minutes.',
-        429,
-        ERROR_CODES.TOO_MANY_REQUESTS
-      )
-    );
-  },
-  skipSuccessfulRequests: true, // Don't count successful sign-ins
-  skipFailedRequests: false, // Count failed attempts to prevent brute force
-});
-
-/**
- * Per-IP rate limiter for admin password sign-in attempts
- * Kept separate from the user limiter so one cannot exhaust the other's budget
  *
- * Limits: 10 failed attempts per 15 minutes per IP
- * Bypassed when INSFORGE_DISABLE_WRITE_RATE_LIMIT=1 (e2e runs)
+ * Create one instance per endpoint so each keeps its own budget.
  */
-export const adminSignInRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => isWriteRateLimitDisabled(),
-  handler: (_req: Request, _res: Response, next: NextFunction) => {
-    next(
-      new AppError(
-        'Too many admin sign-in attempts from this IP. Please try again in 15 minutes.',
-        429,
-        ERROR_CODES.TOO_MANY_REQUESTS
-      )
-    );
-  },
-  skipSuccessfulRequests: true,
-  skipFailedRequests: false,
-});
+function createSignInRateLimiter(message: string) {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => isWriteRateLimitDisabled(),
+    handler: (_req: Request, _res: Response, next: NextFunction) => {
+      next(new AppError(message, 429, ERROR_CODES.TOO_MANY_REQUESTS));
+    },
+    skipSuccessfulRequests: true, // Don't count successful sign-ins
+    skipFailedRequests: false, // Count failed attempts to prevent brute force
+  });
+}
+
+export const passwordSignInRateLimiter = createSignInRateLimiter(
+  'Too many sign-in attempts from this IP. Please try again in 15 minutes.'
+);
+
+// Separate instance from the user limiter so one cannot exhaust the other's budget
+export const adminSignInRateLimiter = createSignInRateLimiter(
+  'Too many admin sign-in attempts from this IP. Please try again in 15 minutes.'
+);
 
 /**
  * Per-IP rate limiter for native provider ID-token exchanges.
