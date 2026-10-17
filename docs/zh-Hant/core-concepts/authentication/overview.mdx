@@ -76,6 +76,41 @@ graph TB
 
 使用者狀態存在於專案的 Postgres 資料庫中的 `auth` 架構中。透過外鍵將 `auth.users` 連接到您的應用程式資料表，透過觸發器對身份變更做出反應，並以與備份其他所有內容相同的方式備份整個事物。
 
+## 設定內建 OAuth 提供者
+
+內建提供者（Google、GitHub、Apple、Microsoft、GitLab、Discord 等）按專案設定。以 **GitHub** 為例：
+
+<Steps>
+  <Step title="在提供者處註冊 OAuth 應用程式">
+    在提供者的開發者主控台中（GitHub 為 [Developer settings → OAuth Apps](https://github.com/settings/developers)），建立一個新的 OAuth 應用程式。將 **Authorization callback URL** 設定為您專案的回呼端點：
+
+    ```
+    <project-api-url>/api/auth/oauth/github/callback
+    ```
+
+    提供者隨後會簽發 **Client ID** 和 **Client Secret**。
+  </Step>
+  <Step title="在 InsForge 中啟用該提供者">
+    在 InsForge 儀表板中，開啟 **Auth Methods**，啟用 **GitHub**，並貼上上一步取得的 **Client ID** 和 **Client Secret**。如果不設定自訂 scope，GitHub 預設使用 `user:email`，以便 InsForge 讀取帳戶的電子郵件地址。
+    {/* TODO: confirm dashboard location — exact per-provider toggle under Auth Methods not verifiable from code */}
+  </Step>
+  <Step title="在應用程式中讓使用者登入">
+    使用 `'github'` 作為提供者鍵呼叫 `signInWithOAuth()`：
+
+    ```typescript
+    await insforge.auth.signInWithOAuth('github', {
+      redirectTo: 'http://localhost:3000/dashboard',
+    });
+    ```
+
+    同樣的呼叫適用於任何已啟用的提供者——將 `'github'` 替換為 `'google'`、`'apple'` 等即可。完整選項列表見 [`signInWithOAuth` 參考](/sdks/typescript/auth)。
+  </Step>
+</Steps>
+
+<Note>
+  想以程式化方式設定提供者？管理員 OAuth 設定 API（`POST /api/auth/oauth/configs`，需要管理員金鑰）儲存的欄位與儀表板寫入的相同：`provider`、`clientId`、`clientSecret` 和 `scopes`。
+</Note>
+
 ## 使用它進行建置
 
 <CardGroup cols={2}>
