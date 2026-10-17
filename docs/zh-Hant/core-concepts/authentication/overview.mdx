@@ -64,6 +64,32 @@ graph TB
 
 對 Google、GitHub、Apple、Microsoft、GitLab、Discord 等的一流支援。透過 URL 新增自訂 OAuth 2.0 / OIDC 提供商（Keycloak、Okta、Auth0、您自己的 IdP），無需撰寫提供商特定的程式碼。
 
+#### 設定提供商
+
+每個社交提供商都需要在該提供商的開發者主控台中建立自己的 OAuth 應用程式，然後將其 **Client ID** 和 **Client Secret** 貼到 InsForge 中。以 Google 為例：
+
+1. 在儀表板中，開啟 **Authentication → Auth Methods**，然後點擊 **Google OAuth**。
+2. 透過 **Create a Google OAuth App** 連結前往 [Google Cloud Console](https://console.cloud.google.com/apis/credentials) 並建立 OAuth 2.0 用戶端。將其授權重新導向 URI 設定為對話框中顯示的回呼 URL，格式類似 `https://<your-backend-url>/api/auth/oauth/google/callback`。
+3. 將 Google 應用程式的 **Client ID** 和 **Client Secret** 複製到對應欄位，然後點擊 **Add Provider**。
+
+GitHub、Microsoft、Discord、LinkedIn、Facebook、X 和 Apple 的流程完全相同——只是各提供商自己的開發者主控台不同。
+
+<Note>
+  在 InsForge Cloud 專案上，您可以開啟 **Shared Keys** 開關，而無需自備憑證。Shared Keys 是由 InsForge 託管的 OAuth 應用程式，可協助您在開發中快速上手；其授權同意頁面會顯示 InsForge 的名稱和標誌，因此切勿在生產環境中使用。
+</Note>
+
+想透過指令碼設定？該對話框呼叫的是僅限管理員的 REST API，因此您可以使用專案 [API Key](/faq)（`ik_...`）從終端機或 CI 中設定提供商：
+
+```bash
+# 建立 Google 提供商設定
+curl -X POST "$INSFORGE_BASE_URL/api/auth/oauth/configs" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"google","clientId":"<client-id>","clientSecret":"<client-secret>"}'
+```
+
+使用 `PUT /api/auth/oauth/<provider>/config` 更新現有提供商，或使用 `DELETE /api/auth/oauth/<provider>/config` 將其移除。
+
 ### OAuth 伺服器模式
 
 將 InsForge 本身作為 OAuth 2.0 / OIDC 身份提供商執行，用於您自己的下游應用程式。有關完整設定，請參閱 [OAuth 伺服器指南](/oauth-server)。
