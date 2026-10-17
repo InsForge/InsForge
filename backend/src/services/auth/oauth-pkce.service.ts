@@ -98,7 +98,12 @@ export class OAuthPKCEService {
 
     // Validate PKCE: SHA256(code_verifier) must equal the stored code_challenge.
     const computedChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
-    if (computedChallenge !== data.codeChallenge) {
+    const computedBuf = Buffer.from(computedChallenge);
+    const storedBuf = Buffer.from(data.codeChallenge);
+    const isValid =
+      computedBuf.length === storedBuf.length && crypto.timingSafeEqual(computedBuf, storedBuf);
+
+    if (!isValid) {
       logger.warn('PKCE validation failed', { provider: data.provider });
       throw new AppError('PKCE verification failed', 400, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
