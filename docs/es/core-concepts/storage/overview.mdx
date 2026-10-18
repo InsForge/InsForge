@@ -57,6 +57,15 @@ Las políticas de almacenamiento leen el mismo JWT de autenticación que las con
 
 Agrupe objetos en depósitos con políticas de acceso separadas. Los depósitos públicos sirven archivos directamente a través de HTTPS; los depósitos privados requieren una URL firmada o una solicitud autenticada.
 
+<Warning>
+  Eliminar un depósito es permanente. Elimina en cascada todos los objetos que
+  contiene, y no hay papelera, borrado temporal ni restauración —ni por cuenta
+  propia ni a través de soporte técnico—. Descargue primero lo que necesite y
+  reserve la acción de eliminar (`DELETE /api/storage/buckets/{bucketName}`, la
+  herramienta MCP `delete-bucket` o el SDK) para depósitos que esté seguro de no
+  volver a necesitar.
+</Warning>
+
 ### Cargas directas
 
 Los clientes de navegador y móvil cargan directamente al almacenamiento con una URL presignada. El backend nunca actúa como proxy de bytes.

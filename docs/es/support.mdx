@@ -1,0 +1,66 @@
+---
+title: "Soporte y comentarios"
+description: "Cómo obtener ayuda, reportar un error o solicitar una función con la CLI de InsForge, contactar al equipo de InsForge y por qué no hay un historial de tickets de soporte en el panel."
+---
+
+Usa esta página cuando necesites ayuda, encuentres un error en InsForge o quieras
+enviar comentarios al equipo.
+
+## Obtener ayuda
+
+Pregunta en el [Discord de InsForge](https://discord.com/invite/DvBtaEc9Jz): es la
+forma más rápida de contactar al equipo y a otros desarrolladores.
+
+## Reportar un error o solicitar una función
+
+Usa el comando `feedback` de la CLI para reportar un obstáculo del lado de
+InsForge: un error (incluidas las discrepancias entre la documentación y el
+comportamiento), una capacidad faltante o fricción en la experiencia de
+desarrollo. Esto es para problemas con InsForge en sí (el backend, un SDK, la
+CLI, las habilidades de agente o la documentación), no con la aplicación que
+estás construyendo. Los correos, tokens, claves y nombres de usuario se ocultan
+localmente antes de enviar el reporte, y no se requiere iniciar sesión.
+
+```bash
+# Interactivo: solicita los campos obligatorios que aún falten
+npx @insforge/cli feedback
+
+# No interactivo (agentes / CI)
+npx @insforge/cli feedback \
+  --type bug \
+  --component sdk \
+  --language js \
+  --title "verifyOtp rejects a valid code" \
+  --detail "Steps, expected vs actual, and anything else useful"
+```
+
+- `--type` — `bug`, `feature-request`, `friction` u `other`
+- `--component` — `backend`, `sdk`, `cli`, `skills`, `docs` u `other`
+- `--language` — obligatorio cuando `--component sdk` (por ejemplo `js`, `python`, `swift`, `kotlin`, `rest-api`)
+- `--title` y `--detail` — el resumen y la descripción (usa `--file <path>` para cargar el detalle desde un archivo)
+- `--severity` — `blocker`, `major` o `minor` (el valor predeterminado es `minor`)
+
+`--type`, `--component`, `--title` y `--detail` son obligatorios; ejecutar el
+comando sin ellos abre un flujo interactivo. Pasa `--json` para obtener un
+resultado estructurado.
+
+## Contactar al equipo
+
+Los usuarios que han iniciado sesión pueden enviar una solicitud de soporte al
+equipo de InsForge desde el panel. {/* TODO: confirm dashboard location */}
+Incluye lo que hiciste, lo que esperabas y capturas de pantalla cuando ayuden.
+
+Algunos problemas de cuenta o de datos no se pueden resolver por cuenta propia.
+Por ejemplo, [eliminar un depósito de almacenamiento es permanente](/es/core-concepts/storage/overview#buckets):
+elimina en cascada todos los objetos y no tiene restauración, ni siquiera a
+través de soporte. Cuando te encuentres con un caso así, escríbenos en
+[Discord](https://discord.com/invite/DvBtaEc9Jz).
+
+## Seguimiento de tus solicitudes
+
+<Note>
+  No existe ninguna vista en el panel ni en la API de los comentarios y
+  solicitudes de soporte que ya has enviado: no hay una lista de historial de
+  tickets. Guarda tu propia copia de lo que envías y haz el seguimiento en el
+  mismo hilo de [Discord](https://discord.com/invite/DvBtaEc9Jz).
+</Note>
