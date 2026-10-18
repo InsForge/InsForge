@@ -78,6 +78,26 @@ npx @insforge/cli deployments cancel deployment_123
 
 每个就绪的部署都获得一个默认 URL `https://<appkey>.insforge.site`。您也可以在 `https://<slug>.insforge.site` 设置一个 InsForge 管理的 slug。对于自定义域，在仪表板中添加域并配置它返回的 DNS 记录，通常是子域的 CNAME。
 
+您也可以用 CLI 管理自定义域。先附加域名，把它返回的 DNS 记录添加到您的 DNS 服务商，然后验证：
+
+```bash
+npx @insforge/cli domains attach yourdomain.com
+npx @insforge/cli domains verify yourdomain.com
+npx @insforge/cli domains status yourdomain.com
+```
+
+`domains attach` 会返回您需要创建的记录：
+
+- **根域（apex）**，例如 `example.com`，返回 **A 记录**。
+- **子域**，例如 `www.example.com` 或 `app.example.com`，返回 **CNAME 记录**。
+- 有些域名还会返回一条或多条**验证记录**（例如 `TXT` 记录），需要和路由记录一起添加。
+
+把每条记录添加到您的 DNS 服务商，然后运行 `domains verify`。`domains status` 会显示该域是否已 `Verified`（已验证）以及是否 `Misconfigured`（配置有误）。域验证通过后，InsForge 会自动为它签发 TLS 证书，因此您的站点将通过 **HTTPS** 提供服务。
+
+根域和它的 `www` 子域是两个独立的条目。要同时提供 `example.com` 和 `www.example.com`，请分别附加每一个，并配置它返回的记录（apex 用 A 记录，`www` 用 CNAME）。
+
+如果您的域名托管在 Cloudflare，可以用 `npx @insforge/cli domains cloudflare login` 连接，然后用 `npx @insforge/cli domains dns sync yourdomain.com` 让 CLI 替您写入记录。
+
 ## 使用它进行部署
 
 <CardGroup cols={2}>
