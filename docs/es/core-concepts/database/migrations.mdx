@@ -53,13 +53,13 @@ Como el CLI ejecuta cada archivo de migración dentro de una sola transacción (
 - `VACUUM` — el vacuum rutinario lo gestiona el autovacuum de PostgreSQL, así que rara vez necesitas ejecutarlo tú.
 - `REINDEX ... CONCURRENTLY`, `ALTER TYPE ... ADD VALUE` (en PostgreSQL antiguo) y comandos similares.
 
-Ejecuta estos comandos fuera de una migración con la ruta de SQL sin procesar «unrestricted» del CLI, que ejecuta la sentencia **sin** envolverla en una transacción:
+Ejecuta estos comandos fuera de una migración con `db query`, que envía la sentencia por sí sola en lugar de dentro de una transacción:
 
 ```bash
-npx @insforge/cli db query --unrestricted "CREATE INDEX CONCURRENTLY idx_orders_customer ON public.orders (customer_id)"
+npx @insforge/cli db query "CREATE INDEX CONCURRENTLY idx_orders_customer ON public.orders (customer_id)"
 ```
 
-El `npx @insforge/cli db query` normal (sin `--unrestricted`) envuelve tu sentencia en una transacción, por lo que da el mismo error; usa `--unrestricted` para los comandos no transaccionales.
+`--unrestricted` es un interruptor de privilegios, no de transacciones: ejecuta la sentencia como propietario de la base de datos en lugar de `project_admin`, que es lo que necesitas para las tablas del sistema o para objetos que `project_admin` no posee. Úsalo cuando la propiedad lo exija, no para escapar de una transacción.
 
 <Note>
   Ambas rutas de `db query` aplican un `statement_timeout` de 30 segundos, así que `CREATE INDEX CONCURRENTLY` o `VACUUM` sobre una tabla grande pueden agotar el tiempo de espera.
