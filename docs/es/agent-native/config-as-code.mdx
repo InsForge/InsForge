@@ -92,6 +92,8 @@ El archivo refleja un subconjunto curado de la configuración del proyecto, las 
 
 Debido a que TOML no tiene un literal `null`, use `retention_days = 0` para deshabilitar la limpieza de retención para mensajes en tiempo real o registros de ejecución de cronograma; `config apply` envía `null` al backend para ese valor. Las plantillas de correo electrónico, las credenciales de la aplicación del proveedor OAuth, los depósitos, los canales en tiempo real, las funciones, las variables de entorno de implementación y los secretos no se administran a través de este archivo.
 
+`storage.max_file_size_mb` es el límite de carga por archivo. Acepta un entero entre 1 y 200 y el valor predeterminado es 50; la API rechaza los valores fuera de ese rango.
+
 Un ejemplo completo:
 
 ```toml
