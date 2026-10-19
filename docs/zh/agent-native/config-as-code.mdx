@@ -92,6 +92,8 @@ description: 通过 insforge.toml 声明文件与 CLI 的 plan、apply、export 
 
 因为 TOML 没有 `null` 文本，使用 `retention_days = 0` 禁用实时消息或计划执行日志的保留清理；`config apply` 为该值向后端发送 `null`。电子邮件模板、OAuth 提供商应用凭证、存储桶、实时通道、函数、部署环境变量和秘密不通过此文件管理。
 
+`storage.max_file_size_mb` 是单文件上传的上限。它接受 1 到 200 之间的整数，默认值为 50；超出该范围的值会被 API 拒绝。
+
 完整示例：
 
 ```toml
