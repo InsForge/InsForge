@@ -274,7 +274,17 @@ export async function createApp() {
       // Build headers, filtering out non-string values and overriding host
       const headers: Record<string, string> = {};
       for (const [key, value] of Object.entries(req.headers)) {
-        if (typeof value === 'string') {
+        if (
+          typeof value === 'string' &&
+          ![
+            'content-length',
+            'transfer-encoding',
+            'connection',
+            'keep-alive',
+            'upgrade',
+            'expect',
+          ].includes(key)
+        ) {
           headers[key] = value;
         }
       }
