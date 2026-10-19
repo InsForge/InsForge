@@ -464,18 +464,6 @@
                 ]
               },
               {
-                "group": "Integrations",
-                "pages": [
-                  "integrations/overview",
-                  "integrations/clerk",
-                  "integrations/auth0",
-                  "integrations/workos",
-                  "integrations/kinde",
-                  "integrations/stytch",
-                  "integrations/better-auth"
-                ]
-              },
-              {
                 "group": "Agent-Native Initiatives",
                 "pages": [
                   "zh/agent-native/overview",
@@ -502,7 +490,6 @@
                 "group": "Self-Hosting",
                 "pages": [
                   "zh/deployment/deployment-security-guide",
-                  "deployment/self-host-storage",
                   "zh/deployment/deploy-to-aws-ec2",
                   "zh/deployment/deploy-to-azure-virtual-machines",
                   "zh/deployment/deploy-to-containarium",
@@ -792,18 +779,6 @@
                 ]
               },
               {
-                "group": "Integrations",
-                "pages": [
-                  "integrations/overview",
-                  "integrations/clerk",
-                  "integrations/auth0",
-                  "integrations/workos",
-                  "integrations/kinde",
-                  "integrations/stytch",
-                  "integrations/better-auth"
-                ]
-              },
-              {
                 "group": "Agent-Native Initiatives",
                 "pages": [
                   "zh-Hant/agent-native/overview",
@@ -830,7 +805,6 @@
                 "group": "Self-Hosting",
                 "pages": [
                   "zh-Hant/deployment/deployment-security-guide",
-                  "deployment/self-host-storage",
                   "zh-Hant/deployment/deploy-to-aws-ec2",
                   "zh-Hant/deployment/deploy-to-azure-virtual-machines",
                   "zh-Hant/deployment/deploy-to-containarium",
@@ -1120,18 +1094,6 @@
                 ]
               },
               {
-                "group": "Integrations",
-                "pages": [
-                  "integrations/overview",
-                  "integrations/clerk",
-                  "integrations/auth0",
-                  "integrations/workos",
-                  "integrations/kinde",
-                  "integrations/stytch",
-                  "integrations/better-auth"
-                ]
-              },
-              {
                 "group": "Agent-Native Initiatives",
                 "pages": [
                   "es/agent-native/overview",
@@ -1158,7 +1120,6 @@
                 "group": "Self-Hosting",
                 "pages": [
                   "es/deployment/deployment-security-guide",
-                  "deployment/self-host-storage",
                   "es/deployment/deploy-to-aws-ec2",
                   "es/deployment/deploy-to-azure-virtual-machines",
                   "es/deployment/deploy-to-containarium",
