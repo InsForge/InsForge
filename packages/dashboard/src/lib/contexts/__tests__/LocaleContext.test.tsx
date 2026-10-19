@@ -62,6 +62,15 @@ describe('normalizeLocale', () => {
 
 describe('LocaleProvider', () => {
   beforeEach(() => {
+    if (!window.localStorage) {
+      Object.defineProperty(window, 'localStorage', {
+        value: {
+          clear: vi.fn(),
+          getItem: vi.fn(),
+          setItem: vi.fn(),
+        },
+      });
+    }
     window.localStorage.clear();
   });
 
