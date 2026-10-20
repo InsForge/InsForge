@@ -72,7 +72,7 @@
     "protobufjs": "7.6.5",
     "postcss": "^8.5.10",
     "dompurify": "3.4.16",
-    "follow-redirects": "^1.16.0",
+    "follow-redirects": "^1.16.1",
     "uuid": "^14.0.0",
     "axios": "1.20.0",
     "ws": "^8.21.0",
