@@ -10,8 +10,9 @@ interface AppErrorLike {
 const mocks = vi.hoisted(() => ({
   signInWithIdToken: vi.fn(),
   idTokenRateLimit: vi.fn(),
-  generateRefreshToken: vi.fn().mockReturnValue('mobile-refresh-token'),
-  generateRefreshTokenWithCsrf: vi.fn(),
+  issueSessionForSubject: vi
+    .fn()
+    .mockResolvedValue({ refreshToken: 'mobile-refresh-token', csrfToken: 'csrf-token' }),
 }));
 
 vi.mock('@/api/middlewares/auth.js', () => ({
@@ -70,9 +71,16 @@ vi.mock('@/infra/socket/socket.manager.js', () => ({
 
 vi.mock('@/infra/security/token.manager.js', () => ({
   TokenManager: {
+    getInstance: () => ({}),
+  },
+}));
+
+vi.mock('@/services/auth/refresh-session.service.js', () => ({
+  RefreshSessionService: {
     getInstance: () => ({
-      generateRefreshToken: mocks.generateRefreshToken,
-      generateRefreshTokenWithCsrf: mocks.generateRefreshTokenWithCsrf,
+      issueSessionForSubject: mocks.issueSessionForSubject,
+      rotateRefreshSession: vi.fn(),
+      revokeRefreshSession: vi.fn(),
     }),
   },
 }));
@@ -149,7 +157,10 @@ describe('POST /api/auth/id-token', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.generateRefreshToken.mockReturnValue('mobile-refresh-token');
+    mocks.issueSessionForSubject.mockResolvedValue({
+      refreshToken: 'mobile-refresh-token',
+      csrfToken: 'csrf-token',
+    });
     mocks.signInWithIdToken.mockResolvedValue({
       ...baseSession,
       user: { ...baseSession.user },
