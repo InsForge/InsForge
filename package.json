@@ -80,7 +80,9 @@
     "minimatch@10": {
       "brace-expansion": "^5.0.12"
     },
-    "shell-quote": "1.10.0",
+    "shell-quote": "1.11.0",
+    "proxy-addr": "2.0.8",
+    "source-map-js": "^1.2.2",
     "form-data": "4.0.6",
     "@opentelemetry/core": "2.9.0",
     "js-yaml": "^4.3.2",
