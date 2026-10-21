@@ -97,7 +97,7 @@ This installs a systemd-user unit inside the box that brings the stack up at eve
 containarium compose status insforge
 ```
 
-You should see `4/4 services up`: `postgres`, `postgrest`, `insforge`, `deno`. (The compose file ships healthchecks for `postgres`, `postgrest`, and `deno`; `insforge` reports `Up` once the others are healthy and it has started.)
+You should see `4/4 services up`: `postgres`, `postgrest`, `insforge`, `deno`. (The compose file ships healthchecks for `postgres` and `deno`; `postgrest` has none, and `insforge` reports `Up` once the others are healthy and it has started.)
 
 ### 5. Expose on a public hostname
 

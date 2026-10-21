@@ -98,30 +98,6 @@ vi.mock('../../src/services/email/email.service', () => ({
   },
 }));
 
-// Mock all OAuth providers the constructor initializes
-const mockOAuthProvider = { getInstance: () => ({}) };
-vi.mock('../../src/providers/oauth/google.oauth.provider', () => ({
-  GoogleOAuthProvider: mockOAuthProvider,
-}));
-vi.mock('../../src/providers/oauth/github.oauth.provider', () => ({
-  GitHubOAuthProvider: mockOAuthProvider,
-}));
-vi.mock('../../src/providers/oauth/discord.oauth.provider', () => ({
-  DiscordOAuthProvider: mockOAuthProvider,
-}));
-vi.mock('../../src/providers/oauth/facebook.oauth.provider', () => ({
-  FacebookOAuthProvider: mockOAuthProvider,
-}));
-vi.mock('../../src/providers/oauth/microsoft.oauth.provider', () => ({
-  MicrosoftOAuthProvider: mockOAuthProvider,
-}));
-vi.mock('../../src/providers/oauth/x.oauth.provider', () => ({
-  XOAuthProvider: mockOAuthProvider,
-}));
-vi.mock('../../src/providers/oauth/apple.oauth.provider', () => ({
-  AppleOAuthProvider: mockOAuthProvider,
-}));
-
 vi.mock('../../src/infra/config/app.config', () => {
   const c = {
     app: {

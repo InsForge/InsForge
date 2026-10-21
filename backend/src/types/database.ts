@@ -1,16 +1,5 @@
 // Type definitions for database schema management
-import { ColumnType, ColumnSchema } from '@insforge/shared-schemas';
-
-// Database metadata format returned by getDatabaseMetadata
-export interface DatabaseMetadata {
-  tables: Record<
-    string,
-    {
-      columns: ColumnSchema[];
-      record_count: number;
-    }
-  >;
-}
+import { ColumnType } from '@insforge/shared-schemas';
 
 export interface ColumnTypeInfo {
   type: ColumnType;
@@ -84,14 +73,6 @@ export const COLUMN_TYPES: Record<ColumnType, ColumnTypeInfo> = {
     icon: 'code',
   },
 };
-
-export interface ForeignKeyDefinition {
-  column: string;
-  references_table: string;
-  references_column: string;
-  on_delete?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
-  on_update?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
-}
 
 // Type definition for foreign key row from database
 export interface ForeignKeyRow {

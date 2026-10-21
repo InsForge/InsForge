@@ -47,5 +47,3 @@ export const NEXT_ACTIONS = {
   RETRY_COMPUTE_OPERATION:
     'The operation failed due to a transient error. Wait a moment and try again.',
 } as const;
-
-export type NextActionKey = keyof typeof NEXT_ACTIONS;
