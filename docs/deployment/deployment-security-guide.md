@@ -171,7 +171,7 @@ docker run hello-world
 curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
 
-Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY`, `ROOT_ADMIN_PASSWORD` and `POSTGRES_PASSWORD` into `.env`. Nothing is started.
+Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY`, `ROOT_ADMIN_PASSWORD`, `POSTGRES_PASSWORD`, `ACCESS_API_KEY` and `ACCESS_ANON_KEY` into `.env`. Nothing is started.
 
 > Rather not pipe a script into a shell? Read it first:
 >
@@ -215,7 +215,7 @@ Expected response:
 ```json
 {
   "status": "ok",
-  "version": "1.x.x",
+  "version": "2.x.x",
   "service": "Insforge OSS Backend",
   "timestamp": "2026-..."
 }

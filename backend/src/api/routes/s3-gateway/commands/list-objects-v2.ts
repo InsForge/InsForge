@@ -264,8 +264,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
   }
 
   // Anything other than a clean walk to the end of the listing leaves rows
-  // behind. That covers hitting maxKeys and also hitting MAX_DB_PAGES, which
-  // used to report a complete listing while silently dropping the tail.
+  // behind. That covers hitting maxKeys and also hitting MAX_DB_PAGES.
   //
   // IsTruncated and NextContinuationToken are derived together so they can
   // never disagree: a paginator that sees truncation without a token re-issues

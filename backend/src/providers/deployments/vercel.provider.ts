@@ -67,13 +67,6 @@ export interface CreateDeploymentOptions {
   regions?: string[];
 }
 
-export interface DeploymentFile {
-  path: string;
-  content: Buffer;
-  sha: string;
-  size: number;
-}
-
 export interface VercelCustomDomain {
   id: string;
   name: string;

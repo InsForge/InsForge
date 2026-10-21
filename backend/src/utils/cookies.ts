@@ -31,7 +31,7 @@ export function setAdminRefreshTokenCookie(res: Response, value: string): void {
 
 /**
  * Clear refresh token cookie on response
- * IMPORTANT: Must use the same options (especially path) as when setting the cookie
+ * Options (especially path) must match the setter, or the browser keeps the cookie.
  */
 export function clearRefreshTokenCookie(res: Response): void {
   res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, {
@@ -44,7 +44,7 @@ export function clearRefreshTokenCookie(res: Response): void {
 
 /**
  * Clear admin dashboard refresh token cookie on response
- * IMPORTANT: Must use the same options (especially path) as when setting the cookie
+ * Options (especially path) must match the setter, or the browser keeps the cookie.
  */
 export function clearAdminRefreshTokenCookie(res: Response): void {
   res.clearCookie(ADMIN_REFRESH_TOKEN_COOKIE_NAME, {

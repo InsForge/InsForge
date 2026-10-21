@@ -257,9 +257,9 @@ export class PostHogApiService {
       return await call();
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 429) {
-        // Absent or unparseable header still gets the one retry, after 1s —
-        // the behaviour this was ported with. Only an explicit long delay
-        // (> 30s) is surfaced instead of holding an inbound request open.
+        // Absent or unparseable header still gets the one retry, after 1s. Only an
+        // explicit long delay (> 30s) is surfaced instead of holding an inbound
+        // request open.
         const retryAfter = parseRetryAfterSeconds(err.response.headers['retry-after']) ?? 1;
         if (retryAfter > MAX_RETRY_AFTER_SECONDS) {
           throw err;
