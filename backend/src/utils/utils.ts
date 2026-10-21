@@ -92,7 +92,6 @@ export function generateUUID(): string {
  * @returns A random string containing only digits (0-9)
  */
 export function generateNumericCode(length: number): string {
-  // Generate each digit independently
   let result = '';
   for (let i = 0; i < length; i++) {
     result += crypto.randomInt(0, 10).toString();

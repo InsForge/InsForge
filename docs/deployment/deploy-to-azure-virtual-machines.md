@@ -98,7 +98,7 @@ This guide provides comprehensive, step-by-step instructions for self-hosting, m
     ```bash
     curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
     ```
-    Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY`, `ROOT_ADMIN_PASSWORD` and `POSTGRES_PASSWORD` into `.env`. Nothing is started.
+    Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY`, `ROOT_ADMIN_PASSWORD`, `POSTGRES_PASSWORD`, `ACCESS_API_KEY` and `ACCESS_ANON_KEY` into `.env`. Nothing is started.
 
 2.  **Create Environment Configuration:**
     The secrets are already generated — leave them as they are. Point the API URLs at your VM.

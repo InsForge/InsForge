@@ -286,8 +286,8 @@ export class TelemetryService {
           functions_configured: Boolean(
             appConfig.denoSubhosting.token && appConfig.denoSubhosting.organizationId
           ),
-          // Whether *any* driver is usable, from the same source the providers read:
-          // this used to test appConfig.fly, which reports false for credentials stored
+          // Whether *any* driver is usable, from the same source the providers read.
+          // appConfig.fly is not enough: it reports false for credentials stored
           // through the dashboard and ignores Docker entirely.
           compute_configured: getComputeMetadata() !== undefined,
           openrouter_configured: Boolean(appConfig.ai.openrouterApiKey),

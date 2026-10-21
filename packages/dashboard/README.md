@@ -18,7 +18,7 @@ The dashboard is organized into focused React feature modules:
 * **Edge Functions:** Serverless edge functions code compiler, deployment manager, and live Deno application logs streaming interface.
 * **Model Gateway:** Direct OpenRouter model catalog configuration, API key management, and live credit/token usage metrics charts.
 * **Compute Services:** Fly.io container configuration, region selection, and CPU/memory resource allocation interface.
-* **Payments:** Integrated Stripe Checkout session manager and customer Billing Portal.
+* **Payments:** Stripe and Razorpay provider settings, plus the Stripe Checkout session manager and customer Billing Portal.
 * **Analytics:** KPI statistics, retention rates, and posthog traffic monitoring panels.
 
 ---
@@ -33,10 +33,9 @@ This package leverages the following frontend stack:
 | **Data Fetching / Caching** | [TanStack Query v5](https://tanstack.com/query/latest) (React Query) |
 | **Styling & Theme** | [Tailwind CSS 4.1](https://tailwindcss.com/) (dark-mode design system) |
 | **Routing** | [React Router DOM 7](https://reactrouter.com/) |
-| **Code Editor** | [CodeMirror 6](https://codemirror.net/) (SQL, JavaScript, and JSON support) |
+| **Code Editor** | [CodeMirror 6](https://codemirror.net/) (SQL, JavaScript, and Python support) |
 | **Data Visualizations** | [Recharts 3](https://recharts.org/) |
 | **Diagrams & Graphs** | [@xyflow/react 12](https://reactflow.dev/) (interactive Schema ER diagrams) |
-| **Real-time Engine** | [Socket.io Client 4.8](https://socket.io/docs/v4/client-api/) |
 
 ---
 
