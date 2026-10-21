@@ -117,19 +117,15 @@ export class MachineGoneError extends Error {
  * providers so the wire payload stays byte-identical between them.
  *
  * Fly's rule: letters, numbers, and dashes, and it must start with a letter.
- * The old `${projectId}-network` failed for the ~63% of projects whose UUID
- * begins with a hex digit, and a bare APP_KEY still failed for the ~30% of keys
- * that are digit-leading. The static `n-` prefix guarantees a letter-leading
- * name for every project while APP_KEY preserves per-project isolation.
+ * APP_KEY alone can be digit-leading, so the static `n-` prefix guarantees a
+ * letter-leading name while APP_KEY preserves per-project isolation.
  *
  * Lives here rather than in the service layer because it is a provider-specific
  * naming rule — Docker has no equivalent concept.
  */
 export function flyNetworkName(): string {
   if (!process.env.APP_KEY) {
-    // Typed, matching what the service layer threw before this moved: a plain
-    // Error surfaces as a generic 500 with no next action, which is a worse
-    // answer than the one an operator missing APP_KEY used to get.
+    // Must be an AppError: a plain Error surfaces as a generic 500 with no next action.
     throw new AppError(
       'APP_KEY environment variable is required for compute network isolation',
       500,

@@ -1191,13 +1191,11 @@ export class ComputeServicesService {
       const isAlreadyExists =
         (status === 422 || msg.includes('422')) && msg.toLowerCase().includes('already exists');
       if (!isAlreadyExists) {
-        // Clean up DB record AND any partially-created Fly app to avoid an
-        // orphaned Fly app under our org that we can't see in the dashboard.
-        // (e.g. allocatePublicIps fails after createApp succeeds — the catch
-        // here used to only delete the row, leaving the Fly app behind to
-        // accrue cost and consume the org's app slot.) Mirrors createService
-        // and deployService cleanup. Best-effort: log and swallow on Fly
-        // errors so the original error still propagates.
+        // Clean up DB record AND any partially-created Fly app (e.g. allocatePublicIps
+        // fails after createApp succeeds), or an orphaned app stays under our org
+        // invisible to the dashboard. Mirrors createService and deployService
+        // cleanup. Best-effort: log and swallow on Fly errors so the original
+        // error still propagates.
         try {
           await fly.destroyApp(appName);
         } catch (destroyError) {

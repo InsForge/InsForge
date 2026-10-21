@@ -183,5 +183,3 @@ export class CloudWebscraperProvider implements WebscraperProvider {
     }
   }
 }
-
-export type { ApifyConnection };

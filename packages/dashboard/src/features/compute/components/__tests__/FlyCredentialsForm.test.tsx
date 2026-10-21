@@ -16,8 +16,7 @@ const api = vi.hoisted(() => ({
 vi.mock('#features/compute/services/compute.service', () => ({
   computeServicesApi: {
     getConfig: () => Promise.resolve(api.config),
-    // Returns whatever the spy returns so a test can reject: previously it recorded the
-    // call and resolved regardless, which made a failure path impossible to exercise.
+    // Returns whatever the spy returns so a test can make it reject.
     updateConfig: (input: unknown) =>
       (api.updateConfig(input) as Promise<unknown> | undefined) ?? Promise.resolve(api.config),
   },
