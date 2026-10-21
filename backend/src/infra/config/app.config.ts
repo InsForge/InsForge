@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { parseTrustProxySetting, TrustProxySetting } from '../../utils/trust-proxy.js';
+import { parseCorsAllowedOrigins } from '../../utils/cors.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,6 +66,12 @@ export interface AppConfig {
     logsDir: string;
     trustProxy: TrustProxySetting;
     keepAliveTimeoutMs: number;
+    /**
+     * Browser origins allowed to make credentialed cross-origin requests.
+     * `undefined` reflects any origin (the historical default); an array is
+     * an exact-match allow-list of normalized origins.
+     */
+    corsAllowedOrigins: string[] | undefined;
   };
   database: {
     host: string;
@@ -244,6 +251,7 @@ export function loadConfig(): AppConfig {
       // Must exceed the idle timeout of any proxy/LB in front of the backend,
       // otherwise clients can reuse a socket the server already closed.
       keepAliveTimeoutMs: parseEnvInt(process.env.KEEP_ALIVE_TIMEOUT_MS, 65000),
+      corsAllowedOrigins: parseCorsAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS),
     },
     database: {
       host: process.env.POSTGRES_HOST || 'localhost',
