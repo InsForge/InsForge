@@ -34,8 +34,10 @@ describe('storage.objects default owner policies migration', () => {
 
   it('does not depend on a bucket existing', () => {
     const doBlock = readMigration().match(/DO\s*\$migration\$[\s\S]*?\$migration\$/i)?.[0] ?? '';
+    const guards = doBlock.split(/CREATE\s/i)[0];
 
-    expect(doBlock).not.toMatch(/FROM\s+storage\.buckets/i);
+    expect(guards).toMatch(/pg_policy/i);
+    expect(guards).not.toMatch(/storage\.buckets/i);
   });
 
   it('keeps every write owner-only', () => {
@@ -62,21 +64,32 @@ describe('storage.objects default owner policies migration', () => {
     );
   });
 
-  it('lets reads see public-bucket objects through a definer helper, not a buckets grant', () => {
+  it('lets reads see public-bucket objects through a hoisted definer helper, not a buckets grant', () => {
     const sql = readMigration();
 
     expect(sql).toMatch(
-      /storage_objects_owner_select[\s\S]*?OR\s+storage\.bucket_is_public\(bucket\)/i
+      /storage_objects_owner_select[\s\S]*?OR\s+\(SELECT\s+storage\.public_buckets\(\)\)\s+@>\s+ARRAY\[bucket\]/i
     );
     expect(sql).toMatch(
-      /FUNCTION\s+storage\.bucket_is_public\(bucket_name\s+text\)[\s\S]*?SECURITY\s+DEFINER/i
-    );
-    expect(sql).toMatch(/SET\s+search_path\s+=\s+pg_catalog,\s*pg_temp/i);
-    expect(sql).toMatch(
-      /REVOKE\s+ALL\s+ON\s+FUNCTION\s+storage\.bucket_is_public\(text\)\s+FROM\s+PUBLIC/i
+      /FUNCTION\s+storage\.public_buckets\(\)[\s\S]*?SECURITY\s+DEFINER\s+SET\s+search_path\s+=\s+pg_catalog,\s*pg_temp/i
     );
     expect(sql).toMatch(
-      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+storage\.bucket_is_public\(text\)\s+TO\s+authenticated/i
+      /REVOKE\s+ALL\s+ON\s+FUNCTION\s+storage\.public_buckets\(\)\s+FROM\s+PUBLIC/i
+    );
+    expect(sql).toMatch(
+      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+storage\.public_buckets\(\)\s+TO\s+authenticated/i
+    );
+  });
+
+  it('creates the helper only after the no-policy guard', () => {
+    const sql = readMigration();
+    const guardEnd = sql.search(/IF\s+EXISTS\s+\(SELECT\s+1\s+FROM\s+pg_policy[\s\S]*?END\s+IF;/i);
+    const helper = sql.search(/CREATE\s+OR\s+REPLACE\s+FUNCTION\s+storage\.public_buckets/i);
+
+    expect(guardEnd).toBeGreaterThan(-1);
+    expect(helper).toBeGreaterThan(guardEnd);
+    expect(sql.slice(0, sql.search(/DO\s*\$migration\$/i))).not.toMatch(
+      /^\s*(CREATE|GRANT|REVOKE)\b/im
     );
   });
 

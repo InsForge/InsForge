@@ -51,15 +51,21 @@ beforeAll(async () => {
 
   // The migration chain ran with no bucket, so 066 is what added the defaults.
   // Fixtures are written by the superuser connection, which bypasses RLS.
+  // Rows written through the S3 protocol have no uploaded_by.
   await pg.query(`
     INSERT INTO storage.buckets (name, public) VALUES
       ('public-assets', true),
-      ('private-docs', false);
-    INSERT INTO storage.objects (bucket, key, size, uploaded_by) VALUES
-      ('private-docs', 'a.txt', 1, '${USER_A}'),
-      ('private-docs', 'b.txt', 1, '${USER_B}'),
-      ('public-assets', 'b-logo.png', 1, '${USER_B}');
+      ('private-docs', false)
   `);
+  await pg.query(
+    `INSERT INTO storage.objects (bucket, key, size, uploaded_by, uploaded_via) VALUES
+       ('private-docs', 'a.txt', 1, $1, 'rest'),
+       ('private-docs', 'b.txt', 1, $2, 'rest'),
+       ('public-assets', 'b-logo.png', 1, $2, 'rest'),
+       ('private-docs', 's3-private.bin', 1, NULL, 's3'),
+       ('public-assets', 's3-public.bin', 1, NULL, 's3')`,
+    [USER_A, USER_B]
+  );
 });
 
 afterAll(() => teardown());
@@ -79,6 +85,7 @@ describe('storage.objects defaults on a project migrated without a bucket', () =
     expect(rows).toEqual([
       { bucket: 'private-docs', key: 'a.txt' },
       { bucket: 'public-assets', key: 'b-logo.png' },
+      { bucket: 'public-assets', key: 's3-public.bin' },
     ]);
   });
 
@@ -110,12 +117,16 @@ describe('storage.objects defaults on a project migrated without a bucket', () =
   it('does not let a user update or delete objects they did not upload', async () => {
     db.setContext(asUser(USER_A));
 
-    const update = await db.query(`UPDATE storage.objects SET size = 9 WHERE uploaded_by = $1`, [
-      USER_B,
-    ]);
+    const update = await db.query(
+      `UPDATE storage.objects SET size = 9 WHERE uploaded_by = $1 OR uploaded_by IS NULL`,
+      [USER_B]
+    );
     expect(update.rowCount).toBe(0);
 
-    const remove = await db.query(`DELETE FROM storage.objects WHERE uploaded_by = $1`, [USER_B]);
+    const remove = await db.query(
+      `DELETE FROM storage.objects WHERE uploaded_by = $1 OR uploaded_by IS NULL`,
+      [USER_B]
+    );
     expect(remove.rowCount).toBe(0);
   });
 
@@ -136,6 +147,18 @@ describe('storage.objects defaults on a project migrated without a bucket', () =
     await expect(
       db.query(
         `INSERT INTO storage.objects (bucket, key, size, uploaded_by) VALUES ('private-docs', 'b.txt', 9, $1)
+         ON CONFLICT (bucket, key) DO UPDATE SET size = EXCLUDED.size`,
+        [USER_A]
+      )
+    ).rejects.toThrow(/row-level security/);
+  });
+
+  it('does not let a user replace an S3-written object, even in a public bucket', async () => {
+    db.setContext(asUser(USER_A));
+
+    await expect(
+      db.query(
+        `INSERT INTO storage.objects (bucket, key, size, uploaded_by) VALUES ('public-assets', 's3-public.bin', 9, $1)
          ON CONFLICT (bucket, key) DO UPDATE SET size = EXCLUDED.size`,
         [USER_A]
       )

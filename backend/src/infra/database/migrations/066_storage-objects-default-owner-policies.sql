@@ -9,20 +9,20 @@
 -- When storage.objects has no policies at all, create the owner defaults and
 -- enable RLS. Writes are owner-only, as in 036. Reads also allow objects in a
 -- public bucket, so end-user listing of public buckets keeps working. Projects
--- that already have any policy on storage.objects are left exactly as they are.
-
-CREATE OR REPLACE FUNCTION storage.bucket_is_public(bucket_name text)
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = pg_catalog, pg_temp
-AS $$
-  SELECT COALESCE((SELECT b.public FROM storage.buckets b WHERE b.name = bucket_name), false)
-$$;
-
-REVOKE ALL ON FUNCTION storage.bucket_is_public(text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION storage.bucket_is_public(text) TO authenticated;
+-- that already have any policy on storage.objects are left exactly as they are,
+-- and do not get the helper function below either.
+--
+-- The public-bucket check goes through storage.public_buckets(), a SECURITY
+-- DEFINER helper, so authenticated does not need a grant on storage.buckets.
+-- It returns the whole set once per query (an InitPlan) rather than being
+-- called for every row, which keeps large public-bucket listings cheap.
+--
+-- As with the 036 defaults, rows written through the S3 protocol have
+-- uploaded_by = NULL and match no owner check: end users cannot see them in a
+-- private bucket, and cannot replace, update or delete them in any bucket
+-- (they can still see them in a public bucket). API-key / project_admin
+-- callers bypass RLS and are unaffected. Projects that mix the user API and
+-- the S3 protocol on the same keys need a custom policy for those rows.
 
 DO $migration$
 BEGIN
@@ -33,11 +33,24 @@ BEGIN
     RETURN;
   END IF;
 
+  CREATE OR REPLACE FUNCTION storage.public_buckets()
+  RETURNS text[]
+  LANGUAGE sql
+  STABLE
+  SECURITY DEFINER
+  SET search_path = pg_catalog, pg_temp
+  AS $fn$
+    SELECT COALESCE(array_agg(b.name), '{}'::text[]) FROM storage.buckets b WHERE b.public
+  $fn$;
+
+  REVOKE ALL ON FUNCTION storage.public_buckets() FROM PUBLIC;
+  GRANT EXECUTE ON FUNCTION storage.public_buckets() TO authenticated;
+
   CREATE POLICY storage_objects_owner_select ON storage.objects
     FOR SELECT TO authenticated
     USING (
       uploaded_by = (SELECT auth.jwt() ->> 'sub')
-      OR storage.bucket_is_public(bucket)
+      OR (SELECT storage.public_buckets()) @> ARRAY[bucket]
     );
   CREATE POLICY storage_objects_owner_insert ON storage.objects
     FOR INSERT TO authenticated
