@@ -83,7 +83,8 @@ describe('storage.objects default owner policies migration', () => {
 
   it('creates the helper only after the no-policy guard', () => {
     const sql = readMigration();
-    const guardEnd = sql.search(/IF\s+EXISTS\s+\(SELECT\s+1\s+FROM\s+pg_policy[\s\S]*?END\s+IF;/i);
+    const guardMatch = sql.match(/IF\s+EXISTS\s+\(SELECT\s+1\s+FROM\s+pg_policy[\s\S]*?END\s+IF;/i);
+    const guardEnd = guardMatch?.index === undefined ? -1 : guardMatch.index + guardMatch[0].length;
     const helper = sql.search(/CREATE\s+OR\s+REPLACE\s+FUNCTION\s+storage\.public_buckets/i);
 
     expect(guardEnd).toBeGreaterThan(-1);
