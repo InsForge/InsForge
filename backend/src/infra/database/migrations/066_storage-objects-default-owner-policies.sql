@@ -1,18 +1,15 @@
 -- Migration: 066 - Give storage.objects owner policies and RLS on every project
 --
 -- 036 enabled RLS on storage.objects but created the owner policies only when
--- a bucket already existed. 047 then disabled RLS when there were no policies
--- and no buckets, so a fresh install stayed usable. Nothing turned either back
--- on when the first bucket was created later. Every project that ran its
--- migrations before it had a bucket therefore ended up with RLS off, no
--- policies, and the authenticated grants from 036: any signed-in end user
--- could insert, replace or delete any other user's object.
+-- a bucket already existed, and 047 disabled RLS when there were no policies
+-- and no buckets, so a fresh install stayed usable. Nothing added the defaults
+-- once the first bucket was created, so projects that migrated before having a
+-- bucket never got them.
 --
 -- When storage.objects has no policies at all, create the owner defaults and
--- enable RLS. Writes stay owner-only, as in 036. Reads also allow objects in a
--- public bucket, so end-user listing of public buckets keeps working the way
--- it did while RLS was off. Projects that already have any policy on
--- storage.objects are left exactly as they are.
+-- enable RLS. Writes are owner-only, as in 036. Reads also allow objects in a
+-- public bucket, so end-user listing of public buckets keeps working. Projects
+-- that already have any policy on storage.objects are left exactly as they are.
 
 CREATE OR REPLACE FUNCTION storage.bucket_is_public(bucket_name text)
 RETURNS boolean
