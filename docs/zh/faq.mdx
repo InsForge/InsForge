@@ -214,6 +214,14 @@ description: "InsForge 常见问题：数据库调用、Edge Function 与 Custom
     在 InsForge Cloud 上你完全不用碰这个。Compute 由平台托管，平台其余部分（数据库、认证、Storage、Edge Functions）都不需要任何 Fly token。
   </Accordion>
 
+  <Accordion title="Ask AI 是什么？它是怎么工作的？">
+    **Ask AI** 就是你现在正在对话的这个助手——一个内置在产品里、用大白话回答 InsForge 相关问题的帮手。点击顶部导航栏里的 **Ask AI** 按钮（那个 sparkles 图标）即可打开；它会在 dashboard 右侧弹出一个面板。
+
+    平台相关的问题都可以问它——比如「免费套餐都包含什么？」或「我怎么通过 MCP 连上我的编码 agent？」——它会基于 InsForge 的公开[文档](https://docs.insforge.dev)流式返回答案，并附上相关文档页面的链接。遇到含糊的问题它会反问一句来澄清，而且它会保留你的对话线程，让后续追问都在上下文里。
+
+    因为它只根据公开文档来回答，所以看不到你自己的项目。凡是跟你后端相关的具体问题——调试报错、读取你的数据、检查你的配置——请改用通过 [CLI](/quickstart) 或 [MCP](/mcp-setup) 连接的编码 agent。详见下一个问题。
+  </Accordion>
+
   <Accordion title="这个助手能帮我解决我自己项目里的具体问题吗？">
     基本不行。这个助手是基于 InsForge 的公开文档来回答的，看不到你的项目：既没法调试报错，也读不到你的数据，更查不了你的配置。凡是跟你自己项目相关的，交给你的编码 agent 来处理。你的 agent 通过 CLI 或 MCP 连着 InsForge，能读到你的实时后端、结构、数据和日志，直接帮你调试，用大白话描述问题就行。想自己拿一份后端健康和报错报告，跑 `npx @insforge/cli diagnose`。参见 [Diagnostics & advisor](/agent-native/diagnostics)。
   </Accordion>
