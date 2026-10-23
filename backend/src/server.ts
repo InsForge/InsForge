@@ -28,7 +28,6 @@ import { errorMiddleware } from '@/api/middlewares/error.js';
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
-import fetch from 'node-fetch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { LogService } from '@/services/logs/log.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
@@ -38,6 +37,8 @@ import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
+import { createFunctionInvokeProxy } from '@/api/routes/functions/invoke-proxy.js';
+import { buildCorsOriginOption } from '@/utils/cors.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
@@ -91,9 +92,13 @@ export async function createApp() {
   app.set('trust proxy', appConfig.server.trustProxy);
 
   // Basic middleware
+  // CORS: by default the request Origin is reflected so SDK apps on any origin
+  // can make credentialed calls (refresh-token cookie + CSRF header). Set
+  // CORS_ALLOWED_ORIGINS to restrict credentialed cross-origin access to an
+  // explicit allow-list in production.
   app.use(
     cors({
-      origin: true, // Allow all origins (matches Better Auth's trustedOrigins: ['*'])
+      origin: buildCorsOriginOption(appConfig.server.corsAllowedOrigins),
       credentials: true, // Allow cookies/credentials
       exposedHeaders: ['Content-Range', 'Preference-Applied'],
     })
@@ -255,65 +260,7 @@ export async function createApp() {
 
   // Proxy function execution to Deno Deploy or local runtime
   // this logic is used for backward compatibility, we will let the sdk directly call the edge function
-  app.all('/functions/:slug', async (req: Request, res: Response) => {
-    const { slug } = req.params;
-
-    try {
-      const functionService = FunctionService.getInstance();
-      const localRuntime = appConfig.functions.denoRuntimeUrl;
-
-      // Get target base URL: prefer Subhosting deployment, fallback to local runtime
-      const baseUrl =
-        (functionService.isSubhostingConfigured() && (await functionService.getDeploymentUrl())) ||
-        localRuntime;
-
-      // Build target URL with query string
-      const targetUrl = new URL(`/${slug}`, baseUrl);
-      targetUrl.search = new URL(req.url, `http://${req.headers.host}`).search;
-
-      // Build headers, filtering out non-string values and overriding host
-      const headers: Record<string, string> = {};
-      for (const [key, value] of Object.entries(req.headers)) {
-        if (typeof value === 'string') {
-          headers[key] = value;
-        }
-      }
-      headers.host = targetUrl.host;
-
-      const response = await fetch(targetUrl, {
-        method: req.method,
-        headers,
-        body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
-      });
-
-      // Read response as raw bytes to preserve binary data (images, PDFs, etc.)
-      const responseBody = Buffer.from(await response.arrayBuffer());
-
-      // Forward response headers, excluding:
-      // - transfer-encoding, content-length: recalculated by Express
-      // - connection: hop-by-hop header
-      // - content-encoding: node-fetch already decompresses the response,
-      //   so we must not tell the client it's still compressed
-      const responseHeaders: Record<string, string> = {};
-      for (const [key, value] of response.headers.entries()) {
-        if (
-          ['transfer-encoding', 'content-length', 'connection', 'content-encoding'].includes(key)
-        ) {
-          continue;
-        }
-        responseHeaders[key] = value;
-      }
-
-      res
-        .status(response.status)
-        .set(responseHeaders)
-        .set('Access-Control-Allow-Origin', '*')
-        .send(responseBody);
-    } catch (error) {
-      logger.error('Failed to proxy function', { slug, error: String(error) });
-      res.status(502).json({ error: error instanceof Error ? error.message : String(error) });
-    }
-  });
+  app.all('/functions/:slug', createFunctionInvokeProxy());
 
   // Redirect root to dashboard login (only for non-insforge cloud environments)
   if (!isCloudEnvironment()) {
