@@ -52,7 +52,7 @@ export class DatabaseManager {
       database: appConfig.database.name,
       user: appConfig.database.user,
       password: appConfig.database.password,
-      max: 20,
+      max: appConfig.database.poolMax,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
     });
