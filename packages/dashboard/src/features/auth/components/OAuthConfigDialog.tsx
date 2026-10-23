@@ -18,9 +18,9 @@ import {
 } from '@insforge/ui';
 import WarningIcon from '#assets/icons/warning.svg';
 import {
+  isSharedKeyOAuthProvider,
   oAuthConfigSchema,
   OAuthConfigSchema,
-  OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
 import { type OAuthProviderInfo } from '#features/auth/helpers';
 import { SecretInput } from './SecretInput';
@@ -119,17 +119,8 @@ export function OAuthConfigDialog({
   const [isClientSecretVisible, setIsClientSecretVisible] = useState(false);
 
   // Our Cloud only support shared keys of these OAuth Providers for now
-  const sharedKeyProviders: readonly OAuthProvidersSchema[] = [
-    'google',
-    'github',
-    'discord',
-    'linkedin',
-    'facebook',
-    'apple',
-    'microsoft',
-  ] satisfies readonly OAuthProvidersSchema[];
   const isSharedKeysAvailable =
-    isInsForgeCloudProject() && provider?.id && sharedKeyProviders.includes(provider.id);
+    isInsForgeCloudProject() && provider?.id && isSharedKeyOAuthProvider(provider.id);
 
   // Use useFormState hook for better reactivity
   const { isDirty } = useFormState({
@@ -165,7 +156,10 @@ export function OAuthConfigDialog({
         clientId: providerConfig.clientId || '',
         nativeClientIds: providerConfig.nativeClientIds || [],
         clientSecret: providerConfig.clientSecret || '',
-        useSharedKey: providerConfig.useSharedKey || false,
+        // A stored config can still carry the flag for a provider the cloud never
+        // proxied. Dropping it here shows the credential fields, so the admin can
+        // repair the config instead of resubmitting a value the backend rejects.
+        useSharedKey: Boolean(isSharedKeysAvailable && providerConfig.useSharedKey),
       });
     }
   }, [form, isLoadingProvider, isOpen, isSharedKeysAvailable, mode, provider, providerConfig]);
