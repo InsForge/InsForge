@@ -34,6 +34,21 @@ Configure SMTP under **Authentication → Email**.
 
 The `From:` header is always your configured sender. SDK callers cannot spoof it.
 
+## Provider settings
+
+Settings for common providers. The sender email must be verified with the provider: a domain, or for some providers (such as SES and SendGrid) a single address.
+
+| Provider | Host | Port | Username | Password |
+|----------|------|------|----------|----------|
+| Amazon SES | `email-smtp.<region>.amazonaws.com` | `587` | SMTP username from the SES console | SMTP password from the SES console (not your IAM access keys) |
+| Groundmail | `smtp.groundmail.dev` | `587` or `2525` | `groundmail` | SMTP credential (`gmsmtp_…`) |
+| Mailgun | `smtp.mailgun.org` (EU domains: `smtp.eu.mailgun.org`) | `587` | The domain's SMTP login | The domain's SMTP password |
+| Postmark | `smtp.postmarkapp.com` | `587` | Server API token | Server API token |
+| Resend | `smtp.resend.com` | `587` | `resend` | API key |
+| SendGrid | `smtp.sendgrid.net` | `587` | `apikey` | API key with Mail Send access |
+
+Port `587` uses STARTTLS. Use `465` only if your provider supports implicit TLS on it.
+
 ## Email templates
 
 Templates render locally from `email.templates`. Variables use `{{ variable }}` and are HTML-escaped.
