@@ -1,12 +1,12 @@
 ---
 title: "模型閘道"
 sidebarTitle: "Overview"
-description: "透過 InsForge 模型閘道以單一受管金鑰呼叫任何 LLM，並依專案設定使用量配額、追蹤成本、限制存取並集中管理計費。"
+description: "從 InsForge 佈建 OpenRouter 金鑰，使用 OpenAI SDK 呼叫聊天、串流和嵌入模型，並在儀表板中追蹤支出與各模型用量。"
 ---
 
-使用模型閘道透過一個 OpenAI 相容的端點呼叫聊天、串流和嵌入模型。InsForge 持有提供商金鑰，追蹤每個專案的使用情況，並透過 [OpenRouter](https://openrouter.ai) 路由流量，因此您的應用程式代碼永遠不會直接看到 Anthropic、OpenAI 或 Mistral 認證。
+使用模型閘道為您的專案佈建 OpenRouter 金鑰、瀏覽模型目錄並追蹤支出和各模型用量。您的應用程式使用該金鑰直接呼叫 [OpenRouter](https://openrouter.ai)，因此一次整合即可存取來自 Anthropic、OpenAI、Mistral、Google 和數十個其他提供商的聊天、串流和嵌入模型。
 
-<Frame caption="一個 OpenAI 相容的端點，具有按提供商存取、隨時可複製的程式碼和使用追蹤。">
+<Frame caption="儀表板中的模型閘道頁面：目前金鑰、按提供商存取、隨時可複製的程式碼和使用圖表。">
   <img src="/images/model-gateway-overview.png" alt="InsForge 儀表板模型閘道概覽，顯示程式碼範例、提供商晶片和使用圖表" />
 </Frame>
 
@@ -38,23 +38,23 @@ graph TB
 
 ### OpenAI 相容的 API
 
-將任何 OpenAI SDK 或 `openai` 相容的程式庫指向 `https://<project>.insforge.dev/v1`，它就能運作。`/v1/chat/completions`、`/v1/embeddings` 和 `/v1/models` 都表現得像上游規範。
+將儀表板中佈建的金鑰複製到僅伺服器端的 `OPENROUTER_API_KEY` 中，然後將任何 OpenAI SDK 或 `openai` 相容的程式庫指向 `https://openrouter.ai/api/v1`。[TypeScript SDK](/sdks/typescript/ai) 和 [REST](/sdks/rest/ai) 參考中提供了可用的程式碼片段。
+
+<Warning>
+  佈建的金鑰是伺服器端認證。請將 OpenRouter 呼叫置於後端路由、伺服器動作或邊緣函式之後，切勿將該金鑰打包進瀏覽器程式碼。
+</Warning>
 
 ### 串流
 
-用於聊天完成的伺服器傳送事件。使用串流端點的方式與 OpenAI 相同；閘道在令牌從提供商到達時轉發它們。
+用於聊天完成的伺服器傳送事件。像使用 OpenAI 那樣設定 `stream: true`，令牌會隨提供商產生而到達。
 
 ### 嵌入
 
 從 OpenRouter 支援的任何嵌入模型產生密集向量。使用 [pgvector](/core-concepts/database/pgvector) 將結果儲存在 Postgres 中以進行語義搜尋。
 
-### 按專案配額
+### 支出與用量
 
-每個專案都有自己的速率限制和支出上限。達到它時，閘道傳回乾淨的 429，而不是將提供商配額狀態洩漏到您的應用程式中。
-
-### 使用追蹤
-
-每個請求都用模型、令牌計數和成本進行記錄。從儀表板、CLI 或 MCP 查詢使用情況 — 帳單自動與 OpenRouter 的發票對帳。
+儀表板中的模型閘道頁面從 OpenRouter 讀取您金鑰的活動資料：總支出，每日、每週和每月用量，剩餘額度及其重設日期，以及按模型的明細。
 
 ### 多提供商路由
 
