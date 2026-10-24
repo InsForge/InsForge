@@ -65,7 +65,12 @@ export async function buildCloudCredentialsError(response: Response): Promise<Er
     if (parsed && typeof parsed === 'object') {
       body = parsed as CloudCredentialsErrorBody;
     }
-  } catch {
+  } catch (error) {
+    // A timeout/abort while reading the body is not "no JSON": keep it so
+    // callers and logs still see the timeout, not a status-only error.
+    if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+      throw error;
+    }
     body = undefined;
   }
 

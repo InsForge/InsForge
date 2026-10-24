@@ -79,6 +79,20 @@ describe('buildCloudCredentialsError', () => {
     );
   });
 
+  it('re-throws a timeout that aborts the body read instead of masking it', async () => {
+    const timeout = new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    const stalled = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.error(timeout);
+        },
+      }),
+      { status: 500, statusText: 'Internal Server Error' }
+    );
+
+    await expect(buildCloudCredentialsError(stalled)).rejects.toBe(timeout);
+  });
+
   it('handles a non-JSON body', async () => {
     const error = await buildCloudCredentialsError(
       new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway' })
