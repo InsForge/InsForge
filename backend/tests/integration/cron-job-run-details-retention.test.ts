@@ -110,12 +110,29 @@ describe('schedules.cleanup_cron_job_run_details', () => {
     expect(await cleanup(1000, 100)).toBe(10);
   });
 
-  it('deletes nothing when retention is disabled', async () => {
-    await seedRuns(10, 30, 'succeeded');
+  it('falls back to a 30-day floor when retention is disabled', async () => {
+    await seedRuns(10, 40, 'succeeded');
+    await seedRuns(10, 20, 'succeeded');
+    await seedRuns(2, null, 'running');
     await pg.query(`UPDATE schedules.config SET retention_days = NULL`);
 
+    expect(await cleanup(1000, 100)).toBe(10);
+
+    const { rows } = await pg.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE end_time < NOW() - INTERVAL '30 days')::int AS older_than_floor,
+         COUNT(*) FILTER (WHERE end_time >= NOW() - INTERVAL '30 days')::int AS within_floor,
+         COUNT(*) FILTER (WHERE end_time IS NULL)::int AS running
+       FROM cron.job_run_details`
+    );
+    expect(rows[0]).toEqual({ older_than_floor: 0, within_floor: 10, running: 2 });
+  });
+
+  it('uses retention_days as-is when it is longer than the floor', async () => {
+    await seedRuns(10, 40, 'succeeded');
+    await pg.query(`UPDATE schedules.config SET retention_days = 60`);
+
     expect(await cleanup(1000, 100)).toBe(0);
-    expect((await remaining()).expired).toBe(10);
   });
 
   it('returns 0 and deletes nothing on invalid arguments', async () => {

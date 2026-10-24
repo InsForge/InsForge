@@ -23,6 +23,12 @@ describe('cron-job-run-details-retention migration', () => {
     expect(sql).toMatch(/SELECT retention_days INTO v_retention_days\s+FROM schedules\.config/i);
   });
 
+  it('falls back to a 30-day floor when retention is disabled', () => {
+    expect(sql).toMatch(
+      /IF v_retention_days IS NULL OR v_retention_days <= 0 THEN\s+v_retention_days := 30;/i
+    );
+  });
+
   it('deletes cron.job_run_details in bounded batches', () => {
     expect(sql).toMatch(/p_batch_size INT DEFAULT 1000/i);
     expect(sql).toMatch(/p_max_batches INT DEFAULT 100/i);

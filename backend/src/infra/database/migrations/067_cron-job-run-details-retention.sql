@@ -7,6 +7,12 @@
 -- this applies the same retention window, schedules.config.retention_days
 -- (default 7 days), to cron.job_run_details.
 --
+-- Unlike schedules.job_logs, this table always has a bound: when retention is
+-- disabled (retention_days IS NULL), finished runs older than 30 days are still
+-- deleted. cron.job_run_details is pg_cron's internal run log, not exposed in
+-- any API or dashboard, so turning off schedule log retention must not let it
+-- grow without limit again. schedules.job_logs keeps NULL = keep forever.
+--
 -- One call deletes at most p_batch_size * p_max_batches rows (100k by
 -- default). The whole call is one transaction: the batches don't commit
 -- separately, so the p_max_batches cap is what bounds the transaction on a
@@ -58,8 +64,10 @@ BEGIN
   SELECT retention_days INTO v_retention_days
   FROM schedules.config LIMIT 1;
 
+  -- Retention disabled: fall back to the 30-day floor instead of keeping
+  -- everything.
   IF v_retention_days IS NULL OR v_retention_days <= 0 THEN
-    RETURN 0;
+    v_retention_days := 30;
   END IF;
 
   v_cutoff := NOW() - (v_retention_days || ' days')::INTERVAL;

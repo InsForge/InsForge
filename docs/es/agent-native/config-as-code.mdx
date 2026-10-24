@@ -90,7 +90,7 @@ El archivo refleja un subconjunto curado de la configuración del proyecto, las 
 | `[schedules]` | `retention_days` |
 | `[deployments]` | `subdomain` |
 
-Debido a que TOML no tiene un literal `null`, use `retention_days = 0` para deshabilitar la limpieza de retención para mensajes en tiempo real o registros de ejecución de cronograma; `config apply` envía `null` al backend para ese valor. Las plantillas de correo electrónico, las credenciales de la aplicación del proveedor OAuth, los depósitos, los canales en tiempo real, las funciones, las variables de entorno de implementación y los secretos no se administran a través de este archivo.
+Debido a que TOML no tiene un literal `null`, use `retention_days = 0` para deshabilitar la limpieza de retención para mensajes en tiempo real o registros de ejecución de cronograma; `config apply` envía `null` al backend para ese valor. `[schedules] retention_days` también controla cuánto tiempo se conserva el registro de ejecuciones propio de pg_cron (`cron.job_run_details`), y ese registro tiene un límite de respaldo de 30 días: con `retention_days = 0`, los registros de ejecución de cronograma se conservan indefinidamente, pero las ejecuciones de pg_cron finalizadas con más de 30 días se siguen eliminando. Las plantillas de correo electrónico, las credenciales de la aplicación del proveedor OAuth, los depósitos, los canales en tiempo real, las funciones, las variables de entorno de implementación y los secretos no se administran a través de este archivo.
 
 Un ejemplo completo:
 
