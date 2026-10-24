@@ -77,7 +77,7 @@ Revisa el diff de `.env.example` antes de actualizar: una versión que añada un
 
 ## Almacenamiento
 
-El almacenamiento de objetos usa por defecto el sistema de archivos del contenedor en un volumen de Docker. Dokploy acepta un único archivo compose, así que los overlays de MinIO y RustFS no aplican; consulta [Self-Hosted Storage](./self-host-storage.mdx) para las dos opciones que sí.
+El almacenamiento de objetos usa por defecto el sistema de archivos del contenedor en un volumen de Docker. Dokploy acepta un único archivo compose, así que los overlays de MinIO y RustFS no aplican; consulta [Self-Hosted Storage](/deployment/self-host-storage) para las dos opciones que sí.
 
 ## Por qué Postgres se construye en lugar de descargarse
 

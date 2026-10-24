@@ -77,7 +77,7 @@ VITE_API_BASE_URL=https://insforge.example.com
 
 ## 存储
 
-对象存储默认落在 Docker 卷上的容器文件系统里。Dokploy 只接受单个 compose 文件，所以 MinIO 和 RustFS 的 overlay 用不了；可用的两种方案见 [Self-Hosted Storage](./self-host-storage.mdx)。
+对象存储默认落在 Docker 卷上的容器文件系统里。Dokploy 只接受单个 compose 文件，所以 MinIO 和 RustFS 的 overlay 用不了；可用的两种方案见 [Self-Hosted Storage](/deployment/self-host-storage)。
 
 ## 为什么 Postgres 是构建而不是拉取
 
