@@ -12,11 +12,27 @@ export const getSecretValueResponseSchema = z.object({
   value: z.string(),
 });
 
+const secretExpiresAtSchema = z
+  .string()
+  .refine((value) => !Number.isNaN(Date.parse(value)), 'Must be a valid date');
+
 // POST /secrets - Create secret (user-facing API)
 export const createSecretRequestSchema = z.object({
   key: z.string().regex(/^[A-Z0-9_]+$/, 'Use uppercase letters, numbers, and underscores only'),
   value: z.string().min(1, 'Value is required'),
+  isReserved: z.boolean().optional(),
+  expiresAt: secretExpiresAtSchema.nullable().optional(),
 });
+
+// PUT /secrets/:key - Update secret
+export const updateSecretRequestSchema = z
+  .object({
+    value: z.string().optional(),
+    isActive: z.boolean().optional(),
+    isReserved: z.boolean().optional(),
+    expiresAt: secretExpiresAtSchema.nullable().optional(),
+  })
+  .refine((body) => Object.keys(body).length > 0, 'Provide at least one field to update');
 
 export const createSecretResponseSchema = z.object({
   success: z.literal(true),
@@ -66,6 +82,7 @@ export type ListSecretsResponse = z.infer<typeof listSecretsResponseSchema>;
 export type GetSecretValueResponse = z.infer<typeof getSecretValueResponseSchema>;
 export type CreateSecretRequest = z.infer<typeof createSecretRequestSchema>;
 export type CreateSecretResponse = z.infer<typeof createSecretResponseSchema>;
+export type UpdateSecretRequest = z.infer<typeof updateSecretRequestSchema>;
 export type UpdateSecretResponse = z.infer<typeof updateSecretResponseSchema>;
 export type DeleteSecretResponse = z.infer<typeof deleteSecretResponseSchema>;
 export type RotateApiKeyRequest = z.infer<typeof rotateApiKeyRequestSchema>;
