@@ -1506,6 +1506,11 @@ export class DeploymentService {
         ),
       };
     } catch (error) {
+      // Keep AppError/UpstreamError (e.g. a cloud quota refusal or a Vercel
+      // 4xx) intact so the caller sees the real reason, like verifyCustomDomain.
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Failed to list custom domains', {
         error: error instanceof Error ? error.message : String(error),
       });
