@@ -1,7 +1,7 @@
 ---
 title: "Razorpay 金流"
 sidebarTitle: "Razorpay"
-description: "將 Razorpay 訂單、訂閱、手動 Webhook 與 Webhook 履行整合至 InsForge，於 Postgres 中安全記錄付款事件。"
+description: "在 InsForge 整合 Razorpay：後端建立 Orders 與 Subscriptions，前端開啟 Checkout 並驗證簽章。"
 ---
 
 如果您需要使用 Razorpay Orders、Razorpay Checkout、Items、Plans 和 Subscriptions，請使用 Razorpay 整合。Razorpay 不像 Stripe Checkout 那樣是託管的重新導向流程。您的後端建立服務商物件，您的前端開啟 Razorpay Checkout 指令碼，接著由您的後端驗證回傳的簽章。
