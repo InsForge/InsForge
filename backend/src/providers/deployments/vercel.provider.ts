@@ -28,6 +28,63 @@ interface CloudCredentialsResponse {
   slug: string | null;
 }
 
+/**
+ * Error body the cloud returns when it refuses to hand out deploy credentials,
+ * e.g. 403 `{ code: 'quota_exceeded', quota, upgrade_url, message }` when the
+ * organization is over its plan quota.
+ */
+interface CloudCredentialsErrorBody {
+  code?: unknown;
+  quota?: unknown;
+  upgrade_url?: unknown;
+  message?: unknown;
+}
+
+const nonEmptyString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() ? value.trim() : undefined;
+
+/**
+ * Turn a non-2xx response from `GET /sites/v1/credentials/:projectId` into an
+ * error. A quota refusal becomes an AppError carrying the cloud's own message
+ * and an upgrade hint, so callers (and the dashboard) can show the real reason
+ * instead of a generic failure. Anything else stays a plain Error, now with
+ * the HTTP status and the cloud's message for the logs.
+ */
+export async function buildCloudCredentialsError(response: Response): Promise<Error> {
+  let body: CloudCredentialsErrorBody | undefined;
+  try {
+    const parsed: unknown = await response.json();
+    if (parsed && typeof parsed === 'object') {
+      body = parsed as CloudCredentialsErrorBody;
+    }
+  } catch {
+    body = undefined;
+  }
+
+  if (response.status === 403 && body?.code === 'quota_exceeded') {
+    const quota = nonEmptyString(body.quota);
+    const upgradeUrl = nonEmptyString(body.upgrade_url);
+    const cloudMessage =
+      nonEmptyString(body.message) ??
+      `Your organization has exceeded its ${quota ?? 'plan'} quota.`;
+    const upgradeHint = upgradeUrl
+      ? `Upgrade your plan to continue: ${upgradeUrl}`
+      : 'Upgrade your plan to continue.';
+    return new AppError(
+      `${cloudMessage} ${upgradeHint}`,
+      403,
+      ERROR_CODES.DEPLOYMENT_QUOTA_EXCEEDED,
+      upgradeHint
+    );
+  }
+
+  const statusLabel = [response.status, response.statusText].filter(Boolean).join(' ');
+  const detail = nonEmptyString(body?.message);
+  return new Error(
+    `Failed to fetch Vercel credentials: ${statusLabel}${detail ? ` - ${detail}` : ''}`
+  );
+}
+
 interface VercelCredentials {
   token: string;
   teamId: string;
@@ -311,7 +368,7 @@ export class VercelProvider {
         );
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch Vercel credentials: ${response.statusText}`);
+          throw await buildCloudCredentialsError(response);
         }
 
         const data = (await response.json()) as CloudCredentialsResponse;
