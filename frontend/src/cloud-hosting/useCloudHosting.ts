@@ -14,6 +14,7 @@ import type {
   DashboardMetricsResponse,
 } from '@insforge/dashboard';
 import { partnerService } from './partner.service';
+import { getErrorMessage, normalizeProjectInfo, type CloudHostingMessage } from './helpers';
 
 const VALID_METRICS_RANGES: readonly DashboardMetricsRange[] = ['1h', '6h', '24h', '3d'] as const;
 const VALID_METRIC_NAMES: readonly DashboardMetricName[] = [
@@ -32,11 +33,6 @@ type InstanceTypeChangeResult = {
   success: boolean;
   instanceType?: string;
   error?: string;
-};
-
-type CloudHostingMessage = {
-  type: string;
-  [key: string]: unknown;
 };
 
 type PendingRequestKey =
@@ -200,10 +196,6 @@ function getCurrentOrigin(): string {
   return '';
 }
 
-function getErrorMessage(message: unknown, fallback: string): string {
-  return typeof message === 'string' && message.trim() ? message : fallback;
-}
-
 function normalizeBackups(backups: unknown): DashboardBackup[] {
   if (!Array.isArray(backups)) {
     return [];
@@ -238,41 +230,6 @@ function normalizeBackups(backups: unknown): DashboardBackup[] {
           : null,
     };
   });
-}
-
-function normalizeProjectInfo(
-  previous: DashboardProjectInfo | undefined,
-  origin: string,
-  message: CloudHostingMessage
-): DashboardProjectInfo {
-  const previousInfo = previous ?? {
-    id: origin,
-    name: 'Project',
-    region: '',
-    instanceType: '',
-  };
-
-  return {
-    id: typeof message.id === 'string' && message.id ? message.id : previousInfo.id,
-    name: typeof message.name === 'string' && message.name ? message.name : previousInfo.name,
-    region:
-      typeof message.region === 'string' && message.region ? message.region : previousInfo.region,
-    instanceType:
-      typeof message.instanceType === 'string' && message.instanceType
-        ? message.instanceType
-        : previousInfo.instanceType,
-    latestVersion:
-      typeof message.latestVersion === 'string' || message.latestVersion === null
-        ? (message.latestVersion as string | null)
-        : previousInfo.latestVersion,
-    currentVersion:
-      typeof message.currentVersion === 'string' || message.currentVersion === null
-        ? (message.currentVersion as string | null)
-        : previousInfo.currentVersion,
-    status:
-      typeof message.status === 'string' && message.status ? message.status : previousInfo.status,
-    isBranch: typeof message.isBranch === 'boolean' ? message.isBranch : previousInfo.isBranch,
-  };
 }
 
 export function useCloudHosting() {
