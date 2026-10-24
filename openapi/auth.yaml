@@ -793,7 +793,7 @@ paths:
   /api/auth/admin/sessions/exchange:
     post:
       summary: Exchange cloud provider authorization code for admin session
-      description: Verifies an authorization code/JWT from from Insforge Cloud platform and issues an internal admin session token with project_admin role
+      description: Verifies an authorization code/JWT from the InsForge Cloud platform and issues an internal admin session token with project_admin role
       tags:
         - Admin
       requestBody:
@@ -807,7 +807,7 @@ paths:
               properties:
                 code:
                   type: string
-                  description: Authorization code or JWT from the Insforge
+                  description: Authorization code or JWT from InsForge Cloud
                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
       responses:
         '200':
