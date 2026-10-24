@@ -7,10 +7,16 @@
 -- this applies the same retention window, schedules.config.retention_days
 -- (default 7 days), to cron.job_run_details.
 --
--- The cleanup deletes in batches of p_batch_size rows and stops after
--- p_max_batches batches, so the first run on a large backlog doesn't delete
--- everything in one long transaction on a small instance. The job runs hourly,
--- so a large backlog drains over a few runs and then stays small.
+-- One call deletes at most p_batch_size * p_max_batches rows (100k by
+-- default). The whole call is one transaction: the batches don't commit
+-- separately, so the p_max_batches cap is what bounds the transaction on a
+-- small instance. The job runs hourly, so a large backlog drains over a few
+-- runs and then stays small.
+--
+-- Only finished runs (end_time set) are deleted. pg_cron can leave a run with
+-- end_time NULL if the server restarts while it runs; those rows are kept
+-- too. They are rare (one per interrupted run), so they are left alone rather
+-- than guessing which NULL-end_time rows are really dead.
 --
 -- The job is named 'cron-job-run-details-retention'. Some instances already
 -- have a manually created job with that name; it is unscheduled and replaced,
