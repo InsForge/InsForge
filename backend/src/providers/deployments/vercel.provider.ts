@@ -38,7 +38,15 @@ interface CloudCredentialsErrorBody {
   quota?: unknown;
   upgrade_url?: unknown;
   message?: unknown;
+  /** Non-quota failures (404, 429, 500) carry their reason in `error`. */
+  error?: unknown;
 }
+
+/**
+ * Upper bound for the cloud credentials request, covering both the headers and
+ * the body read, so a stalled response cannot leave the shared fetch pending.
+ */
+const CLOUD_CREDENTIALS_TIMEOUT_MS = 30_000;
 
 const nonEmptyString = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim() ? value.trim() : undefined;
@@ -79,7 +87,7 @@ export async function buildCloudCredentialsError(response: Response): Promise<Er
   }
 
   const statusLabel = [response.status, response.statusText].filter(Boolean).join(' ');
-  const detail = nonEmptyString(body?.message);
+  const detail = nonEmptyString(body?.message) ?? nonEmptyString(body?.error);
   return new Error(
     `Failed to fetch Vercel credentials: ${statusLabel}${detail ? ` - ${detail}` : ''}`
   );
@@ -364,7 +372,8 @@ export class VercelProvider {
         const signature = TokenManager.getInstance().signCloudToken('Cloud deploy credentials');
 
         const response = await fetch(
-          `${appConfig.cloud.apiHost}/sites/v1/credentials/${projectId}?sign=${signature}`
+          `${appConfig.cloud.apiHost}/sites/v1/credentials/${projectId}?sign=${signature}`,
+          { signal: AbortSignal.timeout(CLOUD_CREDENTIALS_TIMEOUT_MS) }
         );
 
         if (!response.ok) {

@@ -54,6 +54,20 @@ describe('buildCloudCredentialsError', () => {
     );
   });
 
+  it('reads the reason from `error`, the field the cloud uses for non-quota failures', async () => {
+    const error = await buildCloudCredentialsError(
+      jsonResponse(429, 'Too Many Requests', {
+        error: 'Too many requests',
+        retry_after_seconds: 30,
+      })
+    );
+
+    expect(error).not.toBeInstanceOf(AppError);
+    expect(error.message).toBe(
+      'Failed to fetch Vercel credentials: 429 Too Many Requests - Too many requests'
+    );
+  });
+
   it('does not treat a 403 without quota_exceeded as a quota error', async () => {
     const error = await buildCloudCredentialsError(
       jsonResponse(403, 'Forbidden', { message: 'Invalid signature' })
