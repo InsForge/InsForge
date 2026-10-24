@@ -47,7 +47,8 @@ export const getConnections = (
     //    to "insforge" in postgresql.conf), and pgsql-test creates isolated
     //    databases with random names. We stub the cron schema because
     //    migrations 024 and 041 execute DO $$ blocks at migration time
-    //    that SELECT FROM cron.job and PERFORM cron.schedule()/unschedule().
+    //    that SELECT FROM cron.job and PERFORM cron.schedule()/unschedule(),
+    //    and migration 067 creates a cleanup function for cron.job_run_details.
     seed.fn(async (ctx) => {
       await ctx.pg.query(`
         CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -65,6 +66,20 @@ export const getConnections = (
           username text DEFAULT current_user,
           active boolean DEFAULT true,
           jobname text
+        );
+        -- Same columns as pg_cron 1.6. Migration 067 deletes from this table.
+        CREATE SEQUENCE IF NOT EXISTS cron.runid_seq;
+        CREATE TABLE IF NOT EXISTS cron.job_run_details (
+          jobid bigint,
+          runid bigint PRIMARY KEY DEFAULT nextval('cron.runid_seq'),
+          job_pid integer,
+          database text,
+          username text,
+          command text,
+          status text,
+          return_message text,
+          start_time timestamptz,
+          end_time timestamptz
         );
         CREATE FUNCTION cron.schedule(cron_schedule text, command text)
           RETURNS bigint LANGUAGE sql AS $$ SELECT 0::bigint $$;
