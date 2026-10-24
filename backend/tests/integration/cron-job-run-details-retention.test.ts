@@ -155,6 +155,46 @@ describe('schedules.cleanup_cron_job_run_details', () => {
     }
   });
 
+  it('replaces an existing job with the same name or command instead of adding one', async () => {
+    // The shared harness stubs cron.schedule/unschedule as no-ops. Inside this
+    // test's transaction, make them write cron.job like pg_cron does.
+    await pg.query(`
+      CREATE OR REPLACE FUNCTION cron.schedule(job_name text, cron_schedule text, command text)
+        RETURNS bigint LANGUAGE sql AS $$
+          INSERT INTO cron.job (schedule, command, jobname)
+          VALUES (cron_schedule, command, job_name)
+          RETURNING jobid
+        $$;
+      CREATE OR REPLACE FUNCTION cron.unschedule(job_id bigint)
+        RETURNS boolean LANGUAGE sql AS $$
+          DELETE FROM cron.job WHERE jobid = job_id RETURNING true
+        $$;
+    `);
+    // A manually created job with the same name (as on a customer instance),
+    // an unnamed job with the same command, and an unrelated job.
+    await pg.query(`
+      INSERT INTO cron.job (schedule, command, jobname) VALUES
+        ('17 3 * * *', 'DELETE FROM cron.job_run_details WHERE end_time < NOW() - INTERVAL ''7 days''', 'cron-job-run-details-retention'),
+        ('0 * * * *', 'SELECT schedules.cleanup_cron_job_run_details()', NULL),
+        ('*/5 * * * *', 'SELECT 1', 'unrelated-job')
+    `);
+
+    await pg.query(migrationSql);
+    await pg.query(migrationSql);
+
+    const { rows } = await pg.query(
+      `SELECT jobname, schedule, command FROM cron.job ORDER BY jobname`
+    );
+    expect(rows).toEqual([
+      {
+        jobname: 'cron-job-run-details-retention',
+        schedule: '30 * * * *',
+        command: 'SELECT schedules.cleanup_cron_job_run_details()',
+      },
+      { jobname: 'unrelated-job', schedule: '*/5 * * * *', command: 'SELECT 1' },
+    ]);
+  });
+
   it('applies again cleanly on an already migrated database', async () => {
     await seedRuns(10, 30, 'succeeded');
 

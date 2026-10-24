@@ -7,9 +7,10 @@
 -- this applies the same retention window, schedules.config.retention_days
 -- (default 7 days), to cron.job_run_details.
 --
--- Unlike schedules.job_logs, this table always has a bound: when retention is
--- disabled (retention_days IS NULL), finished runs older than 30 days are still
--- deleted. cron.job_run_details is pg_cron's internal run log, not exposed in
+-- Unlike schedules.job_logs, disabling retention does not stop this cleanup:
+-- when retention_days IS NULL, finished runs older than 30 days are still
+-- deleted. A set retention_days is used as-is, with no upper cap, so a very
+-- long value still lets the table grow accordingly. cron.job_run_details is pg_cron's internal run log, not exposed in
 -- any API or dashboard, so turning off schedule log retention must not let it
 -- grow without limit again. schedules.job_logs keeps NULL = keep forever.
 --
