@@ -48,6 +48,7 @@ vi.mock('../../src/providers/storage/s3.provider.js', () => ({
 
 import { DeploymentService } from '../../src/services/deployments/deployment.service';
 import { DeploymentStatus } from '../../src/types/deployments';
+import { AppError } from '../../src/utils/errors';
 import { ERROR_CODES, type StartDeploymentRequest } from '@insforge/shared-schemas';
 
 describe('DeploymentService direct deployment flow', () => {
@@ -121,6 +122,31 @@ describe('DeploymentService direct deployment flow', () => {
           aRecordValue: null,
         },
       ],
+    });
+  });
+
+  it('passes a cloud quota refusal through listCustomDomains instead of a generic 500', async () => {
+    const quotaError = new AppError(
+      'Function call quota exceeded. Upgrade your plan to continue: https://example.com/upgrade',
+      403,
+      ERROR_CODES.DEPLOYMENT_QUOTA_EXCEEDED
+    );
+    mockVercelProvider.listCustomDomains.mockRejectedValueOnce(quotaError);
+
+    const service = DeploymentService.getInstance();
+
+    await expect(service.listCustomDomains()).rejects.toBe(quotaError);
+  });
+
+  it('still wraps unexpected listCustomDomains failures in a 500', async () => {
+    mockVercelProvider.listCustomDomains.mockRejectedValueOnce(new Error('socket hang up'));
+
+    const service = DeploymentService.getInstance();
+
+    await expect(service.listCustomDomains()).rejects.toMatchObject({
+      message: 'Failed to list custom domains',
+      statusCode: 500,
+      code: ERROR_CODES.INTERNAL_ERROR,
     });
   });
 
