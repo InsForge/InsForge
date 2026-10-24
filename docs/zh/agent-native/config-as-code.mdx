@@ -90,7 +90,7 @@ description: 通过 insforge.toml 声明文件与 CLI 的 plan、apply、export 
 | `[schedules]` | `retention_days` |
 | `[deployments]` | `subdomain` |
 
-因为 TOML 没有 `null` 文本，使用 `retention_days = 0` 禁用实时消息或计划执行日志的保留清理；`config apply` 为该值向后端发送 `null`。电子邮件模板、OAuth 提供商应用凭证、存储桶、实时通道、函数、部署环境变量和秘密不通过此文件管理。
+因为 TOML 没有 `null` 文本，使用 `retention_days = 0` 禁用实时消息或计划执行日志的保留清理；`config apply` 为该值向后端发送 `null`。`[schedules] retention_days` 也决定 pg_cron 自身运行日志（`cron.job_run_details`）的保留时间，正值会按原样生效。禁用保留时，该日志改用 30 天作为回退值：设置 `retention_days = 0` 时，计划执行日志会永久保留，但超过 30 天的已完成 pg_cron 运行记录仍会被删除。电子邮件模板、OAuth 提供商应用凭证、存储桶、实时通道、函数、部署环境变量和秘密不通过此文件管理。
 
 完整示例：
 
