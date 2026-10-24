@@ -64,8 +64,8 @@ BEGIN
   SELECT retention_days INTO v_retention_days
   FROM schedules.config LIMIT 1;
 
-  -- Retention disabled: fall back to the 30-day floor instead of keeping
-  -- everything.
+  -- Retention disabled (NULL): fall back to 30 days instead of keeping
+  -- everything. A set retention_days is used as-is, even when below 30.
   IF v_retention_days IS NULL OR v_retention_days <= 0 THEN
     v_retention_days := 30;
   END IF;

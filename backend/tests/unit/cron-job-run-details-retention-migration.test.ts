@@ -23,7 +23,7 @@ describe('cron-job-run-details-retention migration', () => {
     expect(sql).toMatch(/SELECT retention_days INTO v_retention_days\s+FROM schedules\.config/i);
   });
 
-  it('falls back to a 30-day floor when retention is disabled', () => {
+  it('falls back to 30 days when retention is disabled', () => {
     expect(sql).toMatch(
       /IF v_retention_days IS NULL OR v_retention_days <= 0 THEN\s+v_retention_days := 30;/i
     );

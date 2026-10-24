@@ -110,7 +110,7 @@ describe('schedules.cleanup_cron_job_run_details', () => {
     expect(await cleanup(1000, 100)).toBe(10);
   });
 
-  it('falls back to a 30-day floor when retention is disabled', async () => {
+  it('falls back to 30 days when retention is disabled', async () => {
     await seedRuns(10, 40, 'succeeded');
     await seedRuns(10, 20, 'succeeded');
     await seedRuns(2, null, 'running');
@@ -120,15 +120,15 @@ describe('schedules.cleanup_cron_job_run_details', () => {
 
     const { rows } = await pg.query(
       `SELECT
-         COUNT(*) FILTER (WHERE end_time < NOW() - INTERVAL '30 days')::int AS older_than_floor,
-         COUNT(*) FILTER (WHERE end_time >= NOW() - INTERVAL '30 days')::int AS within_floor,
+         COUNT(*) FILTER (WHERE end_time < NOW() - INTERVAL '30 days')::int AS older_than_fallback,
+         COUNT(*) FILTER (WHERE end_time >= NOW() - INTERVAL '30 days')::int AS within_fallback,
          COUNT(*) FILTER (WHERE end_time IS NULL)::int AS running
        FROM cron.job_run_details`
     );
-    expect(rows[0]).toEqual({ older_than_floor: 0, within_floor: 10, running: 2 });
+    expect(rows[0]).toEqual({ older_than_fallback: 0, within_fallback: 10, running: 2 });
   });
 
-  it('uses retention_days as-is when it is longer than the floor', async () => {
+  it('uses retention_days as-is when it is longer than the fallback', async () => {
     await seedRuns(10, 40, 'succeeded');
     await pg.query(`UPDATE schedules.config SET retention_days = 60`);
 
