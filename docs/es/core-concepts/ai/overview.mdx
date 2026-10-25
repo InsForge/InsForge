@@ -60,6 +60,57 @@ Cada solicitud se registra con modelo, recuento de tokens y costo. Consulte el u
 
 Cambie entre Anthropic, OpenAI, Mistral, Llama, Gemini y docenas más al cambiar el nombre del modelo en la solicitud. El código de la aplicación no cambia.
 
+## Elegir un modelo
+
+Selecciona un modelo estableciendo el campo `model` de cada solicitud en un ID de modelo de OpenRouter con formato `provider/model` — por ejemplo `openai/gpt-4o`, `anthropic/claude-3.5-haiku` o `google/gemini-2.5-flash-image`. Cambiar de proveedor o de modelo es un cambio de una línea; nada más en la solicitud cambia.
+
+Explora los modelos disponibles en el catálogo de modelos del panel o en la [página de modelos de OpenRouter](https://openrouter.ai/models). Los despliegues autoalojados también pueden listar el catálogo por la API de administrador con `GET /api/ai/models`.
+
+## Claves de proveedor
+
+Cómo proporcionas la clave de OpenRouter depende de dónde se ejecute InsForge. En cualquier caso, mantén la clave del lado del servidor — nunca la incluyas en un paquete del navegador.
+
+**InsForge Cloud (gestionado).** InsForge provisiona y gestiona la clave de OpenRouter para cada proyecto — no usas la tuya propia. Copia la clave activa desde el panel de InsForge{/* TODO: confirm dashboard location */}, almacénala en `OPENROUTER_API_KEY` e invoca OpenRouter desde código del lado del servidor confiable. Establecer una clave personalizada por la API de administrador se rechaza en Cloud con `Model Gateway credentials are managed by InsForge Cloud.`
+
+**Autoalojado (usa la tuya propia).** Obtén una clave desde [openrouter.ai](https://openrouter.ai) y proporciónala de cualquiera de estas formas:
+
+- Establécela en el entorno antes de iniciar el backend:
+
+  ```bash
+  OPENROUTER_API_KEY=sk-or-...
+  ```
+
+- O guárdala en tiempo de ejecución con la API de administrador (requiere autenticación de administrador — la API Key de tu proyecto):
+
+  ```bash
+  curl -X PUT "$PROJECT_URL/api/ai/config" \
+    -H "Authorization: Bearer $API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{ "apiKey": "sk-or-..." }'
+  ```
+
+Consulta la configuración (la clave se devuelve enmascarada) o vuelve a leer la clave activa:
+
+```bash
+# estado: { "apiKey": { "configured": true, "maskedKey": "sk-or-v1••••••••abcd" }, ... }
+curl "$PROJECT_URL/api/ai/config" -H "Authorization: Bearer $API_KEY"
+
+# la clave de OpenRouter activa de esta instancia
+curl "$PROJECT_URL/api/ai/openrouter/api-key" -H "Authorization: Bearer $API_KEY"
+```
+
+Rota la clave con `POST /api/ai/openrouter/api-key/rotate`. Los puntos finales `/api/ai/config` y `/api/ai/openrouter/*` son solo para autoalojado; en Cloud devuelven el error de credenciales gestionadas anterior.
+
+## Consultar uso y créditos
+
+Cada solicitud se registra con su modelo, recuento de tokens y costo. Para ver cuánto has usado en el período de facturación actual — incluidos los créditos de modelos de IA — ejecuta la CLI:
+
+```bash
+npx @insforge/cli usage
+```
+
+Imprime tu organización y plan, una tabla de resumen de uso (incluida una fila `ai_credits`) y un desglose por proyecto de estado, base de datos, almacenamiento y tráfico de salida. El uso también es visible en el panel{/* TODO: confirm dashboard location */} y a través de MCP. Para la asignación de créditos incluida en cada plan, consulta [Precios](/pricing).
+
 ## Compilar con él
 
 <CardGroup cols={2}>
