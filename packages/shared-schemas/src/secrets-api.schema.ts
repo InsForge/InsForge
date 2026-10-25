@@ -21,7 +21,7 @@ const secretExpiresAtSchema = z
     (value) =>
       value === '' ||
       expiresAtDateSchema.safeParse(value).success ||
-      expiresAtDateTimeSchema.safeParse(value).success,
+      (expiresAtDateTimeSchema.safeParse(value).success && !Number.isNaN(Date.parse(value))),
     'Must be a valid date'
   );
 

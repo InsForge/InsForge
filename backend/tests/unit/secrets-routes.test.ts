@@ -67,6 +67,10 @@ describe('secrets routes request validation', () => {
     ['a non-boolean isReserved', { key: 'NEW_KEY', value: 'sk_live_123', isReserved: 'yes' }],
     ['an unparseable expiresAt', { key: 'NEW_KEY', value: 'sk_live_123', expiresAt: 'next week' }],
     ['an impossible expiresAt', { key: 'NEW_KEY', value: 'sk_live_123', expiresAt: '2027-02-30' }],
+    [
+      'an out-of-range offset',
+      { key: 'NEW_KEY', value: 'sk_live_123', expiresAt: '2027-01-01T00:00:00+99:99' },
+    ],
   ])('rejects a create with %s before touching the store', async (_case, body) => {
     const res = await request(await createApp())
       .post('/api/secrets')
@@ -105,6 +109,17 @@ describe('secrets routes request validation', () => {
     expect(res.status).toBe(201);
     expect(secretServiceMock.createSecret).toHaveBeenCalledWith(
       expect.objectContaining({ expiresAt: new Date('2027-01-01') })
+    );
+  });
+
+  it('creates a secret without an expiry when expiresAt is empty', async () => {
+    const res = await request(await createApp())
+      .post('/api/secrets')
+      .send({ key: 'NEW_KEY', value: 'sk_live_123', expiresAt: '' });
+
+    expect(res.status).toBe(201);
+    expect(secretServiceMock.createSecret).toHaveBeenCalledWith(
+      expect.objectContaining({ expiresAt: undefined })
     );
   });
 
@@ -152,5 +167,14 @@ describe('secrets routes request validation', () => {
 
     expect(res.status).toBe(200);
     expect(secretServiceMock.updateSecret).toHaveBeenCalledWith('secret-1', { expiresAt: null });
+  });
+
+  it('passes isReserved through on update', async () => {
+    const res = await request(await createApp())
+      .put('/api/secrets/STRIPE_API_KEY')
+      .send({ isReserved: true });
+
+    expect(res.status).toBe(200);
+    expect(secretServiceMock.updateSecret).toHaveBeenCalledWith('secret-1', { isReserved: true });
   });
 });
