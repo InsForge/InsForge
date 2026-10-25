@@ -452,7 +452,11 @@ CREATE POLICY "allow_insert" ON %I.%I FOR INSERT TO authenticated WITH CHECK (au
             SELECT
               pi.indrelid AS table_oid,
               indexrelid::regclass AS index_,
-              string_to_array(indkey::text, ' ')::smallint[] AS col_attnums
+              -- Key columns only. indkey lists the INCLUDE payload after the key
+              -- columns, and a payload column cannot be searched on, so counting
+              -- it as covering suppresses a finding the index does not satisfy.
+              (string_to_array(pi.indkey::text, ' ')::smallint[])[1:pi.indnkeyatts]
+                AS col_attnums
             FROM pg_catalog.pg_index pi
             WHERE indisvalid
           )
@@ -685,7 +689,11 @@ USING ((select auth.uid()) = user_id)
           table_indices AS (
             SELECT
               indrelid AS table_oid,
-              string_to_array(indkey::text, ' ')::smallint[] AS col_attnums
+              -- Key columns only. indkey lists the INCLUDE payload after the key
+              -- columns, and a payload column cannot be searched on, so counting
+              -- it as covering suppresses a finding the index does not satisfy.
+              (string_to_array(indkey::text, ' ')::smallint[])[1:indnkeyatts]
+                AS col_attnums
             FROM pg_catalog.pg_index
             WHERE indisvalid
           )
