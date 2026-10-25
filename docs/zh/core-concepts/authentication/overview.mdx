@@ -64,6 +64,32 @@ graph TB
 
 对 Google、GitHub、Apple、Microsoft、GitLab、Discord 等的一流支持。通过 URL 添加自定义 OAuth 2.0 / OIDC 提供程序（Keycloak、Okta、Auth0、您自己的 IdP），无需编写特定于提供程序的代码。
 
+#### 配置提供程序
+
+每个社交提供程序都需要在该提供程序的开发者控制台中创建自己的 OAuth 应用，然后将其 **Client ID** 和 **Client Secret** 粘贴到 InsForge 中。以 Google 为例：
+
+1. 在仪表盘中，打开 **Authentication → Auth Methods**，然后点击 **Google OAuth**。
+2. 通过 **Create a Google OAuth App** 链接前往 [Google Cloud Console](https://console.cloud.google.com/apis/credentials) 并创建 OAuth 2.0 客户端。将其授权重定向 URI 设置为对话框中显示的回调 URL，格式类似 `https://<your-backend-url>/api/auth/oauth/google/callback`。
+3. 将 Google 应用的 **Client ID** 和 **Client Secret** 复制到对应字段，然后点击 **Add Provider**。
+
+GitHub、Microsoft、Discord、LinkedIn、Facebook、X 和 Apple 的流程完全相同——只是各提供程序自己的开发者控制台不同。
+
+<Note>
+  在 InsForge Cloud 项目上，您可以打开 **Shared Keys** 开关，而无需自带凭据。Shared Keys 是由 InsForge 托管的 OAuth 应用，可帮助您在开发中快速上手；其授权同意页面会显示 InsForge 的名称和徽标，因此切勿在生产环境中使用。
+</Note>
+
+想通过脚本配置？该对话框调用的是仅限管理员的 REST API，因此您可以使用项目 [API Key](/faq)（`ik_...`）从终端或 CI 中配置提供程序：
+
+```bash
+# 创建 Google 提供程序配置
+curl -X POST "$INSFORGE_BASE_URL/api/auth/oauth/configs" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"google","clientId":"<client-id>","clientSecret":"<client-secret>"}'
+```
+
+使用 `PUT /api/auth/oauth/<provider>/config` 更新现有提供程序，或使用 `DELETE /api/auth/oauth/<provider>/config` 将其删除。
+
 ### OAuth 服务器模式
 
 将 InsForge 本身作为 OAuth 2.0 / OIDC 身份提供程序运行，用于您自己的下游应用程序。有关完整设置，请参阅 [OAuth 服务器指南](/oauth-server)。
