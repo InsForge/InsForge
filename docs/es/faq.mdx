@@ -177,6 +177,27 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     ¿Sigues atascado? Pregunta en nuestro [Discord](https://discord.com/invite/DvBtaEc9Jz) para la respuesta más rápida.
   </Accordion>
 
+  <Accordion title="¿A qué regiones puedo desplegar un proyecto y puedo mover un proyecto entre regiones?">
+    Usted elige la región de despliegue **al crear un proyecto** — en el panel al crear un proyecto, o con la CLI:
+
+    ```bash
+    npx @insforge/cli create --region eu-central
+    ```
+
+    Las regiones disponibles son:
+
+    | ID de región | Ubicación |
+    |---|---|
+    | `us-east` | US East (North Virginia) |
+    | `us-west` | US West (Oregon) |
+    | `eu-central` | EU Central (Frankfurt) |
+    | `ap-southeast` | Asia Pacific (Singapore) |
+
+    Así que sí — `eu-central` es Frankfurt.
+
+    La región de un proyecto queda fija una vez creado el proyecto: no hay un ajuste para cambiarla, ni un comando de clonación o migración entre regiones. Para ejecutar en otra región, cree un nuevo proyecto en esa región y traslade sus datos (por ejemplo, restaure una [copia de seguridad](/core-concepts/database/backups) o importe un volcado de base de datos en el nuevo proyecto). Elegir la región no cambia el precio — el costo depende de su uso y cómputo, no de qué región elija.
+  </Accordion>
+
   <Accordion title="¿Cómo autentico la CLI sin navegador?">
     `npx @insforge/cli login` abre un navegador para iniciar sesión. En una máquina sin interfaz, un servidor remoto o CI, usa una user API key en su lugar. No hace falta navegador.
 
