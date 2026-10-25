@@ -60,6 +60,8 @@ Búsqueda de vectores nativos para incrustaciones, con índices HNSW e IVFFlat. 
 
 Las políticas RLS de Postgres aplican acceso a nivel de fila. Las políticas leen el JWT de autenticación, por lo que la misma regla se aplica a consultas REST, llamadas SDK, suscripciones en tiempo real y solicitudes de almacenamiento.
 
+Las tablas nuevas tienen RLS **activado** por defecto; pasa `rlsEnabled: false` al crearlas para desactivarlo. Las solicitudes hechas con la API Key de administrador (`ik_...`) omiten RLS. Para cambiarlo en una tabla existente, ejecuta SQL — `ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;` (o `DISABLE`) — con `npx @insforge/cli db query` o una migración. Activar RLS en una tabla sin ninguna política deniega todo acceso a `anon` y `authenticated` hasta que agregues una. Consulta las [FAQ](/faq) para ejemplos de políticas.
+
 ## Conceptos
 
 <CardGroup cols={2}>
