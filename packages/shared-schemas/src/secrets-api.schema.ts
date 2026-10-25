@@ -12,9 +12,18 @@ export const getSecretValueResponseSchema = z.object({
   value: z.string(),
 });
 
+const expiresAtDateSchema = z.string().date();
+const expiresAtDateTimeSchema = z.string().datetime({ offset: true, local: true });
+
 const secretExpiresAtSchema = z
   .string()
-  .refine((value) => !Number.isNaN(Date.parse(value)), 'Must be a valid date');
+  .refine(
+    (value) =>
+      value === '' ||
+      expiresAtDateSchema.safeParse(value).success ||
+      expiresAtDateTimeSchema.safeParse(value).success,
+    'Must be a valid date'
+  );
 
 // POST /secrets - Create secret (user-facing API)
 export const createSecretRequestSchema = z.object({

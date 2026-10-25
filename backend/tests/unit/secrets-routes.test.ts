@@ -61,10 +61,12 @@ describe('secrets routes request validation', () => {
 
   it.each([
     ['a missing value', { key: 'NEW_KEY' }],
+    ['a malformed key', { key: 'new-key', value: 'sk_live_123' }],
     ['an array key', { key: ['NEW_KEY'], value: 'sk_live_123' }],
     ['a non-string value', { key: 'NEW_KEY', value: 42 }],
     ['a non-boolean isReserved', { key: 'NEW_KEY', value: 'sk_live_123', isReserved: 'yes' }],
     ['an unparseable expiresAt', { key: 'NEW_KEY', value: 'sk_live_123', expiresAt: 'next week' }],
+    ['an impossible expiresAt', { key: 'NEW_KEY', value: 'sk_live_123', expiresAt: '2027-02-30' }],
   ])('rejects a create with %s before touching the store', async (_case, body) => {
     const res = await request(await createApp())
       .post('/api/secrets')
@@ -95,11 +97,23 @@ describe('secrets routes request validation', () => {
     });
   });
 
+  it('accepts a date-only expiresAt on create', async () => {
+    const res = await request(await createApp())
+      .post('/api/secrets')
+      .send({ key: 'NEW_KEY', value: 'sk_live_123', expiresAt: '2027-01-01' });
+
+    expect(res.status).toBe(201);
+    expect(secretServiceMock.createSecret).toHaveBeenCalledWith(
+      expect.objectContaining({ expiresAt: new Date('2027-01-01') })
+    );
+  });
+
   it.each([
     ['an empty body', {}],
     ['a non-boolean isActive', { isActive: 'false' }],
     ['a non-string value', { value: { nested: true } }],
     ['an unparseable expiresAt', { expiresAt: 'never' }],
+    ['an impossible expiresAt', { expiresAt: '2027-02-30T00:00:00Z' }],
   ])('rejects an update with %s before touching the store', async (_case, body) => {
     const res = await request(await createApp())
       .put('/api/secrets/STRIPE_API_KEY')
@@ -115,6 +129,26 @@ describe('secrets routes request validation', () => {
     const res = await request(await createApp())
       .put('/api/secrets/STRIPE_API_KEY')
       .send({ expiresAt: null });
+
+    expect(res.status).toBe(200);
+    expect(secretServiceMock.updateSecret).toHaveBeenCalledWith('secret-1', { expiresAt: null });
+  });
+
+  it('accepts a date-only expiresAt on update', async () => {
+    const res = await request(await createApp())
+      .put('/api/secrets/STRIPE_API_KEY')
+      .send({ expiresAt: '2027-01-01' });
+
+    expect(res.status).toBe(200);
+    expect(secretServiceMock.updateSecret).toHaveBeenCalledWith('secret-1', {
+      expiresAt: new Date('2027-01-01'),
+    });
+  });
+
+  it('clears the expiry when an update sends an empty expiresAt', async () => {
+    const res = await request(await createApp())
+      .put('/api/secrets/STRIPE_API_KEY')
+      .send({ expiresAt: '' });
 
     expect(res.status).toBe(200);
     expect(secretServiceMock.updateSecret).toHaveBeenCalledWith('secret-1', { expiresAt: null });
