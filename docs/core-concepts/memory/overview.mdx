@@ -1,0 +1,121 @@
+---
+title: "Memory"
+sidebarTitle: "Overview"
+description: "Store durable agent memories with embeddings and recall them by meaning — a managed, pgvector-backed memory store provisioned in every InsForge project, callable from the CLI or REST API."
+---
+
+Use Memory when an agent or app needs to remember durable facts across sessions — endpoints, decisions and their rationale, user preferences, or where a credential lives — and later recall the relevant ones by meaning. Memory is a managed store provisioned in every InsForge project: you write short, self-contained memories, and InsForge embeds them, deduplicates them, and returns the most relevant ones for a query.
+
+<Note>
+  **Want to build your own vector store instead?** Use [pgvector](/core-concepts/database/pgvector) directly to design your own tables, embeddings, and similarity queries. Memory is an opinionated, managed layer on top of the same technology — reach for it when you want durable agent memory without wiring the schema yourself.
+</Note>
+
+<Note>
+  **Prerequisite.** `remember` and `recall` call the [Model Gateway](/core-concepts/ai/overview) to embed text (and `remember` also uses a chat model to extract and reconcile memories). Self-hosted instances must configure the Model Gateway (set `OPENROUTER_API_KEY`) before storing or recalling. `list` reads Postgres directly and needs no AI provider.
+</Note>
+
+## Concepts
+
+A **memory** is a small, self-contained durable fact with a one-line `title` and a `content` body. Each memory has a **kind** — `fact`, `decision`, `preference`, or `reference` — and is embedded and stored in the managed `memory.memories` table.
+
+A **scope** is a logical partition (for example `project`, an agent id, or an end-user id). Every write and read is scoped, so one project can hold separate memory sets. The default scope is `default`.
+
+Memory exposes three operations:
+
+- **Remember** — store a memory (or extract several from a task transcript).
+- **Recall** — find the most relevant memories for a query.
+- **List** — a cheap, title-only index of everything stored in a scope, with no embedding or AI call.
+
+## Features
+
+### Remember
+
+`remember` works in two modes:
+
+- **Explicit** — pass a `title` and `content` (and optionally a `kind`) to store one memory.
+- **Transcript** — pass a task `transcript` and a chat model extracts the durable memories worth keeping, skipping transient details.
+
+On every write, Memory reconciles the new candidate against similar existing memories and returns one of `ADD` (new information), `UPDATE` (corrects or extends an existing memory), or `NOOP` (nothing new), so duplicates do not pile up.
+
+```bash
+# Store a single fact
+npx @insforge/cli memory remember "The staging Stripe webhook signing secret is in 1Password vault acme-infra, item stripe-staging." \
+  --kind reference --scope project
+
+# Extract memories from a task transcript
+npx @insforge/cli memory remember --file session.log --transcript --scope project
+```
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/memory/remember" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": "project",
+    "kind": "reference",
+    "title": "Stripe webhook secret",
+    "content": "The staging Stripe webhook signing secret is in 1Password vault acme-infra, item stripe-staging."
+  }'
+```
+
+The response reports what happened to each candidate:
+
+```json
+{ "results": [{ "action": "ADD", "id": "…", "title": "Stripe webhook secret" }] }
+```
+
+### Recall
+
+`recall` runs a **hybrid** search: it combines vector similarity with keyword full-text ranking, so exact tokens — identifiers, file paths, key names — still match even when embeddings smear them together. It returns the most relevant memories for the scope, ranked, above a similarity threshold (default `0.45`).
+
+```bash
+npx @insforge/cli memory recall "where is the stripe webhook secret" --scope project --limit 5
+```
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/memory/recall" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{ "scope": "project", "query": "where is the stripe webhook secret", "limit": 5 }'
+```
+
+`limit` defaults to `5` (max `50`); pass an optional `threshold` between `0` and `1` to tighten or loosen matching.
+
+### List
+
+`list` returns every memory title for a scope with no embedding and no AI call — cheap enough to load at the start of a session so an agent knows what it knows, then `recall` the full content on demand.
+
+```bash
+npx @insforge/cli memory list --scope project
+```
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/memory/index" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{ "scope": "project" }'
+```
+
+### Kinds and scopes
+
+Every memory is tagged with a **kind** — `fact`, `decision`, `preference`, or `reference` — and lives in a **scope** you choose with `--scope` (default `default`). Use scopes to keep per-agent or per-user memory separate within one project.
+
+### Storage
+
+Memories live in a managed `memory.memories` table — a `pgvector` `VECTOR(1536)` column embedded with `openai/text-embedding-3-small`, provisioned in every project alongside schemas like `realtime` and `schedules`. Because it is a normal Postgres table, you can query it directly with SQL when you need custom reporting.
+
+## API summary
+
+Every endpoint is a `POST` and authenticates with a project API key (`Authorization: Bearer <INSFORGE_API_KEY>`).
+
+| Endpoint | Purpose | Key body fields |
+|---|---|---|
+| `/api/memory/remember` | Store a memory or extract from a transcript | `scope`, `kind`, `title`, `content` **or** `transcript`, `source` |
+| `/api/memory/recall` | Find relevant memories for a query | `scope`, `query`, `limit`, `threshold` |
+| `/api/memory/index` | Cheap title-only listing for a scope | `scope` |
+
+## Next steps
+
+- Set up the [CLI](/quickstart) to link your project and run `memory` commands.
+- Use [pgvector](/core-concepts/database/pgvector) directly when you need a custom vector store.
+- Review the [Model Gateway](/core-concepts/ai/overview) that powers memory embeddings.
