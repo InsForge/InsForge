@@ -24,4 +24,12 @@ describe('aggregateMetricSeries', () => {
 
     expect(aggregateMetricSeries([point(10, NaN)])).toEqual({ avg: null, max: null, latest: null });
   });
+
+  it('ignores points with non-finite timestamps', () => {
+    const result = aggregateMetricSeries([point(NaN, 100), point(10, 80), point(20, 90)]);
+
+    expect(result.avg).toBe(85);
+    expect(result.max).toBe(90);
+    expect(result.latest).toBe(90);
+  });
 });
