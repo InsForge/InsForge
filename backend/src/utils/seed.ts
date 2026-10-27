@@ -1,6 +1,7 @@
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { isCloudEnvironment, getApiBaseUrl } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
+import { maskSecretForLog } from '@/utils/redact.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { StripeSyncService } from '@/services/payments/stripe/sync.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
@@ -266,8 +267,10 @@ export async function seedBackend(): Promise<void> {
     await secretService.initializeJwtKeyPair();
     await TokenManager.getInstance().ensureKeysLoaded();
 
-    logger.info(`API key generated: ${apiKey}`);
-    logger.info(`Anon key generated: ${anonKey}`);
+    // Never log the key itself: startup output is shipped and served back by
+    // the logs API. The banner below tells the operator where to find it.
+    logger.info(`API key generated: ${maskSecretForLog(apiKey)}`);
+    logger.info(`Anon key generated: ${maskSecretForLog(anonKey)}`);
     logger.info(`Setup complete:
       - Save this API key for your apps!
       - Dashboard: http://localhost:7131
