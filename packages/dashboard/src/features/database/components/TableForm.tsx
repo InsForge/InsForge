@@ -140,16 +140,19 @@ const readTableFormCreateDraft = (
       return null;
     }
 
+    const foreignKeys = tableFormForeignKeySchema
+      .array()
+      .safeParse(foreignKeysValue === undefined ? [] : foreignKeysValue);
+
+    if (!foreignKeys.success) {
+      return null;
+    }
+
     return {
       schemaName: typeof schemaNameValue === 'string' ? schemaNameValue : '',
       tableName: formDraft.data.tableName,
       columns: formDraft.data.columns,
-      foreignKeys: Array.isArray(foreignKeysValue)
-        ? foreignKeysValue.flatMap((foreignKey) => {
-            const result = tableFormForeignKeySchema.safeParse(foreignKey);
-            return result.success ? [result.data] : [];
-          })
-        : [],
+      foreignKeys: foreignKeys.data,
     };
   } catch {
     return null;

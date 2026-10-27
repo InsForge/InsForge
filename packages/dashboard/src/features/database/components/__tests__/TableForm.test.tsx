@@ -23,7 +23,13 @@ vi.mock('#lib/hooks/useMetadata', () => ({
 }));
 
 vi.mock('../TableFormColumn', () => ({
-  TableFormColumn: () => null,
+  TableFormColumn: ({
+    column,
+    index,
+  }: {
+    column: { columnName: string };
+    index: number;
+  }) => <input aria-label={`Column ${index + 1} name`} value={column.columnName} readOnly />,
 }));
 
 vi.mock('../ForeignKeyPopover', () => ({
@@ -70,6 +76,42 @@ const renderTableForm = (
   );
 
   return { ...result, queryClient };
+};
+
+const createSavedDraft = (schemaName = 'public') => ({
+  schemaName,
+  tableName: 'draft_test',
+  columns: [
+    {
+      columnName: 'user_id',
+      type: ColumnType.UUID,
+      defaultValue: '',
+      isNullable: true,
+      isUnique: false,
+      isSystemColumn: false,
+      isNewColumn: true,
+    },
+  ],
+  foreignKeys: [
+    {
+      columnName: 'user_id',
+      referenceTable: 'id',
+      referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
+      onDelete: 'NO ACTION',
+      onUpdate: 'NO ACTION',
+      uid: 'test-foreign-key',
+    },
+  ],
+});
+
+const expectDefaultCreateForm = () => {
+  expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue('');
+  const columnInputs = screen.getAllByRole('textbox', { name: /^Column \d+ name$/ });
+  expect(columnInputs).toHaveLength(4);
+  ['id', 'created_at', 'updated_at', ''].forEach((name, index) => {
+    expect(columnInputs[index]).toHaveValue(name);
+  });
+  expect(screen.queryByRole('button', { name: /^Remove$/ })).not.toBeInTheDocument();
 };
 
 describe('TableForm draft storage', () => {
@@ -140,6 +182,90 @@ describe('TableForm draft storage', () => {
       expect(JSON.parse(window.localStorage.getItem(draftKey) ?? 'null')).toEqual(draft);
     });
     expect(tableFormSchema.safeParse(draft).success).toBe(false);
+  });
+
+  it.each([
+    { columnName: 'user_id', expectedTableName: 'draft_test', restoresForeignKey: true },
+    { columnName: 123, expectedTableName: '', restoresForeignKey: false },
+  ])('restores a draft only when its foreign keys are valid: %j', async ({
+    columnName,
+    expectedTableName,
+    restoresForeignKey,
+  }) => {
+    const draftKey = getTableFormCreateDraftStorageKey('project:project-a', 'public');
+    window.localStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        schemaName: 'public',
+        tableName: 'draft_test',
+        columns: [
+          {
+            columnName: 'user_id',
+            type: ColumnType.UUID,
+            defaultValue: '',
+            isNullable: true,
+            isUnique: false,
+            isSystemColumn: false,
+            isNewColumn: true,
+          },
+        ],
+        foreignKeys: [
+          {
+            columnName,
+            referenceTable: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
+            onDelete: 'NO ACTION',
+            onUpdate: 'NO ACTION',
+            uid: 'test-foreign-key',
+          },
+        ],
+      })
+    );
+
+    renderTableForm();
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue(
+        expectedTableName
+      );
+      if (restoresForeignKey) {
+        expect(screen.getByText('id.id')).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText('id.id')).not.toBeInTheDocument();
+      }
+    });
+  });
+
+  it.each([
+    { description: 'invalid JSON', storedValue: '{"tableName":"draft_test",' },
+    {
+      description: 'invalid column data',
+      storedValue: JSON.stringify({ ...createSavedDraft(), columns: 'not-an-array' }),
+    },
+    {
+      description: 'a mismatched schema name',
+      storedValue: JSON.stringify(createSavedDraft('private')),
+    },
+  ])('starts with the default form for $description', async ({ storedValue }) => {
+    const draftKey = getTableFormCreateDraftStorageKey('project:project-a', 'public');
+    window.localStorage.setItem(draftKey, storedValue);
+
+    renderTableForm();
+
+    await waitFor(expectDefaultCreateForm);
+  });
+
+  it.each([
+    'table-form-columns-draft',
+    'table-form-columns-draft:project%3Aproject-a',
+  ])('ignores a draft under the legacy storage key %s', async (legacyKey) => {
+    const storedValue = JSON.stringify(createSavedDraft());
+    window.localStorage.setItem(legacyKey, storedValue);
+
+    renderTableForm();
+
+    await waitFor(expectDefaultCreateForm);
+    expect(window.localStorage.getItem(legacyKey)).toBe(storedValue);
   });
 
   it('clears a pending discarded scoped draft after project id resolution without restoring it', async () => {
