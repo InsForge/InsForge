@@ -12,6 +12,7 @@ import {
   tableFormForeignKeySchema,
   tableFormSchema,
   TableFormSchema,
+  tableFormDraftSchema,
 } from '#features/database/schema';
 import { TableFormColumn } from './TableFormColumn';
 import { ForeignKeyPopover } from './ForeignKeyPopover';
@@ -50,7 +51,6 @@ export const getTableFormCreateDraftStorageKey = (
   if (schemaName) {
     keyParts.push(encodeURIComponent(schemaName));
   }
-
   return keyParts.join(':');
 };
 
@@ -134,7 +134,7 @@ const readTableFormCreateDraft = (
 
     const schemaNameValue = getRecordValue(parsedValue, 'schemaName');
     const foreignKeysValue = getRecordValue(parsedValue, 'foreignKeys');
-    const formDraft = tableFormSchema.safeParse(parsedValue);
+    const formDraft = tableFormDraftSchema.safeParse(parsedValue);
 
     if (!formDraft.success) {
       return null;

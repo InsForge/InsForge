@@ -6,6 +6,7 @@ import {
   TableForm,
 } from '#features/database/components/TableForm';
 import { ColumnType } from '@insforge/shared-schemas';
+import { tableFormSchema } from '#features/database/schema';
 
 const metadataMock = vi.hoisted(() => ({
   projectId: 'project-a' as string | undefined,
@@ -96,6 +97,49 @@ describe('TableForm draft storage', () => {
     expect(getTableFormCreateDraftStorageKey('project:project-a', 'public')).not.toBe(
       getTableFormCreateDraftStorageKey('project:project-a', 'custom')
     );
+  });
+
+  it.each([
+    { type: ColumnType.INTEGER },
+    { isNullable: false },
+    { isUnique: true },
+  ])('restores the whole draft with an unnamed modified column: %j', async (change) => {
+    const draftKey = getTableFormCreateDraftStorageKey('project:project-a', 'public');
+    const completedColumn = {
+      columnName: 'title',
+      type: ColumnType.STRING,
+      defaultValue: '',
+      isNullable: true,
+      isUnique: false,
+      isSystemColumn: false,
+      isNewColumn: true,
+    };
+    const draft = {
+      schemaName: 'public',
+      tableName: 'products',
+      columns: [completedColumn, { ...completedColumn, columnName: '', ...change }],
+      foreignKeys: [],
+    };
+    window.localStorage.setItem(draftKey, JSON.stringify(draft));
+
+    const { unmount } = renderTableForm();
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue(
+        'products'
+      );
+      expect(JSON.parse(window.localStorage.getItem(draftKey) ?? 'null')).toEqual(draft);
+    });
+
+    // A second mount simulates another refresh after the restored form saves.
+    unmount();
+    renderTableForm();
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue(
+        'products'
+      );
+      expect(JSON.parse(window.localStorage.getItem(draftKey) ?? 'null')).toEqual(draft);
+    });
+    expect(tableFormSchema.safeParse(draft).success).toBe(false);
   });
 
   it('clears a pending discarded scoped draft after project id resolution without restoring it', async () => {
