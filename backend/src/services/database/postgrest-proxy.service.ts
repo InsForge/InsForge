@@ -5,6 +5,7 @@ import logger from '@/utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
+import { serializePostgrestParams } from './postgrest-params.js';
 
 const postgrestUrl = appConfig.database.postgrestBaseUrl;
 
@@ -268,12 +269,16 @@ export class PostgrestProxyService {
       method: string;
       url: string;
       params?: Record<string, unknown>;
+      paramsSerializer?: { serialize: (params: Record<string, unknown>) => string };
       headers: Record<string, string | string[] | undefined>;
       data?: unknown;
     } = {
       method: request.method,
       url: targetUrl,
       params: request.query,
+      // Axios' default bracket-form array encoding turns a repeated filter into
+      // `col[]=`, which PostgREST reads as a different column.
+      paramsSerializer: { serialize: serializePostgrestParams },
       headers: {
         ...request.headers,
         host: undefined,
