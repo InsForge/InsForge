@@ -16,6 +16,7 @@ import { LinkedInOAuthProvider } from '@/providers/oauth/linkedin.provider.js';
 import { FacebookOAuthProvider } from '@/providers/oauth/facebook.provider.js';
 import { MicrosoftOAuthProvider } from '@/providers/oauth/microsoft.provider.js';
 import { validatePassword } from '@/utils/validations.js';
+import { buildUserSearchFilter } from './user-search.js';
 import { getPasswordRequirementsMessage } from '@/utils/utils.js';
 import {
   FacebookUserInfo,
@@ -1505,8 +1506,9 @@ export class AuthService {
     const params: (string | number)[] = [];
 
     if (search) {
-      query += ` AND (u.email LIKE $1 OR u.profile->>'name' LIKE $2)`;
-      params.push(`%${search}%`, `%${search}%`);
+      const filter = buildUserSearchFilter(search, 'u', params.length + 1);
+      query += filter.clause;
+      params.push(...filter.params);
     }
 
     query += ` GROUP BY u.id ORDER BY u.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
@@ -1523,8 +1525,9 @@ export class AuthService {
       'SELECT COUNT(*) as count FROM auth.users WHERE is_anonymous = false AND is_project_admin = false';
     const countParams: string[] = [];
     if (search) {
-      countQuery += ` AND (email LIKE $1 OR profile->>'name' LIKE $2)`;
-      countParams.push(`%${search}%`, `%${search}%`);
+      const filter = buildUserSearchFilter(search, '', countParams.length + 1);
+      countQuery += filter.clause;
+      countParams.push(...filter.params);
     }
     const countResult = await pool.query(countQuery, countParams);
     const count = countResult.rows[0].count;
