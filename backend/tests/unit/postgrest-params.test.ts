@@ -4,9 +4,7 @@ import { serializePostgrestParams } from '@/services/database/postgrest-params.j
 
 describe('serializePostgrestParams', () => {
   it('repeats a key instead of using bracket form', () => {
-    expect(serializePostgrestParams({ age: ['gte.18', 'lte.30'] })).toBe(
-      'age=gte.18&age=lte.30'
-    );
+    expect(serializePostgrestParams({ age: ['gte.18', 'lte.30'] })).toBe('age=gte.18&age=lte.30');
   });
 
   it('keeps single values unchanged', () => {

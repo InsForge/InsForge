@@ -9,9 +9,7 @@
  */
 export type PostgrestQueryParams = Record<string, unknown>;
 
-export function serializePostgrestParams(
-  params: PostgrestQueryParams | undefined
-): string {
+export function serializePostgrestParams(params: PostgrestQueryParams | undefined): string {
   const search = new URLSearchParams();
 
   for (const [key, rawValue] of Object.entries(params ?? {})) {
