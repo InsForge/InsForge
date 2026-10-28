@@ -350,6 +350,7 @@ describe('config.database', () => {
       'POSTGRES_DB',
       'POSTGRES_USER',
       'POSTGRES_PASSWORD',
+      'POSTGRES_POOL_MAX',
       'DATABASE_DIR',
       'POSTGREST_BASE_URL',
       'POSTGREST_MAX_SOCKETS',
@@ -363,6 +364,7 @@ describe('config.database', () => {
     expect(c.database.name).toBe('insforge');
     expect(c.database.user).toBe('postgres');
     expect(c.database.password).toBe('postgres');
+    expect(c.database.poolMax).toBe(20);
     expect(c.database.postgrestBaseUrl).toBe('http://localhost:5430');
     expect(c.database.postgrestMaxSockets).toBe(50);
     expect(c.database.postgrestMaxFreeSockets).toBe(10);
@@ -376,6 +378,7 @@ describe('config.database', () => {
     process.env.POSTGRES_DB = 'myapp';
     process.env.POSTGRES_USER = 'dbuser';
     process.env.POSTGRES_PASSWORD = 'securepass';
+    process.env.POSTGRES_POOL_MAX = '8';
     process.env.POSTGREST_BASE_URL = 'http://postgrest:3000';
     process.env.POSTGREST_MAX_SOCKETS = '100';
     process.env.POSTGREST_MAX_FREE_SOCKETS = '25';
@@ -387,6 +390,7 @@ describe('config.database', () => {
     expect(c.database.name).toBe('myapp');
     expect(c.database.user).toBe('dbuser');
     expect(c.database.password).toBe('securepass');
+    expect(c.database.poolMax).toBe(8);
     expect(c.database.postgrestBaseUrl).toBe('http://postgrest:3000');
     expect(c.database.postgrestMaxSockets).toBe(100);
     expect(c.database.postgrestMaxFreeSockets).toBe(25);
@@ -394,11 +398,13 @@ describe('config.database', () => {
   });
 
   it('falls back to defaults for invalid PostgREST pool sizes', () => {
+    process.env.POSTGRES_POOL_MAX = '80oops';
     process.env.POSTGREST_MAX_SOCKETS = 'not-a-number';
     process.env.POSTGREST_MAX_FREE_SOCKETS = '-3';
     process.env.POSTGREST_FREE_SOCKET_TIMEOUT_MS = '0';
     const c = loadConfig();
 
+    expect(c.database.poolMax).toBe(20);
     expect(c.database.postgrestMaxSockets).toBe(50);
     expect(c.database.postgrestMaxFreeSockets).toBe(10);
     expect(c.database.postgrestFreeSocketTimeoutMs).toBe(4000);
