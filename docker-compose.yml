@@ -12,7 +12,10 @@ services:
       - ./deploy/docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
       - ./deploy/docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Loopback-only: the backend talks to Postgres over the Docker network;
+      # binding the published port to all interfaces exposed a superuser
+      # (default password `postgres`) to whatever could reach the host.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     security_opt:
       - no-new-privileges:true
     networks:
@@ -41,7 +44,10 @@ services:
       PGRST_DB_CHANNEL_ENABLED: true
       PGRST_DB_CHANNEL: pgrst
     ports:
-      - "${POSTGREST_PORT:-5430}:3000"
+      # Loopback-only: PostgREST trusts JWTs signed with JWT_SECRET, which
+      # defaulted to a publicly known value — publishing it on all interfaces
+      # let anyone with that secret query the database directly.
+      - "127.0.0.1:${POSTGREST_PORT:-5430}:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -233,7 +239,9 @@ services:
       - postgres
       - postgrest
     ports:
-      - "${DENO_PORT:-7133}:7133"
+      # Loopback-only: function invocation is unauthenticated; keep the
+      # runtime off externally reachable interfaces.
+      - "127.0.0.1:${DENO_PORT:-7133}:7133"
     environment:
       - PORT=7133
       - DENO_ENV=${DENO_ENV:-development}
