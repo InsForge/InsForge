@@ -204,10 +204,10 @@ export class AuthService {
       // OAuth providers may store emails with mixed capitalization.
       const existingUser = await client.query(
         `SELECT id
-         FROM auth.users
-         WHERE lower(email) = $1
-         ORDER BY created_at ASC
-         LIMIT 1`,
+          FROM auth.users
+          WHERE lower(email) = $1
+          ORDER BY created_at ASC
+          LIMIT 1`,
         [normalizedEmail]
       );
 
@@ -1041,6 +1041,28 @@ export class AuthService {
 
     try {
       await client.query('BEGIN');
+
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Use the same lock as email registration to prevent duplicate accounts.
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `auth_register_email_${normalizedEmail}`,
+      ]);
+
+      // Recheck after acquiring the lock because another signup flow
+      // may have created an account while this OAuth request was waiting.
+      const existingUser = await client.query(
+        `SELECT id
+          FROM auth.users
+          WHERE lower(email) = $1
+          ORDER BY created_at ASC
+          LIMIT 1`,
+        [normalizedEmail]
+      );
+
+      if (existingUser.rows.length > 0) {
+        throw new AppError('User already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
+      }
 
       // Create user record (without password for OAuth users)
       const profile = JSON.stringify({ name: userName, avatar_url: avatarUrl });

@@ -269,8 +269,15 @@ describe('AuthService.register – autoConfirm', () => {
   });
 
   it('rejects registration when an OAuth account already exists with different email casing', async () => {
-    mockClient.query.mockImplementation(async (sql: string) => {
-      if (sql.includes('SELECT id') && sql.includes('FROM auth.users')) {
+    mockClient.query.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (
+        sql.includes('SELECT id') &&
+        sql.includes('FROM auth.users') &&
+        sql.includes('lower(email) = $1')
+      ) {
+        // Simulate an existing OAuth account with mixed-case email.
+        expect(params?.[0]).toBe('jane.doe@contoso.com');
+
         return {
           rows: [{ id: 'existing-oauth-user-id' }],
         };
@@ -288,11 +295,9 @@ describe('AuthService.register – autoConfirm', () => {
     });
 
     const insertCall = mockClient.query.mock.calls.find(
-      (call: unknown[]) =>
-        typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
+      (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
     );
 
     expect(insertCall).toBeUndefined();
   });
-
 });
