@@ -137,6 +137,10 @@ export class CloudWatchProvider extends BaseLogProvider {
     const readNewest = async (fromMs: number, toMs: number) => {
       // CloudWatch Insights can be inconsistent, so use FilterLogEvents with pagination
       // limit arrives unvalidated from the query string, and FilterLogEvents rejects more than 10,000
+      const startTime = Math.max(fromMs, Date.UTC(2024, 0, 1));
+      if (startTime > toMs) {
+        return [];
+      }
       const keep = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 10000) : 100;
       const allEvents: Array<{
         eventId?: string;
@@ -151,7 +155,7 @@ export class CloudWatchProvider extends BaseLogProvider {
           new FilterLogEventsCommand({
             logGroupName: logGroup,
             logStreamNames: streams.length ? streams.slice(0, 100) : undefined,
-            startTime: fromMs,
+            startTime,
             endTime: toMs,
             // newest-first, so paging stops at `keep` instead of reading the whole day oldest-first
             startFromHead: false,
