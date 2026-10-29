@@ -44,10 +44,12 @@ describe('AppRoutes host-mode gating', () => {
     host.mode = 'self-hosting';
   });
 
-  // The sidebar shows "Web Scraper" in both modes (AppSidebar pushes
-  // dashboardWebscraperMenuItem unconditionally), so the route must match in
-  // both: otherwise the nav entry falls through to the catch-all
-  // `<Route path="*">` and silently bounces back to /dashboard.
+  // Regression: the sidebar shows "Web Scraper" in both modes (AppSidebar
+  // pushes dashboardWebscraperMenuItem unconditionally), but the route subtree
+  // used to be wrapped in `{isCloudHosting && ...}`. On a self-hosted install
+  // the nav entry therefore matched no route, fell through to the catch-all
+  // `<Route path="*">` and silently bounced back to /dashboard — making the
+  // whole self-hosted Web Scraper feature unreachable.
   it('serves the webscraper route in self-hosting', () => {
     renderAt('/dashboard/webscraper/actors');
 
@@ -61,9 +63,10 @@ describe('AppRoutes host-mode gating', () => {
     expect(screen.getByText('WEBSCRAPER_LAYOUT')).toBeInTheDocument();
   });
 
-  // Self-hosting connects with the admin's own PostHog personal API key, so the
-  // sidebar pushes the Analytics entry in both modes and the route has to match
-  // in both — the same trap the webscraper cases above cover.
+  // Analytics used to be cloud-only and this asserted that. Self-hosting now
+  // connects with the admin's own PostHog personal API key, so the sidebar
+  // pushes the entry in both modes and the route has to match in both — the
+  // same trap the webscraper cases above cover.
   it('serves the analytics route in self-hosting', () => {
     renderAt('/dashboard/analytics/traffic');
 
