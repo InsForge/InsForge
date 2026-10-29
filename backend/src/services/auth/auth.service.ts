@@ -1071,7 +1071,7 @@ export class AuthService {
         INSERT INTO auth.users (id, email, profile, email_verified, created_at, updated_at)
         VALUES ($1, $2, $3::jsonb, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-        [userId, email, profile]
+        [userId, normalizedEmail, profile]
       );
 
       // Create auth.user_providers record
@@ -1090,7 +1090,7 @@ export class AuthService {
 
       const user: UserSchema = {
         id: userId,
-        email,
+        email: normalizedEmail,
         emailVerified: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -1100,7 +1100,7 @@ export class AuthService {
 
       const accessToken = this.tokenManager.generateAccessToken({
         sub: userId,
-        email,
+        email: normalizedEmail,
         role: 'authenticated',
       });
 

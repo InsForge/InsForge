@@ -269,35 +269,43 @@ describe('AuthService.register – autoConfirm', () => {
   });
 
   it('rejects registration when an OAuth account already exists with different email casing', async () => {
-    mockClient.query.mockImplementation(async (sql: string, params?: unknown[]) => {
-      if (
-        sql.includes('SELECT id') &&
-        sql.includes('FROM auth.users') &&
-        sql.includes('lower(email) = $1')
-      ) {
-        // Simulate an existing OAuth account with mixed-case email.
-        expect(params?.[0]).toBe('jane.doe@contoso.com');
+  const storedOAuthEmail = 'Jane.Doe@Contoso.com';
 
-        return {
-          rows: [{ id: 'existing-oauth-user-id' }],
-        };
-      }
+  mockClient.query.mockImplementation(async (sql: string, params?: unknown[]) => {
+    if (
+      sql.includes('SELECT id') &&
+      sql.includes('FROM auth.users') &&
+      sql.toLowerCase().includes('lower(email)')
+    ) {
+      const lookupEmail = params?.[0];
 
-      return { rows: [] };
-    });
+      // Simulate a case-insensitive database lookup against the mixed-case
+      // email stored for an existing OAuth account.
+      const matchesExistingOAuthUser =
+        typeof lookupEmail === 'string' &&
+        storedOAuthEmail.toLowerCase() === lookupEmail;
 
-    await expect(
-      authService.register('jane.doe@contoso.com', 'password123', 'Jane')
-    ).rejects.toMatchObject({
-      message: 'User already exists',
-      statusCode: 409,
-      code: ERROR_CODES.AUTH_EMAIL_EXISTS,
-    });
+      return {
+        rows: matchesExistingOAuthUser ? [{ id: 'existing-oauth-user-id' }] : [],
+      };
+    }
 
-    const insertCall = mockClient.query.mock.calls.find(
-      (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
-    );
-
-    expect(insertCall).toBeUndefined();
+    return { rows: [] };
   });
+
+  await expect(
+    authService.register('jane.doe@contoso.com', 'password123', 'Jane')
+  ).rejects.toMatchObject({
+    message: 'User already exists',
+    statusCode: 409,
+    code: ERROR_CODES.AUTH_EMAIL_EXISTS,
+  });
+
+  const insertCall = mockClient.query.mock.calls.find(
+    (call: unknown[]) =>
+      typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
+  );
+
+  expect(insertCall).toBeUndefined();
+});
 });
