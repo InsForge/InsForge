@@ -26,8 +26,7 @@ const secretService = SecretService.getInstance();
 const presenceService = RealtimePresenceService.getInstance();
 
 /**
- * SocketManager - Industrial-grade Socket.IO implementation
- * Infrastructure layer for real-time WebSocket communication
+ * Infrastructure layer for real-time WebSocket communication.
  */
 export class SocketManager {
   private static instance: SocketManager;
@@ -468,26 +467,6 @@ export class SocketManager {
   }
 
   /**
-   * Emit message to specific socket
-   */
-  emitToSocket<T extends object>(
-    socket: Socket,
-    event: string,
-    payload: T,
-    senderType: 'system' | 'user' = 'system',
-    senderId?: string,
-    messageId?: string
-  ): void {
-    const message = this.buildSocketMessage(payload, {
-      channel: socket.id,
-      senderType,
-      senderId,
-      messageId,
-    });
-    socket.emit(event, message);
-  }
-
-  /**
    * Broadcast to all connected clients
    */
   broadcastToAll<T extends object>(
@@ -560,28 +539,6 @@ export class SocketManager {
    */
   getConnectionCount(): number {
     return this.socketMetadata.size;
-  }
-
-  /**
-   * Get connection statistics
-   */
-  getConnectionStats(): {
-    total: number;
-    authenticated: number;
-    averageConnectionTime: number;
-  } {
-    const connections = Array.from(this.socketMetadata.values());
-    const authenticated = connections.filter((m) => m.userId).length;
-    const avgTime =
-      connections.reduce((acc, m) => {
-        return acc + (Date.now() - m.connectedAt.getTime());
-      }, 0) / (connections.length || 1);
-
-    return {
-      total: connections.length,
-      authenticated,
-      averageConnectionTime: avgTime,
-    };
   }
 
   /**

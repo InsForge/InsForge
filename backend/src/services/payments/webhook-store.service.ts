@@ -78,7 +78,7 @@ const RETURNING_COLUMNS = `
 /**
  * Shared idempotent store for inbound payment webhook events. Owns the
  * `payments.webhook_events` lifecycle (record-with-idempotency, retry reclaim,
- * status marking) that Stripe and Razorpay previously duplicated. Provider
+ * status marking) for both Stripe and Razorpay. Provider
  * specifics — signature verification, event-id derivation, and event-type
  * dispatch — stay in each provider's webhook service.
  */

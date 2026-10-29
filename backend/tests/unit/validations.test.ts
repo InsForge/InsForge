@@ -1,5 +1,4 @@
 import {
-  validateEmail,
   validateIdentifier,
   isValidIdentifier,
   validateTableName,
@@ -11,16 +10,6 @@ import { AppError } from '../../src/utils/errors';
 import { describe, test, expect } from 'vitest';
 
 describe('Validations Utils', () => {
-  describe('validateEmail', () => {
-    test('valid email returns true', () => {
-      expect(validateEmail('test@example.com')).toBe(true);
-    });
-
-    test('invalid email returns false', () => {
-      expect(validateEmail('invalid-email')).toBe(false);
-    });
-  });
-
   describe('validateIdentifier', () => {
     test('valid identifier returns true', () => {
       expect(validateIdentifier('my_table')).toBe(true);

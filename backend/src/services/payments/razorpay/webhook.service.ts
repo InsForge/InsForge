@@ -241,7 +241,6 @@ export class RazorpayWebhookService {
     switch (payload.event) {
       case 'payment.authorized':
       case 'payment.captured':
-        return this.handlePaymentUpsert(environment, payload, payload.event);
       case 'payment.failed':
         return this.handlePaymentUpsert(environment, payload, payload.event);
       case 'refund.created':

@@ -1,6 +1,5 @@
 /**
  * Socket.IO event types and interfaces
- * Following industrial standards for type-safe WebSocket communication
  */
 
 /**
