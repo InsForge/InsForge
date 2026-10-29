@@ -241,11 +241,17 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - tables
+                  - totalSizeInGB
                 properties:
                   tables:
                     type: array
                     items:
                       type: object
+                      required:
+                        - tableName
+                        - recordCount
                       properties:
                         tableName:
                           type: string
