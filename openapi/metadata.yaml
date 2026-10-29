@@ -302,9 +302,9 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error: "AUTH_UNAUTHORIZED"
-                message: "Only admin users can access API keys"
+                message: "Admin access required"
                 statusCode: 403
-                nextActions: "Contact an administrator for API key access"
+                nextActions: "Check the admin token is valid or login as admin to get a new token."
 
   /api/metadata/anon-key:
     get:
