@@ -92,7 +92,7 @@ describe('FilePreviewDialog', () => {
 
   it('calls onNext when next button is clicked', async () => {
     const onNext = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     render(
       <FilePreviewDialog
@@ -113,7 +113,7 @@ describe('FilePreviewDialog', () => {
 
   it('calls onPrevious when previous button is clicked', async () => {
     const onPrevious = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     render(
       <FilePreviewDialog

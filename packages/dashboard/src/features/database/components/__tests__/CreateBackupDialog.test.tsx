@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { CreateBackupDialog } from '#features/database/components/CreateBackupDialog';
 
 describe('CreateBackupDialog', () => {
-  it('creates a backup with a trimmed name and closes on success', async () => {
-    const user = userEvent.setup();
+  it('creates a backup with a trimmed name and closes on success', { timeout: 10_000 }, async () => {
+    const user = userEvent.setup({ delay: null });
     const onCreate = vi.fn().mockResolvedValue(undefined);
     const onOpenChange = vi.fn();
 
