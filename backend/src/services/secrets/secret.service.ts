@@ -523,7 +523,9 @@ export class SecretService {
 
       const oldKeyId = currentResult.rows[0].id;
 
-      // Rename old key to API_KEY_OLD_<timestamp> for grace period
+      // Rename old key to API_KEY_OLD_<timestamp> for grace period.
+      // Nothing prunes these rows after expires_at passes; every read path
+      // filters on expires_at instead, so expired grace-period rows accumulate.
       const gracePeriodKey = `API_KEY_OLD_${Date.now()}`;
       await client.query(
         `UPDATE system.secrets
@@ -675,7 +677,8 @@ export class SecretService {
 
       const oldKeyId = currentResult.rows[0].id;
 
-      // Rename old key to ANON_KEY_OLD_<timestamp> for grace period
+      // Rename old key to ANON_KEY_OLD_<timestamp> for grace period.
+      // As with API_KEY_OLD_*, expired rows are filtered on read, never pruned.
       const gracePeriodKey = `ANON_KEY_OLD_${Date.now()}`;
       await client.query(
         `UPDATE system.secrets
