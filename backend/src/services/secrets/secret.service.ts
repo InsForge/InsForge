@@ -42,6 +42,7 @@ export class SecretService {
   private anonKeyCache: AnonKeyCache | null = null;
   private anonKeyLoadPromise: Promise<AnonKeyCache> | null = null;
 
+  // Singleton: construct only via getInstance().
   private constructor() {}
 
   public static getInstance(): SecretService {

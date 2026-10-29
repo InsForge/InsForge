@@ -435,6 +435,13 @@ export function startWriteEndpointLimitsRefresh(): void {
   scheduleNext();
 }
 
+export function destroyWriteEndpointLimitsRefresh(): void {
+  if (writeLimitsRefreshTimeout) {
+    clearTimeout(writeLimitsRefreshTimeout);
+    writeLimitsRefreshTimeout = null;
+  }
+}
+
 // Skip the live S3 refresh under vitest so unit tests get deterministic
 // defaults and don't fire network calls on import.
 if (process.env.NODE_ENV !== 'test') {
