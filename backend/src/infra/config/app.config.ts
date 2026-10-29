@@ -211,7 +211,7 @@ export function loadConfig(): AppConfig {
       // `COMPUTE_ISOLATE_NETWORK=1` fails in the unsafe direction.
       isolateNetwork: parseEnvBool(process.env.COMPUTE_ISOLATE_NETWORK),
       // Ceiling on an uploaded build context. Deliberately *not* the JSON body
-      // limit it used to borrow: express buffers the whole tarball in memory
+      // limit: express buffers the whole tarball in memory
       // before any handler runs, and a t4g.nano has ~418MB usable, so a 100MB
       // ceiling is a self-inflicted OOM. A source context is normally single-digit
       // megabytes; 64MB is generous for one that vendors dependencies.

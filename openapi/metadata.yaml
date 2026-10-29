@@ -247,29 +247,21 @@ paths:
                     items:
                       type: object
                       properties:
-                        name:
+                        tableName:
                           type: string
                         recordCount:
                           type: integer
-                  totalTables:
-                    type: integer
-                  totalRecords:
-                    type: integer
-                  databaseSize:
+                  totalSizeInGB:
+                    type: number
+                  hint:
                     type: string
-                  lastUpdated:
-                    type: string
-                    format: date-time
               example:
                 tables:
-                  - name: "posts"
+                  - tableName: "posts"
                     recordCount: 5678
-                  - name: "comments"
+                  - tableName: "comments"
                     recordCount: 9012
-                totalTables: 15
-                totalRecords: 16924
-                databaseSize: "125 MB"
-                lastUpdated: "2024-01-21T10:30:00Z"
+                totalSizeInGB: 0.12
         '401':
           description: Unauthorized
           content:
@@ -277,7 +269,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "UNAUTHORIZED"
+                error: "AUTH_INVALID_CREDENTIALS"
                 message: "Invalid or missing authentication"
                 statusCode: 401
                 nextActions: "Please provide valid authentication credentials"
@@ -309,7 +301,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "INSUFFICIENT_PERMISSIONS"
+                error: "AUTH_UNAUTHORIZED"
                 message: "Only admin users can access API keys"
                 statusCode: 403
                 nextActions: "Contact an administrator for API key access"

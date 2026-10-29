@@ -196,32 +196,40 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - images
                 properties:
-                  model:
-                    type: string
-                    description: Model used for generation
-                  images:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/OpenRouterImageMessage'
                   text:
                     type: string
                     description: Text content from multimodal models
-                  count:
-                    type: integer
-                    description: Number of images generated
+                  images:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - type
+                        - imageUrl
+                      properties:
+                        type:
+                          type: string
+                          enum: [imageUrl]
+                        imageUrl:
+                          type: string
+                          description: Image URL or base64 data URL
                   metadata:
                     type: object
                     properties:
                       model:
                         type: string
-                      revisedPrompt:
-                        type: string
                       usage:
-                        $ref: '#/components/schemas/TokenUsage'
-                  nextActions:
-                    type: string
-                    example: Images have been generated successfully. Use the returned URLs or base64 data to access them.
+                        type: object
+                        properties:
+                          promptTokens:
+                            type: integer
+                          completionTokens:
+                            type: integer
+                          totalTokens:
+                            type: integer
         '400':
           description: Invalid request - missing model or prompt
         '401':
@@ -568,19 +576,6 @@ components:
           description: Text prompt describing the desired image
           example: "A serene landscape with mountains and a lake at sunset"
 
-    OpenRouterImageMessage:
-      type: object
-      properties:
-        type:
-          type: string
-          enum: [image_url]
-        image_url:
-          type: object
-          properties:
-            url:
-              type: string
-              description: Can be a direct URL or data:image base64 URL
-
     ListModelsResponse:
       type: array
       description: Normalized OpenRouter model catalog returned by GET /api/ai/models.
@@ -830,10 +825,12 @@ components:
           enum: [embedding]
           description: Object type, always "embedding"
         embedding:
-          type: array
-          items:
-            type: number
-          description: The embedding vector (array of floats)
+          oneOf:
+            - type: array
+              items:
+                type: number
+            - type: string
+          description: The embedding vector (array of floats, or a base64 string when encoding_format is base64)
         index:
           type: integer
           description: Index of this embedding in the input array

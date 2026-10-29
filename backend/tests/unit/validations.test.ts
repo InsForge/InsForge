@@ -1,26 +1,12 @@
 import {
-  validateEmail,
   validateIdentifier,
-  isValidIdentifier,
   validateTableName,
-  getIdentifierErrorMessage,
   escapeSqlLikePattern,
-  escapeRegexPattern,
 } from '../../src/utils/validations';
 import { AppError } from '../../src/utils/errors';
 import { describe, test, expect } from 'vitest';
 
 describe('Validations Utils', () => {
-  describe('validateEmail', () => {
-    test('valid email returns true', () => {
-      expect(validateEmail('test@example.com')).toBe(true);
-    });
-
-    test('invalid email returns false', () => {
-      expect(validateEmail('invalid-email')).toBe(false);
-    });
-  });
-
   describe('validateIdentifier', () => {
     test('valid identifier returns true', () => {
       expect(validateIdentifier('my_table')).toBe(true);
@@ -35,17 +21,6 @@ describe('Validations Utils', () => {
     });
   });
 
-  describe('isValidIdentifier', () => {
-    test('valid identifier returns true', () => {
-      expect(isValidIdentifier('column1')).toBe(true);
-    });
-
-    test('invalid identifier returns false', () => {
-      expect(isValidIdentifier('')).toBe(false);
-      expect(isValidIdentifier('bad"identifier')).toBe(false);
-    });
-  });
-
   describe('validateTableName', () => {
     test('valid table name returns true', () => {
       expect(validateTableName('users')).toBe(true);
@@ -57,25 +32,9 @@ describe('Validations Utils', () => {
     });
   });
 
-  describe('getIdentifierErrorMessage', () => {
-    test('empty identifier returns proper message', () => {
-      expect(getIdentifierErrorMessage('')).toContain('cannot be empty');
-    });
-
-    test('bad identifier returns proper message', () => {
-      expect(getIdentifierErrorMessage('bad"identifier')).toContain('cannot contain quotes');
-    });
-  });
-
   describe('escapeSqlLikePattern', () => {
     test('escapes % and _ and \\', () => {
       expect(escapeSqlLikePattern('50%_test\\')).toBe('50\\%\\_test\\\\');
-    });
-  });
-
-  describe('escapeRegexPattern', () => {
-    test('escapes regex metacharacters', () => {
-      expect(escapeRegexPattern('test.file(1)')).toBe('test\\.file\\(1\\)');
     });
   });
 });

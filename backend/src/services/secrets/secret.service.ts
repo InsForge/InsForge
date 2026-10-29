@@ -42,9 +42,7 @@ export class SecretService {
   private anonKeyCache: AnonKeyCache | null = null;
   private anonKeyLoadPromise: Promise<AnonKeyCache> | null = null;
 
-  private constructor() {
-    // Encryption is now handled by the shared EncryptionManager
-  }
+  private constructor() {}
 
   public static getInstance(): SecretService {
     if (!SecretService.instance) {
@@ -429,80 +427,6 @@ export class SecretService {
     } catch (error) {
       logger.error('Failed to delete secret', { error, id });
       throw new Error('Failed to delete secret');
-    }
-  }
-
-  /**
-   * Rotate a secret (create new value, keep old for grace period)
-   */
-  async rotateSecret(id: string, newValue: string): Promise<{ newId: string }> {
-    const client = await this.getPool().connect();
-    try {
-      await client.query('BEGIN');
-
-      const oldSecretResult = await client.query(`SELECT key FROM system.secrets WHERE id = $1`, [
-        id,
-      ]);
-
-      if (!oldSecretResult.rows.length) {
-        throw new Error('Secret not found');
-      }
-
-      const secretKey = oldSecretResult.rows[0].key;
-
-      await client.query(
-        `UPDATE system.secrets
-         SET is_active = false,
-             expires_at = NOW() + INTERVAL '24 hours'
-         WHERE id = $1`,
-        [id]
-      );
-
-      const encryptedValue = EncryptionManager.encrypt(newValue);
-      const newSecretResult = await client.query(
-        `INSERT INTO system.secrets (key, value_ciphertext)
-         VALUES ($1, $2)
-         RETURNING id`,
-        [secretKey, encryptedValue]
-      );
-
-      await client.query('COMMIT');
-
-      logger.info('Secret rotated', {
-        oldId: id,
-        newId: newSecretResult.rows[0].id,
-        key: secretKey,
-      });
-
-      return { newId: newSecretResult.rows[0].id };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      logger.error('Failed to rotate secret', { error, id });
-      throw new Error('Failed to rotate secret');
-    } finally {
-      client.release();
-    }
-  }
-
-  /**
-   * Clean up expired secrets
-   */
-  async cleanupExpiredSecrets(): Promise<number> {
-    try {
-      const result = await this.getPool().query(
-        `DELETE FROM system.secrets
-         WHERE expires_at IS NOT NULL
-         AND expires_at < NOW()`
-      );
-
-      const deletedCount = result.rowCount ?? 0;
-      if (deletedCount > 0) {
-        logger.info('Expired secrets cleaned up', { count: deletedCount });
-      }
-      return deletedCount;
-    } catch (error) {
-      logger.error('Failed to cleanup expired secrets', { error });
-      throw new Error('Failed to cleanup expired secrets');
     }
   }
 

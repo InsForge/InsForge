@@ -1,10 +1,6 @@
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type AuthConfigSchema } from '@insforge/shared-schemas';
 
-export function validateEmail(email: string) {
-  return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
-}
-
 /**
  * Validates password against authentication configuration requirements
  * @param password - The password to validate
@@ -77,15 +73,6 @@ export function validateIdentifier(identifier: string, type: string = 'identifie
 }
 
 /**
- * Validates a PostgreSQL identifier and returns boolean without throwing
- * @param identifier - The identifier to validate
- * @returns true if valid, false if invalid
- */
-export function isValidIdentifier(identifier: string): boolean {
-  return Boolean(identifier && identifier.trim() && IDENTIFIER_REGEX.test(identifier));
-}
-
-/**
  * Validates table name with additional checks
  * @param tableName - The table name to validate
  * @returns true if valid
@@ -119,22 +106,6 @@ export function validateFunctionName(functionName: string): boolean {
 }
 
 /**
- * Gets a safe error message for identifier validation
- * @param identifier - The identifier that failed validation
- * @param type - Type of identifier
- * @returns Safe error message
- */
-export function getIdentifierErrorMessage(identifier: string, type: string = 'identifier'): string {
-  if (!identifier || !identifier.trim()) {
-    return `Invalid ${type} name: cannot be empty`;
-  }
-  if (!IDENTIFIER_REGEX.test(identifier)) {
-    return `Invalid ${type} name: cannot contain quotes or control characters`;
-  }
-  return `Invalid ${type} name`;
-}
-
-/**
  * Escapes special characters for SQL LIKE patterns.
  * Prevents injection attacks by escaping %, _ and \ characters which have special meaning in SQL LIKE clauses.
  *
@@ -149,21 +120,4 @@ export function getIdentifierErrorMessage(identifier: string, type: string = 'id
  */
 export function escapeSqlLikePattern(text: string): string {
   return text.replace(/([%_\\])/g, '\\$1');
-}
-
-/**
- * Escapes special regex metacharacters for literal matching in regular expressions.
- * Prevents regex injection by escaping all characters that have special meaning in regex.
- *
- * How it works:
- * - Matches any regex metacharacter: . * + ? ^ $ { } ( ) | [ ] \
- * - Replaces with escaped version (prefixed with \)
- * - This allows creating regex patterns that match these characters literally
- *
- * @param text - Text to escape for use in regex patterns
- * @returns Escaped text safe for regex literal matching
- * @example escapeRegexPattern("test.file(1)") → "test\\.file\\(1\\)"
- */
-export function escapeRegexPattern(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

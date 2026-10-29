@@ -1,6 +1,5 @@
 /**
  * Socket.IO event types and interfaces
- * Following industrial standards for type-safe WebSocket communication
  */
 
 /**
@@ -42,6 +41,5 @@ export interface SocketMetadata {
   userId?: string;
   role?: string;
   connectedAt: Date;
-  lastActivity: Date;
   subscriptions: Set<string>;
 }

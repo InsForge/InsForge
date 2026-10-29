@@ -11,8 +11,6 @@ export const POSTHOG_HOST_BY_REGION = {
   EU: 'https://eu.posthog.com',
 } as const;
 
-export type PosthogHostRegion = keyof typeof POSTHOG_HOST_BY_REGION;
-
 const VALID_HOSTNAMES = new Set(
   Object.values(POSTHOG_HOST_BY_REGION).map((u) => new URL(u).hostname)
 );
