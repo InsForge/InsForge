@@ -185,21 +185,44 @@ export class AuthService {
     const verifiedRedirectTo =
       usesVerifyEmailLink && shouldSendVerificationEmail ? redirectTo : null;
 
+    const normalizedEmail = email.trim().toLowerCase();
     const hashedPassword = await bcrypt.hash(password, 10);
     const userId = crypto.randomUUID();
 
     const pool = this.getPool();
     const client = await pool.connect();
+
     try {
       await client.query('BEGIN');
 
+      // Serialize registrations for the same normalized email.
+      // This prevents concurrent email signups from both passing the lookup.
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `auth_register_email_${normalizedEmail}`,
+      ]);
+
+      // OAuth providers may store emails with mixed capitalization.
+      const existingUser = await client.query(
+        `SELECT id
+         FROM auth.users
+         WHERE lower(email) = $1
+         ORDER BY created_at ASC
+         LIMIT 1`,
+        [normalizedEmail]
+      );
+
+      if (existingUser.rows.length > 0) {
+        throw new AppError('User already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
+      }
+
       const profile = name ? JSON.stringify({ name }) : '{}';
+
       await client.query(
         `INSERT INTO auth.users (id, email, password, profile, email_verified, created_at, updated_at)
          VALUES ($1, $2, $3, $4::jsonb, $5, NOW(), NOW())`,
         [
           userId,
-          email,
+          normalizedEmail,
           hashedPassword,
           profile,
           options?.autoConfirm && options?.isAdminCreation ? true : false,

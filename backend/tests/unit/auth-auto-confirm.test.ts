@@ -267,4 +267,32 @@ describe('AuthService.register – autoConfirm', () => {
         'The user account already exists. Retry delivery with POST /api/auth/email/send-verification instead of registering again.',
     });
   });
+
+  it('rejects registration when an OAuth account already exists with different email casing', async () => {
+    mockClient.query.mockImplementation(async (sql: string) => {
+      if (sql.includes('SELECT id') && sql.includes('FROM auth.users')) {
+        return {
+          rows: [{ id: 'existing-oauth-user-id' }],
+        };
+      }
+
+      return { rows: [] };
+    });
+
+    await expect(
+      authService.register('jane.doe@contoso.com', 'password123', 'Jane')
+    ).rejects.toMatchObject({
+      message: 'User already exists',
+      statusCode: 409,
+      code: ERROR_CODES.AUTH_EMAIL_EXISTS,
+    });
+
+    const insertCall = mockClient.query.mock.calls.find(
+      (call: unknown[]) =>
+        typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
+    );
+
+    expect(insertCall).toBeUndefined();
+  });
+
 });
