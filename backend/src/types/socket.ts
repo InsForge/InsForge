@@ -41,5 +41,6 @@ export interface SocketMetadata {
   userId?: string;
   role?: string;
   connectedAt: Date;
+  lastActivity: Date;
   subscriptions: Set<string>;
 }

@@ -201,6 +201,7 @@ export class SocketManager {
       userId: socket.data.user?.id,
       role: socket.data.user?.role,
       connectedAt: new Date(),
+      lastActivity: new Date(),
       subscriptions: new Set(),
     };
 
@@ -276,6 +277,14 @@ export class SocketManager {
     // Handle realtime publish (client-initiated messages)
     socket.on(ClientEvents.REALTIME_PUBLISH, (payload: PublishEventPayload) => {
       void this.handleRealtimePublish(socket, payload);
+    });
+
+    // Update last activity on any event
+    socket.onAny(() => {
+      const metadata = this.socketMetadata.get(socket.id);
+      if (metadata) {
+        metadata.lastActivity = new Date();
+      }
     });
   }
 
@@ -530,6 +539,28 @@ export class SocketManager {
    */
   getConnectionCount(): number {
     return this.socketMetadata.size;
+  }
+
+  /**
+   * Clean up inactive connections (can be called periodically)
+   */
+  cleanupInactiveConnections(maxInactivityMs: number = 300000): void {
+    const now = Date.now();
+
+    this.socketMetadata.forEach((metadata, socketId) => {
+      const inactivityTime = now - metadata.lastActivity.getTime();
+
+      if (inactivityTime > maxInactivityMs) {
+        const socket = this.io?.sockets.sockets.get(socketId);
+        if (socket) {
+          logger.info('Disconnecting inactive socket', {
+            socketId,
+            inactivityTime,
+          });
+          socket.disconnect(true);
+        }
+      }
+    });
   }
 
   /**

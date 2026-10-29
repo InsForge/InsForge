@@ -432,6 +432,28 @@ export class SecretService {
   }
 
   /**
+   * Clean up expired secrets
+   */
+  async cleanupExpiredSecrets(): Promise<number> {
+    try {
+      const result = await this.getPool().query(
+        `DELETE FROM system.secrets
+         WHERE expires_at IS NOT NULL
+         AND expires_at < NOW()`
+      );
+
+      const deletedCount = result.rowCount ?? 0;
+      if (deletedCount > 0) {
+        logger.info('Expired secrets cleaned up', { count: deletedCount });
+      }
+      return deletedCount;
+    } catch (error) {
+      logger.error('Failed to cleanup expired secrets', { error });
+      throw new Error('Failed to cleanup expired secrets');
+    }
+  }
+
+  /**
    * Generate a new API key with 'ik_' prefix (Insforge Key)
    */
   generateApiKey(): string {
@@ -524,8 +546,8 @@ export class SecretService {
       const oldKeyId = currentResult.rows[0].id;
 
       // Rename old key to API_KEY_OLD_<timestamp> for grace period.
-      // Nothing prunes these rows after expires_at passes; every read path
-      // filters on expires_at instead, so expired grace-period rows accumulate.
+      // Nothing calls cleanupExpiredSecrets() yet, so these rows outlive
+      // expires_at; every read path filters on expires_at instead.
       const gracePeriodKey = `API_KEY_OLD_${Date.now()}`;
       await client.query(
         `UPDATE system.secrets
@@ -678,7 +700,7 @@ export class SecretService {
       const oldKeyId = currentResult.rows[0].id;
 
       // Rename old key to ANON_KEY_OLD_<timestamp> for grace period.
-      // As with API_KEY_OLD_*, expired rows are filtered on read, never pruned.
+      // As with API_KEY_OLD_*, expired rows are filtered on read, not pruned.
       const gracePeriodKey = `ANON_KEY_OLD_${Date.now()}`;
       await client.query(
         `UPDATE system.secrets

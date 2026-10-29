@@ -210,11 +210,12 @@ export function loadConfig(): AppConfig {
       // shared parser so `1`/`yes`/`on` work too: a knob that silently ignores
       // `COMPUTE_ISOLATE_NETWORK=1` fails in the unsafe direction.
       isolateNetwork: parseEnvBool(process.env.COMPUTE_ISOLATE_NETWORK),
-      // Ceiling on an uploaded build context. Deliberately *not* the JSON body
-      // limit: express buffers the whole tarball in memory
-      // before any handler runs, and a t4g.nano has ~418MB usable, so a 100MB
-      // ceiling is a self-inflicted OOM. A source context is normally single-digit
-      // megabytes; 64MB is generous for one that vendors dependencies.
+      // Ceiling on an uploaded build context. Deliberately *not* borrowed from
+      // the 100MB JSON body limit (maxJsonBodySize below): express buffers the
+      // whole tarball in memory before any handler runs, and a t4g.nano has
+      // ~418MB usable, so a 100MB ceiling is a self-inflicted OOM. A source
+      // context is normally single-digit megabytes; 64MB is generous for one
+      // that vendors dependencies.
       buildMaxContextSize: process.env.COMPUTE_BUILD_MAX_CONTEXT || '64mb',
       // How long an upload may send nothing before it is treated as stalled and
       // cut loose. Only builds one at a time, so a connection that stops making

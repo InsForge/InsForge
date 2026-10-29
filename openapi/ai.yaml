@@ -815,13 +815,16 @@ components:
               description: The model used for embedding
               example: text-embedding-ada-002
             usage:
-              type: object
-              description: Embeddings have no completion tokens, so only prompt and total counts are reported
-              properties:
-                promptTokens:
-                  type: integer
-                totalTokens:
-                  type: integer
+              $ref: '#/components/schemas/EmbeddingTokenUsage'
+
+    EmbeddingTokenUsage:
+      type: object
+      description: Embeddings have no completion tokens, so only prompt and total counts are reported
+      properties:
+        promptTokens:
+          type: integer
+        totalTokens:
+          type: integer
 
     EmbeddingObject:
       type: object
