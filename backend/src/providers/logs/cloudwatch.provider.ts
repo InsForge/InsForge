@@ -134,8 +134,7 @@ export class CloudWatchProvider extends BaseLogProvider {
       logStreamName?: string;
     }>;
 
-    if (!beforeTimestamp) {
-      // Case 1: Get the most recent logs - use reliable approach instead of Insights
+    const readNewest = async (fromMs: number, toMs: number) => {
       // CloudWatch Insights can be inconsistent, so use FilterLogEvents with pagination
       // limit arrives unvalidated from the query string, and FilterLogEvents rejects more than 10,000
       const keep = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 10000) : 100;
@@ -152,8 +151,8 @@ export class CloudWatchProvider extends BaseLogProvider {
           new FilterLogEventsCommand({
             logGroupName: logGroup,
             logStreamNames: streams.length ? streams.slice(0, 100) : undefined,
-            startTime: startMs,
-            endTime: endMs,
+            startTime: fromMs,
+            endTime: toMs,
             // newest-first, so paging stops at `keep` instead of reading the whole day oldest-first
             startFromHead: false,
             limit: keep - allEvents.length,
@@ -167,7 +166,11 @@ export class CloudWatchProvider extends BaseLogProvider {
       } while (nextToken && allEvents.length < keep);
 
       // Pages arrive newest-first; callers expect chronological order
-      events = allEvents.reverse();
+      return allEvents.reverse();
+    };
+
+    if (!beforeTimestamp) {
+      events = await readNewest(startMs, endMs);
     } else {
       // Case 2: Get logs before the specified timestamp (pagination)
       // Use CloudWatch Insights for efficient timestamp-based pagination
@@ -244,19 +247,7 @@ export class CloudWatchProvider extends BaseLogProvider {
         // Use a smaller time window for fallback - 6 hours instead of 24
         const fallbackStartMs = beforeMs - 6 * 60 * 60 * 1000;
 
-        const fle = await client.send(
-          new FilterLogEventsCommand({
-            logGroupName: logGroup,
-            logStreamNames: streams.length ? streams.slice(0, 100) : undefined,
-            startTime: fallbackStartMs,
-            endTime: beforeMs,
-            limit: limit * 2, // Get a bit more to ensure we have enough
-          })
-        );
-
-        const allEvents = fle.events || [];
-        // Get the most recent 'limit' events
-        events = allEvents.slice(-limit);
+        events = await readNewest(fallbackStartMs, beforeMs - 1);
       }
     }
     // Keep CloudWatch's default order (oldest first, newest last)

@@ -103,4 +103,17 @@ describe('CloudWatchProvider.getLogsBySource latest logs', () => {
 
     expect(calls.map((c) => c.limit)).toEqual([100, 10000]);
   });
+
+  it('falls back to the newest events before the cursor when Insights fails', async () => {
+    const events = Array.from({ length: 1000 }, (_, i) => event(NOW - (1000 - i) * 1000));
+
+    const { provider } = providerWith(events);
+    const result = await provider.getLogsBySource(
+      'insforge.logs',
+      100,
+      new Date(NOW - 100 * 1000).toISOString()
+    );
+
+    expect(result.logs.map((l) => l.id)).toEqual(ids(events.slice(800, 900)));
+  });
 });
