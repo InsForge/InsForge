@@ -218,18 +218,13 @@ paths:
                           description: Image URL or base64 data URL
                   metadata:
                     type: object
+                    required:
+                      - model
                     properties:
                       model:
                         type: string
                       usage:
-                        type: object
-                        properties:
-                          promptTokens:
-                            type: integer
-                          completionTokens:
-                            type: integer
-                          totalTokens:
-                            type: integer
+                        $ref: '#/components/schemas/TokenUsage'
         '400':
           description: Invalid request - missing model or prompt
         '401':
@@ -809,13 +804,21 @@ components:
             $ref: '#/components/schemas/EmbeddingObject'
         metadata:
           type: object
+          required:
+            - model
           properties:
             model:
               type: string
               description: The model used for embedding
               example: text-embedding-ada-002
             usage:
-              $ref: '#/components/schemas/TokenUsage'
+              type: object
+              description: Embeddings have no completion tokens, so only prompt and total counts are reported
+              properties:
+                promptTokens:
+                  type: integer
+                totalTokens:
+                  type: integer
 
     EmbeddingObject:
       type: object

@@ -29,15 +29,17 @@ export interface AuthRequest extends Request {
 const tokenManager = TokenManager.getInstance();
 const secretService = SecretService.getInstance();
 
-function extractBearerToken(authHeader: string | undefined): string | null {
+// Helper function to extract Bearer token (exported for optional auth checks)
+export function extractBearerToken(authHeader: string | undefined): string | null {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
   }
   return authHeader.substring(7);
 }
 
+// Helper function to extract API key from request
 // Checks both Bearer token (if starts with 'ik_') and x-api-key header
-function extractApiKey(req: AuthRequest): string | null {
+export function extractApiKey(req: AuthRequest): string | null {
   const bearerToken = extractBearerToken(req.headers.authorization);
   if (bearerToken && bearerToken.startsWith('ik_')) {
     return bearerToken;
@@ -51,9 +53,10 @@ function extractApiKey(req: AuthRequest): string | null {
   return null;
 }
 
+// Helper function to extract the opaque anon key from a request
 // The anon key travels in the Authorization header like every other client
 // credential (Bearer anon_...); signed-in clients replace it with their JWT.
-function extractAnonKey(req: AuthRequest): string | null {
+export function extractAnonKey(req: AuthRequest): string | null {
   const bearerToken = extractBearerToken(req.headers.authorization);
   if (bearerToken && bearerToken.startsWith('anon_')) {
     return bearerToken;
