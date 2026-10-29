@@ -205,17 +205,7 @@ paths:
                   images:
                     type: array
                     items:
-                      type: object
-                      required:
-                        - type
-                        - imageUrl
-                      properties:
-                        type:
-                          type: string
-                          enum: [imageUrl]
-                        imageUrl:
-                          type: string
-                          description: Image URL or base64 data URL
+                      $ref: '#/components/schemas/GeneratedImage'
                   metadata:
                     type: object
                     required:
@@ -570,6 +560,19 @@ components:
           type: string
           description: Text prompt describing the desired image
           example: "A serene landscape with mountains and a lake at sunset"
+
+    GeneratedImage:
+      type: object
+      required:
+        - type
+        - imageUrl
+      properties:
+        type:
+          type: string
+          enum: [imageUrl]
+        imageUrl:
+          type: string
+          description: Image URL or base64 data URL
 
     ListModelsResponse:
       type: array

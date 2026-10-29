@@ -270,9 +270,9 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error: "AUTH_INVALID_CREDENTIALS"
-                message: "Invalid or missing authentication"
+                message: "Invalid admin token"
                 statusCode: 401
-                nextActions: "Please provide valid authentication credentials"
+                nextActions: "Check the admin token is valid or login as admin to get a new token."
 
   /api/metadata/api-key:
     get:

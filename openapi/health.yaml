@@ -23,6 +23,7 @@ paths:
                     example: ok
                   version:
                     type: string
+                    description: Backend version, read from the root package.json at startup
                     example: 2.3.5
                   service:
                     type: string
