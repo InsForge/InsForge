@@ -575,7 +575,13 @@ export function TableForm({
       });
       void queryClient.invalidateQueries({ queryKey: ['records', schemaName, data.tableName] });
 
-      showToast(`Table "${data.tableName}" updated successfully!`, 'success');
+      showToast(
+        t('database.tableUpdatedSuccess', {
+          tableName: data.tableName,
+          defaultValue: `Table "${data.tableName}" updated successfully!`,
+        }),
+        'success'
+      );
 
       form.reset();
       setError(null);
