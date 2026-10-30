@@ -230,66 +230,71 @@ describe('TablesPage', () => {
     window.localStorage.clear();
   });
 
-  it.each([true, false])('clears a create draft only when discard is confirmed: %s', async (discard) => {
-    const user = userEvent.setup();
-    const draftKey = getTableFormCreateDraftStorageKey('project:test-project', 'public');
-    const otherDraftKey = getTableFormCreateDraftStorageKey('project:test-project', 'private');
-    const draft = {
-      schemaName: 'public',
-      tableName: 'draft_test',
-      columns: [
-        {
-          columnName: 'title',
-          type: 'string',
-          defaultValue: '',
-          isNullable: true,
-          isUnique: false,
-          isSystemColumn: false,
-          isNewColumn: true,
-        },
-      ],
-      foreignKeys: [],
-    };
-    window.localStorage.setItem(draftKey, JSON.stringify(draft));
-    const otherDraft = JSON.stringify({ ...draft, schemaName: 'private' });
-    window.localStorage.setItem(otherDraftKey, otherDraft);
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-    });
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={['/?table=tableA']}>
-          <TablesPage />
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-
-    await user.click(screen.getByRole('button', { name: 'New Table' }));
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue(
-        'draft_test'
+  it.each([true, false])(
+    'clears a create draft only when discard is confirmed: %s',
+    async (discard) => {
+      const user = userEvent.setup();
+      const draftKey = getTableFormCreateDraftStorageKey('project:test-project', 'public');
+      const otherDraftKey = getTableFormCreateDraftStorageKey('project:test-project', 'private');
+      const draft = {
+        schemaName: 'public',
+        tableName: 'draft_test',
+        columns: [
+          {
+            columnName: 'title',
+            type: 'string',
+            defaultValue: '',
+            isNullable: true,
+            isUnique: false,
+            isSystemColumn: false,
+            isNewColumn: true,
+          },
+        ],
+        foreignKeys: [],
+      };
+      window.localStorage.setItem(draftKey, JSON.stringify(draft));
+      const otherDraft = JSON.stringify({ ...draft, schemaName: 'private' });
+      window.localStorage.setItem(otherDraftKey, otherDraft);
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      });
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/?table=tableA']}>
+            <TablesPage />
+          </MemoryRouter>
+        </QueryClientProvider>
       );
-    });
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(await screen.findByRole('dialog', { name: 'Unsaved Changes' })).toBeInTheDocument();
-    expect(JSON.parse(window.localStorage.getItem(draftKey) ?? 'null')).toEqual(draft);
 
-    await user.click(screen.getByRole('button', { name: discard ? 'Discard' : 'Keep editing' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-
-    if (discard) {
-      expect(screen.queryByPlaceholderText('e.g., products, orders, customers')).not.toBeInTheDocument();
-      expect(window.localStorage.getItem(draftKey)).toBeNull();
       await user.click(screen.getByRole('button', { name: 'New Table' }));
-      expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue('');
-    } else {
-      expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue(
-        'draft_test'
-      );
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue(
+          'draft_test'
+        );
+      });
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(await screen.findByRole('dialog', { name: 'Unsaved Changes' })).toBeInTheDocument();
       expect(JSON.parse(window.localStorage.getItem(draftKey) ?? 'null')).toEqual(draft);
+
+      await user.click(screen.getByRole('button', { name: discard ? 'Discard' : 'Keep editing' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+      if (discard) {
+        expect(
+          screen.queryByPlaceholderText('e.g., products, orders, customers')
+        ).not.toBeInTheDocument();
+        expect(window.localStorage.getItem(draftKey)).toBeNull();
+        await user.click(screen.getByRole('button', { name: 'New Table' }));
+        expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue('');
+      } else {
+        expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue(
+          'draft_test'
+        );
+        expect(JSON.parse(window.localStorage.getItem(draftKey) ?? 'null')).toEqual(draft);
+      }
+      expect(window.localStorage.getItem(otherDraftKey)).toBe(otherDraft);
     }
-    expect(window.localStorage.getItem(otherDraftKey)).toBe(otherDraft);
-  });
+  );
 
   it('clears search input and does not use previous search term when switching tables', async () => {
     const user = userEvent.setup();
