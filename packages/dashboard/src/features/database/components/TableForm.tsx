@@ -433,7 +433,10 @@ export function TableForm({
       void queryClient.invalidateQueries({ queryKey: ['database', 'tables'] });
       void queryClient.invalidateQueries({ queryKey: ['metadata'] });
 
-      showToast('Table created successfully!', 'success');
+      showToast(
+        t('database.tableCreatedSuccess', { defaultValue: 'Table created successfully!' }),
+        'success'
+      );
 
       clearTableFormCreateDraft(draftScope, schemaName);
       skipNextDraftSaveRef.current = true;
