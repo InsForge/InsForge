@@ -1,4 +1,5 @@
 import { apiClient } from '#lib/api/client';
+import type { ApifyConfig } from '@insforge/shared-schemas';
 
 // Apify-specific connection shape kept local (not in @insforge/shared-schemas) —
 // the connector catalog grows by adding providers, not shared types.
@@ -39,11 +40,6 @@ export interface ApifyDataset {
   itemCount: number | null;
   createdAt: string | null;
   actId: string | null;
-}
-
-export interface ApifyLatestData {
-  datasetId: string | null;
-  items: unknown[];
 }
 
 function is404(err: unknown): boolean {
@@ -118,20 +114,12 @@ export const webscraperService = {
     }
   },
 
-  async getApifyLatestData(limit = 5): Promise<ApifyLatestData> {
-    try {
-      const res = await apiClient.request(`/webscraper/apify/data?limit=${limit}`, {
-        headers: apiClient.withAccessToken({}),
-      });
-      return {
-        datasetId: res?.datasetId ?? null,
-        items: res?.items ?? [],
-      };
-    } catch (err: unknown) {
-      if (is404(err)) {
-        return { datasetId: null, items: [] };
-      }
-      throw err;
-    }
+  // Self-hosting only — cloud projects answer 400 here and connect via OAuth.
+  async updateApifyConfig(apiToken: string): Promise<ApifyConfig> {
+    return apiClient.request('/webscraper/apify/config', {
+      method: 'PUT',
+      headers: apiClient.withAccessToken({}),
+      body: JSON.stringify({ apiToken }),
+    });
   },
 };

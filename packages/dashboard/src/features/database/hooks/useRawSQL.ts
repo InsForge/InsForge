@@ -13,6 +13,7 @@ interface UseRawSQLOptions {
 interface RawSQLParams {
   query: string;
   params?: unknown[];
+  explain?: boolean;
 }
 
 export function useRawSQL(options?: UseRawSQLOptions) {
@@ -20,8 +21,8 @@ export function useRawSQL(options?: UseRawSQLOptions) {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async ({ query, params = [] }: RawSQLParams) => {
-      return advanceService.runRawSQL(query, params);
+    mutationFn: async ({ query, params = [], explain }: RawSQLParams) => {
+      return advanceService.runRawSQL(query, params, explain);
     },
     onSuccess: (data) => {
       // Invalidate database schema queries to ensure UI reflects any schema changes

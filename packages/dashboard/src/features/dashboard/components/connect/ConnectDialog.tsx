@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import {
   Badge,
@@ -44,6 +45,7 @@ interface ConnectDialogProps {
 }
 
 export function ConnectDialog({ open, onOpenChange }: ConnectDialogProps) {
+  const { t } = useTranslation('chrome');
   const isCloudHostingMode = useIsCloudHostingMode();
   const isCloudProject = isInsForgeCloudProject();
   const canShowCli = isCloudProject && isCloudHostingMode;
@@ -86,9 +88,13 @@ export function ConnectDialog({ open, onOpenChange }: ConnectDialogProps) {
           <div className="border-b border-[var(--alpha-8)] px-4 pt-3">
             <div className="flex items-start gap-3">
               <div className="flex-1">
-                <DialogTitle>Connect Project</DialogTitle>
+                <DialogTitle>
+                  {t('overview.connectProject', { defaultValue: 'Connect Project' })}
+                </DialogTitle>
                 <DialogDescription className="sr-only">
-                  Connect your project to the InsForge platform
+                  {t('overview.connectProjectDescription', {
+                    defaultValue: 'Connect your project to the InsForge platform',
+                  })}
                 </DialogDescription>
                 <div className="mt-3 flex items-start gap-6 overflow-x-auto">
                   {visibleTabs.map((tab) => {
@@ -106,10 +112,18 @@ export function ConnectDialog({ open, onOpenChange }: ConnectDialogProps) {
                             : 'text-muted-foreground hover:text-foreground'
                         )}
                       >
-                        <span>{tab.label}</span>
+                        <span>
+                          {tab.id === 'connection-string'
+                            ? t('overview.connectionString', {
+                                defaultValue: 'Connection String',
+                              })
+                            : tab.id === 'api-keys'
+                              ? t('overview.apiKeysTab', { defaultValue: 'API Keys' })
+                              : tab.label}
+                        </span>
                         {tab.showRecommended && (
                           <Badge className="rounded bg-[var(--alpha-8)] px-2 py-[2px] text-primary">
-                            Recommended
+                            {t('overview.recommended', { defaultValue: 'Recommended' })}
                           </Badge>
                         )}
                         <span
@@ -125,7 +139,7 @@ export function ConnectDialog({ open, onOpenChange }: ConnectDialogProps) {
               </div>
               <DialogCloseButton
                 className="relative right-auto top-auto h-7 w-7 p-1"
-                aria-label="Close"
+                aria-label={t('common.close', { defaultValue: 'Close' })}
               >
                 <X className="size-5" />
               </DialogCloseButton>
@@ -163,7 +177,7 @@ export function ConnectDialog({ open, onOpenChange }: ConnectDialogProps) {
               onClick={() => onOpenChange(false)}
               className="shrink-0"
             >
-              I&apos;ll connect later
+              {t('overview.connectLater', { defaultValue: "I'll connect later" })}
             </Button>
           </DialogFooter>
         </DialogContent>

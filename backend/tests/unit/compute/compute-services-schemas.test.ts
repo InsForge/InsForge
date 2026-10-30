@@ -142,6 +142,45 @@ describe('createServiceSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  // --always-on CLI flag: scaleToZero: false keeps the machine running 24/7
+  // instead of Fly stopping it when idle.
+  it('accepts scaleToZero: false', () => {
+    const result = createServiceSchema.safeParse({
+      name: 'my-api',
+      imageUrl: 'node:20',
+      port: 8080,
+      scaleToZero: false,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.scaleToZero).toBe(false);
+    }
+  });
+
+  it('omitting scaleToZero is valid (back-compat default applied downstream)', () => {
+    const result = createServiceSchema.safeParse({
+      name: 'my-api',
+      imageUrl: 'node:20',
+      port: 8080,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // The schema itself leaves it undefined; services.service.ts is what
+      // falls back to true at INSERT/Fly-call time.
+      expect(result.data.scaleToZero).toBeUndefined();
+    }
+  });
+
+  it('rejects non-boolean scaleToZero', () => {
+    const result = createServiceSchema.safeParse({
+      name: 'my-svc',
+      imageUrl: 'node:20',
+      port: 8080,
+      scaleToZero: 'no',
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('listServicesResponseSchema', () => {
@@ -216,6 +255,18 @@ describe('updateServiceSchema', () => {
 
   it('rejects invalid protocol on update', () => {
     const result = updateServiceSchema.safeParse({ protocol: 'quic' });
+    expect(result.success).toBe(false);
+  });
+
+  // scaleToZero is updateable so an existing service can be flipped between
+  // scale-to-zero and always-on without a delete + redeploy.
+  it('accepts scaleToZero: false on update', () => {
+    const result = updateServiceSchema.safeParse({ scaleToZero: false });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects non-boolean scaleToZero on update', () => {
+    const result = updateServiceSchema.safeParse({ scaleToZero: 'always' });
     expect(result.success).toBe(false);
   });
 });

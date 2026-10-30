@@ -84,29 +84,6 @@ vi.mock('../../src/infra/security/token.manager', () => ({
   },
 }));
 
-const mockOAuthProvider = { getInstance: () => ({}) };
-vi.mock('../../src/providers/oauth/google.oauth.provider', () => ({
-  GoogleOAuthProvider: mockOAuthProvider,
-}));
-vi.mock('../../src/providers/oauth/github.oauth.provider', () => ({
-  GitHubOAuthProvider: mockOAuthProvider,
-}));
-vi.mock('../../src/providers/oauth/discord.oauth.provider', () => ({
-  DiscordOAuthProvider: mockOAuthProvider,
-}));
-vi.mock('../../src/providers/oauth/facebook.oauth.provider', () => ({
-  FacebookOAuthProvider: mockOAuthProvider,
-}));
-vi.mock('../../src/providers/oauth/microsoft.oauth.provider', () => ({
-  MicrosoftOAuthProvider: mockOAuthProvider,
-}));
-vi.mock('../../src/providers/oauth/x.oauth.provider', () => ({
-  XOAuthProvider: mockOAuthProvider,
-}));
-vi.mock('../../src/providers/oauth/apple.oauth.provider', () => ({
-  AppleOAuthProvider: mockOAuthProvider,
-}));
-
 vi.mock('../../src/infra/config/app.config', () => {
   const c = {
     app: { jwtSecret: 'test-secret', name: 'test' },
@@ -256,5 +233,29 @@ describe('AuthService.findOrCreateThirdPartyUser – disableSignup gate', () => 
 
     expect(result.user.email).toBe('brand-new@test.com');
     expect(mockGetAuthConfig).toHaveBeenCalledOnce();
+  });
+
+  it('preserves non-Apple provider behavior when an email is unavailable', async () => {
+    mockPool.query
+      .mockResolvedValueOnce({ rows: [] }) // user_providers lookup
+      .mockResolvedValueOnce({ rows: [] }); // email lookup
+    mockGetAuthConfig.mockResolvedValueOnce(ENABLED_CONFIG);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(authService as any, 'createThirdPartyUser').mockResolvedValue({
+      user: { id: 'facebook-user', email: '' },
+      accessToken: 'token',
+    });
+
+    const result = await authService.findOrCreateThirdPartyUser(
+      'facebook',
+      'facebook-id-new',
+      '',
+      'Facebook User',
+      '',
+      {}
+    );
+
+    expect(result.user.email).toBe('');
   });
 });

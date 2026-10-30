@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, X } from 'lucide-react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -36,17 +37,6 @@ const DEFAULT_VALUES: FormValues = {
   webhookUrls: [{ url: '' }],
 };
 
-const formSchema = z.object({
-  pattern: z.string().min(1, 'Channel pattern is required'),
-  description: z.string(),
-  enabled: z.boolean(),
-  webhookUrls: z.array(
-    z.object({
-      url: z.string().url('Invalid URL format').or(z.literal('')),
-    })
-  ),
-});
-
 // ── Props ──────────────────────────────────────────────────────────────────────
 
 interface ChannelFormDialogProps {
@@ -68,6 +58,31 @@ export function ChannelFormDialog({
   onCreate,
   isUpdating,
 }: ChannelFormDialogProps) {
+  const { t } = useTranslation('chrome');
+
+  const formSchema = useMemo(
+    () =>
+      z.object({
+        pattern: z
+          .string()
+          .min(
+            1,
+            t('realtime.channelPatternRequired', { defaultValue: 'Channel pattern is required' })
+          ),
+        description: z.string(),
+        enabled: z.boolean(),
+        webhookUrls: z.array(
+          z.object({
+            url: z
+              .string()
+              .url(t('realtime.invalidUrlFormat', { defaultValue: 'Invalid URL format' }))
+              .or(z.literal('')),
+          })
+        ),
+      }),
+    [t]
+  );
+
   const {
     register,
     handleSubmit,
@@ -147,9 +162,15 @@ export function ChannelFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Add Channel' : 'Edit Channel'}</DialogTitle>
+          <DialogTitle>
+            {mode === 'create'
+              ? t('realtime.addChannel', { defaultValue: 'Add Channel' })
+              : t('realtime.editChannel', { defaultValue: 'Edit Channel' })}
+          </DialogTitle>
           <DialogDescription className="sr-only">
-            {mode === 'create' ? 'Add a new channel' : 'Edit channel settings'}
+            {mode === 'create'
+              ? t('realtime.addChannelDescription', { defaultValue: 'Add a new channel' })
+              : t('realtime.editChannelDescription', { defaultValue: 'Edit channel settings' })}
           </DialogDescription>
         </DialogHeader>
 
@@ -159,17 +180,21 @@ export function ChannelFormDialog({
             <div className="flex gap-6 items-start">
               <div className="flex w-[200px] shrink-0 flex-col gap-2">
                 <Label htmlFor="channel-pattern" className="leading-5 text-foreground">
-                  Pattern
+                  {t('realtime.pattern', { defaultValue: 'Pattern' })}
                 </Label>
                 <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
-                  Use alphanumeric characters, colons, hyphens, and % as wildcard
+                  {t('realtime.patternHelp', {
+                    defaultValue: 'Use alphanumeric characters, colons, hyphens, and % as wildcard',
+                  })}
                 </p>
               </div>
               <div className="min-w-0 flex-1">
                 <Input
                   id="channel-pattern"
                   {...register('pattern')}
-                  placeholder="e.g., room:%, chat:lobby"
+                  placeholder={t('realtime.patternPlaceholder', {
+                    defaultValue: 'e.g., room:%, chat:lobby',
+                  })}
                   className={`h-8 rounded bg-[var(--alpha-4)] px-1.5 py-1.5 text-[13px] leading-[18px] ${
                     errors.pattern ? 'border-red-500 focus:ring-red-500' : ''
                   }`}
@@ -185,14 +210,16 @@ export function ChannelFormDialog({
             <div className="flex gap-6 items-start">
               <div className="w-[200px] shrink-0">
                 <Label htmlFor="channel-description" className="leading-5 text-foreground">
-                  Description
+                  {t('realtime.description', { defaultValue: 'Description' })}
                 </Label>
               </div>
               <div className="min-w-0 flex-1">
                 <Textarea
                   id="channel-description"
                   {...register('description')}
-                  placeholder="Optional description"
+                  placeholder={t('realtime.optionalDescription', {
+                    defaultValue: 'Optional description',
+                  })}
                   rows={3}
                   className="min-h-[80px] rounded bg-[var(--alpha-4)] border-[var(--alpha-12)] text-foreground px-2.5 py-1.5 text-[13px] leading-[18px] resize-none"
                 />
@@ -204,7 +231,7 @@ export function ChannelFormDialog({
             <div className="flex gap-6 items-center">
               <div className="w-[200px] shrink-0">
                 <Label htmlFor="channel-enabled" className="leading-5 text-foreground">
-                  Enabled
+                  {t('realtime.enabled', { defaultValue: 'Enabled' })}
                 </Label>
               </div>
               <div className="min-w-0 flex-1 flex justify-end">
@@ -227,9 +254,14 @@ export function ChannelFormDialog({
             {/* Webhook URLs */}
             <div className="flex gap-6 items-start">
               <div className="flex w-[200px] shrink-0 flex-col gap-2">
-                <Label className="leading-5 text-foreground">Webhook URLs</Label>
+                <Label className="leading-5 text-foreground">
+                  {t('realtime.webhookUrls', { defaultValue: 'Webhook URLs' })}
+                </Label>
                 <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
-                  Messages published to this channel will be forwarded to these URLs
+                  {t('realtime.webhookUrlsHelp', {
+                    defaultValue:
+                      'Messages published to this channel will be forwarded to these URLs',
+                  })}
                 </p>
               </div>
               <div className="min-w-0 flex-1 flex flex-col gap-2 items-end">
@@ -266,7 +298,7 @@ export function ChannelFormDialog({
                   className="flex h-8 items-center gap-0.5 rounded border border-[var(--alpha-8)] bg-card px-1.5 text-sm font-medium text-foreground"
                 >
                   <Plus className="size-5" />
-                  <span className="px-1">Add URL</span>
+                  <span className="px-1">{t('realtime.addUrl', { defaultValue: 'Add URL' })}</span>
                 </button>
               </div>
             </div>
@@ -280,7 +312,7 @@ export function ChannelFormDialog({
               disabled={isUpdating}
               className="h-8 rounded px-2"
             >
-              Cancel
+              {t('realtime.cancel', { defaultValue: 'Cancel' })}
             </Button>
             <Button
               type="submit"
@@ -289,11 +321,11 @@ export function ChannelFormDialog({
             >
               {isUpdating
                 ? mode === 'create'
-                  ? 'Creating...'
-                  : 'Saving...'
+                  ? t('realtime.creating', { defaultValue: 'Creating...' })
+                  : t('realtime.saving', { defaultValue: 'Saving...' })
                 : mode === 'create'
-                  ? 'Create Channel'
-                  : 'Save Changes'}
+                  ? t('realtime.createChannel', { defaultValue: 'Create Channel' })
+                  : t('realtime.saveChanges', { defaultValue: 'Save Changes' })}
             </Button>
           </DialogFooter>
         </form>

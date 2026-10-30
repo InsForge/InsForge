@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Dialog,
@@ -40,6 +41,7 @@ export function ForeignKeyPopover({
   onAddForeignKey,
   initialValue,
 }: ForeignKeyPopoverProps) {
+  const { t } = useTranslation('chrome');
   const [newForeignKey, setNewForeignKey] = useState<TableFormForeignKeySchema>({
     columnName: '',
     referenceTable: '',
@@ -162,11 +164,19 @@ export function ForeignKeyPopover({
         <div className="flex flex-col">
           {/* Header */}
           <div className="flex flex-col gap-1 px-6 py-3 border-b border-zinc-200 dark:border-neutral-700">
-            <DialogTitle>{initialValue ? 'Edit Foreign Key' : 'Add Foreign Key'}</DialogTitle>
+            <DialogTitle>
+              {initialValue
+                ? t('database.editForeignKey', { defaultValue: 'Edit Foreign Key' })
+                : t('database.addForeignKey', { defaultValue: 'Add Foreign Key' })}
+            </DialogTitle>
             <DialogDescription>
               {initialValue
-                ? 'Modify the relationship between tables'
-                : 'Create a relationship between this table and another table'}
+                ? t('database.editForeignKeyDescription', {
+                    defaultValue: 'Modify the relationship between tables',
+                  })
+                : t('database.addForeignKeyDescription', {
+                    defaultValue: 'Create a relationship between this table and another table',
+                  })}
             </DialogDescription>
           </div>
 
@@ -174,7 +184,9 @@ export function ForeignKeyPopover({
           <div className="flex flex-col gap-6 p-6">
             {/* Column selector */}
             <div className="flex flex-row gap-10 items-center">
-              <Label className="text-sm text-black dark:text-white flex-1">Column</Label>
+              <Label className="text-sm text-black dark:text-white flex-1">
+                {t('database.column', { defaultValue: 'Column' })}
+              </Label>
               <Select
                 value={newForeignKey.columnName}
                 onValueChange={(value) =>
@@ -188,7 +200,8 @@ export function ForeignKeyPopover({
                       newForeignKey.columnName && 'text-black dark:text-white'
                     )}
                   >
-                    {newForeignKey.columnName || 'Select column'}
+                    {newForeignKey.columnName ||
+                      t('database.selectColumn', { defaultValue: 'Select column' })}
                   </span>
                 </SelectTrigger>
                 <SelectContent>
@@ -210,7 +223,9 @@ export function ForeignKeyPopover({
 
             {/* Reference Table selector */}
             <div className="flex flex-row gap-10 items-center">
-              <Label className="text-sm text-black dark:text-white flex-1">Reference Table</Label>
+              <Label className="text-sm text-black dark:text-white flex-1">
+                {t('database.referenceTable', { defaultValue: 'Reference Table' })}
+              </Label>
               <Select
                 value={newForeignKey.referenceTable}
                 onValueChange={(value) => {
@@ -230,7 +245,8 @@ export function ForeignKeyPopover({
                       newForeignKey.referenceTable && 'text-black dark:text-white'
                     )}
                   >
-                    {newForeignKey.referenceTable || 'Select table'}
+                    {newForeignKey.referenceTable ||
+                      t('database.selectTable', { defaultValue: 'Select table' })}
                   </span>
                 </SelectTrigger>
                 <SelectContent>
@@ -247,7 +263,7 @@ export function ForeignKeyPopover({
             {newForeignKey.referenceTable && newForeignKey.columnName && (
               <div className="flex flex-row gap-10 items-center">
                 <Label className="text-sm text-black dark:text-white flex-1">
-                  Reference Column
+                  {t('database.referenceColumn', { defaultValue: 'Reference Column' })}
                 </Label>
                 <Select
                   key={`column-select-${newForeignKey.referenceTable}`}
@@ -267,7 +283,8 @@ export function ForeignKeyPopover({
                           'text-black dark:text-white'
                       )}
                     >
-                      {newForeignKey.referenceColumns[0]?.referenceColumn || 'Select column'}
+                      {newForeignKey.referenceColumns[0]?.referenceColumn ||
+                        t('database.selectColumn', { defaultValue: 'Select column' })}
                     </span>
                   </SelectTrigger>
                   <SelectContent className="max-w-[360px]">
@@ -287,9 +304,11 @@ export function ForeignKeyPopover({
                           // Determine what to show on the right side
                           let rightText = '';
                           if (!col.isUnique) {
-                            rightText = 'Not unique';
+                            rightText = t('database.notUnique', { defaultValue: 'Not unique' });
                           } else if (!typesMatch) {
-                            rightText = 'Column types mismatch';
+                            rightText = t('database.columnTypesMismatch', {
+                              defaultValue: 'Column types mismatch',
+                            });
                           }
 
                           return (
@@ -310,7 +329,9 @@ export function ForeignKeyPopover({
 
                       return (
                         <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          No columns available
+                          {t('database.noColumnsAvailable', {
+                            defaultValue: 'No columns available',
+                          })}
                         </div>
                       );
                     })()}
@@ -321,7 +342,9 @@ export function ForeignKeyPopover({
 
             {/* On Update action */}
             <div className="flex flex-row gap-10 items-center">
-              <Label className="text-sm text-black dark:text-white flex-1">On Update</Label>
+              <Label className="text-sm text-black dark:text-white flex-1">
+                {t('database.onUpdate', { defaultValue: 'On Update' })}
+              </Label>
               <Select
                 value={newForeignKey.onUpdate}
                 onValueChange={(value) =>
@@ -346,7 +369,9 @@ export function ForeignKeyPopover({
 
             {/* On Delete action */}
             <div className="flex flex-row gap-10 items-center">
-              <Label className="text-sm text-black dark:text-white flex-1">On Delete</Label>
+              <Label className="text-sm text-black dark:text-white flex-1">
+                {t('database.onDelete', { defaultValue: 'On Delete' })}
+              </Label>
               <Select
                 value={newForeignKey.onDelete}
                 onValueChange={(value) =>
@@ -380,7 +405,7 @@ export function ForeignKeyPopover({
               onClick={handleCancelAddForeignKey}
               className="h-10 px-4 dark:bg-neutral-600 dark:text-white dark:border-transparent dark:hover:bg-neutral-700"
             >
-              Cancel
+              {t('common.cancel', { defaultValue: 'Cancel' })}
             </Button>
             <Button
               type="button"
@@ -392,7 +417,9 @@ export function ForeignKeyPopover({
                   : 'bg-zinc-950 dark:text-zinc-950 dark:bg-emerald-300 dark:hover:bg-emerald-400'
               } text-white dark:text-zinc-950 shadow-sm`}
             >
-              {initialValue ? 'Update Foreign Key' : 'Add Foreign Key'}
+              {initialValue
+                ? t('database.updateForeignKey', { defaultValue: 'Update Foreign Key' })
+                : t('database.addForeignKey', { defaultValue: 'Add Foreign Key' })}
             </Button>
           </div>
         </div>

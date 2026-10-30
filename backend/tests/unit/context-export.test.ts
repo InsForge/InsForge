@@ -142,6 +142,39 @@ describe('MetadataService.formatAsMarkdown', () => {
     expect(md).not.toContain('## Realtime');
     // Deployments section omitted for self-hosted
     expect(md).not.toContain('## Deployments');
+    // Compute likewise: absence of the slice is how a client learns compute is off,
+    // so the markdown must not imply otherwise.
+    expect(md).not.toContain('## Compute');
+  });
+
+  // The JSON response gained a compute slice; the markdown export is the same
+  // metadata for a human, so it has to describe what the provider can actually do.
+  it('renders the compute slice with per-provider capabilities', () => {
+    const withCompute: AppMetadataSchema = {
+      ...sampleMetadata,
+      compute: {
+        defaultProvider: 'docker',
+        providers: {
+          docker: {
+            scaleToZero: false,
+            regions: false,
+            ingressModes: ['none', 'port', 'host'],
+            sourceBuild: 'context-upload',
+            deployTokenIssuance: false,
+          },
+        },
+      },
+    };
+
+    const md = metadataService.formatAsMarkdown(withCompute);
+
+    expect(md).toContain('## Compute');
+    expect(md).toContain('docker');
+    // Spelled out rather than dumped, since the point is what a client should stop
+    // offering: no regions, no scale-to-zero.
+    expect(md).toContain('regions no');
+    expect(md).toContain('scale-to-zero no');
+    expect(md).toContain('context-upload');
   });
 
   it('renders database hint when present', () => {

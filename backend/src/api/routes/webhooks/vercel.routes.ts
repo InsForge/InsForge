@@ -9,8 +9,7 @@ import {
   type VercelWebhookPayload,
   type VercelDeploymentEventType,
 } from '@/types/webhooks.js';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 import logger from '@/utils/logger.js';
 
 const router = Router();
@@ -96,15 +95,9 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       return res.status(200).json({ received: true, handled: false });
     }
 
-    // Broadcast deployment status change to frontend via socket
+    // Notify the dashboard that deployment metadata changed.
     try {
-      const socketService = SocketManager.getInstance();
-      socketService.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.DEPLOYMENTS },
-        'system'
-      );
+      dashboardEventService.publishDataUpdate({ resource: 'deployments' });
     } catch {
       // Best-effort notification; do not fail webhook response
     }

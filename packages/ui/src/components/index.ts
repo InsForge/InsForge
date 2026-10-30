@@ -95,3 +95,6 @@ export {
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { LoadingState, type LoadingStateProps } from './LoadingState';
 export { Skeleton } from './Skeleton';
+export { Popover, PopoverTrigger, PopoverAnchor, PopoverContent } from './Popover';
+export { Calendar } from './Calendar';
+export { ClockColumn } from './ClockColumn';

@@ -18,9 +18,16 @@ import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl as getCloudFrontSignedUrl } from '@aws-sdk/cloudfront-signer';
 import { Readable } from 'stream';
 import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
-import { StorageProvider, ObjectMetadata, GetObjectResult } from './base.provider.js';
+import {
+  StorageProvider,
+  ObjectMetadata,
+  GetObjectResult,
+  DeleteObjectsResult,
+  ObjectNotFoundError,
+} from './base.provider.js';
 import logger from '@/utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
+import { getApiBaseUrl } from '@/utils/environment.js';
 
 function stripEtagQuotes(etag: string | undefined): string {
   return (etag ?? '').replace(/^"(.*)"$/, '$1');
@@ -43,6 +50,8 @@ function isS3NotFound(err: unknown): boolean {
 
 const ONE_HOUR_IN_SECONDS = 3600;
 const SEVEN_DAYS_IN_SECONDS = 604800;
+const SIGNING_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_DELETE_OBJECTS_PER_REQUEST = 1000;
 
 /**
  * S3 storage implementation
@@ -98,6 +107,12 @@ export class S3StorageProvider implements StorageProvider {
     }
 
     this.s3Client = new S3Client(s3Config);
+
+    if (!appConfig.storage.s3UsePresignedUrls && appConfig.cloud.cloudFrontUrl) {
+      logger.warn(
+        'S3_USE_PRESIGNED_URLS=false: CloudFront settings are ignored in proxy mode; all object bytes are served through the backend'
+      );
+    }
   }
 
   private getS3Key(bucket: string, key: string): string {
@@ -221,6 +236,69 @@ export class S3StorageProvider implements StorageProvider {
     await this.s3Client.send(command);
   }
 
+  async deleteObjects(bucket: string, keys: string[]): Promise<DeleteObjectsResult> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
+    if (keys.length === 0) {
+      return { deleted: [], failed: [] };
+    }
+
+    const deleted: string[] = [];
+    const failed: Array<{ key: string; message: string }> = [];
+
+    for (let index = 0; index < keys.length; index += MAX_DELETE_OBJECTS_PER_REQUEST) {
+      const batchKeys = keys.slice(index, index + MAX_DELETE_OBJECTS_PER_REQUEST);
+      const s3KeyToOriginalKey = new Map(batchKeys.map((key) => [this.getS3Key(bucket, key), key]));
+      const command = new DeleteObjectsCommand({
+        Bucket: this.s3Bucket,
+        Delete: {
+          Objects: batchKeys.map((key) => ({ Key: this.getS3Key(bucket, key) })),
+          Quiet: true,
+        },
+      });
+      const response = await this.s3Client.send(command);
+      const responseErrors = response.Errors ?? [];
+      const errorsWithKeys = responseErrors.filter(
+        (error): error is (typeof responseErrors)[number] & { Key: string } =>
+          typeof error.Key === 'string' && error.Key.length > 0
+      );
+
+      if (responseErrors.length > 0) {
+        logger.warn('S3 batch object delete returned errors', {
+          bucket,
+          errors: responseErrors.map((error) => ({
+            key: error.Key,
+            code: error.Code,
+            message: error.Message,
+          })),
+        });
+      }
+
+      const hasUnkeyedErrors = errorsWithKeys.length !== responseErrors.length;
+      if (hasUnkeyedErrors) {
+        logger.warn('S3 batch object delete returned an error without a key', {
+          bucket,
+          batchSize: batchKeys.length,
+        });
+      }
+
+      const batchFailed = errorsWithKeys.map((error) => {
+        const originalKey = s3KeyToOriginalKey.get(error.Key) ?? error.Key;
+        return {
+          key: originalKey,
+          message: 'Failed to delete object',
+        };
+      });
+
+      const failedKeys = new Set(batchFailed.map((error) => error.key));
+      deleted.push(...batchKeys.filter((key) => !failedKeys.has(key)));
+      failed.push(...batchFailed);
+    }
+
+    return { deleted, failed };
+  }
+
   async createBucket(_bucket: string): Promise<void> {
     // In S3 with multi-tenant, we don't create actual buckets
     // We just use folders under the app key
@@ -249,6 +327,7 @@ export class S3StorageProvider implements StorageProvider {
             Objects: listResponse.Contents.filter((obj) => obj.Key !== undefined).map((obj) => ({
               Key: obj.Key as string,
             })),
+            Quiet: true,
           },
         });
         await this.s3Client.send(deleteCommand);
@@ -258,19 +337,35 @@ export class S3StorageProvider implements StorageProvider {
     } while (continuationToken);
   }
 
-  // S3 supports presigned URLs
+  // Presigned URLs are handed to clients only when the endpoint is reachable
+  // by them. S3_USE_PRESIGNED_URLS=false switches to proxy mode: strategies point
+  // at the backend routes instead, mirroring LocalStorageProvider.
   supportsPresignedUrls(): boolean {
-    return true;
+    return appConfig.storage.s3UsePresignedUrls;
   }
 
   async getUploadStrategy(
     bucket: string,
     key: string,
     metadata: { contentType?: string; size?: number },
-    maxFileSizeBytes: number
+    maxFileSizeBytes: number,
+    contentType: string = 'application/octet-stream'
   ): Promise<UploadStrategyResponse> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
+    }
+
+    // Proxy mode: the endpoint is not client-reachable (or lacks POST-policy
+    // support), so hand back the backend PUT route — same contract as
+    // LocalStorageProvider. The route writes through provider.putObject.
+    if (!appConfig.storage.s3UsePresignedUrls) {
+      const baseUrl = getApiBaseUrl();
+      return {
+        method: 'direct',
+        uploadUrl: `${baseUrl}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
+        key,
+        confirmRequired: false,
+      };
     }
 
     const s3Key = this.getS3Key(bucket, key);
@@ -281,12 +376,16 @@ export class S3StorageProvider implements StorageProvider {
       const { url, fields } = await createPresignedPost(this.s3Client, {
         Bucket: this.s3Bucket,
         Key: s3Key,
+        Fields: {
+          'Content-Type': contentType,
+        },
         Conditions: [
           [
             'content-length-range',
             0,
             Math.min(metadata.size || maxFileSizeBytes, maxFileSizeBytes),
           ],
+          ['eq', '$Content-Type', contentType],
         ],
         Expires: expiresIn,
       });
@@ -315,10 +414,27 @@ export class S3StorageProvider implements StorageProvider {
     key: string,
     expiresIn: number = ONE_HOUR_IN_SECONDS,
     isPublic: boolean = false,
-    version?: string | null
+    version?: string | null,
+    options?: { asAttachment?: boolean }
   ): Promise<DownloadStrategyResponse> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
+    }
+
+    // Proxy mode: direct URL onto the backend GET route, mirroring
+    // LocalStorageProvider. Safe to append the `?v=` cache stamp (no
+    // signature covers the query string). The branch-mode HEAD probe is
+    // deliberately skipped — the GET route resolves parent fallback itself
+    // via getObjectStream. asAttachment is ignored for the same reason the
+    // local provider ignores it: the route re-derives Content-Disposition
+    // from the stored MIME type.
+    if (!appConfig.storage.s3UsePresignedUrls) {
+      const baseUrl = getApiBaseUrl();
+      const base = `${baseUrl}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`;
+      return {
+        method: 'direct',
+        url: version ? `${base}?v=${encodeURIComponent(version)}` : base,
+      };
     }
 
     // In branch mode, HEAD the branch path first; if missing and a parent
@@ -377,13 +493,24 @@ export class S3StorageProvider implements StorageProvider {
             // URL, so any *other* query — including our `?v=<version>` cache
             // stamp — must be in the URL *before* signing or verification
             // fails with 403. Append v first, then sign.
-            const urlToSign = version ? `${baseUrl}?v=${encodeURIComponent(version)}` : baseUrl;
+            let urlToSign = version ? `${baseUrl}?v=${encodeURIComponent(version)}` : baseUrl;
+            if (options?.asAttachment) {
+              const attachParam = 'response-content-disposition=attachment';
+              urlToSign = urlToSign.includes('?')
+                ? `${urlToSign}&${attachParam}`
+                : `${urlToSign}?${attachParam}`;
+            }
 
             // Convert escaped newlines to actual newlines in the private key
             const formattedPrivateKey = cloudFrontPrivateKey.replace(/\\n/g, '\n');
 
-            // dateLessThan can be string | number | Date - using Date object directly
-            const dateLessThan = new Date(Date.now() + actualExpiresIn * 1000);
+            // needs version: a pinned URL without ?v= keeps serving the old bytes after an overwrite
+            const windowStart = Math.floor(Date.now() / SIGNING_WINDOW_MS) * SIGNING_WINDOW_MS;
+            const dateLessThan = new Date(
+              isPublic && version
+                ? windowStart + SIGNING_WINDOW_MS + SEVEN_DAYS_IN_SECONDS * 1000
+                : Date.now() + actualExpiresIn * 1000
+            );
 
             const signedUrl = getCloudFrontSignedUrl({
               url: urlToSign,
@@ -425,6 +552,7 @@ export class S3StorageProvider implements StorageProvider {
       const command = new GetObjectCommand({
         Bucket: this.s3Bucket,
         Key: s3Key,
+        ...(options?.asAttachment ? { ResponseContentDisposition: 'attachment' } : {}),
       });
 
       const url = await getSignedUrl(this.s3Client, command, { expiresIn: actualExpiresIn });
@@ -511,9 +639,9 @@ export class S3StorageProvider implements StorageProvider {
       this.tryGetObjectStream(s3Key, range)
     );
     if (!result) {
-      // Preserve previous behaviour: missing object surfaces as a thrown
-      // error here (callers expect a stream, not null).
-      throw new Error('GetObject returned empty body');
+      // Missing object surfaces as a typed error (callers expect a stream,
+      // not null) so routes can map it to a 404/NoSuchKey by instanceof.
+      throw new ObjectNotFoundError();
     }
     return result;
   }
@@ -538,6 +666,7 @@ export class S3StorageProvider implements StorageProvider {
         etag: stripEtagQuotes(resp.ETag),
         contentType: resp.ContentType,
         lastModified: resp.LastModified ?? new Date(),
+        contentRange: resp.ContentRange,
       };
     } catch (err) {
       if (isS3NotFound(err)) {

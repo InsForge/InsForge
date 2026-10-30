@@ -65,9 +65,9 @@ export async function mockSelfHostingDashboardApi(page: Page) {
     return fulfillLoggedInSession(route);
   });
 
-  await page.route('https://api.github.com/repos/InsForge/InsForge', (route) =>
+  await page.route('**/api/github/repository', (route) =>
     fulfillJson(route, 200, {
-      stargazers_count: 0,
+      stars: 0,
     })
   );
 

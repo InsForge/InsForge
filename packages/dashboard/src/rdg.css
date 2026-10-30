@@ -5,7 +5,10 @@
   :root {
     --rdg-border-color: var(--alpha-8);
     --rdg-background-color: rgb(var(--semantic-1));
-    --rdg-row-hover-color: var(--alpha-4);
+    /* Must stay opaque: cells inherit this as background-color, and the
+       frozen selection column relies on that opacity to hide row content
+       that scrolls underneath it. */
+    --rdg-row-hover-color: color-mix(in srgb, black 4%, rgb(var(--semantic-0)));
     --rdg-background-color-edit: rgb(var(--semantic-1));
     --rdg-header-row-background-color: rgb(var(--semantic-1));
     --rdg-outline-color: rgb(var(--foreground));
@@ -15,7 +18,7 @@
   .rdg-dark {
     --rdg-border-color: var(--alpha-8);
     --rdg-background-color: rgb(var(--semantic-1));
-    --rdg-row-hover-color: var(--alpha-4);
+    --rdg-row-hover-color: color-mix(in srgb, white 4%, rgb(var(--semantic-0)));
     --rdg-background-color-edit: rgb(var(--semantic-1));
     --rdg-header-row-background-color: rgb(var(--semantic-1));
     --rdg-outline-color: rgb(var(--foreground));

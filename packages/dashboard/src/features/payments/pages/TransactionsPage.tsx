@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { AlertCircle } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import type {
@@ -39,6 +41,10 @@ const PAYMENT_TYPE_LABELS: Record<PaymentTransactionType, string> = {
   refund: 'Refund',
   failed_payment: 'Failed Payment',
 };
+
+function getPaymentTypeLabel(type: PaymentTransactionType, t: TFunction<'chrome'>) {
+  return t(`payments.transactionType.${type}`, { defaultValue: PAYMENT_TYPE_LABELS[type] });
+}
 
 function formatEventDate(value: string | null) {
   if (!value) {
@@ -106,13 +112,13 @@ function getPaymentKey(payment: PaymentTransaction) {
     .join(':');
 }
 
-function getCustomerLabel(payment: PaymentTransaction) {
+function getCustomerLabel(payment: PaymentTransaction, t: TFunction<'chrome'>) {
   return (
     payment.customerEmailSnapshot ??
     payment.providerCustomerId ??
     (payment.subjectType && payment.subjectId
       ? `${payment.subjectType}:${payment.subjectId}`
-      : 'Guest')
+      : t('payments.guest', { defaultValue: 'Guest' }))
   );
 }
 
@@ -132,6 +138,7 @@ function formatStatusLabel(status: PaymentTransactionStatus) {
 }
 
 function PaymentStatusBadge({ status }: { status: PaymentTransactionStatus }) {
+  const { t } = useTranslation('chrome');
   return (
     <span
       className={cn(
@@ -139,27 +146,39 @@ function PaymentStatusBadge({ status }: { status: PaymentTransactionStatus }) {
         PAYMENT_STATUS_CLASS_NAMES[status]
       )}
     >
-      {formatStatusLabel(status)}
+      {t(`payments.transactionStatus.${status}`, { defaultValue: formatStatusLabel(status) })}
     </span>
   );
 }
 
 function EmptyTransactionsState({ hasSearchQuery }: { hasSearchQuery: boolean }) {
+  const { t } = useTranslation('chrome');
   return (
     <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
       <p className="text-sm font-medium text-foreground">
-        {hasSearchQuery ? 'No transactions match your search' : 'No transactions found'}
+        {hasSearchQuery
+          ? t('payments.noTransactionsMatchSearch', {
+              defaultValue: 'No transactions match your search',
+            })
+          : t('payments.noTransactionsFound', { defaultValue: 'No transactions found' })}
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
         {hasSearchQuery
-          ? 'Try a different payment type, customer, payment intent, or invoice reference.'
-          : 'Checkout, invoice, and refund events will appear here after transactions are recorded.'}
+          ? t('payments.tryDifferentTransactionSearch', {
+              defaultValue:
+                'Try a different payment type, customer, payment intent, or invoice reference.',
+            })
+          : t('payments.emptyTransactionsHint', {
+              defaultValue:
+                'Checkout, invoice, and refund events will appear here after transactions are recorded.',
+            })}
       </p>
     </div>
   );
 }
 
 function TransactionRow({ payment }: { payment: PaymentTransaction }) {
+  const { t } = useTranslation('chrome');
   return (
     <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
       <div
@@ -168,7 +187,7 @@ function TransactionRow({ payment }: { payment: PaymentTransaction }) {
       >
         <div className="min-w-0 px-2 py-3">
           <span className="block truncate text-foreground">
-            {PAYMENT_TYPE_LABELS[payment.type]}
+            {getPaymentTypeLabel(payment.type, t)}
           </span>
         </div>
 
@@ -182,9 +201,9 @@ function TransactionRow({ payment }: { payment: PaymentTransaction }) {
               'block truncate text-[13px] leading-[18px]',
               isMutedCustomer(payment) ? 'text-muted-foreground' : 'text-foreground'
             )}
-            title={getCustomerLabel(payment)}
+            title={getCustomerLabel(payment, t)}
           >
-            {getCustomerLabel(payment)}
+            {getCustomerLabel(payment, t)}
           </span>
         </div>
 
@@ -217,6 +236,7 @@ function TransactionRow({ payment }: { payment: PaymentTransaction }) {
 }
 
 export default function TransactionsPage() {
+  const { t } = useTranslation('chrome');
   const { openPaymentsSettings, provider, setProvider, environment } =
     useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
@@ -238,7 +258,7 @@ export default function TransactionsPage() {
 
     return transactions.filter((payment) =>
       [
-        PAYMENT_TYPE_LABELS[payment.type],
+        getPaymentTypeLabel(payment.type, t),
         payment.status,
         payment.subjectType,
         payment.subjectId,
@@ -252,7 +272,7 @@ export default function TransactionsPage() {
         .filter((value): value is string => typeof value === 'string' && value.length > 0)
         .some((value) => value.toLowerCase().includes(normalizedSearch))
     );
-  }, [transactions, searchQuery]);
+  }, [transactions, searchQuery, t]);
 
   const {
     currentPage,
@@ -280,12 +300,12 @@ export default function TransactionsPage() {
           className="h-14 min-h-14"
           leftClassName="py-0"
           rightClassName="py-0"
-          title="Transactions"
+          title={t('payments.transactions', { defaultValue: 'Transactions' })}
           showSearch
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
           searchDebounceTime={300}
-          searchPlaceholder="Search payment"
+          searchPlaceholder={t('payments.searchPayment', { defaultValue: 'Search payment' })}
           searchInputClassName="w-[280px]"
         />
       )}
@@ -294,7 +314,11 @@ export default function TransactionsPage() {
         {error ? (
           <ErrorState error={error as Error} onRetry={() => void refetch()} />
         ) : isLoading ? (
-          <LoadingState message="Loading transactions..." />
+          <LoadingState
+            message={t('payments.loadingTransactions', {
+              defaultValue: 'Loading transactions...',
+            })}
+          />
         ) : !hasActiveKey ? (
           <PaymentsOnboardingState
             provider={provider}
@@ -309,7 +333,11 @@ export default function TransactionsPage() {
                 {activeConnection?.lastSyncError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Latest Stripe sync failed</AlertTitle>
+                    <AlertTitle>
+                      {t('payments.stripeSyncFailedTitle', {
+                        defaultValue: 'Latest Stripe sync failed',
+                      })}
+                    </AlertTitle>
                     <AlertDescription className="mt-2">
                       {activeConnection.lastSyncError}
                     </AlertDescription>
@@ -318,7 +346,11 @@ export default function TransactionsPage() {
                 {activeRazorpayConnection?.lastSyncError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Latest Razorpay sync failed</AlertTitle>
+                    <AlertTitle>
+                      {t('payments.razorpaySyncFailedTitle', {
+                        defaultValue: 'Latest Razorpay sync failed',
+                      })}
+                    </AlertTitle>
                     <AlertDescription className="mt-2">
                       {activeRazorpayConnection.lastSyncError}
                     </AlertDescription>
@@ -329,12 +361,22 @@ export default function TransactionsPage() {
                   className="grid gap-0 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
                   style={{ gridTemplateColumns: TRANSACTIONS_GRID_TEMPLATE }}
                 >
-                  <div className="px-2 py-1.5">Payment</div>
-                  <div className="px-2 py-1.5">Status</div>
-                  <div className="px-2 py-1.5">Customer</div>
-                  <div className="px-2 py-1.5">Amount</div>
-                  <div className="px-2 py-1.5">Provider ID</div>
-                  <div className="px-2 py-1.5">Date</div>
+                  <div className="px-2 py-1.5">
+                    {t('payments.payment', { defaultValue: 'Payment' })}
+                  </div>
+                  <div className="px-2 py-1.5">
+                    {t('payments.status', { defaultValue: 'Status' })}
+                  </div>
+                  <div className="px-2 py-1.5">
+                    {t('payments.customer', { defaultValue: 'Customer' })}
+                  </div>
+                  <div className="px-2 py-1.5">
+                    {t('payments.amount', { defaultValue: 'Amount' })}
+                  </div>
+                  <div className="px-2 py-1.5">
+                    {t('payments.providerId', { defaultValue: 'Provider ID' })}
+                  </div>
+                  <div className="px-2 py-1.5">{t('payments.date', { defaultValue: 'Date' })}</div>
                 </div>
 
                 {filteredTransactions.length === 0 ? (
@@ -357,7 +399,9 @@ export default function TransactionsPage() {
                   onPageChange={setCurrentPage}
                   totalRecords={filteredTransactions.length}
                   pageSize={pageSize}
-                  recordLabel="transactions"
+                  recordLabel={t('payments.recordTransactions', {
+                    defaultValue: 'transactions',
+                  })}
                 />
               </div>
             )}

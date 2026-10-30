@@ -1,4 +1,5 @@
 import { CopyButton, cn } from '@insforge/ui';
+import { useTranslation } from 'react-i18next';
 import { CLI_VERIFY_CONNECTION_PROMPT } from './constants';
 import { useProjectId } from '#lib/hooks/useMetadata';
 
@@ -7,6 +8,7 @@ interface CLISectionProps {
 }
 
 export function CLISection({ className }: CLISectionProps) {
+  const { t } = useTranslation('chrome');
   const { projectId } = useProjectId();
   const cliLinkCommand = `npx @insforge/cli link --project-id ${projectId || '<project id>'}`;
 
@@ -14,16 +16,20 @@ export function CLISection({ className }: CLISectionProps) {
     <div className={cn('flex flex-col gap-6', className)}>
       <div className="flex flex-col gap-2">
         <div className="flex flex-col">
-          <p className="text-sm font-medium leading-6 text-foreground">Step 1 - Link Project</p>
+          <p className="text-sm font-medium leading-6 text-foreground">
+            {t('overview.step1LinkProject', { defaultValue: 'Step 1 - Link Project' })}
+          </p>
           <p className="text-sm leading-6 text-muted-foreground">
-            Run the following command in your terminal
+            {t('overview.runCommandInTerminal', {
+              defaultValue: 'Run the following command in your terminal',
+            })}
           </p>
         </div>
         <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 p-3">
           <div className="flex items-center justify-between">
             <div className="flex h-5 items-center rounded bg-[var(--alpha-8)] px-2">
               <span className="text-xs font-medium leading-4 text-muted-foreground">
-                Terminal Command
+                {t('overview.terminalCommand', { defaultValue: 'Terminal Command' })}
               </span>
             </div>
             <CopyButton text={cliLinkCommand} showText={false} className="shrink-0" />
@@ -35,16 +41,21 @@ export function CLISection({ className }: CLISectionProps) {
       <div className="flex flex-col gap-3">
         <div className="flex flex-col">
           <p className="text-sm font-medium leading-6 text-foreground">
-            Step 2 - Verify Connection
+            {t('overview.step2', { defaultValue: 'Step 2 - Verify Connection' })}
           </p>
           <p className="text-sm leading-6 text-muted-foreground">
-            Send the prompt below to your AI coding agent to verify the connection.
+            {t('overview.sendPrompt', {
+              defaultValue:
+                'Send the prompt below to your AI coding agent to verify the connection.',
+            })}
           </p>
         </div>
         <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 p-3">
           <div className="flex items-center justify-between">
             <div className="flex h-5 items-center rounded bg-[var(--alpha-8)] px-2">
-              <span className="text-xs font-medium leading-4 text-muted-foreground">prompt</span>
+              <span className="text-xs font-medium leading-4 text-muted-foreground">
+                {t('overview.promptLabel', { defaultValue: 'prompt' })}
+              </span>
             </div>
             <CopyButton text={CLI_VERIFY_CONNECTION_PROMPT} showText={false} className="shrink-0" />
           </div>

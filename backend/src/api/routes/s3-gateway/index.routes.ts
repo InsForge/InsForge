@@ -70,7 +70,7 @@ s3GatewayRouter.use((req: Request, res: Response, next) => {
     sendS3Error(
       res,
       'NotImplemented',
-      'S3 protocol requires an S3 storage backend. Set AWS_S3_BUCKET.',
+      'S3 protocol requires an S3 storage backend. Set S3_BUCKET.',
       { resource: req.path }
     );
     return;

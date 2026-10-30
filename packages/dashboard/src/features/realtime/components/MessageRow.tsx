@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronRight } from 'lucide-react';
 import { CodeBlock, cn } from '@insforge/ui';
 import { formatTime } from '#lib/utils/utils';
@@ -11,6 +12,7 @@ interface MessageRowProps {
 }
 
 export function MessageRow({ message, className }: MessageRowProps) {
+  const { t } = useTranslation('chrome');
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -22,7 +24,7 @@ export function MessageRow({ message, className }: MessageRowProps) {
           <div className="px-3 pb-3">
             <CodeBlock
               code={JSON.stringify(message.payload, null, 2)}
-              label="Payload"
+              label={t('realtime.payload', { defaultValue: 'Payload' })}
               variant="compact"
             />
           </div>

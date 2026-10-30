@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Download, ExternalLink } from 'lucide-react';
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from '@insforge/ui';
 import { LoadingState, TypeBadge } from '#components';
@@ -26,6 +27,7 @@ export function FilePreviewDialog({
   hasPrevious = false,
   hasNext = false,
 }: FilePreviewDialogProps) {
+  const { t } = useTranslation('chrome');
   const [isLoading, setIsLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +60,10 @@ export function FilePreviewDialog({
         currentUrl = url;
         setPreviewUrl(url);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load preview';
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : t('storage.failedToLoadPreview', { defaultValue: 'Failed to load preview' });
         setError(errorMessage);
       } finally {
         setIsLoading(false);
@@ -73,7 +78,7 @@ export function FilePreviewDialog({
         URL.revokeObjectURL(currentUrl);
       }
     };
-  }, [file, open, bucket, downloadObject]);
+  }, [file, open, bucket, downloadObject, t]);
 
   const handleDownload = () => {
     if (!file || !previewUrl) {
@@ -89,7 +94,7 @@ export function FilePreviewDialog({
       a.click();
       document.body.removeChild(a);
     } catch {
-      setError('Download failed');
+      setError(t('storage.downloadFailed', { defaultValue: 'Download failed' }));
     }
   };
 
@@ -173,7 +178,9 @@ export function FilePreviewDialog({
             src={previewUrl}
             alt={fileName}
             className="max-w-full max-h-full object-contain"
-            onError={() => setError('Failed to load image')}
+            onError={() =>
+              setError(t('storage.failedToLoadImage', { defaultValue: 'Failed to load image' }))
+            }
           />
         </div>
       );
@@ -185,9 +192,13 @@ export function FilePreviewDialog({
           src={previewUrl}
           controls
           className="w-full h-full object-contain"
-          onError={() => setError('Failed to load video')}
+          onError={() =>
+            setError(t('storage.failedToLoadVideo', { defaultValue: 'Failed to load video' }))
+          }
         >
-          Your browser does not support the video tag.
+          {t('storage.videoNotSupported', {
+            defaultValue: 'Your browser does not support the video tag.',
+          })}
         </video>
       );
     }
@@ -199,9 +210,13 @@ export function FilePreviewDialog({
             src={previewUrl}
             controls
             className="w-full max-w-md"
-            onError={() => setError('Failed to load audio')}
+            onError={() =>
+              setError(t('storage.failedToLoadAudio', { defaultValue: 'Failed to load audio' }))
+            }
           >
-            Your browser does not support the audio tag.
+            {t('storage.audioNotSupported', {
+              defaultValue: 'Your browser does not support the audio tag.',
+            })}
           </audio>
         </div>
       );
@@ -218,7 +233,9 @@ export function FilePreviewDialog({
             src={`${previewUrl}#toolbar=0&navpanes=0`}
             className="w-full h-full"
             title={fileName}
-            onError={() => setError('Failed to load PDF')}
+            onError={() =>
+              setError(t('storage.failedToLoadPdf', { defaultValue: 'Failed to load PDF' }))
+            }
           />
         </div>
       );
@@ -240,7 +257,9 @@ export function FilePreviewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-0 w-[800px] max-w-[calc(100vw-2rem)] h-[min(820px,calc(100vh-2rem))] max-h-[calc(100vh-2rem)]">
         <DialogTitle className="sr-only">{fileName}</DialogTitle>
-        <DialogDescription className="sr-only">Preview of {fileName}</DialogDescription>
+        <DialogDescription className="sr-only">
+          {t('storage.previewOf', { defaultValue: 'Preview of {{fileName}}', fileName })}
+        </DialogDescription>
         <div className="w-full h-full flex flex-col bg-white dark:bg-neutral-800">
           {/* Header */}
           <div className="px-6 py-3">
@@ -286,7 +305,7 @@ export function FilePreviewDialog({
                   className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white disabled:opacity-0"
                   onClick={onPrevious}
                   disabled={!hasPrevious}
-                  aria-label="Previous file"
+                  aria-label={t('storage.previousFile', { defaultValue: 'Previous file' })}
                 >
                   <ChevronLeft className="h-6 w-6" />
                 </Button>
@@ -296,7 +315,7 @@ export function FilePreviewDialog({
                   className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white disabled:opacity-0"
                   onClick={onNext}
                   disabled={!hasNext}
-                  aria-label="Next file"
+                  aria-label={t('storage.nextFile', { defaultValue: 'Next file' })}
                 >
                   <ChevronRight className="h-6 w-6" />
                 </Button>
@@ -313,7 +332,9 @@ export function FilePreviewDialog({
                 onClick={handleDownload}
               >
                 <Download className="h-5 w-5" />
-                <span className="text-sm font-medium dark:text-white">Download</span>
+                <span className="text-sm font-medium dark:text-white">
+                  {t('storage.download', { defaultValue: 'Download' })}
+                </span>
               </Button>
               <Button
                 variant="outline"
@@ -321,7 +342,9 @@ export function FilePreviewDialog({
                 onClick={openInNewTab}
               >
                 <ExternalLink className="h-5 w-5" />
-                <span className="text-sm font-medium dark:text-white">Open in new tab</span>
+                <span className="text-sm font-medium dark:text-white">
+                  {t('storage.openInNewTab', { defaultValue: 'Open in new tab' })}
+                </span>
               </Button>
             </div>
           </div>
@@ -333,6 +356,7 @@ export function FilePreviewDialog({
 
 // Text file preview component
 function TextPreview({ url }: { url: string }) {
+  const { t } = useTranslation('chrome');
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
@@ -349,18 +373,26 @@ function TextPreview({ url }: { url: string }) {
         const text = await response.text();
         // Limit content length for performance
         if (text.length > 100000) {
-          setContent(text.substring(0, 100000) + '\n\n... (content truncated due to size)');
+          setContent(
+            text.substring(0, 100000) +
+              '\n\n' +
+              t('storage.contentTruncated', {
+                defaultValue: '... (content truncated due to size)',
+              })
+          );
         } else {
           setContent(text);
         }
       } catch {
-        setContent('Failed to load text content');
+        setContent(
+          t('storage.failedToLoadTextContent', { defaultValue: 'Failed to load text content' })
+        );
       } finally {
         setLoading(false);
       }
     };
     void loadTextContent();
-  }, [url]);
+  }, [url, t]);
 
   if (loading) {
     return (

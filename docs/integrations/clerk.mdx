@@ -1,0 +1,169 @@
+---
+title: "Clerk Authentication"
+sidebarTitle: "Clerk"
+description: "Add Clerk drop-in auth and user management to your InsForge app. Configure JWT verification, RLS policies, and synced user records in minutes."
+---
+
+## Overview
+
+[Clerk](https://clerk.com) is an authentication and user management platform that provides pre-built UI components and APIs for sign-up, sign-in, and user profiles. This guide shows how to integrate Clerk with InsForge using Clerk's **JWT Templates** feature. Clerk signs tokens with InsForge's JWT secret, so InsForge accepts them natively.
+
+- [Live Demo](https://clerkauth.insforge.site) — A sample todo app using Clerk authentication with InsForge
+- [Source Code](https://github.com/InsForge/insforge-integration/tree/main/auth/clerk) — GitHub repository for the sample app
+
+## Prerequisites
+
+- An InsForge project (self-hosted or cloud)
+- A [Clerk](https://clerk.com) account and application
+
+## Step 1: Set Up Your InsForge Project
+
+Create a new project or link an existing one:
+
+```bash
+# Create a new project
+npx @insforge/cli create
+
+# Or link an existing project
+npx @insforge/cli link --project-id <your-project-id>
+```
+
+Then get your project credentials:
+
+```bash
+# Get the JWT Secret
+npx @insforge/cli secrets get JWT_SECRET
+```
+
+To find your **Project URL** and **Anon Key**, open your project in the [InsForge Dashboard](https://insforge.dev), click the **Connect** button in the top-right corner, and switch to the **API Keys** tab:
+
+![InsForge dashboard — Connect Project modal, API Keys tab showing Project URL and Anon Key](/images/integrations/insforge-connect-project.webp)
+
+Copy the **Project URL** and **Anon Key** — you'll paste these into `.env.local` in Step 3.
+
+The CLI prints the JWT Secret as `JWT_SECRET=<value>` — you'll use only the `<value>` part (everything after the `=`) when creating the Clerk JWT Template in the next step.
+
+## Step 2: Create a JWT Template in Clerk
+
+1. Go to your [Clerk Dashboard](https://dashboard.clerk.com)
+2. Navigate to **Configure** > **Sessions** > **JWT Templates**
+3. Click **New template** and select **Blank**
+4. Name it `insforge`
+5. Toggle on **Custom signing key**
+6. Set the **Signing algorithm** to `HS256`
+7. Paste your InsForge **JWT Secret** into the **Signing key** field
+   - Paste **only the value**, not the `JWT_SECRET=` prefix. For example, if the CLI output is `JWT_SECRET=a1b2c3d4e5f6...`, paste only `a1b2c3d4e5f6...`.
+
+<Frame>
+  <video
+    src="/images/integrations/clerk/jwt-template.mp4"
+    autoPlay
+    muted
+    loop
+    playsInline
+  />
+</Frame>
+
+8. Scroll down to **Customize session token** and set the claims to:
+
+```json
+{
+  "role": "authenticated",
+  "aud": "insforge-api"
+}
+```
+
+<Note>
+`sub` and `iss` are reserved claims in Clerk and are automatically included — do not add them manually.
+</Note>
+
+<Frame>
+  <video
+    src="/images/integrations/clerk/token-claims.mp4"
+    autoPlay
+    muted
+    loop
+    playsInline
+  />
+</Frame>
+
+9. Click **Save** to create the template
+
+## Step 3: Set Up Your Application
+
+Find your Clerk **Publishable key** and **Secret key** in the Clerk Dashboard under **Configure > API keys** ([direct link](https://dashboard.clerk.com/last-active?path=api-keys)) — the page also has a one-click **Quick copy** block preformatted for Next.js:
+
+![Clerk API keys page — Publishable key and Secret keys sections](/images/integrations/clerk-api-keys.webp)
+
+<Warning>
+Don't confuse this with **Configure > User & authentication > Features > User API keys** — that's a separate feature for letting *your app's end users* generate their own API keys, not the keys your app uses.
+</Warning>
+
+Fill in `.env.local`:
+
+```env
+NEXT_PUBLIC_INSFORGE_URL=...
+NEXT_PUBLIC_INSFORGE_ANON_KEY=...               # optional
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...        # required
+CLERK_SECRET_KEY=sk_...                          # required by clerkMiddleware
+```
+
+## Step 4: Set Up InsForge Integration
+
+Ask your agent to complete the following steps:
+
+### 1. Set up the InsForge client with Clerk
+
+```text
+Set up the InsForge client with Clerk authentication. I'm using Next.js (App Router).
+```
+
+This initializes the InsForge client, then refreshes the Clerk token (`getToken({ template: 'insforge' })`) on a ~50-second interval via `setAuthToken()` so the token doesn't expire during the session.
+
+### 2. Create the database schema
+
+```text
+Create a todos table with RLS. Columns: id, user_id, title, is_complete, created_at. Users should only be able to access their own todos.
+```
+
+This creates the `requesting_user_id()` helper function (since Clerk user IDs are strings, not UUIDs) and a `todos` table with Row Level Security policies.
+
+<Note>
+**Do I need RLS on every table?** No — only on tables that store user-specific data. Apply RLS based on your data model:
+- **User-private tables** (todos, notes, drafts): enable RLS and filter by `user_id = requesting_user_id()` so each user only sees their own rows.
+- **Public read-only tables** (blog posts, product catalog, leaderboards): keep RLS enabled but add a permissive `FOR SELECT USING (true)` policy for `authenticated` (and `anon` if unauthenticated reads are allowed). This is safer than disabling RLS outright.
+- **Mixed tables** (e.g., posts everyone can read but only the author can edit): enable RLS with a public `SELECT` policy plus `UPDATE`/`DELETE` policies scoped to `user_id = requesting_user_id()`.
+</Note>
+
+### 3. Build the todo list page
+
+```text
+Build a todo list page with full CRUD — create, read, update, and delete todos.
+```
+
+This creates a page that uses the InsForge client to manage todos. RLS ensures users only see their own data.
+
+## Step 5: Run Your Application
+
+```bash
+# Install dependencies if you haven't already
+npm install
+
+npm run dev
+```
+
+Open `http://localhost:3000` and sign up with a new user through Clerk. Sign in, add a todo, then open both dashboards side-by-side — the new account shows up in the [Clerk Dashboard](https://dashboard.clerk.com) under **Users**, the todo row appears in your InsForge database, and the InsForge **Auth > Users** page stays empty because Clerk owns the identity.
+
+<Frame>
+  <video
+    src="/images/integrations/clerk/demo.mp4"
+    autoPlay
+    muted
+    loop
+    playsInline
+  />
+</Frame>
+
+<Note>
+**Why is InsForge's Auth > Users empty?** Authentication is handled entirely by Clerk, so user records live in the Clerk Dashboard — not in InsForge. InsForge only sees the JWT claim (`sub`) that RLS uses to scope data to the correct user.
+</Note>

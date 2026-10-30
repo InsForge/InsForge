@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Settings } from 'lucide-react';
 import {
   FeatureSidebar,
@@ -7,45 +8,42 @@ import {
 } from '#components';
 import { RealtimeSettingsMenuDialog } from './RealtimeSettingsMenuDialog';
 
-const REALTIME_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
-  {
-    id: 'channels',
-    label: 'Channels',
-    href: '/dashboard/realtime/channels',
-  },
-  {
-    id: 'messages',
-    label: 'Messages',
-    href: '/dashboard/realtime/messages',
-  },
-  {
-    id: 'permissions',
-    label: 'Permissions',
-    href: '/dashboard/realtime/permissions',
-  },
-];
-
-const REALTIME_SETTINGS_LABEL = 'Realtime Settings';
-
 export function RealtimeSidebar() {
+  const { t } = useTranslation('chrome');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  const headerButtons: FeatureSidebarHeaderButton[] = REALTIME_SETTINGS_LABEL
-    ? [
-        {
-          id: 'realtime-settings',
-          label: REALTIME_SETTINGS_LABEL,
-          icon: Settings,
-          onClick: () => setIsSettingsOpen(true),
-        },
-      ]
-    : [];
+  const sidebarItems: FeatureSidebarListItem[] = [
+    {
+      id: 'channels',
+      label: t('realtime.channels', { defaultValue: 'Channels' }),
+      href: '/dashboard/realtime/channels',
+    },
+    {
+      id: 'messages',
+      label: t('realtime.messages', { defaultValue: 'Messages' }),
+      href: '/dashboard/realtime/messages',
+    },
+    {
+      id: 'permissions',
+      label: t('realtime.permissions', { defaultValue: 'Permissions' }),
+      href: '/dashboard/realtime/permissions',
+    },
+  ];
+
+  const headerButtons: FeatureSidebarHeaderButton[] = [
+    {
+      id: 'realtime-settings',
+      label: t('realtime.realtimeSettings', { defaultValue: 'Realtime Settings' }),
+      icon: Settings,
+      onClick: () => setIsSettingsOpen(true),
+    },
+  ];
 
   return (
     <>
       <FeatureSidebar
-        title="Realtime"
-        items={REALTIME_SIDEBAR_ITEMS}
+        title={t('realtime.realtime', { defaultValue: 'Realtime' })}
+        items={sidebarItems}
         headerButtons={headerButtons}
       />
       <RealtimeSettingsMenuDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />

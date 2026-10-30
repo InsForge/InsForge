@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { webscraperService } from '#features/webscraper/services/webscraper.service';
 
 export const webscraperQueryKeys = {
@@ -7,7 +7,6 @@ export const webscraperQueryKeys = {
   apifyActors: ['webscraper', 'apify', 'actors'] as const,
   apifyDatasets: ['webscraper', 'apify', 'datasets'] as const,
   apifyRuns: ['webscraper', 'apify', 'runs'] as const,
-  apifyData: ['webscraper', 'apify', 'data'] as const,
 };
 
 export function useApifyConnection() {
@@ -45,11 +44,16 @@ export function useApifyRuns(enabled: boolean, limit = 100) {
   });
 }
 
-export function useApifyLatestData(enabled: boolean) {
-  return useQuery({
-    queryKey: webscraperQueryKeys.apifyData,
-    queryFn: () => webscraperService.getApifyLatestData(5),
-    enabled,
-    staleTime: 60_000,
+export function useUpdateApifyConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (apiToken: string) => webscraperService.updateApifyConfig(apiToken),
+    onSuccess: () => {
+      // Every webscraper query is derived from the stored token, not just the
+      // connection: actors, runs and datasets are all read from Apify with it.
+      // Invalidating the connection alone left the rest
+      // serving the previous account's results for their 30s staleTime.
+      void queryClient.invalidateQueries({ queryKey: webscraperQueryKeys.all });
+    },
   });
 }

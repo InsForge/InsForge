@@ -8,6 +8,7 @@ describe('Skeleton', () => {
 
     const skeleton = container.firstElementChild as HTMLElement;
     expect(skeleton.className).toContain('animate-pulse');
+    expect(skeleton.className).toContain('bg-alpha-8');
     expect(skeleton.className).toContain('h-8');
     expect(skeleton.className).toContain('w-56');
     expect(skeleton.getAttribute('aria-hidden')).toBe('true');

@@ -10,6 +10,30 @@ export interface ObjectMetadata {
 
 export interface GetObjectResult extends ObjectMetadata {
   body: Readable;
+  /**
+   * Present on ranged GETs: the upstream `Content-Range` header (e.g.
+   * `bytes 0-99/1234`). `size` is then the part length, not the full object
+   * size — exactly what a proxying route must send as `Content-Length`.
+   */
+  contentRange?: string;
+}
+
+export interface DeleteObjectsResult {
+  deleted: string[];
+  failed: Array<{ key: string; message: string }>;
+}
+
+/**
+ * Thrown by read-path provider methods when the blob does not exist in the
+ * backing store (after branch fallback). Callers map it to their protocol's
+ * not-found response (REST 404, S3 gateway NoSuchKey) by type instead of
+ * matching error message text.
+ */
+export class ObjectNotFoundError extends Error {
+  constructor(message = 'Object not found in storage backend') {
+    super(message);
+    this.name = 'ObjectNotFoundError';
+  }
 }
 
 /**
@@ -27,6 +51,7 @@ export interface StorageProvider {
   putObject(bucket: string, key: string, file: Express.Multer.File): Promise<{ etag: string }>;
   getObject(bucket: string, key: string): Promise<Buffer | null>;
   deleteObject(bucket: string, key: string): Promise<void>;
+  deleteObjects(bucket: string, keys: string[]): Promise<DeleteObjectsResult>;
   createBucket(bucket: string): Promise<void>;
   deleteBucket(bucket: string): Promise<void>;
 
@@ -36,7 +61,8 @@ export interface StorageProvider {
     bucket: string,
     key: string,
     metadata: { contentType?: string; size?: number },
-    maxFileSizeBytes: number
+    maxFileSizeBytes: number,
+    contentType?: string
   ): Promise<UploadStrategyResponse>;
   /**
    * Generate a download URL. The optional `version` is a cache-bust stamp
@@ -53,7 +79,8 @@ export interface StorageProvider {
     key: string,
     expiresIn?: number,
     isPublic?: boolean,
-    version?: string | null
+    version?: string | null,
+    options?: { asAttachment?: boolean }
   ): Promise<DownloadStrategyResponse>;
   /**
    * Confirms an object exists in the backing store and returns its

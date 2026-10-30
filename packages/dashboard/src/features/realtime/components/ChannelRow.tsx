@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { formatDate } from '#lib/utils/utils';
 import { Trash2 } from 'lucide-react';
 import { Switch } from '@insforge/ui';
@@ -23,6 +24,7 @@ export function ChannelRow({
   isDeleting,
   className,
 }: ChannelRowProps) {
+  const { t } = useTranslation('chrome');
   return (
     <ListRow className={className} contentClassName="pl-1.5" onClick={onClick}>
       {/* Toggle Switch */}
@@ -70,7 +72,7 @@ export function ChannelRow({
             onDelete();
           }}
           disabled={isDeleting}
-          aria-label="Delete channel"
+          aria-label={t('realtime.deleteChannel', { defaultValue: 'Delete channel' })}
         >
           <Trash2 className="size-5 text-muted-foreground group-hover:text-foreground transition-colors" />
         </button>

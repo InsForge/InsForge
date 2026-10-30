@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Dialog,
@@ -48,6 +49,7 @@ export function LinkRecordDialog({
   onSelectRecord,
   children,
 }: LinkRecordDialogProps) {
+  const { t } = useTranslation('chrome');
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRecord, setSelectedRecord] = useState<DatabaseRecord | null>(null);
@@ -223,13 +225,17 @@ export function LinkRecordDialog({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex h-[min(90dvh,760px)] flex-col overflow-hidden">
           <DialogHeader className="flex-shrink-0">
-            <DialogTitle>Link Record</DialogTitle>
+            <DialogTitle>{t('database.linkRecord', { defaultValue: 'Link Record' })}</DialogTitle>
             <DialogDescription className="sr-only">
-              Select a record to link as a reference
+              {t('database.linkRecordDescription', {
+                defaultValue: 'Select a record to link as a reference',
+              })}
             </DialogDescription>
             <div className="flex items-center gap-1.5">
               <span className="text-sm text-zinc-500 dark:text-neutral-400">
-                Select a record to reference from
+                {t('database.selectRecordToReference', {
+                  defaultValue: 'Select a record to reference from',
+                })}
               </span>
               <TypeBadge
                 type={`${referenceTable}.${fkColumns.map((c) => c.referenceColumn).join(',')}`}
@@ -243,7 +249,7 @@ export function LinkRecordDialog({
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Search records..."
+              placeholder={t('database.searchRecords', { defaultValue: 'Search records...' })}
               className="w-60 dark:text-white dark:bg-neutral-900 dark:border-neutral-700"
               debounceTime={300}
             />
@@ -281,7 +287,11 @@ export function LinkRecordDialog({
               emptyState={
                 <DataGridEmptyState
                   message={
-                    searchQuery ? 'No records match your search criteria' : 'No records found'
+                    searchQuery
+                      ? t('database.noRecordsMatchSearch', {
+                          defaultValue: 'No records match your search criteria',
+                        })
+                      : t('database.noRecordsFound', { defaultValue: 'No records found' })
                   }
                 />
               }
@@ -295,14 +305,14 @@ export function LinkRecordDialog({
               onClick={handleCancel}
               className="dark:bg-neutral-600 dark:text-white dark:border-transparent dark:hover:bg-neutral-700"
             >
-              Cancel
+              {t('common.cancel', { defaultValue: 'Cancel' })}
             </Button>
             <Button
               onClick={handleConfirmSelection}
               disabled={!selectedRecord}
               className="bg-zinc-950 hover:bg-zinc-800 text-white dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
             >
-              Add Record
+              {t('database.addRecord', { defaultValue: 'Add Record' })}
             </Button>
           </div>
         </DialogContent>

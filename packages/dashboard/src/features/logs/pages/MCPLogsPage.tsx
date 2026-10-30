@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DataGridEmptyState, EmptyState, TableHeader } from '#components';
 import { LogsDataGrid, type LogsColumnDef } from '#features/logs/components';
 import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
@@ -7,6 +8,7 @@ import { formatTime } from '#lib/utils/utils';
 import { usePageSize } from '#lib/hooks/usePageSize';
 
 export default function MCPLogsPage() {
+  const { t } = useTranslation('chrome');
   const {
     pageSize,
     pageSizeOptions,
@@ -29,7 +31,7 @@ export default function MCPLogsPage() {
     () => [
       {
         key: 'tool_name',
-        name: 'MCP Call',
+        name: t('logs.mcpCall', { defaultValue: 'MCP Call' }),
         width: '1fr',
         minWidth: 320,
         renderCell: ({ row }) => (
@@ -40,7 +42,7 @@ export default function MCPLogsPage() {
       },
       {
         key: 'created_at',
-        name: 'Time',
+        name: t('logs.time', { defaultValue: 'Time' }),
         width: '260px',
         renderCell: ({ row }) => (
           <p className="truncate text-[13px] font-normal leading-[18px] text-[rgb(var(--foreground))]">
@@ -49,7 +51,7 @@ export default function MCPLogsPage() {
         ),
       },
     ],
-    []
+    [t]
   );
 
   return (
@@ -58,13 +60,16 @@ export default function MCPLogsPage() {
         title="mcp.logs"
         searchValue={mcpSearchQuery}
         onSearchChange={setMcpSearchQuery}
-        searchPlaceholder="Search MCP usage"
+        searchPlaceholder={t('logs.searchMcpUsage', { defaultValue: 'Search MCP usage' })}
       />
 
       <div className="flex-1 overflow-hidden">
         {mcpError ? (
           <div className="flex h-full items-center justify-center">
-            <EmptyState title="Error loading MCP logs" description={String(mcpError)} />
+            <EmptyState
+              title={t('logs.errorLoadingMcpLogs', { defaultValue: 'Error loading MCP logs' })}
+              description={String(mcpError)}
+            />
           </div>
         ) : (
           <LogsDataGrid
@@ -82,11 +87,17 @@ export default function MCPLogsPage() {
               handlePageSizeChange(newSize);
               setMcpCurrentPage(1);
             }}
-            paginationRecordLabel="logs"
+            paginationRecordLabel={t('logs.recordLabel', { defaultValue: 'logs' })}
             gridContainerClassName="border-t border-[var(--alpha-8)]"
             emptyState={
               <DataGridEmptyState
-                message={mcpSearchQuery ? 'No MCP logs match your filters' : 'No MCP logs found'}
+                message={
+                  mcpSearchQuery
+                    ? t('logs.noMcpLogsMatch', {
+                        defaultValue: 'No MCP logs match your filters',
+                      })
+                    : t('logs.noMcpLogs', { defaultValue: 'No MCP logs found' })
+                }
               />
             }
           />

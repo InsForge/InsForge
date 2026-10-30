@@ -1,13 +1,4 @@
 /**
- * Severity options for log filtering
- */
-export const SEVERITY_OPTIONS = [
-  { value: 'error', label: 'Error', color: 'text-red-500' },
-  { value: 'warning', label: 'Warning', color: 'text-yellow-500' },
-  { value: 'informational', label: 'Info', color: 'text-gray-500' },
-] as const;
-
-/**
  * Severity configuration for badges
  */
 export const SEVERITY_CONFIG = {

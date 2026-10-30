@@ -2,28 +2,15 @@ import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import type { DashboardAdvisorIssue } from '#types';
 import { useToast } from '@insforge/ui';
 import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
+import { IgnoreMenu } from './IgnoreMenu';
 import { formatRemediationPrompt } from './remediationPrompt';
-import CriticalIcon from '#assets/icons/severity_critical.svg?react';
-import InfoIcon from '#assets/icons/severity_info.svg?react';
-import WarningIcon from '#assets/icons/severity_warning.svg?react';
+import { SEVERITY_ICON, SEVERITY_TONE } from './severity';
 
 interface AdvisoryItemProps {
   issue: DashboardAdvisorIssue;
   expanded: boolean;
   onToggle: () => void;
 }
-
-const SEVERITY_ICON = {
-  critical: CriticalIcon,
-  warning: WarningIcon,
-  info: InfoIcon,
-} as const;
-
-const SEVERITY_TONE = {
-  critical: 'text-destructive',
-  warning: 'text-warning',
-  info: 'text-info',
-} as const;
 
 export function AdvisoryItem({ issue, expanded, onToggle }: AdvisoryItemProps) {
   const { showToast } = useToast();
@@ -46,30 +33,26 @@ export function AdvisoryItem({ issue, expanded, onToggle }: AdvisoryItemProps) {
 
   return (
     <div className="group border-b border-[var(--alpha-8)] transition-colors last:border-b-0 hover:bg-[var(--alpha-8)]">
-      <div
-        role="button"
-        tabIndex={0}
-        aria-expanded={expanded}
-        onClick={onToggle}
-        onKeyDown={(e) => {
-          if (e.target !== e.currentTarget) {
-            return;
-          }
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onToggle();
-          }
-        }}
-        className="flex cursor-pointer items-start gap-3 p-3"
-      >
+      <div className="flex items-start gap-3 p-3">
         <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${SEVERITY_TONE[issue.severity]}`} />
         <div className="flex min-w-0 flex-1 items-start gap-6">
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <p className="text-sm font-medium leading-5 text-foreground">{issue.title}</p>
+          {/* The title area is the expand control; the action buttons live as
+              siblings (not nested inside it) so we never place interactive
+              controls inside a button. */}
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-label={`${expanded ? 'Collapse' : 'Expand'} ${issue.title}`}
+            onClick={onToggle}
+            className="flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-1 text-left"
+          >
+            <span className="text-sm font-medium leading-5 text-foreground">{issue.title}</span>
             {issue.affectedObject && (
-              <p className="text-xs leading-4 text-muted-foreground">{issue.affectedObject}</p>
+              <span className="text-xs leading-4 text-muted-foreground">
+                {issue.affectedObject}
+              </span>
             )}
-          </div>
+          </button>
           <div className="flex shrink-0 items-center gap-3">
             {issue.recommendation && (
               <button
@@ -84,6 +67,7 @@ export function AdvisoryItem({ issue, expanded, onToggle }: AdvisoryItemProps) {
                 <span className="px-1">{copied ? 'Copied' : 'Copy Remediation'}</span>
               </button>
             )}
+            <IgnoreMenu issue={issue} visibilityClass={copyButtonVisibility} />
             <span
               aria-hidden="true"
               className="flex h-5 w-5 items-center justify-center text-muted-foreground"

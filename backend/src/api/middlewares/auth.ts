@@ -4,6 +4,7 @@ import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type RoleSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import jwt from 'jsonwebtoken';
 
 export type UserContext = {
   /**
@@ -126,7 +127,19 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
       );
     }
 
-    // For admin, we use JWT tokens
+    // The unverified type claim is used only to choose the verifier. A Cloud
+    // project authorization candidate must never fall back to local JWT
+    // verification if Cloud verification fails.
+    const decoded = jwt.decode(token);
+    const tokenType = decoded && typeof decoded === 'object' ? decoded.type : undefined;
+    if (tokenType === 'project_authorization') {
+      const { projectId, userId } = await tokenManager.verifyCloudProjectAuthorization(token);
+      req.projectId = projectId;
+      req.authenticated = true;
+      setRequestUser(req, { sub: `cloud:${userId}`, role: 'project_admin' });
+      return next();
+    }
+
     const payload = tokenManager.verifyToken(token);
 
     if (payload.role !== 'project_admin') {

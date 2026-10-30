@@ -192,7 +192,7 @@ echo "Test file content" > /tmp/test-upload.txt
 response=$(curl -s -w "\n%{http_code}" -X PUT "$TEST_API_BASE/storage/buckets/$TEST_BUCKET/objects/test-file.txt" \
   -H "Authorization: Bearer $API_KEY" \
   -F "file=@/tmp/test-upload.txt")
-test_endpoint "Upload file" "$response" "201"
+test_endpoint "Upload file" "$response" "200"
 
 # 12. Test Download File
 print_info "12. Testing Download File"

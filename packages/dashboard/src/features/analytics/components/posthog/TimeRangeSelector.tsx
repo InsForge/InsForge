@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { PosthogTimeframe } from '@insforge/shared-schemas';
 import { ChevronDown } from 'lucide-react';
 import {
@@ -17,15 +18,18 @@ const OPTIONS: Array<{ value: PosthogTimeframe; label: string }> = [
 ];
 
 export function TimeRangeSelector() {
+  const { t } = useTranslation('chrome');
   const timeframe = useTimeframe();
   const setTimeframe = useSetTimeframe();
   const current = OPTIONS.find((o) => o.value === timeframe) ?? OPTIONS[1];
+  const optionLabel = (opt: (typeof OPTIONS)[number]) =>
+    t(`analytics.timeRange.last${opt.value}`, { defaultValue: opt.label });
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="secondary" className="h-9 rounded px-3 text-foreground">
-          {current.label}
+          {optionLabel(current)}
           <ChevronDown className="ml-1 h-4 w-4 stroke-[1.7]" />
         </Button>
       </DropdownMenuTrigger>
@@ -36,7 +40,7 @@ export function TimeRangeSelector() {
             onClick={() => setTimeframe(opt.value)}
             className="cursor-pointer px-2 py-1.5"
           >
-            {opt.label}
+            {optionLabel(opt)}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

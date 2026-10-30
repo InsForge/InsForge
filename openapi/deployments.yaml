@@ -868,6 +868,14 @@ components:
           type: object
           additionalProperties:
             type: string
+        regions:
+          type: array
+          minItems: 1
+          description: Vercel region IDs the deployment's functions run in. Overrides `regions` in the uploaded `vercel.json`; when both are absent, the provider project's default region is used.
+          items:
+            type: string
+            pattern: '^[a-z]{3}\d$'
+            example: sin1
 
     DeploymentMetadata:
       type: object

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Area,
   AreaChart,
@@ -30,7 +31,8 @@ interface KpiTabProps {
 }
 
 function KpiTab({ metric, item, active, onClick }: KpiTabProps) {
-  const label = webOverviewLabel(metric);
+  const { t } = useTranslation('chrome');
+  const label = t(`analytics.metrics.${metric}`, { defaultValue: webOverviewLabel(metric) });
   const display = item ? webOverviewValue(metric, item.value) : '—';
   const pct = item?.changeFromPreviousPct ?? null;
   const showDelta = pct !== null && Number.isFinite(pct);
@@ -105,6 +107,7 @@ function formatTooltipValue(metric: TrendMetric, value: number): string {
 }
 
 export function KpiSectionWithTrend({ enabled }: { enabled: boolean }) {
+  const { t } = useTranslation('chrome');
   const timeframe = useTimeframe();
   const overview = useWebOverview(timeframe, enabled);
   const [active, setActive] = useState<TrendMetric>('visitors');
@@ -133,7 +136,9 @@ export function KpiSectionWithTrend({ enabled }: { enabled: boolean }) {
 
   const yDomain: [number | string, number | string] =
     active === 'bounce_rate' ? [0, 1] : [0, 'auto'];
-  const tooltipLabel = webOverviewLabel(active);
+  const tooltipLabel = t(`analytics.metrics.${active}`, {
+    defaultValue: webOverviewLabel(active),
+  });
 
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--alpha-8)] bg-card">
@@ -156,12 +161,15 @@ export function KpiSectionWithTrend({ enabled }: { enabled: boolean }) {
         ) : trend.error ? (
           <div className="flex h-full items-center justify-center px-6">
             <div className="w-full max-w-[420px]">
-              <ErrorState title="Failed to load trend" error="Please try again." />
+              <ErrorState
+                title={t('analytics.trendLoadError', { defaultValue: 'Failed to load trend' })}
+                error={t('analytics.pleaseTryAgain', { defaultValue: 'Please try again.' })}
+              />
             </div>
           </div>
         ) : chartData.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <EmptyState title="No data available" />
+            <EmptyState title={t('analytics.noData', { defaultValue: 'No data available' })} />
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">

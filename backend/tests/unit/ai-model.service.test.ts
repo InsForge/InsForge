@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockFetch } = vi.hoisted(() => ({
   mockFetch: vi.fn(),
@@ -12,6 +12,13 @@ describe('AIModelService', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     _resetCacheForTesting();
+  });
+
+  // Suite-level safety net: a test that reaches for fake timers and throws
+  // mid-assertion would otherwise leak them into every later test in the same
+  // worker.
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('fetches the public OpenRouter catalog with all output modalities and caches it', async () => {
@@ -110,6 +117,62 @@ describe('AIModelService', () => {
         outputPriceLabel: undefined,
       },
     ]);
+  });
+
+  it('includes embedding-only models with correct pricing', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: [
+            {
+              id: 'openai/text-embedding-3-small',
+              created: 1767225600,
+              architecture: {
+                input_modalities: ['text'],
+                output_modalities: ['embeddings'],
+              },
+              pricing: {
+                prompt: '0.00000002',
+                completion: '0',
+              },
+            },
+            {
+              id: 'google/gemini-embedding-2-preview',
+              created: 1777248000,
+              architecture: {
+                input_modalities: ['text', 'image', 'file', 'audio', 'video'],
+                output_modalities: ['embeddings'],
+              },
+              pricing: {
+                prompt: '0.0000002',
+                completion: '0',
+              },
+            },
+          ],
+        }),
+    });
+
+    const models = await AIModelService.getModels();
+
+    // Both embedding models should be included (not filtered out)
+    expect(models).toHaveLength(2);
+
+    // Embedding-only model: input has text so inputPrice is set, output is embeddings so no outputPrice
+    const smallModel = models.find((model) => model.id === 'openai/text-embedding-3-small');
+    expect(smallModel).toBeDefined();
+    expect(smallModel!.inputModality).toEqual(['text']);
+    expect(smallModel!.outputModality).toEqual(['embeddings']);
+    expect(smallModel!.inputPrice).toBeGreaterThan(0);
+    expect(smallModel!.outputPrice).toBeUndefined();
+    expect(smallModel!.outputPriceLabel).toBeUndefined();
+
+    // Multimodal embedding model: input has text (among others) so inputPrice is set
+    const geminiModel = models.find((model) => model.id === 'google/gemini-embedding-2-preview');
+    expect(geminiModel).toBeDefined();
+    expect(geminiModel!.inputModality).toContain('text');
+    expect(geminiModel!.outputModality).toEqual(['embeddings']);
+    expect(geminiModel!.inputPrice).toBeGreaterThan(0);
   });
 
   it('clears in-flight state after a failed fetch so a later call retries', async () => {

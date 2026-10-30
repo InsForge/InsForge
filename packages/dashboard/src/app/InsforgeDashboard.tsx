@@ -4,13 +4,17 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from '#lib/contexts/AuthContext';
 import { AppRoutes } from '#router/AppRoutes';
 import { ToastProvider } from '@insforge/ui';
-import { SocketProvider } from '#lib/contexts/SocketContext';
+import { DashboardEventsProvider } from '#lib/contexts/DashboardEventsContext';
 import { PostHogAnalyticsProvider } from '#lib/analytics/posthog';
 import { SQLEditorProvider } from '#features/database/contexts/SQLEditorContext';
 import { DashboardHostProvider, DashboardProjectProvider } from '#lib/config/DashboardHostContext';
 import { setDashboardBackendUrl } from '#lib/config/runtime';
 import { advisorService } from '#features/dashboard/services/advisor.service';
-import type { InsForgeDashboardProps } from '#types';
+import type {
+  InsForgeDashboardProps,
+  DashboardAdvisorIssuesQuery,
+  DashboardAdvisorSuppressRequest,
+} from '#types';
 
 function normalizeBackendUrl(url?: string) {
   return url?.replace(/\/$/, '') || undefined;
@@ -36,12 +40,10 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
     onRequestInstanceTypeChange,
     onUpdateVersion,
     onRequestUserInfo,
+    onUpdatePreferredLocale,
     onRequestUserApiKey,
     onRequestModelCredits,
     onRequestProjectMetrics,
-    onRequestAdvisorLatest,
-    onRequestAdvisorIssues,
-    onTriggerAdvisorScan,
     onConnectPosthog,
     subscribePosthogConnectionStatus,
     onOpenPosthog,
@@ -73,18 +75,18 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onRequestInstanceTypeChange,
       onUpdateVersion,
       onRequestUserInfo,
+      onUpdatePreferredLocale,
       onRequestUserApiKey,
       onRequestModelCredits,
       onRequestProjectMetrics,
-      onRequestAdvisorLatest:
-        onRequestAdvisorLatest ??
-        (mode === 'self-hosting' ? () => advisorService.getLatest() : undefined),
-      onRequestAdvisorIssues:
-        onRequestAdvisorIssues ??
-        (mode === 'self-hosting' ? (q) => advisorService.getIssues(q) : undefined),
-      onTriggerAdvisorScan:
-        onTriggerAdvisorScan ??
-        (mode === 'self-hosting' ? () => advisorService.triggerScan() : undefined),
+      onRequestAdvisorLatest: () => advisorService.getLatest(),
+      onRequestAdvisorIssues: (q: DashboardAdvisorIssuesQuery) => advisorService.getIssues(q),
+      onTriggerAdvisorScan: () => advisorService.triggerScan(),
+      onRequestAdvisorSuppressions: () =>
+        advisorService.getSuppressions().then((r) => r.suppressions),
+      onSuppressAdvisorIssue: (req: DashboardAdvisorSuppressRequest) =>
+        advisorService.suppress(req),
+      onUnsuppressAdvisorIssue: (id: string) => advisorService.unsuppress(id),
       onConnectPosthog,
       subscribePosthogConnectionStatus,
       onOpenPosthog,
@@ -111,12 +113,10 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onRequestInstanceTypeChange,
       onUpdateVersion,
       onRequestUserInfo,
+      onUpdatePreferredLocale,
       onRequestUserApiKey,
       onRequestModelCredits,
       onRequestProjectMetrics,
-      onRequestAdvisorLatest,
-      onRequestAdvisorIssues,
-      onTriggerAdvisorScan,
       onConnectPosthog,
       subscribePosthogConnectionStatus,
       onOpenPosthog,
@@ -146,7 +146,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
           <DashboardHostProvider value={host}>
             <DashboardProjectProvider value={project}>
               <AuthProvider>
-                <SocketProvider>
+                <DashboardEventsProvider>
                   <ToastProvider>
                     <PostHogAnalyticsProvider>
                       <SQLEditorProvider>
@@ -154,7 +154,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
                       </SQLEditorProvider>
                     </PostHogAnalyticsProvider>
                   </ToastProvider>
-                </SocketProvider>
+                </DashboardEventsProvider>
               </AuthProvider>
             </DashboardProjectProvider>
           </DashboardHostProvider>

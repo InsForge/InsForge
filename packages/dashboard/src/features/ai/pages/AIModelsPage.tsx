@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useAIModels } from '#features/ai/hooks/useAIModels';
 import {
@@ -27,6 +28,7 @@ import { ModelRow } from '#features/ai/components';
 import { MODEL_MODALITY_FILTERS, type ModelModalityFilter } from '#features/ai/constants';
 
 export default function AIModelsPage() {
+  const { t } = useTranslation('chrome');
   const { allAvailableModels, isLoadingModels, modelsError } = useAIModels();
 
   // Dynamically generate provider tabs from available models
@@ -162,10 +164,15 @@ export default function AIModelsPage() {
           <div className="flex shrink-0 flex-col gap-4">
             <div className="flex flex-col gap-2">
               <div className="flex items-start justify-between gap-4">
-                <h1 className="text-2xl font-medium leading-8 text-foreground">Models</h1>
+                <h1 className="text-2xl font-medium leading-8 text-foreground">
+                  {t('ai.models.title', { defaultValue: 'Models' })}
+                </h1>
               </div>
               <p className="text-sm leading-5 text-muted-foreground">
-                Your models are ready — build LLM-powered features or add more integrations.
+                {t('ai.models.description', {
+                  defaultValue:
+                    'Your models are ready — build LLM-powered features or add more integrations.',
+                })}
               </p>
             </div>
 
@@ -173,7 +180,7 @@ export default function AIModelsPage() {
               <SearchInput
                 value={searchQuery}
                 onChange={setSearchQuery}
-                placeholder="Search Model"
+                placeholder={t('ai.models.searchPlaceholder', { defaultValue: 'Search Model' })}
                 debounceTime={0}
                 className="min-w-[280px] flex-1"
               />
@@ -184,16 +191,20 @@ export default function AIModelsPage() {
               >
                 {MODEL_MODALITY_FILTERS.map((filter) => (
                   <Tab key={filter.id} value={filter.id} className="h-8 min-w-[66px]">
-                    {filter.label}
+                    {t(`ai.models.modalityFilters.${filter.id}`, { defaultValue: filter.label })}
                   </Tab>
                 ))}
               </Tabs>
               <Select value={activeTab} onValueChange={setActiveTab}>
                 <SelectTrigger className="w-[155px]">
-                  <SelectValue placeholder="All Provider" />
+                  <SelectValue
+                    placeholder={t('ai.models.allProviders', { defaultValue: 'All Provider' })}
+                  />
                 </SelectTrigger>
                 <SelectContent align="start">
-                  <SelectItem value="all">All Provider</SelectItem>
+                  <SelectItem value="all">
+                    {t('ai.models.allProviders', { defaultValue: 'All Provider' })}
+                  </SelectItem>
                   {providers.map((provider) => {
                     const Logo = provider.logo;
                     return (
@@ -202,7 +213,9 @@ export default function AIModelsPage() {
                         value={provider.id}
                         icon={Logo ? <Logo /> : undefined}
                       >
-                        {provider.displayName}
+                        {provider.id === 'other'
+                          ? t('ai.models.otherProvider', { defaultValue: 'Other' })
+                          : provider.displayName}
                       </SelectItem>
                     );
                   })}
@@ -218,22 +231,26 @@ export default function AIModelsPage() {
               </div>
             ) : modelsError ? (
               <ErrorState
-                title="Failed to load models"
+                title={t('ai.models.loadError', { defaultValue: 'Failed to load models' })}
                 error={modelsError}
                 className="border-[var(--alpha-8)] bg-card"
               />
             ) : modelsForActiveProvider.length === 0 ? (
               <div className="flex items-center justify-center h-64 text-muted-foreground">
-                No models match the current filters.
+                {t('ai.models.noMatch', {
+                  defaultValue: 'No models match the current filters.',
+                })}
               </div>
             ) : (
               <div className="flex max-h-full min-h-0 flex-col overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
                 {/* Table Header - Fixed */}
                 <div className="grid h-9 shrink-0 grid-cols-[149px_minmax(120px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)_120px] items-center border-b border-[var(--alpha-8)] text-[13px] leading-[18px] text-muted-foreground">
                   <div className="flex h-full items-center border-r border-[var(--alpha-8)] px-2.5">
-                    Model
+                    {t('ai.models.columns.model', { defaultValue: 'Model' })}
                   </div>
-                  <div className="px-2.5">Input</div>
+                  <div className="px-2.5">
+                    {t('ai.models.columns.input', { defaultValue: 'Input' })}
+                  </div>
                   <button
                     onClick={() => handleSort('inputPrice')}
                     className="group flex items-center gap-1 px-2.5 text-left transition-colors hover:text-foreground"
@@ -245,10 +262,12 @@ export default function AIModelsPage() {
                         : 'none'
                     }
                   >
-                    Input Price
+                    {t('ai.models.columns.inputPrice', { defaultValue: 'Input Price' })}
                     <SortIndicator field="inputPrice" />
                   </button>
-                  <div className="px-2.5">Output</div>
+                  <div className="px-2.5">
+                    {t('ai.models.columns.output', { defaultValue: 'Output' })}
+                  </div>
                   <button
                     onClick={() => handleSort('outputPrice')}
                     className="group flex items-center gap-1 px-2.5 text-left transition-colors hover:text-foreground"
@@ -260,7 +279,7 @@ export default function AIModelsPage() {
                         : 'none'
                     }
                   >
-                    Output Price
+                    {t('ai.models.columns.outputPrice', { defaultValue: 'Output Price' })}
                     <SortIndicator field="outputPrice" />
                   </button>
                   <button
@@ -274,7 +293,7 @@ export default function AIModelsPage() {
                         : 'none'
                     }
                   >
-                    Released
+                    {t('ai.models.columns.released', { defaultValue: 'Released' })}
                     <SortIndicator field="released" />
                   </button>
                 </div>

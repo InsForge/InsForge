@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ExternalLink } from 'lucide-react';
 import { Tabs, Tab } from '@insforge/ui';
 import { useLogs } from '#features/logs/hooks/useLogs';
@@ -20,6 +21,7 @@ type FunctionLogType = 'runtime' | 'build';
 const SOURCE_NAME = 'function.logs';
 
 export default function FunctionLogsPage() {
+  const { t } = useTranslation('chrome');
   const [activeTab, setActiveTab] = useState<FunctionLogType>('runtime');
   const [selectedLog, setSelectedLog] = useState<LogSchema | null>(null);
   const {
@@ -67,7 +69,7 @@ export default function FunctionLogsPage() {
     () => [
       {
         key: 'timestamp',
-        name: 'Time',
+        name: t('logs.time', { defaultValue: 'Time' }),
         width: '240px',
         renderCell: ({ row }) => (
           <p className="truncate text-[13px] font-normal leading-[18px] text-[rgb(var(--foreground))]">
@@ -77,13 +79,13 @@ export default function FunctionLogsPage() {
       },
       {
         key: 'severity',
-        name: 'Type',
+        name: t('logs.type', { defaultValue: 'Type' }),
         width: '160px',
         renderCell: ({ row }) => <SeverityBadge severity={getSeverity(row)} />,
       },
       {
         key: 'event_message',
-        name: 'Definition',
+        name: t('logs.definition', { defaultValue: 'Definition' }),
         width: selectedLog ? '1fr' : 'minmax(400px, 1fr)',
         minWidth: 300,
         renderCell: ({ row }) => {
@@ -101,7 +103,7 @@ export default function FunctionLogsPage() {
         },
       },
     ],
-    [getSeverity, selectedLog]
+    [getSeverity, selectedLog, t]
   );
 
   return (
@@ -114,13 +116,13 @@ export default function FunctionLogsPage() {
             onValueChange={(value) => setActiveTab(value as FunctionLogType)}
             className="h-8"
           >
-            <Tab value="runtime">Runtime Logs</Tab>
-            <Tab value="build">Build Logs</Tab>
+            <Tab value="runtime">{t('logs.runtimeLogs', { defaultValue: 'Runtime Logs' })}</Tab>
+            <Tab value="build">{t('logs.buildLogs', { defaultValue: 'Build Logs' })}</Tab>
           </Tabs>
         }
         searchValue={logsSearchQuery}
         onSearchChange={setLogsSearchQuery}
-        searchPlaceholder="Search logs"
+        searchPlaceholder={t('logs.searchLogs', { defaultValue: 'Search logs' })}
         showSearch={activeTab === 'runtime'}
         rightActions={
           activeTab === 'runtime' ? (
@@ -135,11 +137,13 @@ export default function FunctionLogsPage() {
         ) : logsError ? (
           <div className="flex h-full items-center justify-center">
             <EmptyState
-              title="Error loading logs"
+              title={t('logs.errorLoadingLogs', { defaultValue: 'Error loading logs' })}
               description={
                 logsError instanceof Error
                   ? logsError.message
-                  : 'Failed to load logs. Please refresh or contact support.'
+                  : t('logs.failedToLoadLogs', {
+                      defaultValue: 'Failed to load logs. Please refresh or contact support.',
+                    })
               }
             />
           </div>
@@ -158,7 +162,7 @@ export default function FunctionLogsPage() {
               handlePageSizeChange(newSize);
               setCurrentPage(1);
             }}
-            paginationRecordLabel="logs"
+            paginationRecordLabel={t('logs.recordLabel', { defaultValue: 'logs' })}
             selectedRowId={selectedLog?.id ?? null}
             onRowClick={handleRowClick}
             gridContainerClassName="border-t border-[var(--alpha-8)]"
@@ -169,7 +173,13 @@ export default function FunctionLogsPage() {
                 </div>
               )
             }
-            emptyState={<DataGridEmptyState message="No logs match your filters" />}
+            emptyState={
+              <DataGridEmptyState
+                message={t('logs.noLogsMatchFilters', {
+                  defaultValue: 'No logs match your filters',
+                })}
+              />
+            }
           />
         )}
       </div>

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import type { CatalogPrice, CatalogProduct } from '#features/payments/types/catalog';
@@ -15,19 +17,22 @@ import { PaymentsOnboardingState } from '#features/payments/components/PaymentsO
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
 import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
-import { formatLastSynced, formatPriceAmount } from '#features/payments/helpers';
+import { formatDateTime, formatPriceAmount } from '#features/payments/helpers';
 
 const CATALOG_ROW_GRID_TEMPLATE = '32px minmax(240px,1.5fr) 100px 90px 140px minmax(220px,1fr)';
 
-function formatBilling(price: CatalogPrice) {
+function formatBilling(price: CatalogPrice, t: TFunction<'chrome'>) {
   if (price.type !== 'recurring' || !price.recurringInterval) {
-    return 'One time';
+    return t('payments.billingOneTime', { defaultValue: 'One time' });
   }
 
   const intervalCount = price.recurringIntervalCount ?? 1;
-  return intervalCount === 1
-    ? `Every ${price.recurringInterval}`
-    : `Every ${intervalCount} ${price.recurringInterval}s`;
+  return t('payments.billingEvery', {
+    count: intervalCount,
+    interval: price.recurringInterval,
+    defaultValue_one: 'Every {{interval}}',
+    defaultValue_other: 'Every {{count}} {{interval}}s',
+  });
 }
 
 function sortProductPrices(prices: CatalogPrice[], defaultPriceId: string | null) {
@@ -79,15 +84,25 @@ function StatusBadge({
 }
 
 function EmptyCatalogState({ hasSearchQuery }: { hasSearchQuery: boolean }) {
+  const { t } = useTranslation('chrome');
   return (
     <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
       <p className="text-sm font-medium text-foreground">
-        {hasSearchQuery ? 'No products match your search' : 'No products found'}
+        {hasSearchQuery
+          ? t('payments.noProductsMatchSearch', {
+              defaultValue: 'No products match your search',
+            })
+          : t('payments.noProductsFound', { defaultValue: 'No products found' })}
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
         {hasSearchQuery
-          ? 'Try a different product name, ID, or pricing reference.'
-          : 'Open Payments Settings and sync after creating products in your provider dashboard.'}
+          ? t('payments.tryDifferentProductSearch', {
+              defaultValue: 'Try a different product name, ID, or pricing reference.',
+            })
+          : t('payments.emptyCatalogHint', {
+              defaultValue:
+                'Open Payments Settings and sync after creating products in your provider dashboard.',
+            })}
       </p>
     </div>
   );
@@ -100,12 +115,17 @@ function ProductPricesTable({
   product: CatalogProduct;
   prices: CatalogPrice[];
 }) {
+  const { t } = useTranslation('chrome');
   if (prices.length === 0) {
     return (
       <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-6 text-center">
-        <p className="text-sm font-medium text-foreground">No prices synced for this product</p>
+        <p className="text-sm font-medium text-foreground">
+          {t('payments.noPricesSynced', { defaultValue: 'No prices synced for this product' })}
+        </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Prices attached to this product will appear after the next sync.
+          {t('payments.pricesAppearAfterSync', {
+            defaultValue: 'Prices attached to this product will appear after the next sync.',
+          })}
         </p>
       </div>
     );
@@ -117,11 +137,11 @@ function ProductPricesTable({
     <div className="overflow-x-auto">
       <div className="min-w-[920px] overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
         <div className="grid grid-cols-[160px_120px_140px_minmax(220px,1fr)_minmax(180px,1fr)] border-b border-[var(--alpha-8)] bg-alpha-4 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          <div>Amount</div>
-          <div>Status</div>
-          <div>Billing</div>
-          <div>Price ID</div>
-          <div>Lookup Key</div>
+          <div>{t('payments.amount', { defaultValue: 'Amount' })}</div>
+          <div>{t('payments.status', { defaultValue: 'Status' })}</div>
+          <div>{t('payments.billing', { defaultValue: 'Billing' })}</div>
+          <div>{t('payments.priceId', { defaultValue: 'Price ID' })}</div>
+          <div>{t('payments.lookupKey', { defaultValue: 'Lookup Key' })}</div>
         </div>
 
         {sortedPrices.map((price) => {
@@ -137,18 +157,29 @@ function ProductPricesTable({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="truncate text-foreground">{formatPriceAmount(price)}</span>
-                  {isDefault && <StatusBadge label="Default" tone="info" />}
+                  {isDefault && (
+                    <StatusBadge
+                      label={t('payments.default', { defaultValue: 'Default' })}
+                      tone="info"
+                    />
+                  )}
                 </div>
               </div>
 
               <div>
                 <StatusBadge
-                  label={price.active ? 'Active' : 'Inactive'}
+                  label={
+                    price.active
+                      ? t('payments.active', { defaultValue: 'Active' })
+                      : t('payments.inactive', { defaultValue: 'Inactive' })
+                  }
                   tone={price.active ? 'success' : 'warning'}
                 />
               </div>
 
-              <div className="min-w-0 truncate text-muted-foreground">{formatBilling(price)}</div>
+              <div className="min-w-0 truncate text-muted-foreground">
+                {formatBilling(price, t)}
+              </div>
 
               <div className="min-w-0">
                 <p
@@ -189,6 +220,7 @@ function CatalogRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation('chrome');
   return (
     <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
       <button
@@ -210,7 +242,11 @@ function CatalogRow({
 
           <div className="px-2 py-3">
             <StatusBadge
-              label={product.active ? 'Active' : 'Inactive'}
+              label={
+                product.active
+                  ? t('payments.active', { defaultValue: 'Active' })
+                  : t('payments.inactive', { defaultValue: 'Inactive' })
+              }
               tone={product.active ? 'success' : 'warning'}
             />
           </div>
@@ -241,10 +277,13 @@ function CatalogRow({
           <div className="flex flex-col gap-4">
             <section>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Description
+                {t('payments.description', { defaultValue: 'Description' })}
               </p>
               <p className="mt-2 text-sm leading-6 text-foreground">
-                {product.description?.trim() || 'No description set for this product.'}
+                {product.description?.trim() ||
+                  t('payments.noDescription', {
+                    defaultValue: 'No description set for this product.',
+                  })}
               </p>
             </section>
 
@@ -252,9 +291,13 @@ function CatalogRow({
 
             <section className="flex flex-col gap-2">
               <div>
-                <h2 className="text-sm font-medium text-foreground">Prices</h2>
+                <h2 className="text-sm font-medium text-foreground">
+                  {t('payments.prices', { defaultValue: 'Prices' })}
+                </h2>
                 <p className="text-sm text-muted-foreground">
-                  Active prices, price IDs, and lookup keys are shown here.
+                  {t('payments.pricesSectionHint', {
+                    defaultValue: 'Active prices, price IDs, and lookup keys are shown here.',
+                  })}
                 </p>
               </div>
               <ProductPricesTable product={product} prices={productPrices} />
@@ -267,6 +310,7 @@ function CatalogRow({
 }
 
 export default function CatalogPage() {
+  const { t } = useTranslation('chrome');
   const { openPaymentsSettings, provider, setProvider, environment } =
     useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
@@ -368,18 +412,23 @@ export default function CatalogPage() {
           className="h-14 min-h-14"
           leftClassName="py-0"
           rightClassName="py-0"
-          title="Catalog"
+          title={t('payments.catalog', { defaultValue: 'Catalog' })}
           showDividerAfterTitle
           leftSlot={
             <span className="text-xs text-muted-foreground">
-              Last synced: {formatLastSynced(mostRecentSync)}
+              {t('payments.lastSynced', {
+                defaultValue: 'Last synced: {{time}}',
+                time: mostRecentSync
+                  ? formatDateTime(mostRecentSync)
+                  : t('payments.never', { defaultValue: 'Never' }),
+              })}
             </span>
           }
           showSearch
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
           searchDebounceTime={300}
-          searchPlaceholder="Search product"
+          searchPlaceholder={t('payments.searchProduct', { defaultValue: 'Search product' })}
           searchInputClassName="w-[280px]"
         />
       )}
@@ -388,7 +437,9 @@ export default function CatalogPage() {
         {error ? (
           <ErrorState error={error as Error} onRetry={() => void refetch()} />
         ) : isLoading ? (
-          <LoadingState message="Loading catalog..." />
+          <LoadingState
+            message={t('payments.loadingCatalog', { defaultValue: 'Loading catalog...' })}
+          />
         ) : !hasActiveKey ? (
           <PaymentsOnboardingState
             provider={provider}
@@ -403,7 +454,11 @@ export default function CatalogPage() {
                 {activeConnection?.lastSyncError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Latest Stripe sync failed</AlertTitle>
+                    <AlertTitle>
+                      {t('payments.stripeSyncFailedTitle', {
+                        defaultValue: 'Latest Stripe sync failed',
+                      })}
+                    </AlertTitle>
                     <AlertDescription className="mt-2">
                       {activeConnection.lastSyncError}
                     </AlertDescription>
@@ -412,7 +467,11 @@ export default function CatalogPage() {
                 {activeRazorpayConnection?.lastSyncError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Latest Razorpay sync failed</AlertTitle>
+                    <AlertTitle>
+                      {t('payments.razorpaySyncFailedTitle', {
+                        defaultValue: 'Latest Razorpay sync failed',
+                      })}
+                    </AlertTitle>
                     <AlertDescription className="mt-2">
                       {activeRazorpayConnection.lastSyncError}
                     </AlertDescription>
@@ -424,13 +483,23 @@ export default function CatalogPage() {
                   style={{ gridTemplateColumns: CATALOG_ROW_GRID_TEMPLATE }}
                 >
                   <div />
-                  <div className="px-2 py-1.5">Product</div>
-                  <div className="px-2 py-1.5">Status</div>
-                  <div className="px-2 py-1.5">Prices</div>
                   <div className="px-2 py-1.5">
-                    {provider === 'stripe' ? 'Default Price' : 'Amount'}
+                    {t('payments.product', { defaultValue: 'Product' })}
                   </div>
-                  <div className="px-2 py-1.5">Product ID</div>
+                  <div className="px-2 py-1.5">
+                    {t('payments.status', { defaultValue: 'Status' })}
+                  </div>
+                  <div className="px-2 py-1.5">
+                    {t('payments.prices', { defaultValue: 'Prices' })}
+                  </div>
+                  <div className="px-2 py-1.5">
+                    {provider === 'stripe'
+                      ? t('payments.defaultPrice', { defaultValue: 'Default Price' })
+                      : t('payments.amount', { defaultValue: 'Amount' })}
+                  </div>
+                  <div className="px-2 py-1.5">
+                    {t('payments.productId', { defaultValue: 'Product ID' })}
+                  </div>
                 </div>
 
                 {filteredProducts.length === 0 ? (
@@ -476,7 +545,7 @@ export default function CatalogPage() {
                   onPageChange={setCurrentPage}
                   totalRecords={filteredProducts.length}
                   pageSize={pageSize}
-                  recordLabel="products"
+                  recordLabel={t('payments.recordProducts', { defaultValue: 'products' })}
                 />
               </div>
             )}

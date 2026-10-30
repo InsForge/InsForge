@@ -21,10 +21,12 @@ This project and everyone participating in it is governed by our Code of Conduct
 
 The InsForge monorepo is organized as follows:
 
-- `/backend` - Core backend service with Express.js, PostgreSQL, and Better Auth integration
-- `/frontend` - React-based admin dashboard for managing databases, users, and storage
+- `/backend` - Core backend service with Express.js and PostgreSQL
+- `/frontend` - Self-hosting shell for the admin dashboard, consuming `@insforge/dashboard`
+- `/packages/dashboard` - React admin dashboard for managing databases, users, and storage
+- `/packages/ui` - Shared UI component library used by the dashboard
 - `/packages/shared-schemas` - Zod schemas and TypeScript types shared between frontend and backend
-- `/docs` - MCP documentation
+- `/docs` - Public product documentation (Mintlify)
 - `/functions` - Serverless edge functions for custom business logic
 - `docker-compose.yml` - Docker config file to start the project
 
@@ -40,7 +42,7 @@ Before you start development, ensure you have the following:
 2. Clone your fork locally:
    ```bash
    git clone https://github.com/InsForge/InsForge.git
-   cd insforge
+   cd InsForge
    ```
 3. Install Docker
 4. Open Docker App

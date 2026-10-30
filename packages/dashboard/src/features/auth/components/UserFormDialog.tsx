@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CircleAlert, Lock, Mail, User as UserIcon, X } from 'lucide-react';
 import {
   Button,
@@ -55,6 +56,7 @@ const validatePassword = (password: string): string => {
 };
 
 export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps) {
+  const { t } = useTranslation('chrome');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -136,9 +138,15 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       });
       void refetch();
       onOpenChange(false);
-      showToast('User created successfully', 'success');
+      showToast(
+        t('auth.userCreatedToast', { defaultValue: 'User created successfully' }),
+        'success'
+      );
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create user';
+      const message =
+        err instanceof Error
+          ? err.message
+          : t('auth.createUserFailed', { defaultValue: 'Failed to create user' });
       setError(message);
       showToast(message, 'error');
     } finally {
@@ -159,16 +167,18 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
             <div className="flex w-full items-center gap-3">
               <div className="min-w-0 flex-1">
                 <DialogTitle className="text-base font-medium leading-7 text-foreground">
-                  Add User
+                  {t('auth.addUser', { defaultValue: 'Add User' })}
                 </DialogTitle>
-                <DialogDescription className="sr-only">Create a new user account</DialogDescription>
+                <DialogDescription className="sr-only">
+                  {t('auth.createUserDescription', { defaultValue: 'Create a new user account' })}
+                </DialogDescription>
               </div>
               <DialogCloseButton
                 className="relative right-auto top-auto h-8 w-8 rounded p-1 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground"
                 disabled={loading}
               >
                 <X className="size-4" />
-                <span className="sr-only">Close</span>
+                <span className="sr-only">{t('auth.close', { defaultValue: 'Close' })}</span>
               </DialogCloseButton>
             </div>
           </DialogHeader>
@@ -182,13 +192,13 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                 <span className="inline-flex size-6 items-center justify-center">
                   <UserIcon className="h-[14px] w-[14px] stroke-[1.5] text-muted-foreground" />
                 </span>
-                <span>Name</span>
+                <span>{t('auth.name', { defaultValue: 'Name' })}</span>
               </label>
               <div className="min-w-0">
                 <Input
                   id="user-name"
                   type="text"
-                  placeholder="Enter name"
+                  placeholder={t('auth.enterName', { defaultValue: 'Enter name' })}
                   value={name}
                   onChange={handleNameChange}
                   className="h-8 rounded bg-[var(--alpha-4)] px-1.5 py-1.5 text-[13px] leading-[18px]"
@@ -208,13 +218,13 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                 <span className="inline-flex size-6 items-center justify-center">
                   <Mail className="h-[14px] w-[14px] stroke-[1.5] text-muted-foreground" />
                 </span>
-                <span>Email</span>
+                <span>{t('auth.email', { defaultValue: 'Email' })}</span>
               </label>
               <div className="min-w-0">
                 <Input
                   id="user-email"
                   type="email"
-                  placeholder="Enter email"
+                  placeholder={t('auth.enterEmail', { defaultValue: 'Enter email' })}
                   value={email}
                   onChange={handleEmailChange}
                   className={cn(
@@ -237,13 +247,13 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                 <span className="inline-flex size-6 items-center justify-center">
                   <Lock className="h-[14px] w-[14px] stroke-[1.5] text-muted-foreground" />
                 </span>
-                <span>Password</span>
+                <span>{t('auth.password', { defaultValue: 'Password' })}</span>
               </label>
               <div className="min-w-0">
                 <Input
                   id="user-password"
                   type="password"
-                  placeholder="Enter password"
+                  placeholder={t('auth.enterPassword', { defaultValue: 'Enter password' })}
                   value={password}
                   onChange={handlePasswordChange}
                   className={cn(
@@ -260,11 +270,28 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                   <div className="h-px w-full bg-[var(--alpha-8)]" />
                 </div>
 
-                <div className="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-6">
-                  <label className="text-sm leading-5 text-foreground">Auto-confirm</label>
-                  <div className="min-w-0 flex justify-end">
+                <div className="grid grid-cols-[200px_minmax(0,1fr)] items-start gap-6">
+                  <div>
+                    <label
+                      htmlFor="auto-confirm"
+                      className="block py-1.5 text-sm leading-5 text-foreground"
+                    >
+                      {t('auth.autoConfirm', { defaultValue: 'Auto-confirm' })}
+                    </label>
+                    <p
+                      id="auto-confirm-description"
+                      className="pb-2 text-[13px] leading-[18px] text-muted-foreground"
+                    >
+                      {t('auth.autoConfirmDescription', {
+                        defaultValue:
+                          'Automatically mark the email as verified, so the user can sign in without confirming it.',
+                      })}
+                    </p>
+                  </div>
+                  <div className="min-w-0 flex justify-end py-1.5">
                     <Switch
                       id="auto-confirm"
+                      aria-describedby="auto-confirm-description"
                       checked={autoConfirm}
                       onCheckedChange={setAutoConfirm}
                     />
@@ -288,14 +315,16 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
               disabled={loading}
               className="h-8 rounded px-2"
             >
-              Cancel
+              {t('auth.cancel', { defaultValue: 'Cancel' })}
             </Button>
             <Button
               type="submit"
               disabled={loading || email === '' || password === ''}
               className="h-8 rounded px-2"
             >
-              {loading ? 'Add...' : 'Add'}
+              {loading
+                ? t('auth.addingShort', { defaultValue: 'Add...' })
+                : t('auth.add', { defaultValue: 'Add' })}
             </Button>
           </DialogFooter>
         </form>

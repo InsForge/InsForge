@@ -12,27 +12,22 @@ export function validateEmail(email: string) {
  * @returns true if password meets all requirements, false otherwise
  */
 export function validatePassword(password: string, config: AuthConfigSchema): boolean {
-  // Check minimum length
   if (password.length < config.passwordMinLength) {
     return false;
   }
 
-  // Check for number requirement
   if (config.requireNumber && !/\d/.test(password)) {
     return false;
   }
 
-  // Check for lowercase requirement
   if (config.requireLowercase && !/[a-z]/.test(password)) {
     return false;
   }
 
-  // Check for uppercase requirement
   if (config.requireUppercase && !/[A-Z]/.test(password)) {
     return false;
   }
 
-  // Check for special character requirement
   if (config.requireSpecialChar && !/[!@#$%^&*()_+\-=[\]{};\\|,.<>/?]/.test(password)) {
     return false;
   }
@@ -93,7 +88,6 @@ export function isValidIdentifier(identifier: string): boolean {
 /**
  * Validates table name with additional checks
  * @param tableName - The table name to validate
- * @param operation - The operation being performed (optional)
  * @returns true if valid
  * @throws AppError if invalid
  */

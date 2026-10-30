@@ -19,6 +19,10 @@ export const createS3AccessKeyRequestSchema = z.object({
 export const s3GatewayConfigSchema = z.object({
   endpoint: z.string(),
   region: z.string(),
+  // Whether the gateway is usable on this deployment (requires an S3-backed
+  // storage provider). Defaults to true so older backends without the field
+  // keep the previous cloud behavior.
+  available: z.boolean().default(true),
 });
 
 export type S3AccessKeySchema = z.infer<typeof s3AccessKeySchema>;

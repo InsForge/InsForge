@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { EmptyState, ErrorState, LoadingState } from '#components';
 import { useRetention } from '#features/analytics/hooks/useAnalytics';
 import { formatNumber } from '#features/analytics/lib/format';
@@ -9,6 +10,7 @@ interface Cell {
 }
 
 export function RetentionCard({ enabled }: { enabled: boolean }) {
+  const { t } = useTranslation('chrome');
   const { data, isLoading, error } = useRetention(enabled);
 
   const grid = useMemo(() => {
@@ -45,7 +47,12 @@ export function RetentionCard({ enabled }: { enabled: boolean }) {
     return (
       <div className="flex h-full min-h-0 items-center justify-center px-6">
         <div className="w-full max-w-[420px]">
-          <ErrorState title="Failed to load retention" error="Please try again." />
+          <ErrorState
+            title={t('analytics.retentionLoadError', {
+              defaultValue: 'Failed to load retention',
+            })}
+            error={t('analytics.pleaseTryAgain', { defaultValue: 'Please try again.' })}
+          />
         </div>
       </div>
     );
@@ -54,13 +61,15 @@ export function RetentionCard({ enabled }: { enabled: boolean }) {
   if (!grid || grid.length === 0) {
     return (
       <div className="flex h-full min-h-0 items-center justify-center">
-        <EmptyState title="No data available" />
+        <EmptyState title={t('analytics.noData', { defaultValue: 'No data available' })} />
       </div>
     );
   }
 
   const intervals = grid[0].cells.length;
-  const intervalLabels = Array.from({ length: intervals }, (_, i) => `Week ${i}`);
+  const intervalLabels = Array.from({ length: intervals }, (_, i) =>
+    t('analytics.weekN', { defaultValue: 'Week {{num}}', num: i })
+  );
 
   function formatCohortRange(iso: string): string {
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
@@ -81,7 +90,11 @@ export function RetentionCard({ enabled }: { enabled: boolean }) {
     }
     const end = new Date(start.getTime() + 6 * 86_400_000);
     const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    return `${fmt(start)} to ${fmt(end)}`;
+    return t('analytics.dateRange', {
+      defaultValue: '{{start}} to {{end}}',
+      start: fmt(start),
+      end: fmt(end),
+    });
   }
 
   // Figma 3177-54743 cell-level spec:
@@ -97,10 +110,14 @@ export function RetentionCard({ enabled }: { enabled: boolean }) {
       {/* header row */}
       <div className="flex items-center border-b border-[var(--alpha-8)] pl-1.5">
         <div className="flex h-8 w-[202px] items-center p-1.5">
-          <span className="px-1 text-[13px] leading-[18px] text-muted-foreground">Cohort</span>
+          <span className="px-1 text-[13px] leading-[18px] text-muted-foreground">
+            {t('analytics.cohort', { defaultValue: 'Cohort' })}
+          </span>
         </div>
         <div className="flex h-8 w-[161px] items-center border-l border-[var(--alpha-8)] p-1.5">
-          <span className="px-1 text-[13px] leading-[18px] text-muted-foreground">Size</span>
+          <span className="px-1 text-[13px] leading-[18px] text-muted-foreground">
+            {t('analytics.size', { defaultValue: 'Size' })}
+          </span>
         </div>
         {intervalLabels.map((lbl) => (
           <div
@@ -133,7 +150,12 @@ export function RetentionCard({ enabled }: { enabled: boolean }) {
                 title={
                   cell.count === null
                     ? '—'
-                    : `${formatNumber(cell.count)} users (${(cell.pct ?? 0).toFixed(1)}%)`
+                    : t('analytics.usersPct', {
+                        defaultValue: '{{formatted}} users ({{pct}}%)',
+                        count: cell.count,
+                        formatted: formatNumber(cell.count),
+                        pct: (cell.pct ?? 0).toFixed(1),
+                      })
                 }
                 className="flex h-8 w-[160px] items-center border-l border-[var(--alpha-8)] p-1.5"
               >

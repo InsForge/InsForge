@@ -4,6 +4,10 @@ export const NEXT_ACTIONS = {
   CHECK_TOKEN: 'Check the token is valid or login to get a new token.',
   CHECK_ADMIN_TOKEN: 'Check the admin token is valid or login as admin to get a new token.',
   CHECK_API_KEY: 'Check the API key is valid or generate a new API key.',
+  CONFIGURE_EMAIL_PROVIDER:
+    'Configure and enable custom SMTP, then retry. Cloud-linked projects can use the managed email provider.',
+  RESEND_VERIFICATION_EMAIL:
+    'The user account already exists. Retry delivery with POST /api/auth/email/send-verification instead of registering again.',
 
   // Database next actions
   CHECK_UNIQUE_FIELD: (field: string) =>
@@ -34,6 +38,8 @@ export const NEXT_ACTIONS = {
     'Compute services are not enabled. Self-hosted: set FLY_API_TOKEN and FLY_ORG in your .env, then restart. Cloud: contact your project admin to enable compute.',
   CHECK_COMPUTE_SERVICE_EXISTS:
     'The compute service was not found. Run `compute list` to see available services.',
+  REDEPLOY_COMPUTE_SERVICE:
+    'The machine backing this service no longer exists on the compute provider. Redeploy the service (`compute deploy`) to provision a new machine.',
   CHECK_DOCKER_IMAGE:
     'Check the Docker image URL is valid and accessible. Ensure the image exists in the registry.',
   CHECK_FLY_CAPACITY:
@@ -41,5 +47,3 @@ export const NEXT_ACTIONS = {
   RETRY_COMPUTE_OPERATION:
     'The operation failed due to a transient error. Wait a moment and try again.',
 } as const;
-
-export type NextActionKey = keyof typeof NEXT_ACTIONS;

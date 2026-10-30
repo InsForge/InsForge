@@ -212,3 +212,6 @@ export const presenceLeaveMessageSchema = socketMessageSchema.extend({
 });
 
 export type PresenceLeaveMessage = z.infer<typeof presenceLeaveMessageSchema>;
+
+/** A presence membership delta sent for either `presence:join` or `presence:leave`. */
+export type PresenceMemberEvent = PresenceJoinMessage | PresenceLeaveMessage;

@@ -1,9 +1,9 @@
 import axios from 'axios';
-import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import type { Readable } from 'stream';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError, UpstreamError } from '@/utils/errors.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
@@ -26,6 +26,76 @@ interface CloudCredentialsResponse {
   expires_at: string;
   webhook_secret: string | null;
   slug: string | null;
+}
+
+/**
+ * Error body the cloud returns when it refuses to hand out deploy credentials,
+ * e.g. 403 `{ code: 'quota_exceeded', quota, upgrade_url, message }` when the
+ * organization is over its plan quota.
+ */
+interface CloudCredentialsErrorBody {
+  code?: unknown;
+  quota?: unknown;
+  upgrade_url?: unknown;
+  message?: unknown;
+  /** Non-quota failures (404, 429, 500) carry their reason in `error`. */
+  error?: unknown;
+}
+
+/**
+ * Upper bound for the cloud credentials request, covering both the headers and
+ * the body read, so a stalled response cannot leave the shared fetch pending.
+ */
+const CLOUD_CREDENTIALS_TIMEOUT_MS = 30_000;
+
+const nonEmptyString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() ? value.trim() : undefined;
+
+/**
+ * Turn a non-2xx response from `GET /sites/v1/credentials/:projectId` into an
+ * error. A quota refusal becomes an AppError carrying the cloud's own message
+ * and an upgrade hint, so callers (and the dashboard) can show the real reason
+ * instead of a generic failure. Anything else stays a plain Error, now with
+ * the HTTP status and the cloud's message for the logs.
+ */
+export async function buildCloudCredentialsError(response: Response): Promise<Error> {
+  let body: CloudCredentialsErrorBody | undefined;
+  try {
+    const parsed: unknown = await response.json();
+    if (parsed && typeof parsed === 'object') {
+      body = parsed as CloudCredentialsErrorBody;
+    }
+  } catch (error) {
+    // A timeout/abort while reading the body is not "no JSON": keep it so
+    // callers and logs still see the timeout, not a status-only error.
+    if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+      throw error;
+    }
+    body = undefined;
+  }
+
+  if (response.status === 403 && body?.code === 'quota_exceeded') {
+    const quota = nonEmptyString(body.quota);
+    const upgradeUrl = nonEmptyString(body.upgrade_url);
+    const cloudMessage =
+      nonEmptyString(body.message) ??
+      `Your organization has exceeded its ${quota ?? 'plan'} quota.`;
+    const upgradeHint = upgradeUrl
+      ? `Upgrade your plan to continue: ${upgradeUrl}`
+      : 'Upgrade your plan to continue.';
+    return new AppError(
+      `${cloudMessage} ${upgradeHint}`,
+      403,
+      ERROR_CODES.DEPLOYMENT_QUOTA_EXCEEDED,
+      upgradeHint
+    );
+  }
+
+  const statusLabel = [response.status, response.statusText].filter(Boolean).join(' ');
+  const detail = nonEmptyString(body?.message) ?? nonEmptyString(body?.error);
+  return new Error(
+    `Failed to fetch Vercel credentials: ${statusLabel}${detail ? ` - ${detail}` : ''}`
+  );
 }
 
 interface VercelCredentials {
@@ -64,13 +134,7 @@ export interface CreateDeploymentOptions {
     rootDirectory?: string | null;
   };
   meta?: Record<string, string>;
-}
-
-export interface DeploymentFile {
-  path: string;
-  content: Buffer;
-  sha: string;
-  size: number;
+  regions?: string[];
 }
 
 export interface VercelCustomDomain {
@@ -310,19 +374,15 @@ export class VercelProvider {
           throw new Error('PROJECT_ID not found in environment variables');
         }
 
-        const jwtSecret = appConfig.app.jwtSecret;
-        if (!jwtSecret) {
-          throw new Error('JWT_SECRET not found in environment variables');
-        }
-
-        const signature = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
+        const signature = TokenManager.getInstance().signCloudToken('Cloud deploy credentials');
 
         const response = await fetch(
-          `${appConfig.cloud.apiHost}/sites/v1/credentials/${projectId}?sign=${signature}`
+          `${appConfig.cloud.apiHost}/sites/v1/credentials/${projectId}?sign=${signature}`,
+          { signal: AbortSignal.timeout(CLOUD_CREDENTIALS_TIMEOUT_MS) }
         );
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch Vercel credentials: ${response.statusText}`);
+          throw await buildCloudCredentialsError(response);
         }
 
         const data = (await response.json()) as CloudCredentialsResponse;
@@ -1246,6 +1306,7 @@ export class VercelProvider {
           files: files,
           projectSettings: options.projectSettings,
           meta: options.meta,
+          regions: options.regions,
         },
         { headers: { Authorization: `Bearer ${credentials.token}` } }
       );

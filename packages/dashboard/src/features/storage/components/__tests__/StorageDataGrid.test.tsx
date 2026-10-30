@@ -1,11 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { StorageFileSchema } from '@insforge/shared-schemas';
+import i18n from '#lib/i18n';
 import { createStorageColumns } from '#features/storage/components/StorageDataGrid';
 
 describe('createStorageColumns', () => {
   it('renders the full storage object key in the name column', () => {
-    const columns = createStorageColumns();
+    const columns = createStorageColumns(i18n.t);
     const nameColumn = columns.find((column) => column.key === 'key');
     const row: StorageFileSchema = {
       key: 'avatars/user-1/profile.png',

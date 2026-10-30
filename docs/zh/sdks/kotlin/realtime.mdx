@@ -1,0 +1,171 @@
+---
+title: Kotlin 实时 SDK 参考
+description: 通过 Socket.IO 连接，订阅频道，发布事件，跟踪在线状态，并使用 InsForge Kotlin 实时客户端处理重新连接。
+---
+
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
+## 安装
+
+<KotlinSdkInstallation />
+
+## 心智模型
+
+Kotlin SDK 通过 Socket.IO 连接到 InsForge 实时系统。订阅频道名称（如 `order:123` 或 `chat:room-1`），然后监听发布到这些频道的事件名称。
+
+事件由数据库触发器发布，这些触发器调用 `realtime.publish(...)` 或由已加入频道的客户端发布。有关频道和 RLS 模型，请参阅[实时概述](/core-concepts/realtime/overview)。
+
+## 快速开始
+
+```kotlin
+import dev.insforge.realtime.models.SocketMessage
+
+client.realtime.connect()
+
+val response = client.realtime.subscribe("order:$orderId")
+
+if (!response.ok) {
+    println("Subscribe failed: ${response.error?.message}")
+    return
+}
+
+client.realtime.on<SocketMessage>("status_changed") { message ->
+    message?.let {
+        println("Status changed: ${it.payload}")
+    }
+}
+```
+
+## connect()
+
+建立实时连接。
+
+```kotlin
+client.realtime.connect()
+
+println("Connected: ${client.realtime.isConnected}")
+println("Socket ID: ${client.realtime.socketId}")
+```
+
+监视连接状态：
+
+```kotlin
+client.realtime.connectionState.collect { state ->
+    when (state) {
+        is Realtime.ConnectionState.Connected -> println("Connected")
+        is Realtime.ConnectionState.Connecting -> println("Connecting")
+        is Realtime.ConnectionState.Disconnected -> println("Disconnected")
+        is Realtime.ConnectionState.Error -> println("Error: ${state.message}")
+    }
+}
+```
+
+## subscribe()
+
+订阅频道并接收当前在线状态快照。
+
+```kotlin
+val response = client.realtime.subscribe("chat:room-1")
+
+if (response.ok) {
+    println("Subscribed to: ${response.channel}")
+    println("Members: ${response.presence?.members}")
+} else {
+    println("Error: ${response.error?.message}")
+}
+```
+
+## publish()
+
+将事件发布到频道。
+
+```kotlin
+client.realtime.publish(
+    channel = "chat:room-1",
+    event = "new_message",
+    payload = mapOf(
+        "text" to "Hello from Kotlin",
+        "sentAt" to System.currentTimeMillis()
+    )
+)
+```
+
+<Note>
+  客户端必须订阅频道才能向该频道发布。
+</Note>
+
+如果在 `realtime.messages` 上启用了 RLS，发布也会根据 `INSERT` 策略进行检查。
+
+## on()
+
+注册事件监听器。
+
+```kotlin
+client.realtime.on<SocketMessage>("new_message") { message ->
+    message?.let {
+        println("Message: ${it.payload}")
+    }
+}
+```
+
+连接和系统事件：
+
+| 事件 | 说明 |
+|------|------|
+| `presence:join` | 逻辑成员在频道中变为在线。 |
+| `presence:leave` | 逻辑成员不再在频道中在线。 |
+| `realtime:error` | 订阅或发布失败。 |
+
+## once()
+
+仅监听一次事件。
+
+```kotlin
+client.realtime.once<SocketMessage>("checkout_completed") { message ->
+    println("Checkout completed: ${message?.payload}")
+}
+```
+
+## off()
+
+移除事件监听器。
+
+```kotlin
+val callback = Realtime.EventCallback<SocketMessage> { message ->
+    println("Event received: $message")
+}
+
+client.realtime.on("status_changed", callback)
+client.realtime.off("status_changed", callback)
+```
+
+## unsubscribe()
+
+离开频道。
+
+```kotlin
+client.realtime.unsubscribe("chat:room-1")
+```
+
+## disconnect()
+
+关闭实时连接。
+
+```kotlin
+client.realtime.disconnect()
+```
+
+## getSubscribedChannels()
+
+返回本地订阅的频道。
+
+```kotlin
+val channels = client.realtime.getSubscribedChannels()
+println(channels)
+```
+
+## 在线状态
+
+成功的订阅会返回在线状态快照。监听 `presence:join` 和 `presence:leave` 以更新本地在线状态。
+
+在线状态是临时的。它不是一个持久的房间成员身份表。

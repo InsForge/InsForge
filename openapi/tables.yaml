@@ -50,18 +50,19 @@ paths:
                   items:
                     type: object
                     required:
-                      - name
+                      - columnName
                       - type
-                      - nullable
+                      - isNullable
+                      - isUnique
                     properties:
-                      name:
+                      columnName:
                         type: string
                       type:
                         type: string
-                        enum: [string, datetime, integer, float, boolean, uuid, json, file]
-                      nullable:
+                        enum: [string, date, datetime, integer, float, boolean, uuid, json]
+                      isNullable:
                         type: boolean
-                      unique:
+                      isUnique:
                         type: boolean
                       defaultValue:
                         type: string
@@ -72,7 +73,7 @@ paths:
                     $ref: '#/components/schemas/ForeignKeyConstraint'
                 rlsEnabled:
                   type: boolean
-                  default: false
+                  default: true
                   description: Enable Row Level Security on the table
       responses:
         '201':
@@ -84,7 +85,7 @@ paths:
                 properties:
                   message:
                     type: string
-                  table_name:
+                  tableName:
                     type: string
               example:
                 message: "Table created successfully"
@@ -108,7 +109,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error: "INVALID_FIELD_TYPE"
-                message: "Invalid field type: 'text'. Valid types are: string, integer, float, boolean, datetime, uuid, json, file"
+                message: "Invalid field type: 'text'. Valid types are: string, date, datetime, integer, float, boolean, uuid, json"
                 statusCode: 422
                 nextActions: "Use one of the valid field types"
 
@@ -134,24 +135,23 @@ paths:
               schema:
                 type: object
                 properties:
-                  table_name:
+                  tableName:
                     type: string
                   columns:
                     type: array
                     items:
                       type: object
                       properties:
-                        name:
+                        columnName:
                           type: string
                         type:
                           type: string
-                        nullable:
+                        isNullable:
                           type: boolean
-                        unique:
+                        isUnique:
                           type: boolean
-                        default:
+                        defaultValue:
                           type: string
-                          nullable: true
                         isPrimaryKey:
                           type: boolean
                   foreignKeys:
@@ -162,23 +162,21 @@ paths:
               example:
                 tableName: "posts"
                 columns:
-                  - name: "id"
+                  - columnName: "id"
                     type: "uuid"
-                    nullable: false
-                    unique: true
-                    default: "gen_random_uuid()"
+                    isNullable: false
+                    isUnique: true
+                    defaultValue: "gen_random_uuid()"
                     isPrimaryKey: true
-                  - name: "title"
+                  - columnName: "title"
                     type: "string"
-                    nullable: false
-                    unique: false
-                    default: null
+                    isNullable: false
+                    isUnique: false
                     isPrimaryKey: false
-                  - name: "userId"
+                  - columnName: "userId"
                     type: "uuid"
-                    nullable: false
-                    unique: false
-                    default: null
+                    isNullable: false
+                    isUnique: false
                     isPrimaryKey: false
                 foreignKeys:
                   - constraintName: "fk_userId_auth_users_id"
@@ -228,21 +226,21 @@ paths:
                     required:
                       - columnName
                       - type
+                      - isNullable
+                      - isUnique
                     properties:
                       columnName:
                         type: string
                         description: Name of the new column
                       type:
                         type: string
-                        enum: [string, integer, float, boolean, datetime, uuid, json, file]
+                        enum: [string, date, datetime, integer, float, boolean, uuid, json]
                         description: Data type of the column
                       isNullable:
                         type: boolean
-                        default: true
                         description: Whether the column allows NULL values
                       isUnique:
                         type: boolean
-                        default: false
                         description: Whether the column values must be unique
                       defaultValue:
                         type: string
@@ -383,7 +381,7 @@ paths:
                 properties:
                   message:
                     type: string
-                  table_name:
+                  tableName:
                     type: string
               example:
                 message: "Table deleted successfully"

@@ -34,4 +34,26 @@ describe('AIService', () => {
       headers: { Authorization: 'Bearer token' },
     });
   });
+
+  it('loads and updates Model Gateway configuration through authenticated requests', async () => {
+    const config = {
+      apiKey: { configured: true, maskedKey: 'sk-or••••' },
+      managementKey: { configured: false, maskedKey: null },
+    };
+    apiClientMock.request.mockResolvedValue(config);
+
+    await expect(service.getConfig()).resolves.toEqual(config);
+    await expect(service.updateConfig({ managementKey: 'management-key' })).resolves.toEqual(
+      config
+    );
+
+    expect(apiClientMock.request).toHaveBeenNthCalledWith(1, '/ai/config', {
+      headers: { Authorization: 'Bearer token' },
+    });
+    expect(apiClientMock.request).toHaveBeenNthCalledWith(2, '/ai/config', {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer token' },
+      body: JSON.stringify({ managementKey: 'management-key' }),
+    });
+  });
 });

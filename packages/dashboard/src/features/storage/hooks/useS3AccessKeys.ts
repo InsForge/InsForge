@@ -5,16 +5,22 @@ import type {
   CreateS3AccessKeyRequest,
   S3GatewayConfigSchema,
 } from '@insforge/shared-schemas';
+import { useTranslation } from 'react-i18next';
 import { s3AccessKeyService } from '#features/storage/services/s3-access-key.service';
 import { useToast } from '@insforge/ui';
 
-/** React Query hook for the read-only S3 gateway config (endpoint + region). */
-export function useS3GatewayConfig() {
+/**
+ * React Query hook for the read-only S3 gateway config (endpoint + region +
+ * availability). Pass `enabled: false` to defer the fetch until the caller
+ * actually needs it (e.g. a dialog that isn't open yet).
+ */
+export function useS3GatewayConfig(options?: { enabled?: boolean }) {
   return useQuery<S3GatewayConfigSchema>({
     queryKey: ['storage', 's3-gateway-config'],
     queryFn: () => s3AccessKeyService.getGatewayConfig(),
     // Endpoint/region come from server env; they don't change at runtime.
     staleTime: Infinity,
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -25,6 +31,7 @@ export function useS3GatewayConfig() {
  * `secretAccessKey` there because subsequent list responses don't include it.
  */
 export function useS3AccessKeys() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -39,7 +46,11 @@ export function useS3AccessKeys() {
       void queryClient.invalidateQueries({ queryKey: ['storage', 's3-access-keys'] });
     },
     onError: (error) => {
-      showToast(error.message || 'Failed to create access key', 'error');
+      showToast(
+        error.message ||
+          t('storage.failedToCreateAccessKey', { defaultValue: 'Failed to create access key' }),
+        'error'
+      );
     },
   });
 
@@ -47,10 +58,14 @@ export function useS3AccessKeys() {
     mutationFn: (id) => s3AccessKeyService.delete(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['storage', 's3-access-keys'] });
-      showToast('Access key revoked', 'success');
+      showToast(t('storage.accessKeyRevoked', { defaultValue: 'Access key revoked' }), 'success');
     },
     onError: (error) => {
-      showToast(error.message || 'Failed to revoke access key', 'error');
+      showToast(
+        error.message ||
+          t('storage.failedToRevokeAccessKey', { defaultValue: 'Failed to revoke access key' }),
+        'error'
+      );
     },
   });
 

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Radio, Plus } from 'lucide-react';
 import { Button } from '@insforge/ui';
 
@@ -7,14 +8,19 @@ interface RealtimeEmptyStateProps {
 }
 
 export default function RealtimeEmptyState({ type, onCreateChannel }: RealtimeEmptyStateProps) {
+  const { t } = useTranslation('chrome');
   const content = {
     channels: {
-      title: 'No channels available',
-      description: 'Create a channel to start receiving realtime events',
+      title: t('realtime.noChannelsAvailable', { defaultValue: 'No channels available' }),
+      description: t('realtime.noChannelsDescription', {
+        defaultValue: 'Create a channel to start receiving realtime events',
+      }),
     },
     messages: {
-      title: 'No messages yet',
-      description: 'Messages will appear here when events are published to channels',
+      title: t('realtime.noMessagesYet', { defaultValue: 'No messages yet' }),
+      description: t('realtime.noMessagesDescription', {
+        defaultValue: 'Messages will appear here when events are published to channels',
+      }),
     },
   };
 
@@ -33,7 +39,7 @@ export default function RealtimeEmptyState({ type, onCreateChannel }: RealtimeEm
           className="h-8 rounded px-2 flex items-center gap-1.5 mt-1"
         >
           <Plus className="size-4" />
-          Add Channel
+          {t('realtime.addChannel', { defaultValue: 'Add Channel' })}
         </Button>
       )}
     </div>

@@ -1,9 +1,9 @@
-import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
-import { EmailTemplate } from '@/types/email.js';
+import { EMAIL_TEMPLATE_TYPES, EmailTemplate } from '@/types/email.js';
 import { EmailProvider } from './base.provider.js';
 import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
 
@@ -11,39 +11,6 @@ import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
  * Cloud email provider for sending emails via Insforge cloud backend
  */
 export class CloudEmailProvider implements EmailProvider {
-  /**
-   * Generate JWT sign token for cloud API authentication
-   * @returns JWT token signed with project secret
-   */
-  private generateSignToken(): string {
-    const projectId = appConfig.cloud.projectId;
-    const jwtSecret = appConfig.app.jwtSecret;
-
-    if (!projectId || projectId === 'local') {
-      throw new AppError(
-        'PROJECT_ID is not configured. Cannot send emails without cloud project setup.',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
-    if (!jwtSecret) {
-      throw new AppError(
-        'JWT_SECRET is not configured. Cannot generate sign token.',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
-    const payload = {
-      sub: projectId,
-    };
-
-    return jwt.sign(payload, jwtSecret, {
-      expiresIn: '10m', // Short-lived token for API request
-    });
-  }
-
   /**
    * Check if provider supports templates
    */
@@ -68,7 +35,7 @@ export class CloudEmailProvider implements EmailProvider {
     try {
       const projectId = appConfig.cloud.projectId;
       const apiHost = appConfig.cloud.apiHost;
-      const signToken = this.generateSignToken();
+      const signToken = TokenManager.getInstance().signCloudToken('The managed email provider');
 
       // Validate inputs
       if (!email || !name || !template) {
@@ -79,15 +46,9 @@ export class CloudEmailProvider implements EmailProvider {
         );
       }
 
-      const validTemplates: EmailTemplate[] = [
-        'email-verification-code',
-        'email-verification-link',
-        'reset-password-code',
-        'reset-password-link',
-      ];
-      if (!validTemplates.includes(template)) {
+      if (!EMAIL_TEMPLATE_TYPES.includes(template)) {
         throw new AppError(
-          `Invalid template type: ${template}. Must be one of: ${validTemplates.join(', ')}`,
+          `Invalid template type: ${template}. Must be one of: ${EMAIL_TEMPLATE_TYPES.join(', ')}`,
           400,
           ERROR_CODES.INVALID_INPUT
         );
@@ -192,7 +153,7 @@ export class CloudEmailProvider implements EmailProvider {
     try {
       const projectId = appConfig.cloud.projectId;
       const apiHost = appConfig.cloud.apiHost;
-      const signToken = this.generateSignToken();
+      const signToken = TokenManager.getInstance().signCloudToken('The managed email provider');
 
       const url = `${apiHost}/email/v1/${projectId}/send-on-demand`;
       const response = await axios.post(url, options, {

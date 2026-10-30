@@ -4,6 +4,7 @@
 export const EMAIL_TEMPLATE_TYPES = [
   'email-verification-code',
   'email-verification-link',
+  'request-otp',
   'reset-password-code',
   'reset-password-link',
 ] as const;

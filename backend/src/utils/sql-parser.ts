@@ -224,3 +224,27 @@ export function parseSQLStatements(sqlText: string): string[] {
     );
   }
 }
+
+/**
+ * Verifies if a SQL query is read-only (i.e. consists only of SELECT statements).
+ * Returns null if read-only, or an error string if mutating/restricted statements are found.
+ */
+export function checkSqlReadOnly(query: string): string | null {
+  try {
+    const { stmts } = parseSync(query);
+    if (!stmts || stmts.length === 0) {
+      return 'Query contains no executable statements.';
+    }
+    for (const stmtWrapper of stmts) {
+      const stmt = stmtWrapper.stmt as Record<string, unknown>;
+      const [stmtType] = Object.entries(stmt)[0];
+      if (stmtType !== 'SelectStmt') {
+        return 'Only SELECT statements are allowed in EXPLAIN mode.';
+      }
+    }
+    return null;
+  } catch (error) {
+    logger.warn('SQL parse error in checkSqlReadOnly, rejecting query:', error);
+    return 'Query could not be parsed and was rejected for security reasons.';
+  }
+}

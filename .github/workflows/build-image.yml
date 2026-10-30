@@ -13,6 +13,8 @@ on:
 
 env:
   GHCR_REGISTRY: ghcr.io
+  DOCKERHUB_REGISTRY: docker.io
+  DOCKERHUB_NAMESPACE: insforge
   IMAGE_NAME: insforge-oss
 
 jobs:
@@ -200,3 +202,42 @@ jobs:
           if [[ "${TAG_LATEST}" == "true" ]]; then
             crane copy ${GHCR_IMAGE}:${VERSION} ${ECR_IMAGE}:latest
           fi
+
+  push-to-dockerhub:
+    needs: merge-manifests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    permissions:
+      contents: read
+
+    steps:
+      # SHA-pinned: this step is the only place DOCKERHUB_TOKEN is exposed.
+      - name: Log in to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ${{ env.DOCKERHUB_REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Install crane
+        uses: imjasonh/setup-crane@6da1ae018866400525525ce74ff892880c099987  # v0.5
+
+      - name: Copy multi-arch image to Docker Hub
+        env:
+          VERSION: ${{ github.ref_name }}
+          GHCR_IMAGE_RAW: ${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          DOCKERHUB_IMAGE: ${{ env.DOCKERHUB_REGISTRY }}/${{ env.DOCKERHUB_NAMESPACE }}/${{ env.IMAGE_NAME }}
+        run: |
+          # Convert GHCR image name to lowercase (Docker requires lowercase)
+          GHCR_IMAGE=$(echo "${GHCR_IMAGE_RAW}" | tr '[:upper:]' '[:lower:]')
+          # Copy multi-arch image from GHCR to Docker Hub (preserves all platforms)
+          crane copy ${GHCR_IMAGE}:${VERSION} ${DOCKERHUB_IMAGE}:${VERSION}
+          # The job's `if` gate already restricts this to clean release tags
+          crane copy ${GHCR_IMAGE}:${VERSION} ${DOCKERHUB_IMAGE}:latest

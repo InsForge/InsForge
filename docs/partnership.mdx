@@ -1,6 +1,6 @@
 ---
 title: Partner Integration
-description: Learn how to integrate InsForge as a partner platform through co-branded or white-label partnerships
+description: Integrate InsForge as a co-branded or white-label partner platform with one-click connections, project lifecycle APIs, and dashboard embedding.
 ---
 
 ## Overview
@@ -85,6 +85,8 @@ Partner platforms can:
 - Query project metadata to leverage the completed backend capabilities.
 - Pause projects
 - Restore projects
+- Upgrade projects (change instance type / grow disk)
+- Restart projects (optionally upgrade the InsForge OSS version)
 - Delete projects
 - Get project's authorization token for access
 - Get project's usage
@@ -286,6 +288,56 @@ Partner platforms can:
         "id": "uuid-string",
         "status": "active"
       }
+    }
+    ```
+
+    ### Upgrade Project
+    Change a project's instance type and/or grow its root volume. At least one of `instance_type` or `volume_size_gib` is required; volumes can only be enlarged. The larger instance/volume is billed to the partner via metered compute.
+
+    ```bash
+    POST /partnership/v1/:partnerId/:projectId/upgrade
+    ```
+
+    **Request Body:**
+    ```json
+    {
+      "instance_type": "small",     // optional — any valid instance type (see Instance Type Values)
+      "volume_size_gib": 16,         // optional — new root volume size in GiB (must be larger than current)
+      "wait_for_completion": false   // optional
+    }
+    ```
+
+    **Response:**
+    ```json
+    {
+      "message": "Project upgrade initiated",
+      "previousInstanceType": "nano",
+      "newInstanceType": "small",
+      "previousVolumeSizeGiB": 8,
+      "newVolumeSizeGiB": 16
+    }
+    ```
+
+    ### Restart Project
+    Restart a project, optionally upgrading its InsForge OSS version. Omit `insforge_oss_version` to restart on the current version.
+
+    ```bash
+    POST /partnership/v1/:partnerId/:projectId/restart
+    ```
+
+    **Request Body:**
+    ```json
+    {
+      "insforge_oss_version": "v2.2.1",  // optional — omit to keep the current version
+      "wait_for_completion": false        // optional
+    }
+    ```
+
+    **Response:**
+    ```json
+    {
+      "message": "Project restart initiated",
+      "insforgeOssVersion": "v2.2.1"
     }
     ```
 

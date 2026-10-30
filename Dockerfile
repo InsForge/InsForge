@@ -101,7 +101,9 @@ FROM node:20-alpine AS runner
 # client major at 16 while the bundled postgres image is on 15 — pg_dump 17+
 # emits settings (e.g. transaction_timeout) that a 15 server rejects, which
 # would make every restore fail.
-RUN apk add --no-cache tini postgresql16-client
+# su-exec: the entrypoint drops root to `node` after joining the Docker socket's
+# group. `su` would leave a shell between tini and node, breaking signal delivery.
+RUN apk add --no-cache tini postgresql16-client su-exec
 
 WORKDIR /app
 
@@ -114,6 +116,16 @@ ENV STORAGE_DIR=/insforge-storage
 ENV LOGS_DIR=/insforge-logs
 ENV MAX_JSON_BODY_SIZE=100mb
 ENV MAX_URLENCODED_BODY_SIZE=10mb
+
+# Express production mode + telemetry runtime_environment classification.
+# Only safe in this stage: node_modules are copied in prebuilt, so no npm
+# install runs under it. Do NOT set this in the dev stage — its containers
+# run `npm install` at startup, which would skip devDependencies.
+ENV NODE_ENV=production
+
+# Telemetry deployment-channel default for bare `docker run`. Compose files
+# and PaaS templates override it; platform-injected vars win over both.
+ENV INSFORGE_DEPLOYMENT_METHOD=docker
 
 RUN mkdir -p /data /insforge-storage /insforge-logs && \
     chown node:node /data /insforge-storage /insforge-logs
@@ -151,12 +163,25 @@ COPY --from=build --chown=node:node /app/packages/shared-schemas/src ./packages/
 COPY --from=build --chown=node:node /app/backend/package.json ./backend/package.json
 COPY --from=build --chown=node:node /app/package.json ./package.json
 
-USER node
+# Deliberately still root at this point. The entrypoint reads the group off a mounted
+# Docker socket — a host-specific id that cannot be baked in and should not have to be
+# supplied — then execs the command as `node`. Nothing in the app runs as root.
+#
+# The trade this makes, stated plainly: without `USER node` the image no longer enforces
+# non-root by itself, so `--entrypoint` (or a compose `entrypoint:` override) bypasses
+# the handoff and runs as root. The drop is in the entrypoint, not the image metadata.
+# This is the same shape the official postgres and redis images use for the same reason;
+# if you override the entrypoint, add `user: node` yourself.
+COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/insforge-entrypoint
 
 EXPOSE 7130 7131
 
-ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "cd backend && npm run migrate:up && cd .. && exec npm start"]
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/insforge-entrypoint"]
+# Exec node directly instead of `npm start`: the npm wrapper chain
+# (npm start -> npm run start -> node) keeps two extra npm processes resident
+# (~20-40MB on a 512MB nano) and breaks direct signal delivery. cwd stays
+# /app/backend, matching what `npm run start` ("node ../dist/server.js") used.
+CMD ["sh", "-c", "cd backend && npm run migrate:up && exec node ../dist/server.js"]
 
 
 # ============================================================

@@ -1,8 +1,8 @@
 import { Pool, type PoolClient } from 'pg';
 import AdmZip from 'adm-zip';
-import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { Transform, type Readable, type TransformCallback } from 'stream';
+import { finished } from 'stream/promises';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import {
   VercelProvider,
@@ -10,6 +10,7 @@ import {
 } from '@/providers/deployments/vercel.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import { AppError } from '@/utils/errors.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import {
   DeploymentStatus,
@@ -48,6 +49,37 @@ export type {
 const DEPLOYMENT_BUCKET = '_deployments';
 const getDeploymentKey = (id: string) => `${id}.zip`;
 
+const VERCEL_CONFIG_FILE = 'vercel.json';
+
+const isVercelConfigPath = (filePath: string) =>
+  filePath === VERCEL_CONFIG_FILE || filePath.endsWith(`/${VERCEL_CONFIG_FILE}`);
+
+const getVercelConfigPath = (rootDirectory?: string | null) => {
+  const root = (rootDirectory ?? '').replace(/^(\.\/)+/, '').replace(/\/+$/, '');
+  return root === '' || root === '.' ? VERCEL_CONFIG_FILE : `${root}/${VERCEL_CONFIG_FILE}`;
+};
+
+const parseVercelConfigRegions = (content: Buffer): string[] | undefined => {
+  let config: unknown;
+  try {
+    config = JSON.parse(content.toString('utf8'));
+  } catch {
+    return undefined;
+  }
+  if (typeof config !== 'object' || config === null || !('regions' in config)) {
+    return undefined;
+  }
+  const { regions } = config;
+  if (
+    !Array.isArray(regions) ||
+    regions.length === 0 ||
+    !regions.every((region): region is string => typeof region === 'string')
+  ) {
+    return undefined;
+  }
+  return regions;
+};
+
 interface DeploymentFileRow {
   fileId: string;
   deploymentId: string;
@@ -73,7 +105,7 @@ export class DeploymentService {
     const appKey = appConfig.storage.appKey;
 
     if (s3Bucket) {
-      this.s3Provider = new S3StorageProvider(s3Bucket, appKey, appConfig.storage.awsRegion);
+      this.s3Provider = new S3StorageProvider(s3Bucket, appKey, appConfig.storage.s3Region);
       this.s3Provider.initialize();
     }
   }
@@ -206,7 +238,7 @@ export class DeploymentService {
 
     if (!this.s3Provider) {
       throw new AppError(
-        'S3 storage is required for legacy deployments. Please configure AWS_S3_BUCKET.',
+        'S3 storage is required for legacy deployments. Please configure S3_BUCKET.',
         503,
         ERROR_CODES.INTERNAL_ERROR
       );
@@ -386,12 +418,35 @@ export class DeploymentService {
         lastFileUploadStartedAt: new Date().toISOString(),
       });
 
+      const capturesConfig = isVercelConfigPath(file.path);
+      const vercelConfig: { content: Buffer | null } = { content: null };
+      const validatedStream = this.createValidatedFileStream(
+        content,
+        file.sha,
+        file.size,
+        capturesConfig
+          ? (validated) => {
+              vercelConfig.content = validated;
+            }
+          : undefined
+      );
       await this.vercelProvider.uploadFileStream({
-        content: this.createValidatedFileStream(content, file.sha, file.size),
+        content: validatedStream,
         sha: file.sha,
         size: file.size,
         signal: options.signal,
       });
+      if (capturesConfig) {
+        // Vercel can answer 409 for a known digest before reading the body, so drain it here.
+        await finished(validatedStream.resume(), { readable: false, signal: options.signal });
+      }
+
+      const configRegions = vercelConfig.content
+        ? parseVercelConfigRegions(vercelConfig.content)
+        : undefined;
+      if (configRegions) {
+        await this.recordVercelConfigRegions(id, file.path, configRegions);
+      }
 
       const updateResult = await this.getPool().query<DeploymentFileRow>(
         `UPDATE deployments.files
@@ -474,7 +529,12 @@ export class DeploymentService {
       const uploadMode = this.getUploadMode(deployment, files.length);
 
       if (uploadMode === 'direct') {
-        return await this.startDirectDeployment(id, input, files);
+        const recorded = deployment.metadata?.vercelConfigRegions as
+          | Record<string, string[]>
+          | undefined;
+        const regions =
+          input.regions ?? recorded?.[getVercelConfigPath(input.projectSettings?.rootDirectory)];
+        return await this.startDirectDeployment(id, { ...input, regions }, files);
       }
 
       return await this.startLegacyDeployment(id, input);
@@ -549,7 +609,7 @@ export class DeploymentService {
   ): Promise<DeploymentRecord> {
     if (!this.s3Provider) {
       throw new AppError(
-        'S3 storage is required for legacy deployments. Please configure AWS_S3_BUCKET.',
+        'S3 storage is required for legacy deployments. Please configure S3_BUCKET.',
         503,
         ERROR_CODES.INTERNAL_ERROR
       );
@@ -592,10 +652,15 @@ export class DeploymentService {
       await this.vercelProvider.upsertEnvironmentVariables(input.envVars);
     }
 
+    const configPath = getVercelConfigPath(input.projectSettings?.rootDirectory);
+    const configFile = files.find((file) => file.path === configPath);
+    const regions =
+      input.regions ?? (configFile ? parseVercelConfigRegions(configFile.content) : undefined);
+
     const uploadedFiles = await this.vercelProvider.uploadFiles(files);
     const deployment = await this.createVercelDeploymentFromUploadedFiles(
       id,
-      input,
+      { ...input, regions },
       uploadedFiles,
       'legacy'
     );
@@ -646,9 +711,11 @@ export class DeploymentService {
   ): Promise<DeploymentRecord> {
     const totalSizeBytes = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
 
+    // API deployments ignore vercel.json `regions`; Vercel only reads them from the request.
     const vercelDeployment = await this.vercelProvider.createDeploymentWithFiles(uploadedFiles, {
       projectSettings: input.projectSettings,
       meta: input.meta,
+      regions: input.regions,
     });
 
     const vercelStatus = (
@@ -851,8 +918,13 @@ export class DeploymentService {
     };
   }
 
-  private createFileValidationTransform(expectedSha: string, expectedSize: number): Transform {
+  private createFileValidationTransform(
+    expectedSha: string,
+    expectedSize: number,
+    onValidated?: (content: Buffer) => void
+  ): Transform {
     const hash = crypto.createHash('sha1');
+    const captured: Buffer[] = [];
     let receivedBytes = 0;
 
     return new Transform({
@@ -871,6 +943,9 @@ export class DeploymentService {
         }
 
         hash.update(chunk);
+        if (onValidated) {
+          captured.push(chunk);
+        }
         callback(null, chunk);
       },
       flush(callback: TransformCallback) {
@@ -897,6 +972,7 @@ export class DeploymentService {
           return;
         }
 
+        onValidated?.(Buffer.concat(captured));
         callback();
       },
     });
@@ -905,9 +981,26 @@ export class DeploymentService {
   private createValidatedFileStream(
     content: Readable,
     expectedSha: string,
-    expectedSize: number
+    expectedSize: number,
+    onValidated?: (content: Buffer) => void
   ): Readable {
-    return content.pipe(this.createFileValidationTransform(expectedSha, expectedSize));
+    return content.pipe(this.createFileValidationTransform(expectedSha, expectedSize, onValidated));
+  }
+
+  private async recordVercelConfigRegions(
+    id: string,
+    configPath: string,
+    regions: string[]
+  ): Promise<void> {
+    await this.getPool().query(
+      `UPDATE deployments.runs
+       SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
+         'vercelConfigRegions',
+         COALESCE(metadata->'vercelConfigRegions', '{}'::jsonb) || jsonb_build_object($2::text, $3::jsonb)
+       )
+       WHERE id = $1`,
+      [id, configPath, JSON.stringify(regions)]
+    );
   }
 
   private async getDeploymentFileById(
@@ -1312,17 +1405,8 @@ export class DeploymentService {
       );
     }
 
-    const jwtSecret = appConfig.app.jwtSecret;
-    if (!jwtSecret) {
-      throw new AppError(
-        'JWT_SECRET not found in environment variables',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
     try {
-      const signature = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
+      const signature = TokenManager.getInstance().signCloudToken('Custom deployment slugs');
       const cloudApiHost = appConfig.cloud.apiHost;
 
       const response = await fetch(`${cloudApiHost}/sites/v1/${projectId}/slug`, {
@@ -1422,6 +1506,11 @@ export class DeploymentService {
         ),
       };
     } catch (error) {
+      // Keep AppError/UpstreamError (e.g. a cloud quota refusal or a Vercel
+      // 4xx) intact so the caller sees the real reason, like verifyCustomDomain.
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Failed to list custom domains', {
         error: error instanceof Error ? error.message : String(error),
       });

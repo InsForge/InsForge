@@ -1,0 +1,239 @@
+# InsForge on Coolify
+#
+# Coolify → New Resource → Docker Compose, then set:
+#   Base Directory          /
+#   Docker Compose Location /deploy/coolify/docker-compose.yml
+#
+# The REPLACE_ME defaults below are not safe values — replace all three.
+#
+# Compose's mandatory-variable form (${VAR:?...}) would be better, and Dokploy's
+# copy of this file uses it, but Coolify's parser treats `:?` like `:-`: it seeds
+# the environment row with the message text instead of failing, and a message
+# containing an apostrophe then breaks the postgres command line. Measured on
+# Coolify 4.1.2.
+#
+# Set the environment variables in Coolify's own Environment Variables tab. At
+# minimum JWT_SECRET, ENCRYPTION_KEY, POSTGRES_PASSWORD, ROOT_ADMIN_PASSWORD and
+# the two API_BASE_URL values; the defaults below are placeholders, not safe
+# values.
+#
+# Nothing is published to the host. Assign a domain to the `insforge` service on
+# port 7130 in Coolify's UI, then set API_BASE_URL and VITE_API_BASE_URL to it —
+# without a domain or a port mapping the stack stays on the private network.
+#
+# No service bind-mounts anything out of the repository. Coolify creates file
+# bind mounts as directories (coollabsio/coolify#3375, still open), which breaks
+# Postgres outright. Postgres gets its init files by being built here instead.
+
+services:
+  postgres:
+    # Built here rather than pulled. postgres-all bakes the init files in, and
+    # its copy is frozen at whatever the image was built from — that is how
+    # self-hosted RLS on managed tables broke: no insforge_pg_utils in its
+    # shared_preload_libraries. Building from the repo at deploy time keeps the
+    # files current. 
+    # context is the repository root, spelled relative to it rather than to this
+    # file: Coolify builds with `--project-directory <repo root>`, so Compose
+    # resolves these against the root. Dokploy passes no --project-directory, so
+    # its copy of this file uses ../.. instead. Verified on Coolify 4.1.2.
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.postgres
+    restart: unless-stopped
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c cron.database_name='${POSTGRES_DB:-insforge}' -c app.encryption_key='${ENCRYPTION_KEY:-REPLACE_ME_openssl_rand_hex_32_DIFFERENT_FROM_JWT}'
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-insforge}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-REPLACE_ME_openssl_rand_hex_32_DIFFERENT_FROM_JWT}
+      # postgres-all carried this in its image ENV, so clusters created under it
+      # live in this subdirectory. The base image defaults to the volume root,
+      # which would initdb an empty cluster beside the existing data.
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.12
+    restart: unless-stopped
+    environment:
+      PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
+      PGRST_OPENAPI_SERVER_PROXY_URI: ${POSTGREST_OPENAPI_SERVER_PROXY_URI:-http://localhost:3000}
+      PGRST_DB_SCHEMA: public
+      PGRST_DB_ANON_ROLE: anon
+      # Keep in sync with the backend's POSTGREST_MAX_SOCKETS (default 50)
+      PGRST_DB_POOL: ${PGRST_DB_POOL:-50}
+      PGRST_JWT_SECRET: ${JWT_SECRET:-REPLACE_ME_openssl_rand_hex_32}
+      PGRST_DB_CHANNEL_ENABLED: "true"
+      PGRST_DB_CHANNEL: pgrst
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # No healthcheck: the amd64 postgrest image carries no shell and no
+    # utilities, so nothing inside the container can probe it.
+    security_opt:
+      - no-new-privileges:true
+
+  insforge:
+    image: ghcr.io/insforge/insforge-oss:latest
+    working_dir: /app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgrest:
+        condition: service_started
+    environment:
+      PORT: "7130"
+      PROJECT_ROOT: /app
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:7130}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:7130}
+      JWT_SECRET: ${JWT_SECRET:-REPLACE_ME_openssl_rand_hex_32}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-REPLACE_ME_openssl_rand_hex_32_DIFFERENT_FROM_JWT}
+      ROOT_ADMIN_USERNAME: ${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
+      ROOT_ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:-REPLACE_ME_the_dashboard_is_public}
+      ADMIN_EMAIL: ${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
+      ADMIN_PASSWORD: ${ROOT_ADMIN_PASSWORD:-REPLACE_ME_the_dashboard_is_public}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-insforge}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
+      POSTGREST_BASE_URL: http://postgrest:3000
+      POSTGREST_MAX_SOCKETS: ${POSTGREST_MAX_SOCKETS:-}
+      POSTGREST_MAX_FREE_SOCKETS: ${POSTGREST_MAX_FREE_SOCKETS:-}
+      POSTGREST_FREE_SOCKET_TIMEOUT_MS: ${POSTGREST_FREE_SOCKET_TIMEOUT_MS:-}
+      DENO_RUNTIME_URL: http://deno:7133
+      LOGS_DIR: /insforge-logs
+      STORAGE_DIR: /insforge-storage
+      # ─── Custom Compute: Docker provider (opt-in) ──────────────────────────
+      # Enabled by mounting the Docker socket (see volumes below). Note this
+      # platform is UNVERIFIED for compute: its own reconciler may remove
+      # containers it does not recognise, and its reverse proxy expects specific
+      # labels. Treat it as untested until someone runs it.
+      COMPUTE_PROVIDER: ${COMPUTE_PROVIDER:-}
+      # Socket the driver dials, mounted at the same path below so both sides
+      # agree. Override for rootless Docker or Podman.
+      DOCKER_SOCKET_PATH: ${DOCKER_SOCKET_PATH:-}
+      COMPUTE_DEFAULT_INGRESS: ${COMPUTE_DEFAULT_INGRESS:-none}
+      COMPUTE_PUBLIC_HOST: ${COMPUTE_PUBLIC_HOST:-}
+      # Base domain for `host` ingress. Unset, a service that asks for a
+      # hostname gets no URL rather than an unroutable guess.
+      COMPUTE_DOMAIN: ${COMPUTE_DOMAIN:-}
+      COMPUTE_BIND_ADDRESS: ${COMPUTE_BIND_ADDRESS:-127.0.0.1}
+      # Ceiling on an uploaded source-build context. Express buffers the whole
+      # tarball before the handler runs, so this is a memory bound, not just a
+      # policy — lower it on a small host.
+      COMPUTE_BUILD_MAX_CONTEXT: ${COMPUTE_BUILD_MAX_CONTEXT:-}
+      # Seconds an upload may send nothing before it is treated as stalled and
+      # cut loose. Only one build runs at a time, so a connection that stops
+      # making progress would otherwise block every other deploy. Resets on each
+      # chunk, so a slow but active link is never cut.
+      COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT: ${COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT:-}
+      COMPUTE_ISOLATE_NETWORK: ${COMPUTE_ISOLATE_NETWORK:-}
+      # S3-compatible storage (AWS S3, MinIO, RustFS, Wasabi, R2, Tencent COS ...).
+      # Leave S3_BUCKET empty to keep local filesystem storage. Set
+      # S3_USE_PRESIGNED_URLS=false to proxy object bytes through the backend
+      # (required when the S3 endpoint is not reachable by browsers).
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-}
+      S3_MAX_OBJECT_SIZE_BYTES: ${S3_MAX_OBJECT_SIZE_BYTES:-}
+      S3_USE_PRESIGNED_URLS: ${S3_USE_PRESIGNED_URLS:-}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-}
+      INSFORGE_TELEMETRY_DISABLED: ${INSFORGE_TELEMETRY_DISABLED:-}
+      INSFORGE_DEPLOYMENT_METHOD: coolify
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # Site deployments and custom domains
+      VERCEL_TOKEN: ${VERCEL_TOKEN:-}
+      VERCEL_TEAM_ID: ${VERCEL_TEAM_ID:-}
+      VERCEL_PROJECT_ID: ${VERCEL_PROJECT_ID:-}
+      STRIPE_TEST_SECRET_KEY: ${STRIPE_TEST_SECRET_KEY:-}
+      STRIPE_LIVE_SECRET_KEY: ${STRIPE_LIVE_SECRET_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
+      X_CLIENT_ID: ${X_CLIENT_ID:-}
+      X_CLIENT_SECRET: ${X_CLIENT_SECRET:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      APPLE_CLIENT_SECRET: ${APPLE_CLIENT_SECRET:-}
+    volumes:
+      - storage-data:/insforge-storage
+      - insforge-logs:/insforge-logs
+      # Uncomment to enable the Docker compute provider. The socket is
+      # root-equivalent on the host, so it is opt-in rather than on by default.
+      # Nothing else to set: the entrypoint reads the socket's group and joins it
+      # before dropping to the app user.
+      # UNVERIFIED on this platform — see the note in `environment` above.
+      # - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:${DOCKER_SOCKET_PATH:-/var/run/docker.sock}
+    security_opt:
+      - no-new-privileges:true
+
+  deno:
+    # Built here for the same reason as postgres: the published deno-runtime
+    # image is assembled in another repository and its copy of functions/ matches
+    # no commit in this one, so fixes made here never reach it.
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.deno
+    working_dir: /app
+    command: >
+      sh -c "
+        deno cache --no-lock functions/server.ts &&
+        deno run --no-lock --unstable-worker-options --allow-net --allow-env --allow-read=./functions/worker-template.js functions/server.ts
+      "
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - postgrest
+    environment:
+      PORT: "7133"
+      DENO_ENV: production
+      DENO_DIR: /deno-dir
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-insforge}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGREST_BASE_URL: http://postgrest:3000
+      WORKER_TIMEOUT_MS: ${WORKER_TIMEOUT_MS:-60000}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-REPLACE_ME_openssl_rand_hex_32_DIFFERENT_FROM_JWT}
+      JWT_SECRET: ${JWT_SECRET:-REPLACE_ME_openssl_rand_hex_32}
+    volumes:
+      - deno_cache:/deno-dir
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:7133/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  postgres-data:
+    driver: local
+  deno_cache:
+    driver: local
+  storage-data:
+    driver: local
+  insforge-logs:
+    driver: local

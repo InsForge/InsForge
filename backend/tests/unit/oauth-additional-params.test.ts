@@ -21,6 +21,10 @@ vi.mock('../../src/utils/environment.js', () => ({
   getApiBaseUrl: () => 'http://localhost:7130',
 }));
 
+vi.mock('../../src/services/auth/shared-oauth.service.js', () => ({
+  buildSharedOAuthInitQuery: () => 'redirect_uri=http%3A%2F%2Flocalhost%3A7130',
+}));
+
 vi.mock('../../src/utils/logger.js', () => ({
   default: {
     debug: vi.fn(),

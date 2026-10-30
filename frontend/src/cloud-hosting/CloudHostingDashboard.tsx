@@ -20,12 +20,10 @@ export function CloudHostingDashboard() {
     requestInstanceTypeChange,
     updateVersion,
     requestUserInfo,
+    updatePreferredLocale,
     requestUserApiKey,
     requestModelCredits,
     requestProjectMetrics,
-    requestAdvisorLatest,
-    requestAdvisorIssues,
-    triggerAdvisorScan,
     connectPosthog,
     openPosthog,
     subscribePosthogConnectionStatus,
@@ -54,12 +52,10 @@ export function CloudHostingDashboard() {
       onRequestInstanceTypeChange={requestInstanceTypeChange}
       onUpdateVersion={updateVersion}
       onRequestUserInfo={requestUserInfo}
+      onUpdatePreferredLocale={updatePreferredLocale}
       onRequestUserApiKey={requestUserApiKey}
       onRequestModelCredits={requestModelCredits}
       onRequestProjectMetrics={requestProjectMetrics}
-      onRequestAdvisorLatest={requestAdvisorLatest}
-      onRequestAdvisorIssues={requestAdvisorIssues}
-      onTriggerAdvisorScan={triggerAdvisorScan}
       onConnectPosthog={connectPosthog}
       onOpenPosthog={openPosthog}
       subscribePosthogConnectionStatus={subscribePosthogConnectionStatus}

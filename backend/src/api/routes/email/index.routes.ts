@@ -17,6 +17,17 @@ router.post(
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      // Anonymous clients (anon key, role 'anon') must not be able to send
+      // arbitrary emails. Authenticated users and admin API keys are allowed;
+      // an admin API key leaves req.user undefined, so only 'anon' is blocked.
+      if (req.user?.role === 'anon') {
+        throw new AppError(
+          'Sending emails requires an authenticated user',
+          401,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS
+        );
+      }
+
       const validation = sendRawEmailRequestSchema.safeParse(req.body);
       if (!validation.success) {
         throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);

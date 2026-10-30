@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { storageService } from '#features/storage/services/storage.service';
 import { useToast } from '@insforge/ui';
 
 export function useBuckets() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -65,10 +67,17 @@ export function useBuckets() {
       storageService.createBucket(bucketName, isPublic),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['storage', 'buckets'] });
-      showToast('Bucket created successfully', 'success');
+      showToast(
+        t('storage.bucketCreatedSuccessfully', { defaultValue: 'Bucket created successfully' }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message ?? 'Failed to create bucket', 'error');
+      showToast(
+        error.message ??
+          t('storage.failedToCreateBucket', { defaultValue: 'Failed to create bucket' }),
+        'error'
+      );
     },
   });
 
@@ -77,10 +86,17 @@ export function useBuckets() {
     mutationFn: (bucketName: string) => storageService.deleteBucket(bucketName),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['storage', 'buckets'] });
-      showToast('Bucket deleted successfully', 'success');
+      showToast(
+        t('storage.bucketDeletedSuccessfully', { defaultValue: 'Bucket deleted successfully' }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message ?? 'Failed to delete bucket', 'error');
+      showToast(
+        error.message ??
+          t('storage.failedToDeleteBucket', { defaultValue: 'Failed to delete bucket' }),
+        'error'
+      );
     },
   });
 
@@ -90,10 +106,17 @@ export function useBuckets() {
       storageService.editBucket(bucketName, config),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['storage', 'buckets'] });
-      showToast('Bucket updated successfully', 'success');
+      showToast(
+        t('storage.bucketUpdatedSuccessfully', { defaultValue: 'Bucket updated successfully' }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message ?? 'Failed to update bucket', 'error');
+      showToast(
+        error.message ??
+          t('storage.failedToUpdateBucket', { defaultValue: 'Failed to update bucket' }),
+        'error'
+      );
     },
   });
 

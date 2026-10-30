@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -188,7 +189,7 @@ export function TableForm({
 }: TableFormProps) {
   const { projectId, isLoading: isProjectIdLoading } = useProjectId();
   const draftScope = projectId ? `project:${projectId}` : undefined;
-
+  const { t } = useTranslation('chrome');
   const [error, setError] = useState<string | null>(null);
   const [showForeignKeyDialog, setShowForeignKeyDialog] = useState(false);
   const [editingForeignKey, setEditingForeignKey] = useState<string>();

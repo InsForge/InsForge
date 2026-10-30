@@ -1,5 +1,11 @@
 import { apiClient } from '#lib/api/client';
-import { AIModelSchema, AIOverview, OpenRouterKey } from '@insforge/shared-schemas';
+import {
+  AIModelSchema,
+  AIOverview,
+  ModelGatewayConfig,
+  OpenRouterKey,
+  UpdateModelGatewayConfig,
+} from '@insforge/shared-schemas';
 
 export type AIProvider = 'openrouter';
 
@@ -13,6 +19,20 @@ export class AIService {
   getOverview(): Promise<AIOverview> {
     return apiClient.request('/ai/overview', {
       headers: apiClient.withAccessToken(),
+    });
+  }
+
+  getConfig(): Promise<ModelGatewayConfig> {
+    return apiClient.request('/ai/config', {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  updateConfig(input: UpdateModelGatewayConfig): Promise<ModelGatewayConfig> {
+    return apiClient.request('/ai/config', {
+      method: 'PUT',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(input),
     });
   }
 

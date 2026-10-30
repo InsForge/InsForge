@@ -2,17 +2,18 @@ import { Router, Response, NextFunction } from 'express';
 import {
   ERROR_CODES,
   createMigrationRequestSchema,
+  dryRunMigrationRequestSchema,
   type CreateMigrationResponse,
   type DatabaseMigrationsResponse,
 } from '@insforge/shared-schemas';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { migrationsDryRunLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AppError } from '@/utils/errors.js';
 import { DatabaseMigrationService } from '@/services/database/database-migration.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { successResponse } from '@/utils/response.js';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { type DatabaseResourceUpdate } from '@/utils/sql-parser.js';
+import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 
 const router = Router();
 const migrationService = DatabaseMigrationService.getInstance();
@@ -62,20 +63,40 @@ router.post(
         ip_address: req.ip,
       });
 
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        {
-          resource: DataUpdateResourceType.DATABASE,
-          data: {
-            changes: [{ type: 'migration' }, ...result.changes] as DatabaseResourceUpdate[],
-          },
+      dashboardEventService.publishDataUpdate({
+        resource: 'database',
+        data: {
+          changes: [{ type: 'migration' }, ...result.changes] as DatabaseResourceUpdate[],
         },
-        'system'
-      );
+      });
 
       successResponse(res, result.migration, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/dry-run',
+  verifyAdmin,
+  migrationsDryRunLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = dryRunMigrationRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        const issues = validation.error.issues;
+        throw new AppError(
+          issues.length === 1
+            ? issues[0]?.message || 'Invalid dry-run request.'
+            : issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const result = await migrationService.dryRunMigration(validation.data);
+      successResponse(res, result);
     } catch (error) {
       next(error);
     }

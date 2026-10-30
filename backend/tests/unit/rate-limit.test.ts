@@ -110,21 +110,19 @@ describe('Rate Limit Middleware', () => {
       // First request
       middleware(req as Request, res as Response, next);
 
-      // Try second request immediately
+      // Second request immediately should show approximately 60 seconds remaining
+      let thrown: unknown;
       try {
         middleware(req as Request, res as Response, next);
       } catch (error) {
-        if (error instanceof AppError) {
-          // Should show approximately 60 seconds remaining
-          expect(error.message).toMatch(/wait (\d+) seconds/);
-          const match = error.message.match(/wait (\d+) seconds/);
-          if (match) {
-            const seconds = parseInt(match[1]);
-            expect(seconds).toBeGreaterThanOrEqual(59);
-            expect(seconds).toBeLessThanOrEqual(60);
-          }
-        }
+        thrown = error;
       }
+      expect(thrown).toBeInstanceOf(AppError);
+      const match = (thrown as AppError).message.match(/wait (\d+) seconds/);
+      expect(match).not.toBeNull();
+      const seconds = Number(match?.[1]);
+      expect(seconds).toBeGreaterThanOrEqual(59);
+      expect(seconds).toBeLessThanOrEqual(60);
     });
 
     it('uses custom cooldown duration', () => {
@@ -136,19 +134,18 @@ describe('Rate Limit Middleware', () => {
       middleware(req as Request, res as Response, next);
 
       // Second request should show 30 second cooldown
+      let thrown: unknown;
       try {
         middleware(req as Request, res as Response, next);
       } catch (error) {
-        if (error instanceof AppError) {
-          expect(error.message).toMatch(/wait \d+ seconds/);
-          const match = error.message.match(/wait (\d+) seconds/);
-          if (match) {
-            const seconds = parseInt(match[1]);
-            expect(seconds).toBeGreaterThanOrEqual(29);
-            expect(seconds).toBeLessThanOrEqual(30);
-          }
-        }
+        thrown = error;
       }
+      expect(thrown).toBeInstanceOf(AppError);
+      const match = (thrown as AppError).message.match(/wait (\d+) seconds/);
+      expect(match).not.toBeNull();
+      const seconds = Number(match?.[1]);
+      expect(seconds).toBeGreaterThanOrEqual(29);
+      expect(seconds).toBeLessThanOrEqual(30);
     });
   });
 });

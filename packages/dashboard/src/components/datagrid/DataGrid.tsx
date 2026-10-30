@@ -8,6 +8,7 @@ import ReactDataGrid, {
   type CellMouseEvent,
   type RenderCellProps,
 } from 'react-data-grid';
+import { useTranslation } from 'react-i18next';
 import { DataGridEmptyState } from '#components/DataGridEmptyState';
 import { PaginationControls } from '#components/PaginationControls';
 import { Checkbox, cn } from '@insforge/ui';
@@ -107,6 +108,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   columnOrder,
   onColumnsReorder,
 }: DataGridProps<TRow>) {
+  const { t } = useTranslation('chrome');
   const { resolvedTheme } = useTheme();
 
   const defaultRowKeyGetter = useCallback((row: TRow) => row.id || Math.random().toString(), []);
@@ -284,7 +286,9 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   if (loading && !isSorting) {
     return (
       <div className="flex h-full items-center justify-center bg-[rgb(var(--semantic-1))]">
-        <div className="text-muted-foreground">Loading...</div>
+        <div className="text-muted-foreground">
+          {t('common.loadingEllipsis', { defaultValue: 'Loading...' })}
+        </div>
       </div>
     );
   }
@@ -339,7 +343,9 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
                   className="absolute inset-x-0 bottom-0 flex items-start justify-center bg-semantic-1"
                   style={{ top: headerRowHeight }}
                 >
-                  <DataGridEmptyState message="No data to display" />
+                  <DataGridEmptyState
+                    message={t('common.noDataToDisplay', { defaultValue: 'No data to display' })}
+                  />
                 </div>
               ),
             }}
@@ -351,7 +357,9 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             >
               <div className="flex items-center gap-1">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--alpha-12)] border-t-transparent" />
-                <span className="text-sm text-muted-foreground">Loading</span>
+                <span className="text-sm text-muted-foreground">
+                  {t('common.loading', { defaultValue: 'Loading' })}
+                </span>
               </div>
             </div>
           )}

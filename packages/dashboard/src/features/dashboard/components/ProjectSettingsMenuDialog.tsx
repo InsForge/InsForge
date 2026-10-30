@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Cpu, HardDrive, Plug, RefreshCw, Settings } from 'lucide-react';
 import {
@@ -55,6 +56,7 @@ export default function ProjectSettingsMenuDialog({
   onOpenChange,
   defaultTab = 'info',
 }: ProjectSettingsMenuDialogProps) {
+  const { t } = useTranslation('chrome');
   const host = useDashboardHost();
   const isCloudHostingMode = useIsCloudHostingMode();
   const onRequestInstanceInfo =
@@ -88,10 +90,10 @@ export default function ProjectSettingsMenuDialog({
 
   const sectionTitle =
     activeTab === 'connect'
-      ? 'Connect Project'
+      ? t('settings.connectProject', { defaultValue: 'Connect Project' })
       : activeTab === 'compute'
-        ? 'Compute & Disk'
-        : 'Project Information';
+        ? t('settings.computeAndDisk', { defaultValue: 'Compute & Disk' })
+        : t('settings.projectInformation', { defaultValue: 'Project Information' });
   const isProjectNameDirty = projectName !== projectNameInitialValue;
   const showProjectNameActions =
     isCloud && activeTab === 'info' && (isProjectNameFocused || isProjectNameDirty);
@@ -142,9 +144,16 @@ export default function ProjectSettingsMenuDialog({
       setInstanceInfo(nextInstanceInfo);
       setSelectedInstanceType(null);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to load compute options', 'error');
+      showToast(
+        error instanceof Error
+          ? error.message
+          : t('settings.failedToLoadComputeOptions', {
+              defaultValue: 'Failed to load compute options',
+            }),
+        'error'
+      );
     }
-  }, [onRequestInstanceInfo, showToast]);
+  }, [onRequestInstanceInfo, showToast, t]);
 
   useEffect(() => {
     if (open) {
@@ -206,10 +215,13 @@ export default function ProjectSettingsMenuDialog({
 
   const handleDeleteProject = async () => {
     const confirmed = await confirm({
-      title: 'Delete Project',
-      description: 'Are you certain you wish to remove this project? This action is irreversible.',
-      confirmText: 'Delete Project',
-      cancelText: 'Cancel',
+      title: t('settings.deleteProject', { defaultValue: 'Delete Project' }),
+      description: t('settings.deleteProjectConfirm', {
+        defaultValue:
+          'Are you certain you wish to remove this project? This action is irreversible.',
+      }),
+      confirmText: t('settings.deleteProject', { defaultValue: 'Delete Project' }),
+      cancelText: t('common.cancel', { defaultValue: 'Cancel' }),
       destructive: true,
     });
 
@@ -221,7 +233,12 @@ export default function ProjectSettingsMenuDialog({
       try {
         await host.onDeleteProject();
       } catch (error) {
-        showToast(error instanceof Error ? error.message : 'Failed to delete project', 'error');
+        showToast(
+          error instanceof Error
+            ? error.message
+            : t('settings.failedToDeleteProject', { defaultValue: 'Failed to delete project' }),
+          'error'
+        );
       }
       return;
     }
@@ -235,7 +252,11 @@ export default function ProjectSettingsMenuDialog({
       } catch (error) {
         setIsUpdatingVersion(false);
         showToast(
-          error instanceof Error ? error.message : 'Failed to update project version',
+          error instanceof Error
+            ? error.message
+            : t('settings.failedToUpdateVersion', {
+                defaultValue: 'Failed to update project version',
+              }),
           'error'
         );
       }
@@ -260,7 +281,11 @@ export default function ProjectSettingsMenuDialog({
         await host.onRenameProject(nextProjectName);
       } catch (error) {
         showToast(
-          error instanceof Error ? error.message : 'Failed to update project name',
+          error instanceof Error
+            ? error.message
+            : t('settings.failedToUpdateProjectName', {
+                defaultValue: 'Failed to update project name',
+              }),
           'error'
         );
         return;
@@ -292,12 +317,23 @@ export default function ProjectSettingsMenuDialog({
       queryClient.setQueryData(['metadata', 'apiKey'], result.apiKey);
       showToast(
         immediateRevoke
-          ? 'API key rotated. The old key is now revoked and will fail on the next request.'
-          : 'API key rotated successfully. The old key will remain valid for 24 hours.',
+          ? t('settings.apiKeyRotatedRevoked', {
+              defaultValue:
+                'API key rotated. The old key is now revoked and will fail on the next request.',
+            })
+          : t('settings.apiKeyRotatedGrace', {
+              defaultValue:
+                'API key rotated successfully. The old key will remain valid for 24 hours.',
+            }),
         'success'
       );
     } catch {
-      showToast('Failed to rotate API key. Please try again.', 'error');
+      showToast(
+        t('settings.failedToRotateApiKey', {
+          defaultValue: 'Failed to rotate API key. Please try again.',
+        }),
+        'error'
+      );
     } finally {
       setIsRotatingApiKey(false);
     }
@@ -314,7 +350,10 @@ export default function ProjectSettingsMenuDialog({
 
     setIsChangingInstanceType(true);
     showToast(
-      'Project is updating compute size, please wait a few seconds and refresh the page.',
+      t('settings.computeSizeUpdating', {
+        defaultValue:
+          'Project is updating compute size, please wait a few seconds and refresh the page.',
+      }),
       'success'
     );
 
@@ -340,11 +379,21 @@ export default function ProjectSettingsMenuDialog({
           return;
         }
 
-        showToast(result.error || 'Failed to update compute size', 'error');
+        showToast(
+          result.error ||
+            t('settings.failedToUpdateComputeSize', {
+              defaultValue: 'Failed to update compute size',
+            }),
+          'error'
+        );
       } catch (error) {
         setIsChangingInstanceType(false);
         showToast(
-          error instanceof Error ? error.message : 'Failed to update compute size',
+          error instanceof Error
+            ? error.message
+            : t('settings.failedToUpdateComputeSize', {
+                defaultValue: 'Failed to update compute size',
+              }),
           'error'
         );
       }
@@ -363,9 +412,13 @@ export default function ProjectSettingsMenuDialog({
             setImmediateRevoke(false);
           }
         }}
-        title="Rotate API Key"
-        confirmText={immediateRevoke ? 'Revoke & Rotate' : 'Rotate Key'}
-        cancelText="Cancel"
+        title={t('settings.rotateApiKey', { defaultValue: 'Rotate API Key' })}
+        confirmText={
+          immediateRevoke
+            ? t('settings.revokeAndRotate', { defaultValue: 'Revoke & Rotate' })
+            : t('settings.rotateKey', { defaultValue: 'Rotate Key' })
+        }
+        cancelText={t('common.cancel', { defaultValue: 'Cancel' })}
         destructive
         isLoading={isRotatingApiKey}
         onConfirm={handleConfirmRotateApiKey}
@@ -373,8 +426,14 @@ export default function ProjectSettingsMenuDialog({
           <div className="flex flex-col gap-3">
             <p>
               {immediateRevoke
-                ? 'This will generate a new API key and revoke the current key immediately. Any in-flight callers still using the old key will start failing on the next request. This action cannot be undone.'
-                : 'This will generate a new API key. The current key will remain valid for 24 hours to allow for a smooth transition. This action cannot be undone.'}
+                ? t('settings.rotateApiKeyRevokeDescription', {
+                    defaultValue:
+                      'This will generate a new API key and revoke the current key immediately. Any in-flight callers still using the old key will start failing on the next request. This action cannot be undone.',
+                  })
+                : t('settings.rotateApiKeyGraceDescription', {
+                    defaultValue:
+                      'This will generate a new API key. The current key will remain valid for 24 hours to allow for a smooth transition. This action cannot be undone.',
+                  })}
             </p>
             <label className="flex cursor-pointer items-start gap-2">
               <Checkbox
@@ -384,7 +443,9 @@ export default function ProjectSettingsMenuDialog({
                 className="mt-0.5"
               />
               <span className="text-sm leading-5 text-foreground">
-                Revoke old key immediately (use if exposed)
+                {t('settings.revokeOldKeyImmediately', {
+                  defaultValue: 'Revoke old key immediately (use if exposed)',
+                })}
               </span>
             </label>
           </div>
@@ -394,7 +455,9 @@ export default function ProjectSettingsMenuDialog({
         <MenuDialogContent>
           <MenuDialogSideNav>
             <MenuDialogSideNavHeader>
-              <MenuDialogSideNavTitle>Project Settings</MenuDialogSideNavTitle>
+              <MenuDialogSideNavTitle>
+                {t('settings.projectSettings', { defaultValue: 'Project Settings' })}
+              </MenuDialogSideNavTitle>
             </MenuDialogSideNavHeader>
             <MenuDialogNav className="gap-0 pb-2">
               <MenuDialogNavList className="gap-1">
@@ -403,14 +466,14 @@ export default function ProjectSettingsMenuDialog({
                   active={activeTab === 'info'}
                   onClick={() => setActiveTab('info')}
                 >
-                  General
+                  {t('settings.general', { defaultValue: 'General' })}
                 </MenuDialogNavItem>
                 <MenuDialogNavItem
                   icon={<Plug className="size-5" />}
                   active={activeTab === 'connect'}
                   onClick={() => setActiveTab('connect')}
                 >
-                  Connect
+                  {t('settings.connect', { defaultValue: 'Connect' })}
                 </MenuDialogNavItem>
                 {canUseCloudHost && (
                   <MenuDialogNavItem
@@ -421,7 +484,7 @@ export default function ProjectSettingsMenuDialog({
                       void requestInstanceInfo();
                     }}
                   >
-                    Compute & Disk
+                    {t('settings.computeAndDisk', { defaultValue: 'Compute & Disk' })}
                   </MenuDialogNavItem>
                 )}
               </MenuDialogNavList>
@@ -432,7 +495,9 @@ export default function ProjectSettingsMenuDialog({
             <MenuDialogHeader>
               <MenuDialogTitle>{sectionTitle}</MenuDialogTitle>
               <MenuDialogDescription className="sr-only">
-                Project settings and configuration
+                {t('settings.dialogDescription', {
+                  defaultValue: 'Project settings and configuration',
+                })}
               </MenuDialogDescription>
               <MenuDialogCloseButton className="ml-auto self-start" />
             </MenuDialogHeader>
@@ -446,12 +511,16 @@ export default function ProjectSettingsMenuDialog({
                     <>
                       <div className="flex items-start gap-6">
                         <div className="w-[200px] shrink-0">
-                          <p className="py-1.5 text-sm leading-5 text-foreground">Project Name</p>
+                          <p className="py-1.5 text-sm leading-5 text-foreground">
+                            {t('settings.projectName', { defaultValue: 'Project Name' })}
+                          </p>
                         </div>
                         <div className="flex min-w-0 flex-1 items-start gap-1.5">
                           <Input
                             value={
-                              canUseCloudHost && isProjectInfoLoading ? 'Loading...' : projectName
+                              canUseCloudHost && isProjectInfoLoading
+                                ? t('overview.loading', { defaultValue: 'Loading...' })
+                                : projectName
                             }
                             onChange={(event) => setProjectName(event.target.value)}
                             onFocus={() => setIsProjectNameFocused(true)}
@@ -473,7 +542,9 @@ export default function ProjectSettingsMenuDialog({
 
                   <div className="flex items-start gap-6">
                     <div className="w-[200px] shrink-0">
-                      <p className="py-1.5 text-sm leading-5 text-foreground">Project URL</p>
+                      <p className="py-1.5 text-sm leading-5 text-foreground">
+                        {t('overview.projectUrl', { defaultValue: 'Project URL' })}
+                      </p>
                     </div>
                     <div className="flex min-w-0 flex-1 items-start gap-1.5">
                       <div className={INFO_FIELD_CLASS}>
@@ -493,16 +564,22 @@ export default function ProjectSettingsMenuDialog({
 
                   <div className="flex items-start gap-6">
                     <div className="w-[200px] shrink-0">
-                      <p className="py-1.5 text-sm leading-5 text-foreground">API Key</p>
+                      <p className="py-1.5 text-sm leading-5 text-foreground">
+                        {t('overview.apiKey', { defaultValue: 'API Key' })}
+                      </p>
                       <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
-                        This key has full access control to your project and should be kept secure.
-                        Do not expose this key in your frontend code.
+                        {t('settings.apiKeyDescription', {
+                          defaultValue:
+                            'This key has full access control to your project and should be kept secure. Do not expose this key in your frontend code.',
+                        })}
                       </p>
                     </div>
                     <div className="flex min-w-0 flex-1 items-start gap-1.5">
                       <div className={cn(INFO_FIELD_CLASS, isApiKeyLoading && 'animate-pulse')}>
                         <span className="min-w-0 flex-1 truncate">
-                          {isApiKeyLoading ? 'Loading...' : maskedApiKey}
+                          {isApiKeyLoading
+                            ? t('overview.loading', { defaultValue: 'Loading...' })
+                            : maskedApiKey}
                         </span>
                         {!isApiKeyLoading && apiKey && (
                           <CopyButton
@@ -521,7 +598,9 @@ export default function ProjectSettingsMenuDialog({
                         <RefreshCw
                           className={cn('mr-1.5 size-3.5', isRotatingApiKey && 'animate-spin')}
                         />
-                        {isRotatingApiKey ? 'Rotating...' : 'Rotate'}
+                        {isRotatingApiKey
+                          ? t('settings.rotating', { defaultValue: 'Rotating...' })
+                          : t('settings.rotate', { defaultValue: 'Rotate' })}
                       </Button>
                     </div>
                   </div>
@@ -532,18 +611,25 @@ export default function ProjectSettingsMenuDialog({
 
                   <div className="flex items-start gap-6">
                     <div className="w-[200px] shrink-0">
-                      <p className="py-1.5 text-sm leading-5 text-foreground">Version</p>
+                      <p className="py-1.5 text-sm leading-5 text-foreground">
+                        {t('settings.version', { defaultValue: 'Version' })}
+                      </p>
                     </div>
                     <div className="flex min-w-0 flex-1 items-start gap-1.5">
                       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                         <div className={cn(INFO_FIELD_CLASS, isVersionLoading && 'animate-pulse')}>
                           <span className="truncate">
-                            {isVersionLoading ? 'Loading...' : version || 'Unknown'}
+                            {isVersionLoading
+                              ? t('overview.loading', { defaultValue: 'Loading...' })
+                              : version || t('settings.unknown', { defaultValue: 'Unknown' })}
                           </span>
                         </div>
                         {latestVersion && isVersionOutdated && (
                           <p className="text-[13px] leading-[18px] text-muted-foreground">
-                            {latestVersion} is available for upgrade
+                            {t('settings.versionAvailable', {
+                              version: latestVersion,
+                              defaultValue: '{{version}} is available for upgrade',
+                            })}
                           </p>
                         )}
                       </div>
@@ -553,7 +639,9 @@ export default function ProjectSettingsMenuDialog({
                           disabled={isUpdatingVersion}
                           className="h-8 rounded px-3 text-sm font-medium"
                         >
-                          {isUpdatingVersion ? 'Upgrading...' : 'Upgrade'}
+                          {isUpdatingVersion
+                            ? t('settings.upgrading', { defaultValue: 'Upgrading...' })
+                            : t('settings.upgrade', { defaultValue: 'Upgrade' })}
                         </Button>
                       )}
                     </div>
@@ -566,7 +654,9 @@ export default function ProjectSettingsMenuDialog({
                   {canUseCloudHost && (
                     <div className="flex items-start gap-6">
                       <div className="w-[200px] shrink-0">
-                        <p className="py-1.5 text-sm leading-5 text-foreground">Delete Project</p>
+                        <p className="py-1.5 text-sm leading-5 text-foreground">
+                          {t('settings.deleteProject', { defaultValue: 'Delete Project' })}
+                        </p>
                       </div>
                       <div className="flex min-w-0 flex-1 items-start justify-end gap-1.5">
                         <Button
@@ -574,7 +664,7 @@ export default function ProjectSettingsMenuDialog({
                           onClick={() => void handleDeleteProject()}
                           className="h-8 rounded px-3 text-sm font-medium"
                         >
-                          Delete Project
+                          {t('settings.deleteProject', { defaultValue: 'Delete Project' })}
                         </Button>
                       </div>
                     </div>
@@ -590,7 +680,10 @@ export default function ProjectSettingsMenuDialog({
                         <div className="w-[200px] shrink-0">
                           <p className="py-1.5 text-sm leading-5 text-foreground">CLI</p>
                           <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
-                            Link this cloud project with InsForge CLI and verify the connection.
+                            {t('settings.cliDescription', {
+                              defaultValue:
+                                'Link this cloud project with InsForge CLI and verify the connection.',
+                            })}
                           </p>
                         </div>
                         <div className="flex min-w-0 flex-1 items-start gap-1.5">
@@ -608,8 +701,10 @@ export default function ProjectSettingsMenuDialog({
                     <div className="w-[200px] shrink-0">
                       <p className="py-1.5 text-sm leading-5 text-foreground">MCP</p>
                       <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
-                        Install the MCP server so your coding agent can access and build the
-                        backend.
+                        {t('settings.mcpDescription', {
+                          defaultValue:
+                            'Install the MCP server so your coding agent can access and build the backend.',
+                        })}
                       </p>
                     </div>
                     <div className="flex min-w-0 flex-1 items-start gap-1.5">
@@ -631,11 +726,15 @@ export default function ProjectSettingsMenuDialog({
                       <div className="flex items-start gap-6">
                         <div className="w-[200px] shrink-0">
                           <p className="py-1.5 text-sm leading-5 text-foreground">
-                            Connection String
+                            {t('overview.connectionString', {
+                              defaultValue: 'Connection String',
+                            })}
                           </p>
                           <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
-                            Ideal for applications with persistent and long-lived connections, such
-                            as those running on virtual machines or long-standing containers.
+                            {t('settings.connectionStringDescription', {
+                              defaultValue:
+                                'Ideal for applications with persistent and long-lived connections, such as those running on virtual machines or long-standing containers.',
+                            })}
                           </p>
                         </div>
                         <div className="flex min-w-0 flex-1 items-start gap-1.5">
@@ -651,14 +750,21 @@ export default function ProjectSettingsMenuDialog({
                 <div className="flex w-full flex-col gap-4">
                   {!instanceInfo ? (
                     <div className={cn(INFO_FIELD_CLASS, 'justify-between')}>
-                      <span className="text-muted-foreground">Loading compute options...</span>
+                      <span className="text-muted-foreground">
+                        {t('settings.loadingComputeOptions', {
+                          defaultValue: 'Loading compute options...',
+                        })}
+                      </span>
                     </div>
                   ) : (
                     <>
                       {instanceInfo.planName === 'free' && (
                         <div className="flex flex-col gap-2 rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] p-3">
                           <p className="text-sm leading-5 text-foreground">
-                            Compute upgrades are available on Start plan and above.
+                            {t('settings.computeUpgradesStartPlan', {
+                              defaultValue:
+                                'Compute upgrades are available on Start plan and above.',
+                            })}
                           </p>
                           <div className="flex justify-end">
                             <Button
@@ -666,7 +772,7 @@ export default function ProjectSettingsMenuDialog({
                               className="h-8 rounded px-3 text-sm font-medium"
                               onClick={() => host.onShowUpgradeDialog?.()}
                             >
-                              Upgrade Plan
+                              {t('settings.upgradePlan', { defaultValue: 'Upgrade Plan' })}
                             </Button>
                           </div>
                         </div>
@@ -704,10 +810,15 @@ export default function ProjectSettingsMenuDialog({
                                   {instanceType.id}
                                 </span>
                                 {isCurrent ? (
-                                  <span className="text-xs text-muted-foreground">Current</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {t('settings.current', { defaultValue: 'Current' })}
+                                  </span>
                                 ) : (
                                   <span className="text-xs text-muted-foreground">
-                                    ${instanceType.pricePerHour.toFixed(4)} / hour
+                                    {t('settings.pricePerHour', {
+                                      price: instanceType.pricePerHour.toFixed(4),
+                                      defaultValue: '${{price}} / hour',
+                                    })}
                                   </span>
                                 )}
                               </div>
@@ -738,7 +849,7 @@ export default function ProjectSettingsMenuDialog({
                   onClick={handleCancelProjectNameEdit}
                   className="h-8 rounded border-[var(--alpha-8)] bg-card px-3 text-sm font-medium"
                 >
-                  Cancel
+                  {t('common.cancel', { defaultValue: 'Cancel' })}
                 </Button>
                 <Button
                   type="button"
@@ -748,7 +859,7 @@ export default function ProjectSettingsMenuDialog({
                   disabled={!isProjectNameDirty}
                   className="h-8 rounded px-3 text-sm font-medium"
                 >
-                  Save
+                  {t('common.save', { defaultValue: 'Save' })}
                 </Button>
               </MenuDialogFooter>
             )}
@@ -757,7 +868,9 @@ export default function ProjectSettingsMenuDialog({
                 <div className="mr-auto text-sm text-muted-foreground">
                   {projectedComputeCost && (
                     <span>
-                      Projected monthly compute after credits:{' '}
+                      {t('settings.projectedComputeCost', {
+                        defaultValue: 'Projected monthly compute after credits:',
+                      })}{' '}
                       <span className="text-foreground">
                         ${projectedComputeCost.afterCredits.toFixed(2)}
                       </span>
@@ -771,7 +884,7 @@ export default function ProjectSettingsMenuDialog({
                   className="h-8 rounded border-[var(--alpha-8)] bg-card px-3 text-sm font-medium"
                   disabled={isChangingInstanceType}
                 >
-                  Cancel
+                  {t('common.cancel', { defaultValue: 'Cancel' })}
                 </Button>
                 <Button
                   type="button"
@@ -781,7 +894,9 @@ export default function ProjectSettingsMenuDialog({
                   disabled={isChangingInstanceType}
                   className="h-8 rounded px-3 text-sm font-medium"
                 >
-                  {isChangingInstanceType ? 'Applying...' : 'Apply Changes'}
+                  {isChangingInstanceType
+                    ? t('settings.applying', { defaultValue: 'Applying...' })
+                    : t('settings.applyChanges', { defaultValue: 'Apply Changes' })}
                 </Button>
               </MenuDialogFooter>
             )}

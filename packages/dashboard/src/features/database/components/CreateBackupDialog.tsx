@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Dialog,
@@ -30,6 +31,7 @@ function getDefaultBackupName() {
 }
 
 export function CreateBackupDialog({ open, onOpenChange, onCreate }: CreateBackupDialogProps) {
+  const { t } = useTranslation('chrome');
   const backupNameId = useId();
   const [backupName, setBackupName] = useState(getDefaultBackupName);
   const [isCreating, setIsCreating] = useState(false);
@@ -61,9 +63,13 @@ export function CreateBackupDialog({ open, onOpenChange, onCreate }: CreateBacku
           <DialogHeader className="gap-0">
             <div className="flex w-full items-center gap-3">
               <div className="min-w-0 flex-1">
-                <DialogTitle>Create a Backup</DialogTitle>
+                <DialogTitle>
+                  {t('database.createBackup', { defaultValue: 'Create a Backup' })}
+                </DialogTitle>
                 <DialogDescription className="sr-only">
-                  Create a manual database backup.
+                  {t('database.createBackupDescription', {
+                    defaultValue: 'Create a manual database backup.',
+                  })}
                 </DialogDescription>
               </div>
               <DialogCloseButton className="relative right-auto top-auto h-7 w-7 rounded p-1" />
@@ -76,7 +82,7 @@ export function CreateBackupDialog({ open, onOpenChange, onCreate }: CreateBacku
                 htmlFor={backupNameId}
                 className="text-sm font-normal leading-5 text-foreground"
               >
-                Backup Name
+                {t('database.backupName', { defaultValue: 'Backup Name' })}
               </label>
               <Input
                 id={backupNameId}
@@ -96,7 +102,7 @@ export function CreateBackupDialog({ open, onOpenChange, onCreate }: CreateBacku
               disabled={isCreating}
               onClick={() => onOpenChange(false)}
             >
-              Close
+              {t('common.close', { defaultValue: 'Close' })}
             </Button>
             <Button
               type="button"
@@ -106,7 +112,9 @@ export function CreateBackupDialog({ open, onOpenChange, onCreate }: CreateBacku
                 void handleCreate();
               }}
             >
-              {isCreating ? 'Creating...' : 'Create'}
+              {isCreating
+                ? t('common.creating', { defaultValue: 'Creating...' })
+                : t('common.create', { defaultValue: 'Create' })}
             </Button>
           </DialogFooter>
         </div>

@@ -11,14 +11,6 @@ export function isCloudEnvironment(): boolean {
 }
 
 /**
- * Check if the application can use shared OAuth keys
- * This is typically enabled in cloud environments to avoid storing secrets
- */
-export function isOAuthSharedKeysAvailable(): boolean {
-  return isCloudEnvironment();
-}
-
-/**
  * Get the API base URL from environment variable or default to localhost
  * @returns The API base URL
  */

@@ -2,8 +2,10 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
 import { AppError } from '@/utils/errors.js';
-import { ERROR_CODES, type TokenPayloadSchema } from '@insforge/shared-schemas';
+import { isCloudEnvironment } from '@/utils/environment.js';
+import { ERROR_CODES, type ErrorCode, type TokenPayloadSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
+import logger from '../../utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
 
 const JWT_SECRET = appConfig.app.jwtSecret;
@@ -28,16 +30,31 @@ export interface RefreshTokenWithCsrf {
   csrfToken: string;
 }
 
+export interface CloudProjectAuthorization {
+  projectId: string;
+  userId: string;
+}
+
 /**
- * Create JWKS instance with caching and timeout configuration
- * The instance will automatically cache keys and handle refetching
+ * JWKS instance for verifying cloud-issued tokens, built on first use.
+ *
+ * Lazy because this module is now imported by everything that signs an outbound cloud
+ * request, and only verification needs the key set: at import time `new URL()` would
+ * throw on an instance whose CLOUD_API_HOST is unset. Caching and refetching are
+ * handled internally by jose once created.
  */
-const cloudApiHost = appConfig.cloud.apiHost;
-const JWKS = createRemoteJWKSet(new URL(`${cloudApiHost}/.well-known/jwks.json`), {
-  timeoutDuration: 10000, // 10 second timeout for HTTP requests
-  cooldownDuration: 30000, // 30 seconds cooldown after successful fetch
-  cacheMaxAge: 600000, // Maximum 10 minutes between refetches
-});
+let cachedJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
+
+function getCloudJwks(): ReturnType<typeof createRemoteJWKSet> {
+  if (!cachedJwks) {
+    cachedJwks = createRemoteJWKSet(new URL(`${appConfig.cloud.apiHost}/.well-known/jwks.json`), {
+      timeoutDuration: 10000, // 10 second timeout for HTTP requests
+      cooldownDuration: 30000, // 30 seconds cooldown after successful fetch
+      cacheMaxAge: 600000, // Maximum 10 minutes between refetches
+    });
+  }
+  return cachedJwks;
+}
 
 /**
  * TokenManager - Handles JWT token operations
@@ -53,7 +70,11 @@ export class TokenManager {
 
   private constructor() {
     if (!appConfig.app.jwtSecret) {
-      throw new Error('JWT_SECRET environment variable is required');
+      throw new AppError(
+        'JWT_SECRET is not configured. Cannot sign or verify tokens.',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
     }
   }
 
@@ -310,13 +331,53 @@ export class TokenManager {
   }
 
   /**
+   * Sign the short-lived credential our cloud-backend calls carry: `sub` is the project
+   * id, and the signature proves we hold that project's JWT_SECRET.
+   *
+   * Off our infrastructure there is no such relationship, so this refuses rather than
+   * signing a token that fails remotely with nothing an operator can act on.
+   *
+   * @param feature Subject of the off-cloud message, e.g. 'Cloud database access'.
+   */
+  signCloudToken(feature: string, errorCode: ErrorCode = ERROR_CODES.INTERNAL_ERROR): string {
+    if (!isCloudEnvironment()) {
+      throw new AppError(
+        `${feature} is only available on InsForge Cloud projects.`,
+        500,
+        errorCode
+      );
+    }
+
+    const projectId = appConfig.cloud?.projectId;
+    if (!projectId || projectId === 'local') {
+      throw new AppError(
+        'PROJECT_ID is not configured. Cannot reach the InsForge Cloud API.',
+        500,
+        errorCode
+      );
+    }
+
+    const jwtSecret = appConfig.app.jwtSecret;
+    if (!jwtSecret) {
+      throw new AppError(
+        'JWT_SECRET is not configured. Cannot generate sign token.',
+        500,
+        errorCode
+      );
+    }
+
+    return jwt.sign({ sub: projectId }, jwtSecret, { expiresIn: '10m' });
+  }
+
+  /**
    * Verify cloud backend JWT token
-   * Validates JWT tokens from api.insforge.dev using JWKS
+   * Validates JWT tokens from api.insforge.dev using JWKS.
+   * Inbound only — outbound requests are signed by signCloudToken above.
    */
   async verifyCloudToken(token: string): Promise<{ projectId: string; payload: JWTPayload }> {
     try {
       // JWKS handles caching internally, no need to manage it manually
-      const { payload } = await jwtVerify(token, JWKS, {
+      const { payload } = await jwtVerify(token, getCloudJwks(), {
         algorithms: ['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512'],
       });
 
@@ -354,6 +415,40 @@ export class TokenManager {
   }
 
   /**
+   * Verify a cloud-signed project authorization token.
+   *
+   * This is the shared authority boundary for credentials that grant project
+   * admin access. Claims are inspected only after Cloud signature and project
+   * binding verification succeeds.
+   */
+  async verifyCloudProjectAuthorization(token: string): Promise<CloudProjectAuthorization> {
+    if (!appConfig.cloud.projectId) {
+      throw new AppError(
+        'PROJECT_ID not found in environment variables',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    const { projectId, payload } = await this.verifyCloudToken(token);
+
+    if (
+      payload.type !== 'project_authorization' ||
+      typeof payload.userId !== 'string' ||
+      payload.userId.trim().length === 0
+    ) {
+      throw new AppError(
+        'Invalid cloud project authorization token',
+        401,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+        NEXT_ACTIONS.CHECK_TOKEN
+      );
+    }
+
+    return { projectId, userId: payload.userId };
+  }
+
+  /**
    * Generate CSRF token derived from refresh-session claims using HMAC.
    */
   generateCsrfToken(payload: RefreshTokenPayload): string {
@@ -364,19 +459,29 @@ export class TokenManager {
   }
 
   /**
-   * Verify CSRF token by re-computing from refresh-session claims.
-   * Uses timing-safe comparison to prevent timing attacks
+   * Verify the X-CSRF-Token header by re-computing from refresh-session claims.
+   * Accepts the raw header value; multi-valued headers are invalid.
+   * Uses timing-safe comparison and throws 403 FORBIDDEN on mismatch.
    */
-  verifyCsrfToken(csrfHeader: string | undefined, payload: RefreshTokenPayload): boolean {
-    if (!csrfHeader) {
-      return false;
+  verifyCsrfToken(
+    csrfHeader: string | string[] | undefined,
+    payload: RefreshTokenPayload,
+    logTag: string
+  ): void {
+    const csrfToken = typeof csrfHeader === 'string' ? csrfHeader : undefined;
+    let valid = false;
+    if (csrfToken) {
+      try {
+        const expectedCsrf = this.generateCsrfToken(payload);
+        valid = crypto.timingSafeEqual(Buffer.from(csrfToken), Buffer.from(expectedCsrf));
+      } catch {
+        valid = false;
+      }
     }
 
-    try {
-      const expectedCsrf = this.generateCsrfToken(payload);
-      return crypto.timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(expectedCsrf));
-    } catch {
-      return false;
+    if (!valid) {
+      logger.warn(`[${logTag}] CSRF token validation failed`);
+      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.FORBIDDEN);
     }
   }
 

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { SortColumn } from 'react-data-grid';
 import { AlertCircle, Mail } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
@@ -53,10 +55,10 @@ const countryNames =
     ? new Intl.DisplayNames(undefined, { type: 'region' })
     : null;
 
-const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
+const getCustomerColumns = (t: TFunction<'chrome'>): DataGridColumn<CustomerGridRow>[] => [
   {
     key: 'customerId',
-    name: 'Customer ID',
+    name: t('payments.customerId', { defaultValue: 'Customer ID' }),
     width: 220,
     minWidth: 220,
     sortable: true,
@@ -71,7 +73,7 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
   },
   {
     key: 'customer',
-    name: 'Customer',
+    name: t('payments.customer', { defaultValue: 'Customer' }),
     width: 240,
     minWidth: 240,
     sortable: true,
@@ -86,7 +88,7 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
   },
   {
     key: 'email',
-    name: 'Email',
+    name: t('payments.email', { defaultValue: 'Email' }),
     width: 280,
     minWidth: 280,
     sortable: true,
@@ -94,7 +96,7 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
   },
   {
     key: 'paymentMethodBrand',
-    name: 'Primary payment method',
+    name: t('payments.primaryPaymentMethod', { defaultValue: 'Primary payment method' }),
     width: 240,
     minWidth: 240,
     sortable: false,
@@ -104,7 +106,7 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
   },
   {
     key: 'countryCode',
-    name: 'Country',
+    name: t('payments.country', { defaultValue: 'Country' }),
     width: 220,
     minWidth: 220,
     sortable: false,
@@ -112,7 +114,7 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
   },
   {
     key: 'totalSpend',
-    name: 'Total Spend',
+    name: t('payments.totalSpend', { defaultValue: 'Total Spend' }),
     width: 160,
     minWidth: 160,
     sortable: true,
@@ -122,7 +124,7 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
   },
   {
     key: 'paymentsCount',
-    name: 'Payments',
+    name: t('payments.paymentsCount', { defaultValue: 'Payments' }),
     width: 120,
     minWidth: 120,
     sortable: true,
@@ -137,7 +139,7 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
   },
   {
     key: 'lastPaymentAt',
-    name: 'Last Payment',
+    name: t('payments.lastPayment', { defaultValue: 'Last Payment' }),
     width: 190,
     minWidth: 190,
     sortable: true,
@@ -145,7 +147,7 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
   },
   {
     key: 'createdAt',
-    name: 'Created',
+    name: t('payments.created', { defaultValue: 'Created' }),
     width: 190,
     minWidth: 190,
     sortable: true,
@@ -251,6 +253,7 @@ function compareGridValues(
 }
 
 function CustomerBadge({ variant }: { variant: CustomerBadgeVariant }) {
+  const { t } = useTranslation('chrome');
   if (!variant) {
     return null;
   }
@@ -262,7 +265,9 @@ function CustomerBadge({ variant }: { variant: CustomerBadgeVariant }) {
         CUSTOMER_BADGE_CLASS_NAMES[variant]
       )}
     >
-      {variant === 'deleted' ? 'Deleted' : 'Guest'}
+      {variant === 'deleted'
+        ? t('payments.deleted', { defaultValue: 'Deleted' })
+        : t('payments.guest', { defaultValue: 'Guest' })}
     </span>
   );
 }
@@ -369,8 +374,10 @@ function CountryCell({ code, name }: { code: string | null; name: string | null 
 }
 
 export default function CustomersPage() {
+  const { t } = useTranslation('chrome');
   const { openPaymentsSettings, provider, setProvider, environment } =
     useOutletContext<PaymentsOutletContext>();
+  const customerColumns = useMemo(() => getCustomerColumns(t), [t]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([
     { columnKey: 'lastPaymentAt', direction: 'DESC' },
@@ -481,12 +488,12 @@ export default function CustomersPage() {
           className="h-14 min-h-14"
           leftClassName="py-0"
           rightClassName="py-0"
-          title="Customers"
+          title={t('payments.customers', { defaultValue: 'Customers' })}
           showSearch
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
           searchDebounceTime={300}
-          searchPlaceholder="Search customer"
+          searchPlaceholder={t('payments.searchCustomer', { defaultValue: 'Search customer' })}
           searchInputClassName="w-[280px]"
         />
       )}
@@ -495,7 +502,9 @@ export default function CustomersPage() {
         {error ? (
           <ErrorState error={error as Error} onRetry={() => void refetch()} />
         ) : isLoading ? (
-          <LoadingState message="Loading customers..." />
+          <LoadingState
+            message={t('payments.loadingCustomers', { defaultValue: 'Loading customers...' })}
+          />
         ) : !hasActiveKey ? (
           <PaymentsOnboardingState
             provider={provider}
@@ -509,7 +518,11 @@ export default function CustomersPage() {
               <div className="px-3 py-3">
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Latest Stripe sync failed</AlertTitle>
+                  <AlertTitle>
+                    {t('payments.stripeSyncFailedTitle', {
+                      defaultValue: 'Latest Stripe sync failed',
+                    })}
+                  </AlertTitle>
                   <AlertDescription className="mt-2">
                     {activeConnection.lastSyncError}
                   </AlertDescription>
@@ -520,7 +533,11 @@ export default function CustomersPage() {
               <div className="px-3 py-3">
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Latest Razorpay sync failed</AlertTitle>
+                  <AlertTitle>
+                    {t('payments.razorpaySyncFailedTitle', {
+                      defaultValue: 'Latest Razorpay sync failed',
+                    })}
+                  </AlertTitle>
                   <AlertDescription className="mt-2">
                     {activeRazorpayConnection.lastSyncError}
                   </AlertDescription>
@@ -531,7 +548,7 @@ export default function CustomersPage() {
             <div className="min-h-0 flex-1 overflow-hidden">
               <DataGrid<CustomerGridRow>
                 data={paginatedCustomerRows}
-                columns={CUSTOMER_COLUMNS}
+                columns={customerColumns}
                 sortColumns={sortColumns}
                 onSortColumnsChange={setSortColumns}
                 currentPage={currentPage}
@@ -539,7 +556,9 @@ export default function CustomersPage() {
                 pageSize={pageSize}
                 totalRecords={sortedCustomerRows.length}
                 onPageChange={setCurrentPage}
-                paginationRecordLabel="customers"
+                paginationRecordLabel={t('payments.recordCustomers', {
+                  defaultValue: 'customers',
+                })}
                 showPagination={showPagination}
                 showSelection={false}
                 showTypeBadge={false}
@@ -550,8 +569,10 @@ export default function CustomersPage() {
                   <DataGridEmptyState
                     message={
                       searchQuery.trim().length > 0
-                        ? 'No customers match your search criteria'
-                        : 'No customers found'
+                        ? t('payments.noCustomersMatchSearch', {
+                            defaultValue: 'No customers match your search criteria',
+                          })
+                        : t('payments.noCustomersFound', { defaultValue: 'No customers found' })
                     }
                   />
                 }

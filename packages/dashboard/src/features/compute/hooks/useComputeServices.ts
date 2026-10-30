@@ -1,10 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { computeServicesApi } from '#features/compute/services/compute.service';
-import type { CreateServiceRequest, UpdateServiceRequest } from '@insforge/shared-schemas';
+import type { CreateServiceRequestInput, UpdateServiceRequest } from '@insforge/shared-schemas';
 import { useToast } from '@insforge/ui';
 import { deriveHealth, type ServiceHealth } from '#features/compute/lib/health';
 
-export function useComputeServices() {
+/**
+ * @param enabled Gate the list request. Pass false once it is known that compute
+ *   is not configured: the request would only 503, and spinning on a call whose
+ *   failure is already known reads as a broken page rather than an unconfigured
+ *   feature.
+ */
+export function useComputeServices(enabled = true) {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -12,20 +20,28 @@ export function useComputeServices() {
     data: services = [],
     isLoading,
     error,
+    refetch,
   } = useQuery({
     queryKey: ['compute', 'services'],
     queryFn: () => computeServicesApi.list(),
     staleTime: 30_000,
+    enabled,
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateServiceRequest) => computeServicesApi.create(data),
+    mutationFn: (data: CreateServiceRequestInput) => computeServicesApi.create(data),
     onSuccess: (svc) => {
       void queryClient.invalidateQueries({ queryKey: ['compute', 'services'] });
-      showToast(`Service "${svc.name}" created`, 'success');
+      showToast(
+        t('compute.toastCreated', { defaultValue: 'Service "{{name}}" created', name: svc.name }),
+        'success'
+      );
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Failed to create service', 'error');
+      showToast(
+        err.message || t('compute.toastCreateFailed', { defaultValue: 'Failed to create service' }),
+        'error'
+      );
     },
   });
 
@@ -34,10 +50,13 @@ export function useComputeServices() {
       computeServicesApi.update(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['compute', 'services'] });
-      showToast('Service updated', 'success');
+      showToast(t('compute.toastUpdated', { defaultValue: 'Service updated' }), 'success');
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Failed to update service', 'error');
+      showToast(
+        err.message || t('compute.toastUpdateFailed', { defaultValue: 'Failed to update service' }),
+        'error'
+      );
     },
   });
 
@@ -45,10 +64,13 @@ export function useComputeServices() {
     mutationFn: (id: string) => computeServicesApi.remove(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['compute', 'services'] });
-      showToast('Service deleted', 'success');
+      showToast(t('compute.toastDeleted', { defaultValue: 'Service deleted' }), 'success');
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Failed to delete service', 'error');
+      showToast(
+        err.message || t('compute.toastDeleteFailed', { defaultValue: 'Failed to delete service' }),
+        'error'
+      );
     },
   });
 
@@ -56,10 +78,13 @@ export function useComputeServices() {
     mutationFn: (id: string) => computeServicesApi.stop(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['compute', 'services'] });
-      showToast('Service stopped', 'success');
+      showToast(t('compute.toastStopped', { defaultValue: 'Service stopped' }), 'success');
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Failed to stop service', 'error');
+      showToast(
+        err.message || t('compute.toastStopFailed', { defaultValue: 'Failed to stop service' }),
+        'error'
+      );
     },
   });
 
@@ -67,10 +92,13 @@ export function useComputeServices() {
     mutationFn: (id: string) => computeServicesApi.start(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['compute', 'services'] });
-      showToast('Service started', 'success');
+      showToast(t('compute.toastStarted', { defaultValue: 'Service started' }), 'success');
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Failed to start service', 'error');
+      showToast(
+        err.message || t('compute.toastStartFailed', { defaultValue: 'Failed to start service' }),
+        'error'
+      );
     },
   });
 
@@ -87,6 +115,9 @@ export function useComputeServices() {
 
     // Errors
     error,
+    // Exposed so a failed list can offer Try again, the way payments' pages do,
+    // instead of telling the reader to refresh the page themselves.
+    refetch,
 
     // Actions
     create: createMutation.mutateAsync,

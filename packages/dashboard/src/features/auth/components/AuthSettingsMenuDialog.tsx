@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Lock, Mail, Settings, Plus, X } from 'lucide-react';
@@ -34,6 +35,7 @@ import {
   type UpdateAuthConfigRequest,
 } from '@insforge/shared-schemas';
 import { useAuthConfig } from '#features/auth/hooks/useAuthConfig';
+import { useSmtpConfig } from '#features/auth/hooks/useSmtpConfig';
 import { isInsForgeCloudProject } from '#lib/utils/utils';
 
 interface AuthSettingsMenuDialogProps {
@@ -100,9 +102,24 @@ function SettingRow({ label, description, children }: SettingRowProps) {
 }
 
 export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuDialogProps) {
+  const { t } = useTranslation('chrome');
   const isCloudProject = isInsForgeCloudProject();
   const [activeSection, setActiveSection] = useState<AuthSettingsSection>('general');
   const { config, isLoading, isUpdating, updateConfig } = useAuthConfig();
+  const {
+    config: smtpConfig,
+    isLoading: isSmtpConfigLoading,
+    error: smtpConfigError,
+    refetch: refetchSmtpConfig,
+  } = useSmtpConfig({ enabled: open && !isCloudProject });
+  const hasSuccessfulSmtpLookup =
+    isCloudProject || (!isSmtpConfigLoading && !smtpConfigError && smtpConfig !== undefined);
+  const hasEmailProvider =
+    isCloudProject || (hasSuccessfulSmtpLookup && smtpConfig?.enabled === true);
+  const isEmailVerificationRecoveryRequired =
+    hasSuccessfulSmtpLookup && !hasEmailProvider && config?.requireEmailVerification === true;
+  const canAccessEmailVerification =
+    !hasSuccessfulSmtpLookup || hasEmailProvider || isEmailVerificationRecoveryRequired;
   const { showToast } = useToast();
 
   const form = useForm<UpdateAuthConfigRequest>({
@@ -195,29 +212,40 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
         updateConfig(data);
       },
       () => {
-        showToast('Please fix the highlighted errors before saving changes.', 'error');
+        showToast(
+          t('auth.fixErrorsBeforeSaving', {
+            defaultValue: 'Please fix the highlighted errors before saving changes.',
+          }),
+          'error'
+        );
       }
     )();
   };
 
   const sectionTitle = useMemo(() => {
     if (activeSection === 'email-verification') {
-      return 'Email Verification';
+      return t('auth.emailVerification', { defaultValue: 'Email Verification' });
     }
     if (activeSection === 'password') {
-      return 'Password';
+      return t('auth.password', { defaultValue: 'Password' });
     }
-    return 'General';
-  }, [activeSection]);
+    return t('auth.general', { defaultValue: 'General' });
+  }, [activeSection, t]);
 
-  const saveDisabled = !form.formState.isDirty || !form.formState.isValid || isUpdating;
+  const saveDisabled =
+    !form.formState.isDirty ||
+    !form.formState.isValid ||
+    isUpdating ||
+    (!hasEmailProvider && requireEmailVerification);
 
   return (
     <MenuDialog open={open} onOpenChange={handleOpenChange}>
       <MenuDialogContent>
         <MenuDialogSideNav>
           <MenuDialogSideNavHeader>
-            <MenuDialogSideNavTitle>Auth Settings</MenuDialogSideNavTitle>
+            <MenuDialogSideNavTitle>
+              {t('auth.authSettings', { defaultValue: 'Auth Settings' })}
+            </MenuDialogSideNavTitle>
           </MenuDialogSideNavHeader>
           <MenuDialogNav>
             <MenuDialogNavList>
@@ -226,15 +254,15 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                 active={activeSection === 'general'}
                 onClick={() => setActiveSection('general')}
               >
-                General
+                {t('auth.general', { defaultValue: 'General' })}
               </MenuDialogNavItem>
-              {isCloudProject && (
+              {canAccessEmailVerification && (
                 <MenuDialogNavItem
                   icon={<Mail className="h-5 w-5" />}
                   active={activeSection === 'email-verification'}
                   onClick={() => setActiveSection('email-verification')}
                 >
-                  Email Verification
+                  {t('auth.emailVerification', { defaultValue: 'Email Verification' })}
                 </MenuDialogNavItem>
               )}
               <MenuDialogNavItem
@@ -242,7 +270,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                 active={activeSection === 'password'}
                 onClick={() => setActiveSection('password')}
               >
-                Password
+                {t('auth.password', { defaultValue: 'Password' })}
               </MenuDialogNavItem>
             </MenuDialogNavList>
           </MenuDialogNav>
@@ -252,7 +280,10 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
           <MenuDialogHeader>
             <MenuDialogTitle>{sectionTitle}</MenuDialogTitle>
             <MenuDialogDescription className="sr-only">
-              {sectionTitle} settings
+              {t('auth.sectionSettings', {
+                section: sectionTitle,
+                defaultValue: '{{section}} settings',
+              })}
             </MenuDialogDescription>
             <MenuDialogCloseButton className="ml-auto" />
           </MenuDialogHeader>
@@ -260,7 +291,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
           {isLoading ? (
             <MenuDialogBody>
               <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-muted-foreground">
-                Loading configuration...
+                {t('auth.loadingConfiguration', { defaultValue: 'Loading configuration...' })}
               </div>
             </MenuDialogBody>
           ) : (
@@ -272,8 +303,13 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                 {activeSection === 'general' && (
                   <>
                     <SettingRow
-                      label="Disable New User Signups"
-                      description="When on, public sign-up is rejected and only existing users can sign in. Project admins can still create users via the dashboard or API."
+                      label={t('auth.disableSignupsLabel', {
+                        defaultValue: 'Disable New User Signups',
+                      })}
+                      description={t('auth.disableSignupsDescription', {
+                        defaultValue:
+                          'When on, public sign-up is rejected and only existing users can sign in. Project admins can still create users via the dashboard or API.',
+                      })}
                     >
                       <Controller
                         name="disableSignup"
@@ -288,8 +324,13 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                     </SettingRow>
 
                     <SettingRow
-                      label="Allowed Redirect URLs"
-                      description="Allowed redirect destinations for auth flows. Leave empty to allow all URLs."
+                      label={t('auth.allowedRedirectUrlsLabel', {
+                        defaultValue: 'Allowed Redirect URLs',
+                      })}
+                      description={t('auth.allowedRedirectUrlsDescription', {
+                        defaultValue:
+                          'Allowed redirect destinations for auth flows. Leave empty to allow all URLs.',
+                      })}
                     >
                       <div className="flex flex-col gap-2">
                         {visibleAllowedRedirectUrls.map((url, index) => {
@@ -319,7 +360,8 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                               </div>
                               {itemError && (
                                 <p className="pt-1 text-xs text-destructive">
-                                  {itemError.message || 'Invalid URL'}
+                                  {itemError.message ||
+                                    t('auth.invalidUrl', { defaultValue: 'Invalid URL' })}
                                 </p>
                               )}
                             </div>
@@ -331,7 +373,9 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                           onClick={() => void handleAddAllowedRedirectUrl()}
                         >
                           <Plus className="size-5" />
-                          <span className="px-1">Add URL</span>
+                          <span className="px-1">
+                            {t('auth.addUrl', { defaultValue: 'Add URL' })}
+                          </span>
                         </button>
                       </div>
                     </SettingRow>
@@ -340,15 +384,53 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
 
                 {activeSection === 'email-verification' && (
                   <>
-                    {!isCloudProject ? (
+                    {isSmtpConfigLoading ? (
                       <p className="text-sm text-muted-foreground">
-                        Email verification settings are available for InsForge Cloud projects only.
+                        {t('auth.emailProviderStatusLoading', {
+                          defaultValue: 'Loading email provider configuration...',
+                        })}
+                      </p>
+                    ) : smtpConfigError ? (
+                      <div className="flex flex-col items-start gap-3">
+                        <p className="text-sm text-destructive">
+                          {t('auth.emailProviderStatusLoadFailed', {
+                            defaultValue:
+                              'Could not check email provider availability. Try again to continue.',
+                          })}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => void refetchSmtpConfig()}
+                        >
+                          {t('auth.retry', { defaultValue: 'Retry' })}
+                        </Button>
+                      </div>
+                    ) : !canAccessEmailVerification ? (
+                      <p className="text-sm text-muted-foreground">
+                        {t('auth.emailVerificationProviderRequired', {
+                          defaultValue:
+                            'Email verification settings require InsForge Cloud or enabled custom SMTP.',
+                        })}
                       </p>
                     ) : (
                       <>
+                        {isEmailVerificationRecoveryRequired && (
+                          <p className="text-sm text-destructive">
+                            {t('auth.emailVerificationRecoveryRequired', {
+                              defaultValue:
+                                'No email provider is available. Turn off required email verification before saving, or enable custom SMTP.',
+                            })}
+                          </p>
+                        )}
                         <SettingRow
-                          label="Require Email Verification"
-                          description="Users must verify their email address before they can sign in"
+                          label={t('auth.requireEmailVerificationLabel', {
+                            defaultValue: 'Require Email Verification',
+                          })}
+                          description={t('auth.requireEmailVerificationDescription', {
+                            defaultValue:
+                              'Users must verify their email address before they can sign in',
+                          })}
                         >
                           <Controller
                             name="requireEmailVerification"
@@ -356,6 +438,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                             render={({ field }) => (
                               <Switch
                                 checked={field.value}
+                                disabled={!hasEmailProvider && field.value === false}
                                 onCheckedChange={(value) => {
                                   field.onChange(value);
                                 }}
@@ -366,8 +449,13 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
 
                         {requireEmailVerification && (
                           <SettingRow
-                            label="Email Verification Method"
-                            description="Choose between 6-digit verification code or verification link"
+                            label={t('auth.emailVerificationMethodLabel', {
+                              defaultValue: 'Email Verification Method',
+                            })}
+                            description={t('auth.emailVerificationMethodDescription', {
+                              defaultValue:
+                                'Choose between 6-digit verification code or verification link',
+                            })}
                           >
                             <Controller
                               name="verifyEmailMethod"
@@ -382,11 +470,19 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                                   }}
                                 >
                                   <SelectTrigger>
-                                    <span>{field.value === 'code' ? 'Code' : 'Link'}</span>
+                                    <span>
+                                      {field.value === 'code'
+                                        ? t('auth.code', { defaultValue: 'Code' })
+                                        : t('auth.link', { defaultValue: 'Link' })}
+                                    </span>
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="code">Code</SelectItem>
-                                    <SelectItem value="link">Link</SelectItem>
+                                    <SelectItem value="code">
+                                      {t('auth.code', { defaultValue: 'Code' })}
+                                    </SelectItem>
+                                    <SelectItem value="link">
+                                      {t('auth.link', { defaultValue: 'Link' })}
+                                    </SelectItem>
                                   </SelectContent>
                                 </Select>
                               )}
@@ -401,8 +497,12 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                 {activeSection === 'password' && (
                   <>
                     <SettingRow
-                      label="Minimum Password Length"
-                      description="Must be between 4 and 128 characters"
+                      label={t('auth.minPasswordLengthLabel', {
+                        defaultValue: 'Minimum Password Length',
+                      })}
+                      description={t('auth.minPasswordLengthDescription', {
+                        defaultValue: 'Must be between 4 and 128 characters',
+                      })}
                     >
                       <Input
                         type="number"
@@ -416,12 +516,18 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                       {form.formState.errors.passwordMinLength && (
                         <p className="pt-1 text-xs text-destructive">
                           {form.formState.errors.passwordMinLength.message ||
-                            'Must be between 4 and 128 characters'}
+                            t('auth.minPasswordLengthDescription', {
+                              defaultValue: 'Must be between 4 and 128 characters',
+                            })}
                         </p>
                       )}
                     </SettingRow>
 
-                    <SettingRow label="Password Strength Requirements">
+                    <SettingRow
+                      label={t('auth.passwordStrengthLabel', {
+                        defaultValue: 'Password Strength Requirements',
+                      })}
+                    >
                       <div className="flex flex-col gap-3 pt-1 pb-8">
                         <Controller
                           name="requireNumber"
@@ -433,7 +539,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                                 onCheckedChange={(checked) => field.onChange(checked)}
                               />
                               <span className="text-sm leading-5 text-foreground">
-                                At least 1 number
+                                {t('auth.atLeastOneNumber', { defaultValue: 'At least 1 number' })}
                               </span>
                             </label>
                           )}
@@ -449,7 +555,9 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                                 onCheckedChange={(checked) => field.onChange(checked)}
                               />
                               <span className="text-sm leading-5 text-foreground">
-                                At least 1 special character
+                                {t('auth.atLeastOneSpecialChar', {
+                                  defaultValue: 'At least 1 special character',
+                                })}
                               </span>
                             </label>
                           )}
@@ -465,7 +573,9 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                                 onCheckedChange={(checked) => field.onChange(checked)}
                               />
                               <span className="text-sm leading-5 text-foreground">
-                                At least 1 lowercase character
+                                {t('auth.atLeastOneLowercase', {
+                                  defaultValue: 'At least 1 lowercase character',
+                                })}
                               </span>
                             </label>
                           )}
@@ -481,7 +591,9 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                                 onCheckedChange={(checked) => field.onChange(checked)}
                               />
                               <span className="text-sm leading-5 text-foreground">
-                                At least 1 uppercase character
+                                {t('auth.atLeastOneUppercase', {
+                                  defaultValue: 'At least 1 uppercase character',
+                                })}
                               </span>
                             </label>
                           )}
@@ -491,8 +603,12 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
 
                     {isCloudProject && (
                       <SettingRow
-                        label="Password Reset Method"
-                        description="Choose between 6-digit reset code or reset link"
+                        label={t('auth.passwordResetMethodLabel', {
+                          defaultValue: 'Password Reset Method',
+                        })}
+                        description={t('auth.passwordResetMethodDescription', {
+                          defaultValue: 'Choose between 6-digit reset code or reset link',
+                        })}
                       >
                         <Controller
                           name="resetPasswordMethod"
@@ -507,11 +623,19 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                               }}
                             >
                               <SelectTrigger>
-                                <span>{field.value === 'code' ? 'Code' : 'Link'}</span>
+                                <span>
+                                  {field.value === 'code'
+                                    ? t('auth.code', { defaultValue: 'Code' })
+                                    : t('auth.link', { defaultValue: 'Link' })}
+                                </span>
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="code">Code</SelectItem>
-                                <SelectItem value="link">Link</SelectItem>
+                                <SelectItem value="code">
+                                  {t('auth.code', { defaultValue: 'Code' })}
+                                </SelectItem>
+                                <SelectItem value="link">
+                                  {t('auth.link', { defaultValue: 'Link' })}
+                                </SelectItem>
                               </SelectContent>
                             </Select>
                           )}
@@ -531,10 +655,12 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                       onClick={resetForm}
                       disabled={isUpdating}
                     >
-                      Cancel
+                      {t('auth.cancel', { defaultValue: 'Cancel' })}
                     </Button>
                     <Button type="button" onClick={handleSubmit} disabled={saveDisabled}>
-                      {isUpdating ? 'Saving...' : 'Save Changes'}
+                      {isUpdating
+                        ? t('auth.saving', { defaultValue: 'Saving...' })
+                        : t('auth.saveChanges', { defaultValue: 'Save Changes' })}
                     </Button>
                   </>
                 )}

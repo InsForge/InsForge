@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MoreHorizontal, Plus, Trash2, Pencil, Mail, ChevronDown, KeyRound } from 'lucide-react';
 import {
   OAuthConfigDialog,
@@ -22,6 +23,7 @@ import type { OAuthProvidersSchema, CustomOAuthConfigSchema } from '@insforge/sh
 import { oauthProviders, type OAuthProviderInfo } from '#features/auth/helpers';
 
 export default function AuthMethodsPage() {
+  const { t } = useTranslation('chrome');
   const [selectedProvider, setSelectedProvider] = useState<OAuthProviderInfo>();
   const [oauthDialogMode, setOAuthDialogMode] = useState<OAuthDialogMode>('create');
   const [selectedCustomProvider, setSelectedCustomProvider] = useState<CustomOAuthConfigSchema>();
@@ -50,10 +52,17 @@ export default function AuthMethodsPage() {
 
   const deleteOAuthConfig = async (providerId: OAuthProvidersSchema, providerName: string) => {
     const shouldDelete = await confirm({
-      title: `Delete ${providerName} OAuth`,
-      description: `Are you sure you want to delete the ${providerName} configuration? This action cannot be undone.`,
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      title: t('auth.deleteOAuthTitle', {
+        name: providerName,
+        defaultValue: 'Delete {{name}} OAuth',
+      }),
+      description: t('auth.deleteOAuthConfirm', {
+        name: providerName,
+        defaultValue:
+          'Are you sure you want to delete the {{name}} configuration? This action cannot be undone.',
+      }),
+      confirmText: t('auth.delete', { defaultValue: 'Delete' }),
+      cancelText: t('auth.cancel', { defaultValue: 'Cancel' }),
       destructive: true,
     });
 
@@ -64,10 +73,17 @@ export default function AuthMethodsPage() {
 
   const deleteCustomOAuthConfig = async (providerKey: string, providerName: string) => {
     const shouldDelete = await confirm({
-      title: `Delete ${providerName} OAuth`,
-      description: `Are you sure you want to delete the ${providerName} configuration? This action cannot be undone.`,
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      title: t('auth.deleteOAuthTitle', {
+        name: providerName,
+        defaultValue: 'Delete {{name}} OAuth',
+      }),
+      description: t('auth.deleteOAuthConfirm', {
+        name: providerName,
+        defaultValue:
+          'Are you sure you want to delete the {{name}} configuration? This action cannot be undone.',
+      }),
+      confirmText: t('auth.delete', { defaultValue: 'Delete' }),
+      cancelText: t('auth.cancel', { defaultValue: 'Cancel' }),
       destructive: true,
     });
 
@@ -123,7 +139,9 @@ export default function AuthMethodsPage() {
     return (
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
         <div className="flex flex-1 items-center justify-center">
-          <div className="text-sm text-muted-foreground">Loading OAuth configuration...</div>
+          <div className="text-sm text-muted-foreground">
+            {t('auth.loadingOAuthConfig', { defaultValue: 'Loading OAuth configuration...' })}
+          </div>
         </div>
       </div>
     );
@@ -133,13 +151,15 @@ export default function AuthMethodsPage() {
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <div className="shrink-0 px-6 pb-6 pt-10 sm:px-10">
         <div className="mx-auto flex w-full max-w-[1024px] items-center justify-between gap-3">
-          <h1 className="text-2xl font-medium leading-8 text-foreground">Auth Methods</h1>
+          <h1 className="text-2xl font-medium leading-8 text-foreground">
+            {t('auth.authMethods', { defaultValue: 'Auth Methods' })}
+          </h1>
           <div className="flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="secondary" className="h-9 rounded px-2 text-foreground">
                   <Plus className="h-5 w-5 stroke-[1.7]" />
-                  <span className="px-1">Add Auth</span>
+                  <span className="px-1">{t('auth.addAuth', { defaultValue: 'Add Auth' })}</span>
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -162,13 +182,17 @@ export default function AuthMethodsPage() {
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                     <Plus className="h-4 w-4" />
-                    <span className="truncate">Custom OAuth Provider</span>
+                    <span className="truncate">
+                      {t('auth.customOAuthProvider', { defaultValue: 'Custom OAuth Provider' })}
+                    </span>
                   </div>
                 </DropdownMenuItem>
                 {configuredProviders.length > 0 && <DropdownMenuSeparator className="my-0.5" />}
                 {availableProviders.length === 0 && (
                   <DropdownMenuItem disabled className="px-3 py-2">
-                    All built-in providers are enabled
+                    {t('auth.allBuiltInProvidersEnabled', {
+                      defaultValue: 'All built-in providers are enabled',
+                    })}
                   </DropdownMenuItem>
                 )}
                 {configuredProviders.map(({ provider }) => (
@@ -182,7 +206,7 @@ export default function AuthMethodsPage() {
                       <span className="truncate">{provider.name}</span>
                     </div>
                     <Badge className="h-5 shrink-0 rounded bg-primary/20 px-1.5 py-0 text-primary">
-                      Enabled
+                      {t('auth.enabled', { defaultValue: 'Enabled' })}
                     </Badge>
                   </DropdownMenuItem>
                 ))}
@@ -198,7 +222,7 @@ export default function AuthMethodsPage() {
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <Mail className="h-5 w-5 text-foreground" />
               <span className="truncate text-sm font-medium leading-6 text-foreground">
-                Email Password
+                {t('auth.emailPassword', { defaultValue: 'Email Password' })}
               </span>
             </div>
           </div>
@@ -218,7 +242,7 @@ export default function AuthMethodsPage() {
               <div className="flex items-center gap-2">
                 {config.useSharedKey && (
                   <Badge className="h-5 rounded bg-[var(--alpha-8)] px-2 py-0 text-xs font-medium leading-4 text-muted-foreground">
-                    Shared Keys
+                    {t('auth.sharedKeys', { defaultValue: 'Shared Keys' })}
                   </Badge>
                 )}
 
@@ -238,14 +262,14 @@ export default function AuthMethodsPage() {
                       className="cursor-pointer gap-2"
                     >
                       <Pencil className="h-5 w-5" />
-                      Edit
+                      {t('auth.edit', { defaultValue: 'Edit' })}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => void deleteOAuthConfig(provider.id, provider.name)}
                       className="cursor-pointer gap-2 text-destructive"
                     >
                       <Trash2 className="h-5 w-5" />
-                      Delete
+                      {t('auth.delete', { defaultValue: 'Delete' })}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -267,7 +291,7 @@ export default function AuthMethodsPage() {
 
               <div className="flex items-center gap-2">
                 <Badge className="h-5 rounded bg-primary/20 px-2 py-0 text-xs font-medium leading-4 text-primary">
-                  Custom
+                  {t('auth.custom', { defaultValue: 'Custom' })}
                 </Badge>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -285,7 +309,7 @@ export default function AuthMethodsPage() {
                       className="cursor-pointer gap-2"
                     >
                       <Pencil className="h-5 w-5" />
-                      Edit
+                      {t('auth.edit', { defaultValue: 'Edit' })}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() =>
@@ -294,7 +318,7 @@ export default function AuthMethodsPage() {
                       className="cursor-pointer gap-2 text-destructive"
                     >
                       <Trash2 className="h-5 w-5" />
-                      Delete
+                      {t('auth.delete', { defaultValue: 'Delete' })}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

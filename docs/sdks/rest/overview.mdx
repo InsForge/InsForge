@@ -1,6 +1,6 @@
 ---
-title: REST API
-description: Direct HTTP API access to InsForge services
+title: InsForge REST API overview
+description: Call InsForge auth, database, storage, and functions directly over HTTP with any language, using API keys, JWTs, and standard REST conventions.
 ---
 
 The InsForge REST API provides direct HTTP access to all InsForge services. Use this when you need to integrate with languages or platforms without an official SDK.
@@ -15,13 +15,13 @@ https://your-app.insforge.app
 
 All API requests require authentication via the `Authorization` header:
 
-### Bearer Token
+### Bearer token
 
 ```bash
 Authorization: Bearer your-jwt-token-or-anon-key
 ```
 
-## Quick Start
+## Quick start
 
 ```bash
 # Register a new user
@@ -39,9 +39,9 @@ curl https://your-app.insforge.app/api/database/records/posts \
   -H "Authorization: Bearer your-jwt-token"
 ```
 
-## Response Format
+## Response format
 
-### Success Response
+### Success response
 
 Data is returned directly in the response body:
 
@@ -53,7 +53,7 @@ Data is returned directly in the response body:
 }
 ```
 
-### Error Response
+### Error response
 
 ```json
 {
@@ -64,7 +64,7 @@ Data is returned directly in the response body:
 }
 ```
 
-## Common HTTP Status Codes
+## Common HTTP status codes
 
 | Status | Description |
 |--------|-------------|
@@ -87,7 +87,7 @@ Data is returned directly in the response body:
 - **AI** - Chat completions and image generation
 - **Realtime** - Channel management and message history (WebSocket for real-time)
 
-## API Reference
+## API reference
 
 <CardGroup cols={2}>
   <Card title="Database" icon="database" href="/sdks/rest/database">

@@ -1,4 +1,5 @@
 import { Loader2, RefreshCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@insforge/ui';
 import type { PaymentProvider, RazorpayKeyConfig, StripeKeyConfig } from '@insforge/shared-schemas';
 
@@ -21,17 +22,27 @@ export function PaymentsSyncTabContent({
   onSync: () => void;
   provider?: PaymentProvider;
 }) {
+  const { t } = useTranslation('chrome');
   const providerName = provider === 'stripe' ? 'Stripe' : 'Razorpay';
   const syncDescription =
     provider === 'stripe'
-      ? 'Force a manual sync of Stripe products, prices, customers, and active subscriptions. Normally, Stripe events sync automatically via webhooks.'
-      : 'Force a manual sync of Razorpay items, plans, customers, subscriptions, invoices, and payments. Normally, Razorpay events sync automatically via webhooks.';
+      ? t('payments.syncDescriptionStripe', {
+          defaultValue:
+            'Force a manual sync of Stripe products, prices, customers, and active subscriptions. Normally, Stripe events sync automatically via webhooks.',
+        })
+      : t('payments.syncDescriptionRazorpay', {
+          defaultValue:
+            'Force a manual sync of Razorpay items, plans, customers, subscriptions, invoices, and payments. Normally, Razorpay events sync automatically via webhooks.',
+        });
 
   if (isLoading && !error) {
     return (
       <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Loading {providerName} key configuration...
+        {t('payments.loadingKeyConfiguration', {
+          defaultValue: 'Loading {{provider}} key configuration...',
+          provider: providerName,
+        })}
       </div>
     );
   }
@@ -39,7 +50,11 @@ export function PaymentsSyncTabContent({
   if (error) {
     return (
       <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-        Failed to load {providerName} key configuration. Close the dialog and try again.
+        {t('payments.loadKeyConfigurationFailed', {
+          defaultValue:
+            'Failed to load {{provider}} key configuration. Close the dialog and try again.',
+          provider: providerName,
+        })}
       </div>
     );
   }
@@ -53,13 +68,27 @@ export function PaymentsSyncTabContent({
       <div className="rounded border border-[var(--alpha-8)] bg-muted/40 p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground">Sync all configured environments</p>
+            <p className="text-sm font-medium text-foreground">
+              {t('payments.syncAllEnvironments', {
+                defaultValue: 'Sync all configured environments',
+              })}
+            </p>
             <p className="mt-1 text-[13px] leading-5 text-muted-foreground">
               {configuredKeys.length > 0
-                ? `Configured: ${configuredKeys
-                    .map((key) => (key.environment === 'test' ? 'Test' : 'Live'))
-                    .join(', ')}`
-                : `Configure a ${providerName} test or live key before syncing.`}
+                ? t('payments.configuredEnvironments', {
+                    defaultValue: 'Configured: {{environments}}',
+                    environments: configuredKeys
+                      .map((key) =>
+                        key.environment === 'test'
+                          ? t('payments.modeTest', { defaultValue: 'Test' })
+                          : t('payments.modeLive', { defaultValue: 'Live' })
+                      )
+                      .join(', '),
+                  })
+                : t('payments.configureKeyBeforeSync', {
+                    defaultValue: 'Configure a {{provider}} test or live key before syncing.',
+                    provider: providerName,
+                  })}
             </p>
           </div>
           <Button
@@ -74,7 +103,7 @@ export function PaymentsSyncTabContent({
             ) : (
               <RefreshCw className="h-4 w-4" />
             )}
-            Sync Payments
+            {t('payments.syncPayments', { defaultValue: 'Sync Payments' })}
           </Button>
         </div>
       </div>
@@ -83,7 +112,10 @@ export function PaymentsSyncTabContent({
         <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
           {syncError instanceof Error
             ? syncError.message
-            : `Failed to sync ${providerName} payments.`}
+            : t('payments.syncFailed', {
+                defaultValue: 'Failed to sync {{provider}} payments.',
+                provider: providerName,
+              })}
         </div>
       )}
     </div>

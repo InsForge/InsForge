@@ -25,6 +25,9 @@ Each event contains:
 - Operating system, CPU architecture, Node.js version, runtime environment, and whether the process appears to be running in CI
 - Storage backend category: local filesystem, S3, or S3-compatible
 - Boolean flags for whether optional features are configured: site deployments, functions, compute, and OpenRouter
+- On heartbeat events only, the list of features touched since the previous heartbeat, such as `["auth", "database", "storage"]`. This is a yes or no per feature. InsForge does not send request counts, request volumes, paths, request contents, or anything about who made the request. Reads issued from an open dashboard tab, dashboard sign-in traffic, and unauthenticated requests are not treated as usage.
+
+A final heartbeat is sent when the backend shuts down, so deployments that run for less than 24 hours still report their usage.
 
 ## What InsForge never sends
 

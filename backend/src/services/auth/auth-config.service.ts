@@ -9,6 +9,11 @@ import {
   type UpdateAuthConfigRequest,
 } from '@insforge/shared-schemas';
 import { URL } from 'url';
+import {
+  emailProviderNotConfiguredError,
+  hasAvailableEmailProvider,
+  lockEmailProviderConfiguration,
+} from '@/services/email/helpers.js';
 
 export class AuthConfigService {
   private static instance: AuthConfigService;
@@ -146,6 +151,10 @@ export class AuthConfigService {
     try {
       await client.query('BEGIN');
 
+      if (input.requireEmailVerification !== undefined) {
+        await lockEmailProviderConfiguration(client);
+      }
+
       // Ensure the singleton config row exists before we try to lock and update it.
       await client.query('INSERT INTO auth.config DEFAULT VALUES ON CONFLICT DO NOTHING');
 
@@ -161,6 +170,10 @@ export class AuthConfigService {
           500,
           ERROR_CODES.INTERNAL_ERROR
         );
+      }
+
+      if (input.requireEmailVerification === true && !(await hasAvailableEmailProvider(client))) {
+        throw emailProviderNotConfiguredError();
       }
 
       // Build update query

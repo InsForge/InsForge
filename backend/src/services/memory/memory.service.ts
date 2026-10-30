@@ -242,14 +242,18 @@ Return JSON {"action":"ADD"|"UPDATE"|"NOOP","target_id"?:string,"title"?:string,
       const content = decision.content ?? candidate.content;
       const newEmbedding = await this.embed(`${title}\n${content}`);
       await pool.query(
+        // embedding_model travels with embedding — the row is re-embedded here, so
+        // leaving the old label behind would mislabel the vector it describes.
         `UPDATE memory.memories
-            SET kind = $1, title = $2, content = $3, embedding = $4::vector, source = $5
-          WHERE id = $6 AND scope = $7`,
+            SET kind = $1, title = $2, content = $3, embedding = $4::vector,
+                embedding_model = $5, source = $6
+          WHERE id = $7 AND scope = $8`,
         [
           candidate.kind,
           title,
           content,
           this.toVectorLiteral(newEmbedding),
+          EMBED_MODEL,
           source ?? null,
           decision.target_id,
           scope,
@@ -272,19 +276,26 @@ Return JSON {"action":"ADD"|"UPDATE"|"NOOP","target_id"?:string,"title"?:string,
     title?: string;
     content?: string;
   }): Promise<RememberResult[]> {
+    const isTranscriptMode = Boolean(params.transcript);
     const candidates: Candidate[] = params.transcript
       ? await this.extract(params.transcript)
       : params.title && params.content
         ? [{ kind: params.kind ?? 'fact', title: params.title, content: params.content }]
         : [];
 
-    // Isolate failures per candidate: one bad row (e.g. an embedding hiccup
-    // mid-batch) must not discard the memories already stored before it.
+    // Transcript mode: isolate failures per candidate — one bad row (e.g. an
+    // embedding hiccup mid-batch) must not discard the memories already
+    // stored before it. Explicit single-candidate mode: rethrow, so the
+    // caller gets a real error instead of a misleading NOOP that looks like
+    // "already stored" when nothing was persisted.
     const results: RememberResult[] = [];
     for (const c of candidates) {
       try {
         results.push(await this.rememberOne(params.scope, c, params.source));
       } catch (err) {
+        if (!isTranscriptMode) {
+          throw err;
+        }
         logger.warn('memory.remember candidate failed', {
           scope: params.scope,
           title: c.title,

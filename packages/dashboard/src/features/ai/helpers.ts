@@ -1,4 +1,8 @@
-import { ModalitySchema, AIModelSchema } from '@insforge/shared-schemas';
+import {
+  ModalitySchema,
+  AIModelSchema,
+  type AIOverviewMetricPoint,
+} from '@insforge/shared-schemas';
 export interface ModelOption {
   id: string;
   created?: number;
@@ -141,15 +145,6 @@ export const generateProviderTabs = (models: AIModelSchema[]): ProviderTab[] => 
   });
 };
 
-export const formatTokenCount = (count: number): string => {
-  if (count >= 1000000) {
-    return `${(count / 1000000).toFixed(1)}M`;
-  } else if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}K`;
-  }
-  return count.toString();
-};
-
 // Helper function to filter AI models based on selected modalities
 export const filterModelsByModalities = (
   models: AIModelSchema[],
@@ -194,14 +189,6 @@ export function toModelOption(model: AIModelSchema): ModelOption {
 export type SortField = 'inputPrice' | 'outputPrice' | 'released';
 export type SortDirection = 'asc' | 'desc';
 
-// Format credits display
-export const formatCredits = (remaining: number): string => {
-  if (remaining >= 1000) {
-    return `${(remaining / 1000).toFixed(1)}K`;
-  }
-  return remaining.toFixed(2);
-};
-
 // Format price per million tokens
 export const formatPrice = (price?: number): string => {
   if (price === undefined) {
@@ -241,3 +228,23 @@ export const formatReleasedDate = (created?: number): string => {
     year: 'numeric',
   }).format(new Date(created * 1000));
 };
+
+export function formatCompactNumber(value: number): string {
+  return new Intl.NumberFormat('en', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+export function formatUsd(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: value > 0 && value < 0.01 ? 4 : 2,
+  }).format(value);
+}
+
+export function sumMetricPoints(points: AIOverviewMetricPoint[]): number {
+  return points.reduce((sum, point) => sum + point.value, 0);
+}

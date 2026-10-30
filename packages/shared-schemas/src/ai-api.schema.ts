@@ -95,17 +95,35 @@ export const toolCallSchema = z.object({
 });
 
 // Chat message supports both OpenAI format and legacy format for backward compatibility
-export const chatMessageSchema = z.object({
-  role: z.enum(['user', 'assistant', 'system', 'tool']),
-  // New format: content can be string or array of content parts (OpenAI-compatible)
-  content: z.union([z.string(), z.array(contentSchema)]).nullable(),
-  // Legacy format: separate images field (deprecated but supported for backward compatibility)
-  images: z.array(z.object({ url: z.string() })).optional(),
-  // Tool calls made by the assistant
-  tool_calls: z.array(toolCallSchema).optional(),
-  // Tool call ID for tool response messages
-  tool_call_id: z.string().optional(),
-});
+export const chatMessageSchema = z
+  .object({
+    role: z.enum(['user', 'assistant', 'system', 'tool']),
+    // Content can be a string or an array of content parts (OpenAI-compatible).
+    // Nullable AND optional so an assistant tool-call message may omit it (per the
+    // per-role rule enforced below); `formatMessages` coerces a missing assistant
+    // content to null.
+    content: z.union([z.string(), z.array(contentSchema)]).nullish(),
+    // Legacy format: separate images field (deprecated but supported for backward compatibility)
+    images: z.array(z.object({ url: z.string() })).optional(),
+    // Tool calls made by the assistant
+    tool_calls: z.array(toolCallSchema).optional(),
+    // Tool call ID for tool response messages
+    tool_call_id: z.string().optional(),
+  })
+  .superRefine((message, ctx) => {
+    // OpenAI only makes `content` optional on assistant messages (it may be
+    // omitted when `tool_calls` is present). user / system / tool messages must
+    // still carry the field, so an omitted `content` on those roles is rejected
+    // here rather than silently reaching the provider as `undefined`. `null` stays
+    // allowed for every role, matching the prior behavior.
+    if (message.role !== 'assistant' && message.content === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['content'],
+        message: `content is required for ${message.role} messages`,
+      });
+    }
+  });
 
 // Web Search Plugin configuration for OpenRouter
 export const webSearchPluginSchema = z.object({
@@ -304,6 +322,18 @@ export const aiOverviewMetricPointSchema = z.object({
   value: z.number(),
 });
 
+export const aiModelUsageSchema = z.object({
+  model: z.string(),
+  providers: z.array(z.string()),
+  requests: z.number(),
+  promptTokens: z.number(),
+  completionTokens: z.number(),
+  reasoningTokens: z.number(),
+  totalTokens: z.number(),
+  spend: z.number(),
+  byokSpend: z.number(),
+});
+
 export const aiOverviewSchema = z.object({
   key: z.object({
     label: z.string().optional(),
@@ -323,12 +353,33 @@ export const aiOverviewSchema = z.object({
     requests: z.array(aiOverviewMetricPointSchema),
     tokens: z.array(aiOverviewMetricPointSchema),
   }),
+  // Optional for compatibility while cloud backends and dashboards roll out independently.
+  modelUsage: z.array(aiModelUsageSchema).optional(),
 });
 
 export const openRouterKeySchema = z.object({
   apiKey: z.string(),
   maskedKey: z.string(),
 });
+
+export const modelGatewayCredentialStatusSchema = z.object({
+  configured: z.boolean(),
+  maskedKey: z.string().nullable(),
+});
+
+export const modelGatewayConfigSchema = z.object({
+  apiKey: modelGatewayCredentialStatusSchema,
+  managementKey: modelGatewayCredentialStatusSchema,
+});
+
+export const updateModelGatewayConfigSchema = z
+  .object({
+    apiKey: z.string().trim().min(1).max(512).optional(),
+    managementKey: z.string().trim().min(1).max(512).optional(),
+  })
+  .refine((value) => value.apiKey !== undefined || value.managementKey !== undefined, {
+    message: 'At least one credential is required',
+  });
 
 // Export types
 export type ToolFunction = z.infer<typeof toolFunctionSchema>;
@@ -355,5 +406,9 @@ export type EmbeddingObject = z.infer<typeof embeddingObjectSchema>;
 export type EmbeddingsResponse = z.infer<typeof embeddingsResponseSchema>;
 export type AIModelSchema = z.infer<typeof aiModelSchema>;
 export type AIOverviewMetricPoint = z.infer<typeof aiOverviewMetricPointSchema>;
+export type AIModelUsage = z.infer<typeof aiModelUsageSchema>;
 export type AIOverview = z.infer<typeof aiOverviewSchema>;
 export type OpenRouterKey = z.infer<typeof openRouterKeySchema>;
+export type ModelGatewayCredentialStatus = z.infer<typeof modelGatewayCredentialStatusSchema>;
+export type ModelGatewayConfig = z.infer<typeof modelGatewayConfigSchema>;
+export type UpdateModelGatewayConfig = z.infer<typeof updateModelGatewayConfigSchema>;

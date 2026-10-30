@@ -1,6 +1,8 @@
 # InsForge Deployment Guides
 
-This directory contains deployment guides for self-hosting InsForge on various platforms.
+This directory contains deployment guides for self-hosting the InsForge platform on various platforms.
+
+> Looking to deploy the app you built on InsForge (take it live)? That is [Sites](../core-concepts/sites/overview), not self-hosting. The guides below are for running the InsForge backend on infrastructure you control.
 
 ## 📚 Available Guides
 
@@ -14,7 +16,7 @@ This directory contains deployment guides for self-hosting InsForge on various p
 
 ### Cloud Platforms
 
-> Note: the cloud-provider walkthroughs (AWS, Azure, GCP) are community-maintained and can lag the current release.
+> Note: the cloud-provider walkthroughs (AWS, Azure, GCP, Hetzner) are community-maintained and can lag the current release.
 
 - **[AWS EC2](./deploy-to-aws-ec2.md)** - Deploy InsForge on Amazon EC2 with Docker Compose
   - Instance setup and configuration
@@ -34,6 +36,12 @@ This directory contains deployment guides for self-hosting InsForge on various p
   - Domain and SSL configuration
   - Production best practices
 
+- **[Hetzner Cloud](./deploy-to-hetzner.md)** - Deploy InsForge on a Hetzner Cloud VPS with Docker Compose
+  - Server and firewall setup in the Hetzner Console
+  - Docker Compose deployment via `deploy/setup.sh`
+  - Domain and SSL configuration
+  - Production best practices
+
 - **[Containarium](./deploy-to-containarium.md)** - Deploy InsForge on a self-hosted Containarium host (LXC + MCP-native control plane)
   - One-command box provisioning with Docker pre-installed
   - Built-in TLS-on-a-hostname via Caddy + ACME
@@ -41,10 +49,21 @@ This directory contains deployment guides for self-hosting InsForge on various p
   - Multi-tenant: many isolated InsForge projects per host
   - Optional agent-driven deploy via MCP
 
+### Self-Hosted PaaS
+
+- **[Coolify](./deploy-to-coolify.md)** - Deploy InsForge as a Docker Compose resource on your own Coolify instance
+  - Repository-connected deploys, rebuilt on push
+  - Domain and TLS handled by Coolify's proxy
+  - Postgres built from the repo, so its config tracks the release
+
+- **[Dokploy](./deploy-to-dokploy.md)** - Deploy InsForge as a Compose application on your own Dokploy instance
+  - Repository-connected deploys with optional Auto Deploy
+  - Domain and TLS handled by Dokploy's proxy
+  - Postgres built from the repo, so its config tracks the release
+
 ### Coming Soon
 
 - **Digital Ocean** - Droplet deployment guide
-- **Hetzner** - VPS deployment guide
 - **Kubernetes** - Production-grade Kubernetes deployment
 - **Railway** - One-click Railway deployment
 - **Fly.io** - Global edge deployment
@@ -60,7 +79,7 @@ This directory contains deployment guides for self-hosting InsForge on various p
 - **Kubernetes** (Coming Soon) - High availability, auto-scaling
 
 ### For Cost-Conscious
-- **Hetzner** (Coming Soon) - Best price-to-performance ratio
+- **[Hetzner Cloud](./deploy-to-hetzner.md)** - Strong price-to-performance on EU VPS plans
 - **Digital Ocean** (Coming Soon) - Simple pricing, good performance
 
 ### For Global Distribution

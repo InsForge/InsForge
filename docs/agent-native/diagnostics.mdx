@@ -1,7 +1,7 @@
 ---
 title: "Diagnostics & advisor"
 sidebarTitle: "Diagnostics & advisor"
-description: "The agent reads backend health, advisor findings, and error logs, then applies the fix."
+description: "Use insforge diagnose so the agent can read backend health, advisor findings, RLS warnings, and error logs, then apply the fix without a dashboard."
 ---
 
 When something breaks, an agent should not have to guess. `npx @insforge/cli diagnose` turns the backend's own signals into something an agent can fetch and act on directly: advisor findings with remediations, database health checks, instance metrics, and aggregated error logs. Each finding comes with a fix, so "what is wrong" and "what to do about it" arrive together. The agent pulls all of this itself, with no dashboard in the loop, which is what lets it close security gaps like a permissive RLS policy before they leak data.

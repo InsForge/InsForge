@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -52,6 +53,7 @@ function parseIndexesFromResponse(response: DatabaseIndexesResponse | undefined)
 }
 
 export default function IndexesPage() {
+  const { t } = useTranslation('chrome');
   const location = useLocation();
   const navigate = useNavigate();
   const { selectedSchema, setSelectedSchema } = useDatabaseSchemaSelection();
@@ -106,21 +108,21 @@ export default function IndexesPage() {
     () => [
       {
         key: 'tableName',
-        name: 'Table',
+        name: t('database.tableColumn', { defaultValue: 'Table' }),
         width: 'minmax(180px, 1.5fr)',
         resizable: true,
         sortable: true,
       },
       {
         key: 'indexName',
-        name: 'Name',
+        name: t('common.nameColumn', { defaultValue: 'Name' }),
         width: 'minmax(200px, 2fr)',
         resizable: true,
         sortable: true,
       },
       {
         key: 'isPrimary',
-        name: 'Type',
+        name: t('common.typeColumn', { defaultValue: 'Type' }),
         width: 'minmax(120px, 1fr)',
         resizable: true,
         sortable: true,
@@ -128,40 +130,44 @@ export default function IndexesPage() {
           if (row.isPrimary) {
             return (
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                Primary
+                {t('database.primaryIndex', { defaultValue: 'Primary' })}
               </span>
             );
           }
           if (row.isUnique) {
             return (
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                Unique
+                {t('database.uniqueIndex', { defaultValue: 'Unique' })}
               </span>
             );
           }
           return (
             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-              Index
+              {t('database.indexBadge', { defaultValue: 'Index' })}
             </span>
           );
         },
       },
       {
         key: 'indexDef',
-        name: 'Definition',
+        name: t('database.definitionColumn', { defaultValue: 'Definition' }),
         width: 'minmax(300px, 5fr)',
         resizable: true,
         renderCell: ({ row }) => (
           <SQLCellButton
             value={row.indexDef}
             onClick={() =>
-              setSqlModal({ open: true, title: 'Index Definition', value: row.indexDef })
+              setSqlModal({
+                open: true,
+                title: t('database.indexDefinition', { defaultValue: 'Index Definition' }),
+                value: row.indexDef,
+              })
             }
           />
         ),
       },
     ],
-    [setSqlModal]
+    [setSqlModal, t]
   );
 
   useEffect(() => {
@@ -189,7 +195,11 @@ export default function IndexesPage() {
           </Button>
         </TooltipTrigger>
         <TooltipContent side="bottom" align="center">
-          <p>{isRefreshing ? 'Refreshing...' : 'Refresh indexes'}</p>
+          <p>
+            {isRefreshing
+              ? t('common.refreshing', { defaultValue: 'Refreshing...' })
+              : t('database.refreshIndexes', { defaultValue: 'Refresh indexes' })}
+          </p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -211,8 +221,12 @@ export default function IndexesPage() {
         />
         <div className="min-w-0 flex-1 flex items-center justify-center bg-[rgb(var(--semantic-1))]">
           <EmptyState
-            title="Failed to load indexes"
-            description={error instanceof Error ? error.message : 'An error occurred'}
+            title={t('database.failedToLoadIndexes', { defaultValue: 'Failed to load indexes' })}
+            description={
+              error instanceof Error
+                ? error.message
+                : t('common.anErrorOccurred', { defaultValue: 'An error occurred' })
+            }
           />
         </div>
       </div>
@@ -234,7 +248,7 @@ export default function IndexesPage() {
       />
       <div className="min-w-0 flex-1 flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
         <TableHeader
-          title="Database Indexes"
+          title={t('database.databaseIndexes', { defaultValue: 'Database Indexes' })}
           showDividerAfterTitle
           titleButtons={
             <div className="w-56">
@@ -253,11 +267,14 @@ export default function IndexesPage() {
           leftSlot={refreshButton}
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
-          searchPlaceholder="Search index"
+          searchPlaceholder={t('database.searchIndex', { defaultValue: 'Search index' })}
         />
         {isLoading ? (
           <div className="min-h-0 flex-1 flex items-center justify-center">
-            <EmptyState title="Loading indexes..." description="Please wait" />
+            <EmptyState
+              title={t('database.loadingIndexes', { defaultValue: 'Loading indexes...' })}
+              description={t('common.pleaseWait', { defaultValue: 'Please wait' })}
+            />
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-hidden">
@@ -271,7 +288,7 @@ export default function IndexesPage() {
               pageSize={pageSize}
               pageSizeOptions={pageSizeOptions}
               totalRecords={filteredIndexes.length}
-              paginationRecordLabel="indexes"
+              paginationRecordLabel={t('database.indexesRecordLabel', { defaultValue: 'indexes' })}
               onPageChange={setCurrentPage}
               onPageSizeChange={onPageSizeChange}
               noPadding={true}
@@ -280,7 +297,11 @@ export default function IndexesPage() {
               emptyState={
                 <DataGridEmptyState
                   message={
-                    searchQuery ? 'No indexes match your search criteria' : 'No indexes found'
+                    searchQuery
+                      ? t('database.noIndexesMatchSearch', {
+                          defaultValue: 'No indexes match your search criteria',
+                        })
+                      : t('database.noIndexesFound', { defaultValue: 'No indexes found' })
                   }
                 />
               }

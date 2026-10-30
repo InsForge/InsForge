@@ -1,4 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type {
   RazorpayEnvironment,
   SyncRazorpayPaymentsEnvironmentResult,
@@ -11,20 +13,21 @@ import {
 import { razorpayQueryKeys } from '#features/payments/queryKeys';
 import { useToast } from '@insforge/ui';
 
-const ENVIRONMENT_LABEL: Record<RazorpayEnvironment, string> = {
-  test: 'Test',
-  live: 'Live',
-};
-
-function formatEnvironments(environments: RazorpayEnvironment[]) {
-  return environments.map((environment) => ENVIRONMENT_LABEL[environment]).join(', ');
+function formatEnvironments(environments: RazorpayEnvironment[], t: TFunction<'chrome'>) {
+  return environments
+    .map((environment) =>
+      environment === 'test'
+        ? t('payments.modeTest', { defaultValue: 'Test' })
+        : t('payments.modeLive', { defaultValue: 'Live' })
+    )
+    .join(', ');
 }
 
 function isFailedSyncResult(result: SyncRazorpayPaymentsEnvironmentResult) {
   return result.connection.status === 'error' || result.connection.lastSyncStatus === 'failed';
 }
 
-function getRazorpaySyncToast(result: SyncRazorpayPaymentsResponse) {
+function getRazorpaySyncToast(result: SyncRazorpayPaymentsResponse, t: TFunction<'chrome'>) {
   const attemptedResults = result.results.filter(
     (item) => item.connection.status !== 'unconfigured'
   );
@@ -34,24 +37,32 @@ function getRazorpaySyncToast(result: SyncRazorpayPaymentsResponse) {
   if (attemptedResults.length === 0) {
     return {
       type: 'info' as const,
-      message: 'No configured Razorpay environments to sync.',
+      message: t('payments.noRazorpayEnvironmentsToSync', {
+        defaultValue: 'No configured Razorpay environments to sync.',
+      }),
     };
   }
 
   if (syncFailedEnvironments.length > 0) {
     return {
       type: 'error' as const,
-      message: `Razorpay sync failed for ${formatEnvironments(syncFailedEnvironments)}.`,
+      message: t('payments.razorpaySyncFailedFor', {
+        defaultValue: 'Razorpay sync failed for {{environments}}.',
+        environments: formatEnvironments(syncFailedEnvironments, t),
+      }),
     };
   }
 
   return {
     type: 'success' as const,
-    message: 'Razorpay payments synced successfully.',
+    message: t('payments.razorpayPaymentsSynced', {
+      defaultValue: 'Razorpay payments synced successfully.',
+    }),
   };
 }
 
 export function useRazorpaySync() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -66,11 +77,15 @@ export function useRazorpaySync() {
         queryClient.invalidateQueries({ queryKey: razorpayQueryKeys.transactions }),
       ]);
 
-      const toast = getRazorpaySyncToast(result);
+      const toast = getRazorpaySyncToast(result, t);
       showToast(toast.message, toast.type);
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to sync Razorpay payments', 'error');
+      showToast(
+        error.message ||
+          t('payments.syncRazorpayFailed', { defaultValue: 'Failed to sync Razorpay payments' }),
+        'error'
+      );
     },
   });
 

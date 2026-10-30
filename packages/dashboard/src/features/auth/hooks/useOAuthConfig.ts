@@ -7,10 +7,12 @@ import {
   ListOAuthConfigsResponse,
   OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
+import { useTranslation } from 'react-i18next';
 import { oAuthConfigService } from '#features/auth/services/oauth-config.service';
 import { useToast } from '@insforge/ui';
 
 export function useOAuthConfig(selectedProvider?: OAuthProvidersSchema | null) {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -43,10 +45,20 @@ export function useOAuthConfig(selectedProvider?: OAuthProvidersSchema | null) {
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['oauth-configs'] });
       void queryClient.invalidateQueries({ queryKey: ['oauth-config', data.provider] });
-      showToast(`OAuth configuration for ${data.provider} created successfully`, 'success');
+      showToast(
+        t('auth.oauthCreatedToast', {
+          provider: data.provider,
+          defaultValue: 'OAuth configuration for {{provider}} created successfully',
+        }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to create OAuth configuration', 'error');
+      showToast(
+        error.message ||
+          t('auth.oauthCreateFailed', { defaultValue: 'Failed to create OAuth configuration' }),
+        'error'
+      );
     },
   });
 
@@ -57,10 +69,20 @@ export function useOAuthConfig(selectedProvider?: OAuthProvidersSchema | null) {
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['oauth-configs'] });
       void queryClient.invalidateQueries({ queryKey: ['oauth-config', data.provider] });
-      showToast(`OAuth configuration for ${data.provider} updated successfully`, 'success');
+      showToast(
+        t('auth.oauthUpdatedToast', {
+          provider: data.provider,
+          defaultValue: 'OAuth configuration for {{provider}} updated successfully',
+        }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to update OAuth configuration', 'error');
+      showToast(
+        error.message ||
+          t('auth.oauthUpdateFailed', { defaultValue: 'Failed to update OAuth configuration' }),
+        'error'
+      );
     },
   });
 
@@ -70,10 +92,20 @@ export function useOAuthConfig(selectedProvider?: OAuthProvidersSchema | null) {
     onSuccess: (_, provider) => {
       queryClient.removeQueries({ queryKey: ['oauth-configs'] });
       queryClient.removeQueries({ queryKey: ['oauth-config', provider] });
-      showToast(`OAuth configuration for ${provider} deleted successfully`, 'success');
+      showToast(
+        t('auth.oauthDeletedToast', {
+          provider,
+          defaultValue: 'OAuth configuration for {{provider}} deleted successfully',
+        }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to delete OAuth configuration', 'error');
+      showToast(
+        error.message ||
+          t('auth.oauthDeleteFailed', { defaultValue: 'Failed to delete OAuth configuration' }),
+        'error'
+      );
     },
   });
 

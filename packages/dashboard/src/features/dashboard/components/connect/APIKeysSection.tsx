@@ -1,4 +1,5 @@
 import { CopyButton, cn } from '@insforge/ui';
+import { useTranslation } from 'react-i18next';
 
 interface CredentialRowProps {
   label: string;
@@ -38,16 +39,32 @@ export function APIKeysSection({
   isLoading = false,
   className,
 }: APIKeysSectionProps) {
+  const { t } = useTranslation('chrome');
   return (
     <div className={cn('flex flex-col gap-6', className)}>
       <p className="text-base leading-7 text-muted-foreground">
-        Use the project URL and API key to connect directly via REST API or any HTTP client.
+        {t('overview.apiKeysDescription', {
+          defaultValue:
+            'Use the project URL and API key to connect directly via REST API or any HTTP client.',
+        })}
       </p>
 
       <div className="flex flex-col gap-4">
-        <CredentialRow label="Project URL" value={appUrl} isLoading={isLoading} />
-        <CredentialRow label="API Key" value={apiKey} isLoading={isLoading} />
-        <CredentialRow label="Anon Key" value={anonKey} isLoading={isLoading} />
+        <CredentialRow
+          label={t('overview.projectUrl', { defaultValue: 'Project URL' })}
+          value={appUrl}
+          isLoading={isLoading}
+        />
+        <CredentialRow
+          label={t('overview.apiKey', { defaultValue: 'API Key' })}
+          value={apiKey}
+          isLoading={isLoading}
+        />
+        <CredentialRow
+          label={t('overview.anonKey', { defaultValue: 'Anon Key' })}
+          value={anonKey}
+          isLoading={isLoading}
+        />
       </div>
     </div>
   );

@@ -13,11 +13,10 @@ import {
   bulkUpsertRequestSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { SocketManager } from '@/infra/socket/socket.manager.js';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { successResponse } from '@/utils/response.js';
 import { analyzeQuery, type DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 import { buildQualifiedTableKey } from '@/services/database/helpers.js';
+import { dashboardEventService } from '@/services/dashboard/dashboard-event.service.js';
 
 const router = Router();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
@@ -60,9 +59,11 @@ router.post(
         );
       }
 
-      const { query, params = [] } = validation.data;
+      const { query, params = [], explain = false } = validation.data;
 
-      const response = await dbAdvanceService.executeRawSQL(query, params, true);
+      const response = explain
+        ? await dbAdvanceService.executeExplain(query, params, true)
+        : await dbAdvanceService.executeRawSQL(query, params, true);
 
       await auditService.log({
         actor: req.hasApiKey ? 'api-key' : req.user?.id,
@@ -71,23 +72,23 @@ router.post(
         details: {
           query: query.substring(0, 300), // Limit query length in audit log
           paramCount: params.length,
-          rowsAffected: response.rowCount,
           executionRole: 'root',
+          explain,
+          ...(explain ? {} : { rowsAffected: response.rowCount }),
         },
         ip_address: req.ip,
       });
 
-      // Broadcast changes if any modifying statements detected
-      const changes = analyzeQuery(query);
-      if (changes.length > 0) {
-        invalidateColumnTypeCacheFromChanges(changes);
-        const socket = SocketManager.getInstance();
-        socket.broadcastToRoom(
-          'role:project_admin',
-          ServerEvents.DATA_UPDATE,
-          { resource: DataUpdateResourceType.DATABASE, data: { changes } },
-          'system'
-        );
+      if (!explain) {
+        // Broadcast changes if any modifying statements detected
+        const changes = analyzeQuery(query);
+        if (changes.length > 0) {
+          invalidateColumnTypeCacheFromChanges(changes);
+          dashboardEventService.publishDataUpdate({
+            resource: 'database',
+            data: { changes },
+          });
+        }
       }
 
       successResponse(res, response);
@@ -114,9 +115,11 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
       );
     }
 
-    const { query, params = [] } = validation.data;
+    const { query, params = [], explain = false } = validation.data;
 
-    const response = await dbAdvanceService.executeRawSQL(query, params);
+    const response = explain
+      ? await dbAdvanceService.executeExplain(query, params)
+      : await dbAdvanceService.executeRawSQL(query, params);
 
     await auditService.log({
       actor: req.hasApiKey ? 'api-key' : req.user?.id,
@@ -125,23 +128,23 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
       details: {
         query: query.substring(0, 300), // Limit query length in audit log
         paramCount: params.length,
-        rowsAffected: response.rowCount,
         executionRole: 'project_admin',
+        explain,
+        ...(explain ? {} : { rowsAffected: response.rowCount }),
       },
       ip_address: req.ip,
     });
 
-    // Broadcast changes if any modifying statements detected
-    const changes = analyzeQuery(query);
-    if (changes.length > 0) {
-      invalidateColumnTypeCacheFromChanges(changes);
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.DATABASE, data: { changes } },
-        'system'
-      );
+    if (!explain) {
+      // Broadcast changes if any modifying statements detected
+      const changes = analyzeQuery(query);
+      if (changes.length > 0) {
+        invalidateColumnTypeCacheFromChanges(changes);
+        dashboardEventService.publishDataUpdate({
+          resource: 'database',
+          data: { changes },
+        });
+      }
     }
 
     successResponse(res, response);
@@ -260,20 +263,14 @@ router.post(
         ip_address: req.ip,
       });
 
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        {
-          resource: DataUpdateResourceType.DATABASE,
-          data: {
-            changes: [
-              { type: 'records', name: buildQualifiedTableKey(table, schema) },
-            ] as DatabaseResourceUpdate[],
-          },
+      dashboardEventService.publishDataUpdate({
+        resource: 'database',
+        data: {
+          changes: [
+            { type: 'records', name: buildQualifiedTableKey(table, schema) },
+          ] as DatabaseResourceUpdate[],
         },
-        'system'
-      );
+      });
 
       successResponse(res, response);
     } catch (error: unknown) {
@@ -337,13 +334,7 @@ router.post(
       // Import may contain DDL — clear all column type caches
       DatabaseManager.clearColumnTypeCache();
 
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.DATABASE },
-        'system'
-      );
+      dashboardEventService.publishDataUpdate({ resource: 'database' });
 
       successResponse(res, response);
     } catch (error: unknown) {

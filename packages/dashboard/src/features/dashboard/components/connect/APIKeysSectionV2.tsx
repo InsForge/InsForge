@@ -1,4 +1,5 @@
 import { CopyButton, cn } from '@insforge/ui';
+import { useTranslation } from 'react-i18next';
 import { type ReactNode } from 'react';
 import LinkChainIcon from '#assets/icons/link_chain.svg?react';
 import KeyHorizontalIcon from '#assets/icons/key_horizontal.svg?react';
@@ -47,23 +48,24 @@ export function APIKeysSectionV2({
   isLoading = false,
   className,
 }: APIKeysSectionV2Props) {
+  const { t } = useTranslation('chrome');
   return (
     <div className={cn('flex flex-col gap-6', className)}>
       <CredentialRow
         icon={<LinkChainIcon className="size-5 text-muted-foreground" />}
-        label="Project URL"
+        label={t('overview.projectUrl', { defaultValue: 'Project URL' })}
         value={appUrl}
         isLoading={isLoading}
       />
       <CredentialRow
         icon={<KeyHorizontalIcon className="size-5 text-muted-foreground" />}
-        label="API Key"
+        label={t('overview.apiKey', { defaultValue: 'API Key' })}
         value={apiKey}
         isLoading={isLoading}
       />
       <CredentialRow
         icon={<KeyHorizontalIcon className="size-5 text-muted-foreground" />}
-        label="Anon Key"
+        label={t('overview.anonKey', { defaultValue: 'Anon Key' })}
         value={anonKey}
         isLoading={isLoading}
       />

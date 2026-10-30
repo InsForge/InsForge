@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type { RazorpayEnvironment } from '@insforge/shared-schemas';
 import {
   razorpayService,
@@ -9,6 +10,7 @@ import { razorpayQueryKeys } from '#features/payments/queryKeys';
 import { useToast } from '@insforge/ui';
 
 export function useRazorpayConfig() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -22,10 +24,17 @@ export function useRazorpayConfig() {
     mutationFn: (input: UpsertRazorpayConfigRequest) => razorpayService.upsertConfig(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: razorpayQueryKeys.all });
-      showToast('Razorpay keys saved successfully', 'success');
+      showToast(
+        t('payments.razorpayKeysSaved', { defaultValue: 'Razorpay keys saved successfully' }),
+        'success'
+      );
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Failed to save Razorpay keys', 'error');
+      showToast(
+        err.message ||
+          t('payments.saveRazorpayKeysFailed', { defaultValue: 'Failed to save Razorpay keys' }),
+        'error'
+      );
     },
   });
 
@@ -33,10 +42,19 @@ export function useRazorpayConfig() {
     mutationFn: (environment: RazorpayEnvironment) => razorpayService.removeConfig(environment),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: razorpayQueryKeys.all });
-      showToast('Razorpay keys removed', 'success');
+      showToast(
+        t('payments.razorpayKeysRemoved', { defaultValue: 'Razorpay keys removed' }),
+        'success'
+      );
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Failed to remove Razorpay keys', 'error');
+      showToast(
+        err.message ||
+          t('payments.removeRazorpayKeysFailed', {
+            defaultValue: 'Failed to remove Razorpay keys',
+          }),
+        'error'
+      );
     },
   });
 

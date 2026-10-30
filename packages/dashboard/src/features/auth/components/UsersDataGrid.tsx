@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { KeyRound, Mail, User } from 'lucide-react';
 import {
   Avatar,
@@ -185,22 +186,26 @@ function createProvidersCellRenderer(customLabels?: Record<string, string>) {
   };
 }
 
-const EmailVerifiedCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
-  if (typeof row.emailVerified !== 'boolean') {
-    return <span className="truncate text-[13px] leading-[18px] text-muted-foreground">null</span>;
-  }
+function createEmailVerifiedCellRenderer(trueLabel: string, falseLabel: string) {
+  return function EmailVerifiedCellRenderer({ row }: RenderCellProps<UserDataGridRow>) {
+    if (typeof row.emailVerified !== 'boolean') {
+      return (
+        <span className="truncate text-[13px] leading-[18px] text-muted-foreground">null</span>
+      );
+    }
 
-  return (
-    <Badge
-      className={cn(
-        'h-5 rounded px-1.5 py-0 text-xs font-medium leading-4 text-white',
-        row.emailVerified ? 'bg-[rgb(var(--success))]' : 'bg-[rgb(var(--destructive))]'
-      )}
-    >
-      {row.emailVerified ? 'True' : 'False'}
-    </Badge>
-  );
-};
+    return (
+      <Badge
+        className={cn(
+          'h-5 rounded px-1.5 py-0 text-xs font-medium leading-4 text-white',
+          row.emailVerified ? 'bg-[rgb(var(--success))]' : 'bg-[rgb(var(--destructive))]'
+        )}
+      >
+        {row.emailVerified ? trueLabel : falseLabel}
+      </Badge>
+    );
+  };
+}
 
 const DateTimeCellRenderer = ({
   row,
@@ -222,13 +227,25 @@ const DateTimeCellRenderer = ({
   );
 };
 
+export interface UsersColumnLabels {
+  id?: string;
+  email?: string;
+  providers?: string;
+  emailVerified?: string;
+  created?: string;
+  updated?: string;
+  verifiedTrue?: string;
+  verifiedFalse?: string;
+}
+
 export function createUsersColumns(
-  customProviderLabels?: Record<string, string>
+  customProviderLabels?: Record<string, string>,
+  labels?: UsersColumnLabels
 ): DataGridColumn<UserDataGridRow>[] {
   return [
     {
       key: 'id',
-      name: 'ID',
+      name: labels?.id ?? 'ID',
       width: '1.3fr',
       minWidth: 120,
       sortable: true,
@@ -240,7 +257,7 @@ export function createUsersColumns(
     },
     {
       key: 'email',
-      name: 'Email',
+      name: labels?.email ?? 'Email',
       width: '1.2fr',
       minWidth: 160,
       sortable: true,
@@ -252,7 +269,7 @@ export function createUsersColumns(
     },
     {
       key: 'providers',
-      name: 'Providers',
+      name: labels?.providers ?? 'Providers',
       width: '1fr',
       minWidth: 140,
       sortable: true,
@@ -260,15 +277,18 @@ export function createUsersColumns(
     },
     {
       key: 'emailVerified',
-      name: 'Email Verified',
+      name: labels?.emailVerified ?? 'Email Verified',
       width: '1fr',
       minWidth: 130,
       sortable: true,
-      renderCell: EmailVerifiedCellRenderer,
+      renderCell: createEmailVerifiedCellRenderer(
+        labels?.verifiedTrue ?? 'True',
+        labels?.verifiedFalse ?? 'False'
+      ),
     },
     {
       key: 'createdAt',
-      name: 'Created',
+      name: labels?.created ?? 'Created',
       width: '1.1fr',
       minWidth: 160,
       sortable: true,
@@ -276,7 +296,7 @@ export function createUsersColumns(
     },
     {
       key: 'updatedAt',
-      name: 'Updated',
+      name: labels?.updated ?? 'Updated',
       width: '1.1fr',
       minWidth: 160,
       sortable: true,
@@ -290,41 +310,43 @@ export type UsersDataGridProps = Omit<
   'columns' | 'selectionColumnWidth' | 'renderSelectionCell' | 'selectionHeaderLabel'
 >;
 
-const UserSelectionCell = ({
-  row,
-  isSelected,
-  onToggle,
-  tabIndex,
-}: SelectionCellProps<UserDataGridRow>) => {
-  const profile = row.profile as Record<string, unknown> | null;
-  const avatarUrl = profile?.avatar_url as string | undefined;
-  const rawName = profile?.name;
-  const name =
-    (typeof rawName === 'string' && rawName.trim()) || row.email.split('@')[0] || 'Unknown';
+const createUserSelectionCell = (unknownLabel: string) =>
+  function UserSelectionCell({
+    row,
+    isSelected,
+    onToggle,
+    tabIndex,
+  }: SelectionCellProps<UserDataGridRow>) {
+    const profile = row.profile as Record<string, unknown> | null;
+    const avatarUrl = profile?.avatar_url as string | undefined;
+    const rawName = profile?.name;
+    const name =
+      (typeof rawName === 'string' && rawName.trim()) || row.email.split('@')[0] || unknownLabel;
 
-  return (
-    <div className="flex h-full w-full items-center gap-2 pr-2">
-      <Checkbox
-        checked={isSelected}
-        onCheckedChange={(checked) => onToggle(checked === true)}
-        tabIndex={tabIndex}
-      />
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <Avatar className="h-6 w-6 shrink-0 rounded-full">
-          <AvatarImage src={avatarUrl} alt={name} className="rounded-full object-cover" />
-          <AvatarFallback className="rounded-full bg-[var(--alpha-8)]">
-            <User className="h-3.5 w-3.5 text-muted-foreground" />
-          </AvatarFallback>
-        </Avatar>
-        <span className="truncate text-[13px] leading-[18px] text-foreground" title={name}>
-          {name}
-        </span>
+    return (
+      <div className="flex h-full w-full items-center gap-2 pr-2">
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={(checked) => onToggle(checked === true)}
+          tabIndex={tabIndex}
+        />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Avatar className="h-6 w-6 shrink-0 rounded-full">
+            <AvatarImage src={avatarUrl} alt={name} className="rounded-full object-cover" />
+            <AvatarFallback className="rounded-full bg-[var(--alpha-8)]">
+              <User className="h-3.5 w-3.5 text-muted-foreground" />
+            </AvatarFallback>
+          </Avatar>
+          <span className="truncate text-[13px] leading-[18px] text-foreground" title={name}>
+            {name}
+          </span>
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
 export function UsersDataGrid(props: UsersDataGridProps) {
+  const { t } = useTranslation('chrome');
   const { configs: customConfigs } = useCustomOAuthConfig();
 
   const customProviderLabels = useMemo(() => {
@@ -335,7 +357,25 @@ export function UsersDataGrid(props: UsersDataGridProps) {
     return labels;
   }, [customConfigs]);
 
-  const columns = useMemo(() => createUsersColumns(customProviderLabels), [customProviderLabels]);
+  const columns = useMemo(
+    () =>
+      createUsersColumns(customProviderLabels, {
+        id: t('auth.columnId', { defaultValue: 'ID' }),
+        email: t('auth.email', { defaultValue: 'Email' }),
+        providers: t('auth.columnProviders', { defaultValue: 'Providers' }),
+        emailVerified: t('auth.columnEmailVerified', { defaultValue: 'Email Verified' }),
+        created: t('auth.columnCreated', { defaultValue: 'Created' }),
+        updated: t('auth.columnUpdated', { defaultValue: 'Updated' }),
+        verifiedTrue: t('auth.verifiedTrue', { defaultValue: 'True' }),
+        verifiedFalse: t('auth.verifiedFalse', { defaultValue: 'False' }),
+      }),
+    [customProviderLabels, t]
+  );
+
+  const renderSelectionCell = useMemo(
+    () => createUserSelectionCell(t('auth.unknown', { defaultValue: 'Unknown' })),
+    [t]
+  );
 
   return (
     <DataGrid<UserDataGridRow>
@@ -343,11 +383,11 @@ export function UsersDataGrid(props: UsersDataGridProps) {
       columns={columns}
       showSelection={true}
       showPagination={true}
-      paginationRecordLabel="users"
+      paginationRecordLabel={t('auth.usersRecordLabel', { defaultValue: 'users' })}
       showTypeBadge={false}
       selectionColumnWidth={180}
-      selectionHeaderLabel="User"
-      renderSelectionCell={UserSelectionCell}
+      selectionHeaderLabel={t('auth.user', { defaultValue: 'User' })}
+      renderSelectionCell={renderSelectionCell}
     />
   );
 }

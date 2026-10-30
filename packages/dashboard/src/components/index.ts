@@ -26,4 +26,5 @@ export { PaginationControls, type PaginationControlsProps } from './PaginationCo
 export { SelectionClearButton } from './SelectionClearButton';
 export { TableHeader } from './TableHeader';
 export { ThemeSelect } from './ThemeSelect';
+export { LanguageSelect } from './LanguageSelect';
 export { TypeBadge } from './TypeBadge';

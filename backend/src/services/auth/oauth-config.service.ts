@@ -8,6 +8,7 @@ import { ERROR_CODES, OAuthConfigSchema, OAuthProvidersSchema } from '@insforge/
 export interface CreateOAuthConfigInput {
   provider: OAuthProvidersSchema;
   clientId?: string;
+  nativeClientIds?: string[];
   clientSecret?: string;
   redirectUri?: string;
   scopes?: string[];
@@ -16,10 +17,15 @@ export interface CreateOAuthConfigInput {
 
 export interface UpdateOAuthConfigInput {
   clientId?: string;
+  nativeClientIds?: string[];
   clientSecret?: string;
   redirectUri?: string;
   scopes?: string[];
   useSharedKey?: boolean;
+}
+
+function normalizeNativeClientIds(ids?: string[]): string[] {
+  return [...new Set((ids ?? []).map((id) => id.trim()).filter(Boolean))];
 }
 
 export class OAuthConfigService {
@@ -56,6 +62,7 @@ export class OAuthConfigService {
           id,
           provider,
           client_id as "clientId",
+          native_client_ids as "nativeClientIds",
           redirect_uri as "redirectUri",
           scopes,
           use_shared_key as "useSharedKey",
@@ -102,6 +109,7 @@ export class OAuthConfigService {
           id,
           provider,
           client_id as "clientId",
+          native_client_ids as "nativeClientIds",
           redirect_uri as "redirectUri",
           scopes,
           use_shared_key as "useSharedKey",
@@ -237,12 +245,13 @@ export class OAuthConfigService {
 
       // Create new OAuth config
       const result = await client.query(
-        `INSERT INTO auth.oauth_configs (provider, client_id, secret_id, redirect_uri, scopes, use_shared_key)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO auth.oauth_configs (provider, client_id, native_client_ids, secret_id, redirect_uri, scopes, use_shared_key)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING
            id,
            provider,
            client_id as "clientId",
+           native_client_ids as "nativeClientIds",
            redirect_uri as "redirectUri",
            scopes,
            use_shared_key as "useSharedKey",
@@ -251,6 +260,7 @@ export class OAuthConfigService {
         [
           input.provider.toLowerCase(),
           input.clientId || null,
+          normalizeNativeClientIds(input.nativeClientIds),
           secretId,
           null, // Deprecating redirect_uri
           scopes,
@@ -336,6 +346,11 @@ export class OAuthConfigService {
         values.push(input.clientId);
       }
 
+      if (input.nativeClientIds !== undefined) {
+        updates.push(`native_client_ids = $${paramCount++}`);
+        values.push(normalizeNativeClientIds(input.nativeClientIds));
+      }
+
       if (input.redirectUri !== undefined) {
         updates.push(`redirect_uri = $${paramCount++}`);
         values.push(input.redirectUri);
@@ -373,6 +388,7 @@ export class OAuthConfigService {
              id,
              provider,
              client_id as "clientId",
+             native_client_ids as "nativeClientIds",
              redirect_uri as "redirectUri",
              scopes,
              use_shared_key as "useSharedKey",

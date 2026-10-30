@@ -1,6 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Pool, PoolClient } from 'pg';
 
+const loggerMocks = vi.hoisted(() => ({
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+}));
+
+vi.mock('@/utils/logger.js', () => ({
+  default: loggerMocks,
+}));
+
 // Mock the database manager so StorageService can be instantiated without
 // touching a real pool. The service caches the pool internally; we hand it
 // our mock via a controlled getInstance/getPool flow.
@@ -13,7 +23,9 @@ vi.mock('@/infra/database/database.manager.js', () => ({
 let mockPool: Pool;
 let calls: Array<{ sql: string; params?: unknown[] }>;
 // Per-call queue: each entry is the result for the next .query() call.
-let queryResults: Array<{ rows: unknown[]; rowCount: number }>;
+// An entry with `throwCode` makes that call reject with a pg-style error
+// carrying that SQLSTATE (e.g. '42501' for an RLS violation).
+let queryResults: Array<{ rows: unknown[]; rowCount: number; throwCode?: string }>;
 
 function makeMockPool(): Pool {
   calls = [];
@@ -21,6 +33,11 @@ function makeMockPool(): Pool {
   const query = vi.fn(async (sql: string, params?: unknown[]) => {
     calls.push({ sql, params });
     const result = queryResults.shift() ?? { rows: [], rowCount: 0 };
+    if (result.throwCode) {
+      const error = new Error(`mock pg error ${result.throwCode}`) as Error & { code: string };
+      error.code = result.throwCode;
+      throw error;
+    }
     return result;
   });
   const client = {
@@ -33,9 +50,12 @@ function makeMockPool(): Pool {
   } as unknown as Pool;
 }
 
-describe('StorageService.objectIsVisible — RLS-gated visibility check', () => {
+describe('StorageService.getObjectMetadataVisible — RLS-gated visibility check', () => {
   beforeEach(async () => {
     mockPool = makeMockPool();
+    loggerMocks.info.mockClear();
+    loggerMocks.error.mockClear();
+    loggerMocks.warn.mockClear();
     vi.resetModules();
   });
 
@@ -43,7 +63,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
 
-    // The SELECT 1 returns a row, so objectIsVisible should return true.
+    // The SELECT 1 returns a row, so getObjectMetadataVisible should return true.
     queryResults = [
       { rows: [{ public: false }], rowCount: 1 }, // public bucket check
       { rows: [], rowCount: 0 }, // BEGIN
@@ -54,13 +74,13 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       { rows: [], rowCount: 0 }, // RESET ROLE
     ];
 
-    const visible = await svc.objectIsVisible(
+    const visible = await svc.getObjectMetadataVisible(
       { id: 'alice-sub', email: 'alice@example.com', role: 'authenticated' },
       'photos',
       'alice/cat.jpg'
     );
 
-    expect(visible).toBe(true);
+    expect(visible).toBeTruthy();
 
     // Verify the SELECT happened *inside* withUserContext (BEGIN before, COMMIT after).
     const sequence = calls.map((c) => c.sql);
@@ -68,13 +88,13 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     expect(sequence[1]).toBe('BEGIN');
     expect(sequence[2]).toBe('SET LOCAL ROLE authenticated');
     expect(calls[3].params?.[0]).toBe('request.jwt.claims');
-    expect(sequence).toContain('SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2');
+    expect(sequence).toContain('SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2');
     expect(sequence[sequence.length - 2]).toBe('COMMIT');
     expect(sequence[sequence.length - 1]).toBe('RESET ROLE');
 
     // Verify the SELECT bound bucket and key as parameters.
     const selectCall = calls.find(
-      (c) => c.sql === 'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2'
+      (c) => c.sql === 'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2'
     );
     expect(selectCall?.params).toEqual(['photos', 'alice/cat.jpg']);
   });
@@ -94,13 +114,13 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       { rows: [], rowCount: 0 }, // RESET ROLE
     ];
 
-    const visible = await svc.objectIsVisible(
+    const visible = await svc.getObjectMetadataVisible(
       { id: 'bob-sub', email: 'bob@example.com', role: 'authenticated' },
       'photos',
       'alice/cat.jpg'
     );
 
-    expect(visible).toBe(false);
+    expect(visible).toBeNull();
   });
 
   it('runs SELECT directly on the pool for API-key callers', async () => {
@@ -109,12 +129,12 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
 
     queryResults = [{ rows: [{ '?column?': 1 }], rowCount: 1 }];
 
-    const visible = await svc.objectIsVisible(undefined, 'photos', 'alice/cat.jpg', true);
+    const visible = await svc.getObjectMetadataVisible(undefined, 'photos', 'alice/cat.jpg', true);
 
-    expect(visible).toBe(true);
+    expect(visible).toBeTruthy();
     // API-key path skips BEGIN/SET ROLE/COMMIT — only the visibility SELECT runs.
     expect(calls.map((c) => c.sql)).toEqual([
-      'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+      'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
     ]);
   });
 
@@ -124,15 +144,15 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
 
     queryResults = [{ rows: [{ '?column?': 1 }], rowCount: 1 }];
 
-    const visible = await svc.objectIsVisible(
+    const visible = await svc.getObjectMetadataVisible(
       { id: 'local:admin', role: 'project_admin' },
       'photos',
       'alice/cat.jpg'
     );
 
-    expect(visible).toBe(true);
+    expect(visible).toBeTruthy();
     expect(calls.map((c) => c.sql)).toEqual([
-      'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+      'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
     ]);
   });
 
@@ -218,7 +238,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       key: 'alice/cat.jpg',
       size: 42,
       mimeType: 'image/jpeg',
-      uploadedAt,
+      uploadedAt: uploadedAt.toISOString(),
     });
     expect(calls.map((c) => c.sql)).toEqual([
       'SELECT * FROM storage.objects WHERE bucket = $1 ORDER BY key LIMIT $2 OFFSET $3',
@@ -233,7 +253,9 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
 
     queryResults = [{ rows: [{ public: false }], rowCount: 1 }];
 
-    await expect(svc.objectIsVisible(undefined, 'photos', 'alice/cat.jpg')).resolves.toBe(false);
+    await expect(
+      svc.getObjectMetadataVisible(undefined, 'photos', 'alice/cat.jpg')
+    ).resolves.toBeNull();
     expect(calls).toEqual([
       {
         sql: 'SELECT public FROM storage.buckets WHERE name = $1',
@@ -274,13 +296,12 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
 
     queryResults = [
       { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
-      { rows: [], rowCount: 0 }, // root object dedup query
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
       { rows: [], rowCount: 0 }, // BEGIN
       { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
       { rows: [], rowCount: 0 }, // set_config(claims)
       { rows: [], rowCount: 0 }, // SAVEPOINT
-      { rows: [], rowCount: 1 }, // RLS INSERT probe
+      { rows: [], rowCount: 1 }, // RLS create-or-replace probe
       { rows: [], rowCount: 0 }, // ROLLBACK TO SAVEPOINT
       { rows: [], rowCount: 0 }, // RELEASE SAVEPOINT
       { rows: [], rowCount: 0 }, // COMMIT
@@ -298,18 +319,18 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       sql: 'SELECT 1 FROM storage.buckets WHERE name = $1 LIMIT 1',
       params: ['photos'],
     });
-    expect(calls[1].sql).toContain('SELECT key FROM storage.objects');
-    expect(calls[3].sql).toBe('BEGIN');
-    expect(calls[4].sql).toBe('SET LOCAL ROLE authenticated');
+    expect(calls[2].sql).toBe('BEGIN');
+    expect(calls[3].sql).toBe('SET LOCAL ROLE authenticated');
     expect(calls.map((c) => c.sql).slice(1)).not.toContain(
       'SELECT 1 FROM storage.buckets WHERE name = $1 LIMIT 1'
     );
     expect(calls.map((c) => c.sql)).toContain('SAVEPOINT upload_strategy_rls_probe');
     expect(calls.map((c) => c.sql)).toContain('ROLLBACK TO SAVEPOINT upload_strategy_rls_probe');
-    expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(true);
+    const probe = calls.find((c) => c.sql.includes('INSERT INTO storage.objects'));
+    expect(probe?.sql).toContain('ON CONFLICT (bucket, key) DO UPDATE');
   });
 
-  it('skips the upload-strategy RLS insert probe for project_admin JWT callers', async () => {
+  it('skips the upload-strategy RLS probe for project_admin JWT callers', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
     const provider = {
@@ -324,7 +345,6 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
 
     queryResults = [
       { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
-      { rows: [], rowCount: 0 }, // root object dedup query
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
     ];
 
@@ -350,8 +370,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
 
     // uploaded_at is supplied app-side, so the INSERT no longer uses RETURNING.
     queryResults = [
-      { rows: [], rowCount: 0 }, // root object dedup query
-      { rows: [], rowCount: 1 }, // root insert (no RETURNING)
+      { rows: [], rowCount: 1 }, // root create-or-replace write (no RETURNING)
       { rows: [], rowCount: 1 }, // root etag update
     ];
 
@@ -378,6 +397,220 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     expect(calls.some((c) => /RETURNING/i.test(c.sql))).toBe(false);
   });
 
+  it('replaces an existing key in place by default, preserving ownership', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      putObject: vi.fn(async () => ({ etag: 'etag-replaced' })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [], rowCount: 1 }, // create-or-replace write
+      { rows: [], rowCount: 1 }, // etag update
+    ];
+
+    const result = await svc.putObject(
+      { id: 'local:admin', role: 'project_admin' },
+      'photos',
+      'note.txt',
+      { size: 8, mimetype: 'text/plain' } as Express.Multer.File,
+      false
+    );
+
+    expect(result).toMatchObject({ bucket: 'photos', key: 'note.txt' });
+    expect(provider.putObject).toHaveBeenCalledOnce();
+    const write = calls.find((c) => c.sql.includes('ON CONFLICT'));
+    expect(write?.sql).toContain('ON CONFLICT (bucket, key) DO UPDATE');
+    // Replacing content must never reassign ownership.
+    expect(write?.sql).not.toContain('uploaded_by = EXCLUDED');
+  });
+
+  it('maps an RLS-denied replacement to 403 without touching the blob', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      putObject: vi.fn(async () => ({ etag: 'never' })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    // Bob puts a key whose row belongs to Alice. The ON CONFLICT arm has
+    // no rowCount check by design: Postgres raises 42501 when the existing
+    // row fails the UPDATE policy's USING expression. This test pins that
+    // error path — if the write ever resolved without an error instead, the
+    // provider blob write would run and silently overwrite Alice's object.
+    queryResults = [
+      { rows: [], rowCount: 0 }, // BEGIN
+      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
+      { rows: [], rowCount: 0 }, // set_config(claims)
+      { rows: [], rowCount: 0, throwCode: '42501' }, // ON CONFLICT arm: RLS violation
+      { rows: [], rowCount: 0 }, // ROLLBACK (withUserContext error path)
+      { rows: [], rowCount: 0 }, // RESET ROLE
+    ];
+
+    await expect(
+      svc.putObject(
+        { id: 'bob-sub', email: 'bob@example.com', role: 'authenticated' },
+        'photos',
+        'alice-note.txt',
+        { size: 8, mimetype: 'text/plain' } as Express.Multer.File,
+        false
+      )
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'STORAGE_PERMISSION_DENIED',
+    });
+    expect(provider.putObject).not.toHaveBeenCalled();
+  });
+
+  it('probes create-or-replace permission before issuing an upload strategy', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      getUploadStrategy: vi.fn(async () => ({
+        method: 'direct' as const,
+        uploadUrl: '/upload',
+        key: 'note.txt',
+        confirmRequired: false,
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [], rowCount: 0 }, // BEGIN
+      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
+      { rows: [], rowCount: 0 }, // set_config(claims)
+      { rows: [], rowCount: 0 }, // SAVEPOINT
+      { rows: [], rowCount: 1 }, // RLS create-or-replace probe
+      { rows: [], rowCount: 0 }, // ROLLBACK TO SAVEPOINT
+      { rows: [], rowCount: 0 }, // RELEASE SAVEPOINT
+      { rows: [], rowCount: 0 }, // COMMIT
+      { rows: [], rowCount: 0 }, // RESET ROLE
+    ];
+
+    const strategy = await svc.getUploadStrategy(
+      { id: 'alice-sub', email: 'alice@example.com', role: 'authenticated' },
+      'photos',
+      { filename: 'note.txt', contentType: 'text/plain', size: 8 },
+      false,
+      'text/plain'
+    );
+
+    expect(strategy).toMatchObject({ method: 'direct', key: 'note.txt' });
+    expect(strategy.uploadUrl).toBe('/upload');
+    const probe = calls.find((c) => c.sql.includes('INSERT INTO storage.objects'));
+    expect(probe?.sql).toContain('ON CONFLICT (bucket, key) DO UPDATE');
+    expect(calls.map((c) => c.sql)).toContain('ROLLBACK TO SAVEPOINT upload_strategy_rls_probe');
+  });
+
+  it('rejects an upload strategy when RLS denies replacement', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      getUploadStrategy: vi.fn(),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [], rowCount: 0 }, // BEGIN
+      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
+      { rows: [], rowCount: 0 }, // set_config(claims)
+      { rows: [], rowCount: 0 }, // SAVEPOINT
+      { rows: [], rowCount: 0, throwCode: '42501' }, // RLS denies conflict update
+      { rows: [], rowCount: 0 }, // ROLLBACK TO SAVEPOINT
+      { rows: [], rowCount: 0 }, // RELEASE SAVEPOINT
+      { rows: [], rowCount: 0 }, // ROLLBACK (withUserContext error path)
+      { rows: [], rowCount: 0 }, // RESET ROLE
+    ];
+
+    await expect(
+      svc.getUploadStrategy(
+        { id: 'bob-sub', email: 'bob@example.com', role: 'authenticated' },
+        'photos',
+        { filename: 'note.txt', contentType: 'text/plain', size: 8 },
+        false,
+        'text/plain'
+      )
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'STORAGE_PERMISSION_DENIED',
+    });
+    expect(provider.getUploadStrategy).not.toHaveBeenCalled();
+  });
+
+  it('updates an existing row on confirm-upload by default', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      verifyObjectExists: vi.fn(async () => ({
+        exists: true,
+        size: 16,
+        etag: 'etag-replaced',
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [], rowCount: 1 }, // root create-or-replace write
+    ];
+
+    const result = await svc.confirmUpload(
+      { id: 'local:admin', role: 'project_admin' },
+      'photos',
+      'note.txt',
+      { size: 16, contentType: 'text/plain' },
+      false
+    );
+
+    expect(result).toMatchObject({ bucket: 'photos', key: 'note.txt', size: 16 });
+    // Confirms are a single race-free INSERT ... ON CONFLICT write.
+    const write = calls.find((c) => c.sql.includes('INSERT INTO storage.objects'));
+    expect(write?.sql).toContain('ON CONFLICT (bucket, key) DO UPDATE');
+    // Ownership column is never touched by the conflict arm.
+    expect(write?.sql.split('DO UPDATE')[1]).not.toContain('uploaded_by');
+  });
+
+  it('maps an end-user confirm-upload replacement denial to 403', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      verifyObjectExists: vi.fn(async () => ({
+        exists: true,
+        size: 16,
+        etag: 'etag-uploaded',
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [], rowCount: 0 }, // BEGIN
+      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
+      { rows: [], rowCount: 0 }, // set_config(claims)
+      { rows: [], rowCount: 0, throwCode: '42501' }, // RLS rejects conflict arm
+      { rows: [], rowCount: 0 }, // ROLLBACK
+      { rows: [], rowCount: 0 }, // RESET ROLE
+    ];
+
+    await expect(
+      svc.confirmUpload(
+        { id: 'bob-sub', email: 'bob@example.com', role: 'authenticated' },
+        'photos',
+        'note.txt',
+        { size: 16, contentType: 'text/plain' },
+        false
+      )
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'STORAGE_PERMISSION_DENIED',
+    });
+  });
+
   it('confirms presigned uploads for project_admin JWT callers through root access', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
@@ -393,8 +626,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     // uploaded_at is supplied app-side, so the INSERT no longer uses RETURNING.
     queryResults = [
       { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
-      { rows: [], rowCount: 0 }, // already-confirmed check
-      { rows: [], rowCount: 1 }, // root insert (no RETURNING)
+      { rows: [], rowCount: 1 }, // root create-or-replace write (no RETURNING)
     ];
 
     const result = await svc.confirmUpload(
@@ -423,11 +655,11 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
     const provider = {
-      deleteObject: vi.fn(async () => {}),
+      deleteObjects: vi.fn(async () => ({ deleted: ['note.txt'], failed: [] })),
     };
     (svc as unknown as { provider: typeof provider }).provider = provider;
 
-    queryResults = [{ rows: [], rowCount: 1 }];
+    queryResults = [{ rows: [{ key: 'note.txt' }], rowCount: 1 }];
 
     const deleted = await svc.deleteObject(
       { id: 'local:admin', role: 'project_admin' },
@@ -436,10 +668,191 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     );
 
     expect(deleted).toBe(true);
-    expect(provider.deleteObject).toHaveBeenCalledWith('photos', 'note.txt');
+    expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['note.txt']);
     expect(calls.map((c) => c.sql)).toEqual([
-      'DELETE FROM storage.objects WHERE bucket = $1 AND key = $2',
+      'DELETE FROM storage.objects WHERE bucket = $1 AND key = ANY($2::text[]) RETURNING key',
     ]);
+  });
+
+  it('returns true for single deletes after the DB row is deleted even when provider cleanup fails', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObjects: vi.fn(async () => ({
+        deleted: [],
+        failed: [{ key: 'note.txt', message: 'provider denied' }],
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [{ rows: [{ key: 'note.txt' }], rowCount: 1 }];
+
+    const deleted = await svc.deleteObject(
+      { id: 'local:admin', role: 'project_admin' },
+      'photos',
+      'note.txt'
+    );
+
+    expect(deleted).toBe(true);
+    expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['note.txt']);
+    expect(loggerMocks.warn).toHaveBeenCalledWith(
+      'Storage provider batch delete partially failed after DB rows were deleted',
+      {
+        bucket: 'photos',
+        failed: [{ key: 'note.txt', message: 'provider denied' }],
+      }
+    );
+  });
+
+  it('batch deletes objects for project_admin JWT callers through root access', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObjects: vi.fn(async () => ({
+        deleted: ['a.txt'],
+        failed: [{ key: 'b.txt', message: 'provider denied' }],
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [{ rows: [{ key: 'a.txt' }, { key: 'b.txt' }], rowCount: 2 }];
+
+    const result = await svc.deleteObjects({ id: 'local:admin', role: 'project_admin' }, 'photos', [
+      'a.txt',
+      'b.txt',
+      'missing.txt',
+      'a.txt',
+    ]);
+
+    expect(result).toEqual({
+      results: [
+        { key: 'a.txt', status: 'deleted' },
+        { key: 'b.txt', status: 'failed', message: 'provider denied' },
+        { key: 'missing.txt', status: 'notFound' },
+      ],
+    });
+    expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['a.txt', 'b.txt']);
+    expect(calls.map((c) => c.sql)).toEqual([
+      'DELETE FROM storage.objects WHERE bucket = $1 AND key = ANY($2::text[]) RETURNING key',
+    ]);
+    expect(calls[0].params).toEqual(['photos', ['a.txt', 'b.txt', 'missing.txt']]);
+  });
+
+  it('batch deletes objects through withUserContext for authenticated callers', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObjects: vi.fn(async () => ({ deleted: ['mine.txt'], failed: [] })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [], rowCount: 0 }, // BEGIN
+      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
+      { rows: [], rowCount: 0 }, // set_config(claims)
+      { rows: [{ key: 'mine.txt' }], rowCount: 1 }, // RLS-authorized delete
+      { rows: [], rowCount: 0 }, // COMMIT
+      { rows: [], rowCount: 0 }, // RESET ROLE
+    ];
+
+    const result = await svc.deleteObjects(
+      { id: 'alice-sub', email: 'alice@example.com', role: 'authenticated' },
+      'photos',
+      ['mine.txt', 'not-mine.txt']
+    );
+
+    expect(result).toEqual({
+      results: [
+        { key: 'mine.txt', status: 'deleted' },
+        { key: 'not-mine.txt', status: 'notFound' },
+      ],
+    });
+    expect(provider.deleteObjects).toHaveBeenCalledWith('photos', ['mine.txt']);
+    expect(calls.map((c) => c.sql)).toEqual([
+      'BEGIN',
+      'SET LOCAL ROLE authenticated',
+      'SELECT set_config($1, $2, true)',
+      'DELETE FROM storage.objects WHERE bucket = $1 AND key = ANY($2::text[]) RETURNING key',
+      'COMMIT',
+      'RESET ROLE',
+    ]);
+  });
+
+  it('reports DB-deleted objects as failed when provider result omits them', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObjects: vi.fn(async () => ({
+        deleted: ['a.txt'],
+        failed: [],
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [{ rows: [{ key: 'a.txt' }, { key: 'b.txt' }], rowCount: 2 }];
+
+    const result = await svc.deleteObjects({ id: 'local:admin', role: 'project_admin' }, 'photos', [
+      'a.txt',
+      'b.txt',
+    ]);
+
+    expect(result).toEqual({
+      results: [
+        { key: 'a.txt', status: 'deleted' },
+        { key: 'b.txt', status: 'failed', message: 'Failed to delete object' },
+      ],
+    });
+    expect(loggerMocks.warn).toHaveBeenCalledWith(
+      'Storage provider batch delete partially failed after DB rows were deleted',
+      {
+        bucket: 'photos',
+        failed: [{ key: 'b.txt', message: 'Failed to delete object' }],
+      }
+    );
+  });
+
+  it('reports DB-deleted objects as failed when the provider batch delete fails unexpectedly', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObjects: vi.fn(async () => {
+        throw new Error('/var/private/storage/photos/a.txt permission denied');
+      }),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [{ rows: [{ key: 'a.txt' }], rowCount: 1 }];
+
+    const result = await svc.deleteObjects({ id: 'local:admin', role: 'project_admin' }, 'photos', [
+      'a.txt',
+    ]);
+
+    expect(result).toEqual({
+      results: [{ key: 'a.txt', status: 'failed', message: 'Failed to delete object' }],
+    });
+    expect(loggerMocks.error).toHaveBeenCalledWith('Storage provider batch delete failed', {
+      bucket: 'photos',
+      keys: ['a.txt'],
+      error: '/var/private/storage/photos/a.txt permission denied',
+    });
+  });
+
+  it('rejects invalid batch delete keys as storage validation errors before querying', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const { AppError } = await import('@/utils/errors.js');
+    const svc = StorageService.getInstance();
+
+    try {
+      await svc.deleteObjects({ id: 'local:admin', role: 'project_admin' }, 'photos', ['../bad']);
+      throw new Error('Expected deleteObjects to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect(error).toMatchObject({
+        message: 'Invalid key. Cannot use ".." or start with "/"',
+        statusCode: 400,
+      });
+    }
+    expect(calls).toEqual([]);
   });
 
   it('returns true for public bucket objects without requiring user context', async () => {
@@ -451,16 +864,16 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       { rows: [{ '?column?': 1 }], rowCount: 1 },
     ];
 
-    const visible = await svc.objectIsVisible(undefined, 'photos', 'alice/cat.jpg');
+    const visible = await svc.getObjectMetadataVisible(undefined, 'photos', 'alice/cat.jpg');
 
-    expect(visible).toBe(true);
+    expect(visible).toBeTruthy();
     expect(calls).toEqual([
       {
         sql: 'SELECT public FROM storage.buckets WHERE name = $1',
         params: ['photos'],
       },
       {
-        sql: 'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+        sql: 'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
         params: ['photos', 'alice/cat.jpg'],
       },
     ]);
@@ -475,16 +888,16 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       { rows: [], rowCount: 0 },
     ];
 
-    const visible = await svc.objectIsVisible(undefined, 'photos', 'missing.jpg');
+    const visible = await svc.getObjectMetadataVisible(undefined, 'photos', 'missing.jpg');
 
-    expect(visible).toBe(false);
+    expect(visible).toBeNull();
     expect(calls).toEqual([
       {
         sql: 'SELECT public FROM storage.buckets WHERE name = $1',
         params: ['photos'],
       },
       {
-        sql: 'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+        sql: 'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
         params: ['photos', 'missing.jpg'],
       },
     ]);
@@ -574,7 +987,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     const svc = StorageService.getInstance();
 
     await expect(
-      svc.objectIsVisible(
+      svc.getObjectMetadataVisible(
         { id: 'alice', email: 'alice@example.com', role: 'authenticated' },
         'no spaces allowed',
         'k'
@@ -588,7 +1001,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     const svc = StorageService.getInstance();
 
     await expect(
-      svc.objectIsVisible(
+      svc.getObjectMetadataVisible(
         { id: 'alice', email: 'alice@example.com', role: 'authenticated' },
         'photos',
         '../../etc/passwd'

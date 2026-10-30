@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { AuthConfigSchema, UpdateAuthConfigRequest } from '@insforge/shared-schemas';
 import { authConfigService } from '#features/auth/services/config.service';
 import { useToast } from '@insforge/ui';
 
 export function useAuthConfig() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -23,10 +25,21 @@ export function useAuthConfig() {
     mutationFn: (config: UpdateAuthConfigRequest) => authConfigService.updateConfig(config),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['auth-config'] });
-      showToast('Authentication configuration updated successfully', 'success');
+      showToast(
+        t('auth.authConfigUpdatedToast', {
+          defaultValue: 'Authentication configuration updated successfully',
+        }),
+        'success'
+      );
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to update authentication configuration', 'error');
+      showToast(
+        error.message ||
+          t('auth.authConfigUpdateFailed', {
+            defaultValue: 'Failed to update authentication configuration',
+          }),
+        'error'
+      );
     },
   });
 

@@ -1,0 +1,451 @@
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ArrowLeft, Plus, Play, Square, Trash2, AlertTriangle } from 'lucide-react';
+import { Button } from '@insforge/ui';
+import { ErrorState, LoadingState } from '#components';
+import { useComputeServices } from '#features/compute/hooks/useComputeServices';
+import { Navigate, useOutletContext, useParams } from 'react-router-dom';
+import type { ComputeOutletContext } from '#features/compute/components/ComputeLayout';
+import { ComputeProviderSetup } from '#features/compute/components/ComputeProviderSetup';
+import { ServiceCard } from '#features/compute/components/ServiceCard';
+import { ServiceEvents } from '#features/compute/components/ServiceEvents';
+import { ServiceLogs } from '#features/compute/components/ServiceLogs';
+import { CreateServiceDialog } from '#features/compute/components/CreateServiceDialog';
+import { DeleteServiceDialog } from '#features/compute/components/DeleteServiceDialog';
+import { statusColors, getReachableUrl, isComputeProviderSlug } from '#features/compute/constants';
+import type { ServiceSchema } from '@insforge/shared-schemas';
+
+export default function ComputeServicesPage() {
+  const { t } = useTranslation('chrome');
+  // The provider comes from the route, so the sidebar is the switcher and the URL is
+  // shareable. The layout hands over every service; this page shows its own.
+  const { provider } = useParams();
+  const {
+    services: allServices,
+    configured,
+    openSettings,
+  } = useOutletContext<ComputeOutletContext>();
+  const services = allServices.filter((s) => s.provider === provider);
+  const providerConfigured = provider !== undefined && configured.includes(provider);
+  const {
+    isLoading,
+    error,
+    refetch,
+    create,
+    remove,
+    stop,
+    start,
+    isCreating,
+    isDeleting,
+    isStopping,
+    isStarting,
+  } = useComputeServices(providerConfigured);
+  const [selectedService, setSelectedService] = useState<ServiceSchema | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  // Switching providers keeps this component mounted, so a service selected on one
+  // provider's page would still be open on the next — and `currentService` falls back
+  // to the stale object when the id is missing from the new list, which means its
+  // Stop/Delete buttons would act on the other provider's container.
+  useEffect(() => {
+    setSelectedService(null);
+    setDeleteTarget(null);
+  }, [provider]);
+
+  // Keep selected service in sync with latest data
+  const currentService = selectedService
+    ? (services.find((s) => s.id === selectedService.id) ?? selectedService)
+    : null;
+
+  const handleDelete = async (id: string) => {
+    await remove(id);
+    if (selectedService?.id === id) {
+      setSelectedService(null);
+    }
+    setDeleteTarget(null);
+  };
+
+  // An unknown slug in the URL is a typo or a stale bookmark, not an error worth a
+  // crash — send it back to the tab, which picks a sensible provider.
+  if (!isComputeProviderSlug(provider)) {
+    return <Navigate to="/dashboard/compute" replace />;
+  }
+
+  // This provider is not set up: show how, rather than an empty list that looks like
+  // "you have no services" when the truth is "this provider is not enabled".
+  if (!providerConfigured) {
+    return (
+      <ComputeProviderSetup
+        provider={provider}
+        // Docker has nothing to enter — it is enabled by a compose edit — so it gets
+        // the steps and no button. Fly's credentials are values, so it gets both.
+        onConfigure={provider === 'fly' && openSettings ? () => openSettings(provider) : undefined}
+      />
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <LoadingState
+        message={t('compute.loadingServices', { defaultValue: 'Loading services...' })}
+      />
+    );
+  }
+
+  if (error) {
+    // Friendly empty-state when compute isn't configured (no Fly token / not
+    // enabled). The API returns 503 COMPUTE_NOT_CONFIGURED with setup
+    // instructions in nextActions — surface those instead of a hard error.
+    const apiError = (error as { response?: { data?: { error?: string; nextActions?: string } } })
+      .response?.data;
+    if (apiError?.error === 'COMPUTE_NOT_CONFIGURED') {
+      return (
+        <div className="flex items-center justify-center h-64 px-6">
+          <div className="max-w-xl text-center space-y-3">
+            <AlertTriangle className="w-8 h-8 text-muted-foreground mx-auto" />
+            <h2 className="text-base font-medium text-foreground">
+              {t('compute.notConfigured', {
+                defaultValue: 'Compute services not configured',
+              })}
+            </h2>
+            {apiError.nextActions && (
+              <p className="text-sm text-muted-foreground whitespace-pre-line">
+                {apiError.nextActions}
+              </p>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="p-6">
+        <ErrorState
+          error={
+            error instanceof Error
+              ? error
+              : t('compute.loadServicesFailed', { defaultValue: 'Failed to load services.' })
+          }
+          onRetry={() => void refetch()}
+        />
+      </div>
+    );
+  }
+
+  if (currentService) {
+    const reachableUrl = getReachableUrl(currentService);
+
+    return (
+      <div className="h-full flex flex-col bg-[rgb(var(--semantic-0))]">
+        <div className="flex-1 min-h-0 overflow-y-auto px-10">
+          <div className="max-w-[1024px] w-full mx-auto flex flex-col gap-6 pt-10 pb-6">
+            <button
+              type="button"
+              onClick={() => setSelectedService(null)}
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors self-start"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              {t('compute.backToServices', { defaultValue: 'Back to services' })}
+            </button>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-medium text-foreground leading-8">
+                  {currentService.name}
+                </h1>
+                <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <span
+                    className={`inline-block h-2 w-2 rounded-full ${statusColors[currentService.status]}`}
+                  />
+                  {t(`compute.statuses.${currentService.status}`, {
+                    defaultValue: currentService.status,
+                  })}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {currentService.status === 'running' && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={isStopping || isDeleting}
+                    onClick={() => void stop(currentService.id)}
+                  >
+                    <Square className="h-3.5 w-3.5" />
+                    {isStopping
+                      ? t('compute.stopping', { defaultValue: 'Stopping...' })
+                      : t('compute.stop', { defaultValue: 'Stop' })}
+                  </Button>
+                )}
+                {currentService.status === 'stopped' && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={isStarting || isDeleting}
+                    onClick={() => void start(currentService.id)}
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                    {isStarting
+                      ? t('compute.starting', { defaultValue: 'Starting...' })
+                      : t('compute.start', { defaultValue: 'Start' })}
+                  </Button>
+                )}
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={isDeleting || isStopping || isStarting}
+                  onClick={() => setDeleteTarget(currentService.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {isDeleting
+                    ? t('compute.deleting', { defaultValue: 'Deleting...' })
+                    : t('compute.delete', { defaultValue: 'Delete' })}
+                </Button>
+              </div>
+            </div>
+
+            {currentService.status === 'failed' && (
+              <div className="flex items-center gap-2 px-4 py-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                {t('compute.deployFailed', {
+                  defaultValue: 'This service failed to deploy. You can delete it and try again.',
+                })}
+              </div>
+            )}
+
+            <div className="bg-card border border-[var(--alpha-8)] rounded-lg p-6">
+              <dl className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.image', { defaultValue: 'Image' })}
+                  </dt>
+                  <dd className="text-foreground break-all">
+                    {currentService.imageUrl === 'dockerfile'
+                      ? t('compute.builtFromDockerfile', { defaultValue: 'Built from Dockerfile' })
+                      : currentService.imageUrl}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.port', { defaultValue: 'Port' })}
+                  </dt>
+                  <dd className="text-foreground">{currentService.port}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.cpu', { defaultValue: 'CPU' })}
+                  </dt>
+                  <dd className="text-foreground">{currentService.cpu}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.memory', { defaultValue: 'Memory' })}
+                  </dt>
+                  <dd className="text-foreground">{currentService.memory} MB</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.region', { defaultValue: 'Region' })}
+                  </dt>
+                  <dd className="text-foreground">{currentService.region}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.created', { defaultValue: 'Created' })}
+                  </dt>
+                  <dd className="text-foreground">
+                    {new Date(currentService.createdAt).toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.updated', { defaultValue: 'Updated' })}
+                  </dt>
+                  <dd className="text-foreground">
+                    {new Date(currentService.updatedAt).toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-muted-foreground mb-1">
+                    {t('compute.fields.endpoint', { defaultValue: 'Endpoint' })}
+                  </dt>
+                  <dd className="text-foreground">
+                    {reachableUrl ? (
+                      reachableUrl.href ? (
+                        <a
+                          href={reachableUrl.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          {reachableUrl.display}
+                        </a>
+                      ) : (
+                        <code className="text-foreground font-mono bg-[var(--alpha-8)] px-2 py-0.5 rounded">
+                          {reachableUrl.display}
+                        </code>
+                      )
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {t('compute.notAvailable', { defaultValue: 'Not available' })}
+                      </span>
+                    )}
+                    {reachableUrl && !reachableUrl.href && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t('compute.rawTcpHint', {
+                          defaultValue:
+                            "Raw TCP service. Connect with the protocol's native client (e.g.",
+                        })}{' '}
+                        <code className="font-mono">redis-cli -h &lt;host&gt; -p &lt;port&gt;</code>
+                        ).
+                      </p>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            {currentService.providerInstanceId && <ServiceLogs serviceId={currentService.id} />}
+            {currentService.providerInstanceId && <ServiceEvents serviceId={currentService.id} />}
+          </div>
+        </div>
+
+        <DeleteServiceDialog
+          open={deleteTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeleteTarget(null);
+            }
+          }}
+          serviceName={currentService.name}
+          isLoading={isDeleting}
+          onConfirm={() => {
+            if (deleteTarget) {
+              return handleDelete(deleteTarget);
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col bg-[rgb(var(--semantic-0))]">
+      <div className="flex-1 min-h-0 overflow-y-auto px-10">
+        <div className="max-w-[1024px] w-full mx-auto flex flex-col gap-8 pt-10 pb-6">
+          {/* Services Section */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <h1 className="text-2xl font-medium text-foreground leading-8">
+                  {t('compute.servicesTitle', { defaultValue: 'Services' })}
+                </h1>
+                <p className="text-sm leading-5 text-muted-foreground">
+                  {t('compute.servicesDescription', {
+                    defaultValue:
+                      'Deploy and manage long-running containers on your infrastructure.',
+                  })}
+                </p>
+              </div>
+              <Button variant="primary" onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" />
+                {t('compute.createService', { defaultValue: 'Create Service' })}
+              </Button>
+            </div>
+
+            {services.length === 0 ? (
+              <div className="bg-card border border-[var(--alpha-8)] rounded-lg p-8">
+                <p className="text-sm text-muted-foreground mb-4 text-center">
+                  {t('compute.noServices', { defaultValue: 'No services deployed yet.' })}
+                </p>
+                <div className="flex flex-col gap-3 max-w-xl mx-auto">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1.5">
+                      {t('compute.useButtonOrCli', {
+                        defaultValue: 'Use the button above, the CLI:',
+                      })}
+                    </p>
+                    <code className="block px-3 py-2 bg-muted text-foreground rounded text-xs font-mono break-all">
+                      npx @insforge/cli compute deploy --name my-api --image nginx:alpine --port 80
+                    </code>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1.5">
+                      {t('compute.orAskAgent', { defaultValue: 'Or ask your AI agent:' })}
+                    </p>
+                    <ul className="flex flex-col gap-1 text-xs text-foreground">
+                      <li className="px-3 py-2 bg-muted rounded">
+                        {t('compute.agentExampleDeploy', {
+                          defaultValue: '“Deploy nginx:alpine on port 80 as a compute service”',
+                        })}
+                      </li>
+                      <li className="px-3 py-2 bg-muted rounded">
+                        {t('compute.agentExampleFastapi', {
+                          defaultValue: '“Deploy this FastAPI app in the current directory”',
+                        })}
+                      </li>
+                      <li className="px-3 py-2 bg-muted rounded">
+                        {t('compute.agentExampleRedis', {
+                          defaultValue: '“Create a Redis container for caching”',
+                        })}
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {services.map((service) => (
+                  <ServiceCard
+                    key={service.id}
+                    service={service}
+                    onClick={() => setSelectedService(service)}
+                    onStop={(id) => void stop(id)}
+                    onStart={(id) => void start(id)}
+                    onDelete={setDeleteTarget}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <CreateServiceDialog
+        provider={provider}
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreate={create}
+        isCreating={isCreating}
+      />
+
+      <DeleteServiceDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+          }
+        }}
+        serviceName={services.find((s) => s.id === deleteTarget)?.name ?? ''}
+        isLoading={isDeleting}
+        onConfirm={() => {
+          if (deleteTarget) {
+            return handleDelete(deleteTarget);
+          }
+        }}
+      />
+    </div>
+  );
+}

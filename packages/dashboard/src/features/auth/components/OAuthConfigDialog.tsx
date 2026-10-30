@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm, Controller, useFormState } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -47,6 +48,48 @@ interface OAuthConfigDialogProps {
 
 export type OAuthDialogMode = OAuthConfigDialogProps['mode'];
 
+function NativeClientIdsInput({
+  value,
+  onChange,
+  onBlur,
+  onTextChange,
+}: {
+  value?: string[];
+  onChange: (value: string[]) => void;
+  onBlur: () => void;
+  onTextChange: (value: string) => void;
+}) {
+  const [text, setText] = useState((value ?? []).join(', '));
+
+  useEffect(() => {
+    const nextText = (value ?? []).join(', ');
+    setText(nextText);
+    onTextChange(nextText);
+  }, [onTextChange, value]);
+
+  return (
+    <Input
+      type="text"
+      value={text}
+      onChange={(event) => {
+        setText(event.target.value);
+        onTextChange(event.target.value);
+      }}
+      onBlur={() => {
+        onChange(
+          text
+            .split(',')
+            .map((clientId) => clientId.trim())
+            .filter(Boolean)
+        );
+        onBlur();
+      }}
+      placeholder="com.example.ios-app"
+      className="w-[340px]"
+    />
+  );
+}
+
 export function OAuthConfigDialog({
   provider,
   mode,
@@ -54,6 +97,7 @@ export function OAuthConfigDialog({
   onClose,
   onSuccess,
 }: OAuthConfigDialogProps) {
+  const { t } = useTranslation('chrome');
   const { providerConfig, createConfig, updateConfig, isCreating, isUpdating, isLoadingProvider } =
     useOAuthConfig(mode === 'edit' ? provider?.id : null);
 
@@ -62,6 +106,7 @@ export function OAuthConfigDialog({
     defaultValues: {
       provider: provider?.id || 'google',
       clientId: '',
+      nativeClientIds: [],
       clientSecret: '',
       useSharedKey: false,
     },
@@ -70,6 +115,7 @@ export function OAuthConfigDialog({
   const useSharedKey = form.watch('useSharedKey');
   const clientId = form.watch('clientId');
   const clientSecret = form.watch('clientSecret');
+  const [nativeClientIdsText, setNativeClientIdsText] = useState('');
   const [isClientSecretVisible, setIsClientSecretVisible] = useState(false);
 
   // Our Cloud only support shared keys of these OAuth Providers for now
@@ -106,6 +152,7 @@ export function OAuthConfigDialog({
       form.reset({
         provider: provider.id,
         clientId: '',
+        nativeClientIds: [],
         clientSecret: '',
         useSharedKey: isSharedKeysAvailable,
       });
@@ -116,6 +163,7 @@ export function OAuthConfigDialog({
       form.reset({
         provider: provider.id,
         clientId: providerConfig.clientId || '',
+        nativeClientIds: providerConfig.nativeClientIds || [],
         clientSecret: providerConfig.clientSecret || '',
         useSharedKey: providerConfig.useSharedKey || false,
       });
@@ -128,6 +176,12 @@ export function OAuthConfigDialog({
     }
 
     try {
+      const isNativeOnlyApple =
+        provider.id === 'apple' &&
+        (data.nativeClientIds?.length ?? 0) > 0 &&
+        !data.clientId &&
+        !data.clientSecret;
+
       if (mode === 'edit') {
         if (!providerConfig) {
           return;
@@ -137,18 +191,22 @@ export function OAuthConfigDialog({
         updateConfig({
           provider: provider.id,
           config: data.useSharedKey
-            ? { useSharedKey: true }
-            : {
-                clientId: data.clientId,
-                clientSecret: data.clientSecret,
-                useSharedKey: false,
-              },
+            ? { useSharedKey: true, nativeClientIds: data.nativeClientIds }
+            : isNativeOnlyApple
+              ? { useSharedKey: false, nativeClientIds: data.nativeClientIds }
+              : {
+                  clientId: data.clientId,
+                  nativeClientIds: data.nativeClientIds,
+                  clientSecret: data.clientSecret || undefined,
+                  useSharedKey: false,
+                },
         });
       } else {
         // Create new config
         createConfig({
           provider: provider.id,
           clientId: data.useSharedKey ? undefined : data.clientId,
+          nativeClientIds: data.nativeClientIds,
           clientSecret: data.useSharedKey ? undefined : clientSecret,
           useSharedKey: data.useSharedKey,
         });
@@ -189,7 +247,15 @@ export function OAuthConfigDialog({
       return false;
     }
 
-    // If NOT using shared keys, require both clientId and clientSecret
+    // Native-only Apple setups require a trusted app audience but no browser credentials.
+    if (
+      provider?.id === 'apple' &&
+      nativeClientIdsText.split(',').some((clientIdValue) => clientIdValue.trim().length > 0)
+    ) {
+      return false;
+    }
+
+    // If NOT using shared keys, require both clientId and clientSecret.
     return !clientId || !clientSecret;
   };
 
@@ -199,14 +265,17 @@ export function OAuthConfigDialog({
         <DialogHeader>
           <DialogTitle>{provider?.name}</DialogTitle>
           <DialogDescription className="sr-only">
-            Configure OAuth settings for {provider?.name}
+            {t('auth.configureOAuthFor', {
+              name: provider?.name,
+              defaultValue: 'Configure OAuth settings for {{name}}',
+            })}
           </DialogDescription>
         </DialogHeader>
         {isLoadingProvider ? (
           <div className="p-6 flex items-center justify-center">
             <div className="text-center">
               <div className="text-sm text-gray-500 dark:text-zinc-400">
-                Loading OAuth configuration...
+                {t('auth.loadingOAuthConfig', { defaultValue: 'Loading OAuth configuration...' })}
               </div>
             </div>
           </div>
@@ -232,7 +301,7 @@ export function OAuthConfigDialog({
                       }}
                     />
                     <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      Shared Keys
+                      {t('auth.sharedKeys', { defaultValue: 'Shared Keys' })}
                     </span>
                   </div>
                 )}
@@ -241,14 +310,22 @@ export function OAuthConfigDialog({
                   /* Shared Keys Enabled */
                   <div className="space-y-6">
                     <p className="text-sm text-zinc-500 dark:text-neutral-400">
-                      Shared keys are created by the InsForge team for development. It helps you get
-                      started, but will show a InsForge logo and name on the OAuth screen.
+                      {t('auth.sharedKeysDescription', {
+                        defaultValue:
+                          'Shared keys are created by the InsForge team for development. It helps you get started, but will show a InsForge logo and name on the OAuth screen.',
+                      })}
                     </p>
 
                     <div className="flex items-center gap-3">
-                      <img src={WarningIcon} alt="Warning" className="h-6 w-6" />
+                      <img
+                        src={WarningIcon}
+                        alt={t('auth.warning', { defaultValue: 'Warning' })}
+                        className="h-6 w-6"
+                      />
                       <span className="text-sm font-medium text-zinc-950 dark:text-white">
-                        Shared keys should never be used in production
+                        {t('auth.sharedKeysProductionWarning', {
+                          defaultValue: 'Shared keys should never be used in production',
+                        })}
                       </span>
                     </div>
                   </div>
@@ -263,11 +340,16 @@ export function OAuthConfigDialog({
                         rel="noopener noreferrer"
                         className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium underline"
                       >
-                        Create a {provider?.name.split(' ')[0]} OAuth App
+                        {t('auth.createOAuthApp', {
+                          name: provider?.name.split(' ')[0],
+                          defaultValue: 'Create a {{name}} OAuth App',
+                        })}
                       </a>
                       <span className="text-sm font-normal text-zinc-950 dark:text-white">
                         {' '}
-                        and set the callback url to:
+                        {t('auth.andSetCallbackUrl', {
+                          defaultValue: 'and set the callback url to:',
+                        })}
                       </span>
                     </div>
 
@@ -285,24 +367,63 @@ export function OAuthConfigDialog({
               {!useSharedKey && (
                 <div className="space-y-6 p-6 border-t border-zinc-200 dark:border-neutral-700">
                   <div className="flex flex-row items-center justify-between gap-10">
-                    <label className="text-sm text-zinc-950 dark:text-white">Client ID</label>
+                    <label className="text-sm text-zinc-950 dark:text-white">
+                      {t('auth.clientId', { defaultValue: 'Client ID' })}
+                    </label>
                     <Input
                       type="text"
                       {...form.register('clientId')}
-                      placeholder={`Enter ${provider?.name.split(' ')[0]} OAuth App ID`}
+                      placeholder={t('auth.enterOAuthAppId', {
+                        name: provider?.name.split(' ')[0],
+                        defaultValue: 'Enter {{name}} OAuth App ID',
+                      })}
                       className="w-[340px]"
                     />
                   </div>
 
                   <div className="flex flex-row items-center justify-between gap-10">
-                    <label className="text-sm text-zinc-950 dark:text-white">Client Secret</label>
+                    <label className="text-sm text-zinc-950 dark:text-white">
+                      {t('auth.clientSecret', { defaultValue: 'Client Secret' })}
+                    </label>
                     <SecretInput
                       {...form.register('clientSecret')}
                       value={clientSecret ?? ''}
                       isVisible={isClientSecretVisible}
                       onToggleVisibility={() => setIsClientSecretVisible((visible) => !visible)}
-                      placeholder={`Enter ${provider?.name.split(' ')[0]} OAuth App Secret`}
+                      placeholder={t('auth.enterOAuthAppSecret', {
+                        name: provider?.name.split(' ')[0],
+                        defaultValue: 'Enter {{name}} OAuth App Secret',
+                      })}
                       className="w-[340px]"
+                    />
+                  </div>
+                </div>
+              )}
+              {provider?.id === 'apple' && (
+                <div className="p-6 border-t border-zinc-200 dark:border-neutral-700">
+                  <div className="flex flex-row items-start justify-between gap-10">
+                    <div className="space-y-1">
+                      <label className="text-sm text-zinc-950 dark:text-white">
+                        {t('auth.nativeClientIds', { defaultValue: 'Native App IDs' })}
+                      </label>
+                      <p className="max-w-52 text-xs text-zinc-500 dark:text-neutral-400">
+                        {t('auth.nativeClientIdsDescription', {
+                          defaultValue:
+                            'Comma-separated bundle IDs trusted for native Apple ID tokens.',
+                        })}
+                      </p>
+                    </div>
+                    <Controller
+                      name="nativeClientIds"
+                      control={form.control}
+                      render={({ field }) => (
+                        <NativeClientIdsInput
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          onTextChange={setNativeClientIdsText}
+                        />
+                      )}
                     />
                   </div>
                 </div>
@@ -317,16 +438,16 @@ export function OAuthConfigDialog({
                 onClick={onClose}
                 disabled={saving}
               >
-                Cancel
+                {t('auth.cancel', { defaultValue: 'Cancel' })}
               </Button>
               <Button type="button" onClick={handleSubmit} disabled={isDisabled()} className="w-30">
                 {saving
                   ? mode === 'edit'
-                    ? 'Updating...'
-                    : 'Adding...'
+                    ? t('auth.updating', { defaultValue: 'Updating...' })
+                    : t('auth.adding', { defaultValue: 'Adding...' })
                   : mode === 'edit'
-                    ? 'Update'
-                    : 'Add Provider'}
+                    ? t('auth.update', { defaultValue: 'Update' })
+                    : t('auth.addProvider', { defaultValue: 'Add Provider' })}
               </Button>
             </DialogFooter>
           </>

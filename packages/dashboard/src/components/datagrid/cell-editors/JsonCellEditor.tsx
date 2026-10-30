@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FileJson, AlertCircle, CheckCircle } from 'lucide-react';
 import { Badge, Button, ConfirmDialog, cn } from '@insforge/ui';
 import { Popover, PopoverContent, PopoverTrigger } from '#components';
@@ -11,6 +12,7 @@ export function JsonCellEditor({
   onCancel,
   className,
 }: JsonCellEditorProps) {
+  const { t } = useTranslation('chrome');
   const [open, setOpen] = useState(true);
   const [showNullConfirm, setShowNullConfirm] = useState(false);
   const [jsonText, setJsonText] = useState(() => {
@@ -170,14 +172,14 @@ export function JsonCellEditor({
 
   const formatDisplayValue = () => {
     if (!value || value === 'null') {
-      return 'Empty JSON';
+      return t('common.emptyJson', { defaultValue: 'Empty JSON' });
     }
 
     try {
       const parsed = typeof value === 'string' ? JSON.parse(value) : value;
 
       if (typeof parsed !== 'object' || parsed === null) {
-        return 'Invalid JSON';
+        return t('common.invalidJson', { defaultValue: 'Invalid JSON' });
       }
 
       const keys = Object.keys(parsed);
@@ -187,9 +189,12 @@ export function JsonCellEditor({
       if (keys.length === 1) {
         return `{ ${keys[0]}: ... }`;
       }
-      return `{ ${keys.length} properties }`;
+      return t('common.jsonProperties', {
+        count: keys.length,
+        defaultValue: `{ ${keys.length} properties }`,
+      });
     } catch {
-      return 'Invalid JSON';
+      return t('common.invalidJson', { defaultValue: 'Invalid JSON' });
     }
   };
 
@@ -218,7 +223,9 @@ export function JsonCellEditor({
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileJson className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">JSON Editor</span>
+                <span className="text-sm font-medium text-foreground">
+                  {t('common.jsonEditor', { defaultValue: 'JSON Editor' })}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -227,7 +234,7 @@ export function JsonCellEditor({
                   onClick={handleFormat}
                   disabled={!isValid || !hasJsonText}
                 >
-                  Format
+                  {t('common.format', { defaultValue: 'Format' })}
                 </Button>
                 <Button
                   variant="ghost"
@@ -235,7 +242,7 @@ export function JsonCellEditor({
                   onClick={handleMinify}
                   disabled={!isValid || !hasJsonText}
                 >
-                  Minify
+                  {t('common.minify', { defaultValue: 'Minify' })}
                 </Button>
               </div>
             </div>
@@ -272,7 +279,7 @@ export function JsonCellEditor({
                     setOpen(false);
                   }
                 }}
-                placeholder="Enter JSON here..."
+                placeholder={t('common.enterJsonHere', { defaultValue: 'Enter JSON here...' })}
                 className={cn(
                   'h-75 w-full resize-none rounded-md border bg-[var(--alpha-4)] px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground transition-colors',
                   'focus:outline-none focus:shadow-[0_0_0_1px_rgb(var(--foreground))]',
@@ -294,12 +301,16 @@ export function JsonCellEditor({
                 {isValid ? (
                   <>
                     <CheckCircle className="h-4 w-4" />
-                    <span className="text-xs">Valid JSON</span>
+                    <span className="text-xs">
+                      {t('common.validJson', { defaultValue: 'Valid JSON' })}
+                    </span>
                   </>
                 ) : (
                   <>
                     <AlertCircle className="h-4 w-4" />
-                    <span className="text-xs">Invalid JSON</span>
+                    <span className="text-xs">
+                      {t('common.invalidJson', { defaultValue: 'Invalid JSON' })}
+                    </span>
                   </>
                 )}
               </Badge>
@@ -314,7 +325,9 @@ export function JsonCellEditor({
 
             {/* Tips */}
             <div className="mt-2 rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)] px-2 py-1.5 text-xs text-muted-foreground">
-              Tip: Use Tab for indentation, Ctrl+Enter to save, Escape to cancel
+              {t('common.jsonEditorTip', {
+                defaultValue: 'Tip: Use Tab for indentation, Ctrl+Enter to save, Escape to cancel',
+              })}
             </div>
           </div>
 
@@ -334,10 +347,10 @@ export function JsonCellEditor({
               }}
               className="flex-1"
             >
-              Cancel
+              {t('common.cancel', { defaultValue: 'Cancel' })}
             </Button>
             <Button size="sm" onClick={handleSave} disabled={!isValid} className="flex-1">
-              Save
+              {t('common.save', { defaultValue: 'Save' })}
             </Button>
           </div>
         </PopoverContent>
@@ -346,10 +359,13 @@ export function JsonCellEditor({
       <ConfirmDialog
         open={showNullConfirm}
         onOpenChange={setShowNullConfirm}
-        title="Clear JSON Data"
-        description="This action will permanently remove the current JSON data from this cell and set it to null. Are you sure you want to continue?"
-        confirmText="Clear Data"
-        cancelText="Cancel"
+        title={t('common.clearJsonTitle', { defaultValue: 'Clear JSON Data' })}
+        description={t('common.clearJsonDescription', {
+          defaultValue:
+            'This action will permanently remove the current JSON data from this cell and set it to null. Are you sure you want to continue?',
+        })}
+        confirmText={t('common.clearData', { defaultValue: 'Clear Data' })}
+        cancelText={t('common.cancel', { defaultValue: 'Cancel' })}
         onConfirm={confirmSetNull}
         destructive={true}
       />

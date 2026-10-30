@@ -15,6 +15,8 @@ export interface DashboardUserInfo {
   userId: string;
   email: string;
   name?: string;
+  /** Account-level BCP 47 locale preference; null when the user has none. */
+  preferredLocale?: string | null;
 }
 
 export interface DashboardBackup {
@@ -37,6 +39,11 @@ export interface DashboardBackupInfo {
 export interface DashboardInstanceInfo {
   currentInstanceType: string;
   planName: string;
+  /**
+   * White-labeled partner org. Not derivable from planName — the cloud reports
+   * partner orgs as 'team', so they look identical to a real Team customer.
+   */
+  isPartnerOrg?: boolean;
   computeCredits: number;
   currentOrgComputeCost: number;
   instanceTypes: Array<{
@@ -69,6 +76,8 @@ export type DashboardMetricName =
   | 'disk_usage'
   | 'disk_used'
   | 'disk_total'
+  | 'disk_database'
+  | 'disk_wal'
   | 'network_in'
   | 'network_out';
 
@@ -130,6 +139,45 @@ export interface DashboardAdvisorIssuesQuery {
   offset?: number;
 }
 
+export type DashboardAdvisorSuppressionScope = 'instance' | 'rule';
+export type DashboardAdvisorSuppressionReason =
+  | 'false_positive'
+  | 'accepted_risk'
+  | 'wont_fix'
+  | 'other';
+
+export interface DashboardAdvisorSuppression {
+  id: string;
+  ruleId: string;
+  affectedObject?: string;
+  scope: DashboardAdvisorSuppressionScope;
+  reason: DashboardAdvisorSuppressionReason;
+  note?: string;
+  createdBy?: string;
+  createdAt: string;
+  title?: string;
+  severity?: DashboardAdvisorSeverity;
+  category?: DashboardAdvisorCategory;
+}
+
+interface DashboardAdvisorSuppressRequestBase {
+  ruleId: string;
+  affectedObject?: string;
+  scope: DashboardAdvisorSuppressionScope;
+}
+
+/**
+ * `reason: 'other'` must carry a non-empty `note` (the backend rejects it
+ * otherwise), so the request is a discriminated union: the compiler forces a
+ * `note` for `'other'` and keeps it optional for the preset reasons.
+ */
+export type DashboardAdvisorSuppressRequest =
+  | (DashboardAdvisorSuppressRequestBase & {
+      reason: Exclude<DashboardAdvisorSuppressionReason, 'other'>;
+      note?: string;
+    })
+  | (DashboardAdvisorSuppressRequestBase & { reason: 'other'; note: string });
+
 /** Status event posted from cloud-shell after the PostHog OAuth flow finishes. */
 export interface DashboardPosthogConnectionStatus {
   status: 'connected' | 'error' | 'cancelled';
@@ -169,6 +217,7 @@ export interface DashboardProps {
   ) => Promise<{ success: boolean; instanceType?: string; error?: string }>;
   onUpdateVersion?: () => Promise<void>;
   onRequestUserInfo?: () => Promise<DashboardUserInfo>;
+  onUpdatePreferredLocale?: (locale: string) => void;
   onRequestUserApiKey?: () => Promise<string>;
   onRequestModelCredits?: () => Promise<DashboardModelCreditUsage>;
   onRequestProjectMetrics?: (range: DashboardMetricsRange) => Promise<DashboardMetricsResponse>;
@@ -177,6 +226,9 @@ export interface DashboardProps {
     query: DashboardAdvisorIssuesQuery
   ) => Promise<DashboardAdvisorIssuesResponse>;
   onTriggerAdvisorScan?: () => Promise<void>;
+  onRequestAdvisorSuppressions?: () => Promise<DashboardAdvisorSuppression[]>;
+  onSuppressAdvisorIssue?: (req: DashboardAdvisorSuppressRequest) => Promise<void>;
+  onUnsuppressAdvisorIssue?: (id: string) => Promise<void>;
   /** Cloud-hosting only: ask the parent shell to start the PostHog OAuth flow. */
   onConnectPosthog?: (projectId: string) => void;
   /** Cloud-hosting only: subscribe to PostHog OAuth completion / failure events. */

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Settings } from 'lucide-react';
 import {
   Button,
@@ -60,6 +61,7 @@ function toRetentionOption(retentionDays: number | null): RetentionOption {
 }
 
 export function FunctionsSettingsDialog({ open, onOpenChange }: FunctionsSettingsDialogProps) {
+  const { t } = useTranslation('chrome');
   const [retentionDays, setRetentionDays] = useState<RetentionOption | null>(null);
   const [initialRetentionDays, setInitialRetentionDays] = useState<RetentionOption | null>(null);
   const { config, isLoading, isUpdating, error, updateConfig } = useSchedulesConfig();
@@ -115,12 +117,14 @@ export function FunctionsSettingsDialog({ open, onOpenChange }: FunctionsSetting
       <MenuDialogContent>
         <MenuDialogSideNav>
           <MenuDialogSideNavHeader>
-            <MenuDialogSideNavTitle>Functions Settings</MenuDialogSideNavTitle>
+            <MenuDialogSideNavTitle>
+              {t('functions.settingsTitle', { defaultValue: 'Functions Settings' })}
+            </MenuDialogSideNavTitle>
           </MenuDialogSideNavHeader>
           <MenuDialogNav>
             <MenuDialogNavList>
               <MenuDialogNavItem icon={<Settings className="h-5 w-5" />} active={true}>
-                Schedules
+                {t('functions.schedules', { defaultValue: 'Schedules' })}
               </MenuDialogNavItem>
             </MenuDialogNavList>
           </MenuDialogNav>
@@ -128,22 +132,32 @@ export function FunctionsSettingsDialog({ open, onOpenChange }: FunctionsSetting
 
         <MenuDialogMain>
           <MenuDialogHeader>
-            <MenuDialogTitle>Schedules</MenuDialogTitle>
+            <MenuDialogTitle>
+              {t('functions.schedules', { defaultValue: 'Schedules' })}
+            </MenuDialogTitle>
             <MenuDialogCloseButton className="ml-auto" />
           </MenuDialogHeader>
 
           {!isLoaded ? (
             <MenuDialogBody>
               <div className="flex min-h-[92px] items-center justify-center text-sm text-muted-foreground">
-                {isLoading && !error ? 'Loading configuration...' : 'Unable to load configuration.'}
+                {isLoading && !error
+                  ? t('functions.loadingConfiguration', {
+                      defaultValue: 'Loading configuration...',
+                    })
+                  : t('functions.unableToLoadConfiguration', {
+                      defaultValue: 'Unable to load configuration.',
+                    })}
               </div>
             </MenuDialogBody>
           ) : (
             <>
               <MenuDialogBody>
                 <SettingRow
-                  label="Log Retention"
-                  description="How long execution logs are kept before cleanup."
+                  label={t('functions.logRetention', { defaultValue: 'Log Retention' })}
+                  description={t('functions.logRetentionDescription', {
+                    defaultValue: 'How long execution logs are kept before cleanup.',
+                  })}
                 >
                   <div className="flex justify-end">
                     <Select
@@ -155,11 +169,17 @@ export function FunctionsSettingsDialog({ open, onOpenChange }: FunctionsSetting
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="7">7 days</SelectItem>
-                        <SelectItem value="14">14 days</SelectItem>
-                        <SelectItem value="30">30 days</SelectItem>
-                        <SelectItem value="90">90 days</SelectItem>
-                        <SelectItem value="never">Never</SelectItem>
+                        {[7, 14, 30, 90].map((days) => (
+                          <SelectItem key={days} value={String(days)}>
+                            {t('functions.retentionDays', {
+                              count: days,
+                              defaultValue: '{{count}} days',
+                            })}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="never">
+                          {t('functions.never', { defaultValue: 'Never' })}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -174,14 +194,16 @@ export function FunctionsSettingsDialog({ open, onOpenChange }: FunctionsSetting
                       variant="secondary"
                       onClick={() => handleOpenChange(false)}
                     >
-                      Cancel
+                      {t('functions.cancel', { defaultValue: 'Cancel' })}
                     </Button>
                     <Button
                       type="button"
                       onClick={() => void handleSave()}
                       disabled={!isLoaded || isUpdating || !hasChanges}
                     >
-                      {isUpdating ? 'Saving...' : 'Save Changes'}
+                      {isUpdating
+                        ? t('functions.saving', { defaultValue: 'Saving...' })
+                        : t('functions.saveChanges', { defaultValue: 'Save Changes' })}
                     </Button>
                   </>
                 )}

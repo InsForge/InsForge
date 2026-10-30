@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
 import { S3StorageProvider } from '../../src/providers/storage/s3.provider.ts';
-import { CopyObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  CopyObjectCommand,
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 import crypto from 'crypto';
 
@@ -20,6 +25,9 @@ vi.mock('@/infra/config/app.config.js', () => {
     storage: {
       get s3EndpointUrl() {
         return process.env.S3_ENDPOINT_URL;
+      },
+      get s3UsePresignedUrls() {
+        return process.env.S3_USE_PRESIGNED_URLS !== 'false';
       },
     },
     server: {
@@ -144,6 +152,75 @@ describe('S3StorageProvider — branch fallback', () => {
     });
   });
 
+  describe('deleteObjects', () => {
+    it('sends one DeleteObjectsCommand and maps S3 errors back to original keys', async () => {
+      sendMock.mockResolvedValueOnce({
+        Errors: [
+          {
+            Key: 'branchkey/photos/b.txt',
+            Code: 'AccessDenied',
+            Message: 'denied',
+          },
+        ],
+      });
+      const p = makeProvider('parentkey');
+
+      const result = await p.deleteObjects('photos', ['a.txt', 'b.txt']);
+
+      expect(result).toEqual({
+        deleted: ['a.txt'],
+        failed: [{ key: 'b.txt', message: 'Failed to delete object' }],
+      });
+      expect(sendMock).toHaveBeenCalledTimes(1);
+      const command = sendMock.mock.calls[0][0] as DeleteObjectsCommand;
+      expect(command.input).toMatchObject({
+        Bucket: 'bucket',
+        Delete: {
+          Objects: [{ Key: 'branchkey/photos/a.txt' }, { Key: 'branchkey/photos/b.txt' }],
+          Quiet: true,
+        },
+      });
+    });
+
+    it('chunks deletes into S3-compatible batches of 1000 objects', async () => {
+      sendMock.mockResolvedValue({});
+      const p = makeProvider('parentkey');
+      const keys = Array.from({ length: 1001 }, (_, index) => `file-${index}.txt`);
+
+      const result = await p.deleteObjects('photos', keys);
+
+      expect(result).toEqual({ deleted: keys, failed: [] });
+      expect(sendMock).toHaveBeenCalledTimes(2);
+      const firstCommand = sendMock.mock.calls[0][0] as DeleteObjectsCommand;
+      const secondCommand = sendMock.mock.calls[1][0] as DeleteObjectsCommand;
+      expect(firstCommand.input.Delete?.Objects).toHaveLength(1000);
+      expect(firstCommand.input.Delete?.Quiet).toBe(true);
+      expect(secondCommand.input.Delete?.Objects).toEqual([
+        { Key: 'branchkey/photos/file-1000.txt' },
+      ]);
+      expect(secondCommand.input.Delete?.Quiet).toBe(true);
+    });
+
+    it('reports keys absent from keyed S3 errors as deleted when S3 returns an error without a key', async () => {
+      sendMock.mockResolvedValueOnce({
+        Errors: [
+          {
+            Code: 'InternalError',
+            Message: 'missing key',
+          },
+        ],
+      });
+      const p = makeProvider('parentkey');
+
+      const result = await p.deleteObjects('photos', ['a.txt', 'b.txt']);
+
+      expect(result).toEqual({
+        deleted: ['a.txt', 'b.txt'],
+        failed: [],
+      });
+    });
+  });
+
   describe('getObjectStream', () => {
     function fakeStreamResponse(body: string) {
       return {
@@ -244,6 +321,7 @@ describe('S3StorageProvider — branch fallback', () => {
     });
 
     afterEach(() => {
+      vi.useRealTimers();
       for (const [k, v] of Object.entries(savedEnv)) {
         if (v === undefined) delete process.env[k];
         else process.env[k] = v;
@@ -276,6 +354,40 @@ describe('S3StorageProvider — branch fallback', () => {
       const url = new URL(strategy.url);
       expect(url.searchParams.get('v')).toBeNull();
       expect(url.searchParams.get('Signature')).not.toBeNull();
+    });
+
+    it('returns the same URL for a public object all UTC day', async () => {
+      const p = makeProvider();
+      vi.useFakeTimers({ now: new Date('2026-10-12T00:00:01Z') });
+      const first = await p.getDownloadStrategy('photos', 'a.txt', 0, true, 'etag-abc');
+      vi.setSystemTime(new Date('2026-10-12T23:59:59Z'));
+      const second = await p.getDownloadStrategy('photos', 'a.txt', 0, true, 'etag-abc');
+
+      expect(second.url).toBe(first.url);
+      expect(first.expiresAt).toEqual(new Date('2026-10-20T00:00:00Z'));
+      expect(new URL(first.url).searchParams.get('Expires')).toBe(
+        String(Date.parse('2026-10-20T00:00:00Z') / 1000)
+      );
+    });
+
+    it('keeps the per-request expiry for private objects', async () => {
+      vi.useFakeTimers({ now: new Date('2026-10-12T12:00:00Z') });
+      const strategy = await makeProvider().getDownloadStrategy(
+        'photos',
+        'a.txt',
+        3600,
+        false,
+        'etag-abc'
+      );
+
+      expect(strategy.expiresAt).toEqual(new Date('2026-10-12T13:00:00Z'));
+    });
+
+    it('keeps the per-request expiry for public objects without a version stamp', async () => {
+      vi.useFakeTimers({ now: new Date('2026-10-12T12:00:00Z') });
+      const strategy = await makeProvider().getDownloadStrategy('photos', 'a.txt', 0, true, null);
+
+      expect(strategy.expiresAt).toEqual(new Date('2026-10-19T12:00:00Z'));
     });
 
     it('URL-encodes version values with reserved characters', async () => {

@@ -5,6 +5,7 @@ import { databaseRpcRouter } from './rpc.routes.js';
 import databaseAdvanceRouter from './advance.routes.js';
 import { databaseMigrationsRouter } from './migrations.routes.js';
 import { databaseBackupsRouter } from './backups.routes.js';
+import { databaseConfigRouter } from './config.routes.js';
 import { databaseAdminRouter } from './admin.routes.js';
 import { DatabaseService } from '@/services/database/database.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
@@ -24,6 +25,9 @@ router.use('/advance', databaseAdvanceRouter);
 router.use('/migrations', databaseMigrationsRouter);
 if (!isCloudEnvironment()) {
   router.use('/backups', databaseBackupsRouter);
+  // Database-module config currently only holds backup scheduling, which the
+  // cloud control plane owns — so it stays self-hosting-only with backups.
+  router.use('/config', databaseConfigRouter);
 }
 router.use('/admin', databaseAdminRouter);
 

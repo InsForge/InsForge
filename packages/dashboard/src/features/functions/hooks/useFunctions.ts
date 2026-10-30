@@ -1,24 +1,32 @@
 import { useState, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { functionService } from '#features/functions/services/function.service';
 import { FunctionSchema, type UpdateFunctionRequest } from '@insforge/shared-schemas';
 import { useToast } from '@insforge/ui';
 
-function getDeploymentFailureMessage(buildLogs?: string[]): string {
+function getDeploymentFailureMessage(t: TFunction<'chrome'>, buildLogs?: string[]): string {
   const logs = buildLogs?.map((log) => log.trim()).filter(Boolean) ?? [];
   const lastLog = logs.length > 0 ? logs[logs.length - 1] : null;
 
   const explicitError = logs.find((log) => log.toLowerCase().includes('[error]')) ?? lastLog;
 
   if (!explicitError) {
-    return 'Function saved, but deployment failed.';
+    return t('functions.deploymentFailed', {
+      defaultValue: 'Function saved, but deployment failed.',
+    });
   }
 
   const normalizedError = explicitError.replace(/^\[error\]\s*/i, '');
-  return `Function saved, but deployment failed: ${normalizedError}`;
+  return t('functions.deploymentFailedWithError', {
+    error: normalizedError,
+    defaultValue: 'Function saved, but deployment failed: {{error}}',
+  });
 }
 
 export function useFunctions() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [selectedFunction, setSelectedFunction] = useState<FunctionSchema | null>(null);
@@ -49,11 +57,15 @@ export function useFunctions() {
       } catch (error) {
         console.error('Failed to fetch function details:', error);
         const errorMessage =
-          error instanceof Error ? error.message : 'Failed to load function details';
+          error instanceof Error
+            ? error.message
+            : t('functions.failedToLoadFunctionDetails', {
+                defaultValue: 'Failed to load function details',
+              });
         showToast(errorMessage, 'error');
       }
     },
-    [showToast]
+    [showToast, t]
   );
 
   // Function to clear selected function (back to list)
@@ -66,14 +78,20 @@ export function useFunctions() {
     mutationFn: (slug: string) => functionService.deleteFunction(slug),
     onSuccess: (_, slug) => {
       void queryClient.invalidateQueries({ queryKey: ['functions'] });
-      showToast('Function deleted successfully', 'success');
+      showToast(
+        t('functions.functionDeleted', { defaultValue: 'Function deleted successfully' }),
+        'success'
+      );
       // Clear selection if deleted function was selected
       if (selectedFunction && selectedFunction.slug === slug) {
         setSelectedFunction(null);
       }
     },
     onError: (error: Error) => {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete function';
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : t('functions.failedToDeleteFunction', { defaultValue: 'Failed to delete function' });
       showToast(errorMessage, 'error');
     },
   });
@@ -88,14 +106,25 @@ export function useFunctions() {
       );
 
       if (result.success && result.deployment?.status !== 'failed') {
-        showToast('Function updated successfully', 'success');
+        showToast(
+          t('functions.functionUpdated', { defaultValue: 'Function updated successfully' }),
+          'success'
+        );
         return;
       }
 
-      showToast(getDeploymentFailureMessage(result.deployment?.buildLogs), 'warn', undefined, 6000);
+      showToast(
+        getDeploymentFailureMessage(t, result.deployment?.buildLogs),
+        'warn',
+        undefined,
+        6000
+      );
     },
     onError: (error: Error) => {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update function';
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : t('functions.failedToUpdateFunction', { defaultValue: 'Failed to update function' });
       showToast(errorMessage, 'error');
     },
   });

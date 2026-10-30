@@ -47,6 +47,16 @@ export interface AppConfig {
     org: string;
     domain: string;
   };
+  docker: {
+    socketPath: string;
+    publicHost: string;
+    domain: string;
+    defaultIngress: string;
+    bindAddress: string;
+    isolateNetwork: boolean;
+    buildMaxContextSize: string;
+    buildUploadIdleTimeoutMs: number;
+  };
   server: {
     maxJsonBodySize: string;
     maxUrlencodedBodySize: string;
@@ -54,6 +64,7 @@ export interface AppConfig {
     maxFilesPerField: number;
     logsDir: string;
     trustProxy: TrustProxySetting;
+    keepAliveTimeoutMs: number;
   };
   database: {
     host: string;
@@ -63,6 +74,9 @@ export interface AppConfig {
     password: string;
     dir: string;
     postgrestBaseUrl: string;
+    postgrestMaxSockets: number;
+    postgrestMaxFreeSockets: number;
+    postgrestFreeSocketTimeoutMs: number;
   };
   auth: {
     rootAdminUsername: string;
@@ -74,7 +88,7 @@ export interface AppConfig {
     s3Bucket: string | undefined;
     appKey: string;
     parentAppKey: string | undefined;
-    awsRegion: string;
+    s3Region: string;
     storageDir: string;
     s3AccessKeyId: string | undefined;
     s3SecretAccessKey: string | undefined;
@@ -82,6 +96,7 @@ export interface AppConfig {
     awsSecretAccessKey: string | undefined;
     s3EndpointUrl: string | undefined;
     s3ForcePathStyle: boolean;
+    s3UsePresignedUrls: boolean;
     awsConfigBucket: string;
     awsConfigRegion: string;
     maxS3UploadSize: number;
@@ -120,6 +135,9 @@ function parseEnvBool(val: string | undefined): boolean {
 }
 
 const AWS_MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024;
+
+/** Largest delay `setTimeout` honours; anything above it is silently treated as 1ms. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 function parseEnvBytes(val: string | undefined, fallback: number): number {
   if (!val) return fallback;
@@ -169,6 +187,50 @@ export function loadConfig(): AppConfig {
       org: process.env.FLY_ORG || '',
       domain: process.env.COMPUTE_DOMAIN || '',
     },
+    docker: {
+      // Presence of a reachable socket is how an operator opts in: they mount it
+      // into the InsForge container, and the driver registers itself.
+      socketPath: process.env.DOCKER_SOCKET_PATH || '/var/run/docker.sock',
+      // Host address published-port URLs are built from. Left empty we return a
+      // null endpoint rather than guessing the host's public IP and handing out
+      // a URL that does not resolve.
+      publicHost: process.env.COMPUTE_PUBLIC_HOST || '',
+      // Wildcard domain for `host` ingress, shared with the Fly path.
+      domain: process.env.COMPUTE_DOMAIN || '',
+      // Ingress default for containers this driver creates. `none` publishes no
+      // host port at all, which is right for the majority of compute (queue
+      // workers, processors, inference loops) that takes no inbound traffic.
+      defaultIngress: process.env.COMPUTE_DEFAULT_INGRESS || 'none',
+      // Bind address for published ports. Defaults to loopback: a container
+      // reachable from the whole internet should be a deliberate choice, and
+      // Docker's own default (0.0.0.0, plus [::]) is not.
+      bindAddress: process.env.COMPUTE_BIND_ADDRESS || '127.0.0.1',
+      // Skip attaching containers to the project's own compose network. Off by
+      // default — proximity to the database and storage is the point. Uses the
+      // shared parser so `1`/`yes`/`on` work too: a knob that silently ignores
+      // `COMPUTE_ISOLATE_NETWORK=1` fails in the unsafe direction.
+      isolateNetwork: parseEnvBool(process.env.COMPUTE_ISOLATE_NETWORK),
+      // Ceiling on an uploaded build context. Deliberately *not* the JSON body
+      // limit it used to borrow: express buffers the whole tarball in memory
+      // before any handler runs, and a t4g.nano has ~418MB usable, so a 100MB
+      // ceiling is a self-inflicted OOM. A source context is normally single-digit
+      // megabytes; 64MB is generous for one that vendors dependencies.
+      buildMaxContextSize: process.env.COMPUTE_BUILD_MAX_CONTEXT || '64mb',
+      // How long an upload may send nothing before it is treated as stalled and
+      // cut loose. Only builds one at a time, so a connection that stops making
+      // progress while holding the slot blocks every other deploy. The timer resets
+      // on each chunk, so this bounds silence, not total upload time — a slow but
+      // active link is never cut.
+      //
+      // Clamped to the 32-bit signed max because `setTimeout` silently drops a
+      // larger delay to 1ms: without this, an operator asking for a very lenient
+      // timeout would get the harshest possible behaviour and see every upload
+      // aborted instantly.
+      buildUploadIdleTimeoutMs: Math.min(
+        parseEnvInt(process.env.COMPUTE_BUILD_UPLOAD_IDLE_TIMEOUT, 30) * 1000,
+        MAX_TIMEOUT_MS
+      ),
+    },
     server: {
       maxJsonBodySize: process.env.MAX_JSON_BODY_SIZE || '100mb',
       maxUrlencodedBodySize: process.env.MAX_URLENCODED_BODY_SIZE || '10mb',
@@ -179,6 +241,9 @@ export function loadConfig(): AppConfig {
       maxFilesPerField: parseEnvInt(process.env.MAX_FILES_PER_FIELD, 10),
       logsDir,
       trustProxy: parseTrustProxySetting(process.env.TRUST_PROXY),
+      // Must exceed the idle timeout of any proxy/LB in front of the backend,
+      // otherwise clients can reuse a socket the server already closed.
+      keepAliveTimeoutMs: parseEnvInt(process.env.KEEP_ALIVE_TIMEOUT_MS, 65000),
     },
     database: {
       host: process.env.POSTGRES_HOST || 'localhost',
@@ -188,6 +253,14 @@ export function loadConfig(): AppConfig {
       password: process.env.POSTGRES_PASSWORD || 'postgres',
       dir: process.env.DATABASE_DIR || path.join(__dirname, '../../data'),
       postgrestBaseUrl: process.env.POSTGREST_BASE_URL || 'http://localhost:5430',
+      // HTTP agent pool for the PostgREST proxy. Keep max sockets aligned with
+      // PostgREST's own db pool (PGRST_DB_POOL): sockets beyond it only move
+      // the queue from PostgREST back into this process.
+      postgrestMaxSockets: parseEnvInt(process.env.POSTGREST_MAX_SOCKETS, 50),
+      postgrestMaxFreeSockets: parseEnvInt(process.env.POSTGREST_MAX_FREE_SOCKETS, 10),
+      // Must stay below PostgREST's own idle connection timeout so free
+      // sockets are dropped before the server can close them first.
+      postgrestFreeSocketTimeoutMs: parseEnvInt(process.env.POSTGREST_FREE_SOCKET_TIMEOUT_MS, 4000),
     },
     auth: {
       rootAdminUsername: process.env.ROOT_ADMIN_USERNAME || process.env.ADMIN_EMAIL || '',
@@ -196,10 +269,14 @@ export function loadConfig(): AppConfig {
       accessAnonKey: process.env.ACCESS_ANON_KEY || undefined,
     },
     storage: {
-      s3Bucket: process.env.AWS_S3_BUCKET || undefined,
+      // S3_BUCKET / S3_REGION are the provider-neutral names for self-hosting
+      // (the store can be MinIO, RustFS, Wasabi, R2, ... — not just AWS).
+      // AWS_S3_BUCKET / AWS_REGION remain as fallbacks: cloud provisioning
+      // sets them, and existing self-host .env files keep working.
+      s3Bucket: process.env.S3_BUCKET || process.env.AWS_S3_BUCKET || undefined,
       appKey: process.env.APP_KEY || 'local',
       parentAppKey: process.env.PARENT_APP_KEY?.trim() || undefined,
-      awsRegion: process.env.AWS_REGION || 'us-east-2',
+      s3Region: process.env.S3_REGION || process.env.AWS_REGION || 'us-east-2',
       storageDir: process.env.STORAGE_DIR || path.resolve(process.cwd(), 'insforge-storage'),
       s3AccessKeyId: process.env.S3_ACCESS_KEY_ID || undefined,
       s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY || undefined,
@@ -209,6 +286,12 @@ export function loadConfig(): AppConfig {
       // Default true (MinIO etc.). Set S3_FORCE_PATH_STYLE=false for providers
       // that require virtual-hosted-style addressing (Tencent COS, Aliyun OSS).
       s3ForcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
+      // Default true (presigned upload/download URLs handed to clients). Set
+      // S3_USE_PRESIGNED_URLS=false to proxy all object bytes through the backend
+      // instead — required when the S3 endpoint is not reachable by browsers
+      // (bundled MinIO/RustFS on the Docker network) or lacks POST-policy
+      // support (Cloudflare R2).
+      s3UsePresignedUrls: process.env.S3_USE_PRESIGNED_URLS !== 'false',
       awsConfigBucket: process.env.AWS_CONFIG_BUCKET || 'insforge-config',
       awsConfigRegion: process.env.AWS_CONFIG_REGION || 'us-east-2',
       maxS3UploadSize: parseEnvBytes(process.env.S3_MAX_OBJECT_SIZE_BYTES, 5 * 1024 * 1024 * 1024),

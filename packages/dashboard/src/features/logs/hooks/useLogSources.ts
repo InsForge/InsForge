@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import type { FeatureSidebarListItem } from '#components';
 import { LOCAL_STORAGE_KEYS } from '#lib/utils/constants';
@@ -11,6 +12,7 @@ import { logService } from '#features/logs/services/log.service';
 import type { LogSourceSchema } from '@insforge/shared-schemas';
 
 export function useLogSources() {
+  const { t } = useTranslation('chrome');
   const [selectedSource, setSelectedSource] = useState<string | null>(() => {
     return getLocalStorageItem(LOCAL_STORAGE_KEYS.selectedLogSource);
   });
@@ -47,7 +49,7 @@ export function useLogSources() {
     () => [
       {
         id: 'mcp-logs',
-        label: 'MCP logs',
+        label: t('logs.mcpLogs', { defaultValue: 'MCP logs' }),
         href: '/dashboard/logs/MCP',
       },
       ...sourceNames.map((source) => ({
@@ -56,7 +58,7 @@ export function useLogSources() {
         href: `/dashboard/logs/${source}`,
       })),
     ],
-    [sourceNames]
+    [sourceNames, t]
   );
 
   // Persist selected source to localStorage

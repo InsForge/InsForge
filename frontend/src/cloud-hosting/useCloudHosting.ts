@@ -12,9 +12,6 @@ import type {
   DashboardMetricName,
   DashboardMetricsRange,
   DashboardMetricsResponse,
-  DashboardAdvisorSummary,
-  DashboardAdvisorIssuesQuery,
-  DashboardAdvisorIssuesResponse,
 } from '@insforge/dashboard';
 import { partnerService } from './partner.service';
 
@@ -25,11 +22,11 @@ const VALID_METRIC_NAMES: readonly DashboardMetricName[] = [
   'disk_usage',
   'disk_used',
   'disk_total',
+  'disk_database',
+  'disk_wal',
   'network_in',
   'network_out',
 ] as const;
-const VALID_ADVISOR_SEVERITIES = ['critical', 'warning', 'info'] as const;
-const VALID_ADVISOR_CATEGORIES = ['security', 'performance', 'health'] as const;
 
 type InstanceTypeChangeResult = {
   success: boolean;
@@ -57,10 +54,7 @@ type PendingRequestKey =
   | 'userInfo'
   | 'userApiKey'
   | 'modelCredits'
-  | 'projectMetrics'
-  | 'advisorLatest'
-  | 'advisorIssues'
-  | 'advisorScan';
+  | 'projectMetrics';
 
 type PendingRequest<T> = {
   resolve: (value: T) => void;
@@ -84,9 +78,6 @@ type PendingRequestValues = {
   userApiKey: string;
   modelCredits: DashboardModelCreditUsage;
   projectMetrics: DashboardMetricsResponse;
-  advisorLatest: DashboardAdvisorSummary;
-  advisorIssues: DashboardAdvisorIssuesResponse;
-  advisorScan: void;
 };
 
 type PendingRequests = {
@@ -364,17 +355,6 @@ export function useCloudHosting() {
           pendingRequestsRef.current.projectMetrics =
             pendingRequest as PendingRequest<DashboardMetricsResponse>;
           return;
-        case 'advisorLatest':
-          pendingRequestsRef.current.advisorLatest =
-            pendingRequest as PendingRequest<DashboardAdvisorSummary>;
-          return;
-        case 'advisorIssues':
-          pendingRequestsRef.current.advisorIssues =
-            pendingRequest as PendingRequest<DashboardAdvisorIssuesResponse>;
-          return;
-        case 'advisorScan':
-          pendingRequestsRef.current.advisorScan = pendingRequest as PendingRequest<void>;
-          return;
         default: {
           const exhaustiveKey: never = key;
           throw new Error(`Unhandled pending request key: ${exhaustiveKey}`);
@@ -631,6 +611,8 @@ export function useCloudHosting() {
               userId,
               email,
               name: typeof message.name === 'string' ? message.name : undefined,
+              preferredLocale:
+                typeof message.preferredLocale === 'string' ? message.preferredLocale : null,
             });
             return;
           }
@@ -678,6 +660,7 @@ export function useCloudHosting() {
               currentInstanceType:
                 typeof message.currentInstanceType === 'string' ? message.currentInstanceType : '',
               planName: typeof message.planName === 'string' ? message.planName : '',
+              isPartnerOrg: message.isPartnerOrg === true,
               computeCredits:
                 typeof message.computeCredits === 'number' ? message.computeCredits : 0,
               currentOrgComputeCost:
@@ -799,92 +782,6 @@ export function useCloudHosting() {
               message.code === 'unavailable'
                 ? 'METRICS_UNAVAILABLE'
                 : getErrorMessage(message.error, 'Failed to load metrics')
-            );
-            return;
-          }
-          case 'ADVISOR_LATEST': {
-            const summaryRaw = message.summary as Record<string, unknown> | undefined;
-            const finiteCount = (key: string): number => {
-              const v = summaryRaw?.[key];
-              return typeof v === 'number' && Number.isFinite(v) ? v : 0;
-            };
-            resolvePendingRequest('advisorLatest', {
-              scanId: typeof message.scanId === 'string' ? message.scanId : '',
-              status:
-                message.status === 'running' || message.status === 'failed'
-                  ? message.status
-                  : 'completed',
-              scanType: message.scanType === 'manual' ? 'manual' : 'scheduled',
-              scannedAt: typeof message.scannedAt === 'string' ? message.scannedAt : '',
-              summary: {
-                total: finiteCount('total'),
-                critical: finiteCount('critical'),
-                warning: finiteCount('warning'),
-                info: finiteCount('info'),
-              },
-            });
-            return;
-          }
-          case 'ADVISOR_LATEST_ERROR': {
-            rejectPendingRequest(
-              'advisorLatest',
-              getErrorMessage(message.error, 'Failed to load advisor summary')
-            );
-            return;
-          }
-          case 'ADVISOR_ISSUES': {
-            type AdvisorIssue = DashboardAdvisorIssuesResponse['issues'][number];
-            const issues = Array.isArray(message.issues)
-              ? message.issues.flatMap((entry: unknown): AdvisorIssue[] => {
-                  if (!entry || typeof entry !== 'object') {
-                    return [];
-                  }
-                  const i = entry as Record<string, unknown>;
-                  if (!VALID_ADVISOR_SEVERITIES.includes(i.severity as AdvisorIssue['severity'])) {
-                    return [];
-                  }
-                  if (!VALID_ADVISOR_CATEGORIES.includes(i.category as AdvisorIssue['category'])) {
-                    return [];
-                  }
-                  return [
-                    {
-                      id: typeof i.id === 'string' ? i.id : '',
-                      ruleId: typeof i.ruleId === 'string' ? i.ruleId : '',
-                      severity: i.severity as AdvisorIssue['severity'],
-                      category: i.category as AdvisorIssue['category'],
-                      title: typeof i.title === 'string' ? i.title : '',
-                      description: typeof i.description === 'string' ? i.description : '',
-                      affectedObject:
-                        typeof i.affectedObject === 'string' ? i.affectedObject : undefined,
-                      recommendation:
-                        typeof i.recommendation === 'string' ? i.recommendation : undefined,
-                    },
-                  ];
-                })
-              : [];
-            const totalRaw = message.total;
-            const total =
-              typeof totalRaw === 'number' && Number.isFinite(totalRaw) && totalRaw >= 0
-                ? Math.floor(totalRaw)
-                : issues.length;
-            resolvePendingRequest('advisorIssues', { issues, total });
-            return;
-          }
-          case 'ADVISOR_ISSUES_ERROR': {
-            rejectPendingRequest(
-              'advisorIssues',
-              getErrorMessage(message.error, 'Failed to load advisor issues')
-            );
-            return;
-          }
-          case 'ADVISOR_SCAN_RESULT': {
-            if (message.success === true) {
-              resolvePendingRequest('advisorScan', undefined);
-              return;
-            }
-            rejectPendingRequest(
-              'advisorScan',
-              getErrorMessage(message.error, 'Failed to trigger advisor scan')
             );
             return;
           }
@@ -1064,6 +961,15 @@ export function useCloudHosting() {
     return createPendingRequest('userInfo', 'User info request');
   }, [createPendingRequest, sendMessageToParent]);
 
+  // Fire-and-forget: the shell persists the preference on the account
+  // (users.preferred_locale); the dashboard keeps its local copy regardless.
+  const updatePreferredLocale = useCallback(
+    (locale: string) => {
+      void postMessageToParent({ type: 'UPDATE_PREFERRED_LOCALE', locale });
+    },
+    [postMessageToParent]
+  );
+
   const requestUserApiKey = useCallback(async (): Promise<string> => {
     await sendMessageToParent(
       { type: 'REQUEST_USER_API_KEY' },
@@ -1094,47 +1000,6 @@ export function useCloudHosting() {
     },
     [createPendingRequest, sendMessageToParent]
   );
-
-  const requestAdvisorLatest = useCallback(async (): Promise<DashboardAdvisorSummary> => {
-    await sendMessageToParent(
-      { type: 'REQUEST_ADVISOR_LATEST' },
-      'Unable to request advisor summary from the parent window'
-    );
-    return createPendingRequest('advisorLatest', 'Advisor latest request');
-  }, [createPendingRequest, sendMessageToParent]);
-
-  const advisorIssuesLockRef = useRef<Promise<unknown>>(Promise.resolve());
-
-  const requestAdvisorIssues = useCallback(
-    (query: DashboardAdvisorIssuesQuery): Promise<DashboardAdvisorIssuesResponse> => {
-      const next = advisorIssuesLockRef.current
-        .catch(() => undefined)
-        .then(async () => {
-          await sendMessageToParent(
-            {
-              type: 'REQUEST_ADVISOR_ISSUES',
-              severity: query.severity,
-              category: query.category,
-              limit: query.limit,
-              offset: query.offset,
-            },
-            'Unable to request advisor issues from the parent window'
-          );
-          return createPendingRequest('advisorIssues', 'Advisor issues request');
-        });
-      advisorIssuesLockRef.current = next.catch(() => undefined);
-      return next;
-    },
-    [createPendingRequest, sendMessageToParent]
-  );
-
-  const triggerAdvisorScan = useCallback(async (): Promise<void> => {
-    await sendMessageToParent(
-      { type: 'TRIGGER_ADVISOR_SCAN' },
-      'Unable to trigger advisor scan from the parent window'
-    );
-    return createPendingRequest('advisorScan', 'Advisor scan trigger');
-  }, [createPendingRequest, sendMessageToParent]);
 
   const showUpgradeDialog = useCallback(() => {
     void postMessageToParent({ type: 'SHOW_UPGRADE_DIALOG' });
@@ -1278,12 +1143,10 @@ export function useCloudHosting() {
     showUpgradeDialog,
     openWhatsNew,
     requestUserInfo,
+    updatePreferredLocale,
     requestUserApiKey,
     requestModelCredits,
     requestProjectMetrics,
-    requestAdvisorLatest,
-    requestAdvisorIssues,
-    triggerAdvisorScan,
     connectPosthog,
     openPosthog,
     subscribePosthogConnectionStatus,

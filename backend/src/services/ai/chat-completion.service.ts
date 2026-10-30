@@ -364,6 +364,12 @@ export class ChatCompletionService {
         max_tokens: options.maxTokens ?? 4096,
         top_p: options.topP,
         stream: true,
+        // Opt in to usage accounting for streamed responses. Unlike non-streaming
+        // completions (which always carry a `usage` object), a streamed response
+        // omits usage entirely unless `stream_options.include_usage` is set — the
+        // provider then emits one final chunk with `choices: []` and the full token
+        // usage. Without this, streaming requests report zero token usage.
+        stream_options: { include_usage: true },
         plugins: this.buildPlugins(options),
         tools: options.tools,
         tool_choice: options.toolChoice,
@@ -425,10 +431,11 @@ export class ChatCompletionService {
 
         // Check if this chunk contains usage data
         if (chunk.usage) {
-          // Accumulate tokens instead of replacing
-          tokenUsage.promptTokens += chunk.usage.prompt_tokens || 0;
-          tokenUsage.completionTokens += chunk.usage.completion_tokens || 0;
-          tokenUsage.totalTokens += chunk.usage.total_tokens || 0;
+          // Usage is cumulative in streaming, so we replace instead of accumulate
+          tokenUsage.promptTokens = chunk.usage.prompt_tokens ?? tokenUsage.promptTokens;
+          tokenUsage.completionTokens =
+            chunk.usage.completion_tokens ?? tokenUsage.completionTokens;
+          tokenUsage.totalTokens = chunk.usage.total_tokens ?? tokenUsage.totalTokens;
 
           // Yield the accumulated usage
           yield { tokenUsage: { ...tokenUsage } };

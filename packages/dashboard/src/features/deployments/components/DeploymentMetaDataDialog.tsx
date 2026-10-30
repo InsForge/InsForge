@@ -1,4 +1,5 @@
 import { Copy, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from '@insforge/ui';
 import { ScrollArea } from '#components';
 import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
@@ -13,6 +14,7 @@ export function DeploymentMetaDataDialog({
   deployment,
   onOpenChange,
 }: DeploymentMetaDataDialogProps) {
+  const { t } = useTranslation('chrome');
   const { copied, copy } = useCopyToClipboard();
 
   const handleCopyMetadata = async () => {
@@ -33,30 +35,36 @@ export function DeploymentMetaDataDialog({
         <div className="flex flex-col gap-6 p-6 border-b border-neutral-200 dark:border-neutral-700">
           <div className="flex flex-col gap-1">
             <DialogTitle className="text-2xl font-semibold text-zinc-950 dark:text-white tracking-[-0.6px]">
-              Deployment Meta Data
+              {t('deployments.metaDataTitle', { defaultValue: 'Deployment Meta Data' })}
             </DialogTitle>
             <DialogDescription className="sr-only">
-              View deployment metadata for debugging and auditing
+              {t('deployments.metaDataDescription', {
+                defaultValue: 'View deployment metadata for debugging and auditing',
+              })}
             </DialogDescription>
             <p className="text-sm text-neutral-500 dark:text-neutral-300">{deployment?.id}</p>
           </div>
 
           <div className="flex flex-col gap-3">
             <p className="text-sm text-neutral-500 dark:text-neutral-400">
-              This metadata captures the context of this deployment and can be used for debugging or
-              AI-assisted investigation.
+              {t('deployments.metaDataHint', {
+                defaultValue:
+                  'This metadata captures the context of this deployment and can be used for debugging or AI-assisted investigation.',
+              })}
             </p>
 
             {/* Meta Data Code Block */}
             <div className="bg-neutral-100 dark:bg-neutral-900 rounded h-60">
               <ScrollArea className="h-full p-3">
                 <div className="inline-flex items-center px-2 bg-neutral-200 dark:bg-neutral-700 rounded mb-2">
-                  <span className="text-xs text-zinc-950 dark:text-neutral-50">Meta Data</span>
+                  <span className="text-xs text-zinc-950 dark:text-neutral-50">
+                    {t('deployments.metaDataLabel', { defaultValue: 'Meta Data' })}
+                  </span>
                 </div>
                 <pre className="text-sm text-zinc-950 dark:text-white whitespace-pre-wrap font-mono">
                   {deployment?.metadata
                     ? JSON.stringify(deployment.metadata, null, 2)
-                    : 'No metadata available'}
+                    : t('deployments.noMetadata', { defaultValue: 'No metadata available' })}
                 </pre>
               </ScrollArea>
             </div>
@@ -71,7 +79,7 @@ export function DeploymentMetaDataDialog({
             onClick={handleClose}
             className="h-8 px-3 bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-600 text-zinc-950 dark:text-white"
           >
-            Cancel
+            {t('deployments.cancel', { defaultValue: 'Cancel' })}
           </Button>
           <Button
             size="sm"
@@ -79,7 +87,9 @@ export function DeploymentMetaDataDialog({
             className="h-8 px-3 bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
           >
             {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
-            {copied ? 'Copied' : 'Copy Deployment Meta Data'}
+            {copied
+              ? t('deployments.copied', { defaultValue: 'Copied' })
+              : t('deployments.copyMetaData', { defaultValue: 'Copy Deployment Meta Data' })}
           </Button>
         </div>
       </DialogContent>

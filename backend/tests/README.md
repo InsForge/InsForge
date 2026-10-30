@@ -5,7 +5,7 @@ This directory contains all test scripts for the Insforge backend.
 ## Prerequisites
 
 - Backend server running on `http://localhost:7130`
-- Root admin credentials: `root` / `change-this-password`
+- Root admin credentials: `admin` / `change-this-password`
 - API key for storage operations
 
 ## Environment Variables
@@ -31,20 +31,28 @@ export APP_KEY="app12345"  # 7-9 character tenant identifier
 
 ## Test Organization
 
-Tests are organized into two categories:
+Vitest suites live in `./unit/` (`npm test`) and `./integration/` (`npm run test:integration`). The shell scripts below are organized into two categories, and `run-all-tests.sh` picks up every `test-*.sh` in each:
 
 ### Local Tests (`./local/`)
 Tests for local Docker deployment with local file storage:
 - `test-auth-router.sh` - Authentication and JWT tests
 - `test-database-router.sh` - Database CRUD operations
 - `test-e2e.sh` - End-to-end workflows
+- `test-fk-errors.sh` - Foreign key error handling
+- `test-functions.sh` - Serverless functions
+- `test-id-field.sh` - ID field functionality
+- `test-logs.sh` - Logs and audit endpoints
 - `test-public-bucket.sh` - Local storage bucket tests
-- `test-config.sh` - Configuration management
-- `test-oauth-config.sh` - OAuth configuration
+- `test-rpc.sh` - RPC endpoint
+- `test-schedules.sh` - Schedules router
+- `test-secrets.sh` - Secrets API endpoints
+- `test-storage-rls.sh` - Storage access enforced by Postgres RLS
+- `test-traditional-rest.sh` - Traditional REST response format
 - `comprehensive-curl-tests.sh` - Comprehensive API tests
 
 ### Cloud Tests (`./cloud/`)
 Tests for cloud deployment with S3 multi-tenant storage:
+- `test-s3-gateway.sh` - `/storage/v1/s3` gateway smoke test
 - `test-s3-multitenant.sh` - S3 storage with APP_KEY folder structure
 
 ## Running Tests

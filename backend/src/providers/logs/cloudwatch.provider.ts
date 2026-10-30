@@ -137,6 +137,8 @@ export class CloudWatchProvider extends BaseLogProvider {
     if (!beforeTimestamp) {
       // Case 1: Get the most recent logs - use reliable approach instead of Insights
       // CloudWatch Insights can be inconsistent, so use FilterLogEvents with pagination
+      // limit arrives unvalidated from the query string, and FilterLogEvents rejects more than 10,000
+      const keep = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 10000) : 100;
       const allEvents: Array<{
         eventId?: string;
         timestamp?: number;
@@ -152,6 +154,9 @@ export class CloudWatchProvider extends BaseLogProvider {
             logStreamNames: streams.length ? streams.slice(0, 100) : undefined,
             startTime: startMs,
             endTime: endMs,
+            // newest-first, so paging stops at `keep` instead of reading the whole day oldest-first
+            startFromHead: false,
+            limit: keep - allEvents.length,
             nextToken,
           })
         );
@@ -159,15 +164,10 @@ export class CloudWatchProvider extends BaseLogProvider {
         const pageEvents = fle.events || [];
         allEvents.push(...pageEvents);
         nextToken = fle.nextToken;
+      } while (nextToken && allEvents.length < keep);
 
-        // Safety break to avoid infinite loops
-        if (allEvents.length > 50000) {
-          break;
-        }
-      } while (nextToken);
-
-      // Get the most recent 'limit' events (events are in chronological order)
-      events = allEvents.slice(-limit);
+      // Pages arrive newest-first; callers expect chronological order
+      events = allEvents.reverse();
     } else {
       // Case 2: Get logs before the specified timestamp (pagination)
       // Use CloudWatch Insights for efficient timestamp-based pagination

@@ -225,8 +225,7 @@ export interface AppLogQueryOptions {
   cursor?: string;
 }
 
-// Raw v2 RuntimeLog entry shape. Note `timestamp` (v1 used `time`) and that
-// `region` is optional in v2.
+// Raw v2 RuntimeLog entry shape.
 const runtimeLogSchema = z.object({
   timestamp: z.string(),
   level: z.string(),
@@ -235,14 +234,12 @@ const runtimeLogSchema = z.object({
   revision_id: z.string().optional(),
 });
 
-// v2 wraps logs in an object with body-level pagination (v1 used a Link header).
 const runtimeLogsResponseSchema = z.object({
   logs: z.array(runtimeLogSchema),
   next_cursor: z.string().nullable().optional(),
 });
 
-// Normalized entry returned to callers (stable across the v1→v2 migration so
-// log.service doesn't need to know the wire shape).
+// Normalized entry returned to callers so log.service doesn't need to know the wire shape.
 export interface AppLogEntry {
   time: string;
   level: string;
@@ -263,8 +260,7 @@ export interface BuildLogEntry {
 }
 
 // v2 Revision response (POST /v2/apps/{app}/deploy, GET /v2/revisions/{id}).
-// Renamed from v1's `deployment`; snake_case; no `domains`/`projectId` fields.
-// Deno still doesn't return error details here — they come from build logs.
+// Deno doesn't return error details here — they come from build logs.
 const revisionResponseSchema = z.object({
   id: z.string(),
   status: z.enum(['skipped', 'queued', 'building', 'succeeded', 'failed']),
@@ -608,7 +604,6 @@ export class DenoSubhostingProvider {
         config: {
           runtime: { type: 'dynamic', entrypoint: 'main.ts' },
         },
-        // v2 takes env vars as an array of {key, value} (was a Record in v1).
         // Accessible via Deno.env.get('KEY').
         env_vars: Object.entries(secrets).map(([key, value]) => ({ key, value })),
       };
@@ -1014,7 +1009,6 @@ const dispatch = async (req: Request): Promise<Response> => {
     return new Response(JSON.stringify({
       status: "ok",
       type: "insforge-functions",
-      functions: [],
       timestamp: new Date().toISOString(),
     }), {
       headers: { "Content-Type": "application/json" }
@@ -1080,7 +1074,6 @@ const dispatch = async (req: Request): Promise<Response> => {
       return new Response(JSON.stringify({
         status: "ok",
         type: "insforge-functions",
-        functions: Object.keys(routes),
         timestamp: new Date().toISOString(),
       }), {
         headers: { "Content-Type": "application/json" }
@@ -1094,7 +1087,6 @@ const dispatch = async (req: Request): Promise<Response> => {
     if (!slug || !routes[slug]) {
       return new Response(JSON.stringify({
         error: "Function not found",
-        available: Object.keys(routes),
       }), {
         status: 404,
         headers: { "Content-Type": "application/json" }

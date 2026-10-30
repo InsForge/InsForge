@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { KeyRound, RefreshCw, Webhook } from 'lucide-react';
 import {
   MenuDialog,
@@ -36,6 +37,7 @@ export function PaymentsSettingsDialog({
   provider,
   setProvider,
 }: PaymentsSettingsDialogProps) {
+  const { t } = useTranslation('chrome');
   const stripe = useStripeSettings(open);
   const razorpay = useRazorpaySettings(open);
 
@@ -46,7 +48,11 @@ export function PaymentsSettingsDialog({
   const isBusy = stripe.isPending || razorpay.isPending;
   const canClose = !isBusy;
   const title =
-    activeTab === 'keys' ? 'Connection Keys' : activeTab === 'webhooks' ? 'Webhooks' : 'Sync';
+    activeTab === 'keys'
+      ? t('payments.connectionKeys', { defaultValue: 'Connection Keys' })
+      : activeTab === 'webhooks'
+        ? t('payments.webhooks', { defaultValue: 'Webhooks' })
+        : t('payments.sync', { defaultValue: 'Sync' });
   const providerName = PAYMENT_PROVIDER_LABELS[provider];
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -68,7 +74,9 @@ export function PaymentsSettingsDialog({
       <MenuDialogContent>
         <MenuDialogSideNav>
           <MenuDialogSideNavHeader>
-            <MenuDialogSideNavTitle>Payments Settings</MenuDialogSideNavTitle>
+            <MenuDialogSideNavTitle>
+              {t('payments.settingsTitle', { defaultValue: 'Payments Settings' })}
+            </MenuDialogSideNavTitle>
           </MenuDialogSideNavHeader>
           <MenuDialogNav>
             <PaymentProviderSelect
@@ -83,21 +91,21 @@ export function PaymentsSettingsDialog({
                 active={activeTab === 'keys'}
                 onClick={() => setActiveTab('keys')}
               >
-                Connection Keys
+                {t('payments.connectionKeys', { defaultValue: 'Connection Keys' })}
               </MenuDialogNavItem>
               <MenuDialogNavItem
                 icon={<Webhook className="h-5 w-5" />}
                 active={activeTab === 'webhooks'}
                 onClick={() => setActiveTab('webhooks')}
               >
-                Webhooks
+                {t('payments.webhooks', { defaultValue: 'Webhooks' })}
               </MenuDialogNavItem>
               <MenuDialogNavItem
                 icon={<RefreshCw className="h-5 w-5" />}
                 active={activeTab === 'sync'}
                 onClick={() => setActiveTab('sync')}
               >
-                Sync
+                {t('payments.sync', { defaultValue: 'Sync' })}
               </MenuDialogNavItem>
             </MenuDialogNavList>
           </MenuDialogNav>
@@ -107,7 +115,11 @@ export function PaymentsSettingsDialog({
           <MenuDialogHeader>
             <MenuDialogTitle>{title}</MenuDialogTitle>
             <MenuDialogDescription className="sr-only">
-              {providerName} {title} settings
+              {t('payments.settingsDescription', {
+                defaultValue: '{{provider}} {{tab}} settings',
+                provider: providerName,
+                tab: title,
+              })}
             </MenuDialogDescription>
             <div className="ml-auto" />
             <MenuDialogCloseButton className="shrink-0" />

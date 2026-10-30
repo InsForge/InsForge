@@ -1,4 +1,5 @@
 import { Check, ChevronDown } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   DropdownMenu,
@@ -15,6 +16,11 @@ const SEVERITY_DOT_COLORS: Record<SeverityType, string> = {
   warning: '#F2BB4B',
   informational: '#A3A3A3',
 };
+const SEVERITY_LABEL_KEYS: Record<SeverityType, string> = {
+  error: 'severityError',
+  warning: 'severityWarning',
+  informational: 'severityInfo',
+};
 
 interface SeverityFilterDropdownProps {
   value: string[];
@@ -22,6 +28,7 @@ interface SeverityFilterDropdownProps {
 }
 
 export function SeverityFilterDropdown({ value, onChange }: SeverityFilterDropdownProps) {
+  const { t } = useTranslation('chrome');
   const toggleSeverity = (severity: SeverityType) => {
     const nextValues = value.includes(severity)
       ? value.filter((current) => current !== severity)
@@ -38,7 +45,7 @@ export function SeverityFilterDropdown({ value, onChange }: SeverityFilterDropdo
           size="sm"
           className="h-8 min-w-25 justify-between gap-1 border border-[var(--alpha-8)] bg-[rgb(var(--card))] px-3 text-[13px] font-medium text-[rgb(var(--foreground))]"
         >
-          <span className="truncate">Severity</span>
+          <span className="truncate">{t('logs.severity', { defaultValue: 'Severity' })}</span>
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
@@ -79,7 +86,7 @@ export function SeverityFilterDropdown({ value, onChange }: SeverityFilterDropdo
                     />
                   </span>
                   <span className="text-sm font-medium leading-5 text-foreground">
-                    {config.label}
+                    {t(`logs.${SEVERITY_LABEL_KEYS[severity]}`, { defaultValue: config.label })}
                   </span>
                 </div>
               </div>

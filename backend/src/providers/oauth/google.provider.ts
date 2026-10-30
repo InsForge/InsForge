@@ -3,6 +3,7 @@ import { OAuth2Client } from 'google-auth-library';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
+import { buildSharedOAuthInitQuery } from '@/services/auth/shared-oauth.service.js';
 import type { GoogleUserInfo, OAuthUserData } from '@/types/auth.js';
 import { OAuthProvider } from './base.provider.js';
 
@@ -53,7 +54,7 @@ export class GoogleOAuthProvider implements OAuthProvider {
       const cloudBaseUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
       const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
       const response = await axios.get(
-        `${cloudBaseUrl}/auth/v1/shared/google?redirect_uri=${encodeURIComponent(redirectUri)}`,
+        `${cloudBaseUrl}/auth/v1/shared/google?${buildSharedOAuthInitQuery(redirectUri, state)}`,
         {
           headers: {
             'Content-Type': 'application/json',

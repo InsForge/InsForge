@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type { RazorpayEnvironment } from '@insforge/shared-schemas';
 import {
   razorpayService,
@@ -8,6 +9,7 @@ import { razorpayQueryKeys } from '#features/payments/queryKeys';
 import { useToast } from '@insforge/ui';
 
 export function useRazorpayWebhook() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -24,10 +26,21 @@ export function useRazorpayWebhook() {
       // `all` (['payments', 'razorpay']) is a prefix of every razorpay key, so
       // this single invalidation covers status and all per-environment queries.
       await queryClient.invalidateQueries({ queryKey: razorpayQueryKeys.all });
-      showToast('Razorpay webhook secret rotated', 'success');
+      showToast(
+        t('payments.razorpayWebhookRotated', {
+          defaultValue: 'Razorpay webhook secret rotated',
+        }),
+        'success'
+      );
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Failed to rotate Razorpay webhook secret', 'error');
+      showToast(
+        err.message ||
+          t('payments.rotateRazorpayWebhookFailed', {
+            defaultValue: 'Failed to rotate Razorpay webhook secret',
+          }),
+        'error'
+      );
     },
   });
 

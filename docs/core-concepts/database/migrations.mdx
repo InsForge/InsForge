@@ -1,6 +1,6 @@
 ---
 title: "Database migrations"
-description: "Track schema changes in git and apply them with the InsForge CLI"
+description: "Track Postgres schema changes as timestamped SQL files in git and apply them forward-only with the InsForge CLI, recording history for every project."
 ---
 
 Migrations are versioned SQL files in `migrations/` applied with `@insforge/cli`. Each successful run is recorded in `system.custom_migrations`. The workflow is forward-only.
@@ -44,6 +44,26 @@ Target a single file with `up <version>`, or apply everything pending up to and 
 Adopting migrations on an existing project: run `db migrations fetch` first to materialize remote history into local files. Once applied remotely, never edit a migration in place. Write a forward migration instead.
 
 Once you opt in, route all schema changes through files. Ad hoc dashboard edits cause drift between git and `system.custom_migrations`.
+
+## Non-transactional statements
+
+Because the CLI runs each migration file inside a single transaction (the same reason `BEGIN`/`COMMIT`/`ROLLBACK` are rejected), a few PostgreSQL commands that **cannot run inside a transaction block** will fail in a migration with an error like `CREATE INDEX CONCURRENTLY cannot run inside a transaction block`. The common ones are:
+
+- `CREATE INDEX CONCURRENTLY` — use a plain `CREATE INDEX` in a migration when a brief write lock is acceptable, or run the concurrent build outside a migration (below).
+- `VACUUM` — routine vacuuming is handled by PostgreSQL autovacuum, so you rarely need to run this yourself.
+- `REINDEX ... CONCURRENTLY`, `ALTER TYPE ... ADD VALUE` (on older PostgreSQL), and similar commands.
+
+Run these outside a migration with the CLI's unrestricted raw-SQL path, which executes the statement **without** wrapping it in a transaction:
+
+```bash
+npx @insforge/cli db query --unrestricted "CREATE INDEX CONCURRENTLY idx_orders_customer ON public.orders (customer_id)"
+```
+
+Plain `npx @insforge/cli db query` (without `--unrestricted`) wraps your statement in a transaction, so it hits the same error — use `--unrestricted` for non-transactional commands.
+
+<Note>
+  Both `db query` paths enforce a 30-second `statement_timeout`, so `CREATE INDEX CONCURRENTLY` or `VACUUM` on a large table may time out.
+</Note>
 
 ## More resources
 

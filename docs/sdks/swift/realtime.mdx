@@ -1,6 +1,6 @@
 ---
-title: Realtime SDK Reference
-description: Subscribe to channels, publish events, and track presence with the InsForge Swift SDK.
+title: Swift realtime SDK reference
+description: Connect over Socket.IO, subscribe to channels, publish events, track presence, and handle reconnects with the InsForge Swift realtime client on Apple.
 ---
 
 import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
@@ -9,13 +9,13 @@ import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
 
 <SwiftSdkInstallation />
 
-## Mental Model
+## Mental model
 
 The Swift SDK connects to InsForge Realtime over Socket.IO. Subscribe to channel names such as `order:123` or `chat:room-1`, then listen for event names published to those channels.
 
 Events are published by database triggers that call `realtime.publish(...)` or by clients that publish to a channel they have already joined. See [Realtime overview](/core-concepts/realtime/overview) for the channel and RLS model.
 
-## Quick Start
+## Quick start
 
 ```swift
 try await insforge.realtime.connect()
@@ -103,7 +103,7 @@ let channel = await insforge.realtime.channel("chat:room-1")
 try await channel.subscribe()
 ```
 
-### Broadcast Messages
+### Broadcast messages
 
 Listen for an event:
 

@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   ScheduleSchema,
@@ -23,6 +24,7 @@ export function useScheduleLogs(scheduleId: string, limit = 50, offset = 0) {
 }
 
 export function useSchedules() {
+  const { t } = useTranslation('chrome');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,11 +57,17 @@ export function useSchedules() {
     mutationFn: (payload: CreateScheduleRequest) => scheduleService.createSchedule(payload),
     onSuccess: () => {
       setErrorState(null);
-      showToast('Cron job created', 'success');
+      showToast(t('functions.cronJobCreated', { defaultValue: 'Cron job created' }), 'success');
       void queryClient.invalidateQueries({ queryKey: SCHEDULES_QUERY_KEY });
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err ?? 'Failed to create cron job');
+      const msg =
+        err instanceof Error
+          ? err.message
+          : String(
+              err ??
+                t('functions.failedToCreateCronJob', { defaultValue: 'Failed to create cron job' })
+            );
       setErrorState(err instanceof Error ? err : new Error(msg));
       showToast(msg, 'error');
     },
@@ -92,12 +100,18 @@ export function useSchedules() {
       setErrorState(
         err instanceof Error ? err : new Error(String(err ?? 'Failed to update cron job'))
       );
-      const msg = err instanceof Error ? err.message : String(err ?? 'Failed to update cron job');
+      const msg =
+        err instanceof Error
+          ? err.message
+          : String(
+              err ??
+                t('functions.failedToUpdateCronJob', { defaultValue: 'Failed to update cron job' })
+            );
       showToast(msg, 'error');
     },
     onSuccess: () => {
       setErrorState(null);
-      showToast('Cron job updated', 'success');
+      showToast(t('functions.cronJobUpdated', { defaultValue: 'Cron job updated' }), 'success');
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: SCHEDULES_QUERY_KEY });
@@ -120,12 +134,18 @@ export function useSchedules() {
         queryClient.setQueryData(SCHEDULES_QUERY_KEY, ctx.previous);
       }
       setErrorState(err instanceof Error ? err : new Error(String(err ?? 'Delete failed')));
-      const msg = err instanceof Error ? err.message : String(err ?? 'Delete failed');
+      const msg =
+        err instanceof Error
+          ? err.message
+          : String(
+              err ??
+                t('functions.failedToDeleteCronJob', { defaultValue: 'Failed to delete cron job' })
+            );
       showToast(msg, 'error');
     },
     onSuccess: () => {
       setErrorState(null);
-      showToast('Cron job deleted', 'success');
+      showToast(t('functions.cronJobDeleted', { defaultValue: 'Cron job deleted' }), 'success');
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: SCHEDULES_QUERY_KEY });

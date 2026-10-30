@@ -3,20 +3,34 @@
 ## Prerequisites
 
 - Docker and Docker Compose installed on your machine
+- Git, to check out the repository
 
 ## Setup InsForge
 
-### Step 1: Download the Docker Compose file
+### Step 1: Get the repository
 
 ```bash
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/docker-compose.yml
-wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-compose/.env.example
-mv .env.example .env
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/insforge
 ```
+
+Checks out the files the stack reads and generates `JWT_SECRET`, `ENCRYPTION_KEY`,
+`ROOT_ADMIN_PASSWORD` and `POSTGRES_PASSWORD` into `.env`. Nothing is started.
+
+> Rather not pipe a script into a shell? Read it first:
+>
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh -o setup.sh
+> less setup.sh
+> sh setup.sh ~/insforge
+> ```
+
+Every service pulls a published image — there is no build step. The checkout is
+required because Postgres mounts `deploy/docker-init/db/` from it.
 
 ### Step 2: Start InsForge
 
 ```bash
+cd ~/insforge
 docker compose up -d
 ```
 
@@ -32,26 +46,36 @@ Open your browser and navigate to `http://localhost:7130`, you can see the InsFo
 
 You can run multiple InsForge projects on the same host by using different ports and project names.
 
-### Step 1: Create a separate env file for each project
+### Step 1: Run the setup script once per directory
 
 ```bash
-cp .env.example .env.project1
-cp .env.example .env.project2
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/project1
+curl -fsSL https://raw.githubusercontent.com/InsForge/InsForge/main/deploy/setup.sh | sh -s ~/project2
 ```
 
-### Step 2: Edit each env file with unique ports
+A directory each, so each gets its own generated secrets. Copying `.env.example`
+instead would give both the placeholder values it ships — the same published
+`JWT_SECRET` on every instance.
 
-**.env.project1** (default ports):
-```
-POSTGRES_PORT=5432
-POSTGREST_PORT=5430
-APP_PORT=7130
-AUTH_PORT=7131
-DENO_PORT=7133
+### Step 2: Give each one its own project name and ports
+
+Both `.env` files start with `COMPOSE_PROJECT_NAME=insforge`, and **two
+directories sharing that name share containers** — the second `up -d` adopts the
+first's and recreates them with the second's config. Set it before starting
+anything.
+
+`~/project1/.env` keeps the default ports — which collide with the `~/insforge`
+instance from the quickstart above if it is still running. Stop that one, or give
+`project1` its own ports the way `project2` has:
+
+```ini
+COMPOSE_PROJECT_NAME=project1
 ```
 
-**.env.project2** (different ports):
-```
+`~/project2/.env` needs its own:
+
+```ini
+COMPOSE_PROJECT_NAME=project2
 POSTGRES_PORT=5442
 POSTGREST_PORT=5440
 APP_PORT=7230
@@ -59,31 +83,29 @@ AUTH_PORT=7231
 DENO_PORT=7233
 ```
 
-Make sure each project has its own `JWT_SECRET` and `ROOT_ADMIN_PASSWORD`.
-
-### Step 3: Start each project with a unique name
+### Step 3: Start each project
 
 ```bash
-docker compose --env-file .env.project1 -p project1 up -d
-docker compose --env-file .env.project2 -p project2 up -d
+cd ~/project1 && docker compose up -d
+cd ~/project2 && docker compose up -d
 ```
 
-The `-p` flag gives each project isolated containers, volumes, and networks. The `--env-file` flag assigns unique ports so they don't conflict.
+`COMPOSE_PROJECT_NAME` gives each one isolated containers, volumes, and networks; the ports keep them from colliding on the host.
 
 ### Managing multiple instances
 
 ```bash
 # Check status
-docker compose --env-file .env.project1 -p project1 ps
+cd ~/project1 && docker compose ps
 
 # View logs
-docker compose --env-file .env.project1 -p project1 logs -f
+cd ~/project1 && docker compose logs -f
 
 # Stop an instance
-docker compose --env-file .env.project1 -p project1 down
+cd ~/project1 && docker compose down
 
 # Stop and remove all data
-docker compose --env-file .env.project1 -p project1 down -v
+cd ~/project1 && docker compose down -v
 ```
 
 Each project has its own database, storage, and configuration. They are completely independent.

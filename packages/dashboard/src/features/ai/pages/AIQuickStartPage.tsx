@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button, CopyButton, Tab, Tabs, cn } from '@insforge/ui';
 import { CodeEditor } from '#components';
 import { useOpenRouterKey } from '#features/ai/hooks/useOpenRouterKey';
@@ -60,6 +61,7 @@ function ShellLine({ line }: { line: string }) {
 }
 
 function ShellCodeBlock({ code, copyText, badge }: CodeBlockProps) {
+  const { t } = useTranslation('chrome');
   const lines = code.split('\n');
 
   return (
@@ -86,7 +88,7 @@ function ShellCodeBlock({ code, copyText, badge }: CodeBlockProps) {
         <CopyButton
           text={copyText ?? code}
           showText={false}
-          copyText="Copy code"
+          copyText={t('ai.quickStart.copyCode', { defaultValue: 'Copy code' })}
           className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground"
         />
       </div>
@@ -114,6 +116,7 @@ function EnvLine({ line }: { line: string }) {
 }
 
 function EnvCodeBlock({ code, copyText, badge }: CodeBlockProps) {
+  const { t } = useTranslation('chrome');
   const lines = code.split('\n');
 
   return (
@@ -137,7 +140,7 @@ function EnvCodeBlock({ code, copyText, badge }: CodeBlockProps) {
         <CopyButton
           text={copyText ?? code}
           showText={false}
-          copyText="Copy code"
+          copyText={t('ai.quickStart.copyCode', { defaultValue: 'Copy code' })}
           className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground"
         />
       </div>
@@ -146,6 +149,7 @@ function EnvCodeBlock({ code, copyText, badge }: CodeBlockProps) {
 }
 
 function JavaScriptCodeBlock({ code, copyText, badge }: CodeBlockProps) {
+  const { t } = useTranslation('chrome');
   const lineCount = code.split('\n').length;
   const editorHeight = Math.max(44, lineCount * 20 + (badge ? 54 : 28));
 
@@ -159,7 +163,7 @@ function JavaScriptCodeBlock({ code, copyText, badge }: CodeBlockProps) {
       <CopyButton
         text={copyText ?? code}
         showText={false}
-        copyText="Copy code"
+        copyText={t('ai.quickStart.copyCode', { defaultValue: 'Copy code' })}
         className="absolute right-3 top-3 z-10 text-muted-foreground hover:text-foreground"
       />
       <div style={{ height: editorHeight }}>
@@ -223,12 +227,13 @@ function StepItem({ step, isLast }: { step: QuickStartStep; isLast: boolean }) {
 }
 
 export default function AIQuickStartPage() {
+  const { t } = useTranslation('chrome');
   const [mode, setMode] = useState<QuickStartMode>('text');
   const { data: openRouterKey, isLoading: isOpenRouterKeyLoading } = useOpenRouterKey();
   const copy = QUICK_START_COPY[mode];
   const quickStartPrompt = useMemo(() => getQuickStartPrompt(mode), [mode]);
   const displayedOpenRouterKey = isOpenRouterKeyLoading
-    ? 'Loading...'
+    ? t('ai.quickStart.loading', { defaultValue: 'Loading...' })
     : openRouterKey?.maskedKey || '<YOUR_OPENROUTER_API_KEY>';
   const copiedOpenRouterKey = openRouterKey?.apiKey || '';
   const displayedEnvLine = `OPENROUTER_API_KEY=${displayedOpenRouterKey}`;
@@ -239,8 +244,10 @@ export default function AIQuickStartPage() {
   const steps: QuickStartStep[] = [
     {
       id: 1,
-      title: 'Set Up Your Project',
-      description: 'Create a new directory and initialize a Node.js project.',
+      title: t('ai.quickStart.step1Title', { defaultValue: 'Set Up Your Project' }),
+      description: t('ai.quickStart.step1Description', {
+        defaultValue: 'Create a new directory and initialize a Node.js project.',
+      }),
       blocks: [
         {
           code: `mkdir ${copy.projectName} && cd ${copy.projectName}\nnpm init -y`,
@@ -250,8 +257,10 @@ export default function AIQuickStartPage() {
     },
     {
       id: 2,
-      title: 'Install Dependencies',
-      description: copy.description,
+      title: t('ai.quickStart.step2Title', { defaultValue: 'Install Dependencies' }),
+      description: t(`ai.quickStart.step2Description.${mode}`, {
+        defaultValue: copy.description,
+      }),
       blocks: [
         {
           code: copy.installCommand,
@@ -261,8 +270,10 @@ export default function AIQuickStartPage() {
     },
     {
       id: 3,
-      title: 'Set Up Your API Key',
-      description: 'Add your OpenRouter API key to a .env.local file.',
+      title: t('ai.quickStart.step3Title', { defaultValue: 'Set Up Your API Key' }),
+      description: t('ai.quickStart.step3Description', {
+        defaultValue: 'Add your OpenRouter API key to a .env.local file.',
+      }),
       blocks: [
         {
           badge: '.env.local',
@@ -273,14 +284,18 @@ export default function AIQuickStartPage() {
       ],
       note: (
         <p className="text-sm leading-6 text-muted-foreground">
-          Keep this key private and never commit it to source control.
+          {t('ai.quickStart.keepKeyPrivate', {
+            defaultValue: 'Keep this key private and never commit it to source control.',
+          })}
         </p>
       ),
     },
     {
       id: 4,
-      title: 'Create and Run Your Script',
-      description: 'Save this script as index.ts and run it with tsx.',
+      title: t('ai.quickStart.step4Title', { defaultValue: 'Create and Run Your Script' }),
+      description: t('ai.quickStart.step4Description', {
+        defaultValue: 'Save this script as index.ts and run it with tsx.',
+      }),
       blocks: [
         {
           badge: 'index.ts',
@@ -294,7 +309,9 @@ export default function AIQuickStartPage() {
   return (
     <div className="h-full overflow-y-auto bg-[rgb(var(--semantic-1))]">
       <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-6 px-10 pb-12 pt-10">
-        <h1 className="text-2xl font-medium leading-8 text-foreground">Quick Start</h1>
+        <h1 className="text-2xl font-medium leading-8 text-foreground">
+          {t('ai.quickStart.title', { defaultValue: 'Quick Start' })}
+        </h1>
 
         <Tabs
           value={mode}
@@ -303,18 +320,20 @@ export default function AIQuickStartPage() {
         >
           {QUICK_START_MODES.map((item) => (
             <Tab key={item.value} value={item.value} className="h-8 flex-1">
-              {item.label}
+              {t(`ai.quickStart.modes.${item.value}`, { defaultValue: item.label })}
             </Tab>
           ))}
         </Tabs>
 
         <section className="rounded border border-[var(--alpha-8)] bg-card p-4">
           <div className="flex items-center justify-between gap-4">
-            <p className="text-sm leading-6 text-muted-foreground">{PROMPT_CARD_COPY[mode]}</p>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {t(`ai.quickStart.promptCard.${mode}`, { defaultValue: PROMPT_CARD_COPY[mode] })}
+            </p>
             <CopyButton
               text={quickStartPrompt}
-              copyText="Copy Prompt"
-              copiedText="Copied"
+              copyText={t('ai.quickStart.copyPrompt', { defaultValue: 'Copy Prompt' })}
+              copiedText={t('ai.quickStart.copied', { defaultValue: 'Copied' })}
               className="h-8 shrink-0 rounded bg-primary px-2 text-sm font-medium text-[rgb(var(--inverse))] hover:bg-primary/90"
             />
           </div>

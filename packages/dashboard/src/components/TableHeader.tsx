@@ -1,4 +1,5 @@
 import { SearchInput, cn } from '@insforge/ui';
+import { useTranslation } from 'react-i18next';
 
 interface TableHeaderProps {
   title?: React.ReactNode;
@@ -33,10 +34,11 @@ export function TableHeader({
   showSearch = true,
   searchValue = '',
   onSearchChange,
-  searchPlaceholder = 'Search',
+  searchPlaceholder,
   searchInputClassName,
   searchDebounceTime = 0,
 }: TableHeaderProps) {
+  const { t } = useTranslation('chrome');
   const showTitleDivider = !leftContent && showDividerAfterTitle && (titleButtons || leftSlot);
   const shouldShowSearch = showSearch && !!onSearchChange;
 
@@ -86,7 +88,7 @@ export function TableHeader({
           <SearchInput
             value={searchValue}
             onChange={onSearchChange}
-            placeholder={searchPlaceholder}
+            placeholder={searchPlaceholder ?? t('common.search', { defaultValue: 'Search' })}
             debounceTime={searchDebounceTime}
             className={cn('w-64', searchInputClassName)}
           />

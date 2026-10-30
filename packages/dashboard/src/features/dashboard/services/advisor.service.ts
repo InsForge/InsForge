@@ -3,6 +3,8 @@ import type {
   DashboardAdvisorSummary,
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
+  DashboardAdvisorSuppression,
+  DashboardAdvisorSuppressRequest,
 } from '#types';
 
 export class AdvisorService {
@@ -38,6 +40,28 @@ export class AdvisorService {
   async triggerScan(): Promise<void> {
     await apiClient.request('/advisor/scan', {
       method: 'POST',
+      headers: apiClient.withAccessToken({}),
+    });
+  }
+
+  async getSuppressions(): Promise<{ suppressions: DashboardAdvisorSuppression[] }> {
+    return apiClient.request('/advisor/suppressions', {
+      method: 'GET',
+      headers: apiClient.withAccessToken({}),
+    });
+  }
+
+  async suppress(req: DashboardAdvisorSuppressRequest): Promise<void> {
+    await apiClient.request('/advisor/suppressions', {
+      method: 'POST',
+      headers: apiClient.withAccessToken({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(req),
+    });
+  }
+
+  async unsuppress(id: string): Promise<void> {
+    await apiClient.request(`/advisor/suppressions/${id}`, {
+      method: 'DELETE',
       headers: apiClient.withAccessToken({}),
     });
   }

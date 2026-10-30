@@ -9,6 +9,7 @@ import authRouter from '@/api/routes/auth/index.routes.js';
 import databaseRouter from '@/api/routes/database/index.routes.js';
 import { storageRouter } from '@/api/routes/storage/index.routes.js';
 import { metadataRouter } from '@/api/routes/metadata/index.routes.js';
+import { githubRouter } from '@/api/routes/github/index.routes.js';
 import { logsRouter } from '@/api/routes/logs/index.routes.js';
 import { docsRouter } from '@/api/routes/docs/index.routes.js';
 import functionsRouter from '@/api/routes/functions/index.routes.js';
@@ -42,9 +43,20 @@ import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
 import { webscraperRouter } from '@/api/routes/webscraper/index.routes.js';
+import { dashboardEventsRouter } from '@/api/routes/dashboard/events.routes.js';
 import { appConfig } from '@/infra/config/app.config.js';
-import { TelemetryService } from '@/services/telemetry/telemetry.service.js';
+import {
+  TelemetryService,
+  isTelemetryRuntimeDisabled,
+} from '@/services/telemetry/telemetry.service.js';
+import { FeatureUsageCollector } from '@/services/telemetry/feature-usage.collector.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
+import { DatabaseBackupService } from '@/services/database/database-backup.service.js';
+import {
+  ComputeServicesService,
+  warnIfFlyCredentialsIncomplete,
+} from '@/services/compute/services.service.js';
+import { ComputeConfigService } from '@/services/compute/compute-config.service.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -156,6 +168,19 @@ export async function createApp() {
     next();
   });
 
+  // Count feature usage for anonymous telemetry. Registered before every route
+  // so the /api routers, the S3 protocol gateway, and direct edge-function
+  // invocations are all covered, and before any router rewrites req.url for
+  // its mount path. Skipped entirely when telemetry is off, so no counters
+  // accumulate that nothing will ever drain.
+  if (!isTelemetryRuntimeDisabled()) {
+    const featureUsage = FeatureUsageCollector.getInstance();
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      featureUsage.track(req, res);
+      next();
+    });
+  }
+
   // Mount webhooks with raw body parser BEFORE JSON middleware
   // This ensures signature verification uses the original bytes
   app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhooksRouter);
@@ -220,8 +245,10 @@ export async function createApp() {
   apiRouter.use('/payments', paymentsRouter);
   apiRouter.use('/compute/services', servicesRouter);
   apiRouter.use('/analytics', analyticsRouter);
+  apiRouter.use('/github', githubRouter);
   apiRouter.use('/webscraper', webscraperRouter);
   apiRouter.use('/advisor', advisorRouter);
+  apiRouter.use('/dashboard', dashboardEventsRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
@@ -327,9 +354,22 @@ const PORT = appConfig.app.port;
 async function initializeServer() {
   try {
     const app = await createApp();
+
+    // Before the listener opens, so no request can construct the compute registry from
+    // environment-only credentials. primeSnapshot never throws — a secret-store outage
+    // leaves compute on whatever the environment provides — so this cannot stop the
+    // server from serving.
+    await ComputeConfigService.getInstance().primeSnapshot();
+    warnIfFlyCredentialsIncomplete();
+
     const server = app.listen(PORT, () => {
       logger.info(`Backend API service listening on port ${PORT}`);
     });
+    // Node's 5s default keepAliveTimeout lets long-interval keep-alive clients
+    // reuse sockets the server already closed; keep it above LB idle timeouts,
+    // with headersTimeout just past it so header reads never lose the race.
+    server.keepAliveTimeout = appConfig.server.keepAliveTimeoutMs;
+    server.headersTimeout = server.keepAliveTimeout + 1000;
 
     // Initialize Socket.IO service
     const socketService = SocketManager.getInstance();
@@ -347,7 +387,35 @@ async function initializeServer() {
       });
     });
 
+    // Probe each compute driver and heal rows that drifted while we were down
+    // (a container removed out-of-band, a `docker system prune`, a reclaimed
+    // machine). Non-blocking and non-fatal: compute is optional, and it must not
+    // hold up serving. Constructing the service throws when no driver is
+    // configured at all, which is the normal case, so that is caught too.
+    void (async () => {
+      try {
+        // Load stored Fly credentials before the registry is built, so a deployment
+        // configured through the dashboard comes up with Fly available instead of
+        // waiting for the first write to rebuild.
+        // Credentials were primed before the listener opened, so the registry any
+        // request builds already sees them. Reset anyway: it costs nothing and keeps
+        // this correct if the priming above ever moves back off the startup path.
+        ComputeServicesService.resetForConfigChange();
+        await ComputeServicesService.getInstance().runStartupTasks();
+      } catch (err) {
+        logger.info('Compute startup tasks skipped', {
+          reason: err instanceof Error ? err.message : String(err),
+        });
+      }
+    })();
+
     TelemetryService.getInstance().start();
+
+    // Scheduled backups are self-hosting only; the cloud control plane owns
+    // backups there (the backup routes are not even mounted in cloud env).
+    if (!isCloudEnvironment()) {
+      DatabaseBackupService.getInstance().startScheduler();
+    }
   } catch (error) {
     logger.error('Failed to initialize server', {
       error: error instanceof Error ? error.message : String(error),
@@ -361,6 +429,8 @@ void initializeServer();
 
 async function cleanup() {
   logger.info('Shutting down gracefully...');
+
+  DatabaseBackupService.getInstance().stopScheduler();
 
   try {
     const realtimeManager = RealtimeManager.getInstance();
@@ -390,7 +460,7 @@ async function cleanup() {
   }
 
   try {
-    TelemetryService.getInstance().stop();
+    await TelemetryService.getInstance().shutdown();
   } catch (error) {
     logger.error('Error closing TelemetryService', {
       error: error instanceof Error ? error.message : String(error),

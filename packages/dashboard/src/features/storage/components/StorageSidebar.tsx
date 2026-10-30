@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pencil, Plus, Settings, Trash2 } from 'lucide-react';
 import {
   EmptyStateIllustration,
@@ -31,6 +32,7 @@ export function StorageSidebar({
   onEditBucket,
   onDeleteBucket,
 }: StorageSidebarProps) {
+  const { t } = useTranslation('chrome');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const bucketMenuItems: FeatureSidebarListItem[] = buckets.map((bucket) => ({
@@ -44,7 +46,7 @@ export function StorageSidebar({
     ? [
         {
           id: 'create-bucket',
-          label: 'Create Bucket',
+          label: t('storage.createBucket', { defaultValue: 'Create Bucket' }),
           icon: Plus,
           onClick: onNewBucket,
         },
@@ -57,7 +59,7 @@ export function StorageSidebar({
     if (onEditBucket) {
       actions.push({
         id: `edit-${item.id}`,
-        label: 'Edit Bucket',
+        label: t('storage.editBucket', { defaultValue: 'Edit Bucket' }),
         icon: Pencil,
         onClick: () => onEditBucket(item.id),
       });
@@ -66,7 +68,7 @@ export function StorageSidebar({
     if (onDeleteBucket) {
       actions.push({
         id: `delete-${item.id}`,
-        label: 'Delete Bucket',
+        label: t('storage.deleteBucket', { defaultValue: 'Delete Bucket' }),
         icon: Trash2,
         destructive: true,
         onClick: () => onDeleteBucket(item.id),
@@ -79,7 +81,7 @@ export function StorageSidebar({
   const headerButtons: FeatureSidebarHeaderButton[] = [
     {
       id: 'storage-settings',
-      label: 'Storage Settings',
+      label: t('storage.storageSettings', { defaultValue: 'Storage Settings' }),
       icon: Settings,
       onClick: () => setIsSettingsOpen(true),
     },
@@ -88,7 +90,7 @@ export function StorageSidebar({
   return (
     <>
       <FeatureSidebar
-        title="Buckets"
+        title={t('storage.buckets', { defaultValue: 'Buckets' })}
         items={bucketMenuItems}
         activeItemId={selectedBucket}
         loading={loading}
@@ -98,7 +100,9 @@ export function StorageSidebar({
           showEmptyState ? (
             <div className="flex flex-col items-center gap-2 pt-2 text-center">
               <EmptyStateIllustration />
-              <p className="text-sm font-medium leading-6 text-muted-foreground">No buckets yet</p>
+              <p className="text-sm font-medium leading-6 text-muted-foreground">
+                {t('storage.noBucketsYet', { defaultValue: 'No buckets yet' })}
+              </p>
               <div className="text-xs leading-4">
                 <button
                   type="button"
@@ -106,16 +110,18 @@ export function StorageSidebar({
                   onClick={onNewBucket}
                   disabled={!onNewBucket}
                 >
-                  Create your first bucket
+                  {t('storage.createFirstBucket', { defaultValue: 'Create your first bucket' })}
                 </button>
-                <p className="text-muted-foreground">to get started</p>
+                <p className="text-muted-foreground">
+                  {t('storage.toGetStarted', { defaultValue: 'to get started' })}
+                </p>
               </div>
             </div>
           ) : undefined
         }
         itemActions={getItemActions}
         showSearch={!showEmptyState}
-        searchPlaceholder="Search buckets..."
+        searchPlaceholder={t('storage.searchBuckets', { defaultValue: 'Search buckets...' })}
       />
       <StorageSettingsMenuDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </>

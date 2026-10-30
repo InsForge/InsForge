@@ -1,9 +1,10 @@
 import { Pool, PoolClient } from 'pg';
 import crypto from 'crypto';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
-import { SecretSchema, CreateSecretRequest } from '@insforge/shared-schemas';
+import { SecretSchema, CreateSecretRequest, ERROR_CODES } from '@insforge/shared-schemas';
 import { appConfig } from '@/infra/config/app.config.js';
 
 export interface CreateSecretInput extends CreateSecretRequest {
@@ -67,6 +68,27 @@ export class SecretService {
       const encryptedValue = EncryptionManager.encrypt(input.value);
       const executor = client ?? this.getPool();
 
+      // The dashboard's DELETE endpoint deactivates rows instead of removing
+      // them, but UNIQUE(key) counts inactive rows too — so a soft-deleted
+      // row would block every future INSERT of the same key (23505) with no
+      // way to recover from the dashboard. Revive such a row instead.
+      const revived = await executor.query(
+        `UPDATE system.secrets
+         SET value_ciphertext = $2,
+             is_reserved = $3,
+             expires_at = $4,
+             is_active = true,
+             last_used_at = NULL
+         WHERE key = $1 AND is_active = false AND is_reserved = false
+         RETURNING id`,
+        [input.key, encryptedValue, input.isReserved || false, input.expiresAt || null]
+      );
+
+      if (revived.rows.length) {
+        logger.info('Secret revived', { id: revived.rows[0].id, key: input.key });
+        return { id: revived.rows[0].id };
+      }
+
       const result = await executor.query(
         `INSERT INTO system.secrets (key, value_ciphertext, is_reserved, expires_at)
          VALUES ($1, $2, $3, $4)
@@ -78,6 +100,14 @@ export class SecretService {
       return { id: result.rows[0].id };
     } catch (error) {
       logger.error('Failed to create secret', { error, key: input.key });
+      if ((error as { code?: string }).code === '23505') {
+        throw new AppError(
+          `Secret already exists: ${input.key}`,
+          409,
+          ERROR_CODES.SECRET_ALREADY_EXISTS,
+          `A secret named ${input.key} already exists in this project. Update or delete it in the Secrets tab, or use a different name.`
+        );
+      }
       throw new Error('Failed to create secret');
     }
   }
@@ -277,23 +307,53 @@ export class SecretService {
   }
 
   /**
-   * Delete a secret by key
+   * Delete a secret by key.
+   *
+   * Reserved secrets are skipped: the statement matches zero rows and this
+   * returns false. That is the guard behind the Secrets UI, so it stays the
+   * default. A feature that owns a reserved secret and needs to remove it must
+   * say so explicitly via deleteReservedSecretByKey().
    */
   async deleteSecretByKey(key: string, client?: PoolClient): Promise<boolean> {
+    return this.runDeleteByKey(key, false, client);
+  }
+
+  /**
+   * Delete a secret by key, reserved or not.
+   *
+   * Only for a service removing a reserved secret it created itself — e.g.
+   * ApifyConfigService dropping APIFY_API_TOKEN when the admin disconnects
+   * Apify. Without this the disconnect would report success while leaving the
+   * credential in the store. Never wire this to a generic, user-facing secrets
+   * route: reserved secrets still show up in the Secrets list — `isReserved`
+   * does not hide them — but they are deliberately not editable or deletable
+   * there, so the owning service is the only thing allowed to remove one.
+   */
+  async deleteReservedSecretByKey(key: string, client?: PoolClient): Promise<boolean> {
+    return this.runDeleteByKey(key, true, client);
+  }
+
+  private async runDeleteByKey(
+    key: string,
+    allowReserved: boolean,
+    client?: PoolClient
+  ): Promise<boolean> {
     try {
       const executor = client ?? this.getPool();
       const result = await executor.query(
-        'DELETE FROM system.secrets WHERE key = $1 AND is_reserved = false',
+        allowReserved
+          ? 'DELETE FROM system.secrets WHERE key = $1'
+          : 'DELETE FROM system.secrets WHERE key = $1 AND is_reserved = false',
         [key]
       );
 
       const success = (result.rowCount ?? 0) > 0;
       if (success) {
-        logger.info('Secret deleted by key', { key });
+        logger.info('Secret deleted by key', { key, allowReserved });
       }
       return success;
     } catch (error) {
-      logger.error('Failed to delete secret by key', { error, key });
+      logger.error('Failed to delete secret by key', { error, key, allowReserved });
       throw new Error('Failed to delete secret');
     }
   }

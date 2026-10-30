@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle, X } from 'lucide-react';
@@ -39,6 +40,7 @@ export function RecordFormDialog({
   foreignKeys,
   onSuccess,
 }: RecordFormDialogProps) {
+  const { t } = useTranslation('chrome');
   const [error, setError] = useState<string | null>(null);
   const { createRecord, isCreating } = useRecords(tableName, schemaName);
 
@@ -86,7 +88,10 @@ export function RecordFormDialog({
           onSuccess();
         }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to create record';
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : t('database.failedToCreateRecord', { defaultValue: 'Failed to create record' });
         setError(errorMessage);
         console.error('Form submission error:', err);
       }
@@ -107,10 +112,13 @@ export function RecordFormDialog({
             <div className="flex w-full items-center gap-3">
               <div className="min-w-0 flex-1">
                 <DialogTitle className="text-base font-medium leading-7 text-foreground">
-                  Add Record
+                  {t('database.addRecord', { defaultValue: 'Add Record' })}
                 </DialogTitle>
                 <DialogDescription className="sr-only">
-                  Add a new record to {tableName}
+                  {t('database.addRecordDescription', {
+                    tableName,
+                    defaultValue: 'Add a new record to {{tableName}}',
+                  })}
                 </DialogDescription>
               </div>
               <DialogCloseButton
@@ -118,7 +126,7 @@ export function RecordFormDialog({
                 disabled={isCreating}
               >
                 <X className="size-4" />
-                <span className="sr-only">Close</span>
+                <span className="sr-only">{t('common.close', { defaultValue: 'Close' })}</span>
               </DialogCloseButton>
             </div>
           </DialogHeader>
@@ -158,14 +166,16 @@ export function RecordFormDialog({
               disabled={isCreating}
               className="h-8 rounded px-2"
             >
-              Cancel
+              {t('common.cancel', { defaultValue: 'Cancel' })}
             </Button>
             <Button
               type="submit"
               disabled={isCreating}
               className={cn('h-8 rounded px-2', isCreating && 'opacity-40')}
             >
-              {isCreating ? 'Saving...' : 'Add Record'}
+              {isCreating
+                ? t('common.saving', { defaultValue: 'Saving...' })
+                : t('database.addRecord', { defaultValue: 'Add Record' })}
             </Button>
           </DialogFooter>
         </form>
