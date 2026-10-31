@@ -590,6 +590,7 @@ export default function TablesPage() {
         {showTableForm ? (
           // Show TableForm replacing entire main content area
           <TableForm
+            key={editingTable ? 'edit' : 'create'}
             schemaName={selectedSchema}
             open={showTableForm}
             onOpenChange={(open) => {

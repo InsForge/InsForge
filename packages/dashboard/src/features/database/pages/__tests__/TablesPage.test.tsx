@@ -99,9 +99,11 @@ vi.mock('#features/database/components/DatabaseSidebar', () => ({
   DatabaseSidebar: (props: {
     onTableSelect?: (tableName: string) => void;
     onNewTable?: () => void;
+    onEditTable?: (tableName: string) => void;
   }) => (
     <div data-testid="database-sidebar">
       <button onClick={props.onNewTable}>New Table</button>
+      <button onClick={() => props.onEditTable?.('tableA')}>Edit Table A</button>
       <button onClick={() => props.onTableSelect?.('tableA')}>Switch to Table A</button>
       <button onClick={() => props.onTableSelect?.('tableB')}>Switch to Table B</button>
     </div>
@@ -117,7 +119,9 @@ vi.mock('#features/database/components/RecordFormDialog', () => ({
 }));
 
 vi.mock('#features/database/components/TableFormColumn', () => ({
-  TableFormColumn: () => null,
+  TableFormColumn: ({ column, index }: { column: { columnName: string }; index: number }) => (
+    <input aria-label={`Column ${index + 1} name`} value={column.columnName} readOnly />
+  ),
 }));
 
 vi.mock('#features/database/components/ForeignKeyPopover', () => ({
@@ -229,6 +233,91 @@ describe('TablesPage', () => {
   afterEach(() => {
     window.localStorage.clear();
   });
+
+  it.each([true, false])(
+    'switches from edit to create without saving edit values as a draft (saved draft: %s)',
+    async (hasSavedDraft) => {
+      const user = userEvent.setup();
+      const draftKey = getTableFormCreateDraftStorageKey('project:test-project', 'public');
+      const draft = {
+        schemaName: 'public',
+        tableName: 'draft_test',
+        columns: [
+          {
+            columnName: 'draft_column',
+            type: 'string',
+            defaultValue: '',
+            isNullable: true,
+            isUnique: false,
+            isSystemColumn: false,
+            isNewColumn: true,
+          },
+        ],
+        foreignKeys: [],
+      };
+      if (hasSavedDraft) {
+        window.localStorage.setItem(draftKey, JSON.stringify(draft));
+      }
+      hookMocks.useTableSchema.mockReturnValue({
+        data: {
+          tableName: 'tableA',
+          columns: [
+            {
+              columnName: 'existing_column',
+              type: 'string',
+              isNullable: true,
+              isUnique: false,
+            },
+          ],
+        },
+        isLoading: false,
+        error: null,
+      });
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      });
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/?table=tableA']}>
+            <TablesPage />
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Edit Table A' }));
+      const editName = screen.getByPlaceholderText('e.g., products, orders, customers');
+      expect(editName).toHaveValue('tableA');
+      expect(screen.getByRole('textbox', { name: 'Column 1 name' })).toHaveValue('existing_column');
+      await user.type(editName, '_edited');
+
+      await user.click(screen.getByRole('button', { name: 'New Table' }));
+
+      expect(screen.getByRole('heading', { name: 'Create New Table' })).toBeInTheDocument();
+      const createName = screen.getByPlaceholderText('e.g., products, orders, customers');
+      expect(createName).toHaveValue(hasSavedDraft ? 'draft_test' : '');
+      expect(screen.getByRole('textbox', { name: 'Column 1 name' })).toHaveValue(
+        hasSavedDraft ? 'draft_column' : 'id'
+      );
+      expect(screen.queryByDisplayValue('existing_column')).not.toBeInTheDocument();
+      expect(JSON.parse(window.localStorage.getItem(draftKey) ?? 'null')).toEqual(
+        hasSavedDraft ? draft : null
+      );
+
+      // Subsequent autosaves must also contain only the new create session's values.
+      await user.clear(createName);
+      await user.type(createName, 'continued_draft');
+      await waitFor(() => {
+        const saved = JSON.parse(window.localStorage.getItem(draftKey) ?? 'null');
+        expect(saved.tableName).toBe('continued_draft');
+        expect(saved.columns).not.toContainEqual(
+          expect.objectContaining({ columnName: 'existing_column' })
+        );
+        if (hasSavedDraft) {
+          expect(saved.columns).toEqual(draft.columns);
+        }
+      });
+    }
+  );
 
   it.each([true, false])(
     'clears a create draft only when discard is confirmed: %s',

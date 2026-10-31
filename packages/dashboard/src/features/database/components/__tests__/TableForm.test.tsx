@@ -9,10 +9,13 @@ import {
 import { ColumnType } from '@insforge/shared-schemas';
 import { tableFormSchema } from '#features/database/schema';
 import { tableService } from '#features/database/services/table.service';
+import i18n from '#lib/i18n';
 
 vi.mock('#features/database/services/table.service', () => ({
-  tableService: { createTable: vi.fn() },
+  tableService: { createTable: vi.fn(), updateTableSchema: vi.fn() },
 }));
+
+const showToast = vi.hoisted(() => vi.fn());
 
 const metadataMock = vi.hoisted(() => ({
   projectId: 'project-a' as string | undefined,
@@ -49,7 +52,7 @@ vi.mock('@insforge/ui', () => ({
   ),
   Input: (props: React.ComponentProps<'input'>) => <input {...props} />,
   useToast: () => ({
-    showToast: vi.fn(),
+    showToast,
   }),
 }));
 
@@ -99,8 +102,8 @@ const createSavedDraft = (schemaName = 'public') => ({
       columnName: 'user_id',
       referenceTable: 'id',
       referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
-      onDelete: 'NO ACTION',
-      onUpdate: 'NO ACTION',
+      onDelete: 'NO ACTION' as const,
+      onUpdate: 'NO ACTION' as const,
       uid: 'test-foreign-key',
     },
   ],
@@ -117,8 +120,10 @@ const expectDefaultCreateForm = () => {
 };
 
 describe('TableForm draft storage', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await i18n.changeLanguage('en');
     vi.mocked(tableService.createTable).mockReset();
+    vi.mocked(tableService.updateTableSchema).mockReset();
     metadataMock.projectId = 'project-a';
     metadataMock.isLoading = false;
     Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
@@ -130,6 +135,71 @@ describe('TableForm draft storage', () => {
   afterEach(() => {
     window.localStorage.clear();
     vi.clearAllMocks();
+  });
+
+  it.each(['create', 'edit'] as const)(
+    'uses the selected language for the %s form and fallback errors',
+    async (mode) => {
+      await i18n.changeLanguage('es');
+      const user = userEvent.setup();
+      const draft = createSavedDraft();
+      window.localStorage.setItem(
+        getTableFormCreateDraftStorageKey('project:project-a', 'public'),
+        JSON.stringify(draft)
+      );
+      vi.mocked(tableService.createTable).mockRejectedValue(new Error());
+      vi.mocked(tableService.updateTableSchema).mockRejectedValue(new Error());
+      renderTableForm({ mode, editTable: draft });
+
+      expect(
+        screen.getByRole('heading', {
+          name: mode === 'create' ? 'Crear nueva tabla' : 'Editar tabla',
+        })
+      ).toBeInTheDocument();
+      expect(screen.getByText('Nombre de la tabla')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Columnas' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Claves foráneas' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Añadir columna' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Añadir claves foráneas' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument();
+      // Translating the form must preserve the user's table and column names.
+      const tableName = screen.getByPlaceholderText('p. ej., products, orders, customers');
+      expect(tableName).toHaveValue('draft_test');
+      expect(screen.getByRole('textbox', { name: 'Column 1 name' })).toHaveValue('user_id');
+      if (mode === 'edit') {
+        await user.type(tableName, '_updated');
+      }
+
+      const submit = screen.getByRole('button', {
+        name: mode === 'create' ? 'Crear tabla' : 'Actualizar tabla',
+      });
+      await waitFor(() => expect(submit).toBeEnabled());
+      await user.click(submit);
+
+      const errorMessage =
+        mode === 'create' ? 'No se pudo crear la tabla' : 'No se pudo actualizar la tabla';
+      expect(await screen.findByText(errorMessage)).toBeInTheDocument();
+      expect(showToast).toHaveBeenCalledWith(errorMessage, 'error');
+    }
+  );
+
+  it('translates the update success toast while preserving the table name', async () => {
+    await i18n.changeLanguage('es');
+    const user = userEvent.setup();
+    vi.mocked(tableService.updateTableSchema).mockResolvedValue(undefined);
+    renderTableForm({ mode: 'edit', editTable: createSavedDraft() });
+
+    await user.type(screen.getByPlaceholderText('p. ej., products, orders, customers'), '_updated');
+    const submit = screen.getByRole('button', { name: 'Actualizar tabla' });
+    await waitFor(() => expect(submit).toBeEnabled());
+    await user.click(submit);
+
+    await waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith(
+        '¡Tabla "draft_test_updated" actualizada correctamente!',
+        'success'
+      );
+    });
   });
 
   it('builds separate keys for separate draft scopes and schemas', () => {
