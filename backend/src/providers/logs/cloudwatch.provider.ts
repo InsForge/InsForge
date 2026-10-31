@@ -379,7 +379,8 @@ export class CloudWatchProvider extends BaseLogProvider {
                 logStreamNames: sourceStreams.length ? sourceStreams.slice(0, 100) : undefined,
                 startTime: startMs,
                 endTime: endMs,
-                limit: 1000, // Reasonable limit for fallback
+                startFromHead: false,
+                limit: 1,
               })
             );
 
