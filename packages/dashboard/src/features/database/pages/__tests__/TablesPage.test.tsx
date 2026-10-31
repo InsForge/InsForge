@@ -1,7 +1,9 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getTableFormCreateDraftStorageKey } from '#features/database/components/TableForm';
 
 const hookMocks = vi.hoisted(() => ({
   useTableRecords: vi.fn(),
@@ -80,10 +82,12 @@ vi.mock('#lib/hooks/usePageSize', () => ({
   }),
 }));
 
-vi.mock('#lib/hooks/useConfirm', () => ({
-  useConfirm: () => ({
-    confirm: vi.fn(),
-    confirmDialogProps: {},
+vi.mock('#lib/hooks/useMetadata', () => ({
+  useProjectId: () => ({
+    projectId: 'test-project',
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
   }),
 }));
 
@@ -92,8 +96,14 @@ const toastMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('#features/database/components/DatabaseSidebar', () => ({
-  DatabaseSidebar: (props: { onTableSelect?: (tableName: string) => void }) => (
+  DatabaseSidebar: (props: {
+    onTableSelect?: (tableName: string) => void;
+    onNewTable?: () => void;
+    onEditTable?: (tableName: string) => void;
+  }) => (
     <div data-testid="database-sidebar">
+      <button onClick={props.onNewTable}>New Table</button>
+      <button onClick={() => props.onEditTable?.('tableA')}>Edit Table A</button>
       <button onClick={() => props.onTableSelect?.('tableA')}>Switch to Table A</button>
       <button onClick={() => props.onTableSelect?.('tableB')}>Switch to Table B</button>
     </div>
@@ -108,8 +118,14 @@ vi.mock('#features/database/components/RecordFormDialog', () => ({
   RecordFormDialog: () => null,
 }));
 
-vi.mock('#features/database/components/TableForm', () => ({
-  TableForm: () => null,
+vi.mock('#features/database/components/TableFormColumn', () => ({
+  TableFormColumn: ({ column, index }: { column: { columnName: string }; index: number }) => (
+    <input aria-label={`Column ${index + 1} name`} value={column.columnName} readOnly />
+  ),
+}));
+
+vi.mock('#features/database/components/ForeignKeyPopover', () => ({
+  ForeignKeyPopover: () => null,
 }));
 
 vi.mock('#features/database/components/TablesEmptyState', () => ({
@@ -148,7 +164,20 @@ vi.mock('@insforge/ui', () => ({
       {props.children}
     </button>
   ),
-  ConfirmDialog: () => null,
+  Input: (props: React.ComponentProps<'input'>) => <input {...props} />,
+  ConfirmDialog: (props: {
+    open: boolean;
+    title: string;
+    confirmText?: string;
+    onConfirm: () => void;
+    onOpenChange: (open: boolean) => void;
+  }) =>
+    props.open ? (
+      <div role="dialog" aria-label={props.title}>
+        <button onClick={props.onConfirm}>{props.confirmText}</button>
+        <button onClick={() => props.onOpenChange(false)}>Keep editing</button>
+      </div>
+    ) : null,
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   TooltipContent: () => null,
   TooltipProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -168,9 +197,13 @@ vi.mock('#assets/icons/refresh.svg?react', () => ({
 
 import TablesPage from '#features/database/pages/TablesPage';
 
-describe('TablesPage table-switch search behavior', () => {
+describe('TablesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+      configurable: true,
+      value: vi.fn(),
+    });
 
     hookMocks.useTableRecords.mockReturnValue({
       data: { records: [], pagination: { total: 0 } },
@@ -196,6 +229,161 @@ describe('TablesPage table-switch search behavior', () => {
       error: null,
     });
   });
+
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it.each([true, false])(
+    'switches from edit to create without saving edit values as a draft (saved draft: %s)',
+    async (hasSavedDraft) => {
+      const user = userEvent.setup();
+      const draftKey = getTableFormCreateDraftStorageKey('project:test-project', 'public');
+      const draft = {
+        schemaName: 'public',
+        tableName: 'draft_test',
+        columns: [
+          {
+            columnName: 'draft_column',
+            type: 'string',
+            defaultValue: '',
+            isNullable: true,
+            isUnique: false,
+            isSystemColumn: false,
+            isNewColumn: true,
+          },
+        ],
+        foreignKeys: [],
+      };
+      if (hasSavedDraft) {
+        window.localStorage.setItem(draftKey, JSON.stringify(draft));
+      }
+      hookMocks.useTableSchema.mockReturnValue({
+        data: {
+          tableName: 'tableA',
+          columns: [
+            {
+              columnName: 'existing_column',
+              type: 'string',
+              isNullable: true,
+              isUnique: false,
+            },
+          ],
+        },
+        isLoading: false,
+        error: null,
+      });
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      });
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/?table=tableA']}>
+            <TablesPage />
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Edit Table A' }));
+      const editName = screen.getByPlaceholderText('e.g., products, orders, customers');
+      expect(editName).toHaveValue('tableA');
+      expect(screen.getByRole('textbox', { name: 'Column 1 name' })).toHaveValue('existing_column');
+      await user.type(editName, '_edited');
+
+      await user.click(screen.getByRole('button', { name: 'New Table' }));
+
+      expect(screen.getByRole('heading', { name: 'Create New Table' })).toBeInTheDocument();
+      const createName = screen.getByPlaceholderText('e.g., products, orders, customers');
+      expect(createName).toHaveValue(hasSavedDraft ? 'draft_test' : '');
+      expect(screen.getByRole('textbox', { name: 'Column 1 name' })).toHaveValue(
+        hasSavedDraft ? 'draft_column' : 'id'
+      );
+      expect(screen.queryByDisplayValue('existing_column')).not.toBeInTheDocument();
+      expect(JSON.parse(window.localStorage.getItem(draftKey) ?? 'null')).toEqual(
+        hasSavedDraft ? draft : null
+      );
+
+      // Subsequent autosaves must also contain only the new create session's values.
+      await user.clear(createName);
+      await user.type(createName, 'continued_draft');
+      await waitFor(() => {
+        const saved = JSON.parse(window.localStorage.getItem(draftKey) ?? 'null');
+        expect(saved.tableName).toBe('continued_draft');
+        expect(saved.columns).not.toContainEqual(
+          expect.objectContaining({ columnName: 'existing_column' })
+        );
+        if (hasSavedDraft) {
+          expect(saved.columns).toEqual(draft.columns);
+        }
+      });
+    }
+  );
+
+  it.each([true, false])(
+    'clears a create draft only when discard is confirmed: %s',
+    async (discard) => {
+      const user = userEvent.setup();
+      const draftKey = getTableFormCreateDraftStorageKey('project:test-project', 'public');
+      const otherDraftKey = getTableFormCreateDraftStorageKey('project:test-project', 'private');
+      const draft = {
+        schemaName: 'public',
+        tableName: 'draft_test',
+        columns: [
+          {
+            columnName: 'title',
+            type: 'string',
+            defaultValue: '',
+            isNullable: true,
+            isUnique: false,
+            isSystemColumn: false,
+            isNewColumn: true,
+          },
+        ],
+        foreignKeys: [],
+      };
+      window.localStorage.setItem(draftKey, JSON.stringify(draft));
+      const otherDraft = JSON.stringify({ ...draft, schemaName: 'private' });
+      window.localStorage.setItem(otherDraftKey, otherDraft);
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      });
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/?table=tableA']}>
+            <TablesPage />
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+
+      await user.click(screen.getByRole('button', { name: 'New Table' }));
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue(
+          'draft_test'
+        );
+      });
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(await screen.findByRole('dialog', { name: 'Unsaved Changes' })).toBeInTheDocument();
+      expect(JSON.parse(window.localStorage.getItem(draftKey) ?? 'null')).toEqual(draft);
+
+      await user.click(screen.getByRole('button', { name: discard ? 'Discard' : 'Keep editing' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+      if (discard) {
+        expect(
+          screen.queryByPlaceholderText('e.g., products, orders, customers')
+        ).not.toBeInTheDocument();
+        expect(window.localStorage.getItem(draftKey)).toBeNull();
+        await user.click(screen.getByRole('button', { name: 'New Table' }));
+        expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue('');
+      } else {
+        expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue(
+          'draft_test'
+        );
+        expect(JSON.parse(window.localStorage.getItem(draftKey) ?? 'null')).toEqual(draft);
+      }
+      expect(window.localStorage.getItem(otherDraftKey)).toBe(otherDraft);
+    }
+  );
 
   it('clears search input and does not use previous search term when switching tables', async () => {
     const user = userEvent.setup();
