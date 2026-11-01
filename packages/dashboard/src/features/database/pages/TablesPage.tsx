@@ -425,6 +425,16 @@ export default function TablesPage() {
   };
 
   const handleCreateTable = () => {
+    if (showTableForm) {
+      void handleTableFormClose().then((discarded) => {
+        if (discarded) {
+          setEditingTable(null);
+          setShowTableForm(true);
+        }
+      });
+      return;
+    }
+
     setEditingTable(null);
     setShowTableForm(true);
   };
@@ -590,7 +600,7 @@ export default function TablesPage() {
         {showTableForm ? (
           // Show TableForm replacing entire main content area
           <TableForm
-            key={editingTable ? 'edit' : 'create'}
+            key={`${selectedSchema}:${editingTable ?? 'create'}`}
             schemaName={selectedSchema}
             open={showTableForm}
             onOpenChange={(open) => {

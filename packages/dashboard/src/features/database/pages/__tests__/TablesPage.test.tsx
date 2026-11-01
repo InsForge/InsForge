@@ -291,6 +291,18 @@ describe('TablesPage', () => {
       await user.type(editName, '_edited');
 
       await user.click(screen.getByRole('button', { name: 'New Table' }));
+      expect(await screen.findByRole('dialog', { name: 'Unsaved Changes' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Create New Table' })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(editName).toHaveValue('tableA_edited');
+      expect(screen.getByRole('textbox', { name: 'Column 1 name' })).toHaveValue('existing_column');
+
+      await user.click(screen.getByRole('button', { name: 'New Table' }));
+      expect(await screen.findByRole('dialog', { name: 'Unsaved Changes' })).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Discard' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
       expect(screen.getByRole('heading', { name: 'Create New Table' })).toBeInTheDocument();
       const createName = screen.getByPlaceholderText('e.g., products, orders, customers');
