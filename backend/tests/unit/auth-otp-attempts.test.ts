@@ -187,6 +187,41 @@ describe('AuthOTPService numeric attempt limits', () => {
       expect(mocks.pool.query.mock.calls[0][0]).toContain('attempts_count = 0');
     }
   );
+
+  it('locks the user row when the OTP requires an existing user', async () => {
+    mocks.hash.mockResolvedValue('hash');
+    mocks.pool.query.mockResolvedValue({ rows: [], rowCount: 1 });
+
+    const result = await service.createEmailOTP(
+      'user@example.com',
+      OTPPurpose.RESET_PASSWORD,
+      OTPType.NUMERIC_CODE,
+      { requireExistingUser: true }
+    );
+
+    const sql = mocks.pool.query.mock.calls[0][0] as string;
+    expect(sql).toContain('FROM auth.users');
+    expect(sql).toContain('WHERE email = $1');
+    expect(sql).toContain('FOR KEY SHARE');
+    expect(sql).not.toContain('VALUES (');
+    expect(result.success).toBe(true);
+    expect(result.otp).toMatch(/^\d{6}$/);
+  });
+
+  it('does not issue an OTP when the user was deleted concurrently', async () => {
+    mocks.hash.mockResolvedValue('hash');
+    mocks.pool.query.mockResolvedValue({ rows: [], rowCount: 0 });
+
+    const result = await service.createEmailOTP(
+      'deleted@example.com',
+      OTPPurpose.VERIFY_EMAIL,
+      OTPType.HASH_TOKEN,
+      { requireExistingUser: true }
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.otp).toBe('');
+  });
 });
 
 describe('AuthOTPService.consumeNumericOTP transaction ownership', () => {

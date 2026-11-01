@@ -488,11 +488,15 @@ export class AuthService {
 
     // Create numeric OTP code using the OTP service
     const otpService = AuthOTPService.getInstance();
-    const { otp: code } = await otpService.createEmailOTP(
+    const { success, otp: code } = await otpService.createEmailOTP(
       email,
       OTPPurpose.VERIFY_EMAIL,
-      OTPType.NUMERIC_CODE
+      OTPType.NUMERIC_CODE,
+      { requireExistingUser: true }
     );
+    if (!success) {
+      return;
+    }
 
     // Send email with verification code
     const emailService = EmailService.getInstance();
@@ -521,12 +525,15 @@ export class AuthService {
 
     // Create long cryptographic token for clickable verification link
     const otpService = AuthOTPService.getInstance();
-    const { otp: token } = await otpService.createEmailOTP(
+    const { success, otp: token } = await otpService.createEmailOTP(
       email,
       OTPPurpose.VERIFY_EMAIL,
       OTPType.HASH_TOKEN,
-      { redirectTo }
+      { redirectTo, requireExistingUser: true }
     );
+    if (!success) {
+      return;
+    }
 
     const linkUrl = this.buildEmailLink('/api/auth/email/verify-link', token);
 
@@ -663,11 +670,15 @@ export class AuthService {
 
     // Create numeric OTP code using the OTP service
     const otpService = AuthOTPService.getInstance();
-    const { otp: code } = await otpService.createEmailOTP(
+    const { success, otp: code } = await otpService.createEmailOTP(
       email,
       OTPPurpose.RESET_PASSWORD,
-      OTPType.NUMERIC_CODE
+      OTPType.NUMERIC_CODE,
+      { requireExistingUser: true }
     );
+    if (!success) {
+      return;
+    }
 
     // Send email with reset password code
     const emailService = EmailService.getInstance();
@@ -695,12 +706,15 @@ export class AuthService {
 
     // Create long cryptographic token for clickable reset link
     const otpService = AuthOTPService.getInstance();
-    const { otp: token } = await otpService.createEmailOTP(
+    const { success, otp: token } = await otpService.createEmailOTP(
       email,
       OTPPurpose.RESET_PASSWORD,
       OTPType.HASH_TOKEN,
-      { redirectTo }
+      { redirectTo, requireExistingUser: true }
     );
+    if (!success) {
+      return;
+    }
 
     const linkUrl = this.buildEmailLink('/api/auth/email/reset-password-link', token);
 
@@ -1595,13 +1609,44 @@ export class AuthService {
    * Delete multiple users by IDs
    */
   async deleteUsers(userIds: string[]): Promise<number> {
-    const pool = this.getPool();
+    const client = await this.getPool().connect();
     const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
-    const result = await pool.query(
-      `DELETE FROM auth.users WHERE id IN (${placeholders})`,
-      userIds
-    );
 
-    return result.rowCount || 0;
+    try {
+      await client.query('BEGIN');
+
+      // Delete the users first so their rows stay locked until COMMIT. OTP
+      // creation for existing users locks the same row (FOR KEY SHARE), so any
+      // OTP written concurrently either commits before this point and is
+      // removed below, or waits and then sees the user is gone.
+      const result = await client.query<{ email: string | null }>(
+        `DELETE FROM auth.users WHERE id IN (${placeholders}) RETURNING email`,
+        userIds
+      );
+
+      const emails = Array.from(
+        new Set(
+          result.rows
+            .map((row) => row.email)
+            .filter((email): email is string => typeof email === 'string' && email.length > 0)
+        )
+      );
+
+      if (emails.length > 0) {
+        await client.query('DELETE FROM auth.email_otps WHERE email = ANY($1::text[])', [emails]);
+      }
+
+      await client.query('COMMIT');
+      return result.rowCount || 0;
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // Preserve the original error if rollback fails.
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }

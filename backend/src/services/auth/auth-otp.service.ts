@@ -109,6 +109,10 @@ export class AuthOTPService {
    * @param email - The email address for the token
    * @param purpose - The purpose of the token (e.g., 'VERIFY_EMAIL', 'RESET_PASSWORD')
    * @param otpType - The type of token to generate ('NUMERIC_CODE' or 'HASH_TOKEN')
+   * @param options.requireExistingUser - Only write the OTP while a user with this exact
+   *   email exists. The user row is locked (FOR KEY SHARE) by the same statement, so a
+   *   concurrent user delete either waits for this write (and then removes the OTP) or
+   *   wins and causes no OTP to be written. Returns `success: false` in that case.
    * @returns Promise with creation result including the token and expiry time
    */
   async createEmailOTP(
@@ -118,6 +122,7 @@ export class AuthOTPService {
     options?: {
       redirectTo?: string | null;
       expiresInMinutes?: number;
+      requireExistingUser?: boolean;
     }
   ): Promise<CreateOTPResult> {
     try {
@@ -143,11 +148,17 @@ export class AuthOTPService {
 
       // Upsert token record - insert or update if email+purpose combination already exists
       // This ensures only one active token per email/purpose (replaces any existing token)
-      await this.getPool().query(
+      const values = options?.requireExistingUser
+        ? `SELECT $1::text, $2::text, $3::text, $4::text, $5::timestamptz, NULL::timestamptz, $6::text, 0
+           FROM auth.users
+           WHERE email = $1
+           FOR KEY SHARE`
+        : 'VALUES ($1, $2, $3, $4, $5, NULL, $6, 0)';
+      const result = await this.getPool().query(
         `INSERT INTO auth.email_otps (
            email, purpose, otp_hash, otp_type, expires_at, consumed_at, redirect_to, attempts_count
          )
-         VALUES ($1, $2, $3, $4, $5, NULL, $6, 0)
+         ${values}
          ON CONFLICT (email, purpose)
          DO UPDATE SET
            otp_hash = EXCLUDED.otp_hash,
@@ -159,6 +170,11 @@ export class AuthOTPService {
            updated_at = NOW()`,
         [email, purpose, otpHash, otpType, expiresAt, options?.redirectTo ?? null]
       );
+
+      if (options?.requireExistingUser && !result.rowCount) {
+        logger.info('Skipped email OTP creation because the user no longer exists', { purpose });
+        return { success: false, otp: '', expiresAt };
+      }
 
       logger.info('Email verification token created successfully', {
         purpose,
