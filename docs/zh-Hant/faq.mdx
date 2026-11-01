@@ -122,7 +122,7 @@ description: "InsForge 常見問題：解說資料庫呼叫、Edge Function 與 
     - **Anon Key**：公開的，給瀏覽器用。請求以 `anon` 角色執行，受 RLS 管，`permission denied for schema storage` 就是它撞出來的。
     - **API Key**：全權限管理員 key，只在伺服器端用，繞過 RLS。
 
-    在 dashboard 的 **Project Settings → General** 裡找 API Key（標著 **API Key** 的那一行，寫明「對專案有完全控制權限，不要暴露在前端」），或者執行 `npx @insforge/cli secrets get API_KEY`。
+    在 dashboard 的 **Project Settings → General** 裡找 API Key（標著 **API Key** 的那一行，寫明「對專案有完全控制權限，不要暴露在前端」），或者執行 `npx @insforge/cli secrets get API_KEY`。想用程式取得時，向 `GET /api/metadata/api-key` 發送 admin 請求，它會回傳 `{ "apiKey": "ik_..." }`（需要 admin 身分驗證，所以要帶上一個現有的 API Key——這適用於已經以 admin 身分驗證的工具）。
 
     在可信的伺服器端程式碼裡透過 `createAdminClient` 使用，絕不要放到瀏覽器：
 

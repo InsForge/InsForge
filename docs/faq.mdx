@@ -122,7 +122,7 @@ description: "Answers to common InsForge questions on database calls, edge funct
     - **Anon Key**: public, for the browser. Requests run as the `anon` role, gated by RLS. This is the one that hits `permission denied for schema storage`.
     - **API Key**: full-access admin key, server-only. Bypasses RLS.
 
-    Find the API Key in the dashboard under **Project Settings → General** (the **API Key** row, marked "full access control... do not expose in your frontend"), or run `npx @insforge/cli secrets get API_KEY`.
+    Find the API Key in the dashboard under **Project Settings → General** (the **API Key** row, marked "full access control... do not expose in your frontend"), or run `npx @insforge/cli secrets get API_KEY`. To fetch it programmatically, make an admin request to `GET /api/metadata/api-key`, which returns `{ "apiKey": "ik_..." }` (admin auth required, so send an existing API Key — this is for tooling that already authenticates as admin).
 
     Use it from trusted server code through `createAdminClient`, never the browser:
 
