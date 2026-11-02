@@ -60,7 +60,11 @@ vi.mock('../../src/services/auth/auth-otp.service', () => ({
       getEmailOTPContextByToken: vi.fn(),
     }),
   },
-  OTPPurpose: { VERIFY_EMAIL: 'VERIFY_EMAIL', RESET_PASSWORD: 'RESET_PASSWORD' },
+  OTPPurpose: {
+    VERIFY_EMAIL: 'VERIFY_EMAIL',
+    RESET_PASSWORD: 'RESET_PASSWORD',
+    SIGN_IN: 'SIGN_IN',
+  },
   OTPType: { NUMERIC_CODE: 'NUMERIC_CODE', HASH_TOKEN: 'HASH_TOKEN' },
 }));
 
@@ -166,9 +170,13 @@ describe('AuthService.deleteUsers', () => {
     );
     expect(mockClient.query).toHaveBeenNthCalledWith(
       3,
-      'DELETE FROM auth.email_otps WHERE email = ANY($1::text[])',
-      [['alice@example.com', 'bob@example.com']]
+      expect.stringContaining('DELETE FROM auth.email_otps'),
+      [['alice@example.com', 'bob@example.com'], 'SIGN_IN']
     );
+    const otpSql = mockClient.query.mock.calls[2][0] as string;
+    expect(otpSql).toContain('otp.purpose <> $2 AND otp.email = ANY($1::text[])');
+    expect(otpSql).toContain('lower(otp.email) IN');
+    expect(otpSql).toContain('NOT EXISTS');
     expect(mockClient.query).toHaveBeenNthCalledWith(4, 'COMMIT');
     expect(mockClient.release).toHaveBeenCalledTimes(1);
   });
@@ -185,7 +193,7 @@ describe('AuthService.deleteUsers', () => {
     expect(mockClient.query).toHaveBeenCalledTimes(3);
     expect(mockClient.query).toHaveBeenNthCalledWith(3, 'COMMIT');
     expect(mockClient.query).not.toHaveBeenCalledWith(
-      'DELETE FROM auth.email_otps WHERE email = ANY($1::text[])',
+      expect.stringContaining('DELETE FROM auth.email_otps'),
       expect.anything()
     );
   });
@@ -204,5 +212,58 @@ describe('AuthService.deleteUsers', () => {
     expect(mockClient.query).toHaveBeenNthCalledWith(1, 'BEGIN');
     expect(mockClient.query).toHaveBeenNthCalledWith(3, 'ROLLBACK');
     expect(mockClient.release).toHaveBeenCalledTimes(1);
+    expect(mockClient.release).toHaveBeenCalledWith(rollbackError);
+  });
+
+  it('releases the client normally when rollback succeeds', async () => {
+    const originalError = new Error('delete failed');
+
+    mockClient.query
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(originalError)
+      .mockResolvedValueOnce(undefined);
+
+    await expect(authService.deleteUsers(['user-1'])).rejects.toBe(originalError);
+
+    expect(mockClient.release).toHaveBeenCalledTimes(1);
+    expect(mockClient.release).toHaveBeenCalledWith(undefined);
+  });
+
+  it('retries the transaction when it is aborted as a deadlock victim', async () => {
+    const deadlock = Object.assign(new Error('deadlock detected'), { code: '40P01' });
+
+    mockClient.query
+      // attempt 1: BEGIN, DELETE users, OTP delete deadlocks, ROLLBACK
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ email: 'alice@example.com' }] })
+      .mockRejectedValueOnce(deadlock)
+      .mockResolvedValueOnce(undefined)
+      // attempt 2 succeeds
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ email: 'alice@example.com' }] })
+      .mockResolvedValueOnce({ rowCount: 1 })
+      .mockResolvedValueOnce(undefined);
+
+    const deleted = await authService.deleteUsers(['user-1']);
+
+    expect(deleted).toBe(1);
+    expect(mockPool.connect).toHaveBeenCalledTimes(2);
+    expect(mockClient.query).toHaveBeenNthCalledWith(4, 'ROLLBACK');
+    expect(mockClient.query).toHaveBeenNthCalledWith(8, 'COMMIT');
+    expect(mockClient.release).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after repeated deadlocks', async () => {
+    const deadlock = Object.assign(new Error('deadlock detected'), { code: '40P01' });
+
+    for (let i = 0; i < 3; i++) {
+      mockClient.query
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(deadlock)
+        .mockResolvedValueOnce(undefined);
+    }
+
+    await expect(authService.deleteUsers(['user-1'])).rejects.toBe(deadlock);
+    expect(mockPool.connect).toHaveBeenCalledTimes(3);
   });
 });

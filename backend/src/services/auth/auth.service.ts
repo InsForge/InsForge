@@ -1607,10 +1607,31 @@ export class AuthService {
 
   /**
    * Delete multiple users by IDs
+   *
+   * OTP verification paths lock the OTP row before the user row, while this
+   * transaction locks the user rows first, so a concurrent verification can
+   * deadlock with a delete. PostgreSQL aborts one side; if it aborts the
+   * delete, retry it so the users are still removed.
    */
   async deleteUsers(userIds: string[]): Promise<number> {
+    const maxAttempts = 3;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.deleteUsersOnce(userIds);
+      } catch (error) {
+        const code = (error as { code?: unknown } | null)?.code;
+        if (code !== '40P01' || attempt >= maxAttempts) {
+          throw error;
+        }
+        logger.warn('Retrying deleteUsers after deadlock', { attempt });
+      }
+    }
+  }
+
+  private async deleteUsersOnce(userIds: string[]): Promise<number> {
     const client = await this.getPool().connect();
     const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
+    let rollbackError: Error | undefined;
 
     try {
       await client.query('BEGIN');
@@ -1633,7 +1654,23 @@ export class AuthService {
       );
 
       if (emails.length > 0) {
-        await client.query('DELETE FROM auth.email_otps WHERE email = ANY($1::text[])', [emails]);
+        // Verify/reset OTPs are keyed by the exact user email. Sign-in OTPs are
+        // stored lowercased and matched with lower(email), so clear them
+        // case-insensitively, but keep them while another user still has that
+        // address in a different casing.
+        await client.query(
+          `DELETE FROM auth.email_otps AS otp
+           WHERE (otp.purpose <> $2 AND otp.email = ANY($1::text[]))
+              OR (
+                otp.purpose = $2
+                AND lower(otp.email) IN (SELECT lower(e) FROM unnest($1::text[]) AS e)
+                AND NOT EXISTS (
+                  SELECT 1 FROM auth.users AS remaining
+                  WHERE lower(remaining.email) = lower(otp.email)
+                )
+              )`,
+          [emails, OTPPurpose.SIGN_IN]
+        );
       }
 
       await client.query('COMMIT');
@@ -1641,12 +1678,14 @@ export class AuthService {
     } catch (error) {
       try {
         await client.query('ROLLBACK');
-      } catch {
-        // Preserve the original error if rollback fails.
+      } catch (err) {
+        // Keep the original error; discard the client since its state is unknown.
+        rollbackError = err instanceof Error ? err : new Error(String(err));
+        logger.error('Failed to roll back deleteUsers transaction', { error: err });
       }
       throw error;
     } finally {
-      client.release();
+      client.release(rollbackError);
     }
   }
 }
