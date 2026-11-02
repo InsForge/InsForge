@@ -1,12 +1,12 @@
 ---
 title: "Puerta de enlace de modelos"
 sidebarTitle: "Overview"
-description: "Llama a cualquier LLM a través de la puerta de enlace de modelos de InsForge con una clave OpenRouter administrada, cuotas por proyecto y facturación unificada."
+description: "Provisione una clave de OpenRouter desde InsForge, llame a modelos de chat, transmisión e incrustación con el SDK de OpenAI y siga el gasto y el uso por modelo desde el panel."
 ---
 
-Utilice la puerta de enlace de modelos para llamar a modelos de chat, transmisión e incrustación a través de un único punto final compatible con OpenAI. InsForge mantiene las claves del proveedor, realiza un seguimiento del uso por proyecto e enruta el tráfico a través de [OpenRouter](https://openrouter.ai), por lo que el código de su aplicación nunca ve directamente las credenciales de Anthropic, OpenAI o Mistral.
+Utilice la puerta de enlace de modelos para provisionar una clave de OpenRouter para su proyecto, explorar el catálogo de modelos y seguir el gasto y el uso por modelo. Su aplicación llama a [OpenRouter](https://openrouter.ai) directamente con esa clave, por lo que una única integración alcanza modelos de chat, transmisión e incrustación de Anthropic, OpenAI, Mistral, Google y docenas de otros proveedores.
 
-<Frame caption="Un punto final compatible con OpenAI con acceso por proveedor, código listo para copiar y seguimiento de uso.">
+<Frame caption="La página de la puerta de enlace de modelos en el panel: la clave activa, acceso por proveedor, código listo para copiar y gráficos de uso.">
   <img src="/images/model-gateway-overview.png" alt="Descripción general de la puerta de enlace de modelos del panel de InsForge que muestra ejemplos de código, fichas de proveedores y gráficos de uso" />
 </Frame>
 
@@ -38,23 +38,23 @@ graph TB
 
 ### API compatible con OpenAI
 
-Apunte cualquier SDK de OpenAI o biblioteca compatible con `openai` a `https://<project>.insforge.dev/v1` y funcionará. `/v1/chat/completions`, `/v1/embeddings` y `/v1/models` se comportan como la especificación ascendente.
+Copie la clave provisionada desde el panel en una variable `OPENROUTER_API_KEY` solo de servidor y luego apunte cualquier SDK de OpenAI o biblioteca compatible con `openai` a `https://openrouter.ai/api/v1`. Las referencias del [SDK de TypeScript](/sdks/typescript/ai) y [REST](/sdks/rest/ai) incluyen fragmentos funcionales.
+
+<Warning>
+  La clave provisionada es una credencial del lado del servidor. Mantenga las llamadas a OpenRouter detrás de una ruta de backend, una acción de servidor o una función perimetral, y nunca incluya la clave en un paquete del navegador.
+</Warning>
 
 ### Transmisión
 
-Eventos enviados por servidor para finalizaciones de chat. Utilice el punto final de transmisión de la misma manera que lo haría con OpenAI; la puerta de enlace reenvía los tokens a medida que llegan del proveedor.
+Eventos enviados por servidor para finalizaciones de chat. Establezca `stream: true` como lo haría con OpenAI, y los tokens llegan a medida que el proveedor los produce.
 
 ### Incrustaciones
 
 Genere vectores densos a partir de cualquier modelo de incrustación que OpenRouter admita. Almacene el resultado en Postgres con [pgvector](/core-concepts/database/pgvector) para búsqueda semántica.
 
-### Cuotas por proyecto
+### Gasto y uso
 
-Cada proyecto tiene su propio límite de velocidad y límite de gasto. Al alcanzarlo, la puerta de enlace devuelve un 429 limpio en lugar de filtrar el estado de cuota del proveedor en su aplicación.
-
-### Seguimiento de uso
-
-Cada solicitud se registra con modelo, recuento de tokens y costo. Consulte el uso desde el panel, CLI o MCP — la facturación se reconcilia automáticamente con la factura de OpenRouter.
+La página de la puerta de enlace de modelos en el panel lee la actividad de su clave desde OpenRouter: gasto total, uso diario, semanal y mensual, crédito restante y su fecha de restablecimiento, y un desglose por modelo.
 
 ### Enrutamiento multiproveedor
 
