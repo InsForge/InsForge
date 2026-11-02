@@ -88,33 +88,12 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       );
     }
 
-    // Check if secret already exists
-    const secrets = await secretService.listSecrets();
-    const secret = secrets.find((s) => s.key === key);
-
-    let result: { id: string };
-
-    if (secret && secret?.isActive) {
-      throw new AppError(`Secret already exists: ${key}`, 409, ERROR_CODES.SECRET_ALREADY_EXISTS);
-    } else if (secret && !secret?.isActive && secret?.id) {
-      const success = await secretService.updateSecret(secret?.id, {
-        value,
-        isActive: true,
-        isReserved: isReserved || false,
-        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
-      });
-      if (!success) {
-        throw new AppError(`Failed to create secret: ${key}`, 500, ERROR_CODES.INTERNAL_ERROR);
-      }
-      result = { id: secret.id };
-    } else {
-      result = await secretService.createSecret({
-        key,
-        value,
-        isReserved: isReserved || false,
-        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
-      });
-    }
+    const result = await secretService.createSecret({
+      key,
+      value,
+      isReserved: isReserved || false,
+      expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+    });
 
     // Log audit
     await auditService.log({
