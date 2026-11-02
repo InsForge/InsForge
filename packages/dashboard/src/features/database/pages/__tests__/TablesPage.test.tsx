@@ -401,7 +401,9 @@ describe('TablesPage', () => {
         await waitFor(() => {
           const saved = JSON.parse(window.localStorage.getItem(draftKey) ?? 'null');
           expect(saved.tableName).toBe('fresh_table');
-          expect(saved.columns).not.toContainEqual(expect.objectContaining({ columnName: 'title' }));
+          expect(saved.columns).not.toContainEqual(
+            expect.objectContaining({ columnName: 'title' })
+          );
         });
       } else {
         expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue(
