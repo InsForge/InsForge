@@ -60,6 +60,7 @@ export default function TablesPage() {
   const [showRecordForm, setShowRecordForm] = useState(false);
   const [isTableFormDirty, setIsTableFormDirty] = useState(false);
   const [showTableForm, setShowTableForm] = useState(false);
+  const [createSession, setCreateSession] = useState(0);
   const [editingTable, setEditingTable] = useState<string | null>(null);
   const [searchByTable, setSearchByTable] = useState<Record<string, string>>({});
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -425,18 +426,22 @@ export default function TablesPage() {
   };
 
   const handleCreateTable = () => {
+    const startCreateSession = () => {
+      setCreateSession((session) => session + 1);
+      setEditingTable(null);
+      setShowTableForm(true);
+    };
+
     if (showTableForm) {
       void handleTableFormClose().then((discarded) => {
         if (discarded) {
-          setEditingTable(null);
-          setShowTableForm(true);
+          startCreateSession();
         }
       });
       return;
     }
 
-    setEditingTable(null);
-    setShowTableForm(true);
+    startCreateSession();
   };
 
   const handleCreateDraftDiscardHandled = useCallback((schemaName: string) => {
@@ -600,7 +605,11 @@ export default function TablesPage() {
         {showTableForm ? (
           // Show TableForm replacing entire main content area
           <TableForm
-            key={`${selectedSchema}:${editingTable ?? 'create'}`}
+            key={JSON.stringify([
+              selectedSchema,
+              editingTable ? 'edit' : 'create',
+              editingTable ?? createSession,
+            ])}
             schemaName={selectedSchema}
             open={showTableForm}
             onOpenChange={(open) => {

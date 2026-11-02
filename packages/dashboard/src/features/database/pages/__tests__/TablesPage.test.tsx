@@ -331,9 +331,14 @@ describe('TablesPage', () => {
     }
   );
 
-  it.each([true, false])(
-    'clears a create draft only when discard is confirmed: %s',
-    async (discard) => {
+  it.each([
+    { discard: true, restart: false },
+    { discard: false, restart: false },
+    { discard: true, restart: true },
+    { discard: false, restart: true },
+  ])(
+    'clears a create draft only when discard is confirmed: $discard (restart: $restart)',
+    async ({ discard, restart }) => {
       const user = userEvent.setup();
       const draftKey = getTableFormCreateDraftStorageKey('project:test-project', 'public');
       const otherDraftKey = getTableFormCreateDraftStorageKey('project:test-project', 'private');
@@ -373,7 +378,7 @@ describe('TablesPage', () => {
           'draft_test'
         );
       });
-      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      await user.click(screen.getByRole('button', { name: restart ? 'New Table' : 'Cancel' }));
       expect(await screen.findByRole('dialog', { name: 'Unsaved Changes' })).toBeInTheDocument();
       expect(JSON.parse(window.localStorage.getItem(draftKey) ?? 'null')).toEqual(draft);
 
@@ -381,12 +386,23 @@ describe('TablesPage', () => {
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
       if (discard) {
-        expect(
-          screen.queryByPlaceholderText('e.g., products, orders, customers')
-        ).not.toBeInTheDocument();
         expect(window.localStorage.getItem(draftKey)).toBeNull();
-        await user.click(screen.getByRole('button', { name: 'New Table' }));
-        expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue('');
+        if (!restart) {
+          expect(
+            screen.queryByPlaceholderText('e.g., products, orders, customers')
+          ).not.toBeInTheDocument();
+          await user.click(screen.getByRole('button', { name: 'New Table' }));
+        }
+        const createName = screen.getByPlaceholderText('e.g., products, orders, customers');
+        expect(createName).toHaveValue('');
+        expect(screen.getByRole('textbox', { name: 'Column 1 name' })).toHaveValue('id');
+        expect(screen.queryByDisplayValue('title')).not.toBeInTheDocument();
+        await user.type(createName, 'fresh_table');
+        await waitFor(() => {
+          const saved = JSON.parse(window.localStorage.getItem(draftKey) ?? 'null');
+          expect(saved.tableName).toBe('fresh_table');
+          expect(saved.columns).not.toContainEqual(expect.objectContaining({ columnName: 'title' }));
+        });
       } else {
         expect(screen.getByPlaceholderText('e.g., products, orders, customers')).toHaveValue(
           'draft_test'
