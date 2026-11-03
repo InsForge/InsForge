@@ -50,27 +50,30 @@ export class RealtimeManager {
     // Create a dedicated client for LISTEN (cannot use pooled connections)
     this.listenerClient = DatabaseManager.getInstance().createClient();
 
+    // Attach handlers BEFORE connect(): a client whose connect() fails can
+    // still emit 'error' asynchronously afterwards ("Connection terminated
+    // unexpectedly"), and an unhandled 'error' event crashes the process.
+    this.listenerClient.on('notification', (msg) => {
+      if (msg.channel === 'realtime_message' && msg.payload) {
+        void this.handlePGNotification(msg.payload);
+      }
+    });
+
+    this.listenerClient.on('error', (error) => {
+      logger.error('RealtimeManager connection error', { error: error.message });
+      this.handleDisconnect();
+    });
+
+    this.listenerClient.on('end', () => {
+      logger.warn('RealtimeManager connection ended');
+      this.handleDisconnect();
+    });
+
     try {
       await this.listenerClient.connect();
       await this.listenerClient.query('LISTEN realtime_message');
       this.isConnected = true;
       this.reconnectAttempts = 0;
-
-      this.listenerClient.on('notification', (msg) => {
-        if (msg.channel === 'realtime_message' && msg.payload) {
-          void this.handlePGNotification(msg.payload);
-        }
-      });
-
-      this.listenerClient.on('error', (error) => {
-        logger.error('RealtimeManager connection error', { error: error.message });
-        this.handleDisconnect();
-      });
-
-      this.listenerClient.on('end', () => {
-        logger.warn('RealtimeManager connection ended');
-        this.handleDisconnect();
-      });
 
       logger.info('RealtimeManager initialized and listening');
     } catch (error) {
@@ -197,6 +200,9 @@ export class RealtimeManager {
 
     if (this.listenerClient) {
       this.listenerClient.removeAllListeners();
+      // The dead client's socket can emit one more 'error' after teardown;
+      // without a listener that late event crashes the process.
+      this.listenerClient.on('error', () => {});
       this.listenerClient = null;
     }
 
