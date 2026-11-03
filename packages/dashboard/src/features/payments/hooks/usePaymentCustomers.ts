@@ -3,17 +3,24 @@ import { useQuery } from '@tanstack/react-query';
 import type {
   PaymentEnvironment,
   PaymentProvider,
+  PaystackConnection,
   RazorpayConnection,
 } from '@insforge/shared-schemas';
 import { stripeService } from '#features/payments/services/stripe.service';
 import { razorpayService } from '#features/payments/services/razorpay.service';
-import { razorpayQueryKeys, stripeQueryKeys } from '#features/payments/queryKeys';
+import { paystackService } from '#features/payments/services/paystack.service';
+import {
+  paystackQueryKeys,
+  razorpayQueryKeys,
+  stripeQueryKeys,
+} from '#features/payments/queryKeys';
 
 export const PAYMENT_CUSTOMERS_LIMIT = 100;
 
 export function usePaymentCustomers(provider: PaymentProvider, environment: PaymentEnvironment) {
   const isStripeProvider = provider === 'stripe';
   const isRazorpayProvider = provider === 'razorpay';
+  const isPaystackProvider = provider === 'paystack';
 
   const {
     data: statusData,
@@ -41,6 +48,19 @@ export function usePaymentCustomers(provider: PaymentProvider, environment: Paym
     staleTime: 30 * 1000,
   });
 
+  const {
+    data: paystackStatusData,
+    isLoading: isLoadingPaystackStatus,
+    error: paystackStatusError,
+    refetch: refetchPaystackStatus,
+    isFetching: isFetchingPaystackStatus,
+  } = useQuery({
+    queryKey: paystackQueryKeys.status,
+    queryFn: () => paystackService.getStatus(),
+    enabled: isPaystackProvider,
+    staleTime: 30 * 1000,
+  });
+
   const connections = useMemo(
     () => (isStripeProvider ? (statusData?.connections ?? []) : []),
     [isStripeProvider, statusData]
@@ -48,6 +68,10 @@ export function usePaymentCustomers(provider: PaymentProvider, environment: Paym
   const razorpayConnections = useMemo(
     () => (isRazorpayProvider ? (razorpayStatusData?.razorpayConnections ?? []) : []),
     [isRazorpayProvider, razorpayStatusData]
+  );
+  const paystackConnections = useMemo(
+    () => (isPaystackProvider ? (paystackStatusData?.paystackConnections ?? []) : []),
+    [isPaystackProvider, paystackStatusData]
   );
 
   const activeConnection = useMemo(
@@ -60,9 +84,19 @@ export function usePaymentCustomers(provider: PaymentProvider, environment: Paym
     [environment, razorpayConnections]
   );
 
+  const activePaystackConnection = useMemo<PaystackConnection | null>(
+    () => paystackConnections.find((connection) => connection.environment === environment) ?? null,
+    [environment, paystackConnections]
+  );
+
   const hasStripeKey = !!activeConnection?.maskedKey;
   const hasRazorpayKey = !!activeRazorpayConnection?.maskedKey;
-  const hasActiveKey = isStripeProvider ? hasStripeKey : hasRazorpayKey;
+  const hasPaystackKey = !!activePaystackConnection?.maskedKey;
+  const hasActiveKey = isStripeProvider
+    ? hasStripeKey
+    : isRazorpayProvider
+      ? hasRazorpayKey
+      : hasPaystackKey;
 
   const {
     data: customersData,
@@ -98,34 +132,63 @@ export function usePaymentCustomers(provider: PaymentProvider, environment: Paym
     staleTime: 30 * 1000,
   });
 
+  const {
+    data: paystackCustomersData,
+    isLoading: isLoadingPaystackCustomers,
+    error: paystackCustomersError,
+    refetch: refetchPaystackCustomers,
+    isFetching: isFetchingPaystackCustomers,
+  } = useQuery({
+    queryKey: paystackQueryKeys.customersByEnvironment(environment),
+    queryFn: () =>
+      paystackService.listCustomers({
+        environment,
+        limit: PAYMENT_CUSTOMERS_LIMIT,
+      }),
+    enabled: isPaystackProvider && hasPaystackKey,
+    staleTime: 30 * 1000,
+  });
+
   return {
     connections,
     razorpayConnections,
+    paystackConnections,
     activeConnection,
     activeRazorpayConnection,
+    activePaystackConnection,
     hasActiveKey,
     customers: hasActiveKey
       ? isStripeProvider
         ? (customersData?.customers ?? [])
-        : (razorpayCustomersData?.customers ?? [])
+        : isRazorpayProvider
+          ? (razorpayCustomersData?.customers ?? [])
+          : (paystackCustomersData?.customers ?? [])
       : [],
     isLoading:
       (isStripeProvider && (isLoadingStatus || (hasStripeKey && isLoadingCustomers))) ||
       (isRazorpayProvider &&
-        (isLoadingRazorpayStatus || (hasRazorpayKey && isLoadingRazorpayCustomers))),
+        (isLoadingRazorpayStatus || (hasRazorpayKey && isLoadingRazorpayCustomers))) ||
+      (isPaystackProvider &&
+        (isLoadingPaystackStatus || (hasPaystackKey && isLoadingPaystackCustomers))),
     isRefreshing:
       (isStripeProvider && (isFetchingStatus || (hasStripeKey && isFetchingCustomers))) ||
       (isRazorpayProvider &&
-        (isFetchingRazorpayStatus || (hasRazorpayKey && isFetchingRazorpayCustomers))),
+        (isFetchingRazorpayStatus || (hasRazorpayKey && isFetchingRazorpayCustomers))) ||
+      (isPaystackProvider &&
+        (isFetchingPaystackStatus || (hasPaystackKey && isFetchingPaystackCustomers))),
     error: isStripeProvider
       ? (statusError ?? customersError)
-      : (razorpayStatusError ?? razorpayCustomersError),
+      : isRazorpayProvider
+        ? (razorpayStatusError ?? razorpayCustomersError)
+        : (paystackStatusError ?? paystackCustomersError),
     refetch: () =>
       Promise.all([
         isStripeProvider ? refetchStatus() : null,
         isRazorpayProvider ? refetchRazorpayStatus() : null,
+        isPaystackProvider ? refetchPaystackStatus() : null,
         isStripeProvider && hasStripeKey ? refetchCustomers() : null,
         isRazorpayProvider && hasRazorpayKey ? refetchRazorpayCustomers() : null,
+        isPaystackProvider && hasPaystackKey ? refetchPaystackCustomers() : null,
       ]),
   };
 }
