@@ -149,9 +149,10 @@ describe('AuthService.deleteUsers', () => {
     authService = AuthService.getInstance();
   });
 
-  it('deletes the users and then their OTP rows in one transaction', async () => {
+  it('locks, deletes the users and then their OTP rows in one transaction', async () => {
     mockClient.query
       .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rowCount: 3, rows: [] })
       .mockResolvedValueOnce({
         rowCount: 2,
         rows: [{ email: 'alice@example.com' }, { email: 'bob@example.com' }],
@@ -163,35 +164,60 @@ describe('AuthService.deleteUsers', () => {
 
     expect(deleted).toBe(2);
     expect(mockClient.query).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(mockClient.query).toHaveBeenNthCalledWith(2, expect.stringContaining('FOR UPDATE'), [
+      'user-1',
+      'user-2',
+    ]);
     expect(mockClient.query).toHaveBeenNthCalledWith(
-      2,
+      3,
       'DELETE FROM auth.users WHERE id IN ($1,$2) RETURNING email',
       ['user-1', 'user-2']
     );
     expect(mockClient.query).toHaveBeenNthCalledWith(
-      3,
+      4,
       expect.stringContaining('DELETE FROM auth.email_otps'),
       [['alice@example.com', 'bob@example.com'], 'SIGN_IN']
     );
-    const otpSql = mockClient.query.mock.calls[2][0] as string;
+    const otpSql = mockClient.query.mock.calls[3][0] as string;
     expect(otpSql).toContain('otp.purpose <> $2 AND otp.email = ANY($1::text[])');
     expect(otpSql).toContain('lower(otp.email) IN');
     expect(otpSql).toContain('NOT EXISTS');
-    expect(mockClient.query).toHaveBeenNthCalledWith(4, 'COMMIT');
+    expect(mockClient.query).toHaveBeenNthCalledWith(5, 'COMMIT');
     expect(mockClient.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('locks case-variant users in id order before deleting', async () => {
+    mockClient.query
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rowCount: 2, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ email: 'User@example.com' }] })
+      .mockResolvedValueOnce({ rowCount: 0 })
+      .mockResolvedValueOnce(undefined);
+
+    await authService.deleteUsers(['user-1']);
+
+    const lockSql = (mockClient.query.mock.calls[1][0] as string).replace(/\s+/g, ' ');
+    expect(lockSql).toContain('SELECT id FROM auth.users');
+    expect(lockSql).toContain(
+      'OR lower(email) IN ( SELECT lower(email) FROM auth.users WHERE id IN ($1) )'
+    );
+    expect(lockSql).toContain('ORDER BY id FOR UPDATE');
+    expect(mockClient.query.mock.calls[1][1]).toEqual(['user-1']);
+    expect(mockClient.query.mock.calls[2][0]).toContain('DELETE FROM auth.users');
   });
 
   it('skips OTP cleanup when no matching users are found', async () => {
     mockClient.query
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
       .mockResolvedValueOnce(undefined);
 
     const deleted = await authService.deleteUsers(['missing-user']);
 
     expect(deleted).toBe(0);
-    expect(mockClient.query).toHaveBeenCalledTimes(3);
-    expect(mockClient.query).toHaveBeenNthCalledWith(3, 'COMMIT');
+    expect(mockClient.query).toHaveBeenCalledTimes(4);
+    expect(mockClient.query).toHaveBeenNthCalledWith(4, 'COMMIT');
     expect(mockClient.query).not.toHaveBeenCalledWith(
       expect.stringContaining('DELETE FROM auth.email_otps'),
       expect.anything()
@@ -233,13 +259,15 @@ describe('AuthService.deleteUsers', () => {
     const deadlock = Object.assign(new Error('deadlock detected'), { code: '40P01' });
 
     mockClient.query
-      // attempt 1: BEGIN, DELETE users, OTP delete deadlocks, ROLLBACK
+      // attempt 1: BEGIN, lock, DELETE users, OTP delete deadlocks, ROLLBACK
       .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ email: 'alice@example.com' }] })
       .mockRejectedValueOnce(deadlock)
       .mockResolvedValueOnce(undefined)
       // attempt 2 succeeds
       .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ email: 'alice@example.com' }] })
       .mockResolvedValueOnce({ rowCount: 1 })
       .mockResolvedValueOnce(undefined);
@@ -248,8 +276,8 @@ describe('AuthService.deleteUsers', () => {
 
     expect(deleted).toBe(1);
     expect(mockPool.connect).toHaveBeenCalledTimes(2);
-    expect(mockClient.query).toHaveBeenNthCalledWith(4, 'ROLLBACK');
-    expect(mockClient.query).toHaveBeenNthCalledWith(8, 'COMMIT');
+    expect(mockClient.query).toHaveBeenNthCalledWith(5, 'ROLLBACK');
+    expect(mockClient.query).toHaveBeenNthCalledWith(10, 'COMMIT');
     expect(mockClient.release).toHaveBeenCalledTimes(2);
   });
 

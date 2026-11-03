@@ -1636,7 +1636,23 @@ export class AuthService {
     try {
       await client.query('BEGIN');
 
-      // Delete the users first so their rows stay locked until COMMIT. OTP
+      // Lock the target users and every user sharing their lowercased email,
+      // in id order. Two concurrent deletes of case-variant addresses (e.g.
+      // User@x and user@x) are then serialized, so the later one sees the
+      // earlier delete committed and its NOT EXISTS check below clears the
+      // shared sign-in OTP instead of both transactions skipping it.
+      await client.query(
+        `SELECT id FROM auth.users
+         WHERE id IN (${placeholders})
+            OR lower(email) IN (
+              SELECT lower(email) FROM auth.users WHERE id IN (${placeholders})
+            )
+         ORDER BY id
+         FOR UPDATE`,
+        userIds
+      );
+
+      // Delete the users; their rows stay locked until COMMIT. OTP
       // creation for existing users locks the same row (FOR KEY SHARE), so any
       // OTP written concurrently either commits before this point and is
       // removed below, or waits and then sees the user is gone.
