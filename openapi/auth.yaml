@@ -57,7 +57,11 @@ paths:
   /api/auth/profiles/current:
     patch:
       summary: Update current user's profile
-      description: Update the profile of the currently authenticated user
+      description: >-
+        Update the profile of the currently authenticated user. The entire
+        profile object, including any custom fields, is readable by anyone
+        via GET /api/auth/profiles/{userId} without authentication. Do not
+        store sensitive or private data in this field.
       tags:
         - Client
       security:
@@ -96,7 +100,11 @@ paths:
   /api/auth/profiles/{userId}:
     get:
       summary: Get user profile by ID
-      description: Get public profile information for a user by their ID (public endpoint)
+      description: >-
+        Get public profile information for a user by their ID (public
+        endpoint, no authentication required). Returns the full profile
+        object as stored via PATCH /api/auth/profiles/current, including
+        any custom fields.
       tags:
         - Client
       parameters:
@@ -2380,7 +2388,10 @@ components:
           type: object
           nullable: true
           additionalProperties: true
-          description: User profile data (can contain custom fields)
+          description: >-
+            User profile data (can contain custom fields). Publicly
+            readable without authentication via GET
+            /api/auth/profiles/{userId}; do not store sensitive data here.
           properties:
             name:
               type: string
