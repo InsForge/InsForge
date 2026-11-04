@@ -50,7 +50,11 @@ function continuationSignature(secret: string, scope: ListingScope, key: string)
   // Length-prefix every field so no combination of bucket, prefix, delimiter
   // and key can be rearranged into the same signed string. Keys and delimiters
   // are arbitrary text, so there is no separator character safe to reserve.
-  const signed = ['insforge:s3:listv2:v1', scope.bucket, scope.prefix, scope.delimiter ?? '', key]
+  //
+  // v2: cursors are positions in byte order (COLLATE "C"). v1 cursors were
+  // positions in the database collation, and resuming one under byte order can
+  // skip keys, so v1 tokens no longer verify and the caller restarts instead.
+  const signed = ['insforge:s3:listv2:v2', scope.bucket, scope.prefix, scope.delimiter ?? '', key]
     .map((field) => `${Buffer.byteLength(field, 'utf8')}:${field}`)
     .join('');
   return crypto
