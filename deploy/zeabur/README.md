@@ -1,6 +1,9 @@
 # InsForge Zeabur Template
 
-Internal template for one-click InsForge deployment on Zeabur.
+The previously linked InsForge Zeabur one-click template is no longer available.
+This repository has no verified public template URL. The YAML remains available
+for maintainers to deploy and test through the Zeabur CLI until a new template
+is published and verified.
 
 ## CLI Authentication
 
@@ -9,18 +12,22 @@ npx zeabur@latest auth login
 npx zeabur@latest auth logout
 ```
 
-## Deploy
+## Deploy from YAML
+
+Run this command from `deploy/zeabur`:
 
 ```bash
 npx zeabur@latest template deploy -f template.yml
 ```
 
-## Update
+## Restore the one-click button
 
-```bash
-npx zeabur@latest template update -c Q82M3Y -f template.yml
-```
+Publish the tested YAML from the maintainer's Zeabur account. Verify the new
+template URL and a deployment before adding the button back to the root README.
+Use the code from that URL for subsequent template updates; the old template
+code is no longer available.
 
 ## Documentation
 
-- Zeabur docs: https://zeabur.com/docs/en-US/template/template-in-code
+- Zeabur template format: https://zeabur.com/docs/en-US/template/template-format
+- Zeabur template maintenance: https://zeabur.com/docs/en-US/template/maintain-template
