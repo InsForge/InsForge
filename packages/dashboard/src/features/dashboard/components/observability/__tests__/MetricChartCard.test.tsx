@@ -62,6 +62,26 @@ describe('MetricChartCard rendering modes', () => {
     expect(Math.abs(gaps[0] - gaps[1])).toBeGreaterThan(10);
   });
 
+  it('ignores points with non-finite timestamps when building the chart', () => {
+    const { container } = render(
+      <MetricChartCard
+        {...base}
+        data={pts([
+          [NaN, 100],
+          [1000, 50],
+          [2000, 60],
+        ])}
+      />
+    );
+
+    const paths = [...container.querySelectorAll('svg path')];
+    expect(paths.length).toBeGreaterThan(0);
+
+    for (const path of paths) {
+      expect(path.getAttribute('d')).not.toContain('NaN');
+    }
+  });
+
   it('capacity fallback does not stack the oldest bars on one another', () => {
     // buildSparkline mapped timestamps across the full 434px width and `bars`
     // then clamped with Math.max(Y_AXIS_LABEL_WIDTH + 2, ...). Clamping does not

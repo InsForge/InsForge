@@ -121,7 +121,7 @@ function buildSparkline(
   plotRange: [number, number] = [0, SPARKLINE_WIDTH]
 ): SparklineGeometry {
   const finite = data
-    .filter((p) => Number.isFinite(p.value))
+    .filter((p) => Number.isFinite(p.value) && Number.isFinite(p.timestamp))
     .sort((a, b) => a.timestamp - b.timestamp);
   if (finite.length < 2) {
     return { line: '', area: '', points: [], min: null, max: null };
@@ -218,7 +218,7 @@ export function MetricChartCard({
   );
   const gradientId = useId();
   const xAxisTicks = useMemo(() => {
-    const finite = data.filter((p) => Number.isFinite(p.value));
+    const finite = data.filter((p) => Number.isFinite(p.value) && Number.isFinite(p.timestamp));
     const end =
       finite.length > 0 ? finite[finite.length - 1].timestamp : Math.floor(Date.now() / 1000);
     const start = end - rangeSeconds;
@@ -236,7 +236,11 @@ export function MetricChartCard({
   const latestTimestamp = useMemo(() => {
     let latest: number | null = null;
     for (const point of statsSeries) {
-      if (Number.isFinite(point.value) && (latest === null || point.timestamp > latest)) {
+      if (
+        Number.isFinite(point.value) &&
+        Number.isFinite(point.timestamp) &&
+        (latest === null || point.timestamp > latest)
+      ) {
         latest = point.timestamp;
       }
     }
