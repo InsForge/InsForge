@@ -29,6 +29,8 @@ create table documents (
 
 Genere una incrustación del lado del servidor e insértela.
 
+`OPENROUTER_API_KEY` es la clave que InsForge aprovisiona para el [Model Gateway](/core-concepts/ai/overview). Copie la clave activa del panel (Model Gateway → API Key), guárdela en una variable de entorno `OPENROUTER_API_KEY` solo de servidor y nunca la exponga en código de navegador.
+
 ```typescript
 import OpenAI from 'openai';
 import { createClient } from '@insforge/sdk';
