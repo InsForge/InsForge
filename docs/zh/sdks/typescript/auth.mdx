@@ -148,6 +148,75 @@ if (data) {
 
 ---
 
+## signInWithOtp()
+
+向指定邮箱发送无密码的六位登录验证码。使用 `verifyOtp()` 完成登录流程。无论账号是否存在，响应都是通用的，以避免账号枚举。
+
+### 参数
+
+- `email`（string，必填）- 接收登录验证码的邮箱地址
+
+### 返回
+
+```typescript
+{
+  data: { success: boolean, message: string } | null,
+  error: Error | null
+}
+```
+
+### 示例
+
+```javascript
+const { data, error } = await insforge.auth.signInWithOtp({
+  email: 'user@example.com',
+});
+```
+
+---
+
+## verifyOtp()
+
+验证邮箱登录验证码并创建会话。如果邮箱是新的，将创建一个已验证的无密码用户；`name` 仅在验证首次创建用户时用于设置显示名称。
+
+<Note>
+验证码 5 分钟后过期，只能使用一次，并在三次失败尝试后被消耗。如果已禁用公开注册，未知邮箱的有效验证码会被消耗并返回错误。不支持手机/短信 OTP；登录验证码仅通过邮件发送。
+</Note>
+
+### 参数
+
+- `email`（string，必填）- 接收验证码的邮箱地址
+- `otp`（string，必填）- 六位登录验证码
+- `name`（string，可选）- 个人资料名称，仅在验证创建新用户时使用
+
+### 返回
+
+```typescript
+{
+  data: {
+    user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
+    accessToken: string,
+    csrfToken?: string | null
+  } | null,
+  error: Error | null
+}
+```
+
+### 示例
+
+```javascript
+const { data, error } = await insforge.auth.verifyOtp({
+  email: 'user@example.com',
+  otp: '123456',
+});
+
+if (data) {
+  console.log('Signed in as:', data.user.email);
+}
+```
+
+---
+
 ## signInWithOAuth()
 
 使用已配置的提供商（内置提供商如 Google/GitHub，以及从仪表板配置的任何自定义提供商密钥）启动 OAuth 身份验证流程。
