@@ -1246,9 +1246,6 @@ export class AuthService {
       case 'facebook':
         userData = this.facebookOAuthProvider.handleSharedCallback(payloadData);
         break;
-      case 'x':
-        userData = this.xOAuthProvider.handleSharedCallback(payloadData);
-        break;
       case 'apple':
         userData = this.appleOAuthProvider.handleSharedCallback(payloadData);
         break;
