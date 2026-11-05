@@ -44,6 +44,16 @@ graph TB
 
 Define a table and you immediately get REST endpoints plus a typed SDK client for it. No code generation step. The auth JWT scopes every query through RLS.
 
+### Schema visualizer
+
+See your whole data model at a glance. The dashboard **Visualizer** renders an entity-relationship diagram (ERD) of your project: every table with its columns, your storage buckets, the auth users node, and the foreign-key relationships drawn as edges between related tables. {/* TODO: confirm dashboard location / sidebar label for the Visualizer view */}
+
+Prefer the terminal or an agent? The same schema — including each table's foreign keys — is available without the diagram:
+
+- CLI: `npx @insforge/cli metadata --json` returns the full backend metadata (tables, buckets, functions, and more).
+- REST: `GET /api/database/tables/{table}/schema` returns a single table's structure, including its `foreignKeys`.
+- MCP: the `get-table-schema` tool returns a table's detailed schema (columns, constraints, indexes, and foreign keys).
+
 ### Migrations
 
 Track and apply SQL changes in order. [Migrations](/core-concepts/database/migrations) ship as plain `.sql` files in your repo, applied with `npx @insforge/cli db migrations up --all` or via the MCP tool.
