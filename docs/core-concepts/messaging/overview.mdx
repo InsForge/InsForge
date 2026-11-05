@@ -75,6 +75,12 @@ Send events (`accepted`, `delivered`, `bounced`, `complained`) are recorded per 
 
 Per-project and per-plan limits keep stray loops from melting deliverability. Configurable from the dashboard, enforced at the gateway.
 
+<Note>
+  **On-demand email requires a paid plan.** Sending transactional messages with `emails.send()` is available only on paid plans — on the **Free** plan the call returns `On-demand email service is only available for paid plans` and nothing is delivered. Authentication emails (verification codes, password resets, one-time codes) are the exception: they send on every plan, limited only by your monthly email usage.
+
+  **Recipients are counted individually.** Every address across `to`, `cc`, and `bcc` counts as one send against your rate limit and monthly usage — a single message to three recipients is three sends. Paid plans enforce a fixed one-hour rate-limit window; the exact per-hour allowance depends on your plan. Check your current plan with `npx @insforge/cli usage`, and see [Pricing](/pricing) for what each plan includes.
+</Note>
+
 ## Concepts
 
 <CardGroup cols={2}>

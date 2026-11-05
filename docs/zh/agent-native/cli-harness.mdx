@@ -19,7 +19,7 @@ description: "InsForge CLI 是代理的双手：一个终端接口涵盖架构�
 | 区域 | 命令 |
 |------|----------|
 | 身份验证和上下文 | `login`, `logout`, `whoami`, `current`, `list` |
-| 项目 | `create`, `link`, `projects update-version`, `projects delete` |
+| 项目 | `create`, `link`, `projects update`, `projects update-version`, `projects delete` |
 | 架构 | `db migrations new`, `db migrations up`, `db migrations list` |
 | 代码配置 | `config plan`, `config apply`, `config export` |
 | 分支 | `branch create`, `branch merge`, `branch reset`, `branch delete` |
@@ -40,6 +40,16 @@ npx @insforge/cli projects delete --project <id>
 `projects delete` 会永久删除项目：其数据库、存储以及所有其他资源，包括其后端分支。这里 `--project` 是必需的，且永远不会回退到已链接的项目，因此游离的环境值不会把删除指向错误的项目。两个命令在执行前都会确认，但仅在交互模式下：`--yes` 和 `--json` 都会跳过提示，所以 `projects delete --project <id> --json` 会立即删除。删除不可逆。切勿在此传递 `--yes`，并在命令运行前让人工核实确切的项目 ID。
 
 要改为从仪表板执行其中任一操作，两者都位于 **Settings → General**。
+
+## 重命名项目
+
+```bash
+npx @insforge/cli projects update --name "My New Name"
+```
+
+`projects update` 就地更改项目设置。传入 `--name "<新名称>"` 可重命名项目；名称至少为 2 个字符，且在您的组织内必须唯一。它默认针对已链接的项目，因此传入 `--project <id>` 可重命名其他项目。该命令在底层会发出 `PUT /projects/v1/{projectId}` 请求，请求体为 `{ "name": "<新名称>" }`。
+
+您也可以在仪表板的 **Settings → General** 下重命名项目。
 
 ## 典型代理运行
 
