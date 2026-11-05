@@ -60,6 +60,15 @@ Cada solicitud se registra con modelo, recuento de tokens y costo. Consulte el u
 
 Cambie entre Anthropic, OpenAI, Mistral, Llama, Gemini y docenas más al cambiar el nombre del modelo en la solicitud. El código de la aplicación no cambia.
 
+## Requisitos de plan
+
+El Model Gateway funciona con las claves de proveedor administradas por InsForge, por lo que el acceso depende del plan de su organización:
+
+- **Los planes de pago** pueden usar el Model Gateway. El uso se factura por consumo y descuenta de los créditos de modelo de IA de su organización — consulte la fila **AI model credits** (créditos de modelo de IA) en [Precios](/pricing) — y luego continúa como pago por uso (pay-as-you-go).
+- **Plan gratuito.** Las organizaciones creadas antes del **12 de agosto de 2026** conservan un único crédito de **$1** en créditos de modelo de IA durante toda la vida de la organización y pueden llamar al gateway hasta agotarlo. Las organizaciones creadas en esa fecha o después necesitan un plan de pago para usar el Model Gateway.
+
+Si su organización no tiene derecho a IA en su plan actual, el panel muestra **"Upgrade to Pro to use the AI Model Gateway"** y las llamadas a la API devuelven `403 AI_REQUIRES_PAID_PLAN`. Si tiene acceso pero sus créditos de modelo de IA se agotaron, las solicitudes devuelven un `402` pidiéndole que actualice para continuar. Actualice la organización a un plan de pago para habilitar (o volver a habilitar) el gateway.
+
 ## Compilar con él
 
 <CardGroup cols={2}>
