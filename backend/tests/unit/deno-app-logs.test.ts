@@ -355,6 +355,42 @@ describe('LogService.getLogsBySource with Deno Subhosting', () => {
     expect(result.logs[0].body.status).toBe(200);
   });
 
+  it('preserves correlated invocation fields and formats millisecond durations', async () => {
+    mockPool.query.mockResolvedValue({ rows: [{ id: 'rev-latest' }] });
+    mockFetch.mockResolvedValue(
+      logsResponse([
+        {
+          timestamp: '2025-01-15T10:00:00Z',
+          level: 'info',
+          message: JSON.stringify({
+            event: 'function.invocation',
+            level: 'error',
+            requestId: 'generated-request-id',
+            slug: 'orders',
+            method: 'POST',
+            status: 500,
+            durationMs: 17,
+            request: { contentType: 'application/json' },
+            response: { contentType: 'application/json' },
+            error: { name: 'Error' },
+          }),
+        },
+      ])
+    );
+
+    const result = await logService.getLogsBySource('function.logs', 100);
+    expect(result.logs[0].eventMessage).toBe('POST orders 500 17ms');
+    expect(result.logs[0].body).toMatchObject({
+      event: 'function.invocation',
+      requestId: 'generated-request-id',
+      durationMs: 17,
+      request: { contentType: 'application/json' },
+      response: { contentType: 'application/json' },
+      error: { name: 'Error' },
+      metadata: { level: 'error' },
+    });
+  });
+
   it('lifts a structured log level into metadata and uses its message', async () => {
     mockPool.query.mockResolvedValue({ rows: [{ id: 'rev-latest' }] });
 

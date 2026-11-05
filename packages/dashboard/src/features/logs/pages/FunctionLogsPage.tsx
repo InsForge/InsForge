@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from 'lucide-react';
-import { Tabs, Tab } from '@insforge/ui';
+import { Tabs, Tab, Input, Button } from '@insforge/ui';
 import { useLogs } from '#features/logs/hooks/useLogs';
 import { EmptyState, TableHeader, DataGridEmptyState } from '#components';
 import {
@@ -15,6 +15,7 @@ import {
 import { formatTime } from '#lib/utils/utils';
 import { LogSchema } from '@insforge/shared-schemas';
 import { usePageSize } from '#lib/hooks/usePageSize';
+import { filterFunctionLogs, type FunctionLogFilters } from '#features/logs/helpers';
 
 type FunctionLogType = 'runtime' | 'build';
 
@@ -24,6 +25,13 @@ export default function FunctionLogsPage() {
   const { t } = useTranslation('chrome');
   const [activeTab, setActiveTab] = useState<FunctionLogType>('runtime');
   const [selectedLog, setSelectedLog] = useState<LogSchema | null>(null);
+  const [functionFilters, setFunctionFilters] = useState<FunctionLogFilters>({
+    functionSlug: '',
+    requestId: '',
+    status: '',
+    from: '',
+    to: '',
+  });
   const {
     pageSize,
     pageSizeOptions,
@@ -31,11 +39,13 @@ export default function FunctionLogsPage() {
   } = usePageSize('function-logs');
 
   const {
-    logs,
+    allLogs,
     filteredLogs,
     currentPage,
     setCurrentPage,
-    totalPages,
+    hasMore,
+    isLoadingMore,
+    loadMoreLogs,
     searchQuery: logsSearchQuery,
     setSearchQuery: setLogsSearchQuery,
     severityFilter,
@@ -44,6 +54,47 @@ export default function FunctionLogsPage() {
     error: logsError,
     getSeverity,
   } = useLogs(SOURCE_NAME, pageSize);
+
+  const functionOptions = useMemo(
+    () =>
+      [
+        ...new Set(
+          allLogs
+            .map((log) => log.body.slug)
+            .filter((slug): slug is string => typeof slug === 'string')
+        ),
+      ].sort(),
+    [allLogs]
+  );
+  const statusOptions = useMemo(
+    () =>
+      [
+        ...new Set(
+          allLogs
+            .map((log) => log.body.status)
+            .filter((status): status is number => typeof status === 'number')
+        ),
+      ].sort((a, b) => a - b),
+    [allLogs]
+  );
+  const functionFilteredLogs = useMemo(
+    () => filterFunctionLogs(filteredLogs, functionFilters),
+    [filteredLogs, functionFilters]
+  );
+  const totalPages = Math.ceil(functionFilteredLogs.length / pageSize);
+  const logs = useMemo(
+    () => functionFilteredLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [functionFilteredLogs, currentPage, pageSize]
+  );
+
+  const updateFunctionFilter = useCallback(
+    (key: keyof FunctionLogFilters, value: string) => {
+      setFunctionFilters((current) => ({ ...current, [key]: value }));
+      setCurrentPage(1);
+      setSelectedLog(null);
+    },
+    [setCurrentPage]
+  );
 
   useEffect(() => {
     setSelectedLog(null);
@@ -82,6 +133,36 @@ export default function FunctionLogsPage() {
         name: t('logs.type', { defaultValue: 'Type' }),
         width: '160px',
         renderCell: ({ row }) => <SeverityBadge severity={getSeverity(row)} />,
+      },
+      {
+        key: 'slug',
+        name: t('functions.function', { defaultValue: 'Function' }),
+        width: '160px',
+        renderCell: ({ row }) => (
+          <p className="truncate text-[13px]" title={String(row.body.slug ?? '')}>
+            {String(row.body.slug ?? '—')}
+          </p>
+        ),
+      },
+      {
+        key: 'status',
+        name: t('logs.status', { defaultValue: 'Status' }),
+        width: '90px',
+        renderCell: ({ row }) => (
+          <span className="text-[13px]">{String(row.body.status ?? '—')}</span>
+        ),
+      },
+      {
+        key: 'duration',
+        name: t('logs.duration', { defaultValue: 'Duration' }),
+        width: '110px',
+        renderCell: ({ row }) => (
+          <span className="text-[13px]">
+            {typeof row.body.durationMs === 'number'
+              ? `${row.body.durationMs}ms`
+              : String(row.body.duration ?? '—')}
+          </span>
+        ),
       },
       {
         key: 'event_message',
@@ -131,6 +212,82 @@ export default function FunctionLogsPage() {
         }
       />
 
+      {activeTab === 'runtime' && (
+        <div className="flex flex-wrap items-end gap-2 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))] px-4 py-2">
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            Function
+            <select
+              aria-label="Filter by function"
+              value={functionFilters.functionSlug}
+              onChange={(event) => updateFunctionFilter('functionSlug', event.target.value)}
+              className="h-8 min-w-36 rounded border border-[var(--alpha-8)] bg-[rgb(var(--card))] px-2 text-[13px] text-foreground"
+            >
+              <option value="">All functions</option>
+              {functionOptions.map((slug) => (
+                <option key={slug} value={slug}>
+                  {slug}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            Status
+            <select
+              aria-label="Filter by status"
+              value={functionFilters.status}
+              onChange={(event) => updateFunctionFilter('status', event.target.value)}
+              className="h-8 min-w-28 rounded border border-[var(--alpha-8)] bg-[rgb(var(--card))] px-2 text-[13px] text-foreground"
+            >
+              <option value="">All statuses</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            Request ID
+            <Input
+              aria-label="Filter by request ID"
+              value={functionFilters.requestId}
+              onChange={(event) => updateFunctionFilter('requestId', event.target.value)}
+              placeholder="Request ID"
+              className="h-8 w-44 text-[13px]"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            From (local)
+            <Input
+              aria-label="Filter from time"
+              type="datetime-local"
+              value={functionFilters.from}
+              onChange={(event) => updateFunctionFilter('from', event.target.value)}
+              className="h-8 w-48 text-[13px]"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            To (local)
+            <Input
+              aria-label="Filter to time"
+              type="datetime-local"
+              value={functionFilters.to}
+              onChange={(event) => updateFunctionFilter('to', event.target.value)}
+              className="h-8 w-48 text-[13px]"
+            />
+          </label>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void loadMoreLogs()}
+            disabled={!hasMore || isLoadingMore}
+            className="h-8"
+          >
+            {isLoadingMore ? 'Loading…' : 'Load older logs'}
+          </Button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-hidden">
         {activeTab === 'build' ? (
           <BuildLogsView className="h-full" />
@@ -156,7 +313,7 @@ export default function FunctionLogsPage() {
             totalPages={totalPages}
             pageSize={pageSize}
             pageSizeOptions={pageSizeOptions}
-            totalRecords={filteredLogs.length}
+            totalRecords={functionFilteredLogs.length}
             onPageChange={setCurrentPage}
             onPageSizeChange={(newSize) => {
               handlePageSizeChange(newSize);
