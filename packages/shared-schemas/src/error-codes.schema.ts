@@ -19,6 +19,7 @@ const authErrorCodes = [
   'AUTH_NEED_VERIFICATION',
   'AUTH_SIGNUP_DISABLED',
   'AUTH_VERIFICATION_EMAIL_DELIVERY_FAILED',
+  'AUTH_UNAVAILABLE',
 ] as const;
 
 const databaseErrorCodes = [
