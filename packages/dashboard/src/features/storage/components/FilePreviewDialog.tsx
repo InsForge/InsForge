@@ -280,7 +280,8 @@ export function FilePreviewDialog({
 
           {/* Preview Content */}
           <div className="relative flex flex-1 min-h-0 overflow-hidden border-y border-zinc-200 dark:border-neutral-600">
-            <div className="flex flex-1 p-6">
+            {/* ph-no-capture: session replay records a blank block instead of the file (text masking alone doesn't hide images, video, or PDFs) */}
+            <div className="ph-no-capture flex flex-1 p-6">
               {isLoading ? (
                 <div className="flex items-center justify-center w-full h-full min-h-0">
                   <LoadingState />
