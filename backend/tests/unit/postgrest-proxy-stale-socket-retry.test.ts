@@ -6,6 +6,9 @@
  *   - Any method — including POST — is replayed exactly once, immediately
  *     (no backoff timer), because the server closed the idle socket before
  *     the request was processed.
+ *   - That one replay is sent over a fresh, non-pooled connection, so it
+ *     cannot be spent on a second socket from the same batch of stale ones;
+ *     later backoff retries go back to the keep-alive pool.
  *   - A second reused-socket reset falls through to the method-based policy,
  *     so a POST is not replayed again.
  *   - A reset on a fresh socket is not covered by the exception: a POST
@@ -20,6 +23,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { Agent as NodeHttpAgent } from 'node:http';
+import { Agent as NodeHttpsAgent } from 'node:https';
+import { HttpAgent as KeepAliveHttpAgent, HttpsAgent as KeepAliveHttpsAgent } from 'agentkeepalive';
 
 const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
 
@@ -57,6 +63,18 @@ function connectionReset(reusedSocket: boolean): AxiosError {
 }
 
 const okResponse = { data: { ok: true }, status: 200, headers: {} };
+
+// `keepAlive` is set by the node Agent constructor but not declared on its
+// type, so it is spelled out here rather than cast at every assertion.
+type AgentWithKeepAlive<T> = T & { keepAlive?: boolean };
+
+interface AttemptConfig {
+  method: string;
+  url: string;
+  data?: unknown;
+  httpAgent?: AgentWithKeepAlive<NodeHttpAgent>;
+  httpsAgent?: AgentWithKeepAlive<NodeHttpsAgent>;
+}
 
 describe('PostgREST proxy stale keep-alive socket retry', () => {
   beforeEach(() => {
@@ -107,8 +125,12 @@ describe('PostgREST proxy stale keep-alive socket retry', () => {
     );
   });
 
-  it('does not replay a POST a second time on consecutive reused-socket resets', async () => {
-    requestMock.mockRejectedValue(connectionReset(true));
+  it('does not replay a POST a second time when the fresh replay also resets', async () => {
+    // The replay runs on a non-pooled socket, so its reset is a fresh-socket
+    // one — a reused-socket reset is not reachable there.
+    requestMock
+      .mockRejectedValueOnce(connectionReset(true))
+      .mockRejectedValueOnce(connectionReset(false));
 
     await expect(
       PostgrestProxyService.getInstance().forward({ method: 'POST', path: '/rpc/claim_job' })
@@ -128,7 +150,11 @@ describe('PostgREST proxy stale keep-alive socket retry', () => {
   });
 
   it('keeps backoff retries for GET after the one-shot immediate replay is spent', async () => {
-    requestMock.mockRejectedValue(connectionReset(true));
+    // Pooled socket, then the fresh replay socket, then the pool again.
+    requestMock
+      .mockRejectedValueOnce(connectionReset(true))
+      .mockRejectedValueOnce(connectionReset(false))
+      .mockRejectedValueOnce(connectionReset(true));
 
     const pending = PostgrestProxyService.getInstance().forward({
       method: 'GET',
@@ -140,5 +166,55 @@ describe('PostgREST proxy stale keep-alive socket retry', () => {
 
     // attempt 1, immediate stale-socket replay, then one backoff replay
     expect(requestMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('sends the one replay over a fresh, non-pooled connection', async () => {
+    requestMock.mockRejectedValueOnce(connectionReset(true)).mockResolvedValueOnce(okResponse);
+
+    await PostgrestProxyService.getInstance().forward({
+      method: 'POST',
+      path: '/rpc/claim_job',
+      body: { id: 1 },
+    });
+
+    const [first, replay] = requestMock.mock.calls.map(([config]) => config as AttemptConfig);
+
+    // The first attempt takes the pooled agents configured on the axios
+    // instance — no per-request override.
+    expect(first.httpAgent).toBeUndefined();
+    expect(first.httpsAgent).toBeUndefined();
+
+    // The replay overrides both, with agents that cannot hand back a pooled
+    // socket: plain node agents with keep-alive off.
+    expect(replay.httpAgent).toBeInstanceOf(NodeHttpAgent);
+    expect(replay.httpAgent).not.toBeInstanceOf(KeepAliveHttpAgent);
+    expect(replay.httpAgent?.keepAlive).toBe(false);
+    expect(replay.httpsAgent).toBeInstanceOf(NodeHttpsAgent);
+    expect(replay.httpsAgent).not.toBeInstanceOf(KeepAliveHttpsAgent);
+    expect(replay.httpsAgent?.keepAlive).toBe(false);
+
+    // Everything else about the request is unchanged.
+    expect(replay.method).toBe('POST');
+    expect(replay.url).toContain('/rpc/claim_job');
+    expect(replay.data).toEqual({ id: 1 });
+  });
+
+  it('returns to the pooled agents for backoff retries after the replay', async () => {
+    requestMock
+      .mockRejectedValueOnce(connectionReset(true))
+      .mockRejectedValueOnce(connectionReset(false))
+      .mockResolvedValueOnce(okResponse);
+
+    const pending = PostgrestProxyService.getInstance().forward({
+      method: 'GET',
+      path: '/items',
+    });
+    await vi.runAllTimersAsync();
+    await pending;
+
+    const [, replay, backoff] = requestMock.mock.calls.map(([config]) => config as AttemptConfig);
+    expect(replay.httpAgent?.keepAlive).toBe(false);
+    expect(backoff.httpAgent).toBeUndefined();
+    expect(backoff.httpsAgent).toBeUndefined();
   });
 });
