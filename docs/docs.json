@@ -94,6 +94,12 @@
                     ]
                   },
                   {
+                    "group": "Memory",
+                    "pages": [
+                      "core-concepts/memory/overview"
+                    ]
+                  },
+                  {
                     "group": "Sites",
                     "pages": [
                       "core-concepts/sites/overview"
@@ -420,6 +426,12 @@
                     "group": "模型网关",
                     "pages": [
                       "zh/core-concepts/ai/overview"
+                    ]
+                  },
+                  {
+                    "group": "记忆",
+                    "pages": [
+                      "zh/core-concepts/memory/overview"
                     ]
                   },
                   {
@@ -751,6 +763,12 @@
                     ]
                   },
                   {
+                    "group": "記憶",
+                    "pages": [
+                      "zh-Hant/core-concepts/memory/overview"
+                    ]
+                  },
+                  {
                     "group": "網站",
                     "pages": [
                       "zh-Hant/core-concepts/sites/overview"
@@ -1076,6 +1094,12 @@
                     "group": "Model Gateway",
                     "pages": [
                       "es/core-concepts/ai/overview"
+                    ]
+                  },
+                  {
+                    "group": "Memoria",
+                    "pages": [
+                      "es/core-concepts/memory/overview"
                     ]
                   },
                   {
