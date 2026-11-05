@@ -34,6 +34,23 @@ npx @insforge/cli payments stripe webhooks configure --environment test
 
 Después de conectar una clave, InsForge valida la cuenta, almacena la clave en el almacén de secretos, intenta crear el punto final del webhook de Stripe administrado y ejecuta la sincronización para Productos, Precios, Clientes y Suscripciones.
 
+### Establecer la clave secreta mediante la API de administrador
+
+El dashboard y la CLI llaman al mismo endpoint de administrador. También puedes llamarlo directamente con una API Key de administrador (`ik_...`):
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/payments/stripe/test/config" \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{ "secretKey": "sk_test_xxx" }'
+```
+
+- `PUT /api/payments/stripe/{environment}/config`, donde `{environment}` es `test` o `live`. Solo administrador.
+- El cuerpo de la solicitud es `{ "secretKey": "..." }`. El prefijo de la clave debe coincidir con el entorno (`sk_test_...` para `test`, `sk_live_...` para `live`).
+- Si tiene éxito, InsForge valida la clave contra tu cuenta de Stripe, la almacena cifrada en el almacén de secretos, intenta (re)crear el punto final del webhook administrado y ejecuta la sincronización inicial para Productos, Precios, Clientes y Suscripciones. Si la cuenta de Stripe conectada cambió, primero se borran los datos de pago reflejados anteriormente.
+
+Para leer el estado de la conexión y una clave enmascarada, llama a `GET /api/payments/stripe/status`.
+
 ## Checkout
 
 Cree sesiones de checkout desde código frontend con el token de usuario actual de InsForge.
