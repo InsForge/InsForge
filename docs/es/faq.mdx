@@ -214,6 +214,14 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     En InsForge Cloud nunca tocas esto. El compute está gestionado por nosotros, y el resto de la plataforma (base de datos, autenticación, Storage, edge functions) no necesita ningún token de Fly.
   </Accordion>
 
+  <Accordion title="¿Qué es Ask AI y cómo funciona?">
+    **Ask AI** es el asistente con el que estás hablando ahora mismo: un ayudante integrado en el producto que responde preguntas sobre InsForge en lenguaje natural. Ábrelo desde el botón **Ask AI** (el icono de sparkles) en la barra de navegación superior; se abre un panel anclado a la derecha del dashboard.
+
+    Pregúntale lo que quieras sobre la plataforma —por ejemplo «¿Qué incluye el plan free?» o «¿Cómo conecto mi agente de programación con MCP?»— y te devuelve en streaming una respuesta basada en la [documentación](https://docs.insforge.dev) pública de InsForge, con enlaces a las páginas de documentación relevantes. Puede hacerte una repregunta para aclarar una pregunta ambigua y conserva el hilo de tu conversación para que las preguntas posteriores mantengan el contexto.
+
+    Como responde solo a partir de la documentación pública, no puede ver tu propio proyecto. Para cualquier cosa específica de tu backend —depurar un error, leer tus datos, revisar tu configuración— usa tu agente de programación conectado a través de la [CLI](/quickstart) o [MCP](/mcp-setup). Consulta la siguiente pregunta para más detalles.
+  </Accordion>
+
   <Accordion title="¿Este asistente puede ayudarme con algo específico de mi propio proyecto?">
     En realidad no. Este asistente responde a partir de la documentación pública de InsForge, así que no puede ver tu proyecto: no puede depurar un error, leer tus datos ni revisar tu configuración. Lleva cualquier cosa específica de tu propio proyecto a tu agente de programación. Conectado a InsForge a través de la CLI o MCP, tu agente puede leer tu backend en vivo, el esquema, los datos y los logs, y depurar el problema directamente. Solo descríbelo con tus propias palabras. Para un informe de salud y errores que puedes ejecutar tú mismo, usa `npx @insforge/cli diagnose`. Consulta [Diagnostics & advisor](/agent-native/diagnostics).
   </Accordion>

@@ -214,6 +214,14 @@ description: "Answers to common InsForge questions on database calls, edge funct
     On InsForge Cloud you never touch this. Compute is managed for you, and the rest of the platform (database, auth, storage, edge functions) needs no Fly token at all.
   </Accordion>
 
+  <Accordion title="What is Ask AI, and how does it work?">
+    **Ask AI** is the assistant you're talking to now — an in-product helper that answers questions about InsForge in plain language. Open it from the **Ask AI** button (the sparkles icon) in the top navigation bar; it opens a panel docked to the right of the dashboard.
+
+    Ask it anything about the platform — for example "What's included in the free plan?" or "How do I connect my coding agent with MCP?" — and it streams back an answer grounded in InsForge's public [documentation](https://docs.insforge.dev), with links to the relevant doc pages. It can ask a follow-up to clarify an ambiguous question, and it keeps your conversation thread so later questions stay in context.
+
+    Because it answers only from the public docs, it can't see your own project. For anything specific to your backend — debugging an error, reading your data, checking your configuration — use your coding agent connected through the [CLI](/quickstart) or [MCP](/mcp-setup) instead. See the next question for details.
+  </Accordion>
+
   <Accordion title="Can this assistant help with something specific to my own project?">
     Not really. This assistant answers from InsForge's public docs, so it can't see your project: it can't debug an error, read your data, or check your configuration. Take anything specific to your own project to your coding agent instead. Connected to InsForge through the CLI or MCP, your agent can read your live backend, schema, data, and logs and debug the problem directly. Just describe it in plain words. For a backend health and error report you can run yourself, use `npx @insforge/cli diagnose`. See [Diagnostics & advisor](/agent-native/diagnostics).
   </Accordion>
