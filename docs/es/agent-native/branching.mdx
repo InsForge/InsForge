@@ -39,6 +39,17 @@ Utilice una rama para migraciones de esquema arriesgadas, reescrituras de RLS, i
 
 Las fusiones se bloquean en conflictos. Resuelva en la rama o restablezca e intente de nuevo. Cuotas: 3 proyectos padre por organización, 2 ramas activas por padre, sin anidamiento. Una fusión exitosa no elimina automáticamente la rama.
 
+## Costo
+
+Las ramas no son un complemento con precio aparte: no hay una tarifa por rama. Una rama es un subproyecto completo que se ejecuta en su propia instancia EC2 (de tamaño `nano` o `micro`, restaurada desde el padre), así que mientras está en ejecución su consumo de recursos (tiempo de cómputo, base de datos, almacenamiento, ancho de banda, etc.) se mide y cuenta para los montos incluidos y los excedentes de tu plan, igual que cualquier proyecto.
+
+Dos cosas mantienen esto bajo control:
+
+- **Las cuotas** limitan cuántas puedes tener: de forma predeterminada, 3 proyectos padre con ramas por organización y 2 ramas activas por padre, sin anidamiento.
+- **Las ramas son efímeras.** Restablece o elimina una rama cuando termines; una fusión exitosa no la elimina automáticamente. Cuantas menos ramas de larga duración, menor es el consumo medido.
+
+Para conocer los precios exactos de los planes y las tarifas de excedentes, consulta las [preguntas frecuentes de precios](/pricing).
+
 ## Más recursos
 
 - [Migraciones de base de datos](/core-concepts/database/migrations) para archivos SQL de solo avance.
