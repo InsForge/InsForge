@@ -8,6 +8,7 @@ import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.service.js';
 import { AuthConfigService } from './auth-config.service.js';
 import { AuthOTPService, OTPPurpose, OTPType } from './auth-otp.service.js';
+import { RefreshSessionService } from './refresh-session.service.js';
 import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
 import { GoogleOAuthProvider } from '@/providers/oauth/google.provider.js';
 import { GitHubOAuthProvider } from '@/providers/oauth/github.provider.js';
@@ -376,6 +377,7 @@ export class AuthService {
         );
 
         let userId: string | undefined;
+        let passwordCleared = false;
         if (!existingUser.rows.length) {
           // The code is already consumed. Signal a blocked signup so the caller
           // rejects after the transaction commits — keeping the send path
@@ -416,7 +418,10 @@ export class AuthService {
           userId = dbUser.id;
 
           // A verified OTP proves email ownership: clear any password on a
-          // pre-existing unverified account and mark it verified.
+          // pre-existing unverified account and mark it verified. Destroying
+          // password auth also invalidates older refresh sessions, like a
+          // password reset does (flagged here, applied below once userId is
+          // known to be set).
           if (!dbUser.email_verified) {
             await client.query(
               `UPDATE auth.users
@@ -424,11 +429,18 @@ export class AuthService {
                WHERE id = $1`,
               [userId]
             );
+            passwordCleared = true;
           }
         }
 
         if (!userId) {
           throw new Error('User not found after concurrent OTP sign-in');
+        }
+
+        if (passwordCleared) {
+          const refreshSessions = RefreshSessionService.getInstance();
+          await refreshSessions.bumpSessionVersion(userId, client);
+          await refreshSessions.revokeAllForSubject(userId, client);
         }
 
         await client.query(
@@ -790,6 +802,13 @@ export class AuthService {
       }
 
       const userId = result.rows[0].id;
+
+      // Invalidate pre-reset refresh sessions atomically with the password
+      // change: bump the session version (older tokens fail validation) and
+      // revoke live session rows. ROLLBACK on failure leaves both untouched.
+      const refreshSessions = RefreshSessionService.getInstance();
+      await refreshSessions.bumpSessionVersion(userId, client);
+      await refreshSessions.revokeAllForSubject(userId, client);
 
       await client.query('COMMIT');
 
@@ -1401,6 +1420,7 @@ export class AuthService {
         u.created_at,
         u.updated_at,
         u.password,
+        u.session_version,
         STRING_AGG(DISTINCT a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
@@ -1430,6 +1450,7 @@ export class AuthService {
         u.created_at,
         u.updated_at,
         u.password,
+        u.session_version,
         STRING_AGG(DISTINCT a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
@@ -1496,6 +1517,7 @@ export class AuthService {
         u.created_at,
         u.updated_at,
         u.password,
+        u.session_version,
         STRING_AGG(DISTINCT a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
