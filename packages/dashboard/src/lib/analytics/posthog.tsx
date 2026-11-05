@@ -1,11 +1,12 @@
+import { useState, useEffect } from 'react';
 import posthog from 'posthog-js';
 import { PostHogProvider } from 'posthog-js/react';
 
-const POSTHOG_KEY = import.meta.env.VITE_PUBLIC_POSTHOG_KEY || '';
+const getPostHogKey = (): string => import.meta.env.VITE_PUBLIC_POSTHOG_KEY || '';
 
-if (POSTHOG_KEY) {
+if (getPostHogKey()) {
   try {
-    posthog.init(POSTHOG_KEY, {
+    posthog.init(getPostHogKey(), {
       api_host: 'https://us.i.posthog.com',
       capture_exceptions: true,
       debug: import.meta.env.DEV,
@@ -19,7 +20,7 @@ if (POSTHOG_KEY) {
 }
 
 export const PostHogAnalyticsProvider = ({ children }: { children: React.ReactNode }) => {
-  if (POSTHOG_KEY) {
+  if (getPostHogKey()) {
     return <PostHogProvider client={posthog}>{children}</PostHogProvider>;
   }
   return <>{children}</>;
@@ -29,7 +30,7 @@ export const identifyUser = (
   userId: string,
   properties?: Record<string, unknown>
 ): Promise<void> => {
-  if (!POSTHOG_KEY) {
+  if (!getPostHogKey()) {
     return Promise.resolve();
   }
 
@@ -65,22 +66,49 @@ export const identifyUser = (
 };
 
 export const getCurrentDistinctId = (): string | undefined => {
-  if (!POSTHOG_KEY) {
+  if (!getPostHogKey()) {
     return undefined;
   }
   return posthog.get_distinct_id();
 };
 
 export const trackEvent = (eventName: string, properties?: Record<string, unknown>) => {
-  if (!POSTHOG_KEY) {
+  if (!getPostHogKey()) {
     return;
   }
   posthog.capture(eventName, properties);
 };
 
 export const getFeatureFlag = (featureFlag: string): string | boolean | undefined => {
-  if (!POSTHOG_KEY) {
+  if (!getPostHogKey()) {
     return undefined;
   }
   return posthog.getFeatureFlag(featureFlag);
 };
+
+export const useFeatureFlag = (featureFlag: string): string | boolean | undefined => {
+  const [flagValue, setFlagValue] = useState<string | boolean | undefined>(() =>
+    getFeatureFlag(featureFlag)
+  );
+
+  useEffect(() => {
+    if (!getPostHogKey()) {
+      return;
+    }
+
+    setFlagValue(getFeatureFlag(featureFlag));
+
+    const unsubscribe = posthog.onFeatureFlags(() => {
+      setFlagValue(getFeatureFlag(featureFlag));
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [featureFlag]);
+
+  return flagValue;
+};
+
