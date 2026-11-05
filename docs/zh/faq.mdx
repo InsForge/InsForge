@@ -177,6 +177,12 @@ description: "InsForge 常见问题：数据库调用、Edge Function 与 Custom
     还是卡住？到我们的 [Discord](https://discord.com/invite/DvBtaEc9Jz) 提问，响应最快。
   </Accordion>
 
+  <Accordion title="能把后端项目 API 放到自定义域（比如 api.example.com）上吗？">
+    带自动 TLS 的自定义域仅支持用 [InsForge Sites](/core-concepts/sites/overview) 部署的**前端应用**：你附加域名，添加它返回的 DNS 记录，InsForge 就会为你签发 HTTPS 证书。
+
+    对于**后端项目 API**（`https://<appkey>.<region>.insforge.app`），目前还没有自助式的自定义域流程。`npx @insforge/cli projects update --domain api.example.com` 会在项目上记录一个自定义主机名，但它本身**不会**签发 TLS 证书，也不会返回 DNS/验证记录，所以这并不是一套完整的配置。请继续在默认的 `<appkey>.<region>.insforge.app` 主机上调用 API；如果你确实需要为 API 使用自定义域，请到我们的 [Discord](https://discord.com/invite/DvBtaEc9Jz) 提问。
+  </Accordion>
+
   <Accordion title="不打开浏览器，怎么给 CLI 登录鉴权？">
     `npx @insforge/cli login` 会打开浏览器登录。在无界面机器、远程服务器或 CI 上，改用 user API key，不需要浏览器。
 
