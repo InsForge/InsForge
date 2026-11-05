@@ -156,7 +156,18 @@ description: "InsForge 常見問題：解說資料庫呼叫、Edge Function 與 
 
     想專門加一個管理員，邀請時選 **Administrator** 即可，之後也能在 Members 列表裡改角色。只有 Administrator 能邀請和管理成員。
 
+    更喜歡用 CLI？`npx @insforge/cli orgs members invite <email> --role developer`（加管理員用 `--role administrator`）會送出同樣的邀請，`npx @insforge/cli orgs members list` 可以查看組織成員和待處理的邀請。
+
     把整個組織「移交給新 Owner」是另一個獨立操作，跟邀請成員不是一回事。要移交的話，打開 **Organization Settings**，用裡面的 **Transfer Ownership**（只有目前的 Owner 能發起，且對方必須是已驗證的 InsForge 使用者並接受郵件裡的請求）。
+  </Accordion>
+
+  <Accordion title="InsForge 會根據我的資料庫和 Edge Function 自動產生 API 文件（Swagger/OpenAPI）嗎？">
+    InsForge 會為你建立的每一張表自動產生 **REST API 和型別化 SDK**：定義一張表，你就立刻擁有像 `GET /api/database/records/{table}` 這樣的端點，以及 SDK 查詢建構器，不需要部署任何東西（見 [資料庫](/core-concepts/database/overview) 和 [REST API](/sdks/rest/database)）。它**不會**根據你自己的具體表或 Edge Function 產生一份 Swagger/OpenAPI 文件。
+
+    - **表：** 每張表暴露的 REST 結構都是一致、可預測的，所以一份參考文件就能涵蓋——它以表名（`{table}`）、欄位篩選和 PostgREST 運算子作為參數，沒有專屬於你 schema 的單獨規格。
+    - **Edge Function：** 這些是你自己寫在自己路由上的程式碼，沒有可供內省（introspect）產生規格的對象。把每個 function 的 URL 手動分享給需要呼叫的人即可。
+
+    想把後端的完整脈絡（schema、表、function）交給隊友，正確做法是把他邀請進組織，而不是想辦法匯出文件——見上面「怎麼把專案分享給另一個管理員，或者邀請隊友？」，他就能在 dashboard 裡瀏覽全部內容。永遠不要把你的管理員 **API Key**（`ik_...`）分享出去；邀請他，讓他有自己的驗證存取，而他建立的用戶端應用用公開的 **Anon Key** 驗證（受 RLS 限制）。
   </Accordion>
 
   <Accordion title="為什麼我的專案被暫停了？要怎麼避免被暫停？">

@@ -156,7 +156,18 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
 
     Para añadir otro administrador en concreto, elige el rol **Administrator** al invitar, o cambia su rol más tarde desde la lista de Members. Solo los Administrators pueden invitar o gestionar miembros.
 
+    ¿Prefieres la CLI? `npx @insforge/cli orgs members invite <email> --role developer` (usa `--role administrator` para un administrador) envía la misma invitación, y `npx @insforge/cli orgs members list` muestra los miembros de la organización y las invitaciones pendientes.
+
     Transferir la organización por completo a un nuevo **Owner** es una acción distinta de invitar miembros. Para hacerlo, abre **Organization Settings** y usa **Transfer Ownership** (solo el owner actual puede iniciarlo, y el destinatario debe ser un usuario verificado de InsForge que acepte la solicitud enviada por email).
+  </Accordion>
+
+  <Accordion title="¿InsForge genera documentación de API (Swagger/OpenAPI) a partir de mi base de datos y mis edge functions?">
+    InsForge autogenera la **REST API y un SDK tipado** para cada tabla que creas: define una tabla y al instante tienes endpoints como `GET /api/database/records/{table}` más los constructores de consultas del SDK, sin nada que desplegar (consulta [Base de datos](/core-concepts/database/overview) y la [REST API](/sdks/rest/database)). Lo que **no** hace es producir un documento Swagger/OpenAPI generado a partir de tus tablas o edge functions concretas.
+
+    - **Tablas:** cada tabla expone la misma forma REST predecible, así que una sola referencia ya la cubre — está parametrizada por el nombre de tabla (`{table}`), los filtros de columna y los operadores de PostgREST. No hay una especificación aparte exclusiva de tu schema.
+    - **Edge functions:** son tu propio código en tus propias rutas, así que no hay nada que inspeccionar (introspect) para generar una especificación. Comparte manualmente la URL de cada function con quien necesite llamarla.
+
+    Para dar a un compañero el contexto completo de tu backend (schema, tablas, functions), invítalo a la organización en lugar de intentar exportar documentación — consulta "¿Cómo comparto un proyecto con otro administrador o invito a un compañero de equipo?" más arriba, y podrá explorar todo en el dashboard. Nunca compartas tu **API Key** de administrador (`ik_...`); invítalo para que tenga su propio acceso autenticado, y la app cliente que construya se autentica con la **Anon Key** pública, que está limitada por RLS.
   </Accordion>
 
   <Accordion title="¿Por qué se pausó mi proyecto y cómo evito que se pause?">
