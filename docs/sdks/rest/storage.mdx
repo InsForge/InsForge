@@ -242,7 +242,7 @@ Get the optimal download strategy (direct URL or presigned URL) based on storage
 
 The download strategy API returns the optimal download method based on the storage backend and bucket visibility:
 - **Local Storage**: Direct download from InsForge API
-- **S3-Compatible**: Presigned URL for S3.
+- **S3-Compatible**: Presigned URL for S3
 
 ```
 GET /api/storage/buckets/{bucketName}/download-strategy/objects/{objectKey}
