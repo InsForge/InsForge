@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle, X } from 'lucide-react';
 import {
@@ -14,7 +14,7 @@ import {
   DialogTitle,
   cn,
 } from '@insforge/ui';
-import { ScrollArea } from '#components';
+import { ScrollArea, type ConvertedValue, type DatabaseRecord } from '#components';
 import { useRecords } from '#features/database/hooks/useRecords';
 import { buildDynamicSchema, getInitialValues } from '#features/database';
 import { RecordFormField } from './RecordFormField';
@@ -61,8 +61,10 @@ export function RecordFormDialog({
     return values;
   }, [displayFields]);
 
-  const form = useForm({
-    resolver: zodResolver(dynamicSchema),
+  // The schema is built at runtime from column metadata, so zod 4 infers its output as
+  // Record<string, unknown>; type the form by the record shape the dialog submits.
+  const form = useForm<DatabaseRecord>({
+    resolver: zodResolver(dynamicSchema) as Resolver<DatabaseRecord>,
     defaultValues: initialValues,
   });
 
@@ -80,7 +82,7 @@ export function RecordFormDialog({
   const handleSubmit = form.handleSubmit(
     async (data) => {
       try {
-        await createRecord(data);
+        await createRecord(data as Record<string, ConvertedValue>);
         onOpenChange(false);
         form.reset();
         setError(null);

@@ -23,7 +23,7 @@ router.post('/remember', async (req: AuthRequest, res: Response, next: NextFunct
     const parsed = rememberRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       throw new AppError(
-        `Validation error: ${parsed.error.errors.map((e) => e.message).join(', ')}`,
+        `Validation error: ${parsed.error.issues.map((e) => e.message).join(', ')}`,
         400,
         ERROR_CODES.INVALID_INPUT
       );
@@ -41,7 +41,7 @@ router.post('/recall', async (req: AuthRequest, res: Response, next: NextFunctio
     const parsed = recallRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       throw new AppError(
-        `Validation error: ${parsed.error.errors.map((e) => e.message).join(', ')}`,
+        `Validation error: ${parsed.error.issues.map((e) => e.message).join(', ')}`,
         400,
         ERROR_CODES.INVALID_INPUT
       );
@@ -59,7 +59,7 @@ router.post('/index', async (req: AuthRequest, res: Response, next: NextFunction
     const parsed = memoryIndexRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       throw new AppError(
-        `Validation error: ${parsed.error.errors.map((e) => e.message).join(', ')}`,
+        `Validation error: ${parsed.error.issues.map((e) => e.message).join(', ')}`,
         400,
         ERROR_CODES.INVALID_INPUT
       );
