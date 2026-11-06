@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { requiredString } from './required-string.js';
 
 /**
  * Core auth entity schemas (PostgreSQL structure)
@@ -11,9 +12,9 @@ import { z } from 'zod';
 
 export const userIdSchema = z.string().uuid('Invalid user ID format');
 
-export const emailSchema = z.string().email('Invalid email format').toLowerCase().trim();
+export const emailSchema = requiredString().email('Invalid email format').toLowerCase().trim();
 
-export const passwordSchema = z.string();
+export const passwordSchema = requiredString();
 
 export const nameSchema = z
   .string()

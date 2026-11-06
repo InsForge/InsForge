@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   computeMetadataSchema,
   createScheduleRequestSchema,
+  createUserRequestSchema,
   oAuthInitRequestSchema,
   updateAuthConfigRequestSchema,
   updateCustomOAuthConfigRequestSchema,
@@ -10,7 +11,8 @@ import {
 } from '@insforge/shared-schemas';
 
 // Pins the behaviour of the shared schemas that had to be rewritten for zod 4
-// (required_error, union errorMap, one-argument z.record, enum-keyed z.record),
+// (required_error, union errorMap, one-argument z.record, enum-keyed z.record,
+// zod 3's "Required" message for missing auth fields),
 // so it stays identical to what zod 3 produced.
 describe('shared schemas ported to zod 4', () => {
   const codeChallenge = 'a'.repeat(43);
@@ -34,6 +36,19 @@ describe('shared schemas ported to zod 4', () => {
       oAuthInitRequestSchema.safeParse({ redirect_uri: 'not a url', code_challenge: codeChallenge })
         .success
     ).toBe(false);
+  });
+
+  it('keeps zod 3\'s "Required" for missing auth fields but not for wrong types', () => {
+    const missing = createUserRequestSchema.safeParse({});
+    expect(missing.success).toBe(false);
+    expect(missing.error?.issues.map((i) => [i.path.join('.'), i.message])).toEqual([
+      ['email', 'Required'],
+      ['password', 'Required'],
+    ]);
+
+    const wrongType = createUserRequestSchema.safeParse({ email: 1, password: 2 });
+    expect(wrongType.success).toBe(false);
+    expect(wrongType.error?.issues.map((i) => i.message)).not.toContain('Required');
   });
 
   it('reports the SMTP port allow-list message for invalid and missing ports', () => {

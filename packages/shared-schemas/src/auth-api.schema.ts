@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { requiredString } from './required-string.js';
 import {
   emailSchema,
   passwordSchema,
@@ -34,7 +35,7 @@ export const paginationSchema = z.object({
  * `label` customizes the validation message for the field it guards.
  */
 const sixDigitCodeSchema = (label: string) =>
-  z.string().regex(/^\d{6}$/, `${label} must be a 6-digit numeric code`);
+  requiredString().regex(/^\d{6}$/, `${label} must be a 6-digit numeric code`);
 
 /**
  * POST /api/auth/users - Create user
