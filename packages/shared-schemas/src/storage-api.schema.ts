@@ -50,7 +50,7 @@ export const uploadStrategyRequestSchema = z.object({
 export const uploadStrategyResponseSchema = z.object({
   method: z.enum(['presigned', 'direct']),
   uploadUrl: z.string(),
-  fields: z.record(z.string()).optional(),
+  fields: z.record(z.string(), z.string()).optional(),
   key: z.string(),
   confirmRequired: z.boolean(),
   confirmUrl: z.string().optional(),
@@ -64,7 +64,7 @@ export const downloadStrategyResponseSchema = z.object({
   method: z.enum(['presigned', 'direct']),
   url: z.string(),
   expiresAt: z.date().optional(),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
 });
 
 // Confirm upload schema

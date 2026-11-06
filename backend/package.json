@@ -35,7 +35,7 @@
     "jwt"
   ],
   "dependencies": {
-    "@asteasolutions/zod-to-openapi": "^7.3.4",
+    "@asteasolutions/zod-to-openapi": "^8.5.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.1072.0",
     "@aws-sdk/client-s3": "^3.713.0",
     "@aws-sdk/cloudfront-signer": "^3.901.0",
@@ -67,7 +67,7 @@
     "node-fetch": "^3.3.2",
     "node-pg-migrate": "^8.0.3",
     "nodemailer": "^10.1.4",
-    "openai": "^5.19.1",
+    "openai": "^6.0.1",
     "pg": "^8.16.3",
     "pg-format": "^1.0.4",
     "picomatch": "^4.0.4",
@@ -77,7 +77,7 @@
     "typescript": "^5.3.3",
     "winston": "^3.17.0",
     "xml2js": "^0.6.2",
-    "zod": "^3.23.8"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

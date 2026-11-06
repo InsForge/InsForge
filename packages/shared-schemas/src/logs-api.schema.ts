@@ -28,7 +28,7 @@ export const getAuditLogStatsResponseSchema = z.object({
   totalLogs: z.number(),
   uniqueActors: z.number(),
   uniqueModules: z.number(),
-  actionsByModule: z.record(z.number()),
+  actionsByModule: z.record(z.string(), z.number()),
   recentActivity: z.array(auditLogSchema),
 });
 

@@ -51,7 +51,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
     const validation = updateModelGatewayConfigSchema.safeParse(req.body);
     if (!validation.success) {
       throw new AppError(
-        `Validation error: ${validation.error.errors.map((error) => error.message).join(', ')}`,
+        `Validation error: ${validation.error.issues.map((error) => error.message).join(', ')}`,
         400,
         ERROR_CODES.INVALID_INPUT
       );
@@ -253,7 +253,7 @@ router.post(
       const validationResult = chatCompletionRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
-          `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
+          `Validation error: ${validationResult.error.issues.map((e) => e.message).join(', ')}`,
           400,
           ERROR_CODES.INVALID_INPUT
         );
@@ -335,7 +335,7 @@ router.post(
       const validationResult = imageGenerationRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
-          `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
+          `Validation error: ${validationResult.error.issues.map((e) => e.message).join(', ')}`,
           400,
           ERROR_CODES.INVALID_INPUT
         );
@@ -372,7 +372,7 @@ router.post(
       const validationResult = embeddingsRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
-          `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
+          `Validation error: ${validationResult.error.issues.map((e) => e.message).join(', ')}`,
           400,
           ERROR_CODES.INVALID_INPUT
         );

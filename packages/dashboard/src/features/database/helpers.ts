@@ -1,3 +1,4 @@
+import type { DatabaseRecord } from '#components';
 import { jsonSchema } from '#lib/utils/schemaValidations';
 import {
   type AdminTableRecordPrimaryKey,
@@ -202,8 +203,8 @@ export function buildDynamicSchema(columns: ColumnSchema[]) {
 }
 
 // Get initial values for form based on column definitions
-export function getInitialValues(columns: ColumnSchema[]): Record<string, unknown> {
-  const values: Record<string, unknown> = {};
+export function getInitialValues(columns: ColumnSchema[]): DatabaseRecord {
+  const values: DatabaseRecord = {};
 
   columns.forEach((column) => {
     // Skip auto-generated fields
