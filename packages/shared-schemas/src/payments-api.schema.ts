@@ -136,7 +136,7 @@ export const createStripeProductBodySchema = z
     name: z.string().trim().min(1, 'Product name is required'),
     description: z.string().trim().max(5000).nullable().optional(),
     active: z.boolean().optional(),
-    metadata: z.record(z.string()).optional(),
+    metadata: z.record(z.string(), z.string()).optional(),
     idempotencyKey: stripeIdempotencyKeySchema.optional(),
   })
   .strict();
@@ -152,7 +152,7 @@ const updateStripeProductFields = {
   name: z.string().trim().min(1, 'Product name is required').optional(),
   description: z.string().trim().max(5000).nullable().optional(),
   active: z.boolean().optional(),
-  metadata: z.record(z.string()).optional(),
+  metadata: z.record(z.string(), z.string()).optional(),
 };
 
 function hasAtLeastOneValue(value: Record<string, unknown>) {
@@ -195,7 +195,7 @@ export const createStripePriceBodySchema = z
       .strict()
       .optional(),
     taxBehavior: stripePriceTaxBehaviorSchema.optional(),
-    metadata: z.record(z.string()).optional(),
+    metadata: z.record(z.string(), z.string()).optional(),
     idempotencyKey: stripeIdempotencyKeySchema.optional(),
   })
   .strict();
@@ -211,7 +211,7 @@ const updateStripePriceFields = {
   active: z.boolean().optional(),
   lookupKey: z.string().trim().min(1).max(200).nullable().optional(),
   taxBehavior: stripePriceTaxBehaviorSchema.optional(),
-  metadata: z.record(z.string()).optional(),
+  metadata: z.record(z.string(), z.string()).optional(),
 };
 
 export const updateStripePriceBodySchema = z
@@ -355,7 +355,7 @@ const createRazorpayPlanFields = {
       currency: currencySchema,
     })
     .strict(),
-  notes: z.record(z.string()).optional(),
+  notes: z.record(z.string(), z.string()).optional(),
 };
 
 export const createRazorpayPlanBodySchema = z
@@ -399,7 +399,7 @@ const createCheckoutSessionFields = {
   cancelUrl: z.string().trim().url('Cancel URL must be a valid URL'),
   subject: billingSubjectSchema.optional(),
   customerEmail: z.string().trim().email().nullable().optional(),
-  metadata: z.record(z.string()).optional(),
+  metadata: z.record(z.string(), z.string()).optional(),
   idempotencyKey: stripeIdempotencyKeySchema.optional(),
 };
 
@@ -444,7 +444,7 @@ const createRazorpayOrderFields = {
   customerEmail: z.string().trim().email().nullable().optional(),
   customerContact: z.string().trim().min(1).max(32).nullable().optional(),
   callbackUrl: z.string().trim().url('Callback URL must be a valid URL').nullable().optional(),
-  notes: z.record(z.string()).optional(),
+  notes: z.record(z.string(), z.string()).optional(),
 };
 
 export const createRazorpayOrderBodySchema = z
@@ -510,7 +510,7 @@ const createRazorpaySubscriptionFields = {
   customerEmail: z.string().trim().email().nullable().optional(),
   customerContact: z.string().trim().min(1).max(32).nullable().optional(),
   callbackUrl: z.string().trim().url('Callback URL must be a valid URL').nullable().optional(),
-  notes: z.record(z.string()).optional(),
+  notes: z.record(z.string(), z.string()).optional(),
 };
 
 function hasSubscriptionEnd(value: { totalCount?: number; endAt?: number }) {

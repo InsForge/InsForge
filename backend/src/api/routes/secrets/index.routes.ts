@@ -212,7 +212,7 @@ router.post(
       const parseResult = rotateApiKeyRequestSchema.safeParse(req.body);
       if (!parseResult.success) {
         throw new AppError(
-          `Invalid request: ${parseResult.error.errors.map((e) => e.message).join(', ')}`,
+          `Invalid request: ${parseResult.error.issues.map((e) => e.message).join(', ')}`,
           400,
           ERROR_CODES.INVALID_INPUT
         );
@@ -258,7 +258,7 @@ router.post(
       const parseResult = rotateAnonKeyRequestSchema.safeParse(req.body);
       if (!parseResult.success) {
         throw new AppError(
-          `Invalid request: ${parseResult.error.errors.map((e) => e.message).join(', ')}`,
+          `Invalid request: ${parseResult.error.issues.map((e) => e.message).join(', ')}`,
           400,
           ERROR_CODES.INVALID_INPUT
         );
