@@ -152,6 +152,17 @@ describe('S3StorageProvider — branch fallback', () => {
     });
   });
 
+  describe('verifyObjectExists', () => {
+    it('reports a miss as not existing and rethrows other errors', async () => {
+      sendMock
+        .mockRejectedValueOnce(notFoundError('NotFound'))
+        .mockRejectedValueOnce(Object.assign(new Error('boom'), { name: 'InternalError' }));
+      const p = makeProvider();
+      expect(await p.verifyObjectExists('photos', 'a.txt')).toEqual({ exists: false });
+      await expect(p.verifyObjectExists('photos', 'a.txt')).rejects.toThrow('boom');
+    });
+  });
+
   describe('deleteObjects', () => {
     it('sends one DeleteObjectsCommand and maps S3 errors back to original keys', async () => {
       sendMock.mockResolvedValueOnce({
