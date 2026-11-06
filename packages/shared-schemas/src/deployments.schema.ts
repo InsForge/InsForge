@@ -22,7 +22,7 @@ export const deploymentSchema = z.object({
   provider: z.string(),
   status: deploymentStatusSchema,
   url: z.string().nullable(),
-  metadata: z.record(z.unknown()).nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

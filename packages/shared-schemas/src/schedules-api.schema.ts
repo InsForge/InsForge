@@ -35,10 +35,13 @@ export const createScheduleRequestSchema = z.object({
   functionUrl: z.string().url('The function URL must be a valid URL.'),
   httpMethod: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
   headers: z
-    .record(z.string())
+    .record(z.string(), z.string())
     .optional()
     .describe('Header values can reference secrets using ${{secrets.KEY_NAME}} syntax.'),
-  body: z.record(z.unknown()).optional().describe('The JSON body to send with the request.'),
+  body: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('The JSON body to send with the request.'),
 });
 
 /**
@@ -51,10 +54,13 @@ export const updateScheduleRequestSchema = z.object({
   functionUrl: z.string().url('The function URL must be a valid URL.').optional(),
   httpMethod: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional(),
   headers: z
-    .record(z.string())
+    .record(z.string(), z.string())
     .optional()
     .describe('Header values can reference secrets using ${{secrets.KEY_NAME}} syntax.'),
-  body: z.record(z.unknown()).optional().describe('The JSON body to send with the request.'),
+  body: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('The JSON body to send with the request.'),
   isActive: z.boolean().optional().describe('Enable or disable the schedule.'),
 });
 

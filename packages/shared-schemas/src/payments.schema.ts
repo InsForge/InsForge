@@ -28,7 +28,7 @@ export const stripeConnectionSchema = z.object({
   lastSyncedAt: z.string().nullable(),
   lastSyncStatus: stripeLatestSyncStatusSchema.nullable(),
   lastSyncError: z.string().nullable(),
-  lastSyncCounts: z.record(z.number()),
+  lastSyncCounts: z.record(z.string(), z.number()),
 });
 export type StripeConnection = z.infer<typeof stripeConnectionSchema>;
 
@@ -42,7 +42,7 @@ export const stripeProductSchema = z.object({
   description: z.string().nullable(),
   active: z.boolean(),
   defaultPriceId: z.string().nullable(),
-  metadata: z.record(z.string()),
+  metadata: z.record(z.string(), z.string()),
   syncedAt: z.string(),
 });
 export type StripeProduct = z.infer<typeof stripeProductSchema>;
@@ -61,7 +61,7 @@ export const stripePriceSchema = z.object({
   taxBehavior: z.string().nullable(),
   recurringInterval: z.string().nullable(),
   recurringIntervalCount: z.number().nullable(),
-  metadata: z.record(z.string()),
+  metadata: z.record(z.string(), z.string()),
   syncedAt: z.string(),
 });
 export type StripePrice = z.infer<typeof stripePriceSchema>;
@@ -74,7 +74,7 @@ export const paymentCustomerSchema = z.object({
   name: z.string().nullable(),
   phone: z.string().nullable(),
   deleted: z.boolean(),
-  metadata: z.record(z.string()),
+  metadata: z.record(z.string(), z.string()),
   providerCreatedAt: z.string().nullable(),
   syncedAt: z.string(),
 });
@@ -161,7 +161,7 @@ export const razorpayOrderSchema = z.object({
   attempts: z.number().int().nonnegative().nullable(),
   verifiedPaymentId: z.string().nullable(),
   verifiedAt: z.string().nullable(),
-  notes: z.record(z.string()),
+  notes: z.record(z.string(), z.string()),
   lastError: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -247,7 +247,7 @@ export const stripeSubscriptionItemSchema = z.object({
   productId: z.string().nullable(),
   priceId: z.string().nullable(),
   quantity: z.number().nullable(),
-  metadata: z.record(z.string()),
+  metadata: z.record(z.string(), z.string()),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -268,7 +268,7 @@ export const stripeSubscriptionSchema = z.object({
   trialStart: z.string().nullable(),
   trialEnd: z.string().nullable(),
   latestInvoiceId: z.string().nullable(),
-  metadata: z.record(z.string()),
+  metadata: z.record(z.string(), z.string()),
   syncedAt: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -314,7 +314,7 @@ export const razorpaySubscriptionSchema = z.object({
   offerId: z.string().nullable(),
   authorizationPaymentId: z.string().nullable(),
   authorizationVerifiedAt: z.string().nullable(),
-  notes: z.record(z.string()),
+  notes: z.record(z.string(), z.string()),
   providerCreatedAt: z.string().nullable(),
   syncedAt: z.string(),
   createdAt: z.string(),
@@ -367,7 +367,7 @@ export const razorpayConnectionSchema = z.object({
   lastSyncedAt: z.string().nullable(),
   lastSyncStatus: razorpayLatestSyncStatusSchema.nullable(),
   lastSyncError: z.string().nullable(),
-  lastSyncCounts: z.record(z.number()),
+  lastSyncCounts: z.record(z.string(), z.number()),
 });
 export type RazorpayConnection = z.infer<typeof razorpayConnectionSchema>;
 
@@ -402,7 +402,7 @@ export const razorpayPlanSchema = z.object({
     .describe('Razorpay nested item per-unit amount mirror; usually equals amount.'),
   currency: z.string(),
   active: z.boolean(),
-  notes: z.record(z.string()),
+  notes: z.record(z.string(), z.string()),
   providerCreatedAt: z.string().nullable(),
   syncedAt: z.string(),
 });

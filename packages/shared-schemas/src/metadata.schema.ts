@@ -79,7 +79,9 @@ export const deploymentsMetadataSchema = z.object({
  */
 export const computeMetadataSchema = z.object({
   defaultProvider: computeProviderEnum,
-  providers: z.record(computeProviderEnum, computeCapabilitiesSchema),
+  // Only active providers are present, so the record is partial (zod 4 enum-keyed
+  // z.record() is exhaustive).
+  providers: z.partialRecord(computeProviderEnum, computeCapabilitiesSchema),
 });
 
 export const appMetaDataSchema = z.object({
