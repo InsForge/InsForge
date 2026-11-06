@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import express from 'express';
+import request from 'supertest';
 
 const { mockPoolQuery, mockConnect } = vi.hoisted(() => ({
   mockPoolQuery: vi.fn(),
@@ -30,6 +32,18 @@ vi.mock('../../src/utils/logger.js', () => ({
     error: vi.fn(),
     debug: vi.fn(),
   },
+}));
+
+vi.mock('../../src/services/logs/audit.service.js', () => ({
+  AuditService: { getInstance: () => ({ log: vi.fn() }) },
+}));
+
+vi.mock('../../src/services/functions/function.service.js', () => ({
+  FunctionService: { getInstance: () => ({ isSubhostingConfigured: () => false }) },
+}));
+
+vi.mock('../../src/api/middlewares/auth.js', () => ({
+  verifyAdmin: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
 async function loadSecretService() {
@@ -123,5 +137,43 @@ describe('SecretService.createSecret with soft-deleted rows', () => {
     expect(result).toEqual({ id: 'tx-id' });
     expect(clientQuery).toHaveBeenCalledTimes(2);
     expect(mockPoolQuery).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/secrets on a soft-deleted key', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    mockPoolQuery.mockReset();
+  });
+
+  it('clears the expiry the deleted secret carried', async () => {
+    mockPoolQuery.mockImplementation(async (sql: string) =>
+      sql.includes('SELECT')
+        ? {
+            rows: [
+              {
+                id: 'ghost-id',
+                key: 'STRIPE_API_KEY',
+                isActive: false,
+                isReserved: false,
+                expiresAt: new Date('2020-01-01'),
+              },
+            ],
+          }
+        : { rows: [{ id: 'ghost-id' }], rowCount: 1 }
+    );
+
+    const { default: secretsRouter } = await import('../../src/api/routes/secrets/index.routes.js');
+    const app = express().use(express.json()).use('/secrets', secretsRouter);
+
+    const res = await request(app)
+      .post('/secrets')
+      .send({ key: 'STRIPE_API_KEY', value: 'sk_new' });
+
+    expect(res.status).toBe(201);
+    const writes = mockPoolQuery.mock.calls.filter(([sql]) => sql.includes('UPDATE'));
+    expect(writes).toHaveLength(1);
+    expect(writes[0][0]).toContain('expires_at = $4');
+    expect(writes[0][1]).toEqual(['STRIPE_API_KEY', 'enc:sk_new', false, null]);
   });
 });
