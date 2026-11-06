@@ -373,22 +373,26 @@ export class CloudWatchProvider extends BaseLogProvider {
               error: error instanceof Error ? error.message : String(error),
             });
 
-            const fle = await client.send(
-              new FilterLogEventsCommand({
-                logGroupName: logGroup,
-                logStreamNames: sourceStreams.length ? sourceStreams.slice(0, 100) : undefined,
-                startTime: startMs,
-                endTime: endMs,
-                limit: 1000, // Reasonable limit for fallback
-              })
-            );
+            let latest: number | undefined;
+            let nextToken: string | undefined;
+            do {
+              const fle = await client.send(
+                new FilterLogEventsCommand({
+                  logGroupName: logGroup,
+                  logStreamNames: sourceStreams.length ? sourceStreams.slice(0, 100) : undefined,
+                  startTime: startMs,
+                  endTime: endMs,
+                  startFromHead: false,
+                  limit: 1,
+                  nextToken,
+                })
+              );
+              latest = fle.events?.[0]?.timestamp;
+              nextToken = fle.nextToken;
+            } while (!latest && nextToken);
 
-            const events = fle.events || [];
-            if (events.length) {
-              const latestEvent = events[events.length - 1];
-              if (latestEvent.timestamp) {
-                lastActivity = new Date(latestEvent.timestamp).toISOString();
-              }
+            if (latest) {
+              lastActivity = new Date(latest).toISOString();
             }
           }
         } catch {
