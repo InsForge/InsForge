@@ -24,6 +24,14 @@ export const tableFormSchema = z.object({
   columns: z.array(tableFormColumnSchema),
 });
 
+export const tableFormDraftSchema = tableFormSchema.extend({
+  columns: z.array(
+    tableFormColumnSchema.extend({
+      columnName: z.string(), // Drafts may have unnamed columns
+    })
+  ),
+});
+
 // Type exports
 export type TableFormForeignKeySchema = z.infer<typeof tableFormForeignKeySchema>;
 export type TableFormColumnSchema = z.infer<typeof tableFormColumnSchema>;
