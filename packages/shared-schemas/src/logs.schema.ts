@@ -6,7 +6,7 @@ export const auditLogSchema = z.object({
   actor: z.string(),
   action: z.string(),
   module: z.string(),
-  details: z.record(z.unknown()).nullable(),
+  details: z.record(z.string(), z.unknown()).nullable(),
   ipAddress: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),

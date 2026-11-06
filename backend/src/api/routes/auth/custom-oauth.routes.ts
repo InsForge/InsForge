@@ -92,12 +92,7 @@ router.post(
       const validationResult = createCustomOAuthConfigRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
-          validationResult.error.issues
-            .map(
-              (e: { path: (string | number)[]; message: string }) =>
-                `${e.path.join('.')}: ${e.message}`
-            )
-            .join(', '),
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
           ERROR_CODES.INVALID_INPUT
         );
@@ -136,12 +131,7 @@ router.put(
       const validationResult = updateCustomOAuthConfigRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
-          validationResult.error.issues
-            .map(
-              (e: { path: (string | number)[]; message: string }) =>
-                `${e.path.join('.')}: ${e.message}`
-            )
-            .join(', '),
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
           ERROR_CODES.INVALID_INPUT
         );
@@ -216,12 +206,7 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
     const queryValidation = oAuthInitRequestSchema.safeParse(req.query);
     if (!queryValidation.success) {
       throw new AppError(
-        queryValidation.error.issues
-          .map(
-            (e: { path: (string | number)[]; message: string }) =>
-              `${e.path.join('.')}: ${e.message}`
-          )
-          .join(', '),
+        queryValidation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
         ERROR_CODES.INVALID_INPUT
       );

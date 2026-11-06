@@ -66,7 +66,7 @@ export const contentSchema = z.union([
 export const toolFunctionSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
-  parameters: z.record(z.unknown()).optional(),
+  parameters: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Tool definition
@@ -209,7 +209,7 @@ export const fileAnnotationSchema = z.object({
     // Parsed content from the PDF (used for caching)
     parsedContent: z.string().optional(),
     // Additional metadata from the parser
-    metadata: z.record(z.unknown()).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
   }),
 });
 

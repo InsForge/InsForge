@@ -47,7 +47,7 @@ export const deploymentManifestFileSchema = deploymentManifestFileEntrySchema.ex
 export const createDeploymentResponseSchema = z.object({
   id: z.string().uuid(),
   uploadUrl: z.string().url(),
-  uploadFields: z.record(z.string()),
+  uploadFields: z.record(z.string(), z.string()),
 });
 
 /**
@@ -99,7 +99,7 @@ export const uploadDeploymentFileResponseSchema = deploymentManifestFileSchema.e
 export const startDeploymentRequestSchema = z.object({
   projectSettings: projectSettingsSchema.optional(),
   envVars: z.array(envVarSchema).optional(),
-  meta: z.record(z.string()).optional(),
+  meta: z.record(z.string(), z.string()).optional(),
   /**
    * Vercel region IDs (for example `sin1`) the deployment's functions run in.
    * Takes precedence over `regions` in the uploaded `vercel.json`.
