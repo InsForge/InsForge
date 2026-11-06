@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { requiredString } from './required-string.js';
 import {
   emailSchema,
   passwordSchema,
@@ -34,7 +35,7 @@ export const paginationSchema = z.object({
  * `label` customizes the validation message for the field it guards.
  */
 const sixDigitCodeSchema = (label: string) =>
-  z.string().regex(/^\d{6}$/, `${label} must be a 6-digit numeric code`);
+  requiredString().regex(/^\d{6}$/, `${label} must be a 6-digit numeric code`);
 
 /**
  * POST /api/auth/users - Create user
@@ -158,7 +159,7 @@ export const deleteUsersRequestSchema = z.object({
  * PATCH /api/auth/profiles/current - Update current user's profile
  */
 export const updateProfileRequestSchema = z.object({
-  profile: z.record(z.unknown()),
+  profile: z.record(z.string(), z.unknown()),
 });
 
 /**
@@ -380,7 +381,11 @@ const pkceRegex = /^[A-Za-z0-9._~-]+$/;
  */
 export const oAuthInitRequestSchema = z
   .object({
-    redirect_uri: z.string({ required_error: 'Redirect URI is required' }).url(),
+    redirect_uri: z
+      .string({
+        error: (issue) => (issue.input === undefined ? 'Redirect URI is required' : undefined),
+      })
+      .url(),
     code_challenge: z
       .string()
       .min(43, 'Code challenge must be at least 43 characters')
@@ -487,7 +492,7 @@ export const upsertSmtpConfigRequestSchema = z
     enabled: z.boolean(),
     host: z.string().default(''),
     port: z.union([z.literal(25), z.literal(465), z.literal(587), z.literal(2525)], {
-      errorMap: () => ({ message: 'Port must be one of: 25, 465, 587, 2525' }),
+      error: 'Port must be one of: 25, 465, 587, 2525',
     }),
     username: z.string().default(''),
     password: z.string().min(1, 'SMTP password is required').optional(),

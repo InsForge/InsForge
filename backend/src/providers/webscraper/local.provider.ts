@@ -13,7 +13,7 @@ const APIFY_API_BASE = 'https://api.apify.com/v2';
 // `items` as `unknown`. The point is that a 2xx which is *not* one of these is
 // an upstream contract break — a 502 — rather than a healthy-but-empty answer.
 type ApifyRecord = Record<string, any>;
-const apifyRecordSchema: z.ZodType<ApifyRecord> = z.record(z.any());
+const apifyRecordSchema: z.ZodType<ApifyRecord> = z.record(z.string(), z.any());
 const apifyAccountSchema = z.object({ data: apifyRecordSchema });
 const apifyListSchema = z.object({ data: z.object({ items: z.array(apifyRecordSchema) }) });
 const apifyDatasetItemsSchema = z.array(z.unknown());

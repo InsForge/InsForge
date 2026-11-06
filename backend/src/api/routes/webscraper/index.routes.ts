@@ -165,7 +165,7 @@ webscraperRouter.put(
       const validation = updateApifyConfigSchema.safeParse(req.body);
       if (!validation.success) {
         throw new AppError(
-          `Validation error: ${validation.error.errors.map((e) => e.message).join(', ')}`,
+          `Validation error: ${validation.error.issues.map((e) => e.message).join(', ')}`,
           400,
           ERROR_CODES.INVALID_INPUT
         );
