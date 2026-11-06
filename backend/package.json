@@ -97,6 +97,6 @@
     "tsup": "^8.5.1",
     "tsx": "^4.23.1",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   }
 }
