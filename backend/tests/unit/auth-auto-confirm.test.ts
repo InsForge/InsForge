@@ -14,7 +14,7 @@ const { mockPool, mockClient, mockCreateEmailOTP, mockSendWithTemplate, mockLogg
       query: vi.fn(),
       release: vi.fn(),
     },
-    mockCreateEmailOTP: vi.fn().mockResolvedValue({ otp: '123456' }),
+    mockCreateEmailOTP: vi.fn().mockResolvedValue({ success: true, otp: '123456' }),
     mockSendWithTemplate: vi.fn().mockResolvedValue(undefined),
     mockLogger: {
       info: vi.fn(),
