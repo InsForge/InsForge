@@ -279,6 +279,7 @@
     "createNewBackup": "创建新备份",
     "createNewTable": "创建新表",
     "createTable": "创建表",
+    "createTableDraftNotSaved": "无法在此浏览器中保存草稿。刷新页面会丢失你的更改。",
     "cronExpressionLabel": "cron 表达式",
     "cronOncePerHour": "备份最多每小时执行一次。",
     "csvImportFailed": "CSV 导入因校验错误而失败。请检查文件。",

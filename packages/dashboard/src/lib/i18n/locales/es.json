@@ -292,6 +292,7 @@
     "createNewBackup": "Crear una nueva copia",
     "createNewTable": "Crear nueva tabla",
     "createTable": "Crear tabla",
+    "createTableDraftNotSaved": "No se pudo guardar el borrador en este navegador. Si recargas la página, perderás los cambios.",
     "cronExpressionLabel": "Expresión cron",
     "cronOncePerHour": "Las copias pueden ejecutarse como máximo una vez por hora.",
     "csvImportFailed": "La importación de CSV falló por errores de validación. Revisa el archivo.",
