@@ -16,6 +16,11 @@ export type RefreshSessionType = 'user' | 'admin';
 
 /**
  * Refresh token payload interface
+ *
+ * jti uniquely identifies a single issued token so the server can enforce
+ * single-use rotation (see auth.refresh_sessions). sessionVersion carries the
+ * user's session_version at mint time so a password reset invalidates older
+ * tokens. Tokens minted before these claims existed are rejected as legacy.
  */
 export interface RefreshTokenPayload {
   sub: string;
@@ -23,6 +28,8 @@ export interface RefreshTokenPayload {
   iss: string;
   csrfNonce: string;
   sessionType: RefreshSessionType;
+  jti: string;
+  sessionVersion: number;
 }
 
 export interface RefreshTokenWithCsrf {
@@ -204,13 +211,26 @@ export class TokenManager {
 
   /**
    * Generate refresh token for secure session management
+   *
+   * Prefer RefreshSessionService.issueRefreshSession over calling this
+   * directly: it persists the server-side record that makes single-use
+   * rotation and logout revocation possible. Tokens minted here without a
+   * persisted record are rejected at refresh time.
    */
   generateRefreshToken(
     userId: string,
     sessionType: RefreshSessionType,
-    csrfNonce = this.generateCsrfNonce()
+    csrfNonce = this.generateCsrfNonce(),
+    jti = this.generateTokenId(),
+    sessionVersion = 0
   ): string {
-    const refreshPayload = this.createRefreshTokenPayload(userId, sessionType, csrfNonce);
+    const refreshPayload = this.createRefreshTokenPayload(
+      userId,
+      sessionType,
+      csrfNonce,
+      jti,
+      sessionVersion
+    );
     return jwt.sign(refreshPayload, JWT_SECRET, {
       algorithm: 'HS256',
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
@@ -220,9 +240,17 @@ export class TokenManager {
   generateRefreshTokenWithCsrf(
     userId: string,
     sessionType: RefreshSessionType,
-    csrfNonce = this.generateCsrfNonce()
+    csrfNonce = this.generateCsrfNonce(),
+    jti = this.generateTokenId(),
+    sessionVersion = 0
   ): RefreshTokenWithCsrf {
-    const refreshPayload = this.createRefreshTokenPayload(userId, sessionType, csrfNonce);
+    const refreshPayload = this.createRefreshTokenPayload(
+      userId,
+      sessionType,
+      csrfNonce,
+      jti,
+      sessionVersion
+    );
     return {
       refreshToken: jwt.sign(refreshPayload, JWT_SECRET, {
         algorithm: 'HS256',
@@ -235,6 +263,12 @@ export class TokenManager {
   /**
    * Verify refresh token and return payload
    * Ensures the token is a valid refresh token (not an access token)
+   *
+   * Only checks the JWT itself (signature, expiry, issuer, claims). Callers
+   * must additionally validate the server-side record in
+   * auth.refresh_sessions (existence, consumed/revoked state, session
+   * version) - a passing signature alone does not authorize refresh.
+   * Tokens minted before jti/sessionVersion existed are rejected as legacy.
    */
   verifyRefreshToken(token: string): RefreshTokenPayload {
     try {
@@ -249,7 +283,10 @@ export class TokenManager {
         !decoded.sub ||
         typeof decoded.csrfNonce !== 'string' ||
         decoded.csrfNonce.length === 0 ||
-        (decoded.sessionType !== 'user' && decoded.sessionType !== 'admin')
+        (decoded.sessionType !== 'user' && decoded.sessionType !== 'admin') ||
+        typeof decoded.jti !== 'string' ||
+        decoded.jti.length === 0 ||
+        typeof decoded.sessionVersion !== 'number'
       ) {
         throw new AppError('Invalid refresh token type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
@@ -289,6 +326,10 @@ export class TokenManager {
 
   /**
    * Verify JWT token
+   *
+   * Refresh tokens are never valid access credentials: any JWT carrying
+   * type === 'refresh' is rejected even though it shares the HS256 key.
+   * Legacy access tokens carry no type claim and are unaffected.
    */
   verifyToken(token: string): TokenPayloadSchema {
     try {
@@ -299,6 +340,7 @@ export class TokenManager {
           const decoded = jwt.verify(token, this.publicKey, {
             algorithms: ['RS256'],
           }) as TokenPayloadSchema;
+          this.rejectRefreshTokenAsAccessToken(decoded);
           if (!decoded.sub) {
             throw new AppError('Invalid token subject', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
           }
@@ -314,6 +356,7 @@ export class TokenManager {
       const decoded = jwt.verify(token, JWT_SECRET, {
         algorithms: ['HS256'],
       }) as TokenPayloadSchema;
+      this.rejectRefreshTokenAsAccessToken(decoded);
       if (!decoded.sub) {
         throw new AppError('Invalid token subject', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
@@ -327,6 +370,15 @@ export class TokenManager {
         throw error;
       }
       throw new AppError('Invalid token', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+  }
+
+  /**
+   * Reject refresh JWTs presented as bearer access tokens.
+   */
+  private rejectRefreshTokenAsAccessToken(decoded: TokenPayloadSchema): void {
+    if ((decoded as unknown as Record<string, unknown>).type === 'refresh') {
+      throw new AppError('Invalid token type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
   }
 
@@ -485,6 +537,14 @@ export class TokenManager {
     }
   }
 
+  /**
+   * Generate a unique identifier for a single issued refresh token (jti).
+   * The raw JWT is the bearer credential; only its SHA-256 hash is stored.
+   */
+  generateTokenId(): string {
+    return crypto.randomBytes(32).toString('base64url');
+  }
+
   private generateCsrfNonce(): string {
     return crypto.randomBytes(32).toString('base64url');
   }
@@ -492,7 +552,9 @@ export class TokenManager {
   private createRefreshTokenPayload(
     userId: string,
     sessionType: RefreshSessionType,
-    csrfNonce: string
+    csrfNonce: string,
+    jti: string,
+    sessionVersion: number
   ): RefreshTokenPayload {
     return {
       sub: userId,
@@ -500,6 +562,8 @@ export class TokenManager {
       iss: 'insforge',
       csrfNonce,
       sessionType,
+      jti,
+      sessionVersion,
     };
   }
 }

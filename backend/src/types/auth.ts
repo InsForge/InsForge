@@ -11,6 +11,8 @@ export interface UserRecord {
   updated_at: string;
   password?: string;
   providers?: string;
+  // Bumped on password reset; refresh tokens carry the value at mint time.
+  session_version: number;
 }
 
 // OAuth provider data from external providers
