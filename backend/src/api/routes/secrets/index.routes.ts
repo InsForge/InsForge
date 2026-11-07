@@ -6,12 +6,15 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
+  createSecretRequestSchema,
   rotateAnonKeyRequestSchema,
   rotateApiKeyRequestSchema,
+  updateSecretRequestSchema,
   type RotateAnonKeyResponse,
   type RotateApiKeyResponse,
 } from '@insforge/shared-schemas';
 import { successResponse } from '@/utils/response.js';
+import { parseZodSchema } from '@/utils/zod.js';
 
 const router = Router();
 const secretService = SecretService.getInstance();
@@ -72,21 +75,10 @@ router.get('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
  */
 router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { key, value, isReserved, expiresAt } = req.body;
-
-    // Validate input
-    if (!key || !value) {
-      throw new AppError('Both key and value are required', 400, ERROR_CODES.INVALID_INPUT);
-    }
-
-    // Validate key format (uppercase alphanumeric with underscores only)
-    if (!/^[A-Z0-9_]+$/.test(key)) {
-      throw new AppError(
-        'Invalid key format. Use uppercase letters, numbers, and underscores only (e.g., STRIPE_API_KEY)',
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
+    const { key, value, isReserved, expiresAt } = parseZodSchema(
+      createSecretRequestSchema,
+      req.body
+    );
 
     // Check if secret already exists
     const secrets = await secretService.listSecrets();
@@ -149,7 +141,10 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
 router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { key } = req.params;
-    const { value, isActive, isReserved, expiresAt } = req.body;
+    const { value, isActive, isReserved, expiresAt } = parseZodSchema(
+      updateSecretRequestSchema,
+      req.body
+    );
 
     // Get existing secret
     const secrets = await secretService.listSecrets();
