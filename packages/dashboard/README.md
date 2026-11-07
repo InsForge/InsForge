@@ -67,7 +67,7 @@ To maintain package isolation and clean separation of concerns, the `@insforge/d
 
 * **Internal Packages:** Depends strictly on `@insforge/shared-schemas` for data validation/contracts and `@insforge/ui` for shared UI primitives and components.
 * **No Parent Dependencies:** Does not import or depend on the parent hosting shells (`frontend/` or enterprise cloud hosts). Configuration is passed down from the parent host at runtime via context providers.
-* **Service Isolation:** Interacts with the `insforge-backend` server exclusively via HTTP REST endpoints and Socket.io WebSocket connections. No direct database or server-side internal modules are imported.
+* **Service Isolation:** Interacts with the `insforge-backend` server exclusively via HTTP REST endpoints and the server-sent dashboard event stream. No direct database or server-side internal modules are imported.
 
 ---
 
@@ -111,4 +111,4 @@ npm run lint
 npm run build
 ```
 
-Unit tests are written using `@testing-library/react` and Vitest to guarantee coverage of core feature pages, state-hooks, and form validators.
+Unit tests (`src/**/*.test.ts`) run in Vitest's node environment and cover state-hooks and form validators; component tests (`src/**/*.test.tsx`) use `@testing-library/react` under jsdom to cover core feature pages.

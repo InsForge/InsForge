@@ -17,9 +17,6 @@ import {
 import { FunctionService } from '@/services/functions/function.service.js';
 import { appConfig } from '@/infra/config/app.config.js';
 
-// Re-export the type for backward compatibility
-export type GetBuildLogsResponse = GetBuildLogsResponseSchema;
-
 export class LogService {
   private static instance: LogService;
   private provider!: LogProvider;
@@ -258,7 +255,7 @@ export class LogService {
   /**
    * Get build logs for the latest deployment or a specific deployment
    */
-  async getBuildLogs(deploymentId?: string): Promise<GetBuildLogsResponse | null> {
+  async getBuildLogs(deploymentId?: string): Promise<GetBuildLogsResponseSchema | null> {
     const denoProvider = DenoSubhostingProvider.getInstance();
 
     if (!denoProvider.isConfigured()) {

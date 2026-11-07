@@ -125,7 +125,6 @@ export class DatabaseAdvanceService {
             });
         }
         await client.query(`NOTIFY pgrst, 'reload schema';`);
-        // Metadata is now updated on-demand
       }
 
       const response: RawSQLResponse = {
@@ -903,7 +902,6 @@ export class DatabaseAdvanceService {
 
       await client.query(`NOTIFY pgrst, 'reload schema';`);
       await client.query('COMMIT');
-      // Metadata is now updated on-demand
 
       return {
         success: true,
@@ -1002,10 +1000,7 @@ export class DatabaseAdvanceService {
       >();
 
       for (const record of records) {
-        const keys: string[] = [];
-        for (const key of Object.keys(record)) {
-          keys.push(key);
-        }
+        const keys = Object.keys(record);
         keys.sort();
         const signature = keys.join(',');
 

@@ -60,10 +60,6 @@ paths:
         '200':
           description: List of records
           headers:
-            X-Total-Count:
-              schema:
-                type: integer
-              description: Total number of records matching the query
             Content-Range:
               schema:
                 type: string

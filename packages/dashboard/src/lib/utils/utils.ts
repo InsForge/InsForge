@@ -79,12 +79,10 @@ export function convertValueForColumn(
  * Converts database values to formatted display strings for UI components
  */
 export function formatValueForDisplay(value: ConvertedValue, type?: ColumnType): DisplayValue {
-  // Handle null/undefined values
   if (isEmptyValue(value)) {
     return 'null';
   }
 
-  // Handle different column types
   switch (type) {
     case ColumnType.BOOLEAN:
       return value ? 'True' : 'False';
@@ -127,7 +125,6 @@ export function formatValueForDisplay(value: ConvertedValue, type?: ColumnType):
     case ColumnType.UUID:
     case ColumnType.STRING:
     default: {
-      // Convert to string and optionally truncate
       return String(value);
     }
   }

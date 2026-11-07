@@ -46,13 +46,9 @@ export function ThemeProvider({
   useEffect(() => {
     const root = window.document.documentElement;
 
-    // Remove both classes first
     root.classList.remove('light', 'dark');
-
-    // Add the resolved theme class
     root.classList.add(resolvedTheme);
 
-    // Update meta theme-color for mobile browsers
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
       metaThemeColor.setAttribute('content', resolvedTheme === 'dark' ? '#0a0a0a' : '#ffffff');

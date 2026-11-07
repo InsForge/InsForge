@@ -62,12 +62,6 @@ export type StripeClient = Pick<
   | 'invoicePayments'
 >;
 
-export interface StripeKeyConfig {
-  environment: StripeEnvironment;
-  hasKey: boolean;
-  maskedKey: string | null;
-}
-
 export interface StripeSyncSnapshot {
   account: StripeAccount;
   products: StripeProduct[];

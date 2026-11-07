@@ -545,15 +545,6 @@ export class PaymentCustomerService {
     return typeof value === 'string' && value.length > 0 ? value : null;
   }
 
-  private normalizeCountryCode(value: string | null): string | null {
-    if (!value) {
-      return null;
-    }
-
-    const normalizedCountry = value.trim().toUpperCase();
-    return normalizedCountry.length === 2 ? normalizedCountry : null;
-  }
-
   private isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
   }

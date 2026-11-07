@@ -4,19 +4,14 @@ import type {
   LogSchema,
   GetLogsResponse,
   LogStatsSchema,
+  BuildLogEntrySchema,
+  GetBuildLogsResponseSchema,
 } from '@insforge/shared-schemas';
 
-export interface BuildLogEntry {
-  level: string;
-  message: string;
-}
-
-export interface GetBuildLogsResponse {
-  deploymentId: string;
-  status: 'pending' | 'success' | 'failed';
-  logs: BuildLogEntry[];
-  createdAt: string;
-}
+// Build-log payloads are defined once in shared-schemas; alias them so the
+// dashboard cannot drift from what the backend returns.
+export type BuildLogEntry = BuildLogEntrySchema;
+export type GetBuildLogsResponse = GetBuildLogsResponseSchema;
 
 export class LogService {
   // Get all available log sources

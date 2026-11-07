@@ -477,9 +477,6 @@ export class StorageService {
         'UPDATE storage.buckets SET public = $1, updated_at = CURRENT_TIMESTAMP WHERE name = $2',
         [isPublic, bucket]
       );
-
-      // Update storage metadata
-      // Metadata is now updated on-demand
     } finally {
       client.release();
     }
@@ -512,9 +509,6 @@ export class StorageService {
         bucket,
         isPublic,
       ]);
-
-      // Update storage metadata
-      // Metadata is now updated on-demand
     } finally {
       client.release();
     }
@@ -536,9 +530,6 @@ export class StorageService {
 
       // Delete bucket using backend (handles all files)
       await this.provider.deleteBucket(bucket);
-
-      // Update storage metadata
-      // Metadata is now updated on-demand
 
       return true;
     } finally {

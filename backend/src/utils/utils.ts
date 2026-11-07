@@ -79,14 +79,6 @@ export const convertSqlTypeToColumnType = (sqlType: string): ColumnType | string
 };
 
 /**
- * Generate a UUID v4
- * @returns A UUID v4 string
- */
-export function generateUUID(): string {
-  return crypto.randomUUID();
-}
-
-/**
  * Generate a random numeric string of specified length
  * @param length - The length of the numeric string to generate
  * @returns A random string containing only digits (0-9)

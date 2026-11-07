@@ -347,13 +347,11 @@ export class RazorpayProvider {
   }
 
   /**
-   * Fetch basic account info using the /orders or /items call to confirm key validity.
-   * Razorpay does not have a dedicated "retrieve account" endpoint in the OSS SDK,
-   * so we use a lightweight Orders probe.
+   * Razorpay does not expose account details through the OSS SDK, so this is a
+   * lightweight authenticated Orders call that makes invalid key secrets fail
+   * before they are saved.
    */
   async retrieveAccount(): Promise<RazorpayAccountInfo> {
-    // Razorpay does not expose account details through the OSS SDK. Use a
-    // lightweight authenticated Orders call so invalid key secrets fail before saving.
     await this.client.orders.all({ count: 1, skip: 0 });
 
     // Razorpay key ID encodes the environment implicitly (rzp_test_ / rzp_live_)
@@ -507,28 +505,6 @@ export class RazorpayProvider {
 
   async listInvoices(): Promise<RazorpayInvoice[]> {
     return this.fetchAllPaginated<RazorpayInvoice>((params) => this.client.invoices.all(params));
-  }
-
-  async createCustomer(input: {
-    name?: string | null;
-    email?: string | null;
-    contact?: string | null;
-    notes?: Record<string, string>;
-  }): Promise<RazorpayCustomer> {
-    const params: Record<string, unknown> = {};
-    if (input.name) {
-      params.name = input.name;
-    }
-    if (input.email) {
-      params.email = input.email;
-    }
-    if (input.contact) {
-      params.contact = input.contact;
-    }
-    if (input.notes) {
-      params.notes = input.notes;
-    }
-    return this.client.customers.create(params) as Promise<RazorpayCustomer>;
   }
 
   async syncCatalog(): Promise<{

@@ -90,7 +90,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "INVALID_INPUT"
+                error: "REALTIME_INVALID_CHANNEL_REQUEST"
                 message: "pattern: Channel pattern is required"
                 statusCode: 400
 
@@ -133,7 +133,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "NOT_FOUND"
+                error: "REALTIME_CHANNEL_NOT_FOUND"
                 message: "Channel not found"
                 statusCode: 404
 
@@ -184,7 +184,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "INVALID_INPUT"
+                error: "REALTIME_INVALID_CHANNEL_REQUEST"
                 message: "webhookUrls.0: Invalid url"
                 statusCode: 400
         '404':
@@ -194,7 +194,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "NOT_FOUND"
+                error: "REALTIME_CHANNEL_NOT_FOUND"
                 message: "Channel not found"
                 statusCode: 404
 
@@ -233,7 +233,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "NOT_FOUND"
+                error: "REALTIME_CHANNEL_NOT_FOUND"
                 message: "Channel not found"
                 statusCode: 404
 

@@ -109,6 +109,11 @@ export function resolveFeature(pathname: string): string | null {
   return API_FEATURES.has(segment) ? segment : null;
 }
 
+/** Whether the response says the caller was turned away at the door. */
+export function isRejected(statusCode: number): boolean {
+  return statusCode === UNAUTHENTICATED_STATUS;
+}
+
 /**
  * Whether the request is a dashboard read: someone looking at the project
  * rather than the project being used.
@@ -118,11 +123,6 @@ export function resolveFeature(pathname: string): string | null {
  * is using the database — and every non-dashboard request counts regardless of
  * which credential it carried.
  */
-/** Whether the response says the caller was turned away at the door. */
-export function isRejected(statusCode: number): boolean {
-  return statusCode === UNAUTHENTICATED_STATUS;
-}
-
 export function isDashboardRead(req: Request): boolean {
   if (!READ_METHODS.has(req.method.toUpperCase())) {
     return false;

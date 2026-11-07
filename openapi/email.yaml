@@ -148,7 +148,7 @@ components:
         error:
           type: string
           description: Error code for programmatic handling
-          example: "VALIDATION_ERROR"
+          example: "INVALID_INPUT"
         message:
           type: string
           description: Human-readable error message

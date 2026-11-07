@@ -60,19 +60,12 @@ export function convertToCSV(data: unknown[], filename = 'export'): void {
     throw new Error('Data must be an array of objects');
   }
 
-  // Get all unique column headers from all rows
   const headers = getAllHeaders(data as Record<string, unknown>[]);
-
-  // Create CSV header row
   const headerRow = headers.map(escapeCSVField).join(',');
-
-  // Create data rows
   const dataRows = data.map((row) => {
     const obj = row as Record<string, unknown>;
     return headers.map((header) => escapeCSVField(obj[header])).join(',');
   });
-
-  // Combine header and data
   const csvContent = [headerRow, ...dataRows].join('\n');
 
   // Trigger download with UTF-8 BOM so Excel auto-detects encoding
