@@ -607,7 +607,7 @@ paths:
         '403':
           description: Email verification required, or public signups are disabled for a verified unknown email
         '429':
-          description: Too many OTP verification attempts
+          description: Too many failed password or OTP sign-in attempts from this IP. Retry after the time in the Retry-After header.
 
   /api/auth/refresh:
     post:
@@ -789,6 +789,8 @@ paths:
           description: Invalid credentials
         '403':
           description: User is not an admin
+        '429':
+          description: Too many failed admin sign-in attempts from this IP. Retry after the time in the Retry-After header.
 
   /api/auth/admin/sessions/exchange:
     post:

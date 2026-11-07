@@ -14,6 +14,7 @@ import oauthRouter from './oauth.routes.js';
 import customOAuthRouter from './custom-oauth.routes.js';
 import {
   idTokenSignInRateLimiter,
+  passwordSignInRateLimiter,
   sendEmailOTPLimiter,
   verifyOTPLimiter,
   verifyOTPRateLimiter,
@@ -67,7 +68,7 @@ const authService = AuthService.getInstance();
 
 const verifySessionOTPLimiter = (req: Request, res: Response, next: NextFunction): void => {
   if (req.body?.method !== 'otp') {
-    next();
+    void passwordSignInRateLimiter(req, res, next);
     return;
   }
 
