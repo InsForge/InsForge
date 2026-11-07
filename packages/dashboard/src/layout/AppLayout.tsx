@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
@@ -8,7 +8,7 @@ import { ConnectDialog } from '#features/dashboard/components/connect';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { cn } from '@insforge/ui';
 import { ConnectDialogProvider } from './ConnectDialogContext';
-import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useFeatureFlag, useFeatureFlagsReady } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 import { DTestConnectTip } from '#features/dashboard/components/dtest/DTestConnectTip';
 
@@ -21,9 +21,24 @@ interface ConnectOverlayBridgeProps {
 
 function ConnectOverlayBridge({ hostMode, onOpenDialog }: ConnectOverlayBridgeProps) {
   const navigate = useNavigate();
+  const flagsReady = useFeatureFlagsReady();
+  const dashboardVariant = useFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
+  // Parent can post the connect message before /decide returns. Hold it and
+  // replay once we know which shell the user is in, otherwise a D_TEST user
+  // gets the legacy dialog and never recovers.
+  const pendingConnectRef = useRef(false);
+
+  const openConnect = useCallback(() => {
+    if (dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST) {
+      void navigate('/dashboard/install');
+    } else {
+      onOpenDialog();
+    }
+  }, [dashboardVariant, navigate, onOpenDialog]);
 
   useEffect(() => {
     if (hostMode !== 'cloud-hosting') {
+      pendingConnectRef.current = false;
       return;
     }
 
@@ -42,16 +57,25 @@ function ConnectOverlayBridge({ hostMode, onOpenDialog }: ConnectOverlayBridgePr
         return;
       }
 
-      if (getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT) === FEATURE_FLAG_VARIANTS.D_TEST) {
-        void navigate('/dashboard/install');
-      } else {
-        onOpenDialog();
+      if (!flagsReady) {
+        pendingConnectRef.current = true;
+        return;
       }
+
+      openConnect();
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [hostMode, navigate, onOpenDialog]);
+  }, [hostMode, flagsReady, openConnect]);
+
+  useEffect(() => {
+    if (hostMode !== 'cloud-hosting' || !flagsReady || !pendingConnectRef.current) {
+      return;
+    }
+    pendingConnectRef.current = false;
+    openConnect();
+  }, [hostMode, flagsReady, openConnect]);
 
   return null;
 }
