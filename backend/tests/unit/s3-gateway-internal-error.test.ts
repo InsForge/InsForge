@@ -50,7 +50,9 @@ describe('s3-gateway error sanitization', () => {
     expect(res.status).toBe(500);
     expect(res.headers['content-type']).toMatch(/application\/xml/);
     expect(res.text).toContain('<Code>InternalError</Code>');
-    expect(res.text).toContain('<Message>We encountered an internal error. Please try again.</Message>');
+    expect(res.text).toContain(
+      '<Message>We encountered an internal error. Please try again.</Message>'
+    );
     expect(res.text).not.toContain('database "insforge" connection lost');
     expect(res.text).not.toContain('password leaked');
   });
