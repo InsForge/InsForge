@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { isPrivateIp } from '../../src/services/email/smtp-config.service';
+import dns from 'dns/promises';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { isPrivateIp, SmtpConfigService } from '../../src/services/email/smtp-config.service';
 
 // ---------------------------------------------------------------------------
 // Mock heavy dependencies so we can import isPrivateIp without side effects
@@ -119,5 +120,95 @@ describe('isPrivateIp', () => {
     ])('%s (%s) is public', (ip) => {
       expect(isPrivateIp(ip)).toBe(false);
     });
+  });
+});
+
+describe('validateSmtpHost', () => {
+  const service = SmtpConfigService.getInstance();
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('rejects unallowed SMTP ports', async () => {
+    await expect(service.validateSmtpHost('smtp.example.com', 22)).rejects.toThrow(
+      'Invalid SMTP port: 22'
+    );
+  });
+
+  it('rejects localhost and loopback domains, including trailing dots', async () => {
+    await expect(service.validateSmtpHost('localhost', 587)).rejects.toThrow(
+      'SMTP host is a private or loopback address'
+    );
+    await expect(service.validateSmtpHost('localhost.', 587)).rejects.toThrow(
+      'SMTP host is a private or loopback address'
+    );
+    await expect(service.validateSmtpHost('app.localhost', 587)).rejects.toThrow(
+      'SMTP host is a private or loopback address'
+    );
+    await expect(service.validateSmtpHost('app.localhost.', 587)).rejects.toThrow(
+      'SMTP host is a private or loopback address'
+    );
+  });
+
+  it('rejects raw private IP hosts', async () => {
+    await expect(service.validateSmtpHost('127.0.0.1', 587)).rejects.toThrow(
+      'SMTP host is a private or loopback address'
+    );
+    await expect(service.validateSmtpHost('192.168.1.1', 587)).rejects.toThrow(
+      'SMTP host is a private or loopback address'
+    );
+    await expect(service.validateSmtpHost('10.0.0.1', 587)).rejects.toThrow(
+      'SMTP host is a private or loopback address'
+    );
+    await expect(service.validateSmtpHost('::1', 587)).rejects.toThrow(
+      'SMTP host is a private or loopback address'
+    );
+  });
+
+  it('rejects hosts when DNS resolution fails or throws', async () => {
+    vi.spyOn(dns, 'lookup').mockRejectedValueOnce(
+      Object.assign(new Error('getaddrinfo ENOTFOUND invalid.domain'), { code: 'ENOTFOUND' })
+    );
+
+    await expect(service.validateSmtpHost('invalid.domain', 587)).rejects.toThrow(
+      'SMTP host could not be resolved'
+    );
+  });
+
+  it('rejects hosts when DNS lookup returns empty address array', async () => {
+    vi.spyOn(dns, 'lookup').mockResolvedValueOnce([] as unknown as dns.LookupAddress[]);
+
+    await expect(service.validateSmtpHost('empty.domain', 587)).rejects.toThrow(
+      'SMTP host could not be resolved'
+    );
+  });
+
+  it('rejects hosts resolving to private or loopback IP addresses', async () => {
+    vi.spyOn(dns, 'lookup').mockResolvedValueOnce([
+      { address: '127.0.0.1', family: 4 },
+    ] as dns.LookupAddress[]);
+
+    await expect(service.validateSmtpHost('internal.service.local', 587)).rejects.toThrow(
+      'SMTP host resolves to a private or loopback address, which is not allowed'
+    );
+  });
+
+  it('rejects hosts resolving to IPv6 loopback addresses', async () => {
+    vi.spyOn(dns, 'lookup').mockResolvedValueOnce([
+      { address: '::1', family: 6 },
+    ] as dns.LookupAddress[]);
+
+    await expect(service.validateSmtpHost('internal.ipv6.local', 587)).rejects.toThrow(
+      'SMTP host resolves to a private or loopback address, which is not allowed'
+    );
+  });
+
+  it('accepts hosts resolving to valid public IP addresses', async () => {
+    vi.spyOn(dns, 'lookup').mockResolvedValueOnce([
+      { address: '93.184.216.34', family: 4 },
+    ] as dns.LookupAddress[]);
+
+    await expect(service.validateSmtpHost('smtp.sendgrid.net', 587)).resolves.toBeUndefined();
   });
 });
