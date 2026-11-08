@@ -156,7 +156,18 @@ description: "Answers to common InsForge questions on database calls, edge funct
 
     To add another admin specifically, choose the **Administrator** role when inviting, or change their role later from the Members list. Only Administrators can invite or manage members.
 
+    Prefer the CLI? `npx @insforge/cli orgs members invite <email> --role developer` (use `--role administrator` for an admin) sends the same invitation, and `npx @insforge/cli orgs members list` shows the organization's members and pending invites.
+
     Handing the organization over to a new **Owner** entirely is a separate action from inviting members. To do that, open **Organization Settings** and use **Transfer Ownership** (only the current owner can start it, and the recipient must be a verified InsForge user who accepts the emailed request).
+  </Accordion>
+
+  <Accordion title="Does InsForge generate API documentation (Swagger/OpenAPI) from my database and edge functions?">
+    InsForge auto-generates the **REST API and a typed SDK** for every table you create: define a table and you instantly get endpoints like `GET /api/database/records/{table}` plus SDK query builders, with nothing to deploy (see [Database](/core-concepts/database/overview) and the [REST API](/sdks/rest/database)). What it does **not** do is produce a Swagger/OpenAPI document generated from your own specific tables or edge functions.
+
+    - **Tables:** every table exposes the same predictable REST shape, so one reference already covers it — it's parameterized by table name (`{table}`), column filters, and PostgREST operators. There is no separate spec unique to your schema.
+    - **Edge functions:** these are your own code at your own routes, so there is nothing to introspect into a generated spec. Share each function's URL with whoever needs to call it.
+
+    To give a teammate the full context of your backend (schema, tables, functions), invite them to the organization rather than trying to export docs — see "How do I share a project with another admin, or invite a teammate?" above, and they can browse everything in the dashboard. Never share your admin **API Key** (`ik_...`); invite them so they get their own authenticated access, and the client app they build authenticates with the public **Anon Key**, which is gated by RLS.
   </Accordion>
 
   <Accordion title="Why did my project get paused, and how do I keep it from pausing?">
