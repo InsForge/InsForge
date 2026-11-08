@@ -48,5 +48,8 @@ describe('database schema route wiring', () => {
       'tableService.updateTableSchema(schemaName, tableName, operations)'
     );
     expect(tableRoutesSource).toContain('tableService.deleteTable(schemaName, tableName)');
+    expect(tableRoutesSource).toContain("router.post(\n  '/:tableName/enable-rls',\n  verifyAdmin");
+    expect(tableRoutesSource).toContain('tableService.enableTableRLS(schemaName, tableName)');
+    expect(tableRoutesSource).toContain("action: 'UPDATE_TABLE_RLS'");
   });
 });

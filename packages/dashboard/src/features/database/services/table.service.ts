@@ -61,6 +61,19 @@ export class TableService {
     );
   }
 
+  enableTableRLS(
+    tableName: string,
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
+  ): Promise<{ schemaName: string; tableName: string; rlsEnabled: boolean; message: string }> {
+    return apiClient.request(
+      `/database/tables/${tableName}/enable-rls${buildDatabaseSchemaSearch(schemaName)}`,
+      {
+        method: 'POST',
+        headers: apiClient.withAccessToken(),
+      }
+    );
+  }
+
   updateTableSchema(
     tableName: string,
     operations: UpdateTableSchemaRequest,

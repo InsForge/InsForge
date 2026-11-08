@@ -166,4 +166,34 @@ router.delete(
   }
 );
 
+// Enable RLS on a table
+router.post(
+  '/:tableName/enable-rls',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { tableName } = req.params;
+      const schemaName = normalizeDatabaseSchemaName(req.query.schema);
+      const result = await tableService.enableTableRLS(schemaName, tableName);
+
+      // Log audit for enabling RLS
+      await auditService.log({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'UPDATE_TABLE_RLS',
+        module: 'DATABASE',
+        details: {
+          schemaName,
+          tableName,
+          rlsEnabled: true,
+        },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export { router as databaseTablesRouter };

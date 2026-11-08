@@ -80,6 +80,7 @@ export const tableSchema = z.object({
   // Foreign keys are table-level, one entry per constraint.
   foreignKeys: z.array(foreignKeySchema).optional(),
   recordCount: z.number().optional(),
+  rlsEnabled: z.boolean().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });

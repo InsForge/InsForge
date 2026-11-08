@@ -435,6 +435,20 @@ export class DatabaseTableService {
         row_count = 0;
       }
 
+      // Get RLS status from pg_class
+      const rlsResult = await client.query(
+        `
+          SELECT c.relrowsecurity
+          FROM pg_catalog.pg_class c
+          JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = $1
+            AND c.relname = $2
+            AND c.relkind IN ('r', 'p')
+        `,
+        [schemaName, table]
+      );
+      const rlsEnabled = Boolean(rlsResult.rows[0]?.relrowsecurity);
+
       return {
         schemaName,
         tableName: table,
@@ -452,6 +466,7 @@ export class DatabaseTableService {
         }),
         foreignKeys,
         recordCount: row_count,
+        rlsEnabled,
       };
     } finally {
       client.release();
@@ -769,6 +784,75 @@ export class DatabaseTableService {
             tableName: table,
             nextActions:
               'table deleted successfully, you can create a new table with the POST /api/database/tables endpoint',
+          };
+        },
+        true
+      );
+
+      await client.query('COMMIT');
+      transactionStarted = false;
+      return response;
+    } catch (error) {
+      if (transactionStarted) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Enable Row Level Security on a table
+   */
+  async enableTableRLS(
+    schemaName: string,
+    tableName: string
+  ): Promise<{ schemaName: string; tableName: string; rlsEnabled: boolean; message: string }> {
+    validateSchemaName(schemaName);
+    validateIdentifier(tableName, 'table');
+    const client = await this.getPool().connect();
+    let transactionStarted = false;
+    try {
+      await client.query('BEGIN');
+      transactionStarted = true;
+
+      const response = await withAdminContext(
+        client,
+        async () => {
+          const safeQualifiedTableName = quoteQualifiedName(schemaName, tableName);
+
+          // Verify table exists
+          const tableCheck = await client.query(
+            `
+              SELECT c.relrowsecurity
+              FROM pg_catalog.pg_class c
+              JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+              WHERE n.nspname = $1
+                AND c.relname = $2
+                AND c.relkind IN ('r', 'p')
+            `,
+            [schemaName, tableName]
+          );
+
+          if (tableCheck.rows.length === 0) {
+            throw new AppError(
+              `table ${tableName} not found in schema ${schemaName}`,
+              404,
+              ERROR_CODES.DATABASE_NOT_FOUND,
+              `table ${tableName} not found in schema ${schemaName}.`
+            );
+          }
+
+          await client.query(`ALTER TABLE ${safeQualifiedTableName} ENABLE ROW LEVEL SECURITY;`);
+          await client.query(`NOTIFY pgrst, 'reload schema';`);
+
+          return {
+            schemaName,
+            tableName,
+            rlsEnabled: true,
+            message: `Row Level Security enabled on ${schemaName}.${tableName}`,
           };
         },
         true

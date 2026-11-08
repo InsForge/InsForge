@@ -87,6 +87,25 @@ export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
     },
   });
 
+  // Mutation to enable table RLS
+  const enableTableRLSMutation = useMutation({
+    mutationFn: (tableName: string) => tableService.enableTableRLS(tableName, schemaName),
+    onSuccess: (_, tableName) => {
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['database', 'policies', schemaName],
+      });
+      showToast('Row-Level Security enabled successfully', 'success');
+    },
+    onError: (error: Error) => {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to enable Row-Level Security';
+      showToast(errorMessage, 'error');
+    },
+  });
+
   return {
     // Data
     tables: tables || [],
@@ -97,6 +116,7 @@ export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
     isCreating: createTableMutation.isPending,
     isDeleting: deleteTableMutation.isPending,
     isUpdating: updateTableSchemaMutation.isPending,
+    isEnablingRLS: enableTableRLSMutation.isPending,
 
     // Errors
     tablesError,
@@ -105,6 +125,7 @@ export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
     createTable: createTableMutation.mutate,
     deleteTable: deleteTableMutation.mutate,
     updateTableSchema: updateTableSchemaMutation.mutate,
+    enableTableRLS: enableTableRLSMutation.mutateAsync,
     refetchTables,
 
     // Helpers

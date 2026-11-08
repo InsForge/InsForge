@@ -77,8 +77,16 @@ export default function TablesPage() {
     () => getDatabaseSchemaInfo(schemas, selectedSchema),
     [schemas, selectedSchema]
   );
-  const { tables, isLoadingTables, tablesError, deleteTable, useTableSchema, refetchTables } =
-    useTables(selectedSchema);
+  const {
+    tables,
+    isLoadingTables,
+    tablesError,
+    deleteTable,
+    enableTableRLS,
+    isEnablingRLS,
+    useTableSchema,
+    refetchTables,
+  } = useTables(selectedSchema);
   const selectedTable = useMemo(() => {
     if (isLoadingTables || !tables.length) {
       return null;
@@ -511,6 +519,26 @@ export default function TablesPage() {
     }
   };
 
+  const handleEnableRLS = async (tableName: string) => {
+    const shouldEnable = await confirm({
+      title: t('database.enableRlsTitle', { defaultValue: 'Enable Row-Level Security?' }),
+      description: t('database.enableRlsConfirmDesc', {
+        defaultValue:
+          'Enabling Row-Level Security on this table will enforce access policies. If no policies are defined, non-admin requests through the data API will be denied by default until policies are created.',
+      }),
+      confirmText: t('database.enableRlsAction', { defaultValue: 'Enable RLS' }),
+      destructive: false,
+    });
+
+    if (shouldEnable) {
+      try {
+        await enableTableRLS(tableName);
+      } catch {
+        // Error handling is handled in mutation toast
+      }
+    }
+  };
+
   const error = tablesError || tableError;
 
   // Calculate pagination
@@ -597,6 +625,11 @@ export default function TablesPage() {
                       {selectedSchemaInfo.isProtected && (
                         <span className="rounded bg-alpha-4 px-2 py-0.5 text-xs font-medium text-muted-foreground">
                           {t('database.protectedBadge', { defaultValue: 'Protected' })}
+                        </span>
+                      )}
+                      {schemaData && schemaData.rlsEnabled === false && (
+                        <span className="rounded bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive">
+                          {t('database.rlsDisabledBadge', { defaultValue: 'RLS Off' })}
                         </span>
                       )}
                       <div className="flex h-5 w-5 shrink-0 items-center justify-center">
@@ -710,6 +743,33 @@ export default function TablesPage() {
               {error && (
                 <Alert variant="destructive" className="mx-4 mt-4">
                   <AlertDescription>{String(error)}</AlertDescription>
+                </Alert>
+              )}
+
+              {selectedTable && schemaData && schemaData.rlsEnabled === false && (
+                <Alert
+                  variant="destructive"
+                  className="mx-4 mt-4 shrink-0 flex items-center justify-between"
+                >
+                  <AlertDescription className="text-sm">
+                    {t('database.rlsDisabledWarning', {
+                      defaultValue:
+                        'Row-Level Security is disabled for this table. Database roles with table privileges may access all rows through the data API.',
+                    })}
+                  </AlertDescription>
+                  {canMutateSelectedSchema && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleEnableRLS(selectedTable)}
+                      disabled={isEnablingRLS}
+                      className="ml-4 shrink-0 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    >
+                      {isEnablingRLS
+                        ? t('common.enabling', { defaultValue: 'Enabling...' })
+                        : t('database.enableRlsAction', { defaultValue: 'Enable RLS' })}
+                    </Button>
+                  )}
                 </Alert>
               )}
 
