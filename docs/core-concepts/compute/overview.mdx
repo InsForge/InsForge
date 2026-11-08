@@ -61,6 +61,20 @@ When you self-host, compute containers join your project's own network by defaul
 
 Memory and CPU are configurable per service. Each service runs one instance; run several services if you need several workers.
 
+Pick the CPU tier and memory when you deploy, and change them later with `compute update`:
+
+```bash
+# shared-1x / 512 MB are the defaults if you omit --cpu / --memory
+npx @insforge/cli compute deploy ./worker --name worker --cpu performance-1x --memory 1024
+
+# resize an existing service
+npx @insforge/cli compute update <service-id> --cpu shared-2x --memory 2048
+```
+
+CPU tiers use the `<kind>-<N>x` format, where `<kind>` is `shared` or `performance` — common values are `shared-1x`, `shared-2x`, `performance-1x`, `performance-2x`, and `performance-4x`. Memory is set in MB. If you don't specify them, a new service defaults to **`shared-1x` with 512 MB**.
+
+The same CPU and memory options are available on every plan — plans differ only in how runtime is billed, not in which specs you can choose. The Free plan includes **120 hours of custom-compute runtime per month**, counted as wall-clock time regardless of the spec you pick; on Pro, custom compute is billed by usage. See [Pricing](/pricing) for the full breakdown.
+
 ### Logs
 
 Structured logs per container, queryable by service and time range. Tail in the dashboard, CLI, or MCP without `kubectl exec`-ing into anything.

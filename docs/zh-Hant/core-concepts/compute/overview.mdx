@@ -61,6 +61,20 @@ npx @insforge/cli compute deploy \
 
 記憶體與 CPU 依服務設定。每個服務執行一個實例；需要多個工作者就建立多個服務。
 
+部署時選擇 CPU 等級和記憶體，之後可用 `compute update` 變更：
+
+```bash
+# 省略 --cpu / --memory 時預設為 shared-1x / 512 MB
+npx @insforge/cli compute deploy ./worker --name worker --cpu performance-1x --memory 1024
+
+# 調整現有服務的規格
+npx @insforge/cli compute update <service-id> --cpu shared-2x --memory 2048
+```
+
+CPU 等級使用 `<kind>-<N>x` 格式，其中 `<kind>` 為 `shared` 或 `performance` — 常見值包括 `shared-1x`、`shared-2x`、`performance-1x`、`performance-2x` 和 `performance-4x`。記憶體以 MB 為單位設定。如果不指定，新服務預設使用 **`shared-1x` 加 512 MB**。
+
+所有方案都提供相同的 CPU 和記憶體選項 — 各方案的區別僅在於如何對執行時間計費，而非你可以選擇哪些規格。免費方案每月包含 **120 小時自訂運算執行時間**，無論你選擇哪種規格都按實際執行時長計量；在專業版上，自訂運算按使用情況計費。完整細則請參閱[定價](/pricing)。
+
 ### 日誌
 
 每個容器都有結構化日誌，可依服務與時間範圍查詢。在 dashboard、CLI 或 MCP 中檢視，不必 `kubectl exec` 進容器。
