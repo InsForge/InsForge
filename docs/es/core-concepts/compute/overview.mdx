@@ -61,6 +61,20 @@ Cuando te autoalojas, los contenedores de compute se unen por defecto a la red d
 
 La memoria y la CPU se configuran por servicio. Cada servicio ejecuta una instancia; crea varios servicios si necesitas varios workers.
 
+Elige el nivel de CPU y la memoria al desplegar, y cámbialos más tarde con `compute update`:
+
+```bash
+# shared-1x / 512 MB son los valores predeterminados si omites --cpu / --memory
+npx @insforge/cli compute deploy ./worker --name worker --cpu performance-1x --memory 1024
+
+# redimensiona un servicio existente
+npx @insforge/cli compute update <service-id> --cpu shared-2x --memory 2048
+```
+
+Los niveles de CPU usan el formato `<kind>-<N>x`, donde `<kind>` es `shared` o `performance` — los valores comunes son `shared-1x`, `shared-2x`, `performance-1x`, `performance-2x` y `performance-4x`. La memoria se establece en MB. Si no los especificas, un servicio nuevo usa de forma predeterminada **`shared-1x` con 512 MB**.
+
+Las mismas opciones de CPU y memoria están disponibles en todos los planes — los planes solo difieren en cómo se factura el tiempo de ejecución, no en qué especificaciones puedes elegir. El plan Gratis incluye **120 horas de tiempo de ejecución de computación personalizada al mes**, contadas como tiempo real independientemente de la especificación que elijas; en Pro, la computación personalizada se factura por uso. Consulta [Precios](/pricing) para el desglose completo.
+
 ### Logs
 
 Logs estructurados por contenedor, consultables por servicio y rango de tiempo. Míralos en el dashboard, la CLI o MCP sin hacer `kubectl exec` en nada.
