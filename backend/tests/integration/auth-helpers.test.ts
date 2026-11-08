@@ -1,3 +1,4 @@
+import { describe, it, beforeAll, afterAll, beforeEach, afterEach, expect } from 'vitest';
 import { PgTestClient } from 'insforge-test';
 import { getConnections } from './utils';
 
