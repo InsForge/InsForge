@@ -64,6 +64,32 @@ Envíe un enlace de un solo uso o un código de seis dígitos al correo electró
 
 Soporte de primera clase para Google, GitHub, Apple, Microsoft, GitLab, Discord y más. Agregue proveedores OAuth 2.0 / OIDC personalizados (Keycloak, Okta, Auth0, su propio IdP) por URL sin escribir código específico del proveedor.
 
+#### Configurar un proveedor
+
+Cada proveedor social necesita su propia app de OAuth, creada en la consola de desarrollador de ese proveedor, cuyos **Client ID** y **Client Secret** luego pega en InsForge. Usando Google como ejemplo:
+
+1. En el panel, abra **Authentication → Auth Methods** y haga clic en **Google OAuth**.
+2. Siga el enlace **Create a Google OAuth App** hacia la [Google Cloud Console](https://console.cloud.google.com/apis/credentials) y cree un cliente OAuth 2.0. Establezca su URI de redirección autorizado en la URL de callback que muestra el diálogo, que se ve así: `https://<your-backend-url>/api/auth/oauth/google/callback`.
+3. Copie el **Client ID** y el **Client Secret** de la app de Google en los campos correspondientes y haga clic en **Add Provider**.
+
+El flujo es idéntico para GitHub, Microsoft, Discord, LinkedIn, Facebook, X y Apple: solo cambia la consola de desarrollador de cada proveedor.
+
+<Note>
+  En los proyectos de InsForge Cloud puede activar el interruptor **Shared Keys** en lugar de aportar sus propias credenciales. Las claves compartidas son apps de OAuth gestionadas por InsForge que le permiten empezar rápido en desarrollo; la pantalla de consentimiento muestra el nombre y el logotipo de InsForge, así que nunca las use en producción.
+</Note>
+
+¿Prefiere automatizarlo? El diálogo llama a una API REST exclusiva para administradores, por lo que puede configurar un proveedor desde una terminal o CI con la [API Key](/faq) de su proyecto (`ik_...`):
+
+```bash
+# Crear la configuración del proveedor Google
+curl -X POST "$INSFORGE_BASE_URL/api/auth/oauth/configs" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"google","clientId":"<client-id>","clientSecret":"<client-secret>"}'
+```
+
+Actualice un proveedor existente con `PUT /api/auth/oauth/<provider>/config`, o elimínelo con `DELETE /api/auth/oauth/<provider>/config`.
+
 ### Modo servidor de OAuth
 
 Ejecute InsForge como un proveedor de identidad OAuth 2.0 / OIDC para sus propias aplicaciones posteriores. Vea la [guía del servidor OAuth](/oauth-server) para la configuración completa.
