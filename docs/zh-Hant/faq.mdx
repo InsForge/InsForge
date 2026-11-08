@@ -177,6 +177,12 @@ description: "InsForge 常見問題：解說資料庫呼叫、Edge Function 與 
     還是卡住？到我們的 [Discord](https://discord.com/invite/DvBtaEc9Jz) 提問，回應最快。
   </Accordion>
 
+  <Accordion title="能把後端專案 API 放到自訂網域（例如 api.example.com）上嗎？">
+    帶自動 TLS 的自訂網域僅支援用 [InsForge Sites](/core-concepts/sites/overview) 部署的**前端應用**：你附加網域，新增它回傳的 DNS 記錄，InsForge 就會為你簽發 HTTPS 憑證。
+
+    至於**後端專案 API**（`https://<appkey>.<region>.insforge.app`），目前還沒有自助式的自訂網域流程。`npx @insforge/cli projects update --domain api.example.com` 會在專案上記錄一個自訂主機名稱，但它本身**不會**簽發 TLS 憑證，也不會回傳 DNS/驗證記錄，所以這並不是一套完整的設定。請繼續在預設的 `<appkey>.<region>.insforge.app` 主機上呼叫 API；如果你確實需要為 API 使用自訂網域，請到我們的 [Discord](https://discord.com/invite/DvBtaEc9Jz) 提問。
+  </Accordion>
+
   <Accordion title="不打開瀏覽器，怎麼幫 CLI 登入驗證？">
     `npx @insforge/cli login` 會打開瀏覽器登入。在無介面機器、遠端伺服器或 CI 上，改用 user API key，不需要瀏覽器。
 
