@@ -347,9 +347,11 @@ export class SmtpConfigService {
       );
     }
 
+    const normalizedHost = host.trim().toLowerCase().replace(/\.+$/, '');
+
     // If the host is a raw IP address, validate it directly without DNS
-    if (net.isIP(host)) {
-      if (isPrivateIp(host)) {
+    if (net.isIP(normalizedHost)) {
+      if (isPrivateIp(normalizedHost)) {
         throw new AppError(
           'SMTP host is a private or loopback address, which is not allowed',
           400,
@@ -359,7 +361,6 @@ export class SmtpConfigService {
       return;
     }
 
-    const normalizedHost = host.trim().toLowerCase();
     if (normalizedHost === 'localhost' || normalizedHost.endsWith('.localhost')) {
       throw new AppError(
         'SMTP host is a private or loopback address, which is not allowed',
@@ -369,7 +370,7 @@ export class SmtpConfigService {
     }
 
     try {
-      const addresses = await dns.lookup(host, { all: true });
+      const addresses = await dns.lookup(normalizedHost, { all: true });
       if (!addresses || addresses.length === 0) {
         throw new AppError('SMTP host could not be resolved', 400, ERROR_CODES.INVALID_INPUT);
       }
