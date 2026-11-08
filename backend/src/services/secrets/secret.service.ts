@@ -7,8 +7,7 @@ import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { SecretSchema, CreateSecretRequest, ERROR_CODES } from '@insforge/shared-schemas';
 import { appConfig } from '@/infra/config/app.config.js';
 
-export interface CreateSecretInput extends CreateSecretRequest {
-  isReserved?: boolean;
+export interface CreateSecretInput extends Omit<CreateSecretRequest, 'expiresAt'> {
   expiresAt?: Date;
 }
 
