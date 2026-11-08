@@ -64,6 +64,16 @@ Envíe un enlace de un solo uso o un código de seis dígitos al correo electró
 
 Soporte de primera clase para Google, GitHub, Apple, Microsoft, GitLab, Discord y más. Agregue proveedores OAuth 2.0 / OIDC personalizados (Keycloak, Okta, Auth0, su propio IdP) por URL sin escribir código específico del proveedor.
 
+#### Vincular un proveedor a un usuario existente
+
+No necesita un paso de vinculación de cuentas aparte. Cuando alguien inicia sesión con un proveedor de OAuth (por ejemplo, Google) y el correo electrónico que devuelve ese proveedor coincide con un usuario existente —ya sea que ese usuario se haya creado con correo electrónico y contraseña o con un proveedor diferente—, InsForge vincula la nueva identidad a la cuenta existente automáticamente. Registra el proveedor en `auth.user_providers`, marca el correo electrónico como verificado e inicia la sesión del usuario como esa misma cuenta. No se crea ningún usuario duplicado ni se devuelve ningún error.
+
+Para que sus usuarios actuales empiecen a iniciar sesión con Google, habilite el proveedor de Google en **Authentication → Auth Methods** en el panel. La próxima vez que un usuario inicie sesión con Google usando el mismo correo electrónico que su cuenta existente, esa identidad de Google se adjunta a su usuario y conserva el mismo ID de usuario y sus datos.
+
+<Note>
+  La vinculación se basa únicamente en la coincidencia de la dirección de correo electrónico declarada por el proveedor, así que habilite solo proveedores en los que confíe para verificar la titularidad del correo electrónico. El interruptor de registro a nivel de proyecto solo bloquea usuarios completamente nuevos: un inicio de sesión cuyo correo electrónico coincide con una cuenta existente se vincula e inicia sesión incluso cuando los registros nuevos están deshabilitados. No hay un endpoint integrado para adjuntar un proveedor a una sesión ya iniciada sin un nuevo inicio de sesión de OAuth, ni para desvincularlo.
+</Note>
+
 ### Modo servidor de OAuth
 
 Ejecute InsForge como un proveedor de identidad OAuth 2.0 / OIDC para sus propias aplicaciones posteriores. Vea la [guía del servidor OAuth](/oauth-server) para la configuración completa.
