@@ -159,6 +159,20 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     Transferir la organización por completo a un nuevo **Owner** es una acción distinta de invitar miembros. Para hacerlo, abre **Organization Settings** y usa **Transfer Ownership** (solo el owner actual puede iniciarlo, y el destinatario debe ser un usuario verificado de InsForge que acepte la solicitud enviada por email).
   </Accordion>
 
+  <Accordion title="¿Dónde encuentro el ID de mi organización?">
+    Tus proyectos viven dentro de una **organización**, y los comandos de la CLI que operan por organización (como [`usage`](/pricing)) aceptan un `--org-id`. Para listar todas las organizaciones a las que perteneces, junto con su ID, ejecuta:
+
+    ```bash
+    npx @insforge/cli orgs list
+    ```
+
+    Imprime una tabla con **ID**, **Name** y **Type**. Añade `--json` para una salida legible por máquina.
+
+    Normalmente no necesitas pasar `--org-id` a mano. Los comandos que operan por organización resuelven la organización automáticamente, en este orden: la opción `--org-id`, la variable de entorno `INSFORGE_ORG_ID`, el proyecto vinculado (`.insforge/project.json`), tu organización predeterminada y, por último —si perteneces exactamente a una—, esa organización. Pasa `--org-id` solo cuando pertenezcas a más de una y quieras apuntar a una concreta.
+
+    {/* TODO: confirm dashboard location where the organization ID is displayed */}
+  </Accordion>
+
   <Accordion title="¿Por qué se pausó mi proyecto y cómo evito que se pause?">
     La pausa solo ocurre en el plan Free, por dos motivos:
 
