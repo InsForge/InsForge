@@ -142,6 +142,7 @@ router.get('/email/verify-link', async (req: Request, res: Response, next: NextF
       })
     );
   } catch (error) {
+    logger.error('Verify email link error', { error });
     if (redirectTo) {
       try {
         if (await authConfigService.validateRedirectUrl(redirectTo)) {
@@ -215,6 +216,7 @@ router.get(
         })
       );
     } catch (error) {
+      logger.error('Reset password link error', { error });
       if (redirectTo) {
         try {
           if (await authConfigService.validateRedirectUrl(redirectTo)) {

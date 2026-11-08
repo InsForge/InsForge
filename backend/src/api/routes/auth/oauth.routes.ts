@@ -387,10 +387,9 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     }
 
     if (success !== 'true') {
-      const errorMessage = error || 'OAuth Authentication Failed';
-      logger.warn('Shared OAuth callback failed', { error: errorMessage, provider });
+      logger.warn('Shared OAuth callback failed', { error, provider });
       const errorUrl = new URL(redirectUri);
-      errorUrl.searchParams.set('error', String(errorMessage));
+      errorUrl.searchParams.set('error', 'Authentication failed');
       return res.redirect(errorUrl.toString());
     }
 
