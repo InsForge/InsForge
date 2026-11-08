@@ -93,7 +93,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
         value,
         isActive: true,
         isReserved: isReserved || false,
-        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
       });
       if (!success) {
         throw new AppError(`Failed to create secret: ${key}`, 500, ERROR_CODES.INTERNAL_ERROR);
