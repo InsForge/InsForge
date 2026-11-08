@@ -60,6 +60,22 @@ graph TB
 
 Postgres RLS 原則在列級別強制執行存取。原則讀取驗證 JWT，因此相同的規則適用於 REST 查詢、SDK 呼叫、即時訂閱和儲存請求。
 
+### 關聯與結構描述視覺化
+
+為欄位加入外鍵後，InsForge 會將其視為資料表之間的關聯。每個外鍵會記錄其目標資料表（`referenceTable`）、欄位對應（`referenceColumns`）以及 `onDelete` / `onUpdate` 動作。
+
+儀表板內建了**結構描述視覺化工具（Schema Visualizer）**：一個實體關聯圖（ERD），它將每個資料表繪製為一個節點，並為每個外鍵繪製一條連線，讓您一眼看清各資料表之間的關聯。
+{/* TODO: confirm the exact dashboard sidebar label and navigation path to the Schema Visualizer */}
+
+若要以程式方式讀取關聯，請取得某個資料表的結構描述——回應中包含一個 `foreignKeys` 陣列：
+
+```bash
+curl "https://your-app.insforge.app/api/database/tables/<table>/schema" \
+  -H "Authorization: Bearer <API_KEY>"
+```
+
+智慧代理可以透過 MCP `get-table-schema` 工具取得相同的資訊，該工具會回傳某個資料表的完整結構描述，包括其外鍵。
+
 ## 概念
 
 <CardGroup cols={2}>

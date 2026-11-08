@@ -60,6 +60,22 @@ graph TB
 
 Postgres RLS 策略在行级别强制执行访问。策略读取身份验证 JWT，因此相同的规则适用于 REST 查询、SDK 调用、实时订阅和存储请求。
 
+### 关系与模式可视化
+
+为列添加外键后，InsForge 会将其视为表之间的关系。每个外键会记录其目标表（`referenceTable`）、列映射（`referenceColumns`）以及 `onDelete` / `onUpdate` 操作。
+
+仪表板内置了**模式可视化工具（Schema Visualizer）**：一个实体关系图（ERD），它将每个表绘制为一个节点，并为每个外键绘制一条连线，让您一眼看清各表之间的关联。
+{/* TODO: confirm the exact dashboard sidebar label and navigation path to the Schema Visualizer */}
+
+若要以编程方式读取关系，请获取某个表的模式——响应中包含一个 `foreignKeys` 数组：
+
+```bash
+curl "https://your-app.insforge.app/api/database/tables/<table>/schema" \
+  -H "Authorization: Bearer <API_KEY>"
+```
+
+智能体可以通过 MCP `get-table-schema` 工具获取相同的信息，该工具会返回某个表的完整模式，包括其外键。
+
 ## 概念
 
 <CardGroup cols={2}>
