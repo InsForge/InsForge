@@ -168,4 +168,21 @@ describe('role access control', () => {
     );
     expect(rows).toHaveLength(0);
   });
+
+  it('should automatically enable RLS on newly created tables in public', async () => {
+    await db.query(`CREATE TABLE auto_rls_probe (id INT PRIMARY KEY, content TEXT)`);
+    const row = await db.one(
+      `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_probe'`
+    );
+    expect(row.relrowsecurity).toBe(true);
+
+    // anon should be blocked by default-deny
+    db.setContext({ role: 'anon' });
+    const { rows } = await db.query(`SELECT * FROM auto_rls_probe`);
+    expect(rows).toHaveLength(0);
+
+    await expect(
+      db.query(`INSERT INTO auto_rls_probe (id, content) VALUES (1, 'leak')`)
+    ).rejects.toThrow(/violates row-level security policy/);
+  });
 });

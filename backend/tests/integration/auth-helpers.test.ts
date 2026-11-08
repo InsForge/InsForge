@@ -15,6 +15,7 @@ beforeAll(async () => {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       owner_id UUID DEFAULT auth.uid()
     );
+    CREATE POLICY allow_all ON uid_default_test FOR ALL TO authenticated USING (true) WITH CHECK (true);
     GRANT ALL ON uid_default_test TO authenticated;
   `);
 });
