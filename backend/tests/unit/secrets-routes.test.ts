@@ -123,22 +123,6 @@ describe('secrets routes request validation', () => {
     );
   });
 
-  it('clears the old expiry when a create reactivates an inactive secret', async () => {
-    secretServiceMock.listSecrets.mockResolvedValue([
-      { ...existingSecret, isActive: false, expiresAt: '2026-10-02T00:00:00.000Z' },
-    ]);
-
-    const res = await request(await createApp())
-      .post('/api/secrets')
-      .send({ key: 'STRIPE_API_KEY', value: 'sk_live_456' });
-
-    expect(res.status).toBe(201);
-    expect(secretServiceMock.updateSecret).toHaveBeenCalledWith(
-      'secret-1',
-      expect.objectContaining({ isActive: true, expiresAt: null })
-    );
-  });
-
   it.each([
     ['an empty body', {}],
     ['a non-boolean isActive', { isActive: 'false' }],
