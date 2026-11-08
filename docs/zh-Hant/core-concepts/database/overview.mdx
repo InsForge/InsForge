@@ -60,6 +60,8 @@ graph TB
 
 Postgres RLS 原則在列級別強制執行存取。原則讀取驗證 JWT，因此相同的規則適用於 REST 查詢、SDK 呼叫、即時訂閱和儲存請求。
 
+新資料表預設**開啟** RLS；在建立時傳 `rlsEnabled: false` 可以關閉。使用管理 API Key（`ik_...`）發出的請求會繞過 RLS。要為既有的資料表切換 RLS，用 `npx @insforge/cli db query` 或遷移執行 SQL——`ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;`（或 `DISABLE`）。在沒有任何原則的資料表上啟用 RLS，會拒絕 `anon` 和 `authenticated` 的所有存取，直到你新增一條原則。原則範例見 [FAQ](/faq)。
+
 ## 概念
 
 <CardGroup cols={2}>
