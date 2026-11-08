@@ -177,7 +177,7 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
       return;
     }
     logger.error('S3 gateway handler error', { op, err });
-    sendS3Error(res, 'InternalError', msg, {
+    sendS3Error(res, 'InternalError', 'We encountered an internal error. Please try again.', {
       resource: req.path,
       requestId: authed.s3Auth?.requestId,
     });
