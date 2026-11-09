@@ -169,10 +169,7 @@ export function useAllTableSchemas(schemaName: string = DEFAULT_DATABASE_SCHEMA,
  * Hook to fetch lightweight RLS status for all tables in a schema.
  * Replaces N+1 getTableSchema calls with a single catalog-level request.
  */
-export function useTableRlsStatuses(
-  schemaName: string = DEFAULT_DATABASE_SCHEMA,
-  enabled = true
-) {
+export function useTableRlsStatuses(schemaName: string = DEFAULT_DATABASE_SCHEMA, enabled = true) {
   const {
     data: rlsStatuses,
     isLoading: isLoadingRlsStatuses,
