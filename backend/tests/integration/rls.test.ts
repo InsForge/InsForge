@@ -378,6 +378,11 @@ describe('role access control', () => {
       await expect(
         db.query(`INSERT INTO auto_rls_idem (id, content) VALUES (1, 'leak')`)
       ).rejects.toThrow(/violates row-level security policy/);
+
+      // Roll back to savepoint to clear aborted transaction state before testing the next table
+      await db.rollback();
+      await db.savepoint();
+
       await expect(
         db.query(`INSERT INTO auto_rls_idem_ctas (id, content) VALUES (1, 'leak')`)
       ).rejects.toThrow(/violates row-level security policy/);
