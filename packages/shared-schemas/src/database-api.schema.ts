@@ -28,6 +28,7 @@ export const createTableResponseSchema = tableSchema
     schemaName: true,
     tableName: true,
     columns: true,
+    rlsEnabled: true,
   })
   .extend({
     message: z.string(),

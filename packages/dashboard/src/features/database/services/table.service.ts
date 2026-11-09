@@ -5,6 +5,7 @@ import {
   CreateTableRequest,
   type ForeignKeySchema,
   GetTableSchemaResponse,
+  TableRlsStatus,
   UpdateTableSchemaRequest,
   UpdateTableSchemaResponse,
 } from '@insforge/shared-schemas';
@@ -18,6 +19,19 @@ export class TableService {
       headers: apiClient.withAccessToken(),
       signal,
     });
+  }
+
+  getTableRlsStatuses(
+    schemaName: string = DEFAULT_DATABASE_SCHEMA,
+    signal?: AbortSignal
+  ): Promise<TableRlsStatus[]> {
+    return apiClient.request(
+      `/database/tables/rls-status${buildDatabaseSchemaSearch(schemaName)}`,
+      {
+        headers: apiClient.withAccessToken(),
+        signal,
+      }
+    );
   }
 
   getTableSchema(
@@ -66,7 +80,7 @@ export class TableService {
     schemaName: string = DEFAULT_DATABASE_SCHEMA
   ): Promise<{ schemaName: string; tableName: string; rlsEnabled: boolean; message: string }> {
     return apiClient.request(
-      `/database/tables/${tableName}/enable-rls${buildDatabaseSchemaSearch(schemaName)}`,
+      `/database/tables/${encodeURIComponent(tableName)}/enable-rls${buildDatabaseSchemaSearch(schemaName)}`,
       {
         method: 'POST',
         headers: apiClient.withAccessToken(),

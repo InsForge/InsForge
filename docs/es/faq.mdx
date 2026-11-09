@@ -83,9 +83,16 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
   </Accordion>
 
   <Accordion title="¿Cómo activo o desactivo la seguridad a nivel de fila (RLS) en una tabla?">
-    Las tablas nuevas tienen RLS **activado** por defecto. Cuando creas una tabla (desde el dashboard, `POST /api/database/tables` o el SDK), RLS queda habilitado a menos que pases explícitamente `rlsEnabled: false`.
+    Las tablas nuevas en el esquema `public` tienen RLS **activado** por defecto en todas las vías de creación de tablas:
 
-    El endpoint update-table-schema (`PATCH /api/database/tables/{table}/schema`) no tiene ningún campo para alternar RLS: solo gestiona columnas, claves foráneas y renombrados. Para cambiar RLS en una tabla **existente**, ejecuta una sola sentencia SQL:
+    - **Creador de tablas del Dashboard y API REST**: Al crear una tabla desde la interfaz del dashboard o mediante `POST /api/database/tables`, RLS se activa de forma predeterminada. Si una aplicación especifica explícitamente `rlsEnabled: false`, RLS se desactiva dentro de la transacción de creación, preservando los flujos de trabajo de exclusión deliberada.
+    - **Editor SQL del Dashboard y DDL directo**: Las tablas creadas con DDL SQL directo (`CREATE TABLE`, `CREATE TABLE AS`, `SELECT INTO` o migraciones directas) en el esquema `public` tienen RLS habilitado automáticamente mediante un event trigger de PostgreSQL (`system.auto_enable_rls()`).
+    - **Esquemas personalizados**: El event trigger automatizado protege específicamente el esquema `public`. Si creas tablas en un esquema personalizado expuesto a PostgREST, el trigger no las modifica; ejecuta `ALTER TABLE <schema>.<table> ENABLE ROW LEVEL SECURITY;` explícitamente.
+
+    Para cambiar RLS en una tabla **existente**:
+
+    1. **Desde el Dashboard**: Si RLS está desactivado en una tabla existente, las páginas **Tables** y **Policies** muestran un banner de advertencia con un botón de 1 clic **Enable RLS** (que solicita confirmación).
+    2. **Vía SQL**: Ejecuta `ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;` (o `DISABLE`) usando el editor SQL del dashboard, la herramienta `run-raw-sql` de MCP o la CLI:
 
     ```sql
     -- desactivar RLS
@@ -94,8 +101,6 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     -- volver a activar RLS
     ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;
     ```
-
-    Ejecuta ese SQL de cualquier forma en que ejecutes SQL de administrador; todas requieren acceso de project owner / admin:
 
     ```bash
     # puntual, mediante la CLI
@@ -107,12 +112,18 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     npx @insforge/cli db migrations up --all
     ```
 
-    También puedes ejecutarlo desde el editor SQL del dashboard, la herramienta `run-raw-sql` de MCP, o el endpoint REST de SQL directo (`POST /api/database/advance/rawsql/unrestricted`).
-
     <Warning>
-      **Desactivar** RLS elimina todo el filtrado a nivel de fila: cualquier rol con privilegios sobre la tabla (como `authenticated`, y `anon` donde se le haya concedido) puede leer y escribir todas las filas a través de la API de datos. Es preferible escribir políticas RLS antes que desactivar RLS. Las solicitudes de administrador hechas con la API Key (`ik_...`) omiten RLS de todos modos.
+      **Cómo funcionan juntos los privilegios de tabla (GRANT) y RLS:**
 
-      **Activar** RLS en una tabla que no tiene políticas aplica el rechazo por defecto de PostgreSQL: `anon` y `authenticated` pierden todo acceso a ella a través de la API de datos (se bloquea cada `SELECT`/`INSERT`/`UPDATE`/`DELETE`) hasta que agregues al menos una política. Crea las políticas que necesites antes de activar RLS, o justo después.
+      PostgreSQL utiliza un modelo de permisos de dos niveles para el acceso a la API:
+
+      1. **Privilegios de tabla (`GRANT`)**: Un rol de base de datos (`anon`, `authenticated`) debe tener el privilegio correspondiente a la operación específica que desea ejecutar (p. ej., `SELECT`, `INSERT`, `UPDATE` o `DELETE`). Los roles solo necesitan privilegios para las operaciones que tienen permitido realizar, no necesariamente las cuatro operaciones DML.
+      2. **Seguridad a nivel de fila (RLS)**: Una vez que los privilegios de tabla permiten una operación, las políticas RLS dictan *qué filas* puede ver o modificar ese rol. Las políticas RLS también son específicas para cada operación y rol (p. ej., `FOR SELECT TO authenticated USING (...)`).
+
+      - **Desactivar** RLS elimina todo el filtrado a nivel de fila: cualquier rol con privilegios sobre la tabla puede ejecutar esa operación en *todas las filas* de la tabla sin restricción. Dado que los privilegios por defecto del esquema `public` conceden DML a `anon` y `authenticated`, desactivar RLS expone todas las filas a operaciones públicas de la API.
+      - **Activar** RLS en una tabla sin políticas aplica el rechazo por defecto (**default-deny**) de PostgreSQL: los clientes que acceden a través de la API de datos no pueden seleccionar, insertar, actualizar ni eliminar ninguna fila hasta que crees políticas que cubran sus roles y operaciones previstas.
+
+      Para permitir el acceso público o de usuarios legítimo, define siempre políticas RLS explícitas que coincidan con los roles y operaciones deseados (p. ej., `CREATE POLICY "public_read" ON public.mytable FOR SELECT TO anon, authenticated USING (true);`) en lugar de desactivar RLS. Las solicitudes de administrador realizadas con la API Key (`ik_...`) omiten RLS mediante el atributo de rol `BYPASSRLS`.
     </Warning>
   </Accordion>
 

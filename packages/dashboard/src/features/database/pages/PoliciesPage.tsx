@@ -16,7 +16,7 @@ import {
 } from '#components';
 import { useDatabaseSchemas, usePolicies } from '#features/database/hooks/useDatabase';
 import { useDatabaseSchemaSelection } from '#features/database/hooks/useDatabaseSchemaSelection';
-import { useAllTableSchemas } from '#features/database/hooks/useTables';
+import { useTableRlsStatuses } from '#features/database/hooks/useTables';
 import { SQLModal, SQLCellButton } from '#features/database/components/SQLModal';
 import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
 import { type DatabasePoliciesResponse } from '@insforge/shared-schemas';
@@ -67,14 +67,14 @@ export default function PoliciesPage() {
   const { schemas, isLoading: isLoadingSchemas } = useDatabaseSchemas();
   const selectedSchemaInfo = getDatabaseSchemaInfo(schemas, selectedSchema);
   const { data, isLoading, error, refetch } = usePolicies(selectedSchema, true);
-  const { allSchemas } = useAllTableSchemas(selectedSchema, true);
+  const { rlsStatuses, refetchRlsStatuses } = useTableRlsStatuses(selectedSchema, true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
   const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('db-policies');
   const [currentPage, setCurrentPage] = useState(1);
 
   const rlsDisabledTables = useMemo(() => {
-    return allSchemas.filter((s) => s.rlsEnabled === false).map((s) => s.tableName);
-  }, [allSchemas]);
+    return rlsStatuses.filter((s) => !s.rlsEnabled).map((s) => s.tableName);
+  }, [rlsStatuses]);
 
   const allPolicies = useMemo(() => parsePoliciesFromResponse(data), [data]);
 
@@ -108,7 +108,7 @@ export default function PoliciesPage() {
     try {
       setSearchQuery('');
       setCurrentPage(1);
-      await refetch();
+      await Promise.all([refetch(), refetchRlsStatuses()]);
     } finally {
       setIsRefreshing(false);
     }
@@ -211,6 +211,7 @@ export default function PoliciesPage() {
           <Button
             variant="ghost"
             size="icon"
+            aria-label={t('database.refreshPolicies', { defaultValue: 'Refresh policies' })}
             className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
             onClick={() => void handleRefresh()}
             disabled={isRefreshing}
@@ -301,7 +302,9 @@ export default function PoliciesPage() {
               <div className="font-medium text-sm">
                 {t('database.policiesRlsDisabledTitle', {
                   count: rlsDisabledTables.length,
-                  defaultValue: 'Row-Level Security is disabled for {{count}} table in this schema',
+                  defaultValue_one: 'Row-Level Security is disabled for 1 table in this schema',
+                  defaultValue_other:
+                    'Row-Level Security is disabled for {{count}} tables in this schema',
                 })}
               </div>
               <AlertDescription className="text-xs">

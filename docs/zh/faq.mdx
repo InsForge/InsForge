@@ -83,9 +83,16 @@ description: "InsForge 常见问题：数据库调用、Edge Function 与 Custom
   </Accordion>
 
   <Accordion title="怎么给一张表开启或关闭行级安全（RLS）？">
-    新建的表默认**开启** RLS。创建表时（在 dashboard、`POST /api/database/tables`，或用 SDK），除非你显式传 `rlsEnabled: false`，否则都会启用 RLS。
+    `public` schema 下新建的表在所有建表路径中均默认**开启** RLS：
 
-    update-table-schema 端点（`PATCH /api/database/tables/{table}/schema`）没有切换 RLS 的字段——它只处理列、外键和重命名。要改**已存在**表的 RLS，执行一条 SQL 即可：
+    - **Dashboard 表构建器与 REST API**：在 dashboard UI 或通过 `POST /api/database/tables` 建表时，RLS 默认开启。如果应用显式指定 `rlsEnabled: false`，则会在建表事务内显式关闭 RLS，以保留明确的自选退出工作流。
+    - **Dashboard SQL 编辑器与原始 DDL**：在 `public` schema 中通过原始 SQL DDL（`CREATE TABLE`、`CREATE TABLE AS`、`SELECT INTO` 或原始迁移）创建的表，会自动通过 PostgreSQL 事件触发器（`system.auto_enable_rls()`）开启 RLS。
+    - **自定义 Schema**：该自动事件触发器仅保护 `public` schema。如果你在暴露给 PostgREST 的自定义 schema 中建表，触发器不会修改它们；请显式执行 `ALTER TABLE <schema>.<table> ENABLE ROW LEVEL SECURITY;`。
+
+    要修改**已存在**表的 RLS：
+
+    1. **从 Dashboard 操作**：如果已存在的表关闭了 RLS，**Tables** 页面和 **Policies** 页面会展示警告横幅，并提供一键 **Enable RLS** 按钮（点击后会有确认弹窗）。
+    2. **通过 SQL 操作**：在 dashboard SQL 编辑器、MCP `run-raw-sql` 工具或 CLI 中执行 `ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;`（或 `DISABLE`）：
 
     ```sql
     -- 关闭 RLS
@@ -94,8 +101,6 @@ description: "InsForge 常见问题：数据库调用、Edge Function 与 Custom
     -- 重新开启 RLS
     ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;
     ```
-
-    用任何你运行管理员 SQL 的方式都可以执行它，这些方式都需要 project owner / admin 权限：
 
     ```bash
     # 一次性执行，通过 CLI
@@ -107,12 +112,18 @@ description: "InsForge 常见问题：数据库调用、Edge Function 与 Custom
     npx @insforge/cli db migrations up --all
     ```
 
-    也可以在 dashboard 的 SQL 编辑器、MCP 的 `run-raw-sql` 工具，或原始 SQL 的 REST 端点（`POST /api/database/advance/rawsql/unrestricted`）里执行。
-
     <Warning>
-      **关闭** RLS 会移除所有行级过滤：任何拥有表权限的角色（比如 `authenticated`，以及被授权的 `anon`）都能通过数据 API 读写每一行。相比关闭 RLS，更推荐编写 RLS 策略。用 API Key（`ik_...`）发起的管理员请求本来就会绕过 RLS。
+      **表权限（GRANT）与 RLS 的协同工作机制：**
 
-      给一张没有任何策略的表**开启** RLS 会触发 PostgreSQL 的默认拒绝：在你至少加一条策略之前，`anon` 和 `authenticated` 通过数据 API 对它的所有访问都会被拒绝（每个 `SELECT`/`INSERT`/`UPDATE`/`DELETE` 都被拦下）。请在开启 RLS 之前，或紧接着，补上需要的策略。
+      PostgreSQL 对 API 访问采用双层权限模型：
+
+      1. **表级权限（`GRANT`）**：数据库角色（`anon`、`authenticated`）必须拥有其想要执行的具体操作权限（例如 `SELECT`、`INSERT`、`UPDATE` 或 `DELETE`）。角色只需具备其实际被允许执行的操作权限，而不一定需要全部四种 DML 权限。
+      2. **行级安全（RLS）**：当表级权限允许某项操作后，RLS 策略决定了该角色可以查看或修改*哪些具体行*。RLS 策略同样针对具体操作和角色（例如 `FOR SELECT TO authenticated USING (...)`）。
+
+      - **关闭** RLS 会移除所有行级过滤：任何拥有表级权限的角色都可以无限制地对表中的*所有行*执行该操作。由于 `public` schema 的默认权限授予了 `anon` 和 `authenticated` DML 权限，关闭 RLS 会让所有行暴露在公开 API 操作之下。
+      - 给没有策略的表**开启** RLS 会触发 PostgreSQL 的**默认拒绝**（default-deny）：通过数据 API 访问的客户端在添加涵盖其角色和目标操作的策略之前，无法查询、插入、更新或删除任何行。
+
+      为了允许合法的公开或用户访问，请始终定义匹配预期角色与操作的显式 RLS 策略（例如 `CREATE POLICY "public_read" ON public.mytable FOR SELECT TO anon, authenticated USING (true);`），而非直接关闭 RLS。使用 API Key（`ik_...`）发起的管理员请求则通过 `BYPASSRLS` 角色属性直接绕过 RLS。
     </Warning>
   </Accordion>
 

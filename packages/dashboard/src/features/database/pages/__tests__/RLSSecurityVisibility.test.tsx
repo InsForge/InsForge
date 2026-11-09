@@ -10,6 +10,9 @@ const hookMocks = vi.hoisted(() => ({
   useTableSchema: vi.fn(),
   usePolicies: vi.fn(),
   useAllTableSchemas: vi.fn(),
+  useTableRlsStatuses: vi.fn(),
+  refetchRlsStatuses: vi.fn(),
+  refetchPolicies: vi.fn(),
   enableTableRLS: vi.fn(),
   confirm: vi.fn(),
   showToast: vi.fn(),
@@ -43,6 +46,7 @@ vi.mock('#features/database/hooks/useTables', () => ({
     refetchTables: vi.fn(),
   }),
   useAllTableSchemas: () => hookMocks.useAllTableSchemas(),
+  useTableRlsStatuses: () => hookMocks.useTableRlsStatuses(),
 }));
 
 vi.mock('#features/database/hooks/useRecords', () => ({
@@ -169,11 +173,21 @@ describe('RLS Security Visibility in Dashboard', () => {
       refetch: vi.fn(),
     });
 
+    hookMocks.refetchPolicies.mockResolvedValue({});
+    hookMocks.refetchRlsStatuses.mockResolvedValue({});
+
     hookMocks.usePolicies.mockReturnValue({
       data: { policies: [] },
       isLoading: false,
       error: null,
-      refetch: vi.fn(),
+      refetch: hookMocks.refetchPolicies,
+    });
+
+    hookMocks.useTableRlsStatuses.mockReturnValue({
+      rlsStatuses: [],
+      isLoadingRlsStatuses: false,
+      rlsStatusesError: null,
+      refetchRlsStatuses: hookMocks.refetchRlsStatuses,
     });
 
     hookMocks.confirm.mockResolvedValue(true);
@@ -250,13 +264,15 @@ describe('RLS Security Visibility in Dashboard', () => {
   });
 
   describe('PoliciesPage RLS visibility', () => {
-    it('displays warning alert listing tables with RLS disabled', () => {
-      hookMocks.useAllTableSchemas.mockReturnValue({
-        allSchemas: [
+    it('displays warning alert listing tables with RLS disabled (singular)', () => {
+      hookMocks.useTableRlsStatuses.mockReturnValue({
+        rlsStatuses: [
           { tableName: 'notes', schemaName: 'public', rlsEnabled: false },
           { tableName: 'todos', schemaName: 'public', rlsEnabled: true },
         ],
-        isLoading: false,
+        isLoadingRlsStatuses: false,
+        rlsStatusesError: null,
+        refetchRlsStatuses: hookMocks.refetchRlsStatuses,
       });
 
       render(
@@ -275,13 +291,40 @@ describe('RLS Security Visibility in Dashboard', () => {
       expect(screen.queryByRole('button', { name: 'todos' })).not.toBeInTheDocument();
     });
 
+    it('displays warning alert listing multiple tables with RLS disabled (plural)', () => {
+      hookMocks.useTableRlsStatuses.mockReturnValue({
+        rlsStatuses: [
+          { tableName: 'notes', schemaName: 'public', rlsEnabled: false },
+          { tableName: 'comments', schemaName: 'public', rlsEnabled: false },
+          { tableName: 'todos', schemaName: 'public', rlsEnabled: true },
+        ],
+        isLoadingRlsStatuses: false,
+        rlsStatusesError: null,
+        refetchRlsStatuses: hookMocks.refetchRlsStatuses,
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/dashboard/database/policies']}>
+          <PoliciesPage />
+        </MemoryRouter>
+      );
+
+      expect(
+        screen.getByText(/Row-Level Security is disabled for 2 tables in this schema/i)
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'notes' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'comments' })).toBeInTheDocument();
+    });
+
     it('does not display warning alert when all tables have RLS enabled', () => {
-      hookMocks.useAllTableSchemas.mockReturnValue({
-        allSchemas: [
+      hookMocks.useTableRlsStatuses.mockReturnValue({
+        rlsStatuses: [
           { tableName: 'notes', schemaName: 'public', rlsEnabled: true },
           { tableName: 'todos', schemaName: 'public', rlsEnabled: true },
         ],
-        isLoading: false,
+        isLoadingRlsStatuses: false,
+        rlsStatusesError: null,
+        refetchRlsStatuses: hookMocks.refetchRlsStatuses,
       });
 
       render(
@@ -291,6 +334,28 @@ describe('RLS Security Visibility in Dashboard', () => {
       );
 
       expect(screen.queryByText(/Row-Level Security is disabled for/i)).not.toBeInTheDocument();
+    });
+
+    it('refreshes both policies and RLS status when Refresh button is clicked', async () => {
+      const user = userEvent.setup();
+      hookMocks.useTableRlsStatuses.mockReturnValue({
+        rlsStatuses: [{ tableName: 'notes', schemaName: 'public', rlsEnabled: false }],
+        isLoadingRlsStatuses: false,
+        rlsStatusesError: null,
+        refetchRlsStatuses: hookMocks.refetchRlsStatuses,
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/dashboard/database/policies']}>
+          <PoliciesPage />
+        </MemoryRouter>
+      );
+
+      const refreshBtn = screen.getByRole('button', { name: /Refresh policies/i });
+      await user.click(refreshBtn);
+
+      expect(hookMocks.refetchPolicies).toHaveBeenCalled();
+      expect(hookMocks.refetchRlsStatuses).toHaveBeenCalled();
     });
   });
 });

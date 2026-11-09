@@ -92,6 +92,14 @@ export type ForeignKeySchema = z.infer<typeof foreignKeySchema>;
 export type OnUpdateActionSchema = z.infer<typeof onUpdateActionSchema>;
 export type OnDeleteActionSchema = z.infer<typeof onDeleteActionSchema>;
 
+export const tableRlsStatusSchema = z.object({
+  tableName: z.string(),
+  schemaName: z.string(),
+  rlsEnabled: z.boolean(),
+});
+
+export type TableRlsStatus = z.infer<typeof tableRlsStatusSchema>;
+
 export const databaseSchemaInfoSchema = z.object({
   name: z.string(),
   isProtected: z.boolean(),

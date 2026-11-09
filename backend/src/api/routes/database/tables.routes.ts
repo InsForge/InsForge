@@ -30,7 +30,34 @@ router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: Next
   }
 });
 
-// Create a new table
+/**
+ * GET /api/database/tables/rls-status
+ *
+ * Retrieves lightweight RLS status (tableName, schemaName, rlsEnabled) for all
+ * ordinary and partitioned tables in the specified schema.
+ * Requires admin authentication (JWT or API key).
+ */
+router.get(
+  '/rls-status',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const schemaName = normalizeDatabaseSchemaName(req.query.schema);
+      const statuses = await tableService.getTableRlsStatuses(schemaName);
+      successResponse(res, statuses);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/database/tables
+ *
+ * Creates a new database table with columns, foreign keys, and optional RLS settings.
+ * Invalidates column type cache and records an audit log entry upon success.
+ * Requires admin authentication (JWT or API key).
+ */
 router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const validation = createTableRequestSchema.safeParse(req.body);
@@ -166,7 +193,13 @@ router.delete(
   }
 );
 
-// Enable RLS on a table
+/**
+ * POST /api/database/tables/:tableName/enable-rls
+ *
+ * Enables Row Level Security on the specified table in the given schema.
+ * Reloads the PostgREST schema cache and logs an audit record upon success.
+ * Requires admin authentication (JWT or API key).
+ */
 router.post(
   '/:tableName/enable-rls',
   verifyAdmin,

@@ -95,6 +95,9 @@ export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
         queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
       });
       void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableRlsStatuses(schemaName),
+      });
+      void queryClient.invalidateQueries({
         queryKey: ['database', 'policies', schemaName],
       });
       showToast('Row-Level Security enabled successfully', 'success');
@@ -159,5 +162,33 @@ export function useAllTableSchemas(schemaName: string = DEFAULT_DATABASE_SCHEMA,
   return {
     allSchemas,
     isLoading: isLoadingTables || isLoadingSchemas,
+  };
+}
+
+/**
+ * Hook to fetch lightweight RLS status for all tables in a schema.
+ * Replaces N+1 getTableSchema calls with a single catalog-level request.
+ */
+export function useTableRlsStatuses(
+  schemaName: string = DEFAULT_DATABASE_SCHEMA,
+  enabled = true
+) {
+  const {
+    data: rlsStatuses,
+    isLoading: isLoadingRlsStatuses,
+    error: rlsStatusesError,
+    refetch: refetchRlsStatuses,
+  } = useQuery({
+    queryKey: databaseTableQueryKeys.tableRlsStatuses(schemaName),
+    queryFn: ({ signal }) => tableService.getTableRlsStatuses(schemaName, signal),
+    enabled: enabled && Boolean(schemaName),
+    staleTime: 30 * 1000,
+  });
+
+  return {
+    rlsStatuses: rlsStatuses ?? [],
+    isLoadingRlsStatuses,
+    rlsStatusesError,
+    refetchRlsStatuses,
   };
 }

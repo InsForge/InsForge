@@ -37,7 +37,11 @@ beforeAll(async () => {
   `);
 });
 
-afterAll(() => teardown());
+afterAll(async () => {
+  if (teardown) {
+    await teardown();
+  }
+});
 beforeEach(() => db.beforeEach());
 afterEach(() => db.afterEach());
 
@@ -185,5 +189,93 @@ describe('role access control', () => {
     await expect(
       db.query(`INSERT INTO auto_rls_probe (id, content) VALUES (1, 'leak')`)
     ).rejects.toThrow(/violates row-level security policy/);
+  });
+
+  it('should automatically enable RLS on partitioned table root and its partitions in public', async () => {
+    await db.query(`
+      CREATE TABLE auto_rls_partitioned (
+        id INT,
+        region TEXT NOT NULL,
+        PRIMARY KEY (id, region)
+      ) PARTITION BY LIST (region);
+
+      CREATE TABLE auto_rls_part_east PARTITION OF auto_rls_partitioned
+        FOR VALUES IN ('east');
+    `);
+
+    const rootRow = await db.one(
+      `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_partitioned'`
+    );
+    expect(rootRow.relrowsecurity).toBe(true);
+
+    const partRow = await db.one(
+      `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_part_east'`
+    );
+    expect(partRow.relrowsecurity).toBe(true);
+  });
+
+  it('should not enable RLS on temporary tables', async () => {
+    await db.query(`CREATE TEMP TABLE auto_rls_temp (id INT PRIMARY KEY)`);
+    const row = await db.one(
+      `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_temp' AND relnamespace = pg_my_temp_schema()`
+    );
+    expect(row.relrowsecurity).toBe(false);
+  });
+
+  it('should not enable RLS on tables created in custom non-public schemas', async () => {
+    await db.query(`
+      CREATE SCHEMA IF NOT EXISTS custom_scope;
+      CREATE TABLE custom_scope.auto_rls_custom (id INT PRIMARY KEY);
+    `);
+    const row = await db.one(
+      `SELECT c.relrowsecurity
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'custom_scope' AND c.relname = 'auto_rls_custom'`
+    );
+    expect(row.relrowsecurity).toBe(false);
+  });
+
+  it('should automatically enable RLS on tables created via CREATE TABLE AS and SELECT INTO', async () => {
+    await db.query(`
+      CREATE TABLE auto_rls_source (id INT PRIMARY KEY, val TEXT);
+      INSERT INTO auto_rls_source VALUES (1, 'hello');
+
+      CREATE TABLE auto_rls_ctas AS SELECT * FROM auto_rls_source;
+      SELECT * INTO auto_rls_select_into FROM auto_rls_source;
+    `);
+
+    const ctasRow = await db.one(
+      `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_ctas'`
+    );
+    expect(ctasRow.relrowsecurity).toBe(true);
+
+    const selectIntoRow = await db.one(
+      `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_select_into'`
+    );
+    expect(selectIntoRow.relrowsecurity).toBe(true);
+  });
+
+  it('should remain idempotent when executing repeated or multi-table DDL', async () => {
+    await db.query(`
+      CREATE TABLE auto_rls_multi_1 (id INT PRIMARY KEY);
+      CREATE TABLE auto_rls_multi_2 (id INT PRIMARY KEY);
+    `);
+
+    const row1 = await db.one(
+      `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_multi_1'`
+    );
+    const row2 = await db.one(
+      `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_multi_2'`
+    );
+    expect(row1.relrowsecurity).toBe(true);
+    expect(row2.relrowsecurity).toBe(true);
+
+    // Re-enabling or subsequent DDL succeeds idempotently
+    await db.query(`ALTER TABLE auto_rls_multi_1 ENABLE ROW LEVEL SECURITY;`);
+    const row1After = await db.one(
+      `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_multi_1'`
+    );
+    expect(row1After.relrowsecurity).toBe(true);
   });
 });

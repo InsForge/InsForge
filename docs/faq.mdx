@@ -85,13 +85,13 @@ description: "Answers to common InsForge questions on database calls, edge funct
   <Accordion title="How do I turn row-level security (RLS) on or off for a table?">
     New tables in the `public` schema have RLS **on** by default across all table creation paths:
 
-    - **Dashboard Table Builder & SDK**: When you create a table from the dashboard UI or via `POST /api/database/tables`, RLS is enabled automatically (unless explicitly requested with `rlsEnabled: false`).
-    - **Dashboard SQL Editor & Raw DDL**: Tables created with raw SQL DDL (`CREATE TABLE public.mytable (...)`, `CREATE TABLE AS`, or migrations) in the `public` schema automatically have RLS enabled via a PostgreSQL event trigger (`system.auto_enable_rls()`).
-    - **Custom Schemas**: The automated event trigger specifically protects the `public` schema. If you create tables in a custom schema exposed to PostgREST, run `ALTER TABLE <schema>.<table> ENABLE ROW LEVEL SECURITY;` explicitly.
+    - **Dashboard Table Builder & REST API**: When you create a table from the dashboard UI or via `POST /api/database/tables`, RLS is enabled by default. If an application explicitly specifies `rlsEnabled: false`, RLS is disabled within the creation transaction, preserving deliberate opt-out workflows.
+    - **Dashboard SQL Editor & Raw DDL**: Tables created with raw SQL DDL (`CREATE TABLE`, `CREATE TABLE AS`, `SELECT INTO`, or raw migrations) in the `public` schema automatically have RLS enabled via a PostgreSQL event trigger (`system.auto_enable_rls()`).
+    - **Custom Schemas**: The automated event trigger specifically protects the `public` schema. If you create tables in a custom schema exposed to PostgREST, the trigger does not alter them; run `ALTER TABLE <schema>.<table> ENABLE ROW LEVEL SECURITY;` explicitly.
 
     To change RLS on an **existing** table:
 
-    1. **From the Dashboard**: If RLS is disabled on an existing table, the **Tables** page displays a warning banner with a 1-click **Enable RLS** button (which prompts for confirmation).
+    1. **From the Dashboard**: If RLS is disabled on an existing table, the **Tables** page and **Policies** page display a warning banner with a 1-click **Enable RLS** button (which prompts for confirmation).
     2. **Via SQL**: Run `ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;` (or `DISABLE`) using the dashboard SQL editor, the MCP `run-raw-sql` tool, or the CLI:
 
     ```sql
@@ -113,14 +113,17 @@ description: "Answers to common InsForge questions on database calls, edge funct
     ```
 
     <Warning>
-      **Why table privileges (GRANTs) and RLS serve different purposes:**
+      **How table privileges (GRANTs) and RLS work together:**
 
-      PostgREST requires base table privileges (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) on the `anon` and `authenticated` roles so the API gateway can interact with the table. Row-Level Security (RLS) is the security barrier that determines *which specific rows* those roles may see or modify.
+      PostgreSQL uses a two-tier permission model for API access:
 
-      - Turning RLS **off** removes all row-level filtering: any role with table privileges (such as `anon` and `authenticated`) can read, insert, modify, and delete every row through the public data API.
-      - Turning RLS **on** for a table that has no policies applies PostgreSQL's **default-deny**: unauthenticated `anon` and standard `authenticated` requests lose all access through the data API (every `SELECT`/`INSERT`/`UPDATE`/`DELETE` is blocked) until you add at least one policy.
+      1. **Table Privileges (`GRANT`)**: A database role (`anon`, `authenticated`) must have the privilege for the specific operation it wants to perform (e.g. `SELECT`, `INSERT`, `UPDATE`, or `DELETE`). Roles only need privileges for the operations they are permitted to execute, not necessarily all four DML privileges.
+      2. **Row-Level Security (RLS)**: Once table privileges permit an operation, RLS policies dictate *which rows* that role can view or modify. RLS policies are also operation- and role-specific (e.g., `FOR SELECT TO authenticated USING (...)`).
 
-      To allow legitimate public or user access, always define explicit RLS policies (e.g. `CREATE POLICY "public_read" ON public.mytable FOR SELECT USING (true);`) rather than disabling RLS. Admin requests made with the API Key (`ik_...`) bypass RLS either way.
+      - Turning RLS **off** removes all row-level filtering: any role holding a table privilege can execute that operation on *every row* in the table without restriction. Because `public` schema default privileges grant DML to `anon` and `authenticated`, turning RLS off exposes all rows to public API operations.
+      - Turning RLS **on** for a table with no policies triggers PostgreSQL's **default-deny**: clients accessing the table through the data API cannot select, insert, update, or delete any rows until you create policies covering their roles and target operations.
+
+      To allow legitimate public or user access, always define explicit RLS policies matching your intended roles and operations (e.g., `CREATE POLICY "public_read" ON public.mytable FOR SELECT TO anon, authenticated USING (true);`) rather than disabling RLS. Admin requests made with the API Key (`ik_...`) bypass RLS via the `BYPASSRLS` role attribute.
     </Warning>
   </Accordion>
 

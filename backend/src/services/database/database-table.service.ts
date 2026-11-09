@@ -13,6 +13,7 @@ import {
   UpdateTableSchemaResponse,
   DeleteTableResponse,
   ForeignKeySchema,
+  TableRlsStatus,
 } from '@insforge/shared-schemas';
 import { validateIdentifier, validateSchemaName } from '@/utils/validations.js';
 import { convertSqlTypeToColumnType } from '@/utils/utils.js';
@@ -135,7 +136,54 @@ export class DatabaseTableService {
   }
 
   /**
-   * Create a new table
+   * Get lightweight RLS status for all tables in a schema.
+   * Performs a single query against pg_class and pg_namespace without executing
+   * row counts or introspecting columns, avoiding the N+1 schema query overhead.
+   *
+   * @param schemaName Target schema name (defaults to public)
+   * @returns Array of table RLS status records
+   */
+  async getTableRlsStatuses(
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
+  ): Promise<TableRlsStatus[]> {
+    validateSchemaName(schemaName);
+    const result = await this.getPool().query(
+      `
+        SELECT
+          n.nspname AS "schemaName",
+          c.relname AS "tableName",
+          c.relrowsecurity AS "rlsEnabled"
+        FROM pg_catalog.pg_class c
+        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = $1
+          AND c.relkind IN ('r', 'p')
+        ORDER BY c.relname
+      `,
+      [schemaName]
+    );
+
+    return result.rows.map((row) => ({
+      tableName: row.tableName as string,
+      schemaName: row.schemaName as string,
+      rlsEnabled: Boolean(row.rlsEnabled),
+    }));
+  }
+
+  /**
+   * Creates a new table within the specified database schema.
+   *
+   * By default, tables are created with Row Level Security (RLS) enabled.
+   * If `use_RLS` is explicitly passed as `false`, RLS is disabled within the same
+   * transaction before committing to satisfy deliberate API opt-out contracts without
+   * exposing an insecure window. PostgREST schema cache is reloaded upon creation.
+   *
+   * @param schemaName - Target database schema name (e.g. 'public')
+   * @param table_name - Identifier of the table to create
+   * @param columns - Array of column definitions including types, constraints, and defaults
+   * @param foreignKeys - Optional array of foreign key constraint definitions
+   * @param use_RLS - Whether Row Level Security should be enabled (default: true)
+   * @returns Detailed schema of the newly created table including RLS status
+   * @throws {AppError} When identifier validation fails, duplicate table exists, or DDL execution fails
    */
   async createTable(
     schemaName: string,
@@ -180,6 +228,7 @@ export class DatabaseTableService {
 
     const client = await this.getPool().connect();
     let transactionStarted = false;
+    let releaseError: Error | undefined;
     try {
       await client.query('BEGIN');
       transactionStarted = true;
@@ -277,6 +326,17 @@ export class DatabaseTableService {
               ALTER TABLE ${safeQualifiedTableName} ENABLE ROW LEVEL SECURITY;
             `
             );
+          } else {
+            // Explicit opt-out: when an admin explicitly passes rlsEnabled: false to the
+            // structured table creation API, the PostgreSQL event trigger (system.auto_enable_rls)
+            // will have auto-enabled RLS upon CREATE TABLE in schema public. We immediately disable
+            // RLS within the same uncommitted transaction prior to COMMIT so the table is created
+            // with RLS disabled without exposing an intermediate state to external connections.
+            await client.query(
+              `
+              ALTER TABLE ${safeQualifiedTableName} DISABLE ROW LEVEL SECURITY;
+            `
+            );
           }
 
           // Create trigger for updated_at
@@ -302,9 +362,13 @@ export class DatabaseTableService {
             autoFields: ['id', 'created_at', 'updated_at'],
             nextActions:
               'you can now use the table with the POST /api/database/tables/{table} endpoint',
+            rlsEnabled: use_RLS,
           };
         },
-        true
+        true,
+        (error) => {
+          releaseError = error;
+        }
       );
 
       await client.query('COMMIT');
@@ -312,12 +376,17 @@ export class DatabaseTableService {
       return response;
     } catch (error) {
       if (transactionStarted) {
-        await client.query('ROLLBACK');
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          releaseError =
+            rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+        }
         transactionStarted = false;
       }
       throw error;
     } finally {
-      client.release();
+      client.release(releaseError);
     }
   }
 
@@ -348,6 +417,18 @@ export class DatabaseTableService {
     return defaultValue;
   }
 
+  /**
+   * Introspects and retrieves the full schema of an existing table.
+   *
+   * Queries `information_schema` and PostgreSQL catalogs (`pg_class`, `pg_namespace`,
+   * `pg_constraint`, `pg_index`) to resolve columns, data types, nullability, default values,
+   * primary/foreign keys, exact row counts, and current Row Level Security (`rlsEnabled`) status.
+   *
+   * @param schemaName - Target database schema name
+   * @param table - Identifier of the table to introspect
+   * @returns Table schema metadata object conforming to `GetTableSchemaResponse`
+   * @throws {AppError} When table does not exist or identifier validation fails
+   */
   async getTableSchema(schemaName: string, table: string): Promise<GetTableSchemaResponse> {
     validateSchemaName(schemaName);
     validateIdentifier(table, 'table');
@@ -804,7 +885,17 @@ export class DatabaseTableService {
   }
 
   /**
-   * Enable Row Level Security on a table
+   * Enables Row Level Security (RLS) on an existing table.
+   *
+   * Validates schema and table identifiers, verifies table existence in pg_class within
+   * an admin transaction context, executes `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`,
+   * notifies PostgREST to reload its schema cache (`NOTIFY pgrst, 'reload schema'`),
+   * and guarantees pool connection cleanup even upon rollback failures.
+   *
+   * @param schemaName - Target database schema name
+   * @param tableName - Identifier of the table on which to enable RLS
+   * @returns Confirmation object with schemaName, tableName, rlsEnabled, and human-readable message
+   * @throws {AppError} 404 when table is not found, or 400 when identifier validation fails
    */
   async enableTableRLS(
     schemaName: string,
@@ -814,6 +905,7 @@ export class DatabaseTableService {
     validateIdentifier(tableName, 'table');
     const client = await this.getPool().connect();
     let transactionStarted = false;
+    let releaseError: Error | undefined;
     try {
       await client.query('BEGIN');
       transactionStarted = true;
@@ -855,7 +947,10 @@ export class DatabaseTableService {
             message: `Row Level Security enabled on ${schemaName}.${tableName}`,
           };
         },
-        true
+        true,
+        (error) => {
+          releaseError = error;
+        }
       );
 
       await client.query('COMMIT');
@@ -863,12 +958,17 @@ export class DatabaseTableService {
       return response;
     } catch (error) {
       if (transactionStarted) {
-        await client.query('ROLLBACK');
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          releaseError =
+            rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+        }
         transactionStarted = false;
       }
       throw error;
     } finally {
-      client.release();
+      client.release(releaseError);
     }
   }
 
