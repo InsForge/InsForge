@@ -91,7 +91,7 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
 
     Para cambiar RLS en una tabla **existente**:
 
-    1. **Desde el Dashboard**: Si RLS está desactivado en una tabla existente, las páginas **Tables** y **Policies** muestran un banner de advertencia con un botón de 1 clic **Enable RLS** (que solicita confirmación).
+    1. **Desde el Dashboard**: Si RLS está desactivado en una tabla existente, la página **Tables** muestra un banner de advertencia con un botón de 1 clic **Enable RLS** (que solicita confirmación). La página **Policies** también muestra una alerta advirtiendo sobre las tablas sin RLS, proporcionando enlaces directos para navegar a cada tabla afectada en la página **Tables** para activarlo.
     2. **Vía SQL**: Ejecuta `ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;` (o `DISABLE`) usando el editor SQL del dashboard, la herramienta `run-raw-sql` de MCP o la CLI:
 
     ```sql
@@ -115,15 +115,24 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     <Warning>
       **Cómo funcionan juntos los privilegios de tabla (GRANT) y RLS:**
 
-      PostgreSQL utiliza un modelo de permisos de dos niveles para el acceso a la API:
+      PostgreSQL utiliza un modelo de permisos y seguridad bien diferenciado:
 
-      1. **Privilegios de tabla (`GRANT`)**: Un rol de base de datos (`anon`, `authenticated`) debe tener el privilegio correspondiente a la operación específica que desea ejecutar (p. ej., `SELECT`, `INSERT`, `UPDATE` o `DELETE`). Los roles solo necesitan privilegios para las operaciones que tienen permitido realizar, no necesariamente las cuatro operaciones DML.
-      2. **Seguridad a nivel de fila (RLS)**: Una vez que los privilegios de tabla permiten una operación, las políticas RLS dictan *qué filas* puede ver o modificar ese rol. Las políticas RLS también son específicas para cada operación y rol (p. ej., `FOR SELECT TO authenticated USING (...)`).
+      1. **Privilegios de tabla (`GRANT`)**: Los privilegios de tabla determinan qué operaciones (`SELECT`, `INSERT`, `UPDATE` o `DELETE`) puede intentar ejecutar un rol de base de datos (`anon`, `authenticated`). Los roles solo necesitan permisos para las operaciones específicas que tienen permitido realizar, no necesariamente las cuatro operaciones DML. Disponer de privilegios de tabla por sí solo no impone límites de fila ni hace que una tabla sea segura.
+      2. **Seguridad a nivel de fila (RLS)**: Una vez que los privilegios de tabla permiten una operación, las políticas RLS dictan *qué filas específicas* puede ver o modificar ese rol. Las políticas RLS son específicas para cada operación y rol (p. ej., `FOR SELECT TO authenticated USING (...)`):
+         - Los propietarios de tablas normalmente omiten RLS en sus propias tablas a menos que se habilite `FORCE ROW LEVEL SECURITY` en la tabla (`ALTER TABLE <table> FORCE ROW LEVEL SECURITY;`).
+         - Los superusuarios de PostgreSQL (`postgres`) siempre omiten RLS.
+         - Los roles con el atributo `BYPASSRLS` siempre omiten RLS, incluso cuando `FORCE ROW LEVEL SECURITY` está habilitado en la tabla.
+         - Los roles de aplicación cliente (`anon` y `authenticated`) no tienen `BYPASSRLS` ni son propietarios de tablas; permanecen siempre estrictamente sujetos a las políticas RLS aplicables.
+      3. **Privilegios de configuración de RLS (`ALTER TABLE`)**: Ejecutar `ALTER TABLE <schema>.<table> ENABLE/DISABLE ROW LEVEL SECURITY` requiere ser el propietario de la tabla o contar con privilegios de superusuario. En InsForge, las tablas públicas pertenecen al rol administrativo `project_admin`, que posee el atributo `BYPASSRLS` pero no es un superusuario de PostgreSQL (según la definición auditada de su rol). El usuario de conexión raíz (`postgres`) es el superusuario de la base de datos. Los roles de aplicación (`anon`, `authenticated`) carecen de propiedad sobre las tablas, de privilegios administrativos y de `BYPASSRLS`.
+      4. **Contexto de ejecución de SQL directo**:
+         - **SQL directo estándar** (el editor SQL del dashboard y el endpoint de API SQL estándar) se ejecuta dentro de una transacción bajo el rol `project_admin`. Debido a que `project_admin` es propietario de las tablas públicas y posee `BYPASSRLS`, las consultas omiten RLS en tablas públicas, pero no pueden realizar operaciones restringidas a superusuarios.
+         - **SQL directo sin restricciones** (disponible mediante la CLI con `--unrestricted` o el endpoint de API sin restricciones) se ejecuta directamente como el superusuario de PostgreSQL (`postgres`). Los nuevos objetos públicos creados se reasignan automáticamente a `project_admin`.
+         - Por el contrario, las consultas de la API de datos del cliente (a través de PostgREST) se ejecutan en el contexto restringido de los roles `anon` o `authenticated`, los cuales no poseen `BYPASSRLS` y están estrictamente sujetos a las políticas RLS activas.
 
-      - **Desactivar** RLS elimina todo el filtrado a nivel de fila: cualquier rol con privilegios sobre la tabla puede ejecutar esa operación en *todas las filas* de la tabla sin restricción. Dado que los privilegios por defecto del esquema `public` conceden DML a `anon` y `authenticated`, desactivar RLS expone todas las filas a operaciones públicas de la API.
+      - **Desactivar** RLS elimina todo el filtrado a nivel de fila: cualquier rol con privilegios sobre la tabla puede ejecutar las operaciones permitidas en *todas las filas* sin restricción. Dado que los privilegios por defecto del esquema `public` conceden DML a `anon` y `authenticated`, desactivar RLS expone todas las filas a operaciones públicas de la API.
       - **Activar** RLS en una tabla sin políticas aplica el rechazo por defecto (**default-deny**) de PostgreSQL: los clientes que acceden a través de la API de datos no pueden seleccionar, insertar, actualizar ni eliminar ninguna fila hasta que crees políticas que cubran sus roles y operaciones previstas.
 
-      Para permitir el acceso público o de usuarios legítimo, define siempre políticas RLS explícitas que coincidan con los roles y operaciones deseados (p. ej., `CREATE POLICY "public_read" ON public.mytable FOR SELECT TO anon, authenticated USING (true);`) en lugar de desactivar RLS. Las solicitudes de administrador realizadas con la API Key (`ik_...`) omiten RLS mediante el atributo de rol `BYPASSRLS`.
+      Para permitir el acceso público o de usuarios legítimos, define siempre políticas RLS explícitas que coincidan con los roles y operaciones deseados (p. ej., `CREATE POLICY "public_read" ON public.mytable FOR SELECT TO anon, authenticated USING (true);`) en lugar de desactivar RLS. Las solicitudes de administrador realizadas con la API Key (`ik_...`) omiten RLS mediante el atributo de rol `BYPASSRLS`.
     </Warning>
   </Accordion>
 

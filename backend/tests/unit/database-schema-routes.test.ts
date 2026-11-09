@@ -178,6 +178,82 @@ describe('database tables route endpoints', () => {
       expect(res.status).toBe(400);
       expect(res.body.message).toBe('Schema error');
     });
+
+    it('rejects repeated schema query parameters with HTTP 400', async () => {
+      mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+      const res = await request(app)
+        .get('/api/database/tables/rls-status?schema=public&schema=custom_scope')
+        .set('Authorization', 'Bearer admin-token');
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+      expect(res.body.message).toBe(
+        'The "schema" query parameter must be a single non-empty schema name.'
+      );
+      expect(mockTableService.getTableRlsStatuses).not.toHaveBeenCalled();
+    });
+
+    it('rejects empty or whitespace schema query parameter with HTTP 400', async () => {
+      mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+      const emptyRes = await request(app)
+        .get('/api/database/tables/rls-status?schema=')
+        .set('Authorization', 'Bearer admin-token');
+
+      expect(emptyRes.status).toBe(400);
+      expect(emptyRes.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+      expect(emptyRes.body.message).toBe(
+        'The "schema" query parameter must be a single non-empty schema name.'
+      );
+
+      const whitespaceRes = await request(app)
+        .get('/api/database/tables/rls-status?schema=%20%20')
+        .set('Authorization', 'Bearer admin-token');
+
+      expect(whitespaceRes.status).toBe(400);
+      expect(whitespaceRes.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+      expect(whitespaceRes.body.message).toBe(
+        'The "schema" query parameter must be a single non-empty schema name.'
+      );
+
+      expect(mockTableService.getTableRlsStatuses).not.toHaveBeenCalled();
+    });
+
+    it('rejects malformed non-string object schema query parameter with HTTP 400', async () => {
+      mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+      const res = await request(app)
+        .get('/api/database/tables/rls-status?schema[name]=custom')
+        .set('Authorization', 'Bearer admin-token');
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+      expect(res.body.message).toBe(
+        'The "schema" query parameter must be a single non-empty schema name.'
+      );
+      expect(mockTableService.getTableRlsStatuses).not.toHaveBeenCalled();
+    });
+
+    it('preserves 401 unauthenticated response even when repeated schema is passed', async () => {
+      const res = await request(app).get(
+        '/api/database/tables/rls-status?schema=public&schema=custom_scope'
+      );
+
+      expect(res.status).toBe(401);
+      expect(mockTableService.getTableRlsStatuses).not.toHaveBeenCalled();
+    });
+
+    it('preserves 403 non-admin forbidden response even when repeated schema is passed', async () => {
+      mockTokenManager.verifyToken.mockReturnValue({ role: 'authenticated', sub: 'user-1' });
+
+      const res = await request(app)
+        .get('/api/database/tables/rls-status?schema=public&schema=custom_scope')
+        .set('Authorization', 'Bearer user-token');
+
+      expect(res.status).toBe(403);
+      expect(mockTableService.getTableRlsStatuses).not.toHaveBeenCalled();
+    });
   });
 
   describe('POST /api/database/tables/:tableName/enable-rls', () => {
@@ -286,7 +362,11 @@ describe('database tables route endpoints', () => {
     it('returns 404 when table does not exist', async () => {
       mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-42' });
       mockTableService.enableTableRLS.mockRejectedValue(
-        new AppError('Table "missing" does not exist in schema "public"', 404, ERROR_CODES.NOT_FOUND)
+        new AppError(
+          'Table "missing" does not exist in schema "public"',
+          404,
+          ERROR_CODES.NOT_FOUND
+        )
       );
 
       const res = await request(app)
@@ -311,6 +391,63 @@ describe('database tables route endpoints', () => {
       expect(res.status).toBe(400);
       expect(res.body.message).toBe('Invalid table name');
       expect(mockAuditService.log).not.toHaveBeenCalled();
+    });
+
+    it('rejects repeated schema query parameters with HTTP 400', async () => {
+      mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-42' });
+
+      const res = await request(app)
+        .post('/api/database/tables/orders/enable-rls?schema=public&schema=tenant_1')
+        .set('Authorization', 'Bearer admin-token');
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+      expect(res.body.message).toBe(
+        'The "schema" query parameter must be a single non-empty schema name.'
+      );
+      expect(mockTableService.enableTableRLS).not.toHaveBeenCalled();
+      expect(mockAuditService.log).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /api/database/tables', () => {
+    it('defaults to public schema when query schema is omitted', async () => {
+      mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+      mockTableService.listTables.mockResolvedValue([]);
+
+      const res = await request(app)
+        .get('/api/database/tables')
+        .set('Authorization', 'Bearer admin-token');
+
+      expect(res.status).toBe(200);
+      expect(mockTableService.listTables).toHaveBeenCalledWith('public');
+    });
+
+    it('passes single valid schema query parameter', async () => {
+      mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+      mockTableService.listTables.mockResolvedValue([]);
+
+      const res = await request(app)
+        .get('/api/database/tables?schema=tenant_1')
+        .set('Authorization', 'Bearer admin-token');
+
+      expect(res.status).toBe(200);
+      expect(mockTableService.listTables).toHaveBeenCalledWith('tenant_1');
+    });
+
+    it('rejects repeated schema query parameter with HTTP 400', async () => {
+      mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+      const res = await request(app)
+        .get('/api/database/tables?schema=public&schema=tenant_1')
+        .set('Authorization', 'Bearer admin-token');
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+      expect(res.body.message).toBe(
+        'The "schema" query parameter must be a single non-empty schema name.'
+      );
+      expect(mockTableService.listTables).not.toHaveBeenCalled();
     });
   });
 });

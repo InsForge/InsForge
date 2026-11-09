@@ -96,6 +96,10 @@ export function formatDefaultValue(
   return `DEFAULT ${getSafeDollarQuotedLiteral(value)}`;
 }
 
+/**
+ * Service managing database table lifecycle, DDL operations, schema introspection,
+ * foreign key constraints, and Row Level Security (RLS) enforcement.
+ */
 export class DatabaseTableService {
   private static instance: DatabaseTableService;
   private pool: Pool | null = null;
@@ -109,6 +113,11 @@ export class DatabaseTableService {
     return this.pool;
   }
 
+  /**
+   * Retrieves the singleton instance of DatabaseTableService.
+   *
+   * @returns The singleton DatabaseTableService instance
+   */
   public static getInstance(): DatabaseTableService {
     if (!DatabaseTableService.instance) {
       DatabaseTableService.instance = new DatabaseTableService();
@@ -117,7 +126,11 @@ export class DatabaseTableService {
   }
 
   /**
-   * List all tables
+   * Lists all base table names in the specified database schema.
+   *
+   * @param schemaName - Target database schema name (defaults to 'public')
+   * @returns Array of base table names sorted alphabetically
+   * @throws {AppError} When schemaName validation fails
    */
   async listTables(schemaName: string = DEFAULT_DATABASE_SCHEMA): Promise<string[]> {
     validateSchemaName(schemaName);
@@ -391,11 +404,11 @@ export class DatabaseTableService {
   }
 
   /**
-   * Get table schema
-   */
-  /**
-   * Parse PostgreSQL default value format
-   * Extracts the actual value from formats like 'abc'::text or 123::integer
+   * Parses PostgreSQL default value expressions into cleaned literal strings.
+   * Extracts the actual value from type-cast expressions such as `'abc'::text` or `123::integer`.
+   *
+   * @param defaultValue - Raw PostgreSQL column default value expression
+   * @returns Extracted default value string or undefined if input is null/empty
    */
   private parseDefaultValue(defaultValue: string | null): string | undefined {
     if (!defaultValue) {
@@ -420,9 +433,10 @@ export class DatabaseTableService {
   /**
    * Introspects and retrieves the full schema of an existing table.
    *
-   * Queries `information_schema` and PostgreSQL catalogs (`pg_class`, `pg_namespace`,
-   * `pg_constraint`, `pg_index`) to resolve columns, data types, nullability, default values,
-   * primary/foreign keys, exact row counts, and current Row Level Security (`rlsEnabled`) status.
+   * Queries `information_schema` views (`columns`, `table_constraints`, `key_column_usage`)
+   * and PostgreSQL catalogs (`pg_class`, `pg_namespace`, `pg_constraint`, `pg_attribute`)
+   * to resolve columns, data types, nullability, default values, primary/foreign keys,
+   * exact row counts, and current Row Level Security (`rlsEnabled`) status.
    *
    * @param schemaName - Target database schema name
    * @param table - Identifier of the table to introspect
@@ -555,7 +569,17 @@ export class DatabaseTableService {
   }
 
   /**
-   * Update table schema
+   * Updates an existing table schema by applying column and constraint alterations.
+   *
+   * Executes DDL operations (add/drop/update columns, add/drop foreign keys, rename table)
+   * within an admin transaction. Automatically reloads the PostgREST schema cache upon
+   * completion and safely cleans up connections on rollback failures.
+   *
+   * @param schemaName - Target database schema name
+   * @param tableName - Name of the table to modify
+   * @param operations - Schema modifications conforming to `UpdateTableSchemaRequest`
+   * @returns Updated table schema response
+   * @throws {AppError} When table is missing, identifier validation fails, or DDL execution fails
    */
   async updateTableSchema(
     schemaName: string,
@@ -832,7 +856,15 @@ export class DatabaseTableService {
   }
 
   /**
-   * Delete a table
+   * Drops an existing database table and its dependent objects using CASCADE.
+   *
+   * Executes within an admin transaction, reloads the PostgREST schema cache,
+   * and safely releases pool connections even if rollback fails.
+   *
+   * @param schemaName - Target database schema name
+   * @param table - Identifier of the table to delete
+   * @returns Confirmation response containing success status and table name
+   * @throws {AppError} When schemaName validation fails or DDL execution fails
    */
   async deleteTable(schemaName: string, table: string): Promise<DeleteTableResponse> {
     validateSchemaName(schemaName);
@@ -973,15 +1005,37 @@ export class DatabaseTableService {
   }
 
   // Helper methods
+
+  /**
+   * Quotes an SQL identifier to prevent SQL injection and preserve case sensitivity.
+   *
+   * @param identifier - SQL identifier name
+   * @returns Double-quoted SQL identifier
+   */
   private quoteIdentifier(identifier: string): string {
     return `"${identifier.replace(/"/g, '""')}"`;
   }
 
+  /**
+   * Safely formats and quotes a potentially qualified table reference (e.g. `schema.table` or `table`).
+   *
+   * @param tableRef - Table name or qualified schema.table reference
+   * @param defaultSchemaName - Fallback schema name when unqualified
+   * @returns Properly quoted qualified table reference
+   */
   private quoteTableReference(tableRef: string, defaultSchemaName: string): string {
     const { schemaName, tableName } = splitQualifiedTableReference(tableRef, defaultSchemaName);
     return quoteQualifiedName(schemaName, tableName);
   }
 
+  /**
+   * Validates column definitions against reserved field names and prevents mutations
+   * to system-managed fields (`id`, `created_at`, `updated_at`).
+   *
+   * @param columns - Array of column definitions to validate
+   * @returns Validated column definitions array
+   * @throws {AppError} 400 if user attempts to define or alter system-reserved columns
+   */
   private validateReservedFields(columns: ColumnSchema[]): ColumnSchema[] {
     return columns.filter((col: ColumnSchema) => {
       const reservedType = reservedColumns[col.columnName as keyof typeof reservedColumns];
@@ -1004,6 +1058,14 @@ export class DatabaseTableService {
     });
   }
 
+  /**
+   * Generates a PostgreSQL DDL constraint statement for a foreign key definition.
+   *
+   * @param fk - Foreign key schema specification
+   * @param defaultSchemaName - Default schema for unqualified reference tables
+   * @param include_source_column - Whether to include source column list (for multi-column syntax)
+   * @returns Formatted SQL CONSTRAINT clause
+   */
   private generateFkeyConstraintStatement(
     fk: ForeignKeySchema,
     defaultSchemaName: string,
@@ -1034,6 +1096,13 @@ export class DatabaseTableService {
     }
   }
 
+  /**
+   * Introspects foreign key constraints on the specified table from PostgreSQL catalogs.
+   *
+   * @param schemaName - Target database schema name
+   * @param table - Identifier of the table to introspect
+   * @returns Array of foreign key constraint schemas
+   */
   private async getFkeyConstraints(schemaName: string, table: string): Promise<ForeignKeySchema[]> {
     const result = await this.getPool().query(FOREIGN_KEY_INTROSPECTION_QUERY, [schemaName, table]);
     return groupForeignKeyRows(result.rows as ForeignKeyRow[]);

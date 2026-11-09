@@ -9,6 +9,14 @@ import {
   UpdateTableSchemaRequest,
 } from '@insforge/shared-schemas';
 
+/**
+ * Primary React Query hook for managing database tables in a schema.
+ * Provides query states for table listing, cached schema introspection,
+ * and mutations for creating, deleting, altering tables, and enabling RLS.
+ *
+ * @param schemaName - Database schema name (defaults to 'public')
+ * @returns Table state queries, action mutations, and helper hooks
+ */
 export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
@@ -43,8 +51,14 @@ export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
   const createTableMutation = useMutation({
     mutationFn: ({ tableName, columns }: { tableName: string; columns: ColumnSchema[] }) =>
       tableService.createTable(schemaName, tableName, columns),
-    onSuccess: () => {
+    onSuccess: (_, { tableName }) => {
       void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.tables(schemaName) });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableRlsStatuses(schemaName),
+      });
       showToast('Table created successfully', 'success');
     },
     onError: (error: Error) => {
@@ -56,8 +70,17 @@ export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
   // Mutation to delete a table
   const deleteTableMutation = useMutation({
     mutationFn: (tableName: string) => tableService.deleteTable(tableName, schemaName),
-    onSuccess: () => {
+    onSuccess: (_, tableName) => {
       void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.tables(schemaName) });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableRlsStatuses(schemaName),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['database', 'policies', schemaName],
+      });
       showToast('Table deleted successfully', 'success');
     },
     onError: (error: Error) => {

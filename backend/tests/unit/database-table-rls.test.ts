@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createTableResponseSchema } from '@insforge/shared-schemas';
 import { DatabaseTableService } from '../../src/services/database/database-table.service';
 
 const queryMock = vi.fn();
@@ -297,6 +298,7 @@ describe('DatabaseTableService RLS introspection and enablement', () => {
       );
 
       expect(response.rlsEnabled).toBe(true);
+      expect(createTableResponseSchema.safeParse(response).success).toBe(true);
 
       const sqlCalls = queryMock.mock.calls.map(([sql]) => sql as string);
       const enableCall = sqlCalls.find((sql) =>
@@ -320,6 +322,7 @@ describe('DatabaseTableService RLS introspection and enablement', () => {
       );
 
       expect(response.rlsEnabled).toBe(false);
+      expect(createTableResponseSchema.safeParse(response).success).toBe(true);
 
       const sqlCalls = queryMock.mock.calls.map(([sql]) => sql as string);
       const disableCall = sqlCalls.find((sql) =>
@@ -334,6 +337,81 @@ describe('DatabaseTableService RLS introspection and enablement', () => {
       // Ensure DISABLE is executed before COMMIT
       expect(disableIndex).toBeGreaterThan(-1);
       expect(commitIndex).toBeGreaterThan(disableIndex);
+    });
+  });
+
+  describe('createTableResponseSchema validation', () => {
+    const validBaseResponse = {
+      schemaName: 'public',
+      tableName: 'documents',
+      columns: [
+        {
+          columnName: 'title',
+          type: 'string',
+          isNullable: false,
+          isUnique: false,
+        },
+      ],
+      message: 'table created successfully',
+      autoFields: ['id', 'created_at', 'updated_at'],
+      nextActions: 'you can now use the table with the POST /api/database/tables/{table} endpoint',
+    };
+
+    it('accepts valid response with rlsEnabled: true', () => {
+      const parsed = createTableResponseSchema.safeParse({
+        ...validBaseResponse,
+        rlsEnabled: true,
+      });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.rlsEnabled).toBe(true);
+      }
+    });
+
+    it('accepts valid response with rlsEnabled: false', () => {
+      const parsed = createTableResponseSchema.safeParse({
+        ...validBaseResponse,
+        rlsEnabled: false,
+      });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.rlsEnabled).toBe(false);
+      }
+    });
+
+    it('rejects response when rlsEnabled is missing', () => {
+      const parsed = createTableResponseSchema.safeParse({
+        ...validBaseResponse,
+      });
+      expect(parsed.success).toBe(false);
+      if (!parsed.success) {
+        const rlsIssue = parsed.error.issues.find((issue) => issue.path.includes('rlsEnabled'));
+        expect(rlsIssue).toBeDefined();
+      }
+    });
+
+    it('rejects response when rlsEnabled is non-boolean', () => {
+      const parsedString = createTableResponseSchema.safeParse({
+        ...validBaseResponse,
+        rlsEnabled: 'true',
+      });
+      expect(parsedString.success).toBe(false);
+      if (!parsedString.success) {
+        const issue = parsedString.error.issues.find((i) => i.path.includes('rlsEnabled'));
+        expect(issue).toBeDefined();
+      }
+
+      const parsedNumber = createTableResponseSchema.safeParse({
+        ...validBaseResponse,
+        rlsEnabled: 1,
+      });
+      expect(parsedNumber.success).toBe(false);
+
+      const parsedNull = createTableResponseSchema.safeParse({
+        ...validBaseResponse,
+        rlsEnabled: null,
+      });
+      expect(parsedNull.success).toBe(false);
     });
   });
 });

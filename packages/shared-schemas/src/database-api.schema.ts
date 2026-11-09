@@ -28,9 +28,9 @@ export const createTableResponseSchema = tableSchema
     schemaName: true,
     tableName: true,
     columns: true,
-    rlsEnabled: true,
   })
   .extend({
+    rlsEnabled: z.boolean(),
     message: z.string(),
     autoFields: z.array(z.string()),
     nextActions: z.string(),

@@ -91,7 +91,7 @@ description: "InsForge 常見問題：解說資料庫呼叫、Edge Function 與 
 
     要修改**已存在**表的 RLS：
 
-    1. **從 Dashboard 操作**：若已存在的表關閉了 RLS，**Tables** 頁面與 **Policies** 頁面會顯示警告橫幅，並提供一鍵 **Enable RLS** 按鈕（點擊後會彈出確認視窗）。
+    1. **從 Dashboard 操作**：若已存在的表關閉了 RLS，**Tables** 頁面會顯示警告橫幅並提供一鍵 **Enable RLS** 按鈕（點擊後會彈出確認視窗）。**Policies** 頁面亦會顯示警告橫幅提示未開啟 RLS 的表，並提供連結可直接跳轉至 **Tables** 頁面的對應表進行開啟。
     2. **透過 SQL 操作**：在 dashboard SQL 編輯器、MCP `run-raw-sql` 工具或 CLI 中執行 `ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;`（或 `DISABLE`）：
 
     ```sql
@@ -115,12 +115,21 @@ description: "InsForge 常見問題：解說資料庫呼叫、Edge Function 與 
     <Warning>
       **表權限（GRANT）與 RLS 的協同運作機制：**
 
-      PostgreSQL 對 API 存取採用雙層權限模型：
+      PostgreSQL 採用分層明確的權限與安全模型：
 
-      1. **表級權限（`GRANT`）**：資料庫角色（`anon`、`authenticated`）必須具備其欲執行的具體操作權限（例如 `SELECT`、`INSERT`、`UPDATE` 或 `DELETE`）。角色僅需具備其實際獲准執行的操作權限，不一定需要全部四種 DML 權限。
-      2. **列級安全性（RLS）**：當表級權限允許某項操作後，RLS 原則決定了該角色可以檢視或修改*哪些具體資料列*。RLS 原則同樣針對具體操作與角色（例如 `FOR SELECT TO authenticated USING (...)`）。
+      1. **表級權限（`GRANT`）**：表級權限決定了資料庫角色（`anon`、`authenticated`）獲准對表嘗試執行哪些操作（例如 `SELECT`、`INSERT`、`UPDATE` 或 `DELETE`）。角色僅需具備其實際獲准執行的操作權限，不一定需要全部四種 DML 權限。僅具備表級權限不會限制資料列邊界，亦無法確保表的安全性。
+      2. **列級安全性（RLS）**：當表級權限允許某項操作後，RLS 原則決定了該角色可以檢視或修改*哪些具體資料列*。RLS 原則同樣針對具體操作與角色（例如 `FOR SELECT TO authenticated USING (...)`）：
+         - 表擁有者通常在自己的表上直接繞過 RLS，除非在該表上顯式啟用了 `FORCE ROW LEVEL SECURITY`（`ALTER TABLE <table> FORCE ROW LEVEL SECURITY;`）。
+         - PostgreSQL 超級使用者（`postgres`）始終繞過 RLS。
+         - 具備 `BYPASSRLS` 屬性的角色始終繞過 RLS，即使表上啟用了 `FORCE ROW LEVEL SECURITY` 亦然。
+         - 客戶端應用程式角色（`anon` 與 `authenticated`）不具備 `BYPASSRLS`，且非表擁有者；它們始終嚴格受適用 RLS 原則的約束。
+      3. **RLS 設定權限（`ALTER TABLE`）**：執行 `ALTER TABLE <schema>.<table> ENABLE/DISABLE ROW LEVEL SECURITY` 需要表擁有者權限或超級使用者權限。在 InsForge 中，公開表歸屬於管理角色 `project_admin`，該角色具備 `BYPASSRLS` 屬性，但根據審計的角色定義它並非 PostgreSQL 超級使用者。root 連線使用者（`postgres`）為資料庫超級使用者。應用程式角色（`anon`、`authenticated`）不具備表擁有權、管理員權限及 `BYPASSRLS`。
+      4. **原始 SQL 執行上下文**：
+         - **標準原始 SQL**（dashboard SQL 編輯器及預設原始 SQL API 端點）在交易中以 `project_admin` 角色執行。由於 `project_admin` 擁有公開表並持有 `BYPASSRLS`，查詢會繞過公開表的 RLS，但無法執行限制為超級使用者的操作。
+         - **無限制原始 SQL**（透過 CLI `--unrestricted` 或無限制 API 端點使用）直接以 PostgreSQL 超級使用者（`postgres`）身分執行。新建的公開物件會自動重新指派擁有權給 `project_admin`。
+         - 相較之下，客戶端資料 API 請求（透過 PostgREST）則在受限的 `anon` 或 `authenticated` 角色上下文中執行，這些角色不具有 `BYPASSRLS`，嚴格受有效 RLS 原則的約束。
 
-      - **關閉** RLS 會移除所有列級過濾：任何具備表級權限的角色都可以不受限制地對表中的*所有資料列*執行該操作。由於 `public` schema 的預設權限授予了 `anon` 與 `authenticated` DML 權限，關閉 RLS 會將所有資料列暴露於公開 API 操作之下。
+      - **關閉** RLS 會移除所有列級過濾：任何具備表級權限的角色都可以不受限制地對表中的*所有資料列*執行獲准的操作。由於 `public` schema 的預設權限授予了 `anon` 與 `authenticated` DML 權限，關閉 RLS 會將所有資料列暴露於公開 API 操作之下。
       - 給沒有原則的表**開啟** RLS 會觸發 PostgreSQL 的**預設拒絕**（default-deny）：透過資料 API 存取的客戶端在新增涵蓋其角色與目標操作的原則之前，無法查詢、插入、更新或刪除任何資料列。
 
       為了允許合法的公開或使用者存取，請始終定義符合預期角色與操作的明確 RLS 原則（例如 `CREATE POLICY "public_read" ON public.mytable FOR SELECT TO anon, authenticated USING (true);`），而非直接關閉 RLS。使用 API Key（`ik_...`）發起的管理員請求則透過 `BYPASSRLS` 角色屬性直接繞過 RLS。
