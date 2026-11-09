@@ -1074,13 +1074,18 @@ export class StorageService {
     // S3 prefixes are literal strings. `_` and `%` are SQL LIKE wildcards,
     // so a prefix like "foo_" would match "fooX" keys without escaping.
     const likePrefix = escapeSqlLikePattern(prefix) + '%';
+    // S3 lists keys in UTF-8 byte order, and the handler relies on keys sharing a
+    // CommonPrefix being contiguous. The database default collation (e.g.
+    // en_US.utf8) ignores punctuation, so "a-c" would sort between "a/b" and
+    // "a/d". COLLATE "C" compares bytes and is served by
+    // idx_storage_objects_bucket_key_c.
     const rows = await this.getPool().query(
       `SELECT key, size, etag, uploaded_at
        FROM storage.objects
        WHERE bucket = $1
-         AND key LIKE $2
-         AND ($3::text IS NULL OR key > $3)
-       ORDER BY key
+         AND key COLLATE "C" LIKE $2
+         AND ($3::text IS NULL OR key COLLATE "C" > $3)
+       ORDER BY key COLLATE "C"
        LIMIT $4`,
       [params.bucket, likePrefix, params.startAfter ?? null, params.maxKeys]
     );
