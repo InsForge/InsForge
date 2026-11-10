@@ -179,6 +179,7 @@ describe('useTables mutation cache invalidation', () => {
       await result.current.enableTableRLS('unprotected_table');
     });
 
+    expect(tableServiceMocks.enableTableRLS).toHaveBeenCalledWith('unprotected_table', 'public');
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: databaseTableQueryKeys.tableSchema('public', 'unprotected_table'),
     });

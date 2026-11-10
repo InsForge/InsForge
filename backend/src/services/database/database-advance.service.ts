@@ -110,7 +110,7 @@ export class DatabaseAdvanceService {
           );
 
       // Refresh schema cache if it was a DDL operation
-      if (/CREATE|ALTER|DROP/i.test(sanitizedQuery)) {
+      if (/\b(?:CREATE|ALTER|DROP)\b|\bSELECT\b[\s\S]+?\bINTO\b/i.test(sanitizedQuery)) {
         if (asRoot) {
           // Root-created public objects stay owned by the superuser, which
           // breaks later project_admin DDL (custom migrations, restricted raw

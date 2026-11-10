@@ -74,4 +74,14 @@ describe('reassign root-owned public objects migration', () => {
       /if \(asRoot\) \{[\s\S]*?system\.reassign_public_objects_to_project_admin\(\)/
     );
   });
+
+  it('triggers DDL post-processing for CREATE, ALTER, DROP, and SELECT INTO statements', () => {
+    const ddlPattern = /\b(?:CREATE|ALTER|DROP)\b|\bSELECT\b[\s\S]+?\bINTO\b/i;
+
+    expect(ddlPattern.test('CREATE TABLE foo (id int)')).toBe(true);
+    expect(ddlPattern.test('ALTER TABLE foo ADD COLUMN bar text')).toBe(true);
+    expect(ddlPattern.test('DROP TABLE foo')).toBe(true);
+    expect(ddlPattern.test('SELECT id, name INTO new_table FROM existing_table')).toBe(true);
+    expect(ddlPattern.test('SELECT * FROM foo WHERE id = 1')).toBe(false);
+  });
 });

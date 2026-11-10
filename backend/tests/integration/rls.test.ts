@@ -71,7 +71,16 @@ afterAll(async () => {
   }
 });
 beforeEach(() => db.beforeEach());
-afterEach(() => db.afterEach());
+afterEach(async () => {
+  await db.afterEach();
+  // Drop tables touched through `db` only after `db.afterEach()` rolls back
+  // and releases all transaction locks, preventing DROP TABLE deadlocks.
+  await pg.query(`
+    DROP TABLE IF EXISTS auto_rls_probe;
+    DROP TABLE IF EXISTS auto_rls_idem_ctas;
+    DROP TABLE IF EXISTS auto_rls_idem;
+  `);
+});
 
 describe('owner crud', () => {
   it('should allow user to create their own todo', async () => {
@@ -203,24 +212,20 @@ describe('role access control', () => {
   });
 
   it('should automatically enable RLS on newly created tables in public', async () => {
-    try {
-      await pg.query(`CREATE TABLE auto_rls_probe (id INT PRIMARY KEY, content TEXT)`);
-      const row = await pg.one(
-        `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_probe'`
-      );
-      expect(row.relrowsecurity).toBe(true);
+    await pg.query(`CREATE TABLE auto_rls_probe (id INT PRIMARY KEY, content TEXT)`);
+    const row = await pg.one(
+      `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_probe'`
+    );
+    expect(row.relrowsecurity).toBe(true);
 
-      // anon should be blocked by default-deny
-      db.setContext({ role: 'anon' });
-      const { rows } = await db.query(`SELECT * FROM auto_rls_probe`);
-      expect(rows).toHaveLength(0);
+    // anon should be blocked by default-deny
+    db.setContext({ role: 'anon' });
+    const { rows } = await db.query(`SELECT * FROM auto_rls_probe`);
+    expect(rows).toHaveLength(0);
 
-      await expect(
-        db.query(`INSERT INTO auto_rls_probe (id, content) VALUES (1, 'leak')`)
-      ).rejects.toThrow(/violates row-level security policy/);
-    } finally {
-      await pg.query(`DROP TABLE IF EXISTS auto_rls_probe`);
-    }
+    await expect(
+      db.query(`INSERT INTO auto_rls_probe (id, content) VALUES (1, 'leak')`)
+    ).rejects.toThrow(/violates row-level security policy/);
   });
 
   it('should automatically enable RLS on partitioned table root and its partitions in public', async () => {
@@ -342,56 +347,47 @@ describe('role access control', () => {
   });
 
   it('ensures RLS remains enabled after CREATE TABLE IF NOT EXISTS on existing tables and is applied to CTAS tables', async () => {
-    try {
-      // 1. Initial CREATE TABLE creates the table and fires the auto_enable_rls() event trigger
-      await pg.query(`CREATE TABLE auto_rls_idem (id INT PRIMARY KEY, content TEXT);`);
-      const initialRow = await pg.one(
-        `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_idem'`
-      );
-      expect(initialRow.relrowsecurity).toBe(true);
+    // 1. Initial CREATE TABLE creates the table and fires the auto_enable_rls() event trigger
+    await pg.query(`CREATE TABLE auto_rls_idem (id INT PRIMARY KEY, content TEXT);`);
+    const initialRow = await pg.one(
+      `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_idem'`
+    );
+    expect(initialRow.relrowsecurity).toBe(true);
 
-      // 2. CREATE TABLE IF NOT EXISTS on the existing table executes cleanly without error
-      // and confirms RLS remains enabled on the table.
-      await pg.query(
-        `CREATE TABLE IF NOT EXISTS auto_rls_idem (id INT PRIMARY KEY, content TEXT);`
-      );
-      const repeatRow = await pg.one(
-        `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_idem'`
-      );
-      expect(repeatRow.relrowsecurity).toBe(true);
+    // 2. CREATE TABLE IF NOT EXISTS on the existing table executes cleanly without error
+    // and confirms RLS remains enabled on the table.
+    await pg.query(`CREATE TABLE IF NOT EXISTS auto_rls_idem (id INT PRIMARY KEY, content TEXT);`);
+    const repeatRow = await pg.one(
+      `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_idem'`
+    );
+    expect(repeatRow.relrowsecurity).toBe(true);
 
-      // 3. CTAS statement creates a new table and exercises the event trigger, auto-enabling RLS
-      await pg.query(`CREATE TABLE auto_rls_idem_ctas AS SELECT * FROM auto_rls_idem;`);
-      const ctasRow = await pg.one(
-        `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_idem_ctas'`
-      );
-      expect(ctasRow.relrowsecurity).toBe(true);
+    // 3. CTAS statement creates a new table and exercises the event trigger, auto-enabling RLS
+    await pg.query(`CREATE TABLE auto_rls_idem_ctas AS SELECT * FROM auto_rls_idem;`);
+    const ctasRow = await pg.one(
+      `SELECT relrowsecurity FROM pg_class WHERE relname = 'auto_rls_idem_ctas'`
+    );
+    expect(ctasRow.relrowsecurity).toBe(true);
 
-      // 4. Verify restricted role default-deny enforcement on both tables
-      db.setContext({ role: 'anon' });
-      const { rows: anonRows1 } = await db.query(`SELECT * FROM auto_rls_idem`);
-      expect(anonRows1).toHaveLength(0);
-      const { rows: anonRows2 } = await db.query(`SELECT * FROM auto_rls_idem_ctas`);
-      expect(anonRows2).toHaveLength(0);
+    // 4. Verify restricted role default-deny enforcement on both tables
+    db.setContext({ role: 'anon' });
+    const { rows: anonRows1 } = await db.query(`SELECT * FROM auto_rls_idem`);
+    expect(anonRows1).toHaveLength(0);
+    const { rows: anonRows2 } = await db.query(`SELECT * FROM auto_rls_idem_ctas`);
+    expect(anonRows2).toHaveLength(0);
 
-      // Verify write is rejected by RLS
-      await expect(
-        db.query(`INSERT INTO auto_rls_idem (id, content) VALUES (1, 'leak')`)
-      ).rejects.toThrow(/violates row-level security policy/);
+    // Verify write is rejected by RLS
+    await expect(
+      db.query(`INSERT INTO auto_rls_idem (id, content) VALUES (1, 'leak')`)
+    ).rejects.toThrow(/violates row-level security policy/);
 
-      // Roll back to savepoint to clear aborted transaction state before testing the next table
-      await db.rollback();
-      await db.savepoint();
+    // Roll back to savepoint to clear aborted transaction state before testing the next table
+    await db.rollback();
+    await db.savepoint();
 
-      await expect(
-        db.query(`INSERT INTO auto_rls_idem_ctas (id, content) VALUES (1, 'leak')`)
-      ).rejects.toThrow(/violates row-level security policy/);
-    } finally {
-      await pg.query(`
-        DROP TABLE IF EXISTS auto_rls_idem_ctas;
-        DROP TABLE IF EXISTS auto_rls_idem;
-      `);
-    }
+    await expect(
+      db.query(`INSERT INTO auto_rls_idem_ctas (id, content) VALUES (1, 'leak')`)
+    ).rejects.toThrow(/violates row-level security policy/);
   });
 
   it('should include underscore-prefixed public tables in DatabaseTableService.getTableRlsStatuses() while excluding temporary and non-public tables', async () => {

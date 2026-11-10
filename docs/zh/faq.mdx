@@ -126,7 +126,7 @@ description: "InsForge 常见问题：数据库调用、Edge Function 与 Custom
       3. **RLS 配置权限（`ALTER TABLE`）**：执行 `ALTER TABLE <schema>.<table> ENABLE/DISABLE ROW LEVEL SECURITY` 需要表的所有者权限或超级用户权限。在 InsForge 中，公开表归属于管理角色 `project_admin`，该角色拥有 `BYPASSRLS` 属性，但根据审计的角色定义它不是 PostgreSQL 超级用户。root 连接用户（`postgres`）为数据库超级用户。应用程序角色（`anon`、`authenticated`）不具备表所有权、管理员权限及 `BYPASSRLS`。
       4. **原始 SQL 执行上下文**：
          - **标准原始 SQL**（dashboard SQL 编辑器及默认原始 SQL API 接口）在事务中以 `project_admin` 角色运行。由于 `project_admin` 拥有公开表并持有 `BYPASSRLS`，查询会绕过公开表的 RLS，但无法执行限制为超级用户的操作。
-         - **无限制原始 SQL**（通过 CLI `--unrestricted` 或无限制 API 接口使用）直接以 PostgreSQL 超级用户（`postgres`）身份执行。新建的公开对象会自动重新指派所有权给 `project_admin`。
+         - **无限制原始 SQL**（通过 CLI `--unrestricted` 或无限制 API 接口使用）直接以 PostgreSQL 超级用户（`postgres`）身份执行。新建的公开对象（来自诸如 `CREATE` 与 `SELECT ... INTO` 等 DDL 操作）会自动重新指派所有权给 `project_admin`。
          - 相比之下，客户端数据 API 请求（通过 PostgREST）则在受限的 `anon` 或 `authenticated` 角色上下文中执行，这些角色不具有 `BYPASSRLS`，严格受有效 RLS 策略的约束。
 
       - **关闭** RLS 会移除所有行级过滤：任何拥有表级权限的角色都可以无限制地对表中的*所有行*执行已获授权的操作。由于 `public` schema 的默认权限授予了 `anon` 和 `authenticated` DML 权限，关闭 RLS 会让所有行暴露在公开 API 操作之下。

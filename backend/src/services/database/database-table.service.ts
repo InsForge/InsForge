@@ -592,6 +592,7 @@ export class DatabaseTableService {
 
     const client = await this.getPool().connect();
     let transactionStarted = false;
+    let releaseError: Error | undefined;
     try {
       await client.query('BEGIN');
       transactionStarted = true;
@@ -838,7 +839,10 @@ export class DatabaseTableService {
             operations: completedOperations,
           };
         },
-        true
+        true,
+        (error) => {
+          releaseError = error;
+        }
       );
 
       await client.query('COMMIT');
@@ -846,12 +850,17 @@ export class DatabaseTableService {
       return response;
     } catch (error) {
       if (transactionStarted) {
-        await client.query('ROLLBACK');
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          releaseError =
+            rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+        }
         transactionStarted = false;
       }
       throw error;
     } finally {
-      client.release();
+      client.release(releaseError);
     }
   }
 
@@ -870,6 +879,7 @@ export class DatabaseTableService {
     validateSchemaName(schemaName);
     const client = await this.getPool().connect();
     let transactionStarted = false;
+    let releaseError: Error | undefined;
     try {
       await client.query('BEGIN');
       transactionStarted = true;
@@ -899,7 +909,10 @@ export class DatabaseTableService {
               'table deleted successfully, you can create a new table with the POST /api/database/tables endpoint',
           };
         },
-        true
+        true,
+        (error) => {
+          releaseError = error;
+        }
       );
 
       await client.query('COMMIT');
@@ -907,12 +920,17 @@ export class DatabaseTableService {
       return response;
     } catch (error) {
       if (transactionStarted) {
-        await client.query('ROLLBACK');
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          releaseError =
+            rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+        }
         transactionStarted = false;
       }
       throw error;
     } finally {
-      client.release();
+      client.release(releaseError);
     }
   }
 

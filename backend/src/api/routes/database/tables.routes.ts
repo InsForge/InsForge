@@ -10,33 +10,14 @@ import {
   updateTableSchemaRequestSchema,
 } from '@insforge/shared-schemas';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { normalizeDatabaseSchemaName } from '@/services/database/helpers.js';
+import {
+  normalizeDatabaseSchemaName,
+  validateSchemaQueryParam,
+} from '@/services/database/helpers.js';
 
 const router = Router();
 const tableService = DatabaseTableService.getInstance();
 const auditService = AuditService.getInstance();
-
-/**
- * Validates that the schema query parameter, when provided, is a single non-empty string.
- *
- * Prevents parameter pollution, arrays, objects, or whitespace-only inputs from bypassing
- * schema validation or silently falling back to the default public schema.
- *
- * @param schema - Raw query parameter value to validate
- * @throws {AppError} 400 INVALID_INPUT if schema is not a valid non-empty string
- */
-function validateSchemaQueryParam(schema: unknown): void {
-  if (schema !== undefined) {
-    if (typeof schema !== 'string' || schema.trim().length === 0) {
-      throw new AppError(
-        'The "schema" query parameter must be a single non-empty schema name.',
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        'Provide a single valid schema name or omit the parameter to use the default schema.'
-      );
-    }
-  }
-}
 
 // All table routes accept either JWT token or API key authentication
 // router.use(verifyAdmin);
