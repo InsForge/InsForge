@@ -1,9 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { advanceService } from '#features/database/services/advance.service';
+import { databaseTableQueryKeys } from '#features/database/queryKeys';
 import { RawSQLResponse } from '@insforge/shared-schemas';
 import { useToast } from '@insforge/ui';
 
 interface UseRawSQLOptions {
+  schemaName?: string;
   onSuccess?: (data: RawSQLResponse) => void;
   onError?: (error: Error) => void;
   showSuccessToast?: boolean;
@@ -16,6 +18,14 @@ interface RawSQLParams {
   explain?: boolean;
 }
 
+/**
+ * React Query mutation hook for executing raw SQL queries in the database.
+ * Upon successful execution, invalidates schema and RLS query caches to ensure
+ * the dashboard reflects any structural or security changes.
+ *
+ * @param options - Execution callbacks and toast configuration
+ * @returns React Query mutation object for running SQL queries
+ */
 export function useRawSQL(options?: UseRawSQLOptions) {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
@@ -25,9 +35,27 @@ export function useRawSQL(options?: UseRawSQLOptions) {
       return advanceService.runRawSQL(query, params, explain);
     },
     onSuccess: (data) => {
-      // Invalidate database schema queries to ensure UI reflects any schema changes
-      void queryClient.invalidateQueries({ queryKey: ['database', 'tables'] });
-      void queryClient.invalidateQueries({ queryKey: ['database', 'table-schemas'] });
+      // Invalidate database schema and RLS queries to ensure UI reflects any schema/RLS changes
+      if (options?.schemaName) {
+        void queryClient.invalidateQueries({
+          queryKey: databaseTableQueryKeys.tables(options.schemaName),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ['database', 'table-schemas', options.schemaName],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: databaseTableQueryKeys.tableRlsStatuses(options.schemaName),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ['database', 'policies', options.schemaName],
+        });
+      } else {
+        // Safe broader invalidation strategy when schema cannot be determined or multi-schema SQL
+        void queryClient.invalidateQueries({ queryKey: ['database', 'tables'] });
+        void queryClient.invalidateQueries({ queryKey: ['database', 'table-schemas'] });
+        void queryClient.invalidateQueries({ queryKey: ['database', 'tables-rls'] });
+        void queryClient.invalidateQueries({ queryKey: ['database', 'policies'] });
+      }
 
       if (options?.showSuccessToast !== false) {
         const message = 'SQL query executed successfully';

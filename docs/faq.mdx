@@ -83,9 +83,16 @@ description: "Answers to common InsForge questions on database calls, edge funct
   </Accordion>
 
   <Accordion title="How do I turn row-level security (RLS) on or off for a table?">
-    New tables have RLS **on** by default. When you create a table (from the dashboard, `POST /api/database/tables`, or the SDK), RLS is enabled unless you explicitly pass `rlsEnabled: false`.
+    New tables in the `public` schema have RLS **on** by default across all table creation paths:
 
-    There is no field to toggle RLS on the update-table-schema endpoint (`PATCH /api/database/tables/{table}/schema`) — it only handles columns, foreign keys, and renames. To change RLS on an **existing** table, run one SQL statement:
+    - **Dashboard Table Builder & REST API**: When you create a table from the dashboard UI or via `POST /api/database/tables`, RLS is enabled by default. If an application explicitly specifies `rlsEnabled: false`, RLS is disabled within the creation transaction, preserving deliberate opt-out workflows.
+    - **Dashboard SQL Editor & Raw DDL**: Tables created with raw SQL DDL (`CREATE TABLE`, `CREATE TABLE AS`, `SELECT INTO`, or raw migrations) in the `public` schema automatically have RLS enabled via a PostgreSQL event trigger (`system.auto_enable_rls()`).
+    - **Custom Schemas**: The automated event trigger specifically protects the `public` schema. If you create tables in a custom schema exposed to PostgREST, the trigger does not alter them; run `ALTER TABLE <schema>.<table> ENABLE ROW LEVEL SECURITY;` explicitly.
+
+    To change RLS on an **existing** table:
+
+    1. **From the Dashboard**: If RLS is disabled on an existing table, the **Tables** page displays an alert banner with a 1-click **Enable RLS** button (which prompts for confirmation). The **Policies** page also displays an alert warning of tables without RLS, providing direct links to navigate to each affected table on the **Tables** page to enable it.
+    2. **Via SQL**: Run `ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;` (or `DISABLE`) using the dashboard SQL editor, the MCP `run-raw-sql` tool, or the CLI:
 
     ```sql
     -- turn RLS off
@@ -94,8 +101,6 @@ description: "Answers to common InsForge questions on database calls, edge funct
     -- turn RLS back on
     ALTER TABLE public.mytable ENABLE ROW LEVEL SECURITY;
     ```
-
-    Run that SQL any way you run admin SQL, all of which require project-owner / admin access:
 
     ```bash
     # one-off, via the CLI
@@ -107,12 +112,27 @@ description: "Answers to common InsForge questions on database calls, edge funct
     npx @insforge/cli db migrations up --all
     ```
 
-    You can also run it from the dashboard SQL editor, the MCP `run-raw-sql` tool, or the raw SQL REST endpoint (`POST /api/database/advance/rawsql/unrestricted`).
-
     <Warning>
-      Turning RLS **off** removes all row-level filtering: any role with table privileges (such as `authenticated`, and `anon` where granted) can read and write every row through the data API. Prefer writing RLS policies over disabling RLS. Admin requests made with the API Key (`ik_...`) bypass RLS either way.
+      **How table privileges (GRANTs) and RLS work together:**
 
-      Turning RLS **on** for a table that has no policies applies PostgreSQL's default-deny: `anon` and `authenticated` lose all access to it through the data API (every `SELECT`/`INSERT`/`UPDATE`/`DELETE` is blocked) until you add at least one policy. Add the policies you need before, or right after, enabling RLS.
+      PostgreSQL uses a distinct multi-tier permission and security model:
+
+      1. **Table Privileges (`GRANT`)**: Table privileges determine which operations (`SELECT`, `INSERT`, `UPDATE`, or `DELETE`) a database role (`anon`, `authenticated`) is allowed to attempt on a table. Roles only need grants for the specific operations they are permitted to execute, not necessarily all four DML privileges. Having table privileges alone does not enforce row boundaries or make a table safe.
+      2. **Row-Level Security (RLS)**: Once table privileges permit an operation, RLS policies dictate *which specific rows* that role can view or modify. RLS policies are operation- and role-specific (e.g., `FOR SELECT TO authenticated USING (...)`):
+         - Table owners normally bypass RLS on their own tables unless `FORCE ROW LEVEL SECURITY` is enabled on the table (`ALTER TABLE <table> FORCE ROW LEVEL SECURITY;`).
+         - PostgreSQL superusers (`postgres`) always bypass RLS.
+         - Roles with the `BYPASSRLS` attribute always bypass RLS, even when `FORCE ROW LEVEL SECURITY` is enabled.
+         - Client application roles (`anon` and `authenticated`) do not have `BYPASSRLS` and are not table owners; they remain strictly subject to applicable RLS policies.
+      3. **RLS Configuration Privileges (`ALTER TABLE`)**: Running `ALTER TABLE <schema>.<table> ENABLE/DISABLE ROW LEVEL SECURITY` requires table ownership or superuser privileges. In InsForge, public tables are owned by the `project_admin` administrative role, which has `BYPASSRLS` but is not a PostgreSQL superuser (according to its audited role definition). The root connection user (`postgres`) is the database superuser. Application roles (`anon`, `authenticated`) lack table ownership, administrative privileges, and `BYPASSRLS`.
+      4. **Raw SQL Execution Context**:
+         - **Standard raw SQL** (the dashboard SQL editor and the default raw SQL API endpoint) runs in a transaction under the `project_admin` role. Because `project_admin` owns public tables and holds `BYPASSRLS`, queries bypass RLS on public tables, but cannot perform operations restricted to superusers.
+         - **Unrestricted raw SQL** (available via CLI `--unrestricted` or the unrestricted API endpoint) runs directly as the PostgreSQL superuser (`postgres`). Newly created public objects (from DDL operations such as `CREATE` and `SELECT ... INTO`) are automatically reassigned to `project_admin`.
+         - In contrast, client data API queries (via PostgREST) run in the restricted context of the `anon` or `authenticated` role, which do not have `BYPASSRLS` and are strictly bound by active RLS policies.
+
+      - Turning RLS **off** removes all row-level filtering: any role holding table privileges can execute permitted operations on *every row* in the table without restriction. Because default public schema privileges grant DML to `anon` and `authenticated`, turning RLS off exposes all rows to public API operations.
+      - Turning RLS **on** for a table with no policies triggers PostgreSQL's **default-deny**: clients accessing the table through the data API cannot select, insert, update, or delete any rows until you create policies covering their roles and target operations.
+
+      To allow legitimate public or user access, always define explicit RLS policies matching your intended roles and operations (e.g., `CREATE POLICY "public_read" ON public.mytable FOR SELECT TO anon, authenticated USING (true);`) rather than disabling RLS. Admin requests made with the API Key (`ik_...`) bypass RLS via the `BYPASSRLS` role attribute.
     </Warning>
   </Accordion>
 

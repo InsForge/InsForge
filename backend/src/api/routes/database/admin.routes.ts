@@ -15,6 +15,7 @@ import { AdminRecordService } from '@/services/database/admin-record.service.js'
 import {
   buildQualifiedTableKey,
   normalizeDatabaseSchemaName,
+  validateSchemaQueryParam,
 } from '@/services/database/helpers.js';
 import { paginatedResponse, successResponse } from '@/utils/response.js';
 import type { DatabaseResourceUpdate } from '@/utils/sql-parser.js';
@@ -83,6 +84,7 @@ router.get(
   '/tables/:tableName/records',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      validateSchemaQueryParam(req.query.schema);
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const validation = adminTableRecordsListQuerySchema.safeParse(req.query);
       if (!validation.success) {
@@ -110,6 +112,7 @@ router.get(
   '/tables/:tableName/records/lookup',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      validateSchemaQueryParam(req.query.schema);
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const validation = adminTableRecordLookupQuerySchema.safeParse(req.query);
       if (!validation.success) {
@@ -138,6 +141,7 @@ router.post(
   '/tables/:tableName/records',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      validateSchemaQueryParam(req.query.schema);
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const validation = adminTableRecordsCreateRequestSchema.safeParse(req.body);
       if (!validation.success) {
@@ -162,6 +166,7 @@ router.patch(
   '/tables/:tableName/records',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      validateSchemaQueryParam(req.query.schema);
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
 
       const bodyValidation = adminTableRecordUpdateRequestSchema.safeParse(req.body);
@@ -192,6 +197,7 @@ router.delete(
   '/tables/:tableName/records',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      validateSchemaQueryParam(req.query.schema);
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const validation = adminTableRecordsDeleteRequestSchema.safeParse(req.body);
       if (!validation.success) {

@@ -233,6 +233,12 @@ export function TableForm({
       void queryClient.invalidateQueries({ queryKey: ['database-metadata'] });
       void queryClient.invalidateQueries({ queryKey: ['database', 'tables'] });
       void queryClient.invalidateQueries({ queryKey: ['metadata'] });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableSchema(schemaName, data.tableName),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableRlsStatuses(schemaName),
+      });
 
       showToast(
         t('database.tableCreatedSuccess', { defaultValue: 'Table created successfully!' }),
@@ -367,6 +373,9 @@ export function TableForm({
       if (data.tableName !== editTable?.tableName) {
         void queryClient.invalidateQueries({
           queryKey: databaseTableQueryKeys.tableSchema(schemaName, data.tableName),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: databaseTableQueryKeys.tableRlsStatuses(schemaName),
         });
       }
 

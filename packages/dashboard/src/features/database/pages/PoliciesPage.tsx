@@ -4,6 +4,8 @@ import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
+  Alert,
+  AlertDescription,
   DataGridEmptyState,
   DataGrid,
   type ConvertedValue,
@@ -14,6 +16,7 @@ import {
 } from '#components';
 import { useDatabaseSchemas, usePolicies } from '#features/database/hooks/useDatabase';
 import { useDatabaseSchemaSelection } from '#features/database/hooks/useDatabaseSchemaSelection';
+import { useTableRlsStatuses } from '#features/database/hooks/useTables';
 import { SQLModal, SQLCellButton } from '#features/database/components/SQLModal';
 import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
 import { type DatabasePoliciesResponse } from '@insforge/shared-schemas';
@@ -64,9 +67,14 @@ export default function PoliciesPage() {
   const { schemas, isLoading: isLoadingSchemas } = useDatabaseSchemas();
   const selectedSchemaInfo = getDatabaseSchemaInfo(schemas, selectedSchema);
   const { data, isLoading, error, refetch } = usePolicies(selectedSchema, true);
+  const { rlsStatuses, refetchRlsStatuses } = useTableRlsStatuses(selectedSchema, true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
   const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('db-policies');
   const [currentPage, setCurrentPage] = useState(1);
+
+  const rlsDisabledTables = useMemo(() => {
+    return rlsStatuses.filter((s) => !s.rlsEnabled).map((s) => s.tableName);
+  }, [rlsStatuses]);
 
   const allPolicies = useMemo(() => parsePoliciesFromResponse(data), [data]);
 
@@ -100,7 +108,7 @@ export default function PoliciesPage() {
     try {
       setSearchQuery('');
       setCurrentPage(1);
-      await refetch();
+      await Promise.all([refetch(), refetchRlsStatuses()]);
     } finally {
       setIsRefreshing(false);
     }
@@ -203,6 +211,7 @@ export default function PoliciesPage() {
           <Button
             variant="ghost"
             size="icon"
+            aria-label={t('database.refreshPolicies', { defaultValue: 'Refresh policies' })}
             className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
             onClick={() => void handleRefresh()}
             disabled={isRefreshing}
@@ -287,6 +296,46 @@ export default function PoliciesPage() {
           onSearchChange={setSearchQuery}
           searchPlaceholder={t('database.searchPolicy', { defaultValue: 'Search policy' })}
         />
+        {rlsDisabledTables.length > 0 && (
+          <Alert variant="destructive" className="mx-4 mt-3 shrink-0">
+            <div className="flex flex-col gap-1">
+              <div className="font-medium text-sm">
+                {t('database.policiesRlsDisabledTitle', {
+                  count: rlsDisabledTables.length,
+                  defaultValue_one: 'Row-Level Security is disabled for 1 table in this schema',
+                  defaultValue_other:
+                    'Row-Level Security is disabled for {{count}} tables in this schema',
+                })}
+              </div>
+              <AlertDescription className="text-xs">
+                {t('database.policiesRlsDisabledDesc', {
+                  defaultValue:
+                    'Tables with RLS disabled allow any role with table privileges to access all rows through the data API. Affected tables: ',
+                })}
+                <span className="font-mono">
+                  {rlsDisabledTables.map((tbl, i) => (
+                    <span key={tbl}>
+                      {i > 0 && ', '}
+                      <button
+                        type="button"
+                        className="underline hover:text-foreground cursor-pointer font-medium"
+                        onClick={() =>
+                          void navigate(
+                            `/dashboard/database/tables?schema=${encodeURIComponent(
+                              selectedSchema
+                            )}&table=${encodeURIComponent(tbl)}`
+                          )
+                        }
+                      >
+                        {tbl}
+                      </button>
+                    </span>
+                  ))}
+                </span>
+              </AlertDescription>
+            </div>
+          </Alert>
+        )}
         {isLoading ? (
           <div className="min-h-0 flex-1 flex items-center justify-center">
             <EmptyState

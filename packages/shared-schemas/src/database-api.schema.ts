@@ -30,6 +30,7 @@ export const createTableResponseSchema = tableSchema
     columns: true,
   })
   .extend({
+    rlsEnabled: z.boolean(),
     message: z.string(),
     autoFields: z.array(z.string()),
     nextActions: z.string(),
