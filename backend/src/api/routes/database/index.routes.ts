@@ -11,7 +11,10 @@ import { DatabaseService } from '@/services/database/database.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
 import logger from '@/utils/logger.js';
-import { normalizeDatabaseSchemaName } from '@/services/database/helpers.js';
+import {
+  normalizeDatabaseSchemaName,
+  validateSchemaQueryParam,
+} from '@/services/database/helpers.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 
 const router = Router();
@@ -54,6 +57,7 @@ router.get(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      validateSchemaQueryParam(req.query.schema);
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const response = await databaseService.getFunctions(schemaName);
       successResponse(res, response);
@@ -70,6 +74,7 @@ router.get(
  */
 router.get('/indexes', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    validateSchemaQueryParam(req.query.schema);
     const schemaName = normalizeDatabaseSchemaName(req.query.schema);
     const response = await databaseService.getIndexes(schemaName);
     successResponse(res, response);
@@ -88,6 +93,7 @@ router.get(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      validateSchemaQueryParam(req.query.schema);
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const response = await databaseService.getPolicies(schemaName);
       successResponse(res, response);
@@ -107,6 +113,7 @@ router.get(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      validateSchemaQueryParam(req.query.schema);
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const response = await databaseService.getTriggers(schemaName);
       successResponse(res, response);

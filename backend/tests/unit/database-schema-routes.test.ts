@@ -6,32 +6,61 @@ import request from 'supertest';
 import { AppError } from '../../src/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 
-const { mockTableService, mockAuditService, mockTokenManager, mockSecretService } = vi.hoisted(
-  () => ({
-    mockTableService: {
-      listTables: vi.fn(),
-      getTableRlsStatuses: vi.fn(),
-      createTable: vi.fn(),
-      getTableSchema: vi.fn(),
-      updateTableSchema: vi.fn(),
-      deleteTable: vi.fn(),
-      enableTableRLS: vi.fn(),
-    },
-    mockAuditService: {
-      log: vi.fn().mockResolvedValue(undefined),
-    },
-    mockTokenManager: {
-      verifyToken: vi.fn(),
-      verifyCloudProjectAuthorization: vi.fn(),
-    },
-    mockSecretService: {
-      verifyApiKey: vi.fn(),
-    },
-  })
-);
+const {
+  mockTableService,
+  mockAuditService,
+  mockTokenManager,
+  mockSecretService,
+  mockDatabaseService,
+  mockAdminRecordService,
+} = vi.hoisted(() => ({
+  mockTableService: {
+    listTables: vi.fn(),
+    getTableRlsStatuses: vi.fn(),
+    createTable: vi.fn(),
+    getTableSchema: vi.fn(),
+    updateTableSchema: vi.fn(),
+    deleteTable: vi.fn(),
+    enableTableRLS: vi.fn(),
+  },
+  mockAuditService: {
+    log: vi.fn().mockResolvedValue(undefined),
+  },
+  mockTokenManager: {
+    verifyToken: vi.fn(),
+    verifyCloudProjectAuthorization: vi.fn(),
+    generatePostgrestAdminToken: vi.fn(() => 'mock-admin-token'),
+    generatePostgrestAnonToken: vi.fn(() => 'mock-anon-token'),
+  },
+  mockSecretService: {
+    verifyApiKey: vi.fn(),
+  },
+  mockDatabaseService: {
+    getSchemas: vi.fn(),
+    getFunctions: vi.fn(),
+    getIndexes: vi.fn(),
+    getPolicies: vi.fn(),
+    getTriggers: vi.fn(),
+  },
+  mockAdminRecordService: {
+    listRecords: vi.fn(),
+    lookupRecord: vi.fn(),
+    createRecords: vi.fn(),
+    updateRecord: vi.fn(),
+    deleteRecords: vi.fn(),
+  },
+}));
 
 vi.mock('../../src/services/database/database-table.service.js', () => ({
   DatabaseTableService: { getInstance: () => mockTableService },
+}));
+
+vi.mock('../../src/services/database/database.service.js', () => ({
+  DatabaseService: { getInstance: () => mockDatabaseService },
+}));
+
+vi.mock('../../src/services/database/admin-record.service.js', () => ({
+  AdminRecordService: { getInstance: () => mockAdminRecordService },
 }));
 
 vi.mock('../../src/services/logs/audit.service.js', () => ({
@@ -47,12 +76,16 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
 }));
 
 import { databaseTablesRouter } from '../../src/api/routes/database/tables.routes.js';
+import { databaseAdminRouter } from '../../src/api/routes/database/admin.routes.js';
+import databaseIndexRouter from '../../src/api/routes/database/index.routes.js';
 import { errorMiddleware } from '../../src/api/middlewares/error.js';
 
 function createTestApp() {
   const app = express();
   app.use(express.json());
   app.use('/api/database/tables', databaseTablesRouter);
+  app.use('/api/database/admin', databaseAdminRouter);
+  app.use('/api/database', databaseIndexRouter);
   app.use(errorMiddleware);
   return app;
 }
@@ -88,6 +121,13 @@ describe('database schema route wiring', () => {
   it('normalizes schema query params across dashboard database routes', () => {
     expect(indexRoutesSource).toContain('normalizeDatabaseSchemaName(req.query.schema)');
     expect(tableRoutesSource).toContain('normalizeDatabaseSchemaName(req.query.schema)');
+    expect(adminRoutesSource).toContain('normalizeDatabaseSchemaName(req.query.schema)');
+  });
+
+  it('validates schema query params before normalizing across database routes', () => {
+    expect(indexRoutesSource).toContain('validateSchemaQueryParam(req.query.schema)');
+    expect(tableRoutesSource).toContain('validateSchemaQueryParam(req.query.schema)');
+    expect(adminRoutesSource).toContain('validateSchemaQueryParam(req.query.schema)');
   });
 
   it('passes schema names through table management handlers', () => {
@@ -448,6 +488,320 @@ describe('database tables route endpoints', () => {
         'The "schema" query parameter must be a single non-empty schema name.'
       );
       expect(mockTableService.listTables).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('database metadata route endpoints (index.routes)', () => {
+    describe('GET /api/database/functions', () => {
+      it('defaults to public schema when query schema is omitted', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+        mockDatabaseService.getFunctions.mockResolvedValue([]);
+
+        const res = await request(app)
+          .get('/api/database/functions')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(200);
+        expect(mockDatabaseService.getFunctions).toHaveBeenCalledWith('public');
+      });
+
+      it('passes single valid schema query parameter', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+        mockDatabaseService.getFunctions.mockResolvedValue([]);
+
+        const res = await request(app)
+          .get('/api/database/functions?schema=tenant_1')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(200);
+        expect(mockDatabaseService.getFunctions).toHaveBeenCalledWith('tenant_1');
+      });
+
+      it('rejects repeated schema query parameters with HTTP 400', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+        const res = await request(app)
+          .get('/api/database/functions?schema=public&schema=tenant_1')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+        expect(res.body.message).toBe(
+          'The "schema" query parameter must be a single non-empty schema name.'
+        );
+        expect(mockDatabaseService.getFunctions).not.toHaveBeenCalled();
+      });
+
+      it('rejects empty schema query parameter with HTTP 400', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+        const res = await request(app)
+          .get('/api/database/functions?schema=')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+        expect(res.body.message).toBe(
+          'The "schema" query parameter must be a single non-empty schema name.'
+        );
+        expect(mockDatabaseService.getFunctions).not.toHaveBeenCalled();
+      });
+
+      it('rejects whitespace-only schema query parameter with HTTP 400', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+        const res = await request(app)
+          .get('/api/database/functions?schema=%20%20')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+        expect(res.body.message).toBe(
+          'The "schema" query parameter must be a single non-empty schema name.'
+        );
+        expect(mockDatabaseService.getFunctions).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('GET /api/database/indexes', () => {
+      it('passes single valid schema query parameter', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+        mockDatabaseService.getIndexes.mockResolvedValue([]);
+
+        const res = await request(app)
+          .get('/api/database/indexes?schema=tenant_1')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(200);
+        expect(mockDatabaseService.getIndexes).toHaveBeenCalledWith('tenant_1');
+      });
+
+      it('rejects repeated schema query parameters with HTTP 400', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+        const res = await request(app)
+          .get('/api/database/indexes?schema=public&schema=tenant_1')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+        expect(res.body.message).toBe(
+          'The "schema" query parameter must be a single non-empty schema name.'
+        );
+        expect(mockDatabaseService.getIndexes).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('GET /api/database/policies', () => {
+      it('passes single valid schema query parameter', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+        mockDatabaseService.getPolicies.mockResolvedValue([]);
+
+        const res = await request(app)
+          .get('/api/database/policies?schema=tenant_1')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(200);
+        expect(mockDatabaseService.getPolicies).toHaveBeenCalledWith('tenant_1');
+      });
+
+      it('rejects repeated schema query parameters with HTTP 400', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+        const res = await request(app)
+          .get('/api/database/policies?schema=public&schema=tenant_1')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+        expect(res.body.message).toBe(
+          'The "schema" query parameter must be a single non-empty schema name.'
+        );
+        expect(mockDatabaseService.getPolicies).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('GET /api/database/triggers', () => {
+      it('passes single valid schema query parameter', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+        mockDatabaseService.getTriggers.mockResolvedValue([]);
+
+        const res = await request(app)
+          .get('/api/database/triggers?schema=tenant_1')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(200);
+        expect(mockDatabaseService.getTriggers).toHaveBeenCalledWith('tenant_1');
+      });
+
+      it('rejects repeated schema query parameters with HTTP 400', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+        const res = await request(app)
+          .get('/api/database/triggers?schema=public&schema=tenant_1')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+        expect(res.body.message).toBe(
+          'The "schema" query parameter must be a single non-empty schema name.'
+        );
+        expect(mockDatabaseService.getTriggers).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('database admin route endpoints (admin.routes)', () => {
+    describe('GET /api/database/admin/tables/:tableName/records', () => {
+      it('defaults to public schema when query schema is omitted', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+        mockAdminRecordService.listRecords.mockResolvedValue({ records: [], total: 0 });
+
+        const res = await request(app)
+          .get('/api/database/admin/tables/users/records')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(200);
+        expect(mockAdminRecordService.listRecords).toHaveBeenCalledWith(
+          'public',
+          'users',
+          expect.any(Object)
+        );
+      });
+
+      it('passes single valid schema query parameter', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+        mockAdminRecordService.listRecords.mockResolvedValue({ records: [], total: 0 });
+
+        const res = await request(app)
+          .get('/api/database/admin/tables/users/records?schema=tenant_1')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(200);
+        expect(mockAdminRecordService.listRecords).toHaveBeenCalledWith(
+          'tenant_1',
+          'users',
+          expect.any(Object)
+        );
+      });
+
+      it('rejects repeated schema query parameters with HTTP 400', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+        const res = await request(app)
+          .get('/api/database/admin/tables/users/records?schema=public&schema=tenant_1')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+        expect(res.body.message).toBe(
+          'The "schema" query parameter must be a single non-empty schema name.'
+        );
+        expect(mockAdminRecordService.listRecords).not.toHaveBeenCalled();
+      });
+
+      it('rejects empty schema query parameter with HTTP 400', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+        const res = await request(app)
+          .get('/api/database/admin/tables/users/records?schema=')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+        expect(res.body.message).toBe(
+          'The "schema" query parameter must be a single non-empty schema name.'
+        );
+        expect(mockAdminRecordService.listRecords).not.toHaveBeenCalled();
+      });
+
+      it('rejects whitespace-only schema query parameter with HTTP 400', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+        const res = await request(app)
+          .get('/api/database/admin/tables/users/records?schema=%20%20')
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+        expect(res.body.message).toBe(
+          'The "schema" query parameter must be a single non-empty schema name.'
+        );
+        expect(mockAdminRecordService.listRecords).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('GET /api/database/admin/tables/:tableName/records/lookup', () => {
+      it('rejects repeated schema query parameters with HTTP 400', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+        const res = await request(app)
+          .get(
+            '/api/database/admin/tables/users/records/lookup?column=id&value=1&schema=public&schema=tenant_1'
+          )
+          .set('Authorization', 'Bearer admin-token');
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+        expect(res.body.message).toBe(
+          'The "schema" query parameter must be a single non-empty schema name.'
+        );
+        expect(mockAdminRecordService.lookupRecord).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('POST /api/database/admin/tables/:tableName/records', () => {
+      it('rejects repeated schema query parameters with HTTP 400', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+        const res = await request(app)
+          .post('/api/database/admin/tables/users/records?schema=public&schema=tenant_1')
+          .set('Authorization', 'Bearer admin-token')
+          .send([{ name: 'Alice' }]);
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+        expect(res.body.message).toBe(
+          'The "schema" query parameter must be a single non-empty schema name.'
+        );
+        expect(mockAdminRecordService.createRecords).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('PATCH /api/database/admin/tables/:tableName/records', () => {
+      it('rejects repeated schema query parameters with HTTP 400', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+        const res = await request(app)
+          .patch('/api/database/admin/tables/users/records?schema=public&schema=tenant_1')
+          .set('Authorization', 'Bearer admin-token')
+          .send({ pkKeys: { id: 1 }, data: { name: 'Bob' } });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+        expect(res.body.message).toBe(
+          'The "schema" query parameter must be a single non-empty schema name.'
+        );
+        expect(mockAdminRecordService.updateRecord).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('DELETE /api/database/admin/tables/:tableName/records', () => {
+      it('rejects repeated schema query parameters with HTTP 400', async () => {
+        mockTokenManager.verifyToken.mockReturnValue({ role: 'project_admin', sub: 'admin-1' });
+
+        const res = await request(app)
+          .delete('/api/database/admin/tables/users/records?schema=public&schema=tenant_1')
+          .set('Authorization', 'Bearer admin-token')
+          .send({ pkKeys: [{ id: 1 }] });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(ERROR_CODES.INVALID_INPUT);
+        expect(res.body.message).toBe(
+          'The "schema" query parameter must be a single non-empty schema name.'
+        );
+        expect(mockAdminRecordService.deleteRecords).not.toHaveBeenCalled();
+      });
     });
   });
 });

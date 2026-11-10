@@ -206,6 +206,10 @@ describe('TableForm RLS query cache invalidation', () => {
         }),
         'public'
       );
+      expect(tableServiceMocks.showToast).toHaveBeenCalledWith(
+        expect.stringContaining('notes'),
+        'success'
+      );
     });
 
     // tableRlsStatuses should NOT be invalidated because the table name didn't change
