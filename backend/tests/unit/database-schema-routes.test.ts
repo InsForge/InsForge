@@ -76,7 +76,6 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
 }));
 
 import { databaseTablesRouter } from '../../src/api/routes/database/tables.routes.js';
-import { databaseAdminRouter } from '../../src/api/routes/database/admin.routes.js';
 import databaseIndexRouter from '../../src/api/routes/database/index.routes.js';
 import { errorMiddleware } from '../../src/api/middlewares/error.js';
 
@@ -84,7 +83,6 @@ function createTestApp() {
   const app = express();
   app.use(express.json());
   app.use('/api/database/tables', databaseTablesRouter);
-  app.use('/api/database/admin', databaseAdminRouter);
   app.use('/api/database', databaseIndexRouter);
   app.use(errorMiddleware);
   return app;
