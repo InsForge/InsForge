@@ -21,7 +21,7 @@ This guide walks through self-hosting the InsForge platform on [xCloud](https://
 - A server connected to xCloud
 - A domain or subdomain for the install
 
-The template asks for a server with at least 1 GB of RAM, 2 CPU cores and 10 GB of disk, running xCloud's Docker and Nginx stack.
+xCloud's template requires a server with at least 1 GB of RAM, 2 CPU cores and 10 GB of disk, running xCloud's Docker and Nginx stack. For real workloads, follow InsForge's own sizing in the [deployment overview](./README.md): 2 GB of RAM (4 GB recommended) and 20 GB of storage (30 GB recommended).
 
 ## 1. Pick InsForge from the catalog
 
@@ -48,9 +48,9 @@ From there you can create your first table, or open the **Connect** page in the 
 ## Limitations
 
 - The root admin is the only dashboard login.
-- The InsForge CLI and Skills work only with InsForge Cloud, not with this install.
+- The CLI can link to this install with `npx @insforge/cli link --api-base-url <your-domain> --api-key <API key>`. Some cloud-only features are not available on self-hosted installs.
 - Running your own containers is disabled, because it would need access to the Docker socket.
 
 ## Storage
 
-xCloud mounts a storage volume for uploads, so files live on the local disk of the server you chose. Uploads are limited to 50 MB each. S3-compatible storage can be configured later through the environment editor.
+xCloud mounts a storage volume for uploads, so files live on the local disk of the server you chose. Uploads default to 50 MB each; the root admin can change this in **Dashboard → Storage → Settings**. S3-compatible storage can be configured later through the environment editor, but switching does not move existing uploads, so migrate them first. See the [self-hosted storage guide](./self-host-storage.mdx).
