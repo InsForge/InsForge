@@ -61,6 +61,11 @@ This directory contains deployment guides for self-hosting the InsForge platform
   - Domain and TLS handled by Dokploy's proxy
   - Postgres built from the repo, so its config tracks the release
 
+- **[xCloud](./deploy-to-xcloud.md)** - Deploy InsForge from xCloud's OneClick app catalog onto a server managed by xCloud
+  - One-click install; admin login, API key and anon key generated for you
+  - Domain and HTTPS handled by xCloud
+  - Commercial managed service; the template is maintained by xCloud
+
 ### Coming Soon
 
 - **Digital Ocean** - Droplet deployment guide

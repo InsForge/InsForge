@@ -182,5 +182,6 @@ webscraper
 websocket
 websockets
 Xcode
+xCloud
 Zeabur
 Zod
