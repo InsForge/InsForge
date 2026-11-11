@@ -185,21 +185,44 @@ export class AuthService {
     const verifiedRedirectTo =
       usesVerifyEmailLink && shouldSendVerificationEmail ? redirectTo : null;
 
+    const normalizedEmail = email.trim().toLowerCase();
     const hashedPassword = await bcrypt.hash(password, 10);
     const userId = crypto.randomUUID();
 
     const pool = this.getPool();
     const client = await pool.connect();
+
     try {
       await client.query('BEGIN');
 
+      // Serialize registrations for the same normalized email.
+      // This prevents concurrent email signups from both passing the lookup.
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `auth_register_email_${normalizedEmail}`,
+      ]);
+
+      // OAuth providers may store emails with mixed capitalization.
+      const existingUser = await client.query(
+        `SELECT id
+          FROM auth.users
+          WHERE lower(email) = $1
+          ORDER BY created_at ASC
+          LIMIT 1`,
+        [normalizedEmail]
+      );
+
+      if (existingUser.rows.length > 0) {
+        throw new AppError('User already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
+      }
+
       const profile = name ? JSON.stringify({ name }) : '{}';
+
       await client.query(
         `INSERT INTO auth.users (id, email, password, profile, email_verified, created_at, updated_at)
          VALUES ($1, $2, $3, $4::jsonb, $5, NOW(), NOW())`,
         [
           userId,
-          email,
+          normalizedEmail,
           hashedPassword,
           profile,
           options?.autoConfirm && options?.isAdminCreation ? true : false,
@@ -1019,6 +1042,28 @@ export class AuthService {
     try {
       await client.query('BEGIN');
 
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Use the same lock as email registration to prevent duplicate accounts.
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `auth_register_email_${normalizedEmail}`,
+      ]);
+
+      // Recheck after acquiring the lock because another signup flow
+      // may have created an account while this OAuth request was waiting.
+      const existingUser = await client.query(
+        `SELECT id
+          FROM auth.users
+          WHERE lower(email) = $1
+          ORDER BY created_at ASC
+          LIMIT 1`,
+        [normalizedEmail]
+      );
+
+      if (existingUser.rows.length > 0) {
+        throw new AppError('User already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
+      }
+
       // Create user record (without password for OAuth users)
       const profile = JSON.stringify({ name: userName, avatar_url: avatarUrl });
       await client.query(
@@ -1026,7 +1071,7 @@ export class AuthService {
         INSERT INTO auth.users (id, email, profile, email_verified, created_at, updated_at)
         VALUES ($1, $2, $3::jsonb, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-        [userId, email, profile]
+        [userId, normalizedEmail, profile]
       );
 
       // Create auth.user_providers record
@@ -1045,7 +1090,7 @@ export class AuthService {
 
       const user: UserSchema = {
         id: userId,
-        email,
+        email: normalizedEmail,
         emailVerified: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -1055,7 +1100,7 @@ export class AuthService {
 
       const accessToken = this.tokenManager.generateAccessToken({
         sub: userId,
-        email,
+        email: normalizedEmail,
         role: 'authenticated',
       });
 
