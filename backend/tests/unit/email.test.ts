@@ -3,6 +3,10 @@ import { AppError } from '../../src/utils/errors';
 import { describe, it, expect, beforeEach, afterEach, vi, afterAll } from 'vitest';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
+import { SmtpConfigService } from '../../src/services/email/smtp-config.service';
+import { SmtpEmailProvider } from '../../src/providers/email/smtp.provider';
+import { CloudEmailProvider } from '../../src/providers/email/cloud.provider';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 // Mock dependencies
 vi.mock('axios');
@@ -401,5 +405,85 @@ describe('EmailService', () => {
         token: '123456',
       })
     ).rejects.toThrow('No email provider is configured');
+  });
+
+  describe('Rate limiting and recipient normalization', () => {
+    const mockSmtpConfig = {
+      id: 'smtp-1',
+      enabled: true,
+      host: 'smtp.example.com',
+      port: 587,
+      username: 'user',
+      password: 'password',
+      senderEmail: 'noreply@example.com',
+      senderName: 'Test',
+      minIntervalSeconds: 60,
+    };
+
+    beforeEach(() => {
+      vi.spyOn(SmtpConfigService.getInstance(), 'getRawSmtpConfig').mockResolvedValue(
+        mockSmtpConfig
+      );
+      vi.spyOn(SmtpEmailProvider.prototype, 'sendWithTemplate').mockResolvedValue();
+    });
+
+    it('enforces min interval rate limit case-insensitively and with trimmed whitespace', async () => {
+      // First email to user@example.com succeeds
+      await expect(
+        emailService.sendWithTemplate('user@example.com', 'John', 'email-verification-code', {
+          token: '123456',
+        })
+      ).resolves.toBeUndefined();
+
+      // Second email immediately to differently-cased address should be rate-limited
+      await expect(
+        emailService.sendWithTemplate('USER@example.com', 'John', 'email-verification-code', {
+          token: '123456',
+        })
+      ).rejects.toThrow(/Too many emails to this address/);
+
+      // Whitespace variation should also be rate-limited
+      await expect(
+        emailService.sendWithTemplate('  User@example.com  ', 'John', 'email-verification-code', {
+          token: '123456',
+        })
+      ).rejects.toThrow(/Too many emails to this address/);
+
+      // Email to a different recipient should succeed
+      await expect(
+        emailService.sendWithTemplate('other@example.com', 'Alice', 'email-verification-code', {
+          token: '654321',
+        })
+      ).resolves.toBeUndefined();
+    });
+
+    it('throws AppError when email provider does not support raw email sending', async () => {
+      vi.spyOn(SmtpConfigService.getInstance(), 'getRawSmtpConfig').mockResolvedValue(null);
+      const originalSendRaw = CloudEmailProvider.prototype.sendRaw;
+      // Temporarily remove sendRaw from prototype to test provider capability check
+      delete (CloudEmailProvider.prototype as { sendRaw?: unknown }).sendRaw;
+
+      try {
+        const err = await emailService
+          .sendRaw({
+            to: 'user@example.com',
+            subject: 'Test Raw Email',
+            html: '<p>Hello</p>',
+          })
+          .then(
+            () => null,
+            (e: unknown) => e
+          );
+
+        expect(err).toBeInstanceOf(AppError);
+        expect((err as AppError).statusCode).toBe(400);
+        expect((err as AppError).code).toBe(ERROR_CODES.INVALID_INPUT);
+        expect((err as AppError).message).toContain(
+          'Current email provider does not support raw email sending'
+        );
+      } finally {
+        CloudEmailProvider.prototype.sendRaw = originalSendRaw;
+      }
+    });
   });
 });
