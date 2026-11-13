@@ -12,7 +12,7 @@ import {
   BuildLogsView,
   SeverityFilterDropdown,
 } from '#features/logs/components';
-import { formatTime } from '#lib/utils/utils';
+import { formatTime, formatUtcTime } from '#lib/utils/utils';
 import { LogSchema } from '@insforge/shared-schemas';
 import { usePageSize } from '#lib/hooks/usePageSize';
 
@@ -72,7 +72,10 @@ export default function FunctionLogsPage() {
         name: t('logs.time', { defaultValue: 'Time' }),
         width: '240px',
         renderCell: ({ row }) => (
-          <p className="truncate text-[13px] font-normal leading-[18px] text-[rgb(var(--foreground))]">
+          <p
+            className="truncate text-[13px] font-normal leading-[18px] text-[rgb(var(--foreground))]"
+            title={formatUtcTime(String(row.timestamp ?? ''))}
+          >
             {formatTime(String(row.timestamp ?? ''))}
           </p>
         ),
