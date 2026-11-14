@@ -21,7 +21,7 @@ import {
   useDatabasePassword,
 } from '#lib/hooks/useMetadata';
 import { getBackendUrl } from '#lib/utils/utils';
-import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS } from '#lib/analytics/constants';
 
 interface ClientDetailPageProps {
@@ -36,7 +36,7 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
     ? t(CLIENT_LABEL_I18N_KEYS[clientId] as string, { defaultValue: entry.label })
     : entry.label;
   const declaredTabs = entry.tabs ?? DEFAULT_AGENT_TABS;
-  const mcpVsCliVariant = getFeatureFlag(FEATURE_FLAGS.MCP_VS_CLI);
+  const mcpVsCliVariant = useFeatureFlag(FEATURE_FLAGS.MCP_VS_CLI);
   const variantAllowed: ReadonlyArray<AgentTab> =
     mcpVsCliVariant === 'mcp' ? ['mcp'] : mcpVsCliVariant === 'cli' ? ['cli'] : declaredTabs;
   const filteredTabs = declaredTabs.filter((t) => variantAllowed.includes(t));
