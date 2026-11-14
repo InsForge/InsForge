@@ -19,12 +19,21 @@ export const reservedFunctionSlugMessage = `Reserved slug - "${RESERVED_FUNCTION
   RESERVED_FUNCTION_SLUGS.length === 1 ? 'is' : 'are'
 } used by the functions runtime and cannot be used as a function slug`;
 
+/**
+ * Grammar for a function slug. Shared with the `/functions/:slug` invoke proxy
+ * so a path segment that is not a slug (e.g. `//host`, `../x`) is rejected
+ * before it can be turned into an upstream URL.
+ */
+export const FUNCTION_SLUG_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+export const isValidFunctionSlug = (slug: string): boolean => FUNCTION_SLUG_PATTERN.test(slug);
+
 export const uploadFunctionRequestSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   slug: z
     .string()
     .regex(
-      /^[a-zA-Z0-9_-]+$/,
+      FUNCTION_SLUG_PATTERN,
       'Invalid slug format - must be alphanumeric with hyphens or underscores only'
     )
     .refine((slug) => !isReservedFunctionSlug(slug), reservedFunctionSlugMessage)
