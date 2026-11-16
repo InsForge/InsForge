@@ -216,10 +216,7 @@ export class SmtpEmailProvider implements EmailProvider {
    * @param signal - Optional AbortSignal checked prior to dispatch
    * @returns Promise resolving to the provider-assigned Message-ID returned by nodemailer
    */
-  async sendRaw(
-    options: SendRawEmailOptions,
-    signal?: AbortSignal
-  ): Promise<SendRawEmailResult> {
+  async sendRaw(options: SendRawEmailOptions, signal?: AbortSignal): Promise<SendRawEmailResult> {
     if (signal?.aborted) {
       throw new AppError(
         'Email sending aborted due to lost claim',

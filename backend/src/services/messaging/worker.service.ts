@@ -194,7 +194,8 @@ export class MessagingWorker {
         }),
         new Promise<never>((_, reject) => {
           timeoutHandle = setTimeout(
-            () => reject(new Error(`LISTEN client connection timed out after ${CONNECT_TIMEOUT_MS}ms`)),
+            () =>
+              reject(new Error(`LISTEN client connection timed out after ${CONNECT_TIMEOUT_MS}ms`)),
             CONNECT_TIMEOUT_MS
           );
         }),
@@ -373,8 +374,7 @@ export class MessagingWorker {
 
         // Use the real provider-assigned Message-ID from the send response instead of
         // generating one client-side so audits/rollups match the upstream provider record.
-        const providerMessageId =
-          sendResult?.messageId ?? message.idempotencyKey ?? message.id;
+        const providerMessageId = sendResult?.messageId ?? message.idempotencyKey ?? message.id;
 
         // Log durable audit attempt BEFORE releasing claim in outbox
         await this.logAttempt(
@@ -505,7 +505,7 @@ export class MessagingWorker {
         status,
         // Prefer the real provider Message-ID returned by the send; fall back to the
         // message id only when the provider did not supply one.
-        status === 'sent' ? providerMessageId ?? messageId : null,
+        status === 'sent' ? (providerMessageId ?? messageId) : null,
         error ? error.message : null,
         durationMs || null,
       ]);
@@ -514,7 +514,7 @@ export class MessagingWorker {
       // Catch rollback failures separately: if ROLLBACK itself fails, the connection's
       // transaction state is unknown and must not be silently returned to the pool.
       try {
-        await client.query('ROLLBACK');
+        await client?.query('ROLLBACK');
       } catch (rollbackErr) {
         rollbackError = rollbackErr instanceof Error ? rollbackErr : new Error(String(rollbackErr));
         logger.error(`Failed to rollback logAttempt transaction for message: ${messageId}`, {

@@ -53,8 +53,9 @@ CREATE TABLE IF NOT EXISTS messaging.delivery_attempts (
 CREATE INDEX IF NOT EXISTS idx_messaging_delivery_attempts_msg_id 
 ON messaging.delivery_attempts (message_id);
 
-DROP INDEX IF EXISTS idx_delivery_attempts_unique;
-DROP INDEX IF EXISTS uk_messaging_delivery_attempts_msg_attempt;
+-- Schema-qualify drops so we never target indexes in public (or another schema) by mistake
+DROP INDEX IF EXISTS messaging.idx_delivery_attempts_unique;
+DROP INDEX IF EXISTS messaging.uk_messaging_delivery_attempts_msg_attempt;
 CREATE UNIQUE INDEX IF NOT EXISTS uk_messaging_delivery_attempts_msg_attempt
 ON messaging.delivery_attempts (message_id, attempt_number);
 
