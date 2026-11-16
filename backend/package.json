@@ -76,6 +76,7 @@
     "stripe": "^22.1.0",
     "typescript": "^5.3.3",
     "winston": "^3.17.0",
+    "uuid": "^14.0.0",
     "xml2js": "^0.6.2",
     "zod": "^3.23.8"
   },
@@ -90,6 +91,7 @@
     "@types/pg-format": "^1.0.5",
     "@types/picomatch": "^4.0.3",
     "@types/supertest": "^7.2.0",
+    "@types/uuid": "^10.0.0",
     "@types/xml2js": "^0.4.14",
     "dotenv-cli": "^10.0.0",
     "insforge-test": "^0.2.0",

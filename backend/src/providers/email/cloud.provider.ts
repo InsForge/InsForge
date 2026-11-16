@@ -4,8 +4,8 @@ import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import { AppError } from '@/utils/errors.js';
 import { EMAIL_TEMPLATE_TYPES, EmailTemplate } from '@/types/email.js';
-import { EmailProvider } from './base.provider.js';
-import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
+import { EmailProvider, SendRawEmailOptions, SendRawEmailResult } from './base.provider.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 /**
  * Cloud email provider for sending emails via Insforge cloud backend
@@ -181,12 +181,28 @@ export class CloudEmailProvider implements EmailProvider {
 
   /**
    * Send custom/raw email via cloud backend
+   * @returns Result containing the message ID assigned by the upstream provider (SendGrid/Mailgun)
    */
-  async sendRaw(options: SendRawEmailRequest): Promise<void> {
+  async sendRaw(options: SendRawEmailOptions, signal?: AbortSignal): Promise<SendRawEmailResult> {
+    if (signal?.aborted) {
+      throw new AppError(
+        'Email sending aborted due to lost claim',
+        500,
+        ERROR_CODES.EMAIL_SMTP_SEND_FAILED
+      );
+    }
     try {
       const projectId = appConfig.cloud.projectId;
       const apiHost = appConfig.cloud.apiHost;
       const signToken = this.generateSignToken();
+
+      if (signal?.aborted) {
+        throw new AppError(
+          'Email sending aborted due to lost claim',
+          500,
+          ERROR_CODES.EMAIL_SMTP_SEND_FAILED
+        );
+      }
 
       const url = `${apiHost}/email/v1/${projectId}/send-on-demand`;
       const response = await axios.post(url, options, {
@@ -194,11 +210,14 @@ export class CloudEmailProvider implements EmailProvider {
           'Content-Type': 'application/json',
           sign: signToken,
         },
+        signal,
         timeout: 10000,
       });
 
       if (response.data?.success) {
         logger.info('Raw email sent successfully', { projectId });
+        // Extract the provider-assigned message ID (SendGrid/Mailgun) from the cloud response
+        return { messageId: response.data?.messageId ?? response.data?.data?.messageId };
       } else {
         throw new AppError(
           'Email service returned unsuccessful response',
@@ -207,6 +226,14 @@ export class CloudEmailProvider implements EmailProvider {
         );
       }
     } catch (error) {
+      if (axios.isCancel(error) || signal?.aborted) {
+        throw new AppError(
+          'Email sending aborted due to lost claim',
+          500,
+          ERROR_CODES.EMAIL_SMTP_SEND_FAILED
+        );
+      }
+
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
         const message = error.response?.data?.message || error.message;

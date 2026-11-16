@@ -1,11 +1,15 @@
-import { EmailProvider } from '@/providers/email/base.provider.js';
+import {
+  EmailProvider,
+  SendRawEmailOptions,
+  SendRawEmailResult,
+} from '@/providers/email/base.provider.js';
 import { CloudEmailProvider } from '@/providers/email/cloud.provider.js';
 import { SmtpEmailProvider } from '@/providers/email/smtp.provider.js';
 import { SmtpConfigService, RawSmtpConfig } from '@/services/email/smtp-config.service.js';
 import { AppError } from '@/utils/errors.js';
 import { EmailTemplate } from '@/types/email.js';
 import logger from '@/utils/logger.js';
-import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 /**
  * Email service — resolves provider per-call so SMTP config changes take effect without restart
@@ -100,7 +104,10 @@ export class EmailService {
     }
   }
 
-  public async sendRaw(options: SendRawEmailRequest): Promise<void> {
+  public async sendRaw(
+    options: SendRawEmailOptions,
+    signal?: AbortSignal
+  ): Promise<SendRawEmailResult> {
     const [provider, smtpConfig] = await this.resolveProvider();
 
     const recipients = Array.isArray(options.to) ? options.to : [options.to];
@@ -114,12 +121,16 @@ export class EmailService {
     if (!provider.sendRaw) {
       throw new Error('Current email provider does not support raw email sending');
     }
-    await provider.sendRaw(options);
+    // Return the provider-assigned message ID so queue workers can persist the real
+    // delivery identifier instead of generating one client-side.
+    const result = await provider.sendRaw(options, signal);
 
     if (smtpConfig) {
       for (const recipient of recipients) {
         this.recordEmailSent(recipient, smtpConfig.minIntervalSeconds);
       }
     }
+
+    return result ?? {};
   }
 }
