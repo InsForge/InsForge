@@ -21,7 +21,7 @@ This guide walks through self-hosting the InsForge platform on [xCloud](https://
 - A server connected to xCloud
 - A domain or subdomain for the install
 
-xCloud's template requires a server with at least 1 GB of RAM, 2 CPU cores and 10 GB of disk, running xCloud's Docker and Nginx stack. For real workloads, follow InsForge's own sizing in the [deployment overview](./README.md): 2 GB of RAM (4 GB recommended) and 20 GB of storage (30 GB recommended).
+xCloud's template requires a server with at least 1 GB of RAM, 2 CPU cores and 10 GB of disk, running xCloud's Docker and Nginx stack. For real workloads, follow InsForge's own sizing: 2 GB of RAM (4 GB recommended) and 20 GB of storage (30 GB recommended).
 
 ## 1. Pick InsForge from the catalog
 
