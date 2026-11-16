@@ -1,4 +1,4 @@
--- Migration 065: Create PostgreSQL-native messaging schema for outbox queue
+-- Migration 069: Create PostgreSQL-native messaging schema for outbox queue
 
 CREATE SCHEMA IF NOT EXISTS messaging;
 
