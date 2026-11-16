@@ -4,7 +4,7 @@ import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import { AppError } from '@/utils/errors.js';
 import { EMAIL_TEMPLATE_TYPES, EmailTemplate } from '@/types/email.js';
-import { EmailProvider, SendRawEmailOptions } from './base.provider.js';
+import { EmailProvider, SendRawEmailOptions, SendRawEmailResult } from './base.provider.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 
 /**
@@ -181,8 +181,9 @@ export class CloudEmailProvider implements EmailProvider {
 
   /**
    * Send custom/raw email via cloud backend
+   * @returns Result containing the message ID assigned by the upstream provider (SendGrid/Mailgun)
    */
-  async sendRaw(options: SendRawEmailOptions, signal?: AbortSignal): Promise<void> {
+  async sendRaw(options: SendRawEmailOptions, signal?: AbortSignal): Promise<SendRawEmailResult> {
     if (signal?.aborted) {
       throw new AppError(
         'Email sending aborted due to lost claim',
@@ -215,6 +216,8 @@ export class CloudEmailProvider implements EmailProvider {
 
       if (response.data?.success) {
         logger.info('Raw email sent successfully', { projectId });
+        // Extract the provider-assigned message ID (SendGrid/Mailgun) from the cloud response
+        return { messageId: response.data?.messageId ?? response.data?.data?.messageId };
       } else {
         throw new AppError(
           'Email service returned unsuccessful response',

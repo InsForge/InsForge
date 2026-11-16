@@ -282,6 +282,28 @@ export class MessagingQueueService {
   }
 
   /**
+   * Checks whether a message with the given idempotency key has already been delivered.
+   * Used by workers that lose their lease mid-send to decide whether the email was already sent.
+   *
+   * @param idempotencyKey - Idempotency key of the in-flight message
+   * @returns True if the outbox row exists with 'sent' status or a successful delivery attempt is recorded
+   */
+  async isAlreadySentByidempotencyKey(idempotencyKey: string): Promise<boolean> {
+    const sql = `
+      SELECT EXISTS (
+        SELECT 1 FROM messaging.outbox o
+        WHERE o.idempotency_key = $1 AND o.status = 'sent'
+      ) OR EXISTS (
+        SELECT 1 FROM messaging.delivery_attempts da
+        JOIN messaging.outbox o ON o.id = da.message_id
+        WHERE o.idempotency_key = $1 AND da.status = 'sent'
+      ) AS already_sent;
+    `;
+    const res = await this.getPool().query(sql, [idempotencyKey]);
+    return Boolean(res.rows[0]?.already_sent);
+  }
+
+  /**
    * Marks a job attempt as failed, incrementing retry count or promoting to DLQ.
    *
    * @param messageId - Outbox message UUID
@@ -299,6 +321,8 @@ export class MessagingQueueService {
     const errorMsg = error instanceof Error ? error.message : String(error);
     const pool = this.getPool();
     const client = await pool.connect();
+
+    let rollbackError: Error | null = null;
 
     try {
       await client.query('BEGIN');
@@ -348,10 +372,23 @@ export class MessagingQueueService {
 
       await client.query('COMMIT');
     } catch (err) {
-      await client.query('ROLLBACK').catch(() => {});
+      // Catch rollback failures separately: if ROLLBACK itself fails, the connection's
+      // transaction state is unknown and must not be silently returned to the pool.
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackErr) {
+        rollbackError = rollbackErr instanceof Error ? rollbackErr : new Error(String(rollbackErr));
+        logger.error('Failed to rollback markFailed transaction', { error: rollbackError });
+      }
       throw err;
     } finally {
-      client.release();
+      // Pass the rollback error to release() so the pool destroys the tainted connection
+      // instead of reusing it with an unknown transaction state. Always release the client.
+      if (rollbackError) {
+        client.release(rollbackError);
+      } else {
+        client.release();
+      }
     }
   }
 
