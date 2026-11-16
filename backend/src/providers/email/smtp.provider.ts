@@ -6,7 +6,7 @@ import { EmailTemplate } from '@/types/email.js';
 import { SmtpConfigService, RawSmtpConfig } from '@/services/email/smtp-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
-import { EmailProvider, SendRawEmailOptions } from './base.provider.js';
+import { EmailProvider, SendRawEmailOptions, SendRawEmailResult } from './base.provider.js';
 import logger from '@/utils/logger.js';
 
 /**
@@ -132,14 +132,14 @@ export class SmtpEmailProvider implements EmailProvider {
    * @param mailOptions - Nodemailer mail options
    * @param logContext - Context attributes for structured logging
    * @param signal - Optional AbortSignal checked prior to starting transmission
-   * @returns Promise resolving when transmission succeeds
+   * @returns Promise resolving to the provider-assigned Message-ID from nodemailer's response
    */
   private async send(
     config: RawSmtpConfig,
     mailOptions: Mail.Options,
     logContext: Record<string, unknown>,
     signal?: AbortSignal
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     const transporter = this.createTransporter(config);
 
     try {
@@ -152,12 +152,16 @@ export class SmtpEmailProvider implements EmailProvider {
       }
 
       // Phase 1: AbortSignal is checked pre-flight only. In-flight SMTP sends cannot be recalled.
-      await transporter.sendMail({
+      // The worker therefore waits for this promise to settle before releasing the lease so a
+      // mid-send lease loss can never produce a duplicate delivery attempt.
+      const info = await transporter.sendMail({
         from: formatFromAddress(config.senderName, config.senderEmail),
         ...mailOptions,
       });
 
       logger.info('Email sent via SMTP', logContext);
+      // Extract the actual Message-ID assigned by the provider/nodemailer after sendMail completes
+      return info.messageId;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown SMTP error';
       logger.error(`Failed to send email via SMTP: ${message}`, logContext);
@@ -210,9 +214,12 @@ export class SmtpEmailProvider implements EmailProvider {
    *
    * @param options - Raw email options including recipient, subject, HTML content, and optional idempotency key
    * @param signal - Optional AbortSignal checked prior to dispatch
-   * @returns Promise resolving when email is delivered
+   * @returns Promise resolving to the provider-assigned Message-ID returned by nodemailer
    */
-  async sendRaw(options: SendRawEmailOptions, signal?: AbortSignal): Promise<void> {
+  async sendRaw(
+    options: SendRawEmailOptions,
+    signal?: AbortSignal
+  ): Promise<SendRawEmailResult> {
     if (signal?.aborted) {
       throw new AppError(
         'Email sending aborted due to lost claim',
@@ -229,11 +236,13 @@ export class SmtpEmailProvider implements EmailProvider {
       );
     }
 
+    // Deterministic fallback Message-ID derived from the idempotency key; the actual
+    // provider-assigned Message-ID is extracted from the sendMail() response below.
     const messageId = options.idempotencyKey
       ? `<${this.sanitizeMessageIdKey(options.idempotencyKey)}@insforge.messaging>`
       : undefined;
 
-    await this.send(
+    const providerMessageId = await this.send(
       config,
       {
         to: options.to,
@@ -247,5 +256,7 @@ export class SmtpEmailProvider implements EmailProvider {
       { to: options.to },
       signal
     );
+
+    return { messageId: providerMessageId ?? messageId };
   }
 }
