@@ -18,6 +18,12 @@ console.log(`Deno serverless runtime running on ${hostname}:${port}`);
 // Configuration
 const WORKER_TIMEOUT_MS = parseInt(Deno.env.get('WORKER_TIMEOUT_MS') ?? '60000');
 
+// Header parameters are user-controlled, so keep only a valid media type in logs.
+function safeContentType(value: string | null): string | null {
+  const mediaType = value?.split(';', 1)[0].trim().toLowerCase();
+  return mediaType && /^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(mediaType) ? mediaType : null;
+}
+
 // Worker template code - loaded on first use
 let workerTemplateCode: string | null = null;
 
@@ -272,51 +278,56 @@ Deno.serve({ hostname, port }, async (req: Request) => {
   if (slugMatch) {
     const slug = slugMatch[1];
     const startTime = Date.now();
+    const requestId = crypto.randomUUID();
 
     // Get function code from database
     const code = await getFunctionCode(slug);
+    let response: Response;
+    let errorName: string | undefined;
 
     if (!code) {
-      return new Response(JSON.stringify({ error: 'Function not found or not active' }), {
+      response = new Response(JSON.stringify({ error: 'Function not found or not active' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
       });
+    } else {
+      try {
+        const headers = new Headers(req.headers);
+        headers.set('x-insforge-request-id', requestId);
+        response = await executeInWorker(code, new Request(req, { headers }));
+      } catch (error) {
+        errorName = error instanceof TypeError ? 'TypeError' : 'Error';
+        response = new Response(JSON.stringify({ error: 'Function execution failed' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
     }
 
-    // Execute in worker with original request
+    const responseContentType = safeContentType(response.headers.get('content-type'));
     try {
-      const response = await executeInWorker(code, req);
-      const duration = Date.now() - startTime;
-
-      // Log completed invocations only
-      console.log(
-        JSON.stringify({
-          timestamp: new Date().toISOString(),
-          level: 'info',
-          slug,
-          method: req.method,
-          status: response.status,
-          duration: `${duration}ms`,
-        })
-      );
-
-      return response;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      console.error(
-        JSON.stringify({
-          timestamp: new Date().toISOString(),
-          level: 'error',
-          slug,
-          error: error instanceof Error ? error.message : String(error),
-          duration: `${duration}ms`,
-        })
-      );
-      return new Response(JSON.stringify({ error: 'Function execution failed' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      response.headers.set('x-insforge-request-id', requestId);
+    } catch {
+      /* immutable */
     }
+    // No request/response bodies, URL queries, or credential headers enter logs.
+    console.log(
+      JSON.stringify({
+        event: 'function.invocation',
+        timestamp: new Date().toISOString(),
+        level: response.status >= 500 ? 'error' : 'info',
+        requestId,
+        slug,
+        method: req.method,
+        status: response.status,
+        durationMs: Date.now() - startTime,
+        request: { contentType: safeContentType(req.headers.get('content-type')) },
+        response: { contentType: responseContentType },
+        ...(errorName ? { error: { name: errorName } } : {}),
+      })
+    );
+
+    return response;
   }
 
   // Runtime info
