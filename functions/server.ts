@@ -319,17 +319,15 @@ Deno.serve({ hostname, port }, async (req: Request) => {
     }
   }
 
-  // Runtime info
+  // Runtime info. Deliberately omits `dbConfig` — this endpoint is
+  // unauthenticated, and the internal DB hostname/name are not something an
+  // arbitrary caller needs to know.
   if (pathname === '/info') {
     return new Response(
       JSON.stringify({
         runtime: 'deno',
         version: Deno.version,
         env: Deno.env.get('DENO_ENV') || 'production',
-        database: {
-          host: dbConfig.hostname,
-          database: dbConfig.database,
-        },
       }),
       {
         headers: { 'Content-Type': 'application/json' },
