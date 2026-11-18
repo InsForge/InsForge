@@ -37,3 +37,17 @@ export const razorpayQueryKeys = {
   webhookSetup: (environment: PaymentEnvironment) =>
     ['payments', 'razorpay', 'webhook-setup', environment] as const,
 };
+
+export const paystackQueryKeys = {
+  all: ['payments', 'paystack'] as const,
+  config: ['payments', 'paystack', 'config'] as const,
+  status: ['payments', 'paystack', 'status'] as const,
+  customers: ['payments', 'paystack', 'customers'] as const,
+  customersByEnvironment: (environment: PaymentEnvironment) =>
+    ['payments', 'paystack', 'customers', environment] as const,
+  transactions: ['payments', 'paystack', 'transactions'] as const,
+  transactionsByEnvironment: (environment: PaymentEnvironment) =>
+    ['payments', 'paystack', 'transactions', environment] as const,
+  webhookSetup: (environment: PaymentEnvironment) =>
+    ['payments', 'paystack', 'webhook-setup', environment] as const,
+};

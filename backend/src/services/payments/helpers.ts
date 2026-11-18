@@ -130,6 +130,18 @@ export function isPostgresPermissionError(error: unknown): boolean {
   );
 }
 
+export function isPostgresUniqueViolationError(error: unknown, constraint?: string): boolean {
+  if (
+    typeof error !== 'object' ||
+    error === null ||
+    (error as { code?: unknown }).code !== '23505'
+  ) {
+    return false;
+  }
+
+  return constraint === undefined || (error as { constraint?: unknown }).constraint === constraint;
+}
+
 export function normalizeProductRow(row: StripeProductRow): StripeProductResponse {
   return {
     ...row,
