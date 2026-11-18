@@ -50,6 +50,10 @@ await insforge.database.from('documents').insert({
 });
 ```
 
+<Note>
+  `OPENROUTER_API_KEY` es su propia clave de OpenRouter. En Pro y Empresa, `npx @insforge/cli ai setup` aprovisiona una y la escribe en su archivo de entorno. Los planes Gratis no incluyen créditos de modelo de IA, así que cree una clave en [openrouter.ai/keys](https://openrouter.ai/keys) y configúrela usted mismo.
+</Note>
+
 Consulte por distancia coseno (`<=>`). L2 (`<->`) e producto interno (`<#>`) también están disponibles.
 
 ```sql
