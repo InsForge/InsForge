@@ -385,6 +385,7 @@ paths:
 
     post:
       summary: Upload Object with Auto-Generated Key
+      description: Generated keys are limited to 255 UTF-8 bytes by shortening the sanitized filename base first. The extension is preserved unless it cannot fit even with an empty base, in which case it is shortened without splitting Unicode characters. The timestamp and secure random suffix are preserved.
       tags:
         - Client
       security:
@@ -419,11 +420,11 @@ paths:
                 $ref: '#/components/schemas/StoredFile'
               example:
                 bucket: "avatars"
-                key: "image-1737546841234-a3f2b1.jpg"
+                key: "image-1737546841234-AAECAwQFBgcICQoLDA0ODw.jpg"
                 size: 102400
                 mimeType: "image/jpeg"
                 uploadedAt: "2024-01-21T10:30:00Z"
-                url: "/api/storage/buckets/avatars/objects/image-1737546841234-a3f2b1.jpg"
+                url: "/api/storage/buckets/avatars/objects/image-1737546841234-AAECAwQFBgcICQoLDA0ODw.jpg"
         '400':
           description: Invalid bucket name or file
           content:
