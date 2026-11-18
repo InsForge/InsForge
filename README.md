@@ -286,7 +286,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ---
 
-[![Star History Chart](https://api.star-history.com/svg?repos=InsForge/InsForge&type=Date)](https://www.star-history.com/#InsForge/InsForge&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=InsForge/InsForge&type=Date)](https://star-history.dera.page/#InsForge/InsForge&Date)
 
 ## Badges
 
