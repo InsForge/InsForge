@@ -47,7 +47,7 @@ describe('RealtimeMessagesPage', () => {
   });
 
   it('confirms before clearing all realtime messages from the messages toolbar', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const clearMessages = vi.fn().mockResolvedValue({ deleted: 3 });
     mockMessagesPageState({ clearMessages });
 
@@ -67,7 +67,7 @@ describe('RealtimeMessagesPage', () => {
   });
 
   it('does not clear realtime messages when confirmation is cancelled', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const clearMessages = vi.fn().mockResolvedValue({ deleted: 3 });
     mockMessagesPageState({ clearMessages });
 
