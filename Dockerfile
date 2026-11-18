@@ -8,7 +8,7 @@
 ARG DENO_VERSION=2.0.6
 FROM denoland/deno:alpine-${DENO_VERSION} AS deno-bin
 
-FROM node:20-alpine AS package-prep
+FROM node:24-alpine AS package-prep
 
 RUN apk add --no-cache jq
 
@@ -22,7 +22,7 @@ RUN mkdir -p /out && \
 # ============================================================
 # Stage 2: deps — ALL dependencies (dev + prod) for building
 # ============================================================
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 
 WORKDIR /app
 
@@ -67,7 +67,7 @@ RUN npm run build
 # ============================================================
 # Stage 4: prod-deps — production dependencies only
 # ============================================================
-FROM node:20-alpine AS prod-deps
+FROM node:24-alpine AS prod-deps
 
 WORKDIR /app
 
@@ -94,7 +94,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 # ============================================================
 # Stage 5: runner — minimal production image
 # ============================================================
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 
 # tini: proper PID 1 for signal forwarding and zombie reaping
 # postgresql16-client: pg_dump/pg_restore for database backups. Keep the
@@ -188,7 +188,7 @@ CMD ["sh", "-c", "cd backend && npm run migrate:up && exec node ../dist/server.j
 # Stage: dev — development image (used by docker-compose)
 # ============================================================
 # Source code is mounted via volumes, only needs Node.js + Deno.
-FROM node:20-alpine AS dev
+FROM node:24-alpine AS dev
 
 COPY --from=deno-bin /bin/deno /usr/local/bin/deno
 
