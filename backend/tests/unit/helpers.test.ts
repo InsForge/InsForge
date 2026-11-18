@@ -10,6 +10,7 @@ describe('convertSqlTypeToColumnType', () => {
   it('converts timestamp types correctly', () => {
     expect(convertSqlTypeToColumnType('timestamptz')).toBe(ColumnType.DATETIME);
     expect(convertSqlTypeToColumnType('timestamp with time zone')).toBe(ColumnType.DATETIME);
+    expect(convertSqlTypeToColumnType('timestamp without time zone')).toBe(ColumnType.DATETIME);
   });
 
   it('converts integer types correctly', () => {
