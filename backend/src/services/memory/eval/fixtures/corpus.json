@@ -1,0 +1,250 @@
+{
+  "notes": [
+    "Realistic InsForge developer knowledge, not synthetic filler — every memory is a fact",
+    "someone actually needs while working on this repo. Queries are labeled by the arm they",
+    "should favour: 'lexical' queries name an exact identifier (env var, filename, constant)",
+    "that embeddings smear together; 'semantic' queries paraphrase with no shared tokens;",
+    "'negative' queries have no correct answer and exist to test noise suppression.",
+    "Relevance sets are deliberately tight: a memory is relevant only if it answers the query."
+  ],
+  "memories": [
+    {
+      "id": "m01",
+      "kind": "reference",
+      "title": "OpenRouter key location (self-hosted)",
+      "content": "On self-hosted InsForge you supply your own OPENROUTER_API_KEY in the repo-root .env; the 'provisioned by InsForge' key is the cloud path only."
+    },
+    {
+      "id": "m02",
+      "kind": "fact",
+      "title": "Dashboard port is 7131",
+      "content": "Vite serves the InsForge dashboard UI on port 7131. Port 7130 is the backend API; requesting 7130/dashboard/login returns 404."
+    },
+    {
+      "id": "m03",
+      "kind": "decision",
+      "title": "Hybrid recall fuses arms with RRF at k=60",
+      "content": "recall() combines a vector arm and a keyword arm using Reciprocal Rank Fusion with the standard constant k=60, scoring each row 1/(60+rank_vec) + 1/(60+rank_kw) over a FULL OUTER JOIN, plus a mild recency tiebreak."
+    },
+    {
+      "id": "m04",
+      "kind": "fact",
+      "title": "Memory routes authenticate with the project API key",
+      "content": "The /api/memory/* routes use verifyApiKey and expect the project API key (ik_ prefix), not a user JWT. This is because memory is a platform-managed primitive called by the CLI or an agent."
+    },
+    {
+      "id": "m05",
+      "kind": "reference",
+      "title": "Local admin login is a username",
+      "content": "The local dashboard admin login is username 'admin', not an email address, with the password from ROOT_ADMIN_PASSWORD in .env."
+    },
+    {
+      "id": "m06",
+      "kind": "fact",
+      "title": "docker compose --build fails on the deno image",
+      "content": "Passing --build to docker compose fails building deploy/Dockerfile.deno with \"addgroup: group 'deno' in use\". Plain docker compose up skips that build and works."
+    },
+    {
+      "id": "m07",
+      "kind": "decision",
+      "title": "Keyword arm uses a generated content_tsv column",
+      "content": "The keyword arm searches a generated content_tsv tsvector column with a GIN index, queried via websearch_to_tsquery and ranked by ts_rank, so exact identifiers and file paths stay findable."
+    },
+    {
+      "id": "m08",
+      "kind": "fact",
+      "title": "Memory embeddings use an HNSW cosine index",
+      "content": "memory.memories has an HNSW index on the embedding column using cosine distance (vector_cosine_ops), which is why recall computes similarity as 1 - (embedding <=> query)."
+    },
+    {
+      "id": "m09",
+      "kind": "preference",
+      "title": "Run Prettier on the host, never in the container",
+      "content": "The container's /app has neither .prettierrc nor eslint.config.js, so Prettier inside it falls back to defaults and rewrites files to double quotes. Run npx prettier@3 --check from the host instead."
+    },
+    {
+      "id": "m10",
+      "kind": "fact",
+      "title": "Vitest must run inside the container",
+      "content": "Host node_modules are Docker volumes, so running vitest from the host dies with EACCES. Use docker compose exec -T insforge sh -c 'cd /app/packages/dashboard && npx vitest run <path>'."
+    },
+    {
+      "id": "m11",
+      "kind": "reference",
+      "title": "Generating ENCRYPTION_KEY",
+      "content": "ENCRYPTION_KEY in .env is a base64 32-byte value, generated with openssl rand -base64 32. Secrets in system.secrets are encrypted under it."
+    },
+    {
+      "id": "m12",
+      "kind": "fact",
+      "title": "Compose project name comes from the directory name",
+      "content": "The docker compose project name derives from the checkout's directory name, so two checkouts whose folders normalize to the same string share volumes — including secrets encrypted under a different key."
+    },
+    {
+      "id": "m13",
+      "kind": "decision",
+      "title": "DEFAULT_RECALL_THRESHOLD is 0.35",
+      "content": "DEFAULT_RECALL_THRESHOLD is set to 0.35, re-derived from the in-repo eval harness (baseline-limit5.json) for text-embedding-3-small at recall limit 5."
+    },
+    {
+      "id": "m14",
+      "kind": "fact",
+      "title": "Embedding model and dimensions",
+      "content": "The memory service embeds with openai/text-embedding-3-small at 1536 dimensions, stored per row in an embedding_model column."
+    },
+    {
+      "id": "m15",
+      "kind": "fact",
+      "title": "Chat model for extraction and reconcile",
+      "content": "openai/gpt-4o-mini is the CHAT_MODEL used both to extract candidate memories from a transcript and to make the reconcile decision."
+    },
+    {
+      "id": "m16",
+      "kind": "decision",
+      "title": "Reconcile returns ADD, UPDATE, or NOOP",
+      "content": "Before storing, the service embeds the candidate, finds existing memories above the reconcile threshold, and asks the model for exactly one of ADD, UPDATE, or NOOP so the store converges instead of accumulating duplicates."
+    },
+    {
+      "id": "m17",
+      "kind": "fact",
+      "title": "RECONCILE_THRESHOLD is 0.5",
+      "content": "RECONCILE_THRESHOLD is 0.5, deliberately tighter than the recall threshold so only near-duplicates trigger the extra reconcile LLM call."
+    },
+    {
+      "id": "m18",
+      "kind": "reference",
+      "title": "Memory schema migration file",
+      "content": "The memory schema is created by backend/src/infra/database/migrations/050_create-memory-schema.sql, which also documents HNSW post-filtering as a known and accepted limitation."
+    },
+    {
+      "id": "m19",
+      "kind": "fact",
+      "title": "Input size caps on remember",
+      "content": "remember caps a transcript at 50,000 characters and an explicit content field at 20,000 characters; the transcript cap bounds extraction LLM cost."
+    },
+    {
+      "id": "m20",
+      "kind": "decision",
+      "title": "UPDATE requires a real target_id from the matched set",
+      "content": "An UPDATE decision is only honored when target_id is a syntactically valid UUID that also appears in the set of similar memories just retrieved, so a hallucinated id can never reach the database."
+    },
+    {
+      "id": "m21",
+      "kind": "fact",
+      "title": "PostgREST exposes the schema as REST automatically",
+      "content": "PostgREST v12.2 turns the Postgres schema into a typed REST API, so creating a table instantly yields a CRUD endpoint with no handler code written."
+    },
+    {
+      "id": "m22",
+      "kind": "fact",
+      "title": "RLS is the platform-wide authorization layer",
+      "content": "Row Level Security policies in Postgres are the authorization boundary for every InsForge product, reading claims from the JWT that auth issues — including for storage access."
+    },
+    {
+      "id": "m23",
+      "kind": "reference",
+      "title": "Edge functions run in the deno container",
+      "content": "User edge functions execute in a sandboxed Deno runtime container exposed on port 7133, separate from the Express backend."
+    },
+    {
+      "id": "m24",
+      "kind": "preference",
+      "title": "Branch and commit conventions",
+      "content": "Branches follow type/description, commits follow Conventional Commits, and a pull request links its issue with 'Closes #N'. Draft PRs early are encouraged."
+    },
+    {
+      "id": "m25",
+      "kind": "fact",
+      "title": "Issue assignment limits",
+      "content": "A contributor may hold at most 3 open assigned issues across all InsForge repos, and an issue idle for 7 days gets a warning then is auto-released. A draft PR counts as activity."
+    },
+    {
+      "id": "m26",
+      "kind": "decision",
+      "title": "Anon key is an opaque anon_ token",
+      "content": "The anon key is an opaque identifier prefixed anon_, replacing the legacy JWT-format value. It is safe to embed in frontend bundles because RLS is the real security boundary."
+    },
+    {
+      "id": "m27",
+      "kind": "fact",
+      "title": "Storage is S3-compatible with buckets and objects",
+      "content": "InsForge storage is S3-compatible; objects are uploaded to a named bucket, and a keyed upload uses PUT /api/storage/buckets/:bucketName/objects/* so the caller controls the key."
+    },
+    {
+      "id": "m28",
+      "kind": "reference",
+      "title": "Fixing stale Vite HMR",
+      "content": "When the dashboard stops picking up edits, Vite HMR has gone stale: run docker compose restart insforge, then hard-reload the browser."
+    }
+  ],
+  "queries": [
+    { "id": "q01", "type": "lexical", "query": "OPENROUTER_API_KEY", "relevant": ["m01"] },
+    {
+      "id": "q02",
+      "type": "semantic",
+      "query": "where do I put my model provider credentials when running this myself",
+      "relevant": ["m01"]
+    },
+    { "id": "q03", "type": "lexical", "query": "port 7131", "relevant": ["m02"] },
+    {
+      "id": "q04",
+      "type": "semantic",
+      "query": "which address serves the web console in local development",
+      "relevant": ["m02"]
+    },
+    { "id": "q05", "type": "lexical", "query": "RRF k=60", "relevant": ["m03"] },
+    {
+      "id": "q06",
+      "type": "semantic",
+      "query": "how are the two retrieval strategies merged into a single ranking",
+      "relevant": ["m03"]
+    },
+    { "id": "q07", "type": "lexical", "query": "content_tsv GIN index", "relevant": ["m07"] },
+    {
+      "id": "q08",
+      "type": "semantic",
+      "query": "why keep a lexical search path when you already have embeddings",
+      "relevant": ["m03", "m07"]
+    },
+    { "id": "q09", "type": "lexical", "query": "Dockerfile.deno addgroup", "relevant": ["m06"] },
+    {
+      "id": "q10",
+      "type": "semantic",
+      "query": "the stack refuses to come up when I rebuild the images",
+      "relevant": ["m06"]
+    },
+    { "id": "q11", "type": "lexical", "query": "RECONCILE_THRESHOLD", "relevant": ["m17", "m16"] },
+    {
+      "id": "q12",
+      "type": "semantic",
+      "query": "what stops the store from filling up with the same thing twice",
+      "relevant": ["m16", "m17", "m20"]
+    },
+    { "id": "q13", "type": "lexical", "query": "EACCES vitest", "relevant": ["m10"] },
+    {
+      "id": "q14",
+      "type": "semantic",
+      "query": "correct way to execute the unit tests for this project",
+      "relevant": ["m10"]
+    },
+    {
+      "id": "q15",
+      "type": "lexical",
+      "query": "050_create-memory-schema.sql",
+      "relevant": ["m18"]
+    },
+    {
+      "id": "q16",
+      "type": "semantic",
+      "query": "which indexes back the memory table",
+      "relevant": ["m08", "m07", "m18"]
+    },
+    { "id": "q17", "type": "negative", "query": "what is the capital of France", "relevant": [] },
+    {
+      "id": "q18",
+      "type": "negative",
+      "query": "how do I deploy a Rails application to Heroku",
+      "relevant": []
+    }
+  ]
+}
