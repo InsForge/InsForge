@@ -1184,6 +1184,7 @@ router.put(
       }
 
       const templateType = req.params.type as EmailTemplate;
+
       const template = await emailTemplateService.updateTemplate(
         templateType,
         validationResult.data
