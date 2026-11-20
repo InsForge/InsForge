@@ -57,6 +57,7 @@ docker-compose.rustfs.yml
 functions/deno.json
 functions/server.ts
 functions/worker-template.js
+functions/handler-format.js
 deploy/backup.sh
 deploy/docker-compose/docker-compose.yml
 deploy/docker-init/db/db-init.sql

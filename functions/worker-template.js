@@ -3,9 +3,13 @@
  *
  * This code runs inside a Web Worker environment created by Deno.
  * Each worker is created fresh for a single request, executes once, and terminates.
+ *
+ * `normalizeHandlerFormat` (from handler-format.js) is prepended to this file
+ * by `server.ts`'s `getWorkerTemplateCode()` before the combined source is
+ * turned into the worker's Blob URL, so it is available here as a global.
  */
 /* eslint-env worker */
-/* global self, Request, Deno */
+/* global self, Request, Deno, normalizeHandlerFormat */
 
 // --- SECURITY BLACKOUT (Top-level) ---
 // We polyfill Deno.env and process.env BEFORE any imports using Top-Level Await.
@@ -149,7 +153,7 @@ const handleMessage = async (e) => {
       'Deno',
       'encodeBase64',
       'decodeBase64',
-      code
+      normalizeHandlerFormat(code)
     );
     const exports = {};
     const module = { exports };
@@ -162,7 +166,8 @@ const handleMessage = async (e) => {
 
     if (typeof functionHandler !== 'function') {
       throw new Error(
-        'No function exported. Expected: module.exports = async function(req) { ... }'
+        'No function exported. Expected either "export default async function(req) { ... }" ' +
+          'or "module.exports = async function(req) { ... }"'
       );
     }
 
