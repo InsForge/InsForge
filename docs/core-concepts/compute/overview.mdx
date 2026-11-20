@@ -69,6 +69,37 @@ Structured logs per container, queryable by service and time range. Tail in the 
 
 Set environment variables and secrets per service, separately from your edge-function secrets. Rotate without redeploying.
 
+{/* TODO: confirm dashboard location — the compute env-var editor tab/button is not documented, so only the CLI/API methods below are stated verbatim. */}
+
+Set the values when you first deploy a service. Pass a JSON object with `--env`, or point at a `.env` file (`KEY=VALUE` per line) with `--env-file` — the two are mutually exclusive:
+
+```bash
+# Inline JSON
+npx @insforge/cli compute deploy ./worker \
+  --name worker \
+  --env '{"API_KEY":"ik_...","LOG_LEVEL":"info"}'
+
+# From a .env file
+npx @insforge/cli compute deploy ./worker --name worker --env-file ./worker.env
+```
+
+To change the env vars on a service that already exists, use `compute update <id>`. You can replace the whole map, or edit individual keys without restating the others:
+
+```bash
+# Replace ALL env vars with this map (sending {} clears them)
+npx @insforge/cli compute update <id> --env '{"API_KEY":"ik_new","LOG_LEVEL":"debug"}'
+
+# Rotate or add one key, leaving the rest in place (repeatable)
+npx @insforge/cli compute update <id> --env-set API_KEY=ik_new --env-set LOG_LEVEL=debug
+
+# Remove one key (repeatable)
+npx @insforge/cli compute update <id> --env-unset LOG_LEVEL
+```
+
+`--env` (wholesale replace) and `--env-set`/`--env-unset` (partial merge) are mutually exclusive — pick one per command. Keys must match `[A-Z_][A-Z0-9_]*` and values are capped at 4096 characters.
+
+Programmatically, this is `PATCH /api/compute/services/{id}` with an admin API key: send `envVars` (a full `{ "KEY": "value" }` map that replaces everything) or `envVarsPatch` (`{ "set": { ... }, "unset": [ ... ] }` for a partial edit). The two fields are mutually exclusive.
+
 <Warning>
   **No persistent volumes yet.** Container state survives restarts and host reboots, but changing the image, environment variables, or port recreates the container and discards anything written inside it. Use your project's Postgres or Storage for data you need to keep.
 </Warning>

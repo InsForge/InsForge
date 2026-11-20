@@ -69,6 +69,37 @@ npx @insforge/cli compute deploy \
 
 按服务设置环境变量和 secrets，与 edge function 的 secrets 分开。轮换时不需要重新部署。
 
+{/* TODO: confirm dashboard location — the compute env-var editor tab/button is not documented, so only the CLI/API methods below are stated verbatim. */}
+
+首次部署服务时就可以设置这些值。用 `--env` 传入一个 JSON 对象，或用 `--env-file` 指向一个 `.env` 文件（每行一个 `KEY=VALUE`）——两者互斥：
+
+```bash
+# 内联 JSON
+npx @insforge/cli compute deploy ./worker \
+  --name worker \
+  --env '{"API_KEY":"ik_...","LOG_LEVEL":"info"}'
+
+# 从 .env 文件读取
+npx @insforge/cli compute deploy ./worker --name worker --env-file ./worker.env
+```
+
+要修改已有服务的环境变量，请用 `compute update <id>`。你可以整体替换整个映射，也可以单独编辑某些键而不必重写其余键：
+
+```bash
+# 用该映射替换全部环境变量（传入 {} 会清空）
+npx @insforge/cli compute update <id> --env '{"API_KEY":"ik_new","LOG_LEVEL":"debug"}'
+
+# 轮换或新增某一个键，其余保持不变（可重复使用）
+npx @insforge/cli compute update <id> --env-set API_KEY=ik_new --env-set LOG_LEVEL=debug
+
+# 删除某一个键（可重复使用）
+npx @insforge/cli compute update <id> --env-unset LOG_LEVEL
+```
+
+`--env`（整体替换）与 `--env-set`/`--env-unset`（局部合并）互斥——每条命令只能选其一。键必须匹配 `[A-Z_][A-Z0-9_]*`，值上限为 4096 个字符。
+
+以编程方式操作时，对应 `PATCH /api/compute/services/{id}`（使用 admin API key）：传入 `envVars`（一个完整的 `{ "KEY": "value" }` 映射，会替换全部）或 `envVarsPatch`（`{ "set": { ... }, "unset": [ ... ] }` 用于局部编辑）。两个字段互斥。
+
 <Warning>
   **暂不支持持久化卷。** 容器状态可以跨重启和宿主机重启保留，但修改镜像、环境变量或端口会重建容器，容器内写入的内容会丢失。需要保留的数据请放进项目的 Postgres 或 Storage。
 </Warning>

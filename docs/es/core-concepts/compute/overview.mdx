@@ -69,6 +69,37 @@ Logs estructurados por contenedor, consultables por servicio y rango de tiempo. 
 
 Define variables de entorno y secretos por servicio, aparte de los secretos de tus edge functions. Rótalos sin volver a desplegar.
 
+{/* TODO: confirm dashboard location — the compute env-var editor tab/button is not documented, so only the CLI/API methods below are stated verbatim. */}
+
+Define los valores al desplegar el servicio por primera vez. Pasa un objeto JSON con `--env`, o apunta a un archivo `.env` (un `KEY=VALUE` por línea) con `--env-file`; ambos son mutuamente excluyentes:
+
+```bash
+# JSON en línea
+npx @insforge/cli compute deploy ./worker \
+  --name worker \
+  --env '{"API_KEY":"ik_...","LOG_LEVEL":"info"}'
+
+# Desde un archivo .env
+npx @insforge/cli compute deploy ./worker --name worker --env-file ./worker.env
+```
+
+Para cambiar las variables de entorno de un servicio que ya existe, usa `compute update <id>`. Puedes reemplazar todo el mapa, o editar claves individuales sin tener que volver a declarar las demás:
+
+```bash
+# Reemplaza TODAS las variables de entorno con este mapa (enviar {} las borra)
+npx @insforge/cli compute update <id> --env '{"API_KEY":"ik_new","LOG_LEVEL":"debug"}'
+
+# Rota o añade una clave, dejando el resto en su lugar (repetible)
+npx @insforge/cli compute update <id> --env-set API_KEY=ik_new --env-set LOG_LEVEL=debug
+
+# Elimina una clave (repetible)
+npx @insforge/cli compute update <id> --env-unset LOG_LEVEL
+```
+
+`--env` (reemplazo total) y `--env-set`/`--env-unset` (fusión parcial) son mutuamente excluyentes: elige uno por comando. Las claves deben coincidir con `[A-Z_][A-Z0-9_]*` y los valores tienen un límite de 4096 caracteres.
+
+De forma programática, esto corresponde a `PATCH /api/compute/services/{id}` con una admin API key: envía `envVars` (un mapa completo `{ "KEY": "value" }` que reemplaza todo) o `envVarsPatch` (`{ "set": { ... }, "unset": [ ... ] }` para una edición parcial). Los dos campos son mutuamente excluyentes.
+
 <Warning>
   **Todavía no hay volúmenes persistentes.** El estado del contenedor sobrevive a los reinicios y al reinicio del host, pero cambiar la imagen, las variables de entorno o el puerto recrea el contenedor y descarta lo que se haya escrito dentro. Usa el Postgres o el Storage de tu proyecto para los datos que necesites conservar.
 </Warning>
