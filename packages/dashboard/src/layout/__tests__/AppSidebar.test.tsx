@@ -1,14 +1,23 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-  entitlement: { isLoading: false, allowed: true, reason: null } as {
-    isLoading: boolean;
-    allowed: boolean;
-    reason: 'plan' | 'partner' | null;
-  },
-}));
+const mocks = vi.hoisted(() => {
+  const flagListeners = new Set<() => void>();
+  return {
+    entitlement: { isLoading: false, allowed: true, reason: null } as {
+      isLoading: boolean;
+      allowed: boolean;
+      reason: 'plan' | 'partner' | null;
+    },
+    dashboardVariant: undefined as string | undefined,
+    flagListeners,
+    // Stands in for PostHog calling onFeatureFlags subscribers when a flags response lands.
+    fireFlags() {
+      flagListeners.forEach((listener) => listener());
+    },
+  };
+});
 
 vi.mock('#lib/hooks/useAiEntitlement', () => ({
   useAiEntitlement: () => mocks.entitlement,
@@ -23,9 +32,26 @@ vi.mock('#lib/utils/utils', async (importOriginal) => ({
   isInsForgeCloudProject: () => true,
 }));
 
-vi.mock('#lib/analytics/posthog', () => ({
-  getFeatureFlag: () => undefined,
-}));
+vi.mock('#lib/analytics/posthog', async () => {
+  const { useEffect, useReducer } = await import('react');
+  return {
+    getFeatureFlag: () => undefined,
+    // Re-renders on a flags callback, like the real hook, so a late variant has to arrive
+    // through the listener rather than a manual rerender.
+    useFeatureFlag: () => {
+      const [, rerender] = useReducer((count: number) => count + 1, 0);
+      useEffect(() => {
+        mocks.flagListeners.add(rerender);
+        return () => {
+          mocks.flagListeners.delete(rerender);
+        };
+      }, []);
+      return mocks.dashboardVariant;
+    },
+    useFeatureFlagsReady: () => true,
+    useFeatureFlagsStatus: () => 'loaded',
+  };
+});
 
 // Heavy children that pull in API/context of their own and are irrelevant here.
 vi.mock('#features/dashboard/components', () => ({
@@ -36,6 +62,7 @@ vi.mock('#components', () => ({
 }));
 
 import AppSidebar from '#layout/AppSidebar';
+import { FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 
 function renderSidebar() {
   return render(
@@ -48,6 +75,7 @@ function renderSidebar() {
 describe('AppSidebar AI tab', () => {
   beforeEach(() => {
     mocks.entitlement = { isLoading: false, allowed: true, reason: null };
+    mocks.dashboardVariant = undefined;
   });
 
   it('shows the AI tab for an entitled project', () => {
@@ -65,5 +93,42 @@ describe('AppSidebar AI tab', () => {
     mocks.entitlement = { isLoading: false, allowed: false, reason: 'partner' };
     renderSidebar();
     expect(screen.queryByText('Model Gateway')).not.toBeInTheDocument();
+  });
+});
+
+describe('AppSidebar D_TEST items', () => {
+  beforeEach(() => {
+    mocks.entitlement = { isLoading: false, allowed: true, reason: null };
+    mocks.dashboardVariant = undefined;
+  });
+
+  it('adds Install and Doc for a D_TEST user on cloud', () => {
+    mocks.dashboardVariant = FEATURE_FLAG_VARIANTS.D_TEST;
+    renderSidebar();
+
+    expect(screen.getByText('Install')).toBeInTheDocument();
+    expect(screen.getByText('Doc')).toBeInTheDocument();
+  });
+
+  it('leaves them out for the control variant', () => {
+    mocks.dashboardVariant = 'control';
+    renderSidebar();
+
+    expect(screen.queryByText('Install')).not.toBeInTheDocument();
+    expect(screen.queryByText('Doc')).not.toBeInTheDocument();
+  });
+
+  // The sidebar reads the flag through the hook now, so a variant landing after the first
+  // render has to add the items. Reading it once left a D_TEST user without them.
+  it('adds them when the variant arrives after the first render', () => {
+    renderSidebar();
+    expect(screen.queryByText('Install')).not.toBeInTheDocument();
+
+    act(() => {
+      mocks.dashboardVariant = FEATURE_FLAG_VARIANTS.D_TEST;
+      mocks.fireFlags();
+    });
+
+    expect(screen.getByText('Install')).toBeInTheDocument();
   });
 });
