@@ -488,11 +488,15 @@ export class AuthService {
 
     // Create numeric OTP code using the OTP service
     const otpService = AuthOTPService.getInstance();
-    const { otp: code } = await otpService.createEmailOTP(
+    const { success, otp: code } = await otpService.createEmailOTP(
       email,
       OTPPurpose.VERIFY_EMAIL,
-      OTPType.NUMERIC_CODE
+      OTPType.NUMERIC_CODE,
+      { requireExistingUser: true }
     );
+    if (!success) {
+      return;
+    }
 
     // Send email with verification code
     const emailService = EmailService.getInstance();
@@ -521,12 +525,15 @@ export class AuthService {
 
     // Create long cryptographic token for clickable verification link
     const otpService = AuthOTPService.getInstance();
-    const { otp: token } = await otpService.createEmailOTP(
+    const { success, otp: token } = await otpService.createEmailOTP(
       email,
       OTPPurpose.VERIFY_EMAIL,
       OTPType.HASH_TOKEN,
-      { redirectTo }
+      { redirectTo, requireExistingUser: true }
     );
+    if (!success) {
+      return;
+    }
 
     const linkUrl = this.buildEmailLink('/api/auth/email/verify-link', token);
 
@@ -663,11 +670,15 @@ export class AuthService {
 
     // Create numeric OTP code using the OTP service
     const otpService = AuthOTPService.getInstance();
-    const { otp: code } = await otpService.createEmailOTP(
+    const { success, otp: code } = await otpService.createEmailOTP(
       email,
       OTPPurpose.RESET_PASSWORD,
-      OTPType.NUMERIC_CODE
+      OTPType.NUMERIC_CODE,
+      { requireExistingUser: true }
     );
+    if (!success) {
+      return;
+    }
 
     // Send email with reset password code
     const emailService = EmailService.getInstance();
@@ -695,12 +706,15 @@ export class AuthService {
 
     // Create long cryptographic token for clickable reset link
     const otpService = AuthOTPService.getInstance();
-    const { otp: token } = await otpService.createEmailOTP(
+    const { success, otp: token } = await otpService.createEmailOTP(
       email,
       OTPPurpose.RESET_PASSWORD,
       OTPType.HASH_TOKEN,
-      { redirectTo }
+      { redirectTo, requireExistingUser: true }
     );
+    if (!success) {
+      return;
+    }
 
     const linkUrl = this.buildEmailLink('/api/auth/email/reset-password-link', token);
 
@@ -1593,15 +1607,101 @@ export class AuthService {
 
   /**
    * Delete multiple users by IDs
+   *
+   * OTP verification paths lock the OTP row before the user row, while this
+   * transaction locks the user rows first, so a concurrent verification can
+   * deadlock with a delete. PostgreSQL aborts one side; if it aborts the
+   * delete, retry it so the users are still removed.
    */
   async deleteUsers(userIds: string[]): Promise<number> {
-    const pool = this.getPool();
-    const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
-    const result = await pool.query(
-      `DELETE FROM auth.users WHERE id IN (${placeholders})`,
-      userIds
-    );
+    const maxAttempts = 3;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.deleteUsersOnce(userIds);
+      } catch (error) {
+        const code = (error as { code?: unknown } | null)?.code;
+        if (code !== '40P01' || attempt >= maxAttempts) {
+          throw error;
+        }
+        logger.warn('Retrying deleteUsers after deadlock', { attempt });
+      }
+    }
+  }
 
-    return result.rowCount || 0;
+  private async deleteUsersOnce(userIds: string[]): Promise<number> {
+    const client = await this.getPool().connect();
+    const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
+    let rollbackError: Error | undefined;
+
+    try {
+      await client.query('BEGIN');
+
+      // Lock the target users and every user sharing their lowercased email,
+      // in id order. Two concurrent deletes of case-variant addresses (e.g.
+      // User@x and user@x) are then serialized, so the later one sees the
+      // earlier delete committed and its NOT EXISTS check below clears the
+      // shared sign-in OTP instead of both transactions skipping it.
+      await client.query(
+        `SELECT id FROM auth.users
+         WHERE id IN (${placeholders})
+            OR lower(email) IN (
+              SELECT lower(email) FROM auth.users WHERE id IN (${placeholders})
+            )
+         ORDER BY id
+         FOR UPDATE`,
+        userIds
+      );
+
+      // Delete the users; their rows stay locked until COMMIT. OTP
+      // creation for existing users locks the same row (FOR KEY SHARE), so any
+      // OTP written concurrently either commits before this point and is
+      // removed below, or waits and then sees the user is gone.
+      const result = await client.query<{ email: string | null }>(
+        `DELETE FROM auth.users WHERE id IN (${placeholders}) RETURNING email`,
+        userIds
+      );
+
+      const emails = Array.from(
+        new Set(
+          result.rows
+            .map((row) => row.email)
+            .filter((email): email is string => typeof email === 'string' && email.length > 0)
+        )
+      );
+
+      if (emails.length > 0) {
+        // Verify/reset OTPs are keyed by the exact user email. Sign-in OTPs are
+        // stored lowercased and matched with lower(email), so clear them
+        // case-insensitively, but keep them while another user still has that
+        // address in a different casing.
+        await client.query(
+          `DELETE FROM auth.email_otps AS otp
+           WHERE (otp.purpose <> $2 AND otp.email = ANY($1::text[]))
+              OR (
+                otp.purpose = $2
+                AND lower(otp.email) IN (SELECT lower(e) FROM unnest($1::text[]) AS e)
+                AND NOT EXISTS (
+                  SELECT 1 FROM auth.users AS remaining
+                  WHERE lower(remaining.email) = lower(otp.email)
+                )
+              )`,
+          [emails, OTPPurpose.SIGN_IN]
+        );
+      }
+
+      await client.query('COMMIT');
+      return result.rowCount || 0;
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (err) {
+        // Keep the original error; discard the client since its state is unknown.
+        rollbackError = err instanceof Error ? err : new Error(String(err));
+        logger.error('Failed to roll back deleteUsers transaction', { error: err });
+      }
+      throw error;
+    } finally {
+      client.release(rollbackError);
+    }
   }
 }
