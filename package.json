@@ -94,6 +94,9 @@
     },
     "pg-seed": {
       "csv-parse": "^7.0.2"
+    },
+    "@pgpmjs/core": {
+      "minimatch": "^11.0.1"
     }
   },
   "packageManager": "npm@11.3.0"
