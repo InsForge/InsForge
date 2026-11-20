@@ -15,6 +15,11 @@ const ROLE_MANAGEMENT_STATEMENTS = new Set([
   'GrantRoleStmt',
 ]);
 const SEARCH_PATH_VARIABLE = 'search_path';
+const SET_CONFIG_FUNCTION = 'set_config';
+// Only applied to function/DO bodies, which the parser hands back as opaque
+// strings. Never run this over the whole query: it cannot tell an executable
+// call from the same characters appearing in a comment, a string literal, or an
+// identifier, and it used to reject all three.
 const SET_CONFIG_PATTERN = /\bset_config\b/i;
 const DATABASE_MANAGEMENT_STATEMENTS = new Set([
   'CreatedbStmt',
@@ -24,11 +29,96 @@ const DATABASE_MANAGEMENT_STATEMENTS = new Set([
   'AlterDatabaseRefreshCollStmt',
 ]);
 
-function getRawTextGuardError(query: string): string | null {
-  if (SET_CONFIG_PATTERN.test(query)) {
-    return 'Changing SQL session configuration is not allowed.';
+/**
+ * True when a parsed `funcname` list resolves to `set_config`, regardless of
+ * schema qualification or quoting (`set_config`, `pg_catalog.set_config`,
+ * `pg_catalog."set_config"`).
+ */
+function isSetConfigName(funcname: unknown): boolean {
+  if (!Array.isArray(funcname) || funcname.length === 0) {
+    return false;
   }
+  const last = funcname[funcname.length - 1] as Record<string, unknown> | undefined;
+  const stringNode = last?.String as Record<string, unknown> | undefined;
+  return (
+    typeof stringNode?.sval === 'string' && stringNode.sval.toLowerCase() === SET_CONFIG_FUNCTION
+  );
+}
 
+/**
+ * Walk a parse-tree node for a `set_config()` *call*.
+ *
+ * Matching the call node rather than the text keeps every evasion covered — the
+ * variable name may be a cast, a parameter, or a concatenation (`set_config($1,
+ * …)`, `set_config('ro' || 'le', …)`), none of which can be resolved statically,
+ * which is why `set_config` is refused outright rather than gated on its first
+ * argument. It also stops a `ColumnRef` of the same name from matching.
+ */
+function containsSetConfigCall(node: unknown): boolean {
+  if (Array.isArray(node)) {
+    return node.some(containsSetConfigCall);
+  }
+  if (node === null || typeof node !== 'object') {
+    return false;
+  }
+  const record = node as Record<string, unknown>;
+  const funcCall = record.FuncCall as Record<string, unknown> | undefined;
+  if (funcCall && isSetConfigName(funcCall.funcname)) {
+    return true;
+  }
+  return Object.values(record).some(containsSetConfigCall);
+}
+
+/**
+ * Collect function and `DO` bodies, which the parser returns as opaque strings
+ * (`DefElem` with `defname: 'as'`). Their contents are never parsed, so they are
+ * the one place a text scan is still required — otherwise a `SECURITY DEFINER`
+ * body could carry `set_config('role', …)` straight past the AST check.
+ */
+function collectOpaqueBodies(node: unknown, bodies: string[] = []): string[] {
+  if (Array.isArray(node)) {
+    node.forEach((child) => collectOpaqueBodies(child, bodies));
+    return bodies;
+  }
+  if (node === null || typeof node !== 'object') {
+    return bodies;
+  }
+  const record = node as Record<string, unknown>;
+  const defElem = record.DefElem as Record<string, unknown> | undefined;
+  if (defElem && String(defElem.defname).toLowerCase() === 'as') {
+    collectStringValues(defElem.arg, bodies);
+  }
+  Object.values(record).forEach((child) => collectOpaqueBodies(child, bodies));
+  return bodies;
+}
+
+function collectStringValues(node: unknown, out: string[]): void {
+  if (Array.isArray(node)) {
+    node.forEach((child) => collectStringValues(child, out));
+    return;
+  }
+  if (node === null || typeof node !== 'object') {
+    return;
+  }
+  const record = node as Record<string, unknown>;
+  const stringNode = record.String as Record<string, unknown> | undefined;
+  if (typeof stringNode?.sval === 'string') {
+    out.push(stringNode.sval);
+  }
+  Object.values(record).forEach((child) => collectStringValues(child, out));
+}
+
+function getSetConfigError(stmt: Record<string, unknown>): string | null {
+  if (containsSetConfigCall(stmt)) {
+    return 'Changing SQL session configuration is not allowed: set_config() may not be called.';
+  }
+  const offendingBody = collectOpaqueBodies(stmt).find((body) => SET_CONFIG_PATTERN.test(body));
+  if (offendingBody !== undefined) {
+    return (
+      'Changing SQL session configuration is not allowed: set_config appears inside a ' +
+      'function or DO body, which is not parsed and so cannot be verified.'
+    );
+  }
   return null;
 }
 
@@ -127,17 +217,20 @@ function extractChange(stmt: Record<string, unknown>): DatabaseResourceUpdate | 
 }
 
 export function checkSqlExecutionGuards(query: string): string | null {
-  const rawTextError = getRawTextGuardError(query);
-  if (rawTextError) {
-    return rawTextError;
-  }
-
   try {
     const { stmts } = parseSync(query);
 
     for (const stmtWrapper of stmts) {
       const stmt = stmtWrapper.stmt as Record<string, unknown>;
       const [stmtType, data] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
+
+      // Checked per statement on the parse tree rather than over the raw query
+      // text, so a comment, string literal, or column named `set_config` no
+      // longer trips the guard. An unparseable query is still rejected below.
+      const setConfigError = getSetConfigError(stmt);
+      if (setConfigError) {
+        return setConfigError;
+      }
 
       if (DATABASE_MANAGEMENT_STATEMENTS.has(stmtType)) {
         return 'Query contains restricted operations';
