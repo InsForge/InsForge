@@ -12,6 +12,25 @@ import { BaseLogProvider } from './base.provider.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-schemas';
 
+async function queryResults(
+  client: CloudWatchLogsClient,
+  queryId: string,
+  polls: number,
+  intervalMs: number
+) {
+  for (let i = 0; i < polls; i++) {
+    const r = await client.send(new GetQueryResultsCommand({ queryId }));
+    if (r.status === 'Complete') {
+      return r.results || [];
+    }
+    if (r.status !== 'Scheduled' && r.status !== 'Running') {
+      throw new Error(`CloudWatch Insights query ended with status ${r.status}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error(`CloudWatch Insights query did not complete after ${polls} polls`);
+}
+
 export class CloudWatchProvider extends BaseLogProvider {
   private cwClient: CloudWatchLogsClient | null = null;
   private cwLogGroup: string | null = null;
@@ -193,19 +212,7 @@ export class CloudWatchProvider extends BaseLogProvider {
           })
         );
 
-        const qid = startQuery.queryId || '';
-        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-        let results;
-
-        // Wait for query to complete
-        for (let i = 0; i < 15; i++) {
-          const r = await client.send(new GetQueryResultsCommand({ queryId: qid }));
-          if (r.status === 'Complete' || r.status === 'Failed' || r.status === 'Cancelled') {
-            results = r.results || [];
-            break;
-          }
-          await sleep(300);
-        }
+        const results = await queryResults(client, startQuery.queryId || '', 15, 300);
 
         if (results && results.length) {
           // Convert Insights results to our format
@@ -331,19 +338,7 @@ export class CloudWatchProvider extends BaseLogProvider {
               })
             );
 
-            const qid = startQuery.queryId || '';
-            const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-            let results;
-
-            // Wait for query to complete (shorter timeout for stats)
-            for (let i = 0; i < 10; i++) {
-              const r = await client.send(new GetQueryResultsCommand({ queryId: qid }));
-              if (r.status === 'Complete' || r.status === 'Failed' || r.status === 'Cancelled') {
-                results = r.results || [];
-                break;
-              }
-              await sleep(200);
-            }
+            const results = await queryResults(client, startQuery.queryId || '', 10, 200);
 
             if (results && results.length) {
               const row = results[0];
@@ -468,20 +463,7 @@ export class CloudWatchProvider extends BaseLogProvider {
       })
     );
 
-    const qid = startQuery.queryId || '';
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-    let results;
-
-    for (let i = 0; i < 20; i++) {
-      const r = await client.send(new GetQueryResultsCommand({ queryId: qid }));
-      if (r.status === 'Complete' || r.status === 'Failed' || r.status === 'Cancelled') {
-        results = r.results || [];
-        break;
-      }
-      await sleep(300);
-    }
-
-    const rows = results || [];
+    const rows = await queryResults(client, startQuery.queryId || '', 20, 300);
     const toObj = (row: Array<{ field?: string; value?: string }>) =>
       Object.fromEntries(row.map((c) => [c.field || '', c.value || '']));
 

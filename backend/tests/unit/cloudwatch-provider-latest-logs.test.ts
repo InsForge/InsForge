@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   DescribeLogStreamsCommand,
   FilterLogEventsCommand,
+  GetQueryResultsCommand,
+  StartQueryCommand,
   type FilteredLogEvent,
 } from '@aws-sdk/client-cloudwatch-logs';
 import { CloudWatchProvider } from '../../src/providers/logs/cloudwatch.provider';
@@ -91,6 +93,31 @@ describe('CloudWatchProvider.getLogsBySource latest logs', () => {
 
     const { provider } = providerWith(events);
     const result = await provider.getLogsBySource('insforge.logs', 100);
+
+    expect(result.logs.map((l) => l.id)).toEqual(ids(events));
+  });
+
+  it('falls back to FilterLogEvents when the Insights query fails', async () => {
+    const events = [event(NOW - 2000), event(NOW - 1000)];
+
+    const { provider } = providerWith(events);
+    const { send } = (provider as unknown as { cwClient: { send: (cmd: unknown) => unknown } })
+      .cwClient;
+    Object.assign(provider, {
+      cwClient: {
+        send: async (cmd: unknown) =>
+          cmd instanceof StartQueryCommand
+            ? { queryId: 'q' }
+            : cmd instanceof GetQueryResultsCommand
+              ? { status: 'Failed' }
+              : send(cmd),
+      },
+    });
+    const result = await provider.getLogsBySource(
+      'insforge.logs',
+      100,
+      new Date(NOW).toISOString()
+    );
 
     expect(result.logs.map((l) => l.id)).toEqual(ids(events));
   });
