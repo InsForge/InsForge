@@ -91,7 +91,7 @@ jobs:
 
   dashboard-e2e-tests:
     name: Dashboard E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # 26.04 (ubuntu-latest since 11-19): Playwright has no Chromium build yet
     needs:
       - dashboard-unit-tests
       - dashboard-component-tests
