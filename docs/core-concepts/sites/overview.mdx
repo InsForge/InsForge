@@ -60,7 +60,7 @@ Deploy React, Vue, Svelte, Next.js, static sites, and other frontend projects. I
 
 ### Function regions
 
-Server-side code such as Next.js API routes and server-rendered pages runs in the Vercel project's default region, which is `iad1` (Washington, D.C.) unless it has been changed. Put your functions near your users or your database by listing region IDs in `vercel.json`:
+Server-side code such as Next.js API routes and server-rendered pages runs in the Vercel project's default region, which is `iad1` (Washington, D.C.) unless you change it. Put your functions near your users or your database by listing region IDs in `vercel.json`:
 
 ```json
 {
@@ -68,7 +68,7 @@ Server-side code such as Next.js API routes and server-rendered pages runs in th
 }
 ```
 
-The setting only moves server-side code; static assets are always served from Vercel's global CDN. See [Vercel's region list](https://vercel.com/docs/regions#region-list) for the available IDs.
+The setting only moves server-side code; Vercel's global CDN always serves static assets. See [Vercel's region list](https://vercel.com/docs/regions#region-list) for the available IDs.
 
 ### Environment variables
 
