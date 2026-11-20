@@ -11,7 +11,7 @@ permissions:
 jobs:
   integration-tests:
     name: Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # 26.04 apt gives postgresql-client 18; its pg_restore sends transaction_timeout, which the PG15 test server rejects
 
     services:
       postgres:
