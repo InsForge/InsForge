@@ -116,7 +116,7 @@ paths:
                     description: >-
                       Optional; absent when no compute driver is configured, which is
                       how a client detects that compute is unavailable. Capabilities
-                      are per provider so a client can stop offering what the
+                      are per provider, so a client can stop offering what the
                       configured driver cannot honour.
                     properties:
                       defaultProvider:
@@ -320,8 +320,8 @@ paths:
       description: >-
         Admin-only endpoint to retrieve the project's opaque anon key
         (`anon_...`). The anon key is a non-secret client identifier that maps
-        requests to the `anon` role - safe to embed in frontend bundles; row
-        level security is the security boundary. Rotatable via
+        requests to the `anon` role — safe to embed in frontend bundles;
+        row-level security is the security boundary. Rotatable via
         POST /api/secrets/anon-key/rotate.
       tags:
         - Admin
