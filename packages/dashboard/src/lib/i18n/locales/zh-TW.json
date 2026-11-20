@@ -279,6 +279,7 @@
     "createNewBackup": "建立新備份",
     "createNewTable": "建立新資料表",
     "createTable": "建立資料表",
+    "createTableDraftNotSaved": "無法在此瀏覽器中儲存草稿。重新整理頁面會遺失你的變更。",
     "cronExpressionLabel": "cron 運算式",
     "cronOncePerHour": "備份最多每小時執行一次。",
     "csvImportFailed": "CSV 匯入因驗證錯誤而失敗。請檢查檔案。",
