@@ -593,8 +593,11 @@ export class S3StorageProvider implements StorageProvider {
         size: response.ContentLength,
         etag: stripEtagQuotes(response.ETag) || undefined,
       };
-    } catch {
-      return { exists: false };
+    } catch (err) {
+      if (isS3NotFound(err)) {
+        return { exists: false };
+      }
+      throw err;
     }
   }
 
