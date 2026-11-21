@@ -1,7 +1,25 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+const { connectMock } = vi.hoisted(() => ({
+  connectMock: vi.fn(),
+}));
+
+vi.mock('../../src/infra/database/database.manager.js', () => ({
+  DatabaseManager: {
+    getInstance: vi.fn(() => ({
+      getPool: vi.fn(() => ({
+        connect: connectMock,
+      })),
+    })),
+    clearColumnTypeCache: vi.fn(),
+  },
+}));
+
+import { DatabaseAdvanceService } from '../../src/services/database/database-advance.service.js';
+import { initSqlParser } from '../../src/utils/sql-parser.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const migrationDir = path.resolve(currentDir, '../../src/infra/database/migrations');
@@ -18,6 +36,14 @@ function readMigration(): string {
 }
 
 describe('reassign root-owned public objects migration', () => {
+  beforeAll(async () => {
+    await initSqlParser();
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('migration file exists and runs after the one-time 046 transfer', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
 
@@ -73,5 +99,64 @@ describe('reassign root-owned public objects migration', () => {
     expect(service).toMatch(
       /if \(asRoot\) \{[\s\S]*?system\.reassign_public_objects_to_project_admin\(\)/
     );
+  });
+
+  it('triggers ownership reassignment for unrestricted CREATE, ALTER, DROP, and SELECT INTO statements', async () => {
+    const service = DatabaseAdvanceService.getInstance();
+    const ddlStatements = [
+      'CREATE TABLE public.audit_logs (id integer)',
+      'ALTER TABLE public.audit_logs ADD COLUMN created_at timestamp',
+      'DROP TABLE public.audit_logs',
+      'SELECT id, name INTO public.archived_users FROM public.users',
+    ];
+
+    for (const sql of ddlStatements) {
+      const queryMock = vi.fn().mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+        fields: [],
+      });
+
+      connectMock.mockResolvedValue({
+        query: queryMock,
+        release: vi.fn(),
+      });
+
+      await service.executeRawSQL(sql, [], true);
+
+      expect(queryMock).toHaveBeenCalledWith(
+        'SELECT system.reassign_public_objects_to_project_admin()'
+      );
+      expect(queryMock).toHaveBeenCalledWith("NOTIFY pgrst, 'reload schema';");
+    }
+  });
+
+  it('does not trigger ownership reassignment for ordinary SELECT queries without INTO', async () => {
+    const service = DatabaseAdvanceService.getInstance();
+    const nonDdlStatements = [
+      'SELECT * FROM public.users WHERE id = 1',
+      'SELECT current_user',
+      'SELECT id, name FROM public.products',
+    ];
+
+    for (const sql of nonDdlStatements) {
+      const queryMock = vi.fn().mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+        fields: [],
+      });
+
+      connectMock.mockResolvedValue({
+        query: queryMock,
+        release: vi.fn(),
+      });
+
+      await service.executeRawSQL(sql, [], true);
+
+      expect(queryMock).not.toHaveBeenCalledWith(
+        'SELECT system.reassign_public_objects_to_project_admin()'
+      );
+      expect(queryMock).not.toHaveBeenCalledWith("NOTIFY pgrst, 'reload schema';");
+    }
   });
 });

@@ -80,6 +80,7 @@ export const tableSchema = z.object({
   // Foreign keys are table-level, one entry per constraint.
   foreignKeys: z.array(foreignKeySchema).optional(),
   recordCount: z.number().optional(),
+  rlsEnabled: z.boolean().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -90,6 +91,14 @@ export type ForeignKeyReferenceSchema = z.infer<typeof foreignKeyReferenceSchema
 export type ForeignKeySchema = z.infer<typeof foreignKeySchema>;
 export type OnUpdateActionSchema = z.infer<typeof onUpdateActionSchema>;
 export type OnDeleteActionSchema = z.infer<typeof onDeleteActionSchema>;
+
+export const tableRlsStatusSchema = z.object({
+  tableName: z.string(),
+  schemaName: z.string(),
+  rlsEnabled: z.boolean(),
+});
+
+export type TableRlsStatus = z.infer<typeof tableRlsStatusSchema>;
 
 export const databaseSchemaInfoSchema = z.object({
   name: z.string(),

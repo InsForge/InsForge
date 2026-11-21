@@ -9,6 +9,14 @@ import {
   UpdateTableSchemaRequest,
 } from '@insforge/shared-schemas';
 
+/**
+ * Primary React Query hook for managing database tables in a schema.
+ * Provides query states for table listing, cached schema introspection,
+ * and mutations for creating, deleting, altering tables, and enabling RLS.
+ *
+ * @param schemaName - Database schema name (defaults to 'public')
+ * @returns Table state queries, action mutations, and helper hooks
+ */
 export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
@@ -43,8 +51,14 @@ export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
   const createTableMutation = useMutation({
     mutationFn: ({ tableName, columns }: { tableName: string; columns: ColumnSchema[] }) =>
       tableService.createTable(schemaName, tableName, columns),
-    onSuccess: () => {
+    onSuccess: (_, { tableName }) => {
       void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.tables(schemaName) });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableRlsStatuses(schemaName),
+      });
       showToast('Table created successfully', 'success');
     },
     onError: (error: Error) => {
@@ -56,8 +70,17 @@ export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
   // Mutation to delete a table
   const deleteTableMutation = useMutation({
     mutationFn: (tableName: string) => tableService.deleteTable(tableName, schemaName),
-    onSuccess: () => {
+    onSuccess: (_, tableName) => {
       void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.tables(schemaName) });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableRlsStatuses(schemaName),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['database', 'policies', schemaName],
+      });
       showToast('Table deleted successfully', 'success');
     },
     onError: (error: Error) => {
@@ -87,6 +110,28 @@ export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
     },
   });
 
+  // Mutation to enable table RLS
+  const enableTableRLSMutation = useMutation({
+    mutationFn: (tableName: string) => tableService.enableTableRLS(tableName, schemaName),
+    onSuccess: (_, tableName) => {
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableRlsStatuses(schemaName),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['database', 'policies', schemaName],
+      });
+      showToast('Row-Level Security enabled successfully', 'success');
+    },
+    onError: (error: Error) => {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to enable Row-Level Security';
+      showToast(errorMessage, 'error');
+    },
+  });
+
   return {
     // Data
     tables: tables || [],
@@ -97,6 +142,7 @@ export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
     isCreating: createTableMutation.isPending,
     isDeleting: deleteTableMutation.isPending,
     isUpdating: updateTableSchemaMutation.isPending,
+    isEnablingRLS: enableTableRLSMutation.isPending,
 
     // Errors
     tablesError,
@@ -105,6 +151,7 @@ export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
     createTable: createTableMutation.mutate,
     deleteTable: deleteTableMutation.mutate,
     updateTableSchema: updateTableSchemaMutation.mutate,
+    enableTableRLS: enableTableRLSMutation.mutateAsync,
     refetchTables,
 
     // Helpers
@@ -138,5 +185,30 @@ export function useAllTableSchemas(schemaName: string = DEFAULT_DATABASE_SCHEMA,
   return {
     allSchemas,
     isLoading: isLoadingTables || isLoadingSchemas,
+  };
+}
+
+/**
+ * Hook to fetch lightweight RLS status for all tables in a schema.
+ * Replaces N+1 getTableSchema calls with a single catalog-level request.
+ */
+export function useTableRlsStatuses(schemaName: string = DEFAULT_DATABASE_SCHEMA, enabled = true) {
+  const {
+    data: rlsStatuses,
+    isLoading: isLoadingRlsStatuses,
+    error: rlsStatusesError,
+    refetch: refetchRlsStatuses,
+  } = useQuery({
+    queryKey: databaseTableQueryKeys.tableRlsStatuses(schemaName),
+    queryFn: ({ signal }) => tableService.getTableRlsStatuses(schemaName, signal),
+    enabled: enabled && Boolean(schemaName),
+    staleTime: 30 * 1000,
+  });
+
+  return {
+    rlsStatuses: rlsStatuses ?? [],
+    isLoadingRlsStatuses,
+    rlsStatusesError,
+    refetchRlsStatuses,
   };
 }
