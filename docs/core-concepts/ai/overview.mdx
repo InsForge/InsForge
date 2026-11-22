@@ -60,6 +60,15 @@ Every request is logged with model, token count, and cost. Query usage from the 
 
 Switch between Anthropic, OpenAI, Mistral, Llama, Gemini, and dozens more by changing the model name in the request. Application code does not change.
 
+## Plan requirements
+
+The Model Gateway runs on InsForge-managed provider keys, so access is tied to your organization's plan:
+
+- **Paid plans** can use the Model Gateway. Usage is billed by usage and draws down your organization's AI model credits — see the **AI model credits** row on [Pricing](/pricing) — then continues pay-as-you-go.
+- **Free plan.** Organizations created before **August 12, 2026** keep a one-time **$1** of AI model credits for the life of the organization and can call the gateway until it is spent. Organizations created on or after that date need a paid plan to use the Model Gateway at all.
+
+If your organization is not entitled to AI on its current plan, the dashboard shows **"Upgrade to Pro to use the AI Model Gateway"** and API calls return `403 AI_REQUIRES_PAID_PLAN`. If you have access but your AI model credits are used up, requests return a `402` asking you to upgrade to continue. Upgrade the organization to a paid plan to enable (or re-enable) the gateway.
+
 ## Build with it
 
 <CardGroup cols={2}>

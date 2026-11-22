@@ -60,6 +60,15 @@ graph TB
 
 透過變更請求中的模型名稱，在 Anthropic、OpenAI、Mistral、Llama、Gemini 和數十個其他提供商之間切換。應用程式代碼不會改變。
 
+## 方案要求
+
+Model Gateway 執行在 InsForge 託管的提供商金鑰上，因此存取權限與您組織的方案相關：
+
+- **付費方案**可以使用 Model Gateway。按用量計費，並從組織的 AI 模型額度中扣除 — 參見[定價](/pricing)中的 **AI model credits**(AI 模型額度)一列 — 用完後繼續按用量付費(pay-as-you-go)。
+- **免費方案。** 在 **2026 年 8 月 12 日**之前建立的組織，在組織的整個生命週期內保留一次性 **$1** 的 AI 模型額度，可以一直呼叫閘道直到用完。在該日期當天或之後建立的組織需要付費方案才能使用 Model Gateway。
+
+如果您的組織在目前方案下無權使用 AI,儀表板會顯示 **"Upgrade to Pro to use the AI Model Gateway"**,並且 API 呼叫會傳回 `403 AI_REQUIRES_PAID_PLAN`。如果您有存取權限但 AI 模型額度已用完,請求會傳回 `402`,提示您升級以繼續使用。將組織升級到付費方案即可啟用(或重新啟用)閘道。
+
 ## 使用它進行建置
 
 <CardGroup cols={2}>

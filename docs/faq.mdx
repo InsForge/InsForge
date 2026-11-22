@@ -177,6 +177,27 @@ description: "Answers to common InsForge questions on database calls, edge funct
     Still stuck? Ask in our [Discord](https://discord.com/invite/DvBtaEc9Jz) for the fastest response.
   </Accordion>
 
+  <Accordion title="What regions can I deploy a project to, and can I move a project between regions?">
+    You pick a deployment region **when you create a project** — in the dashboard when you create a project, or with the CLI:
+
+    ```bash
+    npx @insforge/cli create --region eu-central
+    ```
+
+    The available regions are:
+
+    | Region ID | Location |
+    |---|---|
+    | `us-east` | US East (North Virginia) |
+    | `us-west` | US West (Oregon) |
+    | `eu-central` | EU Central (Frankfurt) |
+    | `ap-southeast` | Asia Pacific (Singapore) |
+
+    So yes — `eu-central` is Frankfurt.
+
+    A project's region is fixed once the project is created: there is no setting to change it, and no cross-region clone or migrate command. To run in a different region, create a new project in that region and move your data over (for example, restore a [backup](/core-concepts/database/backups) or import a database dump into the new project). Region choice doesn't change pricing — cost is driven by your usage and compute, not by which region you pick.
+  </Accordion>
+
   <Accordion title="How do I authenticate the CLI without a browser?">
     `npx @insforge/cli login` opens a browser to sign in. On a headless machine, a remote server, or CI, use a user API key instead. No browser needed.
 

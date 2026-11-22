@@ -177,6 +177,27 @@ description: "InsForge 常見問題：解說資料庫呼叫、Edge Function 與 
     還是卡住？到我們的 [Discord](https://discord.com/invite/DvBtaEc9Jz) 提問，回應最快。
   </Accordion>
 
+  <Accordion title="可以把專案部署到哪些區域？能把專案在區域之間遷移嗎？">
+    您在**建立專案時**選擇部署區域 — 在儀表板建立專案時選擇，或使用 CLI：
+
+    ```bash
+    npx @insforge/cli create --region eu-central
+    ```
+
+    可用區域如下：
+
+    | 區域 ID | 位置 |
+    |---|---|
+    | `us-east` | US East (North Virginia) |
+    | `us-west` | US West (Oregon) |
+    | `eu-central` | EU Central (Frankfurt) |
+    | `ap-southeast` | Asia Pacific (Singapore) |
+
+    所以是的 — `eu-central` 就是法蘭克福(Frankfurt)。
+
+    專案的區域一旦建立就固定了：沒有更改它的設定，也沒有跨區域複製或遷移的命令。要在其他區域執行，請在該區域新建一個專案並把資料搬過去(例如，將[備份](/core-concepts/database/backups)還原到新專案，或匯入資料庫傾印)。選擇區域不會改變價格 — 費用由您的用量和運算資源決定，與選擇哪個區域無關。
+  </Accordion>
+
   <Accordion title="不打開瀏覽器，怎麼幫 CLI 登入驗證？">
     `npx @insforge/cli login` 會打開瀏覽器登入。在無介面機器、遠端伺服器或 CI 上，改用 user API key，不需要瀏覽器。
 
