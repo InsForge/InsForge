@@ -122,7 +122,7 @@ description: "Respuestas sobre llamadas a la base de datos, edge functions, cust
     - **Anon Key**: pública, para el navegador. Las peticiones se ejecutan con el rol `anon`, limitadas por RLS. Es la que provoca `permission denied for schema storage`.
     - **API Key**: clave de administrador con acceso total, solo para el servidor. Omite RLS.
 
-    Encuentra la API Key en el panel, en **Project Settings → General** (la fila **API Key**, marcada con "acceso total... no la expongas en tu frontend"), o ejecuta `npx @insforge/cli secrets get API_KEY`.
+    Encuentra la API Key en el panel, en **Project Settings → General** (la fila **API Key**, marcada con "acceso total... no la expongas en tu frontend"), o ejecuta `npx @insforge/cli secrets get API_KEY`. Para obtenerla mediante código, haz una petición de admin a `GET /api/metadata/api-key`, que devuelve `{ "apiKey": "ik_..." }` (requiere autenticación de admin, así que envía una API Key existente — está pensado para herramientas que ya se autentican como admin).
 
     Úsala desde código de servidor de confianza a través de `createAdminClient`, nunca desde el navegador:
 
