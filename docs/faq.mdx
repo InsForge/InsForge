@@ -159,6 +159,20 @@ description: "Answers to common InsForge questions on database calls, edge funct
     Handing the organization over to a new **Owner** entirely is a separate action from inviting members. To do that, open **Organization Settings** and use **Transfer Ownership** (only the current owner can start it, and the recipient must be a verified InsForge user who accepts the emailed request).
   </Accordion>
 
+  <Accordion title="Where do I find my organization ID?">
+    Your projects live inside an **organization**, and org-scoped CLI commands (such as [`usage`](/pricing)) accept an `--org-id`. To list every organization you belong to, along with its ID, run:
+
+    ```bash
+    npx @insforge/cli orgs list
+    ```
+
+    It prints a table of **ID**, **Name**, and **Type**. Add `--json` for machine-readable output.
+
+    You usually don't need to pass `--org-id` by hand. Org-scoped commands resolve the organization automatically, in this order: the `--org-id` flag, the `INSFORGE_ORG_ID` environment variable, the linked project (`.insforge/project.json`), your configured default organization, and finally — if you belong to exactly one — that organization. Pass `--org-id` only when you belong to more than one and want to target a specific one.
+
+    {/* TODO: confirm dashboard location where the organization ID is displayed */}
+  </Accordion>
+
   <Accordion title="Why did my project get paused, and how do I keep it from pausing?">
     Pausing only happens on the Free plan, for two reasons:
 

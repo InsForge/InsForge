@@ -159,6 +159,20 @@ description: "InsForge 常见问题：数据库调用、Edge Function 与 Custom
     把整个组织「移交给新 Owner」是另一个独立操作，跟邀请成员不是一回事。要移交的话，打开 **Organization Settings**，用里面的 **Transfer Ownership**（只有当前 Owner 能发起，且对方必须是已验证的 InsForge 用户并接受邮件里的请求）。
   </Accordion>
 
+  <Accordion title="我在哪里查看组织 ID（organization ID）？">
+    你的项目都归属于某个**组织（organization）**，而按组织维度操作的 CLI 命令（比如 [`usage`](/pricing)）需要传 `--org-id`。要列出你所在的所有组织及其 ID，运行：
+
+    ```bash
+    npx @insforge/cli orgs list
+    ```
+
+    它会打印一个包含 **ID**、**Name**、**Type** 的表格。加 `--json` 可得到机器可读的输出。
+
+    大多数情况下你不用手动传 `--org-id`。按组织维度操作的命令会按以下顺序自动确定组织：`--org-id` 参数、`INSFORGE_ORG_ID` 环境变量、已关联的项目（`.insforge/project.json`）、你配置的默认组织，最后——如果你只属于一个组织——就用那个。只有当你属于多个组织、想指定其中某一个时，才需要传 `--org-id`。
+
+    {/* TODO: confirm dashboard location where the organization ID is displayed */}
+  </Accordion>
+
   <Accordion title="为什么我的项目被暂停了？怎么避免被暂停？">
     只有 Free 计划会出现暂停，原因有两种：
 
