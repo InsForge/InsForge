@@ -186,6 +186,7 @@ describe('validateSmtpHost', () => {
 
   it('rejects hosts resolving to private or loopback IP addresses', async () => {
     vi.spyOn(dns, 'lookup').mockResolvedValueOnce([
+      { address: '93.184.216.34', family: 4 },
       { address: '127.0.0.1', family: 4 },
     ] as dns.LookupAddress[]);
 
